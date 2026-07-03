@@ -1,6 +1,7 @@
 """SQLite storage. stdlib sqlite3, WAL mode, prepared statements throughout."""
 import json
 import re
+import secrets
 import sqlite3
 import time
 
@@ -100,16 +101,25 @@ def create_rfp(title, summary, discourse_url, goal, payout_addresses,
                contact, status="pending"):
     con = connect()
     try:
-        with con:
+        # Retry on the rare race where two concurrent submits pick the same
+        # slug before either commits (UNIQUE(slug) raises on the loser).
+        for attempt in range(5):
             slug = slugify(title, con)
-            cur = con.execute(
-                "INSERT INTO rfps(slug,title,summary,discourse_url,"
-                "funding_goal_usd,payout_addresses,contact,status,created_at,"
-                "approved_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                (slug, title, summary, discourse_url, goal,
-                 json.dumps(payout_addresses), contact, status, now(),
-                 now() if status == "approved" else None))
-            return cur.lastrowid, slug
+            if attempt:
+                slug = "%s-%d" % (slug, secrets.randbelow(9000) + 1000)
+            try:
+                with con:
+                    cur = con.execute(
+                        "INSERT INTO rfps(slug,title,summary,discourse_url,"
+                        "funding_goal_usd,payout_addresses,contact,status,"
+                        "created_at,approved_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                        (slug, title, summary, discourse_url, goal,
+                         json.dumps(payout_addresses), contact, status, now(),
+                         now() if status == "approved" else None))
+                    return cur.lastrowid, slug
+            except sqlite3.IntegrityError:
+                if attempt == 4:
+                    raise
     finally:
         con.close()
 
@@ -241,15 +251,25 @@ def record_donation(rfp_id, tx_hash, verification):
                      now() if status == "confirmed" else None,
                      existing["id"]))
                 return existing["id"], status
-            cur = con.execute(
-                "INSERT INTO donations(rfp_id,token_symbol,token_address,"
-                "amount_raw,amount,donor,tx_hash,status,detail,created_at,"
-                "confirmed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                (rfp_id, v["token_symbol"], v["token_address"],
-                 v["amount_raw"], v["amount"], v["donor"], tx_hash, status,
-                 v["detail"], now(),
-                 now() if status == "confirmed" else None))
-            return cur.lastrowid, status
+            try:
+                cur = con.execute(
+                    "INSERT INTO donations(rfp_id,token_symbol,token_address,"
+                    "amount_raw,amount,donor,tx_hash,status,detail,created_at,"
+                    "confirmed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (rfp_id, v["token_symbol"], v["token_address"],
+                     v["amount_raw"], v["amount"], v["donor"], tx_hash, status,
+                     v["detail"], now(),
+                     now() if status == "confirmed" else None))
+                return cur.lastrowid, status
+            except sqlite3.IntegrityError:
+                # A concurrent request inserted this tx_hash first. Re-read and
+                # treat it as the existing row (idempotent, no double-credit).
+                row = con.execute(
+                    "SELECT id, status FROM donations WHERE tx_hash=?",
+                    (tx_hash,)).fetchone()
+                if row:
+                    return row["id"], row["status"]
+                raise
     finally:
         con.close()
 

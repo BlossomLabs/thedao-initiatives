@@ -28,6 +28,7 @@ app.secret_key = config.SECRET_KEY
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=config.COOKIE_SECURE,
     MAX_CONTENT_LENGTH=64 * 1024,
 )
 
@@ -89,8 +90,18 @@ def rate_limit(key, limit, window_secs):
 
 
 def client_ip():
-    return request.headers.get("X-Forwarded-For", request.remote_addr or "?")\
-        .split(",")[0].strip()
+    """Best-effort client IP for rate limiting.
+
+    X-Forwarded-For is attacker-controlled unless a trusted proxy sets it, so
+    we ignore it by default. Behind a proxy (config.TRUST_PROXY), the real
+    client is the right-most hop the proxy appended, not the left-most (which
+    the client can forge).
+    """
+    if config.TRUST_PROXY:
+        xff = request.headers.get("X-Forwarded-For", "")
+        if xff:
+            return xff.split(",")[-1].strip()
+    return request.remote_addr or "?"
 
 
 def csrf_token():
@@ -174,20 +185,35 @@ MAX_SUMMARY = 4000
 FORUM_HOST_RE = re.compile(r"^[a-z0-9.-]+$")
 
 
-def _is_public_hostname(host):
-    """SSRF guard: every resolved IP must be public."""
+def _ip_is_public(ipstr):
+    ip = ipaddress.ip_address(ipstr)
+    return not (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_multicast or ip.is_reserved or ip.is_unspecified)
+
+
+def _resolve_public_ips(host):
+    """Resolve a host to its IPs, returning them only if EVERY IP is public.
+
+    Returns (ips, None) or (None, reason). The caller pins one of these IPs
+    for the actual connection so a DNS rebind between validation and fetch
+    cannot swing it to an internal address.
+    """
     try:
         infos = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)
     except socket.gaierror:
-        return False
-    if not infos:
-        return False
-    for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
-            return False
-    return True
+        return None, "host does not resolve"
+    ips = [info[4][0] for info in infos]
+    if not ips:
+        return None, "host does not resolve"
+    for ipstr in ips:
+        if not _ip_is_public(ipstr):
+            return None, "host resolves to a non-public address"
+    return ips, None
+
+
+def _is_public_hostname(host):
+    ips, reason = _resolve_public_ips(host)
+    return ips is not None
 
 
 def validate_forum_url(raw):
@@ -212,10 +238,24 @@ def validate_forum_url(raw):
     return clean, None
 
 
+_fetch_pin_lock = threading.Lock()
+
+
 def fetch_discourse_title(topic_url):
-    """Best-effort: Discourse exposes topic JSON at <topic-url>.json."""
+    """Best-effort: Discourse exposes topic JSON at <topic-url>.json.
+
+    SSRF-hardened: we resolve the host to a set of IPs, confirm all are
+    public, then pin DNS resolution to those exact IPs for the duration of
+    the request. This closes the DNS-rebinding window where a low-TTL host
+    could pass validation as public and then connect to an internal address.
+    """
     try:
         u = urllib.parse.urlsplit(topic_url)
+        host = (u.hostname or "").lower()
+        ips, reason = _resolve_public_ips(host)
+        if ips is None:
+            return None
+        pinned = set(ips)
         json_url = urllib.parse.urlunsplit(
             ("https", u.netloc, u.path.rstrip("/") + ".json", "", ""))
 
@@ -223,12 +263,31 @@ def fetch_discourse_title(topic_url):
             def redirect_request(self, *a, **kw):
                 return None
 
+        orig_gai = socket.getaddrinfo
+
+        def pinned_gai(h, *a, **kw):
+            # Only the target host is pinned to its validated public IPs;
+            # any other lookup (there shouldn't be one) is re-validated.
+            if (h or "").lower() == host:
+                infos = orig_gai(next(iter(pinned)), *a, **kw)
+                if any(info[4][0] not in pinned for info in infos):
+                    raise socket.gaierror("pinned IP mismatch")
+                return infos
+            if not _is_public_hostname(h):
+                raise socket.gaierror("blocked non-public host")
+            return orig_gai(h, *a, **kw)
+
         opener = urllib.request.build_opener(NoRedirect)
         req = urllib.request.Request(
             json_url, headers={"User-Agent": "thedao-rfps/1.0",
                                "Accept": "application/json"})
-        with opener.open(req, timeout=6) as resp:
-            body = resp.read(512 * 1024)
+        with _fetch_pin_lock:  # global getaddrinfo swap: serialize fetches
+            socket.getaddrinfo = pinned_gai
+            try:
+                with opener.open(req, timeout=6) as resp:
+                    body = resp.read(512 * 1024)
+            finally:
+                socket.getaddrinfo = orig_gai
         data = json.loads(body.decode("utf-8", "replace"))
         title = (data.get("title") or "").strip()
         return title[:MAX_TITLE] if title else None
@@ -406,10 +465,12 @@ def donate_confirm():
     if not v["found"] and "malformed" in v["detail"]:
         return jsonify({"status": "error", "detail": v["detail"]}), 400
     existing = db.donation_by_hash(tx_hash)
-    if existing and existing["rfp_id"] != r["id"] \
-            and existing["status"] == "confirmed":
+    if existing and existing["rfp_id"] != r["id"]:
+        # This tx is already bound to a different RFP (any state). record_donation
+        # never re-points rfp_id, so crediting here would silently land on the
+        # other RFP while telling this one it succeeded. Reject instead.
         return jsonify({"status": "error",
-                        "detail": "this transaction is already credited to "
+                        "detail": "this transaction is already recorded for "
                                   "another RFP"}), 409
     _, status = db.record_donation(r["id"], tx_hash, v)
     if status == "already-confirmed":
@@ -450,6 +511,9 @@ def admin_login_post():
     check_csrf()
     if not rate_limit("login:" + client_ip(),
                       config.LOGIN_ATTEMPTS_PER_MINUTE_PER_IP, 60):
+        return render_template("admin/login.html",
+                               error="Too many attempts; wait a minute."), 429
+    if not rate_limit("login-global", config.LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL, 60):
         return render_template("admin/login.html",
                                error="Too many attempts; wait a minute."), 429
     pw = request.form.get("password", "")
@@ -527,12 +591,15 @@ def admin_rfp(rfp_id):
             status = request.form.get("pstatus", "pledged")
             if status not in ("pledged", "received"):
                 status = "pledged"
+            purl = (request.form.get("url") or "").strip()[:300]
+            if purl and not purl.lower().startswith(("http://", "https://")):
+                purl = ""  # reject javascript:/data: and other schemes
             if not company or err:
                 error = err or "Company name is required."
             else:
                 db.add_pledge(rfp_id, company, amount, status,
                               (request.form.get("note") or "").strip()[:300],
-                              (request.form.get("url") or "").strip()[:300])
+                              purl)
         elif action == "pledge_status":
             st = request.form.get("pstatus", "")
             if st in ("pledged", "received", "withdrawn"):

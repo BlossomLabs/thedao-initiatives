@@ -51,6 +51,10 @@ ENS_CROSSCHECK_URL = "https://api.ensdata.net/{name}"
 SUBMISSIONS_PER_HOUR_PER_IP = 5
 LOGIN_ATTEMPTS_PER_MINUTE_PER_IP = 5
 
+# A donation is only credited once its tx is this many blocks deep, so a
+# short reorg cannot leave an RFP crediting money that fell off the chain.
+MIN_CONFIRMATIONS = 2
+
 
 def _load_env():
     """Tiny .env loader (no python-dotenv dependency)."""
@@ -73,9 +77,11 @@ def _ensure_env():
         env["SECRET_KEY"] = secrets.token_hex(32)
         changed = True
     if "ADMIN_PASSWORD" not in env:
+        # 5 words from a 64-word list + 4 digits ~= 54 bits of entropy,
+        # so online guessing is infeasible even without rate limiting.
         env["ADMIN_PASSWORD"] = "-".join(
-            secrets.choice(_WORDS) for _ in range(4
-        )) + "-" + str(secrets.randbelow(90) + 10)
+            secrets.choice(_WORDS) for _ in range(5
+        )) + "-" + str(secrets.randbelow(9000) + 1000)
         changed = True
     if changed:
         with open(ENV_PATH, "w") as f:
@@ -88,7 +94,11 @@ def _ensure_env():
 
 _WORDS = (
     "ether summit signal beacon vault ledger anchor cipher merkle nonce "
-    "oracle raft galaxy ember quartz falcon harbor lumen praxis zephyr"
+    "oracle raft galaxy ember quartz falcon harbor lumen praxis zephyr "
+    "cobalt tundra pyre lagoon basalt comet drift fjord glacier hollow "
+    "ivory jasper kelp lantern meadow nectar onyx pebble quill ripple "
+    "saffron thicket umber verdant willow xenon yonder zenith amber brook "
+    "cedar dune echo flint grove haven iris jade karma lotus mango north"
 ).split()
 
 ENV = _ensure_env()
@@ -97,6 +107,15 @@ ADMIN_PASSWORD = ENV["ADMIN_PASSWORD"]
 RPC_URL_OVERRIDE = ENV.get("RPC_URL", "").strip()
 PORT = int(ENV.get("PORT", "4482"))
 TREASURY_ADDRESS = ENV.get("TREASURY_ADDRESS", "").strip() or TREASURY_ADDRESS
+# Only trust X-Forwarded-For when running behind a proxy that sets it.
+# Left off by default so client IPs (used for rate limiting) cannot be spoofed.
+TRUST_PROXY = ENV.get("TRUST_PROXY", "").strip() in ("1", "true", "yes")
+# Send the admin session cookie only over HTTPS. Off by default so local
+# http://127.0.0.1 dev works; set COOKIE_SECURE=1 in any real deployment.
+COOKIE_SECURE = ENV.get("COOKIE_SECURE", "").strip() in ("1", "true", "yes")
+# Global backstop: max failed admin logins per minute across all IPs, to blunt
+# distributed (botnet) brute force that per-IP limits cannot see.
+LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL = 60
 
 if RPC_URL_OVERRIDE:
     RPC_ENDPOINTS = [RPC_URL_OVERRIDE] + RPC_ENDPOINTS

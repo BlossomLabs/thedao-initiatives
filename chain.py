@@ -272,10 +272,33 @@ def verify_donation_tx(tx_hash, treasury, allowed_tokens):
         result["detail"] = "transaction reverted"
         return result
 
+    # Confirmation-depth check: a freshly-mined tx can still be reorged out.
+    # Below MIN_CONFIRMATIONS we report it as pending so it is not credited
+    # yet and the client keeps polling.
+    mined_block = _decode_hex_int(receipt.get("blockNumber"))
+    try:
+        head = get_block_number()
+        depth = head - mined_block + 1 if mined_block else 0
+    except Exception:
+        depth = 0
+    if mined_block and depth < config.MIN_CONFIRMATIONS:
+        result["pending"] = True
+        result["detail"] = ("mined, waiting for confirmations (%d/%d)"
+                            % (max(depth, 0), config.MIN_CONFIRMATIONS))
+        return result
+
     by_addr = {a.lower(): (sym, dec)
                for sym, (a, dec) in allowed_tokens.items()}
     want_to = "0x" + "0" * 24 + treasury.lower().replace("0x", "")
 
+    # Sum every matching transfer of a single token to the treasury, so a
+    # batched/multicall donation is credited in full rather than only its
+    # first log. If a tx moves more than one accepted token to the treasury,
+    # credit the first token seen and note the rest.
+    credited_sym = credited_dec = credited_addr = None
+    total_raw = 0
+    donor = ""
+    extra_tokens = False
     for log in receipt.get("logs", []):
         addr = (log.get("address") or "").lower()
         topics = log.get("topics") or []
@@ -289,13 +312,29 @@ def verify_donation_tx(tx_hash, treasury, allowed_tokens):
         raw = _decode_hex_int(log.get("data"))
         if raw <= 0:
             continue
+        if credited_sym is None:
+            credited_sym, credited_dec, credited_addr = sym, dec, addr
+            donor = to_checksum("0x" + topics[1][-40:])
+        if addr == credited_addr:
+            total_raw += raw
+        else:
+            extra_tokens = True
+
+    if credited_sym is not None and total_raw > 0:
+        min_raw = 10 ** credited_dec  # dust floor: ignore sub-1-token transfers
+        if total_raw < min_raw:
+            result["detail"] = ("transfer below the minimum donation of 1 %s"
+                                % credited_sym)
+            return result
         result["ok"] = True
-        result["token_symbol"] = sym
-        result["token_address"] = to_checksum(addr)
-        result["amount_raw"] = str(raw)
-        result["amount"] = raw / (10 ** dec)
-        result["donor"] = to_checksum("0x" + topics[1][-40:])
-        result["detail"] = "verified: %s %s to treasury" % (result["amount"], sym)
+        result["token_symbol"] = credited_sym
+        result["token_address"] = to_checksum(credited_addr)
+        result["amount_raw"] = str(total_raw)
+        result["amount"] = total_raw / (10 ** credited_dec)
+        result["donor"] = donor
+        result["detail"] = "verified: %s %s to treasury%s" % (
+            result["amount"], credited_sym,
+            " (other tokens in this tx were not credited)" if extra_tokens else "")
         return result
 
     result["detail"] = ("no transfer of an accepted stablecoin to the "

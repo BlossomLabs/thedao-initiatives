@@ -190,6 +190,72 @@ class TestVerifyDonation(unittest.TestCase):
         self.assertEqual(r["token_symbol"], "DAI")
         self.assertEqual(r["amount"], 7.0)
 
+    def test_sums_multiple_transfers_of_same_token(self):
+        # a batched/multicall donation moving the token to treasury twice
+        r = self._verify(_fake_receipt("0x1", [
+            _transfer_log(USDC, DONOR, TREASURY, 100_000_000),
+            _transfer_log(USDC, DONOR, TREASURY, 150_000_000),
+        ]))
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["amount"], 250.0)
+
+    def test_rejects_dust_below_one_token(self):
+        # 0.5 USDC is below the 1-token dust floor
+        r = self._verify(_fake_receipt("0x1", [
+            _transfer_log(USDC, DONOR, TREASURY, 500_000)]))
+        self.assertFalse(r["ok"])
+        self.assertIn("minimum", r["detail"])
+
+    def test_confirmation_depth_pending_when_too_shallow(self):
+        # receipt is mined at block 100; head is also 100 -> depth 1 < 2
+        receipt = {"status": "0x1", "blockNumber": hex(100),
+                   "logs": [_transfer_log(USDC, DONOR, TREASURY, 250_000_000)]}
+
+        def fake_rpc(method, params, timeout=10):
+            if method == "eth_getTransactionReceipt":
+                return receipt
+            if method == "eth_blockNumber":
+                return hex(100)
+            raise AssertionError("unexpected rpc %s" % method)
+        with mock.patch.object(chain, "rpc_call", fake_rpc):
+            r = chain.verify_donation_tx("0x" + "ab" * 32, TREASURY,
+                                         config.TOKENS)
+        self.assertFalse(r["ok"])
+        self.assertTrue(r["pending"])
+
+    def test_confirmation_depth_ok_when_deep_enough(self):
+        receipt = {"status": "0x1", "blockNumber": hex(100),
+                   "logs": [_transfer_log(USDC, DONOR, TREASURY, 250_000_000)]}
+
+        def fake_rpc(method, params, timeout=10):
+            if method == "eth_getTransactionReceipt":
+                return receipt
+            if method == "eth_blockNumber":
+                return hex(105)  # 6 confirmations
+            raise AssertionError("unexpected rpc %s" % method)
+        with mock.patch.object(chain, "rpc_call", fake_rpc):
+            r = chain.verify_donation_tx("0x" + "ab" * 32, TREASURY,
+                                         config.TOKENS)
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["amount"], 250.0)
+
+
+class TestTreasuryGuard(unittest.TestCase):
+    def test_valid_checksum_verifies(self):
+        with mock.patch.object(config, "TREASURY_ADDRESS",
+                               "0xD5Cf05f24727C83976652E3586c0e26DD39884e9"):
+            addr, verified, _ = chain.resolve_treasury()
+            self.assertTrue(verified)
+            self.assertEqual(addr, "0xD5Cf05f24727C83976652E3586c0e26DD39884e9")
+
+    def test_bad_checksum_disables_donations(self):
+        # same address, one character case flipped -> checksum fails
+        with mock.patch.object(config, "TREASURY_ADDRESS",
+                               "0xd5Cf05f24727C83976652E3586c0e26DD39884e9"):
+            _, verified, detail = chain.resolve_treasury()
+            self.assertFalse(verified)
+            self.assertIn("checksum", detail)
+
 
 class TestLiveChain(unittest.TestCase):
     """Live mainnet checks. Skipped when RFPS_SKIP_LIVE=1."""

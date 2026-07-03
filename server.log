@@ -6,6 +6,9 @@ Treasury TheDAO Security Fund treasury -> 0xD5Cf05f24727C83976652E3586c0e26DD398
 [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://127.0.0.1:4482
 [33mPress CTRL+C to quit[0m
-127.0.0.1 - - [03/Jul/2026 15:51:46] "GET /api/donate/params HTTP/1.1" 200 -
-127.0.0.1 - - [03/Jul/2026 15:51:54] "GET /api/donate/params HTTP/1.1" 200 -
-127.0.0.1 - - [03/Jul/2026 15:51:54] "GET /rfp/vyper-compiler-formal-verification HTTP/1.1" 200 -
+127.0.0.1 - - [03/Jul/2026 16:01:58] "GET /api/donate/params HTTP/1.1" 200 -
+127.0.0.1 - - [03/Jul/2026 16:01:59] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [03/Jul/2026 16:01:59] "GET /rfp/vyper-compiler-formal-verification HTTP/1.1" 200 -
+127.0.0.1 - - [03/Jul/2026 16:01:59] "GET /submit HTTP/1.1" 200 -
+127.0.0.1 - - [03/Jul/2026 16:01:59] "GET /admin HTTP/1.1" 200 -
+127.0.0.1 - - [03/Jul/2026 16:01:59] "[31m[1mPOST /api/donate/confirm HTTP/1.1[0m" 400 -

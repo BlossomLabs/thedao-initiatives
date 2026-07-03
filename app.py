@@ -272,18 +272,34 @@ def parse_goal(raw):
 def index():
     rfps = db.list_rfps(("approved",))
     cards = []
+    n_sponsors, n_donations = 0, 0
+    recent = []
     for r in rfps:
         s = db.funding_summary(r["id"])
         pct = min(100, round(100 * s["total"] / r["funding_goal_usd"], 1)) \
             if r["funding_goal_usd"] else 0
-        cards.append({"rfp": r, "sum": s, "pct": pct})
+        pl = db.pledges_for(r["id"])
+        dn = db.donations_for(r["id"])
+        n_sponsors += len(pl)
+        n_donations += len(dn)
+        for d in dn:
+            recent.append({"rfp": r, "d": d})
+        cards.append({"rfp": r, "sum": s, "pct": pct, "n_sponsors": len(pl),
+                      "n_donations": len(dn)})
+    recent.sort(key=lambda x: x["d"]["confirmed_at"] or 0, reverse=True)
     totals = {
         "count": len(cards),
         "goal": sum(c["rfp"]["funding_goal_usd"] for c in cards),
         "raised": sum(c["sum"]["total"] for c in cards),
+        "sponsors": n_sponsors,
+        "donations": n_donations,
     }
+    state = chain_state()
     return render_template("index.html", cards=cards, totals=totals,
-                           state=chain_state())
+                           recent=recent[:8], state=state,
+                           tokens=active_tokens(state),
+                           donations_enabled=bool(state["verified"]
+                                                  and active_tokens(state)))
 
 
 @app.route("/rfp/<slug>")
@@ -354,11 +370,9 @@ def submit():
 
 # ------------------------------------------------------------ donation API
 
-@app.route("/api/donate/params/<slug>")
-def donate_params(slug):
-    r = db.rfp_by_slug(slug)
-    if not r or r["status"] != "approved":
-        abort(404)
+@app.route("/api/donate/params")
+def donate_params():
+    """Global donation parameters (same treasury/tokens for every RFP)."""
     state = chain_state()
     tokens = active_tokens(state)
     if not (state["verified"] and tokens):
@@ -500,6 +514,8 @@ def admin_rfp(rfp_id):
                 error = "Title (8+) and summary (40+) are required."
             if not error:
                 db.update_rfp(rfp_id, title=title, summary=summary,
+                              details=(request.form.get("details")
+                                       or "").strip()[:20000],
                               funding_goal_usd=goal,
                               payout_addresses=json.dumps(payout),
                               discourse_url=url_clean,

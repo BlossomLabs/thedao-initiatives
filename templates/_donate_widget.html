@@ -1,0 +1,29 @@
+{# Reusable donation widget. Vars: slug (required), tokens, manual (bool) #}
+<div class="donate-widget" data-donate data-slug="{{ slug }}">
+  <div class="dw-row">
+    <div class="dw-chips">
+      {% for amt in ('50','100','500','1000') %}
+      <button type="button" class="dw-chip" data-amount="{{ amt }}">${{ amt }}</button>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="dw-row dw-inputs">
+    <input class="dw-amount" type="text" inputmode="decimal" placeholder="Custom amount" aria-label="Amount in dollars">
+    <select class="dw-token" aria-label="Stablecoin">
+      {% for sym in tokens %}<option value="{{ sym }}">{{ sym }}</option>{% endfor %}
+    </select>
+  </div>
+  <button type="button" class="btn primary dw-send">Donate</button>
+  <p class="dw-trust small dim">Goes straight to the fund treasury <b>griff.eth</b> on
+  Ethereum mainnet and is verified on-chain before it counts.</p>
+  <div class="dw-status status" hidden></div>
+  {% if manual %}
+  <details class="manual">
+    <summary>Sent from an exchange or another wallet?</summary>
+    <p class="small dim">Send an accepted stablecoin to <b>griff.eth</b>, then paste the
+    transaction hash here and we will verify it on-chain and credit it to this RFP.</p>
+    <input class="dw-manual-hash m" type="text" placeholder="0x…">
+    <button type="button" class="btn ghost dw-manual-btn">Verify transaction</button>
+  </details>
+  {% endif %}
+</div>

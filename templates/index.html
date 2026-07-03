@@ -1,45 +1,74 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="hero">
-  <h1>Fund <span class="typed">Ethereum Security</span></h1>
-  <p class="tag">Specific security work the ecosystem wants done. Sponsors pledge toward each RFP,
-  anyone can donate stablecoins directly, and TheDAO Security Fund completes the highest-ranked
-  RFPs that come up short.</p>
-</section>
-<hr class="shimmer">
-
-<div class="bluecard">
-  <div class="k">Open RFPs</div>
-  <div class="bigrow">
-    <img src="{{ url_for('static', filename='eth-logo.svg') }}" alt="">
-    <div class="num">{{ totals.count }}</div>
+  <p class="kicker">Ecosystem-funded security work</p>
+  <div class="hero-raised" id="hero-raised" data-target="{{ totals.raised }}">$0</div>
+  <p class="hero-sub">raised for <span class="red">Ethereum security</span> RFPs</p>
+  <div class="hero-stats">
+    <span><b>{{ totals.count }}</b> open RFPs</span>
+    <span><b>{{ totals.sponsors }}</b> sponsor pledge{{ '' if totals.sponsors == 1 else 's' }}</span>
+    <span><b>{{ totals.donations }}</b> on-chain donation{{ '' if totals.donations == 1 else 's' }}</span>
+    <span><b>{{ totals.goal | usd }}</b> in open goals</span>
   </div>
-  <div class="l1">{{ totals.raised | usd }} raised of {{ totals.goal | usd }} in open goals</div>
-  <div class="l2">sponsor pledges + on-chain stablecoin donations, tracked live · treasury <b>griff.eth</b></div>
-</div>
+</section>
 
-<div class="verdicts">
-  <div class="pill"><span class="dot g"></span><div><b>1 · The ecosystem writes RFPs</b><small>an idea with a budget, not a team</small></div></div>
-  <div class="pill"><span class="dot a"></span><div><b>2 · Sponsors pledge, anyone donates</b><small>pledges are conditional; donations are on-chain</small></div></div>
-  <div class="pill"><span class="dot b"></span><div><b>3 · TheDAO completes the gap</b><small>badge holders rank what gets finished</small></div></div>
+{% if recent %}
+<div class="activity">
+  {% for item in recent %}
+  <a class="act" href="{{ url_for('rfp_page', slug=item.rfp.slug) }}">
+    <span class="dot g"></span>
+    <span class="m">{{ item.d.donor | shortaddr }}</span> gave
+    <b>{{ item.d.amount | usd }}</b> to {{ item.rfp.title[:34] }}{% if item.rfp.title|length > 34 %}…{% endif %}
+  </a>
+  {% endfor %}
 </div>
+{% endif %}
 
 <main>
-  <h2>Requests for Proposals <span class="n">{{ totals.count }} open</span></h2>
+  <h2 id="rfps">Open RFPs <span class="n">donate in stablecoins, right from this page</span></h2>
   {% if not cards %}
     <p class="empty">No RFPs published yet. <a href="{{ url_for('submit') }}">Submit the first one.</a></p>
   {% endif %}
-  <div class="tiles rfp-tiles">
+  <div class="rfp-grid">
   {% for c in cards %}
-    <a class="tile rfp-tile" href="{{ url_for('rfp_page', slug=c.rfp.slug) }}">
+    <div class="rfp-card">
       {% if c.rfp.featured %}<span class="star" title="featured">★</span>{% endif %}
-      <div class="k">RFP</div>
-      <div class="t">{{ c.rfp.title }}</div>
-      <p class="s">{{ c.rfp.summary[:180] }}{% if c.rfp.summary|length > 180 %}…{% endif %}</p>
+      <a class="card-title" href="{{ url_for('rfp_page', slug=c.rfp.slug) }}">{{ c.rfp.title }}</a>
+      <p class="card-sum">{{ c.rfp.summary[:170] }}{% if c.rfp.summary|length > 170 %}…{% endif %}</p>
       <div class="bar"><i style="width: {{ c.pct }}%"></i></div>
-      <div class="sub">{{ c.sum.total | usd }} of {{ c.rfp.funding_goal_usd | usd }} · {{ c.pct }}%</div>
-    </a>
+      <div class="card-nums">
+        <span><b>{{ c.sum.total | usd }}</b> of {{ c.rfp.funding_goal_usd | usd }}</span>
+        <span class="dim">{{ c.pct }}%{% if c.n_sponsors %} · {{ c.n_sponsors }} sponsor{{ '' if c.n_sponsors == 1 else 's' }}{% endif %}</span>
+      </div>
+      <div class="card-actions">
+        {% if donations_enabled %}<button class="btn primary sm" type="button" data-donate-toggle>Donate</button>{% endif %}
+        <a class="btn ghost sm" href="{{ url_for('rfp_page', slug=c.rfp.slug) }}">Details →</a>
+      </div>
+      {% if donations_enabled %}
+      <div class="card-donate" hidden>
+        {% with slug=c.rfp.slug, manual=False %}{% include "_donate_widget.html" %}{% endwith %}
+      </div>
+      {% endif %}
+    </div>
   {% endfor %}
+  </div>
+
+  <h2>How it works</h2>
+  <div class="steps">
+    <div class="step"><span class="num g">1</span><div><b>The ecosystem writes RFPs</b>
+      <p>Specific security work with a budget: an idea, not a team. Anyone can <a href="{{ url_for('submit') }}">submit one</a> from a forum post.</p></div></div>
+    <div class="step"><span class="num a">2</span><div><b>Sponsors pledge, anyone donates</b>
+      <p>Companies pledge and pay only when the work ships. Donations land on-chain instantly and count as a public signal.</p></div></div>
+    <div class="step"><span class="num b">3</span><div><b>TheDAO completes the gap</b>
+      <p>The 200 ETHSecurity badge holders rank the RFPs that come up short, and TheDAO Security Fund finishes funding the top ones.</p></div></div>
+  </div>
+
+  <div class="pledge-band">
+    <div>
+      <b>Represent a protocol, L2, or company?</b>
+      <p class="dim">Sponsor an RFP with a pledge: you commit now and pay only when the work is completed and verified. Your name goes on the RFP from day one.</p>
+    </div>
+    <a class="btn" href="https://x.com/thegrifft" target="_blank" rel="noopener">DM @thegrifft to pledge</a>
   </div>
 </main>
 {% endblock %}

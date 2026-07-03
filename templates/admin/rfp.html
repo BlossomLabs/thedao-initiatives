@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Manage RFP — TheDAO RFPs{% endblock %}
+{% block title %}Manage RFP · TheDAO RFPs{% endblock %}
 {% block content %}
 <main class="detail">
   <p class="crumb"><a href="{{ url_for('admin_dashboard') }}">← Dashboard</a></p>
@@ -30,6 +30,8 @@
     <input type="text" name="title" maxlength="140" value="{{ r.title }}">
     <label class="lbl">Summary</label>
     <textarea name="summary" rows="4" maxlength="4000">{{ r.summary }}</textarea>
+    <label class="lbl">Full RFP details <span class="dim">(the complete spec: scope, milestones, budget breakdown; shown on the public page)</span></label>
+    <textarea name="details" rows="10" maxlength="20000">{{ r.details or '' }}</textarea>
     <label class="lbl">Forum link</label>
     <input type="url" name="discourse_url" value="{{ r.discourse_url }}">
     <label class="lbl">Funding goal (USD)</label>

@@ -67,6 +67,10 @@ def init():
     con = connect()
     with con:
         con.executescript(SCHEMA)
+        # migrations for columns added after v1
+        cols = {r["name"] for r in con.execute("PRAGMA table_info(rfps)")}
+        if "details" not in cols:
+            con.execute("ALTER TABLE rfps ADD COLUMN details TEXT DEFAULT ''")
     con.close()
 
 
@@ -138,9 +142,9 @@ def list_rfps(statuses=("approved",)):
 
 
 def update_rfp(rfp_id, **fields):
-    allowed = {"title", "summary", "discourse_url", "funding_goal_usd",
-               "payout_addresses", "contact", "status", "featured",
-               "approved_at"}
+    allowed = {"title", "summary", "details", "discourse_url",
+               "funding_goal_usd", "payout_addresses", "contact", "status",
+               "featured", "approved_at"}
     sets, vals = [], []
     for k, v in fields.items():
         if k not in allowed:

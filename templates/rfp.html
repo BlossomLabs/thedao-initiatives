@@ -1,26 +1,36 @@
 {% extends "base.html" %}
-{% block title %}{{ r.title }} — TheDAO Security Fund{% endblock %}
+{% block title %}{{ r.title }} · TheDAO Security Fund{% endblock %}
 {% block content %}
 <main class="detail">
   <p class="crumb"><a href="{{ url_for('index') }}">← All RFPs</a></p>
   <h1 class="rfp-title">{% if r.featured %}<span class="star">★</span> {% endif %}{{ r.title }}</h1>
   <p class="meta-line">
-    {% if r.discourse_url %}<a class="btn ghost" href="{{ r.discourse_url }}" target="_blank" rel="noopener">Read the full RFP on the forum ↗</a>{% endif %}
+    {% if r.discourse_url %}<a class="btn ghost sm" href="{{ r.discourse_url }}" target="_blank" rel="noopener">💬 Discuss this RFP on the forum</a>{% endif %}
     {% if r.status == 'archived' %}<span class="chip static">archived</span>{% endif %}
   </p>
 
   <div class="cols">
     <div class="col-main">
+      <div class="fund-head">
+        <div class="fund-big"><b>{{ sum.total | usd }}</b> <span class="dim">of {{ r.funding_goal_usd | usd }}</span></div>
+        <div class="bar big"><i style="width: {{ pct }}%"></i></div>
+        <div class="fund-split">
+          <span><b>{{ sum.pledged | usd }}</b> pledged by sponsors</span>
+          <span><b>{{ sum.donated | usd }}</b> donated on-chain</span>
+          <span><b>{{ pct }}%</b> of goal</span>
+        </div>
+      </div>
+
       <h2>Summary</h2>
       <p class="body-text">{{ r.summary }}</p>
 
-      <h2>Funding <span class="n">{{ sum.total | usd }} of {{ r.funding_goal_usd | usd }}</span></h2>
-      <div class="bar big"><i style="width: {{ pct }}%"></i></div>
-      <div class="fund-split">
-        <span><b>{{ sum.pledged | usd }}</b> pledged by sponsors</span>
-        <span><b>{{ sum.donated | usd }}</b> donated on-chain</span>
-        <span><b>{{ pct }}%</b> of goal</span>
-      </div>
+      <h2>Full RFP details</h2>
+      {% if r.details %}
+      <p class="body-text">{{ r.details }}</p>
+      {% else %}
+      <p class="empty">The complete spec (scope, milestones, budget breakdown) is being written.
+      {% if r.discourse_url %}Follow and shape it <a href="{{ r.discourse_url }}" target="_blank" rel="noopener">on the forum thread</a>.{% endif %}</p>
+      {% endif %}
 
       <h2>Sponsors <span class="n">{{ pledges | length }}</span></h2>
       {% if pledges %}
@@ -35,7 +45,8 @@
         {% endfor %}
         </div>
       {% else %}
-        <p class="empty">No sponsor pledges yet. Want your organization on this list? Reach out on the forum thread.</p>
+        <p class="empty">No sponsor pledges yet. Pledges pay only when the work is completed.
+        <a href="https://x.com/thegrifft" target="_blank" rel="noopener">DM @thegrifft</a> to put your name on this RFP.</p>
       {% endif %}
 
       <h2>On-chain donations <span class="n">{{ donations | length }}</span></h2>
@@ -57,7 +68,7 @@
         </table>
       </div>
       {% else %}
-        <p class="empty">No on-chain donations yet — be the first.</p>
+        <p class="empty">No on-chain donations yet. Be the first.</p>
       {% endif %}
 
       {% if payout_addresses %}
@@ -70,44 +81,30 @@
     </div>
 
     <aside class="col-side">
-      <div class="donate-card" id="donate-app"
-           data-slug="{{ r.slug }}"
-           data-enabled="{{ '1' if donations_enabled else '0' }}">
+      <div class="donate-card">
         <div class="k">Donate to this RFP</div>
         {% if donations_enabled %}
-          <p class="small dim">Mainnet stablecoins only. Funds go to the fund treasury
-          <b>griff.eth</b> (<a href="https://etherscan.io/address/{{ state.treasury }}" target="_blank" rel="noopener" class="m">{{ state.treasury | shortaddr }}</a>)
-          and are credited to this RFP.</p>
-          <label class="lbl">Token</label>
-          <select id="d-token">
-            {% for sym in tokens %}<option value="{{ sym }}">{{ sym }}</option>{% endfor %}
-          </select>
-          <label class="lbl">Amount</label>
-          <input id="d-amount" type="text" inputmode="decimal" placeholder="100">
-          <button id="d-connect" class="btn">Connect wallet</button>
-          <button id="d-send" class="btn primary" hidden>Donate</button>
-          <div id="d-status" class="status" hidden></div>
-          <details class="manual">
-            <summary>Already sent it? Credit a transaction</summary>
-            <p class="small dim">Sent stablecoins to <b>griff.eth</b> for this RFP from a wallet
-            or exchange? Paste the transaction hash and we will verify it on-chain.</p>
-            <input id="d-manual-hash" type="text" placeholder="0x…" class="m">
-            <button id="d-manual-btn" class="btn ghost">Verify transaction</button>
-          </details>
+          {% with slug=r.slug, manual=True %}{% include "_donate_widget.html" %}{% endwith %}
         {% else %}
           <p class="small">Donations are temporarily unavailable{% if r.status != 'approved' %} for this RFP{% endif %}.
           {% if state and not state.verified %}<span class="dim">({{ state.detail }})</span>{% endif %}</p>
         {% endif %}
       </div>
       <div class="side-note">
+        <div class="k">Sponsor this RFP</div>
+        <p class="small dim">Companies can pledge instead of donating: you commit publicly now and
+        pay only when the work is completed and verified.
+        <a href="https://x.com/thegrifft" target="_blank" rel="noopener">DM @thegrifft</a> and your
+        name appears here.</p>
+      </div>
+      <div class="side-note">
         <div class="k">What happens next</div>
-        <p class="small dim">Sponsor pledges are conditional and only collected if the RFP is fully
-        funded. If it comes up short, the ETHSecurity badge holders rank it against other RFPs in
-        the October round, and TheDAO completes the highest-ranked ones. Community donations count
-        as a signal in that ranking.</p>
+        <p class="small dim">If sponsors and donors fully fund this RFP, it happens with no TheDAO
+        money at all. If it comes up short, the 200 ETHSecurity badge holders rank it against the
+        other RFPs in the October round and TheDAO Security Fund completes the top-ranked ones.
+        Donations count as a public signal in that ranking.</p>
       </div>
     </aside>
   </div>
 </main>
-<script src="{{ url_for('static', filename='app.js') }}"></script>
 {% endblock %}

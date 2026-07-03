@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>{% block title %}TheDAO Security Fund — RFPs{% endblock %}</title>
+<title>{% block title %}TheDAO Security Fund · RFPs{% endblock %}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -10,20 +10,27 @@
 <link rel="icon" href="{{ url_for('static', filename='eth-logo.svg') }}">
 </head>
 <body>
-<nav class="pillnav">
-  <a href="{{ url_for('index') }}" class="brand"><img src="{{ url_for('static', filename='eth-logo.svg') }}" alt=""> TheDAO&nbsp;Security&nbsp;Fund</a>
-  <a href="{{ url_for('index') }}" {% if request.path == '/' %}class="on"{% endif %}>RFPs</a>
-  <a href="https://transparency.thedao.fund/" target="_blank" rel="noopener">Transparency</a>
-  <a href="{{ url_for('submit') }}" class="cta">Submit an RFP</a>
-</nav>
+<header class="topbar">
+  <a href="{{ url_for('index') }}" class="brand">
+    <img src="{{ url_for('static', filename='eth-logo.svg') }}" alt="">
+    <span>TheDAO <b>Security Fund</b></span>
+  </a>
+  <nav class="topnav">
+    <a href="{{ url_for('index') }}" {% if request.path == '/' %}class="on"{% endif %}>RFPs</a>
+    <a href="https://transparency.thedao.fund/" target="_blank" rel="noopener">Transparency</a>
+    <a href="{{ url_for('submit') }}" class="navcta">Submit an RFP</a>
+    <button id="nav-connect" class="btn wallet" type="button">Connect wallet</button>
+  </nav>
+</header>
 
 {% block content %}{% endblock %}
 
 <footer>
   <hr class="shimmer">
   <p>TheDAO Security Fund · coordinating ecosystem funding for Ethereum security.</p>
-  <p class="m">All donations go to the fund treasury: <b>griff.eth</b>{% if state and state.treasury %} · <a href="https://etherscan.io/address/{{ state.treasury }}" target="_blank" rel="noopener">{{ state.treasury }}</a>{% endif %}</p>
-  <p><a class="dim" href="{{ url_for('admin_login') }}">admin</a></p>
+  <p class="m">Treasury: <b>griff.eth</b>{% if state and state.treasury %} · <a href="https://etherscan.io/address/{{ state.treasury }}" target="_blank" rel="noopener">{{ state.treasury }}</a>{% endif %}</p>
+  <p>Sponsor an RFP: <a href="https://x.com/thegrifft" target="_blank" rel="noopener">@thegrifft</a> · <a class="dim" href="{{ url_for('admin_login') }}">admin</a></p>
 </footer>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

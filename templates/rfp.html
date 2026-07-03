@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}{{ r.title }} — TheDAO Security Fund{% endblock %}
+{% block content %}
+<main class="detail">
+  <p class="crumb"><a href="{{ url_for('index') }}">← All RFPs</a></p>
+  <h1 class="rfp-title">{% if r.featured %}<span class="star">★</span> {% endif %}{{ r.title }}</h1>
+  <p class="meta-line">
+    {% if r.discourse_url %}<a class="btn ghost" href="{{ r.discourse_url }}" target="_blank" rel="noopener">Read the full RFP on the forum ↗</a>{% endif %}
+    {% if r.status == 'archived' %}<span class="chip static">archived</span>{% endif %}
+  </p>
+
+  <div class="cols">
+    <div class="col-main">
+      <h2>Summary</h2>
+      <p class="body-text">{{ r.summary }}</p>
+
+      <h2>Funding <span class="n">{{ sum.total | usd }} of {{ r.funding_goal_usd | usd }}</span></h2>
+      <div class="bar big"><i style="width: {{ pct }}%"></i></div>
+      <div class="fund-split">
+        <span><b>{{ sum.pledged | usd }}</b> pledged by sponsors</span>
+        <span><b>{{ sum.donated | usd }}</b> donated on-chain</span>
+        <span><b>{{ pct }}%</b> of goal</span>
+      </div>
+
+      <h2>Sponsors <span class="n">{{ pledges | length }}</span></h2>
+      {% if pledges %}
+        <div class="sponsors">
+        {% for p in pledges %}
+          <div class="sponsor-pill">
+            <b>{% if p.url %}<a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.company }}</a>{% else %}{{ p.company }}{% endif %}</b>
+            <span>{{ p.amount_usd | usd }}</span>
+            <small class="{{ p.status }}">{{ p.status }}</small>
+            {% if p.note %}<small class="note">{{ p.note }}</small>{% endif %}
+          </div>
+        {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty">No sponsor pledges yet. Want your organization on this list? Reach out on the forum thread.</p>
+      {% endif %}
+
+      <h2>On-chain donations <span class="n">{{ donations | length }}</span></h2>
+      {% if donations %}
+      <div class="tblbox">
+        <table>
+          <thead><tr><th>Date</th><th>Donor</th><th class="amt">Amount</th><th>Token</th><th>Tx</th></tr></thead>
+          <tbody>
+          {% for d in donations %}
+            <tr>
+              <td>{{ d.confirmed_at | dt }}</td>
+              <td class="m">{{ d.donor | shortaddr }}</td>
+              <td class="amt">{{ d.amount | usd }}</td>
+              <td>{{ d.token_symbol }}</td>
+              <td class="m"><a href="https://etherscan.io/tx/{{ d.tx_hash }}" target="_blank" rel="noopener">{{ d.tx_hash | shortaddr }}</a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="empty">No on-chain donations yet — be the first.</p>
+      {% endif %}
+
+      {% if payout_addresses %}
+      <h2>Payout addresses</h2>
+      <p class="dim small">Where funds go if this RFP is completed (provided by the submitter, subject to review):</p>
+      <ul class="m addr-list">
+        {% for a in payout_addresses %}<li>{{ a }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+
+    <aside class="col-side">
+      <div class="donate-card" id="donate-app"
+           data-slug="{{ r.slug }}"
+           data-enabled="{{ '1' if donations_enabled else '0' }}">
+        <div class="k">Donate to this RFP</div>
+        {% if donations_enabled %}
+          <p class="small dim">Mainnet stablecoins only. Funds go to the fund treasury
+          <b>griff.eth</b> (<a href="https://etherscan.io/address/{{ state.treasury }}" target="_blank" rel="noopener" class="m">{{ state.treasury | shortaddr }}</a>)
+          and are credited to this RFP.</p>
+          <label class="lbl">Token</label>
+          <select id="d-token">
+            {% for sym in tokens %}<option value="{{ sym }}">{{ sym }}</option>{% endfor %}
+          </select>
+          <label class="lbl">Amount</label>
+          <input id="d-amount" type="text" inputmode="decimal" placeholder="100">
+          <button id="d-connect" class="btn">Connect wallet</button>
+          <button id="d-send" class="btn primary" hidden>Donate</button>
+          <div id="d-status" class="status" hidden></div>
+          <details class="manual">
+            <summary>Already sent it? Credit a transaction</summary>
+            <p class="small dim">Sent stablecoins to <b>griff.eth</b> for this RFP from a wallet
+            or exchange? Paste the transaction hash and we will verify it on-chain.</p>
+            <input id="d-manual-hash" type="text" placeholder="0x…" class="m">
+            <button id="d-manual-btn" class="btn ghost">Verify transaction</button>
+          </details>
+        {% else %}
+          <p class="small">Donations are temporarily unavailable{% if r.status != 'approved' %} for this RFP{% endif %}.
+          {% if state and not state.verified %}<span class="dim">({{ state.detail }})</span>{% endif %}</p>
+        {% endif %}
+      </div>
+      <div class="side-note">
+        <div class="k">What happens next</div>
+        <p class="small dim">Sponsor pledges are conditional and only collected if the RFP is fully
+        funded. If it comes up short, the ETHSecurity badge holders rank it against other RFPs in
+        the October round, and TheDAO completes the highest-ranked ones. Community donations count
+        as a signal in that ranking.</p>
+      </div>
+    </aside>
+  </div>
+</main>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

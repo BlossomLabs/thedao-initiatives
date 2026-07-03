@@ -1,0 +1,2 @@
+flask==3.0.3
+pycryptodome==3.21.0

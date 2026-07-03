@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Submit an RFP — TheDAO Security Fund{% endblock %}
+{% block content %}
+<main class="detail narrow">
+  <h1>Submit an RFP</h1>
+  <p class="tag left">Write your RFP as a post on a Discourse forum first (the Ethereum security
+  funding forum, ethresear.ch, or any public Discourse). Then link it here. Submissions are
+  reviewed before they appear on the site.</p>
+
+  {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+
+  <form method="post" class="form">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input type="text" name="website" value="" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+    <label class="lbl">Forum link (Discourse topic) *</label>
+    <input type="url" name="discourse_url" required placeholder="https://forum.example.org/t/my-rfp/123"
+           value="{{ form.discourse_url if form else '' }}">
+
+    <label class="lbl">Title <span class="dim">(leave blank to pull it from the forum post)</span></label>
+    <input type="text" name="title" maxlength="140" value="{{ form.title if form else '' }}">
+
+    <label class="lbl">Short summary * <span class="dim">(2–4 sentences: what gets built, why it matters)</span></label>
+    <textarea name="summary" rows="5" required maxlength="4000">{{ form.summary if form else '' }}</textarea>
+
+    <label class="lbl">Funding goal (USD) *</label>
+    <input type="text" name="goal" required inputmode="decimal" placeholder="250000"
+           value="{{ form.goal if form else '' }}">
+
+    <label class="lbl">Payout addresses <span class="dim">(one per line — 0x address or .eth name; where funds would go if completed)</span></label>
+    <textarea name="payout" rows="3" class="m" placeholder="0x… or yourname.eth">{{ form.payout if form else '' }}</textarea>
+
+    <label class="lbl">Contact <span class="dim">(email / telegram, kept private)</span></label>
+    <input type="text" name="contact" maxlength="200" value="{{ form.contact if form else '' }}">
+
+    <button class="btn primary" type="submit">Submit for review</button>
+  </form>
+</main>
+{% endblock %}

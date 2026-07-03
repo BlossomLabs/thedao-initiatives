@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Fund <span class="typed">Ethereum Security</span></h1>
+  <p class="tag">Specific security work the ecosystem wants done. Sponsors pledge toward each RFP,
+  anyone can donate stablecoins directly, and TheDAO Security Fund completes the highest-ranked
+  RFPs that come up short.</p>
+</section>
+<hr class="shimmer">
+
+<div class="bluecard">
+  <div class="k">Open RFPs</div>
+  <div class="bigrow">
+    <img src="{{ url_for('static', filename='eth-logo.svg') }}" alt="">
+    <div class="num">{{ totals.count }}</div>
+  </div>
+  <div class="l1">{{ totals.raised | usd }} raised of {{ totals.goal | usd }} in open goals</div>
+  <div class="l2">sponsor pledges + on-chain stablecoin donations, tracked live · treasury <b>griff.eth</b></div>
+</div>
+
+<div class="verdicts">
+  <div class="pill"><span class="dot g"></span><div><b>1 · The ecosystem writes RFPs</b><small>an idea with a budget, not a team</small></div></div>
+  <div class="pill"><span class="dot a"></span><div><b>2 · Sponsors pledge, anyone donates</b><small>pledges are conditional; donations are on-chain</small></div></div>
+  <div class="pill"><span class="dot b"></span><div><b>3 · TheDAO completes the gap</b><small>badge holders rank what gets finished</small></div></div>
+</div>
+
+<main>
+  <h2>Requests for Proposals <span class="n">{{ totals.count }} open</span></h2>
+  {% if not cards %}
+    <p class="empty">No RFPs published yet. <a href="{{ url_for('submit') }}">Submit the first one.</a></p>
+  {% endif %}
+  <div class="tiles rfp-tiles">
+  {% for c in cards %}
+    <a class="tile rfp-tile" href="{{ url_for('rfp_page', slug=c.rfp.slug) }}">
+      {% if c.rfp.featured %}<span class="star" title="featured">★</span>{% endif %}
+      <div class="k">RFP</div>
+      <div class="t">{{ c.rfp.title }}</div>
+      <p class="s">{{ c.rfp.summary[:180] }}{% if c.rfp.summary|length > 180 %}…{% endif %}</p>
+      <div class="bar"><i style="width: {{ c.pct }}%"></i></div>
+      <div class="sub">{{ c.sum.total | usd }} of {{ c.rfp.funding_goal_usd | usd }} · {{ c.pct }}%</div>
+    </a>
+  {% endfor %}
+  </div>
+</main>
+{% endblock %}

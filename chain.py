@@ -4,9 +4,10 @@ token sanity checks, and ERC-20 transfer verification.
 Design principles:
 - The chain is the source of truth. Donation amounts are read from the
   verified Transfer log, never from client input.
-- The treasury address (griff.eth) is resolved on-chain AND cross-checked
-  against an independent resolver API. If they disagree, donations are
-  disabled rather than risking funds going to a wrong address.
+- The treasury is a static, admin-configured address that must round-trip
+  EIP-55 checksumming exactly; on any mismatch donations are disabled rather
+  than risking funds going to a wrong address. (ENS resolution helpers below
+  are kept for future use, e.g. if the treasury moves back to an ENS name.)
 - No private keys anywhere. The server only reads the chain.
 """
 import json
@@ -176,23 +177,25 @@ def resolve_ens_crosscheck(name: str):
 
 
 def resolve_treasury():
-    """Resolve the treasury ENS with dual verification.
+    """Validate the statically configured treasury address.
 
     Returns (address, verified: bool, detail: str). If verified is False the
     caller must disable donations.
+
+    The configured value must round-trip EIP-55 checksumming EXACTLY: a
+    single mistyped character makes the checksum fail, so a typo disables
+    donations instead of redirecting funds.
     """
-    name = config.TREASURY_ENS
-    onchain = resolve_ens_onchain(name)
+    configured = config.TREASURY_ADDRESS
     try:
-        second = resolve_ens_crosscheck(name)
-    except Exception as e:
-        return onchain, False, "cross-check unavailable: %s" % e
-    if second is None:
-        return onchain, False, "cross-check returned no address"
-    if second.lower() != onchain.lower():
-        return onchain, False, (
-            "MISMATCH: on-chain=%s cross-check=%s" % (onchain, second))
-    return onchain, True, "on-chain and cross-check agree"
+        checksummed = to_checksum(configured)
+    except ValueError as e:
+        return None, False, "treasury address invalid: %s" % e
+    if checksummed != configured:
+        return checksummed, False, (
+            "treasury address failed EIP-55 checksum (configured=%s, "
+            "expected=%s): donations disabled" % (configured, checksummed))
+    return checksummed, True, "static treasury address, checksum verified"
 
 
 # ---------------------------------------------------------------- tokens

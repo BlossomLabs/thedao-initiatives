@@ -14,13 +14,14 @@
     </select>
   </div>
   <button type="button" class="btn primary dw-send">Donate</button>
-  <p class="dw-trust small dim">Goes straight to the fund treasury <b>griff.eth</b> on
-  Ethereum mainnet and is verified on-chain before it counts.</p>
+  <p class="dw-trust small dim">Goes straight to TheDAO Security Fund treasury
+  <b class="m">{{ state.treasury | shortaddr }}</b> on Ethereum mainnet and is verified on-chain before it counts.</p>
   <div class="dw-status status" hidden></div>
   {% if manual %}
   <details class="manual">
     <summary>Sent from an exchange or another wallet?</summary>
-    <p class="small dim">Send an accepted stablecoin to <b>griff.eth</b>, then paste the
+    <p class="small dim">Send an accepted stablecoin to the treasury
+    <b class="m">{{ state.treasury }}</b>, then paste the
     transaction hash here and we will verify it on-chain and credit it to this RFP.</p>
     <input class="dw-manual-hash m" type="text" placeholder="0x…">
     <button type="button" class="btn ghost dw-manual-btn">Verify transaction</button>

@@ -12,10 +12,13 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "rfps.db")
 ENV_PATH = os.path.join(BASE_DIR, ".env")
 
-# All donations flow to this ENS name. Resolved at startup via on-chain ENS
-# lookup AND cross-checked against an independent resolver API; the app
-# refuses to accept donations if the two disagree.
-TREASURY_ENS = "griff.eth"
+# All donations flow to this address (TheDAO Security Fund treasury).
+# It must be written in exact EIP-55 checksum form: chain.resolve_treasury()
+# re-derives the checksum at startup and the app refuses to accept donations
+# on any mismatch, so a typo here cannot silently redirect funds.
+# Overridable via TREASURY_ADDRESS in .env.
+TREASURY_ADDRESS = "0xD5Cf05f24727C83976652E3586c0e26DD39884e9"
+TREASURY_LABEL = "TheDAO Security Fund treasury"
 
 CHAIN_ID = 1  # Ethereum mainnet only
 
@@ -93,6 +96,7 @@ SECRET_KEY = ENV["SECRET_KEY"]
 ADMIN_PASSWORD = ENV["ADMIN_PASSWORD"]
 RPC_URL_OVERRIDE = ENV.get("RPC_URL", "").strip()
 PORT = int(ENV.get("PORT", "4482"))
+TREASURY_ADDRESS = ENV.get("TREASURY_ADDRESS", "").strip() or TREASURY_ADDRESS
 
 if RPC_URL_OVERRIDE:
     RPC_ENDPOINTS = [RPC_URL_OVERRIDE] + RPC_ENDPOINTS

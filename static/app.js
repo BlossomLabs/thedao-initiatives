@@ -141,10 +141,18 @@
 
     function donate() {
       if (!window.ethereum) {
-        status("err",
-          "No wallet detected in this browser. You can still donate from any " +
-          "wallet or exchange: send an accepted stablecoin to <b>griff.eth</b>, " +
-          "then credit it to this RFP with the transaction hash (see the RFP page).");
+        getParams().then(function (p) {
+          status("err",
+            "No wallet detected in this browser. You can still donate from any " +
+            "wallet or exchange: send an accepted stablecoin to the treasury " +
+            "<b class=\"m\">" + p.treasury + "</b>, then credit it to this RFP " +
+            "with the transaction hash (see the RFP page).");
+        }).catch(function () {
+          status("err",
+            "No wallet detected in this browser. You can still donate from any " +
+            "wallet or exchange: see the RFP page for the treasury address and " +
+            "manual verification.");
+        });
         return;
       }
       var pre = account ? Promise.resolve(account)
@@ -159,7 +167,7 @@
           return;
         }
         status("wait", "Check your wallet to approve:<br><b>" +
-               elAmount.value + " " + sym + "</b> → <b>" + params.treasury_ens +
+               elAmount.value + " " + sym + "</b> → <b>" + params.treasury_label +
                "</b> <span class=\"m dim\">(" + short(params.treasury) + ")</span>");
         return ensureMainnet(window.ethereum).then(function () {
           return window.ethereum.request({

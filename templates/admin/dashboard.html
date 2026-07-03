@@ -13,7 +13,7 @@
   <div class="verdicts">
     <div class="pill"><span class="dot {{ 'g' if state.verified else 'a' }}"></span>
       <div><b>Treasury: {{ state.treasury | shortaddr if state.treasury else 'unresolved' }}</b>
-      <small>griff.eth · {{ state.detail }}</small></div></div>
+      <small>{{ state.treasury | shortaddr if state.treasury else "?" }} · {{ state.detail }}</small></div></div>
     <div class="pill"><span class="dot g"></span>
       <div><b>{{ state.tokens.values() | selectattr('ok') | list | length }}/{{ state.tokens | length }} tokens verified</b>
       <small>on-chain decimals + symbol checks</small></div></div>

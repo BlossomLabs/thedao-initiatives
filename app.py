@@ -1,7 +1,7 @@
 """TheDAO Security Fund — RFP funding coordination app.
 
 Public: browse RFPs, submit an RFP from a Discourse forum link, donate
-mainnet stablecoins directly to an RFP (funds go to the treasury, griff.eth).
+mainnet stablecoins directly to an RFP (funds go to the configured treasury).
 Admin: approve/reject submissions, manage company pledges, recheck donations.
 """
 import hmac
@@ -381,7 +381,7 @@ def donate_params():
         "enabled": True,
         "chain_id": config.CHAIN_ID,
         "treasury": state["treasury"],
-        "treasury_ens": config.TREASURY_ENS,
+        "treasury_label": config.TREASURY_LABEL,
         "tokens": {sym: {"address": a, "decimals": d}
                    for sym, (a, d) in tokens.items()},
     })
@@ -569,5 +569,5 @@ if __name__ == "__main__":
     print("TheDAO RFPs — admin password is in .env")
     state = chain_state()
     print("Treasury %s -> %s (verified: %s)" % (
-        config.TREASURY_ENS, state["treasury"], state["verified"]))
+        config.TREASURY_LABEL, state["treasury"], state["verified"]))
     app.run(host="127.0.0.1", port=config.PORT, debug=False)

@@ -12,7 +12,7 @@ Then open http://127.0.0.1:4482 — admin panel at /admin, password in `.env`.
 ## How money flows
 
 - Donations are ERC-20 stablecoin transfers straight from the donor's wallet
-  to the treasury (`griff.eth`). The server never holds funds and has no keys.
+  to the treasury (`0xD5Cf05f24727C83976652E3586c0e26DD39884e9`, set in config.py / .env `TREASURY_ADDRESS`). The server never holds funds and has no keys.
 - The treasury address is resolved via the ENSv2 Universal Resolver AND
   cross-checked against an independent resolver; donations are disabled if
   the two ever disagree.

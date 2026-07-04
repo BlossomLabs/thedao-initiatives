@@ -3,9 +3,9 @@
 {% block content %}
 <main class="detail">
   <p class="crumb"><a href="{{ url_for('index') }}">← All RFPs</a></p>
-  <h1 class="rfp-title">{% if r.featured %}<span class="star">★</span> {% endif %}{{ r.title }}</h1>
+  <h1 class="rfp-title">{{ r.title }}</h1>
   <p class="meta-line">
-    {% if r.discourse_url %}<a class="btn ghost sm" href="{{ r.discourse_url }}" target="_blank" rel="noopener">💬 Discuss this RFP on the forum</a>{% endif %}
+    {% if r.discourse_url %}<a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener">💬 Discuss this RFP on the forum</a>{% endif %}
     {% if r.status == 'archived' %}<span class="chip static">archived</span>{% endif %}
   </p>
 
@@ -37,6 +37,7 @@
         <div class="sponsors">
         {% for p in pledges %}
           <div class="sponsor-pill">
+            {% if p.logo %}<img class="sponsor-logo" src="/logos/{{ p.logo }}" alt="{{ p.company }} logo">{% endif %}
             <b>{% if p.url %}<a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.company }}</a>{% else %}{{ p.company }}{% endif %}</b>
             <span>{{ p.amount_usd | usd }}</span>
             <small class="{{ p.status }}">{{ p.status }}</small>
@@ -71,13 +72,6 @@
         <p class="empty">No on-chain donations yet. Be the first.</p>
       {% endif %}
 
-      {% if payout_addresses %}
-      <h2>Payout addresses</h2>
-      <p class="dim small">Where funds go if this RFP is completed (provided by the submitter, subject to review):</p>
-      <ul class="m addr-list">
-        {% for a in payout_addresses %}<li>{{ a }}</li>{% endfor %}
-      </ul>
-      {% endif %}
     </div>
 
     <aside class="col-side">
@@ -89,6 +83,13 @@
           <p class="small">{% if not r.safe_address %}This RFP's donation address is being set up. Check back soon.{% else %}Donations are temporarily unavailable.{% endif %}</p>
         {% endif %}
       </div>
+      {% if r.discourse_url %}
+      <div class="side-note discuss-card">
+        <div class="k">Join the discussion</div>
+        <p class="small dim">This RFP is being shaped in public.</p>
+        <a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener">💬 Open the forum thread</a>
+      </div>
+      {% endif %}
       <div class="side-note">
         <div class="k">Sponsor this RFP</div>
         <p class="small dim">Companies can pledge instead of donating: you commit publicly now and

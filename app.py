@@ -7,6 +7,7 @@ Admin: approve/reject submissions, manage company pledges, recheck donations.
 import hmac
 import ipaddress
 import json
+import os
 import re
 import socket
 import threading
@@ -17,7 +18,7 @@ from collections import defaultdict, deque
 from functools import wraps
 
 from flask import (Flask, abort, jsonify, redirect, render_template, request,
-                   session, url_for)
+                   send_from_directory, session, url_for)
 
 import chain
 import config
@@ -29,7 +30,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=config.COOKIE_SECURE,
-    MAX_CONTENT_LENGTH=64 * 1024,
+    MAX_CONTENT_LENGTH=2 * 1024 * 1024,  # room for a 1 MB logo upload
 )
 
 db.init()
@@ -295,24 +296,44 @@ def fetch_discourse_title(topic_url):
         return None
 
 
-def validate_payout_addresses(raw):
-    """Up to 10 lines; each an 0x address or an ENS name."""
-    out = []
-    for line in (raw or "").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        if chain.is_address(line):
-            out.append(chain.to_checksum(line))
-        elif re.match(r"^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*\.eth$",
-                      line.lower()):
-            out.append(line.lower())
-        else:
-            return None, ("'%s' is not a valid Ethereum address "
-                          "or .eth name." % line[:60])
-        if len(out) > 10:
-            return None, "At most 10 payout addresses."
-    return out, None
+LOGO_DIR = os.path.join(config.BASE_DIR, "uploads")
+LOGO_MAGIC = {b"\x89PNG": ".png", b"\xff\xd8\xff": ".jpg", b"RIFF": ".webp"}
+
+
+def save_logo_upload(file_storage):
+    """Validate + store an admin-uploaded sponsor logo.
+
+    Returns (filename, None) or (None, error). Content is checked by magic
+    bytes (png/jpg/webp only, max 1 MB) so mislabeled or scriptable files
+    (like SVG) never get served.
+    """
+    if not file_storage or not file_storage.filename:
+        return "", None
+    blob = file_storage.read(1024 * 1024 + 1)
+    if len(blob) > 1024 * 1024:
+        return None, "Logo must be under 1 MB."
+    ext = None
+    for magic, e in LOGO_MAGIC.items():
+        if blob.startswith(magic):
+            ext = e
+            break
+    if ext == ".webp" and blob[8:12] != b"WEBP":
+        ext = None
+    if not ext:
+        return None, "Logo must be a PNG, JPG, or WEBP image."
+    import secrets as _secrets
+    name = _secrets.token_hex(8) + ext
+    os.makedirs(LOGO_DIR, exist_ok=True)
+    with open(os.path.join(LOGO_DIR, name), "wb") as f:
+        f.write(blob)
+    return name, None
+
+
+@app.route("/logos/<name>")
+def serve_logo(name):
+    if not re.fullmatch(r"[0-9a-f]{16}\.(png|jpg|webp)", name):
+        abort(404)
+    return send_from_directory(LOGO_DIR, name, max_age=86400)
 
 
 def parse_goal(raw):
@@ -375,7 +396,6 @@ def rfp_page(slug):
         "rfp.html", r=r, sum=s, pct=pct,
         pledges=db.pledges_for(r["id"]),
         donations=db.donations_for(r["id"]),
-        payout_addresses=json.loads(r["payout_addresses"] or "[]"),
         state=state, tokens=tokens,
         donations_enabled=bool(tokens and r["safe_address"]
                                and r["status"] == "approved"))
@@ -417,12 +437,8 @@ def submit():
     if err:
         return render_template("submit.html", error=err, form=request.form), 400
 
-    payout, err = validate_payout_addresses(request.form.get("payout"))
-    if err:
-        return render_template("submit.html", error=err, form=request.form), 400
-
     contact = (request.form.get("contact") or "").strip()[:200]
-    rfp_id, slug = db.create_rfp(title, summary, url_clean, goal, payout,
+    rfp_id, slug = db.create_rfp(title, summary, url_clean, goal, [],
                                  contact, status="pending")
     return render_template("submitted.html", title=title)
 
@@ -565,11 +581,8 @@ def admin_rfp(rfp_id):
             if new == "approved" and not r["approved_at"]:
                 fields["approved_at"] = db.now()
             db.update_rfp(rfp_id, **fields)
-        elif action == "feature":
-            db.update_rfp(rfp_id, featured=0 if r["featured"] else 1)
         elif action == "edit":
             goal, err = parse_goal(request.form.get("goal"))
-            payout, err2 = validate_payout_addresses(request.form.get("payout"))
             title = (request.form.get("title") or "").strip()[:MAX_TITLE]
             summary = (request.form.get("summary") or "").strip()[:MAX_SUMMARY]
             url_raw = (request.form.get("discourse_url") or "").strip()
@@ -577,7 +590,7 @@ def admin_rfp(rfp_id):
             err3 = None
             if url_raw:
                 url_clean, err3 = validate_forum_url(url_raw)
-            error = err or err2 or err3
+            error = err or err3
             if not error and (len(title) < 8 or len(summary) < 40):
                 error = "Title (8+) and summary (40+) are required."
             if not error:
@@ -585,7 +598,6 @@ def admin_rfp(rfp_id):
                               details=(request.form.get("details")
                                        or "").strip()[:20000],
                               funding_goal_usd=goal,
-                              payout_addresses=json.dumps(payout),
                               discourse_url=url_clean,
                               contact=(request.form.get("contact")
                                        or "").strip()[:200])
@@ -598,12 +610,13 @@ def admin_rfp(rfp_id):
             purl = (request.form.get("url") or "").strip()[:300]
             if purl and not purl.lower().startswith(("http://", "https://")):
                 purl = ""  # reject javascript:/data: and other schemes
-            if not company or err:
-                error = err or "Company name is required."
+            logo, logo_err = save_logo_upload(request.files.get("logo"))
+            if not company or err or logo_err:
+                error = err or logo_err or "Company name is required."
             else:
                 db.add_pledge(rfp_id, company, amount, status,
                               (request.form.get("note") or "").strip()[:300],
-                              purl)
+                              purl, logo)
         elif action == "pledge_status":
             st = request.form.get("pstatus", "")
             if st in ("pledged", "received", "withdrawn"):
@@ -625,7 +638,6 @@ def admin_rfp(rfp_id):
         sum=db.funding_summary(rfp_id),
         pledges=db.pledges_for(rfp_id, include_withdrawn=True),
         donations=db.donations_for(rfp_id, only_confirmed=False),
-        payout_text="\n".join(json.loads(r["payout_addresses"] or "[]")),
         signers_ok=signers_ok, signers_detail=signers_detail,
         signers=config.OPERATIONAL_SIGNERS, safe_threshold=config.SAFE_THRESHOLD)
 

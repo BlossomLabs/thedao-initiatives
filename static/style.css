@@ -228,3 +228,11 @@ select option{background:#244c6d;color:#fff}
 footer{max-width:1100px;margin:0 auto;padding:30px 24px 46px;text-align:center;color:var(--muted);font-size:12.5px}
 footer p{margin:6px 0}
 footer a.dim{color:rgba(255,255,255,.35)}
+
+/* sponsor logos + discuss emphasis (July feedback) */
+.sponsor-logo{display:block;max-height:34px;max-width:150px;margin:0 0 8px;border-radius:6px;background:#fff;padding:3px 6px}
+.btn.discuss{border-color:rgba(90,200,250,.55);color:var(--claims)}
+.btn.discuss:hover{box-shadow:0 0 18px rgba(90,200,250,.2);border-color:var(--claims)}
+.discuss-card{border-color:rgba(90,200,250,.35)}
+.discuss-card .btn{width:100%;margin-top:4px}
+.topbar .brand img{width:22px;height:22px}

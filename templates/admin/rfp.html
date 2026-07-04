@@ -13,7 +13,6 @@
         <button class="btn danger" name="action" value="reject">Reject</button>
       {% elif r.status == 'approved' %}
         <button class="btn ghost" name="action" value="archive">Archive</button>
-        <button class="btn ghost" name="action" value="feature">{{ 'Unfeature ★' if r.featured else 'Feature ★' }}</button>
       {% else %}
         <button class="btn" name="action" value="unarchive">Re-approve</button>
       {% endif %}
@@ -60,8 +59,6 @@
     <input type="url" name="discourse_url" value="{{ r.discourse_url }}">
     <label class="lbl">Funding goal (USD)</label>
     <input type="text" name="goal" inputmode="decimal" value="{{ r.funding_goal_usd }}">
-    <label class="lbl">Payout addresses (one per line)</label>
-    <textarea name="payout" rows="3" class="m">{{ payout_text }}</textarea>
     <label class="lbl">Contact (private)</label>
     <input type="text" name="contact" maxlength="200" value="{{ r.contact }}">
     <button class="btn" name="action" value="edit">Save changes</button>
@@ -101,13 +98,15 @@
   {% endif %}
 
   <h3>Add a pledge</h3>
-  <form method="post" class="form form-row">
+  <form method="post" class="form form-row" enctype="multipart/form-data">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <input type="text" name="company" placeholder="Company *" maxlength="120">
     <input type="text" name="amount" placeholder="Amount USD *" inputmode="decimal">
     <select name="pstatus"><option value="pledged">pledged</option><option value="received">received</option></select>
     <input type="text" name="url" placeholder="Link (optional)" maxlength="300">
     <input type="text" name="note" placeholder="Note (optional)" maxlength="300">
+    <label class="lbl" style="flex-basis:100%">Sponsor logo (optional, PNG/JPG/WEBP, shown on the RFP page)</label>
+    <input type="file" name="logo" accept=".png,.jpg,.jpeg,.webp">
     <button class="btn" name="action" value="add_pledge">Add pledge</button>
   </form>
 

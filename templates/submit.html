@@ -27,9 +27,6 @@
     <input type="text" name="goal" required inputmode="decimal" placeholder="250000"
            value="{{ form.goal if form else '' }}">
 
-    <label class="lbl">Payout addresses <span class="dim">(one per line: 0x address or .eth name; where funds would go if completed)</span></label>
-    <textarea name="payout" rows="3" class="m" placeholder="0x… or yourname.eth">{{ form.payout if form else '' }}</textarea>
-
     <label class="lbl">Contact <span class="dim">(email / telegram, kept private)</span></label>
     <input type="text" name="contact" maxlength="200" value="{{ form.contact if form else '' }}">
 

@@ -74,6 +74,9 @@ def init():
             con.execute("ALTER TABLE rfps ADD COLUMN details TEXT DEFAULT ''")
         if "safe_address" not in cols:
             con.execute("ALTER TABLE rfps ADD COLUMN safe_address TEXT DEFAULT ''")
+        pcols = {r["name"] for r in con.execute("PRAGMA table_info(pledges)")}
+        if "logo" not in pcols:
+            con.execute("ALTER TABLE pledges ADD COLUMN logo TEXT DEFAULT ''")
     con.close()
 
 
@@ -174,14 +177,14 @@ def update_rfp(rfp_id, **fields):
 
 # ---------------------------------------------------------------- pledges
 
-def add_pledge(rfp_id, company, amount_usd, status, note, url):
+def add_pledge(rfp_id, company, amount_usd, status, note, url, logo=""):
     con = connect()
     try:
         with con:
             con.execute(
                 "INSERT INTO pledges(rfp_id,company,amount_usd,status,note,"
-                "url,created_at) VALUES(?,?,?,?,?,?,?)",
-                (rfp_id, company, amount_usd, status, note, url, now()))
+                "url,logo,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                (rfp_id, company, amount_usd, status, note, url, logo, now()))
     finally:
         con.close()
 

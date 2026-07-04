@@ -7,11 +7,5 @@ Safe deploys: disabled (0 of 5 signers configured)
 [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://127.0.0.1:4482
 [33mPress CTRL+C to quit[0m
-127.0.0.1 - - [03/Jul/2026 21:10:27] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [03/Jul/2026 21:10:27] "GET /rfp/vyper-compiler-formal-verification HTTP/1.1" 200 -
-127.0.0.1 - - [03/Jul/2026 21:10:27] "GET /submit HTTP/1.1" 200 -
-127.0.0.1 - - [03/Jul/2026 21:10:27] "GET /admin HTTP/1.1" 200 -
-127.0.0.1 - - [03/Jul/2026 21:10:27] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [03/Jul/2026 21:10:27] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [03/Jul/2026 21:10:27] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [03/Jul/2026 21:10:27] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [03/Jul/2026 21:17:44] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [03/Jul/2026 21:17:44] "GET /static/dao-logo.svg HTTP/1.1" 200 -

@@ -344,7 +344,8 @@ def index():
         for d in dn:
             recent.append({"rfp": r, "d": d})
         cards.append({"rfp": r, "sum": s, "pct": pct, "n_sponsors": len(pl),
-                      "n_donations": len(dn)})
+                      "n_donations": len(dn),
+                      "enabled": bool(r["safe_address"])})
     recent.sort(key=lambda x: x["d"]["confirmed_at"] or 0, reverse=True)
     totals = {
         "count": len(cards),
@@ -354,11 +355,10 @@ def index():
         "donations": n_donations,
     }
     state = chain_state()
+    tokens = active_tokens(state)
     return render_template("index.html", cards=cards, totals=totals,
-                           recent=recent[:8], state=state,
-                           tokens=active_tokens(state),
-                           donations_enabled=bool(state["verified"]
-                                                  and active_tokens(state)))
+                           recent=recent[:8], state=state, tokens=tokens,
+                           tokens_ok=bool(tokens))
 
 
 @app.route("/rfp/<slug>")
@@ -377,7 +377,7 @@ def rfp_page(slug):
         donations=db.donations_for(r["id"]),
         payout_addresses=json.loads(r["payout_addresses"] or "[]"),
         state=state, tokens=tokens,
-        donations_enabled=bool(state["verified"] and tokens
+        donations_enabled=bool(tokens and r["safe_address"]
                                and r["status"] == "approved"))
 
 
@@ -457,11 +457,14 @@ def donate_confirm():
     r = db.rfp_by_slug(slug)
     if not r or r["status"] != "approved":
         abort(404)
+    if not r["safe_address"]:
+        return jsonify({"status": "error",
+                        "detail": "this RFP has no donation address yet"}), 503
     state = chain_state()
-    if not state["verified"]:
+    tokens = active_tokens(state)
+    if not tokens:
         return jsonify({"status": "error", "detail": state["detail"]}), 503
-    v = chain.verify_donation_tx(tx_hash, state["treasury"],
-                                 active_tokens(state))
+    v = chain.verify_donation_tx(tx_hash, r["safe_address"], tokens)
     if not v["found"] and "malformed" in v["detail"]:
         return jsonify({"status": "error", "detail": v["detail"]}), 400
     existing = db.donation_by_hash(tx_hash)
@@ -486,10 +489,11 @@ def donate_status(tx_hash):
     if not row:
         abort(404)
     if row["status"] == "pending" and rate_limit("st:" + tx_hash, 1, 5):
+        r = db.rfp_by_id(row["rfp_id"])
         state = chain_state()
-        if state["verified"]:
-            v = chain.verify_donation_tx(tx_hash, state["treasury"],
-                                         active_tokens(state))
+        tokens = active_tokens(state)
+        if tokens and r and r["safe_address"]:
+            v = chain.verify_donation_tx(tx_hash, r["safe_address"], tokens)
             if v["found"] and not v["pending"]:
                 db.record_donation(row["rfp_id"], tx_hash, v)
                 row = db.donation_by_hash(tx_hash)
@@ -609,18 +613,83 @@ def admin_rfp(rfp_id):
         elif action == "recheck_donation":
             tx = (request.form.get("tx_hash") or "").strip().lower()
             state = chain_state()
-            if state["verified"]:
-                v = chain.verify_donation_tx(tx, state["treasury"],
-                                             active_tokens(state))
+            tokens = active_tokens(state)
+            if tokens and r["safe_address"]:
+                v = chain.verify_donation_tx(tx, r["safe_address"], tokens)
                 if v["found"] and not v["pending"]:
                     db.record_donation(rfp_id, tx, v)
         r = db.rfp_by_id(rfp_id)
+    signers_ok, signers_detail = chain.signers_configured()
     return render_template(
         "admin/rfp.html", r=r, error=error,
         sum=db.funding_summary(rfp_id),
         pledges=db.pledges_for(rfp_id, include_withdrawn=True),
         donations=db.donations_for(rfp_id, only_confirmed=False),
-        payout_text="\n".join(json.loads(r["payout_addresses"] or "[]")))
+        payout_text="\n".join(json.loads(r["payout_addresses"] or "[]")),
+        signers_ok=signers_ok, signers_detail=signers_detail,
+        signers=config.OPERATIONAL_SIGNERS, safe_threshold=config.SAFE_THRESHOLD)
+
+
+# ------------------------------------------------ Safe-per-RFP deployment
+
+@app.route("/api/admin/rfps/<int:rfp_id>/safe-deploy-params")
+@admin_required
+def safe_deploy_params(rfp_id):
+    """Everything the admin wallet needs to deploy this RFP's Safe."""
+    same_origin_only()
+    r = db.rfp_by_id(rfp_id)
+    if not r:
+        abort(404)
+    ok, why = chain.signers_configured()
+    if not ok:
+        return jsonify({"enabled": False, "reason": why}), 503
+    chain_name = ("sepolia" if request.args.get("chain") == "sepolia"
+                  else "mainnet")
+    return jsonify({
+        "enabled": True,
+        "chain": chain_name,
+        "chain_id": (config.SEPOLIA_CHAIN_ID if chain_name == "sepolia"
+                     else config.CHAIN_ID),
+        "factory": config.SAFE_PROXY_FACTORY,
+        "calldata": chain.safe_deploy_calldata(rfp_id),
+        "signers": config.OPERATIONAL_SIGNERS,
+        "threshold": config.SAFE_THRESHOLD,
+        "already_deployed": r["safe_address"] or None,
+    })
+
+
+@app.route("/api/admin/rfps/<int:rfp_id>/safe-confirm", methods=["POST"])
+@admin_required
+def safe_confirm(rfp_id):
+    """Verify a deploy tx, and (mainnet only) store the verified address."""
+    same_origin_only()
+    r = db.rfp_by_id(rfp_id)
+    if not r:
+        abort(404)
+    body = request.get_json(silent=True) or {}
+    tx_hash = str(body.get("tx_hash") or "").strip().lower()
+    chain_name = ("sepolia" if body.get("chain") == "sepolia" else "mainnet")
+    if not re.fullmatch(r"0x[0-9a-f]{64}", tx_hash):
+        return jsonify({"status": "error", "detail": "malformed tx hash"}), 400
+    address, err = chain.extract_deployed_safe(tx_hash, chain_name)
+    if err == "pending":
+        return jsonify({"status": "pending",
+                        "detail": "waiting for the deploy tx to be mined"})
+    if err:
+        return jsonify({"status": "error", "detail": err}), 400
+    ok, detail = chain.verify_safe(address, chain_name)
+    if not ok:
+        return jsonify({"status": "error",
+                        "detail": "Safe deployed at %s but REJECTED: %s"
+                                  % (address, detail)}), 400
+    if chain_name == "mainnet":
+        if r["safe_address"] and r["safe_address"].lower() != address.lower():
+            return jsonify({"status": "error",
+                            "detail": "this RFP already has a different Safe: "
+                                      + r["safe_address"]}), 409
+        db.update_rfp(rfp_id, safe_address=address)
+    return jsonify({"status": "ok", "address": address, "chain": chain_name,
+                    "stored": chain_name == "mainnet", "detail": detail})
 
 
 @app.route("/healthz")
@@ -632,9 +701,82 @@ def healthz():
                                         if t["ok"])})
 
 
+# ------------------------------------------------ donation auto-discovery
+# Background scanner: watches every RFP Safe for incoming transfers of the
+# accepted tokens and credits them automatically. Nobody has to paste a tx
+# hash; the manual path remains as an instant-gratification fallback.
+
+SCAN_INTERVAL_SECS = 180
+SCAN_CHUNK_BLOCKS = 2000
+
+
+def _scan_once():
+    state = chain_state()
+    tokens = active_tokens(state)
+    if not tokens:
+        return
+    safes = {}  # padded topic -> (rfp_id, safe_address)
+    for r in db.list_rfps(("approved",)):
+        if r["safe_address"]:
+            topic = "0x" + "0" * 24 + r["safe_address"].lower().replace("0x", "")
+            safes[topic] = (r["id"], r["safe_address"])
+    if not safes:
+        return
+    head = chain.get_block_number()
+    safe_head = head - (config.MIN_CONFIRMATIONS - 1)
+    last = int(db.meta_get("scan_block", "0") or 0)
+    if last == 0:
+        # first run: start from now; older donations can be credited manually
+        db.meta_set("scan_block", str(safe_head))
+        return
+    if last >= safe_head:
+        return
+    token_addrs = [a for a, _ in tokens.values()]
+    frm = last + 1
+    while frm <= safe_head:
+        to = min(frm + SCAN_CHUNK_BLOCKS - 1, safe_head)
+        try:
+            logs = chain.rpc_call("eth_getLogs", [{
+                "fromBlock": hex(frm), "toBlock": hex(to),
+                "address": token_addrs,
+                "topics": [chain.TRANSFER_TOPIC, None, list(safes.keys())],
+            }]) or []
+        except chain.RpcError:
+            return  # try again next cycle; scan_block stays put
+        seen = []
+        for lg in logs:
+            tx = (lg.get("transactionHash") or "").lower()
+            dest = (lg.get("topics") or [None, None, None])[2]
+            if not tx or not dest or dest.lower() not in safes:
+                continue
+            seen.append((tx, safes[dest.lower()]))
+        for tx, (rfp_id, safe_addr) in seen:
+            existing = db.donation_by_hash(tx)
+            if existing and existing["status"] != "pending":
+                continue
+            v = chain.verify_donation_tx(tx, safe_addr, tokens)
+            if v["ok"]:
+                db.record_donation(rfp_id, tx, v)
+        db.meta_set("scan_block", str(to))
+        frm = to + 1
+
+
+def _scanner_loop():
+    while True:
+        try:
+            _scan_once()
+        except Exception as e:
+            print("scanner error: %s" % e)
+        time.sleep(SCAN_INTERVAL_SECS)
+
+
 if __name__ == "__main__":
     print("TheDAO RFPs — admin password is in .env")
     state = chain_state()
     print("Treasury %s -> %s (verified: %s)" % (
         config.TREASURY_LABEL, state["treasury"], state["verified"]))
+    ok, why = chain.signers_configured()
+    print("Safe deploys: %s (%s)" % ("ENABLED" if ok else "disabled", why))
+    threading.Thread(target=_scanner_loop, daemon=True,
+                     name="donation-scanner").start()
     app.run(host="127.0.0.1", port=config.PORT, debug=False)

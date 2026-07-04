@@ -72,6 +72,8 @@ def init():
         cols = {r["name"] for r in con.execute("PRAGMA table_info(rfps)")}
         if "details" not in cols:
             con.execute("ALTER TABLE rfps ADD COLUMN details TEXT DEFAULT ''")
+        if "safe_address" not in cols:
+            con.execute("ALTER TABLE rfps ADD COLUMN safe_address TEXT DEFAULT ''")
     con.close()
 
 
@@ -154,7 +156,7 @@ def list_rfps(statuses=("approved",)):
 def update_rfp(rfp_id, **fields):
     allowed = {"title", "summary", "details", "discourse_url",
                "funding_goal_usd", "payout_addresses", "contact", "status",
-               "featured", "approved_at"}
+               "featured", "approved_at", "safe_address"}
     sets, vals = [], []
     for k, v in fields.items():
         if k not in allowed:

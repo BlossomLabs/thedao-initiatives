@@ -55,6 +55,29 @@ LOGIN_ATTEMPTS_PER_MINUTE_PER_IP = 5
 # short reorg cannot leave an RFP crediting money that fell off the chain.
 MIN_CONFIRMATIONS = 2
 
+# ---------------------------------------------------------------- Safe-per-RFP
+# Each approved RFP gets its own Gnosis Safe (same operational signers every
+# time) deployed from the admin panel via the canonical SafeProxyFactory.
+# All three addresses verified 2026-07: Etherscan labels + byte-identical
+# code on mainnet and Sepolia (Safe deploys deterministically cross-chain).
+SAFE_PROXY_FACTORY   = "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
+SAFE_SINGLETON       = "0x41675C099F32341bf84BFc5382aF534df5C7461a"
+SAFE_FALLBACK_HANDLER = "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99"
+
+SEPOLIA_RPC_ENDPOINTS = [
+    "https://ethereum-sepolia-rpc.publicnode.com",
+    "https://sepolia.drpc.org",
+]
+SEPOLIA_CHAIN_ID = 11155111
+
+# The 5 operational signers (3-of-5) that own every RFP Safe. Set in .env as
+# OPERATIONAL_SIGNERS=0xaaa...,0xbbb...,... (comma-separated, checksummed).
+# Safe deployment stays disabled until exactly SAFE_OWNER_COUNT valid,
+# distinct addresses are configured, and every deployed Safe is verified
+# on-chain against this exact set before the app will show its address.
+SAFE_THRESHOLD = 3
+SAFE_OWNER_COUNT = 5
+
 
 def _load_env():
     """Tiny .env loader (no python-dotenv dependency)."""
@@ -116,6 +139,10 @@ COOKIE_SECURE = ENV.get("COOKIE_SECURE", "").strip() in ("1", "true", "yes")
 # Global backstop: max failed admin logins per minute across all IPs, to blunt
 # distributed (botnet) brute force that per-IP limits cannot see.
 LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL = 60
+
+OPERATIONAL_SIGNERS = [
+    a.strip() for a in ENV.get("OPERATIONAL_SIGNERS", "").split(",")
+    if a.strip()]
 
 if RPC_URL_OVERRIDE:
     RPC_ENDPOINTS = [RPC_URL_OVERRIDE] + RPC_ENDPOINTS

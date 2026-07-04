@@ -84,10 +84,9 @@
       <div class="donate-card">
         <div class="k">Donate to this RFP</div>
         {% if donations_enabled %}
-          {% with slug=r.slug, manual=True %}{% include "_donate_widget.html" %}{% endwith %}
+          {% with slug=r.slug, address=r.safe_address, manual=True %}{% include "_donate_widget.html" %}{% endwith %}
         {% else %}
-          <p class="small">Donations are temporarily unavailable{% if r.status != 'approved' %} for this RFP{% endif %}.
-          {% if state and not state.verified %}<span class="dim">({{ state.detail }})</span>{% endif %}</p>
+          <p class="small">{% if not r.safe_address %}This RFP's donation address is being set up. Check back soon.{% else %}Donations are temporarily unavailable.{% endif %}</p>
         {% endif %}
       </div>
       <div class="side-note">

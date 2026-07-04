@@ -1,5 +1,5 @@
-{# Reusable donation widget. Vars: slug (required), tokens, manual (bool) #}
-<div class="donate-widget" data-donate data-slug="{{ slug }}">
+{# Reusable donation widget. Vars: slug, address (this RFP's Safe), tokens, manual (bool) #}
+<div class="donate-widget" data-donate data-slug="{{ slug }}" data-address="{{ address }}">
   <div class="dw-row">
     <div class="dw-chips">
       {% for amt in ('50','100','500','1000') %}
@@ -14,17 +14,18 @@
     </select>
   </div>
   <button type="button" class="btn primary dw-send">Donate</button>
-  <p class="dw-trust small dim">Goes straight to TheDAO Security Fund treasury
-  <b class="m">{{ state.treasury | shortaddr }}</b> on Ethereum mainnet and is verified on-chain before it counts.</p>
+  <p class="dw-trust small dim">Goes to this RFP's own {{ safe_threshold or 3 }}-of-5 Safe
+  <a class="m" href="https://etherscan.io/address/{{ address }}" target="_blank" rel="noopener">{{ address | shortaddr }}</a>
+  on Ethereum mainnet, counted automatically.</p>
   <div class="dw-status status" hidden></div>
   {% if manual %}
   <details class="manual">
-    <summary>Sent from an exchange or another wallet?</summary>
-    <p class="small dim">Send an accepted stablecoin to the treasury
-    <b class="m">{{ state.treasury }}</b>, then paste the
-    transaction hash here and we will verify it on-chain and credit it to this RFP.</p>
+    <summary>Donating from an exchange or another wallet?</summary>
+    <p class="small dim">Just send an accepted stablecoin to this RFP's address
+    <b class="m">{{ address }}</b> and it is counted automatically within a few
+    minutes. If you are impatient, paste the transaction hash here:</p>
     <input class="dw-manual-hash m" type="text" placeholder="0x…">
-    <button type="button" class="btn ghost dw-manual-btn">Verify transaction</button>
+    <button type="button" class="btn ghost dw-manual-btn">Verify now</button>
   </details>
   {% endif %}
 </div>

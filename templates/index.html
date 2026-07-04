@@ -41,12 +41,12 @@
         <span class="dim">{{ c.pct }}%{% if c.n_sponsors %} · {{ c.n_sponsors }} sponsor{{ '' if c.n_sponsors == 1 else 's' }}{% endif %}</span>
       </div>
       <div class="card-actions">
-        {% if donations_enabled %}<button class="btn primary sm" type="button" data-donate-toggle>Donate</button>{% endif %}
+        {% if tokens_ok and c.enabled %}<button class="btn primary sm" type="button" data-donate-toggle>Donate</button>{% endif %}
         <a class="btn ghost sm" href="{{ url_for('rfp_page', slug=c.rfp.slug) }}">Details →</a>
       </div>
-      {% if donations_enabled %}
+      {% if tokens_ok and c.enabled %}
       <div class="card-donate" hidden>
-        {% with slug=c.rfp.slug, manual=False %}{% include "_donate_widget.html" %}{% endwith %}
+        {% with slug=c.rfp.slug, address=c.rfp.safe_address, manual=False %}{% include "_donate_widget.html" %}{% endwith %}
       </div>
       {% endif %}
     </div>

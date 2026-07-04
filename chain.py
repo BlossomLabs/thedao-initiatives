@@ -36,15 +36,18 @@ class RpcError(Exception):
     pass
 
 
-def rpc_call(method, params, timeout=10):
-    """Call mainnet JSON-RPC with endpoint failover."""
+def rpc_call(method, params, timeout=10, endpoints=None):
+    """Call JSON-RPC with endpoint failover (mainnet unless endpoints given)."""
     payload = json.dumps({
         "jsonrpc": "2.0", "id": 1, "method": method, "params": params,
     }).encode()
-    endpoints = config.RPC_ENDPOINTS
+    sticky = endpoints is None  # remember the good endpoint for mainnet only
+    if endpoints is None:
+        endpoints = config.RPC_ENDPOINTS
     order = list(range(len(endpoints)))
-    start = _last_good_rpc[0] if _last_good_rpc[0] < len(endpoints) else 0
-    order = order[start:] + order[:start]
+    if sticky:
+        start = _last_good_rpc[0] if _last_good_rpc[0] < len(endpoints) else 0
+        order = order[start:] + order[:start]
     last_err = None
     for i in order:
         url = endpoints[i]
@@ -57,7 +60,8 @@ def rpc_call(method, params, timeout=10):
                 out = json.loads(resp.read().decode())
             if "error" in out and out["error"]:
                 raise RpcError(str(out["error"]))
-            _last_good_rpc[0] = i
+            if sticky:
+                _last_good_rpc[0] = i
             return out.get("result")
         except Exception as e:  # try next endpoint
             last_err = e
@@ -344,3 +348,170 @@ def verify_donation_tx(tx_hash, treasury, allowed_tokens):
 
 def get_block_number():
     return _decode_hex_int(rpc_call("eth_blockNumber", []))
+
+
+# ---------------------------------------------------------------- Safe-per-RFP
+# Deploying and verifying per-RFP Gnosis Safes via the canonical
+# SafeProxyFactory. Selectors and event topics are computed from their
+# signatures at import time (never memorized constants), and asserted
+# against known values in tests/test_core.py.
+
+def _selector(sig: str) -> str:
+    return "0x" + keccak256(sig.encode()).hex()[:8]
+
+
+def _event_topic(sig: str) -> str:
+    return "0x" + keccak256(sig.encode()).hex()
+
+
+SEL_CREATE_PROXY = _selector("createProxyWithNonce(address,bytes,uint256)")
+SEL_SETUP = _selector(
+    "setup(address[],uint256,address,bytes,address,address,uint256,address)")
+SEL_GET_OWNERS = _selector("getOwners()")
+SEL_GET_THRESHOLD = _selector("getThreshold()")
+TOPIC_PROXY_CREATION = _event_topic("ProxyCreation(address,address)")
+
+
+def _abi_word(v) -> bytes:
+    """One 32-byte ABI word from an int or a 0x-address string."""
+    if isinstance(v, str):
+        return bytes(12) + bytes.fromhex(v.lower().replace("0x", ""))
+    return int(v).to_bytes(32, "big")
+
+
+def encode_safe_setup(owners, threshold, fallback_handler) -> bytes:
+    """ABI-encode Safe.setup(owners, threshold, 0, 0x, handler, 0, 0, 0).
+
+    Layout: 8 head words, then the owners array tail, then the empty
+    `data` bytes tail. Offsets are byte offsets from the start of the args.
+    """
+    head_size = 8 * 32
+    owners_tail = _abi_word(len(owners)) + b"".join(_abi_word(o) for o in owners)
+    owners_off = head_size
+    data_off = owners_off + len(owners_tail)
+    zero = "0x" + "0" * 40
+    head = b"".join([
+        _abi_word(owners_off),        # offset -> owners[]
+        _abi_word(threshold),
+        _abi_word(zero),              # to (no delegate call)
+        _abi_word(data_off),          # offset -> data (empty bytes)
+        _abi_word(fallback_handler),
+        _abi_word(zero),              # paymentToken
+        _abi_word(0),                 # payment
+        _abi_word(zero),              # paymentReceiver
+    ])
+    data_tail = _abi_word(0)          # bytes length 0
+    return bytes.fromhex(SEL_SETUP[2:]) + head + owners_tail + data_tail
+
+
+def encode_create_proxy(singleton, initializer: bytes, salt_nonce: int) -> str:
+    """Calldata for SafeProxyFactory.createProxyWithNonce."""
+    head_size = 3 * 32
+    pad = (32 - len(initializer) % 32) % 32
+    init_tail = (_abi_word(len(initializer)) + initializer + b"\x00" * pad)
+    head = b"".join([
+        _abi_word(singleton),
+        _abi_word(head_size),         # offset -> initializer bytes
+        _abi_word(salt_nonce),
+    ])
+    return SEL_CREATE_PROXY + (head + init_tail).hex()
+
+
+def safe_deploy_calldata(rfp_id: int) -> str:
+    """The exact factory calldata the admin wallet sends to deploy an RFP Safe."""
+    init = encode_safe_setup(config.OPERATIONAL_SIGNERS, config.SAFE_THRESHOLD,
+                             config.SAFE_FALLBACK_HANDLER)
+    return encode_create_proxy(config.SAFE_SINGLETON, init, int(rfp_id))
+
+
+def signers_configured():
+    """Exactly SAFE_OWNER_COUNT distinct, checksummed signer addresses."""
+    s = config.OPERATIONAL_SIGNERS
+    if len(s) != config.SAFE_OWNER_COUNT:
+        return False, ("%d of %d signers configured"
+                       % (len(s), config.SAFE_OWNER_COUNT))
+    seen = set()
+    for a in s:
+        if not is_address(a):
+            return False, "invalid signer address: %r" % a
+        if to_checksum(a) != a:
+            return False, "signer not in checksum form: %s" % a
+        if a.lower() in seen:
+            return False, "duplicate signer: %s" % a
+        seen.add(a.lower())
+    return True, "ok"
+
+
+def _chain_endpoints(chain_name):
+    if chain_name == "sepolia":
+        return config.SEPOLIA_RPC_ENDPOINTS
+    return None  # mainnet default
+
+
+def extract_deployed_safe(tx_hash, chain_name="mainnet"):
+    """Parse a deploy tx receipt for the factory's ProxyCreation event.
+
+    Returns (safe_address, None) or (None, reason). Only trusts events
+    emitted BY the canonical factory address.
+    """
+    eps = _chain_endpoints(chain_name)
+    receipt = rpc_call("eth_getTransactionReceipt", [tx_hash], endpoints=eps)
+    if receipt is None:
+        return None, "pending"
+    if receipt.get("status") != "0x1":
+        return None, "deploy transaction reverted"
+    for log in receipt.get("logs", []):
+        if (log.get("address") or "").lower() != config.SAFE_PROXY_FACTORY.lower():
+            continue
+        topics = log.get("topics") or []
+        if not topics or topics[0].lower() != TOPIC_PROXY_CREATION:
+            continue
+        # proxy address: indexed -> topics[1] (v1.4.1). Older layouts put it
+        # in data; handle both.
+        if len(topics) >= 2:
+            return to_checksum("0x" + topics[1][-40:]), None
+        data = log.get("data") or ""
+        if len(data) >= 66:
+            return to_checksum("0x" + data[2:66][-40:]), None
+    return None, "no ProxyCreation event from the canonical factory in this tx"
+
+
+def verify_safe(address, chain_name="mainnet"):
+    """Verify a deployed Safe matches our exact spec before trusting it.
+
+    Checks: owners == configured signers (exact set), threshold, and that
+    the proxy points at the canonical v1.4.1 singleton.
+    Returns (ok, detail).
+    """
+    eps = _chain_endpoints(chain_name)
+
+    def call(data):
+        return rpc_call("eth_call", [{"to": address, "data": data}, "latest"],
+                        endpoints=eps)
+
+    ok, why = signers_configured()
+    if not ok:
+        return False, why
+    try:
+        thr = _decode_hex_int(call(SEL_GET_THRESHOLD))
+        if thr != config.SAFE_THRESHOLD:
+            return False, "threshold is %d, expected %d" % (
+                thr, config.SAFE_THRESHOLD)
+        raw = call(SEL_GET_OWNERS)
+        blob = bytes.fromhex(raw[2:])
+        n = int.from_bytes(blob[32:64], "big")
+        owners = {("0x" + blob[64 + 32 * i + 12:64 + 32 * (i + 1)].hex()).lower()
+                  for i in range(n)}
+        expected = {a.lower() for a in config.OPERATIONAL_SIGNERS}
+        if owners != expected:
+            return False, ("owner set mismatch: on-chain has %d owners, "
+                           "not the configured signers" % n)
+        slot0 = rpc_call("eth_getStorageAt", [address, "0x0", "latest"],
+                         endpoints=eps)
+        impl = ("0x" + slot0[-40:]).lower()
+        if impl != config.SAFE_SINGLETON.lower():
+            return False, "proxy singleton is not canonical Safe v1.4.1"
+        return True, ("verified: %d-of-%d Safe with the configured "
+                      "operational signers" % (config.SAFE_THRESHOLD, n))
+    except Exception as e:
+        return False, "verification failed: %s" % e

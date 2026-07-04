@@ -21,6 +21,30 @@
     </form>
   </div>
 
+  <h2>Donation Safe</h2>
+  {% if r.safe_address %}
+    <p>Deployed and verified: <a class="m" href="https://etherscan.io/address/{{ r.safe_address }}" target="_blank" rel="noopener">{{ r.safe_address }}</a>
+    <span class="chip static st-approved">{{ safe_threshold }}-of-{{ signers | length }}</span></p>
+    <p class="small dim">Donations to this address are counted for this RFP automatically.</p>
+  {% elif not signers_ok %}
+    <p class="small">Safe deployment is disabled: <b>{{ signers_detail }}</b>.</p>
+    <p class="small dim">Set the operational signers once in the config file (Terminal: <span class="m">open -e ~/thedao-rfps/.env</span>, add a line
+    <span class="m">OPERATIONAL_SIGNERS=0x…,0x…,0x…,0x…,0x…</span> with all 5 checksummed addresses, then restart the server).</p>
+  {% elif r.status == 'approved' %}
+    <div id="safe-deploy" data-rfp="{{ r.id }}">
+      <p class="small dim">Deploys a {{ safe_threshold }}-of-{{ signers | length }} Gnosis Safe owned by the operational signers.
+      One transaction from your wallet; the app verifies owners and threshold on-chain before showing the address to donors.</p>
+      <ul class="m addr-list">{% for s in signers %}<li>{{ s }}</li>{% endfor %}</ul>
+      <div class="btnrow" style="display:flex;gap:10px">
+        <button class="btn primary" id="safe-deploy-mainnet" type="button">Deploy Safe (mainnet)</button>
+        <button class="btn ghost" id="safe-deploy-sepolia" type="button">Test deploy (Sepolia)</button>
+      </div>
+      <div class="status" id="safe-deploy-status" hidden></div>
+    </div>
+  {% else %}
+    <p class="small dim">Approve this RFP first, then deploy its donation Safe.</p>
+  {% endif %}
+
   <h2>Funding <span class="n">{{ sum.total | usd }} = {{ sum.pledged | usd }} pledged + {{ sum.donated | usd }} donated</span></h2>
 
   <h2>Edit RFP</h2>
@@ -118,3 +142,4 @@
   {% endif %}
 </main>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='admin.js') }}"></script>{% endblock %}

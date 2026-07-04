@@ -274,5 +274,151 @@ class TestLiveChain(unittest.TestCase):
         self.assertTrue(verified, "treasury cross-check failed: %s" % detail)
 
 
+SIGNERS = [
+    "0x1111111111111111111111111111111111111111",
+    "0x2222222222222222222222222222222222222222",
+    "0x3333333333333333333333333333333333333333",
+    "0x4444444444444444444444444444444444444444",
+    "0x5555555555555555555555555555555555555555",
+]
+SIGNERS = [chain.to_checksum(a) for a in SIGNERS]
+
+
+class TestSafeDeploy(unittest.TestCase):
+    def test_selectors_are_wellknown(self):
+        # cross-check the keccak-derived selectors against published values
+        self.assertEqual(chain.SEL_CREATE_PROXY, "0x1688f0b9")
+        self.assertEqual(chain.SEL_SETUP, "0xb63e800d")
+        self.assertEqual(chain.SEL_GET_OWNERS, "0xa0e67e2b")
+        self.assertEqual(chain.SEL_GET_THRESHOLD, "0xe75235b8")
+
+    def test_setup_encoding_layout(self):
+        blob = chain.encode_safe_setup(SIGNERS, 3, config.SAFE_FALLBACK_HANDLER)
+        self.assertEqual(blob[:4].hex(), "b63e800d")
+        args = blob[4:]
+        # head word 0: offset to owners array = 8 words = 0x100
+        self.assertEqual(int.from_bytes(args[0:32], "big"), 8 * 32)
+        # head word 1: threshold
+        self.assertEqual(int.from_bytes(args[32:64], "big"), 3)
+        # owners tail: length then the 5 addresses
+        off = 8 * 32
+        self.assertEqual(int.from_bytes(args[off:off + 32], "big"), 5)
+        first = "0x" + args[off + 32 + 12:off + 64].hex()
+        self.assertEqual(first.lower(), SIGNERS[0].lower())
+        # data offset (head word 3) points just past the owners tail
+        data_off = int.from_bytes(args[96:128], "big")
+        self.assertEqual(data_off, 8 * 32 + 32 + 5 * 32)
+        # and the bytes there are empty (length 0)
+        self.assertEqual(int.from_bytes(args[data_off:data_off + 32], "big"), 0)
+
+    def test_create_proxy_encoding(self):
+        init = chain.encode_safe_setup(SIGNERS, 3, config.SAFE_FALLBACK_HANDLER)
+        data = chain.encode_create_proxy(config.SAFE_SINGLETON, init, 42)
+        raw = bytes.fromhex(data[2:])
+        self.assertEqual(raw[:4].hex(), "1688f0b9")
+        args = raw[4:]
+        # singleton in word 0, salt nonce in word 2
+        self.assertEqual("0x" + args[12:32].hex(),
+                         config.SAFE_SINGLETON.lower())
+        self.assertEqual(int.from_bytes(args[64:96], "big"), 42)
+        # initializer bytes at the offset in word 1, length matches
+        off = int.from_bytes(args[32:64], "big")
+        ln = int.from_bytes(args[off:off + 32], "big")
+        self.assertEqual(ln, len(init))
+        self.assertEqual(args[off + 32:off + 32 + ln], init)
+
+    def test_proxy_creation_topic(self):
+        # keccak("ProxyCreation(address,address)") — published constant
+        self.assertEqual(
+            chain.TOPIC_PROXY_CREATION,
+            "0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9ec9070a6199ad418e235")
+
+    def test_extract_deployed_safe(self):
+        proxy = "0xAbcDabCDabcdAbCdAbCdABCDabcDABcDABCDabCD"
+        receipt = {"status": "0x1", "logs": [{
+            "address": config.SAFE_PROXY_FACTORY.lower(),
+            "topics": [chain.TOPIC_PROXY_CREATION,
+                       "0x" + "0" * 24 + proxy.lower().replace("0x", "")],
+            "data": "0x",
+        }]}
+
+        def fake_rpc(method, params, timeout=10, endpoints=None):
+            if method == "eth_getTransactionReceipt":
+                return receipt
+            raise AssertionError("unexpected rpc %s" % method)
+        with mock.patch.object(chain, "rpc_call", fake_rpc):
+            addr, err = chain.extract_deployed_safe("0x" + "ab" * 32)
+        self.assertIsNone(err)
+        self.assertEqual(addr.lower(), proxy.lower())
+
+    def test_extract_ignores_events_from_other_contracts(self):
+        receipt = {"status": "0x1", "logs": [{
+            "address": "0x9999999999999999999999999999999999999999",
+            "topics": [chain.TOPIC_PROXY_CREATION,
+                       "0x" + "0" * 24 + "11" * 20],
+            "data": "0x",
+        }]}
+
+        def fake_rpc(method, params, timeout=10, endpoints=None):
+            return receipt
+        with mock.patch.object(chain, "rpc_call", fake_rpc):
+            addr, err = chain.extract_deployed_safe("0x" + "ab" * 32)
+        self.assertIsNone(addr)
+        self.assertIn("no ProxyCreation", err)
+
+    def test_verify_safe_owner_set(self):
+        def encoded_owners(addrs):
+            blob = (32).to_bytes(32, "big") + len(addrs).to_bytes(32, "big")
+            for a in addrs:
+                blob += bytes(12) + bytes.fromhex(a[2:].lower())
+            return "0x" + blob.hex()
+
+        calls = {
+            chain.SEL_GET_THRESHOLD: "0x" + hex(3)[2:].rjust(64, "0"),
+            chain.SEL_GET_OWNERS: encoded_owners(SIGNERS),
+        }
+
+        def fake_rpc(method, params, timeout=10, endpoints=None):
+            if method == "eth_call":
+                return calls[params[0]["data"]]
+            if method == "eth_getStorageAt":
+                return "0x" + "0" * 24 + config.SAFE_SINGLETON[2:].lower()
+            raise AssertionError("unexpected rpc %s" % method)
+
+        with mock.patch.object(config, "OPERATIONAL_SIGNERS", SIGNERS), \
+             mock.patch.object(chain, "rpc_call", fake_rpc):
+            ok, detail = chain.verify_safe("0x" + "aa" * 20)
+            self.assertTrue(ok, detail)
+
+        # wrong owner set must be rejected
+        bad = SIGNERS[:4] + ["0x9999999999999999999999999999999999999999"]
+        calls[chain.SEL_GET_OWNERS] = encoded_owners(bad)
+        with mock.patch.object(config, "OPERATIONAL_SIGNERS", SIGNERS), \
+             mock.patch.object(chain, "rpc_call", fake_rpc):
+            ok, detail = chain.verify_safe("0x" + "aa" * 20)
+            self.assertFalse(ok)
+            self.assertIn("mismatch", detail)
+
+    def test_signers_configured_validation(self):
+        with mock.patch.object(config, "OPERATIONAL_SIGNERS", SIGNERS):
+            ok, _ = chain.signers_configured()
+            self.assertTrue(ok)
+        with mock.patch.object(config, "OPERATIONAL_SIGNERS", SIGNERS[:4]):
+            ok, why = chain.signers_configured()
+            self.assertFalse(ok)
+        with mock.patch.object(config, "OPERATIONAL_SIGNERS",
+                               SIGNERS[:4] + [SIGNERS[0]]):
+            ok, why = chain.signers_configured()
+            self.assertFalse(ok)
+            self.assertIn("duplicate", why)
+        # lowercase (non-checksummed) signer must be rejected; use an address
+        # with letters so lowercase differs from its checksum form
+        with mock.patch.object(config, "OPERATIONAL_SIGNERS",
+                               SIGNERS[:4] + [config.SAFE_FALLBACK_HANDLER.lower()]):
+            ok, why = chain.signers_configured()
+            self.assertFalse(ok)
+            self.assertIn("checksum", why)
+
+
 if __name__ == "__main__":
     unittest.main()

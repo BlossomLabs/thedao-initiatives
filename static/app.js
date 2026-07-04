@@ -111,6 +111,7 @@
 
   function initWidget(root) {
     var slug = root.dataset.slug;
+    var rfpAddress = root.dataset.address || "";
     var elToken = root.querySelector(".dw-token");
     var elAmount = root.querySelector(".dw-amount");
     var elSend = root.querySelector(".dw-send");
@@ -140,19 +141,16 @@
     }
 
     function donate() {
+      if (!/^0x[0-9a-fA-F]{40}$/.test(rfpAddress)) {
+        status("err", "This RFP's donation address is not set up yet.");
+        return;
+      }
       if (!window.ethereum) {
-        getParams().then(function (p) {
-          status("err",
-            "No wallet detected in this browser. You can still donate from any " +
-            "wallet or exchange: send an accepted stablecoin to the treasury " +
-            "<b class=\"m\">" + p.treasury + "</b>, then credit it to this RFP " +
-            "with the transaction hash (see the RFP page).");
-        }).catch(function () {
-          status("err",
-            "No wallet detected in this browser. You can still donate from any " +
-            "wallet or exchange: see the RFP page for the treasury address and " +
-            "manual verification.");
-        });
+        status("err",
+          "No wallet detected in this browser. You can still donate from any " +
+          "wallet or exchange: send an accepted stablecoin to this RFP's own " +
+          "address <b class=\"m\">" + rfpAddress + "</b> and it is counted " +
+          "automatically.");
         return;
       }
       var pre = account ? Promise.resolve(account)
@@ -167,13 +165,13 @@
           return;
         }
         status("wait", "Check your wallet to approve:<br><b>" +
-               elAmount.value + " " + sym + "</b> → <b>" + params.treasury_label +
-               "</b> <span class=\"m dim\">(" + short(params.treasury) + ")</span>");
+               elAmount.value + " " + sym + "</b> → <b>this RFP's Safe</b> " +
+               "<span class=\"m dim\">(" + short(rfpAddress) + ")</span>");
         return ensureMainnet(window.ethereum).then(function () {
           return window.ethereum.request({
             method: "eth_sendTransaction",
             params: [{ from: account, to: tok.address, value: "0x0",
-                       data: transferCalldata(params.treasury, base) }]
+                       data: transferCalldata(rfpAddress, base) }]
           });
         }).then(function (txHash) {
           status("wait", "Sent. Waiting for mainnet confirmation…<br>" +

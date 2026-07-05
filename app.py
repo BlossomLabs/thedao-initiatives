@@ -815,4 +815,8 @@ if __name__ == "__main__":
     print("Safe deploys: %s (%s)" % ("ENABLED" if ok else "disabled", why))
     threading.Thread(target=_scanner_loop, daemon=True,
                      name="donation-scanner").start()
-    app.run(host="127.0.0.1", port=config.PORT, debug=False)
+    # BIND_HOST=0.0.0.0 in .env exposes the app on the local network (e.g. to
+    # click Deploy from a machine that has wallet keys). Default stays
+    # localhost-only.
+    app.run(host=config.ENV.get("BIND_HOST", "127.0.0.1").strip() or "127.0.0.1",
+            port=config.PORT, debug=False)

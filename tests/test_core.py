@@ -422,3 +422,38 @@ class TestSafeDeploy(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOnrampLink(unittest.TestCase):
+    SAFE = "0xD5Cf05f24727C83976652E3586c0e26DD39884e9"
+
+    def _link(self, provider, key):
+        import app as app_mod
+        with mock.patch.object(config, "ONRAMP_PROVIDER", provider), \
+             mock.patch.object(config, "ONRAMP_API_KEY", key):
+            return app_mod.onramp_link(self.SAFE)
+
+    def test_default_keyless_guardarian(self):
+        url, prefilled = self._link("guardarian", "")
+        self.assertIn("guardarian.com", url)
+        self.assertFalse(prefilled)
+
+    def test_transak_without_key_falls_back(self):
+        url, prefilled = self._link("transak", "")
+        self.assertIn("guardarian.com", url)
+        self.assertFalse(prefilled)
+
+    def test_transak_with_key_prefills_address(self):
+        url, prefilled = self._link("transak", "pk_test_123")
+        self.assertTrue(prefilled)
+        self.assertIn("walletAddress=" + self.SAFE, url)
+        self.assertIn("cryptoCurrencyCode=USDC", url)
+        self.assertIn("network=ethereum", url)
+        self.assertIn("{AMT}", url)
+
+    def test_moonpay_with_key_prefills_address(self):
+        url, prefilled = self._link("moonpay", "pk_live_x")
+        self.assertTrue(prefilled)
+        self.assertIn("walletAddress=" + self.SAFE, url)
+        self.assertIn("currencyCode=usdc", url)
+        self.assertIn("{AMT}", url)

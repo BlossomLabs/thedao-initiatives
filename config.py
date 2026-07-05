@@ -144,5 +144,13 @@ OPERATIONAL_SIGNERS = [
     a.strip() for a in ENV.get("OPERATIONAL_SIGNERS", "").split(",")
     if a.strip()]
 
+# Card payments: fiat-to-crypto checkout that delivers USDC straight to the
+# RFP's Safe, where the scanner credits it like any other donation.
+# guardarian works with no partner key (donor pastes the address; we show it
+# with a copy button). transak/moonpay need a partner API key + a public
+# domain; once ONRAMP_API_KEY is set they open fully prefilled.
+ONRAMP_PROVIDER = ENV.get("ONRAMP_PROVIDER", "guardarian").strip().lower()
+ONRAMP_API_KEY = ENV.get("ONRAMP_API_KEY", "").strip()
+
 if RPC_URL_OVERRIDE:
     RPC_ENDPOINTS = [RPC_URL_OVERRIDE] + RPC_ENDPOINTS

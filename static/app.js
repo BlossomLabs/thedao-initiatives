@@ -140,17 +140,59 @@
       elStatus.innerHTML = html;
     }
 
+    // ---- method chooser: wallet / card / exchange -------------------
+    function showMethod(name) {
+      root.querySelectorAll(".dw-method").forEach(function (b) {
+        b.classList.toggle("on", b.dataset.method === name);
+      });
+      root.querySelectorAll(".dw-panel").forEach(function (p) {
+        p.hidden = p.dataset.panel !== name;
+      });
+    }
+    root.querySelectorAll(".dw-method").forEach(function (b) {
+      b.addEventListener("click", function () { showMethod(b.dataset.method); });
+    });
+    // no wallet in this browser: lead with the card option
+    if (!window.ethereum && root.querySelector('[data-panel="card"]')) {
+      showMethod("card");
+    }
+
+    root.querySelectorAll(".dw-copy").forEach(function (b) {
+      b.addEventListener("click", function () {
+        navigator.clipboard.writeText(rfpAddress).then(function () {
+          b.textContent = "Copied ✓";
+          setTimeout(function () { b.textContent = "Copy"; }, 2000);
+        }).catch(function () {
+          status("err", "Copy failed. The address is: " + rfpAddress);
+        });
+      });
+    });
+
+    var cardOpen = root.querySelector(".dw-card-open");
+    if (cardOpen) {
+      var urlTemplate = root.dataset.onramp || "";
+      cardOpen.addEventListener("click", function () {
+        var amt = (elAmount && elAmount.value) ? elAmount.value : "100";
+        if (urlTemplate.indexOf("{AMT}") !== -1) {
+          cardOpen.href = urlTemplate.replace("{AMT}",
+                                              encodeURIComponent(amt));
+        }
+        status("wait", "Card checkout opened in a new tab. Your donation " +
+               "appears here automatically once the USDC arrives " +
+               "(typically a few minutes after the purchase).");
+      });
+    }
+
     function donate() {
       if (!/^0x[0-9a-fA-F]{40}$/.test(rfpAddress)) {
         status("err", "This RFP's donation address is not set up yet.");
         return;
       }
       if (!window.ethereum) {
-        status("err",
-          "No wallet detected in this browser. You can still donate from any " +
-          "wallet or exchange: send an accepted stablecoin to this RFP's own " +
-          "address <b class=\"m\">" + rfpAddress + "</b> and it is counted " +
-          "automatically.");
+        showMethod("card");
+        status("wait", "No wallet detected in this browser, so we switched " +
+               "you to the card option. You can also donate from an " +
+               "exchange with the address under the Exchange tab.");
         return;
       }
       var pre = account ? Promise.resolve(account)

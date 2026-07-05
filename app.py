@@ -336,6 +336,30 @@ def serve_logo(name):
     return send_from_directory(LOGO_DIR, name, max_age=86400)
 
 
+@app.template_global()
+def onramp_link(safe_address):
+    """Card-checkout URL template for buying USDC delivered to an RFP Safe.
+
+    Returns (url_template, prefilled: bool). "{AMT}" in the template is
+    replaced client-side with the donor's chosen dollar amount. Providers
+    that need a partner key fall back to guardarian's keyless page when no
+    key is configured; the widget always shows the Safe address with a copy
+    button, so an unprefilled checkout still works.
+    """
+    p, key = config.ONRAMP_PROVIDER, config.ONRAMP_API_KEY
+    if p == "transak" and key:
+        return ("https://global.transak.com/?apiKey=%s"
+                "&cryptoCurrencyCode=USDC&network=ethereum&fiatCurrency=USD"
+                "&defaultFiatAmount={AMT}&walletAddress=%s"
+                % (urllib.parse.quote(key), safe_address)), True
+    if p == "moonpay" and key:
+        return ("https://buy.moonpay.com/?apiKey=%s"
+                "&currencyCode=usdc&baseCurrencyCode=usd"
+                "&baseCurrencyAmount={AMT}&walletAddress=%s"
+                % (urllib.parse.quote(key), safe_address)), True
+    return "https://guardarian.com/buy-usdc", False
+
+
 def parse_goal(raw):
     try:
         v = float((raw or "").replace(",", "").replace("$", "").strip())

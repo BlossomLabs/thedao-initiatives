@@ -1,15 +1,11 @@
  * Tip: There are .env or .flaskenv files present. Do "pip install python-dotenv" to use them.
 TheDAO RFPs — admin password is in .env
 Treasury TheDAO Security Fund treasury -> 0xD5Cf05f24727C83976652E3586c0e26DD39884e9 (verified: True)
-Safe deploys: disabled (0 of 5 signers configured)
+Safe deploys: ENABLED (ok)
  * Serving Flask app 'app'
  * Debug mode: off
 [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://127.0.0.1:4482
 [33mPress CTRL+C to quit[0m
-127.0.0.1 - - [05/Jul/2026 11:29:32] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [05/Jul/2026 11:29:32] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [05/Jul/2026 11:29:53] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [05/Jul/2026 11:29:53] "GET /rfp/vyper-compiler-formal-verification HTTP/1.1" 200 -
-127.0.0.1 - - [05/Jul/2026 11:30:18] "GET /rfp/vyper-compiler-formal-verification HTTP/1.1" 200 -
-127.0.0.1 - - [05/Jul/2026 11:30:18] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [05/Jul/2026 12:11:30] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [05/Jul/2026 12:11:31] "GET /rfp/this-rfp-board-yes-this-website HTTP/1.1" 200 -

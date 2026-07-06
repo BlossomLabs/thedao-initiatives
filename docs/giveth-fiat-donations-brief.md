@@ -8,9 +8,15 @@
   donation in crypto. No seed phrases, no exchanges, no ID upload for small
   US donations.
 - **The recommended architecture:** every fiat donor gets an embedded wallet
-  created behind a Google or email login (Privy, Web3Auth, or Magic). The card
+  created behind a Google or email login, built on **Turnkey**. The card
   payment buys USDC into THAT wallet, and the wallet then pays each project in
-  the cart. The donor signs once; everything else is automatic.
+  the cart through the existing DonationHandler contract. The donor consents
+  once; everything else is automatic.
+- **Why Turnkey:** multi-chain from day one (Bitcoin, Solana, and anything on
+  either signing curve, which fits Giveth's roadmap), and its policy engine
+  lets us restrict a donor's key so it can only ever sign the two donation
+  transactions for their cart. That policy engine is what makes delayed
+  execution safe without modifying any contracts.
 - **Why the wallet in the middle is required, in one sentence:** every
   card-to-crypto provider delivers one purchase to exactly one address, so a
   cart that splits one charge across five projects is only possible if the
@@ -39,16 +45,19 @@
 3. They choose US card or non-US card (the site pre-selects a guess from IP,
    but the donor can override; lots of crypto users are on VPNs).
    US goes to Stripe's checkout, non-US goes to Onramper's.
-4. Before paying, they approve one signature: "up to $X of USDC may go from my
-   wallet to these projects." The signature is free (no gas needed) and stays
-   valid about 30 days, so slow card settlements are fine.
+4. Before paying, they consent once. That consent creates a Turnkey policy on
+   their wallet: Giveth's automation may have the donor's key sign exactly two
+   transactions, an approve to the DonationHandler for the cart amount and the
+   DonationHandler multiSend with this exact cart payload, and nothing else.
+   The policy engine enforces the templates.
 5. They pay. When the USDC lands in their wallet (minutes usually, sometimes
-   longer if the provider reviews the payment), an automatic service executes
-   the split to every project in the cart. The signature it uses can ONLY send
-   to registered Giveth project addresses; the service holds no funds and its
-   key cannot steal or redirect anything.
-6. Each project sees a normal on-chain donation. GIVbacks and donation
-   tracking work exactly as they do for crypto donors.
+   longer if the provider reviews the payment), the automation has the donor's
+   key sign and broadcast those two transactions at that moment, with a fresh
+   nonce and current gas. Gas comes from a tiny ETH dust the watcher sends
+   first, or an EIP-7702 batch with a Giveth paymaster (team's choice).
+6. On-chain it is identical to a normal cart checkout: same approve, same
+   multiSend, same DonationHandler events. GIVbacks, donation tracking, and
+   receipts work with zero backend changes.
 
 ## What it costs and what the donor experiences
 
@@ -81,8 +90,13 @@
 
 1. Which chain the fiat flow delivers on (drives gas cost, project address
    coverage, GIVbacks mechanics).
-2. Embedded wallet vendor: Privy vs Web3Auth vs Magic (pricing at Giveth's
-   volumes, login methods, key recovery UX).
+2. Embedded wallet vendor: Turnkey is the working choice (multi-chain plus the
+   policy engine). PM validates pricing at Giveth volumes and one non-negotiable
+   configuration: each donor must be the root authority of their own Turnkey
+   sub-organization via passkey or email, with Giveth holding only a
+   policy-scoped automation role. That keeps wallets genuinely donor-owned,
+   which the Stripe terms require. If Giveth's API key were the root instead,
+   this becomes custody with extra steps.
 3. Which entity signs up where: Stripe requires a US or supported-country
    entity; Onramper and Transak run standard business onboarding and Transak
    accepts charities expressly.
@@ -93,6 +107,28 @@
    email and support flow.
 6. Whether GIVbacks flow to the embedded wallet automatically (recommended;
    it is the retention hook).
+
+## How this plugs into the existing cart (DonationHandler)
+
+The DonationHandler contract does not change. That is the headline. Today a
+cart donor approves the DonationHandler, then calls its multi-send, which
+pulls the funds and distributes to every project while emitting the events
+the backend already indexes. The fiat flow produces exactly those two
+transactions from the donor's embedded wallet, just delayed until the card
+money arrives.
+
+How the delay works safely: the donor does not pre-sign raw transactions at
+checkout (a raw signed transaction freezes its nonce and gas fields and can
+go stale while waiting). Instead their checkout consent creates a Turnkey
+policy that authorizes signing those two exact transactions later. When funds
+settle, they are signed fresh and broadcast. Same consent-once semantics,
+none of the staleness.
+
+One thing we explicitly rejected: adding an admin key to the DonationHandler
+that can pull funds out of donor wallets. Every donor who ever approved the
+contract would become drainable by one compromised key. The delayed-signing
+design gets the same outcome with the donor's own key doing the signing under
+a policy it cannot exceed.
 
 ## Risks and gotchas, honestly
 
@@ -154,7 +190,26 @@ Facts sourced from primary pages, not yet adversarially verified:
   mainnet and major L2s supports permit; permits cost no gas to sign, which
   matters because fresh embedded wallets hold no ETH.
 
-Architecture decided for TheDAO RFP board (reuse for Giveth):
+Turnkey and DonationHandler integration facts:
+- Turnkey is key-management infrastructure: keys live in secure enclaves,
+  organized as sub-organizations; a policy engine constrains what each API
+  credential can have a key sign. Supports secp256k1 and ed25519, so
+  Ethereum, Bitcoin, and Solana are all covered.
+- Required configuration: donor is root authority of their own sub-org
+  (passkey or email auth); Giveth automation holds a policy-scoped role
+  limited to signing approve(DonationHandler, amount) and
+  donationHandler multiSend(cart payload) transaction templates.
+- Execution at settlement: watcher detects USDC arrival, automation signs
+  both txs fresh (current nonce and gas) and broadcasts. Gas strategy:
+  dust the wallet with ETH first, or EIP-7702 batching with a paymaster
+  (7702 is live post-Pectra).
+- Do NOT modify DonationHandler to add admin pull rights over user
+  approvals; that creates a drainable honeypot across all past approvers.
+- Pre-signing raw transactions at checkout and broadcasting later is
+  technically possible but fragile (fixed nonce and gas fields go stale);
+  policy-authorized signing at settlement is the robust equivalent.
+
+Architecture decided for TheDAO RFP board (context, adapted above for Giveth):
 - Embedded wallet per donor (donor-owned keys behind social login; the
   operator never controls keys and never custodies funds).
 - Onramp funds the donor wallet: Stripe for US cards, Onramper otherwise,

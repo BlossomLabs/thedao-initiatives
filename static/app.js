@@ -168,6 +168,18 @@
   }
 
   function pad32(hex) { return hex.replace(/^0x/, "").toLowerCase().padStart(64, "0"); }
+
+  function tokenQty(usd, sym) {
+    var tok = params.tokens[sym];
+    var rate = (params.rates && params.rates[sym]) || 1;
+    var prec = Math.min(tok.decimals, 8);
+    return (usd / rate).toFixed(prec)
+      .replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  }
+
+  function parseUsd(raw) {
+    return /^\d+(\.\d+)?$/.test(String(raw).trim()) ? parseFloat(raw) : NaN;
+  }
   function transferCalldata(to, amountBig) {
     return "0xa9059cbb" + pad32(to) + pad32(amountBig.toString(16));
   }
@@ -181,7 +193,23 @@
     var elAmount = root.querySelector(".dw-amount");
     var elSend = root.querySelector(".dw-send");
     var elStatus = root.querySelector(".dw-status");
+    var elConv = root.querySelector(".dw-conv");
     var chips = root.querySelectorAll(".dw-chip");
+
+    function updateConversion() {
+      if (!elConv) return;
+      var sym = elToken ? elToken.value : "";
+      if (!params || !params.tokens[sym]) { elConv.hidden = true; return; }
+      var rate = (params.rates && params.rates[sym]) || 1;
+      var usd = parseUsd(elAmount.value);
+      if (!(usd > 0) || rate === 1) { elConv.hidden = true; return; }
+      var rateStr = rate >= 10
+        ? "$" + Math.round(rate).toLocaleString()
+        : "$" + rate.toFixed(2);
+      elConv.textContent = "\u2248 " + tokenQty(usd, sym) + " " + sym +
+        " \u00b7 " + rateStr + " per " + sym;
+      elConv.hidden = false;
+    }
 
     chips.forEach(function (c) {
       c.addEventListener("click", function (ev) {
@@ -189,6 +217,7 @@
         chips.forEach(function (x) { x.classList.remove("on"); });
         c.classList.add("on");
         elAmount.value = c.dataset.amount;
+        updateConversion();
       });
     });
     if (elAmount) {
@@ -196,8 +225,15 @@
         chips.forEach(function (x) {
           x.classList.toggle("on", x.dataset.amount === elAmount.value);
         });
+        updateConversion();
       });
     }
+    if (elToken) {
+      elToken.addEventListener("change", updateConversion);
+    }
+    // rates come with donate params; fetch eagerly so the line works
+    // before any wallet is connected
+    getParams().then(updateConversion).catch(function () {});
 
     function status(kind, html) {
       elStatus.hidden = false;
@@ -274,15 +310,12 @@
         // quantity with the server-provided USD rate (Chainlink for ETH/EURC/
         // ZCHF, 1.0 for the dollar stables)
         var rate = (params.rates && params.rates[sym]) || 1;
-        var usd = /^\d+(\.\d+)?$/.test(String(elAmount.value).trim())
-          ? parseFloat(elAmount.value) : NaN;
+        var usd = parseUsd(elAmount.value);
         if (!(usd > 0)) {
           status("err", "Enter the amount in dollars, like 100 or 49.50.");
           return;
         }
-        var prec = Math.min(tok.decimals, 8);
-        var qtyStr = (usd / rate).toFixed(prec)
-          .replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+        var qtyStr = tokenQty(usd, sym);
         var base = toBaseUnits(qtyStr, tok.decimals);
         if (base === null) {
           status("err", "That amount is too small for " + sym + ".");

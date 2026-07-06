@@ -10,11 +10,15 @@
     </div>
   </div>
   <div class="dw-row dw-inputs">
-    <input class="dw-amount" type="text" inputmode="decimal" placeholder="Custom amount ($)" aria-label="Amount in dollars">
-    <select class="dw-token" aria-label="Stablecoin">
+    <label class="dw-amount-wrap">
+      <span class="dw-cur">$</span>
+      <input class="dw-amount" type="text" inputmode="decimal" placeholder="Custom amount" aria-label="Amount in US dollars">
+    </label>
+    <select class="dw-token" aria-label="Donation token">
       {% for sym in tokens %}<option value="{{ sym }}">{{ sym }}</option>{% endfor %}
     </select>
   </div>
+  <p class="dw-conv small dim" hidden></p>
 
   <div class="dw-methods" role="tablist">
     <button type="button" class="dw-method on" data-method="wallet">🦊 Wallet</button>

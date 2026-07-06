@@ -29,20 +29,71 @@
 
   function msg(e) {
     if (e && e.code === 4001) return "you rejected the request in the wallet.";
-    return (e && (e.message || e.reason))
-      ? String(e.message || e.reason).slice(0, 200) : "unknown error";
+    if (e && e.code === -32002)
+      return "your wallet already has a request open. Open the wallet and " +
+             "finish or dismiss it, then try again.";
+    var raw = (e && (e.message || e.reason)) ? String(e.message || e.reason) : "";
+    if (/insufficient funds/i.test(raw))
+      return "the wallet does not have enough ETH to pay the network fee.";
+    if (/user rejected|denied/i.test(raw))
+      return "you rejected the request in the wallet.";
+    return raw ? raw.slice(0, 200) : "unknown error";
   }
 
-  function ensureMainnet(eth) {
-    return eth.request({ method: "eth_chainId" }).then(function (id) {
+  function ensureMainnet(p) {
+    return p.request({ method: "eth_chainId" }).then(function (id) {
       if (id === "0x1") return true;
-      return eth.request({
+      return p.request({
         method: "wallet_switchEthereumChain", params: [{ chainId: "0x1" }]
       }).then(function () { return true; });
     });
   }
 
   var navBtn = document.getElementById("nav-connect");
+
+  // EIP-6963: discover every installed wallet instead of racing on
+  // window.ethereum (MetaMask vs Rabby vs Coinbase extension).
+  var providers = [];        // [{info: {uuid,name,icon}, provider}]
+  var activeProvider = null;
+  window.addEventListener("eip6963:announceProvider", function (ev) {
+    try {
+      var d = ev.detail;
+      if (d && d.info && !providers.some(function (p) {
+        return p.info.uuid === d.info.uuid;
+      })) providers.push(d);
+    } catch (e) {}
+  });
+  try { window.dispatchEvent(new Event("eip6963:requestProvider")); } catch (e) {}
+
+  function eth() {
+    return activeProvider
+      || (providers[0] && providers[0].provider)
+      || window.ethereum || null;
+  }
+
+  function disconnectUi() {
+    account = null;
+    balances = {};
+    if (navBtn) {
+      navBtn.textContent = "Connect wallet";
+      navBtn.classList.remove("connected");
+      navBtn.title = "";
+    }
+    annotateTokenSelects();
+  }
+
+  function watchProvider(p) {
+    if (!p || p.__thedaoWatched || typeof p.on !== "function") return;
+    p.__thedaoWatched = true;
+    p.on("accountsChanged", function (accounts) {
+      if (accounts && accounts[0]) setConnected(accounts[0]);
+      else disconnectUi();
+    });
+    p.on("chainChanged", function () {
+      // per-transaction ensureMainnet() re-checks; balances are chain-specific
+      refreshBalances();
+    });
+  }
 
   var balances = {};   // symbol -> float token balance (null = unknown)
 
@@ -67,14 +118,15 @@
   }
 
   function refreshBalances() {
-    if (!account || !params || !window.ethereum) return;
+    var p = eth();
+    if (!account || !params || !p) return;
     var acct = account;
     Object.keys(params.tokens).forEach(function (sym) {
       var tok = params.tokens[sym];
       var req = tok.address === "native"
-        ? window.ethereum.request({ method: "eth_getBalance",
-                                    params: [acct, "latest"] })
-        : window.ethereum.request({ method: "eth_call", params: [{
+        ? p.request({ method: "eth_getBalance",
+                      params: [acct, "latest"] })
+        : p.request({ method: "eth_call", params: [{
             to: tok.address, data: "0x70a08231" + pad32(acct) }, "latest"] });
       req.then(function (hex) {
         if (account !== acct) return;
@@ -104,11 +156,12 @@
   }
 
   function connectWallet() {
-    var eth = window.ethereum;
-    if (!eth) return Promise.reject(new Error("no-wallet"));
+    var p = eth();
+    if (!p) return Promise.reject(new Error("no-wallet"));
+    watchProvider(p);
     return getParams()
-      .then(function () { return ensureMainnet(eth); })
-      .then(function () { return eth.request({ method: "eth_requestAccounts" }); })
+      .then(function () { return ensureMainnet(p); })
+      .then(function () { return p.request({ method: "eth_requestAccounts" }); })
       .then(function (accounts) {
         if (!accounts || !accounts[0]) throw new Error("no account authorized");
         setConnected(accounts[0]);
@@ -116,22 +169,52 @@
       });
   }
 
-  function switchWallet() {
-    var eth = window.ethereum;
+  function switchWallet(p) {
+    p = p || eth();
+    watchProvider(p);
     // wallet_requestPermissions forces the account picker in MetaMask-style
     // wallets; fall back to a plain re-request where unsupported.
-    return eth.request({ method: "wallet_requestPermissions",
-                         params: [{ eth_accounts: {} }] })
+    return p.request({ method: "wallet_requestPermissions",
+                       params: [{ eth_accounts: {} }] })
       .catch(function () { return null; })
-      .then(function () { return eth.request({ method: "eth_requestAccounts" }); })
+      .then(function () { return p.request({ method: "eth_requestAccounts" }); })
       .then(function (accounts) {
         if (accounts && accounts[0]) setConnected(accounts[0]);
       });
   }
 
+  var walletMenu = null;
+  function toggleWalletMenu() {
+    if (walletMenu) { walletMenu.remove(); walletMenu = null; return; }
+    walletMenu = document.createElement("div");
+    walletMenu.className = "wallet-menu";
+    providers.forEach(function (p) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = (activeProvider === p.provider ? "\u25cf " : "") +
+                      p.info.name;
+      b.addEventListener("click", function () {
+        activeProvider = p.provider;
+        walletMenu.remove(); walletMenu = null;
+        switchWallet(p.provider).catch(function () {});
+      });
+      walletMenu.appendChild(b);
+    });
+    var sw = document.createElement("button");
+    sw.type = "button";
+    sw.textContent = "Switch account\u2026";
+    sw.addEventListener("click", function () {
+      walletMenu.remove(); walletMenu = null;
+      switchWallet().catch(function () {});
+    });
+    walletMenu.appendChild(sw);
+    navBtn.parentNode.appendChild(walletMenu);
+  }
+
   if (navBtn) {
     navBtn.addEventListener("click", function () {
-      if (account && window.ethereum) {
+      if (account && eth()) {
+        if (providers.length > 1) { toggleWalletMenu(); return; }
         var prev = navBtn.textContent;
         navBtn.textContent = "Choose wallet…";
         switchWallet().catch(function () { navBtn.textContent = prev; });
@@ -146,12 +229,17 @@
         }
       });
     });
-    // reflect an already-authorized wallet without prompting
-    if (window.ethereum && window.ethereum.request) {
-      window.ethereum.request({ method: "eth_accounts" }).then(function (a) {
-        if (a && a[0]) { getParams().then(function () { setConnected(a[0]); }).catch(function(){}); }
-      }).catch(function () {});
-    }
+    // reflect an already-authorized wallet without prompting (after 6963
+    // announcements settle)
+    setTimeout(function () {
+      var p = eth();
+      if (p && p.request) {
+        watchProvider(p);
+        p.request({ method: "eth_accounts" }).then(function (a) {
+          if (a && a[0]) { getParams().then(function () { setConnected(a[0]); }).catch(function(){}); }
+        }).catch(function () {});
+      }
+    }, 300);
   }
 
   // ------------------------------------------------------------ amounts
@@ -241,6 +329,12 @@
       elStatus.innerHTML = html;
     }
 
+    function setBusy(busy, label) {
+      if (!elSend) return;
+      elSend.disabled = busy;
+      elSend.textContent = busy ? (label || "Working\u2026") : "Donate";
+    }
+
     // ---- method chooser: wallet / card / exchange -------------------
     function showMethod(name) {
       root.querySelectorAll(".dw-method").forEach(function (b) {
@@ -254,7 +348,7 @@
       b.addEventListener("click", function () { showMethod(b.dataset.method); });
     });
     // no wallet in this browser: lead with card if available, else exchange
-    if (!window.ethereum) {
+    if (!eth()) {
       showMethod(root.querySelector('[data-panel="card"]') ? "card" : "exchange");
     }
 
@@ -285,11 +379,12 @@
     }
 
     function donate() {
+      if (elSend && elSend.disabled) return;  // no double-submission
       if (!/^0x[0-9a-fA-F]{40}$/.test(rfpAddress)) {
         status("err", "This RFP's donation address is not set up yet.");
         return;
       }
-      if (!window.ethereum) {
+      if (!eth()) {
         var hasCard = !!root.querySelector('[data-panel="card"]');
         showMethod(hasCard ? "card" : "exchange");
         status("wait", hasCard
@@ -351,16 +446,18 @@
         status("wait", "Check your wallet to approve:<br>" + preview +
                " → <b>this RFP's Safe</b> " +
                "<span class=\"m dim\">(" + short(rfpAddress) + ")</span>");
-        return ensureMainnet(window.ethereum).then(function () {
+        setBusy(true, "Confirm in wallet\u2026");
+        return ensureMainnet(eth()).then(function () {
           var txp = isNative
             ? { from: account, to: rfpAddress,
                 value: "0x" + base.toString(16) }
             : { from: account, to: tok.address, value: "0x0",
                 data: transferCalldata(rfpAddress, base) };
-          return window.ethereum.request({
+          return eth().request({
             method: "eth_sendTransaction", params: [txp]
           });
         }).then(function (txHash) {
+          setBusy(true, "Confirming\u2026");
           status("wait", "Sent. Waiting for mainnet confirmation…<br>" +
                  "<a class=\"m\" target=\"_blank\" rel=\"noopener\" " +
                  "href=\"https://etherscan.io/tx/" + txHash + "\">" +
@@ -368,6 +465,7 @@
           confirmTx(txHash, 0);
         });
       }).catch(function (e) {
+        setBusy(false);
         status("err", "Not sent: " + msg(e));
       });
     }
@@ -389,6 +487,9 @@
     }
 
     function handle(txHash, res, attempt) {
+      if (res.status === "failed" || res.status === "error" || attempt > 50) {
+        setBusy(false);
+      }
       if (res.status === "confirmed") {
         status("ok", "🎉 Confirmed: <b>" + res.amount + " " + res.token +
                "</b> credited to this RFP. Thank you! Refreshing…");

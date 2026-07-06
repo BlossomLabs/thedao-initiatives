@@ -8,6 +8,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <link rel="icon" href="{{ url_for('static', filename='dao-logo.svg') }}">
+<meta property="og:site_name" content="TheDAO Security Fund">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{% block og_title %}TheDAO Security Fund · RFPs{% endblock %}">
+<meta property="og:description" content="{% block og_description %}Ecosystem-funded Ethereum security work. Browse RFPs, donate by wallet or card, sponsor with pledges that pay on completion.{% endblock %}">
+<meta property="og:image" content="{{ site_url }}static/og-image.png">
+<meta property="og:url" content="{{ request.url }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="description" content="{{ self.og_description() }}">
 </head>
 <body>
 <header class="topbar">

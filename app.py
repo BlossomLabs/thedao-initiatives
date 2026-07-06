@@ -162,7 +162,11 @@ def harden(resp):
 
 @app.context_processor
 def inject_globals():
-    return {"csrf_token": csrf_token, "TOKENS": config.TOKENS}
+    site = config.ENV.get("SITE_URL", "").strip()
+    if site and not site.endswith("/"):
+        site += "/"
+    return {"csrf_token": csrf_token, "TOKENS": config.TOKENS,
+            "site_url": site or request.url_root}
 
 
 # ------------------------------------------------------------ jinja filters

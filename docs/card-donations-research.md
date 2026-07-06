@@ -94,3 +94,29 @@ pricing-and-limits) · support.moonpay.com (KYB article) ·
 docs.cdp.coinbase.com/onramp FAQ · coinbase.com/developer-platform (headless
 onramps, zero-fee USDC) · daimo.com · docs.peer.xyz (zkp2p) ·
 docs.onramper.com + knowledge.onramper.com (ranking, routing, pricing)
+
+## DECISION (Griff, July 2026): one unified card flow
+
+Every card donor, US or not, gets an embedded wallet (Google login, donor-owned
+keys via Privy/Web3Auth/Magic, vendor TBD). The onramp funds THAT wallet:
+Stripe for US cards, Onramper-routed for non-US cards, chosen by the donor
+with IP only as a default hint. At donation time the donor signs one
+amount-capped USDC permit (deadline about 30 days, comfortably covering slow
+settlements) whose spender is a tiny immutable contract that can only move
+funds to registered RFP Safes. A gas-only watcher key executes when funds
+land; it cannot steal or redirect. The existing scanner credits the Safe.
+
+Why: every provider is used exactly as intended (delivery to the buyer's own
+wallet), which satisfies Stripe's own-wallet terms without needing a
+compliance exception, and makes the Onramper address-lock question moot. One
+money path; onramps become swappable modules.
+
+Cost accepted: embedded-wallet vendor dependency, one puller contract, a
+watcher, and the parked-funds failure mode (mitigated: the wallet is donor-
+recoverable forever via their login, plus follow-up email links).
+
+Build order: public deploy -> Stripe + Onramper applications (Stripe needs
+the US entity decision: Giveth or General Magic) -> wallet vendor pick ->
+puller contract + watcher. Self-custody wallet tab and exchange tab stay
+unchanged; Transak-direct remains the documented fallback if Onramper
+partnership stalls.

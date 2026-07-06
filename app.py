@@ -518,6 +518,16 @@ def submit():
 
 # ------------------------------------------------------------ donation API
 
+def _row_token_qty(row):
+    """Token quantity from the raw on-chain amount (amount stores USD)."""
+    sym = row["token_symbol"]
+    dec = 18 if sym == "ETH" else (config.TOKENS.get(sym) or (None, None))[1]
+    try:
+        return int(row["amount_raw"]) / (10 ** dec) if dec else row["amount"]
+    except (TypeError, ValueError):
+        return row["amount"]
+
+
 _ens_cache = {}  # lowercase address -> (name-or-empty, fetched_at)
 ENS_CACHE_TTL = 3600
 
@@ -607,7 +617,8 @@ def donate_confirm():
     if status == "already-confirmed":
         status = "confirmed"
     return jsonify({"status": status, "detail": v["detail"],
-                    "amount": v["amount"], "token": v["token_symbol"]})
+                    "amount": v["amount"], "token": v["token_symbol"],
+                    "amount_usd": v.get("amount_usd")})
 
 
 @app.route("/api/donate/status/<tx_hash>")
@@ -626,7 +637,9 @@ def donate_status(tx_hash):
                 db.record_donation(row["rfp_id"], tx_hash, v)
                 row = db.donation_by_hash(tx_hash)
     return jsonify({"status": row["status"], "detail": row["detail"],
-                    "amount": row["amount"], "token": row["token_symbol"]})
+                    "amount": _row_token_qty(row),
+                    "token": row["token_symbol"],
+                    "amount_usd": row["amount"]})
 
 
 # ------------------------------------------------------------ admin

@@ -272,6 +272,97 @@
     return "0xa9059cbb" + pad32(to) + pad32(amountBig.toString(16));
   }
 
+  // ------------------------------------------------------------ celebration
+  // Confetti + a short synthesized "you're a hero" fanfare on confirmed
+  // donations. The AudioContext is created during the donor's click (armAudio)
+  // because browsers only allow sound that originates from a user gesture.
+  var audioCtx = null;
+
+  function armAudio() {
+    try {
+      audioCtx = audioCtx ||
+        new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+    } catch (e) {}
+  }
+
+  function heroFanfare() {
+    if (!audioCtx) return;
+    try {
+      var t0 = audioCtx.currentTime + 0.05;
+      // C5 E5 G5 C6: a quick rising ta-da-da-DAA, under 1.2 seconds
+      var notes = [[523.25, 0.00, 0.16], [659.25, 0.13, 0.16],
+                   [783.99, 0.26, 0.20], [1046.50, 0.42, 0.55]];
+      notes.forEach(function (n) {
+        [["triangle", n[0], 0.22], ["square", n[0] / 2, 0.05]].forEach(
+          function (voice) {
+            var o = audioCtx.createOscillator();
+            var g = audioCtx.createGain();
+            o.type = voice[0];
+            o.frequency.value = voice[1];
+            g.gain.setValueAtTime(0.0001, t0 + n[1]);
+            g.gain.exponentialRampToValueAtTime(voice[2], t0 + n[1] + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, t0 + n[1] + n[2]);
+            o.connect(g);
+            g.connect(audioCtx.destination);
+            o.start(t0 + n[1]);
+            o.stop(t0 + n[1] + n[2] + 0.05);
+          });
+      });
+    } catch (e) {}
+  }
+
+  function confettiBurst() {
+    try {
+      var c = document.createElement("canvas");
+      var W = window.innerWidth, H = window.innerHeight;
+      c.width = W; c.height = H;
+      c.style.cssText = "position:fixed;inset:0;z-index:100;pointer-events:none";
+      document.body.appendChild(c);
+      var ctx = c.getContext("2d");
+      var colors = ["#ff3b38", "#00ff88", "#5ac8fa", "#f0b429", "#ffffff", "#5cb75a"];
+      var parts = [];
+      for (var i = 0; i < 160; i++) {
+        parts.push({
+          x: W / 2 + (Math.random() - 0.5) * W * 0.3,
+          y: H * 0.4,
+          vx: (Math.random() - 0.5) * 16,
+          vy: -(Math.random() * 14 + 6),
+          w: 5 + Math.random() * 6,
+          h: 8 + Math.random() * 8,
+          rot: Math.random() * Math.PI,
+          vr: (Math.random() - 0.5) * 0.3,
+          color: colors[i % colors.length]
+        });
+      }
+      var frame = 0;
+      (function tick() {
+        ctx.clearRect(0, 0, W, H);
+        ctx.globalAlpha = frame < 140 ? 1 : Math.max(0, 1 - (frame - 140) / 40);
+        parts.forEach(function (p) {
+          p.vy += 0.35;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rot += p.vr;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          ctx.restore();
+        });
+        frame++;
+        if (frame < 180) requestAnimationFrame(tick);
+        else c.remove();
+      })();
+    } catch (e) {}
+  }
+
+  function celebrate() {
+    confettiBurst();
+    heroFanfare();
+  }
+
   // ------------------------------------------------------------ widget
 
   function initWidget(root) {
@@ -380,6 +471,7 @@
 
     function donate() {
       if (elSend && elSend.disabled) return;  // no double-submission
+      armAudio();
       if (!/^0x[0-9a-fA-F]{40}$/.test(rfpAddress)) {
         status("err", "This RFP's donation address is not set up yet.");
         return;
@@ -491,9 +583,16 @@
         setBusy(false);
       }
       if (res.status === "confirmed") {
-        status("ok", "🎉 Confirmed: <b>" + res.amount + " " + res.token +
-               "</b> credited to this RFP. Thank you! Refreshing…");
-        setTimeout(function () { window.location.reload(); }, 2200);
+        var amt = res.amount_usd
+          ? "$" + Number(res.amount_usd).toFixed(2) +
+            (res.token === "ETH" || res.token === "EURC" || res.token === "ZCHF"
+              ? " (" + res.amount + " " + res.token + ")"
+              : " " + res.token)
+          : res.amount + " " + res.token;
+        status("ok", "🦸 <b>" + amt + "</b> is now backing this RFP. " +
+               "You're a hero. Refreshing…");
+        celebrate();
+        setTimeout(function () { window.location.reload(); }, 4000);
       } else if (res.status === "failed" || res.status === "error") {
         status("err", "Verification failed: " + (res.detail || "unknown reason"));
       } else if (attempt > 50) {
@@ -514,6 +613,7 @@
     var manualHash = root.querySelector(".dw-manual-hash");
     if (manualBtn && manualHash) {
       manualBtn.addEventListener("click", function () {
+        armAudio();
         var h = (manualHash.value || "").trim();
         if (!/^0x[0-9a-fA-F]{64}$/.test(h)) {
           status("err", "That does not look like a transaction hash (0x + 64 hex characters).");

@@ -39,6 +39,12 @@
         <span><b>{{ c.sum.total | usd }}</b> of {{ c.rfp.funding_goal_usd | usd }}</span>
         <span class="dim">{{ c.pct }}%{% if c.n_sponsors %} · {{ c.n_sponsors }} sponsor{{ '' if c.n_sponsors == 1 else 's' }}{% endif %}</span>
       </div>
+      {% if c.logos %}
+      <div class="card-logos">
+        <span class="dim small">Sponsored by</span>
+        {% for p in c.logos %}<img src="/logos/{{ p.logo }}" alt="{{ p.company }}" title="{{ p.company }}">{% endfor %}
+      </div>
+      {% endif %}
       <div class="card-actions">
         {% if tokens_ok and c.enabled %}<button class="btn primary sm" type="button" data-donate-toggle>Donate</button>{% endif %}
         <a class="btn ghost sm" href="{{ url_for('rfp_page', slug=c.rfp.slug) }}">Details →</a>

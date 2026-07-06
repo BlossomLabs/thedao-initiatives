@@ -17,8 +17,11 @@ import urllib.request
 from collections import defaultdict, deque
 from functools import wraps
 
+import markdown
+import nh3
 from flask import (Flask, abort, jsonify, redirect, render_template, request,
                    send_from_directory, session, url_for)
+from markupsafe import Markup
 
 import chain
 import config
@@ -70,6 +73,14 @@ def active_tokens(state):
     """Only tokens that passed live on-chain verification are offered."""
     return {sym: (t["address"], t["decimals"])
             for sym, t in state["tokens"].items() if t["ok"]}
+
+
+def donor_tokens(state):
+    """What donors can pick: verified ERC20s plus native ETH."""
+    out = dict(active_tokens(state))
+    if config.NATIVE_ETH:
+        out["ETH"] = ("native", 18)
+    return out
 
 
 # ------------------------------------------------------------ security bits
@@ -177,6 +188,34 @@ def dt(ts):
     if not ts:
         return ""
     return time.strftime("%b %d, %Y", time.localtime(int(ts)))
+
+
+# Everything nh3 lets through in RFP details. Anything else — scripts,
+# iframes, event handlers, javascript:/data: URLs — is stripped, so a value
+# written through the admin panel can never script the public page.
+MD_TAGS = {"p", "br", "hr", "a", "strong", "em", "b", "i", "del", "sup",
+           "sub", "code", "pre", "blockquote", "ul", "ol", "li",
+           "h1", "h2", "h3", "h4", "h5", "h6",
+           "table", "thead", "tbody", "tr", "th", "td"}
+MD_ATTRS = {"a": {"href", "title"}, "ol": {"start"}}
+
+# GitHub-style task lists ("- [ ] item"); python-markdown has no native
+# support, so swap the brackets for checkbox glyphs before conversion.
+_TASK_RE = re.compile(r"^(\s*(?:[-*+]|\d+\.)\s+)\[([ xX])\](?=\s)", re.M)
+
+
+@app.template_filter("md")
+def md(text):
+    """Admin-authored markdown -> sanitized HTML for the details field.
+
+    nl2br keeps single line breaks visible, so pre-markdown plain-text
+    entries render exactly as they did under white-space:pre-line.
+    """
+    text = _TASK_RE.sub(
+        lambda m: m.group(1) + ("☑" if m.group(2) in "xX" else "☐"),
+        text or "")
+    html = markdown.markdown(text, extensions=["tables", "sane_lists", "nl2br"])
+    return Markup(nh3.clean(html, tags=MD_TAGS, attributes=MD_ATTRS))
 
 
 # ------------------------------------------------------------ validation
@@ -357,7 +396,12 @@ def onramp_link(safe_address):
                 "&currencyCode=usdc&baseCurrencyCode=usd"
                 "&baseCurrencyAmount={AMT}&walletAddress=%s"
                 % (urllib.parse.quote(key), safe_address)), True
-    return "https://guardarian.com/buy-usdc", False
+    # No keyless fallback: a checkout that demands full KYC for $25 and lets
+    # the network/address drift (Guardarian, tried July 2026) kills donations.
+    # Card returns at public launch via Coinbase Onramp guest checkout
+    # (SMS+email only in the US, Apple Pay/debit, server-locked address+chain)
+    # or a Transak/MoonPay partner key. Until then: no card tab.
+    return "", False
 
 
 def parse_goal(raw):
@@ -390,6 +434,7 @@ def index():
             recent.append({"rfp": r, "d": d})
         cards.append({"rfp": r, "sum": s, "pct": pct, "n_sponsors": len(pl),
                       "n_donations": len(dn),
+                      "logos": [p for p in pl if p["logo"]][:4],
                       "enabled": bool(r["safe_address"])})
     recent.sort(key=lambda x: x["d"]["confirmed_at"] or 0, reverse=True)
     totals = {
@@ -400,10 +445,10 @@ def index():
         "donations": n_donations,
     }
     state = chain_state()
-    tokens = active_tokens(state)
+    tokens = donor_tokens(state)
     return render_template("index.html", cards=cards, totals=totals,
                            recent=recent[:8], state=state, tokens=tokens,
-                           tokens_ok=bool(tokens))
+                           tokens_ok=bool(active_tokens(state)))
 
 
 @app.route("/rfp/<slug>")
@@ -415,13 +460,13 @@ def rfp_page(slug):
     pct = min(100, round(100 * s["total"] / r["funding_goal_usd"], 1)) \
         if r["funding_goal_usd"] else 0
     state = chain_state()
-    tokens = active_tokens(state)
+    tokens = donor_tokens(state)
     return render_template(
         "rfp.html", r=r, sum=s, pct=pct,
         pledges=db.pledges_for(r["id"]),
         donations=db.donations_for(r["id"]),
         state=state, tokens=tokens,
-        donations_enabled=bool(tokens and r["safe_address"]
+        donations_enabled=bool(active_tokens(state) and r["safe_address"]
                                and r["status"] == "approved"))
 
 
@@ -469,20 +514,59 @@ def submit():
 
 # ------------------------------------------------------------ donation API
 
+_ens_cache = {}  # lowercase address -> (name-or-empty, fetched_at)
+ENS_CACHE_TTL = 3600
+
+
+@app.route("/api/ens-name/<address>")
+def ens_name(address):
+    """Reverse-resolve an address to its primary ENS name (or null)."""
+    address = address.strip()
+    if not chain.is_address(address):
+        abort(400)
+    key = address.lower()
+    hit = _ens_cache.get(key)
+    if hit and time.time() - hit[1] < ENS_CACHE_TTL:
+        return jsonify({"name": hit[0] or None})
+    name = ""
+    try:
+        req = urllib.request.Request(
+            "https://api.ensdata.net/%s" % chain.to_checksum(address),
+            headers={"User-Agent": "thedao-rfps/1.0"})
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode())
+        cand = (data.get("ens") or data.get("ens_primary") or "").strip()
+        # only display a forward-verified name (ensdata reports the address
+        # the name forward-resolves to; require it to match)
+        if cand and (data.get("address") or "").lower() == key:
+            name = cand
+    except Exception:
+        pass
+    _ens_cache[key] = (name, time.time())
+    return jsonify({"name": name or None})
+
+
 @app.route("/api/donate/params")
 def donate_params():
     """Global donation parameters (same treasury/tokens for every RFP)."""
     state = chain_state()
-    tokens = active_tokens(state)
+    tokens = donor_tokens(state)
     if not (state["verified"] and tokens):
         return jsonify({"enabled": False, "reason": state["detail"]}), 503
+    priced, rates = {}, {}
+    for sym, (a, d) in tokens.items():
+        try:
+            rates[sym] = chain.usd_rate(sym)
+            priced[sym] = {"address": a, "decimals": d}
+        except Exception:
+            continue  # cannot price it safely right now: do not offer it
     return jsonify({
         "enabled": True,
         "chain_id": config.CHAIN_ID,
         "treasury": state["treasury"],
         "treasury_label": config.TREASURY_LABEL,
-        "tokens": {sym: {"address": a, "decimals": d}
-                   for sym, (a, d) in tokens.items()},
+        "tokens": priced,
+        "rates": rates,
     })
 
 

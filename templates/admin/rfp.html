@@ -53,7 +53,7 @@
     <input type="text" name="title" maxlength="140" value="{{ r.title }}">
     <label class="lbl">Summary</label>
     <textarea name="summary" rows="4" maxlength="4000">{{ r.summary }}</textarea>
-    <label class="lbl">Full RFP details <span class="dim">(the complete spec: scope, milestones, budget breakdown; shown on the public page)</span></label>
+    <label class="lbl">Full RFP details <span class="dim">(the complete spec: scope, milestones, budget breakdown; shown on the public page — markdown supported: headings, **bold**, lists, tables, - [ ] checklists)</span></label>
     <textarea name="details" rows="10" maxlength="20000">{{ r.details or '' }}</textarea>
     <label class="lbl">Forum link</label>
     <input type="url" name="discourse_url" value="{{ r.discourse_url }}">

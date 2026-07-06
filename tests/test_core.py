@@ -433,15 +433,10 @@ class TestOnrampLink(unittest.TestCase):
              mock.patch.object(config, "ONRAMP_API_KEY", key):
             return app_mod.onramp_link(self.SAFE)
 
-    def test_default_keyless_guardarian(self):
-        url, prefilled = self._link("guardarian", "")
-        self.assertIn("guardarian.com", url)
-        self.assertFalse(prefilled)
-
-    def test_transak_without_key_falls_back(self):
+    def test_no_key_means_no_card_option(self):
         url, prefilled = self._link("transak", "")
-        self.assertIn("guardarian.com", url)
         self.assertFalse(prefilled)
+        self.assertEqual(url, "")
 
     def test_transak_with_key_prefills_address(self):
         url, prefilled = self._link("transak", "pk_test_123")
@@ -457,3 +452,67 @@ class TestOnrampLink(unittest.TestCase):
         self.assertIn("walletAddress=" + self.SAFE, url)
         self.assertIn("currencyCode=usdc", url)
         self.assertIn("{AMT}", url)
+
+
+class TestUsdRate(unittest.TestCase):
+    def setUp(self):
+        chain._rate_cache.clear()
+
+    def test_usd_stables_are_exactly_one(self):
+        for sym in ("USDC", "USDT", "DAI", "USDS", "crvUSD", "BOLD", "fxUSD"):
+            self.assertEqual(chain.usd_rate(sym), 1.0)
+
+    def test_feed_tokens_use_chainlink(self):
+        def fake_rpc(method, params, timeout=10, endpoints=None):
+            assert method == "eth_call"
+            assert params[0]["to"] == config.CHAINLINK_FEEDS["EURC"]
+            return hex(114_300_000)  # 1.143 with 8 decimals
+        with mock.patch.object(chain, "rpc_call", fake_rpc):
+            self.assertAlmostEqual(chain.usd_rate("EURC"), 1.143)
+
+    def test_insane_feed_value_raises(self):
+        def fake_rpc(method, params, timeout=10, endpoints=None):
+            return hex(1)  # 0.00000001 USD: out of sane range
+        with mock.patch.object(chain, "rpc_call", fake_rpc):
+            with self.assertRaises(chain.RpcError):
+                chain.usd_rate("ZCHF")
+
+
+class TestNativeEthDonation(unittest.TestCase):
+    def setUp(self):
+        chain._rate_cache.clear()
+
+    def _verify(self, tx_value_wei, tx_to=TREASURY):
+        receipt = {"status": "0x1", "blockNumber": hex(100), "logs": []}
+        tx = {"to": tx_to, "from": DONOR, "value": hex(tx_value_wei)}
+
+        def fake_rpc(method, params, timeout=10, endpoints=None):
+            if method == "eth_getTransactionReceipt":
+                return receipt
+            if method == "eth_getTransactionByHash":
+                return tx
+            if method == "eth_blockNumber":
+                return hex(110)
+            if method == "eth_call":  # ETH/USD feed
+                return hex(int(1769 * 1e8))
+            raise AssertionError("unexpected rpc %s" % method)
+        with mock.patch.object(chain, "rpc_call", fake_rpc):
+            return chain.verify_donation_tx("0x" + "cd" * 32, TREASURY,
+                                            config.TOKENS)
+
+    def test_plain_eth_send_credits_usd_value(self):
+        r = self._verify(10 ** 18)  # 1 ETH
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["token_symbol"], "ETH")
+        self.assertEqual(r["amount"], 1.0)
+        self.assertAlmostEqual(r["amount_usd"], 1769.0, places=1)
+        self.assertEqual(r["donor"].lower(), DONOR.lower())
+
+    def test_eth_to_wrong_recipient_rejected(self):
+        r = self._verify(10 ** 18, tx_to=DONOR)
+        self.assertFalse(r["ok"])
+
+    def test_eth_dust_rejected(self):
+        r = self._verify(10 ** 12)  # 0.000001 ETH
+        self.assertFalse(r["ok"])
+        self.assertIn("minimum", r["detail"])

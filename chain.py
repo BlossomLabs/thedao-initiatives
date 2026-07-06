@@ -235,6 +235,30 @@ def verify_tokens():
     return out
 
 
+# ---------------------------------------------------------------- pricing
+
+_rate_cache = {}  # symbol -> (rate, fetched_at)
+RATE_TTL = 600
+
+
+def usd_rate(symbol):
+    """USD value of one token. 1.0 for USD stables; Chainlink for the rest."""
+    if symbol not in config.CHAINLINK_FEEDS:
+        return 1.0
+    hit = _rate_cache.get(symbol)
+    if hit and time.time() - hit[1] < RATE_TTL:
+        return hit[0]
+    feed = config.CHAINLINK_FEEDS[symbol]
+    raw = _decode_hex_int(eth_call(feed, "0x50d25bcd"))  # latestAnswer()
+    if raw <= 0:
+        raise RpcError("price feed returned nothing for %s" % symbol)
+    rate = raw / 1e8  # all configured feeds use 8 decimals
+    if not (0.1 < rate < 1_000_000):
+        raise RpcError("price feed for %s out of sane range: %s" % (symbol, rate))
+    _rate_cache[symbol] = (rate, time.time())
+    return rate
+
+
 # ---------------------------------------------------------------- receipts
 
 def verify_donation_tx(tx_hash, treasury, allowed_tokens):
@@ -249,7 +273,7 @@ def verify_donation_tx(tx_hash, treasury, allowed_tokens):
     """
     result = {"found": False, "pending": False, "ok": False,
               "token_symbol": "", "token_address": "", "amount_raw": "0",
-              "amount": 0.0, "donor": "", "detail": ""}
+              "amount": 0.0, "amount_usd": 0.0, "donor": "", "detail": ""}
     if not (isinstance(tx_hash, str) and tx_hash.startswith("0x")
             and len(tx_hash) == 66):
         result["detail"] = "malformed transaction hash"
@@ -330,18 +354,52 @@ def verify_donation_tx(tx_hash, treasury, allowed_tokens):
             result["detail"] = ("transfer below the minimum donation of 1 %s"
                                 % credited_sym)
             return result
+        try:
+            rate = usd_rate(credited_sym)
+        except Exception as e:
+            result["pending"] = True
+            result["detail"] = "price feed unavailable, will retry: %s" % e
+            return result
         result["ok"] = True
         result["token_symbol"] = credited_sym
         result["token_address"] = to_checksum(credited_addr)
         result["amount_raw"] = str(total_raw)
         result["amount"] = total_raw / (10 ** credited_dec)
+        result["amount_usd"] = round(result["amount"] * rate, 2)
         result["donor"] = donor
         result["detail"] = "verified: %s %s to treasury%s" % (
             result["amount"], credited_sym,
             " (other tokens in this tx were not credited)" if extra_tokens else "")
         return result
 
-    result["detail"] = ("no transfer of an accepted stablecoin to the "
+    # No accepted-token transfer: check for a plain (native) ETH send.
+    if config.NATIVE_ETH:
+        tx = rpc_call("eth_getTransactionByHash", [tx_hash])
+        if tx and (tx.get("to") or "").lower() == treasury.lower():
+            value = _decode_hex_int(tx.get("value"))
+            eth = value / 1e18
+            if 0 < eth < config.MIN_ETH_DONATION:
+                result["detail"] = ("ETH amount below the minimum donation "
+                                    "of %s ETH" % config.MIN_ETH_DONATION)
+                return result
+            if eth > 0:
+                try:
+                    rate = usd_rate("ETH")
+                except Exception as e:
+                    result["pending"] = True
+                    result["detail"] = "price feed unavailable, will retry: %s" % e
+                    return result
+                result["ok"] = True
+                result["token_symbol"] = "ETH"
+                result["token_address"] = ""
+                result["amount_raw"] = str(value)
+                result["amount"] = eth
+                result["amount_usd"] = round(eth * rate, 2)
+                result["donor"] = to_checksum(tx.get("from"))
+                result["detail"] = "verified: %s ETH to treasury" % eth
+                return result
+
+    result["detail"] = ("no transfer of an accepted stablecoin or ETH to the "
                         "treasury found in this transaction")
     return result
 

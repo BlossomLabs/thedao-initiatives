@@ -26,7 +26,7 @@
 
       <h2>Full RFP details</h2>
       {% if r.details %}
-      <p class="body-text">{{ r.details }}</p>
+      <div class="body-text md">{{ r.details | md }}</div>
       {% else %}
       <p class="empty">The complete spec (scope, milestones, budget breakdown) is being written.
       {% if r.discourse_url %}Follow and shape it <a href="{{ r.discourse_url }}" target="_blank" rel="noopener">on the forum thread</a>.{% endif %}</p>

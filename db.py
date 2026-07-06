@@ -252,7 +252,8 @@ def record_donation(rfp_id, tx_hash, verification):
                     "amount_raw=?,amount=?,donor=?,status=?,detail=?,"
                     "confirmed_at=? WHERE id=?",
                     (v["token_symbol"], v["token_address"], v["amount_raw"],
-                     v["amount"], v["donor"], status, v["detail"],
+                     v.get("amount_usd", v["amount"]), v["donor"], status,
+                     v["detail"],
                      now() if status == "confirmed" else None,
                      existing["id"]))
                 return existing["id"], status
@@ -262,7 +263,8 @@ def record_donation(rfp_id, tx_hash, verification):
                     "amount_raw,amount,donor,tx_hash,status,detail,created_at,"
                     "confirmed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                     (rfp_id, v["token_symbol"], v["token_address"],
-                     v["amount_raw"], v["amount"], v["donor"], tx_hash, status,
+                     v["amount_raw"], v.get("amount_usd", v["amount"]),
+                     v["donor"], tx_hash, status,
                      v["detail"], now(),
                      now() if status == "confirmed" else None))
                 return cur.lastrowid, status

@@ -10,7 +10,7 @@
     </div>
   </div>
   <div class="dw-row dw-inputs">
-    <input class="dw-amount" type="text" inputmode="decimal" placeholder="Custom amount" aria-label="Amount in dollars">
+    <input class="dw-amount" type="text" inputmode="decimal" placeholder="Custom amount ($)" aria-label="Amount in dollars">
     <select class="dw-token" aria-label="Stablecoin">
       {% for sym in tokens %}<option value="{{ sym }}">{{ sym }}</option>{% endfor %}
     </select>
@@ -18,7 +18,7 @@
 
   <div class="dw-methods" role="tablist">
     <button type="button" class="dw-method on" data-method="wallet">🦊 Wallet</button>
-    <button type="button" class="dw-method" data-method="card">💳 Card</button>
+    {% if onramp_prefilled %}<button type="button" class="dw-method" data-method="card">💳 Card</button>{% endif %}
     <button type="button" class="dw-method" data-method="exchange">🏦 Exchange</button>
   </div>
 
@@ -26,21 +26,15 @@
     <button type="button" class="btn primary dw-send">Donate</button>
   </div>
 
+  {% if onramp_prefilled %}
   <div class="dw-panel" data-panel="card" hidden>
-    <p class="small dim">Buy USDC with a card (Visa, Mastercard, Apple Pay, Google Pay)
-    and it is delivered straight to this RFP's fund address. It shows up here
-    automatically once it lands.</p>
-    {% if not onramp_prefilled %}
-    <div class="dw-addr-row">
-      <span class="m dw-addr-text">{{ address }}</span>
-      <button type="button" class="btn ghost sm dw-copy">Copy</button>
-    </div>
-    <p class="small dim">In the checkout, choose <b>USDC on Ethereum</b> and paste
-    this address as the receiving wallet.</p>
-    {% endif %}
+    <p class="small dim">Buy USDC with a card (Visa, Mastercard, Apple Pay, Google Pay).
+    It is delivered straight to this RFP's fund address on Ethereum mainnet,
+    already filled in for you, and shows up here automatically once it lands.</p>
     <a class="btn primary dw-card-open" href="{{ onramp_url }}" target="_blank"
        rel="noopener">Open card checkout ↗</a>
   </div>
+  {% endif %}
 
   <div class="dw-panel" data-panel="exchange" hidden>
     <p class="small dim">Send an accepted stablecoin from any exchange or wallet to

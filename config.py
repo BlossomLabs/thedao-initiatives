@@ -31,6 +31,24 @@ TOKENS = {
     "crvUSD": ("0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E", 18),
     "BOLD":   ("0x6440f144b7e50D6a8439336510312d2F54beB01D", 18),
     "fxUSD":  ("0x085780639CC2cACd35E474e71f4d000e2405d8f6", 18),
+    # non-USD stables (verified on-chain + CoinGecko 2026-07); their USD value
+    # comes from the Chainlink feeds below, never assumed 1:1
+    "EURC":   ("0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c", 6),
+    "ZCHF":   ("0xB58E61C3098d85632Df34EecfB899A1Ed80921cB", 18),
+}
+
+# Native ETH donations (plain value transfer to the RFP Safe). Verified via
+# the transaction itself; the passive scanner cannot see native transfers,
+# so exchange ETH sends need the tx-hash verify (wallet sends auto-verify).
+NATIVE_ETH = True
+MIN_ETH_DONATION = 0.0005
+
+# Chainlink price feeds (mainnet, all 8 decimals; sanity-checked live 2026-07:
+# ETH 1769, EUR 1.143, CHF 1.2413 - each matches independent market data).
+CHAINLINK_FEEDS = {
+    "ETH":  "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",   # ETH/USD
+    "EURC": "0xb49f677943BC038e9857d61E7d053CaA2C1734C1",   # EUR/USD
+    "ZCHF": "0x449d117117838fFA61263B61dA6301AA2a88B13A",   # CHF/USD
 }
 
 RPC_ENDPOINTS = [

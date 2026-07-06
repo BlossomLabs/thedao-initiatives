@@ -44,16 +44,62 @@
 
   var navBtn = document.getElementById("nav-connect");
 
+  var balances = {};   // symbol -> float token balance (null = unknown)
+
   function setConnected(acct) {
     account = acct;
+    balances = {};
     if (navBtn) {
       navBtn.textContent = short(acct);
       navBtn.classList.add("connected");
-      navBtn.disabled = true;
+      navBtn.title = "Connected. Click to switch wallets.";
+      fetch("/api/ens-name/" + acct)
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.name && account === acct) navBtn.textContent = d.name;
+        }).catch(function () {});
     }
     document.querySelectorAll("[data-donate]").forEach(function (el) {
       var b = el.querySelector(".dw-send");
       if (b) b.textContent = "Donate";
+    });
+    refreshBalances();
+  }
+
+  function refreshBalances() {
+    if (!account || !params || !window.ethereum) return;
+    var acct = account;
+    Object.keys(params.tokens).forEach(function (sym) {
+      var tok = params.tokens[sym];
+      var req = tok.address === "native"
+        ? window.ethereum.request({ method: "eth_getBalance",
+                                    params: [acct, "latest"] })
+        : window.ethereum.request({ method: "eth_call", params: [{
+            to: tok.address, data: "0x70a08231" + pad32(acct) }, "latest"] });
+      req.then(function (hex) {
+        if (account !== acct) return;
+        var v = (hex && hex !== "0x") ? BigInt(hex) : BigInt(0);
+        balances[sym] = Number(v) / Math.pow(10, tok.decimals);
+        annotateTokenSelects();
+      }).catch(function () { balances[sym] = null; });
+    });
+  }
+
+  function annotateTokenSelects() {
+    document.querySelectorAll(".dw-token option").forEach(function (o) {
+      var b = balances[o.value];
+      o.textContent = (typeof b === "number" && b > 0)
+        ? o.value + " \u2713" : o.value;
+    });
+    // default each select to a token the wallet actually holds
+    document.querySelectorAll(".dw-token").forEach(function (sel) {
+      if ((balances[sel.value] || 0) > 0) return;
+      for (var i = 0; i < sel.options.length; i++) {
+        if ((balances[sel.options[i].value] || 0) > 0) {
+          sel.value = sel.options[i].value;
+          return;
+        }
+      }
     });
   }
 
@@ -70,8 +116,27 @@
       });
   }
 
+  function switchWallet() {
+    var eth = window.ethereum;
+    // wallet_requestPermissions forces the account picker in MetaMask-style
+    // wallets; fall back to a plain re-request where unsupported.
+    return eth.request({ method: "wallet_requestPermissions",
+                         params: [{ eth_accounts: {} }] })
+      .catch(function () { return null; })
+      .then(function () { return eth.request({ method: "eth_requestAccounts" }); })
+      .then(function (accounts) {
+        if (accounts && accounts[0]) setConnected(accounts[0]);
+      });
+  }
+
   if (navBtn) {
     navBtn.addEventListener("click", function () {
+      if (account && window.ethereum) {
+        var prev = navBtn.textContent;
+        navBtn.textContent = "Choose wallet…";
+        switchWallet().catch(function () { navBtn.textContent = prev; });
+        return;
+      }
       navBtn.textContent = "Connecting…";
       connectWallet().catch(function (e) {
         navBtn.textContent = "Connect wallet";
@@ -152,9 +217,9 @@
     root.querySelectorAll(".dw-method").forEach(function (b) {
       b.addEventListener("click", function () { showMethod(b.dataset.method); });
     });
-    // no wallet in this browser: lead with the card option
-    if (!window.ethereum && root.querySelector('[data-panel="card"]')) {
-      showMethod("card");
+    // no wallet in this browser: lead with card if available, else exchange
+    if (!window.ethereum) {
+      showMethod(root.querySelector('[data-panel="card"]') ? "card" : "exchange");
     }
 
     root.querySelectorAll(".dw-copy").forEach(function (b) {
@@ -189,10 +254,14 @@
         return;
       }
       if (!window.ethereum) {
-        showMethod("card");
-        status("wait", "No wallet detected in this browser, so we switched " +
-               "you to the card option. You can also donate from an " +
-               "exchange with the address under the Exchange tab.");
+        var hasCard = !!root.querySelector('[data-panel="card"]');
+        showMethod(hasCard ? "card" : "exchange");
+        status("wait", hasCard
+          ? "No wallet detected in this browser, so we switched you to the " +
+            "card option."
+          : "No wallet detected in this browser. Send any accepted token to " +
+            "this RFP's address (shown here) from an exchange or another " +
+            "wallet and it is counted automatically.");
         return;
       }
       var pre = account ? Promise.resolve(account)
@@ -200,20 +269,63 @@
       pre.then(function () {
         var sym = elToken.value;
         var tok = params.tokens[sym];
-        var base = toBaseUnits(elAmount.value, tok.decimals);
-        if (base === null) {
-          status("err", "Enter a valid amount (whole numbers or up to " +
-                 tok.decimals + " decimals).");
+        var isNative = tok.address === "native";
+        // amounts are entered in dollars for every token; convert to token
+        // quantity with the server-provided USD rate (Chainlink for ETH/EURC/
+        // ZCHF, 1.0 for the dollar stables)
+        var rate = (params.rates && params.rates[sym]) || 1;
+        var usd = /^\d+(\.\d+)?$/.test(String(elAmount.value).trim())
+          ? parseFloat(elAmount.value) : NaN;
+        if (!(usd > 0)) {
+          status("err", "Enter the amount in dollars, like 100 or 49.50.");
           return;
         }
-        status("wait", "Check your wallet to approve:<br><b>" +
-               elAmount.value + " " + sym + "</b> → <b>this RFP's Safe</b> " +
+        var prec = Math.min(tok.decimals, 8);
+        var qtyStr = (usd / rate).toFixed(prec)
+          .replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+        var base = toBaseUnits(qtyStr, tok.decimals);
+        if (base === null) {
+          status("err", "That amount is too small for " + sym + ".");
+          return;
+        }
+        // balance guards (skipped when the balance is still unknown)
+        var bal = balances[sym];
+        if (typeof bal === "number") {
+          var held = Object.keys(params.tokens).filter(function (s) {
+            return (balances[s] || 0) > 0;
+          });
+          if (bal <= 0 && held.length === 0) {
+            status("err", "This wallet holds none of the accepted tokens (" +
+                   Object.keys(params.tokens).join(", ") + "). Top it up, " +
+                   "switch wallets (button top right), or use the card or " +
+                   "exchange options.");
+            return;
+          }
+          if (bal <= 0) {
+            status("err", "This wallet holds no " + sym + ". You do hold: " +
+                   held.join(", ") + ".");
+            return;
+          }
+          if (bal < parseFloat(qtyStr)) {
+            status("err", "Not enough " + sym + ": you hold " +
+                   bal.toFixed(4) + ", this donation needs " + qtyStr + ".");
+            return;
+          }
+        }
+        var preview = (rate === 1)
+          ? "<b>" + qtyStr + " " + sym + "</b>"
+          : "<b>" + qtyStr + " " + sym + "</b> (about $" + usd + ")";
+        status("wait", "Check your wallet to approve:<br>" + preview +
+               " → <b>this RFP's Safe</b> " +
                "<span class=\"m dim\">(" + short(rfpAddress) + ")</span>");
         return ensureMainnet(window.ethereum).then(function () {
+          var txp = isNative
+            ? { from: account, to: rfpAddress,
+                value: "0x" + base.toString(16) }
+            : { from: account, to: tok.address, value: "0x0",
+                data: transferCalldata(rfpAddress, base) };
           return window.ethereum.request({
-            method: "eth_sendTransaction",
-            params: [{ from: account, to: tok.address, value: "0x0",
-                       data: transferCalldata(rfpAddress, base) }]
+            method: "eth_sendTransaction", params: [txp]
           });
         }).then(function (txHash) {
           status("wait", "Sent. Waiting for mainnet confirmation…<br>" +

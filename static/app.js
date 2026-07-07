@@ -137,14 +137,43 @@
     });
   }
 
+  // Rebuild every token dropdown to exactly the set the server will accept
+  // (/api/donate/params drops tokens whose USD rate can't be priced, so the
+  // server-rendered <option>s can otherwise offer a token donate() then can't
+  // find). Preserves the current selection when it's still valid.
+  function syncTokenOptions() {
+    if (!params || !params.tokens) return;
+    var syms = Object.keys(params.tokens);
+    if (!syms.length) return;
+    document.querySelectorAll(".dw-token").forEach(function (sel) {
+      var have = Array.prototype.map.call(sel.options,
+        function (o) { return o.value; });
+      var same = have.length === syms.length && have.every(
+        function (v, i) { return v === syms[i]; });
+      if (!same) {
+        var cur = sel.value;
+        sel.innerHTML = "";
+        syms.forEach(function (s) {
+          var o = document.createElement("option");
+          o.value = s; o.textContent = s;
+          sel.appendChild(o);
+        });
+        if (syms.indexOf(cur) !== -1) sel.value = cur;
+      }
+    });
+    annotateTokenSelects();
+  }
+
   function annotateTokenSelects() {
     document.querySelectorAll(".dw-token option").forEach(function (o) {
       var b = balances[o.value];
       o.textContent = (typeof b === "number" && b > 0)
         ? o.value + " \u2713" : o.value;
     });
-    // default each select to a token the wallet actually holds
+    // Default each select to a token the wallet actually holds \u2014 but never
+    // override a token the donor picked themselves (dw-token[data-picked]).
     document.querySelectorAll(".dw-token").forEach(function (sel) {
+      if (sel.dataset.picked) return;
       if ((balances[sel.value] || 0) > 0) return;
       for (var i = 0; i < sel.options.length; i++) {
         if ((balances[sel.options[i].value] || 0) > 0) {
@@ -408,11 +437,17 @@
       });
     }
     if (elToken) {
-      elToken.addEventListener("change", updateConversion);
+      elToken.addEventListener("change", function () {
+        elToken.dataset.picked = "1";  // stop auto-default from overriding
+        updateConversion();
+      });
     }
     // rates come with donate params; fetch eagerly so the line works
     // before any wallet is connected
-    getParams().then(updateConversion).catch(function () {});
+    getParams().then(function () {
+      syncTokenOptions();  // match dropdown to what the server accepts
+      updateConversion();
+    }).catch(function () {});
 
     function status(kind, html) {
       elStatus.hidden = false;
@@ -492,6 +527,13 @@
       pre.then(function () {
         var sym = elToken.value;
         var tok = params.tokens[sym];
+        if (!tok) {
+          // dropdown offered a token the server won't price right now
+          syncTokenOptions();
+          status("err", "That token isn't available to donate right now. " +
+                 "Pick another from the list.");
+          return;
+        }
         var isNative = tok.address === "native";
         // amounts are entered in dollars for every token; convert to token
         // quantity with the server-provided USD rate (Chainlink for ETH/EURC/
@@ -508,29 +550,34 @@
           status("err", "That amount is too small for " + sym + ".");
           return;
         }
-        // balance guards (skipped when the balance is still unknown)
+        // balance guards (only assert what we actually know — a null balance
+        // is still loading, not zero, so it must not read as "you hold none")
         var bal = balances[sym];
-        if (typeof bal === "number") {
+        if (typeof bal === "number" && bal <= 0) {
           var held = Object.keys(params.tokens).filter(function (s) {
             return (balances[s] || 0) > 0;
           });
-          if (bal <= 0 && held.length === 0) {
+          var stillChecking = Object.keys(params.tokens).some(function (s) {
+            return balances[s] == null;  // null/undefined = not yet fetched
+          });
+          if (held.length) {
+            status("err", "This wallet holds no " + sym + ". You do hold: " +
+                   held.join(", ") + ".");
+          } else if (stillChecking) {
+            status("err", "This wallet holds no " + sym + " — still checking " +
+                   "your other balances. Try another token from the list.");
+          } else {
             status("err", "This wallet holds none of the accepted tokens (" +
                    Object.keys(params.tokens).join(", ") + "). Top it up, " +
                    "switch wallets (button top right), or use the card or " +
                    "exchange options.");
-            return;
           }
-          if (bal <= 0) {
-            status("err", "This wallet holds no " + sym + ". You do hold: " +
-                   held.join(", ") + ".");
-            return;
-          }
-          if (bal < parseFloat(qtyStr)) {
-            status("err", "Not enough " + sym + ": you hold " +
-                   bal.toFixed(4) + ", this donation needs " + qtyStr + ".");
-            return;
-          }
+          return;
+        }
+        if (typeof bal === "number" && bal < parseFloat(qtyStr)) {
+          status("err", "Not enough " + sym + ": you hold " +
+                 bal.toFixed(4) + ", this donation needs " + qtyStr + ".");
+          return;
         }
         var preview = (rate === 1)
           ? "<b>" + qtyStr + " " + sym + "</b>"
@@ -583,12 +630,19 @@
         setBusy(false);
       }
       if (res.status === "confirmed") {
-        var amt = res.amount_usd
-          ? "$" + Number(res.amount_usd).toFixed(2) +
-            (res.token === "ETH" || res.token === "EURC" || res.token === "ZCHF"
-              ? " (" + res.amount + " " + res.token + ")"
-              : " " + res.token)
-          : res.amount + " " + res.token;
+        // Show the token quantity in parens only when it isn't a 1:1 dollar
+        // stable (rate != 1), so USDC reads "$100.00 in USDC" while ETH reads
+        // "$100.00 (0.032 ETH)". Driven off the live rate, not a token list.
+        var rate = params && params.rates && params.rates[res.token];
+        var amt;
+        if (res.amount_usd) {
+          var dollars = "$" + Number(res.amount_usd).toFixed(2);
+          amt = (rate && rate !== 1)
+            ? dollars + " (" + res.amount + " " + res.token + ")"
+            : dollars + " in " + res.token;
+        } else {
+          amt = res.amount + " " + res.token;
+        }
         status("ok", "🦸 <b>" + amt + "</b> is now backing this RFP. " +
                "You're a hero. Refreshing…");
         celebrate();

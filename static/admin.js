@@ -3,6 +3,17 @@
  * and independently verifies the deployed Safe on-chain before storing it. */
 (function () {
   "use strict";
+
+  // Confirm-before-submit for destructive buttons (CSP forbids inline
+  // onclick, so the button carries data-confirm and we bind it here).
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest("[data-confirm]");
+    if (btn && !window.confirm(btn.dataset.confirm)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+  }, true);
+
   var box = document.getElementById("safe-deploy");
   if (!box) return;
   var rfpId = box.dataset.rfp;

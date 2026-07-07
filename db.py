@@ -79,6 +79,36 @@ def init():
             con.execute("ALTER TABLE pledges ADD COLUMN logo TEXT DEFAULT ''")
         if "sort_rank" not in cols:
             con.execute("ALTER TABLE rfps ADD COLUMN sort_rank INTEGER")
+        # Donations key: one tx can legitimately fund several RFPs (a batch/
+        # disperse that sends to multiple RFP Safes). Move from UNIQUE(tx_hash)
+        # to UNIQUE(tx_hash, rfp_id). Per-Safe verification still gates each
+        # credit, so a tx can only ever credit an RFP whose Safe it paid.
+        idx = {r["name"] for r in con.execute("PRAGMA index_list(donations)")}
+        if "idx_don_tx_rfp" not in idx:
+            con.executescript("""
+                CREATE TABLE donations_new(
+                  id INTEGER PRIMARY KEY,
+                  rfp_id INTEGER NOT NULL REFERENCES rfps(id) ON DELETE CASCADE,
+                  token_symbol TEXT NOT NULL DEFAULT '',
+                  token_address TEXT NOT NULL DEFAULT '',
+                  amount_raw TEXT NOT NULL DEFAULT '0',
+                  amount REAL NOT NULL DEFAULT 0,
+                  donor TEXT DEFAULT '',
+                  tx_hash TEXT NOT NULL,
+                  status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK(status IN ('pending','confirmed','failed')),
+                  detail TEXT DEFAULT '',
+                  created_at INTEGER NOT NULL,
+                  confirmed_at INTEGER
+                );
+                INSERT INTO donations_new SELECT id,rfp_id,token_symbol,
+                  token_address,amount_raw,amount,donor,tx_hash,status,detail,
+                  created_at,confirmed_at FROM donations;
+                DROP TABLE donations;
+                ALTER TABLE donations_new RENAME TO donations;
+                CREATE UNIQUE INDEX idx_don_tx_rfp ON donations(tx_hash, rfp_id);
+                CREATE INDEX idx_donations_rfp ON donations(rfp_id);
+            """)
     con.close()
 
 
@@ -152,9 +182,11 @@ def list_rfps(statuses=("approved",)):
     con = connect()
     try:
         q = ",".join("?" * len(statuses))
+        # Board order is decided in app.order_cards (admin pin, then amount
+        # raised); here just return newest-first for a stable base order.
         return con.execute(
             "SELECT * FROM rfps WHERE status IN (%s) "
-            "ORDER BY featured DESC, created_at DESC" % q, statuses).fetchall()
+            "ORDER BY created_at DESC" % q, statuses).fetchall()
     finally:
         con.close()
 
@@ -162,7 +194,7 @@ def list_rfps(statuses=("approved",)):
 def update_rfp(rfp_id, **fields):
     allowed = {"title", "summary", "details", "discourse_url",
                "funding_goal_usd", "payout_addresses", "contact", "status",
-               "featured", "approved_at", "safe_address", "sort_rank"}
+               "approved_at", "safe_address", "sort_rank"}
     sets, vals = [], []
     for k, v in fields.items():
         if k not in allowed:
@@ -245,8 +277,8 @@ def record_donation(rfp_id, tx_hash, verification):
     try:
         with con:
             existing = con.execute(
-                "SELECT id, rfp_id, status FROM donations WHERE tx_hash=?",
-                (tx_hash,)).fetchone()
+                "SELECT id, status FROM donations WHERE tx_hash=? AND rfp_id=?",
+                (tx_hash, rfp_id)).fetchone()
             if existing:
                 if existing["status"] == "confirmed":
                     return existing["id"], "already-confirmed"
@@ -272,11 +304,11 @@ def record_donation(rfp_id, tx_hash, verification):
                      now() if status == "confirmed" else None))
                 return cur.lastrowid, status
             except sqlite3.IntegrityError:
-                # A concurrent request inserted this tx_hash first. Re-read and
-                # treat it as the existing row (idempotent, no double-credit).
+                # Concurrent insert of this (tx_hash, rfp_id). Re-read and treat
+                # it as existing (idempotent, no double-credit).
                 row = con.execute(
-                    "SELECT id, status FROM donations WHERE tx_hash=?",
-                    (tx_hash,)).fetchone()
+                    "SELECT id, status FROM donations WHERE tx_hash=? "
+                    "AND rfp_id=?", (tx_hash, rfp_id)).fetchone()
                 if row:
                     return row["id"], row["status"]
                 raise
@@ -299,10 +331,21 @@ def donations_for(rfp_id, only_confirmed=True):
 
 
 def donation_by_hash(tx_hash):
+    """Any donation row for this tx (a tx may now credit multiple RFPs)."""
     con = connect()
     try:
-        return con.execute("SELECT * FROM donations WHERE tx_hash=?",
-                           (tx_hash,)).fetchone()
+        return con.execute("SELECT * FROM donations WHERE tx_hash=? "
+                           "ORDER BY id LIMIT 1", (tx_hash,)).fetchone()
+    finally:
+        con.close()
+
+
+def donation_by_hash_rfp(tx_hash, rfp_id):
+    con = connect()
+    try:
+        return con.execute(
+            "SELECT * FROM donations WHERE tx_hash=? AND rfp_id=?",
+            (tx_hash, rfp_id)).fetchone()
     finally:
         con.close()
 

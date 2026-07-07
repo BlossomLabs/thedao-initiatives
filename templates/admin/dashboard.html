@@ -29,7 +29,7 @@
       <tbody>
       {% for row in rows %}
         <tr>
-          <td><span class="chip static st-{{ row.rfp.status }}">{{ row.rfp.status }}</span>{% if row.rfp.featured %} ★{% endif %}</td>
+          <td><span class="chip static st-{{ row.rfp.status }}">{{ row.rfp.status }}</span>{% if row.rfp.sort_rank %} <span title="Pinned to board position {{ row.rfp.sort_rank }}">📌{{ row.rfp.sort_rank }}</span>{% endif %}</td>
           <td>{{ row.rfp.title }}</td>
           <td class="amt">{{ row.rfp.funding_goal_usd | usd }}</td>
           <td class="amt">{{ row.sum.total | usd }}</td>

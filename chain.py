@@ -109,6 +109,20 @@ def _decode_hex_int(h):
     return int(h, 16)
 
 
+def _decode_words(h):
+    """Split an ABI return blob into a list of 32-byte words (as ints)."""
+    if h in (None, "0x", ""):
+        return []
+    raw = bytes.fromhex(h[2:] if h.startswith("0x") else h)
+    return [int.from_bytes(raw[i:i + 32], "big")
+            for i in range(0, len(raw) - len(raw) % 32, 32)]
+
+
+def _as_int256(word):
+    """Interpret an unsigned 256-bit word as a two's-complement int256."""
+    return word - (1 << 256) if word >= (1 << 255) else word
+
+
 def _decode_string_result(hexdata):
     """Decode a solidity `string` return value (also tolerates bytes32)."""
     if not hexdata or hexdata == "0x":
@@ -239,20 +253,40 @@ def verify_tokens():
 
 _rate_cache = {}  # symbol -> (rate, fetched_at)
 RATE_TTL = 600
+# Reject a Chainlink answer older than this. Feeds have different heartbeats
+# (ETH/USD ~1h; FX feeds like EUR/USD and CHF/USD up to 24h), so the window is
+# the slowest heartbeat plus a safety margin — tight enough to catch a frozen
+# feed, loose enough not to reject a healthy FX feed between updates.
+RATE_MAX_STALENESS = 90000  # 25 hours
 
 
 def usd_rate(symbol):
-    """USD value of one token. 1.0 for USD stables; Chainlink for the rest."""
+    """USD value of one token. 1.0 for USD stables; Chainlink for the rest.
+
+    Uses latestRoundData() (not latestAnswer()) so we can reject a stale or
+    incomplete round — a frozen feed must not silently price donations.
+    """
     if symbol not in config.CHAINLINK_FEEDS:
         return 1.0
     hit = _rate_cache.get(symbol)
     if hit and time.time() - hit[1] < RATE_TTL:
         return hit[0]
     feed = config.CHAINLINK_FEEDS[symbol]
-    raw = _decode_hex_int(eth_call(feed, "0x50d25bcd"))  # latestAnswer()
-    if raw <= 0:
+    # latestRoundData() -> (roundId, answer, startedAt, updatedAt, answeredInRound)
+    out = eth_call(feed, "0xfeaf968c")
+    words = _decode_words(out)
+    if len(words) < 5:
+        raise RpcError("price feed returned malformed data for %s" % symbol)
+    answer = _as_int256(words[1])
+    updated_at = words[3]
+    if answer <= 0:
         raise RpcError("price feed returned nothing for %s" % symbol)
-    rate = raw / 1e8  # all configured feeds use 8 decimals
+    if updated_at <= 0:
+        raise RpcError("price feed round for %s is incomplete" % symbol)
+    age = time.time() - updated_at
+    if age > RATE_MAX_STALENESS:
+        raise RpcError("price feed for %s is stale (%d s old)" % (symbol, age))
+    rate = answer / 1e8  # all configured feeds use 8 decimals
     if not (0.1 < rate < 1_000_000):
         raise RpcError("price feed for %s out of sane range: %s" % (symbol, rate))
     _rate_cache[symbol] = (rate, time.time())
@@ -569,6 +603,15 @@ def verify_safe(address, chain_name="mainnet"):
         impl = ("0x" + slot0[-40:]).lower()
         if impl != config.SAFE_SINGLETON.lower():
             return False, "proxy singleton is not canonical Safe v1.4.1"
+        # Fallback handler lives at a fixed slot: keccak256(
+        # "fallback_manager.handler.address"). A rogue handler could change how
+        # the Safe answers calls, so confirm it's the canonical one we set up.
+        fb_slot = "0x" + keccak256(b"fallback_manager.handler.address").hex()
+        fb_raw = rpc_call("eth_getStorageAt", [address, fb_slot, "latest"],
+                          endpoints=eps)
+        fb = ("0x" + fb_raw[-40:]).lower()
+        if fb != config.SAFE_FALLBACK_HANDLER.lower():
+            return False, "fallback handler is not the canonical Safe handler"
         return True, ("verified: %d-of-%d Safe with the configured "
                       "operational signers" % (config.SAFE_THRESHOLD, n))
     except Exception as e:

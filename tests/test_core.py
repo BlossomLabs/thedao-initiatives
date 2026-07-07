@@ -6,6 +6,7 @@ against real mainnet ground truth in test_live).
 """
 import os
 import sys
+import time
 import unittest
 from unittest import mock
 
@@ -13,6 +14,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import chain
 import config
+
+
+def chainlink_round(answer, updated_at=None):
+    """Encode a Chainlink latestRoundData() return blob:
+    (roundId, answer, startedAt, updatedAt, answeredInRound). updatedAt defaults
+    to now so the staleness guard in usd_rate() passes."""
+    if updated_at is None:
+        updated_at = int(time.time())
+    words = [1, answer, updated_at, updated_at, 1]
+    mask = (1 << 256) - 1
+    return "0x" + b"".join((w & mask).to_bytes(32, "big") for w in words).hex()
 
 
 class TestKeccakConstants(unittest.TestCase):
@@ -378,10 +390,16 @@ class TestSafeDeploy(unittest.TestCase):
             chain.SEL_GET_OWNERS: encoded_owners(SIGNERS),
         }
 
+        fb_slot = "0x" + chain.keccak256(
+            b"fallback_manager.handler.address").hex()
+
         def fake_rpc(method, params, timeout=10, endpoints=None):
             if method == "eth_call":
                 return calls[params[0]["data"]]
             if method == "eth_getStorageAt":
+                if params[1] == fb_slot:
+                    return "0x" + "0" * 24 + \
+                        config.SAFE_FALLBACK_HANDLER[2:].lower()
                 return "0x" + "0" * 24 + config.SAFE_SINGLETON[2:].lower()
             raise AssertionError("unexpected rpc %s" % method)
 
@@ -466,16 +484,32 @@ class TestUsdRate(unittest.TestCase):
         def fake_rpc(method, params, timeout=10, endpoints=None):
             assert method == "eth_call"
             assert params[0]["to"] == config.CHAINLINK_FEEDS["EURC"]
-            return hex(114_300_000)  # 1.143 with 8 decimals
+            return chainlink_round(114_300_000)  # 1.143 with 8 decimals
         with mock.patch.object(chain, "rpc_call", fake_rpc):
             self.assertAlmostEqual(chain.usd_rate("EURC"), 1.143)
 
     def test_insane_feed_value_raises(self):
         def fake_rpc(method, params, timeout=10, endpoints=None):
-            return hex(1)  # 0.00000001 USD: out of sane range
+            return chainlink_round(1)  # 0.00000001 USD: out of sane range
         with mock.patch.object(chain, "rpc_call", fake_rpc):
             with self.assertRaises(chain.RpcError):
                 chain.usd_rate("ZCHF")
+
+    def test_stale_feed_raises(self):
+        old = int(time.time()) - chain.RATE_MAX_STALENESS - 3600
+
+        def fake_rpc(method, params, timeout=10, endpoints=None):
+            return chainlink_round(114_300_000, updated_at=old)
+        with mock.patch.object(chain, "rpc_call", fake_rpc):
+            with self.assertRaises(chain.RpcError):
+                chain.usd_rate("EURC")
+
+    def test_incomplete_round_raises(self):
+        def fake_rpc(method, params, timeout=10, endpoints=None):
+            return chainlink_round(114_300_000, updated_at=0)  # never updated
+        with mock.patch.object(chain, "rpc_call", fake_rpc):
+            with self.assertRaises(chain.RpcError):
+                chain.usd_rate("EURC")
 
 
 class TestNativeEthDonation(unittest.TestCase):
@@ -493,8 +527,8 @@ class TestNativeEthDonation(unittest.TestCase):
                 return tx
             if method == "eth_blockNumber":
                 return hex(110)
-            if method == "eth_call":  # ETH/USD feed
-                return hex(int(1769 * 1e8))
+            if method == "eth_call":  # ETH/USD feed (latestRoundData)
+                return chainlink_round(int(1769 * 1e8))
             raise AssertionError("unexpected rpc %s" % method)
         with mock.patch.object(chain, "rpc_call", fake_rpc):
             return chain.verify_donation_tx("0x" + "cd" * 32, TREASURY,
@@ -532,3 +566,57 @@ class TestBoardOrdering(unittest.TestCase):
         e = self._card(None, 10, 300)
         ordered = app_mod.order_cards([a, b, c, d, e])
         self.assertEqual(ordered, [c, b, d, a, e])
+
+
+class TestCompositeDonationKey(unittest.TestCase):
+    """One tx that pays two different RFP Safes must credit both RFPs, keyed on
+    (tx_hash, rfp_id) — the bug the composite key fixes. Uses a throwaway DB."""
+
+    def setUp(self):
+        import tempfile
+        import importlib
+        self._tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self._tmp.close()
+        self._patch = mock.patch.object(config, "DB_PATH", self._tmp.name)
+        self._patch.start()
+        import db
+        importlib.reload(db)  # rebuild connection helpers against the temp path
+        self.db = db
+        db.init()
+
+    def tearDown(self):
+        self._patch.stop()
+        os.unlink(self._tmp.name)
+
+    def _confirmed(self, usd, donor=DONOR):
+        return {"ok": True, "found": True, "pending": False,
+                "token_symbol": "USDC",
+                "token_address": config.TOKENS["USDC"][0],
+                "amount_raw": str(int(usd * 1e6)), "amount": float(usd),
+                "amount_usd": float(usd), "donor": donor,
+                "detail": "confirmed"}
+
+    def test_one_tx_credits_two_rfps(self):
+        rfp_a, _ = self.db.create_rfp("Alpha", "s", "", 0, [], "", "approved")
+        rfp_b, _ = self.db.create_rfp("Beta", "s", "", 0, [], "", "approved")
+        tx = "0x" + "ab" * 32
+
+        _, s1 = self.db.record_donation(rfp_a, tx, self._confirmed(50))
+        _, s2 = self.db.record_donation(rfp_b, tx, self._confirmed(80))
+        self.assertEqual(s1, "confirmed")
+        self.assertEqual(s2, "confirmed")
+
+        # both RFPs credited independently, with their own amounts
+        self.assertEqual(self.db.funding_summary(rfp_a)["donated"], 50)
+        self.assertEqual(self.db.funding_summary(rfp_b)["donated"], 80)
+        self.assertEqual(len(self.db.donations_for(rfp_a)), 1)
+        self.assertEqual(len(self.db.donations_for(rfp_b)), 1)
+
+    def test_same_tx_same_rfp_is_idempotent(self):
+        rfp_a, _ = self.db.create_rfp("Alpha", "s", "", 0, [], "", "approved")
+        tx = "0x" + "cd" * 32
+        self.db.record_donation(rfp_a, tx, self._confirmed(50))
+        _, s2 = self.db.record_donation(rfp_a, tx, self._confirmed(50))
+        self.assertEqual(s2, "already-confirmed")
+        self.assertEqual(len(self.db.donations_for(rfp_a)), 1)
+        self.assertEqual(self.db.funding_summary(rfp_a)["donated"], 50)

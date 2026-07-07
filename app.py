@@ -14,7 +14,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 from functools import wraps
 
 import markdown
@@ -143,10 +143,20 @@ def check_csrf():
 
 
 def same_origin_only():
-    """For JSON endpoints: reject cross-site browser calls."""
+    """For JSON endpoints: reject cross-site browser calls.
+
+    Fails closed for state-changing methods: an Origin, if present, must match
+    this host; if Origin is absent we fall back to Referer and still require a
+    same-host match, so a cross-site POST with a stripped Origin can't slip by.
+    """
     origin = request.headers.get("Origin")
     if origin:
-        host = urllib.parse.urlsplit(origin).netloc
+        if urllib.parse.urlsplit(origin).netloc != request.host:
+            abort(403)
+        return
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        referer = request.headers.get("Referer", "")
+        host = urllib.parse.urlsplit(referer).netloc if referer else ""
         if host != request.host:
             abort(403)
 
@@ -190,6 +200,8 @@ def usd(v):
         v = float(v)
     except (TypeError, ValueError):
         return "$0"
+    if v < 0:  # totals are never negative; don't render "$-50.00"
+        v = 0
     if v >= 1000:
         return "${:,.0f}".format(v)
     return "${:,.2f}".format(v)
@@ -466,7 +478,8 @@ def index():
     tokens = donor_tokens(state)
     return render_template("index.html", cards=cards, totals=totals,
                            recent=recent[:8], state=state, tokens=tokens,
-                           tokens_ok=bool(active_tokens(state)))
+                           tokens_ok=bool(active_tokens(state)
+                                          and state["verified"]))
 
 
 @app.route("/rfp/<slug>")
@@ -484,7 +497,8 @@ def rfp_page(slug):
         pledges=db.pledges_for(r["id"]),
         donations=db.donations_for(r["id"]),
         state=state, tokens=tokens,
-        donations_enabled=bool(active_tokens(state) and r["safe_address"]
+        donations_enabled=bool(active_tokens(state) and state["verified"]
+                               and r["safe_address"]
                                and r["status"] == "approved"))
 
 
@@ -548,8 +562,10 @@ def _row_token_qty(row):
         return row["amount"]
 
 
-_ens_cache = {}  # lowercase address -> (name-or-empty, fetched_at)
+_ens_cache = OrderedDict()  # lowercase address -> (name-or-empty, fetched_at)
+_ens_lock = threading.Lock()
 ENS_CACHE_TTL = 3600
+ENS_CACHE_MAX = 5000  # cap so a flood of distinct addresses can't grow forever
 
 
 @app.route("/api/ens-name/<address>")
@@ -559,9 +575,16 @@ def ens_name(address):
     if not chain.is_address(address):
         abort(400)
     key = address.lower()
-    hit = _ens_cache.get(key)
-    if hit and time.time() - hit[1] < ENS_CACHE_TTL:
-        return jsonify({"name": hit[0] or None})
+    with _ens_lock:
+        hit = _ens_cache.get(key)
+        if hit and time.time() - hit[1] < ENS_CACHE_TTL:
+            _ens_cache.move_to_end(key)  # mark recently used
+            return jsonify({"name": hit[0] or None})
+    # Cache miss hits an external API — rate-limit uncached lookups per client
+    # so this endpoint can't be used to fan out requests through us.
+    if not rate_limit("ens:" + client_ip(), 30, 60):
+        return jsonify({"name": (hit[0] or None) if hit else None,
+                        "detail": "rate limited"}), 429
     name = ""
     try:
         req = urllib.request.Request(
@@ -576,7 +599,11 @@ def ens_name(address):
             name = cand
     except Exception:
         pass
-    _ens_cache[key] = (name, time.time())
+    with _ens_lock:
+        _ens_cache[key] = (name, time.time())
+        _ens_cache.move_to_end(key)
+        while len(_ens_cache) > ENS_CACHE_MAX:
+            _ens_cache.popitem(last=False)  # evict least-recently-used
     return jsonify({"name": name or None})
 
 
@@ -625,14 +652,9 @@ def donate_confirm():
     v = chain.verify_donation_tx(tx_hash, r["safe_address"], tokens)
     if not v["found"] and "malformed" in v["detail"]:
         return jsonify({"status": "error", "detail": v["detail"]}), 400
-    existing = db.donation_by_hash(tx_hash)
-    if existing and existing["rfp_id"] != r["id"]:
-        # This tx is already bound to a different RFP (any state). record_donation
-        # never re-points rfp_id, so crediting here would silently land on the
-        # other RFP while telling this one it succeeded. Reject instead.
-        return jsonify({"status": "error",
-                        "detail": "this transaction is already recorded for "
-                                  "another RFP"}), 409
+    # No cross-RFP guard needed: verify_donation_tx only returns ok when the tx
+    # actually paid THIS RFP's Safe, so a tx can only be credited to an RFP it
+    # funded, and the (tx_hash, rfp_id) key lets one tx credit several RFPs.
     _, status = db.record_donation(r["id"], tx_hash, v)
     if status == "already-confirmed":
         status = "confirmed"
@@ -916,7 +938,7 @@ def _scan_once():
                 continue
             seen.append((tx, safes[dest.lower()]))
         for tx, (rfp_id, safe_addr) in seen:
-            existing = db.donation_by_hash(tx)
+            existing = db.donation_by_hash_rfp(tx, rfp_id)
             if existing and existing["status"] != "pending":
                 continue
             v = chain.verify_donation_tx(tx, safe_addr, tokens)

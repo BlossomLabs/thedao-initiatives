@@ -71,7 +71,9 @@ LOGIN_ATTEMPTS_PER_MINUTE_PER_IP = 5
 
 # A donation is only credited once its tx is this many blocks deep, so a
 # short reorg cannot leave an RFP crediting money that fell off the chain.
-MIN_CONFIRMATIONS = 2
+# Three blocks (~36s) covers the 1-2 block reorgs seen on post-merge mainnet
+# with little added wait, since this gates real money.
+MIN_CONFIRMATIONS = 3
 
 # ---------------------------------------------------------------- Safe-per-RFP
 # Each approved RFP gets its own Gnosis Safe (same operational signers every

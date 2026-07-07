@@ -13,11 +13,20 @@ Everything that changes when the board moves from this Mac to a real domain.
 - [ ] Production RPC key (`RPC_URL=` Alchemy/Infura/dRPC) so the scanner and
       verification stop depending on public endpoints.
 
-## Payments
-- [ ] Stripe fiat-to-crypto onramp application (see docs/card-donations-research.md).
-      Decision needed first: Giveth or General Magic owns the Stripe account.
-      Then: build the session endpoint + set `ONRAMP_PROVIDER=stripe`.
-      CSP needs `js.stripe.com` if the embedded widget is used.
+## Payments (unified card flow, decided July 2026; see card-donations-research.md)
+Order matters: public deployment first, then accounts, then build.
+- [ ] Entity check: which org has US registration (for Stripe) and which has
+      charity docs (for Onramper/Transak). May be two different accounts.
+- [ ] Stripe onramp application (~48h review); ask compliance in the
+      application: "we fund the purchasing user's own embedded wallet" (clean
+      own-wallet use). CSP needs js.stripe.com.
+- [ ] Onramper partner application (non-US card routing, KYB docs).
+- [ ] Embedded-wallet vendor: pick Privy / Web3Auth / Magic (research +
+      recommendation is Claude's job), then sign up for API keys.
+- [ ] Build (Claude): embedded-wallet login, USDC permit flow (amount-capped,
+      ~30-day deadline), the tiny immutable forwarder contract (spender that
+      can only move funds to registered RFP Safes; PC reviews; deployed from
+      the admin wallet like the Safes; Sepolia first), gas-only watcher.
 - [ ] WalletConnect project ID + integration, so mobile donors and desktop
       users without extensions can connect any wallet by QR. Today only
       injected (extension / in-wallet browser) wallets work.

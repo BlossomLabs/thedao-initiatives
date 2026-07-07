@@ -77,6 +77,8 @@ def init():
         pcols = {r["name"] for r in con.execute("PRAGMA table_info(pledges)")}
         if "logo" not in pcols:
             con.execute("ALTER TABLE pledges ADD COLUMN logo TEXT DEFAULT ''")
+        if "sort_rank" not in cols:
+            con.execute("ALTER TABLE rfps ADD COLUMN sort_rank INTEGER")
     con.close()
 
 
@@ -103,7 +105,7 @@ def slugify(title, con=None):
 # ---------------------------------------------------------------- rfps
 
 def create_rfp(title, summary, discourse_url, goal, payout_addresses,
-               contact, status="pending"):
+               contact, status="pending", details=""):
     con = connect()
     try:
         # Retry on the rare race where two concurrent submits pick the same
@@ -117,10 +119,11 @@ def create_rfp(title, summary, discourse_url, goal, payout_addresses,
                     cur = con.execute(
                         "INSERT INTO rfps(slug,title,summary,discourse_url,"
                         "funding_goal_usd,payout_addresses,contact,status,"
-                        "created_at,approved_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                        "created_at,approved_at,details) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                         (slug, title, summary, discourse_url, goal,
                          json.dumps(payout_addresses), contact, status, now(),
-                         now() if status == "approved" else None))
+                         now() if status == "approved" else None, details))
                     return cur.lastrowid, slug
             except sqlite3.IntegrityError:
                 if attempt == 4:
@@ -159,7 +162,7 @@ def list_rfps(statuses=("approved",)):
 def update_rfp(rfp_id, **fields):
     allowed = {"title", "summary", "details", "discourse_url",
                "funding_goal_usd", "payout_addresses", "contact", "status",
-               "featured", "approved_at", "safe_address"}
+               "featured", "approved_at", "safe_address", "sort_rank"}
     sets, vals = [], []
     for k, v in fields.items():
         if k not in allowed:

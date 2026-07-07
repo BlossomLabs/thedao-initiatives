@@ -516,3 +516,19 @@ class TestNativeEthDonation(unittest.TestCase):
         r = self._verify(10 ** 12)  # 0.000001 ETH
         self.assertFalse(r["ok"])
         self.assertIn("minimum", r["detail"])
+
+
+class TestBoardOrdering(unittest.TestCase):
+    def _card(self, rank, total, created):
+        return {"rfp": {"sort_rank": rank, "created_at": created},
+                "sum": {"total": total}}
+
+    def test_pinned_first_then_money_then_newest(self):
+        import app as app_mod
+        a = self._card(None, 500, 100)   # money leader
+        b = self._card(2, 0, 50)         # pinned #2
+        c = self._card(1, 0, 10)         # pinned #1
+        d = self._card(None, 500, 200)   # money tie, newer
+        e = self._card(None, 10, 300)
+        ordered = app_mod.order_cards([a, b, c, d, e])
+        self.assertEqual(ordered, [c, b, d, a, e])

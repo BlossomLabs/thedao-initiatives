@@ -3,9 +3,8 @@
 {% block content %}
 <main class="detail narrow">
   <h1>Submit an RFP</h1>
-  <p class="tag left">Write your RFP as a post on a Discourse forum first (the Ethereum security
-  funding forum, ethresear.ch, or any public Discourse). Then link it here. Submissions are
-  reviewed before they appear on the site.</p>
+  <p class="tag left">The strongest RFPs start as a forum post where the idea gets discussed
+  in public; link it here if you have one. Submissions are reviewed before they appear on the site.</p>
 
   {% if error %}<div class="alert">{{ error }}</div>{% endif %}
 
@@ -13,15 +12,18 @@
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <input type="text" name="website" value="" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
 
-    <label class="lbl">Forum link (Discourse topic) *</label>
-    <input type="url" name="discourse_url" required placeholder="https://forum.example.org/t/my-rfp/123"
-           value="{{ form.discourse_url if form else '' }}">
-
-    <label class="lbl">Title <span class="dim">(leave blank to pull it from the forum post)</span></label>
+    <label class="lbl">Title <span class="dim">(or leave blank and we pull it from the forum link)</span></label>
     <input type="text" name="title" maxlength="140" value="{{ form.title if form else '' }}">
 
     <label class="lbl">Short summary * <span class="dim">(2 to 4 sentences: what gets built, why it matters)</span></label>
     <textarea name="summary" rows="5" required maxlength="4000">{{ form.summary if form else '' }}</textarea>
+
+    <label class="lbl">Full RFP details <span class="dim">(optional: scope, milestones, budget breakdown; markdown supported: headings, **bold**, lists, tables, - [ ] checklists)</span></label>
+    <textarea name="details" rows="10" maxlength="20000">{{ form.details if form else '' }}</textarea>
+
+    <label class="lbl">Forum link <span class="dim">(optional Discourse topic where this RFP is discussed)</span></label>
+    <input type="url" name="discourse_url" placeholder="https://forum.example.org/t/my-rfp/123"
+           value="{{ form.discourse_url if form else '' }}">
 
     <label class="lbl">Funding goal (USD) *</label>
     <input type="text" name="goal" required inputmode="decimal" placeholder="250000"

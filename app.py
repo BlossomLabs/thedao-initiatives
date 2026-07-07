@@ -75,6 +75,19 @@ def active_tokens(state):
             for sym, t in state["tokens"].items() if t["ok"]}
 
 
+def order_cards(cards):
+    """Board order: admin-pinned positions first (1 = top), then everything
+    else by total raised (pledges + confirmed donations), newest first on ties."""
+    def key(c):
+        rank = c["rfp"]["sort_rank"]
+        pinned = rank is not None and rank > 0
+        return (0 if pinned else 1,
+                rank if pinned else 0,
+                -c["sum"]["total"],
+                -(c["rfp"]["created_at"] or 0))
+    return sorted(cards, key=key)
+
+
 def donor_tokens(state):
     """What donors can pick: verified ERC20s plus native ETH."""
     out = dict(active_tokens(state))
@@ -440,6 +453,7 @@ def index():
                       "n_donations": len(dn),
                       "logos": [p for p in pl if p["logo"]][:4],
                       "enabled": bool(r["safe_address"])})
+    cards = order_cards(cards)
     recent.sort(key=lambda x: x["d"]["confirmed_at"] or 0, reverse=True)
     totals = {
         "count": len(cards),
@@ -487,17 +501,22 @@ def submit():
             "submit.html", error="Too many submissions from your address; "
             "try again in an hour.", form=request.form), 429
 
-    url_clean, err = validate_forum_url(request.form.get("discourse_url"))
-    if err:
-        return render_template("submit.html", error=err, form=request.form), 400
+    url_raw = (request.form.get("discourse_url") or "").strip()
+    url_clean = ""
+    if url_raw:
+        url_clean, err = validate_forum_url(url_raw)
+        if err:
+            return render_template("submit.html", error=err,
+                                   form=request.form), 400
 
     title = (request.form.get("title") or "").strip()[:MAX_TITLE]
-    if not title:
+    if not title and url_clean:
         title = fetch_discourse_title(url_clean) or ""
     if len(title) < 8:
         return render_template(
             "submit.html", error="Please give the RFP a title (at least 8 "
-            "characters). We could not read one from the forum link.",
+            "characters)." + (" We could not read one from the forum link."
+                              if url_clean else ""),
             form=request.form), 400
 
     summary = (request.form.get("summary") or "").strip()[:MAX_SUMMARY]
@@ -511,8 +530,9 @@ def submit():
         return render_template("submit.html", error=err, form=request.form), 400
 
     contact = (request.form.get("contact") or "").strip()[:200]
+    details = (request.form.get("details") or "").strip()[:20000]
     rfp_id, slug = db.create_rfp(title, summary, url_clean, goal, [],
-                                 contact, status="pending")
+                                 contact, status="pending", details=details)
     return render_template("submitted.html", title=title)
 
 
@@ -716,6 +736,13 @@ def admin_rfp(rfp_id):
             if url_raw:
                 url_clean, err3 = validate_forum_url(url_raw)
             error = err or err3
+            rank_raw = (request.form.get("sort_rank") or "").strip()
+            rank = None
+            if rank_raw:
+                try:
+                    rank = max(1, min(999, int(rank_raw)))
+                except ValueError:
+                    error = error or "Pin position must be a number (1-999)."
             if not error and (len(title) < 8 or len(summary) < 40):
                 error = "Title (8+) and summary (40+) are required."
             if not error:
@@ -724,6 +751,7 @@ def admin_rfp(rfp_id):
                                        or "").strip()[:20000],
                               funding_goal_usd=goal,
                               discourse_url=url_clean,
+                              sort_rank=rank,
                               contact=(request.form.get("contact")
                                        or "").strip()[:200])
         elif action == "add_pledge":

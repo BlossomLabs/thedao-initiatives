@@ -59,6 +59,8 @@
     <input type="url" name="discourse_url" value="{{ r.discourse_url }}">
     <label class="lbl">Funding goal (USD)</label>
     <input type="text" name="goal" inputmode="decimal" value="{{ r.funding_goal_usd }}">
+    <label class="lbl">Pin to board position <span class="dim">(1 = top of the front page; leave empty to sort automatically by amount raised)</span></label>
+    <input type="text" name="sort_rank" inputmode="numeric" value="{{ r.sort_rank or '' }}">
     <label class="lbl">Contact (private)</label>
     <input type="text" name="contact" maxlength="200" value="{{ r.contact }}">
     <button class="btn" name="action" value="edit">Save changes</button>

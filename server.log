@@ -9,7 +9,5 @@ Safe deploys: ENABLED (ok)
  * Running on http://127.0.0.1:4482
  * Running on http://10.0.0.110:4482
 [33mPress CTRL+C to quit[0m
-127.0.0.1 - - [06/Jul/2026 19:32:15] "GET /submit HTTP/1.1" 200 -
-127.0.0.1 - - [06/Jul/2026 19:32:15] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [06/Jul/2026 19:32:15] "GET /submit HTTP/1.1" 200 -
-127.0.0.1 - - [06/Jul/2026 19:32:15] "POST /submit HTTP/1.1" 200 -
+127.0.0.1 - - [07/Jul/2026 08:13:51] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [07/Jul/2026 08:13:51] "GET /rfp/this-rfp-board-yes-this-website HTTP/1.1" 200 -

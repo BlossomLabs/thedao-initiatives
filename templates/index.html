@@ -17,7 +17,7 @@
   {% for item in recent %}
   <a class="act" href="{{ url_for('rfp_page', slug=item.rfp.slug) }}">
     <span class="dot g"></span>
-    <span class="m">{{ item.d.donor | shortaddr }}</span> gave
+    <span class="m ens-addr" data-addr="{{ item.d.donor }}">{{ item.d.donor | shortaddr }}</span> gave
     <b>{{ item.d.amount | usd }}</b> to {{ item.rfp.title[:34] }}{% if item.rfp.title|length > 34 %}…{% endif %}
   </a>
   {% endfor %}

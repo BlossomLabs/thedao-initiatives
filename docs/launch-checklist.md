@@ -30,6 +30,9 @@ Order matters: public deployment first, then accounts, then build.
 - [ ] WalletConnect project ID + integration, so mobile donors and desktop
       users without extensions can connect any wallet by QR. Today only
       injected (extension / in-wallet browser) wallets work.
+- [ ] .wei / .gwei name display (wei.domains + the ownerless gwei.domains
+      fork). Separate contracts from the ENS registry, so reverse display
+      needs their resolver or API; ENS names already show everywhere.
 
 ## dApp UX (ETHSkills audit)
 - [x] DONE: button loading states + double-submission guard

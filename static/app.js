@@ -290,9 +290,9 @@
     if (!audioCtx) return;
     try {
       var t0 = audioCtx.currentTime + 0.05;
-      // C5 E5 G5 C6: a quick rising ta-da-da-DAA, under 1.2 seconds
-      var notes = [[523.25, 0.00, 0.16], [659.25, 0.13, 0.16],
-                   [783.99, 0.26, 0.20], [1046.50, 0.42, 0.55]];
+      // C5 E5 G5 C6: a snappy rising ta-da-da-DAA, about 0.7 seconds
+      var notes = [[523.25, 0.00, 0.11], [659.25, 0.09, 0.11],
+                   [783.99, 0.18, 0.14], [1046.50, 0.28, 0.42]];
       notes.forEach(function (n) {
         [["triangle", n[0], 0.22], ["square", n[0] / 2, 0.05]].forEach(
           function (voice) {
@@ -641,6 +641,29 @@
       btn.textContent = open ? "Donate" : "Close";
     });
   });
+
+  // ------------------------------------------------------------ ENS everywhere
+  // Server-rendered addresses carry class="ens-addr" data-addr="0x…"; upgrade
+  // them to primary ENS names asynchronously (server endpoint caches lookups).
+  (function () {
+    var els = document.querySelectorAll(".ens-addr[data-addr]");
+    if (!els.length) return;
+    var byAddr = {};
+    els.forEach(function (el) {
+      var a = (el.dataset.addr || "").toLowerCase();
+      if (/^0x[0-9a-f]{40}$/.test(a)) (byAddr[a] = byAddr[a] || []).push(el);
+    });
+    Object.keys(byAddr).forEach(function (a) {
+      fetch("/api/ens-name/" + a)
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.name) byAddr[a].forEach(function (el) {
+            el.textContent = d.name;
+            el.title = a;
+          });
+        }).catch(function () {});
+    });
+  })();
 
   // ------------------------------------------------------------ hero counter
   var hero = document.getElementById("hero-raised");

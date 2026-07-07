@@ -121,7 +121,7 @@
       {% for d in donations %}
         <tr>
           <td>{{ d.status }}</td>
-          <td class="m">{{ d.donor | shortaddr }}</td>
+          <td class="m"><span class="ens-addr" data-addr="{{ d.donor }}">{{ d.donor | shortaddr }}</span></td>
           <td class="amt">{{ d.amount | usd }}</td>
           <td>{{ d.token_symbol }}</td>
           <td class="m"><a href="https://etherscan.io/tx/{{ d.tx_hash }}" target="_blank" rel="noopener">{{ d.tx_hash | shortaddr }}</a></td>

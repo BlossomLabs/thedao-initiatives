@@ -262,7 +262,7 @@ def delete_pledge(pledge_id):
 def record_donation(rfp_id, tx_hash, verification):
     """Insert or update a donation row from a chain verification result.
 
-    Status mapping: confirmed = verified transfer to treasury; failed = mined
+    Status mapping: confirmed = verified transfer to the RFP's Safe; failed = mined
     but wrong (reverted / wrong token / wrong recipient); pending = in the
     mempool OR not visible to our RPC yet (fresh txs propagate slowly).
     """

@@ -1,4 +1,4 @@
-"""Central configuration: tokens, treasury, environment.
+"""Central configuration: tokens, Safe deployment, environment.
 
 Token addresses were verified 2026-07 against two independent sources
 (CoinGecko contract lookup + Etherscan token pages). chain.verify_tokens()
@@ -11,14 +11,6 @@ import secrets
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "rfps.db")
 ENV_PATH = os.path.join(BASE_DIR, ".env")
-
-# All donations flow to this address (TheDAO Security Fund treasury).
-# It must be written in exact EIP-55 checksum form: chain.resolve_treasury()
-# re-derives the checksum at startup and the app refuses to accept donations
-# on any mismatch, so a typo here cannot silently redirect funds.
-# Overridable via TREASURY_ADDRESS in .env.
-TREASURY_ADDRESS = "0xD5Cf05f24727C83976652E3586c0e26DD39884e9"
-TREASURY_LABEL = "TheDAO Security Fund treasury"
 
 CHAIN_ID = 1  # Ethereum mainnet only
 
@@ -58,14 +50,6 @@ RPC_ENDPOINTS = [
     "https://eth.drpc.org",
 ]
 
-# ENS Universal Resolver (ENSv2, 2026). The legacy flat registry was
-# deprecated in the ENSv2 migration; the Universal Resolver is the
-# ENS-sanctioned entry point for all resolution.
-ENS_UNIVERSAL_RESOLVER = "0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe"
-
-# Independent second opinion for ENS resolution (fund-safety cross-check).
-ENS_CROSSCHECK_URL = "https://api.ensdata.net/{name}"
-
 SUBMISSIONS_PER_HOUR_PER_IP = 5
 LOGIN_ATTEMPTS_PER_MINUTE_PER_IP = 5
 
@@ -78,17 +62,10 @@ MIN_CONFIRMATIONS = 3
 # ---------------------------------------------------------------- Safe-per-RFP
 # Each approved RFP gets its own Gnosis Safe (same operational signers every
 # time) deployed from the admin panel via the canonical SafeProxyFactory.
-# All three addresses verified 2026-07: Etherscan labels + byte-identical
-# code on mainnet and Sepolia (Safe deploys deterministically cross-chain).
+# All three addresses verified 2026-07 against Etherscan labels.
 SAFE_PROXY_FACTORY   = "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
 SAFE_SINGLETON       = "0x41675C099F32341bf84BFc5382aF534df5C7461a"
 SAFE_FALLBACK_HANDLER = "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99"
-
-SEPOLIA_RPC_ENDPOINTS = [
-    "https://ethereum-sepolia-rpc.publicnode.com",
-    "https://sepolia.drpc.org",
-]
-SEPOLIA_CHAIN_ID = 11155111
 
 # The 5 operational signers (3-of-5) that own every RFP Safe. Set in .env as
 # OPERATIONAL_SIGNERS=0xaaa...,0xbbb...,... (comma-separated, checksummed).
@@ -149,7 +126,6 @@ SECRET_KEY = ENV["SECRET_KEY"]
 ADMIN_PASSWORD = ENV["ADMIN_PASSWORD"]
 RPC_URL_OVERRIDE = ENV.get("RPC_URL", "").strip()
 PORT = int(ENV.get("PORT", "4482"))
-TREASURY_ADDRESS = ENV.get("TREASURY_ADDRESS", "").strip() or TREASURY_ADDRESS
 # Only trust X-Forwarded-For when running behind a proxy that sets it.
 # Left off by default so client IPs (used for rate limiting) cannot be spoofed.
 TRUST_PROXY = ENV.get("TRUST_PROXY", "").strip() in ("1", "true", "yes")
@@ -165,11 +141,10 @@ OPERATIONAL_SIGNERS = [
     if a.strip()]
 
 # Card payments: fiat-to-crypto checkout that delivers USDC straight to the
-# RFP's Safe, where the scanner credits it like any other donation.
-# guardarian works with no partner key (donor pastes the address; we show it
-# with a copy button). transak/moonpay need a partner API key + a public
-# domain; once ONRAMP_API_KEY is set they open fully prefilled.
-ONRAMP_PROVIDER = ENV.get("ONRAMP_PROVIDER", "guardarian").strip().lower()
+# RFP's Safe, where the scanner credits it like any other donation. Needs a
+# transak or moonpay partner API key; the card tab stays hidden until
+# ONRAMP_API_KEY is set (see docs/card-donations-research.md).
+ONRAMP_PROVIDER = ENV.get("ONRAMP_PROVIDER", "transak").strip().lower()
 ONRAMP_API_KEY = ENV.get("ONRAMP_API_KEY", "").strip()
 
 # AI board search: a visitor describes what they want to fund and an LLM ranks

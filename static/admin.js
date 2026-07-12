@@ -25,15 +25,8 @@
     elStatus.innerHTML = html;
   }
 
-  function chainHex(id) { return "0x" + Number(id).toString(16); }
-
-  function explorer(chain) {
-    return chain === "sepolia" ? "https://sepolia.etherscan.io"
-                               : "https://etherscan.io";
-  }
-
   function ensureChain(eth, chainId) {
-    var want = chainHex(chainId);
+    var want = "0x" + Number(chainId).toString(16);
     return eth.request({ method: "eth_chainId" }).then(function (id) {
       if (id === want) return true;
       return eth.request({
@@ -42,18 +35,18 @@
     });
   }
 
-  function deploy(chainName) {
+  function deploy() {
     var eth = window.ethereum;
     if (!eth) {
       status("err", "No wallet in this browser. Open this page in the browser with your wallet extension.");
       return;
     }
     status("wait", "Fetching deploy parameters…");
-    fetch("/api/admin/rfps/" + rfpId + "/safe-deploy-params?chain=" + chainName)
+    fetch("/api/admin/rfps/" + rfpId + "/safe-deploy-params")
       .then(function (r) { return r.json(); })
       .then(function (p) {
         if (!p.enabled) throw new Error(p.reason || "deployment disabled");
-        status("wait", "Check your wallet: switching to " + p.chain + "…");
+        status("wait", "Check your wallet: switching to mainnet…");
         return ensureChain(eth, p.chain_id)
           .then(function () {
             return eth.request({ method: "eth_requestAccounts" });
@@ -69,10 +62,10 @@
           })
           .then(function (txHash) {
             status("wait", "Deploying… waiting for the transaction to mine.<br>" +
-                   "<a class=\"m\" target=\"_blank\" rel=\"noopener\" href=\"" +
-                   explorer(chainName) + "/tx/" + txHash + "\">" +
+                   "<a class=\"m\" target=\"_blank\" rel=\"noopener\" " +
+                   "href=\"https://etherscan.io/tx/" + txHash + "\">" +
                    txHash.slice(0, 10) + "…</a>");
-            confirmLoop(txHash, chainName, 0);
+            confirmLoop(txHash, 0);
           });
       })
       .catch(function (e) {
@@ -82,45 +75,37 @@
       });
   }
 
-  function confirmLoop(txHash, chainName, attempt) {
+  function confirmLoop(txHash, attempt) {
     fetch("/api/admin/rfps/" + rfpId + "/safe-confirm", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tx_hash: txHash, chain: chainName })
+      body: JSON.stringify({ tx_hash: txHash })
     }).then(function (r) { return r.json(); })
       .then(function (res) {
         if (res.status === "ok") {
-          var link = "<a class=\"m\" target=\"_blank\" rel=\"noopener\" href=\"" +
-                     explorer(chainName) + "/address/" + res.address + "\">" +
-                     res.address + "</a>";
-          if (res.stored) {
-            status("ok", "✅ Safe deployed, verified, and saved: " + link +
-                   "<br>Donations to this address now count for this RFP. Reloading…");
-            setTimeout(function () { window.location.reload(); }, 2500);
-          } else {
-            status("ok", "✅ Test deploy verified on Sepolia (not saved): " + link +
-                   "<br>The real thing will work exactly like this. " +
-                   "Deploy on mainnet when ready.");
-          }
+          status("ok", "✅ Safe deployed, verified, and saved: " +
+                 "<a class=\"m\" target=\"_blank\" rel=\"noopener\" " +
+                 "href=\"https://etherscan.io/address/" + res.address + "\">" +
+                 res.address + "</a><br>Donations to this address now count " +
+                 "for this RFP. Reloading…");
+          setTimeout(function () { window.location.reload(); }, 2500);
         } else if (res.status === "pending" && attempt < 60) {
-          setTimeout(function () { confirmLoop(txHash, chainName, attempt + 1); }, 5000);
+          setTimeout(function () { confirmLoop(txHash, attempt + 1); }, 5000);
         } else {
           status("err", "Verification problem: " + (res.detail || "unknown") +
                  (res.status === "pending" ? " (still pending, keep this page open)" : ""));
           if (res.status === "pending") {
-            setTimeout(function () { confirmLoop(txHash, chainName, attempt + 1); }, 10000);
+            setTimeout(function () { confirmLoop(txHash, attempt + 1); }, 10000);
           }
         }
       })
       .catch(function () {
-        setTimeout(function () { confirmLoop(txHash, chainName, attempt + 1); }, 6000);
+        setTimeout(function () { confirmLoop(txHash, attempt + 1); }, 6000);
       });
   }
 
-  var btnMain = document.getElementById("safe-deploy-mainnet");
-  var btnSep = document.getElementById("safe-deploy-sepolia");
-  if (btnMain) btnMain.addEventListener("click", function () {
-    if (window.confirm("Deploy this RFP's donation Safe on Ethereum MAINNET? " +
-                       "This costs real gas from your wallet.")) deploy("mainnet");
+  var btn = document.getElementById("safe-deploy-mainnet");
+  if (btn) btn.addEventListener("click", function () {
+    if (window.confirm("Deploy this RFP's donation Safe on Ethereum mainnet? " +
+                       "This costs real gas from your wallet.")) deploy();
   });
-  if (btnSep) btnSep.addEventListener("click", function () { deploy("sepolia"); });
 })();

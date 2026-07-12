@@ -1,14 +1,14 @@
-"""Ethereum mainnet access: JSON-RPC with failover, ENS resolution,
-token sanity checks, and ERC-20 transfer verification.
+"""Ethereum mainnet access: JSON-RPC with failover, token sanity checks,
+Chainlink pricing, donation verification, and per-RFP Safe deployment.
 
 Design principles:
 - The chain is the source of truth. Donation amounts are read from the
-  verified Transfer log, never from client input.
-- The treasury is a static, admin-configured address that must round-trip
-  EIP-55 checksumming exactly; on any mismatch donations are disabled rather
-  than risking funds going to a wrong address. (ENS resolution helpers below
-  are kept for future use, e.g. if the treasury moves back to an ENS name.)
-- No private keys anywhere. The server only reads the chain.
+  verified Transfer log (or the tx itself for native ETH), never from
+  client input.
+- Every RFP Safe is re-verified on-chain (owners, threshold, singleton,
+  fallback handler) before the app will show its address to donors.
+- No private keys anywhere. The server only reads the chain; deployment
+  transactions are signed by the admin's own wallet in the browser.
 """
 import json
 import time
@@ -36,32 +36,31 @@ class RpcError(Exception):
     pass
 
 
-def rpc_call(method, params, timeout=10, endpoints=None):
-    """Call JSON-RPC with endpoint failover (mainnet unless endpoints given)."""
+def rpc_call(method, params, timeout=10):
+    """Call mainnet JSON-RPC with endpoint failover.
+
+    Starts from the last endpoint that worked, so one flaky provider does
+    not add a timeout to every call.
+    """
     payload = json.dumps({
         "jsonrpc": "2.0", "id": 1, "method": method, "params": params,
     }).encode()
-    sticky = endpoints is None  # remember the good endpoint for mainnet only
-    if endpoints is None:
-        endpoints = config.RPC_ENDPOINTS
+    endpoints = config.RPC_ENDPOINTS
+    start = _last_good_rpc[0] if _last_good_rpc[0] < len(endpoints) else 0
     order = list(range(len(endpoints)))
-    if sticky:
-        start = _last_good_rpc[0] if _last_good_rpc[0] < len(endpoints) else 0
-        order = order[start:] + order[:start]
+    order = order[start:] + order[:start]
     last_err = None
     for i in order:
-        url = endpoints[i]
         try:
             req = urllib.request.Request(
-                url, data=payload,
+                endpoints[i], data=payload,
                 headers={"Content-Type": "application/json",
                          "User-Agent": "thedao-rfps/1.0"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 out = json.loads(resp.read().decode())
             if "error" in out and out["error"]:
                 raise RpcError(str(out["error"]))
-            if sticky:
-                _last_good_rpc[0] = i
+            _last_good_rpc[0] = i
             return out.get("result")
         except Exception as e:  # try next endpoint
             last_err = e
@@ -92,15 +91,6 @@ def is_address(s: str) -> bool:
         return True
     except (ValueError, AttributeError):
         return False
-
-
-def namehash(name: str) -> bytes:
-    """ENS namehash (EIP-137)."""
-    node = b"\x00" * 32
-    if name:
-        for label in reversed(name.lower().split(".")):
-            node = keccak256(node + keccak256(label.encode()))
-    return node
 
 
 def _decode_hex_int(h):
@@ -136,84 +126,6 @@ def _decode_string_result(hexdata):
             strlen = int.from_bytes(raw[offset:offset + 32], "big")
             return raw[offset + 32:offset + 32 + strlen].decode("utf-8", "replace")
     return ""
-
-
-# ---------------------------------------------------------------- ENS
-
-def dns_encode(name: str) -> bytes:
-    """DNS-encode an ENS name (labels length-prefixed, zero-terminated)."""
-    out = b""
-    for label in name.lower().split("."):
-        raw = label.encode()
-        if not 0 < len(raw) < 64:
-            raise ValueError("bad label in %r" % name)
-        out += bytes([len(raw)]) + raw
-    return out + b"\x00"
-
-
-def _abi_encode_bytes(b: bytes) -> bytes:
-    pad = (32 - len(b) % 32) % 32
-    return len(b).to_bytes(32, "big") + b + b"\x00" * pad
-
-
-def resolve_ens_onchain(name: str):
-    """Resolve an ENS name via the ENSv2 Universal Resolver.
-
-    Calls UniversalResolver.resolve(dnsEncodedName, addr(node) calldata),
-    which handles the full ENSv2 resolution path on-chain.
-    """
-    node = namehash(name)
-    inner = bytes.fromhex("3b3b57de") + node  # addr(bytes32)
-    dnsname = dns_encode(name)
-    head1 = (0x40).to_bytes(32, "big")
-    tail1 = _abi_encode_bytes(dnsname)
-    head2 = (0x40 + len(tail1)).to_bytes(32, "big")
-    calldata = "0x9061b923" + (head1 + head2 + tail1
-                               + _abi_encode_bytes(inner)).hex()
-    res = eth_call(config.ENS_UNIVERSAL_RESOLVER, calldata)
-    if not res or res == "0x":
-        raise RpcError("universal resolver returned nothing for %s" % name)
-    raw = bytes.fromhex(res[2:])
-    if len(raw) < 96:
-        raise RpcError("universal resolver returned short data for %s" % name)
-    off = int.from_bytes(raw[0:32], "big")
-    ln = int.from_bytes(raw[off:off + 32], "big")
-    payload = raw[off + 32:off + 32 + ln]
-    if len(payload) < 20 or int.from_bytes(payload[-20:], "big") == 0:
-        raise RpcError("%s resolves to zero address" % name)
-    return to_checksum("0x" + payload[-20:].hex())
-
-
-def resolve_ens_crosscheck(name: str):
-    """Independent second opinion via ensdata.net."""
-    url = config.ENS_CROSSCHECK_URL.format(name=name)
-    req = urllib.request.Request(url, headers={"User-Agent": "thedao-rfps/1.0"})
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        data = json.loads(resp.read().decode())
-    addr = data.get("address") or ""
-    return to_checksum(addr) if is_address(addr) else None
-
-
-def resolve_treasury():
-    """Validate the statically configured treasury address.
-
-    Returns (address, verified: bool, detail: str). If verified is False the
-    caller must disable donations.
-
-    The configured value must round-trip EIP-55 checksumming EXACTLY: a
-    single mistyped character makes the checksum fail, so a typo disables
-    donations instead of redirecting funds.
-    """
-    configured = config.TREASURY_ADDRESS
-    try:
-        checksummed = to_checksum(configured)
-    except ValueError as e:
-        return None, False, "treasury address invalid: %s" % e
-    if checksummed != configured:
-        return checksummed, False, (
-            "treasury address failed EIP-55 checksum (configured=%s, "
-            "expected=%s): donations disabled" % (configured, checksummed))
-    return checksummed, True, "static treasury address, checksum verified"
 
 
 # ---------------------------------------------------------------- tokens
@@ -295,11 +207,11 @@ def usd_rate(symbol):
 
 # ---------------------------------------------------------------- receipts
 
-def verify_donation_tx(tx_hash, treasury, allowed_tokens):
+def verify_donation_tx(tx_hash, recipient, allowed_tokens):
     """Verify an on-chain donation by its transaction hash.
 
     Checks the receipt for a successful ERC-20 Transfer of an allowed token
-    where the recipient is the treasury. Amount and sender are read from the
+    into `recipient` (the RFP's Safe). Amount and sender are read from the
     log (chain truth), never from the client.
 
     Returns dict: {found, pending, ok, token_symbol, token_address,
@@ -351,11 +263,11 @@ def verify_donation_tx(tx_hash, treasury, allowed_tokens):
 
     by_addr = {a.lower(): (sym, dec)
                for sym, (a, dec) in allowed_tokens.items()}
-    want_to = "0x" + "0" * 24 + treasury.lower().replace("0x", "")
+    want_to = "0x" + "0" * 24 + recipient.lower().replace("0x", "")
 
-    # Sum every matching transfer of a single token to the treasury, so a
+    # Sum every matching transfer of a single token to the Safe, so a
     # batched/multicall donation is credited in full rather than only its
-    # first log. If a tx moves more than one accepted token to the treasury,
+    # first log. If a tx moves more than one accepted token to the Safe,
     # credit the first token seen and note the rest.
     credited_sym = credited_dec = credited_addr = None
     total_raw = 0
@@ -401,7 +313,7 @@ def verify_donation_tx(tx_hash, treasury, allowed_tokens):
         result["amount"] = total_raw / (10 ** credited_dec)
         result["amount_usd"] = round(result["amount"] * rate, 2)
         result["donor"] = donor
-        result["detail"] = "verified: %s %s to treasury%s" % (
+        result["detail"] = "verified: %s %s received%s" % (
             result["amount"], credited_sym,
             " (other tokens in this tx were not credited)" if extra_tokens else "")
         return result
@@ -409,7 +321,7 @@ def verify_donation_tx(tx_hash, treasury, allowed_tokens):
     # No accepted-token transfer: check for a plain (native) ETH send.
     if config.NATIVE_ETH:
         tx = rpc_call("eth_getTransactionByHash", [tx_hash])
-        if tx and (tx.get("to") or "").lower() == treasury.lower():
+        if tx and (tx.get("to") or "").lower() == recipient.lower():
             value = _decode_hex_int(tx.get("value"))
             eth = value / 1e18
             if 0 < eth < config.MIN_ETH_DONATION:
@@ -430,11 +342,11 @@ def verify_donation_tx(tx_hash, treasury, allowed_tokens):
                 result["amount"] = eth
                 result["amount_usd"] = round(eth * rate, 2)
                 result["donor"] = to_checksum(tx.get("from"))
-                result["detail"] = "verified: %s ETH to treasury" % eth
+                result["detail"] = "verified: %s ETH received" % eth
                 return result
 
-    result["detail"] = ("no transfer of an accepted stablecoin or ETH to the "
-                        "treasury found in this transaction")
+    result["detail"] = ("no transfer of an accepted token or ETH to this "
+                        "RFP's address found in this transaction")
     return result
 
 
@@ -534,20 +446,13 @@ def signers_configured():
     return True, "ok"
 
 
-def _chain_endpoints(chain_name):
-    if chain_name == "sepolia":
-        return config.SEPOLIA_RPC_ENDPOINTS
-    return None  # mainnet default
-
-
-def extract_deployed_safe(tx_hash, chain_name="mainnet"):
+def extract_deployed_safe(tx_hash):
     """Parse a deploy tx receipt for the factory's ProxyCreation event.
 
     Returns (safe_address, None) or (None, reason). Only trusts events
     emitted BY the canonical factory address.
     """
-    eps = _chain_endpoints(chain_name)
-    receipt = rpc_call("eth_getTransactionReceipt", [tx_hash], endpoints=eps)
+    receipt = rpc_call("eth_getTransactionReceipt", [tx_hash])
     if receipt is None:
         return None, "pending"
     if receipt.get("status") != "0x1":
@@ -568,18 +473,15 @@ def extract_deployed_safe(tx_hash, chain_name="mainnet"):
     return None, "no ProxyCreation event from the canonical factory in this tx"
 
 
-def verify_safe(address, chain_name="mainnet"):
+def verify_safe(address):
     """Verify a deployed Safe matches our exact spec before trusting it.
 
-    Checks: owners == configured signers (exact set), threshold, and that
-    the proxy points at the canonical v1.4.1 singleton.
+    Checks: owners == configured signers (exact set), threshold, the
+    canonical v1.4.1 singleton, and the canonical fallback handler.
     Returns (ok, detail).
     """
-    eps = _chain_endpoints(chain_name)
-
     def call(data):
-        return rpc_call("eth_call", [{"to": address, "data": data}, "latest"],
-                        endpoints=eps)
+        return rpc_call("eth_call", [{"to": address, "data": data}, "latest"])
 
     ok, why = signers_configured()
     if not ok:
@@ -598,8 +500,7 @@ def verify_safe(address, chain_name="mainnet"):
         if owners != expected:
             return False, ("owner set mismatch: on-chain has %d owners, "
                            "not the configured signers" % n)
-        slot0 = rpc_call("eth_getStorageAt", [address, "0x0", "latest"],
-                         endpoints=eps)
+        slot0 = rpc_call("eth_getStorageAt", [address, "0x0", "latest"])
         impl = ("0x" + slot0[-40:]).lower()
         if impl != config.SAFE_SINGLETON.lower():
             return False, "proxy singleton is not canonical Safe v1.4.1"
@@ -607,8 +508,7 @@ def verify_safe(address, chain_name="mainnet"):
         # "fallback_manager.handler.address"). A rogue handler could change how
         # the Safe answers calls, so confirm it's the canonical one we set up.
         fb_slot = "0x" + keccak256(b"fallback_manager.handler.address").hex()
-        fb_raw = rpc_call("eth_getStorageAt", [address, fb_slot, "latest"],
-                          endpoints=eps)
+        fb_raw = rpc_call("eth_getStorageAt", [address, fb_slot, "latest"])
         fb = ("0x" + fb_raw[-40:]).lower()
         if fb != config.SAFE_FALLBACK_HANDLER.lower():
             return False, "fallback handler is not the canonical Safe handler"

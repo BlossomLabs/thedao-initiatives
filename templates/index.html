@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="hero">
-  <p class="kicker">Ecosystem-funded security work</p>
+  <p class="kicker">Ecosystem-funded security initiatives</p>
   <div class="hero-raised" id="hero-raised" data-target="{{ totals.raised }}">$0</div>
-  <p class="hero-sub">raised for <span class="red">Ethereum security</span> RFPs</p>
+  <p class="hero-sub">raised for <span class="red">Ethereum security</span> initiatives</p>
 </section>
 
 {% if recent %}
@@ -19,13 +19,13 @@
 {% endif %}
 
 <main>
-  <h2 id="rfps">Open RFPs</h2>
+  <h2 id="rfps">Security initiatives looking for funding</h2>
   {% if ai_search and cards %}
   <form id="ai-search" class="ai-search" autocomplete="off">
     <input id="ai-search-q" type="text" maxlength="300"
            placeholder="What kind of security work do you want to fund? Describe it and we'll surface the best matches."
            aria-label="Describe the security work you want to fund">
-    <button class="btn primary" type="submit">Find my match</button>
+    <button class="btn primary" type="submit">Show top matches</button>
   </form>
   <p class="small dim ai-search-note" id="ai-search-note" hidden></p>
   {% endif %}
@@ -63,12 +63,12 @@
 
   <div class="pledge-band">
     <div>
-      <b>Want to write an RFP, or pledge to one?</b>
+      <b>Want to have an ecosystem initiative funded, or pledge your company’s support to one?</b>
       <p class="dim">Anyone can submit an RFP from a forum post. Sponsors pledge now and pay only when the work is completed and verified, with their logo on the RFP from day one.</p>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <a class="btn" href="{{ url_for('submit') }}">Submit an RFP</a>
-      <a class="btn" href="https://x.com/griffgreen" target="_blank" rel="noopener">Tweet @griffgreen to pledge</a>
+      <a class="btn" href="https://x.com/griffgreen" target="_blank" rel="noopener">Contact @griffgreen to pledge</a>
     </div>
   </div>
 </main>

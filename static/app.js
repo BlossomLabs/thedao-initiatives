@@ -750,6 +750,7 @@
     var note = document.getElementById("ai-search-note");
     var btn = form.querySelector("button");
     var originalOrder = Array.prototype.slice.call(grid.children);
+    var idleLabel = btn.textContent;
     var busy = false;
 
     function say(html) { note.hidden = false; note.innerHTML = html; }
@@ -815,7 +816,7 @@
         .then(function () {
           busy = false;
           btn.disabled = false;
-          btn.textContent = "Find my match";
+          btn.textContent = idleLabel;
         });
     });
   })();

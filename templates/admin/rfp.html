@@ -34,9 +34,8 @@
       <p class="small dim">Deploys a {{ safe_threshold }}-of-{{ signers | length }} Gnosis Safe owned by the operational signers.
       One transaction from your wallet; the app verifies owners and threshold on-chain before showing the address to donors.</p>
       <ul class="m addr-list">{% for s in signers %}<li>{{ s }}</li>{% endfor %}</ul>
-      <div class="btnrow" style="display:flex;gap:10px">
-        <button class="btn primary" id="safe-deploy-mainnet" type="button">Deploy Safe (mainnet)</button>
-        <button class="btn ghost" id="safe-deploy-sepolia" type="button">Test deploy (Sepolia)</button>
+      <div class="btnrow">
+        <button class="btn primary" id="safe-deploy-mainnet" type="button">Deploy Safe</button>
       </div>
       <div class="status" id="safe-deploy-status" hidden></div>
     </div>

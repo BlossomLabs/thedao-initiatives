@@ -11,12 +11,6 @@
   </div>
 
   <div class="verdicts">
-    <div class="pill"><span class="dot {{ 'g' if state.verified else 'a' }}"></span>
-      <div><b>Treasury: {{ state.treasury | shortaddr if state.treasury else 'unresolved' }}</b>
-      <small>{{ state.treasury | shortaddr if state.treasury else "?" }} · {{ state.detail }}</small></div></div>
-    <div class="pill"><span class="dot g"></span>
-      <div><b>{{ state.tokens.values() | selectattr('ok') | list | length }}/{{ state.tokens | length }} tokens verified</b>
-      <small>on-chain decimals + symbol checks</small></div></div>
     <div class="pill"><span class="dot {{ 'a' if n_pending else 'b' }}"></span>
       <div><b>{{ n_pending }} pending submission{{ '' if n_pending == 1 else 's' }}</b>
       <small>awaiting review below</small></div></div>

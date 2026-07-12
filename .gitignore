@@ -9,3 +9,5 @@ uploads/
 
 server.log
 *.db.bak.*
+.DS_Store
+*.db.bak-*

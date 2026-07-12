@@ -737,4 +737,86 @@
     }
     if (target > 0) requestAnimationFrame(step); else hero.textContent = "$0";
   }
+
+  // ------------------------------------------------------------ AI search
+  // Describe what you want to fund; the server's LLM ranks the open RFPs and
+  // the browser moves the best matches to the top of the grid. Local pins
+  // only: nothing is stored, "show all" restores the normal board order.
+  (function () {
+    var form = document.getElementById("ai-search");
+    var grid = document.querySelector(".rfp-grid");
+    if (!form || !grid) return;
+    var input = document.getElementById("ai-search-q");
+    var note = document.getElementById("ai-search-note");
+    var btn = form.querySelector("button");
+    var originalOrder = Array.prototype.slice.call(grid.children);
+    var busy = false;
+
+    function say(html) { note.hidden = false; note.innerHTML = html; }
+
+    function clearMatches() {
+      grid.querySelectorAll(".ai-badge").forEach(function (b) { b.remove(); });
+      originalOrder.forEach(function (card) {
+        card.classList.remove("ai-top");
+        grid.appendChild(card);  // re-append in saved order
+      });
+      note.hidden = true;
+      input.value = "";
+    }
+
+    function applyMatches(ids) {
+      grid.querySelectorAll(".ai-badge").forEach(function (b) { b.remove(); });
+      originalOrder.forEach(function (c) { c.classList.remove("ai-top"); });
+      var cards = ids.map(function (id) {
+        return grid.querySelector('.rfp-card[data-rfp-id="' + id + '"]');
+      }).filter(Boolean);
+      for (var i = cards.length - 1; i >= 0; i--) {
+        var badge = document.createElement("span");
+        badge.className = "ai-badge";
+        badge.textContent = cards.length > 1
+          ? "Match #" + (i + 1) : "Best match";
+        cards[i].classList.add("ai-top");
+        cards[i].insertBefore(badge, cards[i].firstChild);
+        grid.insertBefore(cards[i], grid.firstChild);
+      }
+      say("Your best match" + (cards.length > 1 ? "es are" : " is") +
+          " on top. <button type=\"button\" class=\"linklike\" " +
+          "id=\"ai-search-clear\">Show normal order</button>");
+      var clear = document.getElementById("ai-search-clear");
+      if (clear) clear.addEventListener("click", clearMatches);
+      grid.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      if (busy) return;
+      var q = input.value.trim();
+      if (q.length < 3) {
+        say("Describe what you'd like to fund — a few words is plenty.");
+        return;
+      }
+      busy = true;
+      btn.disabled = true;
+      btn.textContent = "Matching…";
+      fetch("/api/ai-search", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q })
+      }).then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.error) { say(res.error); return; }
+          if (!res.matches || !res.matches.length) {
+            say("No strong matches for that — but every RFP below funds " +
+                "Ethereum security, so browse away.");
+            return;
+          }
+          applyMatches(res.matches);
+        })
+        .catch(function () { say("Search is unavailable right now."); })
+        .then(function () {
+          busy = false;
+          btn.disabled = false;
+          btn.textContent = "Find my match";
+        });
+    });
+  })();
 })();

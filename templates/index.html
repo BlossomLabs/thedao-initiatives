@@ -4,12 +4,6 @@
   <p class="kicker">Ecosystem-funded security work</p>
   <div class="hero-raised" id="hero-raised" data-target="{{ totals.raised }}">$0</div>
   <p class="hero-sub">raised for <span class="red">Ethereum security</span> RFPs</p>
-  <div class="hero-stats">
-    <span><b>{{ totals.count }}</b> open RFPs</span>
-    <span><b>{{ totals.sponsors }}</b> sponsor pledge{{ '' if totals.sponsors == 1 else 's' }}</span>
-    <span><b>{{ totals.donations }}</b> on-chain donation{{ '' if totals.donations == 1 else 's' }}</span>
-    <span><b>{{ totals.goal | usd }}</b> in open goals</span>
-  </div>
 </section>
 
 {% if recent %}
@@ -25,13 +19,22 @@
 {% endif %}
 
 <main>
-  <h2 id="rfps">Open RFPs <span class="n">donate in stablecoins, right from this page</span></h2>
+  <h2 id="rfps">Open RFPs</h2>
+  {% if ai_search and cards %}
+  <form id="ai-search" class="ai-search" autocomplete="off">
+    <input id="ai-search-q" type="text" maxlength="300"
+           placeholder="What kind of security work do you want to fund? Describe it and we'll surface the best matches."
+           aria-label="Describe the security work you want to fund">
+    <button class="btn primary" type="submit">Find my match</button>
+  </form>
+  <p class="small dim ai-search-note" id="ai-search-note" hidden></p>
+  {% endif %}
   {% if not cards %}
     <p class="empty">No RFPs published yet. <a href="{{ url_for('submit') }}">Submit the first one.</a></p>
   {% endif %}
   <div class="rfp-grid">
   {% for c in cards %}
-    <div class="rfp-card">
+    <div class="rfp-card" data-rfp-id="{{ c.rfp.id }}">
       <a class="card-title" href="{{ url_for('rfp_page', slug=c.rfp.slug) }}">{{ c.rfp.title }}</a>
       <p class="card-sum">{{ c.rfp.summary[:170] }}{% if c.rfp.summary|length > 170 %}…{% endif %}</p>
       <div class="bar"><i style="width: {{ c.pct }}%"></i></div>

@@ -11,6 +11,43 @@ The goal, unchanged: a donor pays $25 to $1000 by card, minimal identity
 friction, USDC lands on Ethereum mainnet at the RFP's own Safe, scanner
 credits it, we custody nothing.
 
+## VALIDATION UPDATE (July 2026) — simpler than the DECISION below
+
+Re-ran the load-bearing checks. Two findings collapse most of the complexity:
+
+**1. Transak legally allows direct-to-Safe. The embedded wallet is NOT required
+for the Transak path.** Transak's Terms of Service (transak.com/terms-of-service,
+read directly) define a *"Designated Wallet … which may be your wallet or the
+wallet of a Merchant,"* and: *"If your Designated Wallet is a Merchant wallet,
+the Merchant must be on our approved list of Merchants."* [VERIFIED — primary
+ToS text]. So delivering USDC straight to an RFP Safe is expressly permitted,
+provided the fund is an approved Transak merchant and the Safes are allowlisted.
+No embedded wallet, no permit, no puller contract, no gas problem on this path.
+The own-wallet restriction that forced the unified embedded-wallet design is
+**Stripe-specific**, not universal — do not generalize it to Transak.
+
+**2. Stripe acquired Privy (2025).** Privy now bundles a self-custodial embedded
+wallet + Stripe's onramp + a 100+-country aggregator in one SDK
+(docs.privy.io/recipes/stripe-headless-onramp). If the Stripe path is ever
+pursued, **Privy is the vendor** — this resolves the "vendor TBD" in the
+DECISION section; Turnkey is no longer the pick for this app (no BTC/SOL need).
+
+**3. Stripe is not US-entity-only** (corrected): its onramp accepts merchant
+accounts in US, EU, UK, Norway, Switzerland, Australia, Singapore, New Zealand
+(support.stripe.com crypto region page).
+
+**Revised build order (supersedes the DECISION section for v1):**
+- **Phase 1 — Transak direct-to-Safe.** Already ~built (card tab pre-fills the
+  Safe via `onramp_link`, `network=ethereum`, USDC). Gating work is paperwork:
+  entity + charity docs → Transak merchant/KYB application → allowlist the Safe
+  addresses → set `ONRAMP_PROVIDER=transak` + `ONRAMP_API_KEY` in `.env`. Then
+  Griff field-tests it like he did Guardarian (mainnet, no paste, light KYC on
+  small amounts, Safe credited).
+- **Phase 2 — Stripe/Privy embedded wallet (optional).** Only if Transak's
+  reach/fees/UX disappoint. This is where the embedded-wallet + gas story
+  (Privy smart-wallet gas sponsorship, or the permit+puller contract) lives.
+  Deferred; not blocking.
+
 ## Headline reversals from v1
 
 **1. The Stripe direct-to-Safe plan has a likely ToS deal-breaker.**
@@ -96,6 +133,9 @@ onramps, zero-fee USDC) · daimo.com · docs.peer.xyz (zkp2p) ·
 docs.onramper.com + knowledge.onramper.com (ranking, routing, pricing)
 
 ## DECISION (Griff, July 2026): one unified card flow
+> NOTE (superseded for v1 — see "VALIDATION UPDATE" at top): the unified
+> embedded-wallet flow below is now Phase 2 (Stripe path only). Phase 1 is
+> Transak direct-to-Safe, which needs none of the embedded-wallet machinery.
 
 Every card donor, US or not, gets an embedded wallet (Google login, donor-owned
 keys via Privy/Web3Auth/Magic, vendor TBD). The onramp funds THAT wallet:

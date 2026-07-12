@@ -172,5 +172,15 @@ OPERATIONAL_SIGNERS = [
 ONRAMP_PROVIDER = ENV.get("ONRAMP_PROVIDER", "guardarian").strip().lower()
 ONRAMP_API_KEY = ENV.get("ONRAMP_API_KEY", "").strip()
 
+# AI board search: a visitor describes what they want to fund and an LLM ranks
+# the open RFPs by relevance (top ~10% get moved up, client-side only — the
+# stored board order never changes). Any OpenAI-compatible chat-completions
+# API works; default is DeepSeek (very cheap: well under $0.001 per search at
+# this board size). The feature is hidden until AI_SEARCH_API_KEY is set.
+AI_SEARCH_API_KEY = ENV.get("AI_SEARCH_API_KEY", "").strip()
+AI_SEARCH_BASE_URL = ENV.get("AI_SEARCH_BASE_URL",
+                             "https://api.deepseek.com").strip().rstrip("/")
+AI_SEARCH_MODEL = ENV.get("AI_SEARCH_MODEL", "deepseek-chat").strip()
+
 if RPC_URL_OVERRIDE:
     RPC_ENDPOINTS = [RPC_URL_OVERRIDE] + RPC_ENDPOINTS

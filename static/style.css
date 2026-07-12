@@ -51,9 +51,6 @@ a:hover{text-decoration:underline}
   background:linear-gradient(120deg,#fff 30%,var(--bright));-webkit-background-clip:text;
   background-clip:text;-webkit-text-fill-color:transparent}
 .hero-sub{font:300 clamp(17px,2.6vw,24px) var(--sans);color:var(--soft);margin:10px 0 0}
-.hero-stats{display:flex;justify-content:center;gap:28px;flex-wrap:wrap;margin-top:22px;
-  color:var(--muted);font-size:13.5px}
-.hero-stats b{color:var(--text);font-family:var(--tight)}
 
 /* ── social proof strip ──────────────────────────────────────── */
 .activity{display:flex;gap:10px;overflow-x:auto;max-width:1100px;margin:26px auto 0;padding:4px 24px;
@@ -295,3 +292,19 @@ footer a.dim{color:rgba(255,255,255,.35)}
 .wallet-menu button{border:0;background:transparent;color:var(--soft);text-align:left;
   padding:11px 16px;font:400 13px var(--sans);cursor:pointer}
 .wallet-menu button:hover{background:rgba(0,255,136,.08);color:var(--bright)}
+
+/* ---- AI board search ---- */
+.ai-search{display:flex;gap:10px;margin:4px 0 20px;flex-wrap:wrap}
+.ai-search input{flex:1;min-width:260px;background:rgba(255,255,255,.06);
+  border:1px solid var(--edge2);border-radius:12px;color:var(--text);
+  padding:12px 14px;font:300 14px var(--sans);outline:none}
+.ai-search input:focus{border-color:rgba(0,255,136,.55)}
+.ai-search input::placeholder{color:var(--muted)}
+.ai-search-note{margin:-8px 0 18px}
+.linklike{border:0;background:none;color:var(--bright);cursor:pointer;
+  padding:0;font:inherit;text-decoration:underline}
+.rfp-card.ai-top{border-color:rgba(0,255,136,.5);
+  box-shadow:0 0 0 1px rgba(0,255,136,.25),0 14px 30px rgba(0,0,0,.35)}
+.ai-badge{position:absolute;top:-10px;left:14px;background:var(--bright);
+  color:#08321c;font:700 11px var(--tight);letter-spacing:.4px;
+  border-radius:999px;padding:3px 10px;text-transform:uppercase}

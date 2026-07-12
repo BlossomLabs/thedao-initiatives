@@ -568,6 +568,28 @@ class TestBoardOrdering(unittest.TestCase):
         self.assertEqual(ordered, [c, b, d, a, e])
 
 
+class TestAiSearch(unittest.TestCase):
+    """The LLM's output is untrusted; only validated ids may reorder the board."""
+
+    def test_top_k_is_ten_percent_min_one(self):
+        import app as app_mod
+        for n, k in ((1, 1), (5, 1), (10, 1), (13, 2), (30, 3), (40, 4),
+                     (100, 10)):
+            self.assertEqual(app_mod.ai_top_k(n), k, "n=%d" % n)
+
+    def test_filter_rejects_unknown_and_junk_ids(self):
+        import app as app_mod
+        known = {1, 2, 3, 4}
+        # unknown id 99, junk types, and a duplicate are all dropped;
+        # order is the model's, capped at k
+        ranked = [99, "2", 2, None, "x", 4, 1, 3]
+        self.assertEqual(app_mod.ai_filter_ranked(ranked, known, 2), [2, 4])
+        self.assertEqual(app_mod.ai_filter_ranked(ranked, known, 10),
+                         [2, 4, 1, 3])
+        self.assertEqual(app_mod.ai_filter_ranked([], known, 3), [])
+        self.assertEqual(app_mod.ai_filter_ranked(["evil"], known, 3), [])
+
+
 class TestCompositeDonationKey(unittest.TestCase):
     """One tx that pays two different RFP Safes must credit both RFPs, keyed on
     (tx_hash, rfp_id) — the bug the composite key fixes. Uses a throwaway DB."""

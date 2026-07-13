@@ -554,6 +554,36 @@ class TestAiSearch(unittest.TestCase):
             self.assertTrue(app_mod._ai_budget_ok())
 
 
+class TestScannerLock(unittest.TestCase):
+    """The donation scanner must run in exactly one process, even under
+    gunicorn's several workers."""
+
+    def test_flock_grants_a_single_owner(self):
+        import tempfile
+        import app as app_mod
+        held = app_mod._scanner_lock_fd[:]
+        app_mod._scanner_lock_fd[:] = []
+        with mock.patch.object(config, "BASE_DIR", tempfile.mkdtemp()):
+            try:
+                self.assertTrue(app_mod._acquire_scanner_lock())   # first wins
+                self.assertFalse(app_mod._acquire_scanner_lock())  # rest blocked
+            finally:
+                for f in app_mod._scanner_lock_fd:
+                    f.close()
+                app_mod._scanner_lock_fd[:] = held
+
+    def test_start_scanner_once_is_idempotent(self):
+        import app as app_mod
+        app_mod._scanner_started[0] = False
+        with mock.patch.object(app_mod, "_acquire_scanner_lock",
+                               return_value=True), \
+             mock.patch.object(app_mod.threading, "Thread") as thread:
+            app_mod.start_scanner_once()
+            app_mod.start_scanner_once()
+            self.assertEqual(thread.call_count, 1)  # only one scanner thread
+        app_mod._scanner_started[0] = False
+
+
 class TestCompositeDonationKey(unittest.TestCase):
     """One tx that pays two different RFP Safes must credit both RFPs, keyed on
     (tx_hash, rfp_id) — the bug the composite key fixes. Uses a throwaway DB."""

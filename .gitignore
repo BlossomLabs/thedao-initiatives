@@ -12,3 +12,4 @@ server.log
 .DS_Store
 *.db.bak-*
 .DS_Store
+.scanner.lock

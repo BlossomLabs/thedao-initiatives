@@ -1074,13 +1074,56 @@ def _scanner_loop():
         time.sleep(SCAN_INTERVAL_SECS)
 
 
+# The donation scanner must run in exactly ONE process. Under gunicorn there
+# are several worker processes (and no __main__), so we take a cross-process
+# advisory lock on a file: whichever worker grabs it runs the scanner, the
+# rest skip it. The lock is held for the process's lifetime (the fd stays
+# open), so if that worker dies another can acquire it on its next start.
+_scanner_started = [False]
+_scanner_lock_fd = []  # keep the locked fd alive for the whole process
+
+
+def _acquire_scanner_lock():
+    """True if this process won the single-scanner lock (Unix flock)."""
+    try:
+        import fcntl
+    except ImportError:
+        return True  # no flock (non-Unix): assume a single process
+    fd = open(os.path.join(config.BASE_DIR, ".scanner.lock"), "w")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        fd.close()
+        return False  # another worker already owns it
+    _scanner_lock_fd.append(fd)
+    return True
+
+
+def start_scanner_once():
+    """Start the background donation scanner, at most once per process and
+    only in the one worker that wins the cross-process lock."""
+    if _scanner_started[0]:
+        return
+    if not _acquire_scanner_lock():
+        return
+    _scanner_started[0] = True
+    threading.Thread(target=_scanner_loop, daemon=True,
+                     name="donation-scanner").start()
+
+
+# Under gunicorn there is no __main__, so the production launcher sets
+# RFPS_SCANNER=1 and the scanner starts here at import. Tests import this
+# module without that flag, so they never spawn a network-touching thread.
+if os.environ.get("RFPS_SCANNER") == "1":
+    start_scanner_once()
+
+
 if __name__ == "__main__":
     print("TheDAO RFPs — admin password is in .env")
     print(chain_state()["detail"])
     ok, why = chain.signers_configured()
     print("Safe deploys: %s (%s)" % ("ENABLED" if ok else "disabled", why))
-    threading.Thread(target=_scanner_loop, daemon=True,
-                     name="donation-scanner").start()
+    start_scanner_once()
     # BIND_HOST=0.0.0.0 in .env exposes the app on the local network (e.g. to
     # click Deploy from a machine that has wallet keys). Default stays
     # localhost-only.

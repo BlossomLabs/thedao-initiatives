@@ -73,7 +73,31 @@ crontab -e -u rfps
 Backups land in `~/rfps-backups` (14-day retention). For off-host safety, add a
 second line that `rclone`/`scp`s that folder somewhere else.
 
-## 6. Post-launch checklist
+## 6. Zero out test data (launch gate)
+
+Everything on the test machine — RFPs, pledges, donations, the deployed
+Safes — is test data and must NOT appear on the real site.
+
+- A fresh `git clone` deploy **already starts with an empty database**
+  (`rfps.db`, `uploads/`, and `.env` are gitignored), so if you followed
+  step 2 there is nothing to clean.
+- If you copied the database from the test machine (or want to re-zero a
+  staging box), run the reset — it takes a backup first, then deletes every
+  RFP, pledge, donation, uploaded logo, and the scanner cursor:
+
+```sh
+./deploy/reset-for-launch.sh --yes-wipe-everything
+sudo systemctl restart thedao-rfps
+```
+
+- **Old test Safes stay on-chain forever** (nothing can delete a deployed
+  multisig) — they were deployed with the OLD signer set, so just stop
+  referencing them: after the reset, re-add the real RFPs and deploy each
+  one's Safe fresh from the admin panel. Before the first deploy,
+  double-check `OPERATIONAL_SIGNERS` in the server `.env` is the corrected
+  five-address set.
+
+## 7. Post-launch checklist
 
 - Hit `https://your-domain/healthz` — should return `{"ok": true, ...}`.
 - Deploy a real RFP Safe from the admin panel and send a $1 test donation;

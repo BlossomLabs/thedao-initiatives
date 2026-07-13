@@ -11,3 +11,4 @@ server.log
 *.db.bak.*
 .DS_Store
 *.db.bak-*
+.DS_Store

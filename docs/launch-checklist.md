@@ -27,9 +27,11 @@ Order matters: public deployment first, then accounts, then build.
       ~30-day deadline), the tiny immutable forwarder contract (spender that
       can only move funds to registered RFP Safes; PC reviews; deployed from
       the admin wallet like the Safes; Sepolia first), gas-only watcher.
-- [ ] WalletConnect project ID + integration, so mobile donors and desktop
-      users without extensions can connect any wallet by QR. Today only
-      injected (extension / in-wallet browser) wallets work.
+- [x] DONE: WalletConnect integrated (vendored provider, feature-flagged,
+      CSP-scoped, verified in-browser). Mobile donors + extension-less desktop
+      connect any wallet by QR. **Action left for you:** get a free project id
+      at cloud.reown.com, set WALLETCONNECT_PROJECT_ID in .env, and add the
+      site domain to the project's Allowlist in the Reown dashboard.
 - [ ] .wei / .gwei name display (wei.domains + the ownerless gwei.domains
       fork). Separate contracts from the ENS registry, so reverse display
       needs their resolver or API; ENS names already show everywhere.

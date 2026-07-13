@@ -98,20 +98,30 @@ def donor_tokens(state):
 
 # ------------------------------------------------------------ security bits
 
-_buckets = defaultdict(deque)
+_buckets = OrderedDict()  # key -> deque of hit timestamps (LRU-ordered)
 _bucket_lock = threading.Lock()
+BUCKETS_MAX = 20000  # cap so IP-rotating floods can't grow this without bound
 
 
 def rate_limit(key, limit, window_secs):
     now = time.time()
     with _bucket_lock:
-        q = _buckets[key]
+        q = _buckets.get(key)
+        if q is None:
+            q = _buckets[key] = deque()
         while q and q[0] < now - window_secs:
             q.popleft()
-        if len(q) >= limit:
-            return False
-        q.append(now)
-        return True
+        allowed = len(q) < limit
+        if allowed:
+            q.append(now)
+        if q:
+            _buckets[key] = q          # keep non-empty buckets
+            _buckets.move_to_end(key)  # mark recently used
+        else:
+            _buckets.pop(key, None)    # drop emptied buckets immediately
+        while len(_buckets) > BUCKETS_MAX:
+            _buckets.popitem(last=False)  # evict least-recently-used
+        return allowed
 
 
 def client_ip():
@@ -170,16 +180,38 @@ def admin_required(f):
     return inner
 
 
+# WalletConnect (when enabled) needs its relay + wallet-registry hosts in the
+# CSP. Kept out of the default policy so a deployment without WalletConnect
+# stays as tight as possible. The vendored bundle is still script-src 'self'.
+_WC_CONNECT = ("wss://relay.walletconnect.org wss://relay.walletconnect.com "
+               "https://relay.walletconnect.org https://relay.walletconnect.com "
+               "https://explorer-api.walletconnect.com https://api.web3modal.org "
+               "https://pulse.walletconnect.org "
+               "https://ethereum-rpc.publicnode.com")
+_WC_IMG = "https://explorer-api.walletconnect.com https://imagedelivery.net"
+
+
 @app.after_request
 def harden(resp):
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"
     resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    connect_src = "'self'"
+    img_src = "'self' data:"
+    if config.WALLETCONNECT_PROJECT_ID:
+        connect_src += " " + _WC_CONNECT
+        img_src += " " + _WC_IMG
     resp.headers["Content-Security-Policy"] = (
         "default-src 'self'; script-src 'self'; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-        "font-src https://fonts.gstatic.com; img-src 'self' data:; "
-        "connect-src 'self'; frame-ancestors 'none'")
+        "font-src https://fonts.gstatic.com; img-src " + img_src + "; "
+        "connect-src " + connect_src + "; frame-ancestors 'none'; "
+        "base-uri 'none'; form-action 'self'; object-src 'none'")
+    # HSTS: once a browser has seen this it refuses plain-HTTP downgrades.
+    # Only meaningful (and only sent) when we're actually serving over HTTPS.
+    if request.is_secure or config.ENV.get("SITE_URL", "").startswith("https"):
+        resp.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains")
     return resp
 
 
@@ -189,7 +221,8 @@ def inject_globals():
     if site and not site.endswith("/"):
         site += "/"
     return {"csrf_token": csrf_token, "TOKENS": config.TOKENS,
-            "site_url": site or request.url_root}
+            "site_url": site or request.url_root,
+            "wc_project_id": config.WALLETCONNECT_PROJECT_ID}
 
 
 # ------------------------------------------------------------ jinja filters
@@ -753,6 +786,11 @@ def donate_params():
         "chain_id": config.CHAIN_ID,
         "tokens": priced,
         "rates": rates,
+        # Minimums the server enforces, so the client can block a doomed send
+        # instead of letting the donor pay gas for a transfer we'll reject:
+        # ERC-20 needs at least 1 whole token, native ETH at least min_eth.
+        "min_token_units": 1,
+        "min_eth": config.MIN_ETH_DONATION,
     })
 
 
@@ -993,6 +1031,15 @@ def safe_confirm(rfp_id):
         return jsonify({"status": "error",
                         "detail": "this RFP already has a different Safe: "
                                   + r["safe_address"]}), 409
+    # A Safe address must belong to exactly one RFP. The deploy calldata is
+    # salted by rfp_id so distinct RFPs get distinct Safes, but guard the
+    # invariant anyway: if this address is already another RFP's Safe, the
+    # scanner would credit every incoming transfer to BOTH RFPs.
+    other = db.rfp_by_safe_address(address)
+    if other and other["id"] != rfp_id:
+        return jsonify({"status": "error",
+                        "detail": "that Safe is already assigned to another "
+                                  "RFP (%s)" % other["slug"]}), 409
     db.update_rfp(rfp_id, safe_address=address)
     return jsonify({"status": "ok", "address": address, "detail": detail})
 
@@ -1059,10 +1106,31 @@ def _scan_once():
             if existing and existing["status"] != "pending":
                 continue
             v = chain.verify_donation_tx(tx, safe_addr, tokens)
-            if v["ok"]:
+            # Persist any transfer we can see on-chain, even one we can't price
+            # yet (status=pending, e.g. a Chainlink feed briefly down). Advancing
+            # the cursor past an unrecorded transfer would strand it forever;
+            # _reverify_pending() re-checks pending rows until they resolve.
+            if v["found"]:
                 db.record_donation(rfp_id, tx, v)
         db.meta_set("scan_block", str(to))
         frm = to + 1
+    _reverify_pending(tokens)
+
+
+def _reverify_pending(tokens):
+    """Re-verify every donation still marked pending, so a transfer recorded
+    while its price feed was momentarily unavailable is picked up and confirmed
+    on a later cycle instead of being lost."""
+    for d in db.pending_donations():
+        r = db.rfp_by_id(d["rfp_id"])
+        if not r or not r["safe_address"]:
+            continue
+        try:
+            v = chain.verify_donation_tx(d["tx_hash"], r["safe_address"], tokens)
+        except chain.RpcError:
+            continue  # transient; try again next cycle
+        if v["found"] and not v["pending"]:
+            db.record_donation(d["rfp_id"], d["tx_hash"], v)
 
 
 def _scanner_loop():

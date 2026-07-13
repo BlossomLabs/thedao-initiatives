@@ -20,10 +20,10 @@
   </div>
   <p class="dw-conv small dim" hidden></p>
 
-  <div class="dw-methods" role="tablist">
-    <button type="button" class="dw-method on" data-method="wallet">🦊 Wallet</button>
-    {% if onramp_prefilled %}<button type="button" class="dw-method" data-method="card">💳 Card</button>{% endif %}
-    <button type="button" class="dw-method" data-method="exchange">🏦 Exchange</button>
+  <div class="dw-methods" role="group" aria-label="Choose how to donate">
+    <button type="button" class="dw-method on" data-method="wallet" aria-pressed="true">🦊 Wallet</button>
+    {% if onramp_prefilled %}<button type="button" class="dw-method" data-method="card" aria-pressed="false">💳 Card</button>{% endif %}
+    <button type="button" class="dw-method" data-method="exchange" aria-pressed="false">🏦 Exchange</button>
   </div>
 
   <div class="dw-panel" data-panel="wallet">

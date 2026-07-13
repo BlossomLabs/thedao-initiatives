@@ -212,51 +212,160 @@
       });
   }
 
+  // WalletConnect (optional): mobile wallets + extension-less desktop browsers
+  // connect by QR / deep link. Enabled only when the server rendered a project
+  // id on the connect button; the ~1 MB bundle is fetched lazily on first use.
+  // It yields a standard EIP-1193 provider, so it flows through the very same
+  // donation code and server-side verification as an injected wallet.
+  var wcProjectId = (navBtn && navBtn.dataset.wcProject) || "";
+  var wcSrc = (navBtn && navBtn.dataset.wcSrc) || "";
+  var wcProvider = null;
+  var wcBundlePromise = null;
+
+  function wcEnabled() { return !!(wcProjectId && wcSrc); }
+  function hasInjected() { return !!(providers.length || window.ethereum); }
+
+  function loadWcBundle() {
+    if (wcBundlePromise) return wcBundlePromise;
+    wcBundlePromise = new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = wcSrc;
+      s.async = true;
+      s.onload = function () {
+        var mod = window["@walletconnect/ethereum-provider"];
+        if (mod && mod.EthereumProvider) resolve(mod.EthereumProvider);
+        else reject(new Error("WalletConnect unavailable"));
+      };
+      s.onerror = function () { reject(new Error("WalletConnect unavailable")); };
+      document.head.appendChild(s);
+    });
+    return wcBundlePromise;
+  }
+
+  function connectWalletConnect() {
+    // Params first so the widget's token list is ready when the modal returns.
+    return getParams().then(loadWcBundle).then(function (EthereumProvider) {
+      if (wcProvider) return wcProvider;
+      return EthereumProvider.init({
+        projectId: wcProjectId,
+        chains: [1],                 // Ethereum mainnet only
+        showQrModal: true,
+        methods: ["eth_sendTransaction", "personal_sign",
+                  "wallet_switchEthereumChain"],
+        events: ["accountsChanged", "chainChanged", "disconnect"],
+        rpcMap: { 1: "https://ethereum-rpc.publicnode.com" },
+        metadata: {
+          name: "TheDAO Security Fund",
+          description: "Fund Ethereum security initiatives",
+          url: location.origin,
+          icons: [location.origin + "/static/dao-logo.svg"]
+        }
+      }).then(function (provider) {
+        wcProvider = provider;
+        watchProvider(provider);
+        provider.on("disconnect", function () {
+          if (activeProvider === provider) { activeProvider = null; disconnectUi(); }
+        });
+        return provider;
+      });
+    }).then(function (provider) {
+      return provider.enable().then(function (accounts) {  // opens the QR modal
+        if (!accounts || !accounts[0]) throw new Error("no account authorized");
+        activeProvider = provider;
+        setConnected(accounts[0]);
+      });
+    });
+  }
+
+  function resetConnectBtn(e) {
+    navBtn.textContent = account ? short(account) : "Connect wallet";
+    if (e && e.message === "no-wallet") {
+      navBtn.textContent = "No wallet found";
+      setTimeout(function () {
+        if (!account) navBtn.textContent = "Connect wallet";
+      }, 2500);
+    }
+  }
+
   var walletMenu = null;
-  function toggleWalletMenu() {
-    if (walletMenu) { walletMenu.remove(); walletMenu = null; return; }
+  function closeWalletMenu() {
+    if (walletMenu) { walletMenu.remove(); walletMenu = null; }
+  }
+
+  // One menu, two modes: pick a wallet to CONNECT, or switch while connected.
+  function openWalletMenu(connected) {
+    closeWalletMenu();
     walletMenu = document.createElement("div");
     walletMenu.className = "wallet-menu";
-    providers.forEach(function (p) {
+    function item(label, fn) {
       var b = document.createElement("button");
       b.type = "button";
-      b.textContent = (activeProvider === p.provider ? "\u25cf " : "") +
-                      p.info.name;
-      b.addEventListener("click", function () {
-        activeProvider = p.provider;
-        walletMenu.remove(); walletMenu = null;
-        switchWallet(p.provider).catch(function () {});
-      });
+      b.textContent = label;
+      b.addEventListener("click", function () { closeWalletMenu(); fn(); });
       walletMenu.appendChild(b);
+    }
+    function connectInjected() {
+      navBtn.textContent = "Connecting\u2026";
+      connectWallet().catch(resetConnectBtn);
+    }
+    providers.forEach(function (p) {
+      var dot = (activeProvider === p.provider ? "\u25cf " : "");
+      item(dot + p.info.name, function () {
+        activeProvider = p.provider;
+        if (connected) switchWallet(p.provider).catch(function () {});
+        else connectInjected();
+      });
     });
-    var sw = document.createElement("button");
-    sw.type = "button";
-    sw.textContent = "Switch account\u2026";
-    sw.addEventListener("click", function () {
-      walletMenu.remove(); walletMenu = null;
-      switchWallet().catch(function () {});
-    });
-    walletMenu.appendChild(sw);
+    if (!providers.length && window.ethereum) {
+      item("Browser wallet", function () {
+        if (connected) switchWallet().catch(function () {});
+        else connectInjected();
+      });
+    }
+    if (wcEnabled()) {
+      var wdot = (wcProvider && activeProvider === wcProvider ? "\u25cf " : "");
+      item(wdot + "WalletConnect (mobile & more)", function () {
+        navBtn.textContent = "Connecting\u2026";
+        connectWalletConnect().catch(resetConnectBtn);
+      });
+    }
+    if (connected) {
+      item("Switch account\u2026", function () {
+        switchWallet().catch(function () {});
+      });
+    }
     navBtn.parentNode.appendChild(walletMenu);
+    // close on the next click outside the menu
+    setTimeout(function () {
+      document.addEventListener("click", function onDoc(ev) {
+        if (walletMenu && !walletMenu.contains(ev.target) && ev.target !== navBtn) {
+          closeWalletMenu();
+          document.removeEventListener("click", onDoc);
+        }
+      });
+    }, 0);
   }
 
   if (navBtn) {
     navBtn.addEventListener("click", function () {
+      if (walletMenu) { closeWalletMenu(); return; }  // toggle closed
       if (account && eth()) {
-        if (providers.length > 1) { toggleWalletMenu(); return; }
+        // connected: offer switching only if there's more than one way in
+        if (providers.length > 1 || wcEnabled()) { openWalletMenu(true); return; }
         var prev = navBtn.textContent;
         navBtn.textContent = "Choose wallet…";
         switchWallet().catch(function () { navBtn.textContent = prev; });
         return;
       }
+      // not connected: show a chooser when there is more than one option
+      if (hasInjected() && wcEnabled()) { openWalletMenu(false); return; }
+      if (!hasInjected() && wcEnabled()) {
+        navBtn.textContent = "Connecting…";
+        connectWalletConnect().catch(resetConnectBtn);
+        return;
+      }
       navBtn.textContent = "Connecting…";
-      connectWallet().catch(function (e) {
-        navBtn.textContent = "Connect wallet";
-        if (e && e.message === "no-wallet") {
-          navBtn.textContent = "No wallet found";
-          setTimeout(function () { navBtn.textContent = "Connect wallet"; }, 2500);
-        }
-      });
+      connectWallet().catch(resetConnectBtn);
     });
     // reflect an already-authorized wallet without prompting (after 6963
     // announcements settle)
@@ -464,7 +573,9 @@
     // ---- method chooser: wallet / card / exchange -------------------
     function showMethod(name) {
       root.querySelectorAll(".dw-method").forEach(function (b) {
-        b.classList.toggle("on", b.dataset.method === name);
+        var on = b.dataset.method === name;
+        b.classList.toggle("on", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
       });
       root.querySelectorAll(".dw-panel").forEach(function (p) {
         p.hidden = p.dataset.panel !== name;
@@ -548,6 +659,24 @@
         var base = toBaseUnits(qtyStr, tok.decimals);
         if (base === null) {
           status("err", "That amount is too small for " + sym + ".");
+          return;
+        }
+        // Enforce the server's minimums up front, so we never let a donor pay
+        // gas for a transfer the server will reject as dust (ERC-20: ≥ 1 whole
+        // token; native ETH: ≥ min_eth). Amounts are in dollars, so the floor
+        // shows as its dollar cost for the chosen token.
+        var qtyNum = parseFloat(qtyStr);
+        if (isNative) {
+          var minEth = (params.min_eth != null) ? params.min_eth : 0.0005;
+          if (qtyNum < minEth) {
+            status("err", "That is below the minimum ETH donation (" +
+                   minEth + " ETH, about $" + (minEth * rate).toFixed(2) +
+                   "). Enter a larger amount.");
+            return;
+          }
+        } else if (qtyNum < (params.min_token_units || 1)) {
+          status("err", "The minimum donation is 1 " + sym + " (about $" +
+                 rate.toFixed(2) + "). Enter a larger amount.");
           return;
         }
         // balance guards (only assert what we actually know — a null balance
@@ -728,6 +857,8 @@
     function fmt(v) {
       return "$" + Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     }
+    // Screen readers announce the final total (not the mid-animation numbers).
+    hero.setAttribute("aria-label", fmt(target) + " raised");
     function step(ts) {
       if (!t0) t0 = ts;
       var p = Math.min(1, (ts - t0) / dur);

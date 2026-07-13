@@ -130,8 +130,11 @@ PORT = int(ENV.get("PORT", "4482"))
 # Left off by default so client IPs (used for rate limiting) cannot be spoofed.
 TRUST_PROXY = ENV.get("TRUST_PROXY", "").strip() in ("1", "true", "yes")
 # Send the admin session cookie only over HTTPS. Off by default so local
-# http://127.0.0.1 dev works; set COOKIE_SECURE=1 in any real deployment.
-COOKIE_SECURE = ENV.get("COOKIE_SECURE", "").strip() in ("1", "true", "yes")
+# http://127.0.0.1 dev works. Auto-enabled when SITE_URL is https, so a deploy
+# that forgets the flag still can't leak the admin cookie over plain HTTP; set
+# COOKIE_SECURE=1 to force it on regardless.
+COOKIE_SECURE = (ENV.get("COOKIE_SECURE", "").strip() in ("1", "true", "yes")
+                 or ENV.get("SITE_URL", "").strip().startswith("https"))
 # Global backstop: max failed admin logins per minute across all IPs, to blunt
 # distributed (botnet) brute force that per-IP limits cannot see.
 LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL = 60
@@ -156,6 +159,12 @@ AI_SEARCH_API_KEY = ENV.get("AI_SEARCH_API_KEY", "").strip()
 AI_SEARCH_BASE_URL = ENV.get("AI_SEARCH_BASE_URL",
                              "https://api.deepseek.com").strip().rstrip("/")
 AI_SEARCH_MODEL = ENV.get("AI_SEARCH_MODEL", "deepseek-chat").strip()
+
+# WalletConnect: lets mobile wallets and extension-less desktop browsers
+# connect by QR / deep link. Off until a (free) project id from
+# https://cloud.reown.com is set; when empty, the vendored bundle is never
+# loaded and no WalletConnect hosts are added to the CSP.
+WALLETCONNECT_PROJECT_ID = ENV.get("WALLETCONNECT_PROJECT_ID", "").strip()
 
 if RPC_URL_OVERRIDE:
     RPC_ENDPOINTS = [RPC_URL_OVERRIDE] + RPC_ENDPOINTS

@@ -6,10 +6,9 @@
   {% if error %}<div class="alert">{{ error }}</div>{% endif %}
   <form method="post" action="{{ url_for('admin_login_post') }}" class="form narrow-form">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-    <label class="lbl">Password</label>
-    <input type="password" name="password" autofocus>
+    <label class="lbl" for="admin-password">Password</label>
+    <input type="password" id="admin-password" name="password" autofocus>
     <button class="btn primary" type="submit">Log in</button>
   </form>
-  <p class="small dim">The password is in the <span class="m">.env</span> file in the app folder.</p>
 </main>
 {% endblock %}

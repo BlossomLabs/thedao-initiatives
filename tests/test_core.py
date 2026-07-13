@@ -636,3 +636,36 @@ class TestCompositeDonationKey(unittest.TestCase):
         self.assertEqual(s2, "already-confirmed")
         self.assertEqual(len(self.db.donations_for(rfp_a)), 1)
         self.assertEqual(self.db.funding_summary(rfp_a)["donated"], 50)
+
+    def _pending(self):
+        # a transfer the scanner saw but couldn't price yet (feed briefly down)
+        return {"ok": False, "found": True, "pending": True,
+                "token_symbol": "EURC",
+                "token_address": config.TOKENS["EURC"][0],
+                "amount_raw": "0", "amount": 0.0, "amount_usd": 0.0,
+                "donor": DONOR, "detail": "price feed unavailable"}
+
+    def test_pending_donation_is_reverified_and_confirmed(self):
+        import app as app_mod
+        rfp, _ = self.db.create_rfp("Gamma", "s", "", 0, [], "", "approved")
+        self.db.update_rfp(rfp, safe_address="0x" + "11" * 20)
+        tx = "0x" + "ef" * 32
+        _, st = self.db.record_donation(rfp, tx, self._pending())
+        self.assertEqual(st, "pending")                        # stored, not lost
+        self.assertEqual(self.db.funding_summary(rfp)["donated"], 0)
+        # feed recovers -> the reverify pass confirms it (no re-scan needed)
+        with mock.patch.object(app_mod.chain, "verify_donation_tx",
+                               return_value=self._confirmed(50)):
+            app_mod._reverify_pending(config.TOKENS)
+        self.assertEqual(self.db.funding_summary(rfp)["donated"], 50)
+        self.assertEqual(len(self.db.donations_for(rfp)), 1)
+
+    def test_safe_address_belongs_to_one_rfp(self):
+        a, _ = self.db.create_rfp("A", "s", "", 0, [], "", "approved")
+        self.db.create_rfp("B", "s", "", 0, [], "", "approved")
+        safe = "0x" + "22" * 20
+        self.db.update_rfp(a, safe_address=safe)
+        found = self.db.rfp_by_safe_address(safe.upper())  # case-insensitive
+        self.assertIsNotNone(found)
+        self.assertEqual(found["id"], a)
+        self.assertIsNone(self.db.rfp_by_safe_address("0x" + "33" * 20))

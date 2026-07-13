@@ -165,11 +165,13 @@ def verify_tokens():
 
 _rate_cache = {}  # symbol -> (rate, fetched_at)
 RATE_TTL = 600
-# Reject a Chainlink answer older than this. Feeds have different heartbeats
-# (ETH/USD ~1h; FX feeds like EUR/USD and CHF/USD up to 24h), so the window is
-# the slowest heartbeat plus a safety margin — tight enough to catch a frozen
-# feed, loose enough not to reject a healthy FX feed between updates.
-RATE_MAX_STALENESS = 90000  # 25 hours
+# Reject a Chainlink answer older than its feed's heartbeat plus a margin —
+# tight enough to catch a frozen feed, loose enough not to reject a healthy one
+# between updates. Per-feed because heartbeats differ a lot: ETH/USD updates
+# ~hourly, so a day-old ETH answer means the feed is stuck; FX feeds (EUR/USD,
+# CHF/USD) only update ~daily, so they legitimately go ~24h between rounds.
+RATE_MAX_STALENESS = 90000            # default 25h (slow FX feeds)
+RATE_STALENESS = {"ETH": 2 * 3600}    # ETH/USD: 2h (heartbeat ~1h)
 
 
 def usd_rate(symbol):
@@ -196,7 +198,7 @@ def usd_rate(symbol):
     if updated_at <= 0:
         raise RpcError("price feed round for %s is incomplete" % symbol)
     age = time.time() - updated_at
-    if age > RATE_MAX_STALENESS:
+    if age > RATE_STALENESS.get(symbol, RATE_MAX_STALENESS):
         raise RpcError("price feed for %s is stale (%d s old)" % (symbol, age))
     rate = answer / 1e8  # all configured feeds use 8 decimals
     if not (0.1 < rate < 1_000_000):

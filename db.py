@@ -178,6 +178,18 @@ def rfp_by_id(rfp_id):
         con.close()
 
 
+def rfp_by_safe_address(address):
+    """The RFP that owns this Safe address, if any (case-insensitive).
+    Used to keep every Safe bound to exactly one RFP."""
+    con = connect()
+    try:
+        return con.execute(
+            "SELECT * FROM rfps WHERE lower(safe_address)=lower(?)",
+            (address,)).fetchone()
+    finally:
+        con.close()
+
+
 def list_rfps(statuses=("approved",)):
     con = connect()
     try:

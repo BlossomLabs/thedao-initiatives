@@ -37,16 +37,21 @@ a:hover{text-decoration:underline}
 .btn.wallet{margin:0;padding:8px 16px;font-size:13px;border-radius:999px}
 .btn.wallet.connected{border-color:rgba(0,255,136,.6);color:var(--bright);font-family:var(--mono);font-size:12px}
 @media(max-width:760px){
-  .topbar{padding:10px 14px}
-  .topnav{gap:12px}
+  .topbar{padding:10px 14px;flex-wrap:wrap;gap:8px 14px}
+  .topnav{gap:12px;flex-wrap:wrap;row-gap:8px}
   .topnav a{font-size:13px}
+  .hero{padding-top:48px}
+  /* comfortable touch targets (≈44px) on phones */
+  .dw-chip{padding:11px 16px}
+  .dw-method{padding:12px 6px}
+  .btn.sm,.dw-copy{padding:10px 14px}
   .brand span{display:none}
 }
 
 /* ── hero: the money is the hero ─────────────────────────────── */
 .hero{max-width:1100px;margin:0 auto;padding:72px 24px 8px;text-align:center}
 .kicker{font:400 12px var(--tight);letter-spacing:.24em;text-transform:uppercase;color:var(--green);margin:0}
-.hero-raised{font:700 clamp(64px,12vw,132px)/1 var(--tight);letter-spacing:-.04em;
+.hero-raised{font:700 clamp(40px,12vw,132px)/1 var(--tight);letter-spacing:-.04em;
   font-variant-numeric:tabular-nums;margin:14px 0 0;
   background:linear-gradient(120deg,#fff 30%,var(--bright));-webkit-background-clip:text;
   background-clip:text;-webkit-text-fill-color:transparent}

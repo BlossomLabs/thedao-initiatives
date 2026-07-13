@@ -542,6 +542,17 @@ class TestAiSearch(unittest.TestCase):
         self.assertEqual(app_mod.ai_filter_ranked([], known, 3), [])
         self.assertEqual(app_mod.ai_filter_ranked(["evil"], known, 3), [])
 
+    def test_daily_call_cap_blocks_then_resets_next_day(self):
+        import app as app_mod
+        with mock.patch.object(app_mod, "AI_DAILY_CALL_CAP", 2), \
+             mock.patch.dict(app_mod._ai_daily, {"day": "", "calls": 0}):
+            self.assertTrue(app_mod._ai_budget_ok())
+            self.assertTrue(app_mod._ai_budget_ok())
+            self.assertFalse(app_mod._ai_budget_ok())  # cap reached
+            # a new day resets the counter
+            app_mod._ai_daily["day"] = "1999-01-01"
+            self.assertTrue(app_mod._ai_budget_ok())
+
 
 class TestCompositeDonationKey(unittest.TestCase):
     """One tx that pays two different RFP Safes must credit both RFPs, keyed on

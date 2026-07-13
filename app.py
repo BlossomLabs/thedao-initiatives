@@ -611,6 +611,24 @@ _ai_lock = threading.Lock()
 AI_CACHE_TTL = 600
 AI_CACHE_MAX = 500
 AI_QUERY_MAX_CHARS = 300
+# Hard daily ceiling on upstream (paid) API calls, on top of the per-minute
+# rate limits. Cached searches don't count. At DeepSeek prices 500 calls is
+# roughly $0.25, so a worst-case abuse day costs cents, not dollars — and the
+# prepaid balance is the final backstop.
+AI_DAILY_CALL_CAP = 500
+_ai_daily = {"day": "", "calls": 0}
+
+
+def _ai_budget_ok():
+    """Count an upstream call against today's cap; False = cap reached."""
+    today = time.strftime("%Y-%m-%d")
+    with _ai_lock:
+        if _ai_daily["day"] != today:
+            _ai_daily.update(day=today, calls=0)
+        if _ai_daily["calls"] >= AI_DAILY_CALL_CAP:
+            return False
+        _ai_daily["calls"] += 1
+        return True
 
 
 def ai_top_k(n):
@@ -694,11 +712,14 @@ def ai_search():
         if hit and time.time() - hit[1] < AI_CACHE_TTL:
             _ai_cache.move_to_end(cache_key)
             return jsonify({"matches": hit[0]})
-    # Uncached queries hit a paid API: per-client and global rate limits.
+    # Uncached queries hit a paid API: per-client and global rate limits,
+    # plus a hard daily ceiling.
     if not rate_limit("ai:" + client_ip(), 6, 60):
         return jsonify({"error": "too many searches, wait a minute"}), 429
     if not rate_limit("ai:global", 30, 60):
         return jsonify({"error": "search is busy, try again shortly"}), 429
+    if not _ai_budget_ok():
+        return jsonify({"error": "search is resting until tomorrow"}), 429
     try:
         ranked = _ai_rank(query, items)
     except Exception as e:

@@ -42,7 +42,11 @@
 
   function ensureMainnet(p) {
     return p.request({ method: "eth_chainId" }).then(function (id) {
-      if (id === "0x1") return true;
+      // Providers disagree on the shape: injected wallets return "0x1",
+      // WalletConnect may hand back a number or decimal string. Normalize
+      // before deciding to switch, so we never ask a mainnet wallet to
+      // "switch" to mainnet (some reject that request outright).
+      if (parseInt(id, 16) === 1 || parseInt(id, 10) === 1) return true;
       return p.request({
         method: "wallet_switchEthereumChain", params: [{ chainId: "0x1" }]
       }).then(function () { return true; });
@@ -242,17 +246,20 @@
     return wcBundlePromise;
   }
 
-  function connectWalletConnect() {
-    // Params first so the widget's token list is ready when the modal returns.
-    return getParams().then(loadWcBundle).then(function (EthereumProvider) {
-      if (wcProvider) return wcProvider;
+  var wcInitPromise = null;
+  function wcInit() {
+    if (wcInitPromise) return wcInitPromise;
+    wcInitPromise = loadWcBundle().then(function (EthereumProvider) {
+      // IMPORTANT: do NOT pass `methods:`/`events:` here. Those set the
+      // session's REQUIRED capabilities, and any wallet that doesn't declare
+      // one of them (e.g. wallet_switchEthereumChain, or a "disconnect"
+      // event) rejects the whole connection. The provider's defaults require
+      // only eth_sendTransaction + personal_sign and put everything else in
+      // the optional set, which is what maximizes wallet compatibility.
       return EthereumProvider.init({
         projectId: wcProjectId,
         chains: [1],                 // Ethereum mainnet only
         showQrModal: true,
-        methods: ["eth_sendTransaction", "personal_sign",
-                  "wallet_switchEthereumChain"],
-        events: ["accountsChanged", "chainChanged", "disconnect"],
         rpcMap: { 1: "https://ethereum-rpc.publicnode.com" },
         metadata: {
           name: "TheDAO Security Fund",
@@ -268,13 +275,42 @@
         });
         return provider;
       });
-    }).then(function (provider) {
-      return provider.enable().then(function (accounts) {  // opens the QR modal
+    });
+    wcInitPromise.catch(function () { wcInitPromise = null; });  // allow retry
+    return wcInitPromise;
+  }
+
+  var wcConnectPromise = null;  // in-flight guard: no double modal on double click
+  function connectWalletConnect() {
+    if (wcConnectPromise) return wcConnectPromise;
+    // Params first so the widget's token list is ready when the modal returns.
+    wcConnectPromise = getParams().then(wcInit).then(function (provider) {
+      return provider.enable().catch(function (e) {
+        // A stale or corrupt persisted session is WalletConnect's classic
+        // failure mode ("nothing happens" until the user clears site data).
+        // Drop the session so the NEXT attempt starts a clean pairing.
+        return Promise.resolve(provider.disconnect()).catch(function () {})
+          .then(function () { throw e; });
+      }).then(function (accounts) {   // enable() opens the QR modal
         if (!accounts || !accounts[0]) throw new Error("no account authorized");
         activeProvider = provider;
         setConnected(accounts[0]);
       });
     });
+    var clear = function () { wcConnectPromise = null; };
+    wcConnectPromise.then(clear, clear);
+    return wcConnectPromise;
+  }
+
+  function hasWcSession() {
+    // WalletConnect v2 persists sessions under "wc@2:*" keys. Only when one
+    // exists do we spend the 1 MB bundle on a silent reconnect at page load.
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        if (localStorage.key(i).indexOf("wc@2") === 0) return true;
+      }
+    } catch (e) {}
+    return false;
   }
 
   function resetConnectBtn(e) {
@@ -375,6 +411,18 @@
         watchProvider(p);
         p.request({ method: "eth_accounts" }).then(function (a) {
           if (a && a[0]) { getParams().then(function () { setConnected(a[0]); }).catch(function(){}); }
+        }).catch(function () {});
+      } else if (wcEnabled() && hasWcSession()) {
+        // A WalletConnect session survives reloads (persisted by the SDK).
+        // Restore it silently so returning donors see themselves connected;
+        // init() never opens the modal, it only resumes the stored session.
+        wcInit().then(function (provider) {
+          var a = provider.session && provider.accounts;
+          if (a && a[0] && !account) {
+            activeProvider = provider;
+            getParams().then(function () { setConnected(a[0]); })
+              .catch(function () {});
+          }
         }).catch(function () {});
       }
     }, 300);
@@ -584,8 +632,10 @@
     root.querySelectorAll(".dw-method").forEach(function (b) {
       b.addEventListener("click", function () { showMethod(b.dataset.method); });
     });
-    // no wallet in this browser: lead with card if available, else exchange
-    if (!eth()) {
+    // No wallet in this browser: lead with card if available, else exchange —
+    // unless WalletConnect is enabled, in which case the wallet tab still
+    // works (Donate opens the QR modal), so it stays the default.
+    if (!eth() && !wcEnabled()) {
       showMethod(root.querySelector('[data-panel="card"]') ? "card" : "exchange");
     }
 
@@ -623,6 +673,23 @@
         return;
       }
       if (!eth()) {
+        // No injected wallet. WalletConnect (when enabled) IS the wallet path
+        // for these donors — especially phones — so offer it before falling
+        // back to the card/exchange tabs, and resume this donation once the
+        // wallet is connected.
+        if (wcEnabled()) {
+          status("wait", "Opening WalletConnect… scan the QR with your " +
+                 "phone's wallet (or approve in the wallet app).");
+          setBusy(true, "Connecting…");
+          connectWalletConnect().then(function () {
+            setBusy(false);
+            donate();  // account is set now; runs the normal wallet flow
+          }).catch(function (e) {
+            setBusy(false);
+            status("err", "Not connected: " + msg(e));
+          });
+          return;
+        }
         var hasCard = !!root.querySelector('[data-panel="card"]');
         showMethod(hasCard ? "card" : "exchange");
         status("wait", hasCard

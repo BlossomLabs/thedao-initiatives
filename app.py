@@ -189,6 +189,10 @@ _WC_CONNECT = ("wss://relay.walletconnect.org wss://relay.walletconnect.com "
                "https://pulse.walletconnect.org "
                "https://ethereum-rpc.publicnode.com")
 _WC_IMG = "https://explorer-api.walletconnect.com https://imagedelivery.net"
+# WalletConnect Verify runs in a hidden iframe and attests our origin to the
+# wallet. If the CSP blocks it, connections still work but wallets flag the
+# site as "unverified" (scary red banner on the donor's phone).
+_WC_FRAME = "https://verify.walletconnect.org https://verify.walletconnect.com"
 
 
 @app.after_request
@@ -198,14 +202,17 @@ def harden(resp):
     resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     connect_src = "'self'"
     img_src = "'self' data:"
+    frame_src = "'none'"  # the app itself never frames anything
     if config.WALLETCONNECT_PROJECT_ID:
         connect_src += " " + _WC_CONNECT
         img_src += " " + _WC_IMG
+        frame_src = _WC_FRAME
     resp.headers["Content-Security-Policy"] = (
         "default-src 'self'; script-src 'self'; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src https://fonts.gstatic.com; img-src " + img_src + "; "
-        "connect-src " + connect_src + "; frame-ancestors 'none'; "
+        "connect-src " + connect_src + "; frame-src " + frame_src + "; "
+        "frame-ancestors 'none'; "
         "base-uri 'none'; form-action 'self'; object-src 'none'")
     # HSTS: once a browser has seen this it refuses plain-HTTP downgrades.
     # Only meaningful (and only sent) when we're actually serving over HTTPS.

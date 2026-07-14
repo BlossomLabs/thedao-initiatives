@@ -28,6 +28,36 @@ acceptance checks.
 - Outbound HTTPS must be allowed (Ethereum RPC endpoints, api.ensdata.net,
   api.deepseek.com, WalletConnect relay).
 
+## Getting the code + repo setup (you do this first)
+
+You receive two files from Griff:
+
+- `thedao-rfps-launch.tar.gz`: the code as plain files, for reading and
+  reference.
+- `thedao-rfps.bundle`: the same code as a **complete git repository with
+  history**. Use THIS to create the repo, so future updates from Griff's
+  machine push cleanly to the same history.
+
+Set up the repo (about 3 minutes):
+
+1. Create a **private** GitHub repository named **`RFP-crowdfunding`**.
+   Create it empty: no README, no license, no .gitignore.
+2. Clone from the bundle and push:
+
+```sh
+git clone thedao-rfps.bundle thedao-rfps
+cd thedao-rfps
+git remote set-url origin git@github.com:<owner>/RFP-crowdfunding.git
+git push -u origin main
+```
+
+3. Give **Griff admin access** to the repo (Settings, Collaborators). He
+   ships fixes from his machine, so he needs push rights, and the project is
+   his: if you create it under your personal account, plan to transfer
+   ownership to him or his org later.
+
+The server then clones from GitHub as usual (DEPLOY.md step 2).
+
 ## Deploy, in one breath
 
 Follow DEPLOY.md sections 1 to 5: create the `rfps` user, clone the code,
@@ -96,8 +126,9 @@ donation from an exchange credits within about 5 minutes, the scanner works.
 - The 1 MB WalletConnect bundle in `static/vendor/` is vendored on purpose
   (strict CSP forbids CDN scripts); provenance + SHA-256 in
   `static/vendor/README.md`.
-- The strict CSP header comes from the app itself; Caddy only adds HSTS.
-  No extra header config needed in the proxy.
+- Every security header, including HSTS and the strict CSP, comes from the
+  app itself. The Caddyfile stays a plain reverse proxy; add no header
+  config there.
 
 Questions: the code is small and commented; `app.py` is the whole backend,
 `chain.py` is all Ethereum access, `README.md` explains the money flow.

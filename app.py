@@ -19,8 +19,9 @@ from functools import wraps
 
 import markdown
 import nh3
-from flask import (Flask, abort, jsonify, redirect, render_template, request,
-                   send_from_directory, session, url_for)
+from flask import (Flask, abort, jsonify, make_response, redirect,
+                   render_template, request, send_from_directory, session,
+                   url_for)
 from markupsafe import Markup
 
 import chain
@@ -171,6 +172,28 @@ def same_origin_only():
             abort(403)
 
 
+@app.before_request
+def site_lock():
+    """Private-beta gate: when SITE_USERNAME/SITE_PASSWORD are configured, the
+    whole site (pages, APIs, static files) demands them via HTTP Basic Auth.
+    /healthz stays open so uptime monitors work. Blank both + restart = public.
+    """
+    if not (config.SITE_USERNAME and config.SITE_PASSWORD):
+        return
+    if request.path == "/healthz":
+        return
+    auth = request.authorization
+    if (auth and auth.type == "basic"
+            and hmac.compare_digest(auth.username or "", config.SITE_USERNAME)
+            and hmac.compare_digest(auth.password or "", config.SITE_PASSWORD)):
+        return
+    resp = make_response(
+        "This site is in private preview. Enter the username and password "
+        "you were given to continue.", 401)
+    resp.headers["WWW-Authenticate"] = 'Basic realm="TheDAO RFP board"'
+    return resp
+
+
 def admin_required(f):
     @wraps(f)
     def inner(*a, **kw):
@@ -216,7 +239,7 @@ def harden(resp):
         "base-uri 'none'; form-action 'self'; object-src 'none'")
     # HSTS: once a browser has seen this it refuses plain-HTTP downgrades.
     # Only meaningful (and only sent) when we're actually serving over HTTPS.
-    if request.is_secure or config.ENV.get("SITE_URL", "").startswith("https"):
+    if request.is_secure or config.SITE_URL.startswith("https"):
         resp.headers["Strict-Transport-Security"] = (
             "max-age=31536000; includeSubDomains")
     return resp
@@ -224,7 +247,7 @@ def harden(resp):
 
 @app.context_processor
 def inject_globals():
-    site = config.ENV.get("SITE_URL", "").strip()
+    site = config.SITE_URL
     if site and not site.endswith("/"):
         site += "/"
     return {"csrf_token": csrf_token, "TOKENS": config.TOKENS,

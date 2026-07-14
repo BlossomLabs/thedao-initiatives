@@ -33,8 +33,8 @@ su - rfps
 git clone <your-repo-url> thedao-rfps   # or scp the folder up
 cd thedao-rfps
 cp .env.production.template .env
-nano .env          # fill in SITE_URL, ADMIN_PASSWORD, OPERATIONAL_SIGNERS,
-                   # RPC_URL, and any AI/onramp keys
+nano .env          # fill in ADMIN_PASSWORD, SITE_USERNAME/SITE_PASSWORD,
+                   # RPC_URL, and the optional AI / WalletConnect keys
 chmod 600 .env
 ```
 
@@ -120,5 +120,9 @@ sudo systemctl restart thedao-rfps
   through `serve-prod.sh` / the systemd unit / gunicorn.
 - The donation **scanner runs in exactly one process**, protected by a file
   lock (`.scanner.lock`), so bumping gunicorn workers later stays safe.
-- Card donations and WalletConnect are separate follow-ups; see
-  `docs/card-donations-research.md` and `docs/launch-checklist.md`.
+- WalletConnect ships in the app; it activates when WALLETCONNECT_PROJECT_ID
+  is set (and the domain is allowlisted in the Reown dashboard).
+- Card donations are a separate follow-up; see
+  `docs/card-donations-research.md`.
+- The site starts in PRIVATE PREVIEW when SITE_USERNAME/SITE_PASSWORD are set
+  in .env; blank them and restart to go public.

@@ -129,12 +129,24 @@ PORT = int(ENV.get("PORT", "4482"))
 # Only trust X-Forwarded-For when running behind a proxy that sets it.
 # Left off by default so client IPs (used for rate limiting) cannot be spoofed.
 TRUST_PROXY = ENV.get("TRUST_PROXY", "").strip() in ("1", "true", "yes")
+# Public URL of the deployed site. A bare domain is treated as https, so
+# "SITE_URL=rfps.thedao.fund" still turns on the https-dependent protections.
+SITE_URL = ENV.get("SITE_URL", "").strip()
+if SITE_URL and "://" not in SITE_URL:
+    SITE_URL = "https://" + SITE_URL
+
 # Send the admin session cookie only over HTTPS. Off by default so local
 # http://127.0.0.1 dev works. Auto-enabled when SITE_URL is https, so a deploy
 # that forgets the flag still can't leak the admin cookie over plain HTTP; set
 # COOKIE_SECURE=1 to force it on regardless.
 COOKIE_SECURE = (ENV.get("COOKIE_SECURE", "").strip() in ("1", "true", "yes")
-                 or ENV.get("SITE_URL", "").strip().startswith("https"))
+                 or SITE_URL.startswith("https"))
+
+# Private-beta gate: when BOTH are set, the entire site (except /healthz, so
+# uptime monitors keep working) demands this username/password via HTTP Basic
+# Auth before anything is served. Blank both lines + restart to go public.
+SITE_USERNAME = ENV.get("SITE_USERNAME", "").strip()
+SITE_PASSWORD = ENV.get("SITE_PASSWORD", "").strip()
 # Global backstop: max failed admin logins per minute across all IPs, to blunt
 # distributed (botnet) brute force that per-IP limits cannot see.
 LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL = 60

@@ -39,7 +39,8 @@ an **empty database on purpose**; all data from the dev machine was test data.
 
 Non-secret values you can take from this document:
 
-- `SITE_URL` = the real https URL you deploy to
+- `SITE_URL` = `https://rfps.thedao.fund/` (keep the https:// prefix; the
+  cookie and HSTS protections switch on it)
 - `COOKIE_SECURE=1`, `TRUST_PROXY=1`, `BIND_HOST=127.0.0.1`
 - `OPERATIONAL_SIGNERS` = exactly these five, comma-separated, this order is
   fine:
@@ -49,18 +50,22 @@ Non-secret values you can take from this document:
 Secrets Griff sends you separately (never by email, never in git):
 
 - `ADMIN_PASSWORD` (a fresh one for production)
+- `SITE_USERNAME` + `SITE_PASSWORD` (the private-preview login: while both
+  are set, the whole site asks for them before showing anything; /healthz
+  stays open for monitoring. Blank both + restart when Griff says go public.)
 - `RPC_URL` (Alchemy/Infura/dRPC mainnet key)
 - `AI_SEARCH_API_KEY` (DeepSeek; optional, search box hidden if empty)
 - `WALLETCONNECT_PROJECT_ID` (optional; QR wallet connect hidden if empty)
-- `ONRAMP_API_KEY` (leave empty for launch; card tab stays hidden)
 
 Set `chmod 600 .env` after filling it in.
 
 ## Acceptance checks (done = all green)
 
 1. `https://<domain>/healthz` returns `{"ok": true, "tokens_ok": [...9 tokens]}`
-2. Front page loads with a valid TLS cert; `/admin` login works with the new
-   password.
+   with NO login (uptime monitors need it open).
+2. Everything else asks for the site username/password first (a plain
+   `curl -sI https://<domain>/` returns 401). After logging in, the front
+   page loads with a valid TLS cert and `/admin` accepts the admin password.
 3. `journalctl -u thedao-rfps` shows "Safe deploys: ENABLED (ok)" at boot.
 4. Reboot the box once: the service comes back by itself.
 5. Backup cron has produced a file in `~/rfps-backups` (run it once manually).

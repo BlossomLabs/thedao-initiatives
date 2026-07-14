@@ -554,6 +554,47 @@ class TestAiSearch(unittest.TestCase):
             self.assertTrue(app_mod._ai_budget_ok())
 
 
+class TestSiteLock(unittest.TestCase):
+    """Private-preview gate: with SITE_USERNAME/SITE_PASSWORD set, everything
+    except /healthz demands HTTP Basic Auth."""
+
+    def _client(self):
+        import app as app_mod
+        return app_mod.app.test_client()
+
+    def test_open_site_when_unconfigured(self):
+        with mock.patch.object(config, "SITE_USERNAME", ""), \
+             mock.patch.object(config, "SITE_PASSWORD", ""):
+            r = self._client().get("/static/style.css")
+            self.assertEqual(r.status_code, 200)
+
+    def test_locked_site_demands_credentials(self):
+        import base64
+        with mock.patch.object(config, "SITE_USERNAME", "friend"), \
+             mock.patch.object(config, "SITE_PASSWORD", "open-sesame"):
+            c = self._client()
+            r = c.get("/static/style.css")
+            self.assertEqual(r.status_code, 401)
+            self.assertIn("Basic", r.headers.get("WWW-Authenticate", ""))
+            bad = base64.b64encode(b"friend:wrong").decode()
+            r = c.get("/static/style.css",
+                      headers={"Authorization": "Basic " + bad})
+            self.assertEqual(r.status_code, 401)
+            good = base64.b64encode(b"friend:open-sesame").decode()
+            r = c.get("/static/style.css",
+                      headers={"Authorization": "Basic " + good})
+            self.assertEqual(r.status_code, 200)
+
+    def test_healthz_stays_open_for_uptime_monitors(self):
+        with mock.patch.object(config, "SITE_USERNAME", "friend"), \
+             mock.patch.object(config, "SITE_PASSWORD", "open-sesame"), \
+             mock.patch("app.chain_state",
+                        return_value={"tokens": {}, "detail": "t",
+                                      "checked_at": 0}):
+            r = self._client().get("/healthz")
+            self.assertEqual(r.status_code, 200)
+
+
 class TestScannerLock(unittest.TestCase):
     """The donation scanner must run in exactly one process, even under
     gunicorn's several workers."""

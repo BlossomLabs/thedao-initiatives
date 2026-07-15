@@ -1,0 +1,48 @@
+# TheDAO Security Fund — RFP board
+
+Public board of Ethereum-security initiatives (RFPs). Sponsors pledge,
+anyone donates on-chain, TheDAO completes the funding gap.
+
+## Run it
+
+    ./run.sh
+
+Then open http://127.0.0.1:4482 — admin panel at /admin, password in `.env`.
+
+## How money flows
+
+- Every approved RFP gets its **own 3-of-5 Gnosis Safe**, deployed one-click
+  from the admin panel via the canonical Safe v1.4.1 factory. The server
+  re-verifies owners, threshold, singleton, and fallback handler on-chain
+  before it will show the address to donors. The server never holds funds
+  and has no keys; deploy transactions are signed by the admin's wallet.
+- Donations are ERC-20 transfers (or plain ETH sends) straight from the
+  donor's wallet to the RFP's Safe. Accepted tokens — USDC, USDT, DAI, USDS,
+  crvUSD, BOLD, fxUSD, EURC, ZCHF — are re-verified against mainnet
+  (decimals + symbol) at startup; non-USD tokens are priced by Chainlink
+  feeds with staleness checks.
+- A donation is only credited after the server reads the Transfer log (or
+  the tx itself for ETH) from mainnet, `MIN_CONFIRMATIONS` blocks deep.
+  Amounts come from the chain, never from the browser.
+- A background scanner watches every RFP Safe, so exchange withdrawals and
+  card purchases are credited automatically with no tx hash pasting.
+
+## Optional integrations (all off until configured in `.env`)
+
+- `AI_SEARCH_API_KEY` — "Show top matches": a donor describes what they want
+  to fund and an LLM (any OpenAI-compatible API; default DeepSeek) floats
+  the best-fitting initiatives to the top, client-side only.
+- `ONRAMP_API_KEY` + `ONRAMP_PROVIDER` (transak/moonpay) — card checkout tab
+  that delivers USDC straight to the RFP's Safe.
+- `OPERATIONAL_SIGNERS` — the 5 checksummed addresses that own every RFP
+  Safe; Safe deployment stays disabled until set.
+
+## Tests
+
+    .venv/bin/python -m unittest discover tests
+    (RFPS_SKIP_LIVE=1 to skip the live-mainnet checks)
+
+## Voting
+
+Round voting (badge holders + community signal) is future scope; the schema
+and page copy leave room for it.

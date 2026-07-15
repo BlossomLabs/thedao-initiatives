@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Manage RFP · TheDAO RFPs{% endblock %}
+{% block content %}
+<main class="detail">
+  <p class="crumb"><a href="{{ url_for('admin_dashboard') }}">← Dashboard</a></p>
+  <h1 class="rfp-title">{{ r.title }} <span class="chip static st-{{ r.status }}">{{ r.status }}</span></h1>
+  {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+
+  <div class="btnrow">
+    <form method="post"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      {% if r.status == 'pending' %}
+        <button class="btn primary" name="action" value="approve">Approve</button>
+        <button class="btn danger" name="action" value="reject">Reject</button>
+      {% elif r.status == 'approved' %}
+        <button class="btn ghost" name="action" value="archive">Archive</button>
+      {% else %}
+        <button class="btn" name="action" value="unarchive">Re-approve</button>
+      {% endif %}
+      {% if r.status == 'approved' %}<a class="btn ghost" href="{{ url_for('rfp_page', slug=r.slug) }}">View public page</a>{% endif %}
+    </form>
+  </div>
+
+  <h2>Donation Safe</h2>
+  {% if r.safe_address %}
+    <p>Deployed and verified: <a class="m" href="https://etherscan.io/address/{{ r.safe_address }}" target="_blank" rel="noopener">{{ r.safe_address }}</a>
+    <span class="chip static st-approved">{{ safe_threshold }}-of-{{ signers | length }}</span></p>
+    <p class="small dim">Donations to this address are counted for this RFP automatically.</p>
+  {% elif not signers_ok %}
+    <p class="small">Safe deployment is disabled: <b>{{ signers_detail }}</b>.</p>
+    <p class="small dim">Set the operational signers once in the config file (Terminal: <span class="m">open -e ~/thedao-rfps/.env</span>, add a line
+    <span class="m">OPERATIONAL_SIGNERS=0x…,0x…,0x…,0x…,0x…</span> with all 5 checksummed addresses, then restart the server).</p>
+  {% elif r.status == 'approved' %}
+    <div id="safe-deploy" data-rfp="{{ r.id }}">
+      <p class="small dim">Deploys a {{ safe_threshold }}-of-{{ signers | length }} Gnosis Safe owned by the operational signers.
+      One transaction from your wallet; the app verifies owners and threshold on-chain before showing the address to donors.</p>
+      <ul class="m addr-list">{% for s in signers %}<li>{{ s }}</li>{% endfor %}</ul>
+      <div class="btnrow">
+        <button class="btn primary" id="safe-deploy-mainnet" type="button">Deploy Safe</button>
+      </div>
+      <div class="status" id="safe-deploy-status" hidden></div>
+    </div>
+  {% else %}
+    <p class="small dim">Approve this RFP first, then deploy its donation Safe.</p>
+  {% endif %}
+
+  <h2>Funding <span class="n">{{ sum.total | usd }} = {{ sum.pledged | usd }} pledged + {{ sum.donated | usd }} donated</span></h2>
+
+  <h2>Edit RFP</h2>
+  <form method="post" class="form">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label class="lbl">Title</label>
+    <input type="text" name="title" maxlength="140" value="{{ r.title }}">
+    <label class="lbl">Summary</label>
+    <textarea name="summary" rows="4" maxlength="4000">{{ r.summary }}</textarea>
+    <label class="lbl">Full RFP details <span class="dim">(the complete spec: scope, milestones, budget breakdown; shown on the public page — markdown supported: headings, **bold**, lists, tables, - [ ] checklists)</span></label>
+    <textarea name="details" rows="10" maxlength="20000">{{ r.details or '' }}</textarea>
+    <label class="lbl">Forum link</label>
+    <input type="url" name="discourse_url" value="{{ r.discourse_url }}">
+    <label class="lbl">Funding goal (USD)</label>
+    <input type="text" name="goal" inputmode="decimal" value="{{ r.funding_goal_usd }}">
+    <label class="lbl">Pin to board position <span class="dim">(1 = top of the front page; leave empty to sort automatically by amount raised)</span></label>
+    <input type="text" name="sort_rank" inputmode="numeric" value="{{ r.sort_rank or '' }}">
+    <label class="lbl">Contact (private)</label>
+    <input type="text" name="contact" maxlength="200" value="{{ r.contact }}">
+    <button class="btn" name="action" value="edit">Save changes</button>
+  </form>
+
+  <h2>Sponsor pledges <span class="n">{{ pledges | length }}</span></h2>
+  {% if pledges %}
+  <div class="tblbox">
+    <table>
+      <thead><tr><th>Company</th><th class="amt">Amount</th><th>Status</th><th>Note</th><th></th></tr></thead>
+      <tbody>
+      {% for p in pledges %}
+        <tr>
+          <td>{{ p.company }}</td>
+          <td class="amt">{{ p.amount_usd | usd }}</td>
+          <td>{{ p.status }}</td>
+          <td>{{ p.note }}</td>
+          <td>
+            <form method="post" class="inline">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <input type="hidden" name="pledge_id" value="{{ p.id }}">
+              <select name="pstatus">
+                {% for st in ('pledged','received','withdrawn') %}
+                  <option value="{{ st }}" {{ 'selected' if p.status == st }}>{{ st }}</option>
+                {% endfor %}
+              </select>
+              <button class="btn ghost sm" name="action" value="pledge_status">Set</button>
+              <button class="btn danger sm" name="action" value="pledge_delete"
+                      data-confirm="Delete this pledge?">✕</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <h3>Add a pledge</h3>
+  <form method="post" class="form form-row" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <input type="text" name="company" placeholder="Company *" maxlength="120">
+    <input type="text" name="amount" placeholder="Amount USD *" inputmode="decimal">
+    <select name="pstatus"><option value="pledged">pledged</option><option value="received">received</option></select>
+    <input type="text" name="url" placeholder="Link (optional)" maxlength="300">
+    <input type="text" name="note" placeholder="Note (optional)" maxlength="300">
+    <label class="lbl" style="flex-basis:100%">Sponsor logo (optional, PNG/JPG/WEBP, shown on the RFP page)</label>
+    <input type="file" name="logo" accept=".png,.jpg,.jpeg,.webp">
+    <button class="btn" name="action" value="add_pledge">Add pledge</button>
+  </form>
+
+  <h2>Donations <span class="n">{{ donations | length }} (all states)</span></h2>
+  {% if donations %}
+  <div class="tblbox">
+    <table>
+      <thead><tr><th>Status</th><th>Donor</th><th class="amt">Amount</th><th>Token</th><th>Tx</th><th>Detail</th><th></th></tr></thead>
+      <tbody>
+      {% for d in donations %}
+        <tr>
+          <td>{{ d.status }}</td>
+          <td class="m"><span class="ens-addr" data-addr="{{ d.donor }}">{{ d.donor | shortaddr }}</span></td>
+          <td class="amt">{{ d.amount | usd }}</td>
+          <td>{{ d.token_symbol }}</td>
+          <td class="m"><a href="https://etherscan.io/tx/{{ d.tx_hash }}" target="_blank" rel="noopener">{{ d.tx_hash | shortaddr }}</a></td>
+          <td class="small dim">{{ d.detail }}</td>
+          <td>
+            {% if d.status == 'pending' %}
+            <form method="post" class="inline">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <input type="hidden" name="tx_hash" value="{{ d.tx_hash }}">
+              <button class="btn ghost sm" name="action" value="recheck_donation">Recheck</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='admin.js') }}"></script>{% endblock %}

@@ -1,0 +1,315 @@
+/* TheDAO Security Fund — RFP board.
+   Palette shared with thedao.fund; layout designed for donation conversion:
+   one red CTA, preset amounts, progress bars, social proof, minimal clicks. */
+:root{
+  --bg:#1f435f; --text:#fff; --muted:rgba(255,255,255,.62); --soft:rgba(255,255,255,.85);
+  --card:rgba(255,255,255,.05); --edge:rgba(255,255,255,.12); --edge2:rgba(255,255,255,.22);
+  --green:#5cb75a; --bright:#00ff88; --red:#ff3b38; --blue:#2c5e86; --claims:#5ac8fa;
+  --sans:'Inter',sans-serif; --tight:'Inter Tight',sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font:300 14px/1.5 var(--sans)}
+b,strong{font-weight:600}
+a{color:var(--bright);text-decoration:none}
+a:hover{text-decoration:underline}
+.m{font-family:var(--mono);font-size:12.5px}
+.dim{color:var(--muted)}
+.small{font-size:12.5px;line-height:1.6}
+.red{color:var(--red)}
+.empty{color:var(--muted)}
+.star{color:#f0b429}
+
+/* ── top bar ─────────────────────────────────────────────────── */
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
+  gap:16px;padding:14px 28px;background:rgba(31,67,95,.82);backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--edge)}
+.brand{display:flex;align-items:center;gap:10px;color:#fff;font:300 17px var(--tight)}
+.brand b{font-weight:700}
+.brand img{width:15px;height:24px}
+.brand:hover{text-decoration:none}
+.topnav{display:flex;align-items:center;gap:22px}
+.topnav a{font:300 15px var(--tight);color:var(--soft)}
+.topnav a:hover{color:var(--bright);text-decoration:none}
+.topnav a.on{color:var(--green);font-weight:500}
+.topnav .navcta{color:var(--bright);font-weight:500}
+.btn.wallet{margin:0;padding:8px 16px;font-size:13px;border-radius:999px}
+.btn.wallet.connected{border-color:rgba(0,255,136,.6);color:var(--bright);font-family:var(--mono);font-size:12px}
+@media(max-width:760px){
+  .topbar{padding:10px 14px;flex-wrap:wrap;gap:8px 14px}
+  .topnav{gap:12px;flex-wrap:wrap;row-gap:8px}
+  .topnav a{font-size:13px}
+  .hero{padding-top:48px}
+  /* comfortable touch targets (≈44px) on phones */
+  .dw-chip{padding:11px 16px}
+  .dw-method{padding:12px 6px}
+  .btn.sm,.dw-copy{padding:10px 14px}
+  .brand span{display:none}
+}
+
+/* ── hero: the money is the hero ─────────────────────────────── */
+.hero{max-width:1100px;margin:0 auto;padding:72px 24px 8px;text-align:center}
+.kicker{font:400 12px var(--tight);letter-spacing:.24em;text-transform:uppercase;color:var(--green);margin:0}
+.hero-raised{font:700 clamp(40px,12vw,132px)/1 var(--tight);letter-spacing:-.04em;
+  font-variant-numeric:tabular-nums;margin:14px 0 0;
+  background:linear-gradient(120deg,#fff 30%,var(--bright));-webkit-background-clip:text;
+  background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{font:300 clamp(17px,2.6vw,24px) var(--sans);color:var(--soft);margin:10px 0 0}
+
+/* ── social proof strip ──────────────────────────────────────── */
+.activity{display:flex;gap:10px;overflow-x:auto;max-width:1100px;margin:26px auto 0;padding:4px 24px;
+  scrollbar-width:none}
+.activity::-webkit-scrollbar{display:none}
+.act{flex:none;display:flex;align-items:center;gap:8px;border:1px solid var(--edge);border-radius:999px;
+  background:var(--card);padding:7px 16px;font-size:12px;color:var(--soft);white-space:nowrap}
+.act:hover{border-color:rgba(0,255,136,.5);text-decoration:none}
+.act b{color:var(--bright)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dot.g{background:var(--bright);box-shadow:0 0 10px rgba(0,255,136,.6)}
+.dot.a{background:#f0b429;box-shadow:0 0 10px rgba(240,180,41,.55)}
+.dot.b{background:var(--claims);box-shadow:0 0 10px rgba(90,200,250,.55)}
+
+/* ── main ────────────────────────────────────────────────────── */
+main{max-width:1100px;margin:0 auto;padding:6px 24px 80px}
+main.detail{padding-top:34px}
+main.narrow{max-width:720px}
+main.center{text-align:center}
+h2{font:400 13px var(--tight);margin:46px 0 16px;color:var(--green);text-transform:uppercase;letter-spacing:.2em}
+h2 .n{color:var(--muted);text-transform:none;letter-spacing:0;font-size:12px;margin-left:10px}
+h3{font:500 14px var(--tight);margin:20px 0 10px;color:var(--soft)}
+.crumb{margin:0 0 10px}
+.rfp-title{font:500 clamp(26px,4vw,40px)/1.12 var(--tight);letter-spacing:-.02em;margin:6px 0 12px}
+.body-text{max-width:760px;font:300 15px/1.75 var(--sans);color:var(--soft);white-space:pre-line}
+.tag{margin:14px auto 0;max-width:760px;color:var(--muted);font:300 15px/1.65 var(--sans)}
+.tag.left{text-align:left;margin-left:0}
+.shimmer{height:1px;max-width:880px;margin:34px auto;border:0;
+  background:linear-gradient(90deg,rgba(0,255,136,0),rgba(0,255,136,.5),rgba(0,255,136,0))}
+
+/* ── RFP cards with inline donate ────────────────────────────── */
+.rfp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+@media(max-width:860px){.rfp-grid{grid-template-columns:1fr}}
+.rfp-card{position:relative;background:var(--card);border:1px solid var(--edge);border-radius:18px;
+  padding:22px 24px 18px;transition:border-color .2s,box-shadow .2s}
+.rfp-card:hover{border-color:rgba(0,255,136,.4);box-shadow:0 0 30px rgba(0,255,136,.08)}
+.rfp-card .star{position:absolute;top:16px;right:18px}
+.card-title{display:block;font:600 19px/1.25 var(--tight);color:var(--text);letter-spacing:-.01em;padding-right:20px}
+.card-title:hover{color:var(--bright);text-decoration:none}
+.card-sum{color:var(--muted);font-size:13px;line-height:1.6;margin:8px 0 2px;min-height:42px}
+.card-nums{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:13px}
+.card-nums b{font-family:var(--tight)}
+.card-actions{display:flex;gap:10px;margin-top:14px}
+.card-donate{margin-top:14px;border-top:1px solid var(--edge);padding-top:14px}
+
+/* progress bars */
+.bar{height:8px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:12px}
+.bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),var(--bright));
+  box-shadow:0 0 12px rgba(0,255,136,.45);min-width:2px}
+.bar.big{height:13px;max-width:760px}
+
+/* ── donate widget ───────────────────────────────────────────── */
+.donate-widget{display:flex;flex-direction:column;gap:10px}
+.dw-chips{display:flex;gap:8px;flex-wrap:wrap}
+.dw-chip{border:1px solid var(--edge2);background:transparent;color:var(--soft);border-radius:999px;
+  padding:7px 16px;font:500 13px var(--tight);cursor:pointer;transition:all .15s}
+.dw-chip:hover{border-color:rgba(0,255,136,.6);color:var(--bright)}
+.dw-chip.on{background:var(--bright);border-color:var(--bright);color:#08321c;font-weight:700}
+.dw-inputs{display:flex;gap:8px}
+.dw-amount{flex:1;min-width:0}
+.dw-token{width:110px;flex:none}
+.dw-trust{margin:0}
+.donate-widget .btn.primary{margin-top:0}
+.status{border:1px solid var(--edge);border-radius:12px;padding:10px 14px;font-size:12.5px;line-height:1.6}
+.status.ok{border-color:rgba(0,255,136,.5);color:var(--bright)}
+.status.err{border-color:rgba(255,59,56,.55);color:#ffd7d6}
+.status.wait{border-color:rgba(240,180,41,.5);color:#ffe9b8}
+details.manual summary{cursor:pointer;color:var(--muted);font-size:12.5px}
+details.manual input{margin:8px 0}
+
+/* ── how it works ────────────────────────────────────────────── */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:860px){.steps{grid-template-columns:1fr}}
+.step{display:flex;gap:14px;border:1px solid var(--edge);border-radius:18px;background:var(--card);padding:18px 20px}
+.step .num{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font:700 15px var(--tight)}
+.step .num.g{background:rgba(0,255,136,.14);color:var(--bright)}
+.step .num.a{background:rgba(240,180,41,.14);color:#f0b429}
+.step .num.b{background:rgba(90,200,250,.14);color:var(--claims)}
+.step b{font:600 14.5px var(--tight)}
+.step p{margin:6px 0 0;color:var(--muted);font-size:12.5px;line-height:1.6}
+
+/* ── pledge band ─────────────────────────────────────────────── */
+.pledge-band{display:flex;align-items:center;justify-content:space-between;gap:22px;flex-wrap:wrap;
+  margin-top:46px;border:1px solid var(--edge2);border-radius:18px;padding:24px 28px;
+  background:linear-gradient(120deg,var(--blue),rgba(44,94,134,.4))}
+.pledge-band b{font:600 17px var(--tight)}
+.pledge-band p{margin:6px 0 0;max-width:640px;font-size:13px;line-height:1.6}
+.pledge-band .btn{margin:0;flex:none}
+
+/* ── detail page ─────────────────────────────────────────────── */
+.cols{display:grid;grid-template-columns:1fr 340px;gap:36px;align-items:start}
+@media(max-width:960px){.cols{grid-template-columns:1fr}}
+.meta-line{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.fund-head{border:1px solid var(--edge);border-radius:18px;background:var(--card);padding:20px 24px;margin-top:8px}
+.fund-big{font:300 26px var(--tight)}
+.fund-big b{font-weight:700}
+.fund-split{display:flex;gap:26px;flex-wrap:wrap;margin-top:10px;color:var(--muted);font-size:13px}
+.fund-split b{color:var(--text)}
+.sponsors{display:flex;flex-wrap:wrap;gap:10px}
+.sponsor-pill{border:1px solid var(--edge2);background:var(--card);border-radius:14px;padding:10px 16px}
+.sponsor-pill b{font:600 14px var(--tight);margin-right:8px}
+.sponsor-pill span{font-family:var(--mono);font-size:13px;color:var(--bright)}
+.sponsor-pill small{display:inline-block;margin-left:8px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.sponsor-pill small.received{color:var(--green)}
+.sponsor-pill small.note{display:block;margin:4px 0 0;text-transform:none;letter-spacing:0;font-size:11.5px}
+.col-side{position:sticky;top:86px;display:flex;flex-direction:column;gap:14px}
+@media(max-width:960px){.col-side{position:static}}
+.donate-card,.side-note{border:1px solid var(--edge);border-radius:18px;background:var(--card);padding:20px 22px}
+.donate-card{border-color:rgba(0,255,136,.35);box-shadow:0 0 34px rgba(0,255,136,.07)}
+.donate-card .k,.side-note .k{font:400 11px var(--tight);letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:12px;display:block}
+.addr-list{list-style:none;padding:0}
+.addr-list li{padding:3px 0;font-size:12.5px}
+
+/* ── tables ──────────────────────────────────────────────────── */
+table{border-collapse:collapse;width:100%;font-size:12.5px;font-weight:400}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top}
+th{position:sticky;top:0;background:#244c6d;font:500 10.5px var(--tight);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);z-index:5}
+tr:hover td{background:rgba(0,255,136,.045)}
+td.amt,th.amt{text-align:right;font-family:var(--mono);white-space:nowrap}
+.tblbox{max-height:480px;overflow:auto;border:1px solid var(--edge);border-radius:16px;background:var(--card)}
+
+/* chips (admin status) */
+.chip{display:inline-block;border:1px solid var(--edge2);color:var(--soft);padding:5px 14px;margin:0 6px 8px 0;
+  font:400 12.5px var(--tight);border-radius:999px}
+.chip.static{padding:2px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.st-pending{color:#f0b429;border-color:rgba(240,180,41,.5)}
+.st-approved{color:var(--bright);border-color:rgba(0,255,136,.5)}
+.st-rejected,.st-archived{color:var(--muted)}
+
+/* admin verdict pills */
+.verdicts{max-width:1100px;margin:14px 0 0;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.pill{display:flex;gap:12px;align-items:center;border:1px solid var(--edge);border-radius:16px;
+  background:var(--card);padding:14px 18px}
+.pill b{font:600 14px var(--tight);display:block}
+.pill small{color:var(--muted);font-size:12px;display:block;margin-top:1px}
+.pill .dot{width:9px;height:9px}
+@media(max-width:860px){.verdicts{grid-template-columns:1fr}}
+
+/* ── forms + buttons ─────────────────────────────────────────── */
+.form{display:flex;flex-direction:column;gap:6px;max-width:640px}
+.form-row{flex-direction:row;flex-wrap:wrap;align-items:center}
+.form-row input,.form-row select{flex:1;min-width:140px}
+.narrow-form{max-width:360px;margin:0 auto}
+.lbl{font:400 11px var(--tight);color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:12px}
+input[type=text],input[type=url],input[type=password],textarea,select{
+  background:var(--card);border:1px solid var(--edge2);color:var(--text);padding:10px 14px;
+  font:300 14px var(--sans);border-radius:12px;outline:none;width:100%}
+textarea{resize:vertical}
+input:focus,textarea:focus,select:focus{border-color:rgba(0,255,136,.6)}
+select{appearance:none}
+select option{background:#244c6d;color:#fff}
+.hp{position:absolute;left:-9999px;top:-9999px;height:1px;width:1px;opacity:0}
+.btn{display:inline-block;border:1px solid var(--edge2);background:var(--card);color:var(--text);
+  padding:10px 20px;border-radius:12px;font:500 13.5px var(--sans);cursor:pointer;margin-top:10px;
+  transition:border-color .15s,box-shadow .15s,transform .15s;text-decoration:none;text-align:center}
+.btn:hover{border-color:rgba(0,255,136,.6);box-shadow:0 0 18px rgba(0,255,136,.15);text-decoration:none}
+.btn.primary{background:var(--red);border-color:var(--red);box-shadow:0 10px 15px -3px rgba(0,0,0,.4)}
+.btn.primary:hover{transform:scale(1.02);box-shadow:0 10px 22px -3px rgba(0,0,0,.5)}
+.btn.ghost{background:transparent}
+.btn.danger{border-color:rgba(255,59,56,.6);color:#ffb3b1}
+.btn.sm{padding:6px 14px;font-size:12.5px;margin-top:0}
+.btn[disabled]{opacity:.5;cursor:default}
+.btnrow form{display:flex;gap:10px;flex-wrap:wrap}
+.inline{display:flex;gap:6px;align-items:center}
+.inline select{width:auto;padding:4px 8px;font-size:12px}
+.alert{border:1px solid rgba(255,59,56,.55);background:rgba(255,59,56,.12);border-radius:12px;
+  padding:12px 16px;margin:14px 0;color:#ffd7d6;font-size:13.5px}
+.admin-head{display:flex;justify-content:space-between;align-items:center;gap:20px}
+
+/* ── footer ──────────────────────────────────────────────────── */
+footer{max-width:1100px;margin:0 auto;padding:30px 24px 46px;text-align:center;color:var(--muted);font-size:12.5px}
+footer p{margin:6px 0}
+footer a.dim{color:rgba(255,255,255,.35)}
+
+/* sponsor logos + discuss emphasis (July feedback) */
+.sponsor-logo{display:block;max-height:34px;max-width:150px;margin:0 0 8px;border-radius:6px;background:#fff;padding:3px 6px}
+.btn.discuss{border-color:rgba(90,200,250,.55);color:var(--claims)}
+.btn.discuss:hover{box-shadow:0 0 18px rgba(90,200,250,.2);border-color:var(--claims)}
+.discuss-card{border-color:rgba(90,200,250,.35)}
+.discuss-card .btn{width:100%;margin-top:4px}
+.topbar .brand img{width:22px;height:22px}
+
+/* ── markdown-rendered RFP details ───────────────────────────── */
+/* Site-wide h2/h3 rules already style markdown headings; this block covers
+   the rest. Scoped to .md so plain-text fields keep white-space:pre-line. */
+.body-text.md{white-space:normal}
+.body-text.md>:first-child{margin-top:0}
+.body-text.md p{margin:0 0 14px}
+.body-text.md h1{font:500 24px/1.2 var(--tight);letter-spacing:-.02em;color:var(--text);margin:36px 0 14px}
+.body-text.md h4,.body-text.md h5,.body-text.md h6{font:600 13px var(--tight);color:var(--soft);margin:18px 0 8px}
+.body-text.md ul,.body-text.md ol{margin:0 0 14px;padding-left:24px}
+.body-text.md li{margin:4px 0}
+.body-text.md li p{margin:0}
+.body-text.md code{font-family:var(--mono);font-size:13px;background:rgba(0,0,0,.22);border-radius:6px;padding:1px 6px}
+.body-text.md pre{background:rgba(0,0,0,.22);border:1px solid var(--edge);border-radius:12px;padding:14px 16px;overflow-x:auto;margin:0 0 14px}
+.body-text.md pre code{background:none;padding:0}
+.body-text.md blockquote{margin:0 0 14px;padding:2px 18px;border-left:3px solid var(--green);color:var(--muted)}
+.body-text.md hr{border:0;height:1px;background:var(--edge);margin:26px 0}
+.body-text.md table{display:block;width:fit-content;max-width:100%;overflow-x:auto;margin:0 0 16px;
+  font-size:13px;border:1px solid var(--edge);border-radius:14px;background:var(--card)}
+.body-text.md th{position:static;background:rgba(0,0,0,.18)}
+.body-text.md th:empty{padding:0}
+.body-text.md tr:last-child td{border-bottom:0}
+
+/* donate method chooser (card / wallet / exchange) */
+.dw-methods{display:flex;gap:6px;border:1px solid var(--edge);border-radius:12px;padding:4px;background:rgba(0,0,0,.12)}
+.dw-method{flex:1;border:0;background:transparent;color:var(--muted);border-radius:9px;
+  padding:8px 6px;font:500 12.5px var(--tight);cursor:pointer;transition:all .15s;white-space:nowrap}
+.dw-method:hover{color:var(--text)}
+.dw-method.on{background:var(--card);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.3);
+  border:1px solid var(--edge2)}
+.dw-panel{display:flex;flex-direction:column;gap:8px}
+.dw-panel .btn.primary{margin-top:0}
+.dw-panel .small{margin:0}
+.dw-addr-row{display:flex;gap:8px;align-items:center;border:1px solid var(--edge);border-radius:10px;
+  background:rgba(0,0,0,.15);padding:8px 12px}
+.dw-addr-text{flex:1;min-width:0;overflow-wrap:anywhere;font-size:11.5px}
+.dw-addr-row .btn{margin:0;flex:none}
+.dw-card-open{text-align:center}
+
+/* sponsor logos on board cards */
+.card-logos{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.card-logos img{max-height:26px;max-width:110px;border-radius:6px;background:#fff;padding:2px 6px}
+
+/* $-prefixed amount box + live token conversion line */
+.dw-amount-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:2px;
+  background:var(--card);border:1px solid var(--edge2);border-radius:12px;padding:0 0 0 14px}
+.dw-amount-wrap:focus-within{border-color:rgba(0,255,136,.6)}
+.dw-cur{color:var(--muted);font:300 14px var(--sans);flex:none}
+.dw-amount-wrap .dw-amount{flex:1;min-width:0;background:transparent;border:0;outline:none;
+  padding:10px 14px 10px 4px;color:var(--text);font:300 14px var(--sans)}
+.dw-conv{margin:-2px 0 0 2px}
+
+/* multi-wallet picker (EIP-6963) */
+.wallet-menu{position:absolute;top:56px;right:24px;z-index:60;display:flex;flex-direction:column;
+  min-width:180px;background:#244c6d;border:1px solid var(--edge2);border-radius:14px;
+  box-shadow:0 16px 40px rgba(0,0,0,.5);overflow:hidden}
+.wallet-menu button{border:0;background:transparent;color:var(--soft);text-align:left;
+  padding:11px 16px;font:400 13px var(--sans);cursor:pointer}
+.wallet-menu button:hover{background:rgba(0,255,136,.08);color:var(--bright)}
+
+/* ---- AI board search ---- */
+.ai-search{display:flex;gap:10px;margin:4px 0 20px;flex-wrap:wrap}
+.ai-search input{flex:1;min-width:260px;background:rgba(255,255,255,.06);
+  border:1px solid var(--edge2);border-radius:12px;color:var(--text);
+  padding:12px 14px;font:300 14px var(--sans);outline:none}
+.ai-search input:focus{border-color:rgba(0,255,136,.55)}
+.ai-search input::placeholder{color:var(--muted)}
+.ai-search-note{margin:-8px 0 18px}
+.linklike{border:0;background:none;color:var(--bright);cursor:pointer;
+  padding:0;font:inherit;text-decoration:underline}
+.rfp-card.ai-top{border-color:rgba(0,255,136,.5);
+  box-shadow:0 0 0 1px rgba(0,255,136,.25),0 14px 30px rgba(0,0,0,.35)}
+.ai-badge{position:absolute;top:-10px;left:14px;background:var(--bright);
+  color:#08321c;font:700 11px var(--tight);letter-spacing:.4px;
+  border-radius:999px;padding:3px 10px;text-transform:uppercase}

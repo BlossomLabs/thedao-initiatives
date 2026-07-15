@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Admin dashboard · TheDAO RFPs{% endblock %}
+{% block content %}
+<main class="detail">
+  <div class="admin-head">
+    <h1>Admin dashboard</h1>
+    <form method="post" action="{{ url_for('admin_logout') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <button class="btn ghost" type="submit">Log out</button>
+    </form>
+  </div>
+
+  <div class="verdicts">
+    <div class="pill"><span class="dot {{ 'a' if n_pending else 'b' }}"></span>
+      <div><b>{{ n_pending }} pending submission{{ '' if n_pending == 1 else 's' }}</b>
+      <small>awaiting review below</small></div></div>
+  </div>
+
+  <h2>All RFPs</h2>
+  <div class="tblbox">
+    <table>
+      <thead><tr><th>Status</th><th>Title</th><th class="amt">Goal</th><th class="amt">Raised</th><th>Created</th><th></th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td><span class="chip static st-{{ row.rfp.status }}">{{ row.rfp.status }}</span>{% if row.rfp.sort_rank %} <span title="Pinned to board position {{ row.rfp.sort_rank }}">📌{{ row.rfp.sort_rank }}</span>{% endif %}</td>
+          <td>{{ row.rfp.title }}</td>
+          <td class="amt">{{ row.rfp.funding_goal_usd | usd }}</td>
+          <td class="amt">{{ row.sum.total | usd }}</td>
+          <td>{{ row.rfp.created_at | dt }}</td>
+          <td><a class="btn ghost sm" href="{{ url_for('admin_rfp', rfp_id=row.rfp.id) }}">Manage</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</main>
+{% endblock %}

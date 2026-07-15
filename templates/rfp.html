@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}{{ r.title }} · TheDAO Security Fund{% endblock %}
+{% block og_title %}{{ r.title }} · TheDAO Security Fund{% endblock %}
+{% block og_description %}{{ r.summary[:200] }}{% endblock %}
+{% block content %}
+<main class="detail">
+  <p class="crumb"><a href="{{ url_for('index') }}">← All RFPs</a></p>
+  <h1 class="rfp-title">{{ r.title }}</h1>
+  <p class="meta-line">
+    {% if r.discourse_url %}<a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener">💬 Discuss this RFP on the forum</a>{% endif %}
+    {% if r.status == 'archived' %}<span class="chip static">archived</span>{% endif %}
+  </p>
+
+  <div class="cols">
+    <div class="col-main">
+      <div class="fund-head">
+        <div class="fund-big"><b>{{ sum.total | usd }}</b> <span class="dim">of {{ r.funding_goal_usd | usd }}</span></div>
+        <div class="bar big"><i style="width: {{ pct }}%"></i></div>
+        <div class="fund-split">
+          <span><b>{{ sum.pledged | usd }}</b> pledged by sponsors</span>
+          <span><b>{{ sum.donated | usd }}</b> donated on-chain</span>
+          <span><b>{{ pct }}%</b> of goal</span>
+        </div>
+      </div>
+
+      <h2>Summary</h2>
+      <p class="body-text">{{ r.summary }}</p>
+
+      <h2>Full RFP details</h2>
+      {% if r.details %}
+      <div class="body-text md">{{ r.details | md }}</div>
+      {% else %}
+      <p class="empty">The complete spec (scope, milestones, budget breakdown) is being written.
+      {% if r.discourse_url %}Follow and shape it <a href="{{ r.discourse_url }}" target="_blank" rel="noopener">on the forum thread</a>.{% endif %}</p>
+      {% endif %}
+
+      <h2>Sponsors <span class="n">{{ pledges | length }}</span></h2>
+      {% if pledges %}
+        <div class="sponsors">
+        {% for p in pledges %}
+          <div class="sponsor-pill">
+            {% if p.logo %}<img class="sponsor-logo" src="/logos/{{ p.logo }}" alt="{{ p.company }} logo">{% endif %}
+            <b>{% if p.url %}<a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.company }}</a>{% else %}{{ p.company }}{% endif %}</b>
+            <span>{{ p.amount_usd | usd }}</span>
+            <small class="{{ p.status }}">{{ p.status }}</small>
+            {% if p.note %}<small class="note">{{ p.note }}</small>{% endif %}
+          </div>
+        {% endfor %}
+        </div>
+      {% else %}
+        <p class="empty">No sponsor pledges yet. Pledges pay only when the work is completed.
+        <a href="https://x.com/griffgreen" target="_blank" rel="noopener">DM @griffgreen</a> to put your name on this RFP.</p>
+      {% endif %}
+
+      <h2>On-chain donations <span class="n">{{ donations | length }}</span></h2>
+      {% if donations %}
+      <div class="tblbox">
+        <table>
+          <thead><tr><th>Date</th><th>Donor</th><th class="amt">Amount</th><th>Token</th><th>Tx</th></tr></thead>
+          <tbody>
+          {% for d in donations %}
+            <tr>
+              <td>{{ d.confirmed_at | dt }}</td>
+              <td class="m"><span class="ens-addr" data-addr="{{ d.donor }}">{{ d.donor | shortaddr }}</span></td>
+              <td class="amt">{{ d.amount | usd }}</td>
+              <td>{{ d.token_symbol }}</td>
+              <td class="m"><a href="https://etherscan.io/tx/{{ d.tx_hash }}" target="_blank" rel="noopener">{{ d.tx_hash | shortaddr }}</a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="empty">No on-chain donations yet. Be the first.</p>
+      {% endif %}
+
+    </div>
+
+    <aside class="col-side">
+      <div class="donate-card">
+        <div class="k">Donate to this RFP</div>
+        {% if donations_enabled %}
+          {% with slug=r.slug, address=r.safe_address, manual=True %}{% include "_donate_widget.html" %}{% endwith %}
+        {% else %}
+          <p class="small">{% if not r.safe_address %}This RFP's donation address is being set up. Check back soon.{% else %}Donations are temporarily unavailable.{% endif %}</p>
+        {% endif %}
+      </div>
+      {% if r.discourse_url %}
+      <div class="side-note discuss-card">
+        <div class="k">Join the discussion</div>
+        <p class="small dim">This RFP is being shaped in public.</p>
+        <a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener">💬 Open the forum thread</a>
+      </div>
+      {% endif %}
+      <div class="side-note">
+        <div class="k">Sponsor this RFP</div>
+        <p class="small dim">Companies can pledge instead of donating: you commit publicly now and
+        pay only when the work is completed and verified.
+        <a href="https://x.com/griffgreen" target="_blank" rel="noopener">DM @griffgreen</a> and your
+        name appears here.</p>
+      </div>
+      <div class="side-note">
+        <div class="k">What happens next</div>
+        <p class="small dim">If sponsors and donors fully fund this RFP, it happens with no TheDAO
+        money at all. If it comes up short, the 200 ETHSecurity badge holders rank it against the
+        other RFPs in the October round and TheDAO Security Fund completes the top-ranked ones.
+        Donations count as a public signal in that ranking.</p>
+      </div>
+    </aside>
+  </div>
+</main>
+{% endblock %}

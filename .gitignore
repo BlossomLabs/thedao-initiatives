@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.db
+*.db-wal
+*.db-shm
+.env
+.claude/
+uploads/
+
+server.log
+*.db.bak.*
+.DS_Store
+*.db.bak-*
+.DS_Store
+.scanner.lock

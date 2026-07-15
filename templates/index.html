@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <p class="kicker">Ecosystem-funded security initiatives</p>
+  <div class="hero-raised" id="hero-raised" data-target="{{ totals.raised }}">$0</div>
+  <p class="hero-sub">raised for <span class="red">Ethereum security</span> initiatives</p>
+</section>
+
+{% if recent %}
+<div class="activity">
+  {% for item in recent %}
+  <a class="act" href="{{ url_for('rfp_page', slug=item.rfp.slug) }}">
+    <span class="dot g"></span>
+    <span class="m ens-addr" data-addr="{{ item.d.donor }}">{{ item.d.donor | shortaddr }}</span> gave
+    <b>{{ item.d.amount | usd }}</b> to {{ item.rfp.title[:34] }}{% if item.rfp.title|length > 34 %}…{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<main>
+  <h2 id="rfps">Security initiatives looking for funding</h2>
+  {% if ai_search and cards %}
+  <form id="ai-search" class="ai-search" autocomplete="off">
+    <input id="ai-search-q" type="text" maxlength="300"
+           placeholder="What kind of security work do you want to fund? Describe it and we'll surface the best matches."
+           aria-label="Describe the security work you want to fund">
+    <button class="btn primary" type="submit">Show top matches</button>
+  </form>
+  <p class="small dim ai-search-note" id="ai-search-note" hidden></p>
+  {% endif %}
+  {% if not cards %}
+    <p class="empty">No RFPs published yet. <a href="{{ url_for('submit') }}">Submit the first one.</a></p>
+  {% endif %}
+  <div class="rfp-grid">
+  {% for c in cards %}
+    <div class="rfp-card" data-rfp-id="{{ c.rfp.id }}">
+      <a class="card-title" href="{{ url_for('rfp_page', slug=c.rfp.slug) }}">{{ c.rfp.title }}</a>
+      <p class="card-sum">{{ c.rfp.summary[:170] }}{% if c.rfp.summary|length > 170 %}…{% endif %}</p>
+      <div class="bar"><i style="width: {{ c.pct }}%"></i></div>
+      <div class="card-nums">
+        <span><b>{{ c.sum.total | usd }}</b> of {{ c.rfp.funding_goal_usd | usd }}</span>
+        <span class="dim">{{ c.pct }}%{% if c.n_sponsors %} · {{ c.n_sponsors }} sponsor{{ '' if c.n_sponsors == 1 else 's' }}{% endif %}</span>
+      </div>
+      {% if c.logos %}
+      <div class="card-logos">
+        <span class="dim small">Sponsored by</span>
+        {% for p in c.logos %}<img src="/logos/{{ p.logo }}" alt="{{ p.company }}" title="{{ p.company }}">{% endfor %}
+      </div>
+      {% endif %}
+      <div class="card-actions">
+        {% if tokens_ok and c.enabled %}<button class="btn primary sm" type="button" data-donate-toggle>Donate</button>{% endif %}
+        <a class="btn ghost sm" href="{{ url_for('rfp_page', slug=c.rfp.slug) }}">Details →</a>
+      </div>
+      {% if tokens_ok and c.enabled %}
+      <div class="card-donate" hidden>
+        {% with slug=c.rfp.slug, address=c.rfp.safe_address, manual=False %}{% include "_donate_widget.html" %}{% endwith %}
+      </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+  </div>
+
+  <div class="pledge-band">
+    <div>
+      <b>Want to have an ecosystem initiative funded, or pledge your company’s support to one?</b>
+      <p class="dim">Anyone can submit an RFP from a forum post. Sponsors pledge now and pay only when the work is completed and verified, with their logo on the RFP from day one.</p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn" href="{{ url_for('submit') }}">Submit an RFP</a>
+      <a class="btn" href="https://x.com/griffgreen" target="_blank" rel="noopener">Contact @griffgreen to pledge</a>
+    </div>
+  </div>
+</main>
+{% endblock %}

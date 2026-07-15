@@ -1,0 +1,63 @@
+{# Reusable donation widget. Vars: slug, address (this RFP's Safe), tokens, manual (bool) #}
+{% set onramp_url, onramp_prefilled = onramp_link(address) %}
+<div class="donate-widget" data-donate data-slug="{{ slug }}" data-address="{{ address }}"
+     data-onramp="{{ onramp_url }}" data-onramp-prefilled="{{ 1 if onramp_prefilled else 0 }}">
+  <div class="dw-row">
+    <div class="dw-chips">
+      {% for amt in ('50','100','500','1000') %}
+      <button type="button" class="dw-chip" data-amount="{{ amt }}">${{ amt }}</button>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="dw-row dw-inputs">
+    <label class="dw-amount-wrap">
+      <span class="dw-cur">$</span>
+      <input class="dw-amount" type="text" inputmode="decimal" placeholder="Custom amount" aria-label="Amount in US dollars">
+    </label>
+    <select class="dw-token" aria-label="Donation token">
+      {% for sym in tokens %}<option value="{{ sym }}">{{ sym }}</option>{% endfor %}
+    </select>
+  </div>
+  <p class="dw-conv small dim" hidden></p>
+
+  <div class="dw-methods" role="group" aria-label="Choose how to donate">
+    <button type="button" class="dw-method on" data-method="wallet" aria-pressed="true">🦊 Wallet</button>
+    {% if onramp_prefilled %}<button type="button" class="dw-method" data-method="card" aria-pressed="false">💳 Card</button>{% endif %}
+    <button type="button" class="dw-method" data-method="exchange" aria-pressed="false">🏦 Exchange</button>
+  </div>
+
+  <div class="dw-panel" data-panel="wallet">
+    <button type="button" class="btn primary dw-send">Donate</button>
+  </div>
+
+  {% if onramp_prefilled %}
+  <div class="dw-panel" data-panel="card" hidden>
+    <p class="small dim">Buy USDC with a card (Visa, Mastercard, Apple Pay, Google Pay).
+    It is delivered straight to this RFP's fund address on Ethereum mainnet,
+    already filled in for you, and shows up here automatically once it lands.</p>
+    <a class="btn primary dw-card-open" href="{{ onramp_url }}" target="_blank"
+       rel="noopener">Open card checkout ↗</a>
+  </div>
+  {% endif %}
+
+  <div class="dw-panel" data-panel="exchange" hidden>
+    <p class="small dim">Send an accepted stablecoin from any exchange or wallet to
+    this RFP's address and it is counted automatically within a few minutes.
+    <b>Sending ETH this way isn't auto-counted</b> — donate ETH through the Wallet
+    tab instead (or paste its transaction hash below).</p>
+    <div class="dw-addr-row">
+      <span class="m dw-addr-text">{{ address }}</span>
+      <button type="button" class="btn ghost sm dw-copy">Copy</button>
+    </div>
+    {% if manual %}
+    <p class="small dim">Impatient? Paste the transaction hash:</p>
+    <input class="dw-manual-hash m" type="text" placeholder="0x…">
+    <button type="button" class="btn ghost dw-manual-btn">Verify now</button>
+    {% endif %}
+  </div>
+
+  <p class="dw-trust small dim">Every donation goes to this RFP's own {{ safe_threshold or 3 }}-of-5 Safe
+  <a class="m" href="https://etherscan.io/address/{{ address }}" target="_blank" rel="noopener">{{ address | shortaddr }}</a>
+  on Ethereum mainnet, counted automatically.</p>
+  <div class="dw-status status" hidden></div>
+</div>

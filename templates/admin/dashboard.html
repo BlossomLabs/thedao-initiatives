@@ -4,11 +4,19 @@
 <main class="detail">
   <div class="admin-head">
     <h1>Admin dashboard</h1>
-    <form method="post" action="{{ url_for('admin_logout') }}">
-      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-      <button class="btn ghost" type="submit">Log out</button>
-    </form>
+    <div style="display:flex;gap:10px">
+      <form method="post" action="{{ url_for('admin_sync_content') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="btn ghost" type="submit"
+                title="Publish/update RFPs from content/rfps/*.md (run after a git pull)">Sync content files</button>
+      </form>
+      <form method="post" action="{{ url_for('admin_logout') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <button class="btn ghost" type="submit">Log out</button>
+      </form>
+    </div>
   </div>
+  {% if request.args.msg %}<div class="alert">{{ request.args.msg }}</div>{% endif %}
 
   <div class="verdicts">
     <div class="pill"><span class="dot {{ 'a' if n_pending else 'b' }}"></span>

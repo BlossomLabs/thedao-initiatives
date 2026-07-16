@@ -554,6 +554,94 @@ class TestAiSearch(unittest.TestCase):
             self.assertTrue(app_mod._ai_budget_ok())
 
 
+class TestContentSync(unittest.TestCase):
+    """content/rfps/*.md publish RFPs: files own words + goal, the admin
+    panel owns lifecycle and money. Uses a throwaway DB + content dir."""
+
+    GOOD = ("---\n"
+            "title: Test initiative\n"
+            "goal: $250,000\n"
+            "summary: First line\n"
+            "  continued line\n"
+            "forum: https://forum.example.org/t/x/1\n"
+            "---\n# Details\n\nSome **markdown**.")
+
+    def setUp(self):
+        import tempfile
+        self._dir = tempfile.mkdtemp()
+        self._db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self._db.close()
+        self._patches = [
+            mock.patch.object(config, "BASE_DIR", self._dir),
+            mock.patch.object(config, "DB_PATH", self._db.name),
+        ]
+        for p in self._patches:
+            p.start()
+        import db
+        db.init()
+        self.db = db
+        os.makedirs(os.path.join(self._dir, "content", "rfps"))
+
+    def tearDown(self):
+        for p in self._patches:
+            p.stop()
+        os.unlink(self._db.name)
+
+    def _write(self, name, text):
+        with open(os.path.join(self._dir, "content", "rfps", name), "w") as f:
+            f.write(text)
+
+    def test_parser_happy_path(self):
+        import app as app_mod
+        f = app_mod.parse_rfp_file(self.GOOD)
+        self.assertEqual(f["title"], "Test initiative")
+        self.assertEqual(f["goal"], 250000.0)
+        self.assertEqual(f["summary"], "First line continued line")
+        self.assertEqual(f["status"], "approved")
+        self.assertIn("**markdown**", f["details"])
+
+    def test_parser_rejects_bad_files(self):
+        import app as app_mod
+        for bad in ("no frontmatter at all",
+                    "---\ngoal: 100\n---\nbody",          # no title
+                    "---\ntitle: x\ngoal: nope\n---\n",    # bad goal
+                    "---\ntitle: x\ngoal: 5\nstatus: live\n---\n"):
+            with self.assertRaises(ValueError):
+                app_mod.parse_rfp_file(bad)
+
+    def test_sync_creates_then_updates_without_touching_lifecycle(self):
+        import app as app_mod
+        self._write("test-initiative.md", self.GOOD)
+        self.assertEqual(app_mod.sync_content(), (1, 0, []))
+        r = self.db.rfp_by_slug("test-initiative")
+        self.assertEqual(r["status"], "approved")
+        self.assertEqual(r["funding_goal_usd"], 250000.0)
+
+        # simulate launch-time state the file must never clobber
+        self.db.update_rfp(r["id"], status="archived",
+                           safe_address="0x" + "aa" * 20)
+        self._write("test-initiative.md",
+                    self.GOOD.replace("$250,000", "300000"))
+        self.assertEqual(app_mod.sync_content(), (0, 1, []))
+        r = self.db.rfp_by_slug("test-initiative")
+        self.assertEqual(r["funding_goal_usd"], 300000.0)   # words/goal updated
+        self.assertEqual(r["status"], "archived")           # lifecycle kept
+        self.assertEqual(r["safe_address"], "0x" + "aa" * 20)
+
+    def test_sync_reports_bad_file_and_continues(self):
+        import app as app_mod
+        self._write("good-one.md", self.GOOD)
+        self._write("broken.md", "not a content file")
+        created, updated, errors = app_mod.sync_content()
+        self.assertEqual((created, updated), (1, 0))
+        self.assertEqual(len(errors), 1)
+        self.assertIn("broken.md", errors[0])
+        # deleting a file never deletes the RFP
+        os.unlink(os.path.join(self._dir, "content", "rfps", "good-one.md"))
+        app_mod.sync_content()
+        self.assertIsNotNone(self.db.rfp_by_slug("good-one"))
+
+
 class TestSiteLock(unittest.TestCase):
     """Private-preview gate: with SITE_USERNAME/SITE_PASSWORD set, everything
     except /healthz demands HTTP Basic Auth."""

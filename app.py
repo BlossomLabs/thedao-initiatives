@@ -500,6 +500,120 @@ def parse_goal(raw):
     return round(v, 2), None
 
 
+# ------------------------------------------------------------ content as code
+# RFPs can be published from the repo: drop a markdown file with a small
+# frontmatter header into content/rfps/, push, and sync (automatic at startup,
+# or the admin dashboard's "Sync content files" button — no restart needed).
+# The filename is the RFP's permanent slug. Files own the words and the goal;
+# the admin panel owns the lifecycle (approve/archive, Safes, pledges), so a
+# file edit can never unpublish an RFP or touch money data, and deleting a
+# file never deletes the RFP.
+
+def _content_dir():
+    return os.path.join(config.BASE_DIR, "content", "rfps")
+
+
+def parse_rfp_file(text):
+    """Parse an RFP content file: '---' frontmatter, then markdown details.
+
+    Keys: title (required), goal (required, USD), summary (recommended),
+    forum (optional URL), status (approved|pending, create-only),
+    pin (optional board position). A value continues onto following lines
+    when they are indented.
+    """
+    m = re.match(r"\A---\s*\n(.*?)\n---\s*\n?(.*)\Z", text, re.S)
+    if not m:
+        raise ValueError("missing '---' frontmatter block")
+    head, details = m.group(1), m.group(2).strip()
+    fields, key = {}, None
+    for line in head.splitlines():
+        if line[:1] in (" ", "\t") and key:  # indented continuation
+            fields[key] += " " + line.strip()
+            continue
+        k, sep, v = line.partition(":")
+        if not sep or not k.strip():
+            raise ValueError("bad frontmatter line: %r" % line)
+        key = k.strip().lower()
+        fields[key] = v.strip()
+    title = fields.get("title", "")
+    if not (1 <= len(title) <= 140):
+        raise ValueError("title is required (max 140 chars)")
+    goal, err = parse_goal(fields.get("goal", ""))
+    if err:
+        raise ValueError(err)
+    status = fields.get("status", "approved").lower()
+    if status not in ("approved", "pending"):
+        raise ValueError("status must be approved or pending")
+    pin = fields.get("pin", "").strip()
+    if pin and not pin.isdigit():
+        raise ValueError("pin must be a whole number")
+    return {
+        "title": title,
+        "summary": fields.get("summary", "")[:4000],
+        "goal": goal,
+        "discourse_url": fields.get("forum", ""),
+        "status": status,
+        "sort_rank": int(pin) if pin else None,
+        "details": details[:20000],
+    }
+
+
+def sync_content():
+    """Upsert every content/rfps/*.md into the database.
+
+    Returns (created, updated, errors) where errors is a list of
+    "filename: reason" strings. Bad files are reported and skipped; they
+    never block the rest.
+    """
+    created, updated, errors = 0, 0, []
+    cdir = _content_dir()
+    if not os.path.isdir(cdir):
+        return created, updated, errors
+    for name in sorted(os.listdir(cdir)):
+        if not name.endswith(".md") or name == "README.md":
+            continue
+        slug = re.sub(r"[^a-z0-9]+", "-", name[:-3].lower()).strip("-")
+        if not slug:
+            errors.append("%s: filename makes an empty slug" % name)
+            continue
+        try:
+            with open(os.path.join(cdir, name), encoding="utf-8") as f:
+                fields = parse_rfp_file(f.read())
+            result = db.upsert_rfp_content(slug, **fields)
+        except (ValueError, OSError) as e:
+            errors.append("%s: %s" % (name, e))
+            continue
+        if result == "created":
+            created += 1
+        else:
+            updated += 1
+    return created, updated, errors
+
+
+# Publish file-based RFPs at every boot, so `git pull` + restart is a full
+# deploy of new content. Never fatal: a bad file is someone's typo, not an
+# outage.
+try:
+    _c, _u, _errs = sync_content()
+    if _c or _u or _errs:
+        print("content sync: %d created, %d updated%s" % (
+            _c, _u, ("; ERRORS: " + "; ".join(_errs)) if _errs else ""))
+except Exception as _e:
+    print("content sync failed: %s" % _e)
+
+
+@app.route("/admin/sync-content", methods=["POST"])
+@admin_required
+def admin_sync_content():
+    """Pick up freshly pulled content files without restarting the app."""
+    check_csrf()
+    created, updated, errors = sync_content()
+    msg = "Content sync: %d created, %d updated." % (created, updated)
+    if errors:
+        msg += " Skipped: " + "; ".join(errors)
+    return redirect(url_for("admin_dashboard", msg=msg))
+
+
 # ------------------------------------------------------------ public pages
 
 @app.route("/")

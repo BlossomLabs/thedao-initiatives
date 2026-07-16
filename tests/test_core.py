@@ -642,6 +642,92 @@ class TestContentSync(unittest.TestCase):
         self.assertIsNotNone(self.db.rfp_by_slug("good-one"))
 
 
+class TestAdminPassword(unittest.TestCase):
+    """The admin password is the admin's to change from the browser: .env
+    bootstraps a fresh deploy, then the stored hash takes over."""
+
+    def setUp(self):
+        import tempfile
+        self._db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self._db.close()
+        self._patch = mock.patch.object(config, "DB_PATH", self._db.name)
+        self._patch.start()
+        import db
+        db.init()
+        self.db = db
+
+    def tearDown(self):
+        self._patch.stop()
+        os.unlink(self._db.name)
+
+    def test_hash_is_salted_and_verifies(self):
+        import app as app_mod
+        a = app_mod.hash_password("correct horse battery")
+        b = app_mod.hash_password("correct horse battery")
+        self.assertNotEqual(a, b)                       # random salt each time
+        self.assertNotIn("correct horse", a)            # never stores the secret
+        self.assertTrue(app_mod.verify_password("correct horse battery", a))
+        self.assertFalse(app_mod.verify_password("wrong", a))
+        for junk in ("", "nonsense", "scrypt$bad", None):
+            self.assertFalse(app_mod.verify_password("x", junk))
+
+    def test_env_bootstraps_then_stored_hash_wins(self):
+        import app as app_mod
+        with mock.patch.object(config, "ADMIN_PASSWORD", "from-dot-env"):
+            # fresh deploy: .env value is the password
+            self.assertTrue(app_mod.admin_password_ok("from-dot-env"))
+            self.assertFalse(app_mod.admin_password_ok("something-else"))
+            # admin changes it in the browser
+            self.db.meta_set("admin_password_hash",
+                             app_mod.hash_password("chosen-in-browser"))
+            self.assertTrue(app_mod.admin_password_ok("chosen-in-browser"))
+            self.assertFalse(app_mod.admin_password_ok("from-dot-env"))
+            # documented recovery: drop the hash, .env works again
+            self.db.meta_set("admin_password_hash", "")
+            self.assertTrue(app_mod.admin_password_ok("from-dot-env"))
+
+    def test_change_password_endpoint_rules(self):
+        import app as app_mod
+        c = app_mod.app.test_client()
+        with c.session_transaction() as s:
+            s["admin"] = True
+            s["_csrf"] = "tok"
+        def post(**form):
+            form["_csrf"] = "tok"
+            return c.post("/admin/password", data=form,
+                          base_url="http://localhost", follow_redirects=False)
+        with mock.patch.object(config, "ADMIN_PASSWORD", "from-dot-env"), \
+             mock.patch.object(config, "SITE_USERNAME", ""), \
+             mock.patch.object(config, "SITE_PASSWORD", ""):
+            # wrong current password changes nothing
+            r = post(current="nope", new="a" * 12, confirm="a" * 12)
+            self.assertIn("wrong", r.headers["Location"].lower())
+            self.assertTrue(app_mod.admin_password_ok("from-dot-env"))
+            # mismatch changes nothing
+            post(current="from-dot-env", new="a" * 12, confirm="b" * 12)
+            self.assertTrue(app_mod.admin_password_ok("from-dot-env"))
+            # too short changes nothing
+            post(current="from-dot-env", new="short", confirm="short")
+            self.assertTrue(app_mod.admin_password_ok("from-dot-env"))
+            # valid change takes effect
+            post(current="from-dot-env", new="a-long-new-password",
+                 confirm="a-long-new-password")
+            self.assertTrue(app_mod.admin_password_ok("a-long-new-password"))
+            self.assertFalse(app_mod.admin_password_ok("from-dot-env"))
+
+    def test_change_password_requires_admin_session(self):
+        import app as app_mod
+        c = app_mod.app.test_client()  # no admin session
+        with mock.patch.object(config, "SITE_USERNAME", ""), \
+             mock.patch.object(config, "SITE_PASSWORD", ""):
+            r = c.post("/admin/password",
+                       data={"current": "x", "new": "y" * 12,
+                             "confirm": "y" * 12},
+                       base_url="http://localhost")
+            self.assertEqual(r.status_code, 302)
+            self.assertIn("/admin", r.headers["Location"])  # bounced to login
+
+
 class TestSiteLock(unittest.TestCase):
     """Private-preview gate: with SITE_USERNAME/SITE_PASSWORD set, everything
     except /healthz demands HTTP Basic Auth."""

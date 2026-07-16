@@ -14,6 +14,20 @@
     }
   }, true);
 
+  // Change-password panel toggle (CSP forbids inline onclick).
+  var pwToggle = document.getElementById("show-pw-form");
+  var pwForm = document.getElementById("pw-form");
+  if (pwToggle && pwForm) {
+    pwToggle.addEventListener("click", function () {
+      pwForm.hidden = !pwForm.hidden;
+      if (!pwForm.hidden) {
+        pwForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        var f = document.getElementById("pw-current");
+        if (f) f.focus();
+      }
+    });
+  }
+
   var box = document.getElementById("safe-deploy");
   if (!box) return;
   var rfpId = box.dataset.rfp;

@@ -79,7 +79,10 @@ Non-secret values you can take from this document:
 
 Secrets Griff sends you separately (never by email, never in git):
 
-- `ADMIN_PASSWORD` (a fresh one for production)
+- `ADMIN_PASSWORD` (a fresh one for production; this only BOOTSTRAPS the
+  deploy. Griff changes it himself in the admin panel afterwards, which
+  stores a hash in the database and makes this value inert. Recovery if
+  it is ever lost is in DEPLOY.md and needs your server access.)
 - `SITE_USERNAME` + `SITE_PASSWORD` (the private-preview login: while both
   are set, the whole site asks for them before showing anything; /healthz
   stays open for monitoring. Blank both + restart when Griff says go public.)

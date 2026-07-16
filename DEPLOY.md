@@ -97,6 +97,23 @@ sudo systemctl restart thedao-rfps
   double-check `OPERATIONAL_SIGNERS` in the server `.env` is the corrected
   five-address set.
 
+## Admin password: who owns it
+
+`ADMIN_PASSWORD` in `.env` only **bootstraps** a fresh deploy. The admin
+changes it in the browser (dashboard, "Change password"), and from then on
+the real password is a hash stored in the database; the `.env` value is
+ignored. Nobody needs server access to rotate it.
+
+**Recovery, if the admin password is ever lost** (needs server access):
+
+```sh
+su - rfps && cd thedao-rfps
+./.venv/bin/python -c "import db; db.meta_set('admin_password_hash','')"
+```
+
+That drops the stored hash, so the `ADMIN_PASSWORD` in `.env` works again
+(set a fresh one there first if needed). No restart required.
+
 ## 7. Post-launch checklist
 
 - Hit `https://your-domain/healthz` — should return `{"ok": true, ...}`.

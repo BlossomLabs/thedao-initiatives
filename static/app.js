@@ -64,7 +64,7 @@
       var d = ev.detail;
       if (d && d.info && !providers.some(function (p) {
         return p.info.uuid === d.info.uuid;
-      })) providers.push(d);
+      })) { providers.push(d); tryRestore(false); }  // resume a prior explicit choice
     } catch (e) {}
   });
   function requestProviders() {
@@ -84,9 +84,70 @@
       || window.ethereum || null;
   }
 
+  // Remember the wallet the donor explicitly chose, so a returning donor is
+  // reconnected to THAT wallet instead of being re-prompted or silently bound
+  // to whichever extension won the injection race. rdns is stable across
+  // sessions; the EIP-6963 uuid is not, so never persist the uuid.
+  function walletKey(info) { return (info && (info.rdns || info.name)) || ""; }
+  function rememberWallet(info) {
+    try { localStorage.setItem("thedao:wallet", walletKey(info)); } catch (e) {}
+  }
+  function forgetWallet() { try { localStorage.removeItem("thedao:wallet"); } catch (e) {} }
+  function savedWalletId() {
+    try { return localStorage.getItem("thedao:wallet") || ""; } catch (e) { return ""; }
+  }
+  function providerById(id) {
+    if (!id) return null;
+    for (var i = 0; i < providers.length; i++) {
+      if (walletKey(providers[i].info) === id) return providers[i];
+    }
+    return null;
+  }
+
+  // Silently reconnect on load — but ONLY to a wallet the donor chose before
+  // (or the sole injected wallet). With several wallets and no prior choice we
+  // stay disconnected, so the FIRST connect shows the chooser and we never
+  // default to whoever won the injection race. allowSingle is true only on the
+  // settled-DOM pass, never mid-announcement (more wallets may still arrive).
+  function tryRestore(allowSingle) {
+    if (account) return;
+    var saved = providerById(savedWalletId());
+    var target = null;
+    if (saved) { activeProvider = saved.provider; target = saved.provider; }
+    else if (allowSingle && !savedWalletId()) {
+      if (providers.length === 1) target = providers[0].provider;
+      else if (!providers.length && window.ethereum) target = window.ethereum;
+    }
+    if (target && target.request) {
+      watchProvider(target);
+      target.request({ method: "eth_accounts" }).then(function (a) {
+        if (a && a[0] && !account) {
+          getParams().then(function () { setConnected(a[0]); }).catch(function () {});
+        } else if (saved && activeProvider === saved.provider && !account) {
+          activeProvider = null;  // saved wallet no longer authorized; don't pin it
+        }
+      }).catch(function () {
+        if (saved && activeProvider === saved.provider && !account) activeProvider = null;
+      });
+      return;
+    }
+    if (allowSingle && wcEnabled() && hasWcSession()) {
+      // A WalletConnect session survives reloads (persisted by the SDK); resume
+      // it silently — init() only resumes the stored session, never opens a modal.
+      wcInit().then(function (provider) {
+        var a = provider.session && provider.accounts;
+        if (a && a[0] && !account) {
+          activeProvider = provider;
+          getParams().then(function () { setConnected(a[0]); }).catch(function () {});
+        }
+      }).catch(function () {});
+    }
+  }
+
   function disconnectUi() {
     account = null;
     balances = {};
+    forgetWallet();
     if (navBtn) {
       navBtn.textContent = "Connect wallet";
       navBtn.classList.remove("connected");
@@ -303,6 +364,7 @@
   var wcConnectPromise = null;  // in-flight guard: no double modal on double click
   function connectWalletConnect() {
     if (wcConnectPromise) return wcConnectPromise;
+    forgetWallet();  // switching to WC; its own session persistence takes over
     // Params first so the widget's token list is ready when the modal returns.
     wcConnectPromise = getParams().then(wcInit).then(function (provider) {
       return provider.enable().catch(function (e) {
@@ -382,6 +444,7 @@
     providers.forEach(function (p) {
       item(p.info.name, function () {
         activeProvider = p.provider;
+        rememberWallet(p.info);  // remember this explicit choice for next time
         if (connected) switchWallet(p.provider).catch(function () {});
         else connectInjected();
       }, { icon: p.info.icon, active: activeProvider === p.provider });
@@ -443,29 +506,9 @@
       }
       connectWallet().catch(resetConnectBtn);
     });
-    // reflect an already-authorized wallet without prompting (after 6963
-    // announcements settle)
-    setTimeout(function () {
-      var p = eth();
-      if (p && p.request) {
-        watchProvider(p);
-        p.request({ method: "eth_accounts" }).then(function (a) {
-          if (a && a[0]) { getParams().then(function () { setConnected(a[0]); }).catch(function(){}); }
-        }).catch(function () {});
-      } else if (wcEnabled() && hasWcSession()) {
-        // A WalletConnect session survives reloads (persisted by the SDK).
-        // Restore it silently so returning donors see themselves connected;
-        // init() never opens the modal, it only resumes the stored session.
-        wcInit().then(function (provider) {
-          var a = provider.session && provider.accounts;
-          if (a && a[0] && !account) {
-            activeProvider = provider;
-            getParams().then(function () { setConnected(a[0]); })
-              .catch(function () {});
-          }
-        }).catch(function () {});
-      }
-    }, 300);
+    // reflect a previously-chosen wallet without prompting (once 6963
+    // announcements settle); tryRestore(false) also runs as each wallet announces
+    setTimeout(function () { tryRestore(true); }, 300);
   }
 
   // ------------------------------------------------------------ amounts

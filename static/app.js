@@ -349,7 +349,9 @@
   }
 
   // One menu, two modes: pick a wallet to CONNECT, or switch while connected.
-  function openWalletMenu(connected) {
+  // onConnected (connect mode only) runs once a wallet is connected, so a
+  // caller like the Donate button can resume what the donor was doing.
+  function openWalletMenu(connected, onConnected) {
     closeWalletMenu();
     walletMenu = document.createElement("div");
     walletMenu.className = "wallet-menu";
@@ -373,7 +375,9 @@
     }
     function connectInjected() {
       navBtn.textContent = "Connecting\u2026";
-      connectWallet().catch(resetConnectBtn);
+      var pr = connectWallet();
+      if (onConnected) pr = pr.then(function () { onConnected(); });
+      pr.catch(resetConnectBtn);
     }
     providers.forEach(function (p) {
       item(p.info.name, function () {
@@ -391,7 +395,9 @@
     if (wcEnabled()) {
       item("WalletConnect (mobile & more)", function () {
         navBtn.textContent = "Connecting\u2026";
-        connectWalletConnect().catch(resetConnectBtn);
+        var pr = connectWalletConnect();
+        if (onConnected && !connected) pr = pr.then(function () { onConnected(); });
+        pr.catch(resetConnectBtn);
       }, { icon: WC_ICON, active: !!(wcProvider && activeProvider === wcProvider) });
     }
     if (connected) {
@@ -733,6 +739,15 @@
             "this RFP's address (shown here) from an exchange or another " +
             "wallet and it is counted automatically.");
         return;
+      }
+      if (!account) {
+        // Not connected yet. If there's more than one way in (several injected
+        // wallets, or an injected wallet plus WalletConnect), let the donor
+        // pick instead of silently grabbing whichever extension won the
+        // injection race — then resume this donation once they connect.
+        var injected = providers.length || (window.ethereum ? 1 : 0);
+        var options = injected + (wcEnabled() ? 1 : 0);
+        if (options > 1) { openWalletMenu(false, donate); return; }
       }
       var pre = account ? Promise.resolve(account)
                         : (status("wait", "Connecting wallet…"), connectWallet());

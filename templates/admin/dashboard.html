@@ -39,36 +39,7 @@
     <div class="pill"><span class="dot {{ 'a' if n_pending else 'b' }}"></span>
       <div><b>{{ n_pending }} pending submission{{ '' if n_pending == 1 else 's' }}</b>
       <small>awaiting review below</small></div></div>
-    <div class="pill"><span class="dot {{ 'a' if gate_on else 'g' }}"></span>
-      <div><b>{{ 'Private preview' if gate_on else 'Public site' }}</b>
-      <small>{% if gate_on %}visitors need the login{% if gate_user %} (user: {{ gate_user }}){% endif %}{% else %}anyone can view it{% endif %}</small></div></div>
   </div>
-
-  <h2>Who can view the site</h2>
-  {% if gate_on %}
-    <p class="small dim">The whole site is behind a shared login
-    {% if gate_from_env %}from the server's <span class="m">.env</span> file. Set one here and it takes over (no server access needed afterwards).{% else %}you control here.{% endif %}
-    Uptime checks on <span class="m">/healthz</span> stay open either way.</p>
-  {% else %}
-    <p class="small dim">The site is <b>live to the public</b>. Set a login below to put it back behind a preview gate.</p>
-  {% endif %}
-  <form method="post" action="{{ url_for('admin_site_access') }}" class="form narrow-form">
-    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-    <label class="lbl" for="site-user">Viewer username</label>
-    <input type="text" id="site-user" name="site_username" maxlength="60"
-           value="{{ gate_user }}" autocomplete="off">
-    <label class="lbl" for="site-pass">Viewer password <span class="dim">(at least 8 characters; share this with people you want to show the site)</span></label>
-    <input type="text" id="site-pass" name="site_password" autocomplete="off">
-    <button class="btn primary" type="submit">{{ 'Update viewer login' if gate_on else 'Lock the site with this login' }}</button>
-  </form>
-  <p class="small dim">Changing it signs out everyone using the old password.</p>
-  {% if gate_on %}
-  <form method="post" action="{{ url_for('admin_site_public') }}" style="margin-top:10px">
-    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-    <button class="btn danger" type="submit"
-            data-confirm="Make the site PUBLIC? Anyone on the internet will be able to view it. You can re-lock it afterwards.">Make the site public (launch)</button>
-  </form>
-  {% endif %}
 
   <h2>All RFPs</h2>
   <div class="tblbox">

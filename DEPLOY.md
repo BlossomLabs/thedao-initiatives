@@ -114,6 +114,21 @@ git pull
 sudo systemctl restart thedao-rfps
 ```
 
+**RFP content ships without a restart.** RFPs live as markdown files in
+`content/rfps/` (see the README there). After a `git pull`, they publish
+either at the next restart or instantly via the admin dashboard's
+"Sync content files" button. Recommended: add a cron that quietly pulls
+every 5 minutes, so publishing an RFP needs no server access at all —
+push the file, click Sync in the admin panel:
+
+```sh
+crontab -e -u rfps
+# add:
+*/5 * * * *  cd /home/rfps/thedao-rfps && git pull -q origin main
+```
+
+(Code changes still need the manual `systemctl restart` above.)
+
 ## Notes
 
 - **`./run.sh` is dev-only** (Flask's built-in server). Production always goes

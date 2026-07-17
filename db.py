@@ -178,6 +178,38 @@ def rfp_by_id(rfp_id):
         con.close()
 
 
+def upsert_rfp_content(slug, title, summary, details, goal, discourse_url="",
+                       status="approved", sort_rank=None):
+    """Create or update an RFP from a content file (content/rfps/<slug>.md).
+
+    Content files own the words and the goal; the admin panel owns the
+    lifecycle. So on update this NEVER touches status, safe_address, or any
+    money data — an edited file can't unpublish an RFP or detach its Safe.
+    Returns "created" or "updated".
+    """
+    existing = rfp_by_slug(slug)
+    if existing:
+        fields = {"title": title, "summary": summary, "details": details,
+                  "funding_goal_usd": goal, "discourse_url": discourse_url}
+        if sort_rank is not None:
+            fields["sort_rank"] = sort_rank
+        update_rfp(existing["id"], **fields)
+        return "updated"
+    con = connect()
+    try:
+        with con:
+            con.execute(
+                "INSERT INTO rfps(slug,title,summary,discourse_url,"
+                "funding_goal_usd,payout_addresses,contact,status,created_at,"
+                "approved_at,details,sort_rank) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (slug, title, summary, discourse_url, goal, "[]", "",
+                 status, now(), now() if status == "approved" else None,
+                 details, sort_rank))
+        return "created"
+    finally:
+        con.close()
+
+
 def rfp_by_safe_address(address):
     """The RFP that owns this Safe address, if any (case-insensitive).
     Used to keep every Safe bound to exactly one RFP."""

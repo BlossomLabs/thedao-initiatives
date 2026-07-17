@@ -173,26 +173,96 @@ def same_origin_only():
             abort(403)
 
 
-@app.before_request
-def site_lock():
-    """Private-beta gate: when SITE_USERNAME/SITE_PASSWORD are configured, the
-    whole site (pages, APIs, static files) demands them via HTTP Basic Auth.
-    /healthz stays open so uptime monitors work. Blank both + restart = public.
-    """
-    if not (config.SITE_USERNAME and config.SITE_PASSWORD):
-        return
-    if request.path == "/healthz":
-        return
-    auth = request.authorization
-    if (auth and auth.type == "basic"
-            and hmac.compare_digest(auth.username or "", config.SITE_USERNAME)
-            and hmac.compare_digest(auth.password or "", config.SITE_PASSWORD)):
-        return
-    resp = make_response(
+# ---- private-preview gate --------------------------------------------------
+# The whole site can sit behind one shared username/password until launch.
+# Where the setting lives, in priority order:
+#   1. meta.site_gate_off == "1"          -> public, set from the admin panel
+#   2. meta.site_username + password hash -> the admin's own credentials
+#   3. .env SITE_USERNAME/SITE_PASSWORD   -> bootstrap for a fresh deploy
+#   4. nothing configured                 -> public
+# Unlike the admin password (checked once at login), this runs on EVERY
+# request, so a bare PBKDF2 call here would add ~175ms to every page, image
+# and stylesheet (measured). Successful credentials are cached in memory
+# instead; wrong ones always pay the full cost and are rate limited, which
+# keeps brute force slow without letting it burn the CPU.
+
+_site_auth_cache = OrderedDict()  # verified password -> checked_at
+_site_auth_lock = threading.Lock()
+SITE_AUTH_CACHE_MAX = 8
+SITE_AUTH_CACHE_TTL = 300
+
+
+def site_gate():
+    """(username, secret, is_hashed) for the preview gate, or None if public."""
+    if db.meta_get("site_gate_off", "") == "1":
+        return None
+    user = db.meta_get("site_username", "")
+    hashed = db.meta_get("site_password_hash", "")
+    if user and hashed:
+        return (user, hashed, True)
+    if config.SITE_USERNAME and config.SITE_PASSWORD:
+        return (config.SITE_USERNAME, config.SITE_PASSWORD, False)
+    return None
+
+
+def _site_password_cached(password):
+    with _site_auth_lock:
+        hit = _site_auth_cache.get(password)
+        if hit and time.time() - hit < SITE_AUTH_CACHE_TTL:
+            _site_auth_cache.move_to_end(password)
+            return True
+        if hit:
+            _site_auth_cache.pop(password, None)
+        return False
+
+
+def _site_password_remember(password):
+    with _site_auth_lock:
+        _site_auth_cache[password] = time.time()
+        _site_auth_cache.move_to_end(password)
+        while len(_site_auth_cache) > SITE_AUTH_CACHE_MAX:
+            _site_auth_cache.popitem(last=False)
+
+
+def _site_auth_forget():
+    """Drop cached logins so a credential change takes effect at once."""
+    with _site_auth_lock:
+        _site_auth_cache.clear()
+
+
+def _site_challenge(detail=None):
+    resp = make_response(detail or (
         "This site is in private preview. Enter the username and password "
-        "you were given to continue.", 401)
+        "you were given to continue."), 401)
     resp.headers["WWW-Authenticate"] = 'Basic realm="TheDAO RFP board"'
     return resp
+
+
+@app.before_request
+def site_lock():
+    gate = site_gate()
+    if gate is None:
+        return                      # site is public
+    if request.path == "/healthz":
+        return                      # uptime monitors must never be locked out
+    username, secret, is_hashed = gate
+    auth = request.authorization
+    if not (auth and auth.type == "basic" and auth.username and auth.password):
+        return _site_challenge()
+    if not hmac.compare_digest(auth.username, username):
+        return _site_challenge()
+    if not is_hashed:               # .env bootstrap: plain compare, cheap
+        if hmac.compare_digest(auth.password, secret):
+            return
+        return _site_challenge()
+    if _site_password_cached(auth.password):
+        return                      # fast path for everything after login
+    if not rate_limit("sitegate:" + client_ip(), 20, 60):
+        return _site_challenge("Too many attempts; wait a minute.")
+    if verify_password(auth.password, secret):
+        _site_password_remember(auth.password)
+        return
+    return _site_challenge()
 
 
 def admin_required(f):
@@ -1095,6 +1165,46 @@ def admin_change_password():
                                 "time you log in."))
 
 
+SITE_PASSWORD_MIN_LEN = 8
+
+
+@app.route("/admin/site-access", methods=["POST"])
+@admin_required
+def admin_site_access():
+    """Set (or change) the shared username/password that gates the whole site
+    during private preview. Also re-locks a site that was made public."""
+    check_csrf()
+    user = request.form.get("site_username", "").strip()
+    pw = request.form.get("site_password", "")
+    if not (1 <= len(user) <= 60):
+        return redirect(url_for("admin_dashboard",
+                                msg="Pick a username. Nothing changed."))
+    if len(pw) < SITE_PASSWORD_MIN_LEN:
+        return redirect(url_for("admin_dashboard",
+                                msg="Site password needs at least %d "
+                                    "characters. Nothing changed."
+                                    % SITE_PASSWORD_MIN_LEN))
+    db.meta_set("site_username", user)
+    db.meta_set("site_password_hash", hash_password(pw))
+    db.meta_set("site_gate_off", "0")
+    _site_auth_forget()  # old logins stop working immediately
+    return redirect(url_for("admin_dashboard",
+                            msg="Site preview login updated. Everyone with the "
+                                "old password is signed out."))
+
+
+@app.route("/admin/site-public", methods=["POST"])
+@admin_required
+def admin_site_public():
+    """Open the site to the world (launch). Reversible: setting a preview
+    login again re-locks it."""
+    check_csrf()
+    db.meta_set("site_gate_off", "1")
+    _site_auth_forget()
+    return redirect(url_for("admin_dashboard",
+                            msg="The site is now PUBLIC. Anyone can view it."))
+
+
 @app.route("/admin/logout", methods=["POST"])
 def admin_logout():
     check_csrf()
@@ -1111,8 +1221,12 @@ def admin_dashboard():
     rows = []
     for r in list(pending) + list(approved) + list(other):
         rows.append({"rfp": r, "sum": db.funding_summary(r["id"])})
+    gate = site_gate()
     return render_template("admin/dashboard.html", rows=rows,
-                           n_pending=len(pending), state=chain_state())
+                           n_pending=len(pending), state=chain_state(),
+                           gate_on=gate is not None,
+                           gate_user=gate[0] if gate else "",
+                           gate_from_env=bool(gate and not gate[2]))
 
 
 @app.route("/admin/rfp/<int:rfp_id>", methods=["GET", "POST"])

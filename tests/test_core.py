@@ -729,35 +729,94 @@ class TestAdminPassword(unittest.TestCase):
 
 
 class TestSiteLock(unittest.TestCase):
-    """Private-preview gate: with SITE_USERNAME/SITE_PASSWORD set, everything
-    except /healthz demands HTTP Basic Auth."""
+    """Private-preview gate: .env bootstraps it, the admin's own credentials
+    (stored hashed) take over, and it can be switched off to launch."""
+
+    def setUp(self):
+        import tempfile
+        import app as app_mod
+        self._db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self._db.close()
+        self._p = mock.patch.object(config, "DB_PATH", self._db.name)
+        self._p.start()
+        import db
+        db.init()
+        self.db = db
+        app_mod._site_auth_forget()
+
+    def tearDown(self):
+        self._p.stop()
+        os.unlink(self._db.name)
 
     def _client(self):
         import app as app_mod
         return app_mod.app.test_client()
 
+    def _auth(self, user, pw):
+        import base64
+        return {"Authorization": "Basic " + base64.b64encode(
+            ("%s:%s" % (user, pw)).encode()).decode()}
+
     def test_open_site_when_unconfigured(self):
         with mock.patch.object(config, "SITE_USERNAME", ""), \
              mock.patch.object(config, "SITE_PASSWORD", ""):
-            r = self._client().get("/static/style.css")
-            self.assertEqual(r.status_code, 200)
+            self.assertEqual(self._client().get("/static/style.css").status_code,
+                             200)
 
-    def test_locked_site_demands_credentials(self):
-        import base64
+    def test_env_bootstrap_locks_the_site(self):
         with mock.patch.object(config, "SITE_USERNAME", "friend"), \
              mock.patch.object(config, "SITE_PASSWORD", "open-sesame"):
             c = self._client()
-            r = c.get("/static/style.css")
+            self.assertEqual(c.get("/static/style.css").status_code, 401)
+            r = c.get("/static/style.css", headers=self._auth("friend", "wrong"))
             self.assertEqual(r.status_code, 401)
-            self.assertIn("Basic", r.headers.get("WWW-Authenticate", ""))
-            bad = base64.b64encode(b"friend:wrong").decode()
             r = c.get("/static/style.css",
-                      headers={"Authorization": "Basic " + bad})
-            self.assertEqual(r.status_code, 401)
-            good = base64.b64encode(b"friend:open-sesame").decode()
-            r = c.get("/static/style.css",
-                      headers={"Authorization": "Basic " + good})
+                      headers=self._auth("friend", "open-sesame"))
             self.assertEqual(r.status_code, 200)
+
+    def test_stored_credentials_override_env(self):
+        import app as app_mod
+        self.db.meta_set("site_username", "viewer")
+        self.db.meta_set("site_password_hash",
+                         app_mod.hash_password("preview-pass"))
+        with mock.patch.object(config, "SITE_USERNAME", "friend"), \
+             mock.patch.object(config, "SITE_PASSWORD", "open-sesame"):
+            c = self._client()
+            # the .env pair no longer works
+            r = c.get("/static/style.css",
+                      headers=self._auth("friend", "open-sesame"))
+            self.assertEqual(r.status_code, 401)
+            r = c.get("/static/style.css",
+                      headers=self._auth("viewer", "preview-pass"))
+            self.assertEqual(r.status_code, 200)
+            # second hit uses the cache and must still succeed
+            r = c.get("/static/style.css",
+                      headers=self._auth("viewer", "preview-pass"))
+            self.assertEqual(r.status_code, 200)
+
+    def test_gate_off_makes_site_public_even_with_env_set(self):
+        self.db.meta_set("site_gate_off", "1")
+        with mock.patch.object(config, "SITE_USERNAME", "friend"), \
+             mock.patch.object(config, "SITE_PASSWORD", "open-sesame"):
+            self.assertEqual(self._client().get("/static/style.css").status_code,
+                             200)
+
+    def test_changing_credentials_signs_out_old_password(self):
+        import app as app_mod
+        self.db.meta_set("site_username", "viewer")
+        self.db.meta_set("site_password_hash", app_mod.hash_password("old-pass"))
+        c = self._client()
+        self.assertEqual(c.get("/static/style.css",
+                               headers=self._auth("viewer", "old-pass")
+                               ).status_code, 200)  # now cached
+        self.db.meta_set("site_password_hash", app_mod.hash_password("new-pass"))
+        app_mod._site_auth_forget()   # what the admin route does on change
+        self.assertEqual(c.get("/static/style.css",
+                               headers=self._auth("viewer", "old-pass")
+                               ).status_code, 401)
+        self.assertEqual(c.get("/static/style.css",
+                               headers=self._auth("viewer", "new-pass")
+                               ).status_code, 200)
 
     def test_healthz_stays_open_for_uptime_monitors(self):
         with mock.patch.object(config, "SITE_USERNAME", "friend"), \
@@ -765,8 +824,7 @@ class TestSiteLock(unittest.TestCase):
              mock.patch("app.chain_state",
                         return_value={"tokens": {}, "detail": "t",
                                       "checked_at": 0}):
-            r = self._client().get("/healthz")
-            self.assertEqual(r.status_code, 200)
+            self.assertEqual(self._client().get("/healthz").status_code, 200)
 
 
 class TestScannerLock(unittest.TestCase):

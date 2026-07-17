@@ -64,10 +64,19 @@
       var d = ev.detail;
       if (d && d.info && !providers.some(function (p) {
         return p.info.uuid === d.info.uuid;
-      })) providers.push(d);
+      })) { providers.push(d); tryRestore(false); }  // resume a prior explicit choice
     } catch (e) {}
   });
-  try { window.dispatchEvent(new Event("eip6963:requestProvider")); } catch (e) {}
+  function requestProviders() {
+    try { window.dispatchEvent(new Event("eip6963:requestProvider")); } catch (e) {}
+  }
+  requestProviders();
+  // Ask again once the DOM is ready: some extensions inject their EIP-6963
+  // announcer after this script first runs, and would otherwise be missed.
+  // Re-announcements are de-duplicated by uuid above, so this is idempotent.
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", requestProviders);
+  }
 
   function eth() {
     return activeProvider
@@ -75,15 +84,98 @@
       || window.ethereum || null;
   }
 
+  // Remember the wallet the donor explicitly chose, so a returning donor is
+  // reconnected to THAT wallet instead of being re-prompted or silently bound
+  // to whichever extension won the injection race. rdns is stable across
+  // sessions; the EIP-6963 uuid is not, so never persist the uuid.
+  function walletKey(info) { return (info && (info.rdns || info.name)) || ""; }
+  function rememberWallet(info) {
+    try { localStorage.setItem("thedao:wallet", walletKey(info)); } catch (e) {}
+  }
+  function forgetWallet() { try { localStorage.removeItem("thedao:wallet"); } catch (e) {} }
+  function savedWalletId() {
+    try { return localStorage.getItem("thedao:wallet") || ""; } catch (e) { return ""; }
+  }
+  function providerById(id) {
+    if (!id) return null;
+    for (var i = 0; i < providers.length; i++) {
+      if (walletKey(providers[i].info) === id) return providers[i];
+    }
+    return null;
+  }
+  // Persist whichever announced wallet this provider object belongs to, so any
+  // connect path (chooser, single-wallet auto-connect, Donate) is remembered.
+  function rememberProvider(prov) {
+    for (var i = 0; i < providers.length; i++) {
+      if (providers[i].provider === prov) { rememberWallet(providers[i].info); return; }
+    }
+  }
+
+  // Silently reconnect on load — but ONLY to a wallet the donor chose before
+  // We only ever silently reconnect to a wallet the donor EXPLICITLY chose
+  // before (persisted on every successful connect). With no saved choice we
+  // stay disconnected — so the first connect shows the chooser, we never
+  // default to whoever won the injection race, and an explicit Disconnect
+  // (which clears the saved choice) actually sticks across reloads.
+  // allowSingle only gates the WalletConnect session resume (settled-DOM pass).
+  function tryRestore(allowSingle) {
+    if (account) return;
+    var saved = providerById(savedWalletId());
+    if (saved && saved.provider && saved.provider.request) {
+      activeProvider = saved.provider;
+      watchProvider(saved.provider);
+      saved.provider.request({ method: "eth_accounts" }).then(function (a) {
+        if (a && a[0] && !account) {
+          getParams().then(function () { setConnected(a[0]); }).catch(function () {});
+        } else if (activeProvider === saved.provider && !account) {
+          activeProvider = null;  // saved wallet no longer authorized; don't pin it
+        }
+      }).catch(function () {
+        if (activeProvider === saved.provider && !account) activeProvider = null;
+      });
+      return;
+    }
+    if (allowSingle && wcEnabled() && hasWcSession()) {
+      // A WalletConnect session survives reloads (persisted by the SDK); resume
+      // it silently — init() only resumes the stored session, never opens a modal.
+      wcInit().then(function (provider) {
+        var a = provider.session && provider.accounts;
+        if (a && a[0] && !account) {
+          activeProvider = provider;
+          getParams().then(function () { setConnected(a[0]); }).catch(function () {});
+        }
+      }).catch(function () {});
+    }
+  }
+
   function disconnectUi() {
     account = null;
     balances = {};
+    forgetWallet();
     if (navBtn) {
       navBtn.textContent = "Connect wallet";
       navBtn.classList.remove("connected");
       navBtn.title = "";
     }
     annotateTokenSelects();
+  }
+
+  function disconnectWallet() {
+    closeWalletMenu();
+    var p = activeProvider;
+    if (p && p === wcProvider) {
+      // WalletConnect: actually tear the session down (also clears wc@2 storage).
+      try { Promise.resolve(wcProvider.disconnect()).catch(function () {}); } catch (e) {}
+    } else if (p && typeof p.request === "function") {
+      // Injected wallets have no reliable programmatic disconnect; best-effort
+      // revoke where supported (MetaMask), then drop our local connection.
+      try {
+        p.request({ method: "wallet_revokePermissions",
+                    params: [{ eth_accounts: {} }] }).catch(function () {});
+      } catch (e) {}
+    }
+    activeProvider = null;
+    disconnectUi();  // clears account/balances, forgets the saved choice, resets the button
   }
 
   function watchProvider(p) {
@@ -197,6 +289,7 @@
       .then(function () { return p.request({ method: "eth_requestAccounts" }); })
       .then(function (accounts) {
         if (!accounts || !accounts[0]) throw new Error("no account authorized");
+        rememberProvider(p);  // remember so a returning donor reconnects to this wallet
         setConnected(accounts[0]);
         return account;
       });
@@ -225,6 +318,17 @@
   var wcSrc = (navBtn && navBtn.dataset.wcSrc) || "";
   var wcProvider = null;
   var wcBundlePromise = null;
+
+  // WalletConnect brand glyph for the picker. A data: URI keeps it inside the
+  // strict CSP (img-src allows data:); injected wallets bring their own icons
+  // via the EIP-6963 announcement.
+  var WC_ICON = "data:image/svg+xml," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">' +
+    '<rect width="40" height="40" rx="11" fill="#3396ff"/>' +
+    '<path d="M12 16.5c4.4-4.3 11.6-4.3 16 0l.6.6-2.2 2.1-.5-.5c-3.1-3-8-3-11.1 0' +
+    'l-.6.5-2.2-2.1zM8.6 20l2.1 2.1 3.9 3.8c1.8 1.7 4.9 1.7 6.7 0l3.9-3.8 2.1-2.1' +
+    ' 2.2 2.1-2.2 2.2-3.9 3.8c-3 2.9-8 2.9-11 0l-3.9-3.8L6.4 22.1z" fill="#fff"/></svg>'
+  );
 
   function wcEnabled() { return !!(wcProjectId && wcSrc); }
   function hasInjected() { return !!(providers.length || window.ethereum); }
@@ -283,6 +387,7 @@
   var wcConnectPromise = null;  // in-flight guard: no double modal on double click
   function connectWalletConnect() {
     if (wcConnectPromise) return wcConnectPromise;
+    forgetWallet();  // switching to WC; its own session persistence takes over
     // Params first so the widget's token list is ready when the modal returns.
     wcConnectPromise = getParams().then(wcInit).then(function (provider) {
       return provider.enable().catch(function (e) {
@@ -329,28 +434,44 @@
   }
 
   // One menu, two modes: pick a wallet to CONNECT, or switch while connected.
-  function openWalletMenu(connected) {
+  // onConnected (connect mode only) runs once a wallet is connected, so a
+  // caller like the Donate button can resume what the donor was doing.
+  function openWalletMenu(connected, onConnected) {
     closeWalletMenu();
     walletMenu = document.createElement("div");
     walletMenu.className = "wallet-menu";
-    function item(label, fn) {
+    function item(label, fn, opts) {
+      opts = opts || {};
       var b = document.createElement("button");
       b.type = "button";
-      b.textContent = label;
+      if (opts.active) b.classList.add("active");
+      if (opts.klass) b.classList.add(opts.klass);
+      var ic = document.createElement("img");
+      ic.className = "wm-icon" + (opts.icon ? "" : " wm-icon-ph");
+      ic.alt = "";
+      // EIP-6963 icons are data: URIs; the WC glyph is too. Both pass img-src.
+      if (opts.icon) ic.src = opts.icon;
+      b.appendChild(ic);
+      var nm = document.createElement("span");
+      nm.className = "wm-name";
+      nm.textContent = label;
+      b.appendChild(nm);
       b.addEventListener("click", function () { closeWalletMenu(); fn(); });
       walletMenu.appendChild(b);
     }
     function connectInjected() {
       navBtn.textContent = "Connecting\u2026";
-      connectWallet().catch(resetConnectBtn);
+      var pr = connectWallet();
+      if (onConnected) pr = pr.then(function () { onConnected(); });
+      pr.catch(resetConnectBtn);
     }
     providers.forEach(function (p) {
-      var dot = (activeProvider === p.provider ? "\u25cf " : "");
-      item(dot + p.info.name, function () {
+      item(p.info.name, function () {
         activeProvider = p.provider;
+        rememberWallet(p.info);  // remember this explicit choice for next time
         if (connected) switchWallet(p.provider).catch(function () {});
         else connectInjected();
-      });
+      }, { icon: p.info.icon, active: activeProvider === p.provider });
     });
     if (!providers.length && window.ethereum) {
       item("Browser wallet", function () {
@@ -359,16 +480,18 @@
       });
     }
     if (wcEnabled()) {
-      var wdot = (wcProvider && activeProvider === wcProvider ? "\u25cf " : "");
-      item(wdot + "WalletConnect (mobile & more)", function () {
+      item("WalletConnect (mobile & more)", function () {
         navBtn.textContent = "Connecting\u2026";
-        connectWalletConnect().catch(resetConnectBtn);
-      });
+        var pr = connectWalletConnect();
+        if (onConnected && !connected) pr = pr.then(function () { onConnected(); });
+        pr.catch(resetConnectBtn);
+      }, { icon: WC_ICON, active: !!(wcProvider && activeProvider === wcProvider) });
     }
     if (connected) {
       item("Switch account\u2026", function () {
         switchWallet().catch(function () {});
-      });
+      }, { klass: "wm-sep" });
+      item("Disconnect", function () { disconnectWallet(); }, { klass: "wm-danger" });
     }
     navBtn.parentNode.appendChild(walletMenu);
     // close on the next click outside the menu
@@ -386,46 +509,28 @@
     navBtn.addEventListener("click", function () {
       if (walletMenu) { closeWalletMenu(); return; }  // toggle closed
       if (account && eth()) {
-        // connected: offer switching only if there's more than one way in
-        if (providers.length > 1 || wcEnabled()) { openWalletMenu(true); return; }
-        var prev = navBtn.textContent;
-        navBtn.textContent = "Choose wallet…";
-        switchWallet().catch(function () { navBtn.textContent = prev; });
+        // connected: open the menu (switch wallet / switch account / disconnect)
+        openWalletMenu(true);
         return;
       }
-      // not connected: show a chooser when there is more than one option
-      if (hasInjected() && wcEnabled()) { openWalletMenu(false); return; }
-      if (!hasInjected() && wcEnabled()) {
-        navBtn.textContent = "Connecting…";
+      // not connected: show the wallet chooser whenever there's more than one
+      // way in. Several injected wallets (e.g. MetaMask + Rabby) count even
+      // when WalletConnect is off — otherwise we'd silently bind to whichever
+      // extension won the injection race (usually Rabby) and the donor could
+      // never pick MetaMask. With a single option, connect it directly.
+      var injected = providers.length || (window.ethereum ? 1 : 0);
+      var options = injected + (wcEnabled() ? 1 : 0);
+      if (options > 1) { openWalletMenu(false); return; }
+      navBtn.textContent = "Connecting…";
+      if (!injected && wcEnabled()) {
         connectWalletConnect().catch(resetConnectBtn);
         return;
       }
-      navBtn.textContent = "Connecting…";
       connectWallet().catch(resetConnectBtn);
     });
-    // reflect an already-authorized wallet without prompting (after 6963
-    // announcements settle)
-    setTimeout(function () {
-      var p = eth();
-      if (p && p.request) {
-        watchProvider(p);
-        p.request({ method: "eth_accounts" }).then(function (a) {
-          if (a && a[0]) { getParams().then(function () { setConnected(a[0]); }).catch(function(){}); }
-        }).catch(function () {});
-      } else if (wcEnabled() && hasWcSession()) {
-        // A WalletConnect session survives reloads (persisted by the SDK).
-        // Restore it silently so returning donors see themselves connected;
-        // init() never opens the modal, it only resumes the stored session.
-        wcInit().then(function (provider) {
-          var a = provider.session && provider.accounts;
-          if (a && a[0] && !account) {
-            activeProvider = provider;
-            getParams().then(function () { setConnected(a[0]); })
-              .catch(function () {});
-          }
-        }).catch(function () {});
-      }
-    }, 300);
+    // reflect a previously-chosen wallet without prompting (once 6963
+    // announcements settle); tryRestore(false) also runs as each wallet announces
+    setTimeout(function () { tryRestore(true); }, 300);
   }
 
   // ------------------------------------------------------------ amounts
@@ -699,6 +804,15 @@
             "this RFP's address (shown here) from an exchange or another " +
             "wallet and it is counted automatically.");
         return;
+      }
+      if (!account) {
+        // Not connected yet. If there's more than one way in (several injected
+        // wallets, or an injected wallet plus WalletConnect), let the donor
+        // pick instead of silently grabbing whichever extension won the
+        // injection race — then resume this donation once they connect.
+        var injected = providers.length || (window.ethereum ? 1 : 0);
+        var options = injected + (wcEnabled() ? 1 : 0);
+        if (options > 1) { openWalletMenu(false, donate); return; }
       }
       var pre = account ? Promise.resolve(account)
                         : (status("wait", "Connecting wallet…"), connectWallet());

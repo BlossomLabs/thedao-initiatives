@@ -67,7 +67,16 @@
       })) providers.push(d);
     } catch (e) {}
   });
-  try { window.dispatchEvent(new Event("eip6963:requestProvider")); } catch (e) {}
+  function requestProviders() {
+    try { window.dispatchEvent(new Event("eip6963:requestProvider")); } catch (e) {}
+  }
+  requestProviders();
+  // Ask again once the DOM is ready: some extensions inject their EIP-6963
+  // announcer after this script first runs, and would otherwise be missed.
+  // Re-announcements are de-duplicated by uuid above, so this is idempotent.
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", requestProviders);
+  }
 
   function eth() {
     return activeProvider
@@ -393,14 +402,19 @@
         switchWallet().catch(function () { navBtn.textContent = prev; });
         return;
       }
-      // not connected: show a chooser when there is more than one option
-      if (hasInjected() && wcEnabled()) { openWalletMenu(false); return; }
-      if (!hasInjected() && wcEnabled()) {
-        navBtn.textContent = "Connecting…";
+      // not connected: show the wallet chooser whenever there's more than one
+      // way in. Several injected wallets (e.g. MetaMask + Rabby) count even
+      // when WalletConnect is off — otherwise we'd silently bind to whichever
+      // extension won the injection race (usually Rabby) and the donor could
+      // never pick MetaMask. With a single option, connect it directly.
+      var injected = providers.length || (window.ethereum ? 1 : 0);
+      var options = injected + (wcEnabled() ? 1 : 0);
+      if (options > 1) { openWalletMenu(false); return; }
+      navBtn.textContent = "Connecting…";
+      if (!injected && wcEnabled()) {
         connectWalletConnect().catch(resetConnectBtn);
         return;
       }
-      navBtn.textContent = "Connecting…";
       connectWallet().catch(resetConnectBtn);
     });
     // reflect an already-authorized wallet without prompting (after 6963

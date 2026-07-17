@@ -10,7 +10,6 @@
         <button class="btn ghost" type="submit"
                 title="Publish/update RFPs from content/rfps/*.md (run after a git pull)">Sync content files</button>
       </form>
-      <button class="btn ghost" type="button" id="show-pw-form">Change password</button>
       <form method="post" action="{{ url_for('admin_logout') }}">
         <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <button class="btn ghost" type="submit">Log out</button>
@@ -18,22 +17,6 @@
     </div>
   </div>
   {% if request.args.msg %}<div class="alert">{{ request.args.msg }}</div>{% endif %}
-
-  <div id="pw-form" hidden>
-    <h2>Change admin password</h2>
-    <form method="post" action="{{ url_for('admin_change_password') }}" class="form narrow-form">
-      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
-      <label class="lbl" for="pw-current">Current password</label>
-      <input type="password" id="pw-current" name="current" autocomplete="current-password">
-      <label class="lbl" for="pw-new">New password <span class="dim">(at least 12 characters)</span></label>
-      <input type="password" id="pw-new" name="new" autocomplete="new-password">
-      <label class="lbl" for="pw-confirm">New password again</label>
-      <input type="password" id="pw-confirm" name="confirm" autocomplete="new-password">
-      <button class="btn primary" type="submit">Change password</button>
-    </form>
-    <p class="small dim">Takes effect immediately. Store it in your password
-    manager: nobody can look it up for you, and recovering it needs server access.</p>
-  </div>
 
   <div class="verdicts">
     <div class="pill"><span class="dot {{ 'a' if n_pending else 'b' }}"></span>
@@ -61,4 +44,3 @@
   </div>
 </main>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='admin.js') }}"></script>{% endblock %}

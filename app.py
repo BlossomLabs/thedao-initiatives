@@ -4,7 +4,6 @@ Public: browse RFPs, submit an RFP from a Discourse forum link, donate
 mainnet stablecoins or ETH straight to an RFP's own Gnosis Safe.
 Admin: approve/reject submissions, deploy per-RFP Safes, manage pledges.
 """
-import hashlib
 import hmac
 import ipaddress
 import json
@@ -993,54 +992,6 @@ def donate_status(tx_hash):
 
 
 # ------------------------------------------------------------ admin
-# The admin password belongs to the admin, not to the server config: once it
-# is changed in the browser, the new one is stored (hashed) in the database
-# and .env's ADMIN_PASSWORD is only the bootstrap for a fresh deploy.
-# Recovery, if the password is ever lost: delete the stored hash and the
-# .env value works again (see DEPLOY.md).
-
-PASSWORD_MIN_LEN = 12
-# PBKDF2-HMAC-SHA256 rather than scrypt/argon2: it is in every stdlib build
-# (hashlib.scrypt needs an OpenSSL that isn't always compiled in, and argon2
-# would mean a new dependency). 600k iterations is the current OWASP figure
-# and costs a fraction of a second on a login that happens rarely.
-_PBKDF2_ITERS = 600_000
-
-
-def hash_password(password):
-    """PBKDF2-HMAC-SHA256 with a random salt -> one storable string."""
-    salt = os.urandom(16)
-    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt,
-                             _PBKDF2_ITERS, dklen=32)
-    return "pbkdf2_sha256$%d$%s$%s" % (_PBKDF2_ITERS, salt.hex(), dk.hex())
-
-
-def verify_password(password, stored):
-    """Constant-time check of a password against a stored hash string."""
-    try:
-        algo, iters, salt_hex, dk_hex = stored.split("$")
-        if algo != "pbkdf2_sha256":
-            return False
-        dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"),
-                                 bytes.fromhex(salt_hex), int(iters),
-                                 dklen=len(dk_hex) // 2)
-    except (ValueError, TypeError, AttributeError):
-        return False
-    return hmac.compare_digest(dk.hex(), dk_hex)
-
-
-def admin_password_ok(candidate):
-    """True if `candidate` is the current admin password.
-
-    The stored hash wins once the password has been changed in the browser;
-    until then the .env value is used, so a fresh deploy can log in.
-    """
-    stored = db.meta_get("admin_password_hash", "")
-    if stored:
-        return verify_password(candidate, stored)
-    return bool(config.ADMIN_PASSWORD) and hmac.compare_digest(
-        candidate, config.ADMIN_PASSWORD)
-
 
 @app.route("/admin", methods=["GET"])
 def admin_login():
@@ -1060,39 +1011,11 @@ def admin_login_post():
         return render_template("admin/login.html",
                                error="Too many attempts; wait a minute."), 429
     pw = request.form.get("password", "")
-    if admin_password_ok(pw):
+    if hmac.compare_digest(pw, config.ADMIN_PASSWORD):
         session["admin"] = True
         session.permanent = False
         return redirect(url_for("admin_dashboard"))
     return render_template("admin/login.html", error="Wrong password."), 403
-
-
-@app.route("/admin/password", methods=["POST"])
-@admin_required
-def admin_change_password():
-    """Change the admin password from the browser. No server access needed."""
-    check_csrf()
-    if not rate_limit("pwchange:" + client_ip(), 5, 300):
-        return redirect(url_for("admin_dashboard",
-                                msg="Too many attempts; wait a few minutes."))
-    current = request.form.get("current", "")
-    new = request.form.get("new", "")
-    confirm = request.form.get("confirm", "")
-    if not admin_password_ok(current):
-        return redirect(url_for("admin_dashboard",
-                                msg="Current password is wrong. Nothing changed."))
-    if new != confirm:
-        return redirect(url_for("admin_dashboard",
-                                msg="The two new passwords don't match. "
-                                    "Nothing changed."))
-    if len(new) < PASSWORD_MIN_LEN:
-        return redirect(url_for("admin_dashboard",
-                                msg="Use at least %d characters. Nothing "
-                                    "changed." % PASSWORD_MIN_LEN))
-    db.meta_set("admin_password_hash", hash_password(new))
-    return redirect(url_for("admin_dashboard",
-                            msg="Admin password changed. Use the new one next "
-                                "time you log in."))
 
 
 @app.route("/admin/logout", methods=["POST"])

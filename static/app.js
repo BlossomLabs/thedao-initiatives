@@ -103,31 +103,35 @@
     }
     return null;
   }
+  // Persist whichever announced wallet this provider object belongs to, so any
+  // connect path (chooser, single-wallet auto-connect, Donate) is remembered.
+  function rememberProvider(prov) {
+    for (var i = 0; i < providers.length; i++) {
+      if (providers[i].provider === prov) { rememberWallet(providers[i].info); return; }
+    }
+  }
 
   // Silently reconnect on load — but ONLY to a wallet the donor chose before
-  // (or the sole injected wallet). With several wallets and no prior choice we
-  // stay disconnected, so the FIRST connect shows the chooser and we never
-  // default to whoever won the injection race. allowSingle is true only on the
-  // settled-DOM pass, never mid-announcement (more wallets may still arrive).
+  // We only ever silently reconnect to a wallet the donor EXPLICITLY chose
+  // before (persisted on every successful connect). With no saved choice we
+  // stay disconnected — so the first connect shows the chooser, we never
+  // default to whoever won the injection race, and an explicit Disconnect
+  // (which clears the saved choice) actually sticks across reloads.
+  // allowSingle only gates the WalletConnect session resume (settled-DOM pass).
   function tryRestore(allowSingle) {
     if (account) return;
     var saved = providerById(savedWalletId());
-    var target = null;
-    if (saved) { activeProvider = saved.provider; target = saved.provider; }
-    else if (allowSingle && !savedWalletId()) {
-      if (providers.length === 1) target = providers[0].provider;
-      else if (!providers.length && window.ethereum) target = window.ethereum;
-    }
-    if (target && target.request) {
-      watchProvider(target);
-      target.request({ method: "eth_accounts" }).then(function (a) {
+    if (saved && saved.provider && saved.provider.request) {
+      activeProvider = saved.provider;
+      watchProvider(saved.provider);
+      saved.provider.request({ method: "eth_accounts" }).then(function (a) {
         if (a && a[0] && !account) {
           getParams().then(function () { setConnected(a[0]); }).catch(function () {});
-        } else if (saved && activeProvider === saved.provider && !account) {
+        } else if (activeProvider === saved.provider && !account) {
           activeProvider = null;  // saved wallet no longer authorized; don't pin it
         }
       }).catch(function () {
-        if (saved && activeProvider === saved.provider && !account) activeProvider = null;
+        if (activeProvider === saved.provider && !account) activeProvider = null;
       });
       return;
     }
@@ -154,6 +158,24 @@
       navBtn.title = "";
     }
     annotateTokenSelects();
+  }
+
+  function disconnectWallet() {
+    closeWalletMenu();
+    var p = activeProvider;
+    if (p && p === wcProvider) {
+      // WalletConnect: actually tear the session down (also clears wc@2 storage).
+      try { Promise.resolve(wcProvider.disconnect()).catch(function () {}); } catch (e) {}
+    } else if (p && typeof p.request === "function") {
+      // Injected wallets have no reliable programmatic disconnect; best-effort
+      // revoke where supported (MetaMask), then drop our local connection.
+      try {
+        p.request({ method: "wallet_revokePermissions",
+                    params: [{ eth_accounts: {} }] }).catch(function () {});
+      } catch (e) {}
+    }
+    activeProvider = null;
+    disconnectUi();  // clears account/balances, forgets the saved choice, resets the button
   }
 
   function watchProvider(p) {
@@ -267,6 +289,7 @@
       .then(function () { return p.request({ method: "eth_requestAccounts" }); })
       .then(function (accounts) {
         if (!accounts || !accounts[0]) throw new Error("no account authorized");
+        rememberProvider(p);  // remember so a returning donor reconnects to this wallet
         setConnected(accounts[0]);
         return account;
       });
@@ -422,6 +445,7 @@
       var b = document.createElement("button");
       b.type = "button";
       if (opts.active) b.classList.add("active");
+      if (opts.klass) b.classList.add(opts.klass);
       var ic = document.createElement("img");
       ic.className = "wm-icon" + (opts.icon ? "" : " wm-icon-ph");
       ic.alt = "";
@@ -466,7 +490,8 @@
     if (connected) {
       item("Switch account\u2026", function () {
         switchWallet().catch(function () {});
-      });
+      }, { klass: "wm-sep" });
+      item("Disconnect", function () { disconnectWallet(); }, { klass: "wm-danger" });
     }
     navBtn.parentNode.appendChild(walletMenu);
     // close on the next click outside the menu
@@ -484,11 +509,8 @@
     navBtn.addEventListener("click", function () {
       if (walletMenu) { closeWalletMenu(); return; }  // toggle closed
       if (account && eth()) {
-        // connected: offer switching only if there's more than one way in
-        if (providers.length > 1 || wcEnabled()) { openWalletMenu(true); return; }
-        var prev = navBtn.textContent;
-        navBtn.textContent = "Choose wallet…";
-        switchWallet().catch(function () { navBtn.textContent = prev; });
+        // connected: open the menu (switch wallet / switch account / disconnect)
+        openWalletMenu(true);
         return;
       }
       // not connected: show the wallet chooser whenever there's more than one

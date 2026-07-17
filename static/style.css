@@ -303,6 +303,9 @@ footer a.dim{color:rgba(255,255,255,.35)}
 .wallet-menu .wm-icon-ph{background:transparent}
 .wallet-menu .wm-name{flex:1;white-space:nowrap}
 .wallet-menu button.active .wm-name::after{content:" ✓";color:var(--bright)}
+.wallet-menu button.wm-sep{margin-top:6px;padding-top:12px;border-top:1px solid var(--edge2)}
+.wallet-menu button.wm-danger{color:#ff9a9a}
+.wallet-menu button.wm-danger:hover{background:rgba(255,90,90,.12);color:#ffb3b3}
 
 /* ---- AI board search ---- */
 .ai-search{display:flex;gap:10px;margin:4px 0 20px;flex-wrap:wrap}

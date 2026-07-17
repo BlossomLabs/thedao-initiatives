@@ -292,11 +292,17 @@ footer a.dim{color:rgba(255,255,255,.35)}
 
 /* multi-wallet picker (EIP-6963) */
 .wallet-menu{position:absolute;top:56px;right:24px;z-index:60;display:flex;flex-direction:column;
-  min-width:180px;background:#244c6d;border:1px solid var(--edge2);border-radius:14px;
-  box-shadow:0 16px 40px rgba(0,0,0,.5);overflow:hidden}
-.wallet-menu button{border:0;background:transparent;color:var(--soft);text-align:left;
-  padding:11px 16px;font:400 13px var(--sans);cursor:pointer}
+  min-width:236px;background:#244c6d;border:1px solid var(--edge2);border-radius:14px;
+  box-shadow:0 16px 40px rgba(0,0,0,.5);overflow:hidden;padding:6px}
+.wallet-menu button{display:flex;align-items:center;gap:11px;border:0;background:transparent;
+  color:var(--soft);text-align:left;padding:10px 12px;border-radius:9px;
+  font:400 14px var(--sans);cursor:pointer}
 .wallet-menu button:hover{background:rgba(0,255,136,.08);color:var(--bright)}
+.wallet-menu button.active{color:var(--bright)}
+.wallet-menu .wm-icon{width:24px;height:24px;flex:0 0 24px;border-radius:6px;object-fit:contain}
+.wallet-menu .wm-icon-ph{background:transparent}
+.wallet-menu .wm-name{flex:1;white-space:nowrap}
+.wallet-menu button.active .wm-name::after{content:" ✓";color:var(--bright)}
 
 /* ---- AI board search ---- */
 .ai-search{display:flex;gap:10px;margin:4px 0 20px;flex-wrap:wrap}

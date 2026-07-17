@@ -235,6 +235,17 @@
   var wcProvider = null;
   var wcBundlePromise = null;
 
+  // WalletConnect brand glyph for the picker. A data: URI keeps it inside the
+  // strict CSP (img-src allows data:); injected wallets bring their own icons
+  // via the EIP-6963 announcement.
+  var WC_ICON = "data:image/svg+xml," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">' +
+    '<rect width="40" height="40" rx="11" fill="#3396ff"/>' +
+    '<path d="M12 16.5c4.4-4.3 11.6-4.3 16 0l.6.6-2.2 2.1-.5-.5c-3.1-3-8-3-11.1 0' +
+    'l-.6.5-2.2-2.1zM8.6 20l2.1 2.1 3.9 3.8c1.8 1.7 4.9 1.7 6.7 0l3.9-3.8 2.1-2.1' +
+    ' 2.2 2.1-2.2 2.2-3.9 3.8c-3 2.9-8 2.9-11 0l-3.9-3.8L6.4 22.1z" fill="#fff"/></svg>'
+  );
+
   function wcEnabled() { return !!(wcProjectId && wcSrc); }
   function hasInjected() { return !!(providers.length || window.ethereum); }
 
@@ -342,10 +353,21 @@
     closeWalletMenu();
     walletMenu = document.createElement("div");
     walletMenu.className = "wallet-menu";
-    function item(label, fn) {
+    function item(label, fn, opts) {
+      opts = opts || {};
       var b = document.createElement("button");
       b.type = "button";
-      b.textContent = label;
+      if (opts.active) b.classList.add("active");
+      var ic = document.createElement("img");
+      ic.className = "wm-icon" + (opts.icon ? "" : " wm-icon-ph");
+      ic.alt = "";
+      // EIP-6963 icons are data: URIs; the WC glyph is too. Both pass img-src.
+      if (opts.icon) ic.src = opts.icon;
+      b.appendChild(ic);
+      var nm = document.createElement("span");
+      nm.className = "wm-name";
+      nm.textContent = label;
+      b.appendChild(nm);
       b.addEventListener("click", function () { closeWalletMenu(); fn(); });
       walletMenu.appendChild(b);
     }
@@ -354,12 +376,11 @@
       connectWallet().catch(resetConnectBtn);
     }
     providers.forEach(function (p) {
-      var dot = (activeProvider === p.provider ? "\u25cf " : "");
-      item(dot + p.info.name, function () {
+      item(p.info.name, function () {
         activeProvider = p.provider;
         if (connected) switchWallet(p.provider).catch(function () {});
         else connectInjected();
-      });
+      }, { icon: p.info.icon, active: activeProvider === p.provider });
     });
     if (!providers.length && window.ethereum) {
       item("Browser wallet", function () {
@@ -368,11 +389,10 @@
       });
     }
     if (wcEnabled()) {
-      var wdot = (wcProvider && activeProvider === wcProvider ? "\u25cf " : "");
-      item(wdot + "WalletConnect (mobile & more)", function () {
+      item("WalletConnect (mobile & more)", function () {
         navBtn.textContent = "Connecting\u2026";
         connectWalletConnect().catch(resetConnectBtn);
-      });
+      }, { icon: WC_ICON, active: !!(wcProvider && activeProvider === wcProvider) });
     }
     if (connected) {
       item("Switch account\u2026", function () {

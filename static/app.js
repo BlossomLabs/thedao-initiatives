@@ -774,7 +774,7 @@
       if (elSend && elSend.disabled) return;  // no double-submission
       armAudio();
       if (!/^0x[0-9a-fA-F]{40}$/.test(rfpAddress)) {
-        status("err", "This RFP's donation address is not set up yet.");
+        status("err", "This initiative's donation address is not set up yet.");
         return;
       }
       if (!eth()) {
@@ -801,7 +801,7 @@
           ? "No wallet detected in this browser, so we switched you to the " +
             "card option."
           : "No wallet detected in this browser. Send any accepted token to " +
-            "this RFP's address (shown here) from an exchange or another " +
+            "this initiative's address (shown here) from an exchange or another " +
             "wallet and it is counted automatically.");
         return;
       }
@@ -893,7 +893,7 @@
           ? "<b>" + qtyStr + " " + sym + "</b>"
           : "<b>" + qtyStr + " " + sym + "</b> (about $" + usd + ")";
         status("wait", "Check your wallet to approve:<br>" + preview +
-               " → <b>this RFP's Safe</b> " +
+               " → <b>this initiative's Safe</b> " +
                "<span class=\"m dim\">(" + short(rfpAddress) + ")</span>");
         setBusy(true, "Confirm in wallet\u2026");
         return ensureMainnet(eth()).then(function () {
@@ -953,7 +953,7 @@
         } else {
           amt = res.amount + " " + res.token;
         }
-        status("ok", "🦸 <b>" + amt + "</b> is now backing this RFP. " +
+        status("ok", "🦸 <b>" + amt + "</b> is now backing this initiative. " +
                "You're a hero. Refreshing…");
         celebrate();
         setTimeout(function () { window.location.reload(); }, 4000);
@@ -1118,7 +1118,7 @@
         .then(function (res) {
           if (res.error) { say(res.error); return; }
           if (!res.matches || !res.matches.length) {
-            say("No strong matches for that — but every RFP below funds " +
+            say("No strong matches for that — but every initiative below funds " +
                 "Ethereum security, so browse away.");
             return;
           }

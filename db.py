@@ -79,6 +79,18 @@ def init():
             con.execute("ALTER TABLE pledges ADD COLUMN logo TEXT DEFAULT ''")
         if "sort_rank" not in cols:
             con.execute("ALTER TABLE rfps ADD COLUMN sort_rank INTEGER")
+        # Every listing is an "initiative" of one of two types: an RFP (open
+        # competitive bid, no preset vendor) or a Grant (the proposing team
+        # does the work). Existing rows default to 'rfp'; the three launch
+        # listings that are really Grants are set once, here, when the column
+        # first appears (idempotent: the guard is the column's absence).
+        if "type" not in cols:
+            con.execute("ALTER TABLE rfps ADD COLUMN type TEXT NOT NULL "
+                        "DEFAULT 'rfp' CHECK(type IN ('rfp','grant'))")
+            con.execute("UPDATE rfps SET type='grant' WHERE "
+                        "title LIKE '%Vyper Compiler%' OR "
+                        "title LIKE '%EIP Compliance%' OR "
+                        "title LIKE '%PRSpec%'")
         # Donations key: one tx can legitimately fund several RFPs (a batch/
         # disperse that sends to multiple RFP Safes). Move from UNIQUE(tx_hash)
         # to UNIQUE(tx_hash, rfp_id). Per-Safe verification still gates each
@@ -135,7 +147,7 @@ def slugify(title, con=None):
 # ---------------------------------------------------------------- rfps
 
 def create_rfp(title, summary, discourse_url, goal, payout_addresses,
-               contact, status="pending", details=""):
+               contact, status="pending", details="", type="rfp"):
     con = connect()
     try:
         # Retry on the rare race where two concurrent submits pick the same
@@ -149,11 +161,12 @@ def create_rfp(title, summary, discourse_url, goal, payout_addresses,
                     cur = con.execute(
                         "INSERT INTO rfps(slug,title,summary,discourse_url,"
                         "funding_goal_usd,payout_addresses,contact,status,"
-                        "created_at,approved_at,details) "
-                        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                        "created_at,approved_at,details,type) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                         (slug, title, summary, discourse_url, goal,
                          json.dumps(payout_addresses), contact, status, now(),
-                         now() if status == "approved" else None, details))
+                         now() if status == "approved" else None, details,
+                         type))
                     return cur.lastrowid, slug
             except sqlite3.IntegrityError:
                 if attempt == 4:
@@ -179,7 +192,7 @@ def rfp_by_id(rfp_id):
 
 
 def upsert_rfp_content(slug, title, summary, details, goal, discourse_url="",
-                       status="approved", sort_rank=None):
+                       status="approved", sort_rank=None, type="rfp"):
     """Create or update an RFP from a content file (content/rfps/<slug>.md).
 
     Content files own the words and the goal; the admin panel owns the
@@ -190,7 +203,8 @@ def upsert_rfp_content(slug, title, summary, details, goal, discourse_url="",
     existing = rfp_by_slug(slug)
     if existing:
         fields = {"title": title, "summary": summary, "details": details,
-                  "funding_goal_usd": goal, "discourse_url": discourse_url}
+                  "funding_goal_usd": goal, "discourse_url": discourse_url,
+                  "type": type}
         if sort_rank is not None:
             fields["sort_rank"] = sort_rank
         update_rfp(existing["id"], **fields)
@@ -201,10 +215,11 @@ def upsert_rfp_content(slug, title, summary, details, goal, discourse_url="",
             con.execute(
                 "INSERT INTO rfps(slug,title,summary,discourse_url,"
                 "funding_goal_usd,payout_addresses,contact,status,created_at,"
-                "approved_at,details,sort_rank) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                "approved_at,details,sort_rank,type) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (slug, title, summary, discourse_url, goal, "[]", "",
                  status, now(), now() if status == "approved" else None,
-                 details, sort_rank))
+                 details, sort_rank, type))
         return "created"
     finally:
         con.close()
@@ -238,7 +253,7 @@ def list_rfps(statuses=("approved",)):
 def update_rfp(rfp_id, **fields):
     allowed = {"title", "summary", "details", "discourse_url",
                "funding_goal_usd", "payout_addresses", "contact", "status",
-               "approved_at", "safe_address", "sort_rank"}
+               "approved_at", "safe_address", "sort_rank", "type"}
     sets, vals = [], []
     for k, v in fields.items():
         if k not in allowed:

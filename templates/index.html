@@ -30,11 +30,12 @@
   <p class="small dim ai-search-note" id="ai-search-note" hidden></p>
   {% endif %}
   {% if not cards %}
-    <p class="empty">No RFPs published yet. <a href="{{ url_for('submit') }}">Submit the first one.</a></p>
+    <p class="empty">No initiatives published yet. <a href="{{ url_for('submit') }}">Suggest the first one.</a></p>
   {% endif %}
   <div class="rfp-grid">
   {% for c in cards %}
     <div class="rfp-card" data-rfp-id="{{ c.rfp.id }}">
+      <span class="type-badge t-{{ c.rfp.type }}">{{ 'Grant' if c.rfp.type == 'grant' else 'RFP' }}</span>
       <a class="card-title" href="{{ url_for('rfp_page', slug=c.rfp.slug) }}">{{ c.rfp.title }}</a>
       <p class="card-sum">{{ c.rfp.summary[:170] }}{% if c.rfp.summary|length > 170 %}…{% endif %}</p>
       <div class="bar"><i style="width: {{ c.pct }}%"></i></div>
@@ -59,15 +60,19 @@
       {% endif %}
     </div>
   {% endfor %}
+    <a class="rfp-card suggest-card" href="{{ url_for('submit') }}">
+      <span class="suggest-plus" aria-hidden="true">+</span>
+      <span class="suggest-title">Suggest an initiative</span>
+      <span class="suggest-sub">Know something the ecosystem should fund? Pitch it.</span>
+    </a>
   </div>
 
   <div class="pledge-band">
     <div>
-      <b>Want to have an ecosystem initiative funded, or pledge your company’s support to one?</b>
-      <p class="dim">Anyone can submit an RFP from a forum post. Sponsors pledge now and pay only when the work is completed and verified, with their logo on the RFP from day one.</p>
+      <b>Want to pledge support?</b>
+      <p class="dim">Sponsors pledge now and pay only when the work is fully funded, with their logo on the initiative from day one.</p>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <a class="btn" href="{{ url_for('submit') }}">Submit an RFP</a>
       <a class="btn" href="https://x.com/griffgreen" target="_blank" rel="noopener">Contact @griffgreen to pledge</a>
     </div>
   </div>

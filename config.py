@@ -130,7 +130,7 @@ PORT = int(ENV.get("PORT", "4482"))
 # Left off by default so client IPs (used for rate limiting) cannot be spoofed.
 TRUST_PROXY = ENV.get("TRUST_PROXY", "").strip() in ("1", "true", "yes")
 # Public URL of the deployed site. A bare domain is treated as https, so
-# "SITE_URL=rfps.thedao.fund" still turns on the https-dependent protections.
+# "SITE_URL=fund.thedao.fund" still turns on the https-dependent protections.
 SITE_URL = ENV.get("SITE_URL", "").strip()
 if SITE_URL and "://" not in SITE_URL:
     SITE_URL = "https://" + SITE_URL

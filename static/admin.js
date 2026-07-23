@@ -86,7 +86,7 @@
                  "<a class=\"m\" target=\"_blank\" rel=\"noopener\" " +
                  "href=\"https://etherscan.io/address/" + res.address + "\">" +
                  res.address + "</a><br>Donations to this address now count " +
-                 "for this RFP. Reloading…");
+                 "for this initiative. Reloading…");
           setTimeout(function () { window.location.reload(); }, 2500);
         } else if (res.status === "pending" && attempt < 60) {
           setTimeout(function () { confirmLoop(txHash, attempt + 1); }, 5000);
@@ -105,7 +105,7 @@
 
   var btn = document.getElementById("safe-deploy-mainnet");
   if (btn) btn.addEventListener("click", function () {
-    if (window.confirm("Deploy this RFP's donation Safe on Ethereum mainnet? " +
+    if (window.confirm("Deploy this initiative's donation Safe on Ethereum mainnet? " +
                        "This costs real gas from your wallet.")) deploy();
   });
 })();

@@ -688,6 +688,11 @@ class TestScannerLock(unittest.TestCase):
     gunicorn's several workers."""
 
     def test_flock_grants_a_single_owner(self):
+        try:
+            import fcntl  # noqa: F401
+        except ImportError:
+            self.skipTest("no flock on this platform (non-Unix dev box); "
+                          "_acquire_scanner_lock intentionally allows all")
         import tempfile
         import app as app_mod
         held = app_mod._scanner_lock_fd[:]
@@ -798,3 +803,182 @@ class TestCompositeDonationKey(unittest.TestCase):
         self.assertIsNotNone(found)
         self.assertEqual(found["id"], a)
         self.assertIsNone(self.db.rfp_by_safe_address("0x" + "33" * 20))
+
+
+class TestInitiativeTypes(unittest.TestCase):
+    """The initiatives rename: type column, badges, routes, submit flow,
+    pledge-only band, and the admin approval gate. Uses a throwaway DB and a
+    Flask test client with the chain untouched."""
+
+    def setUp(self):
+        import tempfile
+        import app as app_mod
+        import db
+        self.app_mod = app_mod
+        self.db = db
+        self._tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self._tmp.close()
+        self._patches = [
+            mock.patch.object(config, "DB_PATH", self._tmp.name),
+            mock.patch.object(config, "SITE_USERNAME", ""),
+            mock.patch.object(config, "SITE_PASSWORD", ""),
+            mock.patch.object(app_mod, "chain_state", return_value={
+                "tokens": {}, "detail": "test", "checked_at": time.time()}),
+        ]
+        for p in self._patches:
+            p.start()
+        db.init()
+        app_mod._buckets.clear()  # per-IP rate limits reset between tests
+        self.client = app_mod.app.test_client()
+
+    def tearDown(self):
+        for p in self._patches:
+            p.stop()
+        os.unlink(self._tmp.name)
+
+    # -- helpers ---------------------------------------------------------
+
+    def _approved(self, title="Grant style initiative here", type="grant"):
+        rfp_id, slug = self.db.create_rfp(
+            title, "s" * 40, "", 1000, [], "", status="approved", type=type)
+        return rfp_id, slug
+
+    def _submit(self, **overrides):
+        page = self.client.get("/submit").get_data(as_text=True)
+        import re as _re
+        csrf = _re.search(r'name="_csrf" value="([^"]+)"', page).group(1)
+        form = {"_csrf": csrf, "website": "",
+                "title": "A perfectly valid title",
+                "summary": "A summary that is long enough to pass the forty "
+                           "character minimum easily.",
+                "goal": "50000", "type": "grant"}
+        form.update(overrides)
+        return self.client.post("/submit", data=form)
+
+    @staticmethod
+    def _visible_text(html):
+        """Tags (and their attributes) stripped: what a reader actually sees."""
+        import re as _re
+        return _re.sub(r"<[^>]+>", " ", html)
+
+    # -- type column -----------------------------------------------------
+
+    def test_type_column_defaults_validates_and_updates(self):
+        rfp_id, slug = self.db.create_rfp(
+            "Untyped listing gets rfp", "s" * 40, "", 10, [], "")
+        self.assertEqual(self.db.rfp_by_id(rfp_id)["type"], "rfp")
+        _, gslug = self._approved()
+        self.assertEqual(self.db.rfp_by_slug(gslug)["type"], "grant")
+        self.db.update_rfp(rfp_id, type="grant")
+        self.assertEqual(self.db.rfp_by_id(rfp_id)["type"], "grant")
+        con = self.db.connect()
+        try:
+            with self.assertRaises(self.db.sqlite3.IntegrityError):
+                con.execute("UPDATE rfps SET type='bounty' WHERE id=?",
+                            (rfp_id,))
+        finally:
+            con.close()
+
+    def test_migration_is_idempotent(self):
+        self.db.init()
+        self.db.init()  # a second run must not fail or duplicate anything
+
+    # -- submit flow -----------------------------------------------------
+
+    def test_submit_stores_type_and_stays_pending(self):
+        r = self._submit(type="grant")
+        self.assertEqual(r.status_code, 200)
+        row = self.db.list_rfps(("pending",))[0]
+        self.assertEqual(row["type"], "grant")
+        self.assertEqual(row["status"], "pending")
+
+    def test_submit_junk_type_coerced_to_rfp(self):
+        self._submit(type="bounty")
+        self.assertEqual(self.db.list_rfps(("pending",))[0]["type"], "rfp")
+
+    def test_submit_page_offers_both_types(self):
+        page = self.client.get("/submit").get_data(as_text=True)
+        self.assertIn('name="type" value="rfp"', page)
+        self.assertIn('name="type" value="grant"', page)
+
+    # -- index: badges, suggest tile, pledge band ------------------------
+
+    def test_index_shows_type_badge_per_card(self):
+        self._approved(type="grant")
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn("type-badge t-grant", html)
+        self.assertIn(">Grant<", html)
+
+    def test_index_has_suggest_tile_linking_to_submit(self):
+        self._approved()
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn("suggest-card", html)
+        self.assertIn("Suggest an initiative", html)
+        self.assertIn('href="/submit"', html)
+
+    def test_pledge_band_is_pledge_only(self):
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn("Want to pledge support?", html)
+        self.assertIn("Contact @griffgreen to pledge", html)
+        self.assertNotIn("Submit an RFP", html)
+
+    # -- language sweep --------------------------------------------------
+
+    def test_no_user_visible_rfp_outside_type_labels(self):
+        """With a grant-only board, the only place 'RFP' may appear on public
+        pages is the type-label UI (submit form's type choice)."""
+        import re as _re
+        _, slug = self._approved(type="grant")
+        for path in ("/", "/initiative/" + slug):
+            text = self._visible_text(
+                self.client.get(path).get_data(as_text=True))
+            self.assertNotIn("RFP", text, path)
+        submit_html = self.client.get("/submit").get_data(as_text=True)
+        submit_html = _re.sub(
+            r'<div class="type-choice">.*?</div>', "", submit_html,
+            flags=_re.S)
+        self.assertNotIn("RFP", self._visible_text(submit_html), "/submit")
+
+    # -- routes ----------------------------------------------------------
+
+    def test_initiative_route_serves_and_legacy_redirects(self):
+        _, slug = self._approved()
+        r = self.client.get("/initiative/" + slug)
+        self.assertEqual(r.status_code, 200)
+        old = self.client.get("/rfp/" + slug)
+        self.assertEqual(old.status_code, 301)
+        self.assertTrue(old.headers["Location"].endswith(
+            "/initiative/" + slug))
+
+    # -- approval gate ---------------------------------------------------
+
+    def test_new_submission_never_auto_publishes(self):
+        self._submit(title="Sneaky auto publish attempt")
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertNotIn("Sneaky auto publish attempt", html)
+        row = self.db.list_rfps(("pending",))[0]
+        r = self.client.get("/initiative/" + row["slug"])
+        self.assertEqual(r.status_code, 404)
+
+
+class TestContentSyncType(TestContentSync):
+    """Content files can declare their initiative type."""
+
+    def test_file_type_grant_round_trips(self):
+        import app as app_mod
+        self._write("typed.md", self.GOOD.replace(
+            "---\ntitle:", "---\ntype: Grant\ntitle:"))
+        app_mod.sync_content()
+        self.assertEqual(self.db.rfp_by_slug("typed")["type"], "grant")
+
+    def test_file_type_defaults_to_rfp(self):
+        import app as app_mod
+        self._write("plain.md", self.GOOD)
+        app_mod.sync_content()
+        self.assertEqual(self.db.rfp_by_slug("plain")["type"], "rfp")
+
+    def test_file_bad_type_rejected(self):
+        import app as app_mod
+        with self.assertRaises(ValueError):
+            app_mod.parse_rfp_file(self.GOOD.replace(
+                "---\ntitle:", "---\ntype: bounty\ntitle:"))

@@ -7,7 +7,7 @@ Everything that changes when the board moves from this Mac to a real domain.
 - [ ] Host: any Python host with a persistent disk for `rfps.db` (small VPS,
       Render, Railway). Serve behind HTTPS with a real WSGI server
       (gunicorn) instead of the Flask dev server.
-- [ ] `.env` on the server: `SITE_URL=https://rfps.thedao.fund/`,
+- [ ] `.env` on the server: `SITE_URL=https://fund.thedao.fund/`,
       `COOKIE_SECURE=1`, `TRUST_PROXY=1` (behind the host's proxy),
       `BIND_HOST=127.0.0.1` (proxy terminates TLS), a fresh `ADMIN_PASSWORD`.
 - [ ] Production RPC key (`RPC_URL=` Alchemy/Infura/dRPC) so the scanner and

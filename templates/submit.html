@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Submit an RFP · TheDAO Security Fund{% endblock %}
+{% block title %}Suggest an initiative · TheDAO Security Fund{% endblock %}
 {% block content %}
 <main class="detail narrow">
-  <h1>Submit an RFP</h1>
-  <p class="tag left">The strongest RFPs start as a forum post where the idea gets discussed
+  <h1>Suggest an initiative</h1>
+  <p class="tag left">The strongest initiatives start as a forum post where the idea gets discussed
   in public; link it here if you have one. Submissions are reviewed before they appear on the site.</p>
 
   {% if error %}<div class="alert">{{ error }}</div>{% endif %}
@@ -15,14 +15,24 @@
     <label class="lbl" for="f-title">Title <span class="dim">(or leave blank and we pull it from the forum link)</span></label>
     <input type="text" id="f-title" name="title" maxlength="140" value="{{ form.title if form else '' }}">
 
+    <span class="lbl">Type *</span>
+    <div class="type-choice">
+      <label class="type-opt"><input type="radio" name="type" value="rfp"
+        {{ 'checked' if not form or form.get('type', 'rfp') != 'grant' }}>
+        <span><b>RFP</b><small>An open request: any qualified team can bid to do the work.</small></span></label>
+      <label class="type-opt"><input type="radio" name="type" value="grant"
+        {{ 'checked' if form and form.get('type') == 'grant' }}>
+        <span><b>Grant</b><small>Your team presents the idea and does the work.</small></span></label>
+    </div>
+
     <label class="lbl" for="f-summary">Short summary * <span class="dim">(2 to 4 sentences: what gets built, why it matters)</span></label>
     <textarea id="f-summary" name="summary" rows="5" required maxlength="4000">{{ form.summary if form else '' }}</textarea>
 
-    <label class="lbl" for="f-details">Full RFP details <span class="dim">(optional: scope, milestones, budget breakdown; markdown supported: headings, **bold**, lists, tables, - [ ] checklists)</span></label>
+    <label class="lbl" for="f-details">Full initiative details <span class="dim">(optional: scope, milestones, budget breakdown; markdown supported: headings, **bold**, lists, tables, - [ ] checklists)</span></label>
     <textarea id="f-details" name="details" rows="10" maxlength="20000">{{ form.details if form else '' }}</textarea>
 
-    <label class="lbl" for="f-forum">Forum link <span class="dim">(optional Discourse topic where this RFP is discussed)</span></label>
-    <input type="url" id="f-forum" name="discourse_url" placeholder="https://forum.example.org/t/my-rfp/123"
+    <label class="lbl" for="f-forum">Forum link <span class="dim">(optional Discourse topic where this initiative is discussed)</span></label>
+    <input type="url" id="f-forum" name="discourse_url" placeholder="https://forum.example.org/t/my-initiative/123"
            value="{{ form.discourse_url if form else '' }}">
 
     <label class="lbl" for="f-goal">Funding goal (USD) *</label>

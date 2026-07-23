@@ -1,7 +1,7 @@
-# RFPs as files
+# Initiatives as files
 
-Every `.md` file in this folder (except this README) becomes an RFP on the
-board. Publishing is: add or edit a file, push, sync.
+Every `.md` file in this folder (except this README) becomes an initiative
+on the board. Publishing is: add or edit a file, push, sync.
 
 ## How it reaches the live site
 
@@ -14,8 +14,8 @@ board. Publishing is: add or edit a file, push, sync.
 ## Format
 
 The **filename is the permanent slug** (`vyper-formal-verification.md` lives
-at `/rfp/vyper-formal-verification`). Renaming a file makes a NEW RFP, so
-pick the name once.
+at `/initiative/vyper-formal-verification`). Renaming a file makes a NEW
+initiative, so pick the name once.
 
 ```markdown
 ---
@@ -26,7 +26,7 @@ summary: A machine-checked proof that Vyper compilation preserves the
   every future release.
 forum: https://forum.example.org/t/vyper-verification/123
 ---
-Full RFP details go here, in markdown: headings, **bold**, lists,
+Full initiative details go here, in markdown: headings, **bold**, lists,
 tables, and - [ ] checklists all render on the public page.
 ```
 
@@ -40,13 +40,16 @@ Frontmatter keys:
 - `status` (optional, `approved` or `pending`; only used when the file is
   first created, default `approved`)
 - `pin` (optional, board position 1 = top; sets the admin pin)
+- `type` (optional, `rfp` or `grant`, default `rfp`: an RFP is an open
+  competitive bid with no preset vendor; a Grant means the team presenting
+  the idea does the work)
 
 ## Safety rules (enforced by the app)
 
 - Files own the **words and the goal**. The admin panel owns the
-  **lifecycle**: editing a file never changes an RFP's status, its Safe,
+  **lifecycle**: editing a file never changes an initiative's status, its Safe,
   or any donation/pledge data.
-- Deleting a file never deletes the RFP (archive it in the admin panel
+- Deleting a file never deletes the initiative (archive it in the admin panel
   instead).
 - A file with an error (missing title, bad goal) is skipped and reported in
   the sync result; it never blocks the others.

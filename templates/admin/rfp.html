@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Manage RFP · TheDAO RFPs{% endblock %}
+{% block title %}Manage initiative · TheDAO Initiatives{% endblock %}
 {% block content %}
 <main class="detail">
   <p class="crumb"><a href="{{ url_for('admin_dashboard') }}">← Dashboard</a></p>
@@ -24,7 +24,7 @@
   {% if r.safe_address %}
     <p>Deployed and verified: <a class="m" href="https://etherscan.io/address/{{ r.safe_address }}" target="_blank" rel="noopener">{{ r.safe_address }}</a>
     <span class="chip static st-approved">{{ safe_threshold }}-of-{{ signers | length }}</span></p>
-    <p class="small dim">Donations to this address are counted for this RFP automatically.</p>
+    <p class="small dim">Donations to this address are counted for this initiative automatically.</p>
   {% elif not signers_ok %}
     <p class="small">Safe deployment is disabled: <b>{{ signers_detail }}</b>.</p>
     <p class="small dim">Set the operational signers once in the config file (Terminal: <span class="m">open -e ~/thedao-rfps/.env</span>, add a line
@@ -40,19 +40,24 @@
       <div class="status" id="safe-deploy-status" hidden></div>
     </div>
   {% else %}
-    <p class="small dim">Approve this RFP first, then deploy its donation Safe.</p>
+    <p class="small dim">Approve this initiative first, then deploy its donation Safe.</p>
   {% endif %}
 
   <h2>Funding <span class="n">{{ sum.total | usd }} = {{ sum.pledged | usd }} pledged + {{ sum.donated | usd }} donated</span></h2>
 
-  <h2>Edit RFP</h2>
+  <h2>Edit initiative</h2>
   <form method="post" class="form">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <label class="lbl">Title</label>
     <input type="text" name="title" maxlength="140" value="{{ r.title }}">
+    <label class="lbl">Type <span class="dim">(RFP = open competitive bid; Grant = the proposing team does the work)</span></label>
+    <select name="type">
+      <option value="rfp" {{ 'selected' if r.type != 'grant' }}>RFP</option>
+      <option value="grant" {{ 'selected' if r.type == 'grant' }}>Grant</option>
+    </select>
     <label class="lbl">Summary</label>
     <textarea name="summary" rows="4" maxlength="4000">{{ r.summary }}</textarea>
-    <label class="lbl">Full RFP details <span class="dim">(the complete spec: scope, milestones, budget breakdown; shown on the public page — markdown supported: headings, **bold**, lists, tables, - [ ] checklists)</span></label>
+    <label class="lbl">Full initiative details <span class="dim">(the complete spec: scope, milestones, budget breakdown; shown on the public page — markdown supported: headings, **bold**, lists, tables, - [ ] checklists)</span></label>
     <textarea name="details" rows="10" maxlength="20000">{{ r.details or '' }}</textarea>
     <label class="lbl">Forum link</label>
     <input type="url" name="discourse_url" value="{{ r.discourse_url }}">

@@ -101,6 +101,41 @@ h3{font:500 14px var(--tight);margin:20px 0 10px;color:var(--soft)}
 .card-actions{display:flex;gap:10px;margin-top:14px}
 .card-donate{margin-top:14px;border-top:1px solid var(--edge);padding-top:14px}
 
+/* initiative type badges (RFP = open bid, Grant = proposer does the work) */
+.type-badge{display:inline-block;border-radius:999px;padding:3px 12px;
+  font:600 10.5px var(--tight);text-transform:uppercase;letter-spacing:.1em}
+.t-rfp{color:var(--claims);border:1px solid rgba(90,200,250,.5);background:rgba(90,200,250,.1)}
+.t-grant{color:var(--bright);border:1px solid rgba(0,255,136,.5);background:rgba(0,255,136,.08)}
+.rfp-card>.type-badge{position:absolute;top:16px;right:18px}
+.rfp-card .card-title{padding-right:72px}
+.type-badge.inline{position:static}
+
+/* "suggest an initiative" tile: the grid's last card is the submit CTA */
+.suggest-card{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;text-align:center;min-height:220px;border-style:dashed;border-color:var(--edge2);
+  color:var(--soft);cursor:pointer}
+.suggest-card:hover{text-decoration:none;border-color:rgba(0,255,136,.55);
+  box-shadow:0 0 30px rgba(0,255,136,.1)}
+.suggest-plus{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font:300 34px/1 var(--tight);color:var(--bright);
+  background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.35);
+  transition:transform .15s,background .15s}
+.suggest-card:hover .suggest-plus{transform:scale(1.08);background:rgba(0,255,136,.16)}
+.suggest-title{font:600 18px var(--tight);color:var(--text);margin-top:6px}
+.suggest-card:hover .suggest-title{color:var(--bright)}
+.suggest-sub{color:var(--muted);font-size:13px;max-width:260px}
+
+/* submit form: initiative type choice */
+.type-choice{display:flex;gap:10px;flex-wrap:wrap}
+.type-opt{flex:1;min-width:220px;display:flex;gap:10px;align-items:flex-start;
+  border:1px solid var(--edge2);border-radius:12px;background:var(--card);
+  padding:12px 14px;cursor:pointer;transition:border-color .15s}
+.type-opt:hover{border-color:rgba(0,255,136,.45)}
+.type-opt:has(input:checked){border-color:var(--bright);box-shadow:0 0 14px rgba(0,255,136,.12)}
+.type-opt input{margin-top:3px;accent-color:#00ff88}
+.type-opt b{font:600 13.5px var(--tight);display:block}
+.type-opt small{display:block;color:var(--muted);font-size:12px;line-height:1.5;margin-top:2px}
+
 /* progress bars */
 .bar{height:8px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:12px}
 .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),var(--bright));

@@ -69,7 +69,7 @@ an **empty database on purpose**; all data from the dev machine was test data.
 
 Non-secret values you can take from this document:
 
-- `SITE_URL` = `https://rfps.thedao.fund/` (keep the https:// prefix; the
+- `SITE_URL` = `https://fund.thedao.fund/` (keep the https:// prefix; the
   cookie and HSTS protections switch on it)
 - `COOKIE_SECURE=1`, `TRUST_PROXY=1`, `BIND_HOST=127.0.0.1`
 - `OPERATIONAL_SIGNERS` = exactly these five, comma-separated, this order is

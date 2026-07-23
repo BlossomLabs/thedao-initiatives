@@ -33,7 +33,7 @@
   {% if onramp_prefilled %}
   <div class="dw-panel" data-panel="card" hidden>
     <p class="small dim">Buy USDC with a card (Visa, Mastercard, Apple Pay, Google Pay).
-    It is delivered straight to this RFP's fund address on Ethereum mainnet,
+    It is delivered straight to this initiative's fund address on Ethereum mainnet,
     already filled in for you, and shows up here automatically once it lands.</p>
     <a class="btn primary dw-card-open" href="{{ onramp_url }}" target="_blank"
        rel="noopener">Open card checkout ↗</a>
@@ -42,7 +42,7 @@
 
   <div class="dw-panel" data-panel="exchange" hidden>
     <p class="small dim">Send an accepted stablecoin from any exchange or wallet to
-    this RFP's address and it is counted automatically within a few minutes.
+    this initiative's address and it is counted automatically within a few minutes.
     <b>Sending ETH this way isn't auto-counted</b> — donate ETH through the Wallet
     tab instead (or paste its transaction hash below).</p>
     <div class="dw-addr-row">
@@ -56,7 +56,7 @@
     {% endif %}
   </div>
 
-  <p class="dw-trust small dim">Every donation goes to this RFP's own {{ safe_threshold or 3 }}-of-5 Safe
+  <p class="dw-trust small dim">Every donation goes to this initiative's own {{ safe_threshold or 3 }}-of-5 Safe
   <a class="m" href="https://etherscan.io/address/{{ address }}" target="_blank" rel="noopener">{{ address | shortaddr }}</a>
   on Ethereum mainnet, counted automatically.</p>
   <div class="dw-status status" hidden></div>

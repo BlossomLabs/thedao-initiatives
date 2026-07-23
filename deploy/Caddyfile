@@ -3,9 +3,14 @@
 #                       sudo systemctl reload caddy
 # Point the domain's A/AAAA record at this server first; Caddy gets the cert
 # on its own. Change the domain to yours.
-rfps.thedao.fund {
+fund.thedao.fund {
 	encode zstd gzip
 	# gunicorn listens on loopback; Caddy terminates TLS and sets the
 	# X-Forwarded-* headers that TRUST_PROXY=1 relies on.
 	reverse_proxy 127.0.0.1:4482
+}
+
+# Old domain: permanent redirect so links shared before the move keep working.
+rfps.thedao.fund {
+	redir https://fund.thedao.fund{uri} 301
 }

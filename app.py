@@ -518,8 +518,9 @@ def parse_rfp_file(text):
 
     Keys: title (required), goal (required, USD), summary (recommended),
     forum (optional URL), status (approved|pending, create-only),
-    pin (optional board position). A value continues onto following lines
-    when they are indented.
+    pin (optional board position), type (rfp|grant, default rfp — rfp is an
+    open competitive bid, grant means the proposing team does the work).
+    A value continues onto following lines when they are indented.
     """
     m = re.match(r"\A---\s*\n(.*?)\n---\s*\n?(.*)\Z", text, re.S)
     if not m:
@@ -547,6 +548,9 @@ def parse_rfp_file(text):
     pin = fields.get("pin", "").strip()
     if pin and not pin.isdigit():
         raise ValueError("pin must be a whole number")
+    itype = fields.get("type", "rfp").lower()
+    if itype not in ("rfp", "grant"):
+        raise ValueError("type must be rfp or grant")
     return {
         "title": title,
         "summary": fields.get("summary", "")[:4000],
@@ -555,6 +559,7 @@ def parse_rfp_file(text):
         "status": status,
         "sort_rank": int(pin) if pin else None,
         "details": details[:20000],
+        "type": itype,
     }
 
 
@@ -654,6 +659,12 @@ def index():
 
 
 @app.route("/rfp/<slug>")
+def rfp_page_legacy(slug):
+    """Old public URL scheme. 301 so links shared pre-rename keep working."""
+    return redirect(url_for("rfp_page", slug=slug), 301)
+
+
+@app.route("/initiative/<slug>")
 def rfp_page(slug):
     r = db.rfp_by_slug(slug)
     if not r or r["status"] not in ("approved", "archived"):
@@ -698,25 +709,29 @@ def submit():
         title = fetch_discourse_title(url_clean) or ""
     if len(title) < 8:
         return render_template(
-            "submit.html", error="Please give the RFP a title (at least 8 "
-            "characters)." + (" We could not read one from the forum link."
-                              if url_clean else ""),
+            "submit.html", error="Please give the initiative a title (at "
+            "least 8 characters)." + (" We could not read one from the forum "
+                                      "link." if url_clean else ""),
             form=request.form), 400
 
     summary = (request.form.get("summary") or "").strip()[:MAX_SUMMARY]
     if len(summary) < 40:
         return render_template(
-            "submit.html", error="Please describe the RFP in at least 40 "
-            "characters.", form=request.form), 400
+            "submit.html", error="Please describe the initiative in at least "
+            "40 characters.", form=request.form), 400
 
     goal, err = parse_goal(request.form.get("goal"))
     if err:
         return render_template("submit.html", error=err, form=request.form), 400
 
+    itype = request.form.get("type", "rfp")
+    if itype not in ("rfp", "grant"):
+        itype = "rfp"
     contact = (request.form.get("contact") or "").strip()[:200]
     details = (request.form.get("details") or "").strip()[:20000]
     rfp_id, slug = db.create_rfp(title, summary, url_clean, goal, [],
-                                 contact, status="pending", details=details)
+                                 contact, status="pending", details=details,
+                                 type=itype)
     return render_template("submitted.html", title=title)
 
 
@@ -1072,6 +1087,9 @@ def admin_rfp(rfp_id):
                     rank = max(1, min(999, int(rank_raw)))
                 except ValueError:
                     error = error or "Pin position must be a number (1-999)."
+            itype = request.form.get("type", "rfp")
+            if itype not in ("rfp", "grant"):
+                itype = "rfp"
             if not error and (len(title) < 8 or len(summary) < 40):
                 error = "Title (8+) and summary (40+) are required."
             if not error:
@@ -1081,6 +1099,7 @@ def admin_rfp(rfp_id):
                               funding_goal_usd=goal,
                               discourse_url=url_clean,
                               sort_rank=rank,
+                              type=itype,
                               contact=(request.form.get("contact")
                                        or "").strip()[:200])
         elif action == "add_pledge":

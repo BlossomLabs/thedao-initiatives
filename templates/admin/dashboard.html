@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Admin dashboard · TheDAO RFPs{% endblock %}
+{% block title %}Admin dashboard · TheDAO Initiatives{% endblock %}
 {% block content %}
 <main class="detail">
   <div class="admin-head">
@@ -8,7 +8,7 @@
       <form method="post" action="{{ url_for('admin_sync_content') }}">
         <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <button class="btn ghost" type="submit"
-                title="Publish/update RFPs from content/rfps/*.md (run after a git pull)">Sync content files</button>
+                title="Publish/update initiatives from content/rfps/*.md (run after a git pull)">Sync content files</button>
       </form>
       <form method="post" action="{{ url_for('admin_logout') }}">
         <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
@@ -24,7 +24,7 @@
       <small>awaiting review below</small></div></div>
   </div>
 
-  <h2>All RFPs</h2>
+  <h2>All initiatives</h2>
   <div class="tblbox">
     <table>
       <thead><tr><th>Status</th><th>Title</th><th class="amt">Goal</th><th class="amt">Raised</th><th>Created</th><th></th></tr></thead>

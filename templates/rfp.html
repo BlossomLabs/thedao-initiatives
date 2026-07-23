@@ -4,10 +4,11 @@
 {% block og_description %}{{ r.summary[:200] }}{% endblock %}
 {% block content %}
 <main class="detail">
-  <p class="crumb"><a href="{{ url_for('index') }}">← All RFPs</a></p>
+  <p class="crumb"><a href="{{ url_for('index') }}">← All initiatives</a></p>
   <h1 class="rfp-title">{{ r.title }}</h1>
   <p class="meta-line">
-    {% if r.discourse_url %}<a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener">💬 Discuss this RFP on the forum</a>{% endif %}
+    {% if r.discourse_url %}<a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener">💬 Discuss this initiative on the forum</a>{% endif %}
+    <span class="type-badge inline t-{{ r.type }}">{{ 'Grant' if r.type == 'grant' else 'RFP' }}</span>
     {% if r.status == 'archived' %}<span class="chip static">archived</span>{% endif %}
   </p>
 
@@ -26,7 +27,7 @@
       <h2>Summary</h2>
       <p class="body-text">{{ r.summary }}</p>
 
-      <h2>Full RFP details</h2>
+      <h2>Full initiative details</h2>
       {% if r.details %}
       <div class="body-text md">{{ r.details | md }}</div>
       {% else %}
@@ -49,7 +50,7 @@
         </div>
       {% else %}
         <p class="empty">No sponsor pledges yet. Pledges pay only when the work is completed.
-        <a href="https://x.com/griffgreen" target="_blank" rel="noopener">DM @griffgreen</a> to put your name on this RFP.</p>
+        <a href="https://x.com/griffgreen" target="_blank" rel="noopener">DM @griffgreen</a> to put your name on this initiative.</p>
       {% endif %}
 
       <h2>On-chain donations <span class="n">{{ donations | length }}</span></h2>
@@ -78,22 +79,22 @@
 
     <aside class="col-side">
       <div class="donate-card">
-        <div class="k">Donate to this RFP</div>
+        <div class="k">Donate to this initiative</div>
         {% if donations_enabled %}
           {% with slug=r.slug, address=r.safe_address, manual=True %}{% include "_donate_widget.html" %}{% endwith %}
         {% else %}
-          <p class="small">{% if not r.safe_address %}This RFP's donation address is being set up. Check back soon.{% else %}Donations are temporarily unavailable.{% endif %}</p>
+          <p class="small">{% if not r.safe_address %}This initiative's donation address is being set up. Check back soon.{% else %}Donations are temporarily unavailable.{% endif %}</p>
         {% endif %}
       </div>
       {% if r.discourse_url %}
       <div class="side-note discuss-card">
         <div class="k">Join the discussion</div>
-        <p class="small dim">This RFP is being shaped in public.</p>
+        <p class="small dim">This initiative is being shaped in public.</p>
         <a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener">💬 Open the forum thread</a>
       </div>
       {% endif %}
       <div class="side-note">
-        <div class="k">Sponsor this RFP</div>
+        <div class="k">Sponsor this initiative</div>
         <p class="small dim">Companies can pledge instead of donating: you commit publicly now and
         pay only when the work is completed and verified.
         <a href="https://x.com/griffgreen" target="_blank" rel="noopener">DM @griffgreen</a> and your
@@ -101,9 +102,9 @@
       </div>
       <div class="side-note">
         <div class="k">What happens next</div>
-        <p class="small dim">If sponsors and donors fully fund this RFP, it happens with no TheDAO
+        <p class="small dim">If sponsors and donors fully fund this initiative, it happens with no TheDAO
         money at all. If it comes up short, the 200 ETHSecurity badge holders rank it against the
-        other RFPs in the October round and TheDAO Security Fund completes the top-ranked ones.
+        other initiatives in the October round and TheDAO Security Fund completes the top-ranked ones.
         Donations count as a public signal in that ranking.</p>
       </div>
     </aside>

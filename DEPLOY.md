@@ -9,7 +9,7 @@ Everything the code needs is here; the parts only you can do are flagged
 
 ## 0. Before you touch a server — decisions **[you]**
 
-- **Domain**: buy one (or use a subdomain like `rfps.thedao.fund`) and be
+- **Domain**: buy one (or use a subdomain like `fund.thedao.fund`) and be
   ready to point an `A` record at the server's IP.
 - **RPC key**: sign up for a free Alchemy/Infura/dRPC mainnet key. The public
   endpoints work but get rate-limited once a scanner polls them every 3 min.

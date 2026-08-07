@@ -6,17 +6,11 @@
   <p class="hero-sub">raised for <span class="grn">Ethereum security</span> initiatives</p>
 </section>
 
-{% if recent %}
-<div class="activity">
-  {% for item in recent %}
-  <a class="act" href="{{ url_for('rfp_page', slug=item.rfp.slug) }}">
-    <span class="dot g"></span>
-    <span class="m ens-addr" data-addr="{{ item.d.donor }}">{{ item.d.donor | shortaddr }}</span> gave
-    <b>{{ item.d.amount | usd }}</b> to {{ item.rfp.title[:34] }}{% if item.rfp.title|length > 34 %}…{% endif %}
-  </a>
-  {% endfor %}
-</div>
-{% endif %}
+<hr class="shimmer">
+
+{# recent-donations strip removed 2026-08-07 per Zep: it is absent from Rodri's
+   design, has never rendered in production (it needs a recent donation and there
+   have been none), and no commit of Griff's ever added it. Griff to confirm. #}
 
 <main>
   <h2 id="rfps">Security initiatives looking for funding</h2>

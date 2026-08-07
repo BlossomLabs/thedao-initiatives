@@ -3,7 +3,7 @@
    one red CTA, preset amounts, progress bars, social proof, minimal clicks. */
 :root{
   --bg:#2c5e86; --bg2:#1f435f; --text:#fff; --muted:rgba(255,255,255,.62); --soft:rgba(255,255,255,.85);
-  --card:rgba(255,255,255,.05); --edge:rgba(255,255,255,.12); --edge2:rgba(255,255,255,.22);
+  --card:rgba(255,255,255,.05); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.15);
   --green:#5cb75a; --bright:#00ff88; --red:#ff3b38; --blue:#2c5e86; --claims:#5ac8fa;
   --sans:'Inter Tight','Inter',sans-serif; --tight:'Inter Tight',sans-serif;
   --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -15,7 +15,7 @@ body{margin:0;min-height:100vh;color:var(--text);font:400 14px/1.5 var(--sans);
   background-image:linear-gradient(137deg,var(--bg) 31.46%,var(--bg2) 90.4%);
   background-repeat:no-repeat}
 b,strong{font-weight:600}
-a{color:var(--bright);text-decoration:none}
+a{color:var(--green);text-decoration:none}
 a:hover{text-decoration:underline}
 .m{font-family:var(--mono);font-size:12.5px}
 .dim{color:var(--muted)}
@@ -35,14 +35,14 @@ a:hover{text-decoration:underline}
 .brand:hover{text-decoration:none}
 .topnav{display:flex;align-items:center;gap:22px}
 .topnav a{font:400 14px var(--tight);color:rgba(255,255,255,.65)}
-.topnav a:hover{color:var(--bright);text-decoration:none}
+.topnav a:hover{color:var(--green);text-decoration:none}
 .topnav a.on{color:var(--green);position:relative}
 .topnav a.on::after{content:'';position:absolute;left:0;right:0;bottom:-6px;height:2px;
   border-radius:999px;background:var(--green)}
 .topnav .navcta{color:var(--green)}
 .btn.wallet{margin:0;padding:8px 16px;font-size:13px;border-radius:14px;
   background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.2)}
-.btn.wallet.connected{border-color:rgba(0,255,136,.6);color:var(--bright);font-family:var(--mono);font-size:12px}
+.btn.wallet.connected{border-color:rgba(92,183,90,.6);color:var(--green);font-family:var(--mono);font-size:12px}
 @media(max-width:760px){
   .topbar{padding:10px 14px;flex-wrap:wrap;gap:8px 14px}
   .topnav{gap:12px;flex-wrap:wrap;row-gap:8px}
@@ -69,10 +69,10 @@ a:hover{text-decoration:underline}
 .activity::-webkit-scrollbar{display:none}
 .act{flex:none;display:flex;align-items:center;gap:8px;border:1px solid var(--edge);border-radius:999px;
   background:var(--card);padding:7px 16px;font-size:12px;color:var(--soft);white-space:nowrap}
-.act:hover{border-color:rgba(0,255,136,.5);text-decoration:none}
-.act b{color:var(--bright)}
+.act:hover{border-color:rgba(92,183,90,.5);text-decoration:none}
+.act b{color:var(--green)}
 .dot{width:8px;height:8px;border-radius:50%;flex:none}
-.dot.g{background:var(--bright);box-shadow:0 0 10px rgba(0,255,136,.6)}
+.dot.g{background:var(--green);box-shadow:0 0 10px rgba(92,183,90,.6)}
 .dot.a{background:#f0b429;box-shadow:0 0 10px rgba(240,180,41,.55)}
 .dot.b{background:var(--claims);box-shadow:0 0 10px rgba(90,200,250,.55)}
 
@@ -99,10 +99,10 @@ h3{font:500 14px var(--tight);margin:20px 0 10px;color:var(--soft)}
 @media(max-width:860px){.rfp-grid{grid-template-columns:1fr}}
 .rfp-card{position:relative;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
   border-radius:16px;padding:24px;transition:border-color .2s,box-shadow .2s}
-.rfp-card:hover{border-color:rgba(0,255,136,.4);box-shadow:0 0 30px rgba(0,255,136,.08)}
+.rfp-card:hover{border-color:rgba(92,183,90,.4);box-shadow:0 0 30px rgba(92,183,90,.08)}
 .rfp-card .star{position:absolute;top:16px;right:18px}
 .card-title{display:block;font:500 16px/1.35 var(--tight);color:var(--text);padding-right:20px}
-.card-title:hover{color:var(--bright);text-decoration:none}
+.card-title:hover{color:var(--green);text-decoration:none}
 .card-sum{color:rgba(255,255,255,.55);font-size:13px;line-height:1.6;margin:10px 0 2px;min-height:42px}
 .card-nums{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:13px}
 .card-nums{font-size:13px;font-weight:400;color:var(--green)}
@@ -129,15 +129,15 @@ h3{font:500 14px var(--tight);margin:20px 0 10px;color:var(--soft)}
   gap:6px;text-align:center;min-height:220px;border-style:dashed;
   border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.03);
   color:var(--soft);cursor:pointer}
-.suggest-card:hover{text-decoration:none;border-color:rgba(0,255,136,.55);
-  box-shadow:0 0 30px rgba(0,255,136,.1)}
+.suggest-card:hover{text-decoration:none;border-color:rgba(92,183,90,.55);
+  box-shadow:0 0 30px rgba(92,183,90,.1)}
 .suggest-plus{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;font:300 30px/1 var(--tight);color:var(--bright);
+  justify-content:center;font:300 30px/1 var(--tight);color:var(--green);
   background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.3);
   transition:transform .15s,background .15s}
-.suggest-card:hover .suggest-plus{transform:scale(1.08);background:rgba(0,255,136,.16)}
+.suggest-card:hover .suggest-plus{transform:scale(1.08);background:rgba(92,183,90,.16)}
 .suggest-title{font:500 18px var(--tight);color:var(--text);margin-top:6px}
-.suggest-card:hover .suggest-title{color:var(--bright)}
+.suggest-card:hover .suggest-title{color:var(--green)}
 .suggest-sub{color:var(--muted);font-size:13px;max-width:260px}
 
 /* submit form: initiative type choice */
@@ -145,8 +145,8 @@ h3{font:500 14px var(--tight);margin:20px 0 10px;color:var(--soft)}
 .type-opt{flex:1;min-width:220px;display:flex;gap:10px;align-items:flex-start;
   border:1px solid var(--edge2);border-radius:12px;background:var(--card);
   padding:12px 14px;cursor:pointer;transition:border-color .15s}
-.type-opt:hover{border-color:rgba(0,255,136,.45)}
-.type-opt:has(input:checked){border-color:var(--bright);box-shadow:0 0 14px rgba(0,255,136,.12)}
+.type-opt:hover{border-color:rgba(92,183,90,.45)}
+.type-opt:has(input:checked){border-color:var(--green);box-shadow:0 0 14px rgba(92,183,90,.12)}
 .type-opt input{margin-top:3px;accent-color:#00ff88}
 .type-opt b{font:600 13.5px var(--tight);display:block}
 .type-opt small{display:block;color:var(--muted);font-size:12px;line-height:1.5;margin-top:2px}
@@ -154,23 +154,23 @@ h3{font:500 14px var(--tight);margin:20px 0 10px;color:var(--soft)}
 /* progress bars */
 .bar{height:8px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:12px}
 .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),var(--bright));
-  box-shadow:0 0 12px rgba(0,255,136,.45);min-width:2px}
+  box-shadow:0 0 12px rgba(92,183,90,.45);min-width:2px}
 .bar.big{height:13px;max-width:760px}
 
 /* ── donate widget ───────────────────────────────────────────── */
 .donate-widget{display:flex;flex-direction:column;gap:10px}
 .dw-chips{display:flex;gap:8px;flex-wrap:wrap}
-.dw-chip{border:1px solid var(--edge2);background:transparent;color:var(--soft);border-radius:999px;
-  padding:7px 16px;font:500 13px var(--tight);cursor:pointer;transition:all .15s}
-.dw-chip:hover{border-color:rgba(0,255,136,.6);color:var(--bright)}
-.dw-chip.on{background:var(--bright);border-color:var(--bright);color:#08321c;font-weight:700}
+.dw-chip{border:1px solid var(--edge2);background:rgba(255,255,255,.05);color:var(--soft);border-radius:999px;
+  padding:8px 16px;font:400 13px var(--tight);cursor:pointer;transition:all .15s}
+.dw-chip:hover{border-color:rgba(92,183,90,.6);color:var(--green)}
+.dw-chip.on{background:var(--green);border-color:var(--green);color:#fff;font-weight:500}
 .dw-inputs{display:flex;gap:8px}
 .dw-amount{flex:1;min-width:0}
 .dw-token{width:110px;flex:none}
 .dw-trust{margin:0}
 .donate-widget .btn.primary{margin-top:0}
-.status{border:1px solid var(--edge);border-radius:12px;padding:10px 14px;font-size:12.5px;line-height:1.6}
-.status.ok{border-color:rgba(0,255,136,.5);color:var(--bright)}
+.status{border:1px solid var(--edge);border-radius:14px;padding:12px 16px;font-size:12.5px;line-height:1.6}
+.status.ok{border-color:rgba(92,183,90,.5);color:var(--green)}
 .status.err{border-color:rgba(255,59,56,.55);color:#ffd7d6}
 .status.wait{border-color:rgba(240,180,41,.5);color:#ffe9b8}
 details.manual summary{cursor:pointer;color:var(--muted);font-size:12.5px}
@@ -179,10 +179,10 @@ details.manual input{margin:8px 0}
 /* ── how it works ────────────────────────────────────────────── */
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 @media(max-width:860px){.steps{grid-template-columns:1fr}}
-.step{display:flex;gap:14px;border:1px solid var(--edge);border-radius:18px;background:var(--card);padding:18px 20px}
+.step{display:flex;gap:14px;border:1px solid var(--edge);border-radius:16px;background:var(--card);padding:18px 20px}
 .step .num{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   font:700 15px var(--tight)}
-.step .num.g{background:rgba(0,255,136,.14);color:var(--bright)}
+.step .num.g{background:rgba(92,183,90,.14);color:var(--green)}
 .step .num.a{background:rgba(240,180,41,.14);color:#f0b429}
 .step .num.b{background:rgba(90,200,250,.14);color:var(--claims)}
 .step b{font:600 14.5px var(--tight)}
@@ -208,14 +208,14 @@ details.manual input{margin:8px 0}
 .sponsors{display:flex;flex-wrap:wrap;gap:10px}
 .sponsor-pill{border:1px solid var(--edge2);background:var(--card);border-radius:14px;padding:10px 16px}
 .sponsor-pill b{font:600 14px var(--tight);margin-right:8px}
-.sponsor-pill span{font-family:var(--mono);font-size:13px;color:var(--bright)}
+.sponsor-pill span{font-family:var(--mono);font-size:13px;color:var(--green)}
 .sponsor-pill small{display:inline-block;margin-left:8px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
 .sponsor-pill small.received{color:var(--green)}
 .sponsor-pill small.note{display:block;margin:4px 0 0;text-transform:none;letter-spacing:0;font-size:11.5px}
 .col-side{position:sticky;top:86px;display:flex;flex-direction:column;gap:14px}
 @media(max-width:960px){.col-side{position:static}}
 .donate-card,.side-note{border:1px solid var(--edge);border-radius:18px;background:var(--card);padding:20px 22px}
-.donate-card{border-color:rgba(0,255,136,.35);box-shadow:0 0 34px rgba(0,255,136,.07)}
+.donate-card{border-color:rgba(92,183,90,.35);box-shadow:0 0 34px rgba(92,183,90,.07)}
 .donate-card .k,.side-note .k{font:400 11px var(--tight);letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:12px;display:block}
 .addr-list{list-style:none;padding:0}
 .addr-list li{padding:3px 0;font-size:12.5px}
@@ -224,7 +224,7 @@ details.manual input{margin:8px 0}
 table{border-collapse:collapse;width:100%;font-size:12.5px;font-weight:400}
 th,td{padding:7px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top}
 th{position:sticky;top:0;background:#244c6d;font:500 10.5px var(--tight);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);z-index:5}
-tr:hover td{background:rgba(0,255,136,.045)}
+tr:hover td{background:rgba(92,183,90,.045)}
 td.amt,th.amt{text-align:right;font-family:var(--mono);white-space:nowrap}
 .tblbox{max-height:480px;overflow:auto;border:1px solid var(--edge);border-radius:16px;background:var(--card)}
 
@@ -233,7 +233,7 @@ td.amt,th.amt{text-align:right;font-family:var(--mono);white-space:nowrap}
   font:400 12.5px var(--tight);border-radius:999px}
 .chip.static{padding:2px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
 .st-pending{color:#f0b429;border-color:rgba(240,180,41,.5)}
-.st-approved{color:var(--bright);border-color:rgba(0,255,136,.5)}
+.st-approved{color:var(--green);border-color:rgba(92,183,90,.5)}
 .st-rejected,.st-archived{color:var(--muted)}
 
 /* admin verdict pills */
@@ -255,10 +255,10 @@ td.amt,th.amt{text-align:right;font-family:var(--mono);white-space:nowrap}
 .lbl .dim{display:block;margin-top:5px;font:300 13px/1.5 var(--sans);color:var(--muted);
   text-transform:none;letter-spacing:0}
 input[type=text],input[type=url],input[type=password],textarea,select{
-  background:var(--card);border:1px solid var(--edge2);color:var(--text);padding:10px 14px;
-  font:300 14px var(--sans);border-radius:12px;outline:none;width:100%}
+  background:var(--card);border:1px solid var(--edge2);color:var(--text);padding:14px 16px;
+  font:400 14px var(--sans);border-radius:14px;outline:none;width:100%}
 textarea{resize:vertical}
-input:focus,textarea:focus,select:focus{border-color:rgba(0,255,136,.6)}
+input:focus,textarea:focus,select:focus{border-color:rgba(92,183,90,.6)}
 select{appearance:none}
 select option{background:#244c6d;color:#fff}
 .hp{position:absolute;left:-9999px;top:-9999px;height:1px;width:1px;opacity:0}
@@ -266,7 +266,7 @@ select option{background:#244c6d;color:#fff}
   padding:14px 24px;border-radius:14px;font:400 13px var(--sans);cursor:pointer;margin-top:10px;
   transition:border-color .15s,box-shadow .15s,transform .15s;text-decoration:none;text-align:center;
   box-shadow:0 4px 6px -4px rgba(130,24,26,.3)}
-.btn:hover{border-color:rgba(0,255,136,.6);box-shadow:0 0 18px rgba(0,255,136,.15);text-decoration:none}
+.btn:hover{border-color:rgba(92,183,90,.6);box-shadow:0 0 18px rgba(92,183,90,.15);text-decoration:none}
 .btn.primary{background:var(--red);border-color:var(--red);box-shadow:0 4px 6px -4px rgba(130,24,26,.4)}
 .btn.primary:hover{transform:scale(1.02);box-shadow:0 10px 22px -3px rgba(0,0,0,.5)}
 .ai-search .btn.primary::after{content:'→';margin-left:8px}
@@ -329,7 +329,7 @@ footer a.dim{color:rgba(255,255,255,.35)}
 .body-text.md tr:last-child td{border-bottom:0}
 
 /* donate method chooser (card / wallet / exchange) */
-.dw-methods{display:flex;gap:6px;border:1px solid var(--edge);border-radius:12px;padding:4px;background:rgba(0,0,0,.12)}
+.dw-methods{display:flex;gap:6px;border:1px solid var(--edge);border-radius:14px;padding:4px;background:rgba(255,255,255,.03)}
 .dw-method{flex:1;border:0;background:transparent;color:var(--muted);border-radius:9px;
   padding:8px 6px;font:500 12.5px var(--tight);cursor:pointer;transition:all .15s;white-space:nowrap}
 .dw-method:hover{color:var(--text)}
@@ -338,7 +338,7 @@ footer a.dim{color:rgba(255,255,255,.35)}
 .dw-panel{display:flex;flex-direction:column;gap:8px}
 .dw-panel .btn.primary{margin-top:0}
 .dw-panel .small{margin:0}
-.dw-addr-row{display:flex;gap:8px;align-items:center;border:1px solid var(--edge);border-radius:10px;
+.dw-addr-row{display:flex;gap:8px;align-items:center;border:1px solid var(--edge);border-radius:14px;
   background:rgba(0,0,0,.15);padding:8px 12px}
 .dw-addr-text{flex:1;min-width:0;overflow-wrap:anywhere;font-size:11.5px}
 .dw-addr-row .btn{margin:0;flex:none}
@@ -352,7 +352,7 @@ footer a.dim{color:rgba(255,255,255,.35)}
 /* $-prefixed amount box + live token conversion line */
 .dw-amount-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:2px;
   background:var(--card);border:1px solid var(--edge2);border-radius:12px;padding:0 0 0 14px}
-.dw-amount-wrap:focus-within{border-color:rgba(0,255,136,.6)}
+.dw-amount-wrap:focus-within{border-color:rgba(92,183,90,.6)}
 .dw-cur{color:var(--muted);font:300 14px var(--sans);flex:none}
 .dw-amount-wrap .dw-amount{flex:1;min-width:0;background:transparent;border:0;outline:none;
   padding:10px 14px 10px 4px;color:var(--text);font:300 14px var(--sans)}
@@ -365,12 +365,12 @@ footer a.dim{color:rgba(255,255,255,.35)}
 .wallet-menu button{display:flex;align-items:center;gap:11px;border:0;background:transparent;
   color:var(--soft);text-align:left;padding:10px 12px;border-radius:9px;
   font:400 14px var(--sans);cursor:pointer}
-.wallet-menu button:hover{background:rgba(0,255,136,.08);color:var(--bright)}
-.wallet-menu button.active{color:var(--bright)}
+.wallet-menu button:hover{background:rgba(92,183,90,.08);color:var(--green)}
+.wallet-menu button.active{color:var(--green)}
 .wallet-menu .wm-icon{width:24px;height:24px;flex:0 0 24px;border-radius:6px;object-fit:contain}
 .wallet-menu .wm-icon-ph{background:transparent}
 .wallet-menu .wm-name{flex:1;white-space:nowrap}
-.wallet-menu button.active .wm-name::after{content:" ✓";color:var(--bright)}
+.wallet-menu button.active .wm-name::after{content:" ✓";color:var(--green)}
 .wallet-menu button.wm-sep{margin-top:6px;padding-top:12px;border-top:1px solid var(--edge2)}
 .wallet-menu button.wm-danger{color:#ff9a9a}
 .wallet-menu button.wm-danger:hover{background:rgba(255,90,90,.12);color:#ffb3b3}
@@ -383,13 +383,13 @@ footer a.dim{color:rgba(255,255,255,.35)}
   background-color:rgba(255,255,255,.05);
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-opacity='0.45' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.6-3.6'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:16px 50%}
-.ai-search input:focus{border-color:rgba(0,255,136,.55)}
+.ai-search input:focus{border-color:rgba(92,183,90,.55)}
 .ai-search input::placeholder{color:rgba(255,255,255,.25)}
 .ai-search-note{margin:-8px 0 18px}
-.linklike{border:0;background:none;color:var(--bright);cursor:pointer;
+.linklike{border:0;background:none;color:var(--green);cursor:pointer;
   padding:0;font:inherit;text-decoration:underline}
-.rfp-card.ai-top{border-color:rgba(0,255,136,.5);
-  box-shadow:0 0 0 1px rgba(0,255,136,.25),0 14px 30px rgba(0,0,0,.35)}
-.ai-badge{position:absolute;top:-10px;left:14px;background:var(--bright);
+.rfp-card.ai-top{border-color:rgba(92,183,90,.5);
+  box-shadow:0 0 0 1px rgba(92,183,90,.25),0 14px 30px rgba(0,0,0,.35)}
+.ai-badge{position:absolute;top:-10px;left:14px;background:var(--green);
   color:#08321c;font:700 11px var(--tight);letter-spacing:.4px;
   border-radius:999px;padding:3px 10px;text-transform:uppercase}

@@ -79,7 +79,7 @@ a:hover{text-decoration:underline}
 /* ── main ────────────────────────────────────────────────────── */
 main{max-width:1100px;margin:0 auto;padding:6px 24px 80px}
 main.detail{padding-top:34px}
-main.narrow{max-width:720px}
+main.narrow{max-width:672px}
 main.center{text-align:center}
 h2{font:400 13px var(--tight);margin:46px 0 16px;color:var(--green);text-transform:uppercase;letter-spacing:.2em}
 h2 .n{color:var(--muted);text-transform:none;letter-spacing:0;font-size:12px;margin-left:10px}
@@ -91,6 +91,8 @@ h3{font:500 14px var(--tight);margin:20px 0 10px;color:var(--soft)}
 .tag.left{text-align:left;margin-left:0}
 .shimmer{height:1px;max-width:1052px;margin:30px auto 0;border:0;
   background:linear-gradient(90deg,rgba(1,255,136,0),rgba(1,255,136,.5) 50%,rgba(1,255,136,0))}
+.shimmer.soft{max-width:672px;
+  background:linear-gradient(90deg,rgba(92,183,90,0),rgba(92,183,90,.4) 50%,rgba(92,183,90,0))}
 
 /* ── RFP cards with inline donate ────────────────────────────── */
 .rfp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
@@ -116,8 +118,8 @@ h3{font:500 14px var(--tight);margin:20px 0 10px;color:var(--soft)}
 /* initiative type badges (RFP = open bid, Grant = proposer does the work) */
 .type-badge{display:inline-block;border-radius:999px;padding:3px 12px;
   font:600 11px var(--tight);text-transform:uppercase;letter-spacing:.05em}
-.t-rfp{color:#7eb3ff;border:1px solid rgba(126,179,255,.5);background:rgba(126,179,255,.1)}
-.t-grant{color:var(--green);border:1px solid rgba(92,183,90,.5);background:rgba(92,183,90,.1)}
+.t-rfp{color:#7eb3ff;border:1px solid rgba(92,140,220,.3);background:rgba(92,140,220,.15)}
+.t-grant{color:var(--green);border:1px solid rgba(0,255,136,.3);background:rgba(0,255,136,.12)}
 .rfp-card>.type-badge{position:absolute;top:16px;right:18px}
 .rfp-card .card-title{padding-right:72px}
 .type-badge.inline{position:static}

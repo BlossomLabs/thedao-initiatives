@@ -12,7 +12,7 @@
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <input type="text" name="website" value="" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
 
-    <label class="lbl" for="f-title">Title <span class="dim">(or leave blank and we pull it from the forum link)</span></label>
+    <label class="lbl" for="f-title">Title <span class="dim">Or leave blank and we pull it from the forum link.</span></label>
     <input type="text" id="f-title" name="title" maxlength="140" value="{{ form.title if form else '' }}">
 
     <span class="lbl">Type *</span>
@@ -25,13 +25,13 @@
         <span><b>Grant</b><small>Your team presents the idea and does the work.</small></span></label>
     </div>
 
-    <label class="lbl" for="f-summary">Short summary * <span class="dim">(2 to 4 sentences: what gets built, why it matters)</span></label>
+    <label class="lbl" for="f-summary">Short summary * <span class="dim">2 to 4 sentences: what gets built, why it matters.</span></label>
     <textarea id="f-summary" name="summary" rows="5" required maxlength="4000">{{ form.summary if form else '' }}</textarea>
 
-    <label class="lbl" for="f-details">Full initiative details <span class="dim">(optional: scope, milestones, budget breakdown; markdown supported: headings, **bold**, lists, tables, - [ ] checklists)</span></label>
+    <label class="lbl" for="f-details">Full initiative details <span class="dim">Optional: scope, milestones, budget breakdown. Markdown supported: headings, **bold**, lists, tables, - [ ] checklists.</span></label>
     <textarea id="f-details" name="details" rows="10" maxlength="20000">{{ form.details if form else '' }}</textarea>
 
-    <label class="lbl" for="f-forum">Forum link <span class="dim">(optional Discourse topic where this initiative is discussed)</span></label>
+    <label class="lbl" for="f-forum">Forum link <span class="dim">Optional Discourse topic where this initiative is discussed.</span></label>
     <input type="url" id="f-forum" name="discourse_url" placeholder="https://forum.example.org/t/my-initiative/123"
            value="{{ form.discourse_url if form else '' }}">
 
@@ -39,7 +39,7 @@
     <input type="text" id="f-goal" name="goal" required inputmode="decimal" placeholder="250000"
            value="{{ form.goal if form else '' }}">
 
-    <label class="lbl" for="f-contact">Contact <span class="dim">(email / telegram, kept private)</span></label>
+    <label class="lbl" for="f-contact">Contact <span class="dim">Email or Telegram, kept private.</span></label>
     <input type="text" id="f-contact" name="contact" maxlength="200" value="{{ form.contact if form else '' }}">
 
     <button class="btn primary" type="submit">Submit for review</button>

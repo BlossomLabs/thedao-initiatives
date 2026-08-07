@@ -3,7 +3,7 @@
 <section class="hero">
   <p class="kicker">Ecosystem-funded security initiatives</p>
   <div class="hero-raised" id="hero-raised" data-target="{{ totals.raised }}">$0</div>
-  <p class="hero-sub">raised for <span class="red">Ethereum security</span> initiatives</p>
+  <p class="hero-sub">raised for <span class="grn">Ethereum security</span> initiatives</p>
 </section>
 
 {% if recent %}
@@ -40,8 +40,8 @@
       <p class="card-sum">{{ c.rfp.summary[:170] }}{% if c.rfp.summary|length > 170 %}…{% endif %}</p>
       <div class="bar"><i style="width: {{ c.pct }}%"></i></div>
       <div class="card-nums">
-        <span><b>{{ c.sum.total | usd }}</b> of {{ c.rfp.funding_goal_usd | usd }}</span>
-        <span class="dim">{{ c.pct }}%{% if c.n_sponsors %} · {{ c.n_sponsors }} sponsor{{ '' if c.n_sponsors == 1 else 's' }}{% endif %}</span>
+        <span><b>{{ c.sum.total | usd }}</b> of {{ c.rfp.funding_goal_usd | usd }}{% if c.n_sponsors %} <span class="sponsors">· {{ c.n_sponsors }} sponsor{{ '' if c.n_sponsors == 1 else 's' }}</span>{% endif %}</span>
+        <span class="pct">{{ c.pct }}%</span>
       </div>
       {% if c.logos %}
       <div class="card-logos">

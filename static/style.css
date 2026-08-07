@@ -2,7 +2,7 @@
    Palette shared with thedao.fund; layout designed for donation conversion:
    one red CTA, preset amounts, progress bars, social proof, minimal clicks. */
 :root{
-  --bg:#1f435f; --text:#fff; --muted:rgba(255,255,255,.62); --soft:rgba(255,255,255,.85);
+  --bg:#2c5e86; --bg2:#275477; --text:#fff; --muted:rgba(255,255,255,.62); --soft:rgba(255,255,255,.85);
   --card:rgba(255,255,255,.05); --edge:rgba(255,255,255,.12); --edge2:rgba(255,255,255,.22);
   --green:#5cb75a; --bright:#00ff88; --red:#ff3b38; --blue:#2c5e86; --claims:#5ac8fa;
   --sans:'Inter',sans-serif; --tight:'Inter Tight',sans-serif;
@@ -10,7 +10,10 @@
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--text);font:300 14px/1.5 var(--sans)}
+body{margin:0;min-height:100vh;color:var(--text);font:300 14px/1.5 var(--sans);
+  background-color:var(--bg);
+  background-image:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
+  background-repeat:no-repeat}
 b,strong{font-weight:600}
 a{color:var(--bright);text-decoration:none}
 a:hover{text-decoration:underline}
@@ -18,6 +21,7 @@ a:hover{text-decoration:underline}
 .dim{color:var(--muted)}
 .small{font-size:12.5px;line-height:1.6}
 .red{color:var(--red)}
+.grn{color:var(--green)}
 .empty{color:var(--muted)}
 .star{color:#f0b429}
 
@@ -52,9 +56,7 @@ a:hover{text-decoration:underline}
 .hero{max-width:1100px;margin:0 auto;padding:72px 24px 8px;text-align:center}
 .kicker{font:400 12px var(--tight);letter-spacing:.24em;text-transform:uppercase;color:var(--green);margin:0}
 .hero-raised{font:700 clamp(40px,12vw,132px)/1 var(--tight);letter-spacing:-.04em;
-  font-variant-numeric:tabular-nums;margin:14px 0 0;
-  background:linear-gradient(120deg,#fff 30%,var(--bright));-webkit-background-clip:text;
-  background-clip:text;-webkit-text-fill-color:transparent}
+  font-variant-numeric:tabular-nums;margin:14px 0 0;color:#fff}
 .hero-sub{font:300 clamp(17px,2.6vw,24px) var(--sans);color:var(--soft);margin:10px 0 0}
 
 /* ── social proof strip ──────────────────────────────────────── */
@@ -97,7 +99,9 @@ h3{font:500 14px var(--tight);margin:20px 0 10px;color:var(--soft)}
 .card-title:hover{color:var(--bright);text-decoration:none}
 .card-sum{color:var(--muted);font-size:13px;line-height:1.6;margin:8px 0 2px;min-height:42px}
 .card-nums{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:13px}
-.card-nums b{font-family:var(--tight)}
+.card-nums b{font-family:var(--tight);color:var(--green)}
+.card-nums .sponsors{color:var(--muted)}
+.card-nums .pct{color:var(--green)}
 .card-actions{display:flex;gap:10px;margin-top:14px}
 .card-donate{margin-top:14px;border-top:1px solid var(--edge);padding-top:14px}
 
@@ -235,7 +239,10 @@ td.amt,th.amt{text-align:right;font-family:var(--mono);white-space:nowrap}
 .form-row{flex-direction:row;flex-wrap:wrap;align-items:center}
 .form-row input,.form-row select{flex:1;min-width:140px}
 .narrow-form{max-width:360px;margin:0 auto}
-.lbl{font:400 11px var(--tight);color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:12px}
+.lbl{font:400 11px var(--tight);color:var(--green);text-transform:uppercase;letter-spacing:.12em;margin-top:12px}
+/* the hint drops out of the uppercase label onto its own sentence-case line */
+.lbl .dim{display:block;margin-top:5px;font:300 13px/1.5 var(--sans);color:var(--muted);
+  text-transform:none;letter-spacing:0}
 input[type=text],input[type=url],input[type=password],textarea,select{
   background:var(--card);border:1px solid var(--edge2);color:var(--text);padding:10px 14px;
   font:300 14px var(--sans);border-radius:12px;outline:none;width:100%}
@@ -265,6 +272,16 @@ select option{background:#244c6d;color:#fff}
 footer{max-width:1100px;margin:0 auto;padding:30px 24px 46px;text-align:center;color:var(--muted);font-size:12.5px}
 footer p{margin:6px 0}
 footer a.dim{color:rgba(255,255,255,.35)}
+
+/* legal bar: full-bleed strip under the footer, copyright left / socials right */
+.footer-bar{display:flex;align-items:center;justify-content:space-between;gap:20px;
+  flex-wrap:wrap;min-height:88px;padding:16px 48px;background:#28567a}
+.footer-bar p{margin:0;font-size:12.5px;color:var(--soft)}
+.footer-socials{display:flex;align-items:center;gap:12px}
+.footer-socials a{display:block;line-height:0;opacity:.9;transition:opacity .15s,transform .15s}
+.footer-socials a:hover{opacity:1;transform:translateY(-1px)}
+.footer-socials img{width:40px;height:40px;display:block}
+@media(max-width:620px){.footer-bar{padding:16px 20px;justify-content:center;text-align:center}}
 
 /* sponsor logos + discuss emphasis (July feedback) */
 .sponsor-logo{display:block;max-height:34px;max-width:150px;margin:0 0 8px;border-radius:6px;background:#fff;padding:3px 6px}

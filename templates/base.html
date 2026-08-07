@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <link rel="icon" href="{{ url_for('static', filename='dao-logo.svg') }}">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='dao-logo.svg') }}">
-<meta name="theme-color" content="#1f435f">
+<meta name="theme-color" content="#2c5e86">
 <meta property="og:site_name" content="TheDAO Security Fund">
 <meta property="og:type" content="website">
 <meta property="og:title" content="{% block og_title %}TheDAO Security Fund · Initiatives{% endblock %}">
@@ -41,6 +41,18 @@
   <p>TheDAO Security Fund · coordinating ecosystem funding for Ethereum security.</p>
   <p>To sponsor an initiative, contact <a href="https://x.com/griffgreen" target="_blank" rel="noopener">@griffgreen</a> · <a class="dim" href="{{ url_for('admin_login') }}">admin</a></p>
 </footer>
+
+<div class="footer-bar">
+  <p>© 2025–2026 TheDAO LLC. All rights reserved.</p>
+  <div class="footer-socials">
+    <a href="https://paragraph.xyz/@thedao.fund" target="_blank" rel="noopener" aria-label="TheDAO on Paragraph">
+      <img src="{{ url_for('static', filename='icons/paragraph.svg') }}" alt="Paragraph" width="40" height="40"></a>
+    <a href="https://x.com/thedaofund" target="_blank" rel="noopener" aria-label="TheDAO on X">
+      <img src="{{ url_for('static', filename='icons/x.svg') }}" alt="X" width="40" height="40"></a>
+    <a href="https://warpcast.com/thedaofund" target="_blank" rel="noopener" aria-label="TheDAO on Farcaster">
+      <img src="{{ url_for('static', filename='icons/farcaster.svg') }}" alt="Farcaster" width="40" height="40"></a>
+  </div>
+</div>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>

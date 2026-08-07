@@ -5,12 +5,12 @@
   --bg:#2c5e86; --bg2:#275477; --text:#fff; --muted:rgba(255,255,255,.62); --soft:rgba(255,255,255,.85);
   --card:rgba(255,255,255,.05); --edge:rgba(255,255,255,.12); --edge2:rgba(255,255,255,.22);
   --green:#5cb75a; --bright:#00ff88; --red:#ff3b38; --blue:#2c5e86; --claims:#5ac8fa;
-  --sans:'Inter',sans-serif; --tight:'Inter Tight',sans-serif;
+  --sans:'Inter Tight','Inter',sans-serif; --tight:'Inter Tight',sans-serif;
   --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{margin:0;min-height:100vh;color:var(--text);font:300 14px/1.5 var(--sans);
+body{margin:0;min-height:100vh;color:var(--text);font:400 14px/1.5 var(--sans);
   background-color:var(--bg);
   background-image:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
   background-repeat:no-repeat}
@@ -27,18 +27,21 @@ a:hover{text-decoration:underline}
 
 /* ── top bar ─────────────────────────────────────────────────── */
 .topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
-  gap:16px;padding:14px 28px;background:rgba(31,67,95,.82);backdrop-filter:blur(20px);
-  -webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--edge)}
+  gap:16px;padding:12px 32px;background:rgba(44,94,134,.5);backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.07)}
 .brand{display:flex;align-items:center;gap:10px;color:#fff;font:300 17px var(--tight)}
 .brand b{font-weight:700}
 .brand img{width:15px;height:24px}
 .brand:hover{text-decoration:none}
 .topnav{display:flex;align-items:center;gap:22px}
-.topnav a{font:300 15px var(--tight);color:var(--soft)}
+.topnav a{font:400 14px var(--tight);color:rgba(255,255,255,.65)}
 .topnav a:hover{color:var(--bright);text-decoration:none}
-.topnav a.on{color:var(--green);font-weight:500}
-.topnav .navcta{color:var(--bright);font-weight:500}
-.btn.wallet{margin:0;padding:8px 16px;font-size:13px;border-radius:999px}
+.topnav a.on{color:var(--green);position:relative}
+.topnav a.on::after{content:'';position:absolute;left:0;right:0;bottom:-6px;height:2px;
+  border-radius:999px;background:var(--green)}
+.topnav .navcta{color:var(--green)}
+.btn.wallet{margin:0;padding:8px 16px;font-size:13px;border-radius:14px;
+  background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.2)}
 .btn.wallet.connected{border-color:rgba(0,255,136,.6);color:var(--bright);font-family:var(--mono);font-size:12px}
 @media(max-width:760px){
   .topbar{padding:10px 14px;flex-wrap:wrap;gap:8px 14px}
@@ -54,10 +57,11 @@ a:hover{text-decoration:underline}
 
 /* ── hero: the money is the hero ─────────────────────────────── */
 .hero{max-width:1100px;margin:0 auto;padding:72px 24px 8px;text-align:center}
-.kicker{font:400 12px var(--tight);letter-spacing:.24em;text-transform:uppercase;color:var(--green);margin:0}
+.kicker{font:400 11px var(--tight);letter-spacing:.2em;text-transform:uppercase;color:var(--green);margin:0}
 .hero-raised{font:700 clamp(40px,12vw,132px)/1 var(--tight);letter-spacing:-.04em;
-  font-variant-numeric:tabular-nums;margin:14px 0 0;color:#fff}
-.hero-sub{font:300 clamp(17px,2.6vw,24px) var(--sans);color:var(--soft);margin:10px 0 0}
+  font-variant-numeric:tabular-nums;margin:14px 0 0;color:#fff;
+  font-size:clamp(40px,10vw,100px)}
+.hero-sub{font:400 clamp(17px,2.6vw,22px) var(--sans);color:rgba(255,255,255,.8);margin:10px 0 0}
 
 /* ── social proof strip ──────────────────────────────────────── */
 .activity{display:flex;gap:10px;overflow-x:auto;max-width:1100px;margin:26px auto 0;padding:4px 24px;
@@ -89,43 +93,48 @@ h3{font:500 14px var(--tight);margin:20px 0 10px;color:var(--soft)}
   background:linear-gradient(90deg,rgba(0,255,136,0),rgba(0,255,136,.5),rgba(0,255,136,0))}
 
 /* ── RFP cards with inline donate ────────────────────────────── */
-.rfp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.rfp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
 @media(max-width:860px){.rfp-grid{grid-template-columns:1fr}}
-.rfp-card{position:relative;background:var(--card);border:1px solid var(--edge);border-radius:18px;
-  padding:22px 24px 18px;transition:border-color .2s,box-shadow .2s}
+.rfp-card{position:relative;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  border-radius:16px;padding:24px;transition:border-color .2s,box-shadow .2s}
 .rfp-card:hover{border-color:rgba(0,255,136,.4);box-shadow:0 0 30px rgba(0,255,136,.08)}
 .rfp-card .star{position:absolute;top:16px;right:18px}
-.card-title{display:block;font:600 19px/1.25 var(--tight);color:var(--text);letter-spacing:-.01em;padding-right:20px}
+.card-title{display:block;font:500 16px/1.35 var(--tight);color:var(--text);padding-right:20px}
 .card-title:hover{color:var(--bright);text-decoration:none}
-.card-sum{color:var(--muted);font-size:13px;line-height:1.6;margin:8px 0 2px;min-height:42px}
+.card-sum{color:rgba(255,255,255,.55);font-size:13px;line-height:1.6;margin:10px 0 2px;min-height:42px}
 .card-nums{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:13px}
-.card-nums b{font-family:var(--tight);color:var(--green)}
-.card-nums .sponsors{color:var(--muted)}
-.card-nums .pct{color:var(--green)}
+.card-nums{font-size:13px;font-weight:400;color:var(--green)}
+.card-nums b{font-family:var(--tight);font-weight:400;color:var(--green)}
+.card-nums>span:first-child{white-space:nowrap}
+.card-nums .sponsor-count{color:rgba(255,255,255,.3);font-size:12px}
+.card-nums .pct{color:var(--green);font-size:12px}
+.card-nums.zero,.card-nums.zero b{color:rgba(255,255,255,.4)}
+.card-nums.zero .pct{color:rgba(255,255,255,.25)}
 .card-actions{display:flex;gap:10px;margin-top:14px}
 .card-donate{margin-top:14px;border-top:1px solid var(--edge);padding-top:14px}
 
 /* initiative type badges (RFP = open bid, Grant = proposer does the work) */
 .type-badge{display:inline-block;border-radius:999px;padding:3px 12px;
-  font:600 10.5px var(--tight);text-transform:uppercase;letter-spacing:.1em}
-.t-rfp{color:var(--claims);border:1px solid rgba(90,200,250,.5);background:rgba(90,200,250,.1)}
-.t-grant{color:var(--bright);border:1px solid rgba(0,255,136,.5);background:rgba(0,255,136,.08)}
+  font:600 11px var(--tight);text-transform:uppercase;letter-spacing:.05em}
+.t-rfp{color:#7eb3ff;border:1px solid rgba(126,179,255,.5);background:rgba(126,179,255,.1)}
+.t-grant{color:var(--green);border:1px solid rgba(92,183,90,.5);background:rgba(92,183,90,.1)}
 .rfp-card>.type-badge{position:absolute;top:16px;right:18px}
 .rfp-card .card-title{padding-right:72px}
 .type-badge.inline{position:static}
 
 /* "suggest an initiative" tile: the grid's last card is the submit CTA */
 .suggest-card{display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:6px;text-align:center;min-height:220px;border-style:dashed;border-color:var(--edge2);
+  gap:6px;text-align:center;min-height:220px;border-style:dashed;
+  border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.03);
   color:var(--soft);cursor:pointer}
 .suggest-card:hover{text-decoration:none;border-color:rgba(0,255,136,.55);
   box-shadow:0 0 30px rgba(0,255,136,.1)}
-.suggest-plus{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;font:300 34px/1 var(--tight);color:var(--bright);
-  background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.35);
+.suggest-plus{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font:300 30px/1 var(--tight);color:var(--bright);
+  background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.3);
   transition:transform .15s,background .15s}
 .suggest-card:hover .suggest-plus{transform:scale(1.08);background:rgba(0,255,136,.16)}
-.suggest-title{font:600 18px var(--tight);color:var(--text);margin-top:6px}
+.suggest-title{font:500 18px var(--tight);color:var(--text);margin-top:6px}
 .suggest-card:hover .suggest-title{color:var(--bright)}
 .suggest-sub{color:var(--muted);font-size:13px;max-width:260px}
 
@@ -179,10 +188,10 @@ details.manual input{margin:8px 0}
 
 /* ── pledge band ─────────────────────────────────────────────── */
 .pledge-band{display:flex;align-items:center;justify-content:space-between;gap:22px;flex-wrap:wrap;
-  margin-top:46px;border:1px solid var(--edge2);border-radius:18px;padding:24px 28px;
-  background:linear-gradient(120deg,var(--blue),rgba(44,94,134,.4))}
-.pledge-band b{font:600 17px var(--tight)}
-.pledge-band p{margin:6px 0 0;max-width:640px;font-size:13px;line-height:1.6}
+  margin-top:46px;border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:28px 32px;
+  background:rgba(255,255,255,.05)}
+.pledge-band b{font:500 18px var(--tight)}
+.pledge-band p{margin:8px 0 0;max-width:470px;font:400 14px/1.6 var(--tight);color:rgba(255,255,255,.5)}
 .pledge-band .btn{margin:0;flex:none}
 
 /* ── detail page ─────────────────────────────────────────────── */
@@ -252,12 +261,14 @@ select{appearance:none}
 select option{background:#244c6d;color:#fff}
 .hp{position:absolute;left:-9999px;top:-9999px;height:1px;width:1px;opacity:0}
 .btn{display:inline-block;border:1px solid var(--edge2);background:var(--card);color:var(--text);
-  padding:10px 20px;border-radius:12px;font:500 13.5px var(--sans);cursor:pointer;margin-top:10px;
+  padding:14px 24px;border-radius:14px;font:400 13px var(--sans);cursor:pointer;margin-top:10px;
   transition:border-color .15s,box-shadow .15s,transform .15s;text-decoration:none;text-align:center}
 .btn:hover{border-color:rgba(0,255,136,.6);box-shadow:0 0 18px rgba(0,255,136,.15);text-decoration:none}
 .btn.primary{background:var(--red);border-color:var(--red);box-shadow:0 10px 15px -3px rgba(0,0,0,.4)}
 .btn.primary:hover{transform:scale(1.02);box-shadow:0 10px 22px -3px rgba(0,0,0,.5)}
-.btn.ghost{background:transparent}
+.ai-search .btn.primary::after{content:'→';margin-left:8px}
+.pledge-band .btn::after{content:'↗';margin-left:8px;opacity:.7}
+.btn.ghost{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
 .btn.danger{border-color:rgba(255,59,56,.6);color:#ffb3b1}
 .btn.sm{padding:6px 14px;font-size:12.5px;margin-top:0}
 .btn[disabled]{opacity:.5;cursor:default}
@@ -275,7 +286,8 @@ footer a.dim{color:rgba(255,255,255,.35)}
 
 /* legal bar: full-bleed strip under the footer, copyright left / socials right */
 .footer-bar{display:flex;align-items:center;justify-content:space-between;gap:20px;
-  flex-wrap:wrap;min-height:88px;padding:16px 48px;background:#28567a}
+  flex-wrap:wrap;min-height:88px;padding:16px 48px;background:#28567a;
+  border-top:1px solid rgba(255,255,255,.08)}
 .footer-bar p{margin:0;font-size:12.5px;color:var(--soft)}
 .footer-socials{display:flex;align-items:center;gap:12px}
 .footer-socials a{display:block;line-height:0;opacity:.9;transition:opacity .15s,transform .15s}
@@ -331,7 +343,8 @@ footer a.dim{color:rgba(255,255,255,.35)}
 
 /* sponsor logos on board cards */
 .card-logos{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
-.card-logos img{max-height:26px;max-width:110px;border-radius:6px;background:#fff;padding:2px 6px}
+.card-logos img{width:36px;height:36px;border-radius:50%;object-fit:contain;
+  background:#fff;padding:5px;border:1px solid rgba(255,255,255,.12)}
 
 /* $-prefixed amount box + live token conversion line */
 .dw-amount-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:2px;
@@ -361,11 +374,14 @@ footer a.dim{color:rgba(255,255,255,.35)}
 
 /* ---- AI board search ---- */
 .ai-search{display:flex;gap:10px;margin:4px 0 20px;flex-wrap:wrap}
-.ai-search input{flex:1;min-width:260px;background:rgba(255,255,255,.06);
-  border:1px solid var(--edge2);border-radius:12px;color:var(--text);
-  padding:12px 14px;font:300 14px var(--sans);outline:none}
+.ai-search input{flex:1;min-width:260px;color:var(--text);outline:none;
+  border:1px solid rgba(255,255,255,.1);border-radius:14px;
+  padding:14px 16px 14px 44px;font:400 14px var(--sans);
+  background-color:rgba(255,255,255,.05);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-opacity='0.45' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.6-3.6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:16px 50%}
 .ai-search input:focus{border-color:rgba(0,255,136,.55)}
-.ai-search input::placeholder{color:var(--muted)}
+.ai-search input::placeholder{color:rgba(255,255,255,.25)}
 .ai-search-note{margin:-8px 0 18px}
 .linklike{border:0;background:none;color:var(--bright);cursor:pointer;
   padding:0;font:inherit;text-decoration:underline}

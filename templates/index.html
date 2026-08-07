@@ -37,10 +37,10 @@
     <div class="rfp-card" data-rfp-id="{{ c.rfp.id }}">
       <span class="type-badge t-{{ c.rfp.type }}">{{ 'Grant' if c.rfp.type == 'grant' else 'RFP' }}</span>
       <a class="card-title" href="{{ url_for('rfp_page', slug=c.rfp.slug) }}">{{ c.rfp.title }}</a>
-      <p class="card-sum">{{ c.rfp.summary[:170] }}{% if c.rfp.summary|length > 170 %}…{% endif %}</p>
+      <p class="card-sum">{{ c.rfp.summary[:210] }}{% if c.rfp.summary|length > 210 %}…{% endif %}</p>
       <div class="bar"><i style="width: {{ c.pct }}%"></i></div>
-      <div class="card-nums">
-        <span><b>{{ c.sum.total | usd }}</b> of {{ c.rfp.funding_goal_usd | usd }}{% if c.n_sponsors %} <span class="sponsors">· {{ c.n_sponsors }} sponsor{{ '' if c.n_sponsors == 1 else 's' }}</span>{% endif %}</span>
+      <div class="card-nums{% if not c.sum.total %} zero{% endif %}">
+        <span><b>{{ c.sum.total | usd }}</b> of {{ c.rfp.funding_goal_usd | usd }}{% if c.n_sponsors %} <span class="sponsor-count">· {{ c.n_sponsors }} sponsor{{ '' if c.n_sponsors == 1 else 's' }}</span>{% endif %}</span>
         <span class="pct">{{ c.pct }}%</span>
       </div>
       {% if c.logos %}

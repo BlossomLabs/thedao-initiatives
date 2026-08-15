@@ -479,3 +479,7 @@ tr.reported td{background:rgba(255,59,56,.06)}
 .qa-body-cell{font-size:13px;color:rgba(255,255,255,.75);white-space:pre-line;
   overflow-wrap:anywhere}
 @media (max-width:760px){.qa-picks{flex-direction:column;align-items:stretch}}
+.qa-admin{display:inline-flex;gap:12px;flex-wrap:wrap;margin-left:auto}
+.qa-link.admin{color:var(--claims)}
+.qa-link.admin:hover{color:var(--green)}
+.qa-identtitle{font:600 13.5px var(--tight);color:rgba(255,255,255,.85)}

@@ -177,6 +177,8 @@
       state.roles.some(function (t) {
         return ["ADMIN", "CURATOR", "EXPERT"].indexOf(t) >= 0;
       });
+    // A panel admin whose connected wallet holds a role signs; one without a
+    // role still replies via the session path (handled in openReply).
     if (canReply) {
       var rbtn = el("button", "qa-link", "Reply");
       rbtn.type = "button";
@@ -192,8 +194,40 @@
       }).catch(function (e) { flash(box, e.message); });
     });
     foot.appendChild(rep);
+    if (isAdmin) foot.appendChild(adminActions(c, box));
     box.appendChild(foot);
     return box;
+  }
+
+  // Per-entry admin controls (spec §9D). Session-authed form POSTs with the
+  // page CSRF token; the server re-checks @admin_required.
+  function adminActions(c, box) {
+    var wrap = el("span", "qa-admin");
+    function action(label, act) {
+      var b = el("button", "qa-link admin", label);
+      b.type = "button";
+      b.addEventListener("click", function () {
+        var f = document.createElement("form");
+        f.method = "post";
+        f.action = "/admin/comments/" + c.id + "/" + act;
+        var t = document.createElement("input");
+        t.type = "hidden"; t.name = "_csrf"; t.value = csrf;
+        var back = document.createElement("input");
+        back.type = "hidden"; back.name = "back";
+        back.value = location.pathname + "#qa-" + c.id;
+        f.appendChild(t); f.appendChild(back);
+        document.body.appendChild(f);
+        f.submit();
+      });
+      wrap.appendChild(b);
+    }
+    if (c.type === "suggestion" && !c.accepted) action("Accept", "accept");
+    if (c.type === "suggestion" && !c.reviewed) action("Mark reviewed", "review");
+    if (c.featured !== 1) action("Feature", "feature");
+    if (c.featured !== 2) action("Feature on front page", "feature-front");
+    if (c.featured) action("Unfeature", "unfeature");
+    action("Discard", "discard");
+    return wrap;
   }
 
   function flash(box, text) {
@@ -227,7 +261,10 @@
         if (c.type === "question") c.answered = true;
         draw();
       };
-      if (isAdmin && !(window.rfpsWallet && window.rfpsWallet.account())) {
+      // Panel admins reply via their session (spec §9D "TheDAO team"),
+      // regardless of whether a wallet is connected, so a role-less wallet
+      // in the extension does not force the signature path and a 403.
+      if (isAdmin) {
         var nm = nameIn ? nameIn.value.trim() : "";
         try { localStorage.setItem("thedao:qa:adminname", nm); } catch (e) {}
         api("/api/comments/" + c.id + "/reply",
@@ -301,6 +338,7 @@
       formWrap.appendChild(hp);
 
       var ident = el("div", "qa-identbox");
+      ident.appendChild(el("div", "qa-identtitle", "Show who you are (optional)"));
       var connected = window.rfpsWallet && window.rfpsWallet.account();
       var walletBtn = el("button", "btn sm",
         connected ? "Signing as " + connected.slice(0, 6) + "…" + connected.slice(-4)

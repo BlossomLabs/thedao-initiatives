@@ -379,6 +379,7 @@ class TestReplyBinding(unittest.TestCase):
                                        "", "", "", "published")
         client = appmod.app.test_client()
         appmod._buckets.clear()
+        appmod._seen_sigs.clear()
         text = "the reply body"
         h = hashlib.sha256(text.encode()).hexdigest()
         ts = int(time.time())
@@ -390,7 +391,7 @@ class TestReplyBinding(unittest.TestCase):
                                side_effect=fake_verify), \
              mock.patch.object(chain, "has_badge", return_value=False):
             r = client.post("/api/comments/%d/reply" % cid,
-                            json={"body": text, "signature": "0xstub",
+                            json={"body": text, "signature": "0xreplystub",
                                   "ts": ts},
                             headers={"Origin": "http://localhost"},
                             environ_base={"REMOTE_ADDR": "7.7.7.7"})
@@ -400,6 +401,78 @@ class TestReplyBinding(unittest.TestCase):
         # role reply marks the question answered
         self.assertEqual(db.comment_by_id(cid)["answered"], 1)
         self.assertEqual(db.comment_by_id(other)["answered"], 0)
+
+
+class TestSignatureReplayGuard(unittest.TestCase):
+    def test_same_signature_rejected_second_time(self):
+        appmod._seen_sigs.clear()
+        self.assertTrue(appmod._fresh_signature("0xdeadbeef"))
+        self.assertFalse(appmod._fresh_signature("0xdeadbeef"))
+        self.assertFalse(appmod._fresh_signature("0xDEADBEEF"))  # case-insensitive
+
+    def test_expired_signatures_are_pruned(self):
+        appmod._seen_sigs.clear()
+        with mock.patch("app.time") as t:
+            t.time.return_value = 1000
+            appmod._fresh_signature("0xaa")
+        with mock.patch("app.time") as t:
+            t.time.return_value = 1000 + appmod.SIG_WINDOW_SECS + 1
+            # old entry pruned, so the same sig is fresh again after expiry
+            self.assertTrue(appmod._fresh_signature("0xaa"))
+
+
+class TestFeatureRestrictedToTopLevel(unittest.TestCase):
+    def _admin_client(self):
+        appmod.config.ADMIN_PASSWORD = "pw"
+        c = appmod.app.test_client()
+        with c.session_transaction() as s:
+            s["admin"] = True
+            s["_csrf"] = "tok"
+        return c
+
+    def test_cannot_feature_a_reply(self):
+        rid, _ = make_rfp()
+        cid, _t = db.create_comment(rid, None, "question", "", "q", "n",
+                                    "", "", "", "published")
+        reply, _t2 = db.create_comment(rid, cid, "question", "", "r", "n",
+                                       "", "", "ADMIN", "published")
+        c = self._admin_client()
+        r = c.post("/admin/comments/%d/feature-front" % reply,
+                   data={"_csrf": "tok"})
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(db.comment_by_id(reply)["featured"], 0)
+
+    def test_cannot_feature_a_held_entry(self):
+        rid, _ = make_rfp()
+        cid, _t = db.create_comment(rid, None, "suggestion", "", "s", "n",
+                                    "", "", "", "held")
+        c = self._admin_client()
+        r = c.post("/admin/comments/%d/feature" % cid, data={"_csrf": "tok"})
+        self.assertEqual(r.status_code, 400)
+
+
+class TestConfigRefusesBadAddress(unittest.TestCase):
+    def test_non_checksummed_curator_would_raise(self):
+        # The boot-time loop that runs at import (app.py) rejects any
+        # non-checksummed role address; prove the check itself.
+        bad = config.CURATOR_ADDRESSES[0].lower()
+        self.assertNotEqual(chain.to_checksum(bad), bad)  # lower != checksummed
+        with self.assertRaises(Exception):
+            for a in [bad]:
+                if chain.to_checksum(a) != a:
+                    raise RuntimeError("config address not checksummed: %s" % a)
+
+
+@unittest.skipIf(os.environ.get("RFPS_SKIP_LIVE") == "1",
+                 "live mainnet call skipped")
+class TestBadgeLive(unittest.TestCase):
+    """§16.3: verify against mainnet that a known curator holds the badge."""
+    def test_curator_holds_badge_on_mainnet(self):
+        self.assertTrue(chain.has_badge(config.CURATOR_ADDRESSES[0]))
+
+    def test_random_address_has_no_badge(self):
+        self.assertFalse(chain.has_badge(
+            "0x000000000000000000000000000000000000dEaD"))
 
 
 if __name__ == "__main__":

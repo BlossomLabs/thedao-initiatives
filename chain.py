@@ -593,6 +593,11 @@ def recover_personal_sign(message: str, signature: str):
             return None
         if not (1 <= r < _SECP_N and 1 <= s < _SECP_N):
             return None
+        # EIP-2 low-s: reject the malleable high-s twin so a signature has one
+        # canonical form. Nothing here dedups on signature bytes, so this is
+        # hygiene rather than a live fix, but it costs one comparison.
+        if s > _SECP_N // 2:
+            return None
         z = int.from_bytes(personal_message_hash(message), "big")
         # Rebuild the ephemeral point R from its x coordinate (r) and the
         # parity encoded in v, then Q = r^-1 * (s*R - z*G).
@@ -621,7 +626,7 @@ def recover_personal_sign(message: str, signature: str):
 # ---------------------------------------------------- ETHSecurity badge check
 # ERC-721 balanceOf on the badge contract decides the EXPERT role tag.
 # Results are cached per address for an hour (spec §5). IMPORTANT: calldata
-# must be lowercase hex — some RPC nodes silently return 0x0 for mixed-case
+# must be lowercase hex: some RPC nodes silently return 0x0 for mixed-case
 # calldata (verified against publicnode 2026-08-14).
 
 _badge_cache = {}  # lowercase address -> (bool, fetched_at)

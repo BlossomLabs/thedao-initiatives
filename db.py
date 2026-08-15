@@ -574,7 +574,7 @@ def toggle_vote(comment_id, address, sig_ts):
     """Toggle this address's vote. Monotonic-timestamp guard: the signed ts
     must be strictly newer than the last vote action for (entry, address), so
     a replayed signature inside the 10-minute window cannot flip a vote back.
-    Returns (ok, voted_now, votes) — ok False means the replay guard fired.
+    Returns (ok, voted_now, votes). ok False means the replay guard fired.
     The cached votes count is recomputed from the votes table on every write
     (spec §4)."""
     con = connect()
@@ -686,7 +686,8 @@ def front_page_featured(limit=3):
     rows = con.execute(
         "SELECT c.*, r.slug, r.title FROM comments c JOIN rfps r ON "
         "r.id=c.rfp_id WHERE c.status='published' AND c.featured=2 AND "
-        "r.status='approved' ORDER BY c.created_at DESC LIMIT ?",
+        "c.parent_id IS NULL AND r.status='approved' "
+        "ORDER BY c.created_at DESC LIMIT ?",
         (limit,)).fetchall()
     con.close()
     return rows

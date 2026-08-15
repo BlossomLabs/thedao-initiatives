@@ -1091,6 +1091,30 @@ def _sha256_hex(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+# Signature-replay guard for post/reply (votes have their own monotonic-ts
+# guard in db.toggle_vote). A captured signed payload is valid for the 600s
+# window; without this a replay creates a duplicate entry/reply under the
+# victim's address. We remember each accepted signature until it expires.
+_seen_sigs = OrderedDict()  # sig-hex -> expiry epoch
+_seen_lock = threading.Lock()
+
+
+def _fresh_signature(signature):
+    """True the first time a signature is seen; False on replay. Expired
+    entries are pruned so the map cannot grow without bound."""
+    now = time.time()
+    key = (signature or "").lower()
+    with _seen_lock:
+        while _seen_sigs and next(iter(_seen_sigs.values())) < now:
+            _seen_sigs.popitem(last=False)
+        if key in _seen_sigs:
+            return False
+        _seen_sigs[key] = now + SIG_WINDOW_SECS
+        while len(_seen_sigs) > 20000:
+            _seen_sigs.popitem(last=False)
+    return True
+
+
 def ai_screen_comment(ctype, topic, body_text, display_name):
     """AI moderation gate (spec §8 step 6). Returns (verdict, summary) where
     verdict is published|held|discarded. Any failure = held (fail safe).
@@ -1182,8 +1206,13 @@ def comments_list(slug):
     viewer_roles = []
     if viewer and chain.is_address(viewer):
         my_votes = db.votes_by_address(r["id"], viewer)
-        eligible = _vote_eligible(viewer, r["id"])
-        viewer_roles = _comment_roles(viewer, r["id"])
+        # Role/eligibility resolution can trigger a badge eth_call. It is
+        # display-only (the actual vote/reply re-checks server-side), so cap
+        # how often an unauthenticated viewer can churn distinct addresses
+        # through the RPC. Over budget: degrade to not-eligible, no roles.
+        if rate_limit("cviewer:" + client_ip(), 20, 60):
+            eligible = _vote_eligible(viewer, r["id"])
+            viewer_roles = _comment_roles(viewer, r["id"])
     replies_by_parent = defaultdict(list)
     entries = []
     for row in rows:
@@ -1227,22 +1256,29 @@ def comments_post(slug):
                         % config.COMMENT_BODY_MAX}), 400
     if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
         return jsonify({"error": "that email does not look right"}), 400
+    # 2. rate limits (spec §8 gate 2) BEFORE the expensive signature recovery,
+    # so unauthenticated floods and invalid posts are throttled first. Tighter
+    # without a wallet; the wallet path can't be known yet, so gate the anon
+    # bucket on the absence of a signature field.
+    signed = bool(body.get("signature"))
+    if not rate_limit("cpost:" + client_ip(), 5, 3600):
+        return jsonify({"error": "too many posts from your address, "
+                        "try again in an hour"}), 429
+    if not signed and not rate_limit("cpostanon:" + client_ip(), 3, 3600):
+        return jsonify({"error": "too many posts from your address, "
+                        "try again in an hour"}), 429
     # optional wallet signature
     address = ""
-    if body.get("signature"):
+    if signed:
+        if not _fresh_signature(body.get("signature")):
+            return jsonify({"error": "this signature was already used, "
+                            "sign again"}), 409
         addr, err = _verify_sig("post", slug, _sha256_hex(text), body)
         if not addr:
             return jsonify({"error": err}), 400
         address = addr
     if not address and not name:
         return jsonify({"error": "a name is required without a wallet"}), 400
-    # 2. rate limits: tighter without a verified wallet
-    if not rate_limit("cpost:" + client_ip(), 5, 3600):
-        return jsonify({"error": "too many posts from your address, "
-                        "try again in an hour"}), 429
-    if not address and not rate_limit("cpostanon:" + client_ip(), 3, 3600):
-        return jsonify({"error": "too many posts from your address, "
-                        "try again in an hour"}), 429
     roles = _comment_roles(address, r["id"])
     # 5. role fast-lane publishes immediately, skipping the AI screen
     if {"ADMIN", "CURATOR", "EXPERT"} & set(roles):
@@ -1259,10 +1295,13 @@ def comments_post(slug):
     cid, token = db.create_comment(
         r["id"], None, ctype, topic, text, name, email, address,
         ",".join(roles), status, ai_summary=summary, start_vote=start_vote)
+    # The author's own starting vote shows the arrow already pressed (spec
+    # §4): pass their own id in my_votes so voted=true on the returned entry.
+    own = {cid} if start_vote else set()
     return jsonify({"status": status, "id": cid,
                     "claim_token": token if status == "held" else "",
                     "entry": None if status != "published"
-                    else _comment_json(db.comment_by_id(cid), set(), [])})
+                    else _comment_json(db.comment_by_id(cid), own, [])})
 
 
 @app.route("/api/comments/mine")
@@ -1281,6 +1320,12 @@ def comments_mine(slug=None):
 @app.route("/api/comments/<int:cid>/vote", methods=["POST"])
 def comments_vote(cid):
     same_origin_only()
+    # Cheap per-IP throttle BEFORE the expensive pure-Python signature
+    # recovery, so a forged-Origin flood cannot burn CPU unbounded (the
+    # cvote bucket below is keyed on the recovered address, which needs the
+    # work already done).
+    if not rate_limit("cvip:" + client_ip(), 60, 3600):
+        return jsonify({"error": "too many requests, slow down"}), 429
     row = db.comment_by_id(cid)
     if not row or row["status"] != "published" or row["parent_id"]:
         abort(404)
@@ -1333,6 +1378,12 @@ def comments_reply(cid):
         address, roles = "", ["ADMIN"]
     else:
         same_origin_only()
+        # Cheap per-IP throttle before the pure-Python signature recovery.
+        if not rate_limit("crvip:" + client_ip(), 60, 3600):
+            return jsonify({"error": "too many requests, slow down"}), 429
+        if not _fresh_signature(body.get("signature")):
+            return jsonify({"error": "this signature was already used, "
+                            "sign again"}), 409
         # Griff amendment: the reply signature binds the parent entry id, so
         # a signed reply can only ever attach under the entry it was written
         # for (content = "<entry id>:<sha256 of body>").
@@ -1363,6 +1414,12 @@ def admin_comment_action(cid, action):
     row = db.comment_by_id(cid)
     if not row:
         abort(404)
+    # Feature/accept/review only make sense on a top-level published entry;
+    # never let a reply or a held/discarded row become featured (a featured
+    # reply could otherwise surface on the front-page strip).
+    if action in ("accept", "review", "feature", "feature-front") and (
+            row["parent_id"] or row["status"] != "published"):
+        abort(400)
     if action == "publish":
         db.comment_set(cid, status="published")
     elif action == "discard":

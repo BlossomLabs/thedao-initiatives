@@ -13,3 +13,4 @@ server.log
 *.db.bak-*
 .DS_Store
 .scanner.lock
+rfp-app.log

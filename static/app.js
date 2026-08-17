@@ -151,6 +151,7 @@
   function disconnectUi() {
     account = null;
     balances = {};
+    try { document.dispatchEvent(new CustomEvent("rfps:wallet", { detail: { account: null } })); } catch (e) {}
     forgetWallet();
     if (navBtn) {
       navBtn.textContent = "Connect wallet";
@@ -196,6 +197,7 @@
   function setConnected(acct) {
     account = acct;
     balances = {};
+    try { document.dispatchEvent(new CustomEvent("rfps:wallet", { detail: { account: acct } })); } catch (e) {}
     if (navBtn) {
       navBtn.textContent = short(acct);
       navBtn.classList.add("connected");
@@ -1132,4 +1134,27 @@
         });
     });
   })();
+
+  // Minimal bridge for comments.js (community Q&A): read the connected
+  // account, get the active provider for personal_sign, and run the same
+  // connect flow the navbar button uses (chooser included).
+  window.rfpsWallet = {
+    account: function () { return account; },
+    provider: function () { return activeProvider || eth(); },
+    connect: function (onConnected) {
+      if (account && eth()) { if (onConnected) onConnected(); return; }
+      var injected = providers.length || (window.ethereum ? 1 : 0);
+      var options = injected + (wcEnabled() ? 1 : 0);
+      if (options > 1) { openWalletMenu(false, onConnected); return; }
+      if (!injected && wcEnabled()) {
+        var pr = connectWalletConnect();
+        if (onConnected) pr = pr.then(function () { onConnected(); });
+        pr.catch(resetConnectBtn);
+        return;
+      }
+      var pr2 = connectWallet();
+      if (onConnected) pr2 = pr2.then(function () { onConnected(); });
+      pr2.catch(resetConnectBtn);
+    },
+  };
 })();

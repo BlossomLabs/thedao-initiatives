@@ -50,6 +50,42 @@ CREATE TABLE IF NOT EXISTS donations(
   confirmed_at INTEGER
 );
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS comments(
+  id INTEGER PRIMARY KEY,
+  rfp_id INTEGER NOT NULL REFERENCES rfps(id) ON DELETE CASCADE,
+  parent_id INTEGER REFERENCES comments(id),
+  type TEXT NOT NULL CHECK(type IN ('suggestion','question','other')),
+  topic TEXT DEFAULT '',
+  body TEXT NOT NULL,
+  display_name TEXT DEFAULT '',
+  email TEXT DEFAULT '',
+  address TEXT DEFAULT '',
+  roles TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'published'
+    CHECK(status IN ('published','held','discarded')),
+  answered INTEGER NOT NULL DEFAULT 0,
+  reviewed INTEGER NOT NULL DEFAULT 0,
+  accepted INTEGER NOT NULL DEFAULT 0,
+  featured INTEGER NOT NULL DEFAULT 0,
+  votes INTEGER NOT NULL DEFAULT 0,
+  reports INTEGER NOT NULL DEFAULT 0,
+  ai_summary TEXT DEFAULT '',
+  claim_token TEXT DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_comments_rfp ON comments(rfp_id, status);
+CREATE TABLE IF NOT EXISTS comment_votes(
+  comment_id INTEGER NOT NULL REFERENCES comments(id) ON DELETE CASCADE,
+  address TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE(comment_id, address)
+);
+CREATE TABLE IF NOT EXISTS comment_vote_ts(
+  comment_id INTEGER NOT NULL,
+  address TEXT NOT NULL,
+  last_ts INTEGER NOT NULL,
+  UNIQUE(comment_id, address)
+);
 CREATE INDEX IF NOT EXISTS idx_rfps_status ON rfps(status);
 CREATE INDEX IF NOT EXISTS idx_pledges_rfp ON pledges(rfp_id);
 CREATE INDEX IF NOT EXISTS idx_donations_rfp ON donations(rfp_id);
@@ -456,3 +492,210 @@ def meta_set(key, value):
                 (key, value))
     finally:
         con.close()
+
+
+# ---------------------------------------------------------- community Q&A
+
+def create_comment(rfp_id, parent_id, ctype, topic, body, display_name,
+                   email, address, roles, status, ai_summary="",
+                   start_vote=False):
+    """Insert an entry or reply. Returns (comment_id, claim_token).
+
+    start_vote: the author is vote-eligible, so the entry starts at 1 vote
+    (their own, recorded in comment_votes so the toggle works, spec §4).
+    """
+    token = secrets.token_hex(16)
+    con = connect()
+    with con:
+        cur = con.execute(
+            "INSERT INTO comments(rfp_id,parent_id,type,topic,body,"
+            "display_name,email,address,roles,status,ai_summary,claim_token,"
+            "created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (rfp_id, parent_id, ctype, topic, body, display_name, email,
+             address, roles, status, ai_summary, token, now()))
+        cid = cur.lastrowid
+        if start_vote and address and parent_id is None:
+            con.execute("INSERT INTO comment_votes(comment_id,address,"
+                        "created_at) VALUES(?,?,?)", (cid, address, now()))
+            con.execute("UPDATE comments SET votes=1 WHERE id=?", (cid,))
+    con.close()
+    return cid, token
+
+
+def comment_by_id(comment_id):
+    con = connect()
+    row = con.execute("SELECT * FROM comments WHERE id=?",
+                      (comment_id,)).fetchone()
+    con.close()
+    return row
+
+
+def comments_for_rfp(rfp_id):
+    """Published entries + their replies for an initiative page."""
+    con = connect()
+    rows = con.execute(
+        "SELECT * FROM comments WHERE rfp_id=? AND status='published' "
+        "ORDER BY created_at", (rfp_id,)).fetchall()
+    con.close()
+    return rows
+
+
+def comments_by_claim_tokens(tokens):
+    """Author-only view (spec §10): each token unlocks exactly its own held
+    entry, nothing else. Published/discarded rows are never returned here."""
+    if not tokens:
+        return []
+    con = connect()
+    q = ",".join("?" * len(tokens))
+    rows = con.execute(
+        "SELECT * FROM comments WHERE claim_token IN (%s) AND status='held'"
+        % q, list(tokens)).fetchall()
+    con.close()
+    return rows
+
+
+def comment_set(comment_id, **fields):
+    allowed = {"status", "answered", "reviewed", "accepted", "featured",
+               "ai_summary"}
+    sets, vals = [], []
+    for k, v in fields.items():
+        if k not in allowed:
+            raise ValueError("bad field %r" % k)
+        sets.append("%s=?" % k)
+        vals.append(v)
+    vals.append(comment_id)
+    con = connect()
+    with con:
+        con.execute("UPDATE comments SET %s WHERE id=?" % ",".join(sets), vals)
+    con.close()
+
+
+def toggle_vote(comment_id, address, sig_ts):
+    """Toggle this address's vote. Monotonic-timestamp guard: the signed ts
+    must be strictly newer than the last vote action for (entry, address), so
+    a replayed signature inside the 10-minute window cannot flip a vote back.
+    Returns (ok, voted_now, votes). ok False means the replay guard fired.
+    The cached votes count is recomputed from the votes table on every write
+    (spec §4)."""
+    con = connect()
+    with con:
+        row = con.execute(
+            "SELECT last_ts FROM comment_vote_ts WHERE comment_id=? AND "
+            "address=?", (comment_id, address)).fetchone()
+        if row and sig_ts <= row["last_ts"]:
+            votes = con.execute("SELECT votes FROM comments WHERE id=?",
+                                (comment_id,)).fetchone()
+            stale_votes = votes["votes"] if votes else 0
+            row = None  # fall through below; close OUTSIDE the with block
+        else:
+            stale_votes = None
+    if stale_votes is not None:
+        con.close()
+        return False, False, stale_votes
+    with con:
+        con.execute(
+            "INSERT INTO comment_vote_ts(comment_id,address,last_ts) "
+            "VALUES(?,?,?) ON CONFLICT(comment_id,address) "
+            "DO UPDATE SET last_ts=excluded.last_ts",
+            (comment_id, address, sig_ts))
+        existing = con.execute(
+            "SELECT 1 FROM comment_votes WHERE comment_id=? AND address=?",
+            (comment_id, address)).fetchone()
+        if existing:
+            con.execute("DELETE FROM comment_votes WHERE comment_id=? AND "
+                        "address=?", (comment_id, address))
+            voted = False
+        else:
+            con.execute("INSERT INTO comment_votes(comment_id,address,"
+                        "created_at) VALUES(?,?,?)",
+                        (comment_id, address, now()))
+            voted = True
+        n = con.execute("SELECT COUNT(*) c FROM comment_votes WHERE "
+                        "comment_id=?", (comment_id,)).fetchone()["c"]
+        con.execute("UPDATE comments SET votes=? WHERE id=?", (n, comment_id))
+    con.close()
+    return True, voted, n
+
+
+def votes_by_address(rfp_id, address):
+    """Entry ids on this initiative the address has voted for."""
+    con = connect()
+    rows = con.execute(
+        "SELECT v.comment_id FROM comment_votes v JOIN comments c ON "
+        "c.id=v.comment_id WHERE c.rfp_id=? AND v.address=?",
+        (rfp_id, address)).fetchall()
+    con.close()
+    return {r["comment_id"] for r in rows}
+
+
+def add_report(comment_id):
+    con = connect()
+    with con:
+        con.execute("UPDATE comments SET reports=reports+1 WHERE id=? AND "
+                    "status='published'", (comment_id,))
+    con.close()
+
+
+def donation_total_for(rfp_id, address):
+    """Confirmed USD total this address donated to THIS initiative (voting
+    eligibility, spec §4). Donations to other initiatives grant nothing."""
+    con = connect()
+    row = con.execute(
+        "SELECT COALESCE(SUM(amount),0) s FROM donations WHERE rfp_id=? AND "
+        "status='confirmed' AND LOWER(donor)=LOWER(?)",
+        (rfp_id, address)).fetchone()
+    con.close()
+    return row["s"] or 0
+
+
+def held_comments():
+    con = connect()
+    rows = con.execute(
+        "SELECT c.*, r.slug, r.title FROM comments c JOIN rfps r ON "
+        "r.id=c.rfp_id WHERE c.status='held' "
+        "ORDER BY c.reports DESC, c.created_at").fetchall()
+    con.close()
+    return rows
+
+
+def unanswered_questions():
+    """Published questions with no role reply, oldest first (admin panel)."""
+    con = connect()
+    rows = con.execute(
+        "SELECT c.*, r.slug, r.title FROM comments c JOIN rfps r ON "
+        "r.id=c.rfp_id WHERE c.status='published' AND c.type='question' AND "
+        "c.answered=0 AND c.parent_id IS NULL "
+        "ORDER BY c.created_at").fetchall()
+    con.close()
+    return rows
+
+
+def reported_comments():
+    con = connect()
+    rows = con.execute(
+        "SELECT c.*, r.slug, r.title FROM comments c JOIN rfps r ON "
+        "r.id=c.rfp_id WHERE c.status='published' AND c.reports>0 "
+        "ORDER BY c.reports DESC, c.created_at").fetchall()
+    con.close()
+    return rows
+
+
+def front_page_featured(limit=3):
+    """Entries admin-featured for the front-page strip (featured=2)."""
+    con = connect()
+    rows = con.execute(
+        "SELECT c.*, r.slug, r.title FROM comments c JOIN rfps r ON "
+        "r.id=c.rfp_id WHERE c.status='published' AND c.featured=2 AND "
+        "c.parent_id IS NULL AND r.status='approved' "
+        "ORDER BY c.created_at DESC LIMIT ?",
+        (limit,)).fetchall()
+    con.close()
+    return rows
+
+
+def count_front_page_featured():
+    con = connect()
+    n = con.execute("SELECT COUNT(*) c FROM comments WHERE featured=2 AND "
+                    "status='published'").fetchone()["c"]
+    con.close()
+    return n

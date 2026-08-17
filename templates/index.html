@@ -12,6 +12,25 @@
    design, has never rendered in production (it needs a recent donation and there
    have been none), and no commit of Griff's ever added it. Griff to confirm. #}
 
+{% if community %}
+<section class="community-strip">
+  <h2>From the community</h2>
+  <div class="community-cards">
+  {% for c in community %}
+    <a class="community-card" href="{{ url_for('rfp_page', slug=c.slug) }}#qa">
+      <span class="qa-icon">{{ '💡' if c.type == 'suggestion' else ('❓' if c.type == 'question' else '💬') }}</span>
+      <span class="qa-ident">
+        {% if c.address %}<span class="ens-addr" data-addr="{{ c.address }}">{{ c.address | shortaddr }}</span>{% else %}{{ c.display_name }}{% endif %}
+        {% for t in c.roles.split(',')[:2] %}{% if t %}<span class="qa-chip role">{{ 'ETHSECURITY EXPERT' if t == 'EXPERT' else t }}</span>{% endif %}{% endfor %}
+      </span>
+      <span class="qa-snippet">{{ c.body[:120] }}{% if c.body|length > 120 %}…{% endif %}</span>
+      <span class="qa-src dim">on {{ c.title }}</span>
+    </a>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 <main>
   <h2 id="rfps">Security initiatives looking for funding</h2>
   {% if ai_search and cards %}
@@ -35,7 +54,7 @@
       <div class="bar"><i style="width: {{ c.pct }}%"></i></div>
       <div class="card-nums{% if not c.sum.total %} zero{% endif %}">
         <span><b>{{ c.sum.total | usd }}</b> of {{ c.rfp.funding_goal_usd | usd }}{% if c.n_sponsors %} <span class="sponsor-count">· {{ c.n_sponsors }} sponsor{{ '' if c.n_sponsors == 1 else 's' }}</span>{% endif %}</span>
-        <span class="pct">{{ c.pct }}%</span>
+        {% if c.funded %}<span class="chip static funded-chip">FUNDED</span>{% else %}<span class="pct">{{ c.pct }}%</span>{% endif %}
       </div>
       {% if c.logos %}
       <div class="card-logos">

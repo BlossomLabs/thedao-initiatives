@@ -14,6 +14,14 @@
 
   <div class="cols">
     <div class="col-main">
+      {% if funded %}
+      <div class="funded-bar">🎉 Funded! This initiative reached its goal.</div>
+      <div class="fund-split">
+        <span><b>{{ sum.total | usd }}</b> raised of {{ r.funding_goal_usd | usd }}</span>
+        <span><b>{{ sum.pledged | usd }}</b> pledged by sponsors</span>
+        <span><b>{{ sum.donated | usd }}</b> donated on-chain</span>
+      </div>
+      {% else %}
       <div class="fund-head">
         <div class="fund-big"><b>{{ sum.total | usd }}</b> <span class="dim">of {{ r.funding_goal_usd | usd }}</span></div>
         <div class="bar big"><i style="width: {{ pct }}%"></i></div>
@@ -23,6 +31,7 @@
           <span><b>{{ pct }}%</b> of goal</span>
         </div>
       </div>
+      {% endif %}
 
       <h2>Summary</h2>
       <p class="body-text">{{ r.summary }}</p>
@@ -34,6 +43,20 @@
       <p class="empty">The complete spec (scope, milestones, budget breakdown) is being written.
       {% if r.discourse_url %}Follow and shape it <a href="{{ r.discourse_url }}" target="_blank" rel="noopener">on the forum thread</a>.{% endif %}</p>
       {% endif %}
+
+      <section id="qa" data-slug="{{ r.slug }}"
+        {% if r.status == 'approved' %}data-open="1"{% endif %}
+        {% if session.get('admin') %}data-admin="1" data-csrf="{{ csrf_token() }}"{% endif %}>
+        <h2>Questions &amp; Suggestions <span class="n" id="qa-count"></span></h2>
+        <div class="qa-filters" id="qa-filters" hidden>
+          <button type="button" class="qa-filter on" data-f="all">All</button>
+          <button type="button" class="qa-filter" data-f="suggestion">Suggestions</button>
+          <button type="button" class="qa-filter" data-f="question">Questions</button>
+        </div>
+        <div id="qa-list"><p class="empty" id="qa-empty" hidden>Be the first to ask about this initiative.</p></div>
+        <button type="button" class="btn ghost" id="qa-more" hidden>Show more</button>
+        <div id="qa-composer" hidden></div>
+      </section>
 
       <h2>Sponsors <span class="n">{{ pledges | length }}</span></h2>
       {% if pledges %}
@@ -111,3 +134,4 @@
   </div>
 </main>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='comments.js') }}"></script>{% endblock %}

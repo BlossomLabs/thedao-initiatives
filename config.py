@@ -53,6 +53,31 @@ RPC_ENDPOINTS = [
 SUBMISSIONS_PER_HOUR_PER_IP = 5
 LOGIN_ATTEMPTS_PER_MINUTE_PER_IP = 5
 
+# ------------------------------------------------------- community Q&A roles
+# ETHSecurity badge (ERC-721, verified on-chain Aug 2026: name "ETHSecurity
+# Badge", symbol "BADGE"). balanceOf > 0 grants the EXPERT tag.
+BADGE_CONTRACT = "0xf67C0aDe41c607EfeBf198F9D6065Ab1ec5aD4cd"
+
+# Wallets whose signed posts/replies carry the CURATOR tag. All verified to
+# hold the ETHSecurity badge at config time (spec §12); app.py re-validates
+# the checksums at startup and refuses to boot on a mismatch.
+CURATOR_ADDRESSES = [
+    "0x809FA673fe2ab515FaA168259cB14E2BeDeBF68e",
+    "0x1DBA1131000664b884A1Ba238464159892252D3a",
+    "0xB6647e02AE6Dd74137cB80b1C24333852E4AF890",
+    "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+    "0x519d04B37bfff9667F03eA83d3346D6D85301ccb",
+    "0xd161F7FA342DCefEafDEb0827B83a400F57ad0a4",
+    "0xe9Fa0c8B5d7F79DeC36D3F448B1Ac4cEdedE4e69",
+]
+
+ADMIN_ADDRESSES = [
+    "0x839395e20bbB182fa440d08F850E6c7A8f6F0780",  # griff.eth
+]
+
+MIN_VOTE_DONATION_USD = 20
+COMMENT_BODY_MAX = 2000
+
 # A donation is only credited once its tx is this many blocks deep, so a
 # short reorg cannot leave an RFP crediting money that fell off the chain.
 # Three blocks (~36s) covers the 1-2 block reorgs seen on post-merge mainnet

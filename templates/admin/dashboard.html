@@ -3,7 +3,9 @@
 {% block content %}
 <main class="detail">
   <div class="admin-head">
-    <h1>Admin dashboard</h1>
+    <h1>Admin dashboard
+      {% if bell %}<a class="admin-bell" href="#moderation" title="{{ bell }} items need attention">🔔<span class="bell-n">{{ bell }}</span></a>{% endif %}
+    </h1>
     <div style="display:flex;gap:10px">
       <form method="post" action="{{ url_for('admin_sync_content') }}">
         <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
@@ -23,6 +25,78 @@
       <div><b>{{ n_pending }} pending submission{{ '' if n_pending == 1 else 's' }}</b>
       <small>awaiting review below</small></div></div>
   </div>
+
+  <h2 id="moderation">Community moderation</h2>
+  <h3>Waiting for review <span class="n">{{ held | length }}</span></h3>
+  {% if held %}
+  <div class="tblbox">
+    <table>
+      <thead><tr><th>Entry</th><th>AI summary</th><th>Identity</th><th></th></tr></thead>
+      <tbody>
+      {% for c in held %}
+        <tr{% if c.reports %} class="reported"{% endif %}>
+          <td><b>{{ c.type }}</b> on {{ c.title }}{% if c.reports %} · {{ c.reports }} report{{ '' if c.reports == 1 else 's' }}{% endif %}<br>
+            <span class="qa-body-cell">{{ c.body }}</span></td>
+          <td class="small dim">{{ c.ai_summary }}</td>
+          <td class="small">{{ c.display_name or '(no name)' }}{% if c.email %} · {{ c.email }}{% endif %}{% if c.address %}<br>{{ c.address | shortaddr }}{% endif %}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin_comment_action', cid=c.id, action='publish') }}" style="display:inline">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <button class="btn sm" type="submit">Publish</button>
+            </form>
+            <form method="post" action="{{ url_for('admin_comment_action', cid=c.id, action='discard') }}" style="display:inline">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <button class="btn ghost sm" type="submit">Discard</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<p class="empty">Nothing waiting for review.</p>{% endif %}
+
+  <h3>Unanswered questions <span class="n">{{ unanswered | length }}</span></h3>
+  {% if unanswered %}
+  <div class="tblbox">
+    <table>
+      <thead><tr><th>Question</th><th>Asked</th><th></th></tr></thead>
+      <tbody>
+      {% for q in unanswered %}
+        <tr{% if q.created_at < week_ago %} class="stale-q"{% endif %}>
+          <td>on {{ q.title }}<br><span class="qa-body-cell">{{ q.body[:200] }}</span></td>
+          <td>{{ q.created_at | dt }}{% if q.created_at < week_ago %} · <b>7+ days</b>{% endif %}</td>
+          <td><a class="btn ghost sm" href="{{ url_for('rfp_page', slug=q.slug) }}#qa-{{ q.id }}">Open</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<p class="empty">Every question has a reply.</p>{% endif %}
+
+  {% if reported %}
+  <h3>Reported entries <span class="n">{{ reported | length }}</span></h3>
+  <div class="tblbox">
+    <table>
+      <thead><tr><th>Entry</th><th>Reports</th><th></th></tr></thead>
+      <tbody>
+      {% for c in reported %}
+        <tr>
+          <td>{{ c.type }} on {{ c.title }}<br><span class="qa-body-cell">{{ c.body[:200] }}</span></td>
+          <td>{{ c.reports }}</td>
+          <td>
+            <a class="btn ghost sm" href="{{ url_for('rfp_page', slug=c.slug) }}#qa-{{ c.id }}">Open</a>
+            <form method="post" action="{{ url_for('admin_comment_action', cid=c.id, action='discard') }}" style="display:inline">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <button class="btn ghost sm" type="submit">Discard</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
 
   <h2>All initiatives</h2>
   <div class="tblbox">

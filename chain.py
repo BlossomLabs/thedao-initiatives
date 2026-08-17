@@ -518,3 +518,142 @@ def verify_safe(address):
                       "operational signers" % (config.SAFE_THRESHOLD, n))
     except Exception as e:
         return False, "verification failed: %s" % e
+
+
+# ---------------------------------------------------- EIP-191 personal_sign
+# Signature recovery for the community Q&A feature (SPEC-community-qa §6).
+# Pure-Python secp256k1 point math + pycryptodome keccak: no new dependency.
+# The recovered address is the only thing trusted; the message itself is
+# rebuilt server-side from the request fields, never taken from the client.
+
+_SECP_P = 2**256 - 2**32 - 977
+_SECP_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+_SECP_GX = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
+_SECP_GY = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
+
+
+def _inv_mod(a, m):
+    return pow(a, m - 2, m)
+
+
+def _point_add(p1, p2):
+    """Add two points on secp256k1 (affine coords, None = infinity)."""
+    if p1 is None:
+        return p2
+    if p2 is None:
+        return p1
+    x1, y1 = p1
+    x2, y2 = p2
+    if x1 == x2 and (y1 + y2) % _SECP_P == 0:
+        return None
+    if p1 == p2:
+        lam = (3 * x1 * x1) * _inv_mod(2 * y1, _SECP_P) % _SECP_P
+    else:
+        lam = (y2 - y1) * _inv_mod(x2 - x1, _SECP_P) % _SECP_P
+    x3 = (lam * lam - x1 - x2) % _SECP_P
+    y3 = (lam * (x1 - x3) - y1) % _SECP_P
+    return (x3, y3)
+
+
+def _point_mul(k, point):
+    """Scalar multiplication by double-and-add."""
+    result = None
+    addend = point
+    while k:
+        if k & 1:
+            result = _point_add(result, addend)
+        addend = _point_add(addend, addend)
+        k >>= 1
+    return result
+
+
+def personal_message_hash(message: str) -> bytes:
+    """keccak256 of the EIP-191 prefixed message, as wallets sign it."""
+    raw = message.encode("utf-8")
+    prefixed = b"\x19Ethereum Signed Message:\n" + str(len(raw)).encode() + raw
+    return keccak256(prefixed)
+
+
+def recover_personal_sign(message: str, signature: str):
+    """Recover the checksummed signer address of personal_sign(message).
+
+    Returns the address string, or None for any malformed or invalid
+    signature (never raises on bad input).
+    """
+    try:
+        sig = signature.lower().replace("0x", "")
+        if len(sig) != 130:
+            return None
+        r = int(sig[0:64], 16)
+        s = int(sig[64:128], 16)
+        v = int(sig[128:130], 16)
+        if v in (0, 1):
+            v += 27
+        if v not in (27, 28):
+            return None
+        if not (1 <= r < _SECP_N and 1 <= s < _SECP_N):
+            return None
+        # EIP-2 low-s: reject the malleable high-s twin so a signature has one
+        # canonical form. Nothing here dedups on signature bytes, so this is
+        # hygiene rather than a live fix, but it costs one comparison.
+        if s > _SECP_N // 2:
+            return None
+        z = int.from_bytes(personal_message_hash(message), "big")
+        # Rebuild the ephemeral point R from its x coordinate (r) and the
+        # parity encoded in v, then Q = r^-1 * (s*R - z*G).
+        x = r
+        y_sq = (pow(x, 3, _SECP_P) + 7) % _SECP_P
+        y = pow(y_sq, (_SECP_P + 1) // 4, _SECP_P)
+        if pow(y, 2, _SECP_P) != y_sq:
+            return None  # r is not the x of a curve point
+        if (y % 2) != (v - 27):
+            y = _SECP_P - y
+        point_r = (x, y)
+        r_inv = _inv_mod(r, _SECP_N)
+        u1 = (-z * r_inv) % _SECP_N
+        u2 = (s * r_inv) % _SECP_N
+        q = _point_add(_point_mul(u1, (_SECP_GX, _SECP_GY)),
+                       _point_mul(u2, point_r))
+        if q is None:
+            return None
+        qx, qy = q
+        pub = qx.to_bytes(32, "big") + qy.to_bytes(32, "big")
+        return to_checksum("0x" + keccak256(pub)[-20:].hex())
+    except (ValueError, ArithmeticError):
+        return None
+
+
+# ---------------------------------------------------- ETHSecurity badge check
+# ERC-721 balanceOf on the badge contract decides the EXPERT role tag.
+# Results are cached per address for an hour (spec §5). IMPORTANT: calldata
+# must be lowercase hex: some RPC nodes silently return 0x0 for mixed-case
+# calldata (verified against publicnode 2026-08-14).
+
+_badge_cache = {}  # lowercase address -> (bool, fetched_at)
+_badge_lock = None  # set lazily to avoid importing threading at module top
+
+
+def has_badge(address: str) -> bool:
+    """True if the address holds the ETHSecurity badge. RPC failure = False
+    (fail closed: no free role tags when the chain is unreachable)."""
+    import threading
+    global _badge_lock
+    if _badge_lock is None:
+        _badge_lock = threading.Lock()
+    key = address.lower()
+    now = time.time()
+    with _badge_lock:
+        hit = _badge_cache.get(key)
+        if hit and now - hit[1] < 3600:
+            return hit[0]
+    try:
+        data = "0x70a08231" + "0" * 24 + key.replace("0x", "")
+        result = eth_call(config.BADGE_CONTRACT.lower(), data)
+        held = _decode_hex_int(result) > 0
+    except (RpcError, ValueError):
+        return False  # transient failure: no tag this time, no cache poison
+    with _badge_lock:
+        _badge_cache[key] = (held, now)
+        if len(_badge_cache) > 5000:
+            _badge_cache.clear()  # crude but bounded; refills from RPC
+    return held

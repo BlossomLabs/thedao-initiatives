@@ -47,12 +47,7 @@
       <section id="qa" data-slug="{{ r.slug }}"
         {% if r.status == 'approved' %}data-open="1"{% endif %}
         {% if session.get('admin') %}data-admin="1" data-csrf="{{ csrf_token() }}"{% endif %}>
-        <h2>Questions &amp; Suggestions <span class="n" id="qa-count"></span></h2>
-        <div class="qa-filters" id="qa-filters" hidden>
-          <button type="button" class="qa-filter on" data-f="all">All</button>
-          <button type="button" class="qa-filter" data-f="suggestion">Suggestions</button>
-          <button type="button" class="qa-filter" data-f="question">Questions</button>
-        </div>
+        <h2>Comments <span class="n" id="qa-count"></span></h2>
         <div id="qa-list"><p class="empty" id="qa-empty" hidden>Be the first to ask about this initiative.</p></div>
         <button type="button" class="btn ghost" id="qa-more" hidden>Show more</button>
         <div id="qa-composer" hidden></div>

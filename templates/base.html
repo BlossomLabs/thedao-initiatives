@@ -29,6 +29,7 @@
     <a href="{{ url_for('index') }}" {% if request.path == '/' %}class="on"{% endif %}>Initiatives</a>
     <a href="https://transparency.thedao.fund/" target="_blank" rel="noopener">Transparency</a>
     <a href="{{ url_for('submit') }}" class="navcta">Suggest an initiative</a>
+    {% if session.get('admin') %}<a href="{{ url_for('admin_dashboard') }}">Admin</a>{% endif %}
     <button id="nav-connect" class="btn wallet" type="button"
       {% if wc_project_id %}data-wc-project="{{ wc_project_id }}" data-wc-src="{{ url_for('static', filename='vendor/walletconnect-ethereum-provider-2.21.1.min.js') }}"{% endif %}>Connect wallet</button>
   </nav>

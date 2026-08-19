@@ -167,10 +167,21 @@ class TestAuthorStartingVote(unittest.TestCase):
         cid, _tok = db.create_comment(rid, None, "suggestion", "", "body",
                                       "", "", DONOR, "DONOR", "published",
                                       start_vote=True)
-        ok, voted, votes = db.toggle_vote(cid, DONOR, int(time.time()))
+        ok, voted, votes = db.set_vote(cid, DONOR, 1,int(time.time()))
         self.assertTrue(ok)
         self.assertFalse(voted)
         self.assertEqual(votes, 0)
+
+    def test_downvote_and_switch(self):
+        rid, _ = make_rfp()
+        cid, _t = db.create_comment(rid, None, "question", "", "b", "n",
+                                    "", "", "", "published")
+        ok, my, sc = db.set_vote(cid, DONOR, -1, 1000)   # down
+        self.assertTrue(ok); self.assertEqual(my, -1); self.assertEqual(sc, -1)
+        ok, my, sc = db.set_vote(cid, DONOR, 1, 1001)    # switch to up
+        self.assertTrue(ok); self.assertEqual(my, 1); self.assertEqual(sc, 1)
+        ok, my, sc = db.set_vote(cid, DONOR, 1, 1002)    # up again clears
+        self.assertTrue(ok); self.assertEqual(my, 0); self.assertEqual(sc, 0)
 
 
 class TestVoteReplayGuard(unittest.TestCase):
@@ -178,15 +189,15 @@ class TestVoteReplayGuard(unittest.TestCase):
         rid, _ = make_rfp()
         cid, _tok = db.create_comment(rid, None, "question", "", "b", "n",
                                       "", "", "", "published")
-        ok, voted, votes = db.toggle_vote(cid, DONOR, 1000)
+        ok, voted, votes = db.set_vote(cid, DONOR, 1,1000)
         self.assertTrue(ok)
         self.assertTrue(voted)
         # same signed ts replayed: refused, vote stays
-        ok2, _, votes2 = db.toggle_vote(cid, DONOR, 1000)
+        ok2, _, votes2 = db.set_vote(cid, DONOR, 1,1000)
         self.assertFalse(ok2)
         self.assertEqual(votes2, 1)
         # a fresh signature (newer ts) toggles normally
-        ok3, voted3, votes3 = db.toggle_vote(cid, DONOR, 1001)
+        ok3, voted3, votes3 = db.set_vote(cid, DONOR, 1,1001)
         self.assertTrue(ok3)
         self.assertFalse(voted3)
         self.assertEqual(votes3, 0)
@@ -401,6 +412,76 @@ class TestReplyBinding(unittest.TestCase):
         # role reply marks the question answered
         self.assertEqual(db.comment_by_id(cid)["answered"], 1)
         self.assertEqual(db.comment_by_id(other)["answered"], 0)
+
+
+class TestReplyRoleGate(unittest.TestCase):
+    """Replies are role-only (spec §1/§4): team, curators, ETHSecurity badge
+    holders. A plain wallet or a name-only poster cannot reply."""
+
+    def setUp(self):
+        self.rid, self.slug = make_rfp()
+        self.cid, _ = db.create_comment(self.rid, None, "question", "", "q",
+                                        "n", "", "", "", "published")
+        self.client = appmod.app.test_client()
+        appmod._buckets.clear()
+        appmod._seen_sigs.clear()
+
+    def _reply(self, payload, ip="7.7.7.8"):
+        return self.client.post("/api/comments/%d/reply" % self.cid,
+                                json=payload,
+                                headers={"Origin": "http://localhost"},
+                                environ_base={"REMOTE_ADDR": ip})
+
+    def test_plain_wallet_cannot_reply(self):
+        ts = int(time.time())
+        with mock.patch.object(appmod, "_verify_sig",
+                               return_value=(NOBODY, ts)), \
+             mock.patch.object(chain, "has_badge", return_value=False):
+            r = self._reply({"body": "hi", "signature": "0xstub", "ts": ts})
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(db.comment_by_id(self.cid)["answered"], 0)
+
+    def test_curator_can_reply_and_answers(self):
+        ts = int(time.time())
+        with mock.patch.object(appmod, "_verify_sig",
+                               return_value=(CURATOR, ts)), \
+             mock.patch.object(chain, "has_badge", return_value=False):
+            r = self._reply({"body": "hi", "signature": "0xstub2", "ts": ts})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(db.comment_by_id(self.cid)["answered"], 1)
+
+    def test_nameonly_reply_rejected(self):
+        r = self._reply({"body": "hi", "name": "Sam"})
+        self.assertEqual(r.status_code, 403)
+
+
+class TestAdminWalletLogin(unittest.TestCase):
+    """Wallet-gated admin sign-in: a signer in ADMIN_ADDRESSES gets the same
+    admin session the password grants; anyone else is rejected."""
+
+    def setUp(self):
+        self.client = appmod.app.test_client()
+        appmod._buckets.clear()
+        appmod._seen_sigs.clear()
+
+    def _login(self, addr, sig):
+        ts = int(time.time())
+        with mock.patch.object(appmod, "_verify_sig", return_value=(addr, ts)):
+            return self.client.post("/admin/login-wallet",
+                                    json={"signature": sig, "ts": ts},
+                                    headers={"Origin": "http://localhost"},
+                                    environ_base={"REMOTE_ADDR": "6.6.6.6"})
+
+    def test_admin_wallet_grants_session(self):
+        r = self._login(config.ADMIN_ADDRESSES[0], "0xadminstub")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self.client.get("/admin/dashboard").status_code, 200)
+
+    def test_non_admin_wallet_rejected(self):
+        r = self._login(NOBODY, "0xnotadmin")
+        self.assertEqual(r.status_code, 403)
+        self.assertIn(self.client.get("/admin/dashboard").status_code,
+                      (302, 401))
 
 
 class TestSignatureReplayGuard(unittest.TestCase):

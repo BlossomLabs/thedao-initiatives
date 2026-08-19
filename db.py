@@ -89,6 +89,13 @@ CREATE TABLE IF NOT EXISTS comment_vote_ts(
 CREATE INDEX IF NOT EXISTS idx_rfps_status ON rfps(status);
 CREATE INDEX IF NOT EXISTS idx_pledges_rfp ON pledges(rfp_id);
 CREATE INDEX IF NOT EXISTS idx_donations_rfp ON donations(rfp_id);
+CREATE TABLE IF NOT EXISTS nicknames(
+  address TEXT PRIMARY KEY,
+  nickname TEXT NOT NULL DEFAULT '',
+  pfp TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_nick_lower ON nicknames(lower(nickname)) WHERE nickname != '';
 """
 
 
@@ -98,6 +105,75 @@ def connect():
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA foreign_keys=ON")
     return con
+
+
+def get_nickname(address):
+    """The nickname registered for an address (as stored), or None."""
+    if not address:
+        return None
+    con = connect()
+    try:
+        r = con.execute("SELECT nickname FROM nicknames WHERE address=?",
+                        (address.lower(),)).fetchone()
+        return r["nickname"] if r else None
+    finally:
+        con.close()
+
+
+def nickname_owner(nickname):
+    """The address currently holding this nickname (case-insensitive), or None."""
+    con = connect()
+    try:
+        r = con.execute("SELECT address FROM nicknames WHERE lower(nickname)=lower(?)",
+                        (nickname,)).fetchone()
+        return r["address"] if r else None
+    finally:
+        con.close()
+
+
+def set_nickname(address, nickname):
+    """Upsert an address's nickname. Uniqueness (lower) is enforced by index;
+    callers should check nickname_owner first for a friendly error."""
+    con = connect()
+    try:
+        with con:
+            con.execute(
+                "INSERT INTO nicknames(address, nickname, updated_at) VALUES(?,?,?) "
+                "ON CONFLICT(address) DO UPDATE SET nickname=excluded.nickname, "
+                "updated_at=excluded.updated_at",
+                (address.lower(), nickname, int(time.time())))
+    finally:
+        con.close()
+
+
+def get_profile(address):
+    """{'nickname': str|None, 'pfp': str} for an address ('' pfp = default)."""
+    if not address:
+        return {"nickname": None, "pfp": ""}
+    con = connect()
+    try:
+        r = con.execute("SELECT nickname, pfp FROM nicknames WHERE address=?",
+                        (address.lower(),)).fetchone()
+        if not r:
+            return {"nickname": None, "pfp": ""}
+        return {"nickname": r["nickname"] or None, "pfp": r["pfp"] or ""}
+    finally:
+        con.close()
+
+
+def set_pfp(address, pfp):
+    """Set an address's profile picture (a preset id like 'preset:3' or an
+    uploaded ref like 'upload:<file>'). Creates a nickname-less row if needed."""
+    con = connect()
+    try:
+        with con:
+            con.execute(
+                "INSERT INTO nicknames(address, nickname, pfp, updated_at) "
+                "VALUES(?,'',?,?) ON CONFLICT(address) DO UPDATE SET "
+                "pfp=excluded.pfp, updated_at=excluded.updated_at",
+                (address.lower(), pfp, int(time.time())))
+    finally:
+        con.close()
 
 
 def init():
@@ -113,6 +189,27 @@ def init():
         pcols = {r["name"] for r in con.execute("PRAGMA table_info(pledges)")}
         if "logo" not in pcols:
             con.execute("ALTER TABLE pledges ADD COLUMN logo TEXT DEFAULT ''")
+        # Directional votes: +1 up / -1 down. Existing rows were all upvotes.
+        vcols = {r["name"] for r in con.execute("PRAGMA table_info(comment_votes)")}
+        if "value" not in vcols:
+            con.execute("ALTER TABLE comment_votes ADD COLUMN value "
+                        "INTEGER NOT NULL DEFAULT 1")
+        # Featured ordering: the most-recently-featured comment sorts to the very
+        # top, above earlier-featured ones. 0 = not featured; set to now() when an
+        # admin features it, cleared on unfeature.
+        ccols = {r["name"] for r in con.execute("PRAGMA table_info(comments)")}
+        if "featured_at" not in ccols:
+            con.execute("ALTER TABLE comments ADD COLUMN featured_at "
+                        "INTEGER NOT NULL DEFAULT 0")
+        # Profile pictures live alongside nicknames. Allow a profile row with a
+        # pfp but no nickname, so the unique-nickname index goes partial.
+        nick_cols = {r["name"] for r in con.execute("PRAGMA table_info(nicknames)")}
+        if "pfp" not in nick_cols:
+            con.execute("ALTER TABLE nicknames ADD COLUMN pfp TEXT NOT NULL "
+                        "DEFAULT ''")
+            con.execute("DROP INDEX IF EXISTS idx_nick_lower")
+            con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_nick_lower "
+                        "ON nicknames(lower(nickname)) WHERE nickname != ''")
         if "sort_rank" not in cols:
             con.execute("ALTER TABLE rfps ADD COLUMN sort_rank INTEGER")
         # Every listing is an "initiative" of one of two types: an RFP (open
@@ -556,7 +653,7 @@ def comments_by_claim_tokens(tokens):
 
 def comment_set(comment_id, **fields):
     allowed = {"status", "answered", "reviewed", "accepted", "featured",
-               "ai_summary"}
+               "featured_at", "ai_summary"}
     sets, vals = [], []
     for k, v in fields.items():
         if k not in allowed:
@@ -570,28 +667,33 @@ def comment_set(comment_id, **fields):
     con.close()
 
 
-def toggle_vote(comment_id, address, sig_ts):
-    """Toggle this address's vote. Monotonic-timestamp guard: the signed ts
-    must be strictly newer than the last vote action for (entry, address), so
-    a replayed signature inside the 10-minute window cannot flip a vote back.
-    Returns (ok, voted_now, votes). ok False means the replay guard fired.
-    The cached votes count is recomputed from the votes table on every write
-    (spec §4)."""
+def set_vote(comment_id, address, value, sig_ts):
+    """Set this address's vote to +1 (up) or -1 (down); clicking the same
+    direction again clears it. Monotonic-timestamp guard: the signed ts must be
+    strictly newer than the last vote action for (entry, address), so a replayed
+    signature inside the 10-minute window cannot flip a vote back. Returns
+    (ok, myvote, score) with myvote in {-1,0,1} and score = SUM(value) (net).
+    ok False means the replay guard fired."""
+    if value not in (1, -1):
+        return False, 0, 0
     con = connect()
     with con:
         row = con.execute(
             "SELECT last_ts FROM comment_vote_ts WHERE comment_id=? AND "
             "address=?", (comment_id, address)).fetchone()
         if row and sig_ts <= row["last_ts"]:
-            votes = con.execute("SELECT votes FROM comments WHERE id=?",
-                                (comment_id,)).fetchone()
-            stale_votes = votes["votes"] if votes else 0
-            row = None  # fall through below; close OUTSIDE the with block
+            cur = con.execute("SELECT votes FROM comments WHERE id=?",
+                              (comment_id,)).fetchone()
+            stale_score = cur["votes"] if cur else 0
+            mine = con.execute("SELECT value FROM comment_votes WHERE "
+                               "comment_id=? AND address=?",
+                               (comment_id, address)).fetchone()
+            stale_my = mine["value"] if mine else 0
         else:
-            stale_votes = None
-    if stale_votes is not None:
+            stale_score = None
+    if stale_score is not None:
         con.close()
-        return False, False, stale_votes
+        return False, stale_my, stale_score
     with con:
         con.execute(
             "INSERT INTO comment_vote_ts(comment_id,address,last_ts) "
@@ -599,33 +701,39 @@ def toggle_vote(comment_id, address, sig_ts):
             "DO UPDATE SET last_ts=excluded.last_ts",
             (comment_id, address, sig_ts))
         existing = con.execute(
-            "SELECT 1 FROM comment_votes WHERE comment_id=? AND address=?",
+            "SELECT value FROM comment_votes WHERE comment_id=? AND address=?",
             (comment_id, address)).fetchone()
-        if existing:
+        if existing and existing["value"] == value:
             con.execute("DELETE FROM comment_votes WHERE comment_id=? AND "
                         "address=?", (comment_id, address))
-            voted = False
+            myvote = 0
+        elif existing:
+            con.execute("UPDATE comment_votes SET value=?, created_at=? WHERE "
+                        "comment_id=? AND address=?",
+                        (value, now(), comment_id, address))
+            myvote = value
         else:
             con.execute("INSERT INTO comment_votes(comment_id,address,"
-                        "created_at) VALUES(?,?,?)",
-                        (comment_id, address, now()))
-            voted = True
-        n = con.execute("SELECT COUNT(*) c FROM comment_votes WHERE "
-                        "comment_id=?", (comment_id,)).fetchone()["c"]
-        con.execute("UPDATE comments SET votes=? WHERE id=?", (n, comment_id))
+                        "created_at,value) VALUES(?,?,?,?)",
+                        (comment_id, address, now(), value))
+            myvote = value
+        score = con.execute("SELECT COALESCE(SUM(value),0) s FROM "
+                            "comment_votes WHERE comment_id=?",
+                            (comment_id,)).fetchone()["s"]
+        con.execute("UPDATE comments SET votes=? WHERE id=?", (score, comment_id))
     con.close()
-    return True, voted, n
+    return True, myvote, score
 
 
 def votes_by_address(rfp_id, address):
-    """Entry ids on this initiative the address has voted for."""
+    """Map of {entry id: vote value +1/-1} for this address on this initiative."""
     con = connect()
     rows = con.execute(
-        "SELECT v.comment_id FROM comment_votes v JOIN comments c ON "
+        "SELECT v.comment_id, v.value FROM comment_votes v JOIN comments c ON "
         "c.id=v.comment_id WHERE c.rfp_id=? AND v.address=?",
         (rfp_id, address)).fetchall()
     con.close()
-    return {r["comment_id"] for r in rows}
+    return {r["comment_id"]: r["value"] for r in rows}
 
 
 def add_report(comment_id):

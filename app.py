@@ -797,6 +797,158 @@ def ens_name(address):
     return jsonify({"name": name or None})
 
 
+def _forward_resolve(name):
+    """Address an ENS / web3 name forward-resolves to (checksummed), or ''.
+    Cached in the shared ENS cache under a 'fwd:' key. Fails CLOSED (returns
+    '') on any error, so a domain-ownership check can never pass on a failed
+    lookup."""
+    key = "fwd:" + name.lower()
+    with _ens_lock:
+        hit = _ens_cache.get(key)
+        if hit and time.time() - hit[1] < ENS_CACHE_TTL:
+            _ens_cache.move_to_end(key)
+            return hit[0]
+    addr = ""
+    try:
+        req = urllib.request.Request(
+            "https://api.ensdata.net/%s" % urllib.parse.quote(name),
+            headers={"User-Agent": "thedao-rfps/1.0"})
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode())
+        cand = (data.get("address") or "").strip()
+        if chain.is_address(cand):
+            addr = chain.to_checksum(cand)
+    except Exception:
+        pass
+    with _ens_lock:
+        _ens_cache[key] = (addr, time.time())
+        _ens_cache.move_to_end(key)
+        while len(_ens_cache) > ENS_CACHE_MAX:
+            _ens_cache.popitem(last=False)
+    return addr
+
+
+# Nickname registry: a display name tied to a wallet, shown instead of the raw
+# 0x address (ENS still wins when the wallet has a primary name and no nickname
+# is set). A name that LOOKS like a domain (e.g. "griff.eth") is accepted only
+# if the connecting wallet actually owns it (forward-resolves to it), so nobody
+# can wear a .eth they do not hold. A plain name is first-come-first-served.
+_NICK_RE = re.compile(r"^[A-Za-z0-9 ._-]{1,40}$")
+_DOMAIN_RE = re.compile(r"^[a-z0-9-]+(\.[a-z0-9-]+)+$")
+
+
+@app.route("/api/nickname/<address>")
+def get_nickname_route(address):
+    address = address.strip()
+    if not chain.is_address(address):
+        abort(400)
+    p = db.get_profile(address)
+    return jsonify({"nickname": p["nickname"], "pfp": p["pfp"]})
+
+
+_PRESET_RE = re.compile(r"^preset:[0-9]$")
+
+
+@app.route("/api/pfp", methods=["POST"])
+def set_pfp_route():
+    body = request.get_json(silent=True) or {}
+    pfp = str(body.get("pfp") or "").strip()
+    if not _PRESET_RE.match(pfp):
+        return jsonify({"error": "Pick one of the preset avatars."}), 400
+    if not rate_limit("pfp:" + client_ip(), 20, 60):
+        return jsonify({"error": "Too many tries, slow down a moment."}), 429
+    if not _fresh_signature(body.get("signature")):
+        return jsonify({"error": "That signature was already used, "
+                        "sign again."}), 409
+    addr, err = _verify_sig("pfp", "", pfp, body)
+    if not addr:
+        return jsonify({"error": err}), 403
+    db.set_pfp(addr, pfp)
+    return jsonify({"pfp": pfp})
+
+
+PFP_DIR = os.path.join(config.BASE_DIR, "uploads", "pfp")
+
+
+@app.route("/api/pfp/upload", methods=["POST"])
+def upload_pfp_route():
+    """Custom profile picture upload. Signature (action 'pfp-upload') proves the
+    wallet; the image is validated by magic bytes (png/jpg/webp, <=500 KB) like
+    sponsor logos so nothing scriptable is ever served."""
+    same_origin_only()
+    if not rate_limit("pfpup:" + client_ip(), 10, 3600):
+        return jsonify({"error": "Too many uploads, slow down."}), 429
+    sig = request.form.get("signature") or ""
+    if not _fresh_signature(sig):
+        return jsonify({"error": "That signature was already used, "
+                        "sign again."}), 409
+    addr, err = _verify_sig("pfp-upload", "", "upload",
+                            {"signature": sig, "ts": request.form.get("ts")})
+    if not addr:
+        return jsonify({"error": err}), 403
+    fs = request.files.get("image")
+    if not fs or not fs.filename:
+        return jsonify({"error": "Choose an image."}), 400
+    blob = fs.read(512 * 1024 + 1)
+    if len(blob) > 512 * 1024:
+        return jsonify({"error": "Image must be under 500 KB."}), 400
+    ext = None
+    for magic, e in LOGO_MAGIC.items():
+        if blob.startswith(magic):
+            ext = e
+            break
+    if ext == ".webp" and blob[8:12] != b"WEBP":
+        ext = None
+    if not ext:
+        return jsonify({"error": "Use a PNG, JPG, or WEBP image."}), 400
+    import secrets as _secrets
+    name = _secrets.token_hex(8) + ext
+    os.makedirs(PFP_DIR, exist_ok=True)
+    with open(os.path.join(PFP_DIR, name), "wb") as f:
+        f.write(blob)
+    db.set_pfp(addr, "upload:" + name)
+    return jsonify({"pfp": "upload:" + name})
+
+
+@app.route("/uploads/pfp/<name>")
+def serve_pfp(name):
+    if not re.fullmatch(r"[0-9a-f]{16}\.(png|jpg|webp)", name):
+        abort(404)
+    return send_from_directory(PFP_DIR, name, max_age=86400)
+
+
+@app.route("/api/nickname", methods=["POST"])
+def set_nickname_route():
+    body = request.get_json(silent=True) or {}
+    raw = str(body.get("nickname") or "").strip()
+    if not raw:
+        return jsonify({"error": "Pick a name first."}), 400
+    if len(raw) > 40 or not _NICK_RE.match(raw):
+        return jsonify({"error": "Names are 1-40 letters, numbers, "
+                        "spaces or . _ -"}), 400
+    if not rate_limit("nick:" + client_ip(), 10, 60):
+        return jsonify({"error": "Too many tries, slow down a moment."}), 429
+    if not _fresh_signature(body.get("signature")):
+        return jsonify({"error": "That signature was already used, "
+                        "sign again."}), 409
+    addr, err = _verify_sig("nickname", "", raw, body)
+    if not addr:
+        return jsonify({"error": err}), 403
+    if _DOMAIN_RE.match(raw.lower()):
+        owner = _forward_resolve(raw)
+        if not owner or owner.lower() != addr.lower():
+            return jsonify({"error": "You can only use a domain you own. "
+                            "Connect the wallet that " + raw
+                            + " points to."}), 403
+    else:
+        taken = db.nickname_owner(raw)
+        if taken and taken.lower() != addr.lower():
+            return jsonify({"error": "That name is already taken, "
+                            "pick another."}), 409
+    db.set_nickname(addr, raw)
+    return jsonify({"nickname": raw})
+
+
 # ------------------------------------------------------------ AI board search
 # A visitor describes what they want to fund; an LLM picks the most relevant
 # open RFPs. Purely advisory and client-side: the response is a ranked list of
@@ -1182,11 +1334,12 @@ def _comment_json(row, my_votes=None, replies=None):
         "reviewed": bool(row["reviewed"]),
         "accepted": bool(row["accepted"]),
         "featured": row["featured"],
+        "featured_at": row["featured_at"],
         "votes": row["votes"],
         "created_at": row["created_at"],
     }
     if my_votes is not None:
-        out["voted"] = row["id"] in my_votes
+        out["myvote"] = my_votes.get(row["id"], 0)
     if replies is not None:
         out["replies"] = replies
     return out
@@ -1201,7 +1354,7 @@ def comments_list(slug):
         abort(404)
     rows = db.comments_for_rfp(r["id"])
     viewer = str(request.args.get("viewer") or "")
-    my_votes = set()
+    my_votes = {}
     eligible = False
     viewer_roles = []
     if viewer and chain.is_address(viewer):
@@ -1224,7 +1377,7 @@ def comments_list(slug):
     # then everything else by votes desc, newest breaking ties.
     entries.sort(key=lambda c: (
         0 if c["featured"] else 1,
-        -c["created_at"] if c["featured"] else 0,
+        -c["featured_at"] if c["featured"] else 0,
         -c["votes"], -c["created_at"]))
     return jsonify({
         "entries": [_comment_json(row, my_votes, replies_by_parent[row["id"]])
@@ -1295,9 +1448,9 @@ def comments_post(slug):
     cid, token = db.create_comment(
         r["id"], None, ctype, topic, text, name, email, address,
         ",".join(roles), status, ai_summary=summary, start_vote=start_vote)
-    # The author's own starting vote shows the arrow already pressed (spec
-    # §4): pass their own id in my_votes so voted=true on the returned entry.
-    own = {cid} if start_vote else set()
+    # The author's own starting vote shows the up arrow already pressed (spec
+    # §4): pass their own id->+1 in my_votes so myvote=1 on the returned entry.
+    own = {cid: 1} if start_vote else {}
     return jsonify({"status": status, "id": cid,
                     "claim_token": token if status == "held" else "",
                     "entry": None if status != "published"
@@ -1331,7 +1484,12 @@ def comments_vote(cid):
         abort(404)
     r = db.rfp_by_id(row["rfp_id"])
     body = request.get_json(silent=True) or {}
-    addr, err = _verify_sig("vote", r["slug"], str(cid), body)
+    direction = str(body.get("dir") or "up")
+    if direction not in ("up", "down"):
+        return jsonify({"error": "bad vote direction"}), 400
+    # The direction is bound into the signed content so a captured upvote
+    # signature can't be replayed as a downvote (or vice versa).
+    addr, err = _verify_sig("vote", r["slug"], str(cid) + ":" + direction, body)
     if not addr:
         return jsonify({"error": err}), 400
     if not rate_limit("cvote:" + addr.lower(), 30, 3600):
@@ -1340,10 +1498,11 @@ def comments_vote(cid):
         return jsonify({"error": "Voting is for donors of $20+ to this "
                         "initiative, ETHSecurity badge holders, curators, "
                         "and admins."}), 403
-    ok, voted, votes = db.toggle_vote(cid, addr, int(body.get("ts")))
+    ok, myvote, votes = db.set_vote(cid, addr, 1 if direction == "up" else -1,
+                                    int(body.get("ts")))
     if not ok:
         return jsonify({"error": "stale vote signature, retry"}), 409
-    return jsonify({"voted": voted, "votes": votes})
+    return jsonify({"myvote": myvote, "votes": votes})
 
 
 @app.route("/api/comments/<int:cid>/report", methods=["POST"])
@@ -1376,7 +1535,7 @@ def comments_reply(cid):
         if not (tok and hmac.compare_digest(tok, session.get("_csrf", "-"))):
             abort(400, "bad csrf token")
         address, roles = "", ["ADMIN"]
-    else:
+    elif body.get("signature"):
         same_origin_only()
         # Cheap per-IP throttle before the pure-Python signature recovery.
         if not rate_limit("crvip:" + client_ip(), 60, 3600):
@@ -1384,18 +1543,28 @@ def comments_reply(cid):
         if not _fresh_signature(body.get("signature")):
             return jsonify({"error": "this signature was already used, "
                             "sign again"}), 409
-        # Griff amendment: the reply signature binds the parent entry id, so
-        # a signed reply can only ever attach under the entry it was written
-        # for (content = "<entry id>:<sha256 of body>").
+        # The reply signature binds the parent entry id, so a signed reply can
+        # only ever attach under the entry it was written for
+        # (content = "<entry id>:<sha256 of body>"). Anyone can reply
+        # (2026-08-18): any valid wallet, no role required.
         addr, err = _verify_sig("reply", r["slug"],
                                 "%d:%s" % (cid, _sha256_hex(text)), body)
         if not addr:
             return jsonify({"error": err}), 400
         roles = _comment_roles(addr, parent["rfp_id"])
-        if not {"ADMIN", "CURATOR", "EXPERT"} & set(roles):
-            return jsonify({"error": "replies are for the TheDAO team, "
-                            "curators, and ETHSecurity badge holders"}), 403
+        # Replies are role-only (spec §1/§4): team, curators, ETHSecurity
+        # badge holders. A plain wallet with no role cannot reply.
+        if not ({"ADMIN", "CURATOR", "EXPERT"} & set(roles)):
+            return jsonify({"error": "Replies are limited to the team, "
+                            "curators, and ETHSecurity badge holders."}), 403
         address = addr
+    else:
+        # No signature and no admin session: the reply cannot prove a role,
+        # and replies are role-only (spec §1/§4).
+        same_origin_only()
+        return jsonify({"error": "Replies are limited to the team, curators, "
+                        "and ETHSecurity badge holders. Connect that wallet "
+                        "to reply."}), 403
     if not rate_limit("creply:" + (address.lower() or client_ip()), 20, 3600):
         return jsonify({"error": "too many replies, slow down"}), 429
     rid, _ = db.create_comment(
@@ -1429,7 +1598,9 @@ def admin_comment_action(cid, action):
     elif action == "review" and row["type"] == "suggestion":
         db.comment_set(cid, reviewed=1)
     elif action == "feature":
-        db.comment_set(cid, featured=1)
+        # featured_at = now so the newest-featured comment sorts above earlier
+        # featured ones (Zep 2026-08-19).
+        db.comment_set(cid, featured=1, featured_at=db.now())
     elif action == "feature-front":
         # Max 3 on the front page, never automatic (spec §9C): the 4th
         # toggle is refused, the admin unfeatures one first.
@@ -1438,9 +1609,9 @@ def admin_comment_action(cid, action):
                 "admin_dashboard",
                 msg="The front page already has 3 featured entries. "
                     "Unfeature one first."))
-        db.comment_set(cid, featured=2)
+        db.comment_set(cid, featured=2, featured_at=db.now())
     elif action == "unfeature":
-        db.comment_set(cid, featured=0)
+        db.comment_set(cid, featured=0, featured_at=0)
     else:
         abort(400)
     return redirect(request.form.get("back") or url_for("admin_dashboard"))
@@ -1471,6 +1642,37 @@ def admin_login_post():
         session.permanent = False
         return redirect(url_for("admin_dashboard"))
     return render_template("admin/login.html", error="Wrong password."), 403
+
+
+def _is_admin_wallet(address):
+    """True if a recovered wallet address is configured as an admin (spec §5)."""
+    low = (address or "").lower()
+    return any(a.lower() == low for a in config.ADMIN_ADDRESSES)
+
+
+@app.route("/admin/login-wallet", methods=["POST"])
+def admin_login_wallet():
+    """Wallet-gated admin sign-in. The wallet signs the standard message
+    (action:admin-login, no slug/content); a signer in ADMIN_ADDRESSES gets
+    the same admin session the password grants. No transaction, no gas."""
+    same_origin_only()
+    if not rate_limit("login:" + client_ip(),
+                      config.LOGIN_ATTEMPTS_PER_MINUTE_PER_IP, 60):
+        return jsonify({"error": "Too many attempts; wait a minute."}), 429
+    if not rate_limit("login-global", config.LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL, 60):
+        return jsonify({"error": "Too many attempts; wait a minute."}), 429
+    body = request.get_json(silent=True) or {}
+    addr, ts = _verify_sig("admin-login", "", "", body)
+    if not addr:
+        return jsonify({"error": ts or "signature does not verify"}), 403
+    if not _fresh_signature(body.get("signature")):
+        return jsonify({"error": "this signature was already used, sign again"}), 409
+    if not _is_admin_wallet(addr):
+        return jsonify({"error": "That wallet is not an admin."}), 403
+    session["admin"] = True
+    session["admin_addr"] = addr
+    session.permanent = False
+    return jsonify({"ok": True})
 
 
 @app.route("/admin/logout", methods=["POST"])

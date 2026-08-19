@@ -11,7 +11,30 @@
   // ------------------------------------------------------------ shared state
   var params = null;      // /api/donate/params result
   var account = null;
+  var nickname = null;   // registered display name for the connected wallet
+  var myPfp = "";        // connected wallet's pfp value ("" = default)
+  var ensCache = {};     // addr(lower) -> primary ENS name ("" = none)
   var paramsPromise = null;
+
+  function postJson(url, body) {
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok) throw new Error(d.error || "Request failed.");
+        return d;
+      });
+    });
+  }
+  // Render the connected identity into the nav button: avatar + name.
+  function setNav(name) {
+    if (!navBtn) return;
+    navBtn.textContent = "";
+    if (account) navBtn.appendChild(window.rfpsAvatar(account, myPfp, 20));
+    navBtn.appendChild(document.createTextNode(name || ""));
+  }
 
   function getParams() {
     if (paramsPromise) return paramsPromise;
@@ -26,6 +49,14 @@
   }
 
   function short(a) { return a.slice(0, 6) + "…" + a.slice(-4); }
+  // Tiny element helper (createElement + class + text), used by the nickname
+  // modal. Mirrors the one in comments.js.
+  function el(tag, cls, txt) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
 
   function msg(e) {
     if (e && e.code === 4001) return "you rejected the request in the wallet.";
@@ -150,6 +181,7 @@
 
   function disconnectUi() {
     account = null;
+    nickname = null;
     balances = {};
     try { document.dispatchEvent(new CustomEvent("rfps:wallet", { detail: { account: null } })); } catch (e) {}
     forgetWallet();
@@ -197,22 +229,252 @@
   function setConnected(acct) {
     account = acct;
     balances = {};
+    nickname = null;
     try { document.dispatchEvent(new CustomEvent("rfps:wallet", { detail: { account: acct } })); } catch (e) {}
     if (navBtn) {
       navBtn.textContent = short(acct);
       navBtn.classList.add("connected");
       navBtn.title = "Connected. Click to switch wallets.";
-      fetch("/api/ens-name/" + acct)
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (d.name && account === acct) navBtn.textContent = d.name;
-        }).catch(function () {});
+      resolveIdentity(acct);
     }
     document.querySelectorAll("[data-donate]").forEach(function (el) {
       var b = el.querySelector(".dw-send");
       if (b) b.textContent = "Donate";
     });
     refreshBalances();
+  }
+
+  // -------- identity: nickname > ENS > short address ----------------------
+  // On connect, show the wallet's chosen name. A registered nickname wins;
+  // otherwise the primary ENS name; otherwise the shortened 0x address.
+  function resolveIdentity(acct) {
+    if (!acct) return;
+    var low = acct.toLowerCase();
+    myPfp = "";
+    setNav(short(acct));   // default avatar + short address right away
+    fetch("/api/nickname/" + acct).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (account !== acct) return;
+        nickname = d.nickname || null;
+        myPfp = d.pfp || "";
+        setNav(nickname || short(acct));
+        if (nickname) return;   // registered nickname wins; nothing else to do
+        // No registered nickname: auto-detect the wallet's primary ENS / web3
+        // name and display it. Never pop a prompt on connect (Griff: don't
+        // force a name until someone engages, and skip the flow entirely if
+        // they already have a primary name). Picking a nickname stays opt-in
+        // via the wallet menu, and the composer takes a name at comment time.
+        fetch("/api/ens-name/" + acct).then(function (r) { return r.json(); })
+          .then(function (e) {
+            if (account !== acct) return;
+            ensCache[low] = e.name || "";
+            if (e.name && !nickname) setNav(e.name);
+          }).catch(function () {});
+      }).catch(function () {});
+  }
+
+  function signNickname(nick) {
+    return signProfile("nickname", nick);
+  }
+  // Generic wallet signature for a profile action (nickname / pfp). The signed
+  // message matches the server's _sig_message(action, "", content, ts).
+  function signProfile(action, content) {
+    var p = eth();
+    if (!p || !account) return Promise.reject(new Error("Connect a wallet first."));
+    var ts = Math.floor(Date.now() / 1000);
+    var msg = "TheDAO Security Fund\naction:" + action + "\ninitiative:\ncontent:" +
+      content + "\nts:" + ts;
+    return p.request({ method: "personal_sign", params: [msg, account] })
+      .then(function (sig) { return { signature: sig, ts: ts }; });
+  }
+
+  // ---- Avatars: 10 gradient presets + a deterministic default per address --
+  var PFP_COLORS = [
+    ["#5cb75a", "#00ff88"], ["#2c5e86", "#5ac8fa"], ["#ff3b38", "#ffb03a"],
+    ["#a06cff", "#5ac8fa"], ["#ff6ec7", "#ffb03a"], ["#00d2b8", "#5cb75a"],
+    ["#ffcf3a", "#ff6b3a"], ["#6d8cff", "#a06cff"], ["#3ad1ff", "#2c5e86"],
+    ["#ff8a5c", "#ff3b6b"]
+  ];
+  var PFP_GLYPHS = [
+    '<circle cx="20" cy="20" r="8" fill="#fff" opacity=".85"/>',
+    '<path d="M20 12 L28 28 L12 28 Z" fill="#fff" opacity=".85"/>',
+    '<circle cx="20" cy="20" r="8" fill="none" stroke="#fff" stroke-width="3" opacity=".85"/>',
+    '<rect x="13" y="13" width="4" height="14" fill="#fff" opacity=".85"/><rect x="19" y="13" width="4" height="14" fill="#fff" opacity=".85"/><rect x="25" y="13" width="4" height="14" fill="#fff" opacity=".85"/>',
+    '<path d="M20 11 L29 20 L20 29 L11 20 Z" fill="#fff" opacity=".85"/>',
+    '<circle cx="15" cy="15" r="3" fill="#fff" opacity=".85"/><circle cx="25" cy="15" r="3" fill="#fff" opacity=".85"/><circle cx="15" cy="25" r="3" fill="#fff" opacity=".85"/><circle cx="25" cy="25" r="3" fill="#fff" opacity=".85"/>',
+    '<path d="M11 22 Q15 15 20 22 T29 22" fill="none" stroke="#fff" stroke-width="3" opacity=".85"/>',
+    '<path d="M20 11 L22.5 17 L29 17.5 L24 22 L25.5 28.5 L20 25 L14.5 28.5 L16 22 L11 17.5 L17.5 17 Z" fill="#fff" opacity=".85"/>',
+    '<path d="M20 11 L28 15.5 L28 24.5 L20 29 L12 24.5 L12 15.5 Z" fill="#fff" opacity=".85"/>',
+    '<rect x="17" y="12" width="6" height="16" fill="#fff" opacity=".85"/><rect x="12" y="17" width="16" height="6" fill="#fff" opacity=".85"/>'
+  ];
+  function presetSvg(i) {
+    var c = PFP_COLORS[i] || PFP_COLORS[0];
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">' +
+      '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">' +
+      '<stop offset="0" stop-color="' + c[0] + '"/><stop offset="1" stop-color="' + c[1] + '"/>' +
+      '</linearGradient></defs><rect width="40" height="40" rx="20" fill="url(#g)"/>' +
+      (PFP_GLYPHS[i] || "") + '</svg>';
+  }
+  function presetUri(i) { return "data:image/svg+xml," + encodeURIComponent(presetSvg(i)); }
+  function addrHash(a) {
+    var h = 5381, s = (a || "").toLowerCase();
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+    return h;
+  }
+  function pfpDefaultIndex(address) { return addrHash(address) % 10; }
+  // Public: build an <img> avatar for an address given its pfp value ("" =
+  // default from the address, "preset:N", or "upload:<file>").
+  function avatarSrc(address, pfp) {
+    if (pfp && pfp.indexOf("upload:") === 0) return "/uploads/pfp/" + pfp.slice(7);
+    if (pfp && pfp.indexOf("preset:") === 0) return presetUri(parseInt(pfp.slice(7), 10) || 0);
+    return presetUri(pfpDefaultIndex(address));
+  }
+  window.rfpsAvatar = function (address, pfp, size) {
+    var img = document.createElement("img");
+    img.className = "pfp"; img.alt = "";
+    img.width = img.height = size || 26;
+    img.src = avatarSrc(address, pfp);
+    return img;
+  };
+  window.rfpsAvatarSrc = avatarSrc;
+  window.rfpsPresetUri = presetUri;
+
+  var nickOverlay = null;
+  function closeNicknameModal() {
+    if (nickOverlay) { nickOverlay.remove(); nickOverlay = null; }
+  }
+  function openNicknameModal(firstTime, prefill) {
+    closeNicknameModal();
+    closeWalletMenu();
+    nickOverlay = document.createElement("div");
+    nickOverlay.className = "nick-overlay";
+    var box = document.createElement("div");
+    box.className = "nick-modal";
+    var stagedPfp = null;   // selected preset value, or null = unchanged
+    var h = document.createElement("h3");
+    h.textContent = firstTime ? "Set up your profile" : "Edit your profile";
+    var p = document.createElement("p");
+    p.textContent = "Shown on your posts instead of your address. A name ending " +
+      "like .eth only works if your wallet owns it; a plain name just has to be free.";
+    var input = document.createElement("input");
+    input.maxLength = 40;
+    input.placeholder = "Nickname, e.g. vitalik (optional)";
+    input.value = prefill || "";
+
+    var pfpLabel = document.createElement("p");
+    pfpLabel.className = "nick-sub";
+    pfpLabel.textContent = "Profile picture";
+    var grid = document.createElement("div");
+    grid.className = "pfp-grid";
+    var chosenBtn = null;
+    for (var gi = 0; gi < 10; gi++) (function (idx) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "pfp-opt";
+      var im = document.createElement("img");
+      im.src = window.rfpsPresetUri(idx); im.width = im.height = 40; im.alt = "";
+      b.appendChild(im);
+      b.addEventListener("click", function () {
+        if (chosenBtn) chosenBtn.classList.remove("on");
+        b.classList.add("on"); chosenBtn = b; stagedPfp = "preset:" + idx;
+      });
+      grid.appendChild(b);
+    })(gi);
+
+    // custom upload
+    var upWrap = el("div", "pfp-up");
+    var upBtn = el("button", "btn sm", "Upload your own");
+    upBtn.type = "button";
+    var fileIn = document.createElement("input");
+    fileIn.type = "file";
+    fileIn.accept = "image/png,image/jpeg,image/webp";
+    fileIn.className = "qa-hp";   // visually hidden; opened via the button
+    // Preview of the picked image (data: URI, CSP-safe) so you see what you
+    // uploaded. blob: URLs are blocked by the CSP, so use a FileReader.
+    var upPreview = document.createElement("img");
+    upPreview.className = "pfp-preview"; upPreview.alt = ""; upPreview.hidden = true;
+    upBtn.addEventListener("click", function () { fileIn.click(); });
+    fileIn.addEventListener("change", function () {
+      var f = fileIn.files && fileIn.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () { upPreview.src = reader.result; upPreview.hidden = false; };
+      reader.readAsDataURL(f);
+      err.textContent = ""; upBtn.disabled = true; upBtn.textContent = "Sign in wallet…";
+      signProfile("pfp-upload", "upload").then(function (s) {
+        var fd = new FormData();
+        fd.append("image", f);
+        fd.append("signature", s.signature);
+        fd.append("ts", s.ts);
+        return fetch("/api/pfp/upload", { method: "POST", body: fd });
+      }).then(function (r) {
+        return r.json().then(function (d) {
+          if (!r.ok) throw new Error(d.error || "Upload failed.");
+          return d;
+        });
+      }).then(function (d) {
+        myPfp = d.pfp; stagedPfp = null;
+        if (chosenBtn) { chosenBtn.classList.remove("on"); chosenBtn = null; }
+        upBtn.disabled = false; upBtn.textContent = "Uploaded ✓";
+      }).catch(function (e) {
+        upBtn.disabled = false; upBtn.textContent = "Upload your own";
+        err.textContent = e.message;
+      });
+    });
+    upWrap.appendChild(upBtn); upWrap.appendChild(fileIn); upWrap.appendChild(upPreview);
+
+    var err = document.createElement("p");
+    err.className = "nick-err";
+    var row = document.createElement("div");
+    row.className = "nick-row";
+    var save = document.createElement("button");
+    save.className = "btn primary"; save.type = "button"; save.textContent = "Save";
+    var skip = document.createElement("button");
+    skip.className = "btn"; skip.type = "button";
+    skip.textContent = firstTime ? "Not now" : "Cancel";
+    skip.addEventListener("click", closeNicknameModal);
+    save.addEventListener("click", function () {
+      var nick = input.value.trim();
+      if (!nick && !stagedPfp) { closeNicknameModal(); return; }
+      save.disabled = true; err.textContent = ""; save.textContent = "Sign in wallet…";
+      var seq = Promise.resolve();
+      if (nick) {
+        seq = seq.then(function () {
+          return signProfile("nickname", nick).then(function (s) {
+            return postJson("/api/nickname",
+              { nickname: nick, signature: s.signature, ts: s.ts });
+          }).then(function (d) { nickname = d.nickname; });
+        });
+      }
+      if (stagedPfp) {
+        seq = seq.then(function () {
+          return signProfile("pfp", stagedPfp).then(function (s) {
+            return postJson("/api/pfp",
+              { pfp: stagedPfp, signature: s.signature, ts: s.ts });
+          }).then(function (d) { myPfp = d.pfp; });
+        });
+      }
+      seq.then(function () {
+        setNav(nickname || (account ? short(account) : ""));
+        try {
+          document.dispatchEvent(new CustomEvent("rfps:wallet",
+            { detail: { account: account } }));
+        } catch (e) {}
+        closeNicknameModal();
+      }).catch(function (e) {
+        save.disabled = false; save.textContent = "Save";
+        err.textContent = e.message || "Could not save.";
+      });
+    });
+    row.appendChild(save); row.appendChild(skip);
+    box.appendChild(h); box.appendChild(p); box.appendChild(input);
+    box.appendChild(pfpLabel); box.appendChild(grid); box.appendChild(upWrap);
+    box.appendChild(err); box.appendChild(row);
+    nickOverlay.appendChild(box);
+    nickOverlay.addEventListener("click", function (ev) {
+      if (ev.target === nickOverlay && !firstTime) closeNicknameModal();
+    });
+    document.body.appendChild(nickOverlay);
+    input.focus();
   }
 
   function refreshBalances() {
@@ -421,7 +683,7 @@
   }
 
   function resetConnectBtn(e) {
-    navBtn.textContent = account ? short(account) : "Connect wallet";
+    navBtn.textContent = account ? (nickname || short(account)) : "Connect wallet";
     if (e && e.message === "no-wallet") {
       navBtn.textContent = "No wallet found";
       setTimeout(function () {
@@ -438,6 +700,19 @@
   // One menu, two modes: pick a wallet to CONNECT, or switch while connected.
   // onConnected (connect mode only) runs once a wallet is connected, so a
   // caller like the Donate button can resume what the donor was doing.
+  // Small monochrome glyphs (data: URIs, CSP-safe) for menu rows with no wallet
+  // logo of their own, so they never render as a broken image box.
+  function wmGlyph(inner, color) {
+    return "data:image/svg+xml," + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="' + (color || "#b8c4d0") + '" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' + inner + "</svg>");
+  }
+  var WM_SWITCH = wmGlyph('<path d="M7 4 3 8l4 4"/><path d="M3 8h12a4 4 0 0 1 4 4"/>' +
+    '<path d="M17 20l4-4-4-4"/><path d="M21 16H9a4 4 0 0 1-4-4"/>');
+  var WM_EDIT = wmGlyph('<path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M14 6l4 4"/>');
+  var WM_POWER = wmGlyph('<path d="M12 3v9"/><path d="M6.5 7.5a8 8 0 1 0 11 0"/>', "#ff9a9a");
+
   function openWalletMenu(connected, onConnected) {
     closeWalletMenu();
     walletMenu = document.createElement("div");
@@ -448,12 +723,18 @@
       b.type = "button";
       if (opts.active) b.classList.add("active");
       if (opts.klass) b.classList.add(opts.klass);
-      var ic = document.createElement("img");
-      ic.className = "wm-icon" + (opts.icon ? "" : " wm-icon-ph");
-      ic.alt = "";
-      // EIP-6963 icons are data: URIs; the WC glyph is too. Both pass img-src.
-      if (opts.icon) ic.src = opts.icon;
-      b.appendChild(ic);
+      // data: URIs (EIP-6963 wallet icons, WC glyph, our menu glyphs) pass
+      // img-src. No icon: reserve the slot with a span, never a broken <img>.
+      if (opts.icon) {
+        var ic = document.createElement("img");
+        ic.className = "wm-icon"; ic.alt = "";
+        ic.src = opts.icon;
+        b.appendChild(ic);
+      } else {
+        var ph = document.createElement("span");
+        ph.className = "wm-icon wm-icon-ph";
+        b.appendChild(ph);
+      }
       var nm = document.createElement("span");
       nm.className = "wm-name";
       nm.textContent = label;
@@ -492,8 +773,12 @@
     if (connected) {
       item("Switch account\u2026", function () {
         switchWallet().catch(function () {});
-      }, { klass: "wm-sep" });
-      item("Disconnect", function () { disconnectWallet(); }, { klass: "wm-danger" });
+      }, { klass: "wm-sep", icon: WM_SWITCH });
+      item("Change nickname", function () {
+        openNicknameModal(false, nickname || "");
+      }, { icon: WM_EDIT });
+      item("Disconnect", function () { disconnectWallet(); },
+        { klass: "wm-danger", icon: WM_POWER });
     }
     navBtn.parentNode.appendChild(walletMenu);
     // close on the next click outside the menu
@@ -1157,4 +1442,29 @@
       pr2.catch(resetConnectBtn);
     },
   };
+
+  // Wallet-gated admin sign-in (only present on the /admin login page). Connect,
+  // sign the admin-login message, hand the signature to the server for an admin
+  // session. The server checks the signer is in ADMIN_ADDRESSES.
+  var adminLoginBtn = document.getElementById("admin-wallet-login");
+  if (adminLoginBtn) {
+    var adminNote = document.getElementById("admin-wallet-note");
+    var setNote = function (m) { if (adminNote) adminNote.textContent = m; };
+    var doAdminSign = function () {
+      setNote("Check your wallet to sign...");
+      signProfile("admin-login", "").then(function (s) {
+        return postJson("/admin/login-wallet", { signature: s.signature, ts: s.ts });
+      }).then(function () {
+        window.location.href = "/admin/dashboard";
+      }).catch(function (e) { setNote((e && e.message) || "Sign-in failed."); });
+    };
+    adminLoginBtn.addEventListener("click", function () {
+      if (account) { doAdminSign(); return; }
+      setNote("Connecting wallet...");
+      window.rfpsWallet.connect(function () {
+        if (window.rfpsWallet.account()) doAdminSign();
+        else setNote("Connect a wallet to continue.");
+      });
+    });
+  }
 })();

@@ -7,7 +7,7 @@
   <p class="crumb"><a href="{{ url_for('index') }}">← All initiatives</a></p>
   <h1 class="rfp-title">{{ r.title }}</h1>
   <p class="meta-line">
-    {% if r.discourse_url %}<a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener">💬 Discuss this initiative on the forum</a>{% endif %}
+    {% if r.discourse_url %}<a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Discuss this initiative on the forum</a>{% endif %}
     <span class="type-badge inline t-{{ r.type }}">{{ 'Grant' if r.type == 'grant' else 'RFP' }}</span>
     {% if r.status == 'archived' %}<span class="chip static">archived</span>{% endif %}
   </p>
@@ -15,7 +15,7 @@
   <div class="cols">
     <div class="col-main">
       {% if funded %}
-      <div class="funded-bar">🎉 Funded! This initiative reached its goal.</div>
+      <div class="funded-bar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:8px" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0z"/></svg>Funded! This initiative reached its goal.</div>
       <div class="fund-split">
         <span><b>{{ sum.total | usd }}</b> raised of {{ r.funding_goal_usd | usd }}</span>
         <span><b>{{ sum.pledged | usd }}</b> pledged by sponsors</span>
@@ -108,7 +108,7 @@
       <div class="side-note discuss-card">
         <div class="k">Join the discussion</div>
         <p class="small dim">This initiative is being shaped in public.</p>
-        <a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener">💬 Open the forum thread</a>
+        <a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Open the forum thread</a>
       </div>
       {% endif %}
       <div class="side-note">

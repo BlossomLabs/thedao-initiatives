@@ -4,15 +4,15 @@
 :root{
   --bg:#2c5e86; --bg2:#1f435f; --text:#fff; --muted:rgba(255,255,255,.62); --soft:rgba(255,255,255,.85);
   --card:rgba(255,255,255,.05); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.15);
-  --green:#5cb75a; --bright:#00ff88; --red:#ff3b38; --blue:#2c5e86; --claims:#5ac8fa;
+  --green:#5cb75a; --bright:#00ff88; --red:#FF3C38; --blue:#2c5e86; --claims:#5ac8fa;
   --sans:'Inter Tight','Inter',sans-serif; --tight:'Inter Tight',sans-serif;
-  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --mono:'Roboto Mono',ui-monospace,SFMono-Regular,monospace;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;min-height:100vh;color:var(--text);font:400 14px/1.5 var(--sans);
   background-color:var(--bg);
-  background-image:linear-gradient(137deg,var(--bg) 31.46%,var(--bg2) 90.4%);
+  background-image:linear-gradient(142.716deg,var(--bg) 31.46%,var(--bg2) 90.4%);
   background-repeat:no-repeat}
 b,strong{font-weight:600}
 a{color:var(--green);text-decoration:none}
@@ -439,7 +439,8 @@ footer a.dim{color:rgba(255,255,255,.35)}
 .qa-entry.featured{border-color:rgba(92,183,90,.45)}
 .qa-entry.qa-held{border-style:dashed;opacity:.8}
 .qa-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.qa-icon{font-size:15px}
+.qa-icon{font-size:15px;display:inline-flex;align-items:center}
+.qa-icon svg{width:15px;height:15px;color:var(--muted)}
 .qa-ident{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
   font:600 13.5px var(--tight)}
 .qa-typed{color:rgba(255,255,255,.55);font-weight:400}

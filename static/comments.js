@@ -152,7 +152,7 @@
     return wrap;
   }
 
-  var ICONS = { suggestion: "💡", question: "❓", other: "💬" };
+  var HELD_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 
   // Inline SVG icons (stroke = currentColor) for the v2 button/vote design.
   var I = {
@@ -523,13 +523,13 @@
     heldRows.forEach(function (h) {
       var box = el("div", "qa-entry qa-held");
       var head = el("div", "qa-head");
-      head.appendChild(el("span", "qa-icon", ICONS[h.type] || "💬"));
+      var hicon = el("span", "qa-icon"); hicon.innerHTML = HELD_ICON; head.appendChild(hicon);
       head.appendChild(el("span", "qa-chip state", "waiting for review"));
       box.appendChild(head);
       var body = el("div", "qa-body", h.body);
       box.appendChild(body);
       box.appendChild(el("p", "small dim",
-        "Thanks. Your " + h.type + " is waiting for review and is only " +
+        "Thanks. Your comment is waiting for review and is only " +
         "visible to you."));
       listEl.appendChild(box);
     });

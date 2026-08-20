@@ -14,6 +14,7 @@
   var nickname = null;   // registered display name for the connected wallet
   var myPfp = "";        // connected wallet's pfp value ("" = default)
   var ensCache = {};     // addr(lower) -> primary ENS name ("" = none)
+  var namePrompted = false;  // asked this wallet to pick a name once per connect
   var paramsPromise = null;
 
   function postJson(url, body) {
@@ -230,6 +231,7 @@
     account = acct;
     balances = {};
     nickname = null;
+    namePrompted = false;
     try { document.dispatchEvent(new CustomEvent("rfps:wallet", { detail: { account: acct } })); } catch (e) {}
     if (navBtn) {
       navBtn.textContent = short(acct);
@@ -339,12 +341,15 @@
   window.rfpsAvatarSrc = avatarSrc;
   window.rfpsPresetUri = presetUri;
 
-  var nickOverlay = null;
+  var nickOverlay = null, nickDone = null;
   function closeNicknameModal() {
     if (nickOverlay) { nickOverlay.remove(); nickOverlay = null; }
+    var cb = nickDone; nickDone = null;
+    if (cb) cb();   // let a caller (e.g. the composer) continue after the modal
   }
-  function openNicknameModal(firstTime, prefill) {
+  function openNicknameModal(firstTime, prefill, onDone) {
     closeNicknameModal();
+    nickDone = onDone || null;
     closeWalletMenu();
     nickOverlay = document.createElement("div");
     nickOverlay.className = "nick-overlay";
@@ -1440,6 +1445,17 @@
       var pr2 = connectWallet();
       if (onConnected) pr2 = pr2.then(function () { onConnected(); });
       pr2.catch(resetConnectBtn);
+    },
+    // Ensure the connected wallet has picked a name before posting (Griff: prompt
+    // at comment time, not on connect). If it already has a nickname or ENS,
+    // continue immediately; otherwise pop the nickname modal once, then continue
+    // whether they set a name or skip (posting as the bare address is allowed).
+    ensureName: function (cb) {
+      if (!account) { cb(); return; }
+      var low = account.toLowerCase();
+      if (nickname || ensCache[low] || namePrompted) { cb(); return; }
+      namePrompted = true;
+      openNicknameModal(false, "", cb);
     },
   };
 

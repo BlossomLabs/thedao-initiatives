@@ -267,11 +267,14 @@ class TestAiVerdictMapping(unittest.TestCase):
                 appmod.ai_screen_comment("other", "", "buy now", "x")[0],
                 "discarded")
 
-    def test_type_mismatch_holds(self):
-        with self._with_ai({"verdict": "constructive", "type_match": False}):
+    def test_type_match_ignored(self):
+        # Types were collapsed to "other", so type_match is no longer a gate:
+        # a constructive comment publishes regardless of it.
+        with self._with_ai({"verdict": "constructive", "type_match": False,
+                            "name_flag": "ok"}):
             self.assertEqual(
-                appmod.ai_screen_comment("question", "", "x", "Sam")[0],
-                "held")
+                appmod.ai_screen_comment("other", "", "great work on this", "Sam")[0],
+                "published")
 
     def test_bad_name_holds(self):
         with self._with_ai({"verdict": "constructive", "type_match": True,

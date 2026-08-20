@@ -467,14 +467,16 @@
       };
       var acct = window.rfpsWallet && window.rfpsWallet.account();
       if (acct) {
-        sha256hex(text).then(function (h) {
-          return signAction("post", h);
-        }).then(function (s) {
-          payload.signature = s.signature; payload.ts = s.ts; send();
-        }).catch(function () {
-          post.disabled = false;
-          note.textContent = "Signature was cancelled. Post with just a " +
-            "name instead, or try signing again.";
+        window.rfpsWallet.ensureName(function () {
+          sha256hex(text).then(function (h) {
+            return signAction("post", h);
+          }).then(function (s) {
+            payload.signature = s.signature; payload.ts = s.ts; send();
+          }).catch(function () {
+            post.disabled = false;
+            note.textContent = "Signature was cancelled. Post with just a " +
+              "name instead, or try signing again.";
+          });
         });
       } else if (!payload.name) {
         post.disabled = false;

@@ -101,7 +101,7 @@ Paid in two tranches: launch work first, then adoption evidence.
 
 ## Process
 
-- The proposal window opens once the grant is fully funded and stays open for 30 days. In that window, Auditware submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures.
+- The proposal window opens once the grant is fully funded and stays open for 15 days. In that window, Auditware submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures.
 - Giveth reviews the proposal within 7 days and fixes the final plan in the grant agreement.
 - Milestone deliveries are reviewed within 14 days; payment follows acceptance.
 - The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.

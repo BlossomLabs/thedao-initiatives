@@ -314,6 +314,7 @@ def md(text):
 
 MAX_TITLE = 140
 MAX_SUMMARY = 4000
+MAX_FUNDERS = 4000
 FORUM_HOST_RE = re.compile(r"^[a-z0-9.-]+$")
 
 
@@ -621,6 +622,15 @@ def admin_sync_content():
 
 # ------------------------------------------------------------ public pages
 
+@app.route("/llms.txt")
+def llms_txt():
+    """The AI drafting guide (see CONTRIBUTING.md: any submission-form change
+    must update llms.txt in the same PR — the form is the source of truth)."""
+    return send_from_directory(
+        os.path.dirname(os.path.abspath(__file__)), "llms.txt",
+        mimetype="text/plain; charset=utf-8", max_age=3600)
+
+
 @app.route("/")
 def index():
     rfps = db.list_rfps(("approved",))
@@ -729,6 +739,14 @@ def submit():
     if err:
         return render_template("submit.html", error=err, form=request.form), 400
 
+    # NEVER render funders on a public page/API: private fundraising leads,
+    # admin-only exactly like contact (see CONTRIBUTING.md).
+    funders = (request.form.get("funders") or "").strip()[:MAX_FUNDERS]
+    if len(funders) < 10:
+        return render_template(
+            "submit.html", error="Please list who is likely to fund this "
+            "(at least one funder line).", form=request.form), 400
+
     itype = request.form.get("type", "rfp")
     if itype not in ("rfp", "grant"):
         itype = "rfp"
@@ -736,7 +754,7 @@ def submit():
     details = (request.form.get("details") or "").strip()[:20000]
     rfp_id, slug = db.create_rfp(title, summary, url_clean, goal, [],
                                  contact, status="pending", details=details,
-                                 type=itype)
+                                 type=itype, funders=funders)
     return render_template("submitted.html", title=title)
 
 
@@ -1748,7 +1766,9 @@ def admin_rfp(rfp_id):
                               sort_rank=rank,
                               type=itype,
                               contact=(request.form.get("contact")
-                                       or "").strip()[:200])
+                                       or "").strip()[:200],
+                              funders=(request.form.get("funders")
+                                       or "").strip()[:MAX_FUNDERS])
         elif action == "add_pledge":
             company = (request.form.get("company") or "").strip()[:120]
             amount, err = parse_goal(request.form.get("amount"))

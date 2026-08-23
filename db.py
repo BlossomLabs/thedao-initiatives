@@ -186,6 +186,10 @@ def init():
             con.execute("ALTER TABLE rfps ADD COLUMN details TEXT DEFAULT ''")
         if "safe_address" not in cols:
             con.execute("ALTER TABLE rfps ADD COLUMN safe_address TEXT DEFAULT ''")
+        if "funders" not in cols:
+            # Private fundraising leads ("who is likely to fund this?").
+            # NEVER rendered on public pages/APIs — admin-only, like contact.
+            con.execute("ALTER TABLE rfps ADD COLUMN funders TEXT DEFAULT ''")
         pcols = {r["name"] for r in con.execute("PRAGMA table_info(pledges)")}
         if "logo" not in pcols:
             con.execute("ALTER TABLE pledges ADD COLUMN logo TEXT DEFAULT ''")
@@ -280,7 +284,7 @@ def slugify(title, con=None):
 # ---------------------------------------------------------------- rfps
 
 def create_rfp(title, summary, discourse_url, goal, payout_addresses,
-               contact, status="pending", details="", type="rfp"):
+               contact, status="pending", details="", type="rfp", funders=""):
     con = connect()
     try:
         # Retry on the rare race where two concurrent submits pick the same
@@ -294,12 +298,12 @@ def create_rfp(title, summary, discourse_url, goal, payout_addresses,
                     cur = con.execute(
                         "INSERT INTO rfps(slug,title,summary,discourse_url,"
                         "funding_goal_usd,payout_addresses,contact,status,"
-                        "created_at,approved_at,details,type) "
-                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "created_at,approved_at,details,type,funders) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (slug, title, summary, discourse_url, goal,
                          json.dumps(payout_addresses), contact, status, now(),
                          now() if status == "approved" else None, details,
-                         type))
+                         type, funders))
                     return cur.lastrowid, slug
             except sqlite3.IntegrityError:
                 if attempt == 4:
@@ -386,7 +390,7 @@ def list_rfps(statuses=("approved",)):
 def update_rfp(rfp_id, **fields):
     allowed = {"title", "summary", "details", "discourse_url",
                "funding_goal_usd", "payout_addresses", "contact", "status",
-               "approved_at", "safe_address", "sort_rank", "type"}
+               "approved_at", "safe_address", "sort_rank", "type", "funders"}
     sets, vals = [], []
     for k, v in fields.items():
         if k not in allowed:

@@ -67,6 +67,8 @@
     <input type="text" name="sort_rank" inputmode="numeric" value="{{ r.sort_rank or '' }}">
     <label class="lbl">Contact (private)</label>
     <input type="text" name="contact" maxlength="200" value="{{ r.contact }}">
+    <label class="lbl">Who is likely to fund this? (private, fundraising leads)</label>
+    <textarea name="funders" rows="4" maxlength="4000">{{ r.funders or '' }}</textarea>
     <button class="btn" name="action" value="edit">Save changes</button>
   </form>
 

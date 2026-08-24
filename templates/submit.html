@@ -8,6 +8,8 @@
 
   <hr class="shimmer soft">
 
+  <p><button type="button" class="btn ghost sm" id="copy-guide">Drafting with AI? Copy our guide for your assistant.</button></p>
+
   {% if error %}<div class="alert">{{ error }}</div>{% endif %}
 
   <form method="post" class="form">
@@ -41,6 +43,10 @@
     <input type="text" id="f-goal" name="goal" required inputmode="decimal" placeholder="250000"
            value="{{ form.goal if form else '' }}">
 
+    <label class="lbl" for="f-funders">Who is likely to fund this? * <span class="dim">One funder per line: Org name | why they'd pay | relationship (none / met once / know them well) | warm intro? yes/no | suggested ask $. Kept private. Giveth uses this to fundraise alongside you. Don't include third parties' private contact details.</span></label>
+    <textarea id="f-funders" name="funders" rows="4" required maxlength="4000"
+      placeholder="Ethereum Foundation | funds public-goods security tooling | met once | warm intro? yes | $50,000">{{ form.funders if form else '' }}</textarea>
+
     <label class="lbl" for="f-contact">Contact <span class="dim">Email or Telegram, kept private.</span></label>
     <input type="text" id="f-contact" name="contact" maxlength="200" value="{{ form.contact if form else '' }}">
 
@@ -48,3 +54,4 @@
   </form>
 </main>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='submit.js') }}"></script>{% endblock %}

@@ -851,7 +851,8 @@ class TestInitiativeTypes(unittest.TestCase):
                 "title": "A perfectly valid title",
                 "summary": "A summary that is long enough to pass the forty "
                            "character minimum easily.",
-                "goal": "50000", "type": "grant"}
+                "goal": "50000", "type": "grant",
+                "funders": "Acme | pays for infra | none | no | $5,000"}
         form.update(overrides)
         return self.client.post("/submit", data=form)
 

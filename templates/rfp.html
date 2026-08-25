@@ -18,7 +18,7 @@
       <div class="funded-bar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:8px" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0z"/></svg>Funded! This initiative reached its goal.</div>
       <div class="fund-split">
         <span><b>{{ sum.total | usd }}</b> raised of {{ r.funding_goal_usd | usd }}</span>
-        <span><b>{{ sum.pledged | usd }}</b> pledged by sponsors</span>
+        <span><b>{{ sum.pledged | usd }}</b> pledged by backers</span>
         <span><b>{{ sum.donated | usd }}</b> donated on-chain</span>
       </div>
       {% else %}
@@ -26,7 +26,7 @@
         <div class="fund-big"><b>{{ sum.total | usd }}</b> <span class="dim">of {{ r.funding_goal_usd | usd }}</span></div>
         <div class="bar big"><i style="width: {{ pct }}%"></i></div>
         <div class="fund-split">
-          <span><b>{{ sum.pledged | usd }}</b> pledged by sponsors</span>
+          <span><b>{{ sum.pledged | usd }}</b> pledged by backers</span>
           <span><b>{{ sum.donated | usd }}</b> donated on-chain</span>
           <span><b>{{ pct }}%</b> of goal</span>
         </div>
@@ -53,7 +53,7 @@
         <div id="qa-composer" hidden></div>
       </section>
 
-      <h2>Sponsors <span class="n">{{ pledges | length }}</span></h2>
+      <h2>Backers <span class="n">{{ pledges | length }}</span></h2>
       {% if pledges %}
         <div class="sponsors">
         {% for p in pledges %}
@@ -67,7 +67,7 @@
         {% endfor %}
         </div>
       {% else %}
-        <p class="empty">No sponsor pledges yet. Pledges pay only when the work is completed.
+        <p class="empty">No backer pledges yet. Pledges pay only when the work is completed.
         <a href="https://x.com/griffgreen" target="_blank" rel="noopener">DM @griffgreen</a> to put your name on this initiative.</p>
       {% endif %}
 
@@ -112,7 +112,7 @@
       </div>
       {% endif %}
       <div class="side-note">
-        <div class="k">Sponsor this initiative</div>
+        <div class="k">Back this initiative</div>
         <p class="small dim">Companies can pledge instead of donating: you commit publicly now and
         pay only when the work is completed and verified.
         <a href="https://x.com/griffgreen" target="_blank" rel="noopener">DM @griffgreen</a> and your
@@ -120,7 +120,7 @@
       </div>
       <div class="side-note">
         <div class="k">What happens next</div>
-        <p class="small dim">If sponsors and donors fully fund this initiative, it happens with no TheDAO
+        <p class="small dim">If backers and donors fully fund this initiative, it happens with no TheDAO
         money at all. If it comes up short, the 200 ETHSecurity badge holders rank it against the
         other initiatives in the October round and TheDAO Security Fund completes the top-ranked ones.
         Donations count as a public signal in that ranking.</p>

@@ -72,7 +72,7 @@
     <button class="btn" name="action" value="edit">Save changes</button>
   </form>
 
-  <h2>Sponsor pledges <span class="n">{{ pledges | length }}</span></h2>
+  <h2>Backer pledges <span class="n">{{ pledges | length }}</span></h2>
   {% if pledges %}
   <div class="tblbox">
     <table>
@@ -113,7 +113,7 @@
     <select name="pstatus"><option value="pledged">pledged</option><option value="received">received</option></select>
     <input type="text" name="url" placeholder="Link (optional)" maxlength="300">
     <input type="text" name="note" placeholder="Note (optional)" maxlength="300">
-    <label class="lbl" style="flex-basis:100%">Sponsor logo (optional, PNG/JPG/WEBP, shown on the RFP page)</label>
+    <label class="lbl" style="flex-basis:100%">Backer logo (optional, PNG/JPG/WEBP, shown on the RFP page)</label>
     <input type="file" name="logo" accept=".png,.jpg,.jpeg,.webp">
     <button class="btn" name="action" value="add_pledge">Add pledge</button>
   </form>

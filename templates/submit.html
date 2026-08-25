@@ -7,7 +7,15 @@
 
   <hr class="shimmer soft">
 
-  <p><button type="button" class="btn ghost sm" id="copy-guide">Drafting with AI? Copy our guide for your assistant.</button></p>
+  <div class="ai-steps">
+    <div class="ai-step"><span class="ai-num">1</span>
+      <div>Give this guide to your AI<br>
+      <button type="button" class="btn ghost sm" id="copy-guide">Copy the guide</button></div></div>
+    <div class="ai-step"><span class="ai-num">2</span>
+      <div>Answer the questions the AI asks</div></div>
+    <div class="ai-step"><span class="ai-num">3</span>
+      <div>Paste the results below</div></div>
+  </div>
 
   {% if error %}<div class="alert">{{ error }}</div>{% endif %}
 

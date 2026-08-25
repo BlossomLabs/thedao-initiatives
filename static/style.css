@@ -252,6 +252,14 @@ td.amt,th.amt{text-align:right;font-family:var(--mono);white-space:nowrap}
 .narrow-form{max-width:360px;margin:0 auto}
 .lbl{font:400 11px var(--tight);color:var(--green);text-transform:uppercase;letter-spacing:.12em;margin-top:12px}
 /* the hint drops out of the uppercase label onto its own sentence-case line */
+.ai-steps{display:grid;grid-template-columns:1fr;gap:14px;margin:18px 0 26px;padding:18px 20px;
+  background:rgba(92,183,90,.06);border:1px solid rgba(92,183,90,.25);border-radius:14px}
+@media(min-width:720px){.ai-steps{grid-template-columns:1fr 1fr 1fr}}
+.ai-step{display:flex;gap:12px;align-items:flex-start;font:400 15px/1.5 var(--sans)}
+.ai-step .btn{margin-top:8px}
+.ai-num{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(92,183,90,.18);border:1px solid rgba(92,183,90,.5);color:#7dd57e;
+  font:600 13px var(--tight)}
 .lbl .priv{display:inline-block;margin-left:8px;vertical-align:middle;padding:2px 10px;border-radius:999px;
   font:600 11px/1.6 var(--tight);letter-spacing:.06em;text-transform:none;
   color:#7dd57e;background:rgba(92,183,90,.14);border:1px solid rgba(92,183,90,.45)}

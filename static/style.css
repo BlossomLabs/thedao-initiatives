@@ -252,6 +252,9 @@ td.amt,th.amt{text-align:right;font-family:var(--mono);white-space:nowrap}
 .narrow-form{max-width:360px;margin:0 auto}
 .lbl{font:400 11px var(--tight);color:var(--green);text-transform:uppercase;letter-spacing:.12em;margin-top:12px}
 /* the hint drops out of the uppercase label onto its own sentence-case line */
+.lbl .priv{display:inline-block;margin-left:8px;vertical-align:middle;padding:2px 10px;border-radius:999px;
+  font:600 11px/1.6 var(--tight);letter-spacing:.06em;text-transform:none;
+  color:#7dd57e;background:rgba(92,183,90,.14);border:1px solid rgba(92,183,90,.45)}
 .lbl .dim{display:block;margin-top:5px;font:300 13px/1.5 var(--sans);color:var(--muted);
   text-transform:none;letter-spacing:0}
 input[type=text],input[type=url],input[type=password],textarea,select{

@@ -3,8 +3,7 @@
 {% block content %}
 <main class="detail narrow">
   <h1>Suggest an initiative</h1>
-  <p class="tag left">The strongest initiatives start as a forum post where the idea gets discussed
-  in public; link it here if you have one. Submissions are reviewed before they appear on the site.</p>
+  <p class="tag left">Submissions are reviewed before they appear on the site.</p>
 
   <hr class="shimmer soft">
 
@@ -16,8 +15,8 @@
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <input type="text" name="website" value="" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
 
-    <label class="lbl" for="f-title">Title <span class="dim">Or leave blank and we pull it from the forum link.</span></label>
-    <input type="text" id="f-title" name="title" maxlength="140" value="{{ form.title if form else '' }}">
+    <label class="lbl" for="f-title">Title *</label>
+    <input type="text" id="f-title" name="title" required maxlength="140" value="{{ form.title if form else '' }}">
 
     <span class="lbl">Type *</span>
     <div class="type-choice">
@@ -29,25 +28,21 @@
         <span><b>Grant</b><small>Your team presents the idea and does the work.</small></span></label>
     </div>
 
-    <label class="lbl" for="f-summary">Short summary * <span class="dim">2 to 4 sentences: what gets built, why it matters.</span></label>
+    <label class="lbl" for="f-summary">Short summary *</label>
     <textarea id="f-summary" name="summary" rows="5" required maxlength="4000">{{ form.summary if form else '' }}</textarea>
 
-    <label class="lbl" for="f-details">Full initiative details <span class="dim">Optional: scope, milestones, budget breakdown. Markdown supported: headings, **bold**, lists, tables, - [ ] checklists.</span></label>
+    <label class="lbl" for="f-details">Full initiative details</label>
     <textarea id="f-details" name="details" rows="10" maxlength="20000">{{ form.details if form else '' }}</textarea>
-
-    <label class="lbl" for="f-forum">Forum link <span class="dim">Optional Discourse topic where this initiative is discussed.</span></label>
-    <input type="url" id="f-forum" name="discourse_url" placeholder="https://forum.example.org/t/my-initiative/123"
-           value="{{ form.discourse_url if form else '' }}">
 
     <label class="lbl" for="f-goal">Funding goal (USD) *</label>
     <input type="text" id="f-goal" name="goal" required inputmode="decimal" placeholder="250000"
            value="{{ form.goal if form else '' }}">
 
-    <label class="lbl" for="f-funders">Who is likely to fund this? * <span class="dim">One funder per line: Org name | why they'd pay | relationship (none / met once / know them well) | warm intro? yes/no | suggested ask $. Kept private. Giveth uses this to fundraise alongside you. Don't include third parties' private contact details.</span></label>
+    <label class="lbl" for="f-funders">Who is likely to fund this? * <span class="priv">🔒 Private, never published</span></label>
     <textarea id="f-funders" name="funders" rows="4" required maxlength="4000"
       placeholder="Ethereum Foundation | funds public-goods security tooling | met once | warm intro? yes | $50,000">{{ form.funders if form else '' }}</textarea>
 
-    <label class="lbl" for="f-contact">Contact <span class="dim">Email or Telegram, kept private.</span></label>
+    <label class="lbl" for="f-contact">Contact <span class="priv">🔒 Private, never published</span></label>
     <input type="text" id="f-contact" name="contact" maxlength="200" value="{{ form.contact if form else '' }}">
 
     <button class="btn primary" type="submit">Submit for review</button>

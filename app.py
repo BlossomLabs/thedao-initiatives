@@ -720,14 +720,10 @@ def submit():
                                    form=request.form), 400
 
     title = (request.form.get("title") or "").strip()[:MAX_TITLE]
-    if not title and url_clean:
-        title = fetch_discourse_title(url_clean) or ""
     if len(title) < 8:
         return render_template(
             "submit.html", error="Please give the initiative a title (at "
-            "least 8 characters)." + (" We could not read one from the forum "
-                                      "link." if url_clean else ""),
-            form=request.form), 400
+            "least 8 characters).", form=request.form), 400
 
     summary = (request.form.get("summary") or "").strip()[:MAX_SUMMARY]
     if len(summary) < 40:

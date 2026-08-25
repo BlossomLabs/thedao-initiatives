@@ -129,18 +129,17 @@ The verbatim boilerplate:
 
 The final output is copy-paste-ready content for every field of the real form at https://fund.thedao.fund/submit:
 
-1. **Title**: up to 140 characters (can be left blank if a Forum link is provided; the site then pulls the title from the forum topic). Do not repeat the "RFP:" or "Grant:" prefix here; the Type field carries that.
+1. **Title** (required): up to 140 characters. Do not repeat the "RFP:" or "Grant:" prefix here; the Type field carries that.
 2. **Type** (required): RFP or Grant.
 3. **Short summary** (required): 2 to 4 sentences, what gets built and why it matters.
 4. **Full initiative details**: the complete initiative from Step 2, in markdown.
-5. **Forum link**: leave empty unless a discussion thread already exists.
-6. **Funding goal (USD)** (required): one number, matching the budget in the details.
-7. **Who is likely to fund this?** (required, kept private): the funder list from interview question 3. One funder per line, in exactly this format:
+5. **Funding goal (USD)** (required): one number, matching the budget in the details.
+6. **Who is likely to fund this?** (required, never published): the funder list from interview question 3. One funder per line, in exactly this format:
 
    `Org name | why they'd pay | relationship (none / met once / know them well) | warm intro? yes/no | suggested ask $`
 
    This field is never published. Giveth uses it to fundraise alongside the proposer, so honest relationships and real reasons beat an impressive-looking list of names nobody knows. Do not include private contact details of third parties; the org name and the proposer's relationship to it are enough.
-8. **Contact**: the proposer's email or Telegram (kept private).
+7. **Contact**: the proposer's email or Telegram (never published).
 
 End with this scorecard, filled honestly:
 

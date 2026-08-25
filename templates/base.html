@@ -27,9 +27,7 @@
   </a>
   <nav class="topnav">
     <a href="{{ url_for('index') }}" {% if request.path == '/' %}class="on"{% endif %}>Initiatives</a>
-    <a href="https://transparency.thedao.fund/" target="_blank" rel="noopener">Transparency</a>
     <a href="{{ url_for('submit') }}" class="navcta">Suggest an initiative</a>
-    {% if session.get('admin') %}<a href="{{ url_for('admin_dashboard') }}">Admin</a>{% endif %}
     <button id="nav-connect" class="btn wallet" type="button"
       {% if wc_project_id %}data-wc-project="{{ wc_project_id }}" data-wc-src="{{ url_for('static', filename='vendor/walletconnect-ethereum-provider-2.21.1.min.js') }}"{% endif %}>Connect wallet</button>
   </nav>
@@ -39,7 +37,9 @@
 
 <footer>
   <p>TheDAO Security Fund · coordinating ecosystem funding for Ethereum security.</p>
-  <p>To back an initiative, contact <a href="https://x.com/griffgreen" target="_blank" rel="noopener">@griffgreen</a></p>
+  <p>To back an initiative, contact <a href="https://x.com/griffgreen" target="_blank" rel="noopener">@griffgreen</a>
+    · <a class="dim" href="https://transparency.thedao.fund/" target="_blank" rel="noopener">Transparency</a>
+    · <a class="dim" href="{{ url_for('admin_dashboard') if session.get('admin') else '/admin' }}">Admin</a></p>
 </footer>
 
 <div class="footer-bar">

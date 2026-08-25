@@ -359,9 +359,13 @@ footer a.dim{color:rgba(255,255,255,.35)}
 .dw-card-open{text-align:center}
 
 /* sponsor logos on board cards */
-.card-logos{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
-.card-logos img{width:40px;height:40px;border-radius:14px;object-fit:contain;
-  background:#fff;padding:5px}
+.card-logos{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;
+  padding-top:12px;border-top:1px solid var(--edge2)}
+.card-logos .sponsor-lbl{font:600 11px var(--tight);color:var(--green);
+  text-transform:uppercase;letter-spacing:.1em}
+.card-logos img{width:60px;height:60px;border-radius:12px;object-fit:contain;
+  background:#fff;padding:7px;border:1px solid rgba(92,183,90,.55);
+  box-shadow:0 0 14px rgba(92,183,90,.22)}
 
 /* $-prefixed amount box + live token conversion line */
 .dw-amount-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:2px;

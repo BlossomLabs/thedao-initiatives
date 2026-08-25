@@ -58,7 +58,7 @@
       </div>
       {% if c.logos %}
       <div class="card-logos">
-        <span class="dim small">Sponsored by</span>
+        <span class="sponsor-lbl">Sponsored by</span>
         {% for p in c.logos %}<img src="/logos/{{ p.logo }}" alt="{{ p.company }}" title="{{ p.company }}">{% endfor %}
       </div>
       {% endif %}

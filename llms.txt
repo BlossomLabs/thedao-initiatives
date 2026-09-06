@@ -129,8 +129,8 @@ The verbatim boilerplate:
 
 The final output is copy-paste-ready content for every field of the real form at https://fund.thedao.fund/submit:
 
-1. **Title** (required): up to 140 characters. Do not repeat the "RFP:" or "Grant:" prefix here; the Type field carries that.
-2. **Type** (required): RFP or Grant.
+1. **Type** (required): RFP or Grant.
+2. **Title** (required): up to 140 characters. Do not repeat the "RFP:" or "Grant:" prefix here; the Type field carries that.
 3. **Short summary** (required): 2 to 4 sentences, what gets built and why it matters.
 4. **Full initiative details**: the complete initiative from Step 2, in markdown.
 5. **Funding goal (USD)** (required): one number, matching the budget in the details.

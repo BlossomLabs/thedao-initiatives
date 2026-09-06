@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Funder leads · TheDAO Initiatives{% endblock %}
+{% block content %}
+<main class="detail">
+  <p class="crumb"><a href="{{ url_for('admin_dashboard') }}">← Dashboard</a></p>
+  <div class="admin-head">
+    <h1>Funder leads <span class="n">{{ rows | length }}</span></h1>
+    <a class="btn ghost" href="{{ url_for('admin_leads_csv') }}">Download CSV</a>
+  </div>
+  <p class="small dim">Private fundraising intelligence from the "Who is likely to fund this?" field. Never published. The CSV is the interchange for the CRM.</p>
+  {% if rows %}
+  <div class="tblbox">
+    <table>
+      <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Who is likely to fund this</th><th>Contact</th><th>Submitted</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td><a href="{{ url_for('admin_rfp', rfp_id=r.id) }}">{{ r.title }}</a></td>
+          <td><span class="chip static type-chip t-{{ r.type }}">{{ 'Grant' if r.type == 'grant' else 'RFP' }}</span></td>
+          <td><span class="chip static st-{{ r.status }}">{{ r.status }}</span></td>
+          <td class="small pre">{{ r.funders }}</td>
+          <td class="small">{{ r.contact }}</td>
+          <td class="small">{{ r.created_at | dt }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}<p class="empty">No initiative has named likely funders yet.</p>{% endif %}
+</main>
+{% endblock %}

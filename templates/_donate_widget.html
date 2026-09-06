@@ -4,21 +4,28 @@
      data-onramp="{{ onramp_url }}" data-onramp-prefilled="{{ 1 if onramp_prefilled else 0 }}">
   <div class="dw-row">
     <div class="dw-chips">
-      {% for amt in ('50','100','500','1000') %}
-      <button type="button" class="dw-chip" data-amount="{{ amt }}">${{ amt }}</button>
+      {% for amt in ('50','500','5000','50000') %}
+      <button type="button" class="dw-chip" data-amount="{{ amt }}">${{ '{:,}'.format(amt|int) }}</button>
       {% endfor %}
     </div>
   </div>
   <div class="dw-row dw-inputs">
     <label class="dw-amount-wrap">
       <span class="dw-cur">$</span>
-      <input class="dw-amount" type="text" inputmode="decimal" placeholder="Custom amount" aria-label="Amount in US dollars">
+      <input class="dw-amount" type="text" inputmode="decimal" placeholder="Custom amount ($1 minimum)" aria-label="Amount in US dollars">
     </label>
     <select class="dw-token" aria-label="Donation token">
       {% for sym in tokens %}<option value="{{ sym }}">{{ sym }}</option>{% endfor %}
     </select>
   </div>
   <p class="dw-conv small dim" hidden></p>
+
+  {# Terms gate: every method stays locked until this box is checked (app.js unlocks
+     and logs the acceptance via POST /api/terms/accept). #}
+  <label class="dw-terms-row small">
+    <input type="checkbox" class="dw-terms" data-terms-version="{{ terms_version }}">
+    <span>I agree to the <a href="{{ url_for('donation_terms_page') }}" target="_blank" rel="noopener">donation terms</a></span>
+  </label>
 
   <div class="dw-methods" role="group" aria-label="Choose how to donate">
     <button type="button" class="dw-method on" data-method="wallet" aria-pressed="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:5px" aria-hidden="true"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>Wallet</button>
@@ -27,7 +34,7 @@
   </div>
 
   <div class="dw-panel" data-panel="wallet">
-    <button type="button" class="btn primary dw-send">Donate</button>
+    <button type="button" class="btn primary dw-send" disabled>Donate</button>
   </div>
 
   {% if onramp_prefilled %}
@@ -35,8 +42,8 @@
     <p class="small dim">Buy USDC with a card (Visa, Mastercard, Apple Pay, Google Pay).
     It is delivered straight to this initiative's fund address on Ethereum mainnet,
     already filled in for you, and shows up here automatically once it lands.</p>
-    <a class="btn primary dw-card-open" href="{{ onramp_url }}" target="_blank"
-       rel="noopener">Open card checkout ↗</a>
+    <a class="btn primary dw-card-open dis" href="{{ onramp_url }}" target="_blank"
+       rel="noopener" aria-disabled="true">Open card checkout ↗</a>
   </div>
   {% endif %}
 
@@ -46,8 +53,8 @@
     <b>Sending ETH this way isn't auto-counted</b> — donate ETH through the Wallet
     tab instead (or paste its transaction hash below).</p>
     <div class="dw-addr-row">
-      <span class="m dw-addr-text">{{ address }}</span>
-      <button type="button" class="btn ghost sm dw-copy">Copy</button>
+      <span class="m dw-addr-text" data-address="{{ address }}">0x····…····</span>
+      <button type="button" class="btn ghost sm dw-copy" disabled>Copy</button>
     </div>
     {% if manual %}
     <p class="small dim">Impatient? Paste the transaction hash:</p>

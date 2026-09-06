@@ -45,7 +45,17 @@
   {% if not cards %}
     <p class="empty">No initiatives published yet. <a href="{{ url_for('submit') }}">Suggest the first one.</a></p>
   {% endif %}
+  {# Under 20 approved initiatives the suggest card leads the grid (Griff, Sep 2026);
+     at 20 or more it goes back to the end. #}
+  {% macro suggest_card() %}
+    <a class="rfp-card suggest-card" href="{{ url_for('submit') }}">
+      <span class="suggest-plus" aria-hidden="true">+</span>
+      <span class="suggest-title">Suggest an initiative</span>
+      <span class="suggest-sub">Know something the ecosystem should fund? Pitch it.</span>
+    </a>
+  {% endmacro %}
   <div class="rfp-grid">
+  {% if suggest_first %}{{ suggest_card() }}{% endif %}
   {% for c in cards %}
     <div class="rfp-card" data-rfp-id="{{ c.rfp.id }}">
       <span class="type-badge t-{{ c.rfp.type }}">{{ 'Grant' if c.rfp.type == 'grant' else 'RFP' }}</span>
@@ -73,11 +83,7 @@
       {% endif %}
     </div>
   {% endfor %}
-    <a class="rfp-card suggest-card" href="{{ url_for('submit') }}">
-      <span class="suggest-plus" aria-hidden="true">+</span>
-      <span class="suggest-title">Suggest an initiative</span>
-      <span class="suggest-sub">Know something the ecosystem should fund? Pitch it.</span>
-    </a>
+    {% if not suggest_first %}{{ suggest_card() }}{% endif %}
   </div>
 
   <div class="pledge-band">
@@ -86,7 +92,7 @@
       <p class="dim">Backers pledge now and pay only when the work is fully funded, with their logo on the initiative from day one.</p>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <a class="btn" href="https://x.com/griffgreen" target="_blank" rel="noopener">Contact @griffgreen to pledge</a>
+      <a class="btn" href="mailto:info@thedao.fund">Email info@thedao.fund to pledge</a>
     </div>
   </div>
 </main>

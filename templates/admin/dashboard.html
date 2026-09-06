@@ -7,6 +7,7 @@
       {% if bell %}<a class="admin-bell" href="#moderation" title="{{ bell }} items need attention"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="bell-n">{{ bell }}</span></a>{% endif %}
     </h1>
     <div style="display:flex;gap:10px">
+      <a class="btn ghost" href="{{ url_for('admin_leads') }}" title="Who is likely to fund each initiative (private)">Funder leads</a>
       <form method="post" action="{{ url_for('admin_sync_content') }}">
         <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <button class="btn ghost" type="submit"
@@ -105,7 +106,7 @@
       <tbody>
       {% for row in rows %}
         <tr>
-          <td><span class="chip static st-{{ row.rfp.status }}">{{ row.rfp.status }}</span>{% if row.rfp.sort_rank %} <span title="Pinned to board position {{ row.rfp.sort_rank }}">📌{{ row.rfp.sort_rank }}</span>{% endif %}</td>
+          <td><span class="chip static st-{{ row.rfp.status }}">{{ row.rfp.status }}</span> <span class="chip static type-chip t-{{ row.rfp.type }}">{{ 'Grant' if row.rfp.type == 'grant' else 'RFP' }}</span>{% if row.rfp.sort_rank %} <span title="Pinned to board position {{ row.rfp.sort_rank }}">📌{{ row.rfp.sort_rank }}</span>{% endif %}</td>
           <td>{{ row.rfp.title }}</td>
           <td class="amt">{{ row.rfp.funding_goal_usd | usd }}</td>
           <td class="amt">{{ row.sum.total | usd }}</td>

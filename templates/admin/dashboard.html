@@ -102,7 +102,7 @@
   <h2>All initiatives</h2>
   <div class="tblbox">
     <table>
-      <thead><tr><th>Status</th><th>Title</th><th class="amt">Goal</th><th class="amt">Raised</th><th>Created</th><th></th></tr></thead>
+      <thead><tr><th>Status</th><th>Title</th><th class="amt">Goal</th><th class="amt">Raised</th><th>Contact</th><th></th></tr></thead>
       <tbody>
       {% for row in rows %}
         <tr>
@@ -110,7 +110,7 @@
           <td>{{ row.rfp.title }}</td>
           <td class="amt">{{ row.rfp.funding_goal_usd | usd }}</td>
           <td class="amt">{{ row.sum.total | usd }}</td>
-          <td>{{ row.rfp.created_at | dt }}</td>
+          <td class="small">{{ row.rfp.contact or '–' }}</td>
           <td><a class="btn ghost sm" href="{{ url_for('admin_rfp', rfp_id=row.rfp.id) }}">Manage</a></td>
         </tr>
       {% endfor %}

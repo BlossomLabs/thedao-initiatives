@@ -3,7 +3,7 @@
 {% block content %}
 <main class="detail">
   <p class="crumb"><a href="{{ url_for('admin_dashboard') }}">← Dashboard</a></p>
-  <h1 class="rfp-title">{{ r.title }} <span class="chip static st-{{ r.status }}">{{ r.status }}</span></h1>
+  <h1 class="rfp-title">{{ r.title }} <span class="chip static st-{{ r.status }}">{{ r.status }}</span> <span class="chip static type-chip t-{{ r.type }}">{{ 'Grant' if r.type == 'grant' else 'RFP' }}</span></h1>
   {% if error %}<div class="alert">{{ error }}</div>{% endif %}
 
   <div class="btnrow">

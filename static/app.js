@@ -1011,7 +1011,7 @@
 
     function setBusy(busy, label) {
       if (!elSend) return;
-      elSend.disabled = busy;
+      elSend.disabled = busy || !termsAccepted();
       elSend.textContent = busy ? (label || "Working\u2026") : "Donate";
     }
 
@@ -1036,8 +1036,66 @@
       showMethod(root.querySelector('[data-panel="card"]') ? "card" : "exchange");
     }
 
+    // ---- donation terms gate --------------------------------------
+    // Every method is locked (Donate + card buttons disabled, exchange address
+    // masked) until the box is checked. Acceptance is remembered per terms
+    // version in localStorage and logged server-side; a version bump re-asks.
+    var elTerms = root.querySelector(".dw-terms");
+    var termsVersion = elTerms ? (elTerms.dataset.termsVersion || "") : "";
+    var termsKey = "thedao:terms:" + termsVersion;
+    var elAddrText = root.querySelector(".dw-addr-text");
+    var elCardOpen = root.querySelector(".dw-card-open");
+    var lastLoggedAddr = null;
+
+    function termsAccepted() {
+      if (!elTerms) return true;
+      return elTerms.checked;
+    }
+    function logAcceptance() {
+      var body = { version: termsVersion };
+      if (account) body.address = account;
+      if (lastLoggedAddr === (account || "")) return;
+      lastLoggedAddr = account || "";
+      fetch("/api/terms/accept", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      }).catch(function () {});
+    }
+    function applyGate() {
+      var ok = termsAccepted();
+      if (elSend) elSend.disabled = !ok;
+      if (elCardOpen) {
+        elCardOpen.classList.toggle("dis", !ok);
+        elCardOpen.setAttribute("aria-disabled", ok ? "false" : "true");
+      }
+      root.querySelectorAll(".dw-copy").forEach(function (b) { b.disabled = !ok; });
+      if (elAddrText) elAddrText.textContent = ok ? rfpAddress : "0x\u00b7\u00b7\u00b7\u00b7\u2026\u00b7\u00b7\u00b7\u00b7";
+    }
+    if (elTerms) {
+      try { if (termsVersion && localStorage.getItem(termsKey) === "1") elTerms.checked = true; } catch (e) {}
+      elTerms.addEventListener("change", function () {
+        if (elTerms.checked) {
+          try { localStorage.setItem(termsKey, "1"); } catch (e) {}
+          logAcceptance();
+        }
+        applyGate();
+      });
+      if (elCardOpen) {
+        elCardOpen.addEventListener("click", function (ev) {
+          if (!termsAccepted()) { ev.preventDefault(); ev.stopImmediatePropagation(); }
+        }, true);
+      }
+      // a wallet connecting after an anonymous acceptance: log once more with
+      // the address so the trail can bind acceptances to donors
+      document.addEventListener("rfps:wallet", function (ev) {
+        if (ev.detail && ev.detail.account && termsAccepted()) logAcceptance();
+      });
+    }
+    applyGate();
+
     root.querySelectorAll(".dw-copy").forEach(function (b) {
       b.addEventListener("click", function () {
+        if (!termsAccepted()) return;
         navigator.clipboard.writeText(rfpAddress).then(function () {
           b.textContent = "Copied ✓";
           setTimeout(function () { b.textContent = "Copy"; }, 2000);
@@ -1063,6 +1121,7 @@
     }
 
     function donate() {
+      if (!termsAccepted()) { status("err", "Please agree to the donation terms first."); return; }
       if (elSend && elSend.disabled) return;  // no double-submission
       armAudio();
       if (!/^0x[0-9a-fA-F]{40}$/.test(rfpAddress)) {

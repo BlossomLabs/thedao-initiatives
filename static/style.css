@@ -656,3 +656,17 @@ tr.reported td{background:rgba(255,59,56,.06)}
 .qa-composer-hint{font-size:12px;color:var(--muted)}
 .qa-replyform{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .qa-replyform textarea{min-height:70px;background:rgba(9,18,30,.5);border:1px solid rgba(255,255,255,.10);border-radius:12px;color:#fff;font:400 14px var(--tight);padding:10px 12px}
+
+/* donation terms gate + batch 2 polish (Sep 2026) */
+.dw-terms-row{display:flex;align-items:center;gap:8px;margin:2px 0 10px;cursor:pointer;color:var(--soft)}
+.dw-terms-row input{width:16px;height:16px;accent-color:var(--green);margin:0;flex:none}
+.dw-terms-row a{text-decoration:underline}
+.btn.dis{opacity:.4;pointer-events:none}
+.dw-copy:disabled{opacity:.4;cursor:default}
+.type-chip.t-grant{color:#c9a4ff;border-color:rgba(201,164,255,.5)}
+.type-chip.t-rfp{color:#7fc6ff;border-color:rgba(127,198,255,.5)}
+.terms-page .md-body{font-size:15px;line-height:1.65}
+.terms-page .md-body h1{font-size:26px;margin-top:0}
+.terms-page .md-body h2{font-size:19px;margin-top:28px}
+td.pre{white-space:pre-wrap;max-width:420px;overflow-wrap:anywhere}
+@media (max-width:420px){.dw-chip{padding:9px 11px;font-size:13px}}

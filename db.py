@@ -96,6 +96,14 @@ CREATE TABLE IF NOT EXISTS nicknames(
   updated_at INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_nick_lower ON nicknames(lower(nickname)) WHERE nickname != '';
+CREATE TABLE IF NOT EXISTS terms_acceptances(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at INTEGER NOT NULL,
+  version TEXT NOT NULL,
+  address TEXT NOT NULL DEFAULT '',
+  ip TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_terms_addr ON terms_acceptances(address, version);
 """
 
 
@@ -402,6 +410,43 @@ def update_rfp(rfp_id, **fields):
     try:
         with con:
             con.execute("UPDATE rfps SET %s WHERE id=?" % ",".join(sets), vals)
+    finally:
+        con.close()
+
+
+# ---------------------------------------------------------------- donation terms
+
+def log_terms_acceptance(version, address, ip):
+    """Paper trail for the donation-terms gate. Never rendered publicly.
+
+    Anonymous acceptances (no wallet yet) are always appended; once a wallet
+    is connected the (address, version) pair is recorded at most once."""
+    con = connect()
+    try:
+        with con:
+            if address:
+                dup = con.execute(
+                    "SELECT 1 FROM terms_acceptances WHERE address=? AND "
+                    "version=?", (address, version)).fetchone()
+                if dup:
+                    return False
+            con.execute(
+                "INSERT INTO terms_acceptances(created_at, version, address, ip)"
+                " VALUES (?,?,?,?)", (now(), version, address, ip))
+            return True
+    finally:
+        con.close()
+
+
+def funder_leads():
+    """Initiatives with a non-empty funders field, newest first. Private
+    fundraising intelligence: admin-only readers (leads page + CSV)."""
+    con = connect()
+    try:
+        return con.execute(
+            "SELECT id, title, slug, type, status, funding_goal_usd, funders, "
+            "contact, created_at FROM rfps WHERE trim(funders) != '' "
+            "ORDER BY created_at DESC").fetchall()
     finally:
         con.close()
 

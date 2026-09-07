@@ -23,9 +23,6 @@
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <input type="text" name="website" value="" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
 
-    <label class="lbl" for="f-title">Title *</label>
-    <input type="text" id="f-title" name="title" required maxlength="140" value="{{ form.title if form else '' }}">
-
     <span class="lbl">Type *</span>
     <div class="type-choice">
       <label class="type-opt"><input type="radio" name="type" value="rfp"
@@ -35,6 +32,9 @@
         {{ 'checked' if form and form.get('type') == 'grant' }}>
         <span><b>Grant</b><small>Your team presents the idea and does the work.</small></span></label>
     </div>
+
+    <label class="lbl" for="f-title">Title *</label>
+    <input type="text" id="f-title" name="title" required maxlength="140" value="{{ form.title if form else '' }}">
 
     <label class="lbl" for="f-summary">Short summary *</label>
     <textarea id="f-summary" name="summary" rows="5" required maxlength="4000">{{ form.summary if form else '' }}</textarea>

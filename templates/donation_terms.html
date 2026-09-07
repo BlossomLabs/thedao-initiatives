@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Donation terms · TheDAO Security Fund{% endblock %}
+{% block og_title %}Donation terms · TheDAO Security Fund{% endblock %}
+{% block og_description %}Terms of service for donations to TheDAO Security Fund initiatives.{% endblock %}
+{% block content %}
+<main class="detail narrow terms-page">
+  <p class="tag left">Terms version {{ version }}</p>
+  <div class="md-body">{{ body | md }}</div>
+</main>
+{% endblock %}

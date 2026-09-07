@@ -920,7 +920,9 @@ class TestInitiativeTypes(unittest.TestCase):
     def test_pledge_band_is_pledge_only(self):
         html = self.client.get("/").get_data(as_text=True)
         self.assertIn("Want to pledge support?", html)
-        self.assertIn("Contact @griffgreen to pledge", html)
+        # Pledge contact moved to email (Griff, Sep 2026 batch 2).
+        self.assertIn("Email info@thedao.fund to pledge", html)
+        self.assertNotIn("griffgreen", html)
         self.assertNotIn("Submit an RFP", html)
 
     # -- language sweep --------------------------------------------------

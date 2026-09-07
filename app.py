@@ -252,7 +252,62 @@ def inject_globals():
         site += "/"
     return {"csrf_token": csrf_token, "TOKENS": config.TOKENS,
             "site_url": site or request.url_root,
-            "wc_project_id": config.WALLETCONNECT_PROJECT_ID}
+            "wc_project_id": config.WALLETCONNECT_PROJECT_ID,
+            "terms_version": terms_version()}
+
+
+# ------------------------------------------------------------ donation terms
+
+_TERMS_VERSION_RE = re.compile(r"^version:[ \t]*(\S+)[ \t]*\r?\n", re.I)
+
+
+def donation_terms():
+    """(version, markdown body) from content/donation-terms.md.
+
+    The first line `version: YYYY-MM-DD` is the gate version: the widget
+    re-asks for agreement whenever it changes. It is stripped from the body;
+    the document carries its own effective date."""
+    path = os.path.join(config.BASE_DIR, "content", "donation-terms.md")
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return "", ""
+    m = _TERMS_VERSION_RE.match(text)
+    if not m:
+        return "", text
+    return m.group(1), text[m.end():]
+
+
+def terms_version():
+    return donation_terms()[0]
+
+
+@app.route("/donation-terms")
+def donation_terms_page():
+    version, body = donation_terms()
+    if not body:
+        abort(404)
+    return render_template("donation_terms.html", version=version, body=body)
+
+
+@app.route("/api/terms/accept", methods=["POST"])
+def terms_accept():
+    same_origin_only()
+    if not rate_limit("terms:" + client_ip(), 30, 3600):
+        return jsonify({"error": "rate limited"}), 429
+    data = request.get_json(silent=True) or {}
+    version = str(data.get("version") or "").strip()[:40]
+    if not version or version != terms_version():
+        return jsonify({"error": "unknown terms version"}), 400
+    address = str(data.get("address") or "").strip()
+    if address:
+        try:
+            address = chain.to_checksum(address)
+        except Exception:
+            return jsonify({"error": "bad address"}), 400
+    db.log_terms_acceptance(version, address, client_ip())
+    return jsonify({"ok": True})
 
 
 # ------------------------------------------------------------ jinja filters
@@ -665,6 +720,7 @@ def index():
     state = chain_state()
     tokens = donor_tokens(state)
     return render_template("index.html", cards=cards, totals=totals,
+                           suggest_first=len(cards) < 20,
                            recent=recent[:8], state=state, tokens=tokens,
                            community=db.front_page_featured(),
                            ai_search=bool(config.AI_SEARCH_API_KEY),
@@ -1712,6 +1768,35 @@ def admin_dashboard():
                            reported=db.reported_comments(),
                            week_ago=week_ago,
                            bell=len(held) + len(stale))
+
+
+# Funder leads: the ONLY readers of the private funders field besides the
+# manage page. Never link these from a public page; never add a public API.
+@app.route("/admin/leads")
+@admin_required
+def admin_leads():
+    return render_template("admin/leads.html", rows=db.funder_leads())
+
+
+@app.route("/admin/leads.csv")
+@admin_required
+def admin_leads_csv():
+    import csv
+    import io
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\n")
+    w.writerow(["initiative", "slug", "type", "status", "goal_usd", "funders",
+                "contact", "created_at"])
+    for r in db.funder_leads():
+        goal = r["funding_goal_usd"] or 0
+        goal = int(goal) if float(goal).is_integer() else goal
+        w.writerow([r["title"], r["slug"], r["type"], r["status"],
+                    goal, r["funders"], r["contact"],
+                    time.strftime("%Y-%m-%dT%H:%M:%SZ",
+                                  time.gmtime(r["created_at"]))])
+    resp = app.response_class(buf.getvalue(), mimetype="text/csv")
+    resp.headers["Content-Disposition"] = "attachment; filename=funder-leads.csv"
+    return resp
 
 
 @app.route("/admin/rfp/<int:rfp_id>", methods=["GET", "POST"])

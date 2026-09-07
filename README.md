@@ -1,5 +1,7 @@
 # TheDAO Security Fund — RFP board
 
+[![CI](https://github.com/Giveth/thedao-rfps/actions/workflows/ci.yml/badge.svg)](https://github.com/Giveth/thedao-rfps/actions/workflows/ci.yml)
+
 Public board of Ethereum-security initiatives (RFPs). Sponsors pledge,
 anyone donates on-chain, TheDAO completes the funding gap.
 
@@ -41,6 +43,13 @@ Then open http://127.0.0.1:4482 — admin panel at /admin, password in `.env`.
 
     .venv/bin/python -m unittest discover tests
     (RFPS_SKIP_LIVE=1 to skip the live-mainnet checks)
+
+CI runs the same suite on Python 3.10 and 3.12, byte-compiles every module,
+shellchecks the scripts, and boots the app under gunicorn to check `/healthz`
+before anything ships. A green push to `main` deploys itself to the server and
+rolls back on its own if the new revision does not come up healthy — see
+**DEPLOY.md**. The live-mainnet token verification that CI skips runs weekly
+in `.github/workflows/live-chain.yml`.
 
 ## Voting
 

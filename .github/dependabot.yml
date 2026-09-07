@@ -1,0 +1,15 @@
+# Pinned, exact versions in requirements.txt mean a security release only
+# reaches the box when someone bumps it. Dependabot opens that PR; CI proves it
+# still boots before anyone merges.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

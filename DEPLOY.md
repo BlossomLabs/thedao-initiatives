@@ -108,26 +108,105 @@ sudo systemctl restart thedao-rfps
 
 ## How updates work later
 
+**Pushing to `main` deploys.** GitHub Actions (`.github/workflows/ci.yml`) runs
+the tests, byte-compiles, shellchecks the scripts, and boots the app under
+gunicorn to check `/healthz` and `Safe deploys: ENABLED`. Only if all of that
+is green does it SSH in and run `deploy/deploy.sh`, which checks out that exact
+commit, installs dependencies, restarts the unit, and waits for `/healthz`. A
+revision that does not come up healthy is **rolled back automatically** to the
+previous commit.
+
+The manual path still works and is unchanged:
+
 ```sh
 su - rfps && cd thedao-rfps
-git pull
-sudo systemctl restart thedao-rfps
+./deploy/deploy.sh $(git rev-parse origin/main)   # same script CI runs
+# or the old way:
+git pull && sudo systemctl restart thedao-rfps
 ```
 
-**RFP content ships without a restart.** RFPs live as markdown files in
-`content/rfps/` (see the README there). After a `git pull`, they publish
-either at the next restart or instantly via the admin dashboard's
-"Sync content files" button. Recommended: add a cron that quietly pulls
-every 5 minutes, so publishing an RFP needs no server access at all —
-push the file, click Sync in the admin panel:
+**RFP content ships with the deploy too.** RFPs live as markdown files in
+`content/rfps/` (see the README there). Pushing one to `main` publishes it at
+the restart CI triggers; the admin dashboard's "Sync content files" button
+still works for an instant publish without a restart.
+
+> The `*/5 * * * * git pull -q origin main` content-sync cron that earlier
+> versions of this file recommended is now **redundant and harmful** — CI
+> already deploys every push, and that cron would pull `main` straight back on
+> top of an automatic rollback. If it is in the `rfps` crontab, remove it.
+
+## One-time setup for the CI deploy
+
+Do this once on the server; after that every green push to `main` deploys.
+
+### 1. Make a deploy keypair (on your machine, not the server)
 
 ```sh
-crontab -e -u rfps
-# add:
-*/5 * * * *  cd /home/rfps/thedao-rfps && git pull -q origin main
+ssh-keygen -t ed25519 -f ci-deploy -N "" -C "github-actions@thedao-rfps"
 ```
 
-(Code changes still need the manual `systemctl restart` above.)
+### 2. Install the public key on the box, locked to the deploy script
+
+As a sudo user:
+
+```sh
+sudo -u rfps mkdir -p /home/rfps/.ssh
+sudo -u rfps chmod 700 /home/rfps/.ssh
+# paste ci-deploy.pub as the KEY part below, all on one line:
+echo 'restrict,command="/home/rfps/thedao-rfps/deploy/deploy.sh" ssh-ed25519 AAAA...KEY... github-actions@thedao-rfps' \
+  | sudo -u rfps tee -a /home/rfps/.ssh/authorized_keys
+sudo -u rfps chmod 600 /home/rfps/.ssh/authorized_keys
+```
+
+`restrict` turns off port/agent/X11 forwarding and PTY allocation, and the
+forced `command=` means this key can run **only** `deploy/deploy.sh` — it
+cannot get a shell. A leaked CI key can deploy a commit that is already on
+`origin`, and nothing else.
+
+### 3. Let `rfps` restart the unit, and only that unit
+
+```sh
+sudo visudo -f /etc/sudoers.d/rfps-deploy
+```
+
+```
+rfps ALL=(root) NOPASSWD: /usr/bin/systemctl restart thedao-rfps
+rfps ALL=(root) NOPASSWD: /bin/systemctl restart thedao-rfps
+```
+
+(Both paths, because `systemctl` lives in `/usr/bin` on Ubuntu and `/bin` on
+some Debian images. `visudo` refuses to save a file with a syntax error.)
+
+Check it, as `rfps`:
+
+```sh
+sudo -n systemctl restart thedao-rfps     # must work without a password
+sudo -n systemctl stop thedao-rfps        # must be REFUSED
+```
+
+### 4. Repository secrets
+
+Settings, Secrets and variables, Actions:
+
+| Secret | Value |
+|---|---|
+| `DEPLOY_SSH_KEY` | contents of the private `ci-deploy` file (the whole thing, including the BEGIN/END lines) |
+| `DEPLOY_HOST` | the server's hostname or IP |
+| `DEPLOY_KNOWN_HOSTS` | output of `ssh-keyscan -t ed25519 <host>` — pins the host key so the deploy never trusts a new one blindly |
+| `DEPLOY_PORT` | only if sshd is not on 22 |
+| `RPC_URL` | optional; used by the weekly live-chain check so it does not lean on public endpoints |
+
+Then create an Environment named **`production`** (Settings, Environments).
+The deploy job is attached to it, so deploys show up in the repo's Deployments
+tab — and if you later want a human click before each one, adding a required
+reviewer there is the only change needed.
+
+### 5. First deploy
+
+Push anything to `main` and watch the run. The deploy step prints the commit,
+then `==> <sha> is live and healthy`. To rehearse the rollback path, deploy a
+commit you know is broken: the run goes red and the site stays up on the
+previous one.
 
 ## Notes
 

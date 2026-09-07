@@ -109,8 +109,14 @@ donation from an exchange credits within about 5 minutes, the scanner works.
 
 ## Day-2 operations
 
-- Update: `su - rfps && cd thedao-rfps && git pull` then
-  `sudo systemctl restart thedao-rfps`.
+- Update: nothing to do by hand — a green push to `main` deploys itself via
+  GitHub Actions and rolls back if the new revision fails its health check
+  (DEPLOY.md, "How updates work later"). The manual path stays available:
+  `su - rfps && cd thedao-rfps && ./deploy/deploy.sh <sha>`.
+- The CI deploy needs a one-time setup on the box: a forced-command SSH key in
+  the `rfps` user's authorized_keys plus a sudoers rule letting `rfps` run only
+  `systemctl restart thedao-rfps`. Both are in DEPLOY.md, "One-time setup for
+  the CI deploy" — please do this as part of the handoff.
 - Logs: `journalctl -u thedao-rfps -f`
 - Uptime monitoring: point anything at `/healthz`.
 - The database is a single file; the provided backup script uses SQLite's

@@ -1,5 +1,7 @@
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Settings2 } from "lucide-react";
 import DonateWidget from "~/components/donate/DonateWidget";
+import { LinkButton } from "~/components/ui/Button";
+import { useSession } from "~/context/session";
 import type { InitiativePage } from "~/lib/api-types";
 import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
 
@@ -11,6 +13,7 @@ export default function SideCards(
   },
 ) {
   const r = page.initiative;
+  const { session } = useSession();
   return (
     <aside className="sticky top-[86px] flex flex-col gap-3.5 max-[960px]:static">
       <div className="panel border-[rgba(92,183,90,.35)] shadow-[0_0_34px_rgba(92,183,90,.07)]">
@@ -65,6 +68,15 @@ export default function SideCards(
           Donations count as a public signal in that ranking.
         </p>
       </div>
+      {session?.isAdmin && (
+        <div className="panel border-[rgba(255,180,50,.32)]">
+          <span className="k">Only admins</span>
+          <p className="m-0 mb-2 small dim">Edit, approve, or sync this initiative.</p>
+          <LinkButton variant="ghost" className="mt-1 w-full" to={`/admin/initiatives/${r.id}`}>
+            <Settings2 className="size-[15px]" />Manage initiative
+          </LinkButton>
+        </div>
+      )}
     </aside>
   );
 }

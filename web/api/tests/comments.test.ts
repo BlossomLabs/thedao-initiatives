@@ -6,6 +6,7 @@ import { transferLog } from "./helpers.ts";
 
 const EXPERT = "0x3333333333333333333333333333333333333333";
 const DONOR = "0x4444444444444444444444444444444444444444";
+const PROPOSER = "0x5555555555555555555555555555555555555555";
 
 async function setup(aiFetch?: (url: string) => Response) {
   const h = await harness({
@@ -17,6 +18,7 @@ async function setup(aiFetch?: (url: string) => Response) {
     status: "approved",
     goalUsd: 1000,
     safeAddress: "0xD5Cf05f24727C83976652E3586c0e26DD39884e9",
+    proposer: PROPOSER,
   });
   h.script.badgeHolders.add(EXPERT.toLowerCase());
   // DONOR has $25 confirmed on this initiative
@@ -130,6 +132,15 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
     entry: { roles: string[] };
   };
   assertEquals(e1.entry.roles, ["EXPERT"]);
+  // The wallet that proposed this initiative is tagged, skips moderation and can vote.
+  const proposer = await h.mint(PROPOSER);
+  const pr = await j(await post(proposer, { body: "proposer q" })) as {
+    status: string;
+    entry: { roles: string[]; votes: number };
+  };
+  assertEquals(pr.status, "published");
+  assertEquals(pr.entry.roles, ["PROPOSER"]);
+  assertEquals(pr.entry.votes, 1);
   const d1 = await j(await post(donor, { body: "donor q" })) as {
     status: string;
     id: string;
@@ -211,23 +222,39 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   ) as { viewerCanVote: boolean };
   assertEquals(asPlain.viewerCanVote, false);
 
-  // replies: role-only; admin reply answers a question
+  // replies: any signed-in wallet; without a role they are screened (held here,
+  // there is no AI) and do not answer the question. Roles publish at once.
   assertEquals(
-    (await h.req(`/api/comments/${c1.id}/reply`, {
+    (await h.req(`/api/comments/${c1.id}/reply`, { method: "POST", json: { body: "me too" } }))
+      .status,
+    400, // a name is required without a wallet
+  );
+  const anonReply = await j(
+    await h.req(`/api/comments/${c1.id}/reply`, {
+      method: "POST",
+      json: { body: "anon reply", name: "Anon" },
+    }),
+  ) as { status: string; claimToken: string };
+  assertEquals(anonReply.status, "held");
+  assertEquals(anonReply.claimToken.length, 32);
+  const mineHeld = await j(await h.req("/api/comments/mine?tokens=" + anonReply.claimToken)) as {
+    held: { parentId: string | null }[];
+  };
+  assertEquals(mineHeld.held.map((x) => x.parentId), [c1.id]);
+  const plainReply = await j(
+    await h.req(`/api/comments/${c1.id}/reply`, {
       method: "POST",
       token: plain,
       json: { body: "me too" },
-    })).status,
-    403,
-  );
-  assertEquals(
-    (await h.req(`/api/comments/${c1.id}/reply`, {
-      method: "POST",
-      token: donor,
-      json: { body: "me too" },
-    })).status,
-    403,
-  );
+    }),
+  ) as { ok: boolean; status: string; reply: unknown; claimToken: string; answered: boolean };
+  assertEquals(plainReply.status, "held");
+  assertEquals(plainReply.reply, null);
+  assertEquals(plainReply.claimToken.length, 32);
+  assertEquals(plainReply.answered, false);
+  assertEquals((await h.db.comments.get(c1.id))!.answered, false);
+  const heldReply = (await h.db.comments.held()).find((x) => x.address === PLAIN)!;
+  assertEquals(heldReply.parentId, c1.id);
   const rep = await j(
     await h.req(`/api/comments/${c1.id}/reply`, {
       method: "POST",
@@ -251,6 +278,11 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   const top = withReplies.entries.find((e) => e.id === c1.id)!;
   assertEquals(top.replies.length, 2);
   assert(top.answered);
+  await h.req(`/api/admin/comments/${heldReply.id}/publish`, { method: "POST", token: admin });
+  const published = await j(await h.req(`/api/initiatives/${rfp.slug}/comments`)) as {
+    entries: { id: string; replies: unknown[] }[];
+  };
+  assertEquals(published.entries.find((e) => e.id === c1.id)!.replies.length, 3);
 
   // report never hides
   await h.req(`/api/comments/${c1.id}/report`, { method: "POST" });
@@ -258,7 +290,7 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   assertEquals(
     ((await j(await h.req(`/api/initiatives/${rfp.slug}/comments`))).entries as unknown[])
       .length,
-    4,
+    5,
   );
 
   // admin actions: accept only suggestions; feature-front max 3
@@ -323,4 +355,69 @@ Deno.test("two-tier ordering: featured (newest featured first), then votes, then
     e("cold", 0, 0, -2, 5),
   ]).map((x) => x.id);
   assertEquals(sorted, ["new-feat", "old-feat", "newer-same-votes", "hot", "cold"]);
+});
+
+Deno.test("names: .eth is only allowed as the poster's own ENS name", async () => {
+  const h = await harness({
+    fetch: (url) => {
+      if (url.startsWith("https://api.ensdata.net/griff.eth")) {
+        return Response.json({ address: ADMIN });
+      }
+      return Response.json({});
+    },
+  });
+  const rfp = await h.db.rfps.insert({
+    title: "Named initiative",
+    status: "approved",
+    goalUsd: 1000,
+    safeAddress: "0xD5Cf05f24727C83976652E3586c0e26DD39884e9",
+  });
+  const post = (token: string | undefined, body: Record<string, unknown>) =>
+    h.req(`/api/initiatives/${rfp.slug}/comments`, {
+      method: "POST",
+      token,
+      json: { type: "question", topic: "scope", body: "Why?", ...body },
+    });
+  const admin = await h.mint(ADMIN, true);
+  const plain = await h.mint(PLAIN);
+
+  // plain names are untouched (first: anonymous posts are rate limited per IP)
+  assertEquals((await post(undefined, { name: "Ethel" })).status, 200);
+  // anonymous: never
+  assertEquals((await post(undefined, { name: "griff.eth" })).status, 400);
+  assertEquals((await post(undefined, { name: "Griff.ETH" })).status, 400);
+  assertEquals((await post(undefined, { name: "nobody.eth" })).status, 400);
+  // signed in: only the wallet the name points to
+  assertEquals((await post(plain, { name: "griff.eth" })).status, 403);
+  assertEquals((await post(plain, { name: "nobody.eth" })).status, 403);
+  const ok = await j(await post(admin, { name: "griff.eth" })) as { status: string; id: string };
+  assertEquals(ok.status, "published");
+
+  // replies follow the same rule
+  const reply = (token: string | undefined, name: string) =>
+    h.req(`/api/comments/${ok.id}/reply`, { method: "POST", token, json: { body: "hi", name } });
+  assertEquals((await reply(undefined, "griff.eth")).status, 400);
+  assertEquals((await reply(plain, "griff.eth")).status, 403);
+  assertEquals((await reply(admin, "griff.eth")).status, 200);
+
+  // and so does the profile nickname, even with a space that hides the domain shape
+  assertEquals(
+    (await h.req("/api/nickname", {
+      method: "POST",
+      token: plain,
+      json: { nickname: "griff.eth" },
+    }))
+      .status,
+    403,
+  );
+  assertEquals(
+    (await h.req("/api/nickname", {
+      method: "POST",
+      token: plain,
+      json: { nickname: "not me.eth" },
+    }))
+      .status,
+    403,
+  );
+  h.close();
 });

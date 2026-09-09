@@ -18,9 +18,16 @@ export const vote = (id: string, dir: "up" | "down") =>
   api<{ myvote: number; votes: number }>(`/api/comments/${id}/vote`, { json: { dir } });
 export const report = (id: string) =>
   api<{ ok: true }>(`/api/comments/${id}/report`, { method: "POST", token: null });
-export const reply = (id: string, body: string, name: string) =>
-  api<{ ok: true; reply: CommentEntry }>(`/api/comments/${id}/reply`, { json: { body, name } });
+export interface ReplyResult {
+  ok: true;
+  status: "published" | "held";
+  reply: CommentEntry | null;
+  /** Private token for a held reply, so the author can still see it. */
+  claimToken: string;
+  /** Whether the parent question counts as answered after this reply. */
+  answered: boolean;
+}
+export const reply = (id: string, body: string, name: string, token: string | null) =>
+  api<ReplyResult>(`/api/comments/${id}/reply`, { json: { body, name }, token });
 export const adminAction = (id: string, action: string) =>
   api<{ comment: unknown }>(`/api/admin/comments/${id}/${action}`, { method: "POST" });
-
-export const CAN_REPLY = new Set(["ADMIN", "CURATOR", "EXPERT"]);

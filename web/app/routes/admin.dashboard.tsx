@@ -241,7 +241,7 @@ export default function Dashboard() {
                         <LinkButton
                           sm
                           variant="ghost"
-                          to={`/initiative/${c.initiative.slug}#qa-${c.id}`}
+                          to={`/initiative/${c.initiative.slug}#qa-${c.parentId ?? c.id}`}
                         >
                           Open
                         </LinkButton>
@@ -281,7 +281,7 @@ export default function Dashboard() {
                           sm
                           variant="ghost"
                           className="mr-1.5"
-                          to={`/initiative/${c.initiative.slug}#qa-${c.id}`}
+                          to={`/initiative/${c.initiative.slug}#qa-${c.parentId ?? c.id}`}
                         >
                           Open
                         </LinkButton>

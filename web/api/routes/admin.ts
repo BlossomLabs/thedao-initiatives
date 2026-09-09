@@ -10,6 +10,7 @@ import { safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
 import { syncContent } from "../services/content.ts";
 import { syncSafe } from "../services/safe-api.ts";
+import { liveRoles } from "../services/roles.ts";
 import type { Comment, PledgeStatus, Rfp } from "../db/types.ts";
 import {
   CHAIN_ID,
@@ -35,7 +36,10 @@ export function adminRoutes(deps: Deps) {
   };
   const withInitiative = async (rows: Comment[]) => {
     const out = [];
-    for (const cm of rows) out.push(adminCommentJson(cm, await db.rfps.get(cm.rfpId)));
+    for (const cm of rows) {
+      const rfp = await db.rfps.get(cm.rfpId);
+      out.push(adminCommentJson(cm, liveRoles(config, cm.address, rfp), rfp));
+    }
     return out;
   };
 
@@ -344,7 +348,8 @@ export function adminRoutes(deps: Deps) {
     } else if (action === "unfeature") patch = { featured: 0, featuredAt: 0 };
     if (!patch) throw new HttpError(400, "bad action");
     const next = await db.comments.set(row.id, patch);
-    return c.json({ comment: adminCommentJson(next!, await db.rfps.get(row.rfpId)) });
+    const rfp = await db.rfps.get(row.rfpId);
+    return c.json({ comment: adminCommentJson(next!, liveRoles(config, next!.address, rfp), rfp) });
   });
 
   /**

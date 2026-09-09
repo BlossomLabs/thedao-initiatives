@@ -28,6 +28,7 @@ export function FundedChip() {
 
 const ROLE_TAGS: Record<string, [string, string]> = {
   ADMIN: ["TheDAO team", "text-dao-amber border-[rgba(255,180,50,.32)] bg-[rgba(255,180,50,.12)]"],
+  PROPOSER: ["Proposer", "text-dao-sky border-[rgba(90,200,250,.4)] bg-[rgba(90,200,250,.12)]"],
   CURATOR: ["Curator", "text-dao-green border-[rgba(92,183,90,.35)] bg-[rgba(92,183,90,.12)]"],
   EXPERT: [
     "ETHSecurity Badgeholder",
@@ -38,10 +39,11 @@ const ROLE_TAGS: Record<string, [string, string]> = {
 
 /** Role chips, priority order, at most two shown. */
 export function RoleTags({ roles }: { roles: string[] }) {
-  const shown = ["ADMIN", "CURATOR", "EXPERT", "DONOR"].filter((r) => roles.includes(r)).slice(
-    0,
-    2,
-  );
+  const shown = ["ADMIN", "PROPOSER", "CURATOR", "EXPERT", "DONOR"].filter((r) => roles.includes(r))
+    .slice(
+      0,
+      2,
+    );
   return (
     <>
       {shown.map((r) => (

@@ -1,12 +1,18 @@
 import { useState } from "react";
-import { Check, CornerDownLeft, Flag, Star, Trash2 } from "lucide-react";
+import { Check, ChevronDown, CornerDownLeft, Flag, Send, Star, Trash2, Wallet } from "lucide-react";
+import { useAccount } from "wagmi";
+import { useSession } from "~/context/session";
 import Identity from "~/components/wallet/Identity";
 import { Avatar } from "~/components/wallet/Avatar";
 import { QaChip, RoleTags } from "~/components/ui/Badge";
+import WalletMenu from "~/components/wallet/WalletMenu";
 import type { CommentEntry } from "~/lib/api-types";
+import { useIdentity } from "~/hooks/use-identity";
 import { avatarSrc } from "~/lib/avatar";
 import { cn } from "~/lib/utils";
 import VoteBox from "./VoteBox";
+import ConnectInline from "~/components/wallet/ConnectInline";
+import { nameInput, signedInAs, submitBtn } from "./styles";
 
 export function IdentityRow({ c }: { c: CommentEntry }) {
   const label = c.roles.includes("ADMIN") ? "TheDAO team" : c.displayName || "Anonymous";
@@ -38,13 +44,19 @@ function Body({ text, className }: { text: string; className?: string }) {
   );
 }
 
+/** Feature levels by the entry's `featured` value, with the admin action that sets each. */
+const FEATURE_LEVELS = [
+  { label: "Not featured", action: "unfeature" },
+  { label: "Featured", action: "feature" },
+  { label: "Front page", action: "feature-front" },
+];
+
 const linkBtn =
   "inline-flex cursor-pointer items-center gap-[7px] rounded-[9px] border border-white/[.16] bg-white/5 px-3.5 py-2 font-inter-tight text-[13px] font-semibold leading-none text-[#f2f6fa] transition-all duration-150 hover:border-white/[.28] hover:bg-white/10 hover:text-white disabled:cursor-default disabled:opacity-60";
 
 export default function EntryCard({
   c,
   canVote,
-  canReply,
   isAdmin,
   connected,
   onVote,
@@ -54,23 +66,23 @@ export default function EntryCard({
 }: {
   c: CommentEntry;
   canVote: boolean;
-  canReply: boolean;
   isAdmin: boolean;
   connected: boolean;
   onVote: (id: string, dir: "up" | "down") => Promise<void>;
-  onReply: (id: string, body: string, name: string) => Promise<void>;
+  onReply: (id: string, body: string, name: string) => Promise<"published" | "held">;
   onReport: (id: string) => Promise<void>;
   onAdmin: (id: string, action: string) => Promise<void>;
 }) {
   const [replying, setReplying] = useState(false);
+  const [name, setName] = useState("");
+  const [featureMenu, setFeatureMenu] = useState(false);
+  const { address } = useAccount();
+  const { connecting } = useSession();
+  const me = useIdentity(replying ? address : undefined);
+  // The wallet is briefly connected before the sign-in signature; keep the
+  // connect button mounted until then so it can still show a refusal.
+  const signedIn = Boolean(address) && !connecting;
   const [text, setText] = useState("");
-  const [name, setName] = useState(() => {
-    try {
-      return isAdmin ? localStorage.getItem("thedao:qa:adminname") || "" : "";
-    } catch {
-      return "";
-    }
-  });
   const [note, setNote] = useState("");
   const [reported, setReported] = useState(false);
   const [flash, setFlash] = useState("");
@@ -85,14 +97,18 @@ export default function EntryCard({
       setNote("Write something first.");
       return;
     }
+    if (!address && !name.trim()) {
+      setNote("Add your name, or connect a wallet.");
+      return;
+    }
     try {
-      if (isAdmin) localStorage.setItem("thedao:qa:adminname", name.trim());
-    } catch { /* ignore */ }
-    try {
-      await onReply(c.id, t, name.trim());
+      const status = await onReply(c.id, t, name.trim());
       setText("");
       setReplying(false);
       setNote("");
+      if (status === "held") {
+        say("Thanks. Your reply is waiting for review and will appear once approved.");
+      }
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Reply failed.");
     }
@@ -143,15 +159,13 @@ export default function EntryCard({
             </div>
           ))}
           <div className="mt-0.5 flex flex-wrap items-center gap-2">
-            {canReply && (
-              <button
-                type="button"
-                className={linkBtn}
-                onClick={() => setReplying((v) => !v)}
-              >
-                <CornerDownLeft className="size-3.5" />Reply
-              </button>
-            )}
+            <button
+              type="button"
+              className={linkBtn}
+              onClick={() => setReplying((v) => !v)}
+            >
+              <CornerDownLeft className="size-3.5" />Reply
+            </button>
             <button
               type="button"
               className={cn(
@@ -184,42 +198,36 @@ export default function EntryCard({
                     <Check className="size-3.5" />Mark reviewed
                   </button>
                 )}
-                {c.featured !== 1 && (
+                <span className="relative">
                   <button
                     type="button"
                     className={cn(
                       linkBtn,
                       "border-[rgba(92,183,90,.35)] bg-[rgba(92,183,90,.1)] text-dao-green hover:border-dao-green hover:bg-dao-green hover:text-[#0d1f14]",
                     )}
-                    onClick={() => onAdmin(c.id, "feature")}
+                    aria-haspopup="menu"
+                    aria-expanded={featureMenu}
+                    onClick={() => setFeatureMenu((v) => !v)}
                   >
-                    <Star className="size-3.5" />Feature
+                    <Star className="size-3.5" />
+                    {FEATURE_LEVELS[c.featured]?.label ?? "Feature"}
+                    <ChevronDown className="size-3.5 opacity-70" />
                   </button>
-                )}
-                {c.featured !== 2 && (
-                  <button
-                    type="button"
-                    className={cn(
-                      linkBtn,
-                      "border-[rgba(92,183,90,.35)] bg-[rgba(92,183,90,.1)] text-dao-green hover:border-dao-green hover:bg-dao-green hover:text-[#0d1f14]",
-                    )}
-                    onClick={() => onAdmin(c.id, "feature-front")}
-                  >
-                    <Star className="size-3.5" />Front page
-                  </button>
-                )}
-                {c.featured > 0 && (
-                  <button
-                    type="button"
-                    className={cn(
-                      linkBtn,
-                      "border-[rgba(92,183,90,.35)] bg-[rgba(92,183,90,.1)] text-dao-green",
-                    )}
-                    onClick={() => onAdmin(c.id, "unfeature")}
-                  >
-                    <Star className="size-3.5" />Unfeature
-                  </button>
-                )}
+                  {featureMenu && (
+                    <WalletMenu
+                      className="left-0 right-auto top-[36px] min-w-[170px]"
+                      onClose={() => setFeatureMenu(false)}
+                      items={FEATURE_LEVELS.map((f, level) => ({
+                        key: f.action,
+                        label: f.label,
+                        active: c.featured === level,
+                        onClick: () => {
+                          if (c.featured !== level) void onAdmin(c.id, f.action);
+                        },
+                      }))}
+                    />
+                  )}
+                </span>
                 <button
                   type="button"
                   className={cn(
@@ -244,17 +252,31 @@ export default function EntryCard({
                 onChange={(e) => setText(e.target.value)}
                 autoFocus
               />
-              <input
-                className="rounded-[9px] border border-white/10 bg-[rgba(9,18,30,.5)] px-3 py-[9px] font-inter-tight text-[13.5px] text-white outline-none placeholder:text-muted"
-                maxLength={60}
-                placeholder="Display name (optional)"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-              <div className="flex items-center gap-2.5">
-                <button type="button" className="btn btn-sm" onClick={sendReply}>Post reply</button>
-                {note && <span className="text-[13px] text-dao-red">{note}</span>}
+              <div className="flex flex-wrap items-center gap-2.5">
+                {!address && (
+                  <input
+                    className={cn(nameInput, "w-auto min-w-[200px] flex-1")}
+                    maxLength={60}
+                    placeholder="Your name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                )}
+                <span className="ml-auto inline-flex flex-wrap items-center gap-2.5">
+                  {signedIn
+                    ? (
+                      <span className={signedInAs}>
+                        <Wallet className="size-3.5" />
+                        Signed in as {me.name}
+                      </span>
+                    )
+                    : <ConnectInline />}
+                  <button type="button" className={submitBtn} onClick={sendReply}>
+                    <Send className="size-3.5" />Post reply
+                  </button>
+                </span>
               </div>
+              {note && <p className="m-0 text-[13px] text-dao-red">{note}</p>}
             </div>
           )}
         </div>

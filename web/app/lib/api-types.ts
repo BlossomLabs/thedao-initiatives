@@ -180,6 +180,7 @@ export interface PostCommentResult {
 export interface HeldMine {
   id: string;
   rfpId: string;
+  parentId: string | null;
   type: string;
   body: string;
   createdAt: number;

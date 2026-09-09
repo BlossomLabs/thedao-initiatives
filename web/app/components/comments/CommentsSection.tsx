@@ -10,7 +10,6 @@ import { myClaimTokens, rememberClaimToken } from "~/lib/claims";
 import { cn } from "~/lib/utils";
 import {
   adminAction,
-  CAN_REPLY,
   commentsKey,
   fetchComments,
   fetchMine,
@@ -46,7 +45,6 @@ export default function CommentsSection({ slug, open }: { slug: string; open: bo
   const entries = q.data?.entries ?? [];
   const isAdmin = Boolean(session?.isAdmin);
   const canVote = Boolean(q.data?.viewerCanVote) || isAdmin;
-  const canReply = isAdmin || (q.data?.viewerRoles ?? []).some((r) => CAN_REPLY.has(r));
 
   const list = useMemo(() => {
     const l = [...entries];
@@ -72,22 +70,25 @@ export default function CommentsSection({ slug, open }: { slug: string; open: bo
       entries: d.entries.map((e) => (e.id === id ? { ...e, votes: r.votes, myvote: r.myvote } : e)),
     }));
   };
+  // A connected wallet replies signed in (connecting signs in); otherwise the
+  // reply carries a name, like an anonymous top-level post.
   const onReply = async (id: string, body: string, name: string) => {
-    await requireSession();
-    const r = await reply(id, body, name);
-    patch((d) => ({
-      ...d,
-      entries: d.entries.map((
-        e,
-      ) => (e.id === id
-        ? {
-          ...e,
-          answered: e.type === "question" ? true : e.answered,
-          replies: [...(e.replies ?? []), r.reply],
-        }
-        : e)
-      ),
-    }));
+    const token = isConnected ? (await requireSession()).token : null;
+    const r = await reply(id, body, name, token);
+    if (r.claimToken) {
+      rememberClaimToken(r.claimToken);
+      setTokens(myClaimTokens());
+    }
+    const added = r.reply;
+    if (added) {
+      patch((d) => ({
+        ...d,
+        entries: d.entries.map((e) =>
+          e.id === id ? { ...e, answered: r.answered, replies: [...(e.replies ?? []), added] } : e
+        ),
+      }));
+    }
+    return r.status;
   };
   const onReport = async (id: string) => {
     await report(id);
@@ -160,7 +161,6 @@ export default function CommentsSection({ slug, open }: { slug: string; open: bo
           key={c.id}
           c={c}
           canVote={canVote}
-          canReply={canReply}
           isAdmin={isAdmin}
           connected={isConnected}
           onVote={onVote}
@@ -191,7 +191,8 @@ export default function CommentsSection({ slug, open }: { slug: string; open: bo
             {h.body}
           </div>
           <p className="m-0 small dim">
-            Thanks. Your comment is waiting for review and is only visible to you.
+            Thanks. Your {h.parentId ? "reply" : "comment"}{" "}
+            is waiting for review and is only visible to you.
           </p>
         </div>
       ))}

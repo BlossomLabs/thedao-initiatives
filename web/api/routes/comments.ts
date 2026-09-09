@@ -7,7 +7,14 @@ import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { type CommentJson, commentJson } from "../lib/json.ts";
 import { EMAIL_RE } from "../lib/validate.ts";
-import { commentRoles, ROLE_FAST_LANE, voteEligible } from "../services/roles.ts";
+import { assertEthNameOwned } from "../services/names.ts";
+import {
+  commentRoles,
+  liveRoles,
+  ROLE_FAST_LANE,
+  storedRoles,
+  voteEligible,
+} from "../services/roles.ts";
 import type { Comment, CommentType } from "../db/types.ts";
 import { COMMENT_BODY_MAX } from "../config.ts";
 
@@ -58,17 +65,20 @@ export function commentRoutes(deps: Deps) {
       eligible = user.isAdmin || await voteEligible(deps, user.address, rfp.id);
       viewerRoles = await rolesFor(user.address, rfp.id, user.isAdmin);
     }
+    const live = (row: Comment) => liveRoles(deps.config, row.address, rfp);
     const replies = new Map<string, CommentJson[]>();
     const entries: Comment[] = [];
     for (const row of rows) {
       if (row.parentId) {
         const list = replies.get(row.parentId) ?? [];
-        list.push(commentJson(row));
+        list.push(commentJson(row, live(row)));
         replies.set(row.parentId, list);
       } else entries.push(row);
     }
     return c.json({
-      entries: sortEntries(entries).map((e) => commentJson(e, myVotes, replies.get(e.id) ?? [])),
+      entries: sortEntries(entries).map((e) =>
+        commentJson(e, live(e), myVotes, replies.get(e.id) ?? [])
+      ),
       viewerCanVote: eligible,
       viewerRoles,
     });
@@ -95,16 +105,17 @@ export function commentRoutes(deps: Deps) {
       throw new HttpError(400, "that email does not look right");
     }
     const user = c.var.user;
+    const address = user?.address ?? "";
+    if (!address && !name) {
+      throw new HttpError(400, "a name is required without a wallet");
+    }
+    await assertEthNameOwned(deps.ens, name, address);
     const who = user ? "addr:" + user.address.toLowerCase() : "ip:" + c.var.ip;
     if (!(await db.rateLimit("cpost:" + who, 5, 3600))) {
       throw new HttpError(429, "too many posts from your address, try again in an hour");
     }
     if (!user && !(await db.rateLimit("cpostanon:" + c.var.ip, 3, 3600))) {
       throw new HttpError(429, "too many posts from your address, try again in an hour");
-    }
-    const address = user?.address ?? "";
-    if (!address && !name) {
-      throw new HttpError(400, "a name is required without a wallet");
     }
     const roles = await rolesFor(address, rfp.id, Boolean(user?.isAdmin));
     let status: "published" | "held" | "discarded";
@@ -133,7 +144,7 @@ export function commentRoutes(deps: Deps) {
       displayName: name,
       email,
       address,
-      roles,
+      roles: storedRoles(roles),
       status,
       aiSummary: summary,
     }, startVote);
@@ -141,7 +152,9 @@ export function commentRoutes(deps: Deps) {
       status,
       id: cm.id,
       claimToken: status === "held" ? cm.claimToken : "",
-      entry: status === "published" ? commentJson(cm, startVote ? { [cm.id]: 1 } : {}, []) : null,
+      entry: status === "published"
+        ? commentJson(cm, liveRoles(deps.config, address, rfp), startVote ? { [cm.id]: 1 } : {}, [])
+        : null,
     });
   });
 
@@ -156,6 +169,7 @@ export function commentRoutes(deps: Deps) {
       held: rows.map((x) => ({
         id: x.id,
         rfpId: x.rfpId,
+        parentId: x.parentId,
         type: x.type,
         body: x.body,
         createdAt: x.createdAt,
@@ -195,9 +209,12 @@ export function commentRoutes(deps: Deps) {
     return c.json({ ok: true });
   });
 
-  /** Replies are role-only: team (admin), curators, ETHSecurity badge holders. */
-  r.post("/comments/:id/reply", requireAuth, async (c) => {
-    const user = c.var.user!;
+  /** Anyone can reply. Team, proposer, curator and badge-holder replies are
+   * published at once and answer a question; other replies (signed in or
+   * with just a name) go through the same screening as top-level posts and
+   * may be held, with a private claim token so the author can see them. */
+  r.post("/comments/:id/reply", async (c) => {
+    const user = c.var.user;
     const parent = await db.comments.get(c.req.param("id"));
     if (!parent || parent.status !== "published" || parent.parentId) {
       throw new HttpError(404, "not found");
@@ -208,15 +225,41 @@ export function commentRoutes(deps: Deps) {
       throw new HttpError(400, `the text must be 1 to ${COMMENT_BODY_MAX} characters`);
     }
     const name = s(body.name, 60);
-    const roles = await rolesFor(user.address, parent.rfpId, user.isAdmin);
-    if (!roles.some((x) => ROLE_FAST_LANE.has(x))) {
-      throw new HttpError(
-        403,
-        "Replies are limited to the team, curators, and ETHSecurity badge holders.",
+    const address = user?.address ?? "";
+    if (!address && !name) {
+      throw new HttpError(400, "a name is required without a wallet");
+    }
+    await assertEthNameOwned(deps.ens, name, address);
+    const who = user ? "addr:" + user.address.toLowerCase() : "ip:" + c.var.ip;
+    if (!(await db.rateLimit("creply:" + who, 20, 3600))) {
+      throw new HttpError(429, "too many replies, slow down");
+    }
+    if (!user && !(await db.rateLimit("creplyanon:" + c.var.ip, 3, 3600))) {
+      throw new HttpError(429, "too many replies from your address, try again in an hour");
+    }
+    const roles = user ? await rolesFor(user.address, parent.rfpId, user.isAdmin) : [];
+    const fastLane = roles.some((x) => ROLE_FAST_LANE.has(x));
+    let status: "published" | "held" | "discarded" = "published";
+    let summary = "role fast-lane";
+    if (!fastLane) {
+      [status, summary] = await deps.ai.screenComment(
+        parent.type,
+        parent.topic,
+        text,
+        name,
+        () => db.meta.aiBudgetOk(),
       );
     }
-    if (!(await db.rateLimit("creply:" + user.address.toLowerCase(), 20, 3600))) {
-      throw new HttpError(429, "too many replies, slow down");
+    if (status === "discarded") {
+      deps.log(`reply discarded by AI screen (comment ${parent.id}): ${summary}`);
+      // Same answer as held: a spammer learns nothing.
+      return c.json({
+        ok: true,
+        status: "held",
+        reply: null,
+        claimToken: "",
+        answered: parent.answered,
+      });
     }
     const reply = await db.comments.create({
       rfpId: parent.rfpId,
@@ -226,15 +269,25 @@ export function commentRoutes(deps: Deps) {
       body: text,
       displayName: name,
       email: "",
-      address: user.address,
-      roles: roles.slice(0, 2),
-      status: "published",
-      aiSummary: "",
+      address,
+      roles: storedRoles(roles),
+      status,
+      aiSummary: summary,
     });
-    if (parent.type === "question" && !parent.answered) {
+    let answered = parent.answered;
+    if (fastLane && parent.type === "question" && !parent.answered) {
       await db.comments.set(parent.id, { answered: true });
+      answered = true;
     }
-    return c.json({ ok: true, reply: commentJson(reply) });
+    return c.json({
+      ok: true,
+      status,
+      reply: status === "published"
+        ? commentJson(reply, liveRoles(deps.config, address, await db.rfps.get(parent.rfpId)))
+        : null,
+      claimToken: status === "held" ? reply.claimToken : "",
+      answered,
+    });
   });
 
   return r;

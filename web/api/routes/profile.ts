@@ -5,6 +5,7 @@ import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { isAddress } from "../chain/address.ts";
 import { DOMAIN_RE, NICK_RE, PRESET_RE } from "../lib/validate.ts";
+import { assertEthNameOwned } from "../services/names.ts";
 import { pfpUrl } from "../lib/json.ts";
 
 export const PFP_MAX_BYTES = 512 * 1024;
@@ -52,6 +53,8 @@ export function profileRoutes(deps: Deps) {
     if (!(await db.rateLimit("nick:" + addr.toLowerCase(), 10, 60))) {
       throw new HttpError(429, "Too many tries, slow down a moment.");
     }
+    // Anything ending in .eth must be this wallet's ENS name, spaces or not.
+    await assertEthNameOwned(ens, raw, addr);
     if (DOMAIN_RE.test(raw.toLowerCase())) {
       const owner = await ens.forward(raw);
       if (!owner || owner.toLowerCase() !== addr.toLowerCase()) {

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { commentJson, ipfsUrl, publicRfp } from "../lib/json.ts";
+import { liveRoles } from "../services/roles.ts";
 import type { Rfp } from "../db/types.ts";
 import { SAFE_OWNER_COUNT, SAFE_THRESHOLD } from "../config.ts";
 import { onrampLink } from "../lib/onramp.ts";
@@ -74,7 +75,7 @@ export function boardRoutes(deps: Deps) {
     const community = (await db.comments.frontPage())
       .filter((cm) => byId.has(cm.rfpId)).slice(0, 3)
       .map((cm) => ({
-        ...commentJson(cm),
+        ...commentJson(cm, liveRoles(config, cm.address, byId.get(cm.rfpId))),
         initiative: { slug: byId.get(cm.rfpId)!.slug, title: byId.get(cm.rfpId)!.title },
       }));
     return c.json({

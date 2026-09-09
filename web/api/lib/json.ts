@@ -3,6 +3,7 @@
  * and comment `email` are private and only leave through the admin shapes.
  */
 import type { Comment, Donation, Pledge, Rfp } from "../db/types.ts";
+import { LIVE_ROLES } from "../services/roles.ts";
 import type { Config } from "../config.ts";
 
 export function ipfsUrl(config: Config, cid: string): string {
@@ -85,8 +86,13 @@ export function donationJson(
 
 export type CommentJson = Record<string, unknown>;
 
+/**
+ * `live` holds the roles decided at view time (team, proposer); they come
+ * first and replace any such tag an older comment still carries.
+ */
 export function commentJson(
   c: Comment,
+  live: string[] = [],
   myVotes?: Record<string, number>,
   replies?: CommentJson[],
 ): CommentJson {
@@ -97,7 +103,7 @@ export function commentJson(
     body: c.body,
     displayName: c.displayName,
     address: c.address,
-    roles: c.roles.slice(0, 2),
+    roles: [...live, ...c.roles.filter((r) => !LIVE_ROLES.has(r))].slice(0, 2),
     answered: c.answered,
     reviewed: c.reviewed,
     accepted: c.accepted,
@@ -113,10 +119,11 @@ export function commentJson(
 
 export function adminCommentJson(
   c: Comment,
+  live: string[],
   rfp?: { slug: string; title: string } | null,
 ) {
   return {
-    ...commentJson(c),
+    ...commentJson(c, live),
     rfpId: c.rfpId,
     parentId: c.parentId,
     status: c.status,

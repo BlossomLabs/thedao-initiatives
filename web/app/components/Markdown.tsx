@@ -27,6 +27,11 @@ export default function Markdown({ text, className }: { text: string; className?
           li: ({ className: c, children, ...rest }) => (
             <li className={cn(c, c?.includes("task-list-item") && "task")} {...rest}>{children}</li>
           ),
+          table: ({ node: _node, ...rest }) => (
+            <div className="md-table">
+              <table {...rest} />
+            </div>
+          ),
         }}
       >
         {text}

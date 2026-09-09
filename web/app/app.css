@@ -358,6 +358,12 @@
   /* markdown body (initiative details) */
   .md {
     @apply max-w-[760px] font-inter-tight font-light text-[15px] leading-[1.75] text-soft;
+    text-align: justify;
+    hyphens: auto;
+  }
+  .md h1, .md h2, .md h3, .md h4, .md h5, .md h6, .md th, .md td, .md pre {
+    text-align: left;
+    hyphens: manual;
   }
   .md > :first-child {
     margin-top: 0;
@@ -415,8 +421,13 @@
   .md hr {
     @apply border-0 h-px bg-edge my-[26px];
   }
+  /* Markdown.tsx wraps every table in .md-table so the table can be full
+     width and still scroll sideways when its columns need more room. */
+  .md .md-table {
+    @apply mb-4 max-w-full overflow-x-auto rounded-[14px] border border-edge bg-white/5;
+  }
   .md table {
-    @apply block w-fit max-w-full overflow-x-auto mb-4 text-[13px] border border-edge rounded-[14px] bg-white/5 border-separate border-spacing-0;
+    @apply w-full text-[13px] border-separate border-spacing-0;
   }
   .md th, .md td {
     @apply px-2.5 py-[7px] text-left border-b border-white/[.07] align-top;

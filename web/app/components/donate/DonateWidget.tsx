@@ -190,7 +190,7 @@ export default function DonateWidget({
       <label className="my-0.5 flex cursor-pointer items-center gap-2 small text-soft">
         <input
           type="checkbox"
-          className="m-0 size-4 flex-none accent-dao-green"
+          className="size-4"
           checked={accepted}
           onChange={(e) => toggleTerms(e.target.checked)}
         />

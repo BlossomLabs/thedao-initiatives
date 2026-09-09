@@ -148,7 +148,7 @@ export default function Submit() {
                   value={t.id}
                   checked={f.type === t.id}
                   onChange={() => setF((s) => ({ ...s, type: t.id }))}
-                  className="mt-[3px] accent-dao-bright"
+                  className="mt-[3px]"
                 />
                 <span>
                   <b

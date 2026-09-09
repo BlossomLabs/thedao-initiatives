@@ -76,6 +76,53 @@
   [hidden] {
     display: none !important;
   }
+  /* Checkboxes and radios share one look: 16px box, panel fill, green when on. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    flex: none;
+    cursor: pointer;
+    vertical-align: middle;
+    border: 1px solid var(--color-edge2);
+    background: rgba(255, 255, 255, 0.06) center / 12px 12px no-repeat;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+    transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+  }
+  input[type="checkbox"] {
+    border-radius: 4px;
+  }
+  input[type="radio"] {
+    border-radius: 50%;
+  }
+  input[type="checkbox"]:hover,
+  input[type="radio"]:hover {
+    border-color: rgba(92, 183, 90, 0.6);
+  }
+  input[type="checkbox"]:focus-visible,
+  input[type="radio"]:focus-visible {
+    outline: 2px solid rgba(92, 183, 90, 0.5);
+    outline-offset: 2px;
+  }
+  input[type="checkbox"]:checked,
+  input[type="radio"]:checked {
+    border-color: var(--color-dao-green);
+    background-color: var(--color-dao-green);
+    box-shadow: 0 0 10px rgba(92, 183, 90, 0.35);
+  }
+  input[type="checkbox"]:checked {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6.5'/%3E%3C/svg%3E");
+  }
+  input[type="radio"]:checked {
+    background-image: radial-gradient(circle, #fff 0 3px, transparent 3.5px);
+  }
+  input[type="checkbox"]:disabled,
+  input[type="radio"]:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
   input, textarea, select, button {
     font: inherit;
     color: inherit;
@@ -393,17 +440,9 @@
     @apply normal-case tracking-normal text-[19px] text-white mt-7 mb-3;
   }
 
+  /* Read-only checklists: same box, hanging-indent position, no dimming. */
   .md input[type="checkbox"] {
-    @apply absolute left-0 top-[0.45em] m-0 h-4 w-4 cursor-default appearance-none rounded-[4px] border border-edge2 bg-white/[.06] align-middle;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
-  }
-  .md input[type="checkbox"]:checked {
-    @apply border-dao-green bg-dao-green;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6.5'/%3E%3C/svg%3E");
-    background-size: 12px 12px;
-    background-position: center;
-    background-repeat: no-repeat;
-    box-shadow: 0 0 10px rgba(92, 183, 90, 0.35);
+    @apply absolute left-0 top-[0.45em];
   }
   .md input[type="checkbox"]:disabled {
     opacity: 1;

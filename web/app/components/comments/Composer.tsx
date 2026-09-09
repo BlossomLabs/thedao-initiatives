@@ -3,7 +3,9 @@ import { Send, Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useSession } from "~/context/session";
 import { useIdentity } from "~/hooks/use-identity";
+import ConnectInline, { walletBtn } from "~/components/wallet/ConnectInline";
 import { cn } from "~/lib/utils";
+import { nameInput, signedInAs, submitBtn } from "./styles";
 
 /** One generic comment box (the MVP dropped type/topic pickers). */
 export default function Composer(
@@ -17,7 +19,7 @@ export default function Composer(
   },
 ) {
   const { address, isConnected } = useAccount();
-  const { session, requireSession, signingIn } = useSession();
+  const { session, requireSession, signingIn, connecting } = useSession();
   const identity = useIdentity(address);
   const [text, setText] = useState("");
   const [name, setName] = useState("");
@@ -82,7 +84,7 @@ export default function Composer(
         onChange={(e) => setWebsite(e.target.value)}
         aria-hidden="true"
       />
-      <div className="mt-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2.5">
         {isConnected
           ? (
             <span className="text-[12px] text-muted">
@@ -93,37 +95,37 @@ export default function Composer(
           )
           : (
             <input
-              className="rounded-[9px] border border-white/10 bg-[rgba(9,18,30,.5)] px-3 py-[9px] font-inter-tight text-[13.5px] text-white outline-none placeholder:text-muted"
+              className={cn(nameInput, "w-auto min-w-[200px] flex-1")}
               maxLength={60}
-              placeholder="Your name (required without a wallet)"
+              placeholder="Your name"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           )}
-        <div className="flex items-center gap-2.5">
-          {isConnected && (
+        <div className="flex flex-wrap items-center gap-2.5">
+          {
+            /* Kept mounted while connecting: the wallet is briefly connected before
+              the signature, and the button must survive to show a refusal. */
+          }
+          {(!isConnected || connecting) && <ConnectInline />}
+          {isConnected && !connecting && signedIn && (
+            <span className={signedInAs}>
+              <Wallet className="size-3.5" />
+              Signed in as {identity.name}
+            </span>
+          )}
+          {isConnected && !connecting && !signedIn && (
             <button
               type="button"
-              className={cn(
-                "inline-flex cursor-pointer items-center gap-[7px] rounded-[9px] border border-[rgba(126,179,255,.35)] bg-[rgba(44,94,134,.2)] px-3.5 py-2 font-inter-tight text-[13px] font-semibold text-dao-rfp transition-all duration-150 hover:border-[rgba(126,179,255,.6)] hover:bg-[rgba(44,94,134,.45)] hover:text-white",
-              )}
+              className={walletBtn}
               onClick={() => void requireSession().catch(() => {})}
-              disabled={signedIn || signingIn}
+              disabled={signingIn}
             >
               <Wallet className="size-3.5" />
-              {signedIn
-                ? `Signed in as ${identity.name}`
-                : signingIn
-                ? "Check your wallet…"
-                : "Connect & sign"}
+              {signingIn ? "Check your wallet…" : "Sign in"}
             </button>
           )}
-          <button
-            type="button"
-            className="inline-flex cursor-pointer items-center gap-[7px] rounded-[9px] border border-dao-green bg-dao-green px-5 py-[9px] font-inter-tight text-[13px] font-bold text-[#0d1f14] transition-all duration-150 hover:border-[#6cc96a] hover:bg-[#6cc96a] hover:shadow-[0_0_16px_rgba(0,255,136,.28)] disabled:cursor-default disabled:opacity-60 disabled:shadow-none"
-            disabled={busy}
-            onClick={post}
-          >
+          <button type="button" className={submitBtn} disabled={busy} onClick={post}>
             <Send className="size-3.5" />Comment
           </button>
         </div>

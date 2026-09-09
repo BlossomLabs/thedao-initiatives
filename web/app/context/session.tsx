@@ -1,6 +1,10 @@
 /**
  * SIWE session: one signature per session, stored as a bearer token.
- * Sign-in is only prompted when an action needs it (requireSession()).
+ * Connecting a wallet and signing in are one step (connect()): the signature
+ * request opens right after the wallet connects, and a refused or dismissed
+ * signature disconnects the wallet again, so a connected address is always a
+ * signed-in one. A stored session survives reloads; a reconnected wallet
+ * without one is dropped.
  */
 import {
   createContext,
@@ -11,12 +15,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { useAccount, useSignMessage } from "wagmi";
+import { type Connector, useAccount, useConnect, useDisconnect, useSignMessage } from "wagmi";
 import { createSiweMessage } from "viem/siwe";
 import { api, ApiError, setTokenProvider } from "~/lib/api";
 import type { Me, SessionInfo } from "~/lib/api-types";
 
 const KEY = "thedao:session";
+
+/** Dev-only fake wallet: it cannot sign, so it connects without a session. */
+const skipsSignIn = (c: Connector | undefined) => c?.id === "mock";
 
 function load(): SessionInfo | null {
   try {
@@ -39,9 +46,15 @@ interface SessionCtx {
   session: SessionInfo | null;
   me: Me | null;
   signingIn: boolean;
+  /** True from the wallet prompt until sign-in has settled (connect()). */
+  connecting: boolean;
   /** Connected wallet address (may differ from session.address until sign-in). */
   address: string | undefined;
-  signIn(): Promise<SessionInfo>;
+  /** Connect the wallet and sign in with it in one go. On a refused signature
+   * the wallet is disconnected again and the error rethrown. */
+  connect(connector: Connector): Promise<void>;
+  signIn(account?: `0x${string}`): Promise<SessionInfo>;
+  /** Ends the session and disconnects the wallet. */
   signOut(): Promise<void>;
   /** Session for the connected wallet, signing in first if needed. */
   requireSession(): Promise<SessionInfo>;
@@ -51,13 +64,16 @@ interface SessionCtx {
 const Ctx = createContext<SessionCtx | null>(null);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const { address, status } = useAccount();
+  const { address, status, connector } = useAccount();
+  const { connectAsync } = useConnect();
+  const { disconnectAsync } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
   const [session, setSession] = useState<SessionInfo | null>(
     () => (typeof localStorage === "undefined" ? null : load()),
   );
   const [me, setMe] = useState<Me | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const sessionRef = useRef(session);
   sessionRef.current = session;
   // Registered during render, not in an effect: child queries fire their first
@@ -98,35 +114,38 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [address, status, clear]);
 
-  const signIn = useCallback(async (): Promise<SessionInfo> => {
-    if (!address) throw new Error("Connect a wallet first.");
-    setSigningIn(true);
-    try {
-      const { nonce } = await api<{ nonce: string }>("/api/auth/nonce", { token: null });
-      const message = createSiweMessage({
-        domain: globalThis.location.host,
-        address,
-        uri: globalThis.location.origin,
-        version: "1",
-        chainId: 1,
-        nonce,
-        statement: "Sign in to TheDAO Security Fund",
-        issuedAt: new Date(),
-      });
-      const signature = await signMessageAsync({ message });
-      const s = await api<SessionInfo>("/api/auth/verify", {
-        json: { message, signature },
-        token: null,
-      });
-      setSession(s);
-      save(s);
-      sessionRef.current = s;
-      await refreshMe();
-      return s;
-    } finally {
-      setSigningIn(false);
-    }
-  }, [address, signMessageAsync, refreshMe]);
+  const signIn = useCallback(
+    async (account: `0x${string}` | undefined = address): Promise<SessionInfo> => {
+      if (!account) throw new Error("Connect a wallet first.");
+      setSigningIn(true);
+      try {
+        const { nonce } = await api<{ nonce: string }>("/api/auth/nonce", { token: null });
+        const message = createSiweMessage({
+          domain: globalThis.location.host,
+          address: account,
+          uri: globalThis.location.origin,
+          version: "1",
+          chainId: 1,
+          nonce,
+          statement: "Sign in to TheDAO Security Fund",
+          issuedAt: new Date(),
+        });
+        const signature = await signMessageAsync({ message, account });
+        const s = await api<SessionInfo>("/api/auth/verify", {
+          json: { message, signature },
+          token: null,
+        });
+        setSession(s);
+        save(s);
+        sessionRef.current = s;
+        await refreshMe();
+        return s;
+      } finally {
+        setSigningIn(false);
+      }
+    },
+    [address, signMessageAsync, refreshMe],
+  );
 
   const signOut = useCallback(async () => {
     const s = sessionRef.current;
@@ -136,7 +155,43 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       } catch { /* already gone */ }
     }
     clear();
-  }, [clear]);
+    try {
+      await disconnectAsync();
+    } catch { /* not connected */ }
+  }, [clear, disconnectAsync]);
+
+  const connect = useCallback(async (c: Connector) => {
+    setConnecting(true);
+    try {
+      const { accounts } = await connectAsync({ connector: c, chainId: 1 });
+      if (skipsSignIn(c)) return;
+      try {
+        await signIn(accounts[0]);
+      } catch (e) {
+        await disconnectAsync({ connector: c }).catch(() => {});
+        throw e;
+      }
+    } finally {
+      setConnecting(false);
+    }
+  }, [connectAsync, disconnectAsync, signIn]);
+
+  // Keep "connected" meaning "signed in" outside connect(): a wallet that comes
+  // back on reload without a stored session is disconnected again, and an
+  // account switched inside the wallet is asked to sign in (or disconnected).
+  const prev = useRef<{ status: typeof status; address: typeof address }>({ status, address });
+  useEffect(() => {
+    const before = prev.current;
+    prev.current = { status, address };
+    if (status !== "connected" || !address || skipsSignIn(connector)) return;
+    const s = sessionRef.current;
+    if (s && s.address.toLowerCase() === address.toLowerCase()) return;
+    if (before.status === "reconnecting") {
+      void disconnectAsync().catch(() => {});
+    } else if (before.status === "connected" && before.address && before.address !== address) {
+      void signIn(address).catch(() => disconnectAsync().catch(() => {}));
+    }
+  }, [status, address, connector, signIn, disconnectAsync]);
 
   const requireSession = useCallback(async () => {
     const s = sessionRef.current;
@@ -145,8 +200,30 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [address, signIn]);
 
   const value = useMemo<SessionCtx>(
-    () => ({ session, me, signingIn, address, signIn, signOut, requireSession, refreshMe }),
-    [session, me, signingIn, address, signIn, signOut, requireSession, refreshMe],
+    () => ({
+      session,
+      me,
+      signingIn,
+      connecting,
+      address,
+      connect,
+      signIn,
+      signOut,
+      requireSession,
+      refreshMe,
+    }),
+    [
+      session,
+      me,
+      signingIn,
+      connecting,
+      address,
+      connect,
+      signIn,
+      signOut,
+      requireSession,
+      refreshMe,
+    ],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

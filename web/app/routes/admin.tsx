@@ -28,7 +28,7 @@ export default function AdminLayout() {
       <div className="panel mt-5 flex flex-col gap-3">
         {!isConnected && (
           <p className="m-0 small">
-            Connect your wallet with the button in the top right, then sign in here.
+            Connect your wallet with the button in the top right; you will be asked to sign in.
           </p>
         )}
         {isConnected && !session && (

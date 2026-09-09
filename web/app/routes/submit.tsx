@@ -27,9 +27,10 @@ const TYPES: { id: Type; label: string; sub: string }[] = [
 ];
 
 /**
- * The form is only reachable from a wallet that is connected, signed in with
- * Ethereum, and has a display name and picture (ENS or set on the site). The
- * proposer is recorded with the initiative and shown on its page.
+ * The form is only reachable from a wallet that is connected and signed in
+ * with Ethereum (one step from the top-bar button) and has a display name and
+ * picture (ENS or set on the site). The proposer is recorded with the
+ * initiative and shown on its page.
  */
 function Gate({ children }: { children: React.ReactNode }) {
   const { isConnected, address, status } = useAccount();
@@ -74,10 +75,12 @@ function Gate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const step = !isConnected ? 0 : !signedIn ? 1 : 2;
+  const step = !signedIn ? 0 : 1;
   const steps = [
-    { label: "Connect your wallet", sub: "Use the Connect wallet button in the top right." },
-    { label: "Sign in with Ethereum", sub: "One signature, no transaction, no gas." },
+    {
+      label: "Connect your wallet and sign in",
+      sub: "Use the Connect wallet button in the top right. One signature, no transaction, no gas.",
+    },
     {
       label: "Set your name and picture",
       sub: "Shown with your initiative, ENS is used when set.",
@@ -117,7 +120,7 @@ function Gate({ children }: { children: React.ReactNode }) {
           </li>
         ))}
       </ol>
-      {step === 1 && (
+      {step === 0 && isConnected && (
         <Button
           variant="primary"
           className="self-start"
@@ -127,7 +130,7 @@ function Gate({ children }: { children: React.ReactNode }) {
           Sign in with {identity.name}
         </Button>
       )}
-      {step === 2 && (
+      {step === 1 && (
         <Button
           variant="primary"
           className="self-start"

@@ -1,41 +1,36 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Wallet } from "lucide-react";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useAccount } from "wagmi";
 import { useSession } from "~/context/session";
 import { useProfileDialog } from "~/context/profile-dialog";
+import { useConnectors } from "~/hooks/use-connectors";
 import { useIdentity } from "~/hooks/use-identity";
 import { Avatar } from "./Avatar";
 import WalletMenu, { connectorIcon, type WalletMenuItem } from "./WalletMenu";
-import { errorMessage } from "~/lib/api";
 import { walletErrorMessage } from "~/lib/donate";
 import { cn } from "~/lib/utils";
-import { MOCK_WALLET } from "~/lib/wagmi";
 
 /**
  * Top-bar wallet button. Disconnected: opens the connector list (or connects
- * directly when only one wallet exists). Connected: account menu with
- * sign-in, name/picture, switch wallet, disconnect.
+ * directly when only one wallet exists); connecting signs in with Ethereum
+ * in the same step, and a dismissed signature leaves the wallet disconnected
+ * so the button can simply be clicked again. Connected: account menu with
+ * name/picture, switch wallet, sign out.
  */
 export default function ConnectButton() {
   const { address, isConnected, connector } = useAccount();
-  const { connectors, connectAsync, isPending } = useConnect();
-  const { disconnectAsync } = useDisconnect();
-  const { session, signIn, signOut, signingIn } = useSession();
+  const usable = useConnectors();
+  const { session, connect, connecting, signOut } = useSession();
   const identity = useIdentity(address);
   const { profileOpen, openProfile } = useProfileDialog();
   const [menu, setMenu] = useState<"none" | "pick" | "account">("none");
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (isConnected) setError("");
+  }, [isConnected]);
   // Set on a fresh sign-in; consumed once the identity lookups have settled.
   const [promptPending, setPromptPending] = useState(false);
   const lastToken = useRef(session?.token);
-
-  // Hide the generic "Injected" entry once EIP-6963 announced a named wallet.
-  const usable = useMemo(() => {
-    const named = connectors.some((c) => c.type === "injected" && c.id !== "injected");
-    return connectors.filter((c) =>
-      (c.id !== "mock" || MOCK_WALLET) && (c.id !== "injected" || !named)
-    );
-  }, [connectors]);
 
   // Detect a sign-in made in this page (a stored session on reload is not one).
   // Skipped while the dialog itself triggered the sign-in on save.
@@ -63,10 +58,10 @@ export default function ConnectButton() {
     openProfile,
   ]);
 
-  async function connectWith(c: (typeof connectors)[number]) {
+  async function connectWith(c: (typeof usable)[number]) {
     setError("");
     try {
-      await connectAsync({ connector: c, chainId: 1 });
+      await connect(c);
     } catch (e) {
       setError("Not connected: " + walletErrorMessage(e));
     }
@@ -99,12 +94,7 @@ export default function ConnectButton() {
         active: true,
         onClick: () => {},
       }]
-      : [{
-        key: "sign",
-        label: signingIn ? "Check your wallet…" : "Sign in",
-        lucide: "sign" as const,
-        onClick: () => void signIn().catch((e) => setError(errorMessage(e))),
-      }]),
+      : []),
     {
       key: "name",
       label: identity.nameFromEns && identity.avatarFromEns
@@ -120,24 +110,15 @@ export default function ConnectButton() {
       label: "Switch to " + c.name,
       icon: connectorIcon(c),
       lucide: connectorIcon(c) ? undefined : ("switch" as const),
-      onClick: () => void disconnectAsync().then(() => connectWith(c)),
+      onClick: () => void signOut().then(() => connectWith(c)),
     })),
-    ...(session
-      ? [{
-        key: "out",
-        label: "Sign out",
-        lucide: "power" as const,
-        separator: true,
-        onClick: () => void signOut(),
-      }]
-      : []),
     {
-      key: "disc",
-      label: "Disconnect wallet",
+      key: "out",
+      label: session ? "Sign out" : "Disconnect wallet",
       lucide: "power",
       danger: true,
-      separator: !session,
-      onClick: () => void disconnectAsync().then(() => signOut()),
+      separator: true,
+      onClick: () => void signOut(),
     },
   ];
 
@@ -147,14 +128,18 @@ export default function ConnectButton() {
         type="button"
         className={cn("btn btn-wallet", isConnected && "connected")}
         onClick={onClick}
-        disabled={isPending}
+        disabled={connecting}
         aria-haspopup="menu"
         aria-expanded={menu !== "none"}
       >
         {isConnected && address
           ? <Avatar src={identity.avatar} size={20} />
           : <Wallet className="size-4 opacity-80" />}
-        {isPending ? "Connecting…" : isConnected && address ? identity.name : "Connect wallet"}
+        {connecting
+          ? "Check your wallet…"
+          : isConnected && address
+          ? identity.name
+          : "Connect wallet"}
       </button>
       {menu === "pick" && <WalletMenu items={pickItems} onClose={() => setMenu("none")} />}
       {menu === "account" && <WalletMenu items={accountItems} onClose={() => setMenu("none")} />}

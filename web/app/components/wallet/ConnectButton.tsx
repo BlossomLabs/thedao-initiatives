@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Wallet } from "lucide-react";
+import { useNavigate } from "react-router";
 import { useAccount } from "wagmi";
 import { useSession } from "~/context/session";
 import { useProfileDialog } from "~/context/profile-dialog";
@@ -23,6 +24,7 @@ export default function ConnectButton() {
   const { session, connect, connecting, signOut } = useSession();
   const identity = useIdentity(address);
   const { profileOpen, openProfile } = useProfileDialog();
+  const navigate = useNavigate();
   const [menu, setMenu] = useState<"none" | "pick" | "account">("none");
   const [error, setError] = useState("");
   useEffect(() => {
@@ -93,6 +95,14 @@ export default function ConnectButton() {
         lucide: "sign" as const,
         active: true,
         onClick: () => {},
+      }]
+      : []),
+    ...(session?.isAdmin
+      ? [{
+        key: "admin",
+        label: "Admin panel",
+        lucide: "admin" as const,
+        onClick: () => void navigate("/admin"),
       }]
       : []),
     {

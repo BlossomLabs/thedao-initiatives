@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { LogOut, Pencil, RefreshCw, ShieldCheck, Wallet } from "lucide-react";
+import { LayoutDashboard, LogOut, Pencil, RefreshCw, ShieldCheck, Wallet } from "lucide-react";
 import type { Connector } from "wagmi";
 import { cn } from "~/lib/utils";
 
@@ -7,14 +7,21 @@ export interface WalletMenuItem {
   key: string;
   label: string;
   icon?: string;
-  lucide?: "wallet" | "switch" | "edit" | "power" | "sign";
+  lucide?: "wallet" | "switch" | "edit" | "power" | "sign" | "admin";
   active?: boolean;
   danger?: boolean;
   separator?: boolean;
   onClick: () => void;
 }
 
-const ICONS = { wallet: Wallet, switch: RefreshCw, edit: Pencil, power: LogOut, sign: ShieldCheck };
+const ICONS = {
+  wallet: Wallet,
+  switch: RefreshCw,
+  edit: Pencil,
+  power: LogOut,
+  sign: ShieldCheck,
+  admin: LayoutDashboard,
+};
 
 /** The MVP's wallet picker / account menu, anchored under the top-bar button. */
 export default function WalletMenu(

@@ -63,7 +63,8 @@
     background-repeat: no-repeat;
     background-attachment: fixed;
   }
-  b, strong {
+  b,
+  strong {
     font-weight: 600;
   }
   a {
@@ -123,7 +124,10 @@
     cursor: default;
     opacity: 0.55;
   }
-  input, textarea, select, button {
+  input,
+  textarea,
+  select,
+  button {
     font: inherit;
     color: inherit;
   }
@@ -151,7 +155,8 @@
 
   /* section heading (Figma): Inter Tight 13px regular, tracking .2em, green, 46px above / 16px below */
   .h2 {
-    @apply font-inter-tight font-normal text-[13px] uppercase tracking-[0.2em] text-dao-green mt-[46px] mb-4;
+    @apply font-inter-tight font-normal text-[13px] uppercase tracking-[0.2em] text-dao-green
+      mt-[46px] mb-4;
   }
   .h2 .n {
     @apply text-muted normal-case tracking-normal text-[12px] ml-2.5 font-normal;
@@ -163,7 +168,8 @@
     @apply font-inter-tight text-[11px] font-normal tracking-[0.2em] uppercase text-dao-green;
   }
   .k {
-    @apply block font-inter-tight text-[11px] font-normal tracking-[0.18em] uppercase text-dao-green mb-3;
+    @apply block font-inter-tight text-[11px] font-normal tracking-[0.18em] uppercase text-dao-green
+      mb-3;
   }
 
   /* thin green divider: 1052px on the board (Figma hero width), 672px on the form */
@@ -192,7 +198,8 @@
 
   /* glass card + panels (Figma: 16px radius, 24px padding, white/5 fill, 1px white/10 border) */
   .card {
-    @apply relative rounded-2xl bg-white/5 border border-white/10 p-6 transition-[border-color,box-shadow] duration-200;
+    @apply relative rounded-2xl bg-white/5 border border-white/10 p-6
+      transition-[border-color,box-shadow] duration-200;
   }
   .card-hover:hover {
     @apply border-[rgba(92,183,90,.4)] shadow-card-hover;
@@ -208,7 +215,10 @@
      white/5 fill + white/15 border. Red buttons carry the #82181A drop shadows;
      ghost buttons (Details, Connect wallet) are flat. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 h-[51px] px-6 rounded-[14px] border border-white/15 bg-white/5 text-white font-inter-tight text-[13px] font-normal cursor-pointer text-center whitespace-nowrap transition-[border-color,box-shadow,transform,background-color] duration-150;
+    @apply inline-flex items-center justify-center gap-2 h-[51px] px-6 rounded-[14px] border
+      border-white/15 bg-white/5 text-white font-inter-tight text-[13px] font-normal cursor-pointer
+      text-center whitespace-nowrap transition-[border-color,box-shadow,transform,background-color]
+      duration-150;
   }
   .btn:hover {
     @apply border-[rgba(92,183,90,.6)] shadow-glow no-underline;
@@ -234,7 +244,8 @@
   .btn-sm {
     @apply h-[38px] px-5;
   }
-  .btn:disabled, .btn[aria-disabled="true"] {
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
     @apply opacity-50 cursor-default hover:scale-100;
   }
   .btn-wallet {
@@ -246,7 +257,8 @@
 
   /* badges + chips (Figma: pill, 4px 10px padding, Inter Tight 11px semibold, uppercase) */
   .type-badge {
-    @apply inline-flex items-center rounded-full px-2.5 py-1 font-inter-tight font-semibold text-[11px] leading-[1.5] uppercase tracking-[0.05em];
+    @apply inline-flex items-center rounded-full px-2.5 py-1 font-inter-tight font-semibold
+      text-[11px] leading-[1.5] uppercase tracking-[0.05em];
   }
   .t-rfp {
     @apply text-dao-rfp border border-[rgba(92,140,220,.3)] bg-[rgba(92,140,220,.15)];
@@ -255,7 +267,8 @@
     @apply text-dao-green border border-[rgba(0,255,136,.3)] bg-[rgba(0,255,136,.12)];
   }
   .chip {
-    @apply inline-block rounded-full border border-edge2 text-soft px-2.5 py-0.5 font-inter-tight text-[11px] uppercase tracking-[0.08em];
+    @apply inline-block rounded-full border border-edge2 text-soft px-2.5 py-0.5 font-inter-tight
+      text-[11px] uppercase tracking-[0.08em];
   }
   .st-pending {
     @apply text-dao-amber border-[rgba(240,180,41,.5)];
@@ -263,14 +276,18 @@
   .st-approved {
     @apply text-dao-green border-[rgba(92,183,90,.5)];
   }
-  .st-rejected, .st-archived {
+  .st-rejected,
+  .st-archived {
     @apply text-muted;
   }
   .funded-chip {
-    @apply bg-[rgba(92,183,90,.2)] text-dao-green border-[rgba(92,183,90,.5)] font-bold tracking-[0.4px];
+    @apply bg-[rgba(92,183,90,.2)] text-dao-green border-[rgba(92,183,90,.5)] font-bold
+      tracking-[0.4px];
   }
   .priv {
-    @apply inline-block ml-2 align-middle rounded-full px-2.5 py-0.5 font-inter-tight font-semibold text-[11px] leading-[1.6] tracking-[0.06em] normal-case text-[#7dd57e] bg-[rgba(92,183,90,.14)] border border-[rgba(92,183,90,.45)];
+    @apply inline-block ml-2 align-middle rounded-full px-2.5 py-0.5 font-inter-tight font-semibold
+      text-[11px] leading-[1.6] tracking-[0.06em] normal-case text-[#7dd57e]
+      bg-[rgba(92,183,90,.14)] border border-[rgba(92,183,90,.45)];
   }
 
   /* progress bar (Figma: 6px, green to bright gradient) */
@@ -278,7 +295,8 @@
     @apply h-1.5 rounded-full bg-white/[.09] overflow-hidden;
   }
   .bar > i {
-    @apply block h-full rounded-full min-w-[2px] bg-gradient-to-r from-dao-green to-dao-bright shadow-bar;
+    @apply block h-full rounded-full min-w-[2px] bg-gradient-to-r from-dao-green to-dao-bright
+      shadow-bar;
   }
   .bar-big {
     @apply h-3 max-w-[760px];
@@ -287,13 +305,17 @@
   /* forms (Figma): 11px green label, 13px light hint 5px below, 14px input with
      14px 16px padding and a 14px radius, white/5 fill, white/15 border */
   .label {
-    @apply block font-inter-tight text-[11px] font-normal text-dao-green uppercase tracking-[0.12em];
+    @apply block font-inter-tight text-[11px] font-normal text-dao-green uppercase
+      tracking-[0.12em];
   }
   .hint {
-    @apply block mt-[5px] font-inter-tight font-light text-[13px] leading-[1.5] text-muted normal-case tracking-normal;
+    @apply block mt-[5px] font-inter-tight font-light text-[13px] leading-[1.5] text-muted
+      normal-case tracking-normal;
   }
   .field {
-    @apply w-full rounded-[14px] bg-white/5 border border-white/15 text-white px-4 py-3.5 font-inter-tight text-[14px] leading-[1.5] outline-none placeholder:text-white/30 transition-colors duration-150;
+    @apply w-full rounded-[14px] bg-white/5 border border-white/15 text-white px-4 py-3.5
+      font-inter-tight text-[14px] leading-[1.5] outline-none placeholder:text-white/30
+      transition-colors duration-150;
   }
   .field:focus {
     @apply border-[rgba(92,183,90,.6)];
@@ -316,7 +338,8 @@
     opacity: 0;
   }
   .alert {
-    @apply rounded-xl border border-[rgba(255,59,56,.55)] bg-[rgba(255,59,56,.12)] px-4 py-3 my-3.5 text-[#ffd7d6] text-[13.5px];
+    @apply rounded-xl border border-[rgba(255,59,56,.55)] bg-[rgba(255,59,56,.12)] px-4 py-3 my-3.5
+      text-[#ffd7d6] text-[13.5px];
   }
 
   /* status box (donate + forms) */
@@ -337,11 +360,13 @@
   .tbl {
     @apply w-full border-collapse text-[12.5px];
   }
-  .tbl th, .tbl td {
+  .tbl th,
+  .tbl td {
     @apply px-2.5 py-[7px] text-left border-b border-white/[.07] align-top;
   }
   .tbl th {
-    @apply sticky top-0 z-[5] bg-panel font-inter-tight font-medium text-[10.5px] uppercase tracking-[0.1em] text-muted;
+    @apply sticky top-0 z-[5] bg-panel font-inter-tight font-medium text-[10.5px] uppercase
+      tracking-[0.1em] text-muted;
   }
   .tbl tr:hover td {
     @apply bg-[rgba(92,183,90,.045)];
@@ -361,7 +386,15 @@
     text-align: justify;
     hyphens: auto;
   }
-  .md h1, .md h2, .md h3, .md h4, .md h5, .md h6, .md th, .md td, .md pre {
+  .md h1,
+  .md h2,
+  .md h3,
+  .md h4,
+  .md h5,
+  .md h6,
+  .md th,
+  .md td,
+  .md pre {
     text-align: left;
     hyphens: manual;
   }
@@ -372,18 +405,23 @@
     margin: 0 0 14px;
   }
   .md h1 {
-    @apply font-inter-tight font-medium text-[24px] leading-[1.2] tracking-[-0.02em] text-white mt-9 mb-3.5;
+    @apply font-inter-tight font-medium text-[24px] leading-[1.2] tracking-[-0.02em] text-white mt-9
+      mb-3.5;
   }
   .md h2 {
-    @apply font-inter-tight font-normal text-[13px] uppercase tracking-[0.2em] text-dao-green mt-[46px] mb-4;
+    @apply font-inter-tight font-normal text-[13px] uppercase tracking-[0.2em] text-dao-green
+      mt-[46px] mb-4;
   }
   .md h3 {
     @apply font-inter-tight font-medium text-[14px] text-soft mt-5 mb-2.5;
   }
-  .md h4, .md h5, .md h6 {
+  .md h4,
+  .md h5,
+  .md h6 {
     @apply font-inter-tight font-semibold text-[13px] text-soft mt-[18px] mb-2;
   }
-  .md ul, .md ol {
+  .md ul,
+  .md ol {
     margin: 0 0 14px;
     padding-left: 24px;
   }
@@ -429,11 +467,13 @@
   .md table {
     @apply w-full text-[13px] border-separate border-spacing-0;
   }
-  .md th, .md td {
+  .md th,
+  .md td {
     @apply px-2.5 py-[7px] text-left border-b border-white/[.07] align-top;
   }
   .md th {
-    @apply bg-black/[.18] font-inter-tight font-medium text-[10.5px] uppercase tracking-[0.1em] text-muted;
+    @apply bg-black/[.18] font-inter-tight font-medium text-[10.5px] uppercase tracking-[0.1em]
+      text-muted;
   }
   .md th:empty {
     padding: 0;

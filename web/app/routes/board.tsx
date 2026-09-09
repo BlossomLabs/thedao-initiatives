@@ -49,7 +49,7 @@ export default function Board() {
           </div>
         )}
         {data && !cards.length && (
-          <p className="text-muted">
+          <p className="mb-[46px] text-muted">
             No initiatives published yet. <Link to="/submit">Suggest the first one.</Link>
           </p>
         )}

@@ -77,6 +77,7 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
     "sortRank",
     "type",
     "funders",
+    "proposer",
   ]);
 
   /** Patch allowed fields; keeps the Safe index in step. */

@@ -4,7 +4,7 @@ import { HttpError } from "../lib/errors.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAdmin } from "../middleware/auth.ts";
 import { adminCommentJson, adminRfp, donationJson, pledgeJson } from "../lib/json.ts";
-import { parseGoal, TX_HASH_RE, validateForumUrl } from "../lib/validate.ts";
+import { DOMAIN_RE, parseGoal, TX_HASH_RE, validateForumUrl } from "../lib/validate.ts";
 import { decimalsOf } from "./initiatives.ts";
 import { safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
@@ -26,7 +26,7 @@ export const LOGO_MAX_BYTES = 1024 * 1024;
 
 export function adminRoutes(deps: Deps) {
   const r = new Hono<Vars>();
-  const { db, config, chain } = deps;
+  const { db, config, chain, ens } = deps;
   r.use("*", requireAdmin);
 
   const rfpOr404 = async (id: string): Promise<Rfp> => {
@@ -147,6 +147,18 @@ export function adminRoutes(deps: Deps) {
     if (body.type !== undefined) patch.type = body.type === "grant" ? "grant" : "rfp";
     if (body.contact !== undefined) patch.contact = s(body.contact, 200);
     if (body.funders !== undefined) patch.funders = s(body.funders, MAX_FUNDERS);
+    // Owner: the wallet shown publicly as "Proposed by". Address or ENS name; blank clears.
+    if (body.proposer !== undefined) {
+      const raw = s(body.proposer, 100);
+      const lower = raw.toLowerCase();
+      if (!raw) patch.proposer = "";
+      else if (isAddress(raw)) patch.proposer = toChecksum(raw);
+      else if (DOMAIN_RE.test(lower)) {
+        const resolved = await ens.forward(raw);
+        if (!resolved) throw new HttpError(400, `${raw} does not resolve to an address.`);
+        patch.proposer = resolved;
+      } else throw new HttpError(400, "Owner must be a wallet address or an ENS name.");
+    }
     const next = await db.rfps.update(rfp.id, patch);
     return c.json({ initiative: adminRfp(next) });
   });

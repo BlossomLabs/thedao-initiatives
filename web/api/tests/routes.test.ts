@@ -523,12 +523,27 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     await h.req("/api/admin/initiatives/" + id, {
       method: "PATCH",
       token: admin,
-      json: { title: "Renamed initiative", sortRank: "3", type: "grant", goal: "2,000" },
+      json: {
+        title: "Renamed initiative",
+        sortRank: "3",
+        type: "grant",
+        goal: "2,000",
+        proposer: ADMIN.toLowerCase(),
+      },
     }),
   ) as { initiative: Record<string, unknown> };
   assertEquals(patched.initiative.title, "Renamed initiative");
   assertEquals(patched.initiative.sortRank, 3);
   assertEquals(patched.initiative.goalUsd, 2000);
+  assertEquals(patched.initiative.proposer, ADMIN);
+  assertEquals(
+    (await h.req("/api/admin/initiatives/" + id, {
+      method: "PATCH",
+      token: admin,
+      json: { proposer: "not an owner" },
+    })).status,
+    400,
+  );
   assertEquals(
     (await h.req("/api/admin/initiatives/" + id, {
       method: "PATCH",

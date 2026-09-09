@@ -434,6 +434,7 @@ function EditForm(
     discourseUrl: r.discourseUrl,
     goal: String(r.goalUsd),
     sortRank: r.sortRank ? String(r.sortRank) : "",
+    proposer: r.proposer,
     contact: r.contact,
     funders: r.funders,
   });
@@ -504,6 +505,20 @@ function EditForm(
           />
         </Field>
       </div>
+      <Field
+        label="Owner"
+        htmlFor="e-owner"
+        hint="Wallet address or ENS name. Shown publicly as “Proposed by”; blank to hide."
+      >
+        <Input
+          id="e-owner"
+          maxLength={100}
+          placeholder="0x… or name.eth"
+          className="mono"
+          value={f.proposer}
+          onChange={set("proposer")}
+        />
+      </Field>
       <Field label="Contact" htmlFor="e-contact" privateField>
         <Input id="e-contact" maxLength={200} value={f.contact} onChange={set("contact")} />
       </Field>

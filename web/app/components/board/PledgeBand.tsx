@@ -13,7 +13,8 @@ export default function PledgeBand() {
         </p>
       </div>
       <a className="btn flex-none" href={CONTACT_MAILTO}>
-        Email {CONTACT_EMAIL} to pledge <Mail className="size-4 opacity-70" />
+        Email <span className="text-dao-green">{CONTACT_EMAIL}</span> to pledge{" "}
+        <Mail className="size-4 opacity-70" />
       </a>
     </div>
   );

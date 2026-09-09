@@ -1,6 +1,5 @@
 import { lazy, Suspense } from "react";
 import { Link, NavLink } from "react-router";
-import { TRANSPARENCY_URL } from "~/data/site";
 import { cn } from "~/lib/utils";
 
 const ConnectButton = lazy(() => import("~/components/wallet/ConnectButton"));
@@ -36,19 +35,7 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
         <NavLink to="/" end className={staticShell ? link({ isActive: false }) : link}>
           Initiatives
         </NavLink>
-        <a
-          href={TRANSPARENCY_URL}
-          target="_blank"
-          rel="noopener"
-          className={link({ isActive: false })}
-        >
-          Transparency
-        </a>
-        <NavLink
-          to="/submit"
-          className={({ isActive }) =>
-            cn(link({ isActive: isActive && !staticShell }), "text-dao-green")}
-        >
+        <NavLink to="/submit" className={staticShell ? link({ isActive: false }) : link}>
           Suggest an initiative
         </NavLink>
         {staticShell ? <Fallback /> : (

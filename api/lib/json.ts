@@ -1,0 +1,127 @@
+/**
+ * The ONE place that turns stored records into API JSON. `contact`, `funders`
+ * and comment `email` are private and only leave through the admin shapes.
+ */
+import type { Comment, Donation, Pledge, Rfp } from "../db/types.ts";
+import type { Config } from "../config.ts";
+
+export function ipfsUrl(config: Config, cid: string): string {
+  return cid ? `https://${config.pinataGateway}/ipfs/${cid}` : "";
+}
+
+export function pfpUrl(config: Config, pfp: string): string {
+  return pfp.startsWith("ipfs:") ? ipfsUrl(config, pfp.slice(5)) : "";
+}
+
+export function publicRfp(r: Rfp) {
+  return {
+    id: r.id,
+    slug: r.slug,
+    title: r.title,
+    summary: r.summary,
+    details: r.details,
+    discourseUrl: r.discourseUrl,
+    goalUsd: r.goalUsd,
+    status: r.status,
+    type: r.type,
+    sortRank: r.sortRank,
+    safeAddress: r.safeAddress,
+    createdAt: r.createdAt,
+    approvedAt: r.approvedAt,
+  };
+}
+
+export function adminRfp(r: Rfp) {
+  return { ...publicRfp(r), contact: r.contact, funders: r.funders };
+}
+
+export function pledgeJson(config: Config, p: Pledge) {
+  return {
+    id: p.id,
+    company: p.company,
+    amountUsd: p.amountUsd,
+    status: p.status,
+    note: p.note,
+    url: p.url,
+    logoUrl: ipfsUrl(config, p.logoCid),
+    createdAt: p.createdAt,
+  };
+}
+
+/** Token quantity from the raw on-chain amount. */
+export function tokenQty(
+  d: Donation,
+  decimalsOf: (sym: string) => number | undefined,
+): number {
+  const dec = d.tokenSymbol === "ETH" ? 18 : decimalsOf(d.tokenSymbol);
+  if (dec === undefined) return d.amountUsd;
+  try {
+    return Number(BigInt(d.amountRaw)) / 10 ** dec;
+  } catch {
+    return d.amountUsd;
+  }
+}
+
+export function donationJson(
+  d: Donation,
+  decimalsOf: (sym: string) => number | undefined,
+) {
+  return {
+    txHash: d.txHash,
+    tokenSymbol: d.tokenSymbol,
+    tokenAddress: d.tokenAddress,
+    amount: tokenQty(d, decimalsOf),
+    amountRaw: d.amountRaw,
+    amountUsd: d.amountUsd,
+    donor: d.donor,
+    status: d.status,
+    detail: d.detail,
+    source: d.source,
+    createdAt: d.createdAt,
+    confirmedAt: d.confirmedAt,
+  };
+}
+
+export type CommentJson = Record<string, unknown>;
+
+export function commentJson(
+  c: Comment,
+  myVotes?: Record<string, number>,
+  replies?: CommentJson[],
+): CommentJson {
+  const out: CommentJson = {
+    id: c.id,
+    type: c.type,
+    topic: c.topic,
+    body: c.body,
+    displayName: c.displayName,
+    address: c.address,
+    roles: c.roles.slice(0, 2),
+    answered: c.answered,
+    reviewed: c.reviewed,
+    accepted: c.accepted,
+    featured: c.featured,
+    featuredAt: c.featuredAt,
+    votes: c.votes,
+    createdAt: c.createdAt,
+  };
+  if (myVotes) out.myvote = myVotes[c.id] ?? 0;
+  if (replies) out.replies = replies;
+  return out;
+}
+
+export function adminCommentJson(
+  c: Comment,
+  rfp?: { slug: string; title: string } | null,
+) {
+  return {
+    ...commentJson(c),
+    rfpId: c.rfpId,
+    parentId: c.parentId,
+    status: c.status,
+    email: c.email,
+    reports: c.reports,
+    aiSummary: c.aiSummary,
+    initiative: rfp ? { slug: rfp.slug, title: rfp.title } : null,
+  };
+}

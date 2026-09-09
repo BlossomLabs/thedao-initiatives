@@ -1,0 +1,37 @@
+{
+  "name": "thedao-rfps-api",
+  "version": "0.1.0",
+  "exports": "./main.ts",
+  "tasks": {
+    "dev": "deno run --env-file=.env -A --watch main.ts",
+    "start": "deno run -A main.ts",
+    "test": "deno test -A",
+    "check": "deno check main.ts scripts/*.ts && deno lint && deno fmt --check",
+    "sync-content": "deno run --env-file=.env -A scripts/sync-content.ts",
+    "login": "deno run --env-file=.env -A scripts/login.ts",
+    "import-sqlite": "deno run -A scripts/import-sqlite.ts"
+  },
+  "imports": {
+    "hono": "jsr:@hono/hono@^4.13",
+    "@std/ulid": "jsr:@std/ulid@^1",
+    "@std/assert": "jsr:@std/assert@^1",
+    "@std/encoding": "jsr:@std/encoding@^1",
+    "@noble/curves": "jsr:@noble/curves@^2",
+    "@noble/hashes": "jsr:@noble/hashes@^2"
+  },
+  "unstable": [
+    "kv",
+    "cron"
+  ],
+  "lint": {
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    }
+  },
+  "fmt": {
+    "lineWidth": 90,
+    "indentWidth": 2
+  }
+}

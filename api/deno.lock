@@ -1,0 +1,56 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@hono/hono@^4.13.0": "4.13.7",
+    "jsr:@noble/curves@2": "2.4.0",
+    "jsr:@noble/hashes@2": "2.4.0",
+    "jsr:@noble/hashes@2.4.0": "2.4.0",
+    "jsr:@std/assert@1": "1.0.19",
+    "jsr:@std/cli@1": "1.0.32",
+    "jsr:@std/encoding@1": "1.0.11",
+    "jsr:@std/internal@^1.0.12": "1.0.14",
+    "jsr:@std/ulid@1": "1.0.0"
+  },
+  "jsr": {
+    "@hono/hono@4.13.7": {
+      "integrity": "90f83307462b2dd47c9a8028cf5e4827abedc74a53fd291a49130f1579fdcd79"
+    },
+    "@noble/curves@2.4.0": {
+      "integrity": "69dea1a1db3647d4bd41821adcf904bc014432b21b15005704ddf3465039ec25",
+      "dependencies": [
+        "jsr:@noble/hashes@2.4.0"
+      ]
+    },
+    "@noble/hashes@2.4.0": {
+      "integrity": "98c07ca19bfee03258d1755263384d9bc1e2e57f303b25584e5e9578ceae4953"
+    },
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/cli@1.0.32": {
+      "integrity": "188b3a100d6202d64e3f5bd3d799c7fa4f6d77f92cc65eb7f641c1fa0aa92a66"
+    },
+    "@std/encoding@1.0.11": {
+      "integrity": "e7cef2f0b3153bccc17431e7c864a1de03a4b6d9647389c43e08aaa775d37385"
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
+    },
+    "@std/ulid@1.0.0": {
+      "integrity": "d41c3d27a907714413649fee864b7cde8d42ee68437d22b79d5de4f81d808780"
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@hono/hono@^4.13.0",
+      "jsr:@noble/curves@2",
+      "jsr:@noble/hashes@2",
+      "jsr:@std/assert@1",
+      "jsr:@std/encoding@1",
+      "jsr:@std/ulid@1"
+    ]
+  }
+}

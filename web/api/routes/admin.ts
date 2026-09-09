@@ -358,6 +358,7 @@ export function adminRoutes(deps: Deps) {
       }
       patch = { featured: 2, featuredAt: deps.now() };
     } else if (action === "unfeature") patch = { featured: 0, featuredAt: 0 };
+    else if (action === "unreport") patch = { reports: 0 };
     if (!patch) throw new HttpError(400, "bad action");
     const next = await db.comments.set(row.id, patch);
     const rfp = await db.rfps.get(row.rfpId);

@@ -286,6 +286,14 @@ export default function Dashboard() {
                           Open
                         </LinkButton>
                       )}
+                      <Button
+                        sm
+                        variant="ghost"
+                        className="mr-1.5"
+                        onClick={() => act(c.id, "unreport")}
+                      >
+                        Dismiss reports
+                      </Button>
                       <Button sm variant="ghost" onClick={() => act(c.id, "discard")}>
                         Discard
                       </Button>

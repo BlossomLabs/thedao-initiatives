@@ -81,6 +81,7 @@ export function commentsRepo(kv: Deno.Kv, now: () => number) {
     "featured",
     "featuredAt",
     "aiSummary",
+    "reports",
   ]);
   async function set(id: string, patch: Partial<Comment>): Promise<Comment | null> {
     for (const k of Object.keys(patch)) {

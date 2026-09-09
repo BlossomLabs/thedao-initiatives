@@ -292,6 +292,14 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
       .length,
     5,
   );
+  // admin dismisses the reports; the entry stays published
+  assertEquals(
+    (await h.req(`/api/admin/comments/${c1.id}/unreport`, { method: "POST", token: admin }))
+      .status,
+    200,
+  );
+  assertEquals((await h.db.comments.get(c1.id))!.reports, 0);
+  assertEquals((await h.db.comments.reported()).length, 0);
 
   // admin actions: accept only suggestions; feature-front max 3
   assertEquals(

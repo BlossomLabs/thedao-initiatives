@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Roboto+Mono:wght@400;500;600&display=swap");
-
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -410,4 +408,11 @@
   .md input[type="checkbox"]:disabled {
     opacity: 1;
   }
+}
+
+/* Reveal: root.tsx hides <body> inline until this stylesheet is applied, so a
+   slow CSS fetch never paints unstyled text on a white page. Unlayered on
+   purpose: it must beat the (unlayered) inline rule. */
+body {
+  visibility: visible;
 }

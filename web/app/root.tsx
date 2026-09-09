@@ -13,9 +13,15 @@ import Footer from "~/components/layout/Footer";
 import PageSkeleton from "~/components/layout/PageSkeleton";
 import "./app.css";
 
+// Fonts as a <link> rather than an @import inside app.css: the browser fetches
+// them in parallel with the stylesheet instead of after it.
+const FONTS_URL =
+  "https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Roboto+Mono:wght@400;500;600&display=swap";
+
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+  { rel: "stylesheet", href: FONTS_URL },
   { rel: "icon", href: "/dao-logo.svg" },
   { rel: "apple-touch-icon", href: "/dao-logo.svg" },
 ];
@@ -27,6 +33,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#2c5e86" />
+        {
+          /* Critical CSS: paint the brand background before any stylesheet
+            arrives, and keep the body invisible until app.css applies (it
+            ends with `body{visibility:visible}`). The script is a safety net
+            so a failed stylesheet fetch still shows the page. */
+        }
+        <style
+          dangerouslySetInnerHTML={{
+            __html:
+              "html{color-scheme:dark;background:#2c5e86 linear-gradient(142.716deg,#2c5e86 31.46%,#1f435f 90.4%) fixed no-repeat;color:#fff}" +
+              "body{margin:0;visibility:hidden}",
+          }}
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "setTimeout(function(){document.body.style.visibility='visible'},4000)",
+          }}
+        />
         <Meta />
         <Links />
       </head>

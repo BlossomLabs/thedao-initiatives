@@ -1,0 +1,274 @@
+# TheDAO Security Fund: guide for AI assistants drafting initiatives
+
+> TheDAO Security Fund co-funds Ethereum security work. Initiatives (RFPs and grants) are listed at https://fund.thedao.fund, ecosystem stakeholders and donors fund them, and teams get paid as milestones are accepted. If you are an AI assistant and a human asked you to help draft an initiative, this file is your complete instruction set. Follow the three-step process exactly.
+
+This file is only for proposing NEW initiatives. It is not for vendors bidding on an already-funded RFP.
+
+## Your job
+
+You are helping a human turn an idea into an initiative that gets funded. The finished output must be indistinguishable in structure, tone, and quality from the gold-standard example at the bottom of this file. Do not freestyle the format. Do not skip the interview. Do not hide gaps.
+
+## Step 1: Interview the proposer. Do not draft yet.
+
+Before writing a single line of the initiative, ask the proposer these questions. Ask them conversationally, two or three at a time, and wait for real answers. You must ask questions 1 through 4 and wait for a reply at least once before drafting anything, even if the proposer says "just draft it." If they still refuse to answer, you may draft, and every unanswered question becomes a gap in the Step 3 scorecard. Along the way, also collect the proposer's contact (email or Telegram); the form requires it.
+
+1. **What exactly gets built?** What can someone do after this exists that they can't do today?
+2. **Why does Ethereum security need it?** What incident, loss, or concrete gap does it map to? (The best answer names a real event, like Bybit, or a gap practitioners keep hitting.)
+3. **Who would fund this, and why?** This is the most important question, so push on it. TheDAO never funds an initiative alone: expect roughly 25% or more of the goal to come from ecosystem stakeholders, and TheDAO's own share has practical limits (on the order of $200,000). So ask: which L2s, wallets, exchanges, protocols, security firms, or large Ethereum teams benefit enough to put in serious money, think $50,000 from a single stakeholder for a large initiative, scaled down for smaller asks? Commitments are not required before submitting, and TheDAO helps with the fundraising and can approach stakeholders directly. But the proposer must name plausible funders and say why each one would pay. If neither of you can name anyone who plausibly would, tell the proposer plainly: this initiative is not viable yet, and submitting it would waste their time.
+4. **RFP or grant?** An RFP means nobody is pre-selected and qualified teams compete once it's funded. A grant means a named team does the work, and it is only justified when already-done work gives that team a decisive head start (they built the prototype, they did half the verification, they effectively have a monopoly on the expertise). Grants still face an open challenge window, and the head start means a grant should cost LESS than the same work from scratch. If the proposer wants a grant, make them defend the head start.
+5. **Who will USE the result**, and what public evidence of adoption could a reviewer check? A demo is not adoption.
+6. **What does it cost, per milestone?** Would a lean, competent team recognize those numbers as fair?
+7. **Who maintains it** after the money is spent?
+
+## Step 2: Draft the initiative by imitating the example
+
+Write the initiative so it could sit on the board next to the example below without anyone noticing a different author. That means:
+
+- **Same sections, same order, same table.** If your section names differ from the example, you did it wrong.
+- **Same tone.** Plain, direct, confident. Short sentences mixed with the occasional long one. First person plural where the fund speaks ("we expect", "we will never publish"). Concrete numbers over adjectives. No corporate filler, no hype words, no em dashes anywhere: where you would reach for an em dash, use a comma, a colon, parentheses, or an ellipsis. The casual asides in the example ("could probably be vibe coded in a weekend") are deliberate house voice, so keep that register instead of sanding it off.
+- **Same length.** 800 to 2,500 words, counting the boilerplate. The example is about 1,100.
+- **Copy the boilerplate below word for word.** Do not paraphrase it.
+
+The skeleton, with what goes in each slot:
+
+```
+# RFP: <specific title>        (or "# Grant: <title>")
+
+| | |
+|---|---|
+| **Status** | Draft |
+| **Budget** | $<amount> USD |          <- one plain number; never "up to", never payment terms
+| **Proposal window** | 15 days, opening once the RFP is fully funded |   <- grants: 30 days, for finalizing the plan
+| **Indicative duration** | <N> months (proposers set their own timeline) |   <- typically 6 to 12; match the scope
+
+## Why this matters
+<1-2 short paragraphs: the real incident or gap, then what the money buys.
+End with the sharpest one-line version of the idea if you have one.>
+
+## What this actually pays for        <- optional section; use it when the real
+<the honest description of the work>     deliverable differs from what people assume
+
+## Who we expect to do this
+<RFP: nobody pre-selected, open bidding once funded, the profile of a winning
+team, and the disclosure rule. Grant: rename the section "The recipient", name
+the team, defend the head start plainly, keep the disclosure rule. The
+disclosure rule, canonical wording: "Every applicant, including any expected
+recipient, must disclose their relationships to the teams, codebases, and
+firms named in this initiative.">
+
+## Existing work
+<prior art with links, only if real prior art exists; otherwise omit the section>
+
+## Scope
+**In scope**
+<bullets>
+**Out of scope**
+<bullets; this list prevents the expensive misunderstandings>
+
+## Hard requirements
+<numbered instant self-screens: open source (OSI license), acceptance a
+stranger can verify from public evidence, maintenance plan, plus whatever
+the domain demands>
+
+## Milestones (draft)
+<standard preamble, then milestones. Heading format: "### A - Name - $50,000",
+lettered when the order is flexible, numbered when it is fixed. Criteria as
+"- [ ]" checkboxes: binary, and verifiable by a non-expert from public
+evidence. The adoption milestone is ALWAYS last: under $300k total it gets at
+least a third of the budget (more is fine, the example gives it half); at
+$300k+ it gets at least $100k, and a third is still the ideal.>
+
+## Milestone review and acceptance
+<verbatim boilerplate below>
+
+## Process
+<verbatim boilerplate below>
+
+---
+
+Questions, pushback, better ideas? Post them below.
+```
+
+The verbatim boilerplate:
+
+**Milestones preamble:**
+
+> These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
+
+**Milestone review and acceptance:**
+
+> - Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
+> - Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
+> - The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
+
+**Process (for an RFP):**
+
+> - The proposal window opens once the RFP is fully funded and stays open for 15 days.
+> - Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
+> - Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
+> - Milestone deliveries are reviewed within 14 days; payment follows acceptance.
+> - The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
+> - If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
+
+**Process (for a grant):** replace the first three RFP bullets with these two, verbatim apart from the recipient's name; keep the last three bullets unchanged:
+
+> - The proposal window opens once the grant is fully funded and stays open for 30 days. In that window, <recipient> submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures. The window is also an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.
+> - Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement.
+
+**Hard wording rules (legal, non-negotiable):**
+
+- NEVER describe donated funds as refundable, claimable, held, reserved, or escrowed, and never suggest donors can get money back or keep any right to donated funds. The only correct stalled-milestone language is the final Process bullet above, exactly as written.
+- Never promise tax deductibility. Never describe donations as anonymous.
+- "TheDAO" is one word: capital T, no space, capital DAO. Never write "the DAO" when referring to TheDAO or TheDAO Security Fund, and never abbreviate it.
+- All amounts in USD. No em dashes anywhere.
+- Before delivering, scan the finished draft for "the DAO", for em dashes, and for the banned funding words, and fix every hit.
+
+**Budget sanity test:** this is a padding test, not a price formula. For each milestone, ask whether the deliverable is obviously worth the money to a skeptical funder. The classic fail: $60,000 to produce one report, when $60,000 hires a full-time person for a year. Frugal proposals get funded; padded ones get skipped; grants are held to an even higher bar because there is no competition to squeeze the price.
+
+## Step 3: Deliver the form fields plus the scorecard
+
+The final output is copy-paste-ready content for every field of the real form at https://fund.thedao.fund/submit:
+
+1. **Title** (required unless a forum link is given, in which case it is read from the topic): up to 140 characters. Do not repeat the "RFP:" or "Grant:" prefix here; the Type field carries that.
+2. **Type** (required): RFP or Grant.
+3. **Short summary** (required): 2 to 4 sentences, what gets built and why it matters.
+4. **Full initiative details**: the complete initiative from Step 2, in markdown.
+5. **Forum link**: optional Discourse topic where the initiative is discussed (https only).
+6. **Funding goal (USD)** (required): one number, matching the budget in the details.
+7. **Who is likely to fund this?** (required, never published): the funder list from interview question 3. One funder per line, in exactly this format:
+
+   `Org name | why they'd pay | relationship (none / met once / know them well) | warm intro? yes/no | suggested ask $`
+
+   This field is never published. Giveth uses it to fundraise alongside the proposer, so honest relationships and real reasons beat an impressive-looking list of names nobody knows. Do not include private contact details of third parties; the org name and the proposer's relationship to it are enough.
+8. **Contact**: the proposer's email or Telegram (never published).
+
+End with this scorecard, filled honestly:
+
+```
+READINESS: READY | NOT READY
+- All form fields answered: yes / no
+- Type justified (grant head start, or genuinely open RFP): yes / no
+- Financial demand: [stakeholders named, with why each would pay] / none named
+- Adoption milestone is last and meets the size rule: yes / no
+- Budget passes the sanity test: yes / no
+- Format matches the gold-standard example: yes / no
+- Banned wording absent (refundable, claimable, held, reserved, escrowed): yes / no
+- Gaps: [list them]
+```
+
+The verdict is NOT READY whenever any of these is true: a form field is missing, no plausible stakeholders are named, the adoption milestone breaks the size rule, or banned wording is present. Draft even when it's NOT READY; the admin reviews everything and the scorecard shows them the gaps. But never hide a gap, and when the honest answer is that nobody would fund this, say so before the proposer spends more time.
+
+## The gold-standard example
+
+This is a real initiative from the board. Your output must match its structure, tone, and level of detail.
+
+---
+
+# RFP: Public OPSEC Rating System ("Moody's for OPSEC")
+
+| | |
+|---|---|
+| **Status** | Draft |
+| **Budget** | $150,000 USD |
+| **Proposal window** | 15 days, opening once the RFP is fully funded |
+| **Indicative duration** | 12 months (proposers set their own timeline) |
+
+## Why this matters
+
+Your keys, your devices, your multisig process, your access controls... these are just as important as your smart contracts. Every serious team already invests in OPSEC, and OPSEC audits happen all the time. But all of that work is invisible. There is no public signal that tells users, investors or partners who is actually running a tight ship.
+
+We want to change that with a single OPSEC rating the whole industry agrees on. Think of a Moody's rating: people want one because everyone recognizes what it means. Teams that earn an A, AA or AAA get their tier on a public board. That's it, just the tier. We will never publish what a team is missing (a public list of weaknesses is a gift to attackers), and teams with unacceptable OPSEC simply don't make the board... which says something all by itself.
+
+## What this actually pays for
+
+Let's be clear about what this RFP is: **a coordination effort.** The money here pays for a social exercise, getting the community of OPSEC auditing firms around one table to agree on one standard. The website is the easy part.
+
+What we expect to come out of it:
+
+- One scoring template and tier definitions (A / AA / AAA), agreed on by **at least 6 OPSEC auditing companies**. Roughly speaking, an A team follows best practices and we don't expect them to have incidents. AAA is wild: secure beyond what's reasonable.
+- The firms already doing OPSEC audits become the raters. They add exactly one step to the audits they already run: apply the scoring template, issue the tier. The first batch of accredited raters is the same group that built the standard, so they have skin in the game from day one.
+- A simple public board of rated teams and their tiers. Honestly, this part could probably be vibe coded in a weekend. The value is the standard and the names on it.
+- A path to sustainability. The accredited firms form a membership group (think of it as a cooperative professional body) that maintains the standard, certifies new raters and keeps the quality bar up. A small committee, paid something modest like $2,000 per member per cycle, verifies that ratings are sound. That's the piece that keeps the whole thing meaningful, because nobody should ever profit from inflating a score.
+- A six-month cycle. Ratings get reassessed every 6 months, and the scoring template gets revisited on the same rhythm.
+
+Bidders are welcome to propose a different path to get there. The goal is what's fixed: a decentralized rating system that many OPSEC auditing companies co-own, with a real shot at sustaining itself long after this grant is spent.
+
+## Who we expect to do this
+
+Nobody is pre-selected. Once the RFP is fully funded there will be an open bidding process, and the winner gets picked through the process below. The dream candidate is a credible coordinator in the security community: someone who can bring 6+ OPSEC auditing firms to the same table and get them all to sign the same document. (If you have ever tried to get six companies to agree on anything, you know that's the real work here.)
+
+## Scope
+
+**In scope**
+
+- Coordinating at least 6 OPSEC auditing companies to agree on one scoring template and the A / AA / AAA tier definitions
+- Onboarding those firms as the first accredited raters, with whatever materials they need to run the template inside their existing audit flow
+- A simple public board of rated teams and their tiers... tiers only, no details, no gaps
+- Standing up the membership body: how raters get certified, the verification committee, the small stipends, and the funding model that keeps it alive
+- The six-month reassessment cycle, for the ratings AND for the scoring template itself
+
+**Out of scope**
+
+- Performing the underlying OPSEC audits (the accredited firms do that)
+- Publishing any team's specific weaknesses, unmet controls, or the reasons behind a tier
+- A heavy platform build. The board is deliberately simple.
+
+## Hard requirements
+
+1. **Six firms minimum.** At least 6 OPSEC auditing companies formally agree to the scoring template and tier definitions, and commit to issuing ratings with it.
+2. **Tiers only.** The public board shows a team's tier and nothing more. No gaps, no unmet controls, no explanations.
+3. **Open and versioned.** The scoring template and tier definitions are public, open source and versioned, with changes dated and attributable.
+4. **Tool-agnostic.** Every tier is reachable no matter which tools or frameworks a team uses. No vendor's product is ever required.
+5. **Nobody profits from inflating scores.** The membership body maintains the standard with real conflict-of-interest rules and a funding model that keeps the rating honest.
+6. **Ratings expire.** Every rating gets reassessed every 6 months.
+
+## Milestones (draft)
+
+These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
+
+### A - Agreed standard - $50,000
+
+- [ ] A public, versioned scoring template plus the A / AA / AAA tier definitions
+- [ ] At least 6 OPSEC auditing companies formally signed on and committed to rating with it
+- [ ] A written governance and sustainability model: the membership body, how raters get certified, the verification committee and its stipends, and how it all gets funded
+
+### B - Board and first ratings - $25,000
+
+- [ ] The public board is live, showing rated teams and their tiers (and nothing else)
+- [ ] Accredited firms onboarded and issuing ratings inside their normal audit flow
+- [ ] The first teams rated end to end, proving the flow works
+
+### C - Adoption evidence - $75,000
+
+- [ ] At least [N] teams publicly rated on the board by accredited firms
+- [ ] At least one full six-month reassessment completed: existing ratings reset and re-scored, with the changes live on the board
+- [ ] The membership body running on its own funding model, with the verification committee active
+- [ ] A public metrics page: teams rated, tiers awarded, firms participating, reassessments completed
+
+## Milestone review and acceptance
+
+- Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
+- Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
+- The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
+
+## Process
+
+- The proposal window opens once the RFP is fully funded and stays open for 15 days.
+- Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
+- Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
+- Milestone deliveries are reviewed within 14 days; payment follows acceptance.
+- The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
+- If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
+
+---
+
+Questions, pushback, better ideas? Post them below.
+
+---
+
+End of example. Notice what makes it work: the intro names the exact gap and the one-line fix. "What this actually pays for" tells the truth about where the money goes. Hard requirements are instant self-screens, not aspirations. Every milestone criterion is checkable by a stranger. The adoption milestone is last and carries half the budget, comfortably above the one-third minimum. Match that bar.
+
+## Read before drafting (if you can browse)
+
+- The live board and current initiatives: https://fund.thedao.fund
+- The submission form: https://fund.thedao.fund/submit

@@ -220,16 +220,17 @@ Never do these:
 Produce copy-paste-ready content for every field of the form at https://fund.thedao.fund/submit:
 
 1. **Type** (required): RFP or Grant.
-2. **Title** (required): up to 140 characters. No "RFP:" or "Grant:" prefix; the Type field carries that.
+2. **Title** (required unless a forum link is given, in which case it is read from the topic): up to 140 characters. No "RFP:" or "Grant:" prefix; the Type field carries that.
 3. **Short summary** (required): 2 to 4 sentences on what gets built and why it matters.
 4. **Full initiative details**: the complete initiative from Step 2, in markdown.
-5. **Funding goal (USD)** (required): one number, matching the table.
-6. **Who is likely to fund this?** (required, never published): the answer to question 3, one funder per line, in exactly this format:
+5. **Forum link**: optional Discourse topic where the initiative is discussed (https only).
+6. **Funding goal (USD)** (required): one number, matching the table.
+7. **Who is likely to fund this?** (required, never published): the answer to question 3, one funder per line, in exactly this format:
 
    `Org name | why they'd pay | relationship (none / met once / know them well) | warm intro? yes/no | suggested ask $`
 
    Giveth fundraises from this list alongside the proposer, so honest relationships beat impressive names nobody knows. Leave out third parties' private contact details.
-7. **Contact** (required, never published): the proposer's email or Telegram.
+8. **Contact** (required, never published): the proposer's email or Telegram.
 
 Then this scorecard, filled honestly:
 

@@ -1,0 +1,406 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Roboto+Mono:wght@400;500;600&display=swap");
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Tokens: Figma "TheDAO Sites" via the MVP's style.css :root. */
+@theme {
+  --color-dao-blue: #2c5e86;
+  --color-dao-blue-dark: #1f435f;
+  --color-dao-blue-legal: #28567a;
+  --color-dao-green: #5cb75a;
+  --color-dao-bright: #00ff88;
+  --color-dao-red: #ff3b38;
+  --color-dao-red-hover: #e63633;
+  --color-dao-sky: #5ac8fa;
+  --color-dao-amber: #f0b429;
+  --color-dao-rfp: #7eb3ff;
+  --color-muted: rgba(255, 255, 255, 0.62);
+  --color-soft: rgba(255, 255, 255, 0.85);
+  --color-card: rgba(255, 255, 255, 0.05);
+  --color-edge: rgba(255, 255, 255, 0.1);
+  --color-edge2: rgba(255, 255, 255, 0.15);
+  --color-panel: #244c6d;
+  --color-panel-deep: #1e3650;
+  --color-panel-reply: #213c58;
+  --color-panel-modal: #22405c;
+
+  --font-inter-tight: "Inter Tight", "Inter", sans-serif;
+  --font-inter: "Inter", sans-serif;
+  --font-mono: "Roboto Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --shadow-btn: 0 4px 6px -4px rgba(130, 24, 26, 0.3), 0 10px 15px -3px rgba(130, 24, 26, 0.3);
+  --shadow-btn-primary:
+    0 4px 6px -4px rgba(130, 24, 26, 0.3),
+    0 10px 15px -3px rgba(130, 24, 26, 0.3);
+  --shadow-btn-primary-hover:
+    0 4px 6px -4px rgba(130, 24, 26, 0.5),
+    0 12px 20px -3px rgba(130, 24, 26, 0.5);
+  --shadow-glow: 0 0 18px rgba(92, 183, 90, 0.15);
+  --shadow-card-hover: 0 0 30px rgba(92, 183, 90, 0.08);
+  --shadow-bar: 0 0 12px rgba(92, 183, 90, 0.45);
+  --shadow-menu: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.42);
+  --shadow-qa: 0 6px 20px rgba(0, 0, 0, 0.22);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-edge);
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: #fff;
+    font: 400 14px/1.5 var(--font-inter-tight);
+    background-color: var(--color-dao-blue);
+    background-image: linear-gradient(
+      142.716deg,
+      var(--color-dao-blue) 31.46%,
+      var(--color-dao-blue-dark) 90.4%
+    );
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+  b, strong {
+    font-weight: 600;
+  }
+  a {
+    color: var(--color-dao-green);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  [hidden] {
+    display: none !important;
+  }
+  input, textarea, select, button {
+    font: inherit;
+    color: inherit;
+  }
+  select option {
+    background: var(--color-panel);
+    color: #fff;
+  }
+}
+
+@layer components {
+  .mono {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+  }
+  .dim {
+    color: var(--color-muted);
+  }
+  .small {
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* section heading (Figma): Inter Tight 13px regular, tracking .2em, green, 46px above / 16px below */
+  .h2 {
+    @apply font-inter-tight font-normal text-[13px] uppercase tracking-[0.2em] text-dao-green mt-[46px] mb-4;
+  }
+  .h2 .n {
+    @apply text-muted normal-case tracking-normal text-[12px] ml-2.5 font-normal;
+  }
+  .h3 {
+    @apply font-inter-tight font-medium text-[14px] text-soft mt-5 mb-2.5;
+  }
+  .kicker {
+    @apply font-inter-tight text-[11px] font-normal tracking-[0.2em] uppercase text-dao-green;
+  }
+  .k {
+    @apply block font-inter-tight text-[11px] font-normal tracking-[0.18em] uppercase text-dao-green mb-3;
+  }
+
+  /* thin green divider: 1052px on the board (Figma hero width), 672px on the form */
+  .shimmer {
+    height: 1px;
+    max-width: 1052px;
+    margin: 30px auto 0;
+    border: 0;
+    background: linear-gradient(
+      90deg,
+      rgba(1, 255, 136, 0),
+      rgba(1, 255, 136, 0.5) 50%,
+      rgba(1, 255, 136, 0)
+    );
+  }
+  .shimmer-soft {
+    max-width: 672px;
+    margin: 32px auto;
+    background: linear-gradient(
+      90deg,
+      rgba(92, 183, 90, 0),
+      rgba(92, 183, 90, 0.4) 50%,
+      rgba(92, 183, 90, 0)
+    );
+  }
+
+  /* glass card + panels (Figma: 16px radius, 24px padding, white/5 fill, 1px white/10 border) */
+  .card {
+    @apply relative rounded-2xl bg-white/5 border border-white/10 p-6 transition-[border-color,box-shadow] duration-200;
+  }
+  .card-hover:hover {
+    @apply border-[rgba(92,183,90,.4)] shadow-card-hover;
+  }
+  .panel {
+    @apply rounded-[18px] bg-white/5 border border-white/10 px-[22px] py-5;
+  }
+  .tblbox {
+    @apply max-h-[480px] overflow-auto rounded-2xl bg-white/5 border border-white/10;
+  }
+
+  /* buttons (Figma): 51px tall, 38px small, 14px radius, Inter Tight 13px regular,
+     white/5 fill + white/15 border. Red buttons carry the #82181A drop shadows;
+     ghost buttons (Details, Connect wallet) are flat. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 h-[51px] px-6 rounded-[14px] border border-white/15 bg-white/5 text-white font-inter-tight text-[13px] font-normal cursor-pointer text-center whitespace-nowrap transition-[border-color,box-shadow,transform,background-color] duration-150;
+  }
+  .btn:hover {
+    @apply border-[rgba(92,183,90,.6)] shadow-glow no-underline;
+  }
+  .btn-primary {
+    @apply bg-dao-red border-dao-red shadow-btn-primary;
+  }
+  .btn-primary:hover {
+    @apply bg-dao-red-hover border-dao-red-hover scale-[1.02] shadow-btn-primary-hover;
+  }
+  .btn-ghost {
+    @apply bg-white/5 border-white/10 text-white/70;
+  }
+  .btn-danger {
+    @apply border-[rgba(255,59,56,.6)] text-[#ffb3b1];
+  }
+  .btn-discuss {
+    @apply border-[rgba(90,200,250,.55)] text-dao-sky;
+  }
+  .btn-discuss:hover {
+    @apply border-dao-sky shadow-[0_0_18px_rgba(90,200,250,.2)];
+  }
+  .btn-sm {
+    @apply h-[38px] px-5;
+  }
+  .btn:disabled, .btn[aria-disabled="true"] {
+    @apply opacity-50 cursor-default hover:scale-100;
+  }
+  .btn-wallet {
+    @apply h-[38px] px-4 gap-[7px] bg-white/5 border-white/20 shadow-none;
+  }
+  .btn-wallet.connected {
+    @apply border-[rgba(92,183,90,.6)] text-dao-green font-mono text-[12px];
+  }
+
+  /* badges + chips (Figma: pill, 4px 10px padding, Inter Tight 11px semibold, uppercase) */
+  .type-badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 font-inter-tight font-semibold text-[11px] leading-[1.5] uppercase tracking-[0.05em];
+  }
+  .t-rfp {
+    @apply text-dao-rfp border border-[rgba(92,140,220,.3)] bg-[rgba(92,140,220,.15)];
+  }
+  .t-grant {
+    @apply text-dao-green border border-[rgba(0,255,136,.3)] bg-[rgba(0,255,136,.12)];
+  }
+  .chip {
+    @apply inline-block rounded-full border border-edge2 text-soft px-2.5 py-0.5 font-inter-tight text-[11px] uppercase tracking-[0.08em];
+  }
+  .st-pending {
+    @apply text-dao-amber border-[rgba(240,180,41,.5)];
+  }
+  .st-approved {
+    @apply text-dao-green border-[rgba(92,183,90,.5)];
+  }
+  .st-rejected, .st-archived {
+    @apply text-muted;
+  }
+  .funded-chip {
+    @apply bg-[rgba(92,183,90,.2)] text-dao-green border-[rgba(92,183,90,.5)] font-bold tracking-[0.4px];
+  }
+  .priv {
+    @apply inline-block ml-2 align-middle rounded-full px-2.5 py-0.5 font-inter-tight font-semibold text-[11px] leading-[1.6] tracking-[0.06em] normal-case text-[#7dd57e] bg-[rgba(92,183,90,.14)] border border-[rgba(92,183,90,.45)];
+  }
+
+  /* progress bar (Figma: 6px, green to bright gradient) */
+  .bar {
+    @apply h-1.5 rounded-full bg-white/[.09] overflow-hidden;
+  }
+  .bar > i {
+    @apply block h-full rounded-full min-w-[2px] bg-gradient-to-r from-dao-green to-dao-bright shadow-bar;
+  }
+  .bar-big {
+    @apply h-3 max-w-[760px];
+  }
+
+  /* forms (Figma): 11px green label, 13px light hint 5px below, 14px input with
+     14px 16px padding and a 14px radius, white/5 fill, white/15 border */
+  .label {
+    @apply block font-inter-tight text-[11px] font-normal text-dao-green uppercase tracking-[0.12em];
+  }
+  .hint {
+    @apply block mt-[5px] font-inter-tight font-light text-[13px] leading-[1.5] text-muted normal-case tracking-normal;
+  }
+  .field {
+    @apply w-full rounded-[14px] bg-white/5 border border-white/15 text-white px-4 py-3.5 font-inter-tight text-[14px] leading-[1.5] outline-none placeholder:text-white/30 transition-colors duration-150;
+  }
+  .field:focus {
+    @apply border-[rgba(92,183,90,.6)];
+  }
+  .field:disabled {
+    @apply opacity-50;
+  }
+  textarea.field {
+    @apply resize-y;
+  }
+  select.field {
+    @apply appearance-none;
+  }
+  .hp {
+    position: absolute;
+    left: -9999px;
+    top: -9999px;
+    height: 1px;
+    width: 1px;
+    opacity: 0;
+  }
+  .alert {
+    @apply rounded-xl border border-[rgba(255,59,56,.55)] bg-[rgba(255,59,56,.12)] px-4 py-3 my-3.5 text-[#ffd7d6] text-[13.5px];
+  }
+
+  /* status box (donate + forms) */
+  .status {
+    @apply rounded-[14px] border border-edge px-4 py-3 text-[12.5px] leading-[1.6];
+  }
+  .status-ok {
+    @apply border-[rgba(92,183,90,.5)] text-dao-green;
+  }
+  .status-err {
+    @apply border-[rgba(255,59,56,.55)] text-[#ffd7d6];
+  }
+  .status-wait {
+    @apply border-[rgba(240,180,41,.5)] text-[#ffe9b8];
+  }
+
+  /* tables */
+  .tbl {
+    @apply w-full border-collapse text-[12.5px];
+  }
+  .tbl th, .tbl td {
+    @apply px-2.5 py-[7px] text-left border-b border-white/[.07] align-top;
+  }
+  .tbl th {
+    @apply sticky top-0 z-[5] bg-panel font-inter-tight font-medium text-[10.5px] uppercase tracking-[0.1em] text-muted;
+  }
+  .tbl tr:hover td {
+    @apply bg-[rgba(92,183,90,.045)];
+  }
+  .tbl .amt {
+    @apply text-right font-mono whitespace-nowrap;
+  }
+
+  /* avatar */
+  .pfp {
+    @apply rounded-full object-cover align-middle bg-white/[.06] flex-none;
+  }
+
+  /* markdown body (initiative details) */
+  .md {
+    @apply max-w-[760px] font-inter-tight font-light text-[15px] leading-[1.75] text-soft;
+  }
+  .md > :first-child {
+    margin-top: 0;
+  }
+  .md p {
+    margin: 0 0 14px;
+  }
+  .md h1 {
+    @apply font-inter-tight font-medium text-[24px] leading-[1.2] tracking-[-0.02em] text-white mt-9 mb-3.5;
+  }
+  .md h2 {
+    @apply font-inter-tight font-normal text-[13px] uppercase tracking-[0.2em] text-dao-green mt-[46px] mb-4;
+  }
+  .md h3 {
+    @apply font-inter-tight font-medium text-[14px] text-soft mt-5 mb-2.5;
+  }
+  .md h4, .md h5, .md h6 {
+    @apply font-inter-tight font-semibold text-[13px] text-soft mt-[18px] mb-2;
+  }
+  .md ul, .md ol {
+    margin: 0 0 14px;
+    padding-left: 24px;
+  }
+  .md ul {
+    list-style: disc;
+  }
+  .md ol {
+    list-style: decimal;
+  }
+  .md li {
+    margin: 4px 0;
+  }
+  .md li p {
+    margin: 0;
+  }
+  .md li.task {
+    list-style: none;
+    position: relative;
+    margin-left: -24px;
+    padding-left: 26px;
+  }
+  .md code {
+    @apply font-mono text-[13px] bg-black/[.22] rounded-md px-1.5 py-px;
+  }
+  .md pre {
+    @apply bg-black/[.22] border border-edge rounded-xl px-4 py-3.5 overflow-x-auto mb-3.5;
+  }
+  .md pre code {
+    background: none;
+    padding: 0;
+  }
+  .md blockquote {
+    @apply mb-3.5 px-[18px] py-0.5 border-l-[3px] border-dao-green text-muted;
+  }
+  .md hr {
+    @apply border-0 h-px bg-edge my-[26px];
+  }
+  .md table {
+    @apply block w-fit max-w-full overflow-x-auto mb-4 text-[13px] border border-edge rounded-[14px] bg-white/5 border-separate border-spacing-0;
+  }
+  .md th, .md td {
+    @apply px-2.5 py-[7px] text-left border-b border-white/[.07] align-top;
+  }
+  .md th {
+    @apply bg-black/[.18] font-inter-tight font-medium text-[10.5px] uppercase tracking-[0.1em] text-muted;
+  }
+  .md th:empty {
+    padding: 0;
+  }
+  .md tr:last-child td {
+    border-bottom: 0;
+  }
+  .md a {
+    @apply text-dao-green;
+  }
+  .md input[type="checkbox"] {
+    @apply absolute left-0 top-[0.45em] m-0 h-4 w-4 cursor-default appearance-none rounded-[4px] border border-edge2 bg-white/[.06] align-middle;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+  }
+  .md input[type="checkbox"]:checked {
+    @apply border-dao-green bg-dao-green;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6.5'/%3E%3C/svg%3E");
+    background-size: 12px 12px;
+    background-position: center;
+    background-repeat: no-repeat;
+    box-shadow: 0 0 10px rgba(92, 183, 90, 0.35);
+  }
+  .md input[type="checkbox"]:disabled {
+    opacity: 1;
+  }
+}

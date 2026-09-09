@@ -1,0 +1,78 @@
+import { cn } from "~/lib/utils";
+import type { InitiativeType } from "~/lib/api-types";
+
+export function TypeBadge(
+  { type, className, inline }: { type: InitiativeType; className?: string; inline?: boolean },
+) {
+  return (
+    <span
+      className={cn(
+        "type-badge",
+        type === "grant" ? "t-grant" : "t-rfp",
+        !inline && "absolute top-4 right-[18px]",
+        className,
+      )}
+    >
+      {type === "grant" ? "Grant" : "RFP"}
+    </span>
+  );
+}
+
+export function StatusChip({ status, className }: { status: string; className?: string }) {
+  return <span className={cn("chip", `st-${status}`, className)}>{status}</span>;
+}
+
+export function FundedChip() {
+  return <span className="chip funded-chip">FUNDED</span>;
+}
+
+const ROLE_TAGS: Record<string, [string, string]> = {
+  ADMIN: ["TheDAO team", "text-dao-amber border-[rgba(255,180,50,.32)] bg-[rgba(255,180,50,.12)]"],
+  CURATOR: ["Curator", "text-dao-green border-[rgba(92,183,90,.35)] bg-[rgba(92,183,90,.12)]"],
+  EXPERT: [
+    "ETHSecurity Badgeholder",
+    "text-dao-rfp border-[rgba(126,179,255,.3)] bg-[rgba(44,94,134,.22)]",
+  ],
+  DONOR: ["Donor", "text-[#c4a6ff] border-[rgba(160,108,255,.4)] bg-[rgba(160,108,255,.14)]"],
+};
+
+/** Role chips, priority order, at most two shown. */
+export function RoleTags({ roles }: { roles: string[] }) {
+  const shown = ["ADMIN", "CURATOR", "EXPERT", "DONOR"].filter((r) => roles.includes(r)).slice(
+    0,
+    2,
+  );
+  return (
+    <>
+      {shown.map((r) => (
+        <span
+          key={r}
+          className={cn(
+            "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 font-inter-tight text-[10.5px] font-bold uppercase tracking-[.06em] before:size-1.5 before:rounded-full before:bg-current before:content-['']",
+            ROLE_TAGS[r][1],
+          )}
+        >
+          {ROLE_TAGS[r][0]}
+        </span>
+      ))}
+    </>
+  );
+}
+
+export function QaChip(
+  { children, tone = "state" }: { children: React.ReactNode; tone?: "state" | "ok" | "feat" },
+) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 font-inter-tight text-[10.5px] font-bold uppercase tracking-[.06em]",
+        tone === "state" && "border-white/10 bg-white/[.03] text-muted",
+        tone === "ok" && "border-[rgba(92,183,90,.35)] bg-[rgba(92,183,90,.12)] text-dao-green",
+        tone === "feat" &&
+          "border-[rgba(0,255,136,.35)] bg-[rgba(0,255,136,.1)] text-dao-bright before:size-1.5 before:rounded-full before:bg-current before:shadow-[0_0_6px_rgba(0,255,136,.9)] before:content-['']",
+      )}
+    >
+      {children}
+    </span>
+  );
+}

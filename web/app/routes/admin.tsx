@@ -1,0 +1,53 @@
+import { Outlet } from "react-router";
+import { useAccount } from "wagmi";
+import PageMain from "~/components/layout/PageMain";
+import { Button } from "~/components/ui/Button";
+import { useSession } from "~/context/session";
+import { errorMessage } from "~/lib/api";
+import { useState } from "react";
+import { generateMeta } from "~/utils/meta";
+
+export function meta() {
+  return generateMeta({ title: "Admin", url: "/admin", noIndex: true });
+}
+
+/** Gate: everything under /admin needs a SIWE session from an admin wallet. */
+export default function AdminLayout() {
+  const { session, signIn, signingIn } = useSession();
+  const { isConnected, address } = useAccount();
+  const [error, setError] = useState("");
+  if (session?.isAdmin) return <Outlet />;
+  return (
+    <PageMain narrow detail className="min-h-[60vh]">
+      <h1 className="m-0 font-inter-tight text-[clamp(26px,4vw,40px)] font-medium tracking-[-.02em]">
+        Admin
+      </h1>
+      <p className="mt-3.5 font-inter-tight text-[15px] font-light leading-[1.65] text-muted">
+        Sign in with an admin wallet. One signature, no transaction, no gas.
+      </p>
+      <div className="panel mt-5 flex flex-col gap-3">
+        {!isConnected && (
+          <p className="m-0 small">
+            Connect your wallet with the button in the top right, then sign in here.
+          </p>
+        )}
+        {isConnected && !session && (
+          <Button
+            variant="primary"
+            loading={signingIn}
+            onClick={() => signIn().catch((e) => setError(errorMessage(e)))}
+          >
+            Sign in with {address?.slice(0, 6)}…
+          </Button>
+        )}
+        {session && !session.isAdmin && (
+          <p className="m-0 small text-[#ffd7d6]">
+            That wallet ({session.address.slice(0, 6)}…) is not an admin. Switch to the admin wallet
+            and sign in again.
+          </p>
+        )}
+        {error && <p className="m-0 small text-[#ffd7d6]">{error}</p>}
+      </div>
+    </PageMain>
+  );
+}

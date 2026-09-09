@@ -13,16 +13,16 @@ export function profileRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const { db, config, ens } = deps;
 
-  /** Reverse-resolve an address to its primary ENS name (or null). */
+  /** Reverse-resolve an address to its primary ENS name and avatar (null when unset). */
   r.get("/ens-name/:address", async (c) => {
     const address = c.req.param("address").trim();
     if (!isAddress(address)) throw new HttpError(400, "bad address");
     // Cache misses hit an external API: throttle uncached lookups per client.
     if (!ens.has(address) && !(await db.rateLimit("ens:" + c.var.ip, 30, 60))) {
-      return c.json({ name: null, detail: "rate limited" }, 429);
+      return c.json({ name: null, avatar: null, detail: "rate limited" }, 429);
     }
-    const name = await ens.reverse(address);
-    return c.json({ name: name || null });
+    const id = await ens.reverse(address);
+    return c.json({ name: id.name || null, avatar: id.avatar || null });
   });
 
   r.get("/nickname/:address", async (c) => {

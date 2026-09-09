@@ -1,18 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Wallet } from "lucide-react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { useSession } from "~/context/session";
+import { useProfileDialog } from "~/context/profile-dialog";
 import { useIdentity } from "~/hooks/use-identity";
-import { useBoard } from "~/hooks/use-board";
 import { Avatar } from "./Avatar";
 import WalletMenu, { connectorIcon, type WalletMenuItem } from "./WalletMenu";
-import NicknameDialog from "./NicknameDialog";
 import { errorMessage } from "~/lib/api";
 import { walletErrorMessage } from "~/lib/donate";
 import { cn } from "~/lib/utils";
 import { MOCK_WALLET } from "~/lib/wagmi";
-
-const PROMPTED_KEY = "thedao:name-prompted";
 
 /**
  * Top-bar wallet button. Disconnected: opens the connector list (or connects
@@ -25,11 +22,12 @@ export default function ConnectButton() {
   const { disconnectAsync } = useDisconnect();
   const { session, signIn, signOut, signingIn } = useSession();
   const identity = useIdentity(address);
-  const board = useBoard();
+  const { profileOpen, openProfile } = useProfileDialog();
   const [menu, setMenu] = useState<"none" | "pick" | "account">("none");
-  const [nickOpen, setNickOpen] = useState(false);
-  const [firstTime, setFirstTime] = useState(false);
   const [error, setError] = useState("");
+  // Set on a fresh sign-in; consumed once the identity lookups have settled.
+  const [promptPending, setPromptPending] = useState(false);
+  const lastToken = useRef(session?.token);
 
   // Hide the generic "Injected" entry once EIP-6963 announced a named wallet.
   const usable = useMemo(() => {
@@ -39,23 +37,31 @@ export default function ConnectButton() {
     );
   }, [connectors]);
 
-  // Offer a name once per wallet when it has none (MVP behaviour).
+  // Detect a sign-in made in this page (a stored session on reload is not one).
+  // Skipped while the dialog itself triggered the sign-in on save.
   useEffect(() => {
-    if (!isConnected || !address || identity.loading || identity.nickname) return;
-    try {
-      const done = JSON.parse(localStorage.getItem(PROMPTED_KEY) || "{}") as Record<
-        string,
-        boolean
-      >;
-      if (done[address.toLowerCase()]) return;
-      done[address.toLowerCase()] = true;
-      localStorage.setItem(PROMPTED_KEY, JSON.stringify(done));
-    } catch {
-      return;
-    }
-    setFirstTime(true);
-    setNickOpen(true);
-  }, [isConnected, address, identity.loading, identity.nickname]);
+    const token = session?.token;
+    if (token && token !== lastToken.current && !profileOpen) setPromptPending(true);
+    lastToken.current = token;
+  }, [session?.token, profileOpen]);
+
+  // Once signed in: if ENS and the site profile still leave the name or the
+  // picture unset, offer to complete them.
+  useEffect(() => {
+    if (!promptPending || identity.loading) return;
+    if (!session || !address || session.address.toLowerCase() !== address.toLowerCase()) return;
+    setPromptPending(false);
+    if (identity.hasName && identity.hasAvatar) return;
+    openProfile(true);
+  }, [
+    promptPending,
+    identity.loading,
+    identity.hasName,
+    identity.hasAvatar,
+    session,
+    address,
+    openProfile,
+  ]);
 
   async function connectWith(c: (typeof connectors)[number]) {
     setError("");
@@ -101,12 +107,13 @@ export default function ConnectButton() {
       }]),
     {
       key: "name",
-      label: identity.nickname ? "Change name or picture" : "Set a display name",
+      label: identity.nameFromEns && identity.avatarFromEns
+        ? "Your name and picture"
+        : identity.hasName
+        ? "Change name or picture"
+        : "Set a display name",
       lucide: "edit",
-      onClick: () => {
-        setFirstTime(false);
-        setNickOpen(true);
-      },
+      onClick: () => openProfile(false),
     },
     ...usable.filter((c) => c.uid !== connector?.uid).map((c) => ({
       key: "sw-" + c.uid,
@@ -160,12 +167,6 @@ export default function ConnectButton() {
           {error}
         </div>
       )}
-      <NicknameDialog
-        open={nickOpen}
-        onOpenChange={setNickOpen}
-        firstTime={firstTime}
-        uploadsEnabled={board.data?.flags.uploads}
-      />
     </div>
   );
 }

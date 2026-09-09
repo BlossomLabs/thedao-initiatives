@@ -40,6 +40,7 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
         goalUsd: fields.goalUsd ?? 0,
         contact: fields.contact ?? "",
         funders: fields.funders ?? "",
+        proposer: fields.proposer ?? "",
         status,
         type: fields.type ?? "rfp",
         sortRank: fields.sortRank ?? null,

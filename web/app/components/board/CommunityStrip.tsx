@@ -2,7 +2,8 @@ import { Link } from "react-router";
 import { MessageSquare } from "lucide-react";
 import type { CommunityEntry } from "~/lib/api-types";
 import { RoleTags } from "~/components/ui/Badge";
-import { shortAddr, truncate } from "~/lib/format";
+import Identity from "~/components/wallet/Identity";
+import { truncate } from "~/lib/format";
 
 export default function CommunityStrip({ entries }: { entries: CommunityEntry[] }) {
   if (!entries.length) return null;
@@ -22,7 +23,16 @@ export default function CommunityStrip({ entries }: { entries: CommunityEntry[] 
               <MessageSquare className="size-[15px]" />
             </span>
             <span className="flex flex-wrap items-center gap-1.5 font-inter-tight text-[13.5px] font-semibold">
-              {c.address ? <span className="mono">{shortAddr(c.address)}</span> : c.displayName}
+              {c.address
+                ? (
+                  <Identity
+                    address={c.address}
+                    size={18}
+                    revealable={false}
+                    nameClassName="text-[13.5px] font-semibold"
+                  />
+                )
+                : c.displayName}
               <RoleTags roles={c.roles} />
             </span>
             <span className="text-[13.5px] leading-[1.45] text-white/80 [overflow-wrap:anywhere]">

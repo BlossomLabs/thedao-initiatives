@@ -3,6 +3,7 @@ import { useState } from "react";
 import { WagmiProvider } from "wagmi";
 import { wagmiConfig } from "~/lib/wagmi";
 import { SessionProvider } from "./session";
+import { ProfileDialogProvider } from "./profile-dialog";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -14,7 +15,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <ProfileDialogProvider>{children}</ProfileDialogProvider>
+        </SessionProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

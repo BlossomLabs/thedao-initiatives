@@ -26,6 +26,7 @@ export function publicRfp(r: Rfp) {
     type: r.type,
     sortRank: r.sortRank,
     safeAddress: r.safeAddress,
+    proposer: r.proposer ?? "",
     createdAt: r.createdAt,
     approvedAt: r.approvedAt,
   };

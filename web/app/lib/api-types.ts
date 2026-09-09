@@ -14,6 +14,8 @@ export interface Initiative {
   type: InitiativeType;
   sortRank: number | null;
   safeAddress: string;
+  /** Wallet that submitted it ("" for imported initiatives). */
+  proposer: string;
   createdAt: number;
   approvedAt: number | null;
 }
@@ -203,6 +205,12 @@ export interface Profile {
   nickname: string | null;
   pfp: string;
   pfpUrl: string;
+}
+
+/** ENS primary name and avatar record of an address (null when unset). */
+export interface EnsName {
+  name: string | null;
+  avatar: string | null;
 }
 
 export interface SafeSyncState {

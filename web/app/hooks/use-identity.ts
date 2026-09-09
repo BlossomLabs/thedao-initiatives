@@ -1,18 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "~/lib/api";
-import type { Profile } from "~/lib/api-types";
-import { avatarSrc } from "~/lib/avatar";
-import { shortAddr } from "~/lib/format";
+import type { EnsName, Profile } from "~/lib/api-types";
+import { type Identity, resolveIdentity } from "~/lib/identity";
 
-export interface Identity {
-  name: string;
-  nickname: string | null;
-  ens: string | null;
-  avatar: string;
-  loading: boolean;
-}
+export type { Identity };
 
-/** Display identity for an address: nickname, else ENS, else short address. */
+/**
+ * Display identity for an address: ENS name/avatar first, then the site
+ * profile, then a short address. Both lookups run in parallel; the server
+ * caches ENS answers so repeated addresses are cheap.
+ */
 export function useIdentity(address: string | undefined | null): Identity {
   const addr = address ?? "";
   const enabled = /^0x[0-9a-fA-F]{40}$/.test(addr);
@@ -24,17 +21,17 @@ export function useIdentity(address: string | undefined | null): Identity {
   });
   const ens = useQuery({
     queryKey: ["ens", addr.toLowerCase()],
-    enabled: enabled && profile.isSuccess && !profile.data?.nickname,
+    enabled,
     staleTime: 3600_000,
-    queryFn: () => api<{ name: string | null }>(`/api/ens-name/${addr}`, { token: null }),
+    queryFn: () => api<EnsName>(`/api/ens-name/${addr}`, { token: null }),
   });
-  const nickname = profile.data?.nickname ?? null;
-  const ensName = ens.data?.name ?? null;
-  return {
-    name: nickname || ensName || shortAddr(addr),
-    nickname,
-    ens: ensName,
-    avatar: avatarSrc(addr, profile.data?.pfp, profile.data?.pfpUrl),
-    loading: enabled && (profile.isLoading || ens.isLoading),
-  };
+  // A wallet with both a nickname and a picture is complete whatever ENS
+  // says, so only an incomplete profile waits for the (slower) ENS answer.
+  const siteComplete = Boolean(profile.data?.nickname && profile.data?.pfp);
+  return resolveIdentity(
+    addr,
+    profile.data,
+    ens.data,
+    enabled && (profile.isLoading || (ens.isLoading && !siteComplete)),
+  );
 }

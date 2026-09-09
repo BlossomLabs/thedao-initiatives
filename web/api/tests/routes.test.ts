@@ -109,8 +109,51 @@ Deno.test("board ordering: pins first, then money, then newest", async () => {
   h.close();
 });
 
+/** Session token for a wallet that already has a site nickname. */
+async function proposerToken(h: Awaited<ReturnType<typeof harness>>, address = PLAIN) {
+  await h.db.profiles.setNickname(address, "Proposer " + address.slice(-4));
+  return await h.mint(address);
+}
+
+Deno.test("submit: needs a signed-in wallet with a display name; records the proposer", async () => {
+  const h = await harness({
+    fetch: (url) =>
+      url.startsWith("https://api.ensdata.net/")
+        ? new Response("", { status: 404 })
+        : new Response("", { status: 404 }),
+  });
+  const good = {
+    title: "A proper initiative title",
+    summary: "This summary is comfortably longer than the forty character minimum required.",
+    goal: "25,000",
+    funders: "Some L2 and a wallet company",
+  };
+  assertEquals((await h.req("/api/initiatives", { method: "POST", json: good })).status, 401);
+  const nameless = await h.mint(PLAIN);
+  const noName = await h.req("/api/initiatives", { method: "POST", token: nameless, json: good });
+  assertEquals(noName.status, 403);
+  assertStringIncludes(String((await j(noName)).error), "display name");
+  const token = await proposerToken(h);
+  const res = await h.req("/api/initiatives", { method: "POST", token, json: good });
+  assertEquals(res.status, 201);
+  const { slug } = await j(res) as { slug: string };
+  const row = (await h.db.rfps.bySlug(slug))!;
+  assertEquals(row.proposer, PLAIN);
+  // public once approved, proposer included
+  const admin = await h.mint(ADMIN, true);
+  await h.req(`/api/admin/initiatives/${row.id}/status`, {
+    method: "POST",
+    token: admin,
+    json: { action: "approve" },
+  });
+  const pub = await j(await h.req("/api/initiatives/" + slug));
+  assertEquals((pub.initiative as { proposer: string }).proposer, PLAIN);
+  h.close();
+});
+
 Deno.test("submit: validation, honeypot, rate limit, pending never on board", async () => {
   const h = await harness();
+  const token = await proposerToken(h);
   const good = {
     title: "A proper initiative title",
     summary: "This summary is comfortably longer than the forty character minimum required.",
@@ -122,6 +165,7 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
   assertEquals(
     (await h.req("/api/initiatives", {
       method: "POST",
+      token,
       json: { ...good, website: "bot" },
     })).status,
     400,
@@ -129,6 +173,7 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
   assertEquals(
     (await h.req("/api/initiatives", {
       method: "POST",
+      token,
       json: { ...good, title: "short" },
     })).status,
     400,
@@ -136,23 +181,25 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
   assertEquals(
     (await h.req("/api/initiatives", {
       method: "POST",
+      token,
       json: { ...good, summary: "too short" },
     })).status,
     400,
   );
   assertEquals(
-    (await h.req("/api/initiatives", { method: "POST", json: { ...good, funders: "" } }))
+    (await h.req("/api/initiatives", { method: "POST", token, json: { ...good, funders: "" } }))
       .status,
     400,
   );
   assertEquals(
-    (await h.req("/api/initiatives", { method: "POST", json: { ...good, goal: "-5" } }))
+    (await h.req("/api/initiatives", { method: "POST", token, json: { ...good, goal: "-5" } }))
       .status,
     400,
   );
   assertEquals(
     (await h.req("/api/initiatives", {
       method: "POST",
+      token,
       json: { ...good, discourseUrl: "http://forum.example/t/1" },
     })).status,
     400,
@@ -160,6 +207,7 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
   h.clock.now += 3601; // invalid attempts count against the 5/hour budget, as in the MVP
   const res = await h.req("/api/initiatives", {
     method: "POST",
+    token,
     json: { ...good, type: "junk" },
   });
   assertEquals(res.status, 201);
@@ -172,10 +220,10 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
   assertEquals((await h.req("/api/initiatives/" + slug)).status, 404);
   assertEquals(((await j(await h.req("/api/board"))).cards as unknown[]).length, 0);
   for (let i = 0; i < 4; i++) {
-    await h.req("/api/initiatives", { method: "POST", json: good });
+    await h.req("/api/initiatives", { method: "POST", token, json: good });
   }
   assertEquals(
-    (await h.req("/api/initiatives", { method: "POST", json: good })).status,
+    (await h.req("/api/initiatives", { method: "POST", token, json: good })).status,
     429,
   );
   h.close();
@@ -338,7 +386,12 @@ Deno.test("profile: nickname rules, .eth ownership, pfp presets and upload", asy
         return Response.json({ address: ADMIN });
       }
       if (url.startsWith("https://api.ensdata.net/" + PLAIN)) {
-        return Response.json({ ens: "plain.eth", address: PLAIN });
+        return Response.json({
+          ens: "plain.eth",
+          address: PLAIN,
+          avatar: "ipfs://bafy-raw-record",
+          avatar_url: "https://euc.li/plain.eth",
+        });
       }
       if (url.startsWith("https://uploads.pinata.cloud/")) {
         pinataAuth = new Headers(init?.headers).get("authorization") ?? "";
@@ -397,8 +450,11 @@ Deno.test("profile: nickname rules, .eth ownership, pfp presets and upload", asy
     200,
   );
   assertEquals((await j(await h.req("/api/nickname/" + ADMIN))).nickname, "griff.eth");
-  assertEquals((await j(await h.req("/api/ens-name/" + PLAIN))).name, "plain.eth");
-  assertEquals((await j(await h.req("/api/ens-name/" + ADMIN))).name, null);
+  assertEquals(await j(await h.req("/api/ens-name/" + PLAIN)), {
+    name: "plain.eth",
+    avatar: "https://euc.li/plain.eth",
+  });
+  assertEquals(await j(await h.req("/api/ens-name/" + ADMIN)), { name: null, avatar: null });
   assertEquals((await h.req("/api/ens-name/0x123")).status, 400);
   assertEquals(
     (await h.req("/api/pfp", { method: "POST", token: plain, json: { pfp: "preset:7" } }))
@@ -445,6 +501,7 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
   const sub = await j(
     await h.req("/api/initiatives", {
       method: "POST",
+      token: await proposerToken(h),
       json: {
         title: "A proper initiative title",
         summary: "x".repeat(50),
@@ -648,8 +705,10 @@ Deno.test("submit: blank title is read from the Discourse topic; forum errors ar
     },
   });
   const good = { summary: "x".repeat(50), goal: 1000, funders: "someone somewhere" };
+  const token = await proposerToken(h);
   const res = await h.req("/api/initiatives", {
     method: "POST",
+    token,
     json: { ...good, discourseUrl: "https://forum.example.org/t/my-initiative/123" },
   });
   assertEquals(res.status, 201);
@@ -660,15 +719,17 @@ Deno.test("submit: blank title is read from the Discourse topic; forum errors ar
   );
   const noTitle = await h.req("/api/initiatives", {
     method: "POST",
+    token,
     json: { ...good, discourseUrl: "https://forum.example.org/t/no-title/9" },
   });
   assertEquals(noTitle.status, 400);
   assertStringIncludes(String((await j(noTitle)).error), "could not read a title");
-  const nothing = await h.req("/api/initiatives", { method: "POST", json: good });
+  const nothing = await h.req("/api/initiatives", { method: "POST", token, json: good });
   assertEquals(nothing.status, 400);
   assertStringIncludes(String((await j(nothing)).error), "forum link");
   const badHost = await h.req("/api/initiatives", {
     method: "POST",
+    token,
     json: { ...good, discourseUrl: "https://forum.invalid/t/x/1" },
   });
   assertEquals(badHost.status, 400);

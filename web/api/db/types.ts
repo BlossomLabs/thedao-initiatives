@@ -13,6 +13,8 @@ export interface Rfp {
   contact: string;
   /** Private (admin-only): fundraising leads. Never serialised publicly. */
   funders: string;
+  /** SIWE address that submitted it, shown publicly ("" for imported rows). */
+  proposer: string;
   status: RfpStatus;
   type: RfpType;
   sortRank: number | null;

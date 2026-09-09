@@ -12,6 +12,7 @@ import { Field, Input, Select, Textarea } from "~/components/ui/Field";
 import Skeleton from "~/components/ui/Skeleton";
 import Status, { type StatusKind } from "~/components/ui/Status";
 import FundingHead from "~/components/initiative/FundingHead";
+import Identity from "~/components/wallet/Identity";
 import { api, errorMessage } from "~/lib/api";
 import type {
   AdminInitiative,
@@ -198,6 +199,12 @@ export default function AdminInitiativeEditor() {
                     <ExternalLink className="mr-1.5 inline size-3.5 align-[-2px]" />
                     Safe on Etherscan
                   </a>
+                </li>
+              )}
+              {r.proposer && (
+                <li className="dim flex items-center gap-1.5">
+                  Proposed by{" "}
+                  <Identity address={r.proposer} size={16} nameClassName="text-[13px]" />
                 </li>
               )}
               {r.contact && (
@@ -660,7 +667,17 @@ function Donations({ page, base, run }: { page: AdminInitiativePage; base: strin
                 {page.donations.map((d) => (
                   <tr key={d.txHash}>
                     <td className="whitespace-nowrap">{dt(d.confirmedAt ?? d.createdAt)}</td>
-                    <td className="mono">{shortAddr(d.donor)}</td>
+                    <td>
+                      {d.donor
+                        ? (
+                          <Identity
+                            address={d.donor}
+                            size={18}
+                            nameClassName="text-[12.5px] font-normal text-white"
+                          />
+                        )
+                        : <span className="mono">—</span>}
+                    </td>
                     <td className="amt">{usd(d.amountUsd)}</td>
                     <td>
                       {d.tokenSymbol}

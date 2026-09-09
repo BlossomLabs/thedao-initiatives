@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { jsonBody, s } from "../lib/body.ts";
+import { requireAuth } from "../middleware/auth.ts";
 import { donationJson, pledgeJson, publicRfp } from "../lib/json.ts";
 import { parseGoal, validateForumUrl } from "../lib/validate.ts";
 import { pctOf } from "./board.ts";
@@ -22,6 +23,11 @@ export const decimalsOf = (sym: string): number | undefined => TOKENS[sym]?.[1];
 export function initiativeRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const { db, config } = deps;
+
+  /** Site nickname or ENS primary name (ENS answers are cached server-side). */
+  const hasDisplayName = async (address: string) =>
+    Boolean((await db.profiles.get(address)).nickname) ||
+    Boolean((await deps.ens.reverse(address)).name);
 
   r.get("/:slug", async (c) => {
     const rfp = await db.rfps.bySlug(c.req.param("slug"));
@@ -48,10 +54,17 @@ export function initiativeRoutes(deps: Deps) {
     });
   });
 
-  /** Public submission; always lands as pending for admin review. */
-  r.post("/", async (c) => {
+  /**
+   * Submission from a signed-in wallet that has a display name (ENS primary
+   * name or site nickname); always lands as pending for admin review.
+   */
+  r.post("/", requireAuth, async (c) => {
+    const proposer = c.var.user!.address;
     const body = await jsonBody(c);
     if (s(body.website)) throw new HttpError(400, "bad request"); // honeypot
+    if (!(await hasDisplayName(proposer))) {
+      throw new HttpError(403, "Set a display name (or an ENS primary name) before submitting.");
+    }
     if (!(await db.rateLimit("submit:" + c.var.ip, SUBMISSIONS_PER_HOUR_PER_IP, 3600))) {
       throw new HttpError(
         429,
@@ -105,6 +118,7 @@ export function initiativeRoutes(deps: Deps) {
       details: s(body.details, MAX_DETAILS),
       type,
       funders,
+      proposer,
       status: "pending",
     });
     return c.json({ slug: rfp.slug, status: rfp.status }, 201);

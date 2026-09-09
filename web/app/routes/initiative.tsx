@@ -13,10 +13,12 @@ import Backers from "~/components/initiative/Backers";
 import DonationsTable from "~/components/initiative/DonationsTable";
 import SideCards from "~/components/initiative/SideCards";
 import CommentsSection from "~/components/comments/CommentsSection";
+import Identity from "~/components/wallet/Identity";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { useBoard } from "~/hooks/use-board";
 import { ApiError } from "~/lib/api";
 import { SITE_NAME } from "~/data/site";
+import { dt } from "~/lib/format";
 import { generateMeta } from "~/utils/meta";
 
 export function meta() {
@@ -109,6 +111,12 @@ export default function Initiative() {
                 <DonationsTable donations={page.donations} />
               </>
             )}
+          {r.proposer && (
+            <p className="mt-7 flex flex-wrap items-center gap-2 border-t border-white/[.08] pt-4 text-[13.5px] text-muted">
+              Proposed by <Identity address={r.proposer} size={20} />
+              <span>on {dt(r.createdAt)}</span>
+            </p>
+          )}
         </div>
         <SideCards
           page={page}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Send, Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useSession } from "~/context/session";
-import { shortAddr } from "~/lib/format";
+import { useIdentity } from "~/hooks/use-identity";
 import { cn } from "~/lib/utils";
 
 /** One generic comment box (the MVP dropped type/topic pickers). */
@@ -18,6 +18,7 @@ export default function Composer(
 ) {
   const { address, isConnected } = useAccount();
   const { session, requireSession, signingIn } = useSession();
+  const identity = useIdentity(address);
   const [text, setText] = useState("");
   const [name, setName] = useState("");
   const [website, setWebsite] = useState("");
@@ -111,7 +112,7 @@ export default function Composer(
             >
               <Wallet className="size-3.5" />
               {signedIn
-                ? `Signed in as ${shortAddr(address ?? "")}`
+                ? `Signed in as ${identity.name}`
                 : signingIn
                 ? "Check your wallet…"
                 : "Connect & sign"}

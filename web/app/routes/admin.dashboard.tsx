@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { Bell } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
 import SectionHeading from "~/components/layout/SectionHeading";
+import SyncContent from "~/components/admin/SyncContent";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { useSession } from "~/context/session";
@@ -145,6 +146,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <SyncContent />
 
       <SectionHeading id="moderation">Community moderation</SectionHeading>
       <h3 className="h3">

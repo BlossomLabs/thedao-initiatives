@@ -77,6 +77,22 @@ export interface SyncResult {
 }
 
 /** Upsert every file; bad files are reported and skipped, never blocking. */
+export const TERMS_FILE = "donation-terms.md";
+const TERMS_VERSION_RE = /^version:[ \t]*(\S+)[ \t]*\r?\n/i;
+
+/**
+ * content/donation-terms.md: the first line `version: YYYY-MM-DD` is the gate
+ * version (the donate widget re-asks whenever it changes); it is stripped from
+ * the body, which carries its own effective date.
+ */
+export function parseTermsFile(text: string): { version: string; body: string } {
+  const m = TERMS_VERSION_RE.exec(text);
+  if (!m) throw new Error("first line must be `version: <id>`");
+  const body = text.slice(m[0].length).trim();
+  if (!body) throw new Error("terms body is empty");
+  return { version: m[1].slice(0, 40), body };
+}
+
 export async function syncContent(
   db: Db,
   files: { name: string; text: string }[],
@@ -84,6 +100,18 @@ export async function syncContent(
   const out: SyncResult = { created: 0, updated: 0, errors: [] };
   for (const f of [...files].sort((a, b) => a.name.localeCompare(b.name))) {
     if (!f.name.endsWith(".md") || f.name === "README.md") continue;
+    if (f.name === TERMS_FILE) {
+      try {
+        const t = parseTermsFile(f.text);
+        const cur = await db.terms.get();
+        await db.terms.set(t.version, t.body);
+        if (cur) out.updated++;
+        else out.created++;
+      } catch (e) {
+        out.errors.push(`${f.name}: ${(e as Error).message}`);
+      }
+      continue;
+    }
     const slug = slugFromFilename(f.name);
     if (!slug) {
       out.errors.push(`${f.name}: filename makes an empty slug`);

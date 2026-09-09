@@ -1,7 +1,7 @@
 import { MessageSquare } from "lucide-react";
 import DonateWidget from "~/components/donate/DonateWidget";
 import type { InitiativePage } from "~/lib/api-types";
-import { GRIFF_X } from "~/data/site";
+import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
 
 export default function SideCards(
   { page, safeThreshold, onDonated }: {
@@ -52,8 +52,7 @@ export default function SideCards(
         <span className="k">Back this initiative</span>
         <p className="m-0 small dim">
           Companies can pledge instead of donating: you commit publicly now and pay only when the
-          work is completed and verified.{" "}
-          <a href={GRIFF_X} target="_blank" rel="noopener">DM @griffgreen</a>{" "}
+          work is completed and verified. Email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>{" "}
           and your name appears here.
         </p>
       </div>

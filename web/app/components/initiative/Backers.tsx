@@ -1,7 +1,7 @@
 import SectionHeading from "~/components/layout/SectionHeading";
 import type { Pledge } from "~/lib/api-types";
 import { usd } from "~/lib/format";
-import { GRIFF_X } from "~/data/site";
+import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
 import { cn } from "~/lib/utils";
 
 export default function Backers({ pledges }: { pledges: Pledge[] }) {
@@ -41,9 +41,8 @@ export default function Backers({ pledges }: { pledges: Pledge[] }) {
         )
         : (
           <p className="text-muted">
-            No backer pledges yet. Pledges pay only when the work is completed.{" "}
-            <a href={GRIFF_X} target="_blank" rel="noopener">DM @griffgreen</a>{" "}
-            to put your name on this initiative.
+            No backer pledges yet. Pledges pay only when the work is completed. Email{" "}
+            <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a> to put your name on this initiative.
           </p>
         )}
     </>

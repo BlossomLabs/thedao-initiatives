@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router";
 import { CreditCard, Landmark, Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useDonateParams } from "~/hooks/use-donate-params";
+import { api } from "~/lib/api";
 import type { DonateResult, Onramp } from "~/lib/api-types";
 import { parseUsd, tokenQty } from "~/lib/donate";
 import { shortAddr } from "~/lib/format";
@@ -11,8 +13,18 @@ import { Button } from "~/components/ui/Button";
 import { useDonation } from "./useDonation";
 import { WALLETCONNECT_PROJECT_ID } from "~/lib/wagmi";
 
-const CHIPS = ["50", "100", "500", "1000"];
+const CHIPS = ["50", "500", "5000", "50000"];
 type Method = "wallet" | "card" | "exchange";
+
+/** Acceptance is remembered per terms version; a version bump re-asks. */
+const termsKey = (version: string) => "thedao:terms:" + version;
+function readAccepted(version: string): boolean {
+  try {
+    return Boolean(version) && localStorage.getItem(termsKey(version)) === "1";
+  } catch {
+    return false;
+  }
+}
 
 /** The MVP's donate widget: chips, $ amount, token, wallet / card / exchange tabs. */
 export default function DonateWidget({
@@ -39,6 +51,39 @@ export default function DonateWidget({
   const [balances, setBalances] = useState<Record<string, number | null>>({});
   const [copied, setCopied] = useState(false);
   const [manualHash, setManualHash] = useState("");
+
+  // ---- donation terms gate: every method stays locked until the box is checked.
+  // Acceptance is logged server-side (anonymous, then once more with the wallet
+  // address when one connects) so the trail can bind acceptances to donors.
+  const termsVersion = params?.enabled ? params.termsVersion : "";
+  const [accepted, setAccepted] = useState(false);
+  const lastLogged = useRef<string | null>(null);
+  useEffect(() => {
+    setAccepted(readAccepted(termsVersion));
+  }, [termsVersion]);
+  useEffect(() => {
+    if (!accepted || !termsVersion) return;
+    const who = address ?? "";
+    if (lastLogged.current === who) return;
+    lastLogged.current = who;
+    void api("/api/terms/accept", {
+      json: { version: termsVersion, ...(address ? { address } : {}) },
+      token: null,
+    }).catch(() => {});
+  }, [accepted, termsVersion, address]);
+  const toggleTerms = (on: boolean) => {
+    setAccepted(on);
+    try {
+      if (on) localStorage.setItem(termsKey(termsVersion), "1");
+      else localStorage.removeItem(termsKey(termsVersion));
+    } catch { /* private mode: the gate still works for this page view */ }
+    if (!on) lastLogged.current = null;
+  };
+  const gated = () => {
+    if (accepted) return true;
+    d.setStatus({ kind: "err", text: "Please agree to the donation terms first." });
+    return false;
+  };
 
   const tokens = useMemo(() => (params?.enabled ? Object.keys(params.tokens) : []), [params]);
   useEffect(() => {
@@ -84,6 +129,7 @@ export default function DonateWidget({
   ];
 
   const copy = () => {
+    if (!gated()) return;
     navigator.clipboard.writeText(safeAddress).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -107,7 +153,7 @@ export default function DonateWidget({
             )}
             onClick={() => setAmount(c)}
           >
-            ${c}
+            ${Number(c).toLocaleString("en-US")}
           </button>
         ))}
       </div>
@@ -117,7 +163,7 @@ export default function DonateWidget({
           <input
             className="min-w-0 flex-1 bg-transparent py-2.5 pl-1 pr-3.5 font-inter-tight text-[14px] font-light text-white outline-none placeholder:text-white/35"
             inputMode="decimal"
-            placeholder="Custom amount"
+            placeholder="Custom amount ($1 minimum)"
             aria-label="Amount in US dollars"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -140,6 +186,21 @@ export default function DonateWidget({
         </select>
       </div>
       {conv && <p className="-mt-0.5 ml-0.5 m-0 small dim">{conv}</p>}
+
+      <label className="my-0.5 flex cursor-pointer items-center gap-2 small text-soft">
+        <input
+          type="checkbox"
+          className="m-0 size-4 flex-none accent-dao-green"
+          checked={accepted}
+          onChange={(e) => toggleTerms(e.target.checked)}
+        />
+        <span>
+          I agree to the{" "}
+          <Link to="/donation-terms" target="_blank" rel="noopener" className="underline">
+            donation terms
+          </Link>
+        </span>
+      </label>
 
       <div
         className="flex gap-1.5 rounded-[14px] border border-edge bg-white/[.03] p-1"
@@ -167,8 +228,8 @@ export default function DonateWidget({
       {method === "wallet" && (
         <Button
           variant="primary"
-          onClick={() => d.donate(symbol, amount, balances)}
-          disabled={Boolean(d.busy)}
+          onClick={() => gated() && d.donate(symbol, amount, balances)}
+          disabled={Boolean(d.busy) || !accepted}
         >
           {d.busy ?? "Donate"}
         </Button>
@@ -181,12 +242,13 @@ export default function DonateWidget({
             shows up here automatically once it lands.
           </p>
           <a
-            className="btn btn-primary"
+            className={cn("btn btn-primary", !accepted && "pointer-events-none opacity-40")}
             href={onramp.url.replace("{AMT}", encodeURIComponent(amount || "100"))}
             target="_blank"
             rel="noopener"
-            onClick={() =>
-              d.setStatus({
+            aria-disabled={!accepted}
+            onClick={(e) =>
+              !gated() ? e.preventDefault() : d.setStatus({
                 kind: "wait",
                 text:
                   "Card checkout opened in a new tab. Your donation appears here automatically once the USDC arrives (typically a few minutes after the purchase).",
@@ -207,10 +269,19 @@ export default function DonateWidget({
               : ""}.
           </p>
           <div className="flex items-center gap-2 rounded-[14px] border border-edge bg-black/15 px-3 py-2">
-            <span className="mono min-w-0 flex-1 text-[11.5px] [overflow-wrap:anywhere]">
-              {safeAddress}
+            <span
+              className="mono min-w-0 flex-1 text-[11.5px] [overflow-wrap:anywhere]"
+              data-address={safeAddress}
+            >
+              {accepted ? safeAddress : "0x····…····"}
             </span>
-            <Button variant="ghost" sm className="m-0 flex-none" onClick={copy}>
+            <Button
+              variant="ghost"
+              sm
+              className="m-0 flex-none"
+              onClick={copy}
+              disabled={!accepted}
+            >
               {copied ? "Copied ✓" : "Copy"}
             </Button>
           </div>

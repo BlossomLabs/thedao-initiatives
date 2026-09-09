@@ -132,8 +132,27 @@ export type DonateParams =
     rates: Record<string, number>;
     minTokenUnits: number;
     minEth: number;
+    /** Donation-terms gate version ("" until the terms are synced). */
+    termsVersion: string;
   }
   | { enabled: false; reason: string };
+
+export interface DonationTerms {
+  version: string;
+  body: string;
+}
+
+export interface FunderLead {
+  id: string;
+  title: string;
+  slug: string;
+  type: InitiativeType;
+  status: string;
+  goalUsd: number;
+  funders: string;
+  contact: string;
+  createdAt: number;
+}
 
 export interface DonateResult {
   status: "confirmed" | "pending" | "failed" | "error";

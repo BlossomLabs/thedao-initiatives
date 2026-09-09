@@ -30,9 +30,12 @@ remote API.
 - `/initiative/:slug` (funding, summary, markdown details, comments, backers,
   donations, donate/discuss/back/next side cards); `/rfp/:slug` redirects
 - `/submit`, `/submit/thanks`
-- `/admin` (SIWE-gated), `/admin/dashboard`, `/admin/initiatives/:id`
+- `/donation-terms` (content/donation-terms.md, synced into the API; the donate widget's
+  terms gate links here)
+- `/admin` (SIWE-gated), `/admin/dashboard`, `/admin/initiatives/:id`, `/admin/leads`
+  (private funder leads + CSV)
 
-`/`, `/submit`, `/submit/thanks` and `/admin` are prerendered; everything else
+`/`, `/submit`, `/submit/thanks`, `/donation-terms` and `/admin` are prerendered; everything else
 is served from the SPA fallback by `server.ts`. `/api/*` and `/healthz` go to the Hono app.
 
 ## Wallet and sign-in

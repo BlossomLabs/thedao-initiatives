@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { Bell } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
 import SectionHeading from "~/components/layout/SectionHeading";
-import { StatusChip } from "~/components/ui/Badge";
+import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { useSession } from "~/context/session";
 import { api } from "~/lib/api";
@@ -77,7 +77,17 @@ export default function Dashboard() {
             </a>
           )}
         </h1>
-        <Button variant="ghost" sm onClick={() => void signOut()}>Log out</Button>
+        <div className="flex items-center gap-2.5">
+          <LinkButton
+            variant="ghost"
+            sm
+            to="/admin/leads"
+            title="Who is likely to fund each initiative (private)"
+          >
+            Funder leads
+          </LinkButton>
+          <Button variant="ghost" sm onClick={() => void signOut()}>Log out</Button>
+        </div>
       </div>
 
       <div className="mt-3.5 grid grid-cols-3 gap-3 max-[860px]:grid-cols-1">
@@ -294,7 +304,7 @@ export default function Dashboard() {
               <th>Title</th>
               <th className="amt">Goal</th>
               <th className="amt">Raised</th>
-              <th>Created</th>
+              <th>Contact</th>
               <th>Safe sync</th>
               <th></th>
             </tr>
@@ -302,8 +312,8 @@ export default function Dashboard() {
           <tbody>
             {data.rows.map(({ initiative: r, summary, safeSync }) => (
               <tr key={r.id}>
-                <td>
-                  <StatusChip status={r.status} />
+                <td className="whitespace-nowrap">
+                  <StatusChip status={r.status} /> <TypeBadge type={r.type} inline />
                   {r.sortRank
                     ? <span title={`Pinned to board position ${r.sortRank}`}>📌{r.sortRank}</span>
                     : null}
@@ -311,7 +321,7 @@ export default function Dashboard() {
                 <td>{r.title}</td>
                 <td className="amt">{usd(r.goalUsd)}</td>
                 <td className="amt">{usd(summary.total)}</td>
-                <td>{dt(r.createdAt)}</td>
+                <td className="small [overflow-wrap:anywhere]">{r.contact || "–"}</td>
                 <td className="small">
                   {!r.safeAddress
                     ? <span className="dim">no Safe</span>

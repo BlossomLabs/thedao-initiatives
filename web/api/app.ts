@@ -15,6 +15,7 @@ import { commentRoutes } from "./routes/comments.ts";
 import { aiRoutes } from "./routes/ai.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { healthRoutes } from "./routes/health.ts";
+import { termsRoutes } from "./routes/terms.ts";
 import { createSiteLock, type SiteLock } from "./lib/sitelock.ts";
 
 /** The lock is shared with the static server so one gate covers the whole site. */
@@ -55,6 +56,7 @@ export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
   app.route("/api/board", boardRoutes(deps));
   app.route("/api/initiatives", initiativeRoutes(deps));
   app.route("/api/donate", donateRoutes(deps));
+  app.route("/api/terms", termsRoutes(deps));
   app.route("/api", profileRoutes(deps));
   app.route("/api", commentRoutes(deps));
   app.route("/api", aiRoutes(deps));

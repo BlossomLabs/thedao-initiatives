@@ -1,5 +1,6 @@
 /**
- * Push content/rfps/*.md to a running API (push-based content sync).
+ * Push content/rfps/*.md and content/donation-terms.md to a running API
+ * (push-based content sync).
  *
  *   ADMIN_TOKEN=... deno task sync-content
  *   ADMIN_PRIVATE_KEY=0x... deno task sync-content      (logs in first)
@@ -33,6 +34,10 @@ for await (const e of Deno.readDir(dir)) {
     });
   }
 }
+try {
+  const terms = `${dir.replace(/\/+$/, "")}/../donation-terms.md`;
+  files.push({ name: "donation-terms.md", text: await Deno.readTextFile(terms) });
+} catch { /* no terms file next to content/rfps: nothing to push */ }
 console.error(`syncing ${files.length} file(s) from ${dir} to ${apiUrl}`);
 const res = await fetch(apiUrl + "/api/admin/sync-content", {
   method: "POST",

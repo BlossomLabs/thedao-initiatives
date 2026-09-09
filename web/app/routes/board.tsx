@@ -17,6 +17,8 @@ export function meta() {
   return generateMeta({ url: "/" });
 }
 
+const SUGGEST_LAST_FROM = 20;
+
 export default function Board() {
   const { data, isLoading, isError } = useBoard();
   const qc = useQueryClient();
@@ -53,6 +55,8 @@ export default function Board() {
         )}
         {data && (
           <div className="grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
+            {/* Under 20 approved initiatives the suggest card leads the grid (Griff, Sep 2026). */}
+            {cards.length < SUGGEST_LAST_FROM && <SuggestCard />}
             {cards.map((c, i) => (
               <InitiativeCard
                 key={c.initiative.id}
@@ -64,7 +68,9 @@ export default function Board() {
                 style={{ animationDelay: `${i * 60}ms` }}
               />
             ))}
-            <SuggestCard style={{ animationDelay: `${cards.length * 60}ms` }} />
+            {cards.length >= SUGGEST_LAST_FROM && (
+              <SuggestCard style={{ animationDelay: `${cards.length * 60}ms` }} />
+            )}
           </div>
         )}
         <PledgeBand />

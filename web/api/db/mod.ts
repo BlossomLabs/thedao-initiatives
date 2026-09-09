@@ -6,6 +6,7 @@ import { profilesRepo } from "./profiles.ts";
 import { sessionsRepo } from "./sessions.ts";
 import { rateLimiter } from "./ratelimit.ts";
 import { metaRepo } from "./meta.ts";
+import { termsRepo } from "./terms.ts";
 
 export type * from "./types.ts";
 
@@ -22,6 +23,7 @@ export function createDb(kv: Deno.Kv, now: () => number = () => Date.now() / 100
     profiles: profilesRepo(kv, now),
     sessions: sessionsRepo(kv, now),
     meta: metaRepo(kv, now),
+    terms: termsRepo(kv, now),
     rateLimit: rateLimiter(kv, now),
     /** pledged + donated totals for an initiative. */
     async fundingSummary(rfpId: string) {

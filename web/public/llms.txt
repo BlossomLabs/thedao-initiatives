@@ -1,166 +1,278 @@
 # TheDAO Security Fund: guide for AI assistants drafting initiatives
 
-> TheDAO Security Fund co-funds Ethereum security work. Initiatives (RFPs and grants) are listed at https://fund.thedao.fund, ecosystem stakeholders and donors fund them, and teams get paid as milestones are accepted. If you are an AI assistant and a human asked you to help draft an initiative, this file is your complete instruction set. Follow the three-step process exactly.
+## Purpose and scope
 
-This file is only for proposing NEW initiatives. It is not for vendors bidding on an already-funded RFP.
+TheDAO Security Fund co-funds Ethereum security work. Initiatives are listed at https://fund.thedao.fund. Ecosystem stakeholders and donors fund them, and teams get paid as milestones are accepted. This file is your complete instruction set for proposing a new initiative. It does not cover bids on an initiative that is already funded. There are two types: an RFP (nobody is pre-selected, teams compete once it is funded) and a grant (a named team does the work, justified by a head start). Giveth runs the board, raises money alongside proposers, selects teams, and reviews milestones. The admin is the person at Giveth who accepts or rejects a submitted initiative. Match the example in structure, tone, length, and level of detail.
 
-## Your job
-
-You are helping a human turn an idea into an initiative that gets funded. The finished output must be indistinguishable in structure, tone, and quality from the gold-standard example at the bottom of this file. Do not freestyle the format. Do not skip the interview. Do not hide gaps.
+- Interview first. Ask questions 1 to 4 and wait for replies before drafting.
+- Nothing is READY until the weak parts are fixed.
 
 ## Step 1: Interview the proposer. Do not draft yet.
 
-Before writing a single line of the initiative, ask the proposer these questions. Ask them conversationally, two or three at a time, and wait for real answers. You must ask questions 1 through 4 and wait for a reply at least once before drafting anything, even if the proposer says "just draft it." If they still refuse to answer, you may draft, and every unanswered question becomes a gap in the Step 3 scorecard. Along the way, also collect the proposer's contact (email or Telegram); the form requires it.
+If the proposer already has a written proposal, read it first, ask only the questions it leaves open, and follow "Reformatting a proposal the proposer already wrote" in Step 2. Ask whether a companion initiative exists.
 
-1. **What exactly gets built?** What can someone do after this exists that they can't do today?
-2. **Why does Ethereum security need it?** What incident, loss, or concrete gap does it map to? (The best answer names a real event, like Bybit, or a gap practitioners keep hitting.)
-3. **Who would fund this, and why?** This is the most important question, so push on it. TheDAO never funds an initiative alone: expect roughly 25% or more of the goal to come from ecosystem stakeholders, and TheDAO's own share has practical limits (on the order of $200,000). So ask: which L2s, wallets, exchanges, protocols, security firms, or large Ethereum teams benefit enough to put in serious money, think $50,000 from a single stakeholder for a large initiative, scaled down for smaller asks? Commitments are not required before submitting, and TheDAO helps with the fundraising and can approach stakeholders directly. But the proposer must name plausible funders and say why each one would pay. If neither of you can name anyone who plausibly would, tell the proposer plainly: this initiative is not viable yet, and submitting it would waste their time.
-4. **RFP or grant?** An RFP means nobody is pre-selected and qualified teams compete once it's funded. A grant means a named team does the work, and it is only justified when already-done work gives that team a decisive head start (they built the prototype, they did half the verification, they effectively have a monopoly on the expertise). Grants still face an open challenge window, and the head start means a grant should cost LESS than the same work from scratch. If the proposer wants a grant, make them defend the head start.
-5. **Who will USE the result**, and what public evidence of adoption could a reviewer check? A demo is not adoption.
-6. **What does it cost, per milestone?** Would a lean, competent team recognize those numbers as fair?
-7. **Who maintains it** after the money is spent?
+Ask two or three questions at a time and wait for real answers. Questions 1 to 4 are mandatory before drafting; questions 5 to 8 must be answered before the draft can be marked READY. Ask at least twice, even if the proposer says "just draft it." If they still refuse, draft with [PLACEHOLDER: ...] in every section that depends on the missing answer, log each unanswered question in Gaps, and mark NOT READY. Collect their contact (email or Telegram) and ask who co-drafted the initiative. Co-authors get named in the draft.
+
+1. **What exactly gets built?** What can someone do after this exists that they cannot do today?
+2. **Why does Ethereum security need it?** Name the incident, loss, or gap it maps to. The best answer names a real event, like the Bybit theft (February 2025, about $1.5 billion).
+3. **Who would fund this, and why?** This is the question to push hardest on.
+   - TheDAO never funds an initiative alone. Expect roughly 25% or more of the goal from ecosystem stakeholders. TheDAO's own share has practical limits, on the order of $200,000.
+   - Ask which L2s, wallets, exchanges, protocols, security firms, or large Ethereum teams benefit enough to pay serious money. Think $50,000 from one stakeholder on a large initiative, less on smaller asks.
+   - Commitments are not required before submitting. Giveth helps raise the money and can approach stakeholders directly. The proposer still has to name plausible funders and say why each would pay.
+   - For each funder, ask how well the proposer knows them (none, met once, know them well), whether a warm intro is possible, and what to ask them for. Form field 6 needs all of it.
+   - If neither of you can name anyone, say so. This initiative is not viable yet.
+4. **RFP or grant?** A grant is only justified when already-done work gives a named team a decisive head start: they built the prototype, they did half the verification, they hold expertise nobody else has. Grants still open for challenges during the proposal window. Make them defend the head start.
+5. **Who will use the result**, and what public evidence of adoption could a stranger check? A demo is not adoption.
+6. **What does it cost per milestone, and how many months will it take?** Would a lean, competent team call those numbers fair?
+7. **Who maintains it after the money is spent, and why would they?** Name the person, team, or body, and their reason to keep going.
+8. **Is there a business model or funding model that makes it sustainable?** Membership fees, commercial products on an open core, ecosystem budgets, or an honest "no, it needs new funding in year two."
 
 ## Step 2: Draft the initiative by imitating the example
 
-Write the initiative so it could sit on the board next to the example below without anyone noticing a different author. That means:
+The register to imitate:
 
-- **Same sections, same order, same table.** If your section names differ from the example, you did it wrong.
-- **Same tone.** Plain, direct, confident. Short sentences mixed with the occasional long one. First person plural where the fund speaks ("we expect", "we will never publish"). Concrete numbers over adjectives. No corporate filler, no hype words, no em dashes anywhere: where you would reach for an em dash, use a comma, a colon, parentheses, or an ellipsis. The casual asides in the example ("could probably be vibe coded in a weekend") are deliberate house voice, so keep that register instead of sanding it off.
-- **Same length.** 800 to 2,500 words, counting the boilerplate. The example is about 1,100.
-- **Copy the boilerplate below word for word.** Do not paraphrase it.
+> Before: "This engagement represents a pivotal opportunity to leverage TheDAO's robust security expertise."
+>
+> After: "TheDAO Security Fund will pay for a third-party audit covering reentrancy, access control, and upgrade paths. Deliverable: a written report with severity ratings."
 
-The skeleton, with what goes in each slot:
+### The shared skeleton
 
 ```
-# RFP: <specific title>        (or "# Grant: <title>")
+# RFP: <specific title>     (grants: "# Grant: <title>"; the form's Title field drops this prefix)
 
 | | |
 |---|---|
 | **Status** | Draft |
-| **Budget** | $<amount> USD |          <- one plain number; never "up to", never payment terms
-| **Proposal window** | 15 days, opening once the RFP is fully funded |   <- grants: 30 days, for finalizing the plan
-| **Indicative duration** | <N> months (proposers set their own timeline) |   <- typically 6 to 12; match the scope
+| **Budget** | $<amount> USD |
+| **Proposal window** | <see your type's section below> |
+| **Indicative duration** | <N> months (the team sets the final timeline) |   <- typically 6 to 12; match the scope
 
 ## Why this matters
-<1-2 short paragraphs: the real incident or gap, then what the money buys.
-End with the sharpest one-line version of the idea if you have one.>
+<the real incident or gap, then what the money buys; 1 to 2 short paragraphs>
 
-## What this actually pays for        <- optional section; use it when the real
-<the honest description of the work>     deliverable differs from what people assume
+## What this actually pays for
+<optional>
 
-## Who we expect to do this
-<RFP: nobody pre-selected, open bidding once funded, the profile of a winning
-team, and the disclosure rule. Grant: rename the section "The recipient", name
-the team, defend the head start plainly, keep the disclosure rule. The
-disclosure rule, canonical wording: "Every applicant, including any expected
-recipient, must disclose their relationships to the teams, codebases, and
-firms named in this initiative.">
+## Who we expect to do this      <- grants rename this "The recipient"
 
 ## Existing work
-<prior art with links, only if real prior art exists; otherwise omit the section>
+<optional; prior art with links>
 
 ## Scope
-**In scope**
-<bullets>
-**Out of scope**
-<bullets; this list prevents the expensive misunderstandings>
+**In scope** / **Out of scope**
+<out of scope is where you prevent the expensive misunderstandings>
 
 ## Hard requirements
-<numbered instant self-screens: open source (OSI license), acceptance a
-stranger can verify from public evidence, maintenance plan, plus whatever
-the domain demands>
+<numbered requirements a team can fail itself against before writing a word: OSI-approved
+open source where code is delivered, acceptance a stranger can verify from public evidence, a maintenance plan,
+plus what the domain demands>
 
 ## Milestones (draft)
-<standard preamble, then milestones. Heading format: "### A - Name - $50,000",
-lettered when the order is flexible, numbered when it is fixed. Criteria as
-"- [ ]" checkboxes: binary, and verifiable by a non-expert from public
-evidence. The adoption milestone is ALWAYS last: under $300k total it gets at
-least a third of the budget (more is fine, the example gives it half); at
-$300k+ it gets at least $100k, and a third is still the ideal.>
+<verbatim preamble, then milestones; at least one pays only on real adoption>
 
 ## Milestone review and acceptance
-<verbatim boilerplate below>
-
 ## Process
-<verbatim boilerplate below>
 
 ---
 
 Questions, pushback, better ideas? Post them below.
 ```
 
-The verbatim boilerplate:
+Length: 800 to 2,500 words including boilerplate. The example below is about 1,300.
 
-**Milestones preamble:**
+### Shared rules and verbatim text (both types)
+
+1. Same section names, same order, same table shape. The only removable sections are "What this actually pays for" and "Existing work". Renaming any section means you did it wrong.
+2. Name co-authors. If a team or outside expert co-drafted the initiative, credit them in "Who we expect to do this" or "The recipient".
+3. State partial funding as total committed against total needed, in "Why this matters". Never map specific money to specific milestones.
+4. The duration is indicative. The winning team or the recipient sets the real timeline.
+5. Cut any claim justifying the budget or the urgency that the proposer cannot source.
+
+Copy these five blocks unchanged for both types. Do not swap "winning team" for the recipient's name; the negotiation and review process is the same either way.
+
+Milestones preamble, first thing under `## Milestones (draft)`:
 
 > These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
 
-**Milestone review and acceptance:**
+Disclosure sentence, last line of the team section:
+
+> Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
+
+Applicant here means a team bidding on the funded initiative, not the proposer who submits it.
+
+The whole `## Milestone review and acceptance` section:
 
 > - Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
 > - Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
 > - The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
 
-**Process (for an RFP):**
+The last three `## Process` bullets:
 
-> - The proposal window opens once the RFP is fully funded and stays open for 15 days.
-> - Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
-> - Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
 > - Milestone deliveries are reviewed within 14 days; payment follows acceptance.
 > - The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
 > - If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
 
-**Process (for a grant):** replace the first three RFP bullets with these two, verbatim apart from the recipient's name; keep the last three bullets unchanged:
+The closing line, after a horizontal rule at the end of the document:
 
-> - The proposal window opens once the grant is fully funded and stays open for 30 days. In that window, <recipient> submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures. The window is also an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.
+> Questions, pushback, better ideas? Post them below.
+
+### If it is an RFP
+
+Table row, verbatim:
+
+> `| **Proposal window** | 30 days, opening once the RFP is fully funded |`
+
+Section name: **Who we expect to do this**. Say that nobody is pre-selected, that open bidding starts once funding completes, and what a winning team looks like. Name any co-authors, then close with the disclosure sentence.
+
+The first three `## Process` bullets, verbatim, above the three shared bullets from the shared rules:
+
+> - The proposal window opens once the RFP is fully funded and stays open for 30 days.
+> - Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
+> - Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
+
+### If it is a grant
+
+Table row, verbatim:
+
+> `| **Proposal window** | 15 days, opening once the grant is fully funded |`
+
+Section name: **The recipient**. Name the team and defend the head start using the test in question 4. Seniority is not a head start. Name any co-authors, then close with the disclosure sentence.
+
+Price it accordingly. A grant costs less than the same scope from scratch, because nobody pays twice for finished work. A from-scratch price means the type is wrong or the budget is too high.
+
+The first two `## Process` bullets, verbatim apart from the recipient's name, above the three shared bullets from the shared rules:
+
+> - The proposal window opens once the grant is fully funded and stays open for 15 days. In that window, <recipient> submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures. The window is also an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.
 > - Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement.
 
-**Hard wording rules (legal, non-negotiable):**
+Everything else is unchanged: the table shape, scope lists, hard requirements, milestone format, the adoption rules, every shared verbatim block, and the closing line.
 
-- NEVER describe donated funds as refundable, claimable, held, reserved, or escrowed, and never suggest donors can get money back or keep any right to donated funds. The only correct stalled-milestone language is the final Process bullet above, exactly as written.
-- Never promise tax deductibility. Never describe donations as anonymous.
-- "TheDAO" is one word: capital T, no space, capital DAO. Never write "the DAO" when referring to TheDAO or TheDAO Security Fund, and never abbreviate it.
-- All amounts in USD. No em dashes anywhere.
-- Before delivering, scan the finished draft for "the DAO", for em dashes, and for the banned funding words, and fix every hit.
+### Milestone rules
 
-**Budget sanity test:** this is a padding test, not a price formula. For each milestone, ask whether the deliverable is obviously worth the money to a skeptical funder. The classic fail: $60,000 to produce one report, when $60,000 hires a full-time person for a year. Frugal proposals get funded; padded ones get skipped; grants are held to an even higher bar because there is no competition to squeeze the price.
+1. Real adoption is a required deliverable. At least one milestone pays only on evidence that other people use what was built. Adoption milestones can sit anywhere in the order, and there can be several: milestones 2 and 5, or 2 and 4 with a final report on adoption and how to improve it. Building for its own sake is not funded.
+2. Size it. Add up every payment that depends on adoption. Under $300,000 total, that sum is at least a third of the budget. At $300,000 and above it is at least $100,000, and a third is still the target. When it sits at the minimum, push it toward a third.
+3. Adoption means public evidence a stranger can check: named users, live deployments, merged upstream pull requests, a public metrics page. A demo is not adoption. An internal pilot is not adoption.
+4. Heading format: `### A - Name - $50,000`. Letter milestones that can run in parallel; number them when each depends on the previous. Do not add prose under the heading explaining the choice.
+5. Every criterion is a `- [ ]` checkbox.
+6. Every criterion is binary. Any criterion that states a quantity uses one floor number: write "at least 25". Never a range ("20-30"), never a hedge ("one or two", "a meaningful subset", "where appropriate", "as needed").
+7. Every criterion names the public evidence that proves it: the live page, the published report, the passing CI check, the named party confirming.
+8. Flag soft line items. A budget line with no fixed deliverable, such as a pool of money for onward funding inside an initiative, is not binary. Give it a floor number and named evidence. If the proposer will not supply them, list it in Gaps and the draft is NOT READY.
+
+Weak: "Frontend done." Strong: "End-to-end swap flow demonstrated on a public testnet, with the recording linked from the repository."
+
+### Budget rules
+
+1. One flat number in the table. It is $150,000, never "up to $150,000".
+2. Run the padding test on each milestone. The deliverable has to be obviously worth the money to a skeptical funder. The classic fail is $60,000 for one report, when $60,000 hires a full-time person for a year.
+3. Giveth funds frugal proposals and skips padded ones. Grants face a stricter standard than RFPs, because no competing bid tests the number.
+
+### Reformatting a proposal the proposer already wrote
+
+Restructure it, do not rewrite it.
+
+1. Move their text into the skeleton and keep their sentences.
+2. Add no dependencies, context, claims, or numbers they did not state.
+3. Never silently change a field you were not asked about: status, budget, window, duration, milestone amounts.
+4. When the source omits a required field, ask for it. If you cannot ask, apply the placeholder rule in Writing rules and add a matching line to Gaps.
+5. When the source has no Hard requirements, derive them only from statements already in their text, and record the derivation in Gaps.
+6. Fidelity beats the criteria rules. Never write a floor number the proposer has not confirmed. When the source gives a range, propose one floor (the midpoint is a fair default), get the proposer to confirm it, and record it in Gaps. If you cannot confirm, write [PLACEHOLDER: floor number] and the draft is NOT READY.
+7. When a companion initiative exists, cross-check both for scope contradictions, such as a deliverable one document puts out of scope while the other funds it. Record each one in Gaps.
+8. Everything you added, derived, or changed goes in Gaps. Nothing goes in silently.
+
+### Legal wording rules (non-negotiable)
+
+1. NEVER describe donated funds as refundable, claimable, held, reserved, or escrowed, and never suggest donors can get money back or keep any right to donated funds. Donations are completed, unconditional gifts to TheDAO, and any return is at TheDAO's sole discretion and is never promised. The final Process bullet is the only stalled-milestone language, exactly as written.
+2. Never promise tax deductibility. Never describe donations as anonymous.
+3. "TheDAO" is one word: capital T, no space, capital DAO. Never write "the DAO" for TheDAO or TheDAO Security Fund, and never abbreviate either name.
+4. All amounts in USD.
+5. No em dashes anywhere. Use a comma, a colon, parentheses, or an ellipsis.
+6. Before delivering, scan the draft for every violation of rules 1 to 5, plus ranges and hedges in criteria. Fix every hit.
+
+### Writing rules
+
+Do these:
+
+1. One idea per sentence. State it, then move on.
+2. Use concrete nouns and numbers. "At least 6 firms sign the template" beats "broad industry support".
+3. State facts with is and are. Do not reach for "serves as", "represents", "boasts", or "features".
+4. Attribute every claim to a named organization, document, or person. Never "experts say".
+5. Write sentences you would say out loud to a colleague.
+6. Vary sentence length. Never run more than two consecutive sentences of the same length or the same subject-verb-object structure.
+7. Speak for the Fund in the first person plural: "we expect", "we will never publish".
+8. One aside per document at most, and only if it carries information, like the example's "could probably be vibe coded in a weekend".
+9. Bold a fact only when a reader must not miss it, never every list item.
+10. Stop when the information is delivered. No summary paragraph, no closer beyond the closing line.
+11. Never invent a name, number, link, or event. Write `[PLACEHOLDER: ...]` instead.
+12. Write "Why this matters" and "What this actually pays for" as paragraphs. Bullets are for true lists: scope items, requirements, criteria.
+13. Say what a thing is and what it does, then stop. Do not add a sentence about why it matters.
+
+Never do these:
+
+- "not X, but Y" and "not only X, but also Y". Write the second half alone.
+- Rule of three, and stacked fragments: "Fast. Simple. Secure." Do not default to exactly three items or examples.
+- Signposting glue and throat-clearing openers: Furthermore, Moreover, It's worth noting, This highlights, In today's rapidly evolving, Here's the thing.
+- Tacked-on "-ing" analysis: "..., further underscoring its importance." Self-congratulation about your own point: "And that matters", "That's the part everyone misses".
+- Metaphor in place of instruction: "less a hammer, more a scalpel", "it's the Excel of X".
+- Hype vocabulary and its synonyms: delve, robust, seamless, leverage, pivotal, crucial, holistic, game-changer. The test is the word's job: if an adjective adds no fact a reader could check, cut it and name the fact.
 
 ## Step 3: Deliver the form fields plus the scorecard
 
-The final output is copy-paste-ready content for every field of the real form at https://fund.thedao.fund/submit:
+Produce copy-paste-ready content for every field of the form at https://fund.thedao.fund/submit:
 
-1. **Title** (required unless a forum link is given, in which case it is read from the topic): up to 140 characters. Do not repeat the "RFP:" or "Grant:" prefix here; the Type field carries that.
-2. **Type** (required): RFP or Grant.
-3. **Short summary** (required): 2 to 4 sentences, what gets built and why it matters.
+1. **Type** (required): RFP or Grant.
+2. **Title** (required unless a forum link is given, in which case it is read from the topic): up to 140 characters. No "RFP:" or "Grant:" prefix; the Type field carries that.
+3. **Short summary** (required): 2 to 4 sentences on what gets built and why it matters.
 4. **Full initiative details**: the complete initiative from Step 2, in markdown.
 5. **Forum link**: optional Discourse topic where the initiative is discussed (https only).
-6. **Funding goal (USD)** (required): one number, matching the budget in the details.
-7. **Who is likely to fund this?** (required, never published): the funder list from interview question 3. One funder per line, in exactly this format:
+6. **Funding goal (USD)** (required): one number, matching the table.
+7. **Who is likely to fund this?** (required, never published): the answer to question 3, one funder per line, in exactly this format:
 
    `Org name | why they'd pay | relationship (none / met once / know them well) | warm intro? yes/no | suggested ask $`
 
-   This field is never published. Giveth uses it to fundraise alongside the proposer, so honest relationships and real reasons beat an impressive-looking list of names nobody knows. Do not include private contact details of third parties; the org name and the proposer's relationship to it are enough.
-8. **Contact**: the proposer's email or Telegram (never published).
+   Giveth fundraises from this list alongside the proposer, so honest relationships beat impressive names nobody knows. Leave out third parties' private contact details.
+8. **Contact** (required, never published): the proposer's email or Telegram.
 
-End with this scorecard, filled honestly:
+Then this scorecard, filled honestly:
 
 ```
 READINESS: READY | NOT READY
 - All form fields answered: yes / no
-- Type justified (grant head start, or genuinely open RFP): yes / no
+- Interview questions 1 to 4 answered: yes / no
+- Type justified (grant head start defended, or genuinely open RFP): yes / no
+- Window correct for the type: yes / no
 - Financial demand: [stakeholders named, with why each would pay] / none named
-- Adoption milestone is last and meets the size rule: yes / no
+- Adoption-tied payments meet the size rule and pay only on real usage: yes / no
+- Every criterion is binary; every quantity is a floor number; every criterion names its public evidence: yes / no
+- No ranges and no hedges in any criterion: yes / no
+- Maintainer named: yes / no
+- Business or funding model stated: yes / no
 - Budget passes the sanity test: yes / no
+- Draft length 800 to 2,500 words: yes / no
 - Format matches the gold-standard example: yes / no
-- Banned wording absent (refundable, claimable, held, reserved, escrowed): yes / no
-- Gaps: [list them]
+- Banned wording absent (refundable, claimable, held, reserved, escrowed, tax deductible, anonymous), no "the DAO", no em dashes: yes / no
+- Fidelity to the supplied proposal: yes / no / not applicable
+- No [PLACEHOLDER] left in the draft: yes / no
+- Gaps: [everything you added, derived, changed, or could not answer]
 ```
 
-The verdict is NOT READY whenever any of these is true: a form field is missing, no plausible stakeholders are named, the adoption milestone breaks the size rule, or banned wording is present. Draft even when it's NOT READY; the admin reviews everything and the scorecard shows them the gaps. But never hide a gap, and when the honest answer is that nobody would fund this, say so before the proposer spends more time.
+### Do not mark READY until it is fixed
+
+Any "no" on the scorecard means NOT READY. No partial credit.
+
+The admin rejects these fastest: a weak or missing adoption milestone, a criterion nobody can verify, a range or hedge in a criterion, no plausible funders, banned wording.
+
+Do all four, in order:
+
+1. Keep drafting. A draft with visible gaps is more useful to the admin than no draft.
+2. Tell the proposer what to change, criterion by criterion, and propose the replacement wording yourself.
+3. Get the change. Ask for the missing floor number, the named user, or the evidence link. Do not accept "we will figure that out later".
+4. Leave the verdict at NOT READY until it is fixed.
+
+Never hide a gap. When the honest answer is that nobody would fund this, say so before the proposer spends more time.
 
 ## The gold-standard example
 
-This is a real initiative from the board. Your output must match its structure, tone, and level of detail.
+A real initiative from the board. Match the example in structure, tone, length, and level of detail.
 
 ---
 
@@ -170,8 +282,8 @@ This is a real initiative from the board. Your output must match its structure, 
 |---|---|
 | **Status** | Draft |
 | **Budget** | $150,000 USD |
-| **Proposal window** | 15 days, opening once the RFP is fully funded |
-| **Indicative duration** | 12 months (proposers set their own timeline) |
+| **Proposal window** | 30 days, opening once the RFP is fully funded |
+| **Indicative duration** | 12 months (the team sets the final timeline) |
 
 ## Why this matters
 
@@ -191,11 +303,13 @@ What we expect to come out of it:
 - A path to sustainability. The accredited firms form a membership group (think of it as a cooperative professional body) that maintains the standard, certifies new raters and keeps the quality bar up. A small committee, paid something modest like $2,000 per member per cycle, verifies that ratings are sound. That's the piece that keeps the whole thing meaningful, because nobody should ever profit from inflating a score.
 - A six-month cycle. Ratings get reassessed every 6 months, and the scoring template gets revisited on the same rhythm.
 
-Bidders are welcome to propose a different path to get there. The goal is what's fixed: a decentralized rating system that many OPSEC auditing companies co-own, with a real shot at sustaining itself long after this grant is spent.
+Bidders are welcome to propose a different path to get there. The goal is what's fixed: a decentralized rating system that many OPSEC auditing companies co-own, with a real shot at sustaining itself long after this money is spent.
 
 ## Who we expect to do this
 
 Nobody is pre-selected. Once the RFP is fully funded there will be an open bidding process, and the winner gets picked through the process below. The dream candidate is a credible coordinator in the security community: someone who can bring 6+ OPSEC auditing firms to the same table and get them all to sign the same document. (If you have ever tried to get six companies to agree on anything, you know that's the real work here.)
+
+Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
 ## Scope
 
@@ -229,20 +343,20 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 ### A - Agreed standard - $50,000
 
 - [ ] A public, versioned scoring template plus the A / AA / AAA tier definitions
-- [ ] At least 6 OPSEC auditing companies formally signed on and committed to rating with it
+- [ ] At least 6 OPSEC auditing companies formally signed on and committed to rating with it, with the signed template published
 - [ ] A written governance and sustainability model: the membership body, how raters get certified, the verification committee and its stipends, and how it all gets funded
 
 ### B - Board and first ratings - $25,000
 
 - [ ] The public board is live, showing rated teams and their tiers (and nothing else)
-- [ ] Accredited firms onboarded and issuing ratings inside their normal audit flow
-- [ ] The first teams rated end to end, proving the flow works
+- [ ] At least 6 accredited firms have issued ratings inside their normal audit flow, each listed on the public board
+- [ ] At least 5 teams rated end to end and visible on the board
 
 ### C - Adoption evidence - $75,000
 
-- [ ] At least [N] teams publicly rated on the board by accredited firms
+- [ ] At least 20 teams publicly rated on the board by accredited firms
 - [ ] At least one full six-month reassessment completed: existing ratings reset and re-scored, with the changes live on the board
-- [ ] The membership body running on its own funding model, with the verification committee active
+- [ ] The membership body running on its own funding model, with the verification committee active, both shown on the body's public page
 - [ ] A public metrics page: teams rated, tiers awarded, firms participating, reassessments completed
 
 ## Milestone review and acceptance
@@ -253,7 +367,7 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 
 ## Process
 
-- The proposal window opens once the RFP is fully funded and stays open for 15 days.
+- The proposal window opens once the RFP is fully funded and stays open for 30 days.
 - Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
 - Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
 - Milestone deliveries are reviewed within 14 days; payment follows acceptance.
@@ -266,9 +380,9 @@ Questions, pushback, better ideas? Post them below.
 
 ---
 
-End of example. Notice what makes it work: the intro names the exact gap and the one-line fix. "What this actually pays for" tells the truth about where the money goes. Hard requirements are instant self-screens, not aspirations. Every milestone criterion is checkable by a stranger. The adoption milestone is last and carries half the budget, comfortably above the one-third minimum. Match that bar.
+End of example. Note the adoption milestone: half the budget pays only on real usage, above the one-third minimum. Its position in the order is a choice, not a rule.
 
-## Read before drafting (if you can browse)
+## Links
 
-- The live board and current initiatives: https://fund.thedao.fund
+- The board and current initiatives: https://fund.thedao.fund
 - The submission form: https://fund.thedao.fund/submit

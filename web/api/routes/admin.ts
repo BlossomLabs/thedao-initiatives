@@ -330,6 +330,26 @@ export function adminRoutes(deps: Deps) {
     return c.json({ comment: adminCommentJson(next!, await db.rfps.get(row.rfpId)) });
   });
 
+  /**
+   * Funder leads: the ONLY reader of the private funders field besides the
+   * manage page. Never link from a public page; never add a public route.
+   */
+  r.get("/leads", async (c) => {
+    const all = await db.rfps.list(["pending", "approved", "rejected", "archived"]);
+    const rows = all.filter((x) => x.funders.trim()).map((x) => ({
+      id: x.id,
+      title: x.title,
+      slug: x.slug,
+      type: x.type,
+      status: x.status,
+      goalUsd: x.goalUsd,
+      funders: x.funders,
+      contact: x.contact,
+      createdAt: x.createdAt,
+    }));
+    return c.json({ rows });
+  });
+
   /** Push-based content sync: the repo's content/rfps/*.md, sent by scripts/sync-content.ts. */
   r.post("/sync-content", async (c) => {
     const body = await jsonBody(c);

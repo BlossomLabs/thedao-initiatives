@@ -1,5 +1,5 @@
-import { ExternalLink } from "lucide-react";
-import { GRIFF_X } from "~/data/site";
+import { Mail } from "lucide-react";
+import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
 
 // Figma: 28px 32px band 46px below the grid, 18px title, 14px copy, 51px button with ↗.
 export default function PledgeBand() {
@@ -12,8 +12,8 @@ export default function PledgeBand() {
           initiative from day one.
         </p>
       </div>
-      <a className="btn flex-none" href={GRIFF_X} target="_blank" rel="noopener">
-        Contact @griffgreen to pledge <ExternalLink className="size-4 opacity-70" />
+      <a className="btn flex-none" href={CONTACT_MAILTO}>
+        Email {CONTACT_EMAIL} to pledge <Mail className="size-4 opacity-70" />
       </a>
     </div>
   );

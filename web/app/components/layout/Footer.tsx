@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { GRIFF_X, SOCIAL_LINKS, TRANSPARENCY_URL } from "~/data/site";
+import { CONTACT_EMAIL, CONTACT_MAILTO, SOCIAL_LINKS, TRANSPARENCY_URL } from "~/data/site";
 
 // Figma: two 12.5px muted lines (30px above, 46px below), then an 88px legal bar.
 export default function Footer() {
@@ -10,8 +10,7 @@ export default function Footer() {
           TheDAO Security Fund · coordinating ecosystem funding for Ethereum security.
         </p>
         <p className="my-1.5">
-          To sponsor an initiative, contact{" "}
-          <a href={GRIFF_X} target="_blank" rel="noopener">@griffgreen</a>
+          To sponsor an initiative, email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>
           {" · "}
           <a className="text-white/35" href={TRANSPARENCY_URL} target="_blank" rel="noopener">
             Transparency

@@ -494,12 +494,14 @@ function EditForm(
         <Field label="Forum link" htmlFor="e-forum">
           <Input id="e-forum" type="url" value={f.discourseUrl} onChange={set("discourseUrl")} />
         </Field>
-        <Field
-          label="Pin to board position"
-          htmlFor="e-pin"
-          hint="1 = top; blank = sort by money raised."
-        >
-          <Input id="e-pin" inputMode="numeric" value={f.sortRank} onChange={set("sortRank")} />
+        <Field label="Pin to board position" htmlFor="e-pin">
+          <Input
+            id="e-pin"
+            inputMode="numeric"
+            placeholder="1 = top; blank = sort by money raised."
+            value={f.sortRank}
+            onChange={set("sortRank")}
+          />
         </Field>
       </div>
       <Field label="Contact" htmlFor="e-contact" privateField>

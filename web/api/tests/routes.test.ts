@@ -572,6 +572,24 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     })).status,
     400,
   );
+  // an already-deployed Safe can be attached by address: same checks, same conflicts
+  const byAddr = (rfpId: string, address: string) =>
+    h.req("/api/admin/initiatives/" + rfpId + "/safe-confirm", {
+      method: "POST",
+      token: admin,
+      json: { address },
+    });
+  assertEquals((await byAddr(other.id, "0x1234")).status, 400);
+  assertEquals((await byAddr(other.id, SAFE_ADDR)).status, 409); // bound to `id` already
+  const third = await h.db.rfps.insert({ title: "Third initiative", status: "approved" });
+  const existing = "0x" + "a1".repeat(20);
+  const attached = await j(await byAddr(third.id, existing.toLowerCase())) as {
+    status: string;
+    address: string;
+  };
+  assertEquals(attached.status, "ok");
+  assertEquals(attached.address.toLowerCase(), existing);
+  assertEquals((await h.db.rfps.get(third.id))!.safeAddress, attached.address);
   h.close();
 });
 

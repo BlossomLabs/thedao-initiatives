@@ -226,6 +226,57 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
     if (timer.current) clearTimeout(timer.current);
   }, []);
 
+  const [existing, setExisting] = useState("");
+  /** Bind a Safe that already exists: verified on-chain like a fresh deploy. */
+  const attach = async () => {
+    const address = existing.trim();
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+      setStatus({ kind: "err", text: "That is not an Ethereum address (0x + 40 hex characters)." });
+      return;
+    }
+    setStatus({ kind: "wait", text: "Verifying the Safe's owners and threshold on-chain…" });
+    setBusy(true);
+    const res = await api<SafeConfirmResult>(`/api/admin/initiatives/${r.id}/safe-confirm`, {
+      json: { address },
+    }).catch((e) => ({ status: "error", detail: errorMessage(e) } as SafeConfirmResult));
+    setBusy(false);
+    if (res.status === "ok") {
+      setStatus({ kind: "ok", text: `Safe ${res.address} verified: ${res.detail}` });
+      setExisting("");
+      onChange();
+    } else setStatus({ kind: "err", text: res.detail });
+  };
+  const attachForm = (
+    <form
+      className="mt-4 border-t border-edge pt-3.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void attach();
+      }}
+    >
+      <label className="small dim block" htmlFor="safe-existing">
+        Or use a Safe that is already deployed
+      </label>
+      <div className="mt-1.5 flex gap-2">
+        <Input
+          id="safe-existing"
+          className="mono min-w-0 flex-1 py-2 text-[12px]"
+          placeholder="0x…"
+          spellCheck={false}
+          value={existing}
+          onChange={(e) => setExisting(e.target.value)}
+        />
+        <Button type="submit" sm variant="ghost" className="m-0 flex-none" loading={busy}>
+          Use this Safe
+        </Button>
+      </div>
+      <p className="m-0 mt-1.5 small dim">
+        Must be a {page.signers.threshold}-of-{page.signers.list.length}{" "}
+        canonical Safe owned by the operational signers; anything else is rejected.
+      </p>
+    </form>
+  );
+
   const confirmDeploy = async (txHash: string) => {
     const res = await api<SafeConfirmResult>(`/api/admin/initiatives/${r.id}/safe-confirm`, {
       json: { txHash },
@@ -327,7 +378,12 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
     );
   } else if (r.status !== "approved") {
     body = (
-      <p className="m-0 small dim">Approve this initiative first, then deploy its donation Safe.</p>
+      <>
+        <p className="m-0 small dim">
+          Approve this initiative first, then deploy its donation Safe.
+        </p>
+        {attachForm}
+      </>
     );
   } else {
     body = (
@@ -347,6 +403,7 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
         >
           {isConnected ? "Deploy Safe" : "Connect a wallet to deploy"}
         </Button>
+        {attachForm}
       </>
     );
   }

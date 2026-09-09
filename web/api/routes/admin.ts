@@ -7,6 +7,7 @@ import { adminCommentJson, adminRfp, donationJson, pledgeJson } from "../lib/jso
 import { parseGoal, TX_HASH_RE, validateForumUrl } from "../lib/validate.ts";
 import { decimalsOf } from "./initiatives.ts";
 import { safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
+import { isAddress, toChecksum } from "../chain/address.ts";
 import { syncContent } from "../services/content.ts";
 import { syncSafe } from "../services/safe-api.ts";
 import type { Comment, PledgeStatus, Rfp } from "../db/types.ts";
@@ -259,41 +260,57 @@ export function adminRoutes(deps: Deps) {
   });
 
   /** Verify a deploy tx on-chain, then store the verified Safe address. */
+  /**
+   * Bind a Safe to the initiative: either the tx hash of a deploy made from
+   * the admin panel, or the address of a Safe that already exists. Both go
+   * through the same on-chain check (owners, threshold, canonical proxy).
+   */
   r.post("/initiatives/:id/safe-confirm", async (c) => {
     const rfp = await rfpOr404(c.req.param("id"));
-    const tx = s((await jsonBody(c)).txHash, 80).toLowerCase();
-    if (!TX_HASH_RE.test(tx)) {
-      return c.json({ status: "error", detail: "malformed tx hash" }, 400);
+    const body = await jsonBody(c);
+    let address: string;
+    if (s(body.address, 64)) {
+      const given = s(body.address, 64);
+      if (!isAddress(given)) {
+        return c.json({ status: "error", detail: "malformed Safe address" }, 400);
+      }
+      address = toChecksum(given);
+    } else {
+      const tx = s(body.txHash, 80).toLowerCase();
+      if (!TX_HASH_RE.test(tx)) {
+        return c.json({ status: "error", detail: "malformed tx hash" }, 400);
+      }
+      const [found, err] = await chain.extractDeployedSafe(tx);
+      if (err === "pending") {
+        return c.json({
+          status: "pending",
+          detail: "waiting for the deploy tx to be mined",
+        });
+      }
+      if (err) return c.json({ status: "error", detail: err }, 400);
+      address = found!;
     }
-    const [address, err] = await chain.extractDeployedSafe(tx);
-    if (err === "pending") {
-      return c.json({
-        status: "pending",
-        detail: "waiting for the deploy tx to be mined",
-      });
-    }
-    if (err) return c.json({ status: "error", detail: err }, 400);
-    const [ok, detail] = await chain.verifySafe(address!, config.operationalSigners);
+    const [ok, detail] = await chain.verifySafe(address, config.operationalSigners);
     if (!ok) {
       return c.json({
         status: "error",
-        detail: `Safe deployed at ${address} but REJECTED: ${detail}`,
+        detail: `Safe at ${address} REJECTED: ${detail}`,
       }, 400);
     }
-    if (rfp.safeAddress && rfp.safeAddress.toLowerCase() !== address!.toLowerCase()) {
+    if (rfp.safeAddress && rfp.safeAddress.toLowerCase() !== address.toLowerCase()) {
       return c.json({
         status: "error",
         detail: "this initiative already has a different Safe: " + rfp.safeAddress,
       }, 409);
     }
-    const other = await db.rfps.bySafe(address!);
+    const other = await db.rfps.bySafe(address);
     if (other && other.id !== rfp.id) {
       return c.json({
         status: "error",
         detail: `that Safe is already assigned to another initiative (${other.slug})`,
       }, 409);
     }
-    if (!rfp.safeAddress) await db.rfps.update(rfp.id, { safeAddress: address! });
+    if (!rfp.safeAddress) await db.rfps.update(rfp.id, { safeAddress: address });
     return c.json({ status: "ok", address, detail });
   });
 

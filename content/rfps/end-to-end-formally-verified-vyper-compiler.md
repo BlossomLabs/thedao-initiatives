@@ -11,11 +11,11 @@ summary: Vyper is the second most widely used EVM language, securing billions of
   this underway.
 ---
 | | |
-|:--|:--|
+|---|---|
 | **Status** | Draft |
 | **Budget** | $600,000 USD |
-| **Proposal window** | 15 days, opening once the RFP is fully funded |
-| **Indicative duration** | 12 months (proposers set their own timeline) |
+| **Proposal window** | 30 days, opening once the RFP is fully funded |
+| **Indicative duration** | 12 months (the team sets the final timeline) |
 
 ## Why this matters
 
@@ -77,7 +77,7 @@ In the interest of full transparency:
 
 ## Milestones (draft)
 
-These milestones are a draft, scoped with the Vyper core team. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
+These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
 
 - Milestones are lettered because A-C may be delivered in any order, or in parallel; each pays on acceptance.
 - Milestone E always pays last, once the Milestone D release is public.
@@ -140,15 +140,15 @@ Paid in three tranches: launch work, adoption evidence, and continuous verificat
 
 ## Milestone review and acceptance
 
-- Machine-checkable criteria (zero admitted lemmas, CI green, published test-parity and pass-list reports) are accepted automatically when their public CI check passes.
-- Judgment-based criteria (subset adequacy, whether the demonstrated contracts are representative, responsible disclosure of optimizer bugs) are signed off by an independent technical reviewer: a verification expert with no affiliation to the selected team or the existing codebases, agreed between Giveth and the team before work begins and named in the grant agreement.
+- Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
+- Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
 - The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
 
 ## Process
 
-- The proposal window opens once the RFP is fully funded and stays open for 15 days.
-- Proposals include: team and track record in mechanized verification, technical approach (proof assistant, relationship to existing work, frontend strategy, how users run the verified compiler), a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
-- Giveth selects the team within 7 days of the window closing, weighing credibility of the proof plan, price, and strength of the proposed milestones.
+- The proposal window opens once the RFP is fully funded and stays open for 30 days.
+- Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
+- Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
 - Milestone deliveries are reviewed within 14 days; payment follows acceptance.
 - The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
 - If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.

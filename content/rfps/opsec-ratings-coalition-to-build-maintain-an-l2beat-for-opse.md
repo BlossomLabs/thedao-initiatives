@@ -14,11 +14,11 @@ summary: Fund a coordinator to bring at least six OPSEC auditing firms together
   self-sustaining membership body that keeps it credible and pays to keep it going.
 ---
 | | |
-|:--|:--|
+|---|---|
 | **Status** | Draft |
 | **Budget** | $150,000 USD |
-| **Proposal window** | 15 days, opening once the RFP is fully funded |
-| **Indicative duration** | 12 months (proposers set their own timeline) |
+| **Proposal window** | 30 days, opening once the RFP is fully funded |
+| **Indicative duration** | 12 months (the team sets the final timeline) |
 
 ## Why this matters
 
@@ -98,7 +98,7 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 
 ## Process
 
-- The proposal window opens once the RFP is fully funded and stays open for 15 days.
+- The proposal window opens once the RFP is fully funded and stays open for 30 days.
 - Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
 - Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
 - Milestone deliveries are reviewed within 14 days; payment follows acceptance.

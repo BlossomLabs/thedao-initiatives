@@ -8,7 +8,7 @@ summary: solc does not emit the debug information debuggers need, so every tool
   survives the full optimizer pipeline so it works on production builds.
 ---
 | | |
-|:--|:--|
+|---|---|
 | **Status** | Draft |
 | **Budget** | $236,500 USD |
 | **Anchor backer** | $151,000 committed by Argot Collective; this grant raises the remaining $85,500 |
@@ -69,26 +69,26 @@ These milestones are the full project plan, scoped with Argot and Walnut. Final 
 
 The total project budget is $236,500. Argot Collective has committed $151,000 as anchor backer, and this grant raises the remaining $85,500 to finish the project.
 
-**0 - Testing and validation infrastructure - $13,000** (delivered end of June)
+### 0 - Testing and validation infrastructure - $13,000 (delivered end of June)
 
 - [x] Automated test and validation infrastructure for ethdebug output in place, running in public CI. Completed: [PR #16727](https://github.com/argotorg/solidity/pull/16727)
 
-**1 - Internal debug data specification - $19,500** (in progress)
+### 1 - Internal debug data specification - $19,500 (in progress)
 
 - [ ] Internal specification for how solc represents and propagates debug data, published for review. In progress: [PR #16780](https://github.com/argotorg/solidity/pull/16780)
 
-**2 - Yul serialization - $33,000** (target: October 2026)
+### 2 - Yul serialization - $33,000 (target: October 2026)
 
 - [ ] Debug info survives compilation round-trips through Yul, demonstrated by automated tests in public CI
 
-**3 - Full unoptimized pipeline - $85,500** (target: March 2027)
+### 3 - Full unoptimized pipeline - $85,500 (target: March 2027)
 
 - [ ] solc emits ethdebug-format debug data for unoptimized builds, covering storage variables, local variables, memory, calldata, and per-instruction context
 - [ ] Output validates against the ethdebug schemas in an automated public CI check
 - [ ] Implementation is merged into solc, or is an open pull request under active review by the Solidity team, linkable by URL
 - [ ] A published walkthrough showing a debugger or test harness consuming the emitted data on a sample contract
 
-**4 - Optimized pipeline - $85,500** (target: August 2027)
+### 4 - Optimized pipeline - $85,500 (target: August 2027)
 
 - [ ] Debug data extended through all optimizer passes, correct on optimized production builds
 - [ ] Public test suite demonstrates debug data accuracy on optimized builds, with results published
@@ -111,7 +111,7 @@ The total project budget is $236,500. Argot Collective has committed $151,000 as
 ## Budget summary
 
 | Milestone | Cost |
-|:--|:--|
+|---|---|
 | 0. Testing and validation infrastructure | $13,000 |
 | 1. Internal debug data specification | $19,500 |
 | 2. Yul serialization | $33,000 |

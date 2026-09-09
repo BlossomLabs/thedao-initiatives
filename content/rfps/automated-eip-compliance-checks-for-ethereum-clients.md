@@ -12,11 +12,11 @@ summary: Ethereum's client teams implement EIPs by reading specification text
   pipelines of the major execution clients.
 ---
 | | |
-|:--|:--|
+|---|---|
 | **Status** | Draft |
 | **Budget** | $20,000 USD |
-| **Proposal window** | 15 days, opening once the RFP is fully funded |
-| **Indicative duration** | 6 months (proposers set their own timeline) |
+| **Proposal window** | 30 days, opening once the RFP is fully funded |
+| **Indicative duration** | 6 months (the team sets the final timeline) |
 
 ## Why this matters
 
@@ -71,7 +71,7 @@ In the interest of full transparency:
 
 ## Milestones (draft)
 
-These milestones are a draft, adapted from the tool author's proposal. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
+These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
 
 ### 1 - Production-ready packaging and docs - $4,000
 
@@ -106,13 +106,13 @@ The author reports this milestone is already about 80% complete; the payment cov
 
 ## Milestone review and acceptance
 
-- Machine-checkable criteria (public CI green, published reports, public confirmations linkable by URL) are accepted automatically when the public evidence exists.
-- Judgment-based criteria (whether documentation is sufficient, whether a triage report is credible) are signed off by a relevant member of a client team who can confirm the requirements are met. The first milestone must have a reviewer specified at the creation of the agreement.
+- Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
+- Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
 - The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
 
 ## Process
 
-- The proposal window opens once the RFP is fully funded and stays open for 15 days.
+- The proposal window opens once the RFP is fully funded and stays open for 30 days.
 - Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
 - Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
 - Milestone deliveries are reviewed within 14 days; payment follows acceptance.

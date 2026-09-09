@@ -15,7 +15,7 @@ summary: Endpoint Detection and Response is one of the highest-value security
 | **Status** | Draft |
 | **Budget** | $300,000 USD |
 | **Proposal window** | 15 days, opening once the grant is fully funded |
-| **Indicative duration** | 12 months |
+| **Indicative duration** | 12 months (the team sets the final timeline) |
 
 ## Why this matters
 
@@ -28,6 +28,8 @@ This grant funds an EDR that crypto teams will actually adopt: user-space, self-
 This is a grant, and Auditware is the recipient. Full transparency on why: the concept was developed with them, they already built an internal user-space EDR prototype on open-source tooling in a few weeks, and they have committed to taking this on. We think they are the right team for it.
 
 Auditware will disclose their relationships to existing OpSec tooling and firms in their proposal, and everything they build here is open source, so the community can hold the work to account.
+
+Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
 ## Existing work
 
@@ -61,48 +63,52 @@ Auditware will disclose their relationships to existing OpSec tooling and firms 
 
 ## Milestones (draft)
 
-These milestones are a draft, developed with Auditware. The final milestones and payments get negotiated with Auditware and fixed in the grant agreement.
+These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
 
-**A - Architecture, threat model, and privacy design - $40,000**
+### A - Architecture, threat model, and privacy design - $40,000
 
-- A published threat model: the endpoint attacks in scope and the residual risks left out
-- The documented user-space architecture and cryptographic privacy design, with the guarantee stated precisely
-- The detection-rule specification and the format new detectors are written in
-- A public design write-up an outside engineer can evaluate the trust model from
+- [ ] A published threat model: the endpoint attacks in scope and the residual risks left out
+- [ ] The documented user-space architecture and cryptographic privacy design, with the guarantee stated precisely
+- [ ] The detection-rule specification and the format new detectors are written in
+- [ ] A public design write-up an outside engineer can evaluate the trust model from
 
-**B - Working MVP - $110,000**
+### B - Working MVP - $110,000
 
-- A self-hostable user-space agent on [macOS, Windows, and Linux, as fixed in Milestone A], installable from a documented, reproducible process
-- The encrypted telemetry pipeline implementing the Milestone A privacy guarantee, with its tamper-evident audit trail
-- The initial Web3 detectors, each with a test showing it fires on the intended behavior and stays quiet otherwise
-- All code open source, with the public third-party security review published and its findings addressed
+- [ ] A self-hostable user-space agent on [macOS, Windows, and Linux, as fixed in Milestone A], installable from a documented, reproducible process
+- [ ] The encrypted telemetry pipeline implementing the Milestone A privacy guarantee, with its tamper-evident audit trail
+- [ ] The initial Web3 detectors, each with a test showing it fires on the intended behavior and stays quiet otherwise
+- [ ] All code open source, with the public third-party security review published and its findings addressed
 
-**C - Adoption, hardening, and endorsement - $150,000**
+### C - Adoption, hardening, and endorsement - $150,000
 
 Paid in two tranches: launch work first, then adoption evidence.
 
-*Tranche 1: Launch and endorsement - $50,000*
+**Tranche 1: Launch and endorsement - $50,000**
 
-- The detector library expanded to at least [20-30] Web3 detectors, each with a firing test
-- A recognized Ethereum security organization, or a named panel of recognized security engineers, publicly reviews the agent and states it is safe to install across a team
-- A public website, install guide, and a recorded walkthrough a non-expert admin can follow
+- [ ] The detector library expanded to at least [20-30] Web3 detectors, each with a firing test
+- [ ] A recognized Ethereum security organization, or a named panel of recognized security engineers, publicly reviews the agent and states it is safe to install across a team
+- [ ] A public website, install guide, and a recorded walkthrough a non-expert admin can follow
 
-*Tranche 2: Adoption evidence - $100,000*
+**Tranche 2: Adoption evidence - $100,000**
 
-- At least 15 crypto organizations running the agent in production, confirmed publicly by those teams
-- A published adoption-feedback report covering at least [N] evaluations, with the resulting fixes and detectors shipped
-- Published case studies and a public metrics page: deployments, detectors shipped, detections in the field
+- [ ] At least 15 crypto organizations running the agent in production, confirmed publicly by those teams
+- [ ] A published adoption-feedback report covering at least [N] evaluations, with the resulting fixes and detectors shipped
+- [ ] Published case studies and a public metrics page: deployments, detectors shipped, detections in the field
 
 ## Milestone review and acceptance
 
-- Criteria with objective public evidence (a live page, a published report or review, a named organization confirming use) are accepted on sight.
-- Judgment calls are signed off by an independent technical reviewer with no ties to Auditware, agreed between Giveth and Auditware before work begins and named in the grant agreement.
-- The reviewer's fee comes out of the milestone payment, or is pro bono. Auditware coordinates their payment.
+- Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
+- Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
+- The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
 
 ## Process
 
-- The proposal window opens once the grant is fully funded and stays open for 15 days. In that window, Auditware submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures.
-- Giveth reviews the proposal within 7 days and fixes the final plan in the grant agreement.
+- The proposal window opens once the grant is fully funded and stays open for 15 days. In that window, Auditware submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures. The window is also an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.
+- Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement.
 - Milestone deliveries are reviewed within 14 days; payment follows acceptance.
 - The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
-- If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives or can choose to refund to donors.
+- If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
+
+---
+
+Questions, pushback, better ideas? Post them below.

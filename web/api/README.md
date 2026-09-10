@@ -28,7 +28,7 @@ and `../deno.json` holds the tasks and imports.
   `version: YYYY-MM-DD` is the donate widget's gate version: `GET /api/terms` serves it,
   `POST /api/terms/accept` logs acceptances (anonymous, or once per wallet and version) to KV. Run
   the sync after every deploy that changes content.
-- **Uploads go to Pinata** (sponsor logos, profile pictures); only the CID is stored. Set
+- **Uploads go to Pinata** (backer logos, profile pictures); only the CID is stored. Set
   `PINATA_JWT`; until then uploads answer 503.
 - Markdown (`details`) is stored and returned raw; the frontend renders it.
 - Ids are ULID strings. Rate limits live in KV so they hold across isolates.

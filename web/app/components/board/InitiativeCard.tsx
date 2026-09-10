@@ -13,7 +13,7 @@ import { cn } from "~/lib/utils";
 /**
  * Figma card: 16px radius, 24px padding, white/5 fill, white/10 border; Inter
  * Tight 16px medium title, 13px/1.6 white/55 summary, then a bottom block
- * pinned to the card's end (6px bar, 13px numbers, "Sponsored by" 40px chips,
+ * pinned to the card's end (6px bar, 13px numbers, "Backed by" 40px chips,
  * 38px buttons). Cards in a row share a height, so the block sits at the same
  * level across the row.
  */
@@ -83,7 +83,7 @@ export default function InitiativeCard({
           </b>{" "}
           of {usd(r.goalUsd)}
           {backers > 0 && (
-            <span className="text-[12px] text-white/30">· {plural(backers, "sponsor")}</span>
+            <span className="text-[12px] text-white/30">· {plural(backers, "backer")}</span>
           )}
         </span>
         {funded
@@ -96,7 +96,7 @@ export default function InitiativeCard({
       </div>
       {(logos.length > 0 || backers > 0) && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="mr-0.5 font-inter-tight text-[12px] text-white/30">Sponsored by</span>
+          <span className="mr-0.5 font-inter-tight text-[12px] text-white/30">Backed by</span>
           {logos.length
             ? logos.map((l) => (
               <img

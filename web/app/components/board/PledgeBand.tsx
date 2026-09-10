@@ -8,7 +8,7 @@ export default function PledgeBand() {
       <div>
         <b className="font-inter-tight text-[18px] font-medium">Want to pledge support?</b>
         <p className="m-0 mt-2 max-w-[470px] font-inter-tight text-[14px] leading-[1.6] text-white/50">
-          Sponsors pledge now and pay only when the work is fully funded, with their logo on the
+          Backers pledge now and pay only when the work is fully funded, with their logo on the
           initiative from day one.
         </p>
       </div>

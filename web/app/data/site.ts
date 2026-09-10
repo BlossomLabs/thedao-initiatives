@@ -12,7 +12,7 @@ export const SITE_LOGO = "/dao-logo.svg";
 export const HOME_URL = "https://thedao.fund";
 export const TRANSPARENCY_URL = "https://thedao.fund/transparency";
 export const GRIFF_X = "https://x.com/griffgreen";
-/** Pledges and sponsorship go through the fund's inbox (Griff, Sep 2026). */
+/** Pledges and backing go through the fund's inbox (Griff, Sep 2026). */
 export const CONTACT_EMAIL = "info@thedao.fund";
 export const CONTACT_MAILTO = "mailto:" + CONTACT_EMAIL;
 

@@ -9,7 +9,7 @@ export default function Footer() {
           TheDAO Security Fund · coordinating ecosystem funding for Ethereum security.
         </p>
         <p className="my-1.5">
-          To sponsor an initiative, email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>
+          To back an initiative, email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>
           {" · "}
           <a className="text-white/35" href={TRANSPARENCY_URL} target="_blank" rel="noopener">
             Transparency

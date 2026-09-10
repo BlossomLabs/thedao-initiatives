@@ -331,6 +331,10 @@ Ideally the coordinator is not an OPSEC auditing firm, because whoever holds the
 
 Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
+## Existing work
+
+- [Security Frameworks by SEAL](https://frameworks.securityalliance.org/): the Security Alliance's open framework covering operational security, infrastructure, DevOps, incident response and more. Bidders should read it before proposing a scoring template.
+
 ## Scope
 
 **In scope**

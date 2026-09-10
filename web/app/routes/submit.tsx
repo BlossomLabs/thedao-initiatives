@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAccount } from "wagmi";
-import { Check, Send } from "lucide-react";
+import { Check, Copy, Send } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import Crumbs from "~/components/layout/Crumbs";
 import PageMain from "~/components/layout/PageMain";
 import Shimmer from "~/components/layout/Shimmer";
 import Skeleton from "~/components/ui/Skeleton";
 import { Field, Input, Textarea } from "~/components/ui/Field";
 import { Button } from "~/components/ui/Button";
+import SpecularButton from "~/components/ui/SpecularButton";
 import Identity from "~/components/wallet/Identity";
 import { useSession } from "~/context/session";
 import { useProfileDialog } from "~/context/profile-dialog";
@@ -32,16 +35,22 @@ const TYPES: { id: Type; label: string; sub: string }[] = [
  * picture (ENS or set on the site). The proposer is recorded with the
  * initiative and shown on its page.
  */
-function Gate({ children }: { children: React.ReactNode }) {
+/** The connected wallet, whether it is signed in, and whether its identity is complete. */
+function useSubmitter() {
   const { isConnected, address, status } = useAccount();
   const { session, signIn, signingIn } = useSession();
   const identity = useIdentity(address);
-  const { openProfile } = useProfileDialog();
-  const [error, setError] = useState("");
   const signedIn = Boolean(
     session && address && session.address.toLowerCase() === address.toLowerCase(),
   );
   const complete = identity.hasName && identity.hasAvatar;
+  return { isConnected, address, status, signIn, signingIn, identity, signedIn, complete };
+}
+
+function Gate({ children }: { children: React.ReactNode }) {
+  const { isConnected, status, signIn, signingIn, identity, signedIn, complete } = useSubmitter();
+  const { openProfile } = useProfileDialog();
+  const [error, setError] = useState("");
 
   // wagmi starts a reload as "reconnecting" (and stays there while an injected
   // wallet drags its feet), and the identity lookups take a moment: a neutral
@@ -64,16 +73,7 @@ function Gate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (signedIn && complete) {
-    return (
-      <>
-        <p className="mb-7 flex flex-wrap items-center gap-2 text-[13.5px] text-muted">
-          Submitting as <Identity address={address!} size={20} />
-        </p>
-        {children}
-      </>
-    );
-  }
+  if (signedIn && complete) return <>{children}</>;
 
   const step = !signedIn ? 0 : 1;
   const steps = [
@@ -147,6 +147,7 @@ function Gate({ children }: { children: React.ReactNode }) {
 export default function Submit() {
   const navigate = useNavigate();
   const { requireSession } = useSession();
+  const submitter = useSubmitter();
   const [f, setF] = useState({
     title: "",
     type: "rfp" as Type,
@@ -193,7 +194,8 @@ export default function Submit() {
   }
 
   return (
-    <PageMain narrow detail>
+    <PageMain detail>
+      <Crumbs items={[{ label: "Initiatives", to: "/" }]} />
       <h1 className="mb-3 mt-1.5 font-inter-tight text-[clamp(26px,4vw,40px)] font-medium leading-[1.12] tracking-[-.02em]">
         Suggest an initiative
       </h1>
@@ -203,181 +205,211 @@ export default function Submit() {
       </p>
       <Shimmer soft />
 
-      <Gate>
-        <div className="mb-[26px] mt-[18px] grid grid-cols-1 gap-3.5 rounded-[14px] border border-[rgba(92,183,90,.25)] bg-[rgba(92,183,90,.06)] px-5 py-[18px] min-[720px]:grid-cols-3">
-          {[
-            {
-              key: "guide",
-              body: (
-                <span className="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                  Give this guide to your AI
-                  <Button variant="ghost" sm onClick={copyGuide}>
-                    {copied === "done"
-                      ? "Copied ✓"
-                      : copied === "fail"
-                      ? "Copy failed, open /llms.txt"
-                      : "Copy the guide"}
-                  </Button>
-                </span>
-              ),
-            },
-            { key: "answer", body: "Answer the questions the AI asks" },
-            { key: "paste", body: "Paste the results below" },
-          ].map((step, i) => (
-            <div
-              key={step.key}
-              className="flex items-start gap-3 font-inter-tight text-[15px] leading-[1.5]"
-            >
-              <span className="grid size-[26px] flex-none place-items-center rounded-full border border-[rgba(92,183,90,.5)] bg-[rgba(92,183,90,.18)] font-inter-tight text-[13px] font-semibold text-[#7dd57e]">
-                {i + 1}
-              </span>
-              <div>{step.body}</div>
-            </div>
-          ))}
-        </div>
+      <div className="mt-4 grid grid-cols-[1fr_340px] items-start gap-9 max-[960px]:grid-cols-1">
+        <div>
+          <Gate>
+            {error && <div className="alert" role="alert">{error}</div>}
 
-        {error && <div className="alert" role="alert">{error}</div>}
+            <form className="flex flex-col" onSubmit={submit} noValidate>
+              <input
+                type="text"
+                name="website"
+                value={f.website}
+                onChange={set("website")}
+                className="hp"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+              />
 
-        <form className="flex flex-col" onSubmit={submit} noValidate>
-          <input
-            type="text"
-            name="website"
-            value={f.website}
-            onChange={set("website")}
-            className="hp"
-            tabIndex={-1}
-            autoComplete="off"
-            aria-hidden="true"
-          />
+              <Field
+                label="Title"
+                htmlFor="f-title"
+                hint="Or leave blank and we pull it from the forum link."
+                className="mt-0"
+              >
+                <Input id="f-title" maxLength={140} value={f.title} onChange={set("title")} />
+              </Field>
 
-          <Field
-            label="Title"
-            htmlFor="f-title"
-            hint="Or leave blank and we pull it from the forum link."
-          >
-            <Input id="f-title" maxLength={140} value={f.title} onChange={set("title")} />
-          </Field>
-
-          <div className="mt-[18px]">
-            <span className="label">Type *</span>
-            <div className="mt-1.5 flex flex-wrap gap-2.5">
-              {TYPES.map((t) => (
-                <label
-                  key={t.id}
-                  className={cn(
-                    "flex min-w-[220px] flex-1 cursor-pointer items-start gap-2.5 rounded-xl border border-white/15 bg-white/5 px-3.5 py-3 transition-colors duration-150 hover:border-[rgba(92,183,90,.45)]",
-                    f.type === t.id && "border-dao-green shadow-[0_0_14px_rgba(92,183,90,.12)]",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="type"
-                    value={t.id}
-                    checked={f.type === t.id}
-                    onChange={() => setF((s) => ({ ...s, type: t.id }))}
-                    className="mt-[3px]"
-                  />
-                  <span>
-                    <b
+              <div className="mt-[18px]">
+                <span className="label">Type *</span>
+                <div className="mt-1.5 flex flex-wrap gap-2.5">
+                  {TYPES.map((t) => (
+                    <label
+                      key={t.id}
                       className={cn(
-                        "block font-inter-tight text-[13.5px] font-semibold",
-                        f.type === t.id && "text-dao-green",
+                        "flex min-w-[220px] flex-1 cursor-pointer items-start gap-2.5 rounded-xl border border-white/15 bg-white/5 px-3.5 py-3 transition-colors duration-150 hover:border-[rgba(92,183,90,.45)]",
+                        f.type === t.id && "border-dao-green shadow-[0_0_14px_rgba(92,183,90,.12)]",
                       )}
                     >
-                      {t.label}
-                    </b>
-                    <small className="mt-0.5 block text-[12px] leading-[1.5] text-muted">
-                      {t.sub}
-                    </small>
-                  </span>
-                </label>
-              ))}
-            </div>
+                      <input
+                        type="radio"
+                        name="type"
+                        value={t.id}
+                        checked={f.type === t.id}
+                        onChange={() => setF((s) => ({ ...s, type: t.id }))}
+                        className="mt-[3px]"
+                      />
+                      <span>
+                        <b
+                          className={cn(
+                            "block font-inter-tight text-[13.5px] font-semibold",
+                            f.type === t.id && "text-dao-green",
+                          )}
+                        >
+                          {t.label}
+                        </b>
+                        <small className="mt-0.5 block text-[12px] leading-[1.5] text-muted">
+                          {t.sub}
+                        </small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <Field
+                label="Short summary"
+                htmlFor="f-summary"
+                required
+                hint="2 to 4 sentences: what gets built, why it matters."
+              >
+                <Textarea
+                  id="f-summary"
+                  className="min-h-[104px]"
+                  rows={4}
+                  maxLength={4000}
+                  value={f.summary}
+                  onChange={set("summary")}
+                  required
+                />
+              </Field>
+
+              <Field
+                label="Full initiative details"
+                htmlFor="f-details"
+                hint="Optional: scope, milestones, budget breakdown. Markdown supported: headings, **bold**, lists, tables, - [ ] checklists."
+              >
+                <Textarea
+                  id="f-details"
+                  className="min-h-[192px]"
+                  rows={8}
+                  maxLength={20000}
+                  value={f.details}
+                  onChange={set("details")}
+                />
+              </Field>
+
+              <Field
+                label="Forum link"
+                htmlFor="f-forum"
+                hint="Optional Discourse topic where this initiative is discussed."
+              >
+                <Input
+                  id="f-forum"
+                  type="url"
+                  placeholder="https://forum.example.org/t/my-initiative/123"
+                  value={f.discourseUrl}
+                  onChange={set("discourseUrl")}
+                />
+              </Field>
+
+              <Field label="Funding goal (USD)" htmlFor="f-goal" required>
+                <Input
+                  id="f-goal"
+                  inputMode="decimal"
+                  placeholder="250000"
+                  value={f.goal}
+                  onChange={set("goal")}
+                  required
+                />
+              </Field>
+
+              <Field label="Who is likely to fund this?" htmlFor="f-funders" required privateField>
+                <Textarea
+                  id="f-funders"
+                  rows={4}
+                  maxLength={4000}
+                  placeholder="Ethereum Foundation | funds public-goods security tooling | met once | warm intro? yes | $50,000"
+                  value={f.funders}
+                  onChange={set("funders")}
+                  required
+                />
+              </Field>
+
+              <Field
+                label="Contact"
+                htmlFor="f-contact"
+                privateField
+                hint="Email or Telegram, kept private."
+              >
+                <Input id="f-contact" maxLength={200} value={f.contact} onChange={set("contact")} />
+              </Field>
+
+              <Button type="submit" variant="primary" className="mt-4 w-full" loading={busy}>
+                <Send className="size-4" />Submit for review
+              </Button>
+              {submitter.address && (
+                <p className="m-0 mt-3.5 flex flex-wrap items-center justify-center gap-2 text-[13.5px] text-muted">
+                  Submitting as <Identity address={submitter.address} size={20} />
+                </p>
+              )}
+            </form>
+          </Gate>
+        </div>
+        <aside className="sticky top-[86px] flex flex-col gap-3.5 max-[960px]:static max-[960px]:order-first">
+          <div className="panel glow-drift border-[rgba(92,183,90,.35)]">
+            <span className="k">Give this guide to your AI</span>
+            <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
+              {["Copy the guide", "Answer the questions the AI asks", "Paste the results here"]
+                .map((step, i) => (
+                  <li
+                    key={step}
+                    className="flex items-start gap-3 font-inter-tight text-[14px] leading-[1.5]"
+                  >
+                    <span className="grid size-[24px] flex-none place-items-center rounded-full border border-[rgba(92,183,90,.5)] bg-[rgba(92,183,90,.18)] font-inter-tight text-[12.5px] font-semibold text-[#7dd57e]">
+                      {i + 1}
+                    </span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+            </ol>
+            <SpecularButton className="mt-4 w-full" onClick={copyGuide}>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={copied}
+                  className="inline-flex items-center gap-1.5"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                >
+                  {copied === "done"
+                    ? (
+                      <>
+                        <Check className="size-4" />Copied
+                      </>
+                    )
+                    : copied === "fail"
+                    ? "Copy failed, open /llms.txt"
+                    : (
+                      <>
+                        <Copy className="size-4" />Copy the guide
+                      </>
+                    )}
+                </motion.span>
+              </AnimatePresence>
+            </SpecularButton>
           </div>
-
-          <Field
-            label="Short summary"
-            htmlFor="f-summary"
-            required
-            hint="2 to 4 sentences: what gets built, why it matters."
-          >
-            <Textarea
-              id="f-summary"
-              className="min-h-[104px]"
-              rows={4}
-              maxLength={4000}
-              value={f.summary}
-              onChange={set("summary")}
-              required
-            />
-          </Field>
-
-          <Field
-            label="Full initiative details"
-            htmlFor="f-details"
-            hint="Optional: scope, milestones, budget breakdown. Markdown supported: headings, **bold**, lists, tables, - [ ] checklists."
-          >
-            <Textarea
-              id="f-details"
-              className="min-h-[192px]"
-              rows={8}
-              maxLength={20000}
-              value={f.details}
-              onChange={set("details")}
-            />
-          </Field>
-
-          <Field
-            label="Forum link"
-            htmlFor="f-forum"
-            hint="Optional Discourse topic where this initiative is discussed."
-          >
-            <Input
-              id="f-forum"
-              type="url"
-              placeholder="https://forum.example.org/t/my-initiative/123"
-              value={f.discourseUrl}
-              onChange={set("discourseUrl")}
-            />
-          </Field>
-
-          <Field label="Funding goal (USD)" htmlFor="f-goal" required>
-            <Input
-              id="f-goal"
-              inputMode="decimal"
-              placeholder="250000"
-              value={f.goal}
-              onChange={set("goal")}
-              required
-            />
-          </Field>
-
-          <Field label="Who is likely to fund this?" htmlFor="f-funders" required privateField>
-            <Textarea
-              id="f-funders"
-              rows={4}
-              maxLength={4000}
-              placeholder="Ethereum Foundation | funds public-goods security tooling | met once | warm intro? yes | $50,000"
-              value={f.funders}
-              onChange={set("funders")}
-              required
-            />
-          </Field>
-
-          <Field
-            label="Contact"
-            htmlFor="f-contact"
-            privateField
-            hint="Email or Telegram, kept private."
-          >
-            <Input id="f-contact" maxLength={200} value={f.contact} onChange={set("contact")} />
-          </Field>
-
-          <Button type="submit" variant="primary" className="mt-4 w-full" loading={busy}>
-            <Send className="size-4" />Submit for review
-          </Button>
-        </form>
-      </Gate>
+          <div className="panel">
+            <span className="k">What happens next</span>
+            <p className="m-0 small dim">
+              Submissions are reviewed before they appear on the site. Once published, your
+              initiative is listed with your wallet shown as the proposer.
+            </p>
+          </div>
+        </aside>
+      </div>
     </PageMain>
   );
 }

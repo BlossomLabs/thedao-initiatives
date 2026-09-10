@@ -42,10 +42,11 @@ export function Select(
 /** Label + control in one (Figma form: 12px label margin + 6px column gap). */
 export function Field({
   children,
+  className,
   ...label
-}: LabelProps & { children: React.ReactNode }) {
+}: LabelProps & { children: React.ReactNode; className?: string }) {
   return (
-    <div className="mt-[18px] first:mt-3">
+    <div className={cn("mt-[18px] first:mt-3", className)}>
       <Label {...label} />
       <div className="mt-1.5">{children}</div>
     </div>

@@ -43,6 +43,9 @@
 }
 
 @layer base {
+  html {
+    overflow-x: clip;
+  }
   * {
     border-color: var(--color-edge);
   }
@@ -206,6 +209,124 @@
   }
   .panel {
     @apply rounded-[18px] bg-white/5 border border-white/10 px-[22px] py-5;
+  }
+  /* A green drop shadow that sweeps back and forth along the top edge of a
+     panel, top-left to top-right, with an uneven rhythm. It always sits
+     above the box (negative y, negative spread), so it never reaches the
+     translucent card below. Box shadows are painted outside the box only,
+     so the panel's own translucent fill stays clean. */
+  .glow-drift {
+    animation: glow-drift 14s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  }
+  @keyframes glow-drift {
+    0% {
+      box-shadow:
+        -7px -6px 14px -3px rgba(92, 183, 90, 0.31),
+        -12px -9px 22px -4px rgba(0, 255, 136, 0.1);
+    }
+    18% {
+      box-shadow:
+        -2px -8px 16px -3px rgba(92, 183, 90, 0.36),
+        -4px -11px 24px -4px rgba(0, 255, 136, 0.12);
+    }
+    30% {
+      box-shadow:
+        3px -6px 13px -3px rgba(92, 183, 90, 0.3),
+        5px -9px 20px -4px rgba(0, 255, 136, 0.1);
+    }
+    47% {
+      box-shadow:
+        7px -6px 15px -3px rgba(92, 183, 90, 0.35),
+        12px -9px 22px -4px rgba(0, 255, 136, 0.11);
+    }
+    58% {
+      box-shadow:
+        5px -8px 17px -3px rgba(92, 183, 90, 0.37),
+        8px -12px 25px -4px rgba(0, 255, 136, 0.12);
+    }
+    73% {
+      box-shadow:
+        -1px -6px 13px -3px rgba(92, 183, 90, 0.29),
+        -2px -9px 20px -4px rgba(0, 255, 136, 0.1);
+    }
+    88% {
+      box-shadow:
+        -5px -8px 16px -3px rgba(92, 183, 90, 0.35),
+        -9px -11px 24px -4px rgba(0, 255, 136, 0.12);
+    }
+    100% {
+      box-shadow:
+        -7px -6px 14px -3px rgba(92, 183, 90, 0.31),
+        -12px -9px 22px -4px rgba(0, 255, 136, 0.1);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .glow-drift {
+      animation: none;
+      box-shadow: 0 -7px 16px -3px rgba(92, 183, 90, 0.24);
+    }
+  }
+
+  /* Specular button (see components/ui/SpecularButton.tsx). The WebGL rim
+     is drawn on a canvas that overhangs the button by 20px on every side. */
+  .specular-button {
+    --sb-radius: 14px;
+    --sb-tint: #ffffff;
+    --sb-tint-opacity: 0.05;
+    --sb-text-color: #ffffff;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 20px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    margin: 0;
+    font-family: var(--font-inter-tight);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    color: var(--sb-text-color);
+    background: color-mix(in srgb, var(--sb-tint) calc(var(--sb-tint-opacity) * 100%), transparent);
+    border-radius: var(--sb-radius);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    outline: none;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .specular-button:hover {
+    border-color: rgba(92, 183, 90, 0.5);
+  }
+  .specular-button:active {
+    transform: scale(0.97);
+  }
+  .specular-button:focus-visible {
+    outline: 2px solid rgba(0, 255, 136, 0.6);
+    outline-offset: 3px;
+  }
+  .specular-button:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .specular-button:disabled:active {
+    transform: none;
+  }
+  .specular-button__fx {
+    position: absolute;
+    inset: -20px;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .specular-button__fx canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .specular-button__label {
+    position: relative;
+    z-index: 2;
   }
   .tblbox {
     @apply max-h-[480px] overflow-auto rounded-2xl bg-white/5 border border-white/10;

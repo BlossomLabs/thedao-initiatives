@@ -1,28 +1,11 @@
-import { keccak256, utf8 } from "./keccak.ts";
-import { encodeHex } from "@std/encoding";
+import { getAddress, isAddress as viemIsAddress } from "viem";
 
 /** EIP-55 checksum encoding. Throws on anything that is not 20 hex bytes. */
-export function toChecksum(addr: string): string {
-  const a = String(addr).toLowerCase().replace(/^0x/, "");
-  if (!/^[0-9a-f]{40}$/.test(a)) throw new Error(`invalid address: ${addr}`);
-  const h = encodeHex(keccak256(utf8(a)));
-  let out = "";
-  for (let i = 0; i < 40; i++) {
-    const c = a[i];
-    out += /[a-f]/.test(c) && parseInt(h[i], 16) >= 8 ? c.toUpperCase() : c;
-  }
-  return "0x" + out;
-}
+export const toChecksum = (addr: string): string => getAddress(String(addr));
 
-export function isAddress(s: unknown): s is string {
-  if (typeof s !== "string") return false;
-  try {
-    toChecksum(s);
-    return true;
-  } catch {
-    return false;
-  }
-}
+/** 20 hex bytes in any casing (a wrong mixed-case checksum is still an address). */
+export const isAddress = (s: unknown): s is string =>
+  typeof s === "string" && viemIsAddress(s, { strict: false });
 
 export const addrEq = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 

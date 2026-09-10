@@ -242,13 +242,13 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
     method: "POST",
     json: {
       message: msg(nonce, "evil.example"),
-      signature: w.sign(msg(nonce, "evil.example")),
+      signature: await w.sign(msg(nonce, "evil.example")),
     },
   });
   assertEquals(bad.status, 401);
   const res = await h.req("/api/auth/verify", {
     method: "POST",
-    json: { message: msg(nonce), signature: w.sign(msg(nonce)) },
+    json: { message: msg(nonce), signature: await w.sign(msg(nonce)) },
   });
   assertEquals(res.status, 200);
   const body = await j(res) as { token: string; address: string; isAdmin: boolean };
@@ -256,7 +256,7 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
   assertEquals(body.isAdmin, true);
   const reuse = await h.req("/api/auth/verify", {
     method: "POST",
-    json: { message: msg(nonce), signature: w.sign(msg(nonce)) },
+    json: { message: msg(nonce), signature: await w.sign(msg(nonce)) },
   });
   assertEquals(reuse.status, 401);
   assertStringIncludes(String((await j(reuse)).error), "nonce");
@@ -273,7 +273,7 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
   const r2 = await j(
     await h.req("/api/auth/verify", {
       method: "POST",
-      json: { message: m2, signature: p.sign(m2) },
+      json: { message: m2, signature: await p.sign(m2) },
     }),
   ) as { token: string; isAdmin: boolean };
   assertEquals(r2.isAdmin, false);

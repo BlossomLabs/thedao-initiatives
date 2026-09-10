@@ -371,22 +371,25 @@ const VECTORS = [
 const vectorMessage = (v: { content: string }) =>
   `TheDAO Security Fund\naction:post\ninitiative:test-initiative\ncontent:${v.content}\nts:${VECTOR_TS}`;
 
-Deno.test("recoverPersonalSign: known-good vectors, wrong sig, malformed, local wallet", () => {
+Deno.test("recoverPersonalSign: known-good vectors, wrong sig, malformed, local wallet", async () => {
   for (const v of VECTORS) {
-    assertEquals(recoverPersonalSign(vectorMessage(v), v.signature), v.address);
+    assertEquals(await recoverPersonalSign(vectorMessage(v), v.signature), v.address);
   }
   assert(
-    recoverPersonalSign(vectorMessage(VECTORS[0]), VECTORS[1].signature) !==
+    await recoverPersonalSign(vectorMessage(VECTORS[0]), VECTORS[1].signature) !==
       VECTORS[0].address,
   );
   for (
     const sig of ["", "0x", "0x1234", "0x" + "zz".repeat(65), "0x" + "00".repeat(65)]
   ) {
-    assertEquals(recoverPersonalSign("hello", sig), null);
+    assertEquals(await recoverPersonalSign("hello", sig), null);
   }
   const w = wallet("0x" + "11".repeat(32));
   assertEquals(w.address, VECTORS[0].address);
-  assertEquals(recoverPersonalSign("hello world", w.sign("hello world")), w.address);
+  assertEquals(
+    await recoverPersonalSign("hello world", await w.sign("hello world")),
+    w.address,
+  );
 });
 
 const SPEC_MESSAGE = `example.com wants you to sign in with your Ethereum account:
@@ -423,7 +426,8 @@ Deno.test("SIWE parser: spec example, no-statement form, rejects junk", () => {
       "",
       "hello",
       SPEC_MESSAGE.replace("Version: 1", "Version: 2"),
-      SPEC_MESSAGE + "\nextra",
+      SPEC_MESSAGE.replace("Nonce: 32891756\n", ""),
+      SPEC_MESSAGE.replace("Issued At: 2021-09-30T16:25:24Z", "Issued At: yesterday"),
     ]
   ) {
     let threw = false;
@@ -436,7 +440,7 @@ Deno.test("SIWE parser: spec example, no-statement form, rejects junk", () => {
   }
 });
 
-Deno.test("verifySiwe: happy path and each rejection", () => {
+Deno.test("verifySiwe: happy path and each rejection", async () => {
   const w = wallet("0x" + "22".repeat(32));
   const issued = new Date(NOW * 1000).toISOString();
   const msg = (
@@ -455,7 +459,7 @@ Deno.test("verifySiwe: happy path and each rejection", () => {
     now: NOW,
     skewSecs: 300,
   };
-  const ok = verifySiwe({ ...base, message: msg(), signature: w.sign(msg()) });
+  const ok = await verifySiwe({ ...base, message: msg(), signature: await w.sign(msg()) });
   assertEquals(ok[1], null);
   assertEquals(ok[0]!.address, w.address);
   const cases: [string, string][] = [
@@ -465,10 +469,14 @@ Deno.test("verifySiwe: happy path and each rejection", () => {
     [msg({ issued: new Date((NOW - 1000) * 1000).toISOString() }), "issuedAt"],
   ];
   for (const [m, why] of cases) {
-    const [, err] = verifySiwe({ ...base, message: m, signature: w.sign(m) });
+    const [, err] = await verifySiwe({ ...base, message: m, signature: await w.sign(m) });
     assertStringIncludes(err ?? "", why);
   }
   const other = wallet("0x" + "33".repeat(32));
-  const [, err] = verifySiwe({ ...base, message: msg(), signature: other.sign(msg()) });
+  const [, err] = await verifySiwe({
+    ...base,
+    message: msg(),
+    signature: await other.sign(msg()),
+  });
   assertStringIncludes(err ?? "", "signature");
 });

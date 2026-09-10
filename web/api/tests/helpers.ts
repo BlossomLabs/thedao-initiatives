@@ -1,9 +1,6 @@
 /** Shared test utilities: fake RPC, wallet signing, canned chain data. */
-import { secp256k1 } from "@noble/curves/secp256k1.js";
-import { encodeHex } from "@std/encoding";
-import { keccak256 } from "../chain/keccak.ts";
-import { toChecksum } from "../chain/address.ts";
-import { personalMessageHash } from "../chain/sign.ts";
+import type { Hex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import type { Rpc } from "../chain/rpc.ts";
 import { TRANSFER_TOPIC } from "../chain/verify.ts";
 
@@ -55,21 +52,10 @@ export function fakeRpc(handlers: Handlers): Rpc {
 
 /** Deterministic throwaway wallet from a 32-byte hex private key. */
 export function wallet(privHex: string) {
-  const priv = new Uint8Array(32);
   const clean = privHex.replace(/^0x/, "").padStart(64, "0");
-  for (let i = 0; i < 32; i++) priv[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
-  const pub = secp256k1.getPublicKey(priv, false);
-  const address = toChecksum("0x" + encodeHex(keccak256(pub.slice(1)).slice(-20)));
+  const account = privateKeyToAccount(("0x" + clean) as Hex);
   return {
-    address,
-    sign(message: string): string {
-      const sig = secp256k1.sign(personalMessageHash(message), priv, {
-        prehash: false,
-        format: "recovered",
-      });
-      // noble "recovered" = [v(0/1), r, s]; wallets emit r || s || v(27/28)
-      const v = sig[0] + 27;
-      return "0x" + encodeHex(sig.slice(1)) + v.toString(16).padStart(2, "0");
-    },
+    address: account.address as string,
+    sign: (message: string): Promise<string> => account.signMessage({ message }),
   };
 }

@@ -39,7 +39,7 @@ export function authRoutes(deps: Deps) {
     if (!message || !signature) {
       throw new HttpError(400, "message and signature are required");
     }
-    const [m, err] = verifySiwe({
+    const [m, err] = await verifySiwe({
       message,
       signature,
       domains: config.siweDomains,

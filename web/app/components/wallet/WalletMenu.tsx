@@ -1,13 +1,22 @@
 import { useEffect, useRef } from "react";
-import { LayoutDashboard, LogOut, Pencil, RefreshCw, ShieldCheck, Wallet } from "lucide-react";
+import {
+  LayoutDashboard,
+  LogOut,
+  Mail,
+  Pencil,
+  RefreshCw,
+  ShieldCheck,
+  Wallet,
+} from "lucide-react";
 import type { Connector } from "wagmi";
+import { PRIVY_CONNECTOR_ID } from "~/lib/privy";
 import { cn } from "~/lib/utils";
 
 export interface WalletMenuItem {
   key: string;
   label: string;
   icon?: string;
-  lucide?: "wallet" | "switch" | "edit" | "power" | "sign" | "admin";
+  lucide?: "wallet" | "mail" | "switch" | "edit" | "power" | "sign" | "admin";
   active?: boolean;
   danger?: boolean;
   separator?: boolean;
@@ -16,6 +25,7 @@ export interface WalletMenuItem {
 
 const ICONS = {
   wallet: Wallet,
+  mail: Mail,
   switch: RefreshCw,
   edit: Pencil,
   power: LogOut,
@@ -89,3 +99,16 @@ export default function WalletMenu(
 export const connectorIcon = (
   c: Connector,
 ): string | undefined => (typeof c.icon === "string" ? c.icon : undefined);
+
+/** Menu entry for a connector: the wallet's own icon when it has one, else a generic glyph. */
+export const connectorItem = (
+  c: Connector,
+  onClick: () => void,
+  label = c.name,
+): WalletMenuItem => ({
+  key: c.uid,
+  label,
+  icon: connectorIcon(c),
+  lucide: connectorIcon(c) ? undefined : c.id === PRIVY_CONNECTOR_ID ? "mail" : "wallet",
+  onClick,
+});

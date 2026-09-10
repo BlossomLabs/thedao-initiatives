@@ -3,6 +3,7 @@ import { mainnet } from "viem/chains";
 import { createConfig } from "wagmi";
 import { injected, mock, walletConnect } from "wagmi/connectors";
 import { SITE_LOGO, SITE_NAME, SITE_URL } from "~/data/site";
+import { privy, PRIVY_APP_ID } from "./privy";
 
 export const WALLETCONNECT_PROJECT_ID =
   (import.meta.env?.VITE_WALLETCONNECT_PROJECT_ID as string | undefined) ?? "";
@@ -18,6 +19,8 @@ export const wagmiConfig = createConfig({
   chains: [mainnet],
   connectors: [
     ...(MOCK_WALLET ? [mock({ accounts: [MOCK_WALLET], features: { reconnect: true } })] : []),
+    // Email sign-in (Privy embedded wallet), first so people without a wallet see it.
+    ...(PRIVY_APP_ID ? [privy()] : []),
     injected(),
     ...(WALLETCONNECT_PROJECT_ID
       ? [

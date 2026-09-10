@@ -44,11 +44,20 @@ is served from the SPA fallback by `server.ts`. `/api/*` and `/healthz` go to th
 
 ## Wallet and sign-in
 
-wagmi + viem: injected wallets (EIP-6963) and WalletConnect when
-`VITE_WALLETCONNECT_PROJECT_ID` is set. Sign-In with Ethereum happens only when
-an action needs it (vote, reply, name, admin): nonce → `createSiweMessage` →
-`personal_sign` → bearer token in `localStorage` (`thedao:session`). See
-`app/context/session.tsx`.
+wagmi + viem: injected wallets (EIP-6963), WalletConnect when
+`VITE_WALLETCONNECT_PROJECT_ID` is set, and "Email" when `VITE_PRIVY_APP_ID` is set.
+Sign-In with Ethereum happens only when an action needs it (vote, reply, name, admin):
+nonce → `createSiweMessage` → `personal_sign` → bearer token in `localStorage`
+(`thedao:session`). See `app/context/session.tsx`.
+
+Email sign-in is [Privy](https://docs.privy.io) used headless: our own dialog
+(`app/components/wallet/EmailSignInDialog.tsx`) sends and checks the one-time code, Privy
+creates an embedded wallet (a plain EOA) for the account, and `app/lib/privy.ts` exposes that
+wallet to wagmi as the `privy` connector, so SIWE, donations and votes work unchanged and the
+API never learns about Privy. Privy's wallet modals are disabled; the site's buttons are the
+confirmation step. Signing out of the site also logs out of Privy. The SDK (~450 KB gzipped)
+lives in its own chunk (`app/context/privy.tsx`) that only loads when someone picks Email or
+returns with an email session, so wallet users never download it.
 
 ## Deploy (Deno Deploy)
 

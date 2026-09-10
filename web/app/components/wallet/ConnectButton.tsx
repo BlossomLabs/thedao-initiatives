@@ -4,10 +4,12 @@ import { useNavigate } from "react-router";
 import { useAccount } from "wagmi";
 import { useSession } from "~/context/session";
 import { useProfileDialog } from "~/context/profile-dialog";
+import { useEmailSignIn } from "~/context/email-sign-in";
 import { useConnectors } from "~/hooks/use-connectors";
 import { useIdentity } from "~/hooks/use-identity";
 import { Avatar } from "./Avatar";
-import WalletMenu, { connectorIcon, type WalletMenuItem } from "./WalletMenu";
+import WalletMenu, { connectorItem, type WalletMenuItem } from "./WalletMenu";
+import { PRIVY_CONNECTOR_ID } from "~/lib/privy";
 import { walletErrorMessage } from "~/lib/donate";
 import { cn } from "~/lib/utils";
 
@@ -24,6 +26,7 @@ export default function ConnectButton() {
   const { session, connect, connecting, signOut } = useSession();
   const identity = useIdentity(address);
   const { profileOpen, openProfile } = useProfileDialog();
+  const { openEmailSignIn } = useEmailSignIn();
   const navigate = useNavigate();
   const [menu, setMenu] = useState<"none" | "pick" | "account">("none");
   const [error, setError] = useState("");
@@ -62,6 +65,10 @@ export default function ConnectButton() {
 
   async function connectWith(c: (typeof usable)[number]) {
     setError("");
+    if (c.id === PRIVY_CONNECTOR_ID) {
+      openEmailSignIn();
+      return;
+    }
     try {
       await connect(c);
     } catch (e) {
@@ -79,13 +86,9 @@ export default function ConnectButton() {
     else setMenu(menu === "pick" ? "none" : "pick");
   }
 
-  const pickItems: WalletMenuItem[] = usable.map((c) => ({
-    key: c.uid,
-    label: c.name,
-    icon: connectorIcon(c),
-    lucide: connectorIcon(c) ? undefined : "wallet",
-    onClick: () => void connectWith(c),
-  }));
+  const pickItems: WalletMenuItem[] = usable.map((c) =>
+    connectorItem(c, () => void connectWith(c))
+  );
 
   const accountItems: WalletMenuItem[] = [
     ...(session
@@ -116,11 +119,8 @@ export default function ConnectButton() {
       onClick: () => openProfile(false),
     },
     ...usable.filter((c) => c.uid !== connector?.uid).map((c) => ({
+      ...connectorItem(c, () => void signOut().then(() => connectWith(c)), "Switch to " + c.name),
       key: "sw-" + c.uid,
-      label: "Switch to " + c.name,
-      icon: connectorIcon(c),
-      lucide: connectorIcon(c) ? undefined : ("switch" as const),
-      onClick: () => void signOut().then(() => connectWith(c)),
     })),
     {
       key: "out",

@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useSession } from "~/context/session";
+import { useEmailSignIn } from "~/context/email-sign-in";
+import { PRIVY_CONNECTOR_ID } from "~/lib/privy";
 import { useConnectors } from "~/hooks/use-connectors";
 import { walletErrorMessage } from "~/lib/donate";
 import { cn } from "~/lib/utils";
-import WalletMenu, { connectorIcon } from "./WalletMenu";
+import WalletMenu, { connectorItem } from "./WalletMenu";
 
 /** Blue outline button used for wallet actions inside forms. */
 export const walletBtn =
@@ -19,6 +21,7 @@ export const walletBtn =
 export default function ConnectInline({ className }: { className?: string }) {
   const connectors = useConnectors();
   const { connect, connecting } = useSession();
+  const { openEmailSignIn } = useEmailSignIn();
   const { isConnected } = useAccount();
   const [pick, setPick] = useState(false);
   // Shown under the button until dismissed, a retry, or a successful
@@ -30,6 +33,10 @@ export default function ConnectInline({ className }: { className?: string }) {
 
   async function connectWith(c: (typeof connectors)[number]) {
     setError("");
+    if (c.id === PRIVY_CONNECTOR_ID) {
+      openEmailSignIn();
+      return;
+    }
     try {
       await connect(c);
     } catch (e) {
@@ -57,13 +64,7 @@ export default function ConnectInline({ className }: { className?: string }) {
         <WalletMenu
           className="left-0 right-auto top-[40px]"
           onClose={() => setPick(false)}
-          items={connectors.map((c) => ({
-            key: c.uid,
-            label: c.name,
-            icon: connectorIcon(c),
-            lucide: connectorIcon(c) ? undefined : "wallet",
-            onClick: () => void connectWith(c),
-          }))}
+          items={connectors.map((c) => connectorItem(c, () => void connectWith(c)))}
         />
       )}
       {error && (

@@ -1,4 +1,33 @@
-/** Input validation shared by the submit form and the admin editor. */
+/** Input validation shared by the submit form, the proposer's edit page and the admin editor. */
+import { HttpError } from "./errors.ts";
+import { MAX_DETAILS, MAX_SUMMARY, MAX_TITLE } from "../config.ts";
+
+export const MIN_TITLE = 8;
+export const MIN_SUMMARY = 40;
+
+/** Clip a text field to its limit; the same rules everywhere the text is written. */
+export function cleanText(v: unknown, field: "title" | "summary" | "details"): string {
+  const max = field === "title" ? MAX_TITLE : field === "summary" ? MAX_SUMMARY : MAX_DETAILS;
+  return String(v ?? "").trim().slice(0, max);
+}
+
+/**
+ * The three revisioned fields, validated together (title >= 8 chars, summary
+ * >= 40 chars, details optional). Throws a 400 with the user-facing message.
+ */
+export function validateText(
+  text: { title: string; summary: string; details: string },
+): { title: string; summary: string; details: string } {
+  const title = cleanText(text.title, "title");
+  if (title.length < MIN_TITLE) {
+    throw new HttpError(400, `Title needs at least ${MIN_TITLE} characters.`);
+  }
+  const summary = cleanText(text.summary, "summary");
+  if (summary.length < MIN_SUMMARY) {
+    throw new HttpError(400, `Summary needs at least ${MIN_SUMMARY} characters.`);
+  }
+  return { title, summary, details: cleanText(text.details, "details") };
+}
 
 export function parseGoal(raw: unknown): [number, null] | [null, string] {
   const s = String(raw ?? "").replace(/,/g, "").replace(/\$/g, "").trim();

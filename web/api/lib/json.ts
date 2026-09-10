@@ -2,7 +2,7 @@
  * The ONE place that turns stored records into API JSON. `contact`, `funders`
  * and comment `email` are private and only leave through the admin shapes.
  */
-import type { Comment, Donation, Pledge, Rfp } from "../db/types.ts";
+import type { Comment, Donation, Pledge, Revision, Rfp } from "../db/types.ts";
 import { LIVE_ROLES } from "../services/roles.ts";
 import type { Config } from "../config.ts";
 
@@ -28,9 +28,25 @@ export function publicRfp(r: Rfp) {
     sortRank: r.sortRank,
     safeAddress: r.safeAddress,
     proposer: r.proposer ?? "",
+    revision: r.revision ?? 0,
     createdAt: r.createdAt,
     approvedAt: r.approvedAt,
   };
+}
+
+/** History entry: who wrote it and when, without the text. */
+export function revisionMeta(v: Revision) {
+  return {
+    n: v.n,
+    author: v.author,
+    source: v.source,
+    archived: v.archived,
+    createdAt: v.createdAt,
+  };
+}
+
+export function revisionJson(v: Revision) {
+  return { ...revisionMeta(v), title: v.title, summary: v.summary, details: v.details };
 }
 
 export function adminRfp(r: Rfp) {

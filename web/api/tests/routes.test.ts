@@ -1,5 +1,14 @@
 import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
-import { ADMIN, harness, j, loadContentFiles, ORIGIN, PLAIN, SAFE_ADDR } from "./app-helpers.ts";
+import {
+  ADMIN,
+  harness,
+  j,
+  loadContentFiles,
+  ORIGIN,
+  PLAIN,
+  proposerToken,
+  SAFE_ADDR,
+} from "./app-helpers.ts";
 import { transferLog, wallet } from "./helpers.ts";
 import { TOKENS } from "../config.ts";
 import { TOPIC_PROXY_CREATION } from "../chain/safe.ts";
@@ -108,12 +117,6 @@ Deno.test("board ordering: pins first, then money, then newest", async () => {
   assertEquals((board.totals as { raised: number }).raised, 500);
   h.close();
 });
-
-/** Session token for a wallet that already has a site nickname. */
-async function proposerToken(h: Awaited<ReturnType<typeof harness>>, address = PLAIN) {
-  await h.db.profiles.setNickname(address, "Proposer " + address.slice(-4));
-  return await h.mint(address);
-}
 
 Deno.test("submit: needs a signed-in wallet with a display name; records the proposer", async () => {
   const h = await harness({

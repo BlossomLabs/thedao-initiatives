@@ -3,8 +3,14 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAdmin } from "../middleware/auth.ts";
-import { adminCommentJson, adminRfp, donationJson, pledgeJson } from "../lib/json.ts";
-import { DOMAIN_RE, parseGoal, TX_HASH_RE, validateForumUrl } from "../lib/validate.ts";
+import { adminCommentJson, adminRfp, donationJson, pledgeJson, revisionMeta } from "../lib/json.ts";
+import {
+  DOMAIN_RE,
+  parseGoal,
+  TX_HASH_RE,
+  validateForumUrl,
+  validateText,
+} from "../lib/validate.ts";
 import { decimalsOf } from "./initiatives.ts";
 import { safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
@@ -12,15 +18,7 @@ import { syncContent } from "../services/content.ts";
 import { syncSafe } from "../services/safe-api.ts";
 import { liveRoles } from "../services/roles.ts";
 import type { Comment, PledgeStatus, Rfp } from "../db/types.ts";
-import {
-  CHAIN_ID,
-  MAX_DETAILS,
-  MAX_FUNDERS,
-  MAX_SUMMARY,
-  MAX_TITLE,
-  SAFE_PROXY_FACTORY,
-  SAFE_THRESHOLD,
-} from "../config.ts";
+import { CHAIN_ID, MAX_FUNDERS, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
 
 export const LOGO_MAX_BYTES = 1024 * 1024;
 
@@ -90,6 +88,7 @@ export function adminRoutes(deps: Deps) {
     const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
     return c.json({
       initiative: adminRfp(rfp),
+      revisions: (await db.revisions.list(rfp.id, true)).map(revisionMeta),
       summary: await db.fundingSummary(rfp.id),
       pledges: (await db.pledges.list(rfp.id, true)).map((p) => pledgeJson(config, p)),
       donations: (await db.donations.list(rfp.id, false)).map((d) => donationJson(d, decimalsOf)),
@@ -107,19 +106,16 @@ export function adminRoutes(deps: Deps) {
     const rfp = await rfpOr404(c.req.param("id"));
     const body = await jsonBody(c);
     const patch: Partial<Rfp> = {};
-    if (body.title !== undefined) {
-      patch.title = s(body.title, MAX_TITLE);
-      if (patch.title.length < 8) {
-        throw new HttpError(400, "Title needs at least 8 characters.");
-      }
-    }
-    if (body.summary !== undefined) {
-      patch.summary = s(body.summary, MAX_SUMMARY);
-      if (patch.summary.length < 40) {
-        throw new HttpError(400, "Summary needs at least 40 characters.");
-      }
-    }
-    if (body.details !== undefined) patch.details = s(body.details, MAX_DETAILS);
+    // Title, summary and details are revisioned: validated together against
+    // the current text and written as one new revision after the rest.
+    const textGiven = ["title", "summary", "details"].some((k) => body[k] !== undefined);
+    const text = textGiven
+      ? validateText({
+        title: body.title === undefined ? rfp.title : s(body.title),
+        summary: body.summary === undefined ? rfp.summary : s(body.summary),
+        details: body.details === undefined ? rfp.details : s(body.details, 100_000),
+      })
+      : null;
     if (body.goal !== undefined || body.goalUsd !== undefined) {
       const [goal, err] = parseGoal(body.goalUsd ?? body.goal);
       if (err) throw new HttpError(400, err);
@@ -159,8 +155,33 @@ export function adminRoutes(deps: Deps) {
         patch.proposer = resolved;
       } else throw new HttpError(400, "Owner must be a wallet address or an ENS name.");
     }
-    const next = await db.rfps.update(rfp.id, patch);
+    let next = Object.keys(patch).length ? await db.rfps.update(rfp.id, patch) : rfp;
+    if (text) {
+      next = (await db.rfps.revise(rfp.id, text, {
+        author: c.var.user!.address,
+        source: "admin",
+      })).rfp;
+    }
     return c.json({ initiative: adminRfp(next) });
+  });
+
+  /** Hide a superseded revision from the public history, or show it again. */
+  r.post("/initiatives/:id/revisions/:n", async (c) => {
+    const rfp = await rfpOr404(c.req.param("id"));
+    const n = Number(c.req.param("n"));
+    const action = s((await jsonBody(c)).action, 20);
+    if (action !== "archive" && action !== "unarchive") throw new HttpError(400, "bad action");
+    if (action === "archive" && n === rfp.revision) {
+      throw new HttpError(
+        400,
+        "The current revision cannot be archived; save a new revision to replace it.",
+      );
+    }
+    const rev = Number.isInteger(n) && n > 0
+      ? await db.revisions.setArchived(rfp.id, n, action === "archive")
+      : null;
+    if (!rev) throw new HttpError(404, "not found");
+    return c.json({ revision: revisionMeta(rev) });
   });
 
   r.post("/initiatives/:id/status", async (c) => {

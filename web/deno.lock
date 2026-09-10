@@ -30,6 +30,7 @@
     "npm:@types/react@^19.2.5": "19.2.18",
     "npm:@walletconnect/ethereum-provider@2.21.1": "2.21.1_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
     "npm:clsx@^2.1.1": "2.1.1",
+    "npm:diff@^8.0.2": "8.0.4",
     "npm:isbot@^5.1.31": "5.2.2",
     "npm:jsdom@^27.1.0": "27.4.0",
     "npm:lucide-react@0.561": "0.561.0_react@19.2.8",
@@ -1817,6 +1818,9 @@
       "dependencies": [
         "dequal"
       ]
+    },
+    "diff@8.0.4": {
+      "integrity": "sha512-DPi0FmjiSU5EvQV0++GFDOJ9ASQUVFh5kD+OzOnYdi7n3Wpm9hWWGfB/O2blfHcMVTL5WkQXSnRiK9makhrcnw=="
     },
     "dijkstrajs@1.0.3": {
       "integrity": "sha512-qiSlmBq9+BCdCA/L46dw8Uy93mloxsPSbwnm5yrKn2vMPiy8KyAskTF6zuV/j5BMsmOGZDPs7KjU+mjb670kfA=="
@@ -3732,6 +3736,7 @@
         "npm:@types/react@^19.2.5",
         "npm:@walletconnect/ethereum-provider@2.21.1",
         "npm:clsx@^2.1.1",
+        "npm:diff@^8.0.2",
         "npm:isbot@^5.1.31",
         "npm:jsdom@^27.1.0",
         "npm:lucide-react@0.561",

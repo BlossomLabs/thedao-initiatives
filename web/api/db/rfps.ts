@@ -1,9 +1,16 @@
 import { collect, K } from "./keys.ts";
-import type { Rfp, RfpStatus } from "./types.ts";
+import type { Revision, RevisionSource, Rfp, RfpStatus } from "./types.ts";
 import { newId } from "../lib/ids.ts";
 import { slugify } from "../lib/slug.ts";
 
-export type RfpInput = Partial<Omit<Rfp, "id" | "createdAt">> & { title: string };
+export type RfpInput = Partial<Omit<Rfp, "id" | "createdAt" | "revision">> & { title: string };
+
+/** The three public text fields: the only thing a revision holds. */
+export type RfpText = Pick<Rfp, "title" | "summary" | "details">;
+export type RevisionOrigin = { author: string; source: RevisionSource };
+
+const sameText = (a: RfpText, b: RfpText) =>
+  a.title === b.title && a.summary === b.summary && a.details === b.details;
 
 export function rfpsRepo(kv: Deno.Kv, now: () => number) {
   const get = async (id: string): Promise<Rfp | null> => (await kv.get<Rfp>(K.rfp(id))).value;
@@ -18,8 +25,33 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
     return id ? get(id) : null;
   };
 
-  /** Insert with a unique slug (atomic check on the slug index). */
-  async function insert(fields: RfpInput, slug?: string): Promise<Rfp> {
+  const revisionOf = (
+    rfp: Rfp,
+    n: number,
+    text: RfpText,
+    origin: RevisionOrigin,
+    createdAt: number,
+  ): Revision => ({
+    rfpId: rfp.id,
+    n,
+    title: text.title,
+    summary: text.summary,
+    details: text.details,
+    author: origin.author,
+    source: origin.source,
+    archived: false,
+    createdAt,
+  });
+
+  /**
+   * Insert with a unique slug (atomic check on the slug index). Revision 1 is
+   * written in the same commit, so every initiative has a history from birth.
+   */
+  async function insert(
+    fields: RfpInput,
+    slug?: string,
+    origin: RevisionOrigin = { author: fields.proposer ?? "", source: "submit" },
+  ): Promise<Rfp> {
     const base = slug ?? slugify(fields.title);
     for (let attempt = 0; attempt < 8; attempt++) {
       const s = attempt === 0
@@ -45,6 +77,7 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
         type: fields.type ?? "rfp",
         sortRank: fields.sortRank ?? null,
         safeAddress: fields.safeAddress ?? "",
+        revision: 1,
         createdAt: t,
         approvedAt: fields.approvedAt ?? (status === "approved" ? t : null),
       };
@@ -52,6 +85,7 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
         .check({ key: K.rfpBySlug(s), versionstamp: null })
         .set(K.rfpBySlug(s), rfp.id)
         .set(K.rfp(rfp.id), rfp)
+        .set(K.revision(rfp.id, 1), revisionOf(rfp, 1, rfp, origin, t))
         .commit();
       if (res.ok) return rfp;
     }
@@ -64,10 +98,8 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
       .sort((a, b) => b.createdAt - a.createdAt);
   };
 
+  /** Everything but the text fields, which only change through revise(). */
   const ALLOWED = new Set<keyof Rfp>([
-    "title",
-    "summary",
-    "details",
     "discourseUrl",
     "goalUsd",
     "contact",
@@ -109,9 +141,49 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
   }
 
   /**
+   * Replace the public text with a new revision. A no-op when nothing changed
+   * (`revision: null`). A row written before revisions existed first gets its
+   * current text snapshotted as revision 1, so the history is never missing
+   * the version people saw.
+   */
+  async function revise(
+    id: string,
+    input: RfpText,
+    origin: RevisionOrigin,
+  ): Promise<{ rfp: Rfp; revision: Revision | null }> {
+    // Only the three fields, whatever else the caller's record carries.
+    const text: RfpText = { title: input.title, summary: input.summary, details: input.details };
+    for (let i = 0; i < 5; i++) {
+      const cur = await kv.get<Rfp>(K.rfp(id));
+      if (!cur.value) throw new Error("rfp not found");
+      const rfp = cur.value;
+      if (sameText(rfp, text)) return { rfp, revision: null };
+      const legacy = !(rfp.revision > 0);
+      const n = (legacy ? 1 : rfp.revision) + 1;
+      const t = now();
+      const revision = revisionOf(rfp, n, text, origin, t);
+      const next: Rfp = { ...rfp, ...text, revision: n };
+      const op = kv.atomic()
+        .check(cur)
+        .check({ key: K.revision(id, n), versionstamp: null })
+        .set(K.rfp(id), next)
+        .set(K.revision(id, n), revision);
+      if (legacy) {
+        op.check({ key: K.revision(id, 1), versionstamp: null }).set(
+          K.revision(id, 1),
+          revisionOf(rfp, 1, rfp, { author: "", source: "import" }, rfp.createdAt),
+        );
+      }
+      const res = await op.commit();
+      if (res.ok) return { rfp: next, revision };
+    }
+    throw new Error("update conflict");
+  }
+
+  /**
    * Create or update from a content file. Files own the words and the goal;
    * the admin panel owns the lifecycle, so an update never touches status,
-   * safeAddress, or money data.
+   * safeAddress, or money data. Changed words become a revision.
    */
   async function upsertContent(
     slug: string,
@@ -126,23 +198,22 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
       type: Rfp["type"];
     },
   ): Promise<"created" | "updated"> {
+    const origin: RevisionOrigin = { author: "", source: "content" };
     const existing = await bySlug(slug);
     if (existing) {
       const patch: Partial<Rfp> = {
-        title: f.title,
-        summary: f.summary,
-        details: f.details,
         goalUsd: f.goalUsd,
         discourseUrl: f.discourseUrl,
         type: f.type,
       };
       if (f.sortRank !== null) patch.sortRank = f.sortRank;
       await update(existing.id, patch);
+      await revise(existing.id, f, origin);
       return "updated";
     }
-    await insert({ ...f }, slug);
+    await insert({ ...f }, slug, origin);
     return "created";
   }
 
-  return { get, bySlug, bySafe, insert, list, update, upsertContent };
+  return { get, bySlug, bySafe, insert, list, update, revise, upsertContent };
 }

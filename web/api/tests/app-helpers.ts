@@ -205,6 +205,12 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
   };
 }
 
+/** Session token for a wallet that already has a site nickname (may submit and edit). */
+export async function proposerToken(h: Harness, address = PLAIN): Promise<string> {
+  await h.db.profiles.setNickname(address, "Proposer " + address.slice(-4));
+  return await h.mint(address);
+}
+
 export const j = (r: Response) => r.json() as Promise<Record<string, unknown>>;
 
 export async function loadContentFiles(): Promise<{ name: string; text: string }[]> {

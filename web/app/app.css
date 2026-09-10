@@ -391,6 +391,10 @@
     @apply inline-block rounded-full border border-edge2 text-soft px-2.5 py-0.5 font-inter-tight
       text-[11px] uppercase tracking-[0.08em];
   }
+  /* a chip sitting next to a type badge: same height and vertical rhythm */
+  .chip-badge {
+    @apply inline-flex items-center py-1 leading-[1.5] font-semibold tracking-[0.05em];
+  }
   .st-pending {
     @apply text-dao-amber border-[rgba(240,180,41,.5)];
   }
@@ -461,6 +465,21 @@
   .alert {
     @apply rounded-xl border border-[rgba(255,59,56,.55)] bg-[rgba(255,59,56,.12)] px-4 py-3 my-3.5
       text-[#ffd7d6] text-[13.5px];
+  }
+
+  /* revision diff: insertions green, deletions red, wrapped like the source text */
+  .diff {
+    @apply whitespace-pre-wrap [overflow-wrap:anywhere];
+  }
+  .diff-body {
+    @apply text-[14.5px] leading-[1.7];
+  }
+  .diff ins {
+    @apply no-underline rounded-[3px] bg-[rgba(92,183,90,.22)] text-[#bff0be] px-0.5;
+  }
+  .diff del {
+    @apply rounded-[3px] bg-[rgba(255,59,56,.2)] text-[#ffc9c7] px-0.5 line-through
+      decoration-[rgba(255,201,199,.6)];
   }
 
   /* status box (donate + forms) */

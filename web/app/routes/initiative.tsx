@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { Link, useParams } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageSquare } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
@@ -13,11 +13,15 @@ import FundingHead from "~/components/initiative/FundingHead";
 import Backers from "~/components/initiative/Backers";
 import DonationsTable from "~/components/initiative/DonationsTable";
 import SideCards from "~/components/initiative/SideCards";
+import { DiffBlock, type ViewMode } from "~/components/initiative/RevisionBar";
 import CommentsSection from "~/components/comments/CommentsSection";
 import Identity from "~/components/wallet/Identity";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
+import { useRevision } from "~/hooks/use-revision";
 import { useBoard } from "~/hooks/use-board";
 import { ApiError } from "~/lib/api";
+import { diffRevisions } from "~/lib/revision-diff";
+import type { RevisionText } from "~/lib/api-types";
 import { SITE_NAME } from "~/data/site";
 import { dt } from "~/lib/format";
 import { generateMeta } from "~/utils/meta";
@@ -31,6 +35,19 @@ export default function Initiative() {
   const { data: page, isLoading, error, isPlaceholderData } = useInitiative(slug);
   const board = useBoard();
   const qc = useQueryClient();
+
+  // ?rev=N opens an older revision in place of the current text. The history
+  // list comes with the page; the older text is fetched on demand.
+  const [params] = useSearchParams();
+  const current = page?.initiative.revision ?? 0;
+  const asked = Number(params.get("rev"));
+  const viewing = Number.isInteger(asked) && asked > 0 && asked !== current ? asked : current;
+  const older = useRevision(slug, viewing !== current ? viewing : null);
+  const revisions = page?.revisions ?? [];
+  const idx = revisions.findIndex((v) => v.n === viewing);
+  const [mode, setMode] = useState<ViewMode>("rendered");
+  const prevMeta = idx > 0 ? revisions[idx - 1] : null;
+  const prev = useRevision(slug, mode === "changes" && prevMeta ? prevMeta.n : null);
 
   useEffect(() => {
     if (page) document.title = `${page.initiative.title} · ${SITE_NAME}`;
@@ -51,11 +68,18 @@ export default function Initiative() {
     void qc.invalidateQueries({ queryKey: initiativeKey(slug) });
     void qc.invalidateQueries({ queryKey: ["board"] });
   };
+  // The text on screen: the current one, or the older revision once loaded.
+  const showingOld = viewing !== current && Boolean(older.data);
+  const text: RevisionText = showingOld ? older.data! : r;
+  const diff = mode === "changes" && (prev.data || !prevMeta)
+    ? diffRevisions(prev.data ?? null, text)
+    : null;
+  const showBar = revisions.length > 1 || viewing !== current;
   return (
     <PageMain detail>
       <Crumbs items={[{ label: "Initiatives", to: "/" }]} />
       <h1 className="m-0 mb-3 mt-1.5 font-inter-tight text-[clamp(28px,4vw,44px)] font-bold leading-[1.1] tracking-[-.02em]">
-        {r.title}
+        {diff ? <DiffBlock chunks={diff.title} /> : text.title}
       </h1>
       <p className="m-0 flex flex-wrap items-center gap-3">
         {r.discourseUrl && (
@@ -69,8 +93,29 @@ export default function Initiative() {
           </a>
         )}
         <TypeBadge type={r.type} inline />
-        {r.status === "archived" && <span className="chip st-archived">archived</span>}
+        {r.status === "archived" && <span className="chip chip-badge st-archived">archived</span>}
+        {r.status === "pending" && (
+          <span
+            className="chip chip-badge st-pending"
+            title="Only you and the team can see it until it is approved"
+          >
+            pending review
+          </span>
+        )}
+        {showingOld && (
+          <span
+            className="chip chip-badge st-pending"
+            title="An older revision of the text is open"
+          >
+            superseded
+          </span>
+        )}
       </p>
+      {viewing !== current && older.error && (
+        <p className="alert" role="alert">
+          That revision is not available. Showing the current text instead.
+        </p>
+      )}
 
       <div className="mt-4 grid grid-cols-[1fr_340px] items-start gap-9 max-[960px]:grid-cols-1">
         <div className="min-w-0">
@@ -81,19 +126,27 @@ export default function Initiative() {
             funded={page.funded}
           />
           <SectionHeading>Summary</SectionHeading>
-          <p className="md m-0 whitespace-pre-line">{r.summary}</p>
+          {diff
+            ? <DiffBlock chunks={diff.summary} className="diff-body" />
+            : <p className="md m-0 whitespace-pre-line">{text.summary}</p>}
           <SectionHeading>Full initiative details</SectionHeading>
-          {r.details ? <Markdown text={r.details} /> : (
-            <p className="text-muted">
-              The complete spec (scope, milestones, budget breakdown) is being written.
-              {r.discourseUrl && (
-                <>
-                  Follow and shape it{" "}
-                  <a href={r.discourseUrl} target="_blank" rel="noopener">on the forum thread</a>.
-                </>
-              )}
-            </p>
-          )}
+          {diff
+            ? (diff.details.length
+              ? <DiffBlock chunks={diff.details} className="mono text-[13px]" />
+              : <p className="text-muted">No details in either revision.</p>)
+            : text.details
+            ? <Markdown text={text.details} />
+            : (
+              <p className="text-muted">
+                The complete spec (scope, milestones, budget breakdown) is being written.
+                {r.discourseUrl && (
+                  <>
+                    Follow and shape it{" "}
+                    <a href={r.discourseUrl} target="_blank" rel="noopener">on the forum thread</a>.
+                  </>
+                )}
+              </p>
+            )}
           <CommentsSection slug={r.slug} open={r.status === "approved"} />
           {isPlaceholderData
             ? (
@@ -121,6 +174,7 @@ export default function Initiative() {
           page={page}
           safeThreshold={board.data?.flags.safeThreshold}
           onDonated={refresh}
+          revisions={showBar ? { viewing, current, mode, onMode: setMode } : undefined}
         />
       </div>
     </PageMain>

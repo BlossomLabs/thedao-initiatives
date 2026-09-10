@@ -28,7 +28,10 @@ remote API.
 - `/` board (hero total, AI search when enabled, initiative cards with inline
   donate, suggest card, pledge band)
 - `/initiative/:slug` (funding, summary, markdown details, comments, backers,
-  donations, donate/discuss/back/next side cards); `/rfp/:slug` redirects
+  donations, donate/discuss/back/next side cards); `?rev=N` shows an older revision of the
+  text, rendered or as word-level changes against the one before; `/rfp/:slug` redirects
+- `/initiative/:slug/edit` (proposer or admin, SIWE): title, summary and details only; each
+  save is a new public revision that goes live at once
 - `/submit`, `/submit/thanks`
 - `/donation-terms` (content/donation-terms.md, synced into the API; the donate widget's
   terms gate links here)

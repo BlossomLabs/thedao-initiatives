@@ -19,8 +19,30 @@ export interface Rfp {
   type: RfpType;
   sortRank: number | null;
   safeAddress: string;
+  /** Number of the current (latest) revision; 0 = written before revisions existed. */
+  revision: number;
   createdAt: number;
   approvedAt: number | null;
+}
+
+/** Who wrote a revision: the submit form, the proposer's edit page, the admin
+ * editor, a content file, or the one-off import. */
+export type RevisionSource = "submit" | "proposer" | "admin" | "content" | "import";
+
+/** One version of the three public text fields. Immutable except `archived`. */
+export interface Revision {
+  rfpId: string;
+  /** 1-based, dense, increasing. */
+  n: number;
+  title: string;
+  summary: string;
+  details: string;
+  /** Wallet address; "" for content files and imports. */
+  author: string;
+  source: RevisionSource;
+  /** Hidden from the public history (admins still see it). */
+  archived: boolean;
+  createdAt: number;
 }
 
 export type PledgeStatus = "pledged" | "received" | "withdrawn";

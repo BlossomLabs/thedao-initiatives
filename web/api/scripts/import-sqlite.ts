@@ -27,22 +27,28 @@ const rfpIds = new Map<number, string>();
 for (const r of rows<OldRfp>("SELECT * FROM rfps")) {
   let existing = await db.rfps.bySlug(r.slug);
   if (!existing) {
-    existing = await db.rfps.insert({
-      title: str(r.title),
-      summary: str(r.summary),
-      details: str(r.details),
-      discourseUrl: str(r.discourse_url),
-      goalUsd: Number(r.funding_goal_usd ?? 0),
-      contact: str(r.contact),
-      funders: str(r.funders),
-      status: str(r.status) as Rfp["status"],
-      type: (str(r.type) || "rfp") as Rfp["type"],
-      sortRank: r.sort_rank === null || r.sort_rank === undefined ? null : Number(r.sort_rank),
-      safeAddress: str(r.safe_address),
-      approvedAt: r.approved_at ? Number(r.approved_at) : null,
-    }, r.slug);
+    existing = await db.rfps.insert(
+      {
+        title: str(r.title),
+        summary: str(r.summary),
+        details: str(r.details),
+        discourseUrl: str(r.discourse_url),
+        goalUsd: Number(r.funding_goal_usd ?? 0),
+        contact: str(r.contact),
+        funders: str(r.funders),
+        status: str(r.status) as Rfp["status"],
+        type: (str(r.type) || "rfp") as Rfp["type"],
+        sortRank: r.sort_rank === null || r.sort_rank === undefined ? null : Number(r.sort_rank),
+        safeAddress: str(r.safe_address),
+        approvedAt: r.approved_at ? Number(r.approved_at) : null,
+      },
+      r.slug,
+      { author: "", source: "import" },
+    );
     // preserve the original creation time
     await kv.set(["rfp", existing.id], { ...existing, createdAt: Number(r.created_at) });
+    const rev1 = (await db.revisions.get(existing.id, 1))!;
+    await kv.set(["revision", existing.id, 1], { ...rev1, createdAt: Number(r.created_at) });
     console.log(`rfp ${r.slug}: created`);
   } else console.log(`rfp ${r.slug}: exists, skipped`);
   rfpIds.set(r.id, existing.id);

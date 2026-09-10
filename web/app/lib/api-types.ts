@@ -16,9 +16,33 @@ export interface Initiative {
   safeAddress: string;
   /** Wallet that submitted it ("" for imported initiatives). */
   proposer: string;
+  /** Current revision number; 0 for rows that predate revisions. */
+  revision: number;
   createdAt: number;
   approvedAt: number | null;
 }
+
+export type RevisionSource = "submit" | "proposer" | "admin" | "content" | "import";
+
+/** One entry of an initiative's history, without the text. */
+export interface RevisionMeta {
+  n: number;
+  /** Wallet address; "" for content files and imports. */
+  author: string;
+  source: RevisionSource;
+  /** Only ever true in admin responses. */
+  archived: boolean;
+  createdAt: number;
+}
+
+export interface Revision extends RevisionMeta {
+  title: string;
+  summary: string;
+  details: string;
+}
+
+/** The three fields a revision may change. */
+export type RevisionText = Pick<Revision, "title" | "summary" | "details">;
 
 export interface AdminInitiative extends Initiative {
   contact: string;
@@ -117,6 +141,8 @@ export interface Donation {
 
 export interface InitiativePage {
   initiative: Initiative;
+  /** Public history, oldest first (archived entries only for admins). */
+  revisions: RevisionMeta[];
   summary: Summary;
   pct: number;
   pledges: Pledge[];
@@ -248,6 +274,7 @@ export interface AdminDashboard {
 
 export interface AdminInitiativePage {
   initiative: AdminInitiative;
+  revisions: RevisionMeta[];
   summary: Summary;
   pledges: Pledge[];
   donations: Donation[];

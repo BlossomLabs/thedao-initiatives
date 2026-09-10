@@ -31,12 +31,18 @@ and `../deno.json` holds the tasks and imports.
 - **Uploads go to Pinata** (backer logos, profile pictures); only the CID is stored. Set
   `PINATA_JWT`; until then uploads answer 503.
 - Markdown (`details`) is stored and returned raw; the frontend renders it.
+- **Text is revisioned.** Every change to title, summary or details (the proposer's edit page, the
+  admin editor, content sync) appends an immutable revision under `["revision", rfpId, n]`; the
+  initiative row carries the current number. Revisions are public; admins can archive a superseded
+  one (hidden from the public history, never the current one). Rows written before revisions existed
+  get their text snapshotted as revision 1 on their first edit.
 - Ids are ULID strings. Rate limits live in KV so they hold across isolates.
 
 ## Endpoints
 
-Public: `GET /healthz`, `GET /api/board`, `GET /api/initiatives/:slug`, `POST /api/initiatives`
-(submit, always pending), `GET /api/donate/params`, `POST /api/donate/confirm`,
+Public: `GET /healthz`, `GET /api/board`, `GET /api/initiatives/:slug` (a pending one only for its
+proposer and admins), `GET /api/initiatives/:slug/revisions/:n`, `POST /api/initiatives` (submit,
+always pending), `GET /api/donate/params`, `POST /api/donate/confirm`,
 `GET /api/donate/status/:txHash`, `GET /api/ens-name/:addr`, `GET /api/nickname/:addr`,
 `POST /api/ai-search`, `GET /api/initiatives/:slug/comments`,
 `POST /api/initiatives/:slug/comments`, `GET /api/comments/mine?tokens=`,
@@ -44,13 +50,14 @@ Public: `GET /healthz`, `GET /api/board`, `GET /api/initiatives/:slug`, `POST /a
 
 Signed in: `GET /api/auth/me`, `POST /api/auth/logout`, `POST /api/auth/logout-all`,
 `POST /api/nickname`, `POST /api/pfp`, `POST /api/pfp/upload`, `POST /api/comments/:id/vote`,
-`POST /api/comments/:id/reply` (role-gated).
+`POST /api/comments/:id/reply` (role-gated), `POST /api/initiatives/:slug/revisions` (proposer or
+admin: title, summary, details).
 
 Admin (`/api/admin/...`): `GET dashboard`, `GET|PATCH initiatives/:id`,
-`POST initiatives/:id/status`, `POST|PATCH|DELETE initiatives/:id/pledges[/:pid]`,
-`POST initiatives/:id/donations/recheck`, `POST initiatives/:id/sync-donations`,
-`GET initiatives/:id/safe-deploy-params`, `POST initiatives/:id/safe-confirm`,
-`POST comments/:id/:action`, `POST sync-content`.
+`POST initiatives/:id/status`, `POST initiatives/:id/revisions/:n` (archive / unarchive),
+`POST|PATCH|DELETE initiatives/:id/pledges[/:pid]`, `POST initiatives/:id/donations/recheck`,
+`POST initiatives/:id/sync-donations`, `GET initiatives/:id/safe-deploy-params`,
+`POST initiatives/:id/safe-confirm`, `POST comments/:id/:action`, `POST sync-content`.
 
 All bodies and responses are JSON (`{error}` on failure). Private fields (`contact`, `funders`,
 comment `email`) only appear in admin responses.

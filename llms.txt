@@ -48,7 +48,7 @@ The register to imitate:
 | **Indicative duration** | <N> months (the team sets the final timeline) |   <- typically 6 to 12; match the scope
 
 ## Why this matters
-<the real incident or gap, then what the money buys; 1 to 2 short paragraphs>
+<the real incident or gap, then what the money buys; short, bullets wherever they read faster>
 
 ## What this actually pays for
 <optional>
@@ -147,6 +147,16 @@ The first two `## Process` bullets, verbatim apart from the recipient's name, ab
 
 Everything else is unchanged: the table shape, scope lists, hard requirements, milestone format, the adoption rules, every shared verbatim block, and the closing line.
 
+### If the work is already funded and under way
+
+For a grant that tops up work another funder started, these replace the grant rules above. Everything else still applies, including the adoption milestone.
+
+- Table row, verbatim: `| **Proposal window** | None, work already under way |`. Budget is the total project budget. State the split in "Why this matters": "$<committed> committed by <funder>; this grant raises the remaining $<needed>."
+- Section name: **The recipient**. Name the team, say who funded the earlier milestones and under what arrangement, then close with the disclosure sentence.
+- `## Milestones`, without "(draft)" and without the preamble. Completed milestones stay in, checked `- [x]`, each with a link to the delivered work. A target month may follow the amount in the heading: `### 3 - Name - $85,500 (target: March 2027)`.
+- `## Milestone review and acceptance`: the shared block, plus one bullet naming the existing reviewers and stating that payments from this grant start only once the earlier milestones are accepted.
+- `## Process`: one bullet, "This grant tops up work already under way; there is no proposal window and no challenge period.", then the review-within-14-days and stalled-milestone bullets from the shared rules.
+
 ### Milestone rules
 
 1. Real adoption is a required deliverable. At least one milestone pays only on evidence that other people use what was built. Adoption milestones can sit anywhere in the order, and there can be several: milestones 2 and 5, or 2 and 4 with a final report on adoption and how to improve it. Building for its own sake is not funded.
@@ -203,7 +213,7 @@ Do these:
 9. Bold a fact only when a reader must not miss it, never every list item.
 10. Stop when the information is delivered. No summary paragraph, no closer beyond the closing line.
 11. Never invent a name, number, link, or event. Write `[PLACEHOLDER: ...]` instead.
-12. Write "Why this matters" and "What this actually pays for" as paragraphs. Bullets are for true lists: scope items, requirements, criteria.
+12. Use bullet points wherever they make the text easier to scan, including in "Why this matters" and "What this actually pays for". Keep a paragraph only where the argument needs connected sentences.
 13. Say what a thing is and what it does, then stop. Do not add a sentence about why it matters.
 
 Never do these:

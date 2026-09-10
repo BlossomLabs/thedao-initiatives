@@ -27,15 +27,12 @@ This grant funds an EDR that crypto teams will actually adopt: user-space, self-
 
 This is a grant, and Auditware is the recipient. Full transparency on why: the concept was developed with them, they already built an internal user-space EDR prototype on open-source tooling in a few weeks, and they have committed to taking this on. We think they are the right team for it.
 
-Auditware will disclose their relationships to existing OpSec tooling and firms in their proposal, and everything they build here is open source, so the community can hold the work to account.
-
 Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
 ## Existing work
 
 - Auditware's internal user-space EDR prototype, built on open-source endpoint tooling in a few weeks
 - Mature open-source endpoint instrumentation (osquery and similar) to build on
-- Zero-knowledge tooling for the privacy layer, so telemetry can be checked against detection rules without ever being readable by a human
 
 ## Scope
 
@@ -74,25 +71,23 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 
 ### B - Working MVP - $110,000
 
-- [ ] A self-hostable user-space agent on [macOS, Windows, and Linux, as fixed in Milestone A], installable from a documented, reproducible process
+- [ ] A self-hostable user-space agent on macOS, Windows, and Linux, installable from a documented, reproducible process
 - [ ] The encrypted telemetry pipeline implementing the Milestone A privacy guarantee, with its tamper-evident audit trail
 - [ ] The initial Web3 detectors, each with a test showing it fires on the intended behavior and stays quiet otherwise
 - [ ] All code open source, with the public third-party security review published and its findings addressed
 
 ### C - Adoption, hardening, and endorsement - $150,000
 
-Paid in two tranches: launch work first, then adoption evidence.
-
 **Tranche 1: Launch and endorsement - $50,000**
 
-- [ ] The detector library expanded to at least [20-30] Web3 detectors, each with a firing test
+- [ ] The detector library expanded to at least 25 Web3 detectors, each with a firing test
 - [ ] A recognized Ethereum security organization, or a named panel of recognized security engineers, publicly reviews the agent and states it is safe to install across a team
 - [ ] A public website, install guide, and a recorded walkthrough a non-expert admin can follow
 
 **Tranche 2: Adoption evidence - $100,000**
 
 - [ ] At least 15 crypto organizations running the agent in production, confirmed publicly by those teams
-- [ ] A published adoption-feedback report covering at least [N] evaluations, with the resulting fixes and detectors shipped
+- [ ] A published adoption-feedback report covering at least 10 evaluations, with the resulting fixes and detectors shipped
 - [ ] Published case studies and a public metrics page: deployments, detectors shipped, detections in the field
 
 ## Milestone review and acceptance

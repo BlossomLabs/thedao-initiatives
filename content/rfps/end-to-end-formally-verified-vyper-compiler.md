@@ -39,9 +39,10 @@ The end state:
 
 In the interest of full transparency:
 
-- This RFP was drafted together with the **Vyper core team**, builds directly on their open-source groundwork, and we believe they are well positioned to receive the grant.
+- This RFP was drafted together with the **Vyper core team** and builds directly on their open-source groundwork. We expect them to bid.
 - The proposal window is still real. If another team can credibly deliver this scope for less, or propose materially stronger milestones, we want that proposal.
 - We believe the price is fair: published estimates for comparable end-to-end compiler verification run well above this budget.
+- Proposals should show a track record in mechanized verification and spell out the technical approach: proof assistant, relationship to the existing work, frontend strategy, and how users run the verified compiler.
 - Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
 ## Existing work
@@ -74,14 +75,11 @@ In the interest of full transparency:
 3. **Pinned targets.** Each verified release names the exact upstream Vyper commit, optimization settings, and EVM fork it covers.
 4. **Assurance statement.** Each release ships a plain-language document: supported language subset (or complete coverage, if applicable), exclusions, covered passes, and the complete trusted computing base.
 5. **Maintenance plan.** A credible plan for keeping proofs current across Vyper releases and EVM hard forks.
+6. **Independent reviewer.** The technical reviewer for judgment calls has no affiliation with the selected team or with the existing codebases.
 
 ## Milestones (draft)
 
 These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
-
-- Milestones are lettered because A-C may be delivered in any order, or in parallel; each pays on acceptance.
-- Milestone E always pays last, once the Milestone D release is public.
-- The grant agreement may include an advance at signing, counted against the first delivered milestone.
 
 ### A - Formal semantics and frontend - $50,000
 
@@ -99,33 +97,26 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 
 ### C - Verified optimization pipeline - $100,000
 
-Prove correct the optimization passes in the production optimization pipeline of the pinned release, and wire continuous verification into CI.
-
 - [ ] Published list of every pass in the production pipeline, each marked verified or excluded; every verified pass has a machine-checked correctness theorem with zero admitted lemmas
 - [ ] The composed verified pass set has a single machine-checked correctness theorem and is packaged as a distinct, documented compilation mode users can select
 - [ ] CI automatically re-checks all proofs and output-parity against the pinned upstream revision, with a public status page or badge
-- [ ] Soundness bugs found in the production optimizer are responsibly disclosed to the Vyper team. Since the work is planned to be done in tandem with the Vyper team, any soundness bugs are expected to be caught and fixed before any production release of Vyper.
+- [ ] Soundness bugs found in the production optimizer are responsibly disclosed to the Vyper team, with each disclosure linked publicly once fixed
 
 ### D - End-to-end theorem and public release - $125,000
-
-Close the backend proofs (Venom to assembly to bytecode, including stack scheduling) and connect everything into one end-to-end theorem against the formal EVM semantics.
 
 - [ ] A single end-to-end theorem, published in both machine-checked and human-readable form, verified in CI
 - [ ] A public release outside users can run, with installation and usage instructions, distributed as agreed with the Vyper maintainers. The expected form is the verified compiler bundled with the Python compiler and available as a --verified option; the release documents how the verified compiler is executed and what that adds to the trusted base.
 - [ ] Full assurance statement published: supported subset (if applicable), exclusions, covered passes, complete trusted computing base, proof assumptions
 - [ ] The verified pipeline demonstrated on at least five representative real-world Vyper contracts, results published
-- [ ] Stretch goal: provable gas bounds demonstrated for at least one representative contract, a machine-checked upper bound on the gas cost of a chosen function, derived through the verified pipeline against the formal EVM gas model (e.g. "this function always executes within Y gas")
 
 ### E - Adoption and ecosystem impact - $200,000
-
-Paid in three tranches: launch work, adoption evidence, and continuous verification.
 
 **Tranche 1: Launch - $75,000**
 
 - [ ] Public project website explaining the verified compiler and its guarantees in language a non-specialist developer can follow
 - [ ] User documentation plus at least one step-by-step tutorial from a Vyper contract to a verified-compilation artifact
 - [ ] A recorded technical workshop or webinar for developers and auditors, publicly available
-- [ ] A talk accepted or delivered at a major Ethereum or formal-methods event, and at least two published technical blog posts
+- [ ] A talk delivered at a major Ethereum or formal-methods event, and at least two published technical blog posts
 - [ ] Public roadmap for verifying future Vyper releases (verification is expected to accompany each real Vyper release, not lag behind it), including hard-fork policy
 
 **Tranche 2: Adoption - $25,000**

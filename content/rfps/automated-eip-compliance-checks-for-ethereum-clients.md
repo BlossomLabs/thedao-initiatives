@@ -1,13 +1,13 @@
 ---
 title: Automated EIP Compliance Checks for Ethereum Clients
-type: rfp
+type: grant
 goal: 20000
 summary: Ethereum's client teams implement EIPs by reading specification text
   and writing code, and conformance test suites only catch the divergences
   somebody thought to write a test for. PRSpec uses LLM analysis to compare EIP
   specification text directly against client source code and flag semantic
   mismatches, and it has already surfaced a real cross-client inconsistency in
-  how EIP-1559's base-fee burn is implemented. This RFP funds turning it from a
+  how EIP-1559's base-fee burn is implemented. This grant funds turning it from a
   research tool into a self-hosted pre-release check running in the staging
   pipelines of the major execution clients.
 ---
@@ -15,14 +15,14 @@ summary: Ethereum's client teams implement EIPs by reading specification text
 |---|---|
 | **Status** | Draft |
 | **Budget** | $20,000 USD |
-| **Proposal window** | 30 days, opening once the RFP is fully funded |
+| **Proposal window** | 15 days, opening once the grant is fully funded |
 | **Indicative duration** | 6 months (the team sets the final timeline) |
 
 ## Why this matters
 
 Ethereum's client teams implement EIPs by reading specification text and writing code. Conformance test suites like execution-spec catch behavioral divergence on the cases the tests cover, but they can't catch what nobody wrote a test for, and they can't tell a team that their implementation quietly diverges from the spec's intent. PRSpec uses LLM analysis to compare EIP specification text directly against client source code and flag semantic mismatches. It has already surfaced a real cross-client inconsistency in how EIP-1559's base-fee burn is implemented, leading to a spec-clarification issue.
 
-This RFP funds turning PRSpec from a working research tool into something client teams actually run: packaged for local deployment (keeping code and compute inside each team's own environment) and integrated as a pre-release check in the staging pipelines of at least two major execution clients. The end state:
+This grant funds turning PRSpec from a working research tool into something client teams actually run: packaged for local deployment (keeping code and compute inside each team's own environment) and integrated as a pre-release check in the staging pipelines of at least two major execution clients. The end state:
 
 - A plug-and-play integration kit (CLI + Docker) any client team can deploy locally in under an hour
 - PRSpec running continuously in the staging/testing pipelines of at least the two major execution-layer clients and one other, confirmed publicly by those teams
@@ -30,12 +30,12 @@ This RFP funds turning PRSpec from a working research tool into something client
 
 **Reference deployment model.** The production deployment runs PRSpec as a pinned OCI container on a client-owned self-hosted runner against the exact checked-out client commit. A local model endpoint keeps source code and full reports inside the client's environment. Completed runs are reproducible, and only disputed or high-severity findings are selectively escalated to an additional model before entering the human triage queue. Milestone 1 delivers the reproducible container and local-model runtime, milestone 2 validates it inside the first client environment, and milestone 3 adds recurring triggers, selective model escalation, and persistent triage.
 
-## Who we expect to do this
+## The recipient
 
 In the interest of full transparency:
 
-- This RFP was drafted from a proposal by Safi El-Hassanine, the author of PRSpec. We believe they are well positioned to receive the grant, and the first milestone builds directly on work already largely completed.
-- The proposal window is still real. A challenger wins by credibly delivering this scope for less or proposing materially stronger milestones, but given the budget size and the incumbent's head start, this is effectively a direct grant with an open challenge window.
+- This grant was drafted from a proposal by Safi El-Hassanine, the author of PRSpec, and Safi is the recipient. The head start is the tool itself: PRSpec already covers four execution clients across 10 EIPs, and milestone 1 is about 80% complete. The milestone 1 payment covers finishing and hardening it, and the grant agreement may treat part of it as the advance on signing.
+- The proposal window is also an open challenge period. A challenger wins by credibly delivering this scope for less or proposing materially stronger milestones.
 - Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
 ## Existing work
@@ -68,14 +68,13 @@ In the interest of full transparency:
 3. **Public evidence of adoption.** Client-team integrations count only when confirmed publicly by that team (a merged PR in their repo, a public statement, or a public CI run).
 4. **Noise accountability.** A published false-positive/triage report per integrated client, because a CI check that cries wolf gets deleted.
 5. **Maintenance plan.** A credible, documented process for adding new EIPs and forks to the tool's coverage after the grant.
+6. **Reviewer from a client team.** Judgment calls are signed off by an engineer from an execution-layer client team with no ties to the recipient, named in the grant agreement before work begins.
 
 ## Milestones (draft)
 
 These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
 
 ### 1 - Production-ready packaging and docs - $4,000
-
-The author reports this milestone is already about 80% complete; the payment covers finishing and hardening it, and the grant agreement may treat part of it as the advance on signing.
 
 - [ ] PRSpec CLI and Docker image published with pinned, reproducible builds; a reviewer goes from clean checkout to a completed analysis run with one documented command
 - [ ] Integration documentation published, including LLM inference options (local model and API-key paths) with realistic cost estimates per run
@@ -112,9 +111,8 @@ The author reports this milestone is already about 80% complete; the payment cov
 
 ## Process
 
-- The proposal window opens once the RFP is fully funded and stays open for 30 days.
-- Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
-- Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
+- The proposal window opens once the grant is fully funded and stays open for 15 days. In that window, Safi El-Hassanine submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures. The window is also an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.
+- Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement.
 - Milestone deliveries are reviewed within 14 days; payment follows acceptance.
 - The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
 - If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.

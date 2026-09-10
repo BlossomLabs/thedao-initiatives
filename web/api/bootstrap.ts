@@ -3,6 +3,7 @@
 import { createApp, siteLockFor } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { createDb } from "./db/mod.ts";
+import { prefixedKv } from "./db/prefix.ts";
 import { createChain } from "./chain/mod.ts";
 import { createAi } from "./services/ai.ts";
 import { createEns } from "./services/ens.ts";
@@ -28,7 +29,9 @@ export async function createServer() {
     );
   }
 
-  const kv = await Deno.openKv(config.kvPath);
+  // DB_PREFIX namespaces the keys so deployments can share one KV database.
+  const kv = prefixedKv(await Deno.openKv(config.kvPath), config.dbPrefix);
+  if (config.dbPrefix) log(`kv keys namespaced under DB_PREFIX=${JSON.stringify(config.dbPrefix)}`);
   const db = createDb(kv, now);
   const chain = createChain({ endpoints: config.rpcEndpoints, now });
   const deps: Deps = {

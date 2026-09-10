@@ -62,4 +62,5 @@ an action needs it (vote, reply, name, admin): nonce → `createSiweMessage` →
 
 `WEB_ORIGIN` must be this site's origin (CORS is moot on one origin, but the SIWE domain is
 derived from it). Set `SITE_USERNAME` and `SITE_PASSWORD` to keep the site in private preview
-behind HTTP Basic Auth; see `api/README.md`.
+behind HTTP Basic Auth; see `api/README.md`. Set `DB_PREFIX` when two deployments share one KV
+database (keys are namespaced under it; changing it means starting from an empty database).

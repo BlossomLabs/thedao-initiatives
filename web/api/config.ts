@@ -109,6 +109,8 @@ export interface Config {
   trustProxy: boolean;
   port: number;
   kvPath: string | undefined;
+  /** First key part every KV key is stored under; empty = bare keys. */
+  dbPrefix: string;
 }
 
 function list(v: string | undefined): string[] {
@@ -162,5 +164,6 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     trustProxy: flag(env.TRUST_PROXY),
     port: Number(env.PORT ?? "8000") || 8000,
     kvPath: (env.KV_PATH ?? "").trim() || undefined,
+    dbPrefix: (env.DB_PREFIX ?? "").trim(),
   };
 }

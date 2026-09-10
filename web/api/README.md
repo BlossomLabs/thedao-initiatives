@@ -90,7 +90,9 @@ const { token } = await (await fetch(API + "/api/auth/verify", {
 ## Deploy (Deno Deploy)
 
 App root `api/`, entrypoint `main.ts`. Set the variables from `.env.example` (no `KV_PATH`). KV and
-cron are provided by the platform; each timeline gets its own database.
+cron are provided by the platform; each timeline gets its own database. If two deployments must
+share one KV database, give each its own `DB_PREFIX`: every key is stored under that first part,
+so the two never see each other's rows (changing it on a live deployment starts from empty).
 
 ## Scripts
 

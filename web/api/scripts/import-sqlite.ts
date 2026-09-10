@@ -11,12 +11,17 @@
 import { DatabaseSync } from "node:sqlite";
 import { parseArgs } from "jsr:@std/cli@^1/parse-args";
 import { createDb } from "../db/mod.ts";
+import { prefixedKv } from "../db/prefix.ts";
 import type { Rfp } from "../db/types.ts";
 
 const args = parseArgs(Deno.args, { string: ["db", "kv"] });
 const dbPath = args.db ?? "../rfps.db";
 const sqlite = new DatabaseSync(dbPath, { readOnly: true });
-const kv = await Deno.openKv(args.kv || undefined);
+// Same DB_PREFIX as the server so the import lands in the namespace it reads.
+const kv = prefixedKv(
+  await Deno.openKv(args.kv || undefined),
+  (Deno.env.get("DB_PREFIX") ?? "").trim(),
+);
 const db = createDb(kv);
 const rows = <T>(sql: string): T[] => sqlite.prepare(sql).all() as T[];
 const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));

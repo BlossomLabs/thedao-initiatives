@@ -14,7 +14,7 @@
     "fmt": "deno fmt",
     "sync-content": "deno run --env-file=.env -A api/scripts/sync-content.ts",
     "login": "deno run --env-file=.env -A api/scripts/login.ts",
-    "import-sqlite": "deno run -A api/scripts/import-sqlite.ts"
+    "import-sqlite": "deno run --env-file=.env -A api/scripts/import-sqlite.ts"
   },
   "imports": {
     "@std/http": "jsr:@std/http@^1.0.0",

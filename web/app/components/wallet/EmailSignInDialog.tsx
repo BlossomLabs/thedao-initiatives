@@ -3,7 +3,8 @@ import { useLoginWithEmail, usePrivy } from "@privy-io/react-auth";
 import { useConfig } from "wagmi";
 import { Dialog } from "~/components/ui/Dialog";
 import { Button } from "~/components/ui/Button";
-import { Field, Input } from "~/components/ui/Field";
+import { Field, Input, Label } from "~/components/ui/Field";
+import { InputOTP } from "~/components/ui/InputOTP";
 import { useSession } from "~/context/session";
 import { PRIVY_CONNECTOR_ID, privyStore } from "~/lib/privy";
 import { walletErrorMessage } from "~/lib/donate";
@@ -26,7 +27,7 @@ export default function EmailSignInDialog({
   onOpenChange: (o: boolean) => void;
 }) {
   const { sendCode, loginWithCode } = useLoginWithEmail();
-  const { authenticated } = usePrivy();
+  const { authenticated, createWallet } = usePrivy();
   const { connect } = useSession();
   const config = useConfig();
   const [step, setStep] = useState<Step>("email");
@@ -46,6 +47,16 @@ export default function EmailSignInDialog({
     setStep("finishing");
     setBusy(true);
     try {
+      // `embeddedWallets.createOnLogin` does not fire for the headless email
+      // login (observed on staging and locally: the user ends up with only the
+      // email linked and no wallet), so create it explicitly when none exists.
+      if (!privyStore.wallet) {
+        try {
+          await createWallet();
+        } catch (e) {
+          if (!/already has/i.test(walletErrorMessage(e))) throw e;
+        }
+      }
       await privyStore.waitForWallet();
       const c = config.connectors.find((x) => x.id === PRIVY_CONNECTOR_ID);
       if (!c) throw new Error("Email sign-in is not available.");
@@ -84,6 +95,7 @@ export default function EmailSignInDialog({
     setError("");
     try {
       await sendCode({ email: value });
+      setCode("");
       setStep("code");
     } catch (e) {
       setError("Could not send the code: " + walletErrorMessage(e));
@@ -92,8 +104,8 @@ export default function EmailSignInDialog({
     }
   }
 
-  async function submitCode() {
-    const value = code.replace(/\D/g, "");
+  async function submitCode(raw = code) {
+    const value = raw.replace(/\D/g, "");
     if (value.length < 6) {
       setError("Enter the 6-digit code from the email.");
       return;
@@ -104,7 +116,10 @@ export default function EmailSignInDialog({
       await loginWithCode({ code: value });
     } catch (e) {
       setError("That code did not work: " + walletErrorMessage(e));
+      setCode("");
       setBusy(false);
+      // The field was disabled while checking, which dropped focus.
+      requestAnimationFrame(() => document.getElementById("email-code")?.focus());
       return;
     }
     await finish();
@@ -159,21 +174,31 @@ export default function EmailSignInDialog({
       )}
       {step === "code" && (
         <>
-          <Field label="Code" htmlFor="email-code">
-            <Input
+          <div className="mt-3">
+            <div className="flex items-center justify-between gap-3">
+              <Label label="Code" htmlFor="email-code" />
+              <button
+                type="button"
+                className="border-0 bg-transparent p-0 font-inter-tight text-[11.5px] text-dao-rfp underline-offset-2 hover:underline disabled:opacity-60"
+                disabled={busy}
+                onClick={() => void submitEmail()}
+              >
+                Resend code
+              </button>
+            </div>
+            <InputOTP
+              className="mt-1.5"
               id="email-code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]*"
-              maxLength={6}
-              placeholder="123456"
-              className="tracking-[.3em]"
+              autoFocus
               value={code}
               disabled={busy}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              onKeyDown={onKey(() => void submitCode())}
+              onChange={setCode}
+              // A full code (typed or pasted) submits itself.
+              onComplete={(value: string) => {
+                if (!busy) void submitCode(value);
+              }}
             />
-          </Field>
+          </div>
           {error && <p className="m-0 text-[12.5px] text-[#ffd7d6]" role="alert">{error}</p>}
           <div className="mt-2 flex gap-2">
             <Button
@@ -188,18 +213,16 @@ export default function EmailSignInDialog({
             >
               Change email
             </Button>
-            <Button className="flex-1" variant="primary" sm loading={busy} onClick={submitCode}>
+            <Button
+              className="flex-1"
+              variant="primary"
+              sm
+              loading={busy}
+              onClick={() => void submitCode()}
+            >
               Sign in
             </Button>
           </div>
-          <button
-            type="button"
-            className="mt-1 self-start border-0 bg-transparent p-0 text-[12.5px] text-dao-rfp underline-offset-2 hover:underline disabled:opacity-60"
-            disabled={busy}
-            onClick={() => void submitEmail()}
-          >
-            Resend code
-          </button>
         </>
       )}
       {step === "finishing" && (

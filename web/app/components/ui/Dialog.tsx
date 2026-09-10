@@ -26,22 +26,30 @@ export function Dialog({
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descId = useId();
+  // Callers often pass an inline closure; reading it through a ref keeps the
+  // open effect from re-running (and re-focusing) on every render.
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onOpenChange(false);
+      if (e.key === "Escape") onOpenChangeRef.current(false);
     };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const first = panel.current?.querySelector<HTMLElement>("input,textarea,button,[tabindex]");
+    // A field first; the close button in the header is the last resort.
+    const first = panel.current?.querySelector<HTMLElement>(
+      "input:not([disabled]),textarea:not([disabled]),select:not([disabled])",
+    ) ?? panel.current?.querySelector<HTMLElement>("button:not([aria-label='Close']),[tabindex]") ??
+      panel.current?.querySelector<HTMLElement>("button");
     first?.focus();
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onOpenChange]);
+  }, [open]);
 
   if (!open || typeof document === "undefined") return null;
   return createPortal(

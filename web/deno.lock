@@ -32,6 +32,7 @@
     "npm:@walletconnect/ethereum-provider@2.21.1": "2.21.1_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
     "npm:clsx@^2.1.1": "2.1.1",
     "npm:diff@^8.0.2": "8.0.4",
+    "npm:input-otp@^1.5.0": "1.5.0_react@19.2.8_react-dom@19.2.8",
     "npm:isbot@^5.1.31": "5.2.2",
     "npm:jsdom@^27.1.0": "27.4.0",
     "npm:lucide-react@0.561": "0.561.0_react@19.2.8",
@@ -1325,16 +1326,6 @@
         "viem@2.56.3_typescript@5.9.3_zod@3.22.4"
       ]
     },
-    "@reown/appkit-controllers@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3": {
-      "integrity": "sha512-IdXlJlivrlj6m63VsGLsjtPHHsTWvKGVzWIP1fXZHVqmK+rZCBDjCi9j267Rb9/nYRGHWBtlFQhO8dK35WfeDA==",
-      "dependencies": [
-        "@reown/appkit-common@1.7.8_typescript@5.9.3_zod@3.22.4",
-        "@reown/appkit-wallet@1.7.8_typescript@5.9.3",
-        "@walletconnect/universal-provider@2.21.0_typescript@5.9.3",
-        "valtio@1.13.2_@types+react@19.2.18_react@19.2.8",
-        "viem@2.56.3_typescript@5.9.3_zod@3.22.4"
-      ]
-    },
     "@reown/appkit-controllers@1.7.8_zod@3.25.76": {
       "integrity": "sha512-IdXlJlivrlj6m63VsGLsjtPHHsTWvKGVzWIP1fXZHVqmK+rZCBDjCi9j267Rb9/nYRGHWBtlFQhO8dK35WfeDA==",
       "dependencies": [
@@ -1353,17 +1344,6 @@
         "@walletconnect/universal-provider@2.21.9_typescript@5.9.3",
         "valtio@2.1.7_@types+react@19.2.18_react@19.2.8",
         "viem@2.56.3_typescript@5.9.3_zod@3.22.4"
-      ]
-    },
-    "@reown/appkit-pay@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3": {
-      "integrity": "sha512-OSGQ+QJkXx0FEEjlpQqIhT8zGJKOoHzVnyy/0QFrl3WrQTjCzg0L6+i91Ad5Iy1zb6V5JjqtfIFpRVRWN4M3pw==",
-      "dependencies": [
-        "@reown/appkit-common@1.7.8_typescript@5.9.3_zod@3.22.4",
-        "@reown/appkit-controllers@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "@reown/appkit-ui@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "@reown/appkit-utils@1.7.8_valtio@1.13.2_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "lit",
-        "valtio@1.13.2_@types+react@19.2.18_react@19.2.8"
       ]
     },
     "@reown/appkit-pay@1.7.8_zod@3.25.76": {
@@ -1400,17 +1380,6 @@
         "buffer"
       ]
     },
-    "@reown/appkit-scaffold-ui@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3_valtio@1.13.2": {
-      "integrity": "sha512-RCeHhAwOrIgcvHwYlNWMcIDibdI91waaoEYBGw71inE0kDB8uZbE7tE6DAXJmDkvl0qPh+DqlC4QbJLF1FVYdQ==",
-      "dependencies": [
-        "@reown/appkit-common@1.7.8_typescript@5.9.3_zod@3.22.4",
-        "@reown/appkit-controllers@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "@reown/appkit-ui@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "@reown/appkit-utils@1.7.8_valtio@1.13.2_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "@reown/appkit-wallet@1.7.8_typescript@5.9.3",
-        "lit"
-      ]
-    },
     "@reown/appkit-scaffold-ui@1.7.8_zod@3.25.76": {
       "integrity": "sha512-RCeHhAwOrIgcvHwYlNWMcIDibdI91waaoEYBGw71inE0kDB8uZbE7tE6DAXJmDkvl0qPh+DqlC4QbJLF1FVYdQ==",
       "dependencies": [
@@ -1433,16 +1402,6 @@
         "lit"
       ]
     },
-    "@reown/appkit-ui@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3": {
-      "integrity": "sha512-1hjCKjf6FLMFzrulhl0Y9Vb9Fu4royE+SXCPSWh4VhZhWqlzUFc7kutnZKx8XZFVQH4pbBvY62SpRC93gqoHow==",
-      "dependencies": [
-        "@reown/appkit-common@1.7.8_typescript@5.9.3_zod@3.22.4",
-        "@reown/appkit-controllers@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "@reown/appkit-wallet@1.7.8_typescript@5.9.3",
-        "lit",
-        "qrcode"
-      ]
-    },
     "@reown/appkit-ui@1.7.8_zod@3.25.76": {
       "integrity": "sha512-1hjCKjf6FLMFzrulhl0Y9Vb9Fu4royE+SXCPSWh4VhZhWqlzUFc7kutnZKx8XZFVQH4pbBvY62SpRC93gqoHow==",
       "dependencies": [
@@ -1462,19 +1421,6 @@
         "@reown/appkit-wallet@1.8.9",
         "lit",
         "qrcode"
-      ]
-    },
-    "@reown/appkit-utils@1.7.8_valtio@1.13.2_@types+react@19.2.18_react@19.2.8_typescript@5.9.3": {
-      "integrity": "sha512-8X7UvmE8GiaoitCwNoB86pttHgQtzy4ryHZM9kQpvjQ0ULpiER44t1qpVLXNM4X35O0v18W0Dk60DnYRMH2WRw==",
-      "dependencies": [
-        "@reown/appkit-common@1.7.8_typescript@5.9.3_zod@3.22.4",
-        "@reown/appkit-controllers@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "@reown/appkit-polyfills@1.7.8",
-        "@reown/appkit-wallet@1.7.8_typescript@5.9.3",
-        "@walletconnect/logger@2.1.2",
-        "@walletconnect/universal-provider@2.21.0_typescript@5.9.3",
-        "valtio@1.13.2_@types+react@19.2.18_react@19.2.8",
-        "viem@2.56.3_typescript@5.9.3_zod@3.22.4"
       ]
     },
     "@reown/appkit-utils@1.7.8_valtio@1.13.2_zod@3.25.76": {
@@ -1520,24 +1466,6 @@
         "@reown/appkit-polyfills@1.8.9",
         "@walletconnect/logger@2.1.2",
         "zod@3.22.4"
-      ]
-    },
-    "@reown/appkit@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3": {
-      "integrity": "sha512-51kTleozhA618T1UvMghkhKfaPcc9JlKwLJ5uV+riHyvSoWPKPRIa5A6M1Wano5puNyW0s3fwywhyqTHSilkaA==",
-      "dependencies": [
-        "@reown/appkit-common@1.7.8_typescript@5.9.3_zod@3.22.4",
-        "@reown/appkit-controllers@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "@reown/appkit-pay@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "@reown/appkit-polyfills@1.7.8",
-        "@reown/appkit-scaffold-ui@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3_valtio@1.13.2",
-        "@reown/appkit-ui@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "@reown/appkit-utils@1.7.8_valtio@1.13.2_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
-        "@reown/appkit-wallet@1.7.8_typescript@5.9.3",
-        "@walletconnect/types@2.21.0",
-        "@walletconnect/universal-provider@2.21.0_typescript@5.9.3",
-        "bs58",
-        "valtio@1.13.2_@types+react@19.2.18_react@19.2.8",
-        "viem@2.56.3_typescript@5.9.3_zod@3.22.4"
       ]
     },
     "@reown/appkit@1.7.8_zod@3.25.76": {
@@ -2684,12 +2612,10 @@
       "integrity": "sha512-hPwdmePYjQqSWlw9JmzrzVgmw2PJ+NJsUQ/BuPBYbzBS8+cW5vWdqiaKLB4qTF9m+yr+zSp7u91KBgvOWz50og==",
       "dependencies": [
         "@wagmi/core@3.6.5_typescript@5.9.3_viem@2.56.3_@types+react@19.2.18_react@19.2.8_use-sync-external-store@1.4.0",
-        "@walletconnect/ethereum-provider@2.21.1_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
         "typescript",
         "viem@2.56.3_typescript@5.9.3_zod@3.22.4"
       ],
       "optionalPeers": [
-        "@walletconnect/ethereum-provider@2.21.1_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
         "typescript"
       ]
     },
@@ -2740,28 +2666,6 @@
         "@wallet-standard/base"
       ]
     },
-    "@walletconnect/core@2.21.0_typescript@5.9.3": {
-      "integrity": "sha512-o6R7Ua4myxR8aRUAJ1z3gT9nM+jd2B2mfamu6arzy1Cc6vi10fIwFWb6vg3bC8xJ6o9H3n/cN5TOW3aA9Y1XVw==",
-      "dependencies": [
-        "@walletconnect/heartbeat",
-        "@walletconnect/jsonrpc-provider",
-        "@walletconnect/jsonrpc-types",
-        "@walletconnect/jsonrpc-utils",
-        "@walletconnect/jsonrpc-ws-connection",
-        "@walletconnect/keyvaluestorage",
-        "@walletconnect/logger@2.1.2",
-        "@walletconnect/relay-api",
-        "@walletconnect/relay-auth",
-        "@walletconnect/safe-json",
-        "@walletconnect/time",
-        "@walletconnect/types@2.21.0",
-        "@walletconnect/utils@2.21.0_typescript@5.9.3",
-        "@walletconnect/window-getters",
-        "es-toolkit@1.33.0",
-        "events",
-        "uint8arrays@3.1.0"
-      ]
-    },
     "@walletconnect/core@2.21.0_zod@3.25.76": {
       "integrity": "sha512-o6R7Ua4myxR8aRUAJ1z3gT9nM+jd2B2mfamu6arzy1Cc6vi10fIwFWb6vg3bC8xJ6o9H3n/cN5TOW3aA9Y1XVw==",
       "dependencies": [
@@ -2778,28 +2682,6 @@
         "@walletconnect/time",
         "@walletconnect/types@2.21.0",
         "@walletconnect/utils@2.21.0_zod@3.25.76",
-        "@walletconnect/window-getters",
-        "es-toolkit@1.33.0",
-        "events",
-        "uint8arrays@3.1.0"
-      ]
-    },
-    "@walletconnect/core@2.21.1_typescript@5.9.3": {
-      "integrity": "sha512-Tp4MHJYcdWD846PH//2r+Mu4wz1/ZU/fr9av1UWFiaYQ2t2TPLDiZxjLw54AAEpMqlEHemwCgiRiAmjR1NDdTQ==",
-      "dependencies": [
-        "@walletconnect/heartbeat",
-        "@walletconnect/jsonrpc-provider",
-        "@walletconnect/jsonrpc-types",
-        "@walletconnect/jsonrpc-utils",
-        "@walletconnect/jsonrpc-ws-connection",
-        "@walletconnect/keyvaluestorage",
-        "@walletconnect/logger@2.1.2",
-        "@walletconnect/relay-api",
-        "@walletconnect/relay-auth",
-        "@walletconnect/safe-json",
-        "@walletconnect/time",
-        "@walletconnect/types@2.21.1",
-        "@walletconnect/utils@2.21.1_typescript@5.9.3",
         "@walletconnect/window-getters",
         "es-toolkit@1.33.0",
         "events",
@@ -2881,16 +2763,16 @@
     "@walletconnect/ethereum-provider@2.21.1_@types+react@19.2.18_react@19.2.8_typescript@5.9.3": {
       "integrity": "sha512-SSlIG6QEVxClgl1s0LMk4xr2wg4eT3Zn/Hb81IocyqNSGfXpjtawWxKxiC5/9Z95f1INyBD6MctJbL/R1oBwIw==",
       "dependencies": [
-        "@reown/appkit@1.7.8_@types+react@19.2.18_react@19.2.8_typescript@5.9.3",
+        "@reown/appkit@1.7.8_zod@3.25.76",
         "@walletconnect/jsonrpc-http-connection",
         "@walletconnect/jsonrpc-provider",
         "@walletconnect/jsonrpc-types",
         "@walletconnect/jsonrpc-utils",
         "@walletconnect/keyvaluestorage",
-        "@walletconnect/sign-client@2.21.1_typescript@5.9.3",
+        "@walletconnect/sign-client@2.21.1_zod@3.25.76",
         "@walletconnect/types@2.21.1",
-        "@walletconnect/universal-provider@2.21.1_typescript@5.9.3",
-        "@walletconnect/utils@2.21.1_typescript@5.9.3",
+        "@walletconnect/universal-provider@2.21.1_zod@3.25.76",
+        "@walletconnect/utils@2.21.1_zod@3.25.76",
         "events"
       ],
       "deprecated": true
@@ -3029,21 +2911,6 @@
         "tslib@1.14.1"
       ]
     },
-    "@walletconnect/sign-client@2.21.0_typescript@5.9.3": {
-      "integrity": "sha512-z7h+PeLa5Au2R591d/8ZlziE0stJvdzP9jNFzFolf2RG/OiXulgFKum8PrIyXy+Rg2q95U9nRVUF9fWcn78yBA==",
-      "dependencies": [
-        "@walletconnect/core@2.21.0_typescript@5.9.3",
-        "@walletconnect/events",
-        "@walletconnect/heartbeat",
-        "@walletconnect/jsonrpc-utils",
-        "@walletconnect/logger@2.1.2",
-        "@walletconnect/time",
-        "@walletconnect/types@2.21.0",
-        "@walletconnect/utils@2.21.0_typescript@5.9.3",
-        "events"
-      ],
-      "deprecated": true
-    },
     "@walletconnect/sign-client@2.21.0_zod@3.25.76": {
       "integrity": "sha512-z7h+PeLa5Au2R591d/8ZlziE0stJvdzP9jNFzFolf2RG/OiXulgFKum8PrIyXy+Rg2q95U9nRVUF9fWcn78yBA==",
       "dependencies": [
@@ -3055,21 +2922,6 @@
         "@walletconnect/time",
         "@walletconnect/types@2.21.0",
         "@walletconnect/utils@2.21.0_zod@3.25.76",
-        "events"
-      ],
-      "deprecated": true
-    },
-    "@walletconnect/sign-client@2.21.1_typescript@5.9.3": {
-      "integrity": "sha512-QaXzmPsMnKGV6tc4UcdnQVNOz4zyXgarvdIQibJ4L3EmLat73r5ZVl4c0cCOcoaV7rgM9Wbphgu5E/7jNcd3Zg==",
-      "dependencies": [
-        "@walletconnect/core@2.21.1_typescript@5.9.3",
-        "@walletconnect/events",
-        "@walletconnect/heartbeat",
-        "@walletconnect/jsonrpc-utils",
-        "@walletconnect/logger@2.1.2",
-        "@walletconnect/time",
-        "@walletconnect/types@2.21.1",
-        "@walletconnect/utils@2.21.1_typescript@5.9.3",
         "events"
       ],
       "deprecated": true
@@ -3167,24 +3019,6 @@
         "events"
       ]
     },
-    "@walletconnect/universal-provider@2.21.0_typescript@5.9.3": {
-      "integrity": "sha512-mtUQvewt+X0VBQay/xOJBvxsB3Xsm1lTwFjZ6WUwSOTR1X+FNb71hSApnV5kbsdDIpYPXeQUbGt2se1n5E5UBg==",
-      "dependencies": [
-        "@walletconnect/events",
-        "@walletconnect/jsonrpc-http-connection",
-        "@walletconnect/jsonrpc-provider",
-        "@walletconnect/jsonrpc-types",
-        "@walletconnect/jsonrpc-utils",
-        "@walletconnect/keyvaluestorage",
-        "@walletconnect/logger@2.1.2",
-        "@walletconnect/sign-client@2.21.0_typescript@5.9.3",
-        "@walletconnect/types@2.21.0",
-        "@walletconnect/utils@2.21.0_typescript@5.9.3",
-        "es-toolkit@1.33.0",
-        "events"
-      ],
-      "deprecated": true
-    },
     "@walletconnect/universal-provider@2.21.0_zod@3.25.76": {
       "integrity": "sha512-mtUQvewt+X0VBQay/xOJBvxsB3Xsm1lTwFjZ6WUwSOTR1X+FNb71hSApnV5kbsdDIpYPXeQUbGt2se1n5E5UBg==",
       "dependencies": [
@@ -3198,24 +3032,6 @@
         "@walletconnect/sign-client@2.21.0_zod@3.25.76",
         "@walletconnect/types@2.21.0",
         "@walletconnect/utils@2.21.0_zod@3.25.76",
-        "es-toolkit@1.33.0",
-        "events"
-      ],
-      "deprecated": true
-    },
-    "@walletconnect/universal-provider@2.21.1_typescript@5.9.3": {
-      "integrity": "sha512-Wjx9G8gUHVMnYfxtasC9poGm8QMiPCpXpbbLFT+iPoQskDDly8BwueWnqKs4Mx2SdIAWAwuXeZ5ojk5qQOxJJg==",
-      "dependencies": [
-        "@walletconnect/events",
-        "@walletconnect/jsonrpc-http-connection",
-        "@walletconnect/jsonrpc-provider",
-        "@walletconnect/jsonrpc-types",
-        "@walletconnect/jsonrpc-utils",
-        "@walletconnect/keyvaluestorage",
-        "@walletconnect/logger@2.1.2",
-        "@walletconnect/sign-client@2.21.1_typescript@5.9.3",
-        "@walletconnect/types@2.21.1",
-        "@walletconnect/utils@2.21.1_typescript@5.9.3",
         "es-toolkit@1.33.0",
         "events"
       ],
@@ -3273,28 +3089,6 @@
         "events"
       ]
     },
-    "@walletconnect/utils@2.21.0_typescript@5.9.3": {
-      "integrity": "sha512-zfHLiUoBrQ8rP57HTPXW7rQMnYxYI4gT9yTACxVW6LhIFROTF6/ytm5SKNoIvi4a5nX5dfXG4D9XwQUCu8Ilig==",
-      "dependencies": [
-        "@noble/ciphers@1.2.1",
-        "@noble/curves@1.8.1",
-        "@noble/hashes@1.7.1",
-        "@walletconnect/jsonrpc-utils",
-        "@walletconnect/keyvaluestorage",
-        "@walletconnect/relay-api",
-        "@walletconnect/relay-auth",
-        "@walletconnect/safe-json",
-        "@walletconnect/time",
-        "@walletconnect/types@2.21.0",
-        "@walletconnect/window-getters",
-        "@walletconnect/window-metadata",
-        "bs58",
-        "detect-browser",
-        "query-string",
-        "uint8arrays@3.1.0",
-        "viem@2.23.2_typescript@5.9.3_zod@3.25.76"
-      ]
-    },
     "@walletconnect/utils@2.21.0_zod@3.25.76": {
       "integrity": "sha512-zfHLiUoBrQ8rP57HTPXW7rQMnYxYI4gT9yTACxVW6LhIFROTF6/ytm5SKNoIvi4a5nX5dfXG4D9XwQUCu8Ilig==",
       "dependencies": [
@@ -3308,28 +3102,6 @@
         "@walletconnect/safe-json",
         "@walletconnect/time",
         "@walletconnect/types@2.21.0",
-        "@walletconnect/window-getters",
-        "@walletconnect/window-metadata",
-        "bs58",
-        "detect-browser",
-        "query-string",
-        "uint8arrays@3.1.0",
-        "viem@2.23.2_typescript@5.9.3_zod@3.25.76"
-      ]
-    },
-    "@walletconnect/utils@2.21.1_typescript@5.9.3": {
-      "integrity": "sha512-VPZvTcrNQCkbGOjFRbC24mm/pzbRMUq2DSQoiHlhh0X1U7ZhuIrzVtAoKsrzu6rqjz0EEtGxCr3K1TGRqDG4NA==",
-      "dependencies": [
-        "@noble/ciphers@1.2.1",
-        "@noble/curves@1.8.1",
-        "@noble/hashes@1.7.1",
-        "@walletconnect/jsonrpc-utils",
-        "@walletconnect/keyvaluestorage",
-        "@walletconnect/relay-api",
-        "@walletconnect/relay-auth",
-        "@walletconnect/safe-json",
-        "@walletconnect/time",
-        "@walletconnect/types@2.21.1",
         "@walletconnect/window-getters",
         "@walletconnect/window-metadata",
         "bs58",
@@ -4325,6 +4097,13 @@
     },
     "inline-style-parser@0.2.7": {
       "integrity": "sha512-Nb2ctOyNR8DqQoR0OwRG95uNWIC0C1lCgf5Naz5H6Ji72KZ8OcFZLz2P5sNgwlyoJ8Yif11oMuYs5pBQa86csA=="
+    },
+    "input-otp@1.5.0_react@19.2.8_react-dom@19.2.8": {
+      "integrity": "sha512-3AcfdW1sNG0FmSA5hHMBXG7jNW5CdcdKs8ln8JOmn6S2SRkoXoJx+2UwC+ZvjflfnOdHJx0SfQ9/YjlxVYLtGQ==",
+      "dependencies": [
+        "react",
+        "react-dom"
+      ]
     },
     "iron-webcrypto@1.2.1": {
       "integrity": "sha512-feOM6FaSr6rEABp/eDfVseKyTMDt+KGpeB35SkVn9Tyn0CqvVsY3EwI0v5i8nMHyJnzCIQf7nsy3p41TPkJZhg=="
@@ -5469,7 +5248,6 @@
       "integrity": "sha512-gu9FfjjvvYBgQXUHWTp6n3wkTxVtEcqFotM7i3GEZeoQbvLGbssAicCz6hFZ8+xggrJWwi/RLmbwNra50SMmUQ==",
       "dependencies": [
         "@tanstack/react-query",
-        "@wagmi/core@2.22.1_typescript@5.9.3_viem@2.56.3_@types+react@19.2.18_react@19.2.8_use-sync-external-store@1.4.0",
         "hono",
         "idb-keyval",
         "mipd",
@@ -5477,15 +5255,13 @@
         "react",
         "typescript",
         "viem@2.56.3_typescript@5.9.3_zod@3.22.4",
-        "wagmi@2.19.5_@tanstack+react-query@5.102.8_react@19.2.8_typescript@5.9.3_viem@2.56.3_@types+react@19.2.18_zod@3.25.76",
         "zod@4.6.1",
         "zustand@5.0.15_@types+react@19.2.18_react@19.2.8_use-sync-external-store@1.4.0"
       ],
       "optionalPeers": [
         "@tanstack/react-query",
         "react",
-        "typescript",
-        "wagmi@2.19.5_@tanstack+react-query@5.102.8_react@19.2.8_typescript@5.9.3_viem@2.56.3_@types+react@19.2.18_zod@3.25.76"
+        "typescript"
       ],
       "bin": true
     },
@@ -6716,6 +6492,7 @@
         "npm:@walletconnect/ethereum-provider@2.21.1",
         "npm:clsx@^2.1.1",
         "npm:diff@^8.0.2",
+        "npm:input-otp@^1.5.0",
         "npm:isbot@^5.1.31",
         "npm:jsdom@^27.1.0",
         "npm:lucide-react@0.561",

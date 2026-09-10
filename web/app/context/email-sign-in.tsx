@@ -5,7 +5,16 @@
  * comes back with an email session; wallet users never download it.
  * A no-op when Privy is not configured (the option is not listed then either).
  */
-import { createContext, lazy, Suspense, useCallback, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  lazy,
+  Suspense,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Dialog } from "~/components/ui/Dialog";
 import { PRIVY_APP_ID, privyStore, recentConnectorIsPrivy } from "~/lib/privy";
 
@@ -32,13 +41,19 @@ function Loading({ open, onOpenChange }: { open: boolean; onOpenChange: (o: bool
 
 export function EmailSignInProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  // Decided during the first render, before wagmi's reconnect effect runs, so
-  // the connector knows whether to wait for Privy.
-  const [load, setLoad] = useState(() => {
-    const wanted = Boolean(PRIVY_APP_ID) && recentConnectorIsPrivy();
-    if (wanted) privyStore.request();
-    return wanted;
+  // Whether Privy is wanted is decided during the first render, before wagmi's
+  // reconnect effect runs, so the connector knows to wait for it. Mounting the
+  // island waits for an effect: the server cannot read localStorage, so
+  // rendering it during hydration would mismatch the server HTML.
+  const [wanted] = useState(() => {
+    const w = Boolean(PRIVY_APP_ID) && recentConnectorIsPrivy();
+    if (w) privyStore.request();
+    return w;
   });
+  const [load, setLoad] = useState(false);
+  useEffect(() => {
+    if (wanted) setLoad(true);
+  }, [wanted]);
   const openEmailSignIn = useCallback(() => {
     if (!PRIVY_APP_ID) return;
     privyStore.request();

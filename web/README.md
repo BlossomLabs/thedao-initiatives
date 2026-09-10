@@ -69,7 +69,9 @@ returns with an email session, so wallet users never download it.
 | Entrypoint | `server.ts` |
 | Env | everything in `.env.example` except `KV_PATH` and the dev-only keys |
 
-`WEB_ORIGIN` must be this site's origin (CORS is moot on one origin, but the SIWE domain is
-derived from it). Set `SITE_USERNAME` and `SITE_PASSWORD` to keep the site in private preview
+`WEB_ORIGIN` lists the browser origins allowed to call the API (comma-separated; the custom domain
+goes here). Requests served on a platform host (`*.deno.net`, `*.deno.dev`, or whatever
+`SELF_HOST_SUFFIXES` names) are additionally accepted as their own origin, for both the origin guard
+and the SIWE domain, so production and branch preview URLs work without listing each one. Set `SITE_USERNAME` and `SITE_PASSWORD` to keep the site in private preview
 behind HTTP Basic Auth; see `api/README.md`. Set `DB_PREFIX` when two deployments share one KV
 database (keys are namespaced under it; changing it means starting from an empty database).

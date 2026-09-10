@@ -91,6 +91,8 @@ export interface Config {
   rpcEndpoints: string[];
   webOrigins: string[]; // allowed browser origins (CORS + SIWE uri)
   siweDomains: string[]; // allowed SIWE `domain` values
+  /** Hostname suffixes whose own origin is accepted without listing (see lib/origin.ts). */
+  selfHostSuffixes: string[];
   adminAddresses: string[];
   operationalSigners: string[];
   safeApiKey: string;
@@ -141,6 +143,9 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
       : [...DEFAULT_RPC_ENDPOINTS],
     webOrigins,
     siweDomains,
+    selfHostSuffixes: list(env.SELF_HOST_SUFFIXES).length
+      ? list(env.SELF_HOST_SUFFIXES)
+      : [".deno.net", ".deno.dev"],
     adminAddresses: list(env.ADMIN_ADDRESSES).length
       ? list(env.ADMIN_ADDRESSES)
       : [...DEFAULT_ADMIN_ADDRESSES],

@@ -4,6 +4,7 @@ import { requireAuth } from "../middleware/auth.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
 import { verifySiwe } from "../chain/siwe.ts";
+import { selfOrigin } from "../lib/origin.ts";
 import { MAX_CONTRACT_SIGNATURE_BYTES } from "../chain/sign.ts";
 import { isAdminAddress } from "../services/roles.ts";
 import { pfpUrl } from "../lib/json.ts";
@@ -41,11 +42,15 @@ export function authRoutes(deps: Deps) {
     if (!message || !signature) {
       throw new HttpError(400, "message and signature are required");
     }
+    // The page signs for the host it was loaded on. A platform host (*.deno.net)
+    // is accepted alongside the configured list; any other host must be listed,
+    // since a bare Host header is not proof the page was served here.
+    const self = selfOrigin(c.req.raw, config);
     const [m, err] = await verifySiwe({
       message,
       signature,
-      domains: config.siweDomains,
-      origins: config.webOrigins,
+      domains: self ? [...config.siweDomains, new URL(self).host] : config.siweDomains,
+      origins: self ? [...config.webOrigins, self] : config.webOrigins,
       chainId: CHAIN_ID,
       now: deps.now(),
       skewSecs: SIWE_CLOCK_SKEW_SECS,

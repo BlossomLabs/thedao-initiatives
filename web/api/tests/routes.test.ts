@@ -249,6 +249,27 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
     },
   });
   assertEquals(bad.status, 401);
+  // The host the page was served on is accepted even when not configured.
+  const { nonce: n0 } = await j(await h.req("/api/auth/nonce")) as { nonce: string };
+  const own = msg(n0, "preview.deno.net").replace(
+    `URI: ${ORIGIN}`,
+    "URI: https://preview.deno.net",
+  );
+  const onSelf = await h.app.request("https://preview.deno.net/api/auth/verify", {
+    method: "POST",
+    headers: { Origin: "https://preview.deno.net", "Content-Type": "application/json" },
+    body: JSON.stringify({ message: own, signature: await w.sign(own) }),
+  });
+  assertEquals(onSelf.status, 200);
+  // A forged Host outside the platform suffixes does not widen the binding.
+  const { nonce: n1 } = await j(await h.req("/api/auth/nonce")) as { nonce: string };
+  const forged = msg(n1, "evil.example").replace(`URI: ${ORIGIN}`, "URI: https://evil.example");
+  const onForged = await h.app.request("https://evil.example/api/auth/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: forged, signature: await w.sign(forged) }),
+  });
+  assertEquals(onForged.status, 401);
   const res = await h.req("/api/auth/verify", {
     method: "POST",
     json: { message: msg(nonce), signature: await w.sign(msg(nonce)) },
@@ -269,7 +290,8 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
   assertEquals((await h.req("/api/admin/dashboard", { token: body.token })).status, 200);
   await h.req("/api/auth/logout", { method: "POST", token: body.token });
   assertEquals((await h.req("/api/auth/me", { token: body.token })).status, 401);
-  // a non-admin wallet gets a plain session
+  // a non-admin wallet gets a plain session (past the per-IP login window)
+  h.clock.now += 61;
   const p = wallet("0x" + "22".repeat(32));
   const { nonce: n2 } = await j(await h.req("/api/auth/nonce")) as { nonce: string };
   const m2 = msg(n2).replace(w.address, p.address);
@@ -292,6 +314,21 @@ Deno.test("origin guard and CORS", async () => {
     body: "{}",
   });
   assertEquals(res.status, 403);
+  // Same-origin on a host that is not in WEB_ORIGIN (a *.deno.net preview URL)
+  // passes: the origin the request was served on is always its own.
+  const self = await h.app.request("https://preview.deno.net/api/initiatives", {
+    method: "POST",
+    headers: { Origin: "https://preview.deno.net", "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assertEquals(self.status, 401);
+  // ...but an unlisted host outside the platform suffixes is still refused.
+  const other = await h.app.request("https://other.example/api/initiatives", {
+    method: "POST",
+    headers: { Origin: "https://other.example", "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assertEquals(other.status, 403);
   const pre = await h.app.request("http://api.test/api/board", {
     method: "OPTIONS",
     headers: {

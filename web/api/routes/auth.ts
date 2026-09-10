@@ -4,6 +4,7 @@ import { requireAuth } from "../middleware/auth.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
 import { verifySiwe } from "../chain/siwe.ts";
+import { MAX_CONTRACT_SIGNATURE_BYTES } from "../chain/sign.ts";
 import { isAdminAddress } from "../services/roles.ts";
 import { pfpUrl } from "../lib/json.ts";
 import {
@@ -35,7 +36,8 @@ export function authRoutes(deps: Deps) {
     }
     const body = await jsonBody(c);
     const message = String(body.message ?? "");
-    const signature = s(body.signature, 200);
+    // EOA signatures are 132 chars; contract signatures (EIP-1271) can be longer.
+    const signature = s(body.signature, 2 + 2 * MAX_CONTRACT_SIGNATURE_BYTES);
     if (!message || !signature) {
       throw new HttpError(400, "message and signature are required");
     }
@@ -47,6 +49,7 @@ export function authRoutes(deps: Deps) {
       chainId: CHAIN_ID,
       now: deps.now(),
       skewSecs: SIWE_CLOCK_SKEW_SECS,
+      rpc: deps.chain.rpc,
     });
     if (!m) throw new HttpError(401, err);
     if (!(await db.sessions.consumeNonce(m.nonce))) {

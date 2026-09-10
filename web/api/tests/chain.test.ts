@@ -25,7 +25,15 @@ import {
   TOPIC_PROXY_CREATION,
   verifySafe,
 } from "../chain/safe.ts";
-import { recoverPersonalSign } from "../chain/sign.ts";
+import {
+  encodeIsValidSignature,
+  isValidContractSignature,
+  MAX_CONTRACT_SIGNATURE_BYTES,
+  personalMessageHash,
+  recoverPersonalSign,
+  SEL_IS_VALID_SIGNATURE,
+} from "../chain/sign.ts";
+import { encodeFunctionData, parseAbi } from "viem";
 import { parseSiweMessage, verifySiwe } from "../chain/siwe.ts";
 import * as config from "../config.ts";
 import { encodeHex } from "@std/encoding";
@@ -479,4 +487,106 @@ Deno.test("verifySiwe: happy path and each rejection", async () => {
     signature: await other.sign(msg()),
   });
   assertStringIncludes(err ?? "", "signature");
+});
+
+Deno.test("encodeIsValidSignature matches viem's ABI encoding", () => {
+  const abi = parseAbi(["function isValidSignature(bytes32,bytes) view returns (bytes4)"]);
+  const hash = personalMessageHash("hello");
+  for (const len of [0, 65, 130, 33]) {
+    const sig = new Uint8Array(len).map((_, i) => i + 1);
+    const expected = encodeFunctionData({
+      abi,
+      functionName: "isValidSignature",
+      args: [("0x" + encodeHex(hash)) as `0x${string}`, ("0x" + encodeHex(sig)) as `0x${string}`],
+    });
+    assertEquals(encodeIsValidSignature(hash, sig), expected);
+  }
+});
+
+Deno.test("verifySiwe: EIP-1271 fallback for contract accounts", async () => {
+  const account = SAFE;
+  const issued = new Date(NOW * 1000).toISOString();
+  const message =
+    `fund.example wants you to sign in with your Ethereum account:\n${account}\n\n\n` +
+    `URI: https://fund.example\nVersion: 1\nChain ID: 1\nNonce: abcdefgh12\nIssued At: ${issued}`;
+  const base = {
+    message,
+    domains: ["fund.example"],
+    origins: ["https://fund.example"],
+    chainId: 1,
+    now: NOW,
+    skewSecs: 300,
+  };
+  // A 2-of-n Safe signature: two 65-byte parts, longer than any EOA signature.
+  const signature = "0x" + "ab".repeat(130);
+  const magic = SEL_IS_VALID_SIGNATURE + "0".repeat(56);
+  const calls: unknown[] = [];
+  const contract = (answer: unknown) =>
+    fakeRpc({
+      eth_call: (params) => {
+        calls.push(params);
+        const [tx] = params as [{ to: string; data: string }];
+        assertEquals(tx.to.toLowerCase(), account.toLowerCase());
+        assertEquals(
+          tx.data,
+          encodeIsValidSignature(
+            personalMessageHash(message),
+            new Uint8Array(130).fill(0xab),
+          ),
+        );
+        return answer;
+      },
+    });
+
+  // Without an rpc the contract signature is just an invalid signature.
+  assertStringIncludes((await verifySiwe({ ...base, signature }))[1] ?? "", "signature");
+  // The contract accepts it.
+  const ok = await verifySiwe({ ...base, signature, rpc: contract(magic) });
+  assertEquals(ok[1], null);
+  assertEquals(ok[0]!.address, account);
+  assertEquals(calls.length, 1);
+  // The contract (or an EOA, answering "0x") rejects it.
+  for (const answer of ["0x", "0x" + "00".repeat(32), magic + "00", null]) {
+    const [, err] = await verifySiwe({ ...base, signature, rpc: contract(answer) });
+    assertStringIncludes(err ?? "", "signature");
+  }
+  // RPC trouble fails closed.
+  const down = fakeRpc({
+    eth_call: () => {
+      throw new RpcError("all endpoints failed");
+    },
+  });
+  assertStringIncludes((await verifySiwe({ ...base, signature, rpc: down }))[1] ?? "", "signature");
+  // Oversized or malformed signatures never reach the chain.
+  const never = fakeRpc({});
+  assertFalse(
+    await isValidContractSignature(
+      never,
+      account,
+      message,
+      "0x" + "ab".repeat(MAX_CONTRACT_SIGNATURE_BYTES + 1),
+    ),
+  );
+  assertFalse(await isValidContractSignature(never, account, message, "0xabc"));
+  assertFalse(await isValidContractSignature(never, account, message, "not hex"));
+});
+
+Deno.test("verifySiwe: a valid EOA signature never touches the rpc", async () => {
+  const w = wallet("0x" + "44".repeat(32));
+  const issued = new Date(NOW * 1000).toISOString();
+  const message =
+    `fund.example wants you to sign in with your Ethereum account:\n${w.address}\n\n\n` +
+    `URI: https://fund.example\nVersion: 1\nChain ID: 1\nNonce: abcdefgh12\nIssued At: ${issued}`;
+  const [m, err] = await verifySiwe({
+    message,
+    signature: await w.sign(message),
+    domains: ["fund.example"],
+    origins: ["https://fund.example"],
+    chainId: 1,
+    now: NOW,
+    skewSecs: 300,
+    rpc: fakeRpc({}),
+  });
+  assertEquals(err, null);
+  assertEquals(m!.address, w.address);
 });

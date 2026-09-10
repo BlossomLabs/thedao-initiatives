@@ -15,10 +15,12 @@ and `../deno.json` holds the tasks and imports.
 
 ## How it differs from the Python MVP
 
-- **Sign-In with Ethereum** (EIP-4361) is the only auth. `GET /api/auth/nonce`, sign the message,
-  `POST /api/auth/verify` → bearer token. One signature per session instead of one per
-  comment/vote/nickname. A session whose address is in `ADMIN_ADDRESSES` is an admin session. No
-  password. The only cookie is the private-preview unlock (below).
+- **Sign-In with Ethereum** (EIP-4361) is the only auth. EOA signatures are recovered locally; when
+  that fails the message address is asked via EIP-1271 (one `eth_call`), so Safes and smart wallets
+  can sign in too. `GET /api/auth/nonce`, sign the message, `POST /api/auth/verify` → bearer token.
+  One signature per session instead of one per comment/vote/nickname. A session whose address is in
+  `ADMIN_ADDRESSES` is an admin session. No password. The only cookie is the private-preview unlock
+  (below).
 - **No background scanner.** Donations are discovered through the Safe Transaction Service: a
   `Deno.cron` (default every 10 min) makes one authenticated request per Safe, re-verifies each new
   tx over RPC, and writes the result to KV. Page reads never call Safe. Set `SAFE_API_KEY`.
@@ -91,8 +93,8 @@ const { token } = await (await fetch(API + "/api/auth/verify", {
 
 App root `api/`, entrypoint `main.ts`. Set the variables from `.env.example` (no `KV_PATH`). KV and
 cron are provided by the platform; each timeline gets its own database. If two deployments must
-share one KV database, give each its own `DB_PREFIX`: every key is stored under that first part,
-so the two never see each other's rows (changing it on a live deployment starts from empty).
+share one KV database, give each its own `DB_PREFIX`: every key is stored under that first part, so
+the two never see each other's rows (changing it on a live deployment starts from empty).
 
 ## Scripts
 

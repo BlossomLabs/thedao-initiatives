@@ -1,10 +1,13 @@
 /** Sign-In with Ethereum (EIP-4361) on top of viem/siwe: the parser is viem's,
  * this file only insists on the required fields and applies our policy
- * (allowed domains/origins, chain, clock skew) before recovering the signer. */
+ * (allowed domains/origins, chain, clock skew) before recovering the signer.
+ * EOA signatures are checked locally; when that fails and an RPC is given,
+ * the message address is asked via EIP-1271 (Safes, smart wallets). */
 import type { Hex } from "viem";
 import { parseSiweMessage as viemParse, validateSiweMessage } from "viem/siwe";
 import { addrEq, toChecksum } from "./address.ts";
-import { recoverPersonalSign } from "./sign.ts";
+import type { Rpc } from "./rpc.ts";
+import { isValidContractSignature, recoverPersonalSign } from "./sign.ts";
 
 export interface SiweMessage {
   scheme?: string;
@@ -60,6 +63,8 @@ export interface SiweVerifyInput {
   chainId: number;
   now: number; // seconds
   skewSecs: number;
+  /** Enables the EIP-1271 fallback; without it only EOA signatures verify. */
+  rpc?: Rpc;
 }
 
 /** Verify everything except nonce freshness (the caller owns nonce storage). */
@@ -89,6 +94,12 @@ export async function verifySiwe(
     return [null, "message expired or not yet valid"];
   }
   const signer = await recoverPersonalSign(input.message, input.signature);
-  if (!signer || !addrEq(signer, m.address)) return [null, "signature does not verify"];
-  return [m, null];
+  if (signer && addrEq(signer, m.address)) return [m, null];
+  if (
+    input.rpc &&
+    await isValidContractSignature(input.rpc, m.address, input.message, input.signature)
+  ) {
+    return [m, null];
+  }
+  return [null, "signature does not verify"];
 }

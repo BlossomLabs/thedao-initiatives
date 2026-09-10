@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { Bell } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
+import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import SyncContent from "~/components/admin/SyncContent";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
@@ -62,6 +63,7 @@ export default function Dashboard() {
 
   return (
     <PageMain detail>
+      <Crumbs items={[{ label: "Initiatives", to: "/" }]} />
       <div className="flex items-center justify-between gap-5">
         <h1 className="m-0 font-inter-tight text-[clamp(26px,4vw,40px)] font-medium tracking-[-.02em]">
           Admin dashboard

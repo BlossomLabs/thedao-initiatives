@@ -5,6 +5,7 @@ import { sendTransaction } from "wagmi/actions";
 import { useAccount, useConfig } from "wagmi";
 import { ExternalLink, MessageSquare, RefreshCw, Trash2, Upload } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
+import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
@@ -68,9 +69,9 @@ export default function AdminInitiativeEditor() {
   if (error || !data) {
     return (
       <PageMain detail>
-        <p className="m-0 mb-2.5">
-          <Link to="/admin/dashboard">← Dashboard</Link>
-        </p>
+        <Crumbs
+          items={[{ label: "Initiatives", to: "/" }, { label: "Admin", to: "/admin" }]}
+        />
         <p className="alert">{error instanceof Error ? error.message : "Not found."}</p>
       </PageMain>
     );
@@ -81,9 +82,7 @@ export default function AdminInitiativeEditor() {
 
   return (
     <PageMain detail>
-      <p className="m-0 mb-2.5">
-        <Link to="/admin/dashboard">← Dashboard</Link>
-      </p>
+      <Crumbs items={[{ label: "Initiatives", to: "/" }, { label: "Admin", to: "/admin" }]} />
       <h1 className="m-0 mb-3 mt-1.5 font-inter-tight text-[clamp(28px,4vw,44px)] font-bold leading-[1.1] tracking-[-.02em]">
         {r.title}
       </h1>

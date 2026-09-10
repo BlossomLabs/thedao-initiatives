@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageSquare } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
+import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import { TypeBadge } from "~/components/ui/Badge";
 import Skeleton from "~/components/ui/Skeleton";
@@ -52,9 +53,7 @@ export default function Initiative() {
   };
   return (
     <PageMain detail>
-      <p className="m-0 mb-2.5">
-        <Link to="/">← All initiatives</Link>
-      </p>
+      <Crumbs items={[{ label: "Initiatives", to: "/" }]} />
       <h1 className="m-0 mb-3 mt-1.5 font-inter-tight text-[clamp(28px,4vw,44px)] font-bold leading-[1.1] tracking-[-.02em]">
         {r.title}
       </h1>

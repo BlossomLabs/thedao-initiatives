@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import PageMain from "~/components/layout/PageMain";
+import Crumbs from "~/components/layout/Crumbs";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
 import { api } from "~/lib/api";
@@ -65,9 +66,7 @@ export default function Leads() {
   };
   return (
     <PageMain detail>
-      <p className="crumb">
-        <Link to="/admin/dashboard">← Dashboard</Link>
-      </p>
+      <Crumbs items={[{ label: "Initiatives", to: "/" }, { label: "Admin", to: "/admin" }]} />
       <div className="flex items-center justify-between gap-5">
         <h1 className="m-0 font-inter-tight text-[clamp(26px,4vw,40px)] font-medium tracking-[-.02em]">
           Funder leads{" "}

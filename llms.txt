@@ -78,7 +78,7 @@ plus what the domain demands>
 Questions, pushback, better ideas? Post them below.
 ```
 
-Length: 800 to 2,500 words including boilerplate. The example below is about 1,300.
+Length: 800 to 2,500 words including boilerplate. The example below is about 2,000.
 
 ### Shared rules and verbatim text (both types)
 
@@ -285,14 +285,14 @@ A real initiative from the board. Match the example in structure, tone, length, 
 
 ---
 
-# RFP: Public OPSEC Rating System ("Moody's for OPSEC")
+# RFP: OPSEC Ratings Coalition to Build & Maintain an "L2Beat for OPSEC"
 
 | | |
 |---|---|
 | **Status** | Draft |
 | **Budget** | $150,000 USD |
 | **Proposal window** | 30 days, opening once the RFP is fully funded |
-| **Indicative duration** | 12 months (the team sets the final timeline) |
+| **Indicative duration** | 18 months (the team sets the final timeline) |
 
 ## Why this matters
 
@@ -304,19 +304,30 @@ We want to change that with a single OPSEC rating the whole industry agrees on. 
 
 Let's be clear about what this RFP is: **a coordination effort.** The money here pays for a social exercise, getting the community of OPSEC auditing firms around one table to agree on one standard. The website is the easy part.
 
+Three roles, and only one of them gets this money:
+
+| Role | Who | Funded by this RFP? |
+|---|---|---|
+| Rated teams | Protocol, L2 and infra teams whose OPSEC gets scored and who appear on the board with their tier | No, they pay a fixed fee for their own assessment |
+| Accredited raters | The 6+ existing OPSEC auditing firms that agree the scoring template and issue tiers inside their existing audit flow | No, the membership body pays them per rating from the fee pool |
+| Coordinator | The single party that convenes the firms, gets them to sign one standard, builds the board and stands up the membership body | Yes, this is the recipient |
+
 What we expect to come out of it:
 
 - One scoring template and tier definitions (A / AA / AAA), agreed on by **at least 6 OPSEC auditing companies**. Roughly speaking, an A team follows best practices and we don't expect them to have incidents. AAA is wild: secure beyond what's reasonable.
 - The firms already doing OPSEC audits become the raters. They add exactly one step to the audits they already run: apply the scoring template, issue the tier. The first batch of accredited raters is the same group that built the standard, so they have skin in the game from day one.
-- A simple public board of rated teams and their tiers. Honestly, this part could probably be vibe coded in a weekend. The value is the standard and the names on it.
-- A path to sustainability. The accredited firms form a membership group (think of it as a cooperative professional body) that maintains the standard, certifies new raters and keeps the quality bar up. A small committee, paid something modest like $2,000 per member per cycle, verifies that ratings are sound. That's the piece that keeps the whole thing meaningful, because nobody should ever profit from inflating a score.
-- A six-month cycle. Ratings get reassessed every 6 months, and the scoring template gets revisited on the same rhythm.
+- A simple public board of rated teams, their tiers, a valid-until date and a last check-in date. Honestly, this part could probably be vibe coded in a weekend. The value is the standard and the names on it.
+- A membership body that ends up owning all of it. The accredited firms form a cooperative professional body, one firm, one vote. It maintains the standard, certifies new raters, runs a small verification committee (paid something modest like $2,000 per member per cycle) that spot-checks a share of ratings, and takes over the standard, the board and the name from the coordinator no later than six months after this grant ends.
+- A funding model that outlives the grant: issuer-pays, the same model the Moody's analogy comes from. Rated teams pay a fixed fee for their assessment (think $2,000 to $5,000 on top of an audit they were buying anyway), and the fee is the same whether they get a AAA or nothing. Fees go to the membership body, not to the rater. The body pays raters from the pool and funds the verification committee from it. Rough math: 30 teams a year at $3,000 is $90,000 a year, enough for the committee and a lean secretariat. The budget is sized for 12 to 18 months of runway on purpose, because fee revenue is thin until enough teams are on the board that being absent is conspicuous.
+- Ratings that go stale on events, not on a calendar. A rating is valid for 12 months. At the six-month mark the team files a short self-attestation and its rater does a check-in (not a full audit), or the rating lapses. A disclosed incident or a material change (signer set, leadership, treasury or infrastructure migration) suspends the rating automatically until the team is re-rated. The scoring template itself changes through a defined process no more than once a year, so nobody is chasing a moving target.
 
 Bidders are welcome to propose a different path to get there. The goal is what's fixed: a decentralized rating system that many OPSEC auditing companies co-own, with a real shot at sustaining itself long after this money is spent.
 
 ## Who we expect to do this
 
 Nobody is pre-selected. Once the RFP is fully funded there will be an open bidding process, and the winner gets picked through the process below. The dream candidate is a credible coordinator in the security community: someone who can bring 6+ OPSEC auditing firms to the same table and get them all to sign the same document. (If you have ever tried to get six companies to agree on anything, you know that's the real work here.)
+
+Ideally the coordinator is not an OPSEC auditing firm, because whoever holds the pen on the standard walks away with an edge over the firms they convened. That is a preference, not a requirement, and it will weigh in selection. An audit firm that coordinates takes no rater role during the grant and no ownership of the board. The best pitch a bidder can make is simple: here is why the other firms can trust me to run this.
 
 Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
@@ -326,9 +337,10 @@ Every applicant, including any expected recipient, must disclose their relations
 
 - Coordinating at least 6 OPSEC auditing companies to agree on one scoring template and the A / AA / AAA tier definitions
 - Onboarding those firms as the first accredited raters, with whatever materials they need to run the template inside their existing audit flow
-- A simple public board of rated teams and their tiers... tiers only, no details, no gaps
-- Standing up the membership body: how raters get certified, the verification committee, the small stipends, and the funding model that keeps it alive
-- The six-month reassessment cycle, for the ratings AND for the scoring template itself
+- A simple public board of rated teams and their tiers, with valid-until and last check-in dates... tiers only, no details, no gaps
+- Standing up the membership body: the charter (one firm, one vote), how raters get certified, the verification committee, the fixed fee schedule and the pooled funding model
+- The 12-month rating cycle with the six-month check-in and the event-based suspension process
+- The handoff: transferring the standard, the board and the name to the membership body
 
 **Out of scope**
 
@@ -339,11 +351,14 @@ Every applicant, including any expected recipient, must disclose their relations
 ## Hard requirements
 
 1. **Six firms minimum.** At least 6 OPSEC auditing companies formally agree to the scoring template and tier definitions, and commit to issuing ratings with it.
-2. **Tiers only.** The public board shows a team's tier and nothing more. No gaps, no unmet controls, no explanations.
-3. **Open and versioned.** The scoring template and tier definitions are public, open source and versioned, with changes dated and attributable.
+2. **Tiers only.** The public board shows a team's tier, its valid-until date and its last check-in, and nothing more. No gaps, no unmet controls, no explanations.
+3. **Open and versioned.** The scoring template and tier definitions are public, open source and versioned, with changes dated and attributable, revised through a defined change process no more than once a year.
 4. **Tool-agnostic.** Every tier is reachable no matter which tools or frameworks a team uses. No vendor's product is ever required.
-5. **Nobody profits from inflating scores.** The membership body maintains the standard with real conflict-of-interest rules and a funding model that keeps the rating honest.
-6. **Ratings expire.** Every rating gets reassessed every 6 months.
+5. **One firm, one vote.** Every founding firm gets equal governance rights in the membership body, regardless of who convened whom.
+6. **Neutral name.** The standard and the board are not branded after the coordinator or any single firm.
+7. **Mandatory handoff.** The standard, the board, the name and any secretariat function transfer to the membership body no later than six months after the final milestone. The coordinator keeps no veto and no unilateral control.
+8. **Fixed fees, pooled.** Rated teams pay a fixed, outcome-independent fee. Fees flow to the membership body, which pays raters from the pool and funds the verification committee from it. No tier-contingent pricing, no "we'll get you to AA" upsell.
+9. **Twelve months, checked at six, suspended on events.** A rating is valid for 12 months, lapses without the six-month self-attestation and check-in, and is suspended automatically on a disclosed incident or a material change until the team is re-rated.
 
 ## Milestones (draft)
 
@@ -351,22 +366,22 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 
 ### A - Agreed standard - $50,000
 
-- [ ] A public, versioned scoring template plus the A / AA / AAA tier definitions
+- [ ] A public, versioned scoring template plus the A / AA / AAA tier definitions, with the change process for future revisions
 - [ ] At least 6 OPSEC auditing companies formally signed on and committed to rating with it, with the signed template published
-- [ ] A written governance and sustainability model: the membership body, how raters get certified, the verification committee and its stipends, and how it all gets funded
+- [ ] The membership body's charter published: one firm, one vote, rater certification, the verification committee and its stipends, the fixed fee schedule, the pooled funding model, and the handoff agreement with a transfer date no later than six months after the final milestone
 
 ### B - Board and first ratings - $25,000
 
-- [ ] The public board is live, showing rated teams and their tiers (and nothing else)
+- [ ] The public board is live, showing rated teams, their tiers, valid-until dates and last check-ins (and nothing else)
 - [ ] At least 6 accredited firms have issued ratings inside their normal audit flow, each listed on the public board
-- [ ] At least 5 teams rated end to end and visible on the board
+- [ ] At least 5 teams rated end to end, with their fees paid through the membership body's pool
 
 ### C - Adoption evidence - $75,000
 
 - [ ] At least 20 teams publicly rated on the board by accredited firms
-- [ ] At least one full six-month reassessment completed: existing ratings reset and re-scored, with the changes live on the board
-- [ ] The membership body running on its own funding model, with the verification committee active, both shown on the body's public page
-- [ ] A public metrics page: teams rated, tiers awarded, firms participating, reassessments completed
+- [ ] The six-month check-in running: every rating older than six months shows a check-in date on the board, and the event-based suspension process is live with a public change log
+- [ ] The membership body running on pooled fees, with the verification committee active and its spot-check sample published, both shown on the body's public page
+- [ ] A public metrics page: teams rated, tiers awarded, firms participating, check-ins completed, suspensions and renewals
 
 ## Milestone review and acceptance
 
@@ -386,7 +401,6 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 ---
 
 Questions, pushback, better ideas? Post them below.
-
 ---
 
 End of example. Note the adoption milestone: half the budget pays only on real usage, above the one-third minimum. Its position in the order is a choice, not a rule.

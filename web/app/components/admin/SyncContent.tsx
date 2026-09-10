@@ -12,15 +12,16 @@ interface SyncResult {
   errors: string[];
 }
 
-/** Files the API's sync accepts: content/rfps/*.md plus content/donation-terms.md. */
+/** Files the API's sync accepts: content/rfps/*.md. */
 async function readMarkdown(list: FileList | null) {
   const out: { name: string; text: string }[] = [];
   for (const f of Array.from(list ?? [])) {
     const name = f.name;
     if (!name.endsWith(".md") || name === "README.md") continue;
-    // README aside, only two shapes exist: rfps/<slug>.md and donation-terms.md.
+    // README aside, only rfps/<slug>.md is content the API takes (the donation
+    // terms are bundled into the site at build time).
     const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath ?? "";
-    if (rel && !/(^|\/)(rfps\/[^/]+|donation-terms)\.md$/.test(rel)) continue;
+    if (rel && !/(^|\/)rfps\/[^/]+\.md$/.test(rel)) continue;
     out.push({ name, text: await f.text() });
   }
   return out;
@@ -73,7 +74,6 @@ export default function SyncContent() {
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["admin"] }),
         qc.invalidateQueries({ queryKey: boardKey }),
-        qc.invalidateQueries({ queryKey: ["terms"] }),
       ]);
     } catch (e) {
       setMsg({ kind: "err", text: errorMessage(e) });

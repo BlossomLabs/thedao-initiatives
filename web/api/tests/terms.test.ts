@@ -1,48 +1,18 @@
-import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import { ADMIN, harness, j, loadContentFiles, PLAIN } from "./app-helpers.ts";
-import { parseTermsFile } from "../services/content.ts";
 import { K } from "../db/keys.ts";
 
-const TERMS = "version: 2026-09-06\n\n# Donation Terms\n\n**Effective September 6, 2026.**\n";
-
-Deno.test("terms file: version line is the gate version and leaves the body", () => {
-  const t = parseTermsFile(TERMS);
-  assertEquals(t.version, "2026-09-06");
-  assert(t.body.startsWith("# Donation Terms"));
-  let threw = false;
-  try {
-    parseTermsFile("# no version line\n");
-  } catch {
-    threw = true;
-  }
-  assert(threw);
-});
-
-Deno.test("terms: sync publishes, params carry the version, acceptance log dedupes per address", async () => {
+// The terms document lives in the site bundle (content/donation-terms.md via
+// app/data/terms.ts); the API only keeps the acceptance log.
+Deno.test("terms: no document in the API, acceptance log dedupes per address", async () => {
   const h = await harness();
   try {
     assertEquals((await h.req("/api/terms")).status, 404);
-    const admin = await h.mint(ADMIN, true);
-    const files = [...(await loadContentFiles()), { name: "donation-terms.md", text: TERMS }];
-    const res = await j(
-      await h.req("/api/admin/sync-content", {
-        method: "POST",
-        token: admin,
-        json: { files },
-      }),
-    );
-    assertEquals(res.errors, []);
 
-    const terms = await j(await h.req("/api/terms"));
-    assertEquals(terms.version, "2026-09-06");
-    assertStringIncludes(String(terms.body), "# Donation Terms");
-    assertFalse(String(terms.body).includes("version:"));
-
-    const params = await j(await h.req("/api/donate/params"));
-    assertEquals(params.termsVersion, "2026-09-06");
-
-    const bad = await h.req("/api/terms/accept", { method: "POST", json: { version: "old" } });
-    assertEquals(bad.status, 400);
+    for (const version of ["", "not a version", "x".repeat(41), "../etc"]) {
+      const bad = await h.req("/api/terms/accept", { method: "POST", json: { version } });
+      assertEquals(bad.status, 400, JSON.stringify(version));
+    }
     const badAddr = await h.req("/api/terms/accept", {
       method: "POST",
       json: { version: "2026-09-06", address: "0x1234" },

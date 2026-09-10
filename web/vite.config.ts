@@ -29,6 +29,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     watch: { ignored: ["**/*.tmp.*"] },
+    // app/data/terms.ts imports ../content/donation-terms.md from outside web/.
+    fs: { allow: [".", fileURLToPath(new URL("../content", import.meta.url))] },
     // API and web share one origin in production; mirror that in dev.
     proxy: {
       "/api": process.env.API_PROXY || "http://localhost:8000",

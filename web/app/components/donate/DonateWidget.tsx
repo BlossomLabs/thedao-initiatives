@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { CreditCard, Landmark, Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useDonateParams } from "~/hooks/use-donate-params";
+import { TERMS } from "~/data/terms";
 import { api } from "~/lib/api";
 import type { DonateResult, Onramp } from "~/lib/api-types";
 import { parseUsd, tokenQty } from "~/lib/donate";
@@ -55,7 +56,7 @@ export default function DonateWidget({
   // ---- donation terms gate: every method stays locked until the box is checked.
   // Acceptance is logged server-side (anonymous, then once more with the wallet
   // address when one connects) so the trail can bind acceptances to donors.
-  const termsVersion = params?.enabled ? params.termsVersion : "";
+  const termsVersion = TERMS.version;
   const [accepted, setAccepted] = useState(false);
   const lastLogged = useRef<string | null>(null);
   useEffect(() => {

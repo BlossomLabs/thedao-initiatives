@@ -32,7 +32,6 @@ export function donateRoutes(deps: Deps) {
       rates,
       minTokenUnits: 1,
       minEth: MIN_ETH_DONATION,
-      termsVersion: (await db.terms.get())?.version ?? "",
     });
   });
 

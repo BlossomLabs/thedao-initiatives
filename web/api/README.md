@@ -22,12 +22,13 @@ and `../deno.json` holds the tasks and imports.
 - **No background scanner.** Donations are discovered through the Safe Transaction Service: a
   `Deno.cron` (default every 10 min) makes one authenticated request per Safe, re-verifies each new
   tx over RPC, and writes the result to KV. Page reads never call Safe. Set `SAFE_API_KEY`.
-- **Content sync is push-based.** `deno task sync-content` reads `../../content/rfps/*.md` plus
-  `../../content/donation-terms.md` and POSTs them to `/api/admin/sync-content`. Files own the words
-  and the goal; the admin panel owns status, Safes and money. The terms file's first line
-  `version: YYYY-MM-DD` is the donate widget's gate version: `GET /api/terms` serves it,
-  `POST /api/terms/accept` logs acceptances (anonymous, or once per wallet and version) to KV. Run
-  the sync after every deploy that changes content.
+- **Content sync is push-based.** `deno task sync-content` reads `../../content/rfps/*.md` and POSTs
+  them to `/api/admin/sync-content`. Files own the words and the goal; the admin panel owns status,
+  Safes and money. Run the sync after every deploy that changes content.
+- **The donation terms are not in the API.** `content/donation-terms.md` is bundled into the site at
+  build time (`app/data/terms.ts`, prerendered at `/donation-terms`). Its first line
+  `version: YYYY-MM-DD` is the donate widget's gate version; `POST /api/terms/accept` logs the
+  version accepted (anonymous, or once per wallet and version) to KV.
 - **Uploads go to Pinata** (backer logos, profile pictures); only the CID is stored. Set
   `PINATA_JWT`; until then uploads answer 503.
 - Markdown (`details`) is stored and returned raw; the frontend renders it.

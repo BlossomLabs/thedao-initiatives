@@ -33,8 +33,8 @@ remote API.
 - `/initiative/:slug/edit` (proposer or admin, SIWE): title, summary and details only; each
   save is a new public revision that goes live at once
 - `/submit`, `/submit/thanks`
-- `/donation-terms` (content/donation-terms.md, synced into the API; the donate widget's
-  terms gate links here)
+- `/donation-terms` (content/donation-terms.md, bundled at build time by `app/data/terms.ts`;
+  the donate widget's terms gate links here and logs acceptances by its `version:` line)
 - `/admin` (SIWE-gated), `/admin/dashboard` (incl. "Sync content files": pick the repo's
   `content` folder in the browser, no private key needed), `/admin/initiatives/:id`,
   `/admin/leads` (private funder leads + CSV)

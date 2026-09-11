@@ -12,6 +12,11 @@ fields plus the scorecard" section lists every form field in the form's
 top-to-bottom order with the same required flags. When you touch
 `templates/submit.html` or the submit route in `app.py`, re-check that list.
 
+The process rules live in `content/boilerplate/{rfp,grant,topup}.md` and render
+on every initiative page and on the submit form; the guide embeds the same
+text under "What the site adds". Change all three in one PR, and bump the
+`version:` line when the wording changes.
+
 ## Private fields are never rendered publicly
 
 `contact` and `funders` are admin-only. They must never appear on any public

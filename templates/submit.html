@@ -19,7 +19,7 @@
 
   {% if error %}<div class="alert">{{ error }}</div>{% endif %}
 
-  <form method="post" class="form">
+  <form method="post" class="form" id="submit-form">
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <input type="text" name="website" value="" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
 
@@ -32,6 +32,25 @@
         {{ 'checked' if form and form.get('type') == 'grant' }}>
         <span><b>Grant</b><small>Your team presents the idea and does the work.</small></span></label>
     </div>
+    <div class="topup-row" id="topup-row" {% if not form or form.get('type') != 'grant' %}hidden{% endif %}>
+      <label class="check-lbl"><input type="checkbox" name="topup" id="f-topup" value="1" {{ 'checked' if form and form.get('topup') }}>
+        Work is already under way with another funder (a top-up grant)</label>
+      <div id="reviewer-row" {% if not form or not form.get('topup') %}hidden{% endif %}>
+        <label class="lbl" for="f-reviewer">Milestone reviewer</label>
+        <input type="text" id="f-reviewer" name="milestone_reviewer" maxlength="200"
+               placeholder="Who decides whether the remaining milestones pass, e.g. a named engineer and their affiliation"
+               value="{{ form.milestone_reviewer if form else '' }}">
+      </div>
+    </div>
+
+    {% for kind, p in rules_panels().items() if p %}
+    <section class="rules-panel form-rules" data-rules="{{ kind }}" {% if kind != ((form.get('type') if form else 'rfp') if not (form and form.get('topup')) else 'topup') %}hidden{% endif %}>
+      <h3>{{ p.title }}</h3>
+      <p class="small dim">The site shows this on every initiative of this type. You do not need to write any of it.</p>
+      <div class="body-text md">{{ p.body | md }}</div>
+      <p class="small dim rules-version">Rules v{{ p.version }}, shown on every initiative of this type.</p>
+    </section>
+    {% endfor %}
 
     <label class="lbl" for="f-title">Title *</label>
     <input type="text" id="f-title" name="title" required maxlength="140" value="{{ form.title if form else '' }}">
@@ -42,9 +61,19 @@
     <label class="lbl" for="f-details">Full initiative details</label>
     <textarea id="f-details" name="details" rows="10" maxlength="20000">{{ form.details if form else '' }}</textarea>
 
-    <label class="lbl" for="f-goal">Funding goal (USD) *</label>
-    <input type="text" id="f-goal" name="goal" required inputmode="decimal" placeholder="250000"
-           value="{{ form.goal if form else '' }}">
+    <div class="two-col">
+      <div>
+        <label class="lbl" for="f-goal">Funding goal (USD) *</label>
+        <input type="text" id="f-goal" name="goal" required inputmode="decimal" placeholder="250000"
+               value="{{ form.goal if form else '' }}">
+      </div>
+      <div>
+        <label class="lbl" for="f-duration">Expected duration (months) *</label>
+        <input type="text" id="f-duration" name="duration_months" required inputmode="numeric" placeholder="12"
+               value="{{ form.duration_months if form else '' }}">
+        <span class="small dim">Months from funding until the last milestone is complete.</span>
+      </div>
+    </div>
 
     <label class="lbl" for="f-funders">Who is likely to fund this? * <span class="priv">🔒 Private, never published</span></label>
     <textarea id="f-funders" name="funders" rows="4" required maxlength="4000"

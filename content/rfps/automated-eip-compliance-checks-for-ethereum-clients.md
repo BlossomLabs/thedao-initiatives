@@ -10,14 +10,8 @@ summary: Ethereum's client teams implement EIPs by reading specification text
   how EIP-1559's base-fee burn is implemented. This grant funds turning it from a
   research tool into a self-hosted pre-release check running in the staging
   pipelines of the major execution clients.
+duration: 6
 ---
-| | |
-|---|---|
-| **Status** | Draft |
-| **Budget** | $20,000 USD |
-| **Proposal window** | 15 days, opening once the grant is fully funded |
-| **Indicative duration** | 6 months (the team sets the final timeline) |
-
 ## Why this matters
 
 Ethereum's client teams implement EIPs by reading specification text and writing code. Conformance test suites like execution-spec catch behavioral divergence on the cases the tests cover, but they can't catch what nobody wrote a test for, and they can't tell a team that their implementation quietly diverges from the spec's intent. PRSpec uses LLM analysis to compare EIP specification text directly against client source code and flag semantic mismatches. It has already surfaced a real cross-client inconsistency in how EIP-1559's base-fee burn is implemented, leading to a spec-clarification issue.
@@ -35,8 +29,6 @@ This grant funds turning PRSpec from a working research tool into something clie
 In the interest of full transparency:
 
 - This grant was drafted from a proposal by Safi El-Hassanine, the author of PRSpec, and Safi is the recipient. The head start is the tool itself: PRSpec already covers four execution clients across 10 EIPs, and milestone 1 is about 80% complete. The milestone 1 payment covers finishing and hardening it, and the grant agreement may treat part of it as the advance on signing.
-- The proposal window is also an open challenge period. A challenger wins by credibly delivering this scope for less or proposing materially stronger milestones.
-- Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
 ## Existing work
 
@@ -72,8 +64,6 @@ In the interest of full transparency:
 
 ## Milestones (draft)
 
-These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
-
 ### 1 - Production-ready packaging and docs - $4,000
 
 - [ ] PRSpec CLI and Docker image published with pinned, reproducible builds; a reviewer goes from clean checkout to a completed analysis run with one documented command
@@ -102,21 +92,3 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 ### 5 - Majority client adoption - $6,000
 
 - [ ] At least three execution-layer client teams running PRSpec as a recurring pre-release check, publicly confirmed by those teams (must include Nethermind and Geth)
-
-## Milestone review and acceptance
-
-- Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
-- Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
-- The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
-
-## Process
-
-- The proposal window opens once the grant is fully funded and stays open for 15 days. In that window, Safi El-Hassanine submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures. The window is also an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.
-- Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement.
-- Milestone deliveries are reviewed within 14 days; payment follows acceptance.
-- The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
-- If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
-
----
-
-Questions, pushback, better ideas? Post them below.

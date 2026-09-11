@@ -1,0 +1,224 @@
+
+<header class="topbar">
+  <a href="#" class="brand">
+    <img src="LOGO_SRC" alt="TheDAO">
+    <span>TheDAO <b>Security Fund</b></span>
+  </a>
+  <nav class="topnav">
+    <a href="#">Initiatives</a>
+    <a href="#" class="navcta">Suggest an initiative</a>
+    <button id="nav-connect" class="btn wallet" type="button">Connect wallet</button>
+  </nav>
+</header>
+
+<main class="detail narrow">
+  <h1>Suggest an initiative</h1>
+  <p class="tag left">Submissions are reviewed before they appear on the site.</p>
+
+  <hr class="shimmer soft">
+
+  <div class="ai-steps">
+    <div class="ai-step"><span class="ai-num">1</span>
+      <div>Give this guide to your AI<br>
+      <button type="button" class="btn ghost sm" id="copy-guide">Copy the guide</button></div></div>
+    <div class="ai-step"><span class="ai-num">2</span>
+      <div>Answer the questions the AI asks</div></div>
+    <div class="ai-step"><span class="ai-num">3</span>
+      <div>Paste the whole draft below, we sort it into the sections</div></div>
+  </div>
+
+  <div class="proto-banner" role="note">
+    <span class="pb-dot" aria-hidden="true"></span>
+    <span><b>Prototype of the proposed flow.</b> The form starts empty, the way a person meets it.
+    Nothing is submitted. To watch a draft sort itself into the fields, use the button: it drops the
+    OPSEC Ratings Coalition example into the paste box and runs the same code a real paste runs.
+    That button is here for the demo and does not ship.
+    <span class="pb-btns">
+      <button type="button" class="btn ghost sm" id="btn-example">Try it with an example draft</button>
+      <button type="button" class="btn ghost sm" id="btn-clear">Clear the form</button>
+    </span></span>
+  </div>
+
+  <form class="form" id="form" novalidate>
+    <input type="text" name="website" value="" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+    <span class="lbl">Type <em class="reqtag">Required</em></span>
+    <div class="type-choice">
+      <label class="type-opt"><input type="radio" name="type" value="rfp" id="t-rfp" checked>
+        <span><b>RFP</b><small>An open request: any qualified team can bid to do the work.</small></span></label>
+      <label class="type-opt"><input type="radio" name="type" value="grant" id="t-grant">
+        <span><b>Grant</b><small>Your team presents the idea and does the work.</small></span></label>
+    </div>
+
+    <div class="subopt" id="subopt" hidden>
+      <label class="cbrow" for="f-topup"><input type="checkbox" id="f-topup">
+        <span>Work is already under way with another funder</span></label>
+      <p class="hint">This makes it a top-up. No proposal window, no challenge period. Completed
+      milestones get a link to the delivered work, and every remaining one carries a target month.</p>
+    </div>
+
+    <details class="rules" id="rules" open>
+      <summary><span id="rules-title">How RFPs work</span>
+        <span class="rules-tag">The site writes this</span></summary>
+      <div id="rules-body"></div>
+    </details>
+    <p class="rules-ver">Rules v2026-09, shown on every initiative of this type.</p>
+
+    <div class="grp">
+      <span class="grp-k">Paste your whole draft</span>
+      <span class="grp-h">One paste, no button. The moment a draft lands in the box we split it on
+      the section headings and fill every field below. Edit anything afterwards, the fields are what
+      gets submitted.</span>
+    </div>
+
+    <div id="paste-block">
+      <label class="lbl" for="f-paste">Paste your whole draft here</label>
+      <textarea id="f-paste" rows="10" spellcheck="false"
+        placeholder="Paste the draft your AI wrote. Sorting starts as soon as it lands."></textarea>
+      <p class="hint" id="paste-help">Milestone headings look like
+      <code>### Agreed standard - $50,000</code>, in order: the site letters them A, B, C. Add
+      <code>(adoption)</code> to a milestone that pays only on evidence of adoption, and
+      <code>(done)</code> to a top-up milestone that is already finished. Bullet lines under a
+      milestone become its acceptance criteria, one per line. Under
+      <code>## Backers already committed</code>, one backer per line as
+      <code>Organization | amount | link</code>. Headings inside a section become bold text: the
+      site owns the headings.</p>
+    </div>
+    <p class="hint" id="sort-note"></p>
+    <p class="paste-again" id="paste-again" hidden>
+      <button type="button" class="linklike" id="btn-paste-again">Sort again from the paste box</button>
+    </p>
+
+    <div class="unsorted" id="unsorted" hidden>
+      <span class="eyebrow top">Unsorted text</span>
+      <p class="hint">These lines matched no section. Copy what you need into a field above, then
+      clear this box. Nothing here is submitted.</p>
+      <textarea id="f-unsorted" rows="5"></textarea>
+    </div>
+
+    <div class="grp">
+      <span class="grp-k">The page fields</span>
+      <span class="grp-h">These render in the header of your initiative page, next to the type
+      badge. They are never part of a body section.</span>
+    </div>
+
+    <label class="lbl" for="f-title">Title <em class="reqtag">Required</em>
+      <span class="dim">Up to 140 characters. No "RFP:" or "Grant:" prefix, the badge says it.</span></label>
+    <input type="text" id="f-title" maxlength="140" value="">
+
+    <label class="lbl" for="f-summary">Short summary <em class="reqtag">Required</em>
+      <span class="dim">2 to 4 sentences. This is the text on the board card.</span></label>
+    <textarea id="f-summary" rows="5" maxlength="4000"></textarea>
+
+    <label class="lbl" for="f-goal">Funding goal (USD) <em class="reqtag">Required</em>
+      <span class="dim">One flat number.</span></label>
+    <input type="text" id="f-goal" class="mono" inputmode="decimal" placeholder="250,000" value="">
+    <span class="amt-echo" id="echo-goal"></span>
+
+    <label class="lbl" for="f-duration">Expected duration (months) <em class="reqtag">Required</em>
+      <span class="dim">Months from funding until the last milestone is complete.</span></label>
+    <input type="text" id="f-duration" class="mono" inputmode="numeric" placeholder="12" value="">
+
+    <div id="grant-only" hidden>
+      <label class="lbl" for="f-recipient">Recipient team <em class="reqtag">Required</em>
+        <span class="dim">Short name for the header and the board card, as in "Grant to Verity Labs".</span></label>
+      <input type="text" id="f-recipient" maxlength="120" value="">
+    </div>
+
+    <label class="lbl" for="f-links">Links
+      <span class="dim">Optional. Repo, site, prior write-up. One per line.</span></label>
+    <textarea id="f-links" rows="3" spellcheck="false"></textarea>
+
+    <div class="grp">
+      <span class="grp-k">Backers already committed</span>
+      <span class="grp-h">Optional, and open to every type. Anyone who has already committed money
+      to this work, with their logo. The header of your page and your board card show the total and
+      the logos, the way backer logos show on every initiative today.</span>
+    </div>
+
+    <div id="bk-rows"></div>
+    <div class="pasterow">
+      <button type="button" class="btn ghost sm" id="btn-add-bk">Add a backer</button>
+    </div>
+    <div class="bk-head" id="bk-head"></div>
+
+    <div class="grp">
+      <span class="grp-k">The sections</span>
+      <span class="grp-h">The site renders the heading, you answer the question. Fixed order, no
+      renaming, no dropping. Bold, links and lists are welcome inside a field.</span>
+    </div>
+
+    <div id="sections"></div>
+
+    <div class="grp">
+      <span class="grp-k">Milestones</span>
+      <span class="grp-h">Each row renders as a heading with a checklist under it. The site letters
+      them A, B, C in the order they sit here. The amounts add up against your funding goal.</span>
+    </div>
+
+    <div id="ms-rows" class="eb"></div>
+    <div class="pasterow">
+      <button type="button" class="btn ghost sm" id="btn-add-ms">Add milestone</button>
+    </div>
+    <div class="tot">
+      <span id="tot-line"></span>
+      <span id="adopt-line"></span>
+    </div>
+
+    <div class="grp">
+      <span class="grp-k">Checks</span>
+      <span class="grp-h">Warnings are yours to judge, you can submit past them. Errors do not
+      block the button: press Submit and every problem is marked on the question it belongs
+      to.</span>
+    </div>
+
+    <div class="checks" id="checks">
+      <h4>What the form found</h4>
+      <div id="checks-list"></div>
+    </div>
+
+    <div class="grp">
+      <span class="grp-k">Preview</span>
+      <span class="grp-h">Exactly what the site publishes, including the panel the site adds for
+      you and the card the board shows. If your markdown died in the paste, you see it here.</span>
+    </div>
+
+    <div class="pasterow">
+      <button type="button" class="btn ghost" id="btn-preview" aria-expanded="false"
+        aria-controls="preview">See it as a page</button>
+    </div>
+    <div class="preview-wrap" id="preview" hidden></div>
+
+    <div class="grp">
+      <span class="grp-k">Private, never published</span>
+      <span class="grp-h">Only the review team reads these two fields. They never appear on the
+      page, the board, or the API.</span>
+    </div>
+
+    <label class="lbl" for="f-funders">Who is likely to fund this? <em class="reqtag">Required</em>
+      <span class="priv">&#128274; Private, never published</span>
+      <span class="dim">One funder per line: name | why they care | your relationship | warm intro? | likely amount.</span></label>
+    <textarea id="f-funders" rows="6"></textarea>
+
+    <label class="lbl" for="f-contact">Contact <em class="reqtag">Required</em>
+      <span class="priv">&#128274; Private, never published</span>
+      <span class="dim">Email or handle. We use it only to ask about this submission.</span></label>
+    <input type="text" id="f-contact" maxlength="200" value="">
+
+    <div class="subrow">
+      <button class="btn primary" type="submit" id="btn-submit">Submit for review</button>
+      <span class="blockmsg" id="blockmsg"></span>
+    </div>
+    <div class="conf" id="conf" hidden></div>
+  </form>
+</main>
+
+<footer>
+  <p>TheDAO Security Fund &#183; coordinating ecosystem funding for Ethereum security.</p>
+  <p>To back an initiative, email <a href="#">info@thedao.fund</a>
+    &#183; <a class="dim" href="#">Admin</a></p>
+</footer>
+
+<div class="footer-bar">
+  <p>&#169; 2025&#8211;2026 TheDAO LLC. All rights reserved.</p>
+</div>

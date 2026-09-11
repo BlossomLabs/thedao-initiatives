@@ -9,14 +9,8 @@ summary: Endpoint Detection and Response is one of the highest-value security
   vendor. This grant funds an EDR crypto teams will actually adopt,
   user-space, self-hostable, privacy-preserving by construction, tuned for
   Web3 threats. Auditware is the recipient.
+duration: 12
 ---
-| | |
-|---|---|
-| **Status** | Draft |
-| **Budget** | $300,000 USD |
-| **Proposal window** | 15 days, opening once the grant is fully funded |
-| **Indicative duration** | 12 months (the team sets the final timeline) |
-
 ## Why this matters
 
 Endpoint Detection and Response is one of the highest-value security controls a team can run, and almost nobody in crypto runs it. Why? Mainstream EDR (CrowdStrike, SentinelOne) sits in your operating system kernel and streams your telemetry to a central vendor. Users worry about the privacy of their data and device usage. Even security engineers refuse to install that on their own machines, and honestly, who can blame them? The result is a blind spot on the exact laptops that hold keys and approve transactions.
@@ -26,8 +20,6 @@ This grant funds an EDR that crypto teams will actually adopt: user-space, self-
 ## The recipient
 
 This is a grant, and Auditware is the recipient. Full transparency on why: the concept was developed with them, they already built an internal user-space EDR prototype on open-source tooling in a few weeks, and they have committed to taking this on. We think they are the right team for it.
-
-Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
 ## Existing work
 
@@ -60,8 +52,6 @@ Every applicant, including any expected recipient, must disclose their relations
 
 ## Milestones (draft)
 
-These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
-
 ### A - Architecture, threat model, and privacy design - $40,000
 
 - [ ] A published threat model: the endpoint attacks in scope and the residual risks left out
@@ -89,21 +79,3 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 - [ ] At least 15 crypto organizations running the agent in production, confirmed publicly by those teams
 - [ ] A published adoption-feedback report covering at least 10 evaluations, with the resulting fixes and detectors shipped
 - [ ] Published case studies and a public metrics page: deployments, detectors shipped, detections in the field
-
-## Milestone review and acceptance
-
-- Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
-- Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
-- The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
-
-## Process
-
-- The proposal window opens once the grant is fully funded and stays open for 15 days. In that window, Auditware submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures. The window is also an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.
-- Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement.
-- Milestone deliveries are reviewed within 14 days; payment follows acceptance.
-- The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
-- If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
-
----
-
-Questions, pushback, better ideas? Post them below.

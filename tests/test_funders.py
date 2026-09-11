@@ -68,7 +68,8 @@ class TestFundersPrivacy(unittest.TestCase):
                 "type": "rfp",
                 "summary": "A summary long enough to satisfy the validator, "
                            "forty plus characters of text.",
-                "goal": "1000", "contact": "someone@example.org"}
+                "goal": "1000", "duration_months": "6",
+                "contact": "someone@example.org"}
         resp = self.client.post("/submit", data=form)
         self.assertEqual(resp.status_code, 400)
         self.assertIn(b"likely to fund", resp.data)
@@ -79,7 +80,8 @@ class TestFundersPrivacy(unittest.TestCase):
                 "type": "grant",
                 "summary": "A summary long enough to satisfy the validator, "
                            "forty plus characters of text.",
-                "goal": "1000", "contact": "someone@example.org",
+                "goal": "1000", "duration_months": "6",
+                "contact": "someone@example.org",
                 "funders": "Acme | pays for infra | none | no | $5,000"}
         resp = self.client.post("/submit", data=form)
         self.assertEqual(resp.status_code, 200)

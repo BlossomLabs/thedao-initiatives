@@ -9,14 +9,8 @@ summary: Vyper is the second most widely used EVM language, securing billions of
   source programs, plus the infrastructure to re-verify every future release. No
   other serious smart-contract language, Solidity included, has an effort like
   this underway.
+duration: 12
 ---
-| | |
-|---|---|
-| **Status** | Draft |
-| **Budget** | $600,000 USD |
-| **Proposal window** | 15 days, opening once the grant is fully funded |
-| **Indicative duration** | 12 months (the team sets the final timeline) |
-
 ## Why this matters
 
 - **Adoption.** Vyper is the second most widely used EVM language, securing billions of dollars in production protocols such as Curve, Yearn, and Lido. A verified Vyper compiler protects real value and increases public assurance in smart contract deployments.
@@ -40,10 +34,9 @@ The end state:
 In the interest of full transparency:
 
 - This grant was drafted together with the **Vyper core team**, builds directly on their open-source groundwork, and the Vyper core team is the recipient. The head start is real: an executable HOL4 semantics of a large Vyper subset that already passes the codegen section of the official test suite, in-progress proofs for the Vyper to Venom to bytecode pipeline, and a formal EVM semantics validated against the Execution Spec Tests (see Existing work).
-- The proposal window is also an open challenge period. If another team can credibly deliver this scope for less, or propose materially stronger milestones, we want that proposal.
+
 - We believe the price is fair: published estimates for comparable end-to-end compiler verification run well above this budget.
 - The proposal should show a track record in mechanized verification and spell out the technical approach: proof assistant, relationship to the existing work, frontend strategy, and how users run the verified compiler.
-- Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
 ## Existing work
 
@@ -78,8 +71,6 @@ In the interest of full transparency:
 6. **Independent reviewer.** The technical reviewer for judgment calls has no affiliation with the selected team or with the existing codebases.
 
 ## Milestones (draft)
-
-These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
 
 ### A - Formal semantics and frontend - $50,000
 
@@ -128,21 +119,3 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 **Tranche 3: Continuous verification - $100,000**
 
 - [ ] Continuous verification demonstrated across at least one new production Vyper release after the Milestone D release: proofs repaired, re-checked in CI, new assurance statement published
-
-## Milestone review and acceptance
-
-- Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
-- Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
-- The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
-
-## Process
-
-- The proposal window opens once the grant is fully funded and stays open for 15 days. In that window, the Vyper core team submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures. The window is also an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.
-- Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement.
-- Milestone deliveries are reviewed within 14 days; payment follows acceptance.
-- The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
-- If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
-
----
-
-Questions, pushback, better ideas? Post them below.

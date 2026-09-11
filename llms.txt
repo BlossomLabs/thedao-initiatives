@@ -35,25 +35,20 @@ The register to imitate:
 >
 > After: "TheDAO Security Fund will pay for a third-party audit covering reentrancy, access control, and upgrade paths. Deliverable: a written report with severity ratings."
 
-### The shared skeleton
+### The document you write
+
+The site renders the page header (type, title, funding goal, expected duration, backers already committed) and the rules panel for the type. Your document is only the sections below, in this order, with these exact headings:
 
 ```
-# RFP: <specific title>     (grants: "# Grant: <title>"; the form's Title field drops this prefix)
-
-| | |
-|---|---|
-| **Status** | Draft |
-| **Budget** | $<amount> USD |
-| **Proposal window** | <see your type's section below> |
-| **Indicative duration** | <N> months (the team sets the final timeline) |   <- typically 6 to 12; match the scope
-
 ## Why this matters
-<the real incident or gap, then what the money buys; short, bullets wherever they read faster>
+<the real gap, then what the money buys; short, bullets wherever they read faster>
 
 ## What this actually pays for
 <optional>
 
 ## Who we expect to do this      <- grants rename this "The recipient"
+<RFP: nobody is pre-selected, open bidding once funded, what a winning team looks like, co-authors.
+Grant: name the team, defend the head start with links, co-authors.>
 
 ## Existing work
 <optional; prior art with links>
@@ -68,94 +63,74 @@ open source where code is delivered, acceptance a stranger can verify from publi
 plus what the domain demands>
 
 ## Milestones (draft)
-<verbatim preamble, then milestones; at least one pays only on real adoption>
-
-## Milestone review and acceptance
-## Process
-
----
-
-Questions, pushback, better ideas? Post them below.
+<milestones only; at least one pays only on real adoption>
 ```
 
-Length: 800 to 2,500 words including boilerplate. The example below is about 2,000.
+Do NOT write any of these; the site shows them next to every initiative: a status or budget table, the proposal window, the indicative duration, the milestones preamble, the disclosure sentence, a "Milestone review and acceptance" section, a "Process" section, or a closing line. A draft that pastes them shows them twice on the page.
 
-### Shared rules and verbatim text (both types)
+Length: 600 to 2,000 words. The example below is about 1,700.
 
-1. Same section names, same order, same table shape. The only removable sections are "What this actually pays for" and "Existing work". Renaming any section means you did it wrong.
+### Shared rules (both types)
+
+1. Same section names, same order. The only removable sections are "What this actually pays for" and "Existing work". Renaming any section means you did it wrong.
 2. Name co-authors. If a team or outside expert co-drafted the initiative, credit them in "Who we expect to do this" or "The recipient".
-3. State partial funding as total committed against total needed, in "Why this matters". Never map specific money to specific milestones.
-4. The duration is indicative. The winning team or the recipient sets the real timeline.
+3. Money already committed by a backer is entered in the form, not in the text, and the site shows it in the header. Never map specific money to specific milestones.
+4. The expected duration is a form field (whole months from funding to the last milestone). Do not restate it in the text.
 5. Cut any claim justifying the budget or the urgency that the proposer cannot source.
-
-Copy these five blocks unchanged for both types. Do not swap "winning team" for the recipient's name; the negotiation and review process is the same either way.
-
-Milestones preamble, first thing under `## Milestones (draft)`:
-
-> These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
-
-Disclosure sentence, last line of the team section:
-
-> Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
-
-Applicant here means a team bidding on the funded initiative, not the proposer who submits it.
-
-The whole `## Milestone review and acceptance` section:
-
-> - Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
-> - Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
-> - The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
-
-The last three `## Process` bullets:
-
-> - Milestone deliveries are reviewed within 14 days; payment follows acceptance.
-> - The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
-> - If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
-
-The closing line, after a horizontal rule at the end of the document:
-
-> Questions, pushback, better ideas? Post them below.
 
 ### If it is an RFP
 
-Table row, verbatim:
-
-> `| **Proposal window** | 30 days, opening once the RFP is fully funded |`
-
-Section name: **Who we expect to do this**. Say that nobody is pre-selected, that open bidding starts once funding completes, and what a winning team looks like. Name any co-authors, then close with the disclosure sentence.
-
-The first three `## Process` bullets, verbatim, above the three shared bullets from the shared rules:
-
-> - The proposal window opens once the RFP is fully funded and stays open for 30 days.
-> - Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
-> - Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
+Section name: **Who we expect to do this**. Say that nobody is pre-selected, that open bidding starts once funding completes, and what a winning team looks like. Name any co-authors.
 
 ### If it is a grant
 
-Table row, verbatim:
-
-> `| **Proposal window** | 15 days, opening once the grant is fully funded |`
-
-Section name: **The recipient**. Name the team and defend the head start using the test in question 4. Seniority is not a head start. Name any co-authors, then close with the disclosure sentence.
+Section name: **The recipient**. Name the team and defend the head start using the test in question 4. Seniority is not a head start. Name any co-authors.
 
 Price it accordingly. A grant costs less than the same scope from scratch, because nobody pays twice for finished work. A from-scratch price means the type is wrong or the budget is too high.
 
-The first two `## Process` bullets, verbatim apart from the recipient's name, above the three shared bullets from the shared rules:
+### If the work is already funded and under way (a top-up grant)
 
-> - The proposal window opens once the grant is fully funded and stays open for 15 days. In that window, <recipient> submits their formal proposal: the final milestone plan, per-milestone budget (the draft above, or a stronger version), and full disclosures. The window is also an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.
-> - Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement.
+Tick "Work is already under way with another funder" in the form and name the milestone reviewer there. In the text: state the split in "Why this matters" ("$<committed> committed by <funder>; this grant raises the remaining $<needed>"), name who funded the earlier milestones in "The recipient", keep completed milestones checked `- [x]` with a link to the delivered work, and put a target month after the amount in the heading of each remaining milestone: `### 3 - Name - $85,500 (target: March 2027)`. The adoption milestone is still required.
 
-Everything else is unchanged: the table shape, scope lists, hard requirements, milestone format, the adoption rules, every shared verbatim block, and the closing line.
+### What the site adds (do not paste any of this)
 
-### If the work is already funded and under way
+Every initiative page ends with the rules panel for its type, exactly as below. Read it so your draft does not contradict it; never copy it into the draft.
 
-For a grant that tops up work another funder started, these replace the grant rules above. Everything else still applies, including the adoption milestone.
+# How RFPs work
 
-- Table row, verbatim: `| **Proposal window** | None, work already under way |`. Budget is the total project budget. State the split in "Why this matters": "$<committed> committed by <funder>; this grant raises the remaining $<needed>."
-- Section name: **The recipient**. Name the team, say who funded the earlier milestones and under what arrangement, then close with the disclosure sentence.
-- `## Milestones`, without "(draft)" and without the preamble. Completed milestones stay in, checked `- [x]`, each with a link to the delivered work. A target month may follow the amount in the heading: `### 3 - Name - $85,500 (target: March 2027)`.
-- `## Milestone review and acceptance`: the shared block, plus one bullet naming the existing reviewers and stating that payments from this grant start only once the earlier milestones are accepted.
-- `## Process`: one bullet, "This grant tops up work already under way; there is no proposal window and no challenge period.", then the review-within-14-days and stalled-milestone bullets from the shared rules.
+1. Funding comes first. Nothing starts until the initiative is fully funded.
+2. When funding completes, a 30-day proposal window opens. Any qualified team can bid.
+3. This page describes the solution we want. A team with another solid way to solve the same problem is welcome to propose it, even if it departs from the draft milestones below.
+4. A proposal contains the team and its track record, the technical approach, a milestone plan with a per-milestone budget (the draft on this page or a stronger version), and full disclosures. Every applicant discloses their relationships to the teams, codebases, and firms named on this page.
+5. Giveth selects the team within 7 days of the window closing, weighing credibility, price, and the strength of the proposed milestones.
+6. The milestones on this page are a draft. Final milestones and payments get negotiated with the selected team and fixed in the grant agreement.
+7. Before work begins, an independent technical reviewer with no ties to the team is appointed and named in the grant agreement. The reviewer decides whether each milestone passes or fails. Giveth is not the reviewer unless explicitly named, and Giveth oversees the arrangement so the reviewer stays independent of the team. The reviewer's fee comes out of the milestone payment, or the reviewer works pro bono; the team coordinates that payment.
+8. The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
+9. Milestone deliveries are reviewed by the technical reviewer and paid within 14 days of acceptance.
+10. If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund can reclaim the unspent funds and put them toward other Ethereum security initiatives.
+11. In some circumstances the resulting grant may be managed by the Ethereum Foundation or another established ecosystem organization, when that is a better fit than Giveth.
+
+# How grants work
+
+1. Funding comes first. Nothing starts until the initiative is fully funded.
+2. When funding completes, a 15-day window opens. In that window the recipient submits the formal proposal: the final milestone plan, the per-milestone budget, and full disclosures. The same window is an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.
+3. Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement. Until then, the milestones on this page are a draft.
+4. Before work begins, an independent technical reviewer with no ties to the team is appointed and named in the grant agreement. The reviewer decides whether each milestone passes or fails. Giveth is not the reviewer unless explicitly named, and Giveth oversees the arrangement so the reviewer stays independent of the team. The reviewer's fee comes out of the milestone payment, or the reviewer works pro bono; the team coordinates that payment.
+5. The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
+6. Milestone deliveries are reviewed by the technical reviewer and paid within 14 days of acceptance.
+7. If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund can reclaim the unspent funds and put them toward other Ethereum security initiatives.
+8. In some circumstances a grant may be managed by the Ethereum Foundation or another established ecosystem organization, when that is a better fit than Giveth.
+
+# How top-up grants work (work already under way with another funder)
+
+1. This grant tops up work that is already under way. There is no proposal window and no challenge period.
+2. The funding goal on this page is the total project budget. The amount already committed, and by whom, is shown in the header with each backer's logo; this grant raises the remainder.
+3. Completed milestones are marked done with a link to the delivered work. Each remaining milestone carries a target month.
+4. Payments from this grant start only once the earlier milestones have been accepted.
+5. An independent technical reviewer with no ties to the team, appointed before this grant begins and named in the grant agreement, decides whether each remaining milestone passes or fails. Giveth is not the reviewer unless explicitly named, and Giveth oversees the arrangement so the reviewer stays independent of the team.
+6. Milestone deliveries are reviewed by the technical reviewer and paid within 14 days of acceptance.
+7. If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund can reclaim the unspent funds and put them toward other Ethereum security initiatives.
+8. In some circumstances a grant may be managed by the Ethereum Foundation or another established ecosystem organization, when that is a better fit than Giveth.
 
 ### Milestone rules
 
@@ -233,13 +208,15 @@ Produce copy-paste-ready content for every field of the form at https://fund.the
 2. **Title** (required): up to 140 characters. No "RFP:" or "Grant:" prefix; the Type field carries that.
 3. **Short summary** (required): 2 to 4 sentences on what gets built and why it matters.
 4. **Full initiative details**: the complete initiative from Step 2, in markdown.
-5. **Funding goal (USD)** (required): one number, matching the table.
-6. **Who is likely to fund this?** (required, never published): the answer to question 3, one funder per line, in exactly this format:
+5. **Funding goal (USD)** (required): one number.
+6. **Expected duration (months)** (required): whole months from funding until the last milestone is complete.
+7. **Work already under way with another funder** (grants only): yes or no. If yes, also give the **Milestone reviewer**: who decides whether the remaining milestones pass, name and affiliation.
+8. **Who is likely to fund this?** (required, never published): the answer to question 3, one funder per line, in exactly this format:
 
    `Org name | why they'd pay | relationship (none / met once / know them well) | warm intro? yes/no | suggested ask $`
 
    Giveth fundraises from this list alongside the proposer, so honest relationships beat impressive names nobody knows. Leave out third parties' private contact details.
-7. **Contact** (required, never published): the proposer's email or Telegram.
+9. **Contact** (required, never published): the proposer's email or Telegram.
 
 Then this scorecard, filled honestly:
 
@@ -248,7 +225,7 @@ READINESS: READY | NOT READY
 - All form fields answered: yes / no
 - Interview questions 1 to 4 answered: yes / no
 - Type justified (grant head start defended, or genuinely open RFP): yes / no
-- Window correct for the type: yes / no
+- Expected duration stated, in whole months: yes / no
 - Financial demand: [stakeholders named, with why each would pay] / none named
 - Adoption-tied payments meet the size rule and pay only on real usage: yes / no
 - Every criterion is binary; every quantity is a floor number; every criterion names its public evidence: yes / no
@@ -257,7 +234,7 @@ READINESS: READY | NOT READY
 - Business or funding model stated: yes / no
 - Budget passes the sanity test: yes / no
 - Draft length 800 to 2,500 words: yes / no
-- Format matches the gold-standard example: yes / no
+- Format matches the gold-standard example, and none of the site-added text is in the draft: yes / no
 - Banned wording absent (refundable, claimable, held, reserved, escrowed, tax deductible, anonymous), no "the DAO", no em dashes: yes / no
 - Fidelity to the supplied proposal: yes / no / not applicable
 - No [PLACEHOLDER] left in the draft: yes / no
@@ -286,13 +263,6 @@ A real initiative from the board. Match the example in structure, tone, length, 
 ---
 
 # RFP: OPSEC Ratings Coalition to Build & Maintain an "L2Beat for OPSEC"
-
-| | |
-|---|---|
-| **Status** | Draft |
-| **Budget** | $150,000 USD |
-| **Proposal window** | 30 days, opening once the RFP is fully funded |
-| **Indicative duration** | 18 months (the team sets the final timeline) |
 
 ## Why this matters
 
@@ -329,8 +299,6 @@ Nobody is pre-selected. Once the RFP is fully funded there will be an open biddi
 
 Ideally the coordinator is not an OPSEC auditing firm, because whoever holds the pen on the standard walks away with an edge over the firms they convened. That is a preference, not a requirement, and it will weigh in selection. An audit firm that coordinates takes no rater role during the grant and no ownership of the board. The best pitch a bidder can make is simple: here is why the other firms can trust me to run this.
 
-Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
-
 ## Existing work
 
 - [Security Frameworks by SEAL](https://frameworks.securityalliance.org/): the Security Alliance's open framework covering operational security, infrastructure, DevOps, incident response and more. Bidders should read it before proposing a scoring template.
@@ -366,8 +334,6 @@ Every applicant, including any expected recipient, must disclose their relations
 
 ## Milestones (draft)
 
-These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
-
 ### A - Agreed standard - $50,000
 
 - [ ] A public, versioned scoring template plus the A / AA / AAA tier definitions, with the change process for future revisions
@@ -386,28 +352,9 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 - [ ] The six-month check-in running: every rating older than six months shows a check-in date on the board, and the event-based suspension process is live with a public change log
 - [ ] The membership body running on pooled fees, with the verification committee active and its spot-check sample published, both shown on the body's public page
 - [ ] A public metrics page: teams rated, tiers awarded, firms participating, check-ins completed, suspensions and renewals
-
-## Milestone review and acceptance
-
-- Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
-- Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
-- The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
-
-## Process
-
-- The proposal window opens once the RFP is fully funded and stays open for 30 days.
-- Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
-- Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
-- Milestone deliveries are reviewed within 14 days; payment follows acceptance.
-- The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
-- If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
-
 ---
 
-Questions, pushback, better ideas? Post them below.
----
-
-End of example. Note the adoption milestone: half the budget pays only on real usage, above the one-third minimum. Its position in the order is a choice, not a rule.
+End of example. Note the adoption milestone: half the budget pays only on real usage, above the one-third minimum. Its position in the order is a choice, not a rule. On the live page this text is preceded by the header (goal $150,000, about 18 months) and followed by the "How RFPs work" panel; neither is part of the draft.
 
 ## Links
 

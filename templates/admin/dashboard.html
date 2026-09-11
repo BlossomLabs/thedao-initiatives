@@ -13,6 +13,8 @@
         <button class="btn ghost" type="submit"
                 title="Publish/update initiatives from content/rfps/*.md (run after a git pull)">Sync content files</button>
       </form>
+      <a class="btn ghost" href="{{ url_for('admin_strip_canned') }}"
+         title="Strip the canned process text out of every stored body (dry run first, then apply)">Strip canned text</a>
       <form method="post" action="{{ url_for('admin_logout') }}">
         <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <button class="btn ghost" type="submit">Log out</button>

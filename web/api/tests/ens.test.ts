@@ -8,7 +8,8 @@ function resolver(over: Partial<EnsResolver>): EnsResolver {
   return {
     name: () => Promise.resolve(null),
     address: () => Promise.resolve(null),
-    avatar: () => Promise.resolve(null),
+    avatarRecord: () => Promise.resolve(null),
+    avatarUrl: () => Promise.resolve(null),
     ...over,
   };
 }
@@ -27,7 +28,8 @@ Deno.test("ens: on-chain name + avatar, forward-verified, ensdata never asked", 
     onchain: resolver({
       name: () => Promise.resolve("griff.eth"),
       address: () => Promise.resolve(ADDR.toLowerCase()),
-      avatar: () => Promise.resolve("https://euc.li/griff.eth"),
+      avatarRecord: () => Promise.resolve("https://euc.li/griff.eth"),
+      avatarUrl: (r) => Promise.resolve(r),
     }),
   });
   assertEquals(await ens.reverse(ADDR), { name: "griff.eth", avatar: "https://euc.li/griff.eth" });
@@ -50,7 +52,8 @@ Deno.test("ens: non-https avatars are dropped and a broken avatar record keeps t
     onchain: resolver({
       name: () => Promise.resolve("griff.eth"),
       address: () => Promise.resolve(ADDR),
-      avatar: () => Promise.resolve("ipfs://bafy-raw"),
+      avatarRecord: () => Promise.resolve("ipfs://bafy-raw"),
+      avatarUrl: () => Promise.resolve("ipfs://bafy-raw"),
     }),
   });
   assertEquals(await ens.reverse(ADDR), { name: "griff.eth", avatar: "" });
@@ -60,11 +63,84 @@ Deno.test("ens: non-https avatars are dropped and a broken avatar record keeps t
     onchain: resolver({
       name: () => Promise.resolve("griff.eth"),
       address: () => Promise.resolve(ADDR),
-      avatar: () => Promise.reject(new Error("metadata 500")),
+      avatarRecord: () => Promise.reject(new Error("rpc 500")),
     }),
   });
   assertEquals(await broken.reverse(ADDR), { name: "griff.eth", avatar: "" });
   assertEquals(logs.length, 1);
+});
+
+const NFT = "eip155:1/erc721:0x66b1dd8b17849e270075229b901ba9ef5dc3a8dc/1873";
+
+/** A name whose NFT avatar viem cannot render any more (dead metadata host). */
+const deadNft = () =>
+  resolver({
+    name: () => Promise.resolve("sem-the-bee.eth"),
+    address: () => Promise.resolve(ADDR),
+    avatarRecord: () => Promise.resolve(NFT),
+  });
+
+Deno.test("ens: an avatar record viem cannot render comes from ensdata", async () => {
+  const calls: string[] = [];
+  const ens = createEns(
+    ensdataFetch(calls, { avatar: NFT, avatar_url: "https://i2c.seadn.io/x.png" }),
+    () => 1000,
+    { onchain: deadNft() },
+  );
+  assertEquals(await ens.reverse(ADDR), {
+    name: "sem-the-bee.eth",
+    avatar: "https://i2c.seadn.io/x.png",
+  });
+  assertEquals(calls, ["https://api.ensdata.net/sem-the-bee.eth"]);
+});
+
+Deno.test("ens: ...then from the ENS metadata service, only when it has an image", async () => {
+  const seen: string[] = [];
+  const f = (kind: "image" | "missing") =>
+    ((input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      seen.push((init?.method ?? "GET") + " " + url);
+      if (url.startsWith("https://api.ensdata.net/")) {
+        return Promise.resolve(new Response("", { status: 429 }));
+      }
+      return Promise.resolve(
+        kind === "image"
+          ? new Response(null, { status: 200, headers: { "content-type": "image/png" } })
+          : new Response("not found", { status: 404 }),
+      );
+    }) as typeof fetch;
+  const withImage = createEns(f("image"), () => 1000, { onchain: deadNft() });
+  assertEquals(
+    (await withImage.reverse(ADDR)).avatar,
+    "https://metadata.ens.domains/mainnet/avatar/sem-the-bee.eth",
+  );
+  assertEquals(seen, [
+    "GET https://api.ensdata.net/sem-the-bee.eth",
+    "HEAD https://metadata.ens.domains/mainnet/avatar/sem-the-bee.eth",
+  ]);
+  const logs: string[] = [];
+  const without = createEns(f("missing"), () => 1000, {
+    onchain: deadNft(),
+    log: (m) => logs.push(m),
+  });
+  assertEquals(await without.reverse(ADDR), { name: "sem-the-bee.eth", avatar: "" });
+  assertEquals(logs.length, 3);
+});
+
+Deno.test("ens: a name without an avatar record asks nobody else", async () => {
+  const calls: string[] = [];
+  const ens = createEns(
+    ensdataFetch(calls, { avatar_url: "https://stale.example/x.png" }),
+    () => 1000,
+    {
+      onchain: resolver({
+        name: () => Promise.resolve("curator.griff.eth"),
+        address: () => Promise.resolve(ADDR),
+      }),
+    },
+  );
+  assertEquals(await ens.reverse(ADDR), { name: "curator.griff.eth", avatar: "" });
+  assertEquals(calls, []);
 });
 
 Deno.test("ens: an authoritative on-chain 'no name' does not fall back to ensdata", async () => {

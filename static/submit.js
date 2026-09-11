@@ -323,7 +323,7 @@
           '<span class="eyebrow sm">Acceptance criteria, one per row <em class="reqtag sm">Required</em></span>' +
           '<div class="crit-list">' + crits.map(function (c, j) {
             return '<div class="crit"><span class="crit-box" aria-hidden="true"></span>' +
-              '<input type="text" id="' + p + "c" + j + '" data-mk="crit" data-ci="' + j + '" value="' + esc(c) + '" placeholder="One checkable outcome">' +
+              '<textarea rows="2" id="' + p + "c" + j + '" data-mk="crit" data-ci="' + j + '" placeholder="One checkable outcome">' + esc(c) + "</textarea>" +
               '<button type="button" class="crit-del" data-cdel="' + j + '" title="Remove this criterion" aria-label="Remove this criterion">&#215;</button></div>';
           }).join("") + "</div>" +
           '<button type="button" class="linklike crit-add">Add criterion</button>' +
@@ -750,7 +750,7 @@
   $("#ms-rows").addEventListener("input", function (e) {
     var r = readRow(e);
     if (!r) { return; }
-    if (r.k === "crit") { r.m.criteria[parseInt(r.el.getAttribute("data-ci"), 10)] = r.el.value; }
+    if (r.k === "crit") { r.m.criteria[parseInt(r.el.getAttribute("data-ci"), 10)] = r.el.value.replace(/[\r\n]+/g, " "); }
     else if (r.k === "amount") { r.m.amount = parseAmount(r.el.value); updateAmountEcho(r.el, r.m.amount); }
     else if (r.k !== "adoption" && r.k !== "done") { r.m[r.k] = r.el.value; }
     updateAll();
@@ -779,8 +779,8 @@
     }
   });
   form.addEventListener("keydown", function (e) {
-    if (e.key !== "Enter" || e.target.tagName !== "INPUT") { return; }
-    if (e.target.getAttribute("data-mk") === "crit") {
+    if (e.key !== "Enter") { return; }
+    if (e.target.getAttribute("data-mk") === "crit") {  /* a criterion is one line: Enter starts the next one */
       e.preventDefault();
       var r = readRowFromEl(e.target);
       if (!r) { return; }
@@ -789,7 +789,7 @@
       renderMilestones(); updateAll(); focusCrit(r.i, at);
       return;
     }
-    if (e.target.type !== "submit") { e.preventDefault(); }
+    if (e.target.tagName === "INPUT" && e.target.type !== "submit") { e.preventDefault(); }
   });
   $("#btn-add-ms").addEventListener("click", function () {
     state.milestones.push(emptyMilestone()); renderMilestones(); updateAll();

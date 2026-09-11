@@ -846,10 +846,11 @@ input.has-warn,textarea.has-warn{border-color:rgba(240,180,41,.7)}
 
 /* acceptance criteria: one input per criterion, one line each */
 .crit-list{display:flex;flex-direction:column;gap:7px;margin-top:2px}
-.crit{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+.crit{display:flex;align-items:flex-start;gap:8px;flex-wrap:nowrap}
+.crit .crit-box,.crit .crit-del{margin-top:6px}
 .crit-box{flex:none;width:14px;height:14px;border:1px solid rgba(255,255,255,.38);
   border-radius:4px}
-.crit input{flex:1;min-width:0;padding:9px 11px;border-radius:10px;font-size:13.5px}
+.crit textarea{flex:1;min-width:0;padding:9px 11px;border-radius:10px;font-size:13.5px;line-height:1.4;resize:vertical;min-height:0}
 .crit-del{flex:none;width:26px;height:26px;padding:0;border-radius:8px;cursor:pointer;
   border:1px solid var(--edge2);background:rgba(255,255,255,.05);color:var(--muted);
   font:400 15px/1 var(--sans)}

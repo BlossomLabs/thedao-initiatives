@@ -241,6 +241,19 @@ def init():
         # (Griff, 2026-09-11: the ethdebug listing had them in its custom text).
         if "milestone_reviewer" not in cols:
             con.execute("ALTER TABLE rfps ADD COLUMN milestone_reviewer TEXT NOT NULL DEFAULT ''")
+        # Phase 2: one column per section (NULL = legacy body in `details`),
+        # links, and structured milestones as a JSON list. The page renders the
+        # sections when `structured` is set, otherwise the legacy body.
+        for sec in ("why", "in_scope", "out_scope", "existing", "who", "hard_req",
+                    "team", "why_grant", "commitments"):
+            if sec not in cols:
+                con.execute("ALTER TABLE rfps ADD COLUMN %s TEXT" % sec)
+        if "links" not in cols:
+            con.execute("ALTER TABLE rfps ADD COLUMN links TEXT NOT NULL DEFAULT ''")
+        if "milestones_json" not in cols:
+            con.execute("ALTER TABLE rfps ADD COLUMN milestones_json TEXT NOT NULL DEFAULT '[]'")
+        if "structured" not in cols:
+            con.execute("ALTER TABLE rfps ADD COLUMN structured INTEGER NOT NULL DEFAULT 0")
         # Every listing is an "initiative" of one of two types: an RFP (open
         # competitive bid, no preset vendor) or a Grant (the proposing team
         # does the work). Existing rows default to 'rfp'; the three launch
@@ -445,7 +458,9 @@ def update_rfp(rfp_id, **fields):
                "funding_goal_usd", "payout_addresses", "contact", "status",
                "approved_at", "safe_address", "sort_rank", "type", "funders",
                "duration_months", "recipient_team", "topup", "boilerplate",
-               "milestone_reviewer"}
+               "milestone_reviewer", "why", "in_scope", "out_scope", "existing",
+               "who", "hard_req", "team", "why_grant", "commitments", "links",
+               "milestones_json", "structured"}
     sets, vals = [], []
     for k, v in fields.items():
         if k not in allowed:

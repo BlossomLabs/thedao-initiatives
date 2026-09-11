@@ -6,6 +6,7 @@
   will appear on the initiatives board and can start collecting pledges and donations.</p>
   {% if rules %}<p class="small dim">The site adds the "{{ rules.title }}" rules panel under your text, so the
   process, the reviewer and the payment terms never need to be part of what you wrote.</p>{% endif %}
+  {% if warnings %}<p class="small dim">You submitted past {{ warnings | length }} warning{{ '' if warnings | length == 1 else 's' }}. The reviewer sees the same list.</p>{% endif %}
   <p><a class="btn" href="{{ url_for('index') }}">Back to the board</a></p>
 </main>
 {% endblock %}

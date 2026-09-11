@@ -5,6 +5,8 @@
 import type { Comment, Donation, Pledge, Revision, Rfp } from "../db/types.ts";
 import { LIVE_ROLES } from "../services/roles.ts";
 import type { Config } from "../config.ts";
+import { isStructured } from "../../shared/draft/mod.ts";
+import { pickText } from "../db/rfps.ts";
 
 export function ipfsUrl(config: Config, cid: string): string {
   return cid ? `https://${config.pinataGateway}/ipfs/${cid}` : "";
@@ -28,9 +30,26 @@ export function publicRfp(r: Rfp) {
     sortRank: r.sortRank,
     safeAddress: r.safeAddress,
     proposer: r.proposer ?? "",
+    durationMonths: r.durationMonths ?? null,
+    recipientTeam: r.recipientTeam ?? "",
+    recipientUrl: r.recipientUrl ?? "",
+    topup: Boolean(r.topup),
+    milestoneReviewer: r.milestoneReviewer ?? "",
+    ...structuredJson(r),
     revision: r.revision ?? 0,
     createdAt: r.createdAt,
     approvedAt: r.approvedAt,
+  };
+}
+
+/** The structured body with defaults for rows written before it existed. */
+function structuredJson(r: Pick<Rfp, "sections" | "milestones" | "links">) {
+  const t = pickText({ ...r, title: "", summary: "", details: "" });
+  return {
+    sections: t.sections,
+    milestones: t.milestones,
+    links: t.links,
+    structured: isStructured(t),
   };
 }
 
@@ -46,12 +65,22 @@ export function revisionMeta(v: Revision) {
 }
 
 export function revisionJson(v: Revision) {
-  return { ...revisionMeta(v), title: v.title, summary: v.summary, details: v.details };
+  return {
+    ...revisionMeta(v),
+    title: v.title,
+    summary: v.summary,
+    details: v.details,
+    ...structuredJson(v),
+  };
 }
 
 export function adminRfp(r: Rfp) {
   return { ...publicRfp(r), contact: r.contact, funders: r.funders };
 }
+
+/** What the proposer sees of their own row: the public shape plus the two
+ * private fields they wrote themselves. */
+export const proposerRfp = adminRfp;
 
 export function pledgeJson(config: Config, p: Pledge) {
   return {

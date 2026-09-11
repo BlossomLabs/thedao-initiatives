@@ -1,0 +1,223 @@
+import { describe, expect, it } from "vitest";
+import { splitDraft } from "@shared/draft/mod";
+import {
+  applySplit,
+  draftReducer,
+  type DraftState,
+  emptyBacker,
+  emptyCriterion,
+  emptyDraft,
+  emptyMilestone,
+  fromInitiative,
+  isEmptyDraft,
+  splitReport,
+  toPayload,
+} from "./useDraft";
+import type { Initiative } from "~/lib/api-types";
+
+const state = (): DraftState => ({ draft: emptyDraft(), undo: null });
+
+describe("useDraft reducer", () => {
+  it("setType to rfp clears the top-up; a grant keeps it", () => {
+    let s = draftReducer(state(), { t: "setType", type: "grant" });
+    s = draftReducer(s, { t: "setTopup", topup: true });
+    expect(s.draft.topup).toBe(true);
+    s = draftReducer(s, { t: "setType", type: "rfp" });
+    expect(s.draft.topup).toBe(false);
+    // a top-up on an RFP is ignored
+    s = draftReducer(s, { t: "setTopup", topup: true });
+    expect(s.draft.topup).toBe(false);
+  });
+
+  it("re-letters milestones from their index after a removal", () => {
+    let s = state();
+    const a = s.draft.milestones[0].id;
+    const b = emptyMilestone();
+    const c = emptyMilestone();
+    s = draftReducer(s, { t: "addMilestone", row: b });
+    s = draftReducer(s, { t: "addMilestone", row: c });
+    s = draftReducer(s, { t: "setMilestone", id: c.id, patch: { name: "Third" } });
+    s = draftReducer(s, { t: "removeMilestone", id: a });
+    expect(s.draft.milestones.map((m) => m.id)).toEqual([b.id, c.id]);
+    // the payload letters by position: "Third" is now B (index 1)
+    expect(toPayload(s.draft).milestones[1].name).toBe("Third");
+  });
+
+  it("insertCriterion adds after the given row and flattens newlines on set", () => {
+    let s = state();
+    const ms = s.draft.milestones[0];
+    const first = ms.criteria[0];
+    const inserted = emptyCriterion();
+    s = draftReducer(s, { t: "insertCriterion", ms: ms.id, after: first.id, row: inserted });
+    const tail = emptyCriterion();
+    s = draftReducer(s, { t: "insertCriterion", ms: ms.id, after: null, row: tail });
+    expect(s.draft.milestones[0].criteria.map((c) => c.id)).toEqual([
+      first.id,
+      inserted.id,
+      tail.id,
+    ]);
+    s = draftReducer(s, {
+      t: "setCriterion",
+      ms: ms.id,
+      id: inserted.id,
+      value: "one\r\nline\nonly",
+    });
+    expect(s.draft.milestones[0].criteria[1].text).toBe("one line only");
+    s = draftReducer(s, { t: "removeCriterion", ms: ms.id, id: first.id });
+    expect(s.draft.milestones[0].criteria.map((c) => c.id)).toEqual([inserted.id, tail.id]);
+  });
+
+  it("applySplit fills only what the paste has, and undo restores the draft", () => {
+    let s = state();
+    s = draftReducer(s, { t: "setPage", key: "summary", value: "kept summary" });
+    s = draftReducer(s, { t: "setSection", key: "why", value: "old why" });
+    const res = splitDraft(
+      [
+        "# RFP: A pasted title",
+        "## Funding goal",
+        "$150,000",
+        "## Why this matters",
+        "new why",
+        "## Milestones",
+        "### First - $150,000 (adoption)",
+        "- [ ] Checkable thing",
+        "## Something unknown",
+        "stray line",
+      ].join("\n"),
+      "rfp",
+    );
+    const before = s.draft;
+    s = draftReducer(s, { t: "applySplit", result: res });
+    expect(s.draft.page.title).toBe("A pasted title");
+    expect(s.draft.page.goal).toBe("150,000");
+    expect(s.draft.page.summary).toBe("kept summary");
+    expect(s.draft.sections.why).toBe("new why");
+    expect(s.draft.milestones).toHaveLength(1);
+    expect(s.draft.milestones[0].name).toBe("First");
+    expect(s.draft.milestones[0].amount).toBe("150,000");
+    expect(s.draft.milestones[0].adoption).toBe(true);
+    expect(s.draft.milestones[0].criteria[0].text).toBe("Checkable thing");
+    expect(s.draft.unsorted).toContain("stray line");
+    expect(s.undo).toBe(before);
+    s = draftReducer(s, { t: "undoSplit" });
+    expect(s.draft).toBe(before);
+    expect(s.undo).toBeNull();
+  });
+
+  it("applySplit keeps milestones and backers when the paste has none", () => {
+    const d = emptyDraft();
+    d.milestones[0].name = "Mine";
+    d.backers = [{ ...emptyBacker(), org: "Org" }];
+    const res = splitDraft("## Why this matters\nx", "rfp");
+    const out = applySplit(d, res);
+    expect(out.milestones[0].name).toBe("Mine");
+    expect(out.backers[0].org).toBe("Org");
+    const withBackers = splitDraft(
+      "## Backers already committed\nEF | $20,000 | https://ethereum.org\n",
+      "rfp",
+    );
+    const out2 = applySplit(d, withBackers);
+    expect(out2.backers).toHaveLength(1);
+    expect(out2.backers[0]).toMatchObject({
+      org: "EF",
+      amount: "20,000",
+      url: "https://ethereum.org",
+    });
+  });
+
+  it("splitReport counts the type's sections and flags the other type's", () => {
+    const res = splitDraft("## Why this matters\nx\n## The team\ny\n## Commitments\nz", "rfp");
+    const r = splitReport(res, "rfp");
+    expect(r.sections).toBe(1);
+    expect(r.otherType).toEqual(["team", "commitments"]);
+    expect(splitReport(res, "grant").sections).toBe(3);
+  });
+
+  it("toPayload parses amounts, drops empty criteria and other-type sections", () => {
+    const d = emptyDraft();
+    d.page.goal = "150.000";
+    d.page.duration = "12";
+    d.page.links = "https://a.example\n\n  https://b.example  ";
+    d.sections = { why: "why", team: "grant only" };
+    d.milestones[0].name = "A";
+    d.milestones[0].amount = "$100,000.50";
+    d.milestones[0].criteria = [emptyCriterion("ok"), emptyCriterion("  ")];
+    d.milestones[0].done = true;
+    d.milestones[0].link = "https://x.example";
+    d.backers = [
+      { ...emptyBacker(), org: "EF", amount: "20,000", logoCid: "bafy" },
+      emptyBacker(),
+    ];
+    const p = toPayload(d);
+    expect(p.goal).toBe("150000");
+    expect(p.durationMonths).toBe("12");
+    expect(p.links).toEqual(["https://a.example", "https://b.example"]);
+    expect(p.sections).toEqual({ why: "why" });
+    expect(p.milestones[0]).toMatchObject({ amount: 100000.5, criteria: ["ok"] });
+    // done and its link only mean something on a top-up
+    expect(p.milestones[0].done).toBe(false);
+    expect(p.milestones[0].link).toBe("");
+    expect(p.backers).toEqual([{ org: "EF", amountUsd: 20000, url: "", logoCid: "bafy" }]);
+    expect(toPayload(d, { [d.backers[0].id]: "newcid" }).backers[0].logoCid).toBe("newcid");
+    expect(p.website).toBe("");
+  });
+
+  it("fromInitiative round-trips through toPayload", () => {
+    const r: Initiative = {
+      id: "1",
+      slug: "x",
+      title: "Title here",
+      summary: "Summary",
+      details: "",
+      discourseUrl: "",
+      goalUsd: 150000,
+      status: "pending",
+      type: "grant",
+      sortRank: null,
+      safeAddress: "",
+      proposer: "",
+      durationMonths: 9,
+      recipientTeam: "Team",
+      recipientUrl: "https://team.example",
+      topup: true,
+      milestoneReviewer: "N.",
+      sections: { why: "w", team: "t" },
+      milestones: [{
+        name: "A",
+        amount: 150000,
+        adoption: true,
+        done: true,
+        link: "https://d.example",
+        month: "",
+        criteria: ["c1"],
+      }],
+      links: ["https://l.example"],
+      structured: true,
+      revision: 1,
+      createdAt: 0,
+      approvedAt: null,
+    };
+    const d = fromInitiative(r);
+    expect(isEmptyDraft(d)).toBe(false);
+    expect(d.page.goal).toBe("150,000");
+    const p = toPayload(d);
+    expect(p).toMatchObject({
+      type: "grant",
+      topup: true,
+      goal: "150000",
+      durationMonths: "9",
+      recipientTeam: "Team",
+      milestoneReviewer: "N.",
+      sections: { why: "w", team: "t" },
+      links: ["https://l.example"],
+    });
+    expect(p.milestones[0]).toEqual(r.milestones[0]);
+  });
+
+  it("isEmptyDraft is true for a fresh draft only", () => {
+    expect(isEmptyDraft(emptyDraft())).toBe(true);
+    const d = emptyDraft();
+    d.milestones[0].criteria[0].text = "x";
+    expect(isEmptyDraft(d)).toBe(false);
+  });
+});

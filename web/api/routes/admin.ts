@@ -4,23 +4,23 @@ import { HttpError } from "../lib/errors.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAdmin } from "../middleware/auth.ts";
 import { adminCommentJson, adminRfp, donationJson, pledgeJson, revisionMeta } from "../lib/json.ts";
-import {
-  DOMAIN_RE,
-  parseGoal,
-  TX_HASH_RE,
-  validateForumUrl,
-  validateText,
-} from "../lib/validate.ts";
-import { decimalsOf } from "./initiatives.ts";
+import { DOMAIN_RE, parseGoal, TX_HASH_RE, validateText } from "../lib/validate.ts";
+import { decimalsOf, editChecks } from "./initiatives.ts";
+import { readPageFacts } from "../lib/page-facts.ts";
+import { assertNoErrors, mergeFindings, readStructured } from "../lib/structured.ts";
+import { pickText, type RfpText } from "../db/rfps.ts";
+import { type Findings, isStructured } from "../../shared/draft/mod.ts";
 import { safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
 import { syncContent } from "../services/content.ts";
 import { syncSafe } from "../services/safe-api.ts";
 import { liveRoles } from "../services/roles.ts";
 import type { Comment, PledgeStatus, Rfp } from "../db/types.ts";
-import { CHAIN_ID, MAX_FUNDERS, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
+import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
 
-export const LOGO_MAX_BYTES = 1024 * 1024;
+const TEXT_KEYS = ["title", "summary", "details", "sections", "milestones", "links"];
+/** Findings that block an admin save: shape rules, not editorial ones. */
+const HARD_FIELD_RE = /^(links(_\d+)?|ms_\d+_(link|month))$/;
 
 export function adminRoutes(deps: Deps) {
   const r = new Hono<Vars>();
@@ -102,33 +102,18 @@ export function adminRoutes(deps: Deps) {
     });
   });
 
+  /**
+   * The admin editor. Page facts go through `readPageFacts`; the text
+   * (title, summary, and the structured body or the legacy details) is
+   * revisioned together, fields not sent carrying over from the row. Shape
+   * rules block (caps, https links, month format, byte cap, structured XOR
+   * details); the editorial rules (required sections, sums, adoption) come
+   * back as `findings` for the form to show without blocking.
+   */
   r.patch("/initiatives/:id", async (c) => {
     const rfp = await rfpOr404(c.req.param("id"));
     const body = await jsonBody(c);
-    const patch: Partial<Rfp> = {};
-    // Title, summary and details are revisioned: validated together against
-    // the current text and written as one new revision after the rest.
-    const textGiven = ["title", "summary", "details"].some((k) => body[k] !== undefined);
-    const text = textGiven
-      ? validateText({
-        title: body.title === undefined ? rfp.title : s(body.title),
-        summary: body.summary === undefined ? rfp.summary : s(body.summary),
-        details: body.details === undefined ? rfp.details : s(body.details, 100_000),
-      })
-      : null;
-    if (body.goal !== undefined || body.goalUsd !== undefined) {
-      const [goal, err] = parseGoal(body.goalUsd ?? body.goal);
-      if (err) throw new HttpError(400, err);
-      patch.goalUsd = goal!;
-    }
-    if (body.discourseUrl !== undefined) {
-      const raw = s(body.discourseUrl, 500);
-      if (raw) {
-        const [clean, err] = await validateForumUrl(raw, deps.resolve);
-        if (err) throw new HttpError(400, err);
-        patch.discourseUrl = clean!;
-      } else patch.discourseUrl = "";
-    }
+    const patch = await readPageFacts(body, rfp, deps);
     if (body.sortRank !== undefined) {
       const raw = s(body.sortRank, 10);
       if (!raw) patch.sortRank = null;
@@ -140,9 +125,6 @@ export function adminRoutes(deps: Deps) {
         patch.sortRank = Math.max(1, Math.min(999, n));
       }
     }
-    if (body.type !== undefined) patch.type = body.type === "grant" ? "grant" : "rfp";
-    if (body.contact !== undefined) patch.contact = s(body.contact, 200);
-    if (body.funders !== undefined) patch.funders = s(body.funders, MAX_FUNDERS);
     // Owner: the wallet shown publicly as "Proposed by". Address or ENS name; blank clears.
     if (body.proposer !== undefined) {
       const raw = s(body.proposer, 100);
@@ -155,6 +137,44 @@ export function adminRoutes(deps: Deps) {
         patch.proposer = resolved;
       } else throw new HttpError(400, "Owner must be a wallet address or an ENS name.");
     }
+    const nextType = patch.type ?? rfp.type;
+    const cur = pickText(rfp);
+    const textGiven = TEXT_KEYS.some((k) => body[k] !== undefined);
+    // A type switch re-normalises a structured body: other-type sections go.
+    const reshape = nextType !== rfp.type && isStructured(cur);
+    let text: RfpText | null = null;
+    let findings: Findings = { errors: [], warnings: [] };
+    if (textGiven || reshape) {
+      const base = textGiven
+        ? validateText({
+          title: body.title === undefined ? cur.title : s(body.title),
+          summary: body.summary === undefined ? cur.summary : s(body.summary),
+          details: body.details === undefined ? cur.details : s(body.details, 100_000),
+        })
+        : { title: cur.title, summary: cur.summary, details: cur.details };
+      const { structured, findings: caps } = readStructured({
+        sections: body.sections === undefined ? cur.sections : body.sections,
+        milestones: body.milestones === undefined ? cur.milestones : body.milestones,
+        links: body.links === undefined ? cur.links : body.links,
+      }, nextType);
+      if (isStructured(structured)) {
+        // Sending sections to a legacy row migrates it; sending both is a mistake.
+        if (body.details === undefined) base.details = "";
+        if (base.details) throw new HttpError(400, "Send either details or sections, not both.");
+        const checks = editChecks(
+          {
+            type: nextType,
+            topup: patch.topup ?? rfp.topup,
+            goalUsd: patch.goalUsd ?? rfp.goalUsd,
+          },
+          { ...base, ...structured },
+        );
+        const hard = checks.errors.filter((e) => HARD_FIELD_RE.test(e.field));
+        assertNoErrors(mergeFindings(caps, { errors: hard, warnings: [] }));
+        findings = mergeFindings(caps, checks);
+      } else assertNoErrors(caps);
+      text = { ...base, ...structured };
+    }
     let next = Object.keys(patch).length ? await db.rfps.update(rfp.id, patch) : rfp;
     if (text) {
       next = (await db.rfps.revise(rfp.id, text, {
@@ -162,7 +182,7 @@ export function adminRoutes(deps: Deps) {
         source: "admin",
       })).rfp;
     }
-    return c.json({ initiative: adminRfp(next) });
+    return c.json({ initiative: adminRfp(next), findings });
   });
 
   /** Hide a superseded revision from the public history, or show it again. */

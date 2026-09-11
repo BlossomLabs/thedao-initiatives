@@ -1,17 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { Save } from "lucide-react";
 import Crumbs from "~/components/layout/Crumbs";
 import PageMain from "~/components/layout/PageMain";
 import Skeleton from "~/components/ui/Skeleton";
-import { Field, Input, Textarea } from "~/components/ui/Field";
-import { Button, LinkButton } from "~/components/ui/Button";
+import { LinkButton } from "~/components/ui/Button";
 import Identity from "~/components/wallet/Identity";
+import InitiativeForm from "~/components/initiative-form/InitiativeForm";
+import type { SubmitPayload } from "~/components/initiative-form/types";
+import { fromInitiative } from "~/components/initiative-form/useDraft";
 import { useSession } from "~/context/session";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { api, ApiError, errorMessage } from "~/lib/api";
-import type { RevisionText } from "~/lib/api-types";
+import type { Initiative } from "~/lib/api-types";
+import { LEGACY_NOTE, pageFactsPatch, textBody, textChanged } from "~/lib/edit-initiative";
 import { CONTACT_EMAIL, CONTACT_MAILTO, SITE_NAME } from "~/data/site";
 import { generateMeta } from "~/utils/meta";
 
@@ -20,9 +22,12 @@ export function meta() {
 }
 
 /**
- * The proposer's edit page: title, summary and details only. Saving writes a
- * new public revision that goes live at once; the old text stays browsable.
- * Admins may use it too (their edits are tagged as the team's).
+ * The proposer's edit page, on the same form as the submit page. Sections,
+ * milestones, links, title and summary are always editable and every save is
+ * a new public revision. While the initiative is pending the page facts
+ * (type, goal, duration, recipient, reviewer, forum link) and the private
+ * fields can change too; after approval those belong to the team. Admins
+ * may use it too (their edits are tagged as the team's).
  */
 export default function EditInitiative() {
   const { slug = "" } = useParams();
@@ -103,7 +108,7 @@ export default function EditInitiative() {
       </div>
     );
   } else {
-    body = <EditForm slug={r.slug} initial={r} />;
+    body = null;
   }
 
   return (
@@ -122,111 +127,104 @@ export default function EditInitiative() {
         on the initiative page.
       </p>
 
-      <div className="mt-4 grid grid-cols-[1fr_340px] items-start gap-9 max-[960px]:grid-cols-1">
-        <div className="min-w-0">{body}</div>
-        <aside className="sticky top-[86px] flex flex-col gap-3.5 max-[960px]:static max-[960px]:order-first">
-          <div className="panel">
-            <span className="k">What you can change</span>
-            <p className="m-0 small dim">
-              The title, the short summary and the full details. The funding goal, the forum link
-              and the type are set by the team: email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>
-              {" "}
-              to change those.
-            </p>
+      {body === null && r
+        ? <EditForm key={r.slug} r={r} />
+        : (
+          <div className="mt-4 grid grid-cols-[1fr_340px] items-start gap-9 max-[960px]:grid-cols-1">
+            <div className="min-w-0">{body}</div>
+            <aside className="sticky top-[86px] flex flex-col gap-3.5 max-[960px]:static max-[960px]:order-first">
+              <WhatYouCanChange status={r?.status} />
+              <RevisionsCard />
+            </aside>
           </div>
-          <div className="panel">
-            <span className="k">Revisions</span>
-            <p className="m-0 small dim">
-              Each save is a new revision with your wallet as its author. Older revisions stay
-              readable, with a word-by-word view of what changed.
-            </p>
-          </div>
-        </aside>
-      </div>
+        )}
     </PageMain>
   );
 }
 
-function EditForm({ slug, initial }: { slug: string; initial: RevisionText }) {
+/** What can change, by status. */
+function WhatYouCanChange({ status }: { status?: Initiative["status"] }) {
+  return (
+    <div className="panel">
+      <span className="k">What you can change</span>
+      <p className="m-0 small dim">
+        {status === "pending"
+          ? "Everything you submitted can still be changed here. Backers are added by the team."
+          : (
+            <>
+              Locked after approval: type, goal, duration, recipient and the private fields. Email
+              {" "}
+              <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a> to change them.
+            </>
+          )}
+      </p>
+    </div>
+  );
+}
+
+function RevisionsCard() {
+  return (
+    <div className="panel">
+      <span className="k">Revisions</span>
+      <p className="m-0 small dim">
+        Each save is a new revision with your wallet as its author. Older revisions stay readable,
+        with a word-by-word view of what changed.
+      </p>
+    </div>
+  );
+}
+
+function EditForm({ r }: { r: Initiative }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { requireSession } = useSession();
-  const [f, setF] = useState<RevisionText>({
-    title: initial.title,
-    summary: initial.summary,
-    details: initial.details,
-  });
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const set =
-    (k: keyof RevisionText) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setF((s) => ({ ...s, [k]: e.target.value }));
-  const dirty = f.title !== initial.title || f.summary !== initial.summary ||
-    f.details !== initial.details;
+  const pending = r.status === "pending";
+  const initial = useMemo(() => fromInitiative(r), [r]);
+  const path = `/api/initiatives/${encodeURIComponent(r.slug)}`;
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setBusy(true);
+  async function onSubmit(payload: SubmitPayload) {
+    await requireSession();
+    const facts = pending ? pageFactsPatch(payload, r) : null;
+    const text = textChanged(payload, r);
+    if (!facts && !text) throw new Error("Nothing changed.");
+    let patched = false;
     try {
-      await requireSession();
-      await api(`/api/initiatives/${encodeURIComponent(slug)}/revisions`, { json: f });
-      await qc.invalidateQueries({ queryKey: initiativeKey(slug) });
-      void qc.invalidateQueries({ queryKey: ["board"] });
-      navigate(`/initiative/${slug}`);
+      if (facts) {
+        await api(path, { method: "PATCH", json: facts });
+        patched = true;
+      }
+      if (text) await api(`${path}/revisions`, { json: textBody(payload) });
     } catch (err) {
-      setError(errorMessage(err));
-      globalThis.scrollTo({ top: 0, behavior: "smooth" });
-    } finally {
-      setBusy(false);
+      // the facts are saved even when the text was refused: show the row as it is now
+      if (patched) void qc.invalidateQueries({ queryKey: initiativeKey(r.slug) });
+      throw err;
     }
+    await qc.invalidateQueries({ queryKey: initiativeKey(r.slug) });
+    void qc.invalidateQueries({ queryKey: ["board"] });
+    navigate(`/initiative/${r.slug}`);
   }
 
   return (
-    <>
-      {error && <div className="alert" role="alert">{error}</div>}
-      <form className="flex flex-col" onSubmit={submit} noValidate>
-        <Field label="Title" htmlFor="e-title" required className="mt-0">
-          <Input id="e-title" maxLength={140} value={f.title} onChange={set("title")} required />
-        </Field>
-        <Field
-          label="Short summary"
-          htmlFor="e-summary"
-          required
-          hint="2 to 4 sentences: what gets built, why it matters."
-        >
-          <Textarea
-            id="e-summary"
-            className="min-h-[104px]"
-            rows={4}
-            maxLength={4000}
-            value={f.summary}
-            onChange={set("summary")}
-            required
-          />
-        </Field>
-        <Field
-          label="Full initiative details"
-          htmlFor="e-details"
-          hint="Scope, milestones, budget breakdown. Markdown supported: headings, **bold**, lists, tables, - [ ] checklists."
-        >
-          <Textarea
-            id="e-details"
-            className="mono min-h-[320px] text-[13px] leading-[1.55]"
-            rows={16}
-            maxLength={20000}
-            value={f.details}
-            onChange={set("details")}
-          />
-        </Field>
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <Button type="submit" variant="primary" loading={busy} disabled={!dirty}>
-            <Save className="size-4" />Save as a new revision
-          </Button>
-          <Link className="btn btn-ghost" to={`/initiative/${slug}`}>Cancel</Link>
-          {!dirty && <span className="small dim">Nothing changed yet.</span>}
-        </div>
-      </form>
-    </>
+    <InitiativeForm
+      mode="proposer"
+      initial={initial}
+      locked={!pending}
+      onSubmit={onSubmit}
+      submitLabel="Save as a new revision"
+      showBackers={false}
+      showPrivate={pending}
+      showTypePicker={pending}
+      showRules={false}
+      autosaveKey={null}
+      pasteText={r.structured ? undefined : r.details}
+      pasteNote={r.structured ? undefined : LEGACY_NOTE}
+      asideTop={<WhatYouCanChange status={r.status} />}
+      asideBottom={<RevisionsCard />}
+      footer={
+        <p className="m-0 mt-3.5 text-center">
+          <Link className="btn btn-ghost btn-sm" to={`/initiative/${r.slug}`}>Cancel</Link>
+        </p>
+      }
+    />
   );
 }

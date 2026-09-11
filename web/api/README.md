@@ -26,35 +26,65 @@ and `../deno.json` holds the tasks and imports.
   tx over RPC, and writes the result to KV. Page reads never call Safe. Set `SAFE_API_KEY`.
 - **Content sync is push-based.** `deno task sync-content` reads `../../content/rfps/*.md` and POSTs
   them to `/api/admin/sync-content`. Files own the words and the goal; the admin panel owns status,
-  Safes and money. Run the sync after every deploy that changes content.
+  Safes and money. Run the sync after every deploy that changes content. Besides the keys in
+  `content/rfps/README.md` (`duration`, `topup`, `reviewer`), the web parser reads two web-only keys
+  on grants: `recipient` (the team the grant goes to) and `recipient_url` (an https link). **Content
+  files must be structured**: the body is split with the guide's headings (`## Why this
+  matters`,
+  `## In scope`, `## Out of scope`, …, `## Milestones` with `### Name - $amount
+  (adoption)` rows
+  and one `- criterion` per line, optionally `## Links`). A file is synced only when every section
+  of its type is present, every milestone has an amount and a criterion, the amounts sum to the
+  goal, no other-type section and no text outside a known heading remain. Any other file is skipped
+  and its sync error lists what is missing
+  (`not structured: missing: Out of
+  scope; unsorted text: …`); the row it would have updated is
+  left as it was.
+- **The process rules are not in the API.** `content/boilerplate/{rfp,grant,topup}.md` are bundled
+  at build time (`app/data/rules.ts`) and render as a panel on every initiative page; the kind is
+  picked from the initiative's type and top-up flag.
 - **The donation terms are not in the API.** `content/donation-terms.md` is bundled into the site at
   build time (`app/data/terms.ts`, prerendered at `/donation-terms`). Its first line
   `version: YYYY-MM-DD` is the donate widget's gate version; `POST /api/terms/accept` logs the
   version accepted (anonymous, or once per wallet and version) to KV.
 - **Uploads go to Pinata** (backer logos, profile pictures); only the CID is stored. Set
   `PINATA_JWT`; until then uploads answer 503.
-- Markdown (`details`) is stored and returned raw; the frontend renders it.
-- **Text is revisioned.** Every change to title, summary or details (the proposer's edit page, the
-  admin editor, content sync) appends an immutable revision under `["revision", rfpId, n]`; the
-  initiative row carries the current number. Revisions are public; admins can archive a superseded
-  one (hidden from the public history, never the current one). Rows written before revisions existed
-  get their text snapshotted as revision 1 on their first edit.
+- **Initiatives are structured** (submission redesign, Sep 2026): the text of a row is `sections`
+  (one markdown answer per section key of its type, see `shared/draft/sections.ts`), `milestones`
+  (`{name, amount, adoption, done, link, month, criteria[]}`) and `links` (https only). The JSON
+  carries them plus `structured: true`. `details` is legacy-only: rows written before the redesign
+  keep their single markdown body (`structured: false`) until someone re-submits them as sections; a
+  row is one or the other, never both. The rules that check a body (`shared/draft/checks.ts`) are
+  the same on the form and here; failures come back as
+  `{error, findings: {errors: [{field, msg, kind}], warnings: [{field, msg}]}}` with the form's
+  field ids.
+- **Text is revisioned.** Every change to title, summary, sections, milestones, links or the legacy
+  details (the proposer's edit page, the admin editor, content sync) appends an immutable revision
+  under `["revision", rfpId, n]`; the initiative row carries the current number. A revision carries
+  the structured fields too. Revisions are public; admins can archive a superseded one (hidden from
+  the public history, never the current one). Rows written before revisions existed get their text
+  snapshotted as revision 1 on their first edit.
 - Ids are ULID strings. Rate limits live in KV so they hold across isolates.
 
 ## Endpoints
 
 Public: `GET /healthz`, `GET /api/board`, `GET /api/initiatives/:slug` (a pending one only for its
 proposer and admins), `GET /api/initiatives/:slug/revisions/:n`, `POST /api/initiatives` (submit,
-always pending), `GET /api/donate/params`, `POST /api/donate/confirm`,
-`GET /api/donate/status/:txHash`, `GET /api/ens-name/:addr`, `GET /api/nickname/:addr`,
-`POST /api/ai-search`, `GET /api/initiatives/:slug/comments`,
+always pending: the form as JSON, backers become `pledged` rows), `GET /api/donate/params`,
+`POST /api/donate/confirm`, `GET /api/donate/status/:txHash`, `GET /api/ens-name/:addr`,
+`GET /api/nickname/:addr`, `POST /api/ai-search`, `GET /api/initiatives/:slug/comments`,
 `POST /api/initiatives/:slug/comments`, `GET /api/comments/mine?tokens=`,
 `POST /api/comments/:id/report`.
 
 Signed in: `GET /api/auth/me`, `POST /api/auth/logout`, `POST /api/auth/logout-all`,
 `POST /api/nickname`, `POST /api/pfp`, `POST /api/pfp/upload`, `POST /api/comments/:id/vote`,
-`POST /api/comments/:id/reply` (role-gated), `POST /api/initiatives/:slug/revisions` (proposer or
-admin: title, summary, details).
+`POST /api/comments/:id/reply` (role-gated), `POST /api/uploads/logo` (multipart `image`, a backer
+logo pinned before submitting; returns `{cid, logoUrl}`, the CID is only accepted on a submission
+from the same wallet within a day), `POST /api/initiatives/:slug/revisions` (proposer or admin:
+title, summary, sections, milestones, links; a legacy row also takes `details`),
+`PATCH /api/initiatives/:slug` (proposer while pending, admin always: type, topup, goal,
+durationMonths, recipientTeam, recipientUrl, milestoneReviewer, discourseUrl, funders, contact;
+after approval a proposer gets 403).
 
 Admin (`/api/admin/...`): `GET dashboard`, `GET|PATCH initiatives/:id`,
 `POST initiatives/:id/status`, `POST initiatives/:id/revisions/:n` (archive / unarchive),

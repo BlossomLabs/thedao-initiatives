@@ -3,23 +3,84 @@
  * header. The filename is the permanent slug. Files own the words and the
  * goal; the admin panel owns the lifecycle.
  */
-import { MAX_DETAILS, MAX_SUMMARY, MAX_TITLE } from "../config.ts";
-import { parseGoal } from "../lib/validate.ts";
+import { MAX_SUMMARY, MAX_TITLE } from "../config.ts";
+import { parseDuration, parseGoal, validateHttpsLink } from "../lib/validate.ts";
 import type { Db } from "../db/mod.ts";
 import type { RfpStatus, RfpType } from "../db/types.ts";
+import {
+  FIELDS,
+  LIMITS,
+  type Milestone,
+  milestonesTotal,
+  normaliseStructured,
+  type SectionKey,
+  SECTIONS,
+  type Sections,
+  splitDraft,
+  type Structured,
+  structuredBytes,
+  TOO_LONG_MSG,
+  usd,
+} from "../../shared/draft/mod.ts";
 
 export interface ContentFields {
   title: string;
   summary: string;
+  /** Always "" since the strict parser: content files must be structured. */
   details: string;
+  sections: Sections;
+  milestones: Milestone[];
+  links: string[];
   goalUsd: number;
   discourseUrl: string;
   status: RfpStatus;
   sortRank: number | null;
   type: RfpType;
+  durationMonths: number | null;
+  recipientTeam: string;
+  recipientUrl: string;
+  topup: boolean;
+  milestoneReviewer: string;
 }
 
-/** Parse '---' frontmatter then markdown details. Indented lines continue a value. */
+/**
+ * The body must split cleanly into the guide's sections and milestones:
+ * every section of the type, at least one milestone each with an amount and
+ * a criterion, amounts summing to the goal, no other-type sections, no text
+ * outside a known heading. Otherwise the reasons (v1's wording) are thrown.
+ */
+export function parseStructuredBody(body: string, type: RfpType, goal: number): Structured {
+  const res = splitDraft(body, type);
+  const reasons: string[] = [];
+  const missing = SECTIONS[type].filter((k) => !(res.fields[k] ?? "").trim());
+  if (missing.length) reasons.push("missing: " + missing.map((k) => FIELDS[k].heading).join(", "));
+  const rows = res.milestones;
+  if (!rows.length) reasons.push("no milestone headings found");
+  const bad = rows.filter((m) => !m.criteria.length || !(m.amount > 0)).map((m) => m.name);
+  if (bad.length) reasons.push("milestones without amount or criteria: " + bad.join(", "));
+  const total = milestonesTotal(rows);
+  if (rows.length && Math.round(total) !== Math.round(goal)) {
+    reasons.push(`milestones total ${usd(total)}, goal is ${usd(goal)}`);
+  }
+  const extra = (Object.keys(res.fields) as SectionKey[]).filter(
+    (k) => !SECTIONS[type].includes(k),
+  );
+  if (extra.length) {
+    reasons.push("sections of the other type: " + extra.map((k) => FIELDS[k].heading).join(", "));
+  }
+  if (res.unsorted) {
+    reasons.push("unsorted text: " + res.unsorted.slice(0, 80).replace(/\n/g, " / "));
+  }
+  if (reasons.length) throw new Error("not structured: " + reasons.join("; "));
+  const structured = normaliseStructured(
+    { sections: res.fields, milestones: rows, links: res.page.links ?? "" },
+    type,
+  );
+  if (structuredBytes(structured) > LIMITS.STRUCTURED_BYTES) throw new Error(TOO_LONG_MSG);
+  return structured;
+}
+
+/** Parse '---' frontmatter then the structured markdown body. Indented lines continue a value. */
 export function parseRfpFile(text: string): ContentFields {
   const m = /^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/.exec(text);
   if (!m) throw new Error("missing '---' frontmatter block");
@@ -52,15 +113,33 @@ export function parseRfpFile(text: string): ContentFields {
   if (pin && !/^\d+$/.test(pin)) throw new Error("pin must be a whole number");
   const type = (fields.type ?? "rfp").toLowerCase();
   if (type !== "rfp" && type !== "grant") throw new Error("type must be rfp or grant");
+  // Page facts. `duration`, `topup` and `reviewer` match the Flask MVP's keys
+  // (content/rfps/README.md); `recipient` and `recipient_url` are web-only.
+  const [duration, durErr] = parseDuration(fields.duration ?? "");
+  if (durErr) throw new Error(durErr);
+  const topup = ["true", "yes", "1"].includes((fields.topup ?? "").trim().toLowerCase());
+  if (topup && type !== "grant") throw new Error("topup applies to grants only");
+  const recipientTeam = type === "grant" ? (fields.recipient ?? "").trim().slice(0, 120) : "";
+  const [recipientUrl, urlErr] = validateHttpsLink(
+    recipientTeam ? fields.recipient_url ?? "" : "",
+  );
+  if (urlErr) throw new Error(`recipient_url: ${urlErr}`);
+  const structured = parseStructuredBody(body, type, goal!);
   return {
     title,
     summary: (fields.summary ?? "").slice(0, MAX_SUMMARY),
-    details: body.trim().slice(0, MAX_DETAILS),
+    details: "",
+    ...structured,
     goalUsd: goal!,
     discourseUrl: fields.forum ?? "",
     status,
     sortRank: pin ? Number(pin) : null,
     type,
+    durationMonths: duration,
+    recipientTeam,
+    recipientUrl: recipientUrl!,
+    topup,
+    milestoneReviewer: topup ? (fields.reviewer ?? "").trim().slice(0, 200) : "",
   };
 }
 

@@ -1,0 +1,70 @@
+import { bodyKey } from "./body-key.ts";
+import { isStructured, normaliseStructured, sameStructured, structuredBytes } from "./normalise.ts";
+
+test("normalise drops empty and other-type sections, strips headings, clips", () => {
+  const s = normaliseStructured({
+    sections: { why: "## Heading\ntext ", team: "grant only", existing: "" },
+    milestones: [{ name: " A ", amount: "1,000", criteria: ["x", " ", "y"], extra: 1 }, "junk"],
+    links: "https://a.org\n\nhttps://a.org\nhttps://b.org",
+  }, "rfp");
+  expect(s.sections).toEqual({ why: "**Heading**\ntext" });
+  expect(s.milestones).toEqual([{
+    name: "A",
+    amount: 1000,
+    adoption: false,
+    done: false,
+    link: "",
+    month: "",
+    criteria: ["x", "y"],
+  }]);
+  expect(s.links).toEqual(["https://a.org", "https://b.org"]);
+});
+
+test("sameStructured ignores key order and whitespace; bytes count UTF-8", () => {
+  const a = normaliseStructured({
+    sections: { in_scope: "b", why: "a " },
+    milestones: [],
+    links: [],
+  }, "rfp");
+  const b = normaliseStructured({
+    sections: { why: "a", in_scope: "b" },
+    milestones: [],
+    links: [],
+  }, "rfp");
+  expect(sameStructured(a, b)).toBe(true);
+  expect(
+    structuredBytes(
+      normaliseStructured({ sections: { why: "é" }, milestones: [], links: [] }, "rfp"),
+    ),
+  )
+    .toBeGreaterThan(
+      structuredBytes(
+        normaliseStructured({ sections: { why: "e" }, milestones: [], links: [] }, "rfp"),
+      ),
+    );
+  expect(isStructured({ sections: {}, milestones: [] })).toBe(false);
+  expect(isStructured({ sections: { why: "x" }, milestones: [] })).toBe(true);
+});
+
+test("body key normalises whitespace and case and includes milestones", () => {
+  const k1 = bodyKey({ why: "Hello   World" }, [{
+    name: "M",
+    amount: 1,
+    adoption: false,
+    done: false,
+    link: "",
+    month: "",
+    criteria: ["c1"],
+  }]);
+  const k2 = bodyKey({ why: "hello world" }, [{
+    name: "m",
+    amount: 2,
+    adoption: true,
+    done: false,
+    link: "",
+    month: "",
+    criteria: ["C1"],
+  }]);
+  expect(k1).toBe(k2);
+  expect(bodyKey({}, [])).toBe("");
+});

@@ -1,16 +1,11 @@
 /** Proposer edits and the public revision history. */
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
-import { ADMIN, harness, j, loadContentFiles, PLAIN, proposerToken } from "./app-helpers.ts";
+import { ADMIN, harness, j, PLAIN, proposerToken } from "./app-helpers.ts";
 import type { Revision, Rfp } from "../db/types.ts";
+import { minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
 
 const OTHER = "0x2222222222222222222222222222222222222222";
-const GOOD = {
-  title: "A proper initiative title",
-  summary: "This summary is comfortably longer than the forty character minimum required.",
-  details: "## Scope\n\nFirst draft of the details.",
-  goal: "25,000",
-  funders: "Some L2 and a wallet company",
-};
+const GOOD = minimalSubmission(25000);
 type Meta = { n: number; author: string; source: string; archived: boolean; createdAt: number };
 type Page = { initiative: { title: string; revision: number }; revisions: Meta[] };
 
@@ -44,7 +39,7 @@ Deno.test("submit writes revision 1; the proposer's edit goes live as revision 2
   const edit = {
     ...GOOD,
     title: "A better initiative title",
-    details: "## Scope\n\nSecond draft.",
+    sections: { ...GOOD.sections, why: "Second draft." },
   };
   assertEquals(
     (await h.req(`/api/initiatives/${slug}/revisions`, {
@@ -79,7 +74,8 @@ Deno.test("submit writes revision 1; the proposer's edit goes live as revision 2
   assertEquals(after.revisions.map((r) => r.n), [1, 2]);
   const v1 = await j(await h.req(`/api/initiatives/${slug}/revisions/1`));
   assertEquals((v1.revision as { title: string }).title, GOOD.title);
-  assertEquals((v1.revision as { details: string }).details, GOOD.details);
+  assertEquals((v1.revision as { sections: { why: string } }).sections.why, GOOD.sections.why);
+  assert((v1.revision as { structured: boolean }).structured);
   assertEquals((await h.req(`/api/initiatives/${slug}/revisions/9`)).status, 404);
   assertEquals((await h.req(`/api/initiatives/${slug}/revisions/x`)).status, 404);
 
@@ -163,11 +159,16 @@ Deno.test("admin editor: text changes become admin revisions, other fields do no
   assertEquals((await patch({ title: "short" })).status, 400);
   assertEquals((await patch({ title: "Renamed by the team" })).status, 200); // no-op, still fine
   assertEquals((await h.db.revisions.list(id)).length, 2);
-  // an admin may also use the public edit endpoint; it is tagged as an admin revision
+  // an admin may also use the public edit endpoint; it is tagged as an admin
+  // revision (the milestones must match the goal the admin just raised)
   const res = await h.req(`/api/initiatives/${slug}/revisions`, {
     method: "POST",
     token: admin,
-    json: { ...GOOD, title: "Renamed again by the team" },
+    json: {
+      ...GOOD,
+      title: "Renamed again by the team",
+      milestones: [{ ...GOOD.milestones[0], amount: 30000 }],
+    },
   });
   assertEquals(res.status, 201);
   assertEquals((await j(res) as { revision: Meta }).revision.source, "admin");
@@ -179,7 +180,7 @@ Deno.test("admin editor: text changes become admin revisions, other fields do no
 Deno.test("content sync: an unchanged file adds no revision, a changed one does", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
-  const files = await loadContentFiles();
+  const files = syntheticContentFiles();
   const sync = (f = files) =>
     h.req("/api/admin/sync-content", { method: "POST", token: admin, json: { files: f } });
   await sync();
@@ -189,7 +190,11 @@ Deno.test("content sync: an unchanged file adds no revision, a changed one does"
     const revs = await h.db.revisions.list(r.id);
     assertEquals(revs.map((v) => [v.n, v.source, v.author]), [[1, "content", ""]]);
   }
-  const changed = files.map((f, i) => i === 0 ? { ...f, text: f.text + "\n\nOne more line." } : f);
+  const changed = files.map((f, i) =>
+    i === 0
+      ? { ...f, text: f.text.replace("Because it closes a gap.", "Because it really does.") }
+      : f
+  );
   await sync(changed);
   const total = (await Promise.all(rows.map((r) => h.db.revisions.list(r.id)))).flat().length;
   assertEquals(total, rows.length + 1);

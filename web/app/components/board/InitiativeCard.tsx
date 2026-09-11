@@ -1,4 +1,5 @@
 import { useState } from "react";
+import BackerLogo from "~/components/ui/BackerLogo";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router";
 import { FundedChip, TypeBadge } from "~/components/ui/Badge";
@@ -99,33 +100,12 @@ export default function InitiativeCard({
           <span className="mr-0.5 font-inter-tight text-[12px] text-white/30">Backed by</span>
           {logos.length
             ? logos.map((l) => (
-              <img
-                key={l.logoUrl}
-                src={l.logoUrl}
-                alt={l.company}
-                title={l.company}
-                className="size-10 rounded-full border border-white/15 bg-white object-contain p-1.5"
-              />
+              <BackerLogo key={l.logoUrl} logoUrl={l.logoUrl} company={l.company} />
             ))
-            : Array.from({ length: Math.min(backers, 4) }, (_, i) => (
-              <span
-                key={i}
-                className="flex size-10 items-center justify-center rounded-full border border-white/15 bg-white/[.06] text-white/40"
-                aria-hidden="true"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                >
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
-                </svg>
-              </span>
-            ))}
+            : Array.from(
+              { length: Math.min(backers, 4) },
+              (_, i) => <BackerLogo key={i} logoUrl="" company="" />,
+            )}
         </div>
       )}
       <div className="mt-4 flex gap-2">

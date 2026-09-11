@@ -30,7 +30,13 @@ export default defineConfig({
     strictPort: true,
     watch: { ignored: ["**/*.tmp.*"] },
     // app/data/terms.ts imports ../content/donation-terms.md from outside web/.
-    fs: { allow: [".", fileURLToPath(new URL("../content", import.meta.url))] },
+    fs: {
+      allow: [
+        ".",
+        fileURLToPath(new URL("../content", import.meta.url)),
+        fileURLToPath(new URL("../llms.txt", import.meta.url)),
+      ],
+    },
     // API and web share one origin in production; mirror that in dev.
     proxy: {
       "/api": process.env.API_PROXY || "http://localhost:8000",
@@ -46,6 +52,6 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./test/setup.ts"],
-    include: ["app/**/*.test.ts", "app/**/*.test.tsx"],
+    include: ["app/**/*.test.ts", "app/**/*.test.tsx", "shared/**/*.test.ts"],
   },
 });

@@ -113,6 +113,42 @@ export async function validateForumUrl(
   return [u.toString(), null];
 }
 
+export const MAX_DURATION_MONTHS = 120;
+
+/** Whole months from funding to the last milestone; blank means "not stated". */
+export function parseDuration(raw: unknown): [number | null, null] | [null, string] {
+  const s = String(raw ?? "").trim();
+  if (!s) return [null, null];
+  if (!/^\d+$/.test(s)) return [null, "Duration must be a whole number of months."];
+  const n = Number(s);
+  if (n < 1 || n > MAX_DURATION_MONTHS) {
+    return [null, `Duration must be between 1 and ${MAX_DURATION_MONTHS} months.`];
+  }
+  return [n, null];
+}
+
+/**
+ * An https link the page renders as an anchor (recipient team site). Only the
+ * scheme and host shape are checked; nothing fetches it server-side.
+ */
+export function validateHttpsLink(raw: unknown): [string, null] | [null, string] {
+  const s = String(raw ?? "").trim();
+  if (!s) return ["", null];
+  if (s.length > 500) return [null, "Link is too long."];
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return [null, "That does not look like a valid URL."];
+  }
+  if (u.protocol !== "https:") return [null, "The link must be https."];
+  const host = u.hostname.toLowerCase();
+  if (!host || !FORUM_HOST_RE.test(host) || !host.includes(".")) {
+    return [null, "That does not look like a valid link host."];
+  }
+  return [u.toString(), null];
+}
+
 export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const TX_HASH_RE = /^0x[0-9a-f]{64}$/;
 export const NICK_RE = /^[A-Za-z0-9 ._-]{1,40}$/;

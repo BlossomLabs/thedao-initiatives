@@ -3,8 +3,15 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
-import { donationJson, pledgeJson, publicRfp, revisionJson, revisionMeta } from "../lib/json.ts";
-import { parseGoal, validateForumUrl, validateText } from "../lib/validate.ts";
+import {
+  donationJson,
+  pledgeJson,
+  proposerRfp,
+  publicRfp,
+  revisionJson,
+  revisionMeta,
+} from "../lib/json.ts";
+import { cleanText, validateForumUrl, validateText } from "../lib/validate.ts";
 import { pctOf } from "./board.ts";
 import { onrampLink } from "../lib/onramp.ts";
 import { fetchDiscourseTitle } from "../services/forum.ts";
@@ -15,9 +22,49 @@ import {
   TOKENS,
 } from "../config.ts";
 import type { Rfp, Session } from "../db/types.ts";
+import { pickText } from "../db/rfps.ts";
+import { assertNoErrors, mergeFindings, readBackers, readStructured } from "../lib/structured.ts";
+import { readPageFacts } from "../lib/page-facts.ts";
+import { ownsUpload } from "./uploads.ts";
+import {
+  bodyKey,
+  checkSubmission,
+  type Finding,
+  isStructured,
+  parseAmount,
+} from "../../shared/draft/mod.ts";
 
 export { onrampLink };
 export const decimalsOf = (sym: string): number | undefined => TOKENS[sym]?.[1];
+
+/** The text rules of an edit: title, summary, sections, milestones against
+ * the stored goal, links. Page facts and backers are checked where they are
+ * edited. */
+export function editChecks(rfp: Pick<Rfp, "type" | "topup" | "goalUsd">, text: {
+  title: string;
+  summary: string;
+  sections: Rfp["sections"];
+  milestones: Rfp["milestones"];
+  links: Rfp["links"];
+}) {
+  return checkSubmission({
+    type: rfp.type,
+    topup: Boolean(rfp.topup),
+    page: {
+      title: text.title,
+      summary: text.summary,
+      goal: rfp.goalUsd,
+      duration: "",
+      recipient: "",
+      funders: "",
+      contact: "",
+    },
+    sections: text.sections,
+    milestones: text.milestones,
+    links: text.links,
+    backers: [],
+  }, "edit");
+}
 
 export function initiativeRoutes(deps: Deps) {
   const r = new Hono<Vars>();
@@ -42,6 +89,16 @@ export function initiativeRoutes(deps: Deps) {
     return rfp;
   };
 
+  /** The proposer (or an admin) may act on this row; everyone else is refused. */
+  const editableBy = async (slug: string, user: Session) => {
+    const rfp = await visibleOr404(slug, user);
+    const proposer = isProposer(rfp, user);
+    if (!proposer && !user.isAdmin) {
+      throw new HttpError(403, "Only the proposer can edit this initiative.");
+    }
+    return { rfp, proposer };
+  };
+
   r.get("/:slug", async (c) => {
     const user = c.var.user;
     const rfp = await visibleOr404(c.req.param("slug"), user);
@@ -52,8 +109,9 @@ export function initiativeRoutes(deps: Deps) {
       deps.chain.activeTokens(),
       db.revisions.list(rfp.id, Boolean(user?.isAdmin)),
     ]);
+    const mine = Boolean(user?.isAdmin) || isProposer(rfp, user);
     return c.json({
-      initiative: publicRfp(rfp),
+      initiative: mine ? proposerRfp(rfp) : publicRfp(rfp),
       revisions: revisions.map(revisionMeta),
       summary,
       pct: pctOf(summary.total, rfp.goalUsd),
@@ -78,16 +136,14 @@ export function initiativeRoutes(deps: Deps) {
   });
 
   /**
-   * The proposer (or an admin) replaces the title, summary and details. Goes
-   * live at once; the previous text stays in the history.
+   * The proposer (or an admin) replaces the text. Goes live at once; the
+   * previous text stays in the history. A body with `sections`, `milestones`
+   * or `links` takes the structured path (the rules of the form, "edit"
+   * scope, block); a legacy `details` body is accepted on legacy rows only.
    */
   r.post("/:slug/revisions", requireAuth, async (c) => {
     const user = c.var.user!;
-    const rfp = await visibleOr404(c.req.param("slug"), user);
-    const proposer = isProposer(rfp, user);
-    if (!proposer && !user.isAdmin) {
-      throw new HttpError(403, "Only the proposer can edit this initiative.");
-    }
+    const { rfp, proposer } = await editableBy(c.req.param("slug"), user);
     if (rfp.status !== "pending" && rfp.status !== "approved") {
       throw new HttpError(403, "This initiative is no longer open for edits.");
     }
@@ -101,22 +157,65 @@ export function initiativeRoutes(deps: Deps) {
       throw new HttpError(429, "Too many edits; try again in an hour.");
     }
     const body = await jsonBody(c);
-    const text = validateText({
-      title: s(body.title),
-      summary: s(body.summary),
-      details: s(body.details, 100_000),
-    });
-    const { rfp: next, revision } = await db.rfps.revise(rfp.id, text, {
-      author: user.address,
-      source: proposer ? "proposer" : "admin",
-    });
+    const cur = pickText(rfp);
+    const structuredBody = ["sections", "milestones", "links"].some((k) => body[k] !== undefined);
+    if (!structuredBody && isStructured(cur)) {
+      throw new HttpError(
+        400,
+        "This initiative uses sections; send sections, milestones and links.",
+      );
+    }
+    const origin = { author: user.address, source: proposer ? "proposer" : "admin" } as const;
+    let warnings: Finding[] = [];
+    let text;
+    if (structuredBody) {
+      const base = validateText({ title: s(body.title), summary: s(body.summary), details: "" });
+      const { structured, findings: caps } = readStructured({
+        sections: body.sections ?? cur.sections,
+        milestones: body.milestones ?? cur.milestones,
+        links: body.links ?? cur.links,
+      }, rfp.type);
+      const findings = mergeFindings(caps, editChecks(rfp, { ...base, ...structured }));
+      assertNoErrors(findings);
+      warnings = findings.warnings;
+      text = { ...base, ...structured };
+    } else {
+      text = validateText({
+        title: s(body.title),
+        summary: s(body.summary),
+        details: s(body.details, 100_000),
+      });
+    }
+    const { rfp: next, revision } = await db.rfps.revise(rfp.id, text, origin);
     if (!revision) throw new HttpError(400, "Nothing changed.");
-    return c.json({ initiative: publicRfp(next), revision: revisionMeta(revision) }, 201);
+    return c.json(
+      { initiative: publicRfp(next), revision: revisionMeta(revision), warnings },
+      201,
+    );
+  });
+
+  /**
+   * The page facts (type, top-up, goal, duration, recipient, reviewer, forum
+   * link, funders, contact): the proposer may change them while the row is
+   * pending; after approval they belong to the team. Admins always may.
+   */
+  r.patch("/:slug", requireAuth, async (c) => {
+    const user = c.var.user!;
+    const { rfp } = await editableBy(c.req.param("slug"), user);
+    if (!user.isAdmin && rfp.status !== "pending") {
+      throw new HttpError(403, "Locked after approval; email the team.");
+    }
+    const patch = await readPageFacts(await jsonBody(c), rfp, deps);
+    const next = Object.keys(patch).length ? await db.rfps.update(rfp.id, patch) : rfp;
+    return c.json({ initiative: proposerRfp(next) });
   });
 
   /**
    * Submission from a signed-in wallet that has a display name (ENS primary
-   * name or site nickname); always lands as pending for admin review.
+   * name or site nickname); always lands as pending for admin review. The
+   * body is the form: page fields, one answer per section, milestone rows,
+   * links, backers. Every rule the form runs is run again here and the
+   * failures come back as `findings` painted on the fields.
    */
   r.post("/", requireAuth, async (c) => {
     const proposer = c.var.user!.address;
@@ -139,9 +238,12 @@ export function initiativeRoutes(deps: Deps) {
     }
     // The title may be left blank when a forum link is given: we read the
     // topic's title from Discourse (SSRF-hardened, best effort).
-    let title = s(body.title);
+    let title = cleanText(body.title, "title");
     if (!title && discourseUrl) {
-      title = (await fetchDiscourseTitle(discourseUrl, deps.fetch, deps.resolve)) ?? "";
+      title = cleanText(
+        await fetchDiscourseTitle(discourseUrl, deps.fetch, deps.resolve),
+        "title",
+      );
     }
     if (title.length < 8) {
       throw new HttpError(
@@ -151,39 +253,94 @@ export function initiativeRoutes(deps: Deps) {
           : "Please give the initiative a title (at least 8 characters), or a forum link we can read it from.",
       );
     }
-    if (s(body.summary).length < 40) {
-      throw new HttpError(
-        400,
-        "Please describe the initiative in at least 40 characters.",
-      );
-    }
-    const text = validateText({
-      title,
-      summary: s(body.summary),
-      details: s(body.details, 100_000),
-    });
-    const [goal, gerr] = parseGoal(body.goal);
-    if (gerr) throw new HttpError(400, gerr);
+    const summary = cleanText(body.summary, "summary");
+    const type = body.type === "grant" ? "grant" : "rfp";
+    const topup = type === "grant" && Boolean(body.topup);
+    const { structured, findings: caps } = readStructured(body, type);
+    const { backers, findings: backerCaps } = readBackers(body);
+    // Page facts. Amounts are read the forgiving way ("150,000", "150.000");
+    // a leading minus survives so the range rule can refuse it.
+    const rawGoal = String(body.goal ?? body.goalUsd ?? "");
+    const goal = Math.round((/^\s*-/.test(rawGoal) ? -1 : 1) * parseAmount(rawGoal) * 100) / 100;
+    const duration = s(body.durationMonths ?? body.duration, 10);
+    const recipientTeam = type === "grant" ? s(body.recipientTeam, 120) : "";
+    const recipientUrl = type === "grant" ? s(body.recipientUrl, 300) : "";
+    const milestoneReviewer = topup ? s(body.milestoneReviewer, 200) : "";
     // NEVER rendered publicly: private fundraising leads, admin-only like contact.
     const funders = s(body.funders, MAX_FUNDERS);
-    if (funders.length < 10) {
-      throw new HttpError(
-        400,
-        "Please list who is likely to fund this (at least one funder line).",
-      );
+    const contact = s(body.contact, 200);
+    const checks = checkSubmission({
+      type,
+      topup,
+      page: {
+        title,
+        summary,
+        goal,
+        duration,
+        recipient: recipientTeam,
+        recipientUrl,
+        funders,
+        contact,
+      },
+      ...structured,
+      backers,
+    }, "submit");
+    const extra: Finding[] = [];
+    // Logo receipts: a CID rides the form only if this wallet pinned it.
+    for (const [i, b] of backers.entries()) {
+      if (b.logoCid && !(await ownsUpload(db, b.logoCid, proposer))) {
+        extra.push({ field: `bk_logo_${i}`, msg: "Upload the logo again.", kind: "content" });
+      }
     }
-    const type = body.type === "grant" ? "grant" : "rfp";
+    // The same text submitted twice (whatever the status of the first copy).
+    if (isStructured(structured)) {
+      const key = bodyKey(structured.sections, structured.milestones);
+      const all = await db.rfps.list(["pending", "approved", "rejected", "archived"]);
+      const dup = all.find((x) => {
+        const t = pickText(x);
+        return isStructured(t) && bodyKey(t.sections, t.milestones) === key;
+      });
+      if (dup) {
+        extra.push({
+          field: "",
+          msg:
+            `This exact text is already submitted ("${dup.title}"). Edit it before submitting again.`,
+          kind: "content",
+        });
+      }
+    }
+    const findings = mergeFindings(caps, backerCaps, checks, { errors: extra, warnings: [] });
+    assertNoErrors(findings);
     const rfp = await db.rfps.insert({
-      ...text,
+      title,
+      summary,
+      details: "",
+      ...structured,
       discourseUrl,
-      goalUsd: goal!,
-      contact: s(body.contact, 200),
+      goalUsd: goal,
+      contact,
       type,
       funders,
       proposer,
       status: "pending",
+      durationMonths: /^\d+$/.test(duration) ? Number(duration) : null,
+      recipientTeam,
+      recipientUrl,
+      topup,
+      milestoneReviewer,
     });
-    return c.json({ slug: rfp.slug, status: rfp.status }, 201);
+    for (const b of backers) {
+      if (!b.org) continue;
+      await db.pledges.add(rfp.id, {
+        company: b.org,
+        amountUsd: b.amountUsd,
+        status: "pledged",
+        note: "",
+        url: b.url,
+        logoCid: b.logoCid,
+      });
+    }
+    return c.json({ slug: rfp.slug, status: rfp.status, warnings: findings.warnings }, 201);
   });
 
   return r;

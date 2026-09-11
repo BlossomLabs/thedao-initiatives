@@ -72,11 +72,19 @@ Deno.test("rfps: content upsert never touches lifecycle or money", async () => {
     title: "T",
     summary: "s",
     details: "d",
+    sections: {},
+    milestones: [],
+    links: [],
     goalUsd: 100,
     discourseUrl: "",
     status: "approved" as const,
     sortRank: null,
     type: "rfp" as const,
+    durationMonths: null,
+    recipientTeam: "",
+    recipientUrl: "",
+    topup: false,
+    milestoneReviewer: "",
   };
   assertEquals(await db.rfps.upsertContent("my-slug", f), "created");
   const r = (await db.rfps.bySlug("my-slug"))!;
@@ -101,6 +109,79 @@ Deno.test("rfps: content upsert never touches lifecycle or money", async () => {
   kv.close();
 });
 
+Deno.test("rfps: revise ignores reordered or trimmed structured text, refuses details+sections", async () => {
+  const { kv, db } = await fresh();
+  const ms = (name: string, amount: number, criteria: string[]) => ({
+    name,
+    amount,
+    adoption: false,
+    done: false,
+    link: "",
+    month: "",
+    criteria,
+  });
+  const origin = { author: "0xabc", source: "proposer" as const };
+  const r = await db.rfps.insert({
+    title: "Structured from birth",
+    summary: "s",
+    details: "",
+    sections: { why: "Because.", in_scope: "Things." },
+    milestones: [ms("One", 100, ["Merged."])],
+    links: ["https://a.example/"],
+  });
+  assertEquals((await db.revisions.get(r.id, 1))!.sections, {
+    why: "Because.",
+    in_scope: "Things.",
+  });
+  // Same content, keys in another order, an empty key added: no revision.
+  const same = await db.rfps.revise(r.id, {
+    title: "Structured from birth",
+    summary: "s",
+    details: "",
+    sections: { in_scope: "Things.", why: "Because.", out_scope: "" },
+    milestones: [ms("One", 100, ["Merged."])],
+    links: ["https://a.example/"],
+  }, origin);
+  assertEquals(same.revision, null);
+  assertEquals((await db.rfps.get(r.id))!.revision, 1);
+  // A real change is revision 2 and carries the structured fields.
+  const changed = await db.rfps.revise(r.id, {
+    title: "Structured from birth",
+    summary: "s",
+    details: "",
+    sections: { why: "Because!", in_scope: "Things." },
+    milestones: [ms("One", 100, ["Merged."])],
+    links: [],
+  }, origin);
+  assertEquals(changed.revision!.n, 2);
+  assertEquals(changed.revision!.links, []);
+  assertEquals((await db.rfps.get(r.id))!.sections.why, "Because!");
+  // Structured XOR details.
+  await assertRejects(
+    () =>
+      db.rfps.revise(r.id, {
+        title: "Structured from birth",
+        summary: "s",
+        details: "legacy text",
+        sections: { why: "Because!" },
+        milestones: [],
+        links: [],
+      }, origin),
+    Error,
+    "structured rows carry no details",
+  );
+  // A legacy caller (no structured fields) on a legacy row is unchanged.
+  const legacy = await db.rfps.insert({ title: "Legacy row here", details: "d" });
+  const l2 = await db.rfps.revise(legacy.id, {
+    title: "Legacy row here",
+    summary: "",
+    details: "d2",
+  }, origin);
+  assertEquals(l2.revision!.n, 2);
+  assertEquals(l2.rfp.sections, {});
+  kv.close();
+});
+
 Deno.test("donations: one tx credits two initiatives, idempotent, pending->confirmed", async () => {
   const { kv, db } = await fresh();
   const a = await db.rfps.insert({ title: "First one here" });
@@ -113,10 +194,10 @@ Deno.test("donations: one tx credits two initiatives, idempotent, pending->confi
   assertEquals(s3, "already-confirmed");
   assertEquals((await db.fundingSummary(a.id)).donated, 50);
   assertEquals((await db.fundingSummary(b.id)).donated, 20);
-  assertEquals(
-    (await db.donations.byHash(tx.toUpperCase().replace("0X", "0x")))?.amountUsd,
-    50,
-  );
+  // byHash returns a row for the tx, case-insensitively; which of the two
+  // initiatives comes first depends on ULID order within the same millisecond.
+  const found = await db.donations.byHash(tx.toUpperCase().replace("0X", "0x"));
+  assert(found && [50, 20].includes(found.amountUsd));
 
   const tx2 = "0x" + "cd".repeat(32);
   const [, p] = await db.donations.record(

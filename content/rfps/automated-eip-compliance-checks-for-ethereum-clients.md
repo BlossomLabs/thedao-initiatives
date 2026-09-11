@@ -30,15 +30,14 @@ In the interest of full transparency:
 
 - This grant was drafted from a proposal by Safi El-Hassanine, the author of PRSpec, and Safi is the recipient. The head start is the tool itself: PRSpec already covers four execution clients across 10 EIPs, and milestone 1 is about 80% complete. The milestone 1 payment covers finishing and hardening it, and the grant agreement may treat part of it as the advance on signing.
 
-## Existing work
+## Why a grant: what already exists
 
 - [PRSpec](https://github.com/Fosurero/PRSpec): LLM-based differential analysis of EIP specs against client source; currently covers go-ethereum, Nethermind, Besu, and Reth across 10 EIPs, with 149 passing tests
 - [execution-spec-tests (archived)](https://github.com/ethereum/execution-spec-tests) and [ethereum/tests](https://github.com/ethereum/tests): the conformance test suites client teams already run; PRSpec complements these, it does not replace them
 - [execution-specs (live repo)](https://github.com/ethereum/execution-specs): the executable Python spec whose fork-to-fork diffs PRSpec builds on
 
-## Scope
+## In scope
 
-**In scope**
 
 - Production packaging of the PRSpec CLI and Docker image for local, self-hosted deployment
 - Integration documentation good enough that a client-team engineer can go from clean checkout to a first run without talking to the author
@@ -46,14 +45,14 @@ In the interest of full transparency:
 - A documented triage workflow: finding severity, false-positive tracking, and how a team silences a known-noisy check
 - Clear documentation of LLM inference options and costs (local models vs. API keys), since each team runs the tool on its own infrastructure
 
-**Out of scope**
+## Out of scope
 
 - Guaranteeing spec compliance. PRSpec is an LLM-assisted review layer that flags likely mismatches for human review.
 - Replacing or duplicating execution-spec-tests or ethereum/tests
 - Consensus-layer clients (execution layer only, matching PRSpec's current coverage)
 - Perpetual maintenance beyond the grant period; the maintenance plan (hard requirement) covers how new EIPs and forks get added, but ongoing operation is each client team's choice
 
-## Hard requirements
+## Commitments
 
 1. **Open source.** All code and documentation under an OSI-approved license, with no closed-source dependencies required to run the tool.
 2. **Self-hosted by default.** Client teams run the tool entirely in their own environment; no client source code leaves their infrastructure unless they choose an external LLM API and that choice is documented. Support for local, open-weight models is explicitly highlighted to guarantee zero code leakage.
@@ -82,13 +81,13 @@ In the interest of full transparency:
 - [ ] Published triage/false-positive report covering at least one month of automated runs
 - [ ] Integration bugs and automation fixes from live operation merged and released
 
-### 4 - Multi-client adoption - $4,000
+### 4 - Multi-client adoption - $4,000 (adoption)
 
 - [ ] At least one additional major execution-layer client team running PRSpec as a recurring pre-release check, publicly confirmed by that team (any of the major clients: Nethermind, Geth, Besu, or Reth)
 - [ ] A public adoption page listing which clients run PRSpec, which EIPs are covered, and links to each public confirmation
 - [ ] At least one new EIP or fork added to coverage during the grant, demonstrating the extension process end to end
 - [ ] Published maintenance plan and a recorded walkthrough or workshop for client teams to reference
 
-### 5 - Majority client adoption - $6,000
+### 5 - Majority client adoption - $6,000 (adoption)
 
 - [ ] At least three execution-layer client teams running PRSpec as a recurring pre-release check, publicly confirmed by those teams (must include Nethermind and Geth)

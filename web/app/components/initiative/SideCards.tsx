@@ -2,9 +2,11 @@ import { MessageSquare, PencilLine, Settings2 } from "lucide-react";
 import DonateWidget from "~/components/donate/DonateWidget";
 import { LinkButton } from "~/components/ui/Button";
 import RevisionPanel, { type ViewMode } from "~/components/initiative/RevisionBar";
+import KeyFacts from "~/components/initiative/KeyFacts";
 import { useSession } from "~/context/session";
 import type { InitiativePage } from "~/lib/api-types";
 import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
+import { WHAT_NEXT } from "~/data/what-next";
 
 export default function SideCards(
   { page, safeThreshold, onDonated, revisions }: {
@@ -44,6 +46,7 @@ export default function SideCards(
             </p>
           )}
       </div>
+      <KeyFacts r={r} summary={page.summary} />
       {r.discourseUrl && (
         <div className="panel border-[rgba(90,200,250,.35)]">
           <span className="k">Join the discussion</span>
@@ -68,20 +71,16 @@ export default function SideCards(
       </div>
       <div className="panel">
         <span className="k">What happens next</span>
-        <p className="m-0 small dim">
-          If backers and donors fully fund this initiative, it happens with no TheDAO money at all.
-          If it comes up short, the 200 ETHSecurity badge holders rank it against the other
-          initiatives in the October round and TheDAO Security Fund completes the top-ranked ones.
-          Donations count as a public signal in that ranking.
-        </p>
+        <p className="m-0 small dim">{WHAT_NEXT[r.type]}</p>
       </div>
       {revisions && <RevisionPanel slug={r.slug} revisions={page.revisions} {...revisions} />}
       {mine && editable && (
         <div className="panel border-[rgba(90,200,250,.35)]">
           <span className="k">Your initiative</span>
           <p className="m-0 mb-2 small dim">
-            You proposed this initiative. Edits to the title, summary and details go live at once,
-            and every version stays in the history.
+            {r.status === "pending"
+              ? "You proposed this initiative. While it waits for review you can change everything here; every version stays in the history."
+              : "You proposed this initiative. Edits to the text, milestones and links go live at once and every version stays in the history; the money facts are locked."}
           </p>
           <LinkButton variant="ghost" className="mt-1 w-full" to={`/initiative/${r.slug}/edit`}>
             <PencilLine className="size-[15px]" />Edit initiative

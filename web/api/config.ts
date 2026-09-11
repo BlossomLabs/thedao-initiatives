@@ -39,6 +39,8 @@ export const DEFAULT_RPC_ENDPOINTS = [
 
 export const SUBMISSIONS_PER_HOUR_PER_IP = 5;
 export const REVISIONS_PER_HOUR_PER_ADDRESS = 20;
+/** Backer logos pinned before a submission (POST /api/uploads/logo). */
+export const LOGO_UPLOADS_PER_HOUR_PER_ADDRESS = 12;
 export const LOGIN_ATTEMPTS_PER_MINUTE_PER_IP = 5;
 export const LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL = 60;
 
@@ -80,6 +82,8 @@ export const MAX_TITLE = 140;
 export const MAX_SUMMARY = 4000;
 export const MAX_FUNDERS = 4000;
 export const MAX_DETAILS = 20000;
+/** Backer logo (admin pledges and the pre-submit upload). */
+export const LOGO_MAX_BYTES = 1024 * 1024;
 export const AI_QUERY_MAX_CHARS = 300;
 export const AI_DAILY_CALL_CAP = 500;
 export const SESSION_TTL_SECS = 7 * 86400;

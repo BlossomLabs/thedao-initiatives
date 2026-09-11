@@ -10,6 +10,7 @@ import {
   SAFE_ADDR,
 } from "./app-helpers.ts";
 import { transferLog, wallet } from "./helpers.ts";
+import { grantBody, minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
 import { TOKENS } from "../config.ts";
 import { TOPIC_PROXY_CREATION } from "../chain/safe.ts";
 import { SAFE_PROXY_FACTORY } from "../config.ts";
@@ -25,13 +26,13 @@ async function seedApproved(h: Awaited<ReturnType<typeof harness>>, safe = SAFE_
     token: admin,
     json: { files },
   });
-  assertEquals(res.status, 200);
+  assertEquals(await j(res), { created: 5, updated: 0, errors: [] });
   const first = (await h.db.rfps.list(["approved"]))[0];
   if (safe) await h.db.rfps.update(first.id, { safeAddress: safe });
   return { admin, first: (await h.db.rfps.get(first.id))! };
 }
 
-Deno.test("content sync publishes the repo files; public JSON never leaks private fields", async () => {
+Deno.test("content sync publishes the repo files as structured rows; public JSON never leaks private fields", async () => {
   const h = await harness();
   const { admin, first } = await seedApproved(h);
   await h.db.rfps.update(first.id, {
@@ -47,17 +48,34 @@ Deno.test("content sync publishes the repo files; public JSON never leaks privat
   assertEquals(bySlug["privacy-preserving-edr"].type, "grant");
   assertEquals(bySlug["privacy-preserving-edr"].goalUsd, 300000);
   assertEquals(bySlug["end-to-end-formally-verified-vyper-compiler"].goalUsd, 600000);
+  // every file split cleanly into the guide's sections and milestones
+  for (const c of cards) {
+    assertEquals(c.initiative.details, "");
+    assertEquals(c.initiative.structured, true);
+    assert((c.initiative.milestones as unknown[]).length > 0);
+  }
+  const ethdebug = (await h.db.rfps.bySlug(
+    "source-level-debugging-for-solidity-ethdebug-in-solc",
+  ))!;
+  assertEquals(ethdebug.topup, true);
+  const delivered = ethdebug.milestones.find((m) => m.done)!;
+  assert(delivered.link.startsWith("https://"));
   const boardText = JSON.stringify(board);
   assertFalse(boardText.includes("SECRET"));
   assertFalse(boardText.includes("funders"));
   assertFalse(boardText.includes("contact"));
   const page = await j(await h.req("/api/initiatives/" + first.slug));
   assertFalse(JSON.stringify(page).includes("SECRET"));
-  assert(
-    String((page.initiative as { details: string }).details).includes(
-      "## Why this matters",
-    ),
-  );
+  const init = page.initiative as {
+    details: string;
+    structured: boolean;
+    sections: Record<string, string>;
+    milestones: { amount: number }[];
+  };
+  assertEquals(init.details, "");
+  assert(init.structured);
+  assert(init.sections.why);
+  assert(init.milestones.length > 0);
   const adminView = await j(
     await h.req("/api/admin/initiatives/" + first.id, { token: admin }),
   );
@@ -75,6 +93,9 @@ Deno.test("content sync publishes the repo files; public JSON never leaks privat
     }),
   );
   assertEquals(again, { created: 0, updated: 5, errors: [] });
+  for (const r of await h.db.rfps.list(["approved", "pending", "archived"])) {
+    assertEquals((await h.db.revisions.list(r.id)).length, 1); // unchanged: no new revision
+  }
   assertEquals((await h.db.rfps.get(first.id))!.status, "archived");
   assertEquals((await h.db.rfps.get(first.id))!.safeAddress, SAFE_ADDR);
   const bad = await j(
@@ -85,6 +106,24 @@ Deno.test("content sync publishes the repo files; public JSON never leaks privat
     }),
   );
   assertEquals((bad.errors as string[]).length, 1);
+  // A file that does not split cleanly is refused, the error says what is
+  // missing, and no row is written for it.
+  const broken = syntheticContentFiles()[0];
+  const noScope = await j(
+    await h.req("/api/admin/sync-content", {
+      method: "POST",
+      token: admin,
+      json: {
+        files: [{
+          name: "broken.md",
+          text: broken.text.replace("## Out of scope\n\nOther things.\n", ""),
+        }],
+      },
+    }),
+  ) as { created: number; errors: string[] };
+  assertEquals(noScope.created, 0);
+  assertEquals(noScope.errors, ["broken.md: not structured: missing: Out of scope"]);
+  assertEquals(await h.db.rfps.bySlug("broken"), null);
   h.close();
 });
 
@@ -125,12 +164,7 @@ Deno.test("submit: needs a signed-in wallet with a display name; records the pro
         ? new Response("", { status: 404 })
         : new Response("", { status: 404 }),
   });
-  const good = {
-    title: "A proper initiative title",
-    summary: "This summary is comfortably longer than the forty character minimum required.",
-    goal: "25,000",
-    funders: "Some L2 and a wallet company",
-  };
+  const good = minimalSubmission(25000);
   assertEquals((await h.req("/api/initiatives", { method: "POST", json: good })).status, 401);
   const nameless = await h.mint(PLAIN);
   const noName = await h.req("/api/initiatives", { method: "POST", token: nameless, json: good });
@@ -157,14 +191,7 @@ Deno.test("submit: needs a signed-in wallet with a display name; records the pro
 Deno.test("submit: validation, honeypot, rate limit, pending never on board", async () => {
   const h = await harness();
   const token = await proposerToken(h);
-  const good = {
-    title: "A proper initiative title",
-    summary: "This summary is comfortably longer than the forty character minimum required.",
-    goal: "25,000",
-    funders: "Some L2 and a wallet company",
-    type: "grant",
-    contact: "me@example.com",
-  };
+  const good = minimalSubmission(25000);
   assertEquals(
     (await h.req("/api/initiatives", {
       method: "POST",
@@ -542,13 +569,7 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     await h.req("/api/initiatives", {
       method: "POST",
       token: await proposerToken(h),
-      json: {
-        title: "A proper initiative title",
-        summary: "x".repeat(50),
-        goal: 1000,
-        funders: "someone somewhere",
-        contact: "c@x.y",
-      },
+      json: minimalSubmission(1000),
     }),
   ) as { slug: string };
   const id = (await h.db.rfps.bySlug(sub.slug))!.id;
@@ -759,7 +780,7 @@ Deno.test("submit: blank title is read from the Discourse topic; forum errors ar
       return new Response("", { status: 404 });
     },
   });
-  const good = { summary: "x".repeat(50), goal: 1000, funders: "someone somewhere" };
+  const { title: _noTitle, ...good } = minimalSubmission(1000);
   const token = await proposerToken(h);
   const res = await h.req("/api/initiatives", {
     method: "POST",
@@ -802,5 +823,96 @@ Deno.test("submit: blank title is read from the Discourse topic; forum errors ar
   }[])[0];
   assert(card.onramp.prefilled);
   assertStringIncludes(card.onramp.url, "walletAddress=" + SAFE_ADDR);
+  h.close();
+});
+
+Deno.test("page facts: content keys sync, admin patch validates and clears per type", async () => {
+  const h = await harness();
+  const { admin } = await seedApproved(h);
+  const board = await j(await h.req("/api/board"));
+  const bySlug = Object.fromEntries(
+    (board.cards as { initiative: Record<string, unknown> }[]).map((
+      c,
+    ) => [c.initiative.slug as string, c.initiative]),
+  );
+  // content/rfps front matter: duration on most files, topup + reviewer on ethdebug
+  assertEquals(bySlug["end-to-end-formally-verified-vyper-compiler"].durationMonths, 12);
+  assertEquals(bySlug["end-to-end-formally-verified-vyper-compiler"].topup, false);
+  const ethdebug = bySlug["source-level-debugging-for-solidity-ethdebug-in-solc"];
+  assertEquals(ethdebug.topup, true);
+  assertEquals(ethdebug.durationMonths, null);
+  assertStringIncludes(String(ethdebug.milestoneReviewer), "Nicholas");
+  const rows = ethdebug.milestones as { done: boolean; link: string; month: string }[];
+  assert(rows.some((m) => m.done && m.link.startsWith("https://")));
+  assert(rows.some((m) => !m.done && /^\d{4}-\d{2}$/.test(m.month)));
+  // web-only keys, and topup on an RFP is an error
+  const sync = await j(
+    await h.req("/api/admin/sync-content", {
+      method: "POST",
+      token: admin,
+      json: {
+        files: [
+          {
+            name: "grant-x.md",
+            text: "---\ntitle: Grant X\ngoal: 100\ntype: grant\nduration: 3\n" +
+              "recipient: Team X\nrecipient_url: https://x.example/team#top\n---\n" +
+              grantBody(100),
+          },
+          {
+            name: "bad-topup.md",
+            text: "---\ntitle: Bad\ngoal: 100\ntopup: true\n---\nbody",
+          },
+          {
+            name: "bad-url.md",
+            text: "---\ntitle: Bad\ngoal: 100\ntype: grant\nrecipient: T\n" +
+              "recipient_url: javascript:alert(1)\n---\nbody",
+          },
+        ],
+      },
+    }),
+  );
+  assertEquals(sync.created, 1);
+  assertEquals((sync.errors as string[]).length, 2);
+  const gx = (await h.db.rfps.bySlug("grant-x"))!;
+  assertEquals(gx.durationMonths, 3);
+  assertEquals(gx.recipientTeam, "Team X");
+  assertEquals(gx.recipientUrl, "https://x.example/team#top");
+
+  const patch = (json: Record<string, unknown>) =>
+    h.req("/api/admin/initiatives/" + gx.id, { method: "PATCH", token: admin, json });
+  const p1 = await j(
+    await patch({ topup: true, milestoneReviewer: "Rev", durationMonths: "" }),
+  ) as { initiative: Record<string, unknown> };
+  assertEquals(p1.initiative.topup, true);
+  assertEquals(p1.initiative.milestoneReviewer, "Rev");
+  assertEquals(p1.initiative.durationMonths, null);
+  assertEquals((await patch({ durationMonths: "1.5" })).status, 400);
+  assertEquals((await patch({ durationMonths: "500" })).status, 400);
+  assertEquals((await patch({ recipientUrl: "http://x.example/" })).status, 400);
+  assertEquals((await patch({ recipientUrl: "javascript:alert(1)" })).status, 400);
+  // dropping the top-up flag clears the reviewer; switching to RFP clears the grant fields
+  const p2 = await j(await patch({ topup: false })) as { initiative: Record<string, unknown> };
+  assertEquals(p2.initiative.milestoneReviewer, "");
+  const p3 = await j(await patch({ type: "rfp" })) as {
+    initiative: Record<string, unknown>;
+    findings: { errors: { field: string }[] };
+  };
+  assertEquals(p3.initiative.recipientTeam, "");
+  assertEquals(p3.initiative.recipientUrl, "");
+  assertEquals(p3.initiative.topup, false);
+  // the structured body is re-cut for the new type: grant-only sections go,
+  // and the RFP sections it now lacks come back as non-blocking findings
+  assertEquals(Object.keys(p3.initiative.sections as object).sort(), [
+    "in_scope",
+    "out_scope",
+    "why",
+  ]);
+  assert(p3.findings.errors.some((e) => e.field === "hard_req"));
+  // the public page carries the facts and nothing private
+  const page = await j(await h.req("/api/initiatives/grant-x")) as {
+    initiative: Record<string, unknown>;
+  };
+  assertEquals(page.initiative.durationMonths, null);
+  assert("topup" in page.initiative);
   h.close();
 });

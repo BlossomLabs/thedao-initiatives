@@ -2,15 +2,41 @@ import { collect, K } from "./keys.ts";
 import type { Revision, RevisionSource, Rfp, RfpStatus } from "./types.ts";
 import { newId } from "../lib/ids.ts";
 import { slugify } from "../lib/slug.ts";
+import { isStructured, sameStructured } from "../../shared/draft/mod.ts";
 
 export type RfpInput = Partial<Omit<Rfp, "id" | "createdAt" | "revision">> & { title: string };
 
-/** The three public text fields: the only thing a revision holds. */
-export type RfpText = Pick<Rfp, "title" | "summary" | "details">;
+/** The public text fields: the only thing a revision holds. `details` is the
+ * legacy markdown body; a structured row has sections/milestones/links and
+ * `details: ""`. */
+export type RfpText = Pick<
+  Rfp,
+  "title" | "summary" | "details" | "sections" | "milestones" | "links"
+>;
 export type RevisionOrigin = { author: string; source: RevisionSource };
+/** What `revise` accepts: the legacy trio always, the structured fields
+ * defaulting to empty (a legacy caller keeps writing legacy rows). */
+export type RfpTextInput = Pick<RfpText, "title" | "summary" | "details"> & Partial<RfpText>;
 
-const sameText = (a: RfpText, b: RfpText) =>
-  a.title === b.title && a.summary === b.summary && a.details === b.details;
+/** The text fields of a record (row, revision or input), with defaults for
+ * rows written before the structured body existed. */
+export function pickText(r: Partial<RfpText>): RfpText {
+  return {
+    title: r.title ?? "",
+    summary: r.summary ?? "",
+    details: r.details ?? "",
+    sections: r.sections ?? {},
+    milestones: r.milestones ?? [],
+    links: r.links ?? [],
+  };
+}
+
+export const sameText = (a: Partial<RfpText>, b: Partial<RfpText>): boolean => {
+  const x = pickText(a);
+  const y = pickText(b);
+  return x.title === y.title && x.summary === y.summary && x.details === y.details &&
+    sameStructured(x, y);
+};
 
 export function rfpsRepo(kv: Deno.Kv, now: () => number) {
   const get = async (id: string): Promise<Rfp | null> => (await kv.get<Rfp>(K.rfp(id))).value;
@@ -34,9 +60,7 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
   ): Revision => ({
     rfpId: rfp.id,
     n,
-    title: text.title,
-    summary: text.summary,
-    details: text.details,
+    ...pickText(text),
     author: origin.author,
     source: origin.source,
     archived: false,
@@ -65,9 +89,7 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
       const rfp: Rfp = {
         id: newId(),
         slug: s,
-        title: fields.title,
-        summary: fields.summary ?? "",
-        details: fields.details ?? "",
+        ...pickText(fields),
         discourseUrl: fields.discourseUrl ?? "",
         goalUsd: fields.goalUsd ?? 0,
         contact: fields.contact ?? "",
@@ -77,6 +99,11 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
         type: fields.type ?? "rfp",
         sortRank: fields.sortRank ?? null,
         safeAddress: fields.safeAddress ?? "",
+        durationMonths: fields.durationMonths ?? null,
+        recipientTeam: fields.recipientTeam ?? "",
+        recipientUrl: fields.recipientUrl ?? "",
+        topup: fields.topup ?? false,
+        milestoneReviewer: fields.milestoneReviewer ?? "",
         revision: 1,
         createdAt: t,
         approvedAt: fields.approvedAt ?? (status === "approved" ? t : null),
@@ -110,6 +137,11 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
     "type",
     "funders",
     "proposer",
+    "durationMonths",
+    "recipientTeam",
+    "recipientUrl",
+    "topup",
+    "milestoneReviewer",
   ]);
 
   /** Patch allowed fields; keeps the Safe index in step. */
@@ -148,11 +180,12 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
    */
   async function revise(
     id: string,
-    input: RfpText,
+    input: RfpTextInput,
     origin: RevisionOrigin,
   ): Promise<{ rfp: Rfp; revision: Revision | null }> {
-    // Only the three fields, whatever else the caller's record carries.
-    const text: RfpText = { title: input.title, summary: input.summary, details: input.details };
+    // Only the text fields, whatever else the caller's record carries.
+    const text = pickText(input);
+    if (text.details && isStructured(text)) throw new Error("structured rows carry no details");
     for (let i = 0; i < 5; i++) {
       const cur = await kv.get<Rfp>(K.rfp(id));
       if (!cur.value) throw new Error("rfp not found");
@@ -191,11 +224,19 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
       title: string;
       summary: string;
       details: string;
+      sections?: Rfp["sections"];
+      milestones?: Rfp["milestones"];
+      links?: Rfp["links"];
       goalUsd: number;
       discourseUrl: string;
       status: RfpStatus;
       sortRank: number | null;
       type: Rfp["type"];
+      durationMonths: number | null;
+      recipientTeam: string;
+      recipientUrl: string;
+      topup: boolean;
+      milestoneReviewer: string;
     },
   ): Promise<"created" | "updated"> {
     const origin: RevisionOrigin = { author: "", source: "content" };
@@ -205,6 +246,11 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
         goalUsd: f.goalUsd,
         discourseUrl: f.discourseUrl,
         type: f.type,
+        durationMonths: f.durationMonths,
+        recipientTeam: f.recipientTeam,
+        recipientUrl: f.recipientUrl,
+        topup: f.topup,
+        milestoneReviewer: f.milestoneReviewer,
       };
       if (f.sortRank !== null) patch.sortRank = f.sortRank;
       await update(existing.id, patch);

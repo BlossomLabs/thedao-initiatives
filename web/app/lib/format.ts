@@ -30,3 +30,14 @@ export const pctText = (p: number): string => `${p.toFixed(1)}%`;
 export const truncate = (s: string, n: number): string => (s.length > n ? s.slice(0, n) + "…" : s);
 
 export const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** "2026-11" → "Nov 2026" (a milestone's target month); anything else unchanged. */
+export function monthLabel(month: string): string {
+  const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(String(month ?? "").trim());
+  if (!m) return month;
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1)).toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}

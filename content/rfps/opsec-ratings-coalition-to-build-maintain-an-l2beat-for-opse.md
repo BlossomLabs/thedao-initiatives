@@ -52,9 +52,8 @@ Ideally the coordinator is not an OPSEC auditing firm, because whoever holds the
 
 - [Security Frameworks by SEAL](https://frameworks.securityalliance.org/): the Security Alliance's open framework covering operational security, infrastructure, DevOps, incident response and more. Bidders should read it before proposing a scoring template.
 
-## Scope
+## In scope
 
-**In scope**
 
 - Coordinating at least 6 OPSEC auditing companies to agree on one scoring template and the A / AA / AAA tier definitions
 - Onboarding those firms as the first accredited raters, with whatever materials they need to run the template inside their existing audit flow
@@ -63,7 +62,7 @@ Ideally the coordinator is not an OPSEC auditing firm, because whoever holds the
 - The 12-month rating cycle with the six-month check-in and the event-based suspension process
 - The handoff: transferring the standard, the board and the name to the membership body
 
-**Out of scope**
+## Out of scope
 
 - Performing the underlying OPSEC audits (the accredited firms do that)
 - Publishing any team's specific weaknesses, unmet controls, or the reasons behind a tier
@@ -95,7 +94,7 @@ Ideally the coordinator is not an OPSEC auditing firm, because whoever holds the
 - [ ] At least 6 accredited firms have issued ratings inside their normal audit flow, each listed on the public board
 - [ ] At least 5 teams rated end to end, with their fees paid through the membership body's pool
 
-### C - Adoption evidence - $75,000
+### C - Adoption evidence - $75,000 (adoption)
 
 - [ ] At least 20 teams publicly rated on the board by accredited firms
 - [ ] The six-month check-in running: every rating older than six months shows a check-in date on the board, and the event-based suspension process is live with a public change log

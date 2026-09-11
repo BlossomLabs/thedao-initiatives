@@ -13,6 +13,10 @@ import FundingHead from "~/components/initiative/FundingHead";
 import Backers from "~/components/initiative/Backers";
 import DonationsTable from "~/components/initiative/DonationsTable";
 import SideCards from "~/components/initiative/SideCards";
+import RulesPanel from "~/components/initiative/RulesPanel";
+import Sections from "~/components/initiative/Sections";
+import Milestones from "~/components/initiative/Milestones";
+import Links from "~/components/initiative/Links";
 import { DiffBlock, type ViewMode } from "~/components/initiative/RevisionBar";
 import CommentsSection from "~/components/comments/CommentsSection";
 import Identity from "~/components/wallet/Identity";
@@ -24,7 +28,9 @@ import { diffRevisions } from "~/lib/revision-diff";
 import type { RevisionText } from "~/lib/api-types";
 import { SITE_NAME } from "~/data/site";
 import { dt } from "~/lib/format";
+import { httpsHref } from "~/lib/utils";
 import { generateMeta } from "~/utils/meta";
+import { isStructured } from "@shared/draft/mod";
 
 export function meta() {
   return generateMeta({ title: "Initiative" });
@@ -72,8 +78,11 @@ export default function Initiative() {
   const showingOld = viewing !== current && Boolean(older.data);
   const text: RevisionText = showingOld ? older.data! : r;
   const diff = mode === "changes" && (prev.data || !prevMeta)
-    ? diffRevisions(prev.data ?? null, text)
+    ? diffRevisions(prev.data ?? null, text, r.type)
     : null;
+  // Structured rows render their sections, milestones and links; a legacy
+  // revision (or one side of a diff) still shows the details blob.
+  const structured = isStructured(text) || Boolean(diff?.structured);
   const showBar = revisions.length > 1 || viewing !== current;
   return (
     <PageMain detail>
@@ -93,6 +102,22 @@ export default function Initiative() {
           </a>
         )}
         <TypeBadge type={r.type} inline />
+        {r.type === "grant" && r.topup && (
+          <span className="chip chip-badge" title="Work already under way with another funder">
+            top-up, work under way
+          </span>
+        )}
+        {r.type === "grant" && r.recipientTeam && (
+          <span className="chip chip-badge">
+            to {httpsHref(r.recipientUrl)
+              ? (
+                <a href={httpsHref(r.recipientUrl)} target="_blank" rel="noopener noreferrer">
+                  {r.recipientTeam}
+                </a>
+              )
+              : r.recipientTeam}
+          </span>
+        )}
         {r.status === "archived" && <span className="chip chip-badge st-archived">archived</span>}
         {r.status === "pending" && (
           <span
@@ -125,44 +150,64 @@ export default function Initiative() {
             pct={page.pct}
             funded={page.funded}
           />
+          {!isPlaceholderData && <Backers pledges={page.pledges} />}
           <SectionHeading>Summary</SectionHeading>
           {diff
             ? <DiffBlock chunks={diff.summary} className="diff-body" />
             : <p className="md m-0 whitespace-pre-line">{text.summary}</p>}
-          <SectionHeading>Full initiative details</SectionHeading>
-          {diff
-            ? (diff.details.length
-              ? <DiffBlock chunks={diff.details} className="mono text-[13px]" />
-              : <p className="text-muted">No details in either revision.</p>)
-            : text.details
-            ? <Markdown text={text.details} />
-            : (
-              <p className="text-muted">
-                The complete spec (scope, milestones, budget breakdown) is being written.
-                {r.discourseUrl && (
-                  <>
-                    Follow and shape it{" "}
-                    <a href={r.discourseUrl} target="_blank" rel="noopener">on the forum thread</a>.
-                  </>
-                )}
-              </p>
-            )}
-          <CommentsSection slug={r.slug} open={r.status === "approved"} />
-          {isPlaceholderData
+          {structured
             ? (
               <>
-                <SectionHeading>Backers</SectionHeading>
-                <Skeleton className="h-11 w-64" />
-                <SectionHeading>On-chain donations</SectionHeading>
-                <Skeleton className="h-11" />
+                <Sections type={r.type} sections={text.sections ?? {}} diff={diff} />
+                <Milestones
+                  type={r.type}
+                  topup={r.type === "grant" && r.topup}
+                  milestones={text.milestones ?? []}
+                  diff={diff}
+                />
+                <Links links={text.links ?? []} diff={diff} />
+                {diff && diff.details.length > 0 && (
+                  <>
+                    <SectionHeading>Full initiative details</SectionHeading>
+                    <DiffBlock chunks={diff.details} className="mono text-[13px]" />
+                  </>
+                )}
               </>
             )
             : (
               <>
-                <Backers pledges={page.pledges} />
-                <DonationsTable donations={page.donations} />
+                <SectionHeading>Full initiative details</SectionHeading>
+                {diff
+                  ? (diff.details.length
+                    ? <DiffBlock chunks={diff.details} className="mono text-[13px]" />
+                    : <p className="text-muted">No details in either revision.</p>)
+                  : text.details
+                  ? <Markdown text={text.details} />
+                  : (
+                    <p className="text-muted">
+                      The complete spec (scope, milestones, budget breakdown) is being written.
+                      {r.discourseUrl && (
+                        <>
+                          Follow and shape it{" "}
+                          <a href={r.discourseUrl} target="_blank" rel="noopener">
+                            on the forum thread
+                          </a>.
+                        </>
+                      )}
+                    </p>
+                  )}
               </>
             )}
+          <RulesPanel r={r} />
+          <CommentsSection slug={r.slug} open={r.status === "approved"} />
+          {isPlaceholderData
+            ? (
+              <>
+                <SectionHeading>On-chain donations</SectionHeading>
+                <Skeleton className="h-11" />
+              </>
+            )
+            : <DonationsTable donations={page.donations} />}
           {r.proposer && (
             <p className="mt-7 flex flex-wrap items-center gap-2 border-t border-white/[.08] pt-4 text-[13.5px] text-muted">
               Proposed by <Identity address={r.proposer} size={20} />

@@ -21,14 +21,13 @@ This grant funds an EDR that crypto teams will actually adopt: user-space, self-
 
 This is a grant, and Auditware is the recipient. Full transparency on why: the concept was developed with them, they already built an internal user-space EDR prototype on open-source tooling in a few weeks, and they have committed to taking this on. We think they are the right team for it.
 
-## Existing work
+## Why a grant: what already exists
 
 - Auditware's internal user-space EDR prototype, built on open-source endpoint tooling in a few weeks
 - Mature open-source endpoint instrumentation (osquery and similar) to build on
 
-## Scope
+## In scope
 
-**In scope**
 
 - A user-space endpoint agent: self-hostable, no kernel privileges, no mandatory central vendor
 - Telemetry encrypted so nobody can inspect it unless the data provably matches a detection rule
@@ -37,12 +36,12 @@ This is a grant, and Auditware is the recipient. Full transparency on why: the c
 - Configurable and extensible detectors: teams can easily implement and add private custom detectors for their team, or contribute to the open-source set
 - An endorsement path, with an Ethereum security body confirming the agent is safe to install
 
-**Out of scope**
+## Out of scope
 
 - Kernel-level instrumentation. It gives deeper assurance, and it also needs OS-vendor approval and puts attack surface inside the user's kernel. Fine as future work.
 - Replacing enterprise EDR in regulated environments. This is for crypto teams who run nothing today.
 
-## Hard requirements
+## Commitments
 
 1. **Open source.** Agent, detectors and server components under an OSI-approved license, with no closed-source dependency for core function.
 2. **Self-hostable.** A team can run the full stack without handing plaintext telemetry to anyone.
@@ -66,7 +65,7 @@ This is a grant, and Auditware is the recipient. Full transparency on why: the c
 - [ ] The initial Web3 detectors, each with a test showing it fires on the intended behavior and stays quiet otherwise
 - [ ] All code open source, with the public third-party security review published and its findings addressed
 
-### C - Adoption, hardening, and endorsement - $150,000
+### C - Adoption, hardening, and endorsement - $150,000 (adoption)
 
 **Tranche 1: Launch and endorsement - $50,000**
 

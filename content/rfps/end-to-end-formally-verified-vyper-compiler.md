@@ -38,15 +38,14 @@ In the interest of full transparency:
 - We believe the price is fair: published estimates for comparable end-to-end compiler verification run well above this budget.
 - The proposal should show a track record in mechanized verification and spell out the technical approach: proof assistant, relationship to the existing work, frontend strategy, and how users run the verified compiler.
 
-## Existing work
+## Why a grant: what already exists
 
 - **vyper-hol**: executable formal semantics of a large Vyper subset in HOL4, passing the codegen section of the official Vyper test suite, plus in-progress proofs for the Vyper to Venom to bytecode pipeline (GPL-3.0)
 - **Verifereum**: formal EVM semantics in HOL4, validated against the Ethereum Execution Spec Tests
 - Proposers may build on this work or justify an alternative foundation in a mature proof assistant with a small trusted kernel (HOL4, Rocq, Isabelle/HOL, Lean)
 
-## Scope
+## In scope
 
-**In scope**
 
 - Executable formal semantics of Vyper, maintained against current releases. Supported coverage should be full coverage of the Vyper language semantics with any exclusions documented.
 - Machine-checked proofs for the full pipeline: Vyper source to Venom IR to EVM bytecode, including optimization passes and ABI encoding/decoding
@@ -55,13 +54,13 @@ In the interest of full transparency:
 - Gas modeling: the source semantics quantifies over gas rather than fixing a cost model; tying this to the formal EVM gas model through the verified compiler makes concrete bounds (e.g. "this function executes within Y gas") provable about the compiled bytecode
 - Public releases, documentation, and adoption work
 
-**Out of scope**
+## Out of scope
 
 - Correctness of user-written contracts. The proof guarantees the bytecode matches the source; source-level safety remains the author's job.
 - Verification of the Python compiler implementation itself; the expected architecture is a verified compiler bundled with the Python compiler and available as a --verified option
 - Perpetual re-verification after the grant period. That folds into normal compiler maintenance, which this infrastructure makes inexpensive.
 
-## Hard requirements
+## Commitments
 
 1. **Open source.** All code, proofs, and documentation under an OSI-approved license, with no closed-source dependencies.
 2. **Kernel-checked, no gaps.** Headline theorems check with zero admitted/cheated lemmas in their dependency graph, enforced by an automated check in public CI. Milestone payment depends on this check passing.
@@ -100,7 +99,7 @@ In the interest of full transparency:
 - [ ] Full assurance statement published: supported subset (if applicable), exclusions, covered passes, complete trusted computing base, proof assumptions
 - [ ] The verified pipeline demonstrated on at least five representative real-world Vyper contracts, results published
 
-### E - Adoption and ecosystem impact - $200,000
+### E - Adoption and ecosystem impact - $200,000 (adoption)
 
 **Tranche 1: Launch - $75,000**
 

@@ -1,3 +1,5 @@
+import type { Milestone, Sections } from "../../shared/draft/types.ts";
+
 export type RfpStatus = "pending" | "approved" | "rejected" | "archived";
 export type RfpType = "rfp" | "grant";
 
@@ -19,6 +21,24 @@ export interface Rfp {
   type: RfpType;
   sortRank: number | null;
   safeAddress: string;
+  /** Page facts (submission redesign, Sep 2026). Rows written before it lack
+   * them; readers treat a missing value as the default. */
+  /** Whole months from funding to the last milestone; null = not stated. */
+  durationMonths: number | null;
+  /** Grants only: the team the grant goes to, with an optional https link. */
+  recipientTeam: string;
+  recipientUrl: string;
+  /** Grants only: work already under way with another funder. */
+  topup: boolean;
+  /** Top-ups only: who decides whether the remaining milestones pass. */
+  milestoneReviewer: string;
+  /** Structured body (submission redesign, Sep 2026): one answer per section
+   * of the type, milestone rows, links. A structured row stores `details: ""`
+   * (structured XOR details, enforced by `revise`). Rows written before it
+   * lack the keys; readers treat them as `{}` / `[]`. */
+  sections: Sections;
+  milestones: Milestone[];
+  links: string[];
   /** Number of the current (latest) revision; 0 = written before revisions existed. */
   revision: number;
   createdAt: number;
@@ -29,7 +49,8 @@ export interface Rfp {
  * editor, a content file, or the one-off import. */
 export type RevisionSource = "submit" | "proposer" | "admin" | "content" | "import";
 
-/** One version of the three public text fields. Immutable except `archived`. */
+/** One version of the public text (title, summary, and either the legacy
+ * `details` or the structured body). Immutable except `archived`. */
 export interface Revision {
   rfpId: string;
   /** 1-based, dense, increasing. */
@@ -37,6 +58,9 @@ export interface Revision {
   title: string;
   summary: string;
   details: string;
+  sections: Sections;
+  milestones: Milestone[];
+  links: string[];
   /** Wallet address; "" for content files and imports. */
   author: string;
   source: RevisionSource;

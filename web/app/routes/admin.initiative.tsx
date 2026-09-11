@@ -10,19 +10,24 @@ import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
-import { Field, Input, Select, Textarea } from "~/components/ui/Field";
+import { Field, Input, Select } from "~/components/ui/Field";
 import Skeleton from "~/components/ui/Skeleton";
 import Status, { type StatusKind } from "~/components/ui/Status";
 import FundingHead from "~/components/initiative/FundingHead";
+import InitiativeForm from "~/components/initiative-form/InitiativeForm";
+import type { SubmitPayload } from "~/components/initiative-form/types";
+import { fromInitiative } from "~/components/initiative-form/useDraft";
 import Identity from "~/components/wallet/Identity";
 import { api, errorMessage } from "~/lib/api";
 import type {
   AdminInitiative,
   AdminInitiativePage,
+  Findings,
   SafeConfirmResult,
   SafeDeployParams,
   SafeSyncState,
 } from "~/lib/api-types";
+import { LEGACY_NOTE } from "~/lib/edit-initiative";
 import { walletErrorMessage } from "~/lib/donate";
 import { dt, shortAddr, usd } from "~/lib/format";
 
@@ -107,8 +112,12 @@ export default function AdminInitiativeEditor() {
 
           <SectionHeading>Edit initiative</SectionHeading>
           <EditForm
+            key={r.id}
             r={r}
-            onSave={(patch) => run(() => api(base, { method: "PATCH", json: patch }), "Saved.")}
+            onSaved={(text) => {
+              setMsg({ kind: "ok", text });
+              refresh();
+            }}
           />
 
           <SectionHeading count={data.revisions.length}>Revisions</SectionHeading>
@@ -426,122 +435,107 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
   );
 }
 
-function EditForm(
-  { r, onSave }: { r: AdminInitiative; onSave: (patch: Record<string, unknown>) => Promise<void> },
-) {
-  const fromInitiative = () => ({
-    title: r.title,
-    type: r.type,
-    summary: r.summary,
-    details: r.details,
-    discourseUrl: r.discourseUrl,
-    goal: String(r.goalUsd),
+/**
+ * The same form as the submit page, in admin mode: nothing blocks the
+ * button, the server's editorial findings come back as open points. The
+ * admin-only knobs (board pin, owner) ride the same PATCH.
+ */
+function EditForm({ r, onSaved }: { r: AdminInitiative; onSaved: (text: string) => void }) {
+  const extrasOf = () => ({
     sortRank: r.sortRank ? String(r.sortRank) : "",
     proposer: r.proposer,
-    contact: r.contact,
-    funders: r.funders,
   });
-  const [f, setF] = useState(fromInitiative);
-  useEffect(() => setF(fromInitiative()), [r]);
-  const set =
-    (k: keyof typeof f) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      setF((s) => ({ ...s, [k]: e.target.value }));
-  const [busy, setBusy] = useState(false);
+  const [extras, setExtras] = useState(extrasOf);
+  useEffect(() => setExtras(extrasOf()), [r.sortRank, r.proposer]);
+  const [open, setOpen] = useState<Findings | null>(null);
+  const [initial] = useState(() => fromInitiative(r));
+
+  async function onSubmit(payload: SubmitPayload) {
+    const { website: _hp, backers: _bk, ...fields } = payload;
+    const body = { ...fields, sortRank: extras.sortRank, proposer: extras.proposer };
+    const res = await api<{ initiative: AdminInitiative; findings: Findings }>(
+      `/api/admin/initiatives/${r.id}`,
+      { method: "PATCH", json: body },
+    );
+    const points = res.findings.errors.length || res.findings.warnings.length ? res.findings : null;
+    setOpen(points);
+    onSaved("Saved.");
+    return points;
+  }
+
   return (
-    <form
-      className="panel flex flex-col"
-      onSubmit={(e) => {
-        e.preventDefault();
-        setBusy(true);
-        onSave(f).finally(() => setBusy(false));
-      }}
-    >
-      <Field label="Title" htmlFor="e-title">
-        <Input id="e-title" maxLength={140} value={f.title} onChange={set("title")} />
-      </Field>
-      <div className="grid grid-cols-2 gap-x-4 max-[640px]:grid-cols-1 [&>*:first-child]:mt-[18px]">
-        <Field label="Type" htmlFor="e-type">
-          <Select id="e-type" value={f.type} onChange={set("type")}>
-            <option value="rfp">RFP (open competitive bid)</option>
-            <option value="grant">Grant (proposing team does the work)</option>
-          </Select>
-        </Field>
-        <Field label="Funding goal (USD)" htmlFor="e-goal">
-          <Input id="e-goal" inputMode="decimal" value={f.goal} onChange={set("goal")} />
-        </Field>
-      </div>
-      <Field label="Summary" htmlFor="e-summary" hint="Shown on the board card.">
-        <Textarea
-          id="e-summary"
-          rows={4}
-          maxLength={4000}
-          value={f.summary}
-          onChange={set("summary")}
-        />
-      </Field>
-      <Field
-        label="Full initiative details"
-        htmlFor="e-details"
-        hint="Markdown: headings, **bold**, lists, tables, - [ ] checklists."
-      >
-        <Textarea
-          id="e-details"
-          rows={12}
-          maxLength={20000}
-          className="mono text-[13px] leading-[1.55]"
-          value={f.details}
-          onChange={set("details")}
-        />
-      </Field>
-      <div className="grid grid-cols-2 gap-x-4 max-[640px]:grid-cols-1 [&>*:first-child]:mt-[18px]">
-        <Field label="Forum link" htmlFor="e-forum">
-          <Input id="e-forum" type="url" value={f.discourseUrl} onChange={set("discourseUrl")} />
-        </Field>
-        <Field label="Pin to board position" htmlFor="e-pin">
-          <Input
-            id="e-pin"
-            inputMode="numeric"
-            placeholder="1 = top; blank = sort by money raised."
-            value={f.sortRank}
-            onChange={set("sortRank")}
-          />
-        </Field>
-      </div>
-      <Field
-        label="Owner"
-        htmlFor="e-owner"
-        hint="Wallet address or ENS name. Shown publicly as “Proposed by”; blank to hide."
-      >
-        <Input
-          id="e-owner"
-          maxLength={100}
-          placeholder="0x… or name.eth"
-          className="mono"
-          value={f.proposer}
-          onChange={set("proposer")}
-        />
-      </Field>
-      <Field label="Contact" htmlFor="e-contact" privateField>
-        <Input id="e-contact" maxLength={200} value={f.contact} onChange={set("contact")} />
-      </Field>
-      <Field label="Who is likely to fund this?" htmlFor="e-funders" privateField>
-        <Textarea
-          id="e-funders"
-          rows={4}
-          maxLength={4000}
-          value={f.funders}
-          onChange={set("funders")}
-        />
-      </Field>
-      <div className="mt-5 flex items-center gap-3">
-        <Button type="submit" variant="primary" sm loading={busy}>Save changes</Button>
-        <span className="small dim">
-          Goes live immediately; a changed title, summary or details is saved as a new public
-          revision.
-        </span>
-      </div>
-    </form>
+    <div className="panel">
+      <InitiativeForm
+        mode="admin"
+        initial={initial}
+        locked={false}
+        enforce={false}
+        layout="inline"
+        onSubmit={onSubmit}
+        submitLabel="Save changes"
+        showBackers={false}
+        showPrivate
+        showTypePicker
+        showRules={false}
+        autosaveKey={null}
+        pasteText={r.structured ? undefined : r.details}
+        pasteNote={r.structured ? undefined : LEGACY_NOTE}
+        before={
+          <>
+            <div className="grid grid-cols-2 gap-x-4 max-[640px]:grid-cols-1 [&>*:first-child]:mt-[18px]">
+              <Field label="Pin to board position" htmlFor="e-pin">
+                <Input
+                  id="e-pin"
+                  inputMode="numeric"
+                  placeholder="1 = top; blank = sort by money raised."
+                  value={extras.sortRank}
+                  onChange={(e) => setExtras((s) => ({ ...s, sortRank: e.target.value }))}
+                />
+              </Field>
+              <Field
+                label="Owner"
+                htmlFor="e-owner"
+                hint="Wallet address or ENS name. Shown publicly as “Proposed by”; blank to hide."
+              >
+                <Input
+                  id="e-owner"
+                  maxLength={100}
+                  placeholder="0x… or name.eth"
+                  className="mono"
+                  value={extras.proposer}
+                  onChange={(e) => setExtras((s) => ({ ...s, proposer: e.target.value }))}
+                />
+              </Field>
+            </div>
+          </>
+        }
+        footer={
+          <>
+            <p className="m-0 mt-3 text-center small dim">
+              Goes live immediately; a changed title, summary, section, milestone or link is saved
+              as a new public revision.
+            </p>
+            {open && (
+              <div
+                className="mt-4 rounded-2xl border border-[rgba(240,180,41,.5)] bg-[rgba(240,180,41,.06)] px-5 py-4"
+                role="status"
+              >
+                <p className="m-0 small text-[#ffe9b8]">
+                  The page is saved; the reviewer sees these open points:
+                </p>
+                <ul className="m-0 mt-2 flex list-disc flex-col gap-1 pl-5 small">
+                  {[...open.errors, ...open.warnings].map((f, i) => (
+                    <li key={i} className={f.kind ? "text-[#ffd7d6]" : "text-[#ffe9b8]"}>
+                      {f.msg}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        }
+      />
+    </div>
   );
 }
 

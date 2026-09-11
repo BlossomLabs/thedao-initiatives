@@ -29,26 +29,25 @@ In the interest of full transparency:
 - This is not a competitive tender. The project is already in progress with the first milestones funded and underway, so there is no open challenge window. A challenger just doesn't make sense in this case.
 - **Argot Collective is the anchor backer.** A public goods nonprofit, Argot has committed $151,000 of the $236,500 project budget. This grant raises the remaining $85,500 to finish the project.
 
-## Existing work
+## Why a grant: what already exists
 
 - [ethdebug/format](https://github.com/ethdebug/format) is the open specification for EVM debug information, comparable in intent to DWARF for C and C++. It defines schemas for types, variable locations, runtime context, and compiler metadata.
 - The implementation is underway at Walnut, with the first milestones below funded by Argot.
 
-## Scope
+## In scope
 
-**In scope**
 
 - The full five-milestone implementation of ethdebug in solc, from test infrastructure through the optimized production pipeline
 - Complete debug data covering storage variables, local variables, memory, calldata, and per-instruction context
 - Upstreaming the implementation into solc and documenting how tools consume the emitted data
 
-**Out of scope**
+## Out of scope
 
 - Building end-user debugger UIs. This funds the compiler-level data, not the tools that read it.
 - The ethdebug format specification itself, which Argot maintains separately.
 - Ongoing maintenance beyond the grant period, beyond the maintenance plan required below.
 
-## Hard requirements
+## Commitments
 
 1. **Open source.** All work merged under solc's existing license, no closed-source dependencies.
 2. **Upstream, not a fork.** Deliverables land in the official solc repository, or are open pull requests under active review by the Solidity team. A private fork does not count.
@@ -58,46 +57,40 @@ In the interest of full transparency:
 
 ## Milestones
 
-The total project budget is $236,500. Argot Collective has committed $151,000 as anchor backer, and this grant raises the remaining $85,500 to finish the project.
+### 0 - Testing and validation infrastructure - $13,000 (done)
 
-### 0 - Testing and validation infrastructure - $13,000 (delivered end of June)
+Delivered: https://github.com/argotorg/solidity/pull/16727
 
 - [x] Automated test and validation infrastructure for ethdebug output in place, running in public CI. Completed: [PR #16727](https://github.com/argotorg/solidity/pull/16727)
 
-### 1 - Internal debug data specification - $19,500 (in progress)
+### 1 - Internal debug data specification - $19,500
 
 - [ ] Internal specification for how solc represents and propagates debug data, published for review. In progress: [PR #16780](https://github.com/argotorg/solidity/pull/16780)
 
-### 2 - Yul serialization - $33,000 (target: October 2026)
+### 2 - Yul serialization - $33,000
+
+Target month: 2026-10
 
 - [ ] Debug info survives compilation round-trips through Yul, demonstrated by automated tests in public CI
 
-### 3 - Full unoptimized pipeline - $85,500 (target: March 2027)
+### 3 - Full unoptimized pipeline - $85,500
+
+Target month: 2027-03
 
 - [ ] solc emits ethdebug-format debug data for unoptimized builds, covering storage variables, local variables, memory, calldata, and per-instruction context
 - [ ] Output validates against the ethdebug schemas in an automated public CI check
 - [ ] Implementation is merged into solc, or is an open pull request under active review by the Solidity team, linkable by URL
 - [ ] A published walkthrough showing a debugger or test harness consuming the emitted data on a sample contract
 
-### 4 - Optimized pipeline - $85,500 (target: August 2027)
+### 4 - Optimized pipeline - $85,500
+
+Target month: 2027-08
 
 - [ ] Debug data extended through all optimizer passes, correct on optimized production builds
 - [ ] Public test suite demonstrates debug data accuracy on optimized builds, with results published
 - [ ] Implementation merged into solc, or an open pull request under active review, linkable by URL
 - [ ] Published maintenance plan for keeping ethdebug output current across future solc and optimizer changes
 
-## Budget summary
-
-| Milestone | Cost |
-|---|---|
-| 0. Testing and validation infrastructure | $13,000 |
-| 1. Internal debug data specification | $19,500 |
-| 2. Yul serialization | $33,000 |
-| 3. Full unoptimized pipeline | $85,500 |
-| 4. Optimized pipeline | $85,500 |
-| **Total** | **$236,500** |
-
-Argot Collective has committed $151,000. This grant raises the remaining $85,500.
 
 ## Team
 

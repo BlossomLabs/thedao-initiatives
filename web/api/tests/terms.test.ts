@@ -1,5 +1,6 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { ADMIN, harness, j, loadContentFiles, PLAIN } from "./app-helpers.ts";
+import { ADMIN, harness, j, PLAIN } from "./app-helpers.ts";
+import { syntheticContentFiles } from "./fixtures.ts";
 import { K } from "../db/keys.ts";
 
 // The terms document lives in the site bundle (content/donation-terms.md via
@@ -52,7 +53,7 @@ Deno.test("admin leads: only initiatives with funders, private, admin-only", asy
   const h = await harness();
   try {
     const admin = await h.mint(ADMIN, true);
-    const files = await loadContentFiles();
+    const files = syntheticContentFiles();
     await h.req("/api/admin/sync-content", { method: "POST", token: admin, json: { files } });
     const all = await h.db.rfps.list(["approved"]);
     await h.db.rfps.update(all[0].id, {

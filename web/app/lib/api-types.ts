@@ -1,4 +1,7 @@
 /** Hand-mirrored shapes of the API's JSON (api/lib/json.ts + routes). */
+import type { Finding, Findings, Milestone, SectionKey, Sections } from "@shared/draft/types";
+
+export type { Finding, Findings, Milestone, SectionKey, Sections };
 export type InitiativeType = "rfp" | "grant";
 export type InitiativeStatus = "pending" | "approved" | "rejected" | "archived";
 
@@ -16,10 +19,28 @@ export interface Initiative {
   safeAddress: string;
   /** Wallet that submitted it ("" for imported initiatives). */
   proposer: string;
+  /** Whole months from funding to the last milestone; null = not stated. */
+  durationMonths: number | null;
+  /** Grants only: the team the grant goes to, with an optional https link. */
+  recipientTeam: string;
+  recipientUrl: string;
+  /** Grants only: work already under way with another funder. */
+  topup: boolean;
+  /** Top-ups only: who decides whether the remaining milestones pass. */
+  milestoneReviewer: string;
+  /** Structured body (sections per type, milestones, links). A structured
+   * row has `details === ""`; a legacy row has empty sections. */
+  sections: Sections;
+  milestones: Milestone[];
+  links: string[];
+  structured: boolean;
   /** Current revision number; 0 for rows that predate revisions. */
   revision: number;
   createdAt: number;
   approvedAt: number | null;
+  /** The private fields: only in answers to the proposer or an admin. */
+  contact?: string;
+  funders?: string;
 }
 
 export type RevisionSource = "submit" | "proposer" | "admin" | "content" | "import";
@@ -39,10 +60,17 @@ export interface Revision extends RevisionMeta {
   title: string;
   summary: string;
   details: string;
+  sections: Sections;
+  milestones: Milestone[];
+  links: string[];
+  structured: boolean;
 }
 
-/** The three fields a revision may change. */
-export type RevisionText = Pick<Revision, "title" | "summary" | "details">;
+/** The fields a revision may change. */
+export type RevisionText = Pick<
+  Revision,
+  "title" | "summary" | "details" | "sections" | "milestones" | "links"
+>;
 
 export interface AdminInitiative extends Initiative {
   contact: string;

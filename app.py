@@ -855,7 +855,7 @@ def rfp_page(slug):
         remaining=max(0, (r["funding_goal_usd"] or 0) - committed),
         sections=structured_sections(r),
         milestones_md=structured_milestones_md(r),
-        links=[l.strip() for l in (r["links"] or "").split("\n") if l.strip()],
+        links=draft.clean_links(r["links"]),
         state=state, tokens=tokens,
         funded=bool(r["funding_goal_usd"]
                     and s["total"] >= r["funding_goal_usd"]),
@@ -938,7 +938,7 @@ def submit():
         "goal": draft.parse_amount(f.get("goal")),
         "duration": (f.get("duration_months") or "").strip(),
         "recipient": (f.get("recipient_team") or "").strip()[:120],
-        "links": (f.get("links") or "").strip()[:2000],
+        "links": "\n".join(draft.clean_links((f.get("links") or "")[:2000])),
         "funders": (f.get("funders") or "").strip()[:MAX_FUNDERS],
         "contact": (f.get("contact") or "").strip()[:200],
     }
@@ -2106,7 +2106,7 @@ def admin_rfp(rfp_id):
                 rows, _pre = draft.parse_milestones(
                     (request.form.get("milestones_md") or "").replace("\r\n", "\n").split("\n"))
                 structured.update({"milestones_json": draft.milestones_to_json(rows),
-                                   "links": (request.form.get("links") or "").strip()[:2000],
+                                   "links": "\n".join(draft.clean_links((request.form.get("links") or "")[:2000])),
                                    "structured": 1})
             if not error:
                 db.update_rfp(rfp_id, title=title, summary=summary,

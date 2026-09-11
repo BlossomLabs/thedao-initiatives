@@ -81,8 +81,11 @@ class TestFundersPrivacy(unittest.TestCase):
                 "summary": "A summary long enough to satisfy the validator, "
                            "forty plus characters of text.",
                 "goal": "1000", "duration_months": "6",
+                "recipient_team": "Acme Labs",
                 "contact": "someone@example.org",
                 "funders": "Acme | pays for infra | none | no | $5,000"}
+        import draft as _draft
+        form.update(_draft.minimal_submission(1000))
         resp = self.client.post("/submit", data=form)
         self.assertEqual(resp.status_code, 200)
         con = db.connect()
@@ -99,7 +102,7 @@ class TestFundersPrivacy(unittest.TestCase):
         resp = self.client.get("/llms.txt")
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.content_type.startswith("text/plain"))
-        self.assertIn(b"Who is likely to fund this?", resp.data)
+        self.assertIn(b"## Who is likely to fund this", resp.data)
 
     def test_existing_rows_still_load(self):
         r = db.rfp_by_slug(self.slug)

@@ -44,10 +44,22 @@
       <h2>Summary</h2>
       <p class="body-text">{{ r.summary }}</p>
 
+      {% if sections %}
+      {% for heading, text in sections %}
+      <h2>{{ heading }}</h2>
+      <div class="body-text md">{{ text | md }}</div>
+      {% endfor %}
+      <h2>{{ 'Milestones' if r.type == 'grant' else 'Milestones (draft)' }}</h2>
+      <div class="body-text md milestones">{{ milestones_md | md }}</div>
+      {% if links %}
+      <h2>Links</h2>
+      <ul class="body-text links">{% for l in links %}<li><a href="{{ l }}" target="_blank" rel="noopener">{{ l }}</a></li>{% endfor %}</ul>
+      {% endif %}
+      {% elif r.details %}
       <h2>Full initiative details</h2>
-      {% if r.details %}
       <div class="body-text md">{{ r.details | md }}</div>
       {% else %}
+      <h2>Full initiative details</h2>
       <p class="empty">The complete spec (scope, milestones, budget breakdown) is being written.
       {% if r.discourse_url %}Follow and shape it <a href="{{ r.discourse_url }}" target="_blank" rel="noopener">on the forum thread</a>.{% endif %}</p>
       {% endif %}

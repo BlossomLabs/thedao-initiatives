@@ -254,7 +254,8 @@ class TestSubmitFieldOrder(unittest.TestCase):
 
     def test_llms_guide_lists_type_first(self):
         txt = self.client.get("/llms.txt").data.decode()
-        self.assertLess(txt.index("**Type**"), txt.index("**Title**"))
+        # v3: the type is chosen on the form, the guide says so where it hands over
+        self.assertIn("pick the type at https://fund.thedao.fund/submit", txt)
 
 
 class TestAdminTypeChip(unittest.TestCase):

@@ -24,9 +24,11 @@ from flask import (Flask, abort, jsonify, make_response, redirect,
                    url_for)
 from markupsafe import Markup
 
+import canned
 import chain
 import config
 import db
+import draft
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
@@ -253,7 +255,8 @@ def inject_globals():
     return {"csrf_token": csrf_token, "TOKENS": config.TOKENS,
             "site_url": site or request.url_root,
             "wc_project_id": config.WALLETCONNECT_PROJECT_ID,
-            "terms_version": terms_version()}
+            "terms_version": terms_version(),
+            "rules_panels": all_rules_panels}
 
 
 # ------------------------------------------------------------ donation terms
@@ -281,6 +284,81 @@ def donation_terms():
 
 def terms_version():
     return donation_terms()[0]
+
+
+# ------------------------------------------------------------ rules panels
+#
+# The process rules ("How RFPs work", "How grants work", "How top-up grants
+# work") live in content/boilerplate/*.md and render on every initiative page
+# and on the submit form, so no submission carries them in its body any more.
+# Same file shape as donation-terms.md: a `version:` first line, then markdown
+# whose first heading is the panel title.
+
+RULES_KINDS = ("rfp", "grant", "topup")
+
+
+def rules_panel(kind):
+    """{"kind", "title", "version", "body"} for one panel, or None if the file
+    is missing (the page then shows nothing rather than failing)."""
+    if kind not in RULES_KINDS:
+        return None
+    path = os.path.join(config.BASE_DIR, "content", "boilerplate", kind + ".md")
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return None
+    version = ""
+    m = _TERMS_VERSION_RE.match(text)
+    if m:
+        version, text = m.group(1), text[m.end():]
+    title = ""
+    tm = re.match(r"\s*#\s*(.+?)\s*\n", text)
+    if tm:
+        title, text = tm.group(1), text[tm.end():]
+    return {"kind": kind, "title": title, "version": version, "body": text.strip()}
+
+
+def rules_kind_for(r):
+    """Which panel an initiative row gets: none for a legacy body that keeps its
+    own process text, otherwise top-up / grant / rfp."""
+    if (r["boilerplate"] or "auto") == "none":
+        return None
+    if r["type"] == "grant" and r["topup"]:
+        return "topup"
+    return "grant" if r["type"] == "grant" else "rfp"
+
+
+def all_rules_panels():
+    return {k: rules_panel(k) for k in RULES_KINDS}
+
+
+def structured_sections(r):
+    """[(heading, markdown)] for a structured row in the type's order, else []
+    (the page then renders the legacy `details` body)."""
+    if not r["structured"]:
+        return []
+    out = []
+    for key in draft.SECTIONS["grant" if r["type"] == "grant" else "rfp"]:
+        text = r[key] or ""
+        if text.strip():
+            out.append((draft.FIELDS[key]["heading"], text))
+    return out
+
+
+def structured_milestones_md(r):
+    if not r["structured"]:
+        return ""
+    rows = draft.milestones_from_json(r["milestones_json"])
+    return draft.render_milestones_md(rows, topup=bool(r["type"] == "grant" and r["topup"]))
+
+
+def committed_by_backers(pledges):
+    """Header line inputs: total pledged/received and the backer names, from the
+    pledge rows the admin already manages (withdrawn ones are excluded upstream)."""
+    total = sum((p["amount_usd"] or 0) for p in pledges)
+    names = [p["company"] for p in pledges if p["company"]]
+    return total, names
 
 
 @app.route("/donation-terms")
@@ -362,7 +440,11 @@ def md(text):
         lambda m: m.group(1) + ("☑" if m.group(2) in "xX" else "☐"),
         text or "")
     html = markdown.markdown(text, extensions=["tables", "sane_lists", "nl2br"])
-    return Markup(nh3.clean(html, tags=MD_TAGS, attributes=MD_ATTRS))
+    html = nh3.clean(html, tags=MD_TAGS, attributes=MD_ATTRS)
+    # the checkbox glyph is the bullet: no list dot in front of it (Griff, 2026-09-11).
+    # Added after the sanitizer so it is the only class attribute that can exist.
+    html = re.sub(r"<li>(\s*(?:<p>)?)(?=[☐☑])", r'<li class="tl">\1', html)
+    return Markup(html)
 
 
 # ------------------------------------------------------------ validation
@@ -607,6 +689,12 @@ def parse_rfp_file(text):
     itype = fields.get("type", "rfp").lower()
     if itype not in ("rfp", "grant"):
         raise ValueError("type must be rfp or grant")
+    dur = fields.get("duration", "").strip()
+    if dur and not dur.isdigit():
+        raise ValueError("duration must be a whole number of months")
+    topup = fields.get("topup", "").strip().lower() in ("true", "yes", "1")
+    if topup and itype != "grant":
+        raise ValueError("topup applies to grants only")
     return {
         "title": title,
         "summary": fields.get("summary", "")[:4000],
@@ -616,6 +704,9 @@ def parse_rfp_file(text):
         "sort_rank": int(pin) if pin else None,
         "details": details[:20000],
         "type": itype,
+        "duration_months": int(dur) if dur else None,
+        "topup": 1 if topup else 0,
+        "milestone_reviewer": fields.get("reviewer", "").strip()[:200] if topup else "",
     }
 
 
@@ -648,6 +739,15 @@ def sync_content():
             created += 1
         else:
             updated += 1
+        # The rules panel now carries the process text; a file that still
+        # pastes a Process or Milestone review section shows it twice on the
+        # page. Warn (never fail) so the author strips it.
+        row = db.rfp_by_slug(slug)
+        if row is not None and (row["boilerplate"] or "auto") == "auto" \
+                and canned.has_canned_headings(fields["details"]):
+            errors.append("warning: %s still carries a Process or Milestone "
+                          "review section; the rules panel renders those "
+                          "now" % name)
     return created, updated, errors
 
 
@@ -743,10 +843,19 @@ def rfp_page(slug):
         if r["funding_goal_usd"] else 0
     state = chain_state()
     tokens = donor_tokens(state)
+    pledges = db.pledges_for(r["id"])
+    committed, backer_names = committed_by_backers(pledges)
+    kind = rules_kind_for(r)
     return render_template(
         "rfp.html", r=r, sum=s, pct=pct,
-        pledges=db.pledges_for(r["id"]),
+        pledges=pledges,
         donations=db.donations_for(r["id"]),
+        rules=rules_panel(kind) if kind else None,
+        committed=committed, backer_names=backer_names,
+        remaining=max(0, (r["funding_goal_usd"] or 0) - committed),
+        sections=structured_sections(r),
+        milestones_md=structured_milestones_md(r),
+        links=[l.strip() for l in (r["links"] or "").split("\n") if l.strip()],
         state=state, tokens=tokens,
         funded=bool(r["funding_goal_usd"]
                     and s["total"] >= r["funding_goal_usd"]),
@@ -754,60 +863,136 @@ def rfp_page(slug):
                                and r["status"] == "approved"))
 
 
+MAX_DURATION_MONTHS = 120
+
+
+def parse_duration(raw):
+    """Whole months from funding to the last milestone. (value, error)."""
+    raw = (raw or "").strip()
+    if not raw.isdigit() or not (1 <= int(raw) <= MAX_DURATION_MONTHS):
+        return None, ("Expected duration must be a whole number of months "
+                      "(1 to %d)." % MAX_DURATION_MONTHS)
+    return int(raw), None
+
+
+def _submit_context(form=None, errors=None, warnings=None, milestones=None, backers=None):
+    """Everything submit.html needs, on GET and on a failed POST (the JS rehydrates
+    the milestone and backer rows from `state`)."""
+    return {"form": form, "errors": errors or [], "warnings": warnings or [],
+            "fields": draft.FIELDS, "sections": draft.SECTIONS,
+            "state": json.dumps({"milestones": milestones or [], "backers": backers or []}),
+            "example": draft.split_draft(_guide_example(), "rfp")["fields"]}
+
+
+_EXAMPLE_CACHE = {}
+
+
+def _guide_example():
+    """The gold-standard example from llms.txt, for the per-section example toggles."""
+    if "doc" not in _EXAMPLE_CACHE:
+        try:
+            with open(os.path.join(config.BASE_DIR, "llms.txt"), encoding="utf-8") as f:
+                txt = f.read()
+            # the RFP example plus the grant-only sections block, one document
+            blocks = re.findall(r"```markdown\n(## .*?)```", txt, re.S)
+            _EXAMPLE_CACHE["doc"] = "\n\n".join(blocks)
+        except OSError:
+            _EXAMPLE_CACHE["doc"] = ""
+    return _EXAMPLE_CACHE["doc"]
+
+
+def _read_backers(form, files):
+    """Repeated bk_org / bk_amount / bk_url fields plus bk_logo files -> rows.
+    Logos are validated and stored only once the submission passes the checks."""
+    orgs, amts, urls = form.getlist("bk_org"), form.getlist("bk_amount"), form.getlist("bk_url")
+    logos = files.getlist("bk_logo") if files else []
+    rows = []
+    for i in range(max(len(orgs), len(amts), len(urls))):
+        org = (orgs[i] if i < len(orgs) else "").strip()[:120]
+        amt = draft.parse_amount(amts[i] if i < len(amts) else "")
+        url = (urls[i] if i < len(urls) else "").strip()[:300]
+        if url and not url.lower().startswith(("http://", "https://")):
+            url = ""
+        logo = logos[i] if i < len(logos) else None
+        if not org and amt <= 0 and not url:
+            continue
+        rows.append({"org": org, "amount": amt, "url": url, "logo": logo})
+    return rows[:12]
+
+
 @app.route("/submit", methods=["GET", "POST"])
 def submit():
     if request.method == "GET":
-        return render_template("submit.html")
+        return render_template("submit.html", **_submit_context())
     check_csrf()
     if request.form.get("website"):  # honeypot
         abort(400)
-    if not rate_limit("submit:" + client_ip(),
-                      config.SUBMISSIONS_PER_HOUR_PER_IP, 3600):
-        return render_template(
-            "submit.html", error="Too many submissions from your address; "
-            "try again in an hour.", form=request.form), 429
-
-    url_raw = (request.form.get("discourse_url") or "").strip()
-    url_clean = ""
-    if url_raw:
-        url_clean, err = validate_forum_url(url_raw)
-        if err:
-            return render_template("submit.html", error=err,
-                                   form=request.form), 400
-
-    title = (request.form.get("title") or "").strip()[:MAX_TITLE]
-    if len(title) < 8:
-        return render_template(
-            "submit.html", error="Please give the initiative a title (at "
-            "least 8 characters).", form=request.form), 400
-
-    summary = (request.form.get("summary") or "").strip()[:MAX_SUMMARY]
-    if len(summary) < 40:
-        return render_template(
-            "submit.html", error="Please describe the initiative in at least "
-            "40 characters.", form=request.form), 400
-
-    goal, err = parse_goal(request.form.get("goal"))
-    if err:
-        return render_template("submit.html", error=err, form=request.form), 400
-
-    # NEVER render funders on a public page/API: private fundraising leads,
-    # admin-only exactly like contact (see CONTRIBUTING.md).
-    funders = (request.form.get("funders") or "").strip()[:MAX_FUNDERS]
-    if len(funders) < 10:
-        return render_template(
-            "submit.html", error="Please list who is likely to fund this "
-            "(at least one funder line).", form=request.form), 400
-
-    itype = request.form.get("type", "rfp")
+    f = request.form
+    itype = f.get("type", "rfp")
     if itype not in ("rfp", "grant"):
         itype = "rfp"
-    contact = (request.form.get("contact") or "").strip()[:200]
-    details = (request.form.get("details") or "").strip()[:20000]
-    rfp_id, slug = db.create_rfp(title, summary, url_clean, goal, [],
-                                 contact, status="pending", details=details,
-                                 type=itype, funders=funders)
-    return render_template("submitted.html", title=title)
+    topup = bool(itype == "grant" and f.get("topup"))
+    page = {
+        "title": (f.get("title") or "").strip()[:MAX_TITLE],
+        "summary": (f.get("summary") or "").strip()[:MAX_SUMMARY],
+        "goal": draft.parse_amount(f.get("goal")),
+        "duration": (f.get("duration_months") or "").strip(),
+        "recipient": (f.get("recipient_team") or "").strip()[:120],
+        "links": (f.get("links") or "").strip()[:2000],
+        "funders": (f.get("funders") or "").strip()[:MAX_FUNDERS],
+        "contact": (f.get("contact") or "").strip()[:200],
+    }
+    fields = {k: draft.strip_inline_headings((f.get(k) or "")[:20000]) for k in draft.SECTION_KEYS}
+    milestones = draft.milestones_from_json(f.get("milestones_json"))
+    backers = _read_backers(f, request.files)
+    errors, warnings = draft.check_submission(itype, topup, page, fields, milestones,
+                                              [{"org": b["org"], "amount": b["amount"]} for b in backers])
+    duration = None
+    if page["duration"]:
+        duration, derr = parse_duration(page["duration"])
+        if derr:
+            errors.append({"field": "duration_months", "msg": derr})
+    if not rate_limit("submit:" + client_ip(), config.SUBMISSIONS_PER_HOUR_PER_IP, 3600):
+        errors.append({"field": "", "msg": "Too many submissions from your address; try again in an hour."})
+    # byte-identical body to an existing submission = a re-paste, not a new initiative
+    key = draft.body_key(fields, milestones)
+    if not errors and key:
+        for row in db.list_rfps(("pending", "approved", "rejected", "archived")):
+            if row["structured"] and draft.body_key(
+                    {k: row[k] for k in draft.SECTION_KEYS},
+                    draft.milestones_from_json(row["milestones_json"])) == key:
+                errors.append({"field": "", "msg": "This exact text is already submitted (\"%s\"). "
+                               "Edit it before submitting again." % row["title"]})
+                break
+    if errors:
+        return render_template("submit.html", **_submit_context(
+            form=f, errors=errors, warnings=warnings, milestones=milestones,
+            backers=[{"org": b["org"], "amount": b["amount"], "url": b["url"]} for b in backers])), 400
+    # logos: validated now, stored only for a submission that passed
+    saved_logos = []
+    for b in backers:
+        name, lerr = save_logo_upload(b["logo"]) if b["logo"] is not None else ("", None)
+        if lerr:
+            return render_template("submit.html", **_submit_context(
+                form=f, errors=[{"field": "backers", "msg": "%s: %s" % (b["org"] or "backer", lerr)}],
+                warnings=warnings, milestones=milestones,
+                backers=[{"org": x["org"], "amount": x["amount"], "url": x["url"]} for x in backers])), 400
+        saved_logos.append(name or "")
+    reviewer = (f.get("milestone_reviewer") or "").strip()[:200] if topup else ""
+    rfp_id, slug = db.create_rfp(page["title"], page["summary"], "", page["goal"], [],
+                                 page["contact"], status="pending", details="",
+                                 type=itype, funders=page["funders"],
+                                 duration_months=duration, topup=1 if topup else 0)
+    extra = {k: fields[k] for k in draft.SECTIONS[itype]}
+    extra.update({"links": page["links"], "recipient_team": page["recipient"] if itype == "grant" else "",
+                  "milestones_json": draft.milestones_to_json(milestones), "structured": 1,
+                  "milestone_reviewer": reviewer})
+    db.update_rfp(rfp_id, **extra)
+    for b, logo in zip(backers, saved_logos):
+        if b["org"]:
+            db.add_pledge(rfp_id, b["org"], b["amount"], "pledged", "", b["url"], logo)
+    return render_template("submitted.html", title=page["title"], warnings=warnings,
+                           rules=rules_panel("topup" if topup else itype))
 
 
 # ------------------------------------------------------------ donation API
@@ -1770,6 +1955,72 @@ def admin_dashboard():
                            bell=len(held) + len(stale))
 
 
+# One-time migration for the submission redesign: strip the canned process
+# text from every stored body (the rules panel renders it now). Two steps,
+# both admin-only: a dry run that shows the per-row diff, then apply, which
+# takes an SQLite online backup first. Also runnable as `python canned.py`.
+@app.route("/admin/strip-canned", methods=["GET", "POST"])
+@admin_required
+def admin_strip_canned():
+    rows = db.list_rfps(("pending", "approved", "rejected", "archived"))
+    plans = canned.plan(rows)
+    applied_at = db.get_meta("canned_strip_applied_at")
+    if request.method == "POST":
+        check_csrf()
+        if request.form.get("action") != "apply" or not plans:
+            return redirect(url_for("admin_strip_canned"))
+        backup = canned.backup_db(config.DB_PATH,
+                                  os.path.join(config.BASE_DIR, "backups"))
+        for p in plans:
+            fields = {"details": p["new"]}
+            if p["duration_months"]:
+                fields["duration_months"] = p["duration_months"]
+            if p["topup"]:
+                fields["topup"] = 1
+            if p["reviewer"]:
+                fields["milestone_reviewer"] = p["reviewer"]
+            db.update_rfp(p["id"], **fields)
+        db.set_meta("canned_strip_applied_at", str(db.now()))
+        return redirect(url_for("admin_dashboard",
+                                msg="Stripped the canned text from %d initiatives. "
+                                    "Backup: %s" % (len(plans), os.path.basename(backup))))
+    return render_template("admin/strip.html", plans=plans, total=len(rows),
+                           applied_at=applied_at)
+
+
+@app.route("/admin/structure", methods=["GET", "POST"])
+@admin_required
+def admin_structure():
+    """Migration 2: split legacy bodies into the section columns, one row at a
+    time, only where everything parses and the sums match. `details` stays in
+    the row untouched, so a bad conversion is one admin edit (or restore) away."""
+    legacy = [r for r in db.list_rfps(("pending", "approved", "rejected", "archived"))
+              if not r["structured"] and (r["details"] or "").strip()]
+    plans = []
+    for r in legacy:
+        fields, reasons = draft.convert_legacy(r)
+        plans.append({"id": r["id"], "title": r["title"], "type": r["type"], "status": r["status"],
+                      "ok": fields is not None, "reasons": reasons, "fields": fields,
+                      "milestones_md": draft.milestones_to_md(
+                          draft.milestones_from_json(fields["milestones_json"])) if fields else ""})
+    if request.method == "POST":
+        check_csrf()
+        want = set(request.form.getlist("rfp_id"))
+        if request.form.get("action") == "apply_all":
+            want = {str(p["id"]) for p in plans}
+        chosen = [p for p in plans if p["ok"] and str(p["id"]) in want]
+        if not chosen:
+            return redirect(url_for("admin_structure"))
+        backup = canned.backup_db(config.DB_PATH, os.path.join(config.BASE_DIR, "backups"))
+        for p in chosen:
+            db.update_rfp(p["id"], **p["fields"])
+        return redirect(url_for("admin_dashboard",
+                                msg="Structured %d initiatives. Backup: %s"
+                                    % (len(chosen), os.path.basename(backup))))
+    return render_template("admin/structure.html", plans=plans,
+                           ready=sum(1 for p in plans if p["ok"]))
+
+
 # Funder leads: the ONLY readers of the private funders field besides the
 # manage page. Never link these from a public page; never add a public API.
 @app.route("/admin/leads")
@@ -1838,14 +2089,41 @@ def admin_rfp(rfp_id):
                 itype = "rfp"
             if not error and (len(title) < 8 or len(summary) < 40):
                 error = "Title (8+) and summary (40+) are required."
+            dur_raw = (request.form.get("duration_months") or "").strip()
+            duration = None
+            if dur_raw:
+                duration, err4 = parse_duration(dur_raw)
+                error = error or err4
+            topup = 1 if (itype == "grant" and request.form.get("topup")) else 0
+            boilerplate = request.form.get("boilerplate", "auto")
+            if boilerplate not in ("auto", "none"):
+                boilerplate = "auto"
+            # structured rows: one field per section, milestones in the paste format
+            structured = {}
+            if request.form.get("structured"):
+                structured = {k: draft.strip_inline_headings((request.form.get("sec_" + k) or "")[:20000])
+                              for k in draft.SECTION_KEYS}
+                rows, _pre = draft.parse_milestones(
+                    (request.form.get("milestones_md") or "").replace("\r\n", "\n").split("\n"))
+                structured.update({"milestones_json": draft.milestones_to_json(rows),
+                                   "links": (request.form.get("links") or "").strip()[:2000],
+                                   "structured": 1})
             if not error:
                 db.update_rfp(rfp_id, title=title, summary=summary,
                               details=(request.form.get("details")
                                        or "").strip()[:20000],
+                              **structured,
                               funding_goal_usd=goal,
                               discourse_url=url_clean,
                               sort_rank=rank,
                               type=itype,
+                              duration_months=duration,
+                              recipient_team=(request.form.get("recipient_team")
+                                              or "").strip()[:120] if itype == "grant" else "",
+                              topup=topup,
+                              milestone_reviewer=(request.form.get("milestone_reviewer")
+                                                  or "").strip()[:200] if topup else "",
+                              boilerplate=boilerplate,
                               contact=(request.form.get("contact")
                                        or "").strip()[:200],
                               funders=(request.form.get("funders")
@@ -1884,6 +2162,8 @@ def admin_rfp(rfp_id):
     signers_ok, signers_detail = chain.signers_configured()
     return render_template(
         "admin/rfp.html", r=r, error=error,
+        fields=draft.FIELDS, sections=draft.SECTIONS,
+        milestones_md=draft.milestones_to_md(draft.milestones_from_json(r["milestones_json"])),
         sum=db.funding_summary(rfp_id),
         pledges=db.pledges_for(rfp_id, include_withdrawn=True),
         donations=db.donations_for(rfp_id, only_confirmed=False),

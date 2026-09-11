@@ -43,6 +43,18 @@ Frontmatter keys:
 - `type` (optional, `rfp` or `grant`, default `rfp`: an RFP is an open
   competitive bid with no preset vendor; a Grant means the team presenting
   the idea does the work)
+- `duration` (recommended, whole months from funding to the last milestone;
+  renders as "About N months" in the page header)
+- `topup` (grants only, `true` when the work is already under way with
+  another funder: the page shows the top-up rules panel and "raises the
+  remaining" from the pledges)
+- `reviewer` (top-ups only, who decides whether the remaining milestones pass)
+
+The process rules are NOT part of the body any more: the site renders the
+panel for the type from `content/boilerplate/*.md`. Do not paste a header
+table, the proposal window, the milestones preamble, the disclosure sentence,
+"Milestone review and acceptance", "Process" or the closing line; the sync
+warns when a file still carries a Process or Milestone review heading.
 
 ## Safety rules (enforced by the app)
 

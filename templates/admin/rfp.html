@@ -3,7 +3,7 @@
 {% block content %}
 <main class="detail">
   <p class="crumb"><a href="{{ url_for('admin_dashboard') }}">← Dashboard</a></p>
-  <h1 class="rfp-title">{{ r.title }} <span class="chip static st-{{ r.status }}">{{ r.status }}</span> <span class="chip static type-chip t-{{ r.type }}">{{ 'Grant' if r.type == 'grant' else 'RFP' }}</span></h1>
+  <h1 class="rfp-title">{{ r.title }} <span class="chip static st-{{ r.status }}">{{ r.status }}</span> <span class="chip static type-chip t-{{ r.type }}">{{ 'Grant' if r.type == 'grant' else 'RFP' }}</span>{% if not r.structured %} <span class="chip static" title="One markdown body instead of one field per section">legacy format</span>{% endif %}</h1>
   {% if error %}<div class="alert">{{ error }}</div>{% endif %}
 
   <div class="btnrow">
@@ -57,12 +57,47 @@
     </select>
     <label class="lbl">Summary</label>
     <textarea name="summary" rows="4" maxlength="4000">{{ r.summary }}</textarea>
-    <label class="lbl">Full initiative details <span class="dim">(the complete spec: scope, milestones, budget breakdown; shown on the public page — markdown supported: headings, **bold**, lists, tables, - [ ] checklists)</span></label>
+    {% if r.structured %}
+    <input type="hidden" name="structured" value="1">
+    <input type="hidden" name="details" value="{{ r.details or '' }}">
+    <p class="small dim">Structured submission: one field per section. The site renders the headings; bold, links and lists work inside a field, a heading inside a field is flattened to bold.</p>
+    {% for key in sections['grant' if r.type == 'grant' else 'rfp'] %}
+    <label class="lbl">{{ fields[key].heading }} <span class="dim">{{ fields[key].q }}</span></label>
+    <textarea name="sec_{{ key }}" rows="{{ fields[key].rows }}" maxlength="20000">{{ r[key] or '' }}</textarea>
+    {% endfor %}
+    {% for key in fields if key not in sections['grant' if r.type == 'grant' else 'rfp'] %}<input type="hidden" name="sec_{{ key }}" value="{{ r[key] or '' }}">{% endfor %}
+    <label class="lbl">Milestones <span class="dim">(one <code>### Name - $amount</code> heading per milestone, add <code>(adoption)</code> or <code>(done)</code>; bullets under it are the criteria; top-ups: <code>Target month: 2026-11</code> or <code>Delivered: https://…</code> lines)</span></label>
+    <textarea name="milestones_md" rows="12" maxlength="20000" spellcheck="false">{{ milestones_md }}</textarea>
+    <label class="lbl">Links <span class="dim">(one per line)</span></label>
+    <textarea name="links" rows="3" maxlength="2000" spellcheck="false">{{ r.links or '' }}</textarea>
+    {% else %}
+    <label class="lbl">Full initiative details <span class="dim">(legacy format: one markdown body; shown on the public page — markdown supported: headings, **bold**, lists, tables, - [ ] checklists. <a href="{{ url_for('admin_structure') }}">Structure legacy bodies</a> converts it into sections where it parses cleanly.)</span></label>
     <textarea name="details" rows="10" maxlength="20000">{{ r.details or '' }}</textarea>
-    <label class="lbl">Forum link</label>
+    {% endif %}
+    {% if r.discourse_url %}
+    <label class="lbl">Forum link <span class="dim">(legacy; clear it to drop the forum button)</span></label>
     <input type="url" name="discourse_url" value="{{ r.discourse_url }}">
+    {% endif %}
     <label class="lbl">Funding goal (USD)</label>
     <input type="text" name="goal" inputmode="decimal" value="{{ r.funding_goal_usd }}">
+    <label class="lbl">Expected duration (months) <span class="dim">(from funding to the last milestone; blank shows "Duration not stated")</span></label>
+    <input type="text" name="duration_months" inputmode="numeric" value="{{ r.duration_months or '' }}">
+    <div data-grant-only {% if r.type != 'grant' %}hidden{% endif %}>
+      <label class="lbl">Recipient team <span class="dim">(shows as "to X" next to the badge)</span></label>
+      <input type="text" name="recipient_team" maxlength="120" value="{{ r.recipient_team or '' }}">
+      <label class="check-lbl"><input type="checkbox" name="topup" value="1" {{ 'checked' if r.topup }}> Top-up: work already under way with another funder (switches the rules panel)</label>
+      <div data-topup-only {% if not r.topup %}hidden{% endif %}>
+        <label class="lbl">Milestone reviewer <span class="dim">(who decides the remaining milestones)</span></label>
+        <input type="text" name="milestone_reviewer" maxlength="200" value="{{ r.milestone_reviewer or '' }}">
+      </div>
+    </div>
+    {% if r.boilerplate == 'none' %}
+    <label class="lbl">Rules panel <span class="dim">(none = legacy body that carries its own process text; auto = the panel for the type renders under the details)</span></label>
+    <select name="boilerplate">
+      <option value="auto">auto</option>
+      <option value="none" selected>none</option>
+    </select>
+    {% endif %}
     <label class="lbl">Pin to board position <span class="dim">(1 = top of the front page; leave empty to sort automatically by amount raised)</span></label>
     <input type="text" name="sort_rank" inputmode="numeric" value="{{ r.sort_rank or '' }}">
     <label class="lbl">Contact (private)</label>

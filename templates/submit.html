@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Suggest an initiative · TheDAO Security Fund{% endblock %}
 {% block content %}
+{% set ftype = (form.get('type') if form else 'rfp') or 'rfp' %}
+{% set ftopup = (form.get('topup') if form else '') %}
+{% set fkind = 'topup' if (ftype == 'grant' and ftopup) else ftype %}
 <main class="detail narrow">
   <h1>Suggest an initiative</h1>
   <p class="tag left">Submissions are reviewed before they appear on the site.</p>
@@ -14,46 +17,199 @@
     <div class="ai-step"><span class="ai-num">2</span>
       <div>Answer the questions the AI asks</div></div>
     <div class="ai-step"><span class="ai-num">3</span>
-      <div>Paste the results below</div></div>
+      <div>Paste the whole draft below, we sort it into the sections</div></div>
   </div>
 
-  {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+  {% if errors %}
+  <div class="alert" id="server-errors">
+    <b>{{ errors | length }} thing{{ '' if errors | length == 1 else 's' }} need{{ 's' if errors | length == 1 else '' }} fixing.</b>
+    <ul>{% for e in errors %}<li>{{ e.msg }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
 
-  <form method="post" class="form">
+  <form method="post" class="form" id="submit-form" enctype="multipart/form-data" novalidate
+        data-state='{{ state }}' data-errors='{{ errors | tojson }}' data-warnings='{{ warnings | tojson }}'>
     <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <input type="text" name="website" value="" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <input type="hidden" name="milestones_json" id="milestones-json" value="[]">
 
-    <span class="lbl">Type *</span>
+    <span class="lbl">Type <em class="reqtag">Required</em></span>
     <div class="type-choice">
-      <label class="type-opt"><input type="radio" name="type" value="rfp"
-        {{ 'checked' if not form or form.get('type', 'rfp') != 'grant' }}>
+      <label class="type-opt"><input type="radio" name="type" value="rfp" id="t-rfp" {{ 'checked' if ftype != 'grant' }}>
         <span><b>RFP</b><small>An open request: any qualified team can bid to do the work.</small></span></label>
-      <label class="type-opt"><input type="radio" name="type" value="grant"
-        {{ 'checked' if form and form.get('type') == 'grant' }}>
+      <label class="type-opt"><input type="radio" name="type" value="grant" id="t-grant" {{ 'checked' if ftype == 'grant' }}>
         <span><b>Grant</b><small>Your team presents the idea and does the work.</small></span></label>
     </div>
 
-    <label class="lbl" for="f-title">Title *</label>
-    <input type="text" id="f-title" name="title" required maxlength="140" value="{{ form.title if form else '' }}">
+    <div class="subopt" id="subopt" {% if ftype != 'grant' %}hidden{% endif %}>
+      <label class="cbrow" for="f-topup"><input type="checkbox" name="topup" value="1" id="f-topup" {{ 'checked' if ftopup }}>
+        <span>Work is already under way with another funder</span></label>
+      <p class="hint">This makes it a top-up. No proposal window, no challenge period. Completed
+      milestones get a link to the delivered work, and every remaining one carries a target month.</p>
+      <div id="reviewer-row" {% if not ftopup %}hidden{% endif %}>
+        <label class="lbl" for="f-reviewer">Milestone reviewer
+          <span class="dim">Who decides whether the remaining milestones pass: a named engineer and their affiliation.</span></label>
+        <input type="text" id="f-reviewer" name="milestone_reviewer" maxlength="200" value="{{ form.milestone_reviewer if form else '' }}">
+      </div>
+    </div>
 
-    <label class="lbl" for="f-summary">Short summary *</label>
-    <textarea id="f-summary" name="summary" rows="5" required maxlength="4000">{{ form.summary if form else '' }}</textarea>
+    <div id="paste-block">
+      <label class="lbl" for="f-paste">Paste your whole draft here
+        <span class="dim">It splits on the section headings and fills the fields below. The fields are what gets submitted.</span></label>
+      <textarea id="f-paste" rows="10" spellcheck="false"
+        placeholder="Paste the draft your AI wrote. Sorting starts as soon as it lands."></textarea>
+      <p class="hint">Milestone headings look like <code>### Agreed standard - $50,000</code>, in order: the site
+      letters them A, B, C. Add <code>(adoption)</code> to a milestone that pays only on evidence of adoption, and
+      <code>(done)</code> to a top-up milestone that is already finished. Bullet lines under a milestone become its
+      acceptance criteria, one per line. Under <code>## Backers already committed</code>, one backer per line as
+      <code>Organization | amount | link</code>. Headings inside a section become bold text: the site owns the headings.</p>
+    </div>
+    <p class="hint" id="sort-note"></p>
 
-    <label class="lbl" for="f-details">Full initiative details</label>
-    <textarea id="f-details" name="details" rows="10" maxlength="20000">{{ form.details if form else '' }}</textarea>
+    <div class="unsorted" id="unsorted" hidden>
+      <span class="eyebrow top">Unsorted text</span>
+      <p class="hint">These lines matched no section. Copy what you need into a field above, then
+      clear this box. Nothing here is submitted.</p>
+      <textarea id="f-unsorted" rows="5"></textarea>
+    </div>
 
-    <label class="lbl" for="f-goal">Funding goal (USD) *</label>
-    <input type="text" id="f-goal" name="goal" required inputmode="decimal" placeholder="250000"
-           value="{{ form.goal if form else '' }}">
+    <div class="grp">
+      <span class="grp-k">The page fields</span>
+      <span class="grp-h">These render in the header of your initiative page, next to the type
+      badge. They are never part of a body section.</span>
+    </div>
 
-    <label class="lbl" for="f-funders">Who is likely to fund this? * <span class="priv">🔒 Private, never published</span></label>
-    <textarea id="f-funders" name="funders" rows="4" required maxlength="4000"
-      placeholder="Ethereum Foundation | funds public-goods security tooling | met once | warm intro? yes | $50,000">{{ form.funders if form else '' }}</textarea>
+    <label class="lbl" for="f-title">Title <em class="reqtag">Required</em>
+      <span class="dim">Up to 140 characters. No "RFP:" or "Grant:" prefix, the badge says it.</span></label>
+    <input type="text" id="f-title" name="title" maxlength="140" value="{{ form.title if form else '' }}">
 
-    <label class="lbl" for="f-contact">Contact <span class="priv">🔒 Private, never published</span></label>
+    <label class="lbl" for="f-summary">Short summary <em class="reqtag">Required</em>
+      <span class="dim">2 to 4 sentences. This is the text on the board card.</span></label>
+    <textarea id="f-summary" name="summary" rows="5" maxlength="4000">{{ form.summary if form else '' }}</textarea>
+
+    <label class="lbl" for="f-goal">Funding goal (USD) <em class="reqtag">Required</em>
+      <span class="dim">One flat number.</span></label>
+    <input type="text" id="f-goal" name="goal" class="mono" inputmode="decimal" placeholder="250,000" value="{{ form.goal if form else '' }}">
+    <span class="amt-echo" id="echo-goal"></span>
+
+    <label class="lbl" for="f-duration">Expected duration (months) <em class="reqtag">Required</em>
+      <span class="dim">Months from funding until the last milestone is complete.</span></label>
+    <input type="text" id="f-duration" name="duration_months" class="mono" inputmode="numeric" placeholder="12" value="{{ form.duration_months if form else '' }}">
+
+    <div id="grant-only" {% if ftype != 'grant' %}hidden{% endif %}>
+      <label class="lbl" for="f-recipient">Recipient team <em class="reqtag">Required</em>
+        <span class="dim">Short name for the header and the board card, as in "Grant to the OPSEC ratings coalition".</span></label>
+      <input type="text" id="f-recipient" name="recipient_team" maxlength="120" value="{{ form.recipient_team if form else '' }}">
+    </div>
+
+    <label class="lbl" for="f-links">Links
+      <span class="dim">Optional. Repo, site, prior write-up. One per line.</span></label>
+    <textarea id="f-links" name="links" rows="3" spellcheck="false">{{ form.links if form else '' }}</textarea>
+
+    <div class="grp">
+      <span class="grp-k">Backers already committed</span>
+      <span class="grp-h">Optional, and open to every type. Anyone who has already committed money
+      to this work, with their logo. The header of your page and your board card show the total and
+      the logos, the way backer logos show on every initiative today.</span>
+    </div>
+
+    <div id="bk-rows"></div>
+    <div class="pasterow">
+      <button type="button" class="btn ghost sm" id="btn-add-bk">Add a backer</button>
+    </div>
+    <div class="bk-head" id="bk-head"></div>
+
+    <div class="grp">
+      <span class="grp-k">The sections</span>
+      <span class="grp-h">The site renders the heading, you answer the question. Fixed order, no
+      renaming, no dropping. Bold, links and lists are welcome inside a field.</span>
+    </div>
+
+    {# every section textarea exists once; the JS shows the ones for the chosen type, in its order #}
+    <div id="sections">
+      {% for key, fld in fields.items() %}
+      <div class="fld" data-sec="{{ key }}" hidden>
+        <span class="eyebrow">Renders as: {{ fld.heading }} <em class="reqtag sm">Required</em></span>
+        <label class="lbl q" for="s-{{ key }}">{{ fld.q }}<span class="dim">{{ fld.helper }}</span></label>
+        <textarea id="s-{{ key }}" name="{{ key }}" data-k="{{ key }}" rows="{{ fld.rows }}" maxlength="20000">{{ form.get(key) if form else '' }}</textarea>
+        <div class="fld-foot">
+          <button type="button" class="linklike ex-btn" data-ex="{{ key }}" aria-expanded="false" aria-controls="ex-{{ key }}">Show example</button>
+          <span class="wc" data-wc="{{ key }}"></span>
+        </div>
+        <div class="exbox" id="ex-{{ key }}" hidden>
+          {% if example.get(key) %}<span class="ex-lbl">Example <i>from the gold-standard initiative</i></span>
+          <div class="ex-body md">{{ example.get(key) | md }}</div>
+          {% else %}<span class="ex-lbl">Example</span><p class="ex-body">The gold-standard example is an RFP; see the guide for a grant example of this section.</p>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="grp">
+      <span class="grp-k">Milestones</span>
+      <span class="grp-h">Each row renders as a heading with a checklist under it. The site letters
+      them A, B, C in the order they sit here. The amounts add up against your funding goal.</span>
+    </div>
+
+    <div id="ms-rows" class="eb"></div>
+    <div class="pasterow">
+      <button type="button" class="btn ghost sm" id="btn-add-ms">Add milestone</button>
+    </div>
+    <div class="tot">
+      <span id="tot-line"></span>
+      <span id="adopt-line"></span>
+    </div>
+
+    <div class="grp">
+      <span class="grp-k">Checks</span>
+      <span class="grp-h">Warnings are yours to judge, you can submit past them. Errors do not
+      block the button: press Submit and every problem is marked on the question it belongs to.</span>
+    </div>
+
+    <div class="checks" id="checks">
+      <h4>What the form found</h4>
+      <div id="checks-list"></div>
+    </div>
+
+    <div class="grp">
+      <span class="grp-k">Preview</span>
+      <span class="grp-h">Exactly what the site publishes, including the panel the site adds for
+      you. If your markdown died in the paste, you see it here.</span>
+    </div>
+
+    <div class="pasterow">
+      <button type="button" class="btn ghost" id="btn-preview" aria-expanded="false" aria-controls="preview">See it as a page</button>
+    </div>
+    <div class="preview-wrap" id="preview" hidden></div>
+
+    <div class="grp">
+      <span class="grp-k">Private, never published</span>
+      <span class="grp-h">Only the review team reads these two fields. They never appear on the
+      page, the board, or the API.</span>
+    </div>
+
+    <label class="lbl" for="f-funders">Who is likely to fund this? <em class="reqtag">Required</em>
+      <span class="priv">🔒 Private, never published</span>
+      <span class="dim">One funder per line: name | why they care | your relationship | warm intro? | likely amount.</span></label>
+    <textarea id="f-funders" name="funders" rows="6" maxlength="4000">{{ form.funders if form else '' }}</textarea>
+
+    <label class="lbl" for="f-contact">Contact <em class="reqtag">Required</em>
+      <span class="priv">🔒 Private, never published</span>
+      <span class="dim">Email or handle. We use it only to ask about this submission.</span></label>
     <input type="text" id="f-contact" name="contact" maxlength="200" value="{{ form.contact if form else '' }}">
 
-    <button class="btn primary" type="submit">Submit for review</button>
+    {% for kind, p in rules_panels().items() if p %}
+    <details class="rules" data-rules="{{ kind }}" {% if kind == fkind %}open{% else %}hidden{% endif %}>
+      <summary><span>{{ p.title }}</span></summary>
+      <div class="md">{{ p.body | md }}</div>
+      <p class="rules-ver">Rules v{{ p.version }}, shown on every initiative of this type.</p>
+    </details>
+    {% endfor %}
+
+    <div class="subrow">
+      <button class="btn primary" type="submit" id="btn-submit">Submit for review</button>
+      <span class="blockmsg" id="blockmsg"></span>
+    </div>
   </form>
 </main>
 {% endblock %}

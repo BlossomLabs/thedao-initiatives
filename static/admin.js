@@ -14,6 +14,19 @@
     }
   }, true);
 
+  // Manage form: only the fields for the chosen type are shown.
+  var typeSel = document.querySelector('form.form select[name="type"]');
+  var topupBox = document.querySelector('form.form input[name="topup"]');
+  if (typeSel && topupBox) {
+    var sync = function () {
+      var grant = typeSel.value === "grant";
+      document.querySelectorAll("[data-grant-only]").forEach(function (el) { el.hidden = !grant; });
+      document.querySelectorAll("[data-topup-only]").forEach(function (el) { el.hidden = !(grant && topupBox.checked); });
+    };
+    typeSel.addEventListener("change", sync);
+    topupBox.addEventListener("change", sync);
+  }
+
   var box = document.getElementById("safe-deploy");
   if (!box) return;
   var rfpId = box.dataset.rfp;

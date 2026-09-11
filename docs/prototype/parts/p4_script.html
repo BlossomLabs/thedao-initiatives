@@ -1,0 +1,1424 @@
+
+<script>
+/* ============================================================================
+   Suggest an initiative, v2 prototype, second pass (Griff's review of
+   2026-09-10 applied).
+   Plain vanilla JS, no libraries, written to be readable as a reference for
+   the real implementation. Five parts:
+     1. amount parsing
+     2. the field dictionary (questions, helpers, rules copy, example draft)
+     3. the splitter that turns one pasted draft into filled fields
+     4. rendering (sections, backers, milestone rows, checks, page preview)
+     5. checks, error painting, and wiring
+   ============================================================================ */
+(function () {
+  "use strict";
+
+  /* ---------------------------------------------------------------- helpers */
+  function $(sel) { return document.querySelector(sel); }
+  function all(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  function v(id) { var n = document.getElementById(id); return n ? n.value : ""; }
+  function setV(id, val) { var n = document.getElementById(id); if (n) { n.value = val; } }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function words(s) { var t = String(s || "").trim(); return t ? t.split(/\s+/).length : 0; }
+  function nonEmpty(s) { return String(s || "").trim() !== ""; }
+  function letter(i) { return String.fromCharCode(65 + (i % 26)); }
+  function intOf(x) {
+    var n = parseInt(String(x == null ? "" : x).replace(/[^0-9]/g, ""), 10);
+    return isFinite(n) ? n : 0;
+  }
+
+  /* ------------------------------------------------- 1. amount parsing */
+  /* One reader for every money field on this form: the funding goal, every
+     milestone amount, every backer amount. The audience is global and types
+     money several ways, so the last separator decides how the number is read:
+       "150.000" and "150,000"  ->  150000
+           a separator followed by exactly three digits at the end of the
+           number is a thousands separator
+       "150.00" and "150,00"    ->  150
+           a separator followed by one or two digits is a decimal point
+       "150.000,50"             ->  150000.5
+           mixed separators: the last one is the decimal point
+     Anything that is not a digit or a separator (currency symbols, spaces,
+     stray words) is dropped first. A tail of four digits or more is treated
+     as grouping too, which is the only sane reading left. Every amount field
+     echoes the parsed number back as "$150,000", so a wrong read is visible
+     before anyone submits it. */
+  function parseAmount(raw) {
+    var s = String(raw == null ? "" : raw).replace(/[^0-9.,]/g, "");
+    if (!s) { return 0; }
+    var last = Math.max(s.lastIndexOf("."), s.lastIndexOf(","));
+    var n;
+    if (last < 0) {
+      n = parseFloat(s);
+    } else if (/^\d{1,2}$/.test(s.slice(last + 1))) {
+      n = parseFloat(s.slice(0, last).replace(/[.,]/g, "") + "." + s.slice(last + 1));
+    } else {
+      n = parseFloat(s.replace(/[.,]/g, ""));
+    }
+    return isFinite(n) ? n : 0;
+  }
+
+  function usd(n) {
+    var x = Number(n) || 0;
+    var cents = Math.abs(x % 1) > 0.004 ? 2 : 0;
+    return "$" + x.toLocaleString("en-US",
+      { minimumFractionDigits: cents, maximumFractionDigits: cents });
+  }
+  function money(n) {
+    return n ? Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 }) : "";
+  }
+
+  /* ------------------------------------------- 2. the field dictionary */
+  /* One question per section. The site owns the heading; the submitter answers
+     the question. Order here is the order on the page, and it differs by type. */
+  var FIELD = {
+    why: {
+      heading: "Why this matters", rows: 7,
+      q: "What gap does this close, and what can people do afterwards that they cannot today?",
+      helper: "1 to 2 short paragraphs or a bullet list."
+    },
+    in_scope: {
+      heading: "In scope", rows: 8,
+      q: "What gets built or delivered?",
+      helper: "Concrete deliverables. This is also where you say what the money actually pays for."
+    },
+    out_scope: {
+      heading: "Out of scope", rows: 5,
+      q: "What is deliberately not included?",
+      helper: "This is where the expensive misunderstandings get prevented."
+    },
+    existing: {
+      heading: "Existing work", rows: 4,
+      q: "What prior art should bidders build on?",
+      helper: "Links. Say what would justify building on something else. Write none if there is nothing."
+    },
+    who: {
+      heading: "Who we expect to do this", rows: 7,
+      q: "What does a winning team look like, and who co-drafted this initiative?",
+      helper: "Nobody is pre-selected. Name co-authors and your own relationship to any team or codebase named above."
+    },
+    hard_req: {
+      heading: "Hard requirements", rows: 9,
+      q: "What must every proposal meet or be ignored?",
+      helper: "Numbered. Open source under an OSI license where code is delivered, verifiable acceptance, a maintenance plan, plus what the domain demands."
+    },
+    team: {
+      heading: "The team", rows: 6, grantOnly: true,
+      q: "Who does the work? Names, roles, track record, links.",
+      helper: "Also state any other funding you have for this work, and your relationships to codebases or firms named in this initiative."
+    },
+    why_grant: {
+      heading: "Why a grant: what already exists", rows: 7, grantOnly: true,
+      q: "What have you already built or done that gives you a decisive head start, and where can a stranger check it?",
+      helper: "Links to code, reports, deployments. Say why the price is below a from-scratch build. If the head start is thin, say so, the admin may ask you to resubmit as an RFP."
+    },
+    commitments: {
+      heading: "Commitments", rows: 6, grantOnly: true,
+      q: "What do you commit to on license, maintenance after the money is spent, and pinned targets? Any exception you are asking for?",
+      helper: "What you commit to on license, maintenance after the money is spent, and pinned targets. State any exception you are asking for."
+    }
+  };
+
+  var SECTIONS = {
+    rfp: ["why", "in_scope", "out_scope", "existing", "who", "hard_req"],
+    grant: ["why", "team", "why_grant", "in_scope", "out_scope", "commitments"]
+  };
+
+  /* The gold-standard example is an RFP, so the three grant-only sections get a
+     short illustrative example instead. Guide v3 ships a full grant example.
+     The team example is the Giveth roster, per Griff. */
+  var GRANT_EX = {
+    team: "**Giveth** does the work. Griff Green, co-founder, leads TheDAO Security Fund and holds the funder relationships. Lauren Luz runs project management, Jake Schumacher leads business development and fundraising, and Anamarija Begonja leads communications. Cotabe Moral covers business development and partnerships.\n\nTrack record: giveth.io, github.com/Giveth, and the 29 initiatives already on this board.\n\nNo other funder pays for this scope. Giveth administers TheDAO Security Fund, so the independent reviewer for these milestones is named in the grant agreement and is not Giveth.",
+    why_grant: "The scoring template already exists in draft: 40 controls, three tiers, run against 9 teams inside our own audits over the last year. Redacted samples are at example.org/opsec-tiers. Two firms have signed a letter of intent to adopt it.\n\nThat is why this costs $60,000 rather than a from-scratch $150,000: the drafting and the first firm conversations are done. What is left is the other four firms, the board, and the membership body.",
+    commitments: "- Template and tier definitions published under CC BY 4.0, board code under MIT.\n- We maintain the board for 12 months after the last milestone at no further cost.\n- Pinned target: at least 20 rated teams within 9 months of the first payment.\n- One exception requested: the raters' internal scoring worksheets stay closed for the first year, because they name the controls a team failed."
+  };
+
+  /* The rules panel, verbatim from docs/rules-panel-text-2026-09-10.md. The
+     site renders this from content/boilerplate, by type. Nobody pastes it,
+     nobody edits it, and it is the same on every initiative of that type. */
+  var RULES = {
+    rfp: {
+      title: "How RFPs work",
+      items: [
+        "Funding comes first. Nothing starts until the initiative is fully funded.",
+        "When funding completes, a 30-day proposal window opens. Any qualified team can bid.",
+        "This page describes the solution we want. A team with another solid way to solve the same problem is welcome to propose it, even if it departs from the draft milestones below.",
+        "A proposal contains the team and its track record, the technical approach, a milestone plan with a per-milestone budget (the draft on this page or a stronger version), and full disclosures. Every applicant discloses their relationships to the teams, codebases, and firms named on this page.",
+        "Giveth selects the team within 7 days of the window closing, weighing credibility, price, and the strength of the proposed milestones.",
+        "The milestones on this page are a draft. Final milestones and payments get negotiated with the selected team and fixed in the grant agreement.",
+        "Before work begins, an independent technical reviewer with no ties to the team is appointed and named in the grant agreement. The reviewer decides whether each milestone passes or fails. Giveth is not the reviewer unless explicitly named, and Giveth oversees the arrangement so the reviewer stays independent of the team. The reviewer's fee comes out of the milestone payment, or the reviewer works pro bono; the team coordinates that payment.",
+        "The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.",
+        "Milestone deliveries are reviewed by the technical reviewer and paid within 14 days of acceptance.",
+        "If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund can reclaim the unspent funds and put them toward other Ethereum security initiatives.",
+        "In some circumstances the resulting grant may be managed by the Ethereum Foundation or another established ecosystem organization, when that is a better fit than Giveth."
+      ]
+    },
+    grant: {
+      title: "How grants work",
+      items: [
+        "Funding comes first. Nothing starts until the initiative is fully funded.",
+        "When funding completes, a 15-day window opens. In that window the recipient submits the formal proposal: the final milestone plan, the per-milestone budget, and full disclosures. The same window is an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.",
+        "Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement. Until then, the milestones on this page are a draft.",
+        "Before work begins, an independent technical reviewer with no ties to the team is appointed and named in the grant agreement. The reviewer decides whether each milestone passes or fails. Giveth is not the reviewer unless explicitly named, and Giveth oversees the arrangement so the reviewer stays independent of the team. The reviewer's fee comes out of the milestone payment, or the reviewer works pro bono; the team coordinates that payment.",
+        "The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.",
+        "Milestone deliveries are reviewed by the technical reviewer and paid within 14 days of acceptance.",
+        "If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund can reclaim the unspent funds and put them toward other Ethereum security initiatives.",
+        "In some circumstances a grant may be managed by the Ethereum Foundation or another established ecosystem organization, when that is a better fit than Giveth."
+      ]
+    },
+    topup: {
+      title: "How top-up grants work (work already under way with another funder)",
+      items: [
+        "This grant tops up work that is already under way. There is no proposal window and no challenge period.",
+        "The funding goal on this page is the total project budget. The amount already committed, and by whom, is shown in the header with each backer's logo; this grant raises the remainder.",
+        "Completed milestones are marked done with a link to the delivered work. Each remaining milestone carries a target month.",
+        "Payments from this grant start only once the earlier milestones have been accepted.",
+        "An independent technical reviewer with no ties to the team, appointed before this grant begins and named in the grant agreement, decides whether each remaining milestone passes or fails. Giveth is not the reviewer unless explicitly named, and Giveth oversees the arrangement so the reviewer stays independent of the team.",
+        "Milestone deliveries are reviewed by the technical reviewer and paid within 14 days of acceptance.",
+        "If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund can reclaim the unspent funds and put them toward other Ethereum security initiatives.",
+        "In some circumstances a grant may be managed by the Ethereum Foundation or another established ecosystem organization, when that is a better fit than Giveth."
+      ]
+    }
+  };
+
+  /* The example draft lives here, not in the paste box: the form starts empty.
+     The banner button drops this into the paste box and runs the same code path
+     a real paste runs. It is a demo control and does not ship. */
+  var EXAMPLE_DRAFT = [
+    "# RFP: OPSEC Ratings Coalition to Build & Maintain an \"L2Beat for OPSEC\"",
+    "",
+    "## Short summary",
+    "",
+    "One OPSEC rating the whole industry recognizes, issued by the firms that already run OPSEC audits. This RFP funds the coordinator who gets at least 6 auditing firms to agree on one scoring template and the A / AA / AAA tiers, stands up a public board of rated teams, and hands the standard to a membership body the firms own. Rated teams pay a fixed fee, so the system pays for itself once enough teams are on the board.",
+    "",
+    "## Funding goal",
+    "",
+    "$150,000 USD",
+    "",
+    "## Expected duration",
+    "",
+    "18 months",
+    "",
+    "## Links",
+    "",
+    "https://frameworks.securityalliance.org/",
+    "https://securityalliance.org/",
+    "",
+    "## Why this matters",
+    "",
+    "Your keys, your devices, your multisig process, your access controls... these are just as important as your smart contracts. Every serious team already invests in OPSEC, and OPSEC audits happen all the time. But all of that work is invisible. There is no public signal that tells users, investors or partners who is actually running a tight ship.",
+    "",
+    "We want to change that with a single OPSEC rating the whole industry agrees on. Think of a Moody's rating: people want one because everyone recognizes what it means. Teams that earn an A, AA or AAA get their tier on a public board. That's it, just the tier. We will never publish what a team is missing (a public list of weaknesses is a gift to attackers), and teams with unacceptable OPSEC simply don't make the board... which says something all by itself.",
+    "",
+    "## In scope",
+    "",
+    "- Coordinating at least 6 OPSEC auditing companies to agree on one scoring template and the A / AA / AAA tier definitions",
+    "- Onboarding those firms as the first accredited raters, with whatever materials they need to run the template inside their existing audit flow",
+    "- A simple public board of rated teams and their tiers, with valid-until and last check-in dates... tiers only, no details, no gaps",
+    "- Standing up the membership body: the charter (one firm, one vote), how raters get certified, the verification committee, the fixed fee schedule and the pooled funding model",
+    "- The 12-month rating cycle with the six-month check-in and the event-based suspension process",
+    "- The handoff: transferring the standard, the board and the name to the membership body",
+    "",
+    "## Out of scope",
+    "",
+    "- Performing the underlying OPSEC audits (the accredited firms do that)",
+    "- Publishing any team's specific weaknesses, unmet controls, or the reasons behind a tier",
+    "- A heavy platform build. The board is deliberately simple.",
+    "",
+    "## Existing work",
+    "",
+    "- [Security Frameworks by SEAL](https://frameworks.securityalliance.org/): the Security Alliance's open framework covering operational security, infrastructure, DevOps, incident response and more. Bidders should read it before proposing a scoring template.",
+    "",
+    "## Who we expect to do this",
+    "",
+    "Nobody is pre-selected. Once this RFP is fully funded the bidding opens to anyone. The dream candidate is a credible coordinator in the security community: someone who can bring 6+ OPSEC auditing firms to the same table and get them all to sign the same document. (If you have ever tried to get six companies to agree on anything, you know that's the real work here.)",
+    "",
+    "Ideally the coordinator is not an OPSEC auditing firm, because whoever holds the pen on the standard walks away with an edge over the firms they convened. That is a preference, not a requirement, and it will weigh in selection. An audit firm that coordinates takes no rater role during the grant and no ownership of the board. The best pitch a bidder can make is simple: here is why the other firms can trust me to run this.",
+    "",
+    "Co-drafted by the submitter with input from the SEAL frameworks working group. The submitter runs no OPSEC auditing firm and will not bid.",
+    "",
+    "## Hard requirements",
+    "",
+    "1. **Six firms minimum.** At least 6 OPSEC auditing companies formally agree to the scoring template and tier definitions, and commit to issuing ratings with it.",
+    "2. **Tiers only.** The public board shows a team's tier, its valid-until date and its last check-in, and nothing more. No gaps, no unmet controls, no explanations.",
+    "3. **Open and versioned.** The scoring template and tier definitions are public, open source and versioned, with changes dated and attributable, revised through a defined change process no more than once a year.",
+    "4. **Tool-agnostic.** Every tier is reachable no matter which tools or frameworks a team uses. No vendor's product is ever required.",
+    "5. **One firm, one vote.** Every founding firm gets equal governance rights in the membership body, regardless of who convened whom.",
+    "6. **Neutral name.** The standard and the board are not branded after the coordinator or any single firm.",
+    "7. **Mandatory handoff.** The standard, the board, the name and any secretariat function transfer to the membership body no later than six months after the final milestone. The coordinator keeps no veto and no unilateral control.",
+    "8. **Fixed fees, pooled.** Rated teams pay a fixed, outcome-independent fee. Fees flow to the membership body, which pays raters from the pool and funds the verification committee from it. No tier-contingent pricing, no \"we'll get you to AA\" upsell.",
+    "9. **Twelve months, checked at six, suspended on events.** A rating is valid for 12 months, lapses without the six-month self-attestation and check-in, and is suspended automatically on a disclosed incident or a material change until the team is re-rated.",
+    "",
+    "## What this actually pays for",
+    "",
+    "Let's be clear about what this RFP is: a coordination effort. The money pays for the social exercise of getting the OPSEC auditing firms around one table to agree on one standard. The website is the easy part.",
+    "",
+    "## Milestones (draft)",
+    "",
+    "### Agreed standard - $50,000",
+    "",
+    "- [ ] A public, versioned scoring template plus the A / AA / AAA tier definitions, with the change process for future revisions",
+    "- [ ] At least 6 OPSEC auditing companies formally signed on and committed to rating with it, with the signed template published",
+    "- [ ] The membership body's charter published: one firm, one vote, rater certification, the verification committee and its stipends, the fixed fee schedule, the pooled funding model, and the handoff agreement with a transfer date no later than six months after the final milestone",
+    "",
+    "### Board and first ratings - $25,000",
+    "",
+    "- [ ] The public board is live, showing rated teams, their tiers, valid-until dates and last check-ins (and nothing else)",
+    "- [ ] At least 6 accredited firms have issued ratings inside their normal audit flow, each listed on the public board",
+    "- [ ] At least 5 teams rated end to end, with their fees paid through the membership body's pool",
+    "",
+    "### Adoption evidence - $75,000 (adoption)",
+    "",
+    "- [ ] 20 teams publicly rated on the board by accredited firms",
+    "- [ ] The six-month check-in running: every rating older than six months shows a check-in date on the board, and the event-based suspension process is live with a public change log",
+    "- [ ] The membership body running on pooled fees, with the verification committee active and its spot-check sample published, both shown on the body's public page",
+    "- [ ] A public metrics page: teams rated, tiers awarded, firms participating, check-ins completed, suspensions and renewals",
+    "",
+    "## Who is likely to fund this",
+    "",
+    "Ethereum Foundation | funds public-goods security tooling | met once at Devconnect | warm intro? yes | $50,000",
+    "Safe Ecosystem Foundation | multisig OPSEC is their core risk surface | no contact yet | warm intro? no | $25,000",
+    "Security Alliance (SEAL) | published the framework this builds on | co-drafted the standard question | warm intro? yes | suggested ask $25,000",
+    "",
+    "## Contact",
+    "",
+    "opsec-coalition@example.org"
+  ].join("\n");
+
+  /* ------------------------------------------------- 3. the splitter */
+  /* Known headings, exact names plus a short alias list. Two aliases depend on
+     the type, because the old format used one heading for two different jobs. */
+  function headingKey(rawName, type) {
+    var n = String(rawName).toLowerCase()
+      .replace(/[*_`#]/g, "").replace(/\s+/g, " ").trim().replace(/[:.]+$/, "");
+
+    if (n === "what already exists") { return type === "grant" ? "why_grant" : "existing"; }
+    if (n === "the recipient" || n === "recipient team and why them") {
+      return type === "grant" ? "team" : "who";
+    }
+
+    var map = {
+      /* page fields */
+      "title": "title",
+      "short summary": "summary", "summary": "summary",
+      "funding goal": "goal", "funding goal (usd)": "goal", "budget": "goal", "funding": "goal",
+      "expected duration": "duration", "expected duration (months)": "duration",
+      "duration": "duration", "indicative duration": "duration",
+      "recipient team": "recipient",
+      "backers": "backers", "backers already committed": "backers",
+      "already committed": "backers", "already committed (usd)": "backers",
+      "links": "links", "link": "links",
+      "who is likely to fund this": "funders", "who is likely to fund this?": "funders",
+      "funders": "funders", "contact": "contact",
+      /* sections */
+      "why this matters": "why",
+      "in scope": "in_scope", "scope": "in_scope",
+      "out of scope": "out_scope",
+      "existing work": "existing", "prior art": "existing",
+      "who we expect to do this": "who", "who we expect to do this work": "who",
+      "hard requirements": "hard_req", "requirements": "hard_req",
+      "the team": "team", "team": "team",
+      "why a grant": "why_grant", "why a grant what already exists": "why_grant",
+      "why a grant: what already exists": "why_grant",
+      "commitments": "commitments",
+      /* milestones */
+      "milestones": "milestones", "milestones (draft)": "milestones",
+      "draft milestones": "milestones", "milestone plan": "milestones"
+    };
+    return map[n] || null;
+  }
+
+  var PAGE_KEYS = ["title", "summary", "goal", "duration", "recipient", "backers",
+                   "links", "funders", "contact"];
+
+  function splitDraft(text, type) {
+    var out = { page: {}, fields: {}, milestones: [], unsorted: "" };
+    var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    var buckets = {}, msLines = [], unsorted = [], cur = null;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var h = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+
+      if (h) {
+        var level = h[1].length, name = h[2];
+        /* a lone top-level heading is the title, with any type prefix removed */
+        if (level === 1 && !out.page.title) {
+          out.page.title = name.replace(/^\s*(rfp|grant)\s*:\s*/i, "").trim();
+          cur = null;
+          continue;
+        }
+        /* inside the milestones block, deeper headings are milestone rows */
+        if (cur === "milestones" && level >= 3) { msLines.push(line); continue; }
+
+        var key = headingKey(name, type);
+        if (key) { cur = key; if (!buckets[key]) { buckets[key] = []; } continue; }
+
+        /* no heading is allowed inside a field: keep the text, drop the heading */
+        if (cur && cur !== "milestones" && cur !== "unsorted" && level >= 3) {
+          buckets[cur].push("**" + name + "**");
+          continue;
+        }
+        cur = "unsorted";
+        unsorted.push(line);
+        continue;
+      }
+
+      if (cur === "milestones") { msLines.push(line); continue; }
+      if (cur && cur !== "unsorted") { buckets[cur].push(line); continue; }
+      unsorted.push(line);
+    }
+
+    Object.keys(buckets).forEach(function (k) {
+      var text2 = buckets[k].join("\n").replace(/\n{3,}/g, "\n\n").trim();
+      if (PAGE_KEYS.indexOf(k) >= 0) { out.page[k] = text2; } else { out.fields[k] = text2; }
+    });
+
+    out.milestones = parseMilestones(msLines, function (spill) { unsorted.push(spill); });
+    out.unsorted = unsorted.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+    return out;
+  }
+
+  /* "### Agreed standard - $50,000 (adoption)" becomes a row, and the bullet
+     lines under it become its acceptance criteria. A leading "A - " from the
+     old format is accepted and thrown away: the letter is the row's position. */
+  function rowFromHeading(s) {
+    var row = { name: "", amount: 0, adoption: false, done: false, link: "", month: "", criteria: [] };
+    var t = String(s).trim();
+    if (/\(adoption\)/i.test(t)) { row.adoption = true; t = t.replace(/\(adoption\)/ig, "").trim(); }
+    if (/\(done\)/i.test(t)) { row.done = true; t = t.replace(/\(done\)/ig, "").trim(); }
+    t = t.replace(/[*_`]/g, "").trim();
+
+    var parts = t.split(/\s+-\s+/);
+    if (parts.length >= 3 && parts[0].trim().length <= 3) {
+      row.amount = parseAmount(parts[parts.length - 1]);
+      row.name = parts.slice(1, -1).join(" - ").trim();
+    } else if (parts.length >= 2 && parseAmount(parts[parts.length - 1]) > 0) {
+      row.amount = parseAmount(parts[parts.length - 1]);
+      row.name = parts.slice(0, -1).join(" - ").trim();
+    } else {
+      row.name = t;
+    }
+    return row;
+  }
+
+  function parseMilestones(lines, spill) {
+    var rows = [], cur = null, preamble = [];
+    lines.forEach(function (line) {
+      var h = line.match(/^#{2,6}\s+(.+?)\s*#*\s*$/);
+      if (h) { cur = rowFromHeading(h[1]); rows.push(cur); return; }
+      var t = line.trim();
+      if (!t) { return; }
+      if (!cur) { preamble.push(line); return; }
+      /* guide v3 conventions for top-ups: first lines under the heading */
+      var mm = t.match(/^target month:\s*(\d{4}-\d{2})\b/i);
+      if (mm) { cur.month = mm[1]; return; }
+      var dl = t.match(/^delivered:\s*(\S+)/i);
+      if (dl) { cur.link = dl[1]; return; }
+      var crit = t.replace(/^[-*+]\s+/, "").replace(/^\d+[.)]\s+/, "")
+                  .replace(/^\[[ xX]\]\s*/, "").trim();
+      if (crit) { cur.criteria.push(crit); }
+    });
+    /* the old milestones preamble is not a criterion, it goes to unsorted */
+    if (preamble.length && spill) { spill(preamble.join("\n").trim()); }
+    return rows;
+  }
+
+  /* "Security Alliance (SEAL) | $20,000 | https://..." becomes a backer row.
+     Logos are never text, so a pasted draft never carries one: the proposer
+     uploads the organization's own logo file in the form. */
+  function parseBackers(text) {
+    return String(text || "").split("\n").map(function (line) {
+      return line.replace(/^[-*+]\s+/, "").trim();
+    }).filter(function (line) { return line.indexOf("|") > 0; }).map(function (line) {
+      var p = line.split("|");
+      return {
+        org: (p[0] || "").trim(),
+        amount: parseAmount(p[1] || ""),
+        url: (p[2] || "").trim(),
+        logoName: "", logoData: ""
+      };
+    });
+  }
+
+  /* ---------------------------------------------------- tiny markdown */
+  function mdInline(s) {
+    return esc(s)
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="#" title="$2">$1</a>')
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+  function mdToHtml(src) {
+    var out = [], para = [], list = null;
+    function flushPara() { if (para.length) { out.push("<p>" + mdInline(para.join(" ")) + "</p>"); para = []; } }
+    function flushList() {
+      if (list) {
+        out.push("<" + list.tag + ">" + list.items.map(function (x) {
+          return "<li>" + mdInline(x) + "</li>";
+        }).join("") + "</" + list.tag + ">");
+        list = null;
+      }
+    }
+    String(src || "").replace(/\r\n?/g, "\n").split("\n").forEach(function (line) {
+      var t = line.trim();
+      if (!t) { flushPara(); flushList(); return; }
+      var ul = t.match(/^[-*+]\s+(.*)$/), ol = t.match(/^\d+[.)]\s+(.*)$/);
+      if (ul) {
+        flushPara();
+        if (!list || list.tag !== "ul") { flushList(); list = { tag: "ul", items: [] }; }
+        list.items.push(ul[1].replace(/^\[[ xX]\]\s*/, ""));
+        return;
+      }
+      if (ol) {
+        flushPara();
+        if (!list || list.tag !== "ol") { flushList(); list = { tag: "ol", items: [] }; }
+        list.items.push(ol[1]);
+        return;
+      }
+      flushList();
+      para.push(t);
+    });
+    flushPara(); flushList();
+    return out.join("");
+  }
+
+  /* --------------------------------------------------------- 4. state */
+  var state = {
+    type: "rfp", topup: false, fields: {}, milestones: [], backers: [],
+    previewOpen: false, submitted: false
+  };
+  /* the example toggles read the same parsed example, whether the form is
+     filled or empty */
+  var EXAMPLE_FIELDS = {};
+
+  function emptyMilestone() {
+    return { name: "", amount: 0, adoption: false, done: false, link: "", month: "", criteria: [""] };
+  }
+  function emptyBacker() {
+    return { org: "", amount: 0, url: "", logoName: "", logoData: "" };
+  }
+
+  function rulesKey() { return state.type === "grant" ? (state.topup ? "topup" : "grant") : "rfp"; }
+  function rulesTitle() { return RULES[rulesKey()].title; }
+  /* the top-up title carries a parenthetical that reads badly mid-sentence */
+  function panelName() { return rulesTitle().replace(/\s*\(.*\)\s*$/, ""); }
+  function goal() { return parseAmount(v("f-goal")); }
+  function msTotal() {
+    return state.milestones.reduce(function (a, m) { return a + parseAmount(m.amount); }, 0);
+  }
+  function adoptionTotal() {
+    return state.milestones.reduce(function (a, m) {
+      return a + (m.adoption ? parseAmount(m.amount) : 0);
+    }, 0);
+  }
+  function liveBackers() {
+    return state.backers.filter(function (b) { return nonEmpty(b.org) || b.amount > 0; });
+  }
+  function committedTotal() {
+    return liveBackers().reduce(function (a, b) { return a + parseAmount(b.amount); }, 0);
+  }
+
+  /* ------------------------------------------------------ 4. rendering */
+  function renderRules() {
+    var r = RULES[rulesKey()];
+    $("#rules-title").textContent = r.title;
+    $("#rules-body").innerHTML = "<ol>" + r.items.map(function (li) {
+      return "<li>" + mdInline(li) + "</li>";
+    }).join("") + "</ol>";
+  }
+
+  function exampleHtml(id) {
+    var body = EXAMPLE_FIELDS[id] || GRANT_EX[id] || "";
+    var note = FIELD[id].grantOnly
+      ? '<i>illustrative, the gold-standard example is an RFP</i>'
+      : '<i>from the gold-standard initiative</i>';
+    if (!body) { return '<span class="ex-lbl">Example</span><p class="ex-body">Not written yet.</p>'; }
+    return '<span class="ex-lbl">Example ' + note + '</span>' +
+           '<div class="ex-body">' + mdToHtml(body) + "</div>";
+  }
+
+  function renderSections() {
+    var ids = SECTIONS[state.type];
+    $("#sections").innerHTML = ids.map(function (id, i) {
+      var f = FIELD[id];
+      return '<div class="fld">' +
+        '<span class="eyebrow' + (i === 0 ? " top" : "") + '">Renders as: ' + esc(f.heading) +
+          ' <em class="reqtag sm">Required</em></span>' +
+        '<label class="lbl q" for="s-' + id + '">' + esc(f.q) +
+          '<span class="dim">' + esc(f.helper) + "</span></label>" +
+        '<textarea id="s-' + id + '" data-k="' + id + '" rows="' + f.rows + '">' +
+          esc(state.fields[id] || "") + "</textarea>" +
+        '<div class="fld-foot">' +
+          '<button type="button" class="linklike ex-btn" data-ex="' + id + '" ' +
+            'aria-expanded="false" aria-controls="ex-' + id + '">Show example</button>' +
+          '<span class="wc" data-wc="' + id + '"></span>' +
+        "</div>" +
+        '<div class="exbox" id="ex-' + id + '" hidden>' + exampleHtml(id) + "</div>" +
+      "</div>";
+    }).join("");
+    ids.forEach(updateWordCount);
+  }
+
+  function updateWordCount(id) {
+    var span = document.querySelector('[data-wc="' + id + '"]');
+    if (span) { span.textContent = words(state.fields[id]) + " words"; }
+  }
+
+  /* one backer per row: organization, amount, link, and the organization's own
+     logo file. The chip under the row is the same pill the initiative page and
+     the board card render. */
+  function backerChip(b) {
+    if (!nonEmpty(b.org) && !b.logoData) { return ""; }
+    return '<div class="bk-chip"><span class="eyebrow sm">On the page it looks like this</span>' +
+      '<div class="sponsors"><div class="sponsor-pill">' +
+      (b.logoData ? '<img class="sponsor-logo" src="' + esc(b.logoData) + '" alt="' +
+        esc(b.org || "Backer") + ' logo">' : "") +
+      "<b>" + esc(b.org || "Unnamed backer") + "</b>" +
+      "<span>" + usd(parseAmount(b.amount)) + "</span>" +
+      '<small class="pledged">committed</small>' +
+      "</div></div></div>";
+  }
+
+  function renderBackers() {
+    if (!state.backers.length) {
+      $("#bk-rows").innerHTML = '<p class="emptyrow">No backers listed. Add one for every ' +
+        'organization that has already committed money to this work.</p>';
+      return;
+    }
+    $("#bk-rows").innerHTML = state.backers.map(function (b, i) {
+      var p = "bk-" + i + "-";
+      return '<div class="bk-row" data-i="' + i + '">' +
+        '<div class="row-head"><span class="row-k">Backer ' + (i + 1) + "</span>" +
+          '<button type="button" class="btn ghost sm bk-del" data-del="' + i + '">Remove</button></div>' +
+        '<div class="ms-grid">' +
+          '<label class="ms-f grow"><span class="eyebrow sm">Organization</span>' +
+            '<input type="text" id="' + p + 'org" data-bk="org" value="' + esc(b.org) +
+            '" placeholder="Who committed the money"></label>' +
+          '<label class="ms-f amt"><span class="eyebrow sm">Amount committed (USD)</span>' +
+            '<input type="text" class="money" inputmode="decimal" id="' + p + 'amount" ' +
+            'data-bk="amount" value="' + esc(money(b.amount)) + '">' +
+            '<span class="amt-echo">' + (b.amount ? usd(b.amount) : "") + "</span></label>" +
+        "</div>" +
+        '<label class="ms-f"><span class="eyebrow sm">Link</span>' +
+          '<input type="text" id="' + p + 'url" data-bk="url" placeholder="https://" value="' +
+          esc(b.url) + '"></label>' +
+        '<div class="ms-f"><span class="eyebrow sm">Logo file</span>' +
+          '<input type="file" class="filein" id="' + p + 'logo" data-bk="logo" ' +
+          'accept=".png,.jpg,.jpeg,.webp,.svg">' +
+          '<p class="hint">Upload the organization\'s official logo file (from their press kit, ' +
+          'brand page, or repository). Never a redrawn or AI-made version.</p>' +
+          (b.logoName ? '<p class="hint bk-file">Selected: ' + esc(b.logoName) + "</p>" : "") +
+        "</div>" +
+        backerChip(b) +
+      "</div>";
+    }).join("");
+  }
+
+  function renderBackerHead() {
+    var live = liveBackers(), total = committedTotal(), g = goal();
+    if (!live.length || total <= 0) {
+      $("#bk-head").innerHTML = '<span class="dimline">Nothing committed yet, so this line stays ' +
+        "off your page and your board card.</span>";
+      return;
+    }
+    var names = live.map(function (b) { return b.org || "an unnamed backer"; }).join(", ");
+    var line = usd(total) + " already committed by " + names;
+    if (state.topup && g > total) {
+      line += "; this grant raises the remaining " + usd(g - total);
+    }
+    $("#bk-head").innerHTML = '<span class="okline">' + esc(line) + "</span>";
+  }
+
+  function renderMilestones() {
+    if (!state.milestones.length) {
+      $("#ms-rows").innerHTML = '<p class="emptyrow">No milestones yet. Add the first one, or ' +
+        "paste a draft and we build the rows from it.</p>";
+      return;
+    }
+    $("#ms-rows").innerHTML = state.milestones.map(function (m, i) {
+      var p = "ms-" + i + "-";
+      var crits = m.criteria.length ? m.criteria : [""];
+      return '<div class="ms-row" data-i="' + i + '">' +
+        '<div class="row-head"><span class="row-k">Milestone ' + letter(i) + "</span>" +
+          '<button type="button" class="btn ghost sm ms-del" data-del="' + i + '">Remove</button></div>' +
+        '<div class="ms-grid">' +
+          '<label class="ms-f grow"><span class="eyebrow sm">Name' +
+            ' <em class="reqtag sm">Required</em></span>' +
+            '<input type="text" id="' + p + 'name" data-mk="name" value="' + esc(m.name) + '"></label>' +
+          '<label class="ms-f amt"><span class="eyebrow sm">Amount (USD)' +
+            ' <em class="reqtag sm">Required</em></span>' +
+            '<input type="text" class="money" inputmode="decimal" id="' + p + 'amount" ' +
+            'data-mk="amount" value="' + esc(money(m.amount)) + '">' +
+            '<span class="amt-echo">' + (m.amount ? usd(m.amount) : "") + "</span></label>" +
+        "</div>" +
+        '<div class="ms-flags">' +
+          '<label class="cbrow"><input type="checkbox" data-mk="adoption"' +
+            (m.adoption ? " checked" : "") + "> <span>Adoption milestone</span></label>" +
+          (state.topup
+            ? '<label class="cbrow"><input type="checkbox" data-mk="done"' +
+              (m.done ? " checked" : "") + "> <span>Already done</span></label>"
+            : "") +
+        "</div>" +
+        (state.topup && m.done
+          ? '<label class="ms-f"><span class="eyebrow sm">Link to the delivered work</span>' +
+            '<input type="text" id="' + p + 'link" data-mk="link" placeholder="https://" value="' +
+            esc(m.link) + '"></label>'
+          : "") +
+        (state.topup && !m.done
+          ? '<label class="ms-f mth"><span class="eyebrow sm">Target month</span>' +
+            '<input type="month" id="' + p + 'month" data-mk="month" value="' + esc(m.month) +
+            '"></label>'
+          : "") +
+        '<div class="crit-block eb" id="' + p + 'crit">' +
+          '<span class="eyebrow sm">Acceptance criteria, one per row' +
+            ' <em class="reqtag sm">Required</em></span>' +
+          '<div class="crit-list">' + crits.map(function (c, j) {
+            return '<div class="crit"><span class="crit-box" aria-hidden="true"></span>' +
+              '<input type="text" id="' + p + "c" + j + '" data-mk="crit" data-ci="' + j +
+              '" value="' + esc(c) + '" placeholder="One checkable outcome">' +
+              '<button type="button" class="crit-del" data-cdel="' + j +
+              '" title="Remove this criterion" aria-label="Remove this criterion">&#215;</button></div>';
+          }).join("") + "</div>" +
+          '<button type="button" class="linklike crit-add">Add criterion</button>' +
+        "</div>" +
+      "</div>";
+    }).join("");
+  }
+
+  function renderTotals() {
+    var sum = msTotal(), g = goal(), ad = adoptionTotal();
+    var pct = g > 0 ? Math.round((ad / g) * 100) : 0;
+    var okSum = state.milestones.length === 0 || Math.round(sum) === Math.round(g);
+    $("#tot-line").innerHTML = '<span class="' + (okSum ? "okc" : "bad") + '">Milestones total ' +
+      usd(sum) + " of " + usd(g) + " goal</span>";
+    var okAd = g > 0 && ad >= g / 3;
+    $("#adopt-line").innerHTML = '<span class="' + (okAd ? "okc" : "bad") + '">Adoption-tied: ' +
+      usd(ad) + " (" + pct + "%), minimum one third, " + usd(g / 3) + "</span>";
+  }
+
+  function updateAmountEcho(el, n) {
+    var echo = el.parentNode ? el.parentNode.querySelector(".amt-echo") : null;
+    if (echo) { echo.textContent = n ? usd(n) : ""; }
+  }
+
+  /* ------------------------------------------------ 5. checks */
+  /* Two kinds of finding. An error has to be fixed before the submission is
+     any use to a reviewer; a warning is a judgment call the submitter can
+     overrule. Neither disables the button: pressing Submit paints every
+     finding on the question it belongs to and scrolls to the first one.
+     Every finding carries the id of the field it belongs to, which is what
+     the painting uses. */
+  var HEDGES = /\bas needed\b|\bwhere appropriate\b/i;
+
+  function runChecks() {
+    var errs = [], warns = [];
+    function err(target, msg, text) {
+      errs.push({ target: target, msg: msg, text: text || esc(msg), kind: "content" });
+    }
+    function need(target, label, msg) {
+      errs.push({
+        target: target, msg: msg, kind: "missing",
+        text: "<b>" + esc(label) + "</b> is required. " + esc(msg)
+      });
+    }
+    function warn(target, msg, text, lines) {
+      warns.push({ target: target, msg: msg, text: text || esc(msg), lines: lines });
+    }
+
+    if (!nonEmpty(v("f-title"))) { need("f-title", "Title", "Write the title, up to 140 characters."); }
+    if (!nonEmpty(v("f-summary"))) {
+      need("f-summary", "Short summary", "Write the 2 to 4 sentences the board card shows.");
+    }
+    if (goal() <= 0) { need("f-goal", "Funding goal", "Enter the goal in USD, one flat number."); }
+    if (intOf(v("f-duration")) <= 0) {
+      need("f-duration", "Expected duration", "Enter the number of months to the last milestone.");
+    }
+    if (state.type === "grant" && !nonEmpty(v("f-recipient"))) {
+      need("f-recipient", "Recipient team", "Name the team that receives this grant.");
+    }
+    SECTIONS[state.type].forEach(function (id) {
+      if (!nonEmpty(state.fields[id])) {
+        need("s-" + id, FIELD[id].heading, "Answer the question above.");
+      }
+    });
+    if (!nonEmpty(v("f-funders"))) {
+      need("f-funders", "Who is likely to fund this",
+        "Name at least one funder, one per line. Private, never published.");
+    }
+    if (!nonEmpty(v("f-contact"))) {
+      need("f-contact", "Contact", "An email or handle, so we can ask about this submission.");
+    }
+
+    /* backers are optional, but a half-filled row is a mistake */
+    state.backers.forEach(function (b, i) {
+      var p = "bk-" + i + "-";
+      if (nonEmpty(b.org) && parseAmount(b.amount) <= 0) {
+        err(p + "amount", "Add what " + b.org + " committed, or remove the row.");
+      }
+      if (!nonEmpty(b.org) && parseAmount(b.amount) > 0) {
+        err(p + "org", "Name the organization that committed this amount, or remove the row.");
+      }
+    });
+    if (state.topup && !liveBackers().length) {
+      warn("bk-rows", "A top-up says the work is already funded by someone else. List that " +
+        "backer so the header can show the amount and the logo.");
+    }
+
+    if (!state.milestones.length) {
+      need("ms-rows", "Milestones", "Add at least one milestone.");
+    }
+    state.milestones.forEach(function (m, i) {
+      var p = "ms-" + i + "-", L = "Milestone " + letter(i);
+      if (!nonEmpty(m.name)) { need(p + "name", L + " name", "Name this milestone."); }
+      if (parseAmount(m.amount) <= 0) {
+        need(p + "amount", L + " amount", "Enter what this milestone pays.");
+      }
+      if (!m.criteria.filter(nonEmpty).length) {
+        need(p + "crit", L + " criteria", "Write at least one criterion a reviewer can check.");
+      }
+      if (state.topup && m.done && !nonEmpty(m.link)) {
+        warn(p + "link", L + " is marked done with no link to the delivered work.");
+      }
+      if (state.topup && !m.done && !nonEmpty(m.month)) {
+        warn(p + "month", L + " has no target month. Every remaining milestone needs one.");
+      }
+    });
+
+    var sum = msTotal(), g = goal();
+    if (state.milestones.length && g > 0 && Math.round(sum) !== Math.round(g)) {
+      err("f-goal", "Milestone amounts total " + usd(sum) + " against a " + usd(g) +
+        " goal. Change the goal or a milestone amount.",
+        "Milestone amounts total <b>" + usd(sum) + "</b>, the funding goal is <b>" + usd(g) +
+        "</b>. Change one of them before you submit.");
+    }
+
+    /* Item 10: the adoption rule blocks. At least one adoption milestone, and
+       adoption-tied amounts worth at least a third of the goal, which is at
+       least $100,000 once the goal reaches $300,000. A top-up is exempt only
+       when every milestone it lists is already flagged done, because then
+       there is no remaining work left to tie to adoption. */
+    var exempt = state.topup && state.milestones.length > 0 &&
+      state.milestones.every(function (m) { return m.done; });
+    var ad = adoptionTotal(), need3 = g / 3;
+    if (g > 0 && state.milestones.length && !exempt) {
+      if (ad === 0) {
+        err("ms-rows", "No milestone is an adoption milestone. Flag at least one, worth " +
+          usd(need3) + " or more, a third of the goal.");
+      } else if (ad < need3) {
+        err("ms-rows", "Adoption milestones carry " + usd(ad) + ", which is " +
+          Math.round((ad / g) * 100) + "% of the goal. Raise them to at least " + usd(need3) +
+          ", a third.");
+      }
+    }
+
+    state.milestones.forEach(function (m, i) {
+      m.criteria.forEach(function (c, j) {
+        var t = String(c).trim();
+        if (!t) { return; }
+        var reasons = [];
+        if (t.indexOf("[") >= 0) { reasons.push("an unresolved bracket"); }
+        if (/\bTBD\b/i.test(t)) { reasons.push("TBD"); }
+        if (/PLACEHOLDER/i.test(t)) { reasons.push("PLACEHOLDER"); }
+        if (/\d+\s*-\s*\d+/.test(t)) { reasons.push("a range, pick the floor"); }
+        if (HEDGES.test(t)) { reasons.push("a hedge"); }
+        if (reasons.length) {
+          warns.push({
+            target: "ms-" + i + "-c" + j, msg: "Not checkable yet: " + reasons.join(", ") + ".",
+            text: "<b>Milestone " + letter(i) + "</b> " + esc(t) +
+                  " <i>(" + esc(reasons.join(", ")) + ")</i>", group: "criteria"
+          });
+        }
+      });
+    });
+
+    return { errs: errs, warns: warns };
+  }
+
+  function renderChecks(res) {
+    var show = state.submitted;
+    var errs = show ? res.errs : res.errs.filter(function (e) { return e.kind !== "missing"; });
+    var crit = res.warns.filter(function (w) { return w.group === "criteria"; });
+    var other = res.warns.filter(function (w) { return w.group !== "criteria"; });
+
+    var html = errs.map(function (e) {
+      return '<div class="check err"><span class="k">Error</span><span class="t">' + e.text +
+        "</span></div>";
+    }).join("") + other.map(function (w) {
+      return '<div class="check warn"><span class="k">Warning</span><span class="t">' + w.text +
+        "</span></div>";
+    }).join("");
+    if (crit.length) {
+      html += '<div class="check warn"><span class="k">Warning</span><span class="t">' +
+        "These acceptance criteria are not checkable yet:<ul><li>" +
+        crit.map(function (w) { return w.text; }).join("</li><li>") + "</li></ul></span></div>";
+    }
+    if (!errs.length) {
+      html = '<div class="check ok"><span class="k">Clear</span><span class="t">' +
+        (show ? "Nothing blocks this submission" : "Nothing is wrong with what is filled in so far") +
+        (res.warns.length ? ". You can submit past warnings, the reviewer sees them too." : ".") +
+        "</span></div>" + html;
+    }
+    if (!show) {
+      html += '<div class="check note"><span class="k">Note</span><span class="t">Required ' +
+        "questions carry a Required marker. Press Submit for review and anything still missing " +
+        "shows up here and on the question itself.</span></div>";
+    }
+    $("#checks-list").innerHTML = html;
+
+    $("#blockmsg").textContent = show && res.errs.length
+      ? (res.errs.length === 1 ? "One thing needs fixing, marked above."
+                               : res.errs.length + " things need fixing, marked above.")
+      : "";
+  }
+
+  /* red edge, one line of plain instruction under the field, and nothing until
+     the person has pressed Submit once. After that the marks come and go as
+     the fields get fixed. */
+  function paintFindings(res) {
+    all(".has-error,.has-warn").forEach(function (el) {
+      el.classList.remove("has-error");
+      el.classList.remove("has-warn");
+    });
+    all(".fld-msg").forEach(function (el) { el.parentNode.removeChild(el); });
+    if (!state.submitted) { return null; }
+
+    var first = null;
+    res.errs.forEach(function (e) { if (mark(e, "has-error", "fld-err") && !first) { first = e.target; } });
+    res.warns.forEach(function (w) { mark(w, "has-warn", "fld-warn"); });
+    return first;
+  }
+
+  /* scroll something on screen and make sure it really got there: not every
+     browser honours a smooth scroll request, so check once and jump if the
+     element is still off screen. */
+  function bringIntoView(el) {
+    if (!el) { return; }
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(function () {
+      var r = el.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > (window.innerHeight || 0)) {
+        el.scrollIntoView({ block: "center" });
+      }
+    }, 700);
+  }
+
+  function mark(item, cls, msgCls) {
+    if (!item.target || !item.msg) { return false; }
+    var el = document.getElementById(item.target);
+    if (!el || el.offsetParent === null) { return false; }
+    el.classList.add(cls);
+    var p = document.createElement("p");
+    p.className = "fld-msg " + msgCls;
+    p.textContent = item.msg;
+    if (el.nextSibling) { el.parentNode.insertBefore(p, el.nextSibling); }
+    else { el.parentNode.appendChild(p); }
+    return true;
+  }
+
+  /* --------------------------------------------- the page preview */
+  function rulesPanelHtml() {
+    var r = RULES[rulesKey()];
+    return '<details class="rules" open><summary><span>' + esc(r.title) + "</span>" +
+      '<span class="rules-tag">Added by the site</span></summary><ol>' +
+      r.items.map(function (li) { return "<li>" + mdInline(li) + "</li>"; }).join("") +
+      '</ol><p class="rules-ver">Rules v2026-09, shown on every initiative of this type.</p></details>';
+  }
+
+  function backerPillsHtml() {
+    return '<div class="sponsors">' + liveBackers().map(function (b) {
+      return '<div class="sponsor-pill">' +
+        (b.logoData ? '<img class="sponsor-logo" src="' + esc(b.logoData) + '" alt="' +
+          esc(b.org) + ' logo">' : "") +
+        "<b>" + (nonEmpty(b.url)
+          ? '<a href="#" title="' + esc(b.url) + '">' + esc(b.org) + "</a>"
+          : esc(b.org)) + "</b>" +
+        "<span>" + usd(parseAmount(b.amount)) + "</span>" +
+        '<small class="pledged">committed</small></div>';
+    }).join("") + "</div>";
+  }
+
+  function cardMockHtml() {
+    var g = goal(), total = committedTotal();
+    var pct = g > 0 ? Math.min(100, Math.round((total / g) * 100)) : 0;
+    var live = liveBackers(), logos = live.filter(function (b) { return !!b.logoData; });
+    var sum = v("f-summary").trim();
+    return '<div class="card-mock"><div class="rfp-card">' +
+      '<span class="type-badge t-' + state.type + '">' +
+        (state.type === "grant" ? "Grant" : "RFP") + "</span>" +
+      '<a class="card-title" href="#">' + esc(v("f-title") || "Untitled initiative") + "</a>" +
+      '<p class="card-sum">' + esc(sum.slice(0, 210)) + (sum.length > 210 ? "&#8230;" : "") + "</p>" +
+      '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="card-nums' + (total ? "" : " zero") + '"><span><b>' + usd(total) + "</b> of " +
+        usd(g) + (live.length ? ' <span class="sponsor-count">&#183; ' + live.length +
+          " backer" + (live.length === 1 ? "" : "s") + "</span>" : "") + "</span>" +
+        '<span class="pct">' + pct + "%</span></div>" +
+      (logos.length
+        ? '<div class="card-logos"><span class="sponsor-lbl">Backed by</span>' +
+          logos.map(function (b) {
+            return '<img src="' + esc(b.logoData) + '" alt="' + esc(b.org) + '" title="' +
+              esc(b.org) + '">';
+          }).join("") + "</div>"
+        : "") +
+      '<div class="card-actions"><a class="btn ghost sm" href="#">Details</a></div>' +
+      "</div></div>";
+  }
+
+  function renderPreview() {
+    var isGrant = state.type === "grant";
+    var g = goal(), months = intOf(v("f-duration")), total = committedTotal();
+    var live = liveBackers();
+    var h = '<div class="preview-flag"><span>Preview</span>' +
+            "<span>This is what the site publishes</span></div>";
+    h += '<p class="crumb"><a href="#">&#8592; All initiatives</a></p>';
+    h += '<h1 class="rfp-title">' + esc(v("f-title") || "Untitled initiative") + "</h1>";
+    h += '<p class="meta-line"><span class="type-badge inline t-' + state.type + '">' +
+         (isGrant ? "Grant" : "RFP") + "</span>";
+    if (isGrant && nonEmpty(v("f-recipient"))) {
+      h += '<span class="dim">Grant to <b>' + esc(v("f-recipient")) + "</b></span>";
+    }
+    h += '<span class="dim">Goal <b class="mono">' + usd(g) + "</b></span>";
+    h += '<span class="dim">About ' + months + " month" + (months === 1 ? "" : "s") + "</span></p>";
+    if (live.length && total > 0) {
+      var names = live.map(function (b) { return b.org || "an unnamed backer"; }).join(", ");
+      h += '<p class="body-text small">' + usd(total) + " already committed by " + esc(names) +
+        (state.topup && g > total
+          ? "; this grant raises the remaining " + usd(g - total) + "."
+          : ".") + "</p>";
+    }
+    h += "<h2>Summary</h2>";
+    h += '<p class="body-text">' + esc(v("f-summary")) + "</p>";
+
+    SECTIONS[state.type].forEach(function (id) {
+      h += "<h2>" + esc(FIELD[id].heading) + "</h2>";
+      h += '<div class="body-text md">' + mdToHtml(state.fields[id] || "") + "</div>";
+    });
+
+    h += "<h2>" + (isGrant ? "Milestones" : "Milestones (draft)") + "</h2>";
+    h += '<div class="body-text md">';
+    state.milestones.forEach(function (m, i) {
+      h += "<h3>" + esc(letter(i) + " - " + (m.name || "Unnamed") + " - " +
+        usd(parseAmount(m.amount))) +
+        (m.adoption ? ' <span class="ms-flagtag">adoption milestone</span>' : "") +
+        (state.topup && m.done ? ' <span class="ms-flagtag done">done</span>' : "") + "</h3>";
+      if (state.topup && !m.done && nonEmpty(m.month)) {
+        h += '<p class="small dim">Target month: ' + esc(m.month) + "</p>";
+      }
+      var crit = m.criteria.filter(nonEmpty);
+      h += '<ul class="task">' + crit.map(function (c) {
+        return "<li>" + mdInline(c) + "</li>";
+      }).join("") + "</ul>";
+      if (state.topup && m.done && nonEmpty(m.link)) {
+        h += '<p class="small"><a href="#" title="' + esc(m.link) + '">Delivered work: ' +
+          esc(m.link) + "</a></p>";
+      }
+    });
+    h += "</div>";
+
+    var links = v("f-links").split("\n").filter(nonEmpty);
+    if (links.length) {
+      h += '<h2>Links</h2><div class="body-text md"><ul>' + links.map(function (l) {
+        return '<li><a href="#" title="' + esc(l.trim()) + '">' + esc(l.trim()) + "</a></li>";
+      }).join("") + "</ul></div>";
+    }
+
+    if (live.length) {
+      h += '<h2>Backers <span class="n">' + live.length + "</span></h2>" + backerPillsHtml();
+    }
+
+    h += rulesPanelHtml();
+    h += '<div class="preview-flag mid"><span>On the board</span>' +
+         "<span>The card people click</span></div>";
+    h += cardMockHtml();
+    $("#preview").innerHTML = h;
+  }
+
+  /* ---------------------------------------------------- 5. wiring */
+  function updateAll() {
+    renderTotals();
+    renderBackerHead();
+    var res = runChecks();
+    renderChecks(res);
+    paintFindings(res);
+    if (state.previewOpen) { renderPreview(); }
+  }
+
+  function applySplit(silent) {
+    var res = splitDraft(v("f-paste"), state.type);
+    var filled = 0;
+
+    if (res.page.title) { setV("f-title", res.page.title); filled++; }
+    if (res.page.summary) { setV("f-summary", res.page.summary); filled++; }
+    if (res.page.goal) { setV("f-goal", money(parseAmount(res.page.goal))); filled++; }
+    if (res.page.duration) { setV("f-duration", String(intOf(res.page.duration))); filled++; }
+    if (res.page.links) { setV("f-links", res.page.links); filled++; }
+    if (res.page.recipient) { setV("f-recipient", res.page.recipient); filled++; }
+    if (res.page.funders) { setV("f-funders", res.page.funders); }
+    if (res.page.contact) { setV("f-contact", res.page.contact); }
+
+    var backers = res.page.backers ? parseBackers(res.page.backers) : [];
+    if (backers.length) { state.backers = backers; filled++; }
+
+    var sections = 0;
+    Object.keys(res.fields).forEach(function (k) {
+      if (FIELD[k]) { state.fields[k] = res.fields[k]; sections++; }
+    });
+    if (res.milestones.length) { state.milestones = res.milestones; }
+
+    setV("f-unsorted", res.unsorted);
+    $("#unsorted").hidden = !nonEmpty(res.unsorted);
+
+    renderSections();
+    renderBackers();
+    renderMilestones();
+    updateAmountEchoes();
+    updateAll();
+
+    if (!silent) {
+      $("#sort-note").innerHTML = '<span class="sorted-ok">Sorted:</span> ' + sections +
+        " sections, " + res.milestones.length + " milestones, " + filled + " page fields" +
+        (nonEmpty(res.unsorted) ? ", plus text nothing matched." : ".");
+    }
+  }
+
+  /* the goal echo is outside a row, so it gets its own line */
+  function updateAmountEchoes() {
+    var g = goal();
+    $("#echo-goal").textContent = g ? usd(g) : "";
+  }
+
+  /* one code path for a real paste and for the demo button */
+  function sortFromPaste() {
+    applySplit(false);
+    $("#paste-block").hidden = true;
+    $("#paste-again").hidden = false;
+  }
+
+  function setType(type, topup) {
+    state.type = type;
+    state.topup = type === "grant" ? !!topup : false;
+    $("#subopt").hidden = type !== "grant";
+    $("#grant-only").hidden = type !== "grant";
+    renderRules();
+    renderSections();
+    renderMilestones();
+    updateAll();
+  }
+
+  function boot() {
+    EXAMPLE_FIELDS = splitDraft(EXAMPLE_DRAFT, "rfp").fields;
+    state.fields = {};
+    state.milestones = [emptyMilestone()];
+    state.backers = [emptyBacker()];
+    renderRules();
+    renderSections();
+    renderBackers();
+    renderMilestones();
+    updateAmountEchoes();
+    updateAll();
+  }
+
+  /* type radios and the top-up checkbox */
+  document.getElementById("t-rfp").addEventListener("change", function () { setType("rfp", false); });
+  document.getElementById("t-grant").addEventListener("change", function () {
+    setType("grant", document.getElementById("f-topup").checked);
+  });
+  document.getElementById("f-topup").addEventListener("change", function () {
+    setType("grant", this.checked);
+  });
+
+  /* page fields */
+  ["f-title", "f-summary", "f-goal", "f-duration", "f-recipient",
+   "f-links", "f-funders", "f-contact"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", function () {
+      if (id === "f-goal") { updateAmountEchoes(); }
+      updateAll();
+    });
+  });
+  document.getElementById("f-goal").addEventListener("change", function () {
+    var n = parseAmount(this.value);
+    if (n) { this.value = money(n); }
+    updateAmountEchoes();
+    updateAll();
+  });
+
+  /* section fields, example toggles */
+  $("#sections").addEventListener("input", function (e) {
+    var k = e.target.getAttribute("data-k");
+    if (!k) { return; }
+    state.fields[k] = e.target.value;
+    updateWordCount(k);
+    updateAll();
+  });
+  $("#sections").addEventListener("click", function (e) {
+    var btn = e.target.closest(".ex-btn");
+    if (!btn) { return; }
+    var box = document.getElementById("ex-" + btn.getAttribute("data-ex"));
+    var open = box.hidden;
+    box.hidden = !open;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.textContent = open ? "Hide example" : "Show example";
+  });
+
+  /* ------------------------------------------------------ backer rows */
+  function readBk(e) {
+    var row = e.target.closest(".bk-row");
+    if (!row) { return null; }
+    var b = state.backers[parseInt(row.getAttribute("data-i"), 10)];
+    var k = e.target.getAttribute("data-bk");
+    if (!b || !k) { return null; }
+    return { b: b, k: k, el: e.target };
+  }
+  $("#bk-rows").addEventListener("input", function (e) {
+    var r = readBk(e);
+    if (!r) { return; }
+    if (r.k === "amount") {
+      r.b.amount = parseAmount(r.el.value);
+      updateAmountEcho(r.el, r.b.amount);
+    } else if (r.k !== "logo") {
+      r.b[r.k] = r.el.value;
+    }
+    refreshBkChip(r.el);
+    updateAll();
+  });
+  $("#bk-rows").addEventListener("change", function (e) {
+    var r = readBk(e);
+    if (!r) { return; }
+    if (r.k === "amount" && r.b.amount) { r.el.value = money(r.b.amount); }
+    if (r.k === "logo") {
+      var f = r.el.files && r.el.files[0];
+      if (!f) { r.b.logoName = ""; r.b.logoData = ""; refreshBkChip(r.el); updateAll(); return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        r.b.logoName = f.name;
+        r.b.logoData = String(reader.result);
+        refreshBkChip(r.el);
+        updateAll();
+      };
+      reader.readAsDataURL(f);
+      return;
+    }
+    updateAll();
+  });
+  /* the chip redraws in place, so choosing a file does not wipe the row */
+  function refreshBkChip(el) {
+    var row = el.closest(".bk-row");
+    if (!row) { return; }
+    var i = parseInt(row.getAttribute("data-i"), 10);
+    var b = state.backers[i];
+    var old = row.querySelector(".bk-chip");
+    if (old) { old.parentNode.removeChild(old); }
+    var file = row.querySelector(".bk-file");
+    if (file) { file.parentNode.removeChild(file); }
+    if (b.logoName) {
+      var p = document.createElement("p");
+      p.className = "hint bk-file";
+      p.textContent = "Selected: " + b.logoName;
+      row.querySelector('input[data-bk="logo"]').parentNode.appendChild(p);
+    }
+    var chip = backerChip(b);
+    if (chip) { row.insertAdjacentHTML("beforeend", chip); }
+  }
+  $("#bk-rows").addEventListener("click", function (e) {
+    var btn = e.target.closest(".bk-del");
+    if (!btn) { return; }
+    state.backers.splice(parseInt(btn.getAttribute("data-del"), 10), 1);
+    renderBackers();
+    updateAll();
+  });
+  $("#btn-add-bk").addEventListener("click", function () {
+    state.backers.push(emptyBacker());
+    renderBackers();
+    updateAll();
+    var rows = document.querySelectorAll('.bk-row input[data-bk="org"]');
+    if (rows.length) { rows[rows.length - 1].focus(); }
+  });
+
+  /* ------------------------------------------------- milestone rows */
+  function readRow(e) {
+    var row = e.target.closest(".ms-row");
+    if (!row) { return null; }
+    var m = state.milestones[parseInt(row.getAttribute("data-i"), 10)];
+    var k = e.target.getAttribute("data-mk");
+    if (!m || !k) { return null; }
+    return { m: m, k: k, el: e.target, i: parseInt(row.getAttribute("data-i"), 10) };
+  }
+  $("#ms-rows").addEventListener("input", function (e) {
+    var r = readRow(e);
+    if (!r) { return; }
+    if (r.k === "crit") {
+      r.m.criteria[parseInt(r.el.getAttribute("data-ci"), 10)] = r.el.value;
+    } else if (r.k === "amount") {
+      r.m.amount = parseAmount(r.el.value);
+      updateAmountEcho(r.el, r.m.amount);
+    } else if (r.k !== "adoption" && r.k !== "done") {
+      r.m[r.k] = r.el.value;
+    }
+    updateAll();
+  });
+  $("#ms-rows").addEventListener("change", function (e) {
+    var r = readRow(e);
+    if (!r) { return; }
+    if (r.k === "adoption") { r.m.adoption = r.el.checked; }
+    if (r.k === "done") { r.m.done = r.el.checked; renderMilestones(); }
+    if (r.k === "amount" && r.m.amount) { r.el.value = money(r.m.amount); }
+    updateAll();
+  });
+  $("#ms-rows").addEventListener("click", function (e) {
+    var del = e.target.closest(".ms-del");
+    if (del) {
+      state.milestones.splice(parseInt(del.getAttribute("data-del"), 10), 1);
+      renderMilestones();
+      updateAll();
+      return;
+    }
+    var cdel = e.target.closest(".crit-del");
+    if (cdel) {
+      var r1 = readRowFromEl(cdel);
+      if (r1) {
+        r1.m.criteria.splice(parseInt(cdel.getAttribute("data-cdel"), 10), 1);
+        renderMilestones();
+        updateAll();
+      }
+      return;
+    }
+    var add = e.target.closest(".crit-add");
+    if (add) {
+      var r2 = readRowFromEl(add);
+      if (r2) {
+        r2.m.criteria.push("");
+        renderMilestones();
+        updateAll();
+        focusCrit(r2.i, r2.m.criteria.length - 1);
+      }
+    }
+  });
+  /* Enter inside a criterion opens the next one, the way a list should behave.
+     Enter anywhere else in the form does nothing: an accidental Enter should
+     not fire the submit checks. */
+  $("#form").addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" || e.target.tagName !== "INPUT") { return; }
+    if (e.target.getAttribute("data-mk") === "crit") {
+      e.preventDefault();
+      var r = readRowFromEl(e.target);
+      if (!r) { return; }
+      var at = parseInt(e.target.getAttribute("data-ci"), 10) + 1;
+      r.m.criteria.splice(at, 0, "");
+      renderMilestones();
+      updateAll();
+      focusCrit(r.i, at);
+      return;
+    }
+    if (e.target.type !== "submit") { e.preventDefault(); }
+  });
+  function readRowFromEl(el) {
+    var row = el.closest(".ms-row");
+    if (!row) { return null; }
+    var i = parseInt(row.getAttribute("data-i"), 10);
+    return { m: state.milestones[i], i: i };
+  }
+  function focusCrit(i, j) {
+    var el = document.getElementById("ms-" + i + "-c" + j);
+    if (el) { el.focus(); }
+  }
+  $("#btn-add-ms").addEventListener("click", function () {
+    state.milestones.push(emptyMilestone());
+    renderMilestones();
+    updateAll();
+    var rows = document.querySelectorAll(".ms-row input[data-mk='name']");
+    if (rows.length) { rows[rows.length - 1].focus(); }
+  });
+
+  /* -------------------------------------- paste, demo controls, submit */
+  /* The splitter runs on the paste itself. The value arrives after the event,
+     so read it on the next tick. */
+  $("#f-paste").addEventListener("paste", function () {
+    setTimeout(sortFromPaste, 0);
+  });
+  $("#btn-paste-again").addEventListener("click", function () {
+    $("#paste-block").hidden = false;
+    $("#paste-again").hidden = true;
+    document.getElementById("f-paste").focus();
+  });
+
+  $("#btn-example").addEventListener("click", function () {
+    setV("f-paste", EXAMPLE_DRAFT);
+    sortFromPaste();
+    $("#conf").hidden = true;
+  });
+
+  $("#btn-clear").addEventListener("click", function () {
+    ["f-paste", "f-title", "f-summary", "f-goal", "f-duration", "f-recipient", "f-links",
+     "f-funders", "f-contact", "f-unsorted"].forEach(function (id) { setV(id, ""); });
+    state.fields = {};
+    state.milestones = [emptyMilestone()];
+    state.backers = [emptyBacker()];
+    state.submitted = false;
+    document.getElementById("f-topup").checked = false;
+    document.getElementById("t-rfp").checked = true;
+    $("#unsorted").hidden = true;
+    $("#paste-block").hidden = false;
+    $("#paste-again").hidden = true;
+    $("#sort-note").innerHTML = "";
+    $("#conf").hidden = true;
+    setType("rfp", false);
+    renderBackers();
+    updateAmountEchoes();
+    updateAll();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  $("#btn-preview").addEventListener("click", function () {
+    state.previewOpen = !state.previewOpen;
+    $("#preview").hidden = !state.previewOpen;
+    this.setAttribute("aria-expanded", state.previewOpen ? "true" : "false");
+    this.textContent = state.previewOpen ? "Hide the page view" : "See it as a page";
+    if (state.previewOpen) { renderPreview(); }
+  });
+
+  $("#copy-guide").addEventListener("click", function () {
+    var btn = this, original = "Copy the guide";
+    btn.textContent = "Copied!";
+    setTimeout(function () { btn.textContent = original; }, 2000);
+  });
+
+  /* Submit is always clickable. Pressing it runs the checks, marks every
+     problem on the field it belongs to, and scrolls to the first one. */
+  $("#form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    state.submitted = true;
+    var res = runChecks();
+    renderTotals();
+    renderBackerHead();
+    renderChecks(res);
+    var first = paintFindings(res);
+    if (res.errs.length) {
+      $("#conf").hidden = true;
+      var el = first ? document.getElementById(first) : null;
+      if (el) {
+        /* focus first: focus() cancels a smooth scroll that is already running */
+        try { el.focus({ preventScroll: true }); } catch (err) { el.focus(); }
+        bringIntoView(el);
+      } else {
+        bringIntoView($("#checks"));
+      }
+      return;
+    }
+    var conf = $("#conf");
+    conf.innerHTML = "<b>Submitted for review.</b> The site adds the " + esc(panelName()) +
+      " panel to your page. Nothing was actually sent, this is a prototype." +
+      (res.warns.length
+        ? "<p>You submitted past " + res.warns.length + (res.warns.length === 1 ? " warning" : " warnings") +
+          ". The reviewer sees the same list.</p>"
+        : "");
+    conf.hidden = false;
+    bringIntoView(conf);
+  });
+
+  boot();
+})();
+</script>

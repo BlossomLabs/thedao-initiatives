@@ -1,31 +1,25 @@
 ---
 title: End-to-End Formally Verified Vyper Compiler
-type: rfp
+type: grant
 goal: 600000
 summary: Vyper is the second most widely used EVM language, securing billions of
   dollars in production protocols like Curve, Yearn, and Lido, yet the
-  correctness of its compiler rests on testing and auditing alone. This RFP
+  correctness of its compiler rests on testing and auditing alone. This grant
   funds a machine-checked proof that Vyper compilation preserves the meaning of
   source programs, plus the infrastructure to re-verify every future release. No
   other serious smart-contract language, Solidity included, has an effort like
   this underway.
+duration: 12
 ---
-| | |
-|---|---|
-| **Status** | Draft |
-| **Budget** | $600,000 USD |
-| **Proposal window** | 30 days, opening once the RFP is fully funded |
-| **Indicative duration** | 12 months (the team sets the final timeline) |
-
 ## Why this matters
 
 - **Adoption.** Vyper is the second most widely used EVM language, securing billions of dollars in production protocols such as Curve, Yearn, and Lido. A verified Vyper compiler protects real value and increases public assurance in smart contract deployments.
-- **Nobody else is doing this.** No other serious smart-contract language (Solidity included) has an effort underway toward formally verified compilation. This RFP makes Vyper the only EVM language whose deployed bytecode carries machine-checked guarantees.
+- **Nobody else is doing this.** No other serious smart-contract language (Solidity included) has an effort underway toward formally verified compilation. This grant makes Vyper the only EVM language whose deployed bytecode carries machine-checked guarantees.
 - **The compiler is built for it.** Venom, Vyper's LLVM-style SSA intermediate representation, gives the pipeline a clean, stage-by-stage structure that proofs can follow, while running a modern optimization pipeline more advanced than those covered by landmark verified compilers like CompCert. Verifying it means both a safer Vyper and an advance on the state of the art in compiler verification.
 
 Developers, auditors, and verification tools reason about Vyper source code; Ethereum executes EVM bytecode. Everything in between is the compiler, and today its correctness rests on testing and auditing alone. In July 2023, miscompiled reentrancy locks let attackers drain tens of millions of dollars from Curve pools whose source code was correct.
 
-This RFP funds a machine-checked proof that Vyper compilation preserves the meaning of source programs, plus the infrastructure to re-verify every future production release.
+This grant funds a machine-checked proof that Vyper compilation preserves the meaning of source programs, plus the infrastructure to re-verify every future production release.
 
 In addition, an executable formal semantics lets developers prove end-to-end properties about Vyper source that carry through to deployed bytecode(!), which are not limited in expressivity as bounded model checkers are.
 
@@ -35,14 +29,14 @@ The end state:
 - **Source-level proofs that reach the chain**: properties proven about Vyper source carry over to the deployed bytecode
 - **Continuous verification**: each supported compiler release can be re-verified using the existing proof infrastructure
 
-## Who we expect to do this
+## The recipient
 
 In the interest of full transparency:
 
-- This RFP was drafted together with the **Vyper core team**, builds directly on their open-source groundwork, and we believe they are well positioned to receive the grant.
-- The proposal window is still real. If another team can credibly deliver this scope for less, or propose materially stronger milestones, we want that proposal.
+- This grant was drafted together with the **Vyper core team**, builds directly on their open-source groundwork, and the Vyper core team is the recipient. The head start is real: an executable HOL4 semantics of a large Vyper subset that already passes the codegen section of the official test suite, in-progress proofs for the Vyper to Venom to bytecode pipeline, and a formal EVM semantics validated against the Execution Spec Tests (see Existing work).
+
 - We believe the price is fair: published estimates for comparable end-to-end compiler verification run well above this budget.
-- Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
+- The proposal should show a track record in mechanized verification and spell out the technical approach: proof assistant, relationship to the existing work, frontend strategy, and how users run the verified compiler.
 
 ## Existing work
 
@@ -74,14 +68,9 @@ In the interest of full transparency:
 3. **Pinned targets.** Each verified release names the exact upstream Vyper commit, optimization settings, and EVM fork it covers.
 4. **Assurance statement.** Each release ships a plain-language document: supported language subset (or complete coverage, if applicable), exclusions, covered passes, and the complete trusted computing base.
 5. **Maintenance plan.** A credible plan for keeping proofs current across Vyper releases and EVM hard forks.
+6. **Independent reviewer.** The technical reviewer for judgment calls has no affiliation with the selected team or with the existing codebases.
 
 ## Milestones (draft)
-
-These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
-
-- Milestones are lettered because A-C may be delivered in any order, or in parallel; each pays on acceptance.
-- Milestone E always pays last, once the Milestone D release is public.
-- The grant agreement may include an advance at signing, counted against the first delivered milestone.
 
 ### A - Formal semantics and frontend - $50,000
 
@@ -99,33 +88,26 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 
 ### C - Verified optimization pipeline - $100,000
 
-Prove correct the optimization passes in the production optimization pipeline of the pinned release, and wire continuous verification into CI.
-
 - [ ] Published list of every pass in the production pipeline, each marked verified or excluded; every verified pass has a machine-checked correctness theorem with zero admitted lemmas
 - [ ] The composed verified pass set has a single machine-checked correctness theorem and is packaged as a distinct, documented compilation mode users can select
 - [ ] CI automatically re-checks all proofs and output-parity against the pinned upstream revision, with a public status page or badge
-- [ ] Soundness bugs found in the production optimizer are responsibly disclosed to the Vyper team. Since the work is planned to be done in tandem with the Vyper team, any soundness bugs are expected to be caught and fixed before any production release of Vyper.
+- [ ] Soundness bugs found in the production optimizer are responsibly disclosed to the Vyper team, with each disclosure linked publicly once fixed
 
 ### D - End-to-end theorem and public release - $125,000
-
-Close the backend proofs (Venom to assembly to bytecode, including stack scheduling) and connect everything into one end-to-end theorem against the formal EVM semantics.
 
 - [ ] A single end-to-end theorem, published in both machine-checked and human-readable form, verified in CI
 - [ ] A public release outside users can run, with installation and usage instructions, distributed as agreed with the Vyper maintainers. The expected form is the verified compiler bundled with the Python compiler and available as a --verified option; the release documents how the verified compiler is executed and what that adds to the trusted base.
 - [ ] Full assurance statement published: supported subset (if applicable), exclusions, covered passes, complete trusted computing base, proof assumptions
 - [ ] The verified pipeline demonstrated on at least five representative real-world Vyper contracts, results published
-- [ ] Stretch goal: provable gas bounds demonstrated for at least one representative contract, a machine-checked upper bound on the gas cost of a chosen function, derived through the verified pipeline against the formal EVM gas model (e.g. "this function always executes within Y gas")
 
 ### E - Adoption and ecosystem impact - $200,000
-
-Paid in three tranches: launch work, adoption evidence, and continuous verification.
 
 **Tranche 1: Launch - $75,000**
 
 - [ ] Public project website explaining the verified compiler and its guarantees in language a non-specialist developer can follow
 - [ ] User documentation plus at least one step-by-step tutorial from a Vyper contract to a verified-compilation artifact
 - [ ] A recorded technical workshop or webinar for developers and auditors, publicly available
-- [ ] A talk accepted or delivered at a major Ethereum or formal-methods event, and at least two published technical blog posts
+- [ ] A talk delivered at a major Ethereum or formal-methods event, and at least two published technical blog posts
 - [ ] Public roadmap for verifying future Vyper releases (verification is expected to accompany each real Vyper release, not lag behind it), including hard-fork policy
 
 **Tranche 2: Adoption - $25,000**
@@ -137,22 +119,3 @@ Paid in three tranches: launch work, adoption evidence, and continuous verificat
 **Tranche 3: Continuous verification - $100,000**
 
 - [ ] Continuous verification demonstrated across at least one new production Vyper release after the Milestone D release: proofs repaired, re-checked in CI, new assurance statement published
-
-## Milestone review and acceptance
-
-- Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
-- Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
-- The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
-
-## Process
-
-- The proposal window opens once the RFP is fully funded and stays open for 30 days.
-- Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
-- Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
-- Milestone deliveries are reviewed within 14 days; payment follows acceptance.
-- The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
-- If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
-
----
-
-Questions, pushback, better ideas? Post them below.

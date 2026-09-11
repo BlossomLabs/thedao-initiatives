@@ -851,8 +851,12 @@ class TestInitiativeTypes(unittest.TestCase):
                 "title": "A perfectly valid title",
                 "summary": "A summary that is long enough to pass the forty "
                            "character minimum easily.",
-                "goal": "50000", "type": "grant",
+                "goal": "50000", "type": "grant", "duration_months": "12",
+                "recipient_team": "Acme Labs", "contact": "c@example.org",
                 "funders": "Acme | pays for infra | none | no | $5,000"}
+        import draft as _draft
+        form.update(_draft.minimal_submission(50000))
+        form["why"] += " " + form["title"]  # one body per probe (duplicate check)
         form.update(overrides)
         return self.client.post("/submit", data=form)
 
@@ -940,6 +944,17 @@ class TestInitiativeTypes(unittest.TestCase):
         submit_html = _re.sub(
             r'<div class="type-choice">.*?</div>', "", submit_html,
             flags=_re.S)
+        # The rules panels ("How RFPs work"), the per-section examples (taken
+        # from a real RFP) and the field hints are per-type UI, not a stray
+        # label; they are allowed to say RFP.
+        submit_html = _re.sub(
+            r'<details class="rules"[^>]*>.*?</details>', "",
+            submit_html, flags=_re.S)
+        submit_html = _re.sub(
+            r'<div class="exbox"[^>]*>.*?</div>\s*</div>', "",
+            submit_html, flags=_re.S)
+        submit_html = _re.sub(
+            r'<span class="dim">[^<]*</span>', "", submit_html)
         self.assertNotIn("RFP", self._visible_text(submit_html), "/submit")
 
     # -- routes ----------------------------------------------------------

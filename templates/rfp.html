@@ -9,7 +9,15 @@
   <p class="meta-line">
     {% if r.discourse_url %}<a class="btn discuss" href="{{ r.discourse_url }}" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Discuss this initiative on the forum</a>{% endif %}
     <span class="type-badge inline t-{{ r.type }}">{{ 'Grant' if r.type == 'grant' else 'RFP' }}</span>
+    {% if r.type == 'grant' and r.topup %}<span class="chip static">top-up, work under way</span>{% endif %}
+    {% if r.type == 'grant' and r.recipient_team %}<span class="chip static">to {{ r.recipient_team }}</span>{% endif %}
     {% if r.status == 'archived' %}<span class="chip static">archived</span>{% endif %}
+  </p>
+  <p class="page-facts">
+    <span><b>{{ r.funding_goal_usd | usd }}</b> goal</span>
+    <span class="dur">{% if r.duration_months %}About {{ r.duration_months }} month{{ '' if r.duration_months == 1 else 's' }}{% else %}Duration not stated{% endif %}</span>
+    {% if committed %}<span class="committed"><b>{{ committed | usd }}</b> already committed by {{ backer_names | join(', ') }}{% if r.type == 'grant' and r.topup %}; this grant raises the remaining <b>{{ remaining | usd }}</b>{% endif %}</span>{% endif %}
+    {% if r.type == 'grant' and r.topup and r.milestone_reviewer %}<span class="reviewer">Milestone reviewer: {{ r.milestone_reviewer }}</span>{% endif %}
   </p>
 
   <div class="cols">
@@ -36,12 +44,32 @@
       <h2>Summary</h2>
       <p class="body-text">{{ r.summary }}</p>
 
+      {% if sections %}
+      {% for heading, text in sections %}
+      <h2>{{ heading }}</h2>
+      <div class="body-text md">{{ text | md }}</div>
+      {% endfor %}
+      <h2>{{ 'Milestones' if r.type == 'grant' else 'Milestones (draft)' }}</h2>
+      <div class="body-text md milestones">{{ milestones_md | md }}</div>
+      {% if links %}
+      <h2>Links</h2>
+      <ul class="body-text links">{% for l in links %}<li><a href="{{ l }}" target="_blank" rel="noopener">{{ l }}</a></li>{% endfor %}</ul>
+      {% endif %}
+      {% elif r.details %}
       <h2>Full initiative details</h2>
-      {% if r.details %}
       <div class="body-text md">{{ r.details | md }}</div>
       {% else %}
+      <h2>Full initiative details</h2>
       <p class="empty">The complete spec (scope, milestones, budget breakdown) is being written.
       {% if r.discourse_url %}Follow and shape it <a href="{{ r.discourse_url }}" target="_blank" rel="noopener">on the forum thread</a>.{% endif %}</p>
+      {% endif %}
+
+      {% if rules %}
+      <section class="rules-panel" id="rules">
+        <h2>{{ rules.title }}</h2>
+        <div class="body-text md">{{ rules.body | md }}</div>
+        <p class="small dim rules-version">Rules v{{ rules.version }}, shown on every initiative of this type.</p>
+      </section>
       {% endif %}
 
       <section id="qa" data-slug="{{ r.slug }}"
@@ -120,10 +148,19 @@
       </div>
       <div class="side-note">
         <div class="k">What happens next</div>
-        <p class="small dim">If backers and donors fully fund this initiative, it happens with no TheDAO
-        money at all. If it comes up short, the 200 ETHSecurity badge holders rank it against the
-        other initiatives in the October round and TheDAO Security Fund completes the top-ranked ones.
-        Donations count as a public signal in that ranking.</p>
+        {% if r.type == 'grant' %}
+        <p class="small dim">If backers and donors fully fund this initiative, the team has 15 days to
+        finalize milestone terms and deadlines and they are paid out as they complete the milestones.
+        If it hasn't reached its funding goal but has enough support to qualify for TheDAO's voting
+        round near the end of the year, then the ETHSecurity Badge holders will rank it against the
+        other initiatives and TheDAO Security Fund completes the funding for the top-voted initiatives.</p>
+        {% else %}
+        <p class="small dim">If backers and donors fully fund this initiative, a 30 day open RFP process
+        begins, a team is chosen and they are paid out as they complete the milestones. If it hasn't
+        reached its funding goal but has enough support to qualify for TheDAO's voting round near the
+        end of the year, then the ETHSecurity Badge holders will rank it against the other initiatives
+        and TheDAO Security Fund completes the funding for the top-voted initiatives.</p>
+        {% endif %}
       </div>
     </aside>
   </div>

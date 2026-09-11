@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Strip canned text · Admin{% endblock %}
+{% block content %}
+<main class="detail">
+  <p class="crumb"><a href="{{ url_for('admin_dashboard') }}">← Admin dashboard</a></p>
+  <h1>Strip the canned process text</h1>
+  <p class="body-text">The rules panel now renders the process for each type, so the header table, the
+  proposal window, the milestones preamble, the disclosure sentence, the Milestone review and
+  acceptance section, the Process section and the closing line come out of every stored body.
+  This is the dry run: nothing has changed yet. Apply takes an SQLite backup first
+  (<code>backups/rfps-&lt;time&gt;-pre-strip.db</code>), then writes.</p>
+  {% if applied_at %}<div class="alert">Already applied once (at {{ applied_at }}). Running it again only touches rows that still carry canned text.</div>{% endif %}
+
+  <div class="verdicts">
+    <div class="pill"><span class="dot {{ 'a' if plans else 'b' }}"></span>
+      <div><b>{{ plans | length }} of {{ total }} initiatives change</b>
+      <small>{{ 'review the diffs below, then apply' if plans else 'nothing left to strip' }}</small></div></div>
+  </div>
+
+  {% if plans %}
+  <form method="post" class="form" style="margin:16px 0 28px">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <button class="btn primary" name="action" value="apply" type="submit">Back up and apply to {{ plans | length }} initiatives</button>
+  </form>
+  {% endif %}
+
+  {% for p in plans %}
+  <details class="strip-row" {% if loop.index <= 3 %}open{% endif %}>
+    <summary><b>#{{ p.id }} {{ p.title }}</b>
+      <span class="small dim">removes: {{ p.removed | join(', ') if p.removed else 'nothing (whitespace tidy only)' }}{% if p.duration_months %} · sets duration {{ p.duration_months }} months{% endif %}{% if p.topup %} · marks top-up{% endif %}{% if p.reviewer %} · reviewer: {{ p.reviewer }}{% endif %}</span></summary>
+    <pre class="diff">{{ p.diff }}</pre>
+  </details>
+  {% endfor %}
+</main>
+{% endblock %}

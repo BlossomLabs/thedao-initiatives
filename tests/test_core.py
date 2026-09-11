@@ -851,7 +851,7 @@ class TestInitiativeTypes(unittest.TestCase):
                 "title": "A perfectly valid title",
                 "summary": "A summary that is long enough to pass the forty "
                            "character minimum easily.",
-                "goal": "50000", "type": "grant",
+                "goal": "50000", "type": "grant", "duration_months": "12",
                 "funders": "Acme | pays for infra | none | no | $5,000"}
         form.update(overrides)
         return self.client.post("/submit", data=form)
@@ -940,6 +940,11 @@ class TestInitiativeTypes(unittest.TestCase):
         submit_html = _re.sub(
             r'<div class="type-choice">.*?</div>', "", submit_html,
             flags=_re.S)
+        # The rules panels ("How RFPs work") are site-owned process text shown
+        # per type, not a stray label; they are allowed to say RFP.
+        submit_html = _re.sub(
+            r'<section class="rules-panel[^"]*"[^>]*>.*?</section>', "",
+            submit_html, flags=_re.S)
         self.assertNotIn("RFP", self._visible_text(submit_html), "/submit")
 
     # -- routes ----------------------------------------------------------

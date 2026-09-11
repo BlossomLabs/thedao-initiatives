@@ -63,6 +63,18 @@
     <input type="url" name="discourse_url" value="{{ r.discourse_url }}">
     <label class="lbl">Funding goal (USD)</label>
     <input type="text" name="goal" inputmode="decimal" value="{{ r.funding_goal_usd }}">
+    <label class="lbl">Expected duration (months) <span class="dim">(from funding to the last milestone; blank shows "Duration not stated")</span></label>
+    <input type="text" name="duration_months" inputmode="numeric" value="{{ r.duration_months or '' }}">
+    <label class="lbl">Recipient team <span class="dim">(grants only; shows as "to X" next to the badge)</span></label>
+    <input type="text" name="recipient_team" maxlength="120" value="{{ r.recipient_team or '' }}">
+    <label class="check-lbl"><input type="checkbox" name="topup" value="1" {{ 'checked' if r.topup }}> Top-up: work already under way with another funder (grants only; switches the rules panel)</label>
+    <label class="lbl">Milestone reviewer <span class="dim">(top-ups only; who decides the remaining milestones)</span></label>
+    <input type="text" name="milestone_reviewer" maxlength="200" value="{{ r.milestone_reviewer or '' }}">
+    <label class="lbl">Rules panel <span class="dim">(auto = the panel for the type renders under the details; none = legacy body that carries its own process text)</span></label>
+    <select name="boilerplate">
+      <option value="auto" {{ 'selected' if (r.boilerplate or 'auto') == 'auto' }}>auto</option>
+      <option value="none" {{ 'selected' if r.boilerplate == 'none' }}>none</option>
+    </select>
     <label class="lbl">Pin to board position <span class="dim">(1 = top of the front page; leave empty to sort automatically by amount raised)</span></label>
     <input type="text" name="sort_rank" inputmode="numeric" value="{{ r.sort_rank or '' }}">
     <label class="lbl">Contact (private)</label>

@@ -1,0 +1,2560 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>:root{color-scheme:light}body{margin:0;font:14px system-ui,sans-serif;background:#fafaf9}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<title>Suggest an Initiative v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Part 1: the live site stylesheet, inlined verbatim from
+   static/style.css on origin/main (2026-09-10).
+   ============================================================ */
+/* TheDAO Security Fund, RFP board.
+   Palette shared with thedao.fund; layout designed for donation conversion:
+   one red CTA, preset amounts, progress bars, social proof, minimal clicks. */
+:root{
+  --bg:#2c5e86; --bg2:#1f435f; --text:#fff; --muted:rgba(255,255,255,.62); --soft:rgba(255,255,255,.85);
+  --card:rgba(255,255,255,.05); --edge:rgba(255,255,255,.1); --edge2:rgba(255,255,255,.15);
+  --green:#5cb75a; --bright:#00ff88; --red:#FF3C38; --blue:#2c5e86; --claims:#5ac8fa;
+  --sans:'Inter Tight','Inter',sans-serif; --tight:'Inter Tight',sans-serif;
+  --mono:'Roboto Mono',ui-monospace,SFMono-Regular,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;min-height:100vh;color:var(--text);font:400 14px/1.5 var(--sans);
+  background-color:var(--bg);
+  background-image:linear-gradient(142.716deg,var(--bg) 31.46%,var(--bg2) 90.4%);
+  background-repeat:no-repeat}
+b,strong{font-weight:600}
+a{color:var(--green);text-decoration:none}
+a:hover{text-decoration:underline}
+.m{font-family:var(--mono);font-size:12.5px}
+.dim{color:var(--muted)}
+.small{font-size:12.5px;line-height:1.6}
+.red{color:var(--red)}
+.grn{color:var(--green)}
+.empty{color:var(--muted)}
+.star{color:#f0b429}
+
+/* ── top bar ─────────────────────────────────────────────────── */
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
+  gap:16px;padding:12px 32px;background:rgba(44,94,134,.5);backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.07)}
+.brand{display:flex;align-items:center;gap:10px;color:#fff;font:300 17px var(--tight)}
+.brand b{font-weight:700}
+.brand img{width:15px;height:24px}
+.brand:hover{text-decoration:none}
+.topnav{display:flex;align-items:center;gap:22px}
+.topnav a{font:400 14px var(--tight);color:rgba(255,255,255,.65)}
+.topnav a:hover{color:var(--green);text-decoration:none}
+.topnav a.on{color:var(--green);position:relative}
+.topnav a.on::after{content:'';position:absolute;left:0;right:0;bottom:-6px;height:2px;
+  border-radius:999px;background:var(--green)}
+.topnav .navcta{color:var(--green)}
+.btn.wallet{margin:0;padding:8px 16px;font-size:13px;border-radius:14px;
+  background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.2);height:38px;padding:0 16px}
+.btn.wallet.connected{border-color:rgba(92,183,90,.6);color:var(--green);font-family:var(--mono);font-size:12px}
+@media(max-width:760px){
+  .topbar{padding:10px 14px;flex-wrap:wrap;gap:8px 14px}
+  .topnav{gap:12px;flex-wrap:wrap;row-gap:8px}
+  .topnav a{font-size:13px}
+  .hero{padding-top:48px}
+  /* comfortable touch targets (≈44px) on phones */
+  .dw-chip{padding:11px 16px}
+  .dw-method{padding:12px 6px}
+  .btn.sm,.dw-copy{padding:10px 14px}
+  .brand span{display:none}
+}
+
+/* ── hero: the money is the hero ─────────────────────────────── */
+.hero{max-width:1100px;margin:0 auto;padding:72px 24px 8px;text-align:center}
+.kicker{font:400 11px var(--tight);letter-spacing:.2em;text-transform:uppercase;color:var(--green);margin:0}
+.hero-raised{font:700 clamp(40px,12vw,132px)/1 var(--tight);letter-spacing:-.04em;
+  font-variant-numeric:tabular-nums;margin:14px 0 0;color:#fff;
+  font-size:clamp(40px,10vw,100px)}
+.hero-sub{font:400 clamp(17px,2.6vw,22px) var(--sans);color:rgba(255,255,255,.8);margin:10px 0 0}
+
+/* ── social proof strip ──────────────────────────────────────── */
+.activity{display:flex;gap:10px;overflow-x:auto;max-width:1100px;margin:26px auto 0;padding:4px 24px;
+  scrollbar-width:none}
+.activity::-webkit-scrollbar{display:none}
+.act{flex:none;display:flex;align-items:center;gap:8px;border:1px solid var(--edge);border-radius:999px;
+  background:var(--card);padding:7px 16px;font-size:12px;color:var(--soft);white-space:nowrap}
+.act:hover{border-color:rgba(92,183,90,.5);text-decoration:none}
+.act b{color:var(--green)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dot.g{background:var(--green);box-shadow:0 0 10px rgba(92,183,90,.6)}
+.dot.a{background:#f0b429;box-shadow:0 0 10px rgba(240,180,41,.55)}
+.dot.b{background:var(--claims);box-shadow:0 0 10px rgba(90,200,250,.55)}
+
+/* ── main ────────────────────────────────────────────────────── */
+main{max-width:1100px;margin:0 auto;padding:6px 24px 80px}
+main.detail{padding-top:34px}
+main.narrow{max-width:672px}
+main.center{text-align:center}
+h2{font:400 13px var(--tight);margin:46px 0 16px;color:var(--green);text-transform:uppercase;letter-spacing:.2em}
+h2 .n{color:var(--muted);text-transform:none;letter-spacing:0;font-size:12px;margin-left:10px}
+h3{font:500 14px var(--tight);margin:20px 0 10px;color:var(--soft)}
+.crumb{margin:0 0 10px}
+.rfp-title{font:500 clamp(26px,4vw,40px)/1.12 var(--tight);letter-spacing:-.02em;margin:6px 0 12px}
+.body-text{max-width:760px;font:300 15px/1.75 var(--sans);color:var(--soft);white-space:pre-line}
+.tag{margin:14px auto 0;max-width:760px;color:var(--muted);font:300 15px/1.65 var(--sans)}
+.tag.left{text-align:left;margin-left:0}
+.shimmer{height:1px;max-width:1052px;margin:30px auto 0;border:0;
+  background:linear-gradient(90deg,rgba(1,255,136,0),rgba(1,255,136,.5) 50%,rgba(1,255,136,0))}
+.shimmer.soft{max-width:672px;
+  background:linear-gradient(90deg,rgba(92,183,90,0),rgba(92,183,90,.4) 50%,rgba(92,183,90,0))}
+
+/* ── RFP cards with inline donate ────────────────────────────── */
+.rfp-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+@media(max-width:860px){.rfp-grid{grid-template-columns:1fr}}
+.rfp-card{position:relative;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  border-radius:16px;padding:24px;transition:border-color .2s,box-shadow .2s}
+.rfp-card:hover{border-color:rgba(92,183,90,.4);box-shadow:0 0 30px rgba(92,183,90,.08)}
+.rfp-card .star{position:absolute;top:16px;right:18px}
+.card-title{display:block;font:500 16px/1.35 var(--tight);color:var(--text);padding-right:20px}
+.card-title:hover{color:var(--green);text-decoration:none}
+.card-sum{color:rgba(255,255,255,.55);font-size:13px;line-height:1.6;margin:10px 0 2px;min-height:42px}
+.card-nums{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-size:13px}
+.card-nums{font-size:13px;font-weight:400;color:var(--green)}
+.card-nums b{font-family:var(--tight);font-weight:400;color:var(--green)}
+.card-nums>span:first-child{white-space:nowrap}
+.card-nums .sponsor-count{color:rgba(255,255,255,.3);font-size:12px}
+.card-nums .pct{color:var(--green);font-size:12px}
+.card-nums.zero,.card-nums.zero b{color:rgba(255,255,255,.4)}
+.card-nums.zero .pct{color:rgba(255,255,255,.25)}
+.card-actions{display:flex;gap:10px;margin-top:14px}
+.card-donate{margin-top:14px;border-top:1px solid var(--edge);padding-top:14px}
+
+/* initiative type badges (RFP = open bid, Grant = proposer does the work) */
+.type-badge{display:inline-block;border-radius:999px;padding:3px 12px;
+  font:600 11px var(--tight);text-transform:uppercase;letter-spacing:.05em}
+.t-rfp{color:#7eb3ff;border:1px solid rgba(92,140,220,.3);background:rgba(92,140,220,.15)}
+.t-grant{color:var(--green);border:1px solid rgba(0,255,136,.3);background:rgba(0,255,136,.12)}
+.rfp-card>.type-badge{position:absolute;top:16px;right:18px}
+.rfp-card .card-title{padding-right:72px}
+.type-badge.inline{position:static}
+
+/* "suggest an initiative" tile: the grid's last card is the submit CTA */
+.suggest-card{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;text-align:center;min-height:220px;border-style:dashed;
+  border-color:rgba(255,255,255,.15);background:rgba(255,255,255,.03);
+  color:var(--soft);cursor:pointer}
+.suggest-card:hover{text-decoration:none;border-color:rgba(92,183,90,.55);
+  box-shadow:0 0 30px rgba(92,183,90,.1)}
+.suggest-plus{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font:300 30px/1 var(--tight);color:var(--green);
+  background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.3);
+  transition:transform .15s,background .15s}
+.suggest-card:hover .suggest-plus{transform:scale(1.08);background:rgba(92,183,90,.16)}
+.suggest-title{font:500 18px var(--tight);color:var(--text);margin-top:6px}
+.suggest-card:hover .suggest-title{color:var(--green)}
+.suggest-sub{color:var(--muted);font-size:13px;max-width:260px}
+
+/* submit form: initiative type choice */
+.type-choice{display:flex;gap:10px;flex-wrap:wrap}
+.type-opt{flex:1;min-width:220px;display:flex;gap:10px;align-items:flex-start;
+  border:1px solid var(--edge2);border-radius:12px;background:var(--card);
+  padding:12px 14px;cursor:pointer;transition:border-color .15s}
+.type-opt:hover{border-color:rgba(92,183,90,.45)}
+.type-opt:has(input:checked){border-color:var(--green);box-shadow:0 0 14px rgba(92,183,90,.12)}
+.type-opt input{margin-top:3px;accent-color:#00ff88}
+.type-opt b{font:600 13.5px var(--tight);display:block}
+.type-opt small{display:block;color:var(--muted);font-size:12px;line-height:1.5;margin-top:2px}
+
+/* progress bars */
+.bar{height:8px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:12px}
+.bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),var(--bright));
+  box-shadow:0 0 12px rgba(92,183,90,.45);min-width:2px}
+.bar.big{height:13px;max-width:760px}
+
+/* ── donate widget ───────────────────────────────────────────── */
+.donate-widget{display:flex;flex-direction:column;gap:10px}
+.dw-chips{display:flex;gap:8px;flex-wrap:wrap}
+.dw-chip{border:1px solid var(--edge2);background:rgba(255,255,255,.05);color:var(--soft);border-radius:999px;
+  padding:8px 16px;font:400 13px var(--tight);cursor:pointer;transition:all .15s}
+.dw-chip:hover{border-color:rgba(92,183,90,.6);color:var(--green)}
+.dw-chip.on{background:var(--green);border-color:var(--green);color:#fff;font-weight:500}
+.dw-inputs{display:flex;gap:8px}
+.dw-amount{flex:1;min-width:0}
+.dw-token{width:110px;flex:none}
+.dw-trust{margin:0}
+.donate-widget .btn.primary{margin-top:0}
+.status{border:1px solid var(--edge);border-radius:14px;padding:12px 16px;font-size:12.5px;line-height:1.6}
+.status.ok{border-color:rgba(92,183,90,.5);color:var(--green)}
+.status.err{border-color:rgba(255,59,56,.55);color:#ffd7d6}
+.status.wait{border-color:rgba(240,180,41,.5);color:#ffe9b8}
+details.manual summary{cursor:pointer;color:var(--muted);font-size:12.5px}
+details.manual input{margin:8px 0}
+
+/* ── how it works ────────────────────────────────────────────── */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:860px){.steps{grid-template-columns:1fr}}
+.step{display:flex;gap:14px;border:1px solid var(--edge);border-radius:16px;background:var(--card);padding:18px 20px}
+.step .num{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font:700 15px var(--tight)}
+.step .num.g{background:rgba(92,183,90,.14);color:var(--green)}
+.step .num.a{background:rgba(240,180,41,.14);color:#f0b429}
+.step .num.b{background:rgba(90,200,250,.14);color:var(--claims)}
+.step b{font:600 14.5px var(--tight)}
+.step p{margin:6px 0 0;color:var(--muted);font-size:12.5px;line-height:1.6}
+
+/* ── pledge band ─────────────────────────────────────────────── */
+.pledge-band{display:flex;align-items:center;justify-content:space-between;gap:22px;flex-wrap:wrap;
+  margin-top:46px;border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:28px 32px;
+  background:rgba(255,255,255,.05)}
+.pledge-band b{font:500 18px var(--tight)}
+.pledge-band p{margin:8px 0 0;max-width:470px;font:400 14px/1.6 var(--tight);color:rgba(255,255,255,.5)}
+.pledge-band .btn{margin:0;flex:none}
+
+/* ── detail page ─────────────────────────────────────────────── */
+.cols{display:grid;grid-template-columns:1fr 340px;gap:36px;align-items:start}
+@media(max-width:960px){.cols{grid-template-columns:1fr}}
+.meta-line{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.fund-head{border:1px solid var(--edge);border-radius:18px;background:var(--card);padding:20px 24px;margin-top:8px}
+.fund-big{font:300 26px var(--tight)}
+.fund-big b{font-weight:700}
+.fund-split{display:flex;gap:26px;flex-wrap:wrap;margin-top:10px;color:var(--muted);font-size:13px}
+.fund-split b{color:var(--text)}
+.sponsors{display:flex;flex-wrap:wrap;gap:10px}
+.sponsor-pill{border:1px solid var(--edge2);background:var(--card);border-radius:14px;padding:10px 16px}
+.sponsor-pill b{font:600 14px var(--tight);margin-right:8px}
+.sponsor-pill span{font-family:var(--mono);font-size:13px;color:var(--green)}
+.sponsor-pill small{display:inline-block;margin-left:8px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.sponsor-pill small.received{color:var(--green)}
+.sponsor-pill small.note{display:block;margin:4px 0 0;text-transform:none;letter-spacing:0;font-size:11.5px}
+.col-side{position:sticky;top:86px;display:flex;flex-direction:column;gap:14px}
+@media(max-width:960px){.col-side{position:static}}
+.donate-card,.side-note{border:1px solid var(--edge);border-radius:18px;background:var(--card);padding:20px 22px}
+.donate-card{border-color:rgba(92,183,90,.35);box-shadow:0 0 34px rgba(92,183,90,.07)}
+.donate-card .k,.side-note .k{font:400 11px var(--tight);letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:12px;display:block}
+.addr-list{list-style:none;padding:0}
+.addr-list li{padding:3px 0;font-size:12.5px}
+
+/* ── tables ──────────────────────────────────────────────────── */
+table{border-collapse:collapse;width:100%;font-size:12.5px;font-weight:400}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top}
+th{position:sticky;top:0;background:#244c6d;font:500 10.5px var(--tight);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);z-index:5}
+tr:hover td{background:rgba(92,183,90,.045)}
+td.amt,th.amt{text-align:right;font-family:var(--mono);white-space:nowrap}
+.tblbox{max-height:480px;overflow:auto;border:1px solid var(--edge);border-radius:16px;background:var(--card)}
+
+/* chips (admin status) */
+.chip{display:inline-block;border:1px solid var(--edge2);color:var(--soft);padding:5px 14px;margin:0 6px 8px 0;
+  font:400 12.5px var(--tight);border-radius:999px}
+.chip.static{padding:2px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.st-pending{color:#f0b429;border-color:rgba(240,180,41,.5)}
+.st-approved{color:var(--green);border-color:rgba(92,183,90,.5)}
+.st-rejected,.st-archived{color:var(--muted)}
+
+/* admin verdict pills */
+.verdicts{max-width:1100px;margin:14px 0 0;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.pill{display:flex;gap:12px;align-items:center;border:1px solid var(--edge);border-radius:16px;
+  background:var(--card);padding:14px 18px}
+.pill b{font:600 14px var(--tight);display:block}
+.pill small{color:var(--muted);font-size:12px;display:block;margin-top:1px}
+.pill .dot{width:9px;height:9px}
+@media(max-width:860px){.verdicts{grid-template-columns:1fr}}
+
+/* ── forms + buttons ─────────────────────────────────────────── */
+.form{display:flex;flex-direction:column;gap:6px;max-width:640px}
+.form-row{flex-direction:row;flex-wrap:wrap;align-items:center}
+.form-row input,.form-row select{flex:1;min-width:140px}
+.narrow-form{max-width:360px;margin:0 auto}
+.lbl{font:400 11px var(--tight);color:var(--green);text-transform:uppercase;letter-spacing:.12em;margin-top:12px}
+/* the hint drops out of the uppercase label onto its own sentence-case line */
+.ai-steps{display:grid;grid-template-columns:1fr;gap:14px;margin:18px 0 26px;padding:18px 20px;
+  background:rgba(92,183,90,.06);border:1px solid rgba(92,183,90,.25);border-radius:14px}
+@media(min-width:720px){.ai-steps{grid-template-columns:1fr 1fr 1fr}}
+.ai-step{display:flex;gap:12px;align-items:flex-start;font:400 15px/1.5 var(--sans)}
+.ai-step .btn{margin-top:8px}
+.ai-num{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(92,183,90,.18);border:1px solid rgba(92,183,90,.5);color:#7dd57e;
+  font:600 13px var(--tight)}
+.lbl .priv{display:inline-block;margin-left:8px;vertical-align:middle;padding:2px 10px;border-radius:999px;
+  font:600 11px/1.6 var(--tight);letter-spacing:.06em;text-transform:none;
+  color:#7dd57e;background:rgba(92,183,90,.14);border:1px solid rgba(92,183,90,.45)}
+.lbl .dim{display:block;margin-top:5px;font:300 13px/1.5 var(--sans);color:var(--muted);
+  text-transform:none;letter-spacing:0}
+input[type=text],input[type=url],input[type=password],textarea,select{
+  background:var(--card);border:1px solid var(--edge2);color:var(--text);padding:14px 16px;
+  font:400 14px var(--sans);border-radius:14px;outline:none;width:100%}
+textarea{resize:vertical}
+input:focus,textarea:focus,select:focus{border-color:rgba(92,183,90,.6)}
+select{appearance:none}
+select option{background:#244c6d;color:#fff}
+.hp{position:absolute;left:-9999px;top:-9999px;height:1px;width:1px;opacity:0}
+.btn{display:inline-block;border:1px solid var(--edge2);background:var(--card);color:var(--text);
+  height:51px;padding:0 24px;border-radius:14px;font:400 13px var(--sans);cursor:pointer;margin-top:10px;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  transition:border-color .15s,box-shadow .15s,transform .15s;text-decoration:none;text-align:center;
+  box-shadow:0 4px 6px -4px rgba(130,24,26,.3),0 10px 15px -3px rgba(130,24,26,.3)}
+.btn:hover{border-color:rgba(92,183,90,.6);box-shadow:0 0 18px rgba(92,183,90,.15);text-decoration:none}
+.btn.primary{background:var(--red);border-color:var(--red);
+  box-shadow:0 4px 6px -4px rgba(130,24,26,.4),0 10px 15px -3px rgba(130,24,26,.4)}
+.btn.primary:hover{transform:scale(1.02);
+  box-shadow:0 4px 6px -4px rgba(130,24,26,.5),0 12px 20px -3px rgba(130,24,26,.5)}
+.ai-search .btn.primary::after{content:'→';margin-left:8px}
+.pledge-band .btn::after{content:'↗';margin-left:8px;opacity:.7}
+.btn.ghost{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
+.btn.danger{border-color:rgba(255,59,56,.6);color:#ffb3b1}
+.btn.sm{height:38px;padding:0 18px;font-size:13px;margin-top:0}
+.btn[disabled]{opacity:.5;cursor:default}
+.btnrow form{display:flex;gap:10px;flex-wrap:wrap}
+.inline{display:flex;gap:6px;align-items:center}
+.inline select{width:auto;padding:4px 8px;font-size:12px}
+.alert{border:1px solid rgba(255,59,56,.55);background:rgba(255,59,56,.12);border-radius:12px;
+  padding:12px 16px;margin:14px 0;color:#ffd7d6;font-size:13.5px}
+.admin-head{display:flex;justify-content:space-between;align-items:center;gap:20px}
+
+/* ── footer ──────────────────────────────────────────────────── */
+footer{max-width:1100px;margin:0 auto;padding:30px 24px 46px;text-align:center;color:var(--muted);font-size:12.5px}
+footer p{margin:6px 0}
+footer a.dim{color:rgba(255,255,255,.35)}
+
+/* legal bar: full-bleed strip under the footer, copyright left / socials right */
+.footer-bar{display:flex;align-items:center;justify-content:space-between;gap:20px;
+  flex-wrap:wrap;min-height:88px;padding:16px 48px;background:#28567a;
+  border-top:1px solid rgba(255,255,255,.08)}
+.footer-bar p{margin:0;font-size:12.5px;color:var(--soft)}
+.footer-socials{display:flex;align-items:center;gap:12px}
+.footer-socials a{display:block;line-height:0;opacity:.9;transition:opacity .15s,transform .15s}
+.footer-socials a:hover{opacity:1;transform:translateY(-1px)}
+.footer-socials img{width:40px;height:40px;display:block}
+@media(max-width:620px){.footer-bar{padding:16px 20px;justify-content:center;text-align:center}}
+
+/* sponsor logos + discuss emphasis (July feedback) */
+.sponsor-logo{display:block;max-height:34px;max-width:150px;margin:0 0 8px;border-radius:6px;background:#fff;padding:3px 6px}
+.btn.discuss{border-color:rgba(90,200,250,.55);color:var(--claims)}
+.btn.discuss:hover{box-shadow:0 0 18px rgba(90,200,250,.2);border-color:var(--claims)}
+.discuss-card{border-color:rgba(90,200,250,.35)}
+.discuss-card .btn{width:100%;margin-top:4px}
+.topbar .brand img{width:22px;height:22px}
+
+/* ── markdown-rendered RFP details ───────────────────────────── */
+/* Site-wide h2/h3 rules already style markdown headings; this block covers
+   the rest. Scoped to .md so plain-text fields keep white-space:pre-line. */
+.body-text.md{white-space:normal}
+.body-text.md>:first-child{margin-top:0}
+.body-text.md p{margin:0 0 14px}
+.body-text.md h1{font:500 24px/1.2 var(--tight);letter-spacing:-.02em;color:var(--text);margin:36px 0 14px}
+.body-text.md h4,.body-text.md h5,.body-text.md h6{font:600 13px var(--tight);color:var(--soft);margin:18px 0 8px}
+.body-text.md ul,.body-text.md ol{margin:0 0 14px;padding-left:24px}
+.body-text.md li{margin:4px 0}
+.body-text.md li p{margin:0}
+.body-text.md code{font-family:var(--mono);font-size:13px;background:rgba(0,0,0,.22);border-radius:6px;padding:1px 6px}
+.body-text.md pre{background:rgba(0,0,0,.22);border:1px solid var(--edge);border-radius:12px;padding:14px 16px;overflow-x:auto;margin:0 0 14px}
+.body-text.md pre code{background:none;padding:0}
+.body-text.md blockquote{margin:0 0 14px;padding:2px 18px;border-left:3px solid var(--green);color:var(--muted)}
+.body-text.md hr{border:0;height:1px;background:var(--edge);margin:26px 0}
+.body-text.md table{display:block;width:fit-content;max-width:100%;overflow-x:auto;margin:0 0 16px;
+  font-size:13px;border:1px solid var(--edge);border-radius:14px;background:var(--card)}
+.body-text.md th{position:static;background:rgba(0,0,0,.18)}
+.body-text.md th:empty{padding:0}
+.body-text.md tr:last-child td{border-bottom:0}
+
+/* donate method chooser (card / wallet / exchange) */
+.dw-methods{display:flex;gap:6px;border:1px solid var(--edge);border-radius:14px;padding:4px;background:rgba(255,255,255,.03)}
+.dw-method{flex:1;border:0;background:transparent;color:var(--muted);border-radius:9px;
+  padding:8px 6px;font:500 12.5px var(--tight);cursor:pointer;transition:all .15s;white-space:nowrap}
+.dw-method:hover{color:var(--text)}
+.dw-method.on{background:var(--card);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.3);
+  border:1px solid var(--edge2)}
+.dw-panel{display:flex;flex-direction:column;gap:8px}
+.dw-panel .btn.primary{margin-top:0}
+.dw-panel .small{margin:0}
+.dw-addr-row{display:flex;gap:8px;align-items:center;border:1px solid var(--edge);border-radius:14px;
+  background:rgba(0,0,0,.15);padding:8px 12px}
+.dw-addr-text{flex:1;min-width:0;overflow-wrap:anywhere;font-size:11.5px}
+.dw-addr-row .btn{margin:0;flex:none}
+.dw-card-open{text-align:center}
+
+/* sponsor logos on board cards */
+.card-logos{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;
+  padding-top:12px;border-top:1px solid var(--edge2)}
+.card-logos .sponsor-lbl{font:600 11px var(--tight);color:var(--green);
+  text-transform:uppercase;letter-spacing:.1em}
+.card-logos img{width:60px;height:60px;border-radius:12px;object-fit:contain;
+  background:#fff;padding:7px;border:1px solid rgba(92,183,90,.55);
+  box-shadow:0 0 14px rgba(92,183,90,.22)}
+
+/* $-prefixed amount box + live token conversion line */
+.dw-amount-wrap{flex:1;min-width:0;display:flex;align-items:center;gap:2px;
+  background:var(--card);border:1px solid var(--edge2);border-radius:12px;padding:0 0 0 14px}
+.dw-amount-wrap:focus-within{border-color:rgba(92,183,90,.6)}
+.dw-cur{color:var(--muted);font:300 14px var(--sans);flex:none}
+.dw-amount-wrap .dw-amount{flex:1;min-width:0;background:transparent;border:0;outline:none;
+  padding:10px 14px 10px 4px;color:var(--text);font:300 14px var(--sans)}
+.dw-conv{margin:-2px 0 0 2px}
+
+/* multi-wallet picker (EIP-6963) */
+.wallet-menu{position:absolute;top:56px;right:24px;z-index:60;display:flex;flex-direction:column;
+  min-width:236px;background:#244c6d;border:1px solid var(--edge2);border-radius:14px;
+  box-shadow:0 16px 40px rgba(0,0,0,.5);overflow:hidden;padding:6px}
+.wallet-menu button{display:flex;align-items:center;gap:11px;border:0;background:transparent;
+  color:var(--soft);text-align:left;padding:10px 12px;border-radius:9px;
+  font:400 14px var(--sans);cursor:pointer}
+.wallet-menu button:hover{background:rgba(92,183,90,.08);color:var(--green)}
+.wallet-menu button.active{color:var(--green)}
+.wallet-menu .wm-icon{width:24px;height:24px;flex:0 0 24px;border-radius:6px;object-fit:contain}
+.wallet-menu .wm-icon-ph{background:transparent}
+.wallet-menu .wm-name{flex:1;white-space:nowrap}
+.wallet-menu button.active .wm-name::after{content:" ✓";color:var(--green)}
+.wallet-menu button.wm-sep{margin-top:6px;padding-top:12px;border-top:1px solid var(--edge2)}
+.wallet-menu button.wm-danger{color:#ff9a9a}
+.wallet-menu button.wm-danger:hover{background:rgba(255,90,90,.12);color:#ffb3b3}
+.nick-overlay{position:fixed;inset:0;z-index:200;display:flex;align-items:center;
+  justify-content:center;padding:20px;background:rgba(15,30,44,.62);backdrop-filter:blur(4px)}
+.nick-modal{width:min(420px,100%);background:#22405c;border:1px solid var(--edge2);
+  border-radius:18px;padding:22px;display:flex;flex-direction:column;gap:12px;
+  box-shadow:0 24px 60px rgba(0,0,0,.42)}
+.nick-modal h3{margin:0;color:#fff;font:500 18px var(--tight)}
+.nick-modal p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.5}
+.nick-modal input{background:rgba(255,255,255,.05);border:1px solid var(--edge2);
+  border-radius:12px;color:#fff;padding:11px 13px;font:400 14px var(--sans);outline:none}
+.nick-modal input:focus{border-color:rgba(92,183,90,.6)}
+.nick-modal .nick-row{display:flex;gap:10px;margin-top:2px}
+.nick-modal .nick-row .btn{flex:1;margin:0}
+.nick-err{color:#ff9a9a;font-size:12.5px;min-height:1px;margin:0}
+.pfp{border-radius:50%;object-fit:cover;vertical-align:middle;background:rgba(255,255,255,.06);flex:none}
+.btn.wallet{display:inline-flex;align-items:center;gap:7px}
+.qa-ident .pfp{margin-right:2px}
+.nick-sub{margin:6px 0 0;font:600 12px var(--tight);color:var(--soft)}
+.pfp-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-top:2px}
+.pfp-opt{padding:3px;border:2px solid transparent;border-radius:50%;background:none;cursor:pointer;line-height:0}
+.pfp-opt img{border-radius:50%;display:block}
+.pfp-opt:hover{border-color:rgba(255,255,255,.3)}
+.pfp-opt.on{border-color:var(--green)}
+.pfp-up{margin-top:2px}
+.pfp-preview{display:block;width:56px;height:56px;border-radius:50%;object-fit:cover;margin-top:8px;border:2px solid var(--green)}
+
+/* ---- AI board search ---- */
+.ai-search{display:flex;gap:10px;margin:4px 0 20px;flex-wrap:wrap}
+.ai-search input{flex:1;min-width:260px;color:var(--text);outline:none;
+  border:1px solid rgba(255,255,255,.1);border-radius:14px;
+  padding:14px 16px 14px 44px;font:400 14px var(--sans);
+  background-color:rgba(255,255,255,.05);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-opacity='0.45' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.6-3.6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:16px 50%}
+.ai-search input:focus{border-color:rgba(92,183,90,.55)}
+.ai-search input::placeholder{color:rgba(255,255,255,.25)}
+.ai-search-note{margin:-8px 0 18px}
+.linklike{border:0;background:none;color:var(--green);cursor:pointer;
+  padding:0;font:inherit;text-decoration:underline}
+.rfp-card.ai-top{border-color:rgba(92,183,90,.5);
+  box-shadow:0 0 0 1px rgba(92,183,90,.25),0 14px 30px rgba(0,0,0,.35)}
+.ai-badge{position:absolute;top:-10px;left:14px;background:var(--green);
+  color:#08321c;font:700 11px var(--tight);letter-spacing:.4px;
+  border-radius:999px;padding:3px 10px;text-transform:uppercase}
+
+/* ---------------------------------------------- community Q&A (spec §9) */
+.funded-bar{background:linear-gradient(90deg,rgba(92,183,90,.25),rgba(0,255,136,.12));
+  border:1px solid rgba(92,183,90,.5);border-radius:10px;padding:14px 18px;
+  font:600 16px var(--tight);color:var(--green);margin-bottom:10px}
+.funded-chip{background:rgba(92,183,90,.2);color:var(--green);
+  border:1px solid rgba(92,183,90,.5);font:700 11px var(--tight);
+  letter-spacing:.4px}
+#qa{margin-top:8px}
+.qa-filters{display:flex;gap:6px;margin-bottom:12px}
+.qa-filter{background:none;border:1px solid rgba(255,255,255,.15);
+  border-radius:999px;color:rgba(255,255,255,.65);font:500 12.5px var(--tight);
+  padding:4px 12px;cursor:pointer}
+.qa-filter.on{border-color:var(--green);color:var(--green)}
+.qa-entry{border:1px solid rgba(255,255,255,.1);border-radius:10px;
+  padding:12px 14px;margin-bottom:10px;background:rgba(255,255,255,.02)}
+.qa-entry.featured{border-color:rgba(92,183,90,.45)}
+.qa-entry.qa-held{border-style:dashed;opacity:.8}
+.qa-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.qa-icon{font-size:15px;display:inline-flex;align-items:center}
+.qa-icon svg{width:15px;height:15px;color:var(--muted)}
+.qa-ident{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  font:600 13.5px var(--tight)}
+.qa-typed{color:rgba(255,255,255,.55);font-weight:400}
+.qa-unverified{color:rgba(255,255,255,.55);font-weight:400}
+.qa-chip{font:700 10px var(--tight);letter-spacing:.5px;border-radius:999px;
+  padding:2px 8px;text-transform:uppercase;border:1px solid rgba(255,255,255,.2);
+  color:rgba(255,255,255,.7)}
+.qa-chip.role{border-color:rgba(90,200,250,.5);color:var(--claims)}
+.qa-chip.feat{border-color:rgba(92,183,90,.6);color:var(--green)}
+.qa-chip.state{border-color:rgba(255,255,255,.25)}
+.qa-chip.state.ok{border-color:rgba(92,183,90,.6);color:var(--green)}
+.qa-vote{margin-left:auto;background:none;border:1px solid rgba(255,255,255,.2);
+  border-radius:8px;color:rgba(255,255,255,.75);font:600 13px var(--tight);
+  padding:4px 10px;cursor:pointer}
+.qa-vote.on{border-color:var(--green);color:var(--green)}
+.qa-vote:disabled{opacity:.45;cursor:default}
+.qa-body{margin:8px 0 4px;font-size:14.5px;line-height:1.55;
+  overflow-wrap:anywhere}
+.qa-reply{border-left:2px solid rgba(90,200,250,.35);margin:10px 0 0 14px;
+  padding:6px 0 0 12px}
+.qa-replymark{color:rgba(255,255,255,.35)}
+/* Reddit-style forum: vote box on the left, content on the right */
+.qa-entry{padding:0}
+.qa-row{display:flex;gap:12px;align-items:flex-start;padding:14px 16px}
+.qa-main{flex:1;min-width:0}
+.votebox{flex:none;display:flex;flex-direction:column;align-items:center;gap:3px;width:44px;padding-top:2px}
+.vbtn{width:34px;height:30px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.18);border-radius:9px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.7);font-size:12px;cursor:pointer;line-height:1}
+.vbtn:hover:not(:disabled){border-color:rgba(255,255,255,.4);color:#fff}
+.vbtn:disabled{opacity:.4;cursor:default}
+.vbtn.up.on{background:rgba(92,183,90,.16);border-color:rgba(92,183,90,.6);color:var(--green)}
+.vbtn.down.on{background:rgba(255,59,56,.16);border-color:rgba(255,59,56,.6);color:#ff8582}
+.vscore{font:600 14px var(--tight);font-variant-numeric:tabular-nums;color:#fff}
+.lockhint{font-size:9.5px;color:var(--muted);text-align:center;line-height:1.3;margin-top:2px}
+.nick{font:600 14px var(--tight);color:#fff}
+.nick.clickable{cursor:pointer}
+.nick.clickable:hover{color:var(--green)}
+.qa-addr{color:var(--muted);font-size:12px;margin-left:2px}
+.rtag{font:700 9.5px var(--tight);letter-spacing:.03em;text-transform:uppercase;padding:2px 8px;border-radius:999px;display:inline-flex;align-items:center;gap:5px}
+.rtag.expert{background:rgba(92,183,90,.16);border:1px solid rgba(92,183,90,.5);color:var(--green)}
+.rtag.team{background:rgba(44,94,134,.35);border:1px solid rgba(120,170,210,.5);color:#bcd8f0}
+.rtag.curator{background:rgba(255,207,58,.14);border:1px solid rgba(255,207,58,.5);color:#ffcf3a}
+.rtag.donor{background:rgba(160,108,255,.16);border:1px solid rgba(160,108,255,.5);color:#c4a6ff}
+.qa-sortbar{display:flex;gap:6px;margin:0 0 12px}
+.qa-sort{font:500 12px var(--tight);color:rgba(255,255,255,.7);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 13px;cursor:pointer}
+.qa-sort:hover{border-color:rgba(92,183,90,.5);color:#fff}
+.qa-sort.on{border-color:var(--green);color:var(--green);background:rgba(92,183,90,.12)}
+.qa-foot{display:flex;gap:14px;margin-top:6px}
+.qa-link{background:none;border:none;color:rgba(255,255,255,.45);
+  font:500 12.5px var(--tight);cursor:pointer;padding:0}
+.qa-link:hover{color:var(--green)}
+.qa-flash{color:var(--red);font-size:13px;margin-top:6px}
+.qa-picks{display:flex;gap:10px;align-items:center;margin:14px 0 10px;
+  flex-wrap:wrap}
+.qa-form{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.qa-form textarea{min-height:110px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;
+  font:400 14.5px var(--sans);padding:10px 12px;resize:vertical}
+.qa-form select,.qa-form input,.qa-replyform input{background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;
+  font:400 13.5px var(--sans);padding:8px 10px}
+.qa-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.qa-identbox{display:flex;flex-direction:column;gap:8px;
+  border-top:1px solid rgba(255,255,255,.08);padding-top:10px}
+.qa-note{color:var(--red);font-size:13px;min-height:1em}
+.qa-typerow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.qa-typebtn{font:600 13px var(--tight);color:rgba(255,255,255,.8);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:7px 14px;cursor:pointer}
+.qa-typebtn:hover{border-color:rgba(92,183,90,.5);color:#fff}
+.qa-typebtn.on{border-color:var(--green);color:var(--green);background:rgba(92,183,90,.12)}
+.qa-typelink{background:none;border:none;color:rgba(255,255,255,.45);font:500 12.5px var(--tight);cursor:pointer;padding:4px 2px;text-decoration:underline}
+.qa-typelink:hover{color:#fff}
+.qa-typelink.on{color:var(--green)}
+.qa-topicrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.qa-topiclbl{font:500 12px var(--tight);color:var(--muted);margin-right:2px}
+.qa-topic{font:500 11.5px var(--tight);text-transform:capitalize;color:rgba(255,255,255,.7);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:4px 11px;cursor:pointer}
+.qa-topic:hover{border-color:rgba(92,183,90,.5);color:#fff}
+.qa-topic.on{border-color:var(--green);color:var(--green);background:rgba(92,183,90,.12)}
+.or-divider{display:flex;align-items:center;text-align:center;color:var(--muted);font:500 12px var(--tight);gap:10px;margin:16px 0}
+.or-divider::before,.or-divider::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.14)}
+.qa-replyform{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.qa-replyform textarea{min-height:70px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;
+  font:400 14px var(--sans);padding:8px 10px}
+.community-strip{max-width:1080px;margin:0 auto;padding:0 22px}
+.community-strip h2{font:600 19px var(--tight);margin:18px 0 10px}
+.community-cards{display:grid;gap:12px;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.community-card{display:flex;flex-direction:column;gap:6px;
+  border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:12px 14px;
+  color:inherit;background:rgba(255,255,255,.02)}
+.community-card:hover{border-color:rgba(92,183,90,.5);text-decoration:none}
+.qa-snippet{font-size:13.5px;line-height:1.45;color:rgba(255,255,255,.8);
+  overflow-wrap:anywhere}
+.qa-src{font-size:12px}
+.admin-bell{position:relative;font-size:18px;margin-left:10px;
+  text-decoration:none}
+.bell-n{background:var(--red);color:#fff;font:700 11px var(--tight);
+  border-radius:999px;padding:1px 6px;margin-left:2px;vertical-align:top}
+.stale-q td{background:rgba(255,59,56,.06)}
+tr.reported td{background:rgba(255,59,56,.06)}
+.qa-body-cell{font-size:13px;color:rgba(255,255,255,.75);white-space:pre-line;
+  overflow-wrap:anywhere}
+@media (max-width:760px){.qa-picks{flex-direction:column;align-items:stretch}}
+.qa-admin{display:inline-flex;gap:12px;flex-wrap:wrap;margin-left:auto}
+.qa-link.admin{color:var(--claims)}
+.qa-link.admin:hover{color:var(--green)}
+.qa-identtitle{font:600 13.5px var(--tight);color:rgba(255,255,255,.85)}
+
+/* =========================================================================
+   Forum design v2 "Solid Professional" (Zep pick 2026-08-19). Overrides the
+   Q&A styles above; mapped from the TheDAO design system (Inter Tight, green
+   #5cb75a + neon #00ff88, solid navy panels, pill buttons with real hover).
+   ========================================================================= */
+/* segmented filter + sort bars */
+.qa-filters,.qa-sortbar{display:inline-flex;padding:4px;gap:2px;background:rgba(9,18,30,.55);border:1px solid rgba(255,255,255,.10);border-radius:999px;margin:0 0 14px}
+.qa-filter,.qa-sort{font:600 13px var(--tight);color:var(--muted);background:transparent;border:0;padding:7px 15px;border-radius:999px;cursor:pointer;transition:.15s ease}
+.qa-filter:hover,.qa-sort:hover{color:#fff;border-color:transparent;background:transparent}
+.qa-filter.on,.qa-sort.on{background:var(--green);color:#0d1f14}
+/* cards */
+.qa-entry{background:#1e3650;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:0;margin-bottom:16px;box-shadow:0 6px 20px rgba(0,0,0,.22);transition:border-color .15s ease}
+.qa-entry:hover{border-color:rgba(255,255,255,.16)}
+.qa-entry.featured{background:linear-gradient(180deg,rgba(92,183,90,.10),rgba(92,183,90,.02)),#213c58;border-color:rgba(92,183,90,.55);box-shadow:0 0 0 1px rgba(92,183,90,.12),0 8px 26px rgba(0,0,0,.28),0 0 22px rgba(92,183,90,.10)}
+.qa-entry.qa-held{border-style:dashed;opacity:.85;padding:16px 18px}
+.qa-row{display:flex;gap:16px;align-items:flex-start;padding:18px 20px}
+.qa-main{flex:1;min-width:0}
+/* vote box */
+.votebox{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;width:40px;padding-top:2px}
+.vbtn{width:32px;height:32px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.10);border-radius:8px;background:rgba(255,255,255,.04);color:var(--muted);cursor:pointer;transition:.15s ease}
+.vbtn svg{width:15px;height:15px}
+.vbtn:hover:not(:disabled){color:#fff;border-color:rgba(255,255,255,.16);background:rgba(255,255,255,.08)}
+.vbtn:disabled{opacity:.4;cursor:default}
+.vbtn.up.on{color:var(--green);border-color:rgba(92,183,90,.6);background:rgba(92,183,90,.14)}
+.vbtn.down.on{color:var(--red);border-color:rgba(255,59,56,.55);background:rgba(255,59,56,.12)}
+.vscore{font:700 15px var(--tight);font-variant-numeric:tabular-nums;color:#f2f6fa}
+.vscore.active-up{color:var(--green)}
+.lockhint{font-size:9.5px;color:var(--muted);text-align:center;line-height:1.3;margin-top:2px}
+/* featured flag row */
+.featured-flag{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.10)}
+.featured-flag .hint{font-size:11.5px;color:var(--muted);font-weight:500}
+/* identity row */
+.qa-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.qa-ident{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pfp{border-radius:50%}
+.nick{font:700 14.5px var(--tight);color:#f2f6fa;text-decoration:none}
+.nick.clickable{cursor:pointer}
+.nick.clickable:hover{color:#00ff88}
+.qa-addr{color:var(--muted);font-size:12px;margin-left:2px}
+.qa-unverified{color:var(--muted);font-weight:400}
+/* chips */
+.rtag,.qa-chip{display:inline-flex;align-items:center;gap:6px;font:700 10.5px var(--tight);letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.10);color:var(--muted);background:rgba(255,255,255,.03);white-space:nowrap}
+.rtag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:0 0 auto}
+.rtag.expert{color:#7eb3ff;border-color:rgba(126,179,255,.30);background:rgba(44,94,134,.22)}
+.rtag.team{color:#ffb432;border-color:rgba(255,180,50,.32);background:rgba(255,180,50,.12)}
+.rtag.curator{color:var(--green);border-color:rgba(92,183,90,.35);background:rgba(92,183,90,.12)}
+.rtag.donor{color:#c4a6ff;border-color:rgba(160,108,255,.4);background:rgba(160,108,255,.14)}
+.qa-chip.feat{color:#00ff88;border-color:rgba(0,255,136,.35);background:rgba(0,255,136,.10)}
+.qa-chip.feat .dot,.qa-chip.feat::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 6px rgba(0,255,136,.9);flex:0 0 auto}
+.qa-chip.state{color:var(--muted)}
+.qa-chip.state.ok{color:var(--green);border-color:rgba(92,183,90,.35);background:rgba(92,183,90,.12)}
+/* body */
+.qa-body{font-size:15px;color:#dce5ef;margin:2px 0 14px;line-height:1.55;overflow-wrap:anywhere}
+/* nested replies */
+.qa-reply{background:#213c58;border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:14px 16px;margin:14px 0 0 18px;border-left:2px solid rgba(255,180,50,.28)}
+.qa-reply .qa-body{margin-bottom:10px;font-size:14.5px}
+.qa-replymark{display:none}
+/* action buttons */
+.qa-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px}
+.qa-link{font:600 13px var(--tight);display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:9px;cursor:pointer;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:#f2f6fa;transition:.15s ease;line-height:1}
+.qa-link svg{width:14px;height:14px}
+.qa-link:hover{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.28);color:#fff}
+.qa-link.report{background:transparent;border-color:rgba(255,255,255,.10);color:var(--muted)}
+.qa-link.report:hover{color:#fff;border-color:rgba(255,255,255,.16);background:rgba(255,255,255,.05)}
+.qa-spacer{flex:1 1 auto}
+.qa-admin{display:inline-flex;align-items:center;gap:8px;padding-left:14px;border-left:1px solid rgba(255,255,255,.10);margin-left:0;flex-wrap:wrap}
+.qa-admin-label{font:700 10px var(--tight);letter-spacing:.10em;text-transform:uppercase;color:var(--muted)}
+.qa-link.admin{color:var(--green);border-color:rgba(92,183,90,.35);background:rgba(92,183,90,.10)}
+.qa-link.admin:hover{color:#0d1f14;background:var(--green);border-color:var(--green)}
+.qa-link.danger{color:#ffd2d1;border-color:rgba(255,59,56,.35);background:rgba(255,59,56,.10)}
+.qa-link.danger:hover{color:#fff;background:rgba(255,59,56,.20);border-color:rgba(255,59,56,.6)}
+.qa-flash{color:var(--red);font-size:13px;margin-top:6px}
+/* composer */
+.qa-form{background:#1e3650;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:18px 20px;box-shadow:0 6px 20px rgba(0,0,0,.22);margin-top:26px;margin-bottom:14px;display:flex;flex-direction:column;gap:0}
+.qa-form-title{font:700 15px var(--tight);margin:0 0 12px;color:#f2f6fa}
+.qa-form textarea{width:100%;min-height:96px;resize:vertical;font:400 14.5px var(--tight);color:#f2f6fa;background:rgba(9,18,30,.5);border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:14px 16px;transition:.15s ease}
+.qa-form textarea::placeholder{color:var(--muted)}
+.qa-form textarea:focus{outline:none;border-color:rgba(92,183,90,.55);box-shadow:0 0 0 3px rgba(92,183,90,.14)}
+.qa-identbox{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;flex-wrap:wrap;border-top:none;padding-top:0}
+.qa-form input,.qa-replyform input{background:rgba(9,18,30,.5);border:1px solid rgba(255,255,255,.10);border-radius:9px;color:#fff;font:400 13.5px var(--tight);padding:9px 12px}
+.qa-note{color:var(--red);font-size:13px;min-height:1em}
+.qa-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.qa-wallet{font:600 13px var(--tight);display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:9px;cursor:pointer;color:#7eb3ff;border:1px solid rgba(126,179,255,.35);background:rgba(44,94,134,.20);transition:.15s ease}
+.qa-wallet svg{width:14px;height:14px}
+.qa-wallet:hover{color:#fff;background:rgba(44,94,134,.45);border-color:rgba(126,179,255,.6)}
+.qa-post{font:700 13px var(--tight);display:inline-flex;align-items:center;gap:7px;padding:9px 20px;border-radius:9px;cursor:pointer;background:var(--green);color:#0d1f14;border:1px solid var(--green);transition:.15s ease}
+.qa-post svg{width:14px;height:14px}
+.qa-post:hover{background:#6cc96a;border-color:#6cc96a;box-shadow:0 0 16px rgba(0,255,136,.28)}
+.qa-post:disabled{opacity:.6;cursor:default;box-shadow:none}
+.qa-buttons{display:flex;gap:10px;align-items:center}
+.qa-composer-hint{font-size:12px;color:var(--muted)}
+.qa-replyform{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.qa-replyform textarea{min-height:70px;background:rgba(9,18,30,.5);border:1px solid rgba(255,255,255,.10);border-radius:12px;color:#fff;font:400 14px var(--tight);padding:10px 12px}
+
+/* donation terms gate + batch 2 polish (Sep 2026) */
+.dw-terms-row{display:flex;align-items:center;gap:8px;margin:2px 0 10px;cursor:pointer;color:var(--soft)}
+.dw-terms-row input{width:16px;height:16px;accent-color:var(--green);margin:0;flex:none}
+.dw-terms-row a{text-decoration:underline}
+.btn.dis{opacity:.4;pointer-events:none}
+.dw-copy:disabled{opacity:.4;cursor:default}
+.type-chip.t-grant{color:#c9a4ff;border-color:rgba(201,164,255,.5)}
+.type-chip.t-rfp{color:#7fc6ff;border-color:rgba(127,198,255,.5)}
+.terms-page .md-body{font-size:15px;line-height:1.65}
+.terms-page .md-body h1{font-size:26px;margin-top:0}
+.terms-page .md-body h2{font-size:19px;margin-top:28px}
+td.pre{white-space:pre-wrap;max-width:420px;overflow-wrap:anywhere}
+@media (max-width:420px){.dw-chip{padding:9px 11px;font-size:13px}}
+
+/* ============================================================
+   Part 2: prototype additions, same token vocabulary as above.
+   Only what the live stylesheet does not already have:
+   rules panel, paste box, section fields, backer rows,
+   milestone rows, criteria rows, checks, page preview,
+   board-card mock, confirmation card.
+   ============================================================ */
+
+:root{color-scheme:dark}
+body{background:var(--bg);color:var(--text);
+  background-image:linear-gradient(142.716deg,var(--bg) 31.46%,var(--bg2) 90.4%);
+  background-attachment:fixed;background-repeat:no-repeat}
+h1,h2,h3,h4,.rfp-title,.lbl.q{text-wrap:balance}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;
+  scroll-behavior:auto!important}}
+
+/* the form column stays readable: about 70 characters of running text */
+.form{max-width:640px}
+.hint{margin:6px 0 0;font:300 12.5px/1.65 var(--sans);color:var(--muted);max-width:66ch}
+.hint code,.check code,.rules code{font-family:var(--mono);font-size:11.5px;
+  background:rgba(0,0,0,.28);border-radius:5px;padding:1px 5px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* month and file inputs are not in the site stylesheet yet */
+input[type=month]{background:var(--card);border:1px solid var(--edge2);color:var(--text);
+  padding:10px 12px;font:400 13.5px var(--sans);border-radius:11px;outline:none;width:100%}
+input[type=month]:focus{border-color:rgba(92,183,90,.6)}
+input[type=file].filein{width:100%;padding:9px 12px;border:1px dashed var(--edge2);
+  border-radius:11px;background:rgba(0,0,0,.14);color:var(--soft);font:400 12.5px var(--sans)}
+input[type=file].filein::file-selector-button{margin-right:12px;border:1px solid var(--edge2);
+  background:rgba(255,255,255,.06);color:var(--soft);border-radius:9px;padding:6px 12px;
+  font:400 12.5px var(--sans);cursor:pointer}
+input[type=file].filein::file-selector-button:hover{border-color:rgba(92,183,90,.6)}
+
+/* prototype banner */
+.proto-banner{display:flex;gap:11px;align-items:flex-start;margin:0 0 4px;
+  border:1px solid rgba(240,180,41,.45);background:rgba(240,180,41,.10);
+  border-radius:14px;padding:13px 16px;color:#ffe9b8;font-size:13.5px;line-height:1.6}
+.proto-banner b{color:#ffd98a}
+.pb-dot{flex:none;width:9px;height:9px;border-radius:50%;margin-top:6px;
+  background:#f0b429;box-shadow:0 0 10px rgba(240,180,41,.6)}
+.pb-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.pb-btns .btn{margin-top:0}
+
+/* group headers inside the form */
+.grp{margin-top:30px;padding-top:18px;border-top:1px solid var(--edge)}
+.grp-k{display:block;font:600 14px var(--tight);color:var(--text)}
+.grp-h{display:block;margin-top:4px;color:var(--muted);font-size:12.5px;line-height:1.6;max-width:64ch}
+
+/* type sub-option (top-up) */
+.subopt{margin-top:10px;border:1px solid var(--edge);border-radius:14px;
+  background:rgba(255,255,255,.03);padding:12px 16px}
+.cbrow{display:flex;align-items:flex-start;gap:10px;cursor:pointer;
+  font:400 13.5px/1.5 var(--sans);color:var(--soft)}
+.cbrow input{width:16px;height:16px;margin:1px 0 0;flex:none;accent-color:#00ff88}
+
+/* the "Required" marker that sits in an eyebrow or label row */
+.reqtag{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;
+  font:600 9.5px/1.6 var(--tight);letter-spacing:.12em;text-transform:uppercase;font-style:normal;
+  color:#7dd57e;background:rgba(92,183,90,.14);border:1px solid rgba(92,183,90,.45);
+  vertical-align:1px}
+.reqtag.sm{margin-left:6px;padding:1px 6px;font-size:9px}
+
+/* rules panel: what the site writes, not the submitter */
+.rules{margin-top:14px;border:1px solid var(--edge2);background:rgba(0,0,0,.16);
+  border-radius:16px;padding:2px 20px 16px}
+.rules>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;
+  padding:14px 0 8px;font:600 15px var(--tight);color:var(--text)}
+.rules>summary::-webkit-details-marker{display:none}
+.rules>summary::before{content:"\25B8";color:var(--green);font-size:13px;line-height:1;flex:none}
+.rules[open]>summary::before{content:"\25BE"}
+.rules-tag{margin-left:auto;font:400 10px var(--tight);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--green);white-space:nowrap}
+.rules ol,.rules ul{margin:4px 0 0;padding-left:22px}
+.rules li{margin:0 0 10px;font:300 13.5px/1.7 var(--sans);color:var(--soft);max-width:62ch}
+.rules li::marker{color:var(--green)}
+.rules li:last-child{margin-bottom:0}
+.rules-ver{margin:8px 0 0;font-size:11.5px;color:var(--muted)}
+
+/* paste to fill */
+.pasterow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.pasterow .btn{margin-top:0}
+.pasterow .hint{margin:0}
+.sorted-ok{color:var(--green)}
+.paste-again{margin:10px 0 0;font-size:12.5px;color:var(--muted)}
+.unsorted{margin-top:12px;border:1px solid rgba(240,180,41,.45);
+  background:rgba(240,180,41,.07);border-radius:16px;padding:14px 16px}
+.unsorted .eyebrow{margin-top:0;color:#f0b429}
+.unsorted textarea{margin-top:8px}
+
+/* one question per section */
+.fld{margin-top:22px;padding-top:16px;border-top:1px solid rgba(255,255,255,.07)}
+.fld:first-child{border-top:0;padding-top:0}
+.eyebrow{display:block;margin-top:14px;font:400 10.5px var(--tight);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--green)}
+.eyebrow.top{margin-top:0}
+.eyebrow.sm{margin:0 0 4px;font-size:10px;letter-spacing:.12em;color:var(--muted)}
+.lbl.q{margin-top:7px;text-transform:none;letter-spacing:0;color:var(--text);
+  font:500 15px/1.45 var(--tight);max-width:62ch}
+.fld-foot{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:7px}
+.wc{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;
+  white-space:nowrap}
+.exbox{margin-top:10px;border:1px dashed rgba(255,255,255,.20);border-radius:14px;
+  background:rgba(0,0,0,.16);padding:14px 16px}
+.ex-lbl{display:block;margin-bottom:8px;font:400 10.5px var(--tight);letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted)}
+.ex-lbl i{font-style:normal;text-transform:none;letter-spacing:0;color:rgba(255,255,255,.4);
+  margin-left:8px;font-size:11px}
+.ex-body{font:300 13.5px/1.7 var(--sans);color:rgba(255,255,255,.7);max-width:64ch}
+.ex-body>:first-child{margin-top:0}
+.ex-body p{margin:0 0 10px}
+.ex-body ul,.ex-body ol{margin:0 0 10px;padding-left:20px}
+.ex-body li{margin:4px 0}
+.ex-body b{color:rgba(255,255,255,.85)}
+
+/* inline error and warning states, painted after a submit attempt */
+input.has-error,textarea.has-error,select.has-error{border-color:var(--red);
+  box-shadow:0 0 0 1px rgba(255,60,56,.35)}
+input.has-warn,textarea.has-warn{border-color:rgba(240,180,41,.7)}
+.eb.has-error{border-left:2px solid var(--red);padding-left:12px}
+.eb.has-warn{border-left:2px solid rgba(240,180,41,.7);padding-left:12px}
+.fld-msg{margin:6px 0 0;font:400 12.5px/1.55 var(--sans);max-width:60ch}
+.fld-err{color:#ffb3b1}
+.fld-warn{color:#ffd98a}
+
+/* backers already committed */
+.bk-row,.ms-row{margin-top:12px;border:1px solid var(--edge2);background:var(--card);
+  border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:11px}
+.row-head{display:flex;align-items:center;gap:12px}
+.row-k{font:600 13.5px var(--tight);color:var(--text)}
+.row-head .btn{margin:0 0 0 auto}
+.bk-head{margin-top:14px;font-family:var(--mono);font-size:12.5px;
+  font-variant-numeric:tabular-nums;color:var(--soft)}
+.bk-head .dimline{color:var(--muted);font-family:var(--sans);font-size:12.5px}
+.bk-head .okline{color:var(--green)}
+.bk-chip{margin-top:2px}
+.bk-chip .sponsors{margin-top:4px}
+.bk-file{margin-top:6px;color:var(--soft)}
+
+/* milestone rows */
+.ms-grid{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.ms-f{display:flex;flex-direction:column;min-width:0}
+.ms-f.grow{flex:1;min-width:190px}
+.ms-f.amt{width:170px;flex:none}
+.ms-f.mth{width:190px;flex:none}
+.ms-f input,.ms-f textarea{padding:10px 12px;border-radius:11px;font-size:13.5px}
+.ms-f input.money{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.amt-echo{margin-top:5px;font-family:var(--mono);font-size:11px;color:var(--muted);
+  font-variant-numeric:tabular-nums}
+.ms-flags{display:flex;gap:18px;flex-wrap:wrap}
+.tot{display:flex;flex-direction:column;gap:5px;margin-top:14px;
+  font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--soft)}
+.tot .bad{color:#ff8582}
+.tot .warnc{color:#f0b429}
+.tot .okc{color:var(--green)}
+.ms-flagtag{display:inline-block;margin-left:8px;padding:2px 9px;border-radius:999px;
+  font:600 10px var(--tight);letter-spacing:.08em;text-transform:uppercase;
+  color:var(--green);border:1px solid rgba(92,183,90,.45);background:rgba(92,183,90,.12);
+  vertical-align:2px}
+.ms-flagtag.done{color:#7eb3ff;border-color:rgba(126,179,255,.45);background:rgba(44,94,134,.3)}
+.emptyrow{margin:12px 0 0;font-size:12.5px;color:var(--muted)}
+
+/* acceptance criteria: one input per criterion, one line each */
+.crit-list{display:flex;flex-direction:column;gap:7px;margin-top:2px}
+.crit{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+.crit-box{flex:none;width:14px;height:14px;border:1px solid rgba(255,255,255,.38);
+  border-radius:4px}
+.crit input{flex:1;min-width:0;padding:9px 11px;border-radius:10px;font-size:13.5px}
+.crit-del{flex:none;width:26px;height:26px;padding:0;border-radius:8px;cursor:pointer;
+  border:1px solid var(--edge2);background:rgba(255,255,255,.05);color:var(--muted);
+  font:400 15px/1 var(--sans)}
+.crit-del:hover{border-color:rgba(255,60,56,.6);color:#ffb3b1}
+.crit-add{margin-top:9px;font-size:12.5px}
+
+/* checks */
+.checks{margin-top:16px;border:1px solid var(--edge);background:rgba(0,0,0,.16);
+  border-radius:16px;padding:16px 18px}
+.checks h4{margin:0 0 10px;font:400 10.5px var(--tight);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--green)}
+.check{display:flex;gap:11px;align-items:flex-start;margin:9px 0;font-size:13px;line-height:1.6}
+.check .k{flex:none;margin-top:1px;padding:3px 9px;border-radius:999px;border:1px solid currentColor;
+  font:700 9.5px var(--tight);letter-spacing:.1em;text-transform:uppercase}
+.check.err{color:#ffb3b1}
+.check.warn{color:#ffd98a}
+.check.ok{color:var(--green)}
+.check.note{color:rgba(255,255,255,.5)}
+.check .t{color:var(--soft);max-width:60ch}
+.check .t b{color:inherit}
+.check ul{margin:7px 0 0;padding-left:18px;color:var(--muted)}
+.check li{margin:3px 0}
+
+/* private block */
+.privnote{margin-top:6px}
+
+/* submit */
+.subrow{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:22px}
+.blockmsg{color:#ffb3b1;font-size:12.5px;line-height:1.6;max-width:44ch}
+.conf{margin-top:14px;border:1px solid rgba(92,183,90,.5);background:rgba(92,183,90,.10);
+  border-radius:16px;padding:16px 18px;color:var(--soft);font-size:13.5px;line-height:1.65}
+.conf b{color:var(--green)}
+.conf p{margin:8px 0 0}
+
+/* "see it as a page" preview */
+.preview-wrap{max-width:none;margin-top:16px;border:1px solid rgba(92,183,90,.35);
+  border-radius:20px;background:rgba(0,0,0,.18);padding:0 22px 26px}
+.preview-flag{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  padding:13px 0;border-bottom:1px solid var(--edge);
+  font:400 10.5px var(--tight);letter-spacing:.14em;text-transform:uppercase;color:var(--green)}
+.preview-flag span:last-child{color:var(--muted)}
+.preview-flag.mid{margin-top:30px;border-top:1px solid var(--edge)}
+.preview-wrap .crumb{margin-top:16px}
+.preview-wrap h2{margin-top:34px}
+.preview-wrap .meta-line{margin-bottom:6px}
+.preview-wrap .meta-line .dim{font-size:13px}
+.preview-wrap .body-text,.preview-wrap .rules li{max-width:64ch}
+.preview-wrap .rules{background:rgba(92,183,90,.07);border-color:rgba(92,183,90,.4);margin-top:20px}
+.task{list-style:none;margin:0 0 16px;padding-left:2px}
+.task li{position:relative;margin:7px 0;padding-left:27px}
+.task li::before{content:"";position:absolute;left:0;top:5px;width:14px;height:14px;
+  border:1px solid rgba(255,255,255,.38);border-radius:4px}
+
+/* the board card, as the same fields render on the front page */
+.card-mock{max-width:380px;margin-top:18px}
+
+@media(max-width:620px){
+  .ms-f.amt,.ms-f.mth{width:100%}
+  .row-head .btn{height:32px;padding:0 12px;font-size:12px}
+}
+</style>
+
+<header class="topbar">
+  <a href="#" class="brand">
+    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjY0IiBoZWlnaHQ9IjI2NCIgdmlld0JveD0iMCAwIDI2NCAyNjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGZpbHRlcj0idXJsKCNmaWx0ZXIwX2RkXzQyNV83MTYpIj4KPHJlY3QgeD0iMTIiIHk9IjIiIHdpZHRoPSIyNDAiIGhlaWdodD0iMjQwIiByeD0iMTguMzc5NyIgZmlsbD0iI0ZGM0MzOCIvPgo8cGF0aCBkPSJNODEuNDQyNCAxOTIuODMzVjUxLjE2NkgxMzAuMjQzQzE0MS4yNTkgNTEuMTY2IDE0OS42NjcgNTEuODQyNSAxNTUuNDY1IDUzLjE5NTNDMTYzLjU4MiA1NS4wNjM2IDE3MC41MDcgNTguNDQ1OCAxNzYuMjQxIDYzLjM0MkMxODMuNzE0IDY5LjY1NTUgMTg5LjI4NyA3Ny43NDA2IDE5Mi45NTkgODcuNTk3M0MxOTYuNjk2IDk3LjM4OTcgMTk4LjU2NCAxMDguNTk5IDE5OC41NjQgMTIxLjIyNkMxOTguNTY0IDEzMS45ODUgMTk3LjMwOCAxNDEuNTIgMTk0Ljc5NSAxNDkuODNDMTkyLjI4MyAxNTguMTQxIDE4OS4wNjEgMTY1LjAzNCAxODUuMTMyIDE3MC41MUMxODEuMjAyIDE3NS45MjIgMTc2Ljg4NSAxODAuMjA2IDE3Mi4xODIgMTgzLjM2MkMxNjcuNTQ0IDE4Ni40NTUgMTYxLjkwNyAxODguODA2IDE1NS4yNzEgMTkwLjQxN0MxNDguNyAxOTIuMDI3IDE0MS4xMzEgMTkyLjgzMyAxMzIuNTYyIDE5Mi44MzNIODEuNDQyNFpNMTAwLjE5IDE3Ni4xMTVIMTMwLjQzNkMxMzkuNzc4IDE3Ni4xMTUgMTQ3LjA5IDE3NS4yNDUgMTUyLjM3MiAxNzMuNTA2QzE1Ny43MTkgMTcxLjc2NiAxNjEuOTcxIDE2OS4zMTggMTY1LjEyOCAxNjYuMTYxQzE2OS41NzMgMTYxLjcxNiAxNzMuMDIgMTU1Ljc1NyAxNzUuNDY4IDE0OC4yODRDMTc3Ljk4MSAxNDAuNzQ3IDE3OS4yMzcgMTMxLjYzMSAxNzkuMjM3IDEyMC45MzZDMTc5LjIzNyAxMDYuMTE5IDE3Ni43ODkgOTQuNzQ4MyAxNzEuODkzIDg2LjgyNDNDMTY3LjA2MSA3OC44MzU4IDE2MS4xNjYgNzMuNDg4NyAxNTQuMjA4IDcwLjc4MjlDMTQ5LjE4MyA2OC44NTAyIDE0MS4wOTggNjcuODgzOCAxMjkuOTUzIDY3Ljg4MzhIMTAwLjE5VjE3Ni4xMTVaIiBmaWxsPSJ3aGl0ZSIvPgo8cmVjdCB4PSI2Ni4xNjciIHk9IjExNS4zMTEiIHdpZHRoPSI3NC4yNDYxIiBoZWlnaHQ9IjEzLjEwMjMiIGZpbGw9IndoaXRlIi8+CjwvZz4KPGRlZnM+CjxmaWx0ZXIgaWQ9ImZpbHRlcjBfZGRfNDI1XzcxNiIgeD0iMCIgeT0iMCIgd2lkdGg9IjI2NCIgaGVpZ2h0PSIyNjQiIGZpbHRlclVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj4KPGZlRmxvb2QgZmxvb2Qtb3BhY2l0eT0iMCIgcmVzdWx0PSJCYWNrZ3JvdW5kSW1hZ2VGaXgiLz4KPGZlQ29sb3JNYXRyaXggaW49IlNvdXJjZUFscGhhIiB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMTI3IDAiIHJlc3VsdD0iaGFyZEFscGhhIi8+CjxmZU1vcnBob2xvZ3kgcmFkaXVzPSI0IiBvcGVyYXRvcj0iZXJvZGUiIGluPSJTb3VyY2VBbHBoYSIgcmVzdWx0PSJlZmZlY3QxX2Ryb3BTaGFkb3dfNDI1XzcxNiIvPgo8ZmVPZmZzZXQgZHk9IjQiLz4KPGZlR2F1c3NpYW5CbHVyIHN0ZERldmlhdGlvbj0iMyIvPgo8ZmVDb2xvck1hdHJpeCB0eXBlPSJtYXRyaXgiIHZhbHVlcz0iMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMC4xIDAiLz4KPGZlQmxlbmQgbW9kZT0ibm9ybWFsIiBpbjI9IkJhY2tncm91bmRJbWFnZUZpeCIgcmVzdWx0PSJlZmZlY3QxX2Ryb3BTaGFkb3dfNDI1XzcxNiIvPgo8ZmVDb2xvck1hdHJpeCBpbj0iU291cmNlQWxwaGEiIHR5cGU9Im1hdHJpeCIgdmFsdWVzPSIwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAxMjcgMCIgcmVzdWx0PSJoYXJkQWxwaGEiLz4KPGZlTW9ycGhvbG9neSByYWRpdXM9IjMiIG9wZXJhdG9yPSJlcm9kZSIgaW49IlNvdXJjZUFscGhhIiByZXN1bHQ9ImVmZmVjdDJfZHJvcFNoYWRvd180MjVfNzE2Ii8+CjxmZU9mZnNldCBkeT0iMTAiLz4KPGZlR2F1c3NpYW5CbHVyIHN0ZERldmlhdGlvbj0iNy41Ii8+CjxmZUNvbG9yTWF0cml4IHR5cGU9Im1hdHJpeCIgdmFsdWVzPSIwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwLjEgMCIvPgo8ZmVCbGVuZCBtb2RlPSJub3JtYWwiIGluMj0iZWZmZWN0MV9kcm9wU2hhZG93XzQyNV83MTYiIHJlc3VsdD0iZWZmZWN0Ml9kcm9wU2hhZG93XzQyNV83MTYiLz4KPGZlQmxlbmQgbW9kZT0ibm9ybWFsIiBpbj0iU291cmNlR3JhcGhpYyIgaW4yPSJlZmZlY3QyX2Ryb3BTaGFkb3dfNDI1XzcxNiIgcmVzdWx0PSJzaGFwZSIvPgo8L2ZpbHRlcj4KPC9kZWZzPgo8L3N2Zz4K" alt="TheDAO">
+    <span>TheDAO <b>Security Fund</b></span>
+  </a>
+  <nav class="topnav">
+    <a href="#">Initiatives</a>
+    <a href="#" class="navcta">Suggest an initiative</a>
+    <button id="nav-connect" class="btn wallet" type="button">Connect wallet</button>
+  </nav>
+</header>
+
+<main class="detail narrow">
+  <h1>Suggest an initiative</h1>
+  <p class="tag left">Submissions are reviewed before they appear on the site.</p>
+
+  <hr class="shimmer soft">
+
+  <div class="ai-steps">
+    <div class="ai-step"><span class="ai-num">1</span>
+      <div>Give this guide to your AI<br>
+      <button type="button" class="btn ghost sm" id="copy-guide">Copy the guide</button></div></div>
+    <div class="ai-step"><span class="ai-num">2</span>
+      <div>Answer the questions the AI asks</div></div>
+    <div class="ai-step"><span class="ai-num">3</span>
+      <div>Paste the whole draft below, we sort it into the sections</div></div>
+  </div>
+
+  <div class="proto-banner" role="note">
+    <span class="pb-dot" aria-hidden="true"></span>
+    <span><b>Prototype of the proposed flow.</b> The form starts empty, the way a person meets it.
+    Nothing is submitted. To watch a draft sort itself into the fields, use the button: it drops the
+    OPSEC Ratings Coalition example into the paste box and runs the same code a real paste runs.
+    That button is here for the demo and does not ship.
+    <span class="pb-btns">
+      <button type="button" class="btn ghost sm" id="btn-example">Try it with an example draft</button>
+      <button type="button" class="btn ghost sm" id="btn-clear">Clear the form</button>
+    </span></span>
+  </div>
+
+  <form class="form" id="form" novalidate>
+    <input type="text" name="website" value="" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+    <span class="lbl">Type <em class="reqtag">Required</em></span>
+    <div class="type-choice">
+      <label class="type-opt"><input type="radio" name="type" value="rfp" id="t-rfp" checked>
+        <span><b>RFP</b><small>An open request: any qualified team can bid to do the work.</small></span></label>
+      <label class="type-opt"><input type="radio" name="type" value="grant" id="t-grant">
+        <span><b>Grant</b><small>Your team presents the idea and does the work.</small></span></label>
+    </div>
+
+    <div class="subopt" id="subopt" hidden>
+      <label class="cbrow" for="f-topup"><input type="checkbox" id="f-topup">
+        <span>Work is already under way with another funder</span></label>
+      <p class="hint">This makes it a top-up. No proposal window, no challenge period. Completed
+      milestones get a link to the delivered work, and every remaining one carries a target month.</p>
+    </div>
+
+    <details class="rules" id="rules" open>
+      <summary><span id="rules-title">How RFPs work</span>
+        <span class="rules-tag">The site writes this</span></summary>
+      <div id="rules-body"></div>
+    </details>
+    <p class="rules-ver">Rules v2026-09, shown on every initiative of this type.</p>
+
+    <div class="grp">
+      <span class="grp-k">Paste your whole draft</span>
+      <span class="grp-h">One paste, no button. The moment a draft lands in the box we split it on
+      the section headings and fill every field below. Edit anything afterwards, the fields are what
+      gets submitted.</span>
+    </div>
+
+    <div id="paste-block">
+      <label class="lbl" for="f-paste">Paste your whole draft here</label>
+      <textarea id="f-paste" rows="10" spellcheck="false"
+        placeholder="Paste the draft your AI wrote. Sorting starts as soon as it lands."></textarea>
+      <p class="hint" id="paste-help">Milestone headings look like
+      <code>### Agreed standard - $50,000</code>, in order: the site letters them A, B, C. Add
+      <code>(adoption)</code> to a milestone that pays only on evidence of adoption, and
+      <code>(done)</code> to a top-up milestone that is already finished. Bullet lines under a
+      milestone become its acceptance criteria, one per line. Under
+      <code>## Backers already committed</code>, one backer per line as
+      <code>Organization | amount | link</code>. Headings inside a section become bold text: the
+      site owns the headings.</p>
+    </div>
+    <p class="hint" id="sort-note"></p>
+    <p class="paste-again" id="paste-again" hidden>
+      <button type="button" class="linklike" id="btn-paste-again">Sort again from the paste box</button>
+    </p>
+
+    <div class="unsorted" id="unsorted" hidden>
+      <span class="eyebrow top">Unsorted text</span>
+      <p class="hint">These lines matched no section. Copy what you need into a field above, then
+      clear this box. Nothing here is submitted.</p>
+      <textarea id="f-unsorted" rows="5"></textarea>
+    </div>
+
+    <div class="grp">
+      <span class="grp-k">The page fields</span>
+      <span class="grp-h">These render in the header of your initiative page, next to the type
+      badge. They are never part of a body section.</span>
+    </div>
+
+    <label class="lbl" for="f-title">Title <em class="reqtag">Required</em>
+      <span class="dim">Up to 140 characters. No "RFP:" or "Grant:" prefix, the badge says it.</span></label>
+    <input type="text" id="f-title" maxlength="140" value="">
+
+    <label class="lbl" for="f-summary">Short summary <em class="reqtag">Required</em>
+      <span class="dim">2 to 4 sentences. This is the text on the board card.</span></label>
+    <textarea id="f-summary" rows="5" maxlength="4000"></textarea>
+
+    <label class="lbl" for="f-goal">Funding goal (USD) <em class="reqtag">Required</em>
+      <span class="dim">One flat number.</span></label>
+    <input type="text" id="f-goal" class="mono" inputmode="decimal" placeholder="250,000" value="">
+    <span class="amt-echo" id="echo-goal"></span>
+
+    <label class="lbl" for="f-duration">Expected duration (months) <em class="reqtag">Required</em>
+      <span class="dim">Months from funding until the last milestone is complete.</span></label>
+    <input type="text" id="f-duration" class="mono" inputmode="numeric" placeholder="12" value="">
+
+    <div id="grant-only" hidden>
+      <label class="lbl" for="f-recipient">Recipient team <em class="reqtag">Required</em>
+        <span class="dim">Short name for the header and the board card, as in "Grant to Verity Labs".</span></label>
+      <input type="text" id="f-recipient" maxlength="120" value="">
+    </div>
+
+    <label class="lbl" for="f-links">Links
+      <span class="dim">Optional. Repo, site, prior write-up. One per line.</span></label>
+    <textarea id="f-links" rows="3" spellcheck="false"></textarea>
+
+    <div class="grp">
+      <span class="grp-k">Backers already committed</span>
+      <span class="grp-h">Optional, and open to every type. Anyone who has already committed money
+      to this work, with their logo. The header of your page and your board card show the total and
+      the logos, the way backer logos show on every initiative today.</span>
+    </div>
+
+    <div id="bk-rows"></div>
+    <div class="pasterow">
+      <button type="button" class="btn ghost sm" id="btn-add-bk">Add a backer</button>
+    </div>
+    <div class="bk-head" id="bk-head"></div>
+
+    <div class="grp">
+      <span class="grp-k">The sections</span>
+      <span class="grp-h">The site renders the heading, you answer the question. Fixed order, no
+      renaming, no dropping. Bold, links and lists are welcome inside a field.</span>
+    </div>
+
+    <div id="sections"></div>
+
+    <div class="grp">
+      <span class="grp-k">Milestones</span>
+      <span class="grp-h">Each row renders as a heading with a checklist under it. The site letters
+      them A, B, C in the order they sit here. The amounts add up against your funding goal.</span>
+    </div>
+
+    <div id="ms-rows" class="eb"></div>
+    <div class="pasterow">
+      <button type="button" class="btn ghost sm" id="btn-add-ms">Add milestone</button>
+    </div>
+    <div class="tot">
+      <span id="tot-line"></span>
+      <span id="adopt-line"></span>
+    </div>
+
+    <div class="grp">
+      <span class="grp-k">Checks</span>
+      <span class="grp-h">Warnings are yours to judge, you can submit past them. Errors do not
+      block the button: press Submit and every problem is marked on the question it belongs
+      to.</span>
+    </div>
+
+    <div class="checks" id="checks">
+      <h4>What the form found</h4>
+      <div id="checks-list"></div>
+    </div>
+
+    <div class="grp">
+      <span class="grp-k">Preview</span>
+      <span class="grp-h">Exactly what the site publishes, including the panel the site adds for
+      you and the card the board shows. If your markdown died in the paste, you see it here.</span>
+    </div>
+
+    <div class="pasterow">
+      <button type="button" class="btn ghost" id="btn-preview" aria-expanded="false"
+        aria-controls="preview">See it as a page</button>
+    </div>
+    <div class="preview-wrap" id="preview" hidden></div>
+
+    <div class="grp">
+      <span class="grp-k">Private, never published</span>
+      <span class="grp-h">Only the review team reads these two fields. They never appear on the
+      page, the board, or the API.</span>
+    </div>
+
+    <label class="lbl" for="f-funders">Who is likely to fund this? <em class="reqtag">Required</em>
+      <span class="priv">&#128274; Private, never published</span>
+      <span class="dim">One funder per line: name | why they care | your relationship | warm intro? | likely amount.</span></label>
+    <textarea id="f-funders" rows="6"></textarea>
+
+    <label class="lbl" for="f-contact">Contact <em class="reqtag">Required</em>
+      <span class="priv">&#128274; Private, never published</span>
+      <span class="dim">Email or handle. We use it only to ask about this submission.</span></label>
+    <input type="text" id="f-contact" maxlength="200" value="">
+
+    <div class="subrow">
+      <button class="btn primary" type="submit" id="btn-submit">Submit for review</button>
+      <span class="blockmsg" id="blockmsg"></span>
+    </div>
+    <div class="conf" id="conf" hidden></div>
+  </form>
+</main>
+
+<footer>
+  <p>TheDAO Security Fund &#183; coordinating ecosystem funding for Ethereum security.</p>
+  <p>To back an initiative, email <a href="#">info@thedao.fund</a>
+    &#183; <a class="dim" href="#">Admin</a></p>
+</footer>
+
+<div class="footer-bar">
+  <p>&#169; 2025&#8211;2026 TheDAO LLC. All rights reserved.</p>
+</div>
+
+<script>
+/* ============================================================================
+   Suggest an initiative, v2 prototype, second pass (Griff's review of
+   2026-09-10 applied).
+   Plain vanilla JS, no libraries, written to be readable as a reference for
+   the real implementation. Five parts:
+     1. amount parsing
+     2. the field dictionary (questions, helpers, rules copy, example draft)
+     3. the splitter that turns one pasted draft into filled fields
+     4. rendering (sections, backers, milestone rows, checks, page preview)
+     5. checks, error painting, and wiring
+   ============================================================================ */
+(function () {
+  "use strict";
+
+  /* ---------------------------------------------------------------- helpers */
+  function $(sel) { return document.querySelector(sel); }
+  function all(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  function v(id) { var n = document.getElementById(id); return n ? n.value : ""; }
+  function setV(id, val) { var n = document.getElementById(id); if (n) { n.value = val; } }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function words(s) { var t = String(s || "").trim(); return t ? t.split(/\s+/).length : 0; }
+  function nonEmpty(s) { return String(s || "").trim() !== ""; }
+  function letter(i) { return String.fromCharCode(65 + (i % 26)); }
+  function intOf(x) {
+    var n = parseInt(String(x == null ? "" : x).replace(/[^0-9]/g, ""), 10);
+    return isFinite(n) ? n : 0;
+  }
+
+  /* ------------------------------------------------- 1. amount parsing */
+  /* One reader for every money field on this form: the funding goal, every
+     milestone amount, every backer amount. The audience is global and types
+     money several ways, so the last separator decides how the number is read:
+       "150.000" and "150,000"  ->  150000
+           a separator followed by exactly three digits at the end of the
+           number is a thousands separator
+       "150.00" and "150,00"    ->  150
+           a separator followed by one or two digits is a decimal point
+       "150.000,50"             ->  150000.5
+           mixed separators: the last one is the decimal point
+     Anything that is not a digit or a separator (currency symbols, spaces,
+     stray words) is dropped first. A tail of four digits or more is treated
+     as grouping too, which is the only sane reading left. Every amount field
+     echoes the parsed number back as "$150,000", so a wrong read is visible
+     before anyone submits it. */
+  function parseAmount(raw) {
+    var s = String(raw == null ? "" : raw).replace(/[^0-9.,]/g, "");
+    if (!s) { return 0; }
+    var last = Math.max(s.lastIndexOf("."), s.lastIndexOf(","));
+    var n;
+    if (last < 0) {
+      n = parseFloat(s);
+    } else if (/^\d{1,2}$/.test(s.slice(last + 1))) {
+      n = parseFloat(s.slice(0, last).replace(/[.,]/g, "") + "." + s.slice(last + 1));
+    } else {
+      n = parseFloat(s.replace(/[.,]/g, ""));
+    }
+    return isFinite(n) ? n : 0;
+  }
+
+  function usd(n) {
+    var x = Number(n) || 0;
+    var cents = Math.abs(x % 1) > 0.004 ? 2 : 0;
+    return "$" + x.toLocaleString("en-US",
+      { minimumFractionDigits: cents, maximumFractionDigits: cents });
+  }
+  function money(n) {
+    return n ? Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 }) : "";
+  }
+
+  /* ------------------------------------------- 2. the field dictionary */
+  /* One question per section. The site owns the heading; the submitter answers
+     the question. Order here is the order on the page, and it differs by type. */
+  var FIELD = {
+    why: {
+      heading: "Why this matters", rows: 7,
+      q: "What gap does this close, and what can people do afterwards that they cannot today?",
+      helper: "1 to 2 short paragraphs or a bullet list."
+    },
+    in_scope: {
+      heading: "In scope", rows: 8,
+      q: "What gets built or delivered?",
+      helper: "Concrete deliverables. This is also where you say what the money actually pays for."
+    },
+    out_scope: {
+      heading: "Out of scope", rows: 5,
+      q: "What is deliberately not included?",
+      helper: "This is where the expensive misunderstandings get prevented."
+    },
+    existing: {
+      heading: "Existing work", rows: 4,
+      q: "What prior art should bidders build on?",
+      helper: "Links. Say what would justify building on something else. Write none if there is nothing."
+    },
+    who: {
+      heading: "Who we expect to do this", rows: 7,
+      q: "What does a winning team look like, and who co-drafted this initiative?",
+      helper: "Nobody is pre-selected. Name co-authors and your own relationship to any team or codebase named above."
+    },
+    hard_req: {
+      heading: "Hard requirements", rows: 9,
+      q: "What must every proposal meet or be ignored?",
+      helper: "Numbered. Open source under an OSI license where code is delivered, verifiable acceptance, a maintenance plan, plus what the domain demands."
+    },
+    team: {
+      heading: "The team", rows: 6, grantOnly: true,
+      q: "Who does the work? Names, roles, track record, links.",
+      helper: "Also state any other funding you have for this work, and your relationships to codebases or firms named in this initiative."
+    },
+    why_grant: {
+      heading: "Why a grant: what already exists", rows: 7, grantOnly: true,
+      q: "What have you already built or done that gives you a decisive head start, and where can a stranger check it?",
+      helper: "Links to code, reports, deployments. Say why the price is below a from-scratch build. If the head start is thin, say so, the admin may ask you to resubmit as an RFP."
+    },
+    commitments: {
+      heading: "Commitments", rows: 6, grantOnly: true,
+      q: "What do you commit to on license, maintenance after the money is spent, and pinned targets? Any exception you are asking for?",
+      helper: "What you commit to on license, maintenance after the money is spent, and pinned targets. State any exception you are asking for."
+    }
+  };
+
+  var SECTIONS = {
+    rfp: ["why", "in_scope", "out_scope", "existing", "who", "hard_req"],
+    grant: ["why", "team", "why_grant", "in_scope", "out_scope", "commitments"]
+  };
+
+  /* The gold-standard example is an RFP, so the three grant-only sections get a
+     short illustrative example instead. Guide v3 ships a full grant example.
+     The team example is the Giveth roster, per Griff. */
+  var GRANT_EX = {
+    team: "**Giveth** does the work. Griff Green, co-founder, leads TheDAO Security Fund and holds the funder relationships. Lauren Luz runs project management, Jake Schumacher leads business development and fundraising, and Anamarija Begonja leads communications. Cotabe Moral covers business development and partnerships.\n\nTrack record: giveth.io, github.com/Giveth, and the 29 initiatives already on this board.\n\nNo other funder pays for this scope. Giveth administers TheDAO Security Fund, so the independent reviewer for these milestones is named in the grant agreement and is not Giveth.",
+    why_grant: "The scoring template already exists in draft: 40 controls, three tiers, run against 9 teams inside our own audits over the last year. Redacted samples are at example.org/opsec-tiers. Two firms have signed a letter of intent to adopt it.\n\nThat is why this costs $60,000 rather than a from-scratch $150,000: the drafting and the first firm conversations are done. What is left is the other four firms, the board, and the membership body.",
+    commitments: "- Template and tier definitions published under CC BY 4.0, board code under MIT.\n- We maintain the board for 12 months after the last milestone at no further cost.\n- Pinned target: at least 20 rated teams within 9 months of the first payment.\n- One exception requested: the raters' internal scoring worksheets stay closed for the first year, because they name the controls a team failed."
+  };
+
+  /* The rules panel, verbatim from docs/rules-panel-text-2026-09-10.md. The
+     site renders this from content/boilerplate, by type. Nobody pastes it,
+     nobody edits it, and it is the same on every initiative of that type. */
+  var RULES = {
+    rfp: {
+      title: "How RFPs work",
+      items: [
+        "Funding comes first. Nothing starts until the initiative is fully funded.",
+        "When funding completes, a 30-day proposal window opens. Any qualified team can bid.",
+        "This page describes the solution we want. A team with another solid way to solve the same problem is welcome to propose it, even if it departs from the draft milestones below.",
+        "A proposal contains the team and its track record, the technical approach, a milestone plan with a per-milestone budget (the draft on this page or a stronger version), and full disclosures. Every applicant discloses their relationships to the teams, codebases, and firms named on this page.",
+        "Giveth selects the team within 7 days of the window closing, weighing credibility, price, and the strength of the proposed milestones.",
+        "The milestones on this page are a draft. Final milestones and payments get negotiated with the selected team and fixed in the grant agreement.",
+        "Before work begins, an independent technical reviewer with no ties to the team is appointed and named in the grant agreement. The reviewer decides whether each milestone passes or fails. Giveth is not the reviewer unless explicitly named, and Giveth oversees the arrangement so the reviewer stays independent of the team. The reviewer's fee comes out of the milestone payment, or the reviewer works pro bono; the team coordinates that payment.",
+        "The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.",
+        "Milestone deliveries are reviewed by the technical reviewer and paid within 14 days of acceptance.",
+        "If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund can reclaim the unspent funds and put them toward other Ethereum security initiatives.",
+        "In some circumstances the resulting grant may be managed by the Ethereum Foundation or another established ecosystem organization, when that is a better fit than Giveth."
+      ]
+    },
+    grant: {
+      title: "How grants work",
+      items: [
+        "Funding comes first. Nothing starts until the initiative is fully funded.",
+        "When funding completes, a 15-day window opens. In that window the recipient submits the formal proposal: the final milestone plan, the per-milestone budget, and full disclosures. The same window is an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.",
+        "Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement. Until then, the milestones on this page are a draft.",
+        "Before work begins, an independent technical reviewer with no ties to the team is appointed and named in the grant agreement. The reviewer decides whether each milestone passes or fails. Giveth is not the reviewer unless explicitly named, and Giveth oversees the arrangement so the reviewer stays independent of the team. The reviewer's fee comes out of the milestone payment, or the reviewer works pro bono; the team coordinates that payment.",
+        "The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.",
+        "Milestone deliveries are reviewed by the technical reviewer and paid within 14 days of acceptance.",
+        "If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund can reclaim the unspent funds and put them toward other Ethereum security initiatives.",
+        "In some circumstances a grant may be managed by the Ethereum Foundation or another established ecosystem organization, when that is a better fit than Giveth."
+      ]
+    },
+    topup: {
+      title: "How top-up grants work (work already under way with another funder)",
+      items: [
+        "This grant tops up work that is already under way. There is no proposal window and no challenge period.",
+        "The funding goal on this page is the total project budget. The amount already committed, and by whom, is shown in the header with each backer's logo; this grant raises the remainder.",
+        "Completed milestones are marked done with a link to the delivered work. Each remaining milestone carries a target month.",
+        "Payments from this grant start only once the earlier milestones have been accepted.",
+        "An independent technical reviewer with no ties to the team, appointed before this grant begins and named in the grant agreement, decides whether each remaining milestone passes or fails. Giveth is not the reviewer unless explicitly named, and Giveth oversees the arrangement so the reviewer stays independent of the team.",
+        "Milestone deliveries are reviewed by the technical reviewer and paid within 14 days of acceptance.",
+        "If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund can reclaim the unspent funds and put them toward other Ethereum security initiatives.",
+        "In some circumstances a grant may be managed by the Ethereum Foundation or another established ecosystem organization, when that is a better fit than Giveth."
+      ]
+    }
+  };
+
+  /* The example draft lives here, not in the paste box: the form starts empty.
+     The banner button drops this into the paste box and runs the same code path
+     a real paste runs. It is a demo control and does not ship. */
+  var EXAMPLE_DRAFT = [
+    "# RFP: OPSEC Ratings Coalition to Build & Maintain an \"L2Beat for OPSEC\"",
+    "",
+    "## Short summary",
+    "",
+    "One OPSEC rating the whole industry recognizes, issued by the firms that already run OPSEC audits. This RFP funds the coordinator who gets at least 6 auditing firms to agree on one scoring template and the A / AA / AAA tiers, stands up a public board of rated teams, and hands the standard to a membership body the firms own. Rated teams pay a fixed fee, so the system pays for itself once enough teams are on the board.",
+    "",
+    "## Funding goal",
+    "",
+    "$150,000 USD",
+    "",
+    "## Expected duration",
+    "",
+    "18 months",
+    "",
+    "## Links",
+    "",
+    "https://frameworks.securityalliance.org/",
+    "https://securityalliance.org/",
+    "",
+    "## Why this matters",
+    "",
+    "Your keys, your devices, your multisig process, your access controls... these are just as important as your smart contracts. Every serious team already invests in OPSEC, and OPSEC audits happen all the time. But all of that work is invisible. There is no public signal that tells users, investors or partners who is actually running a tight ship.",
+    "",
+    "We want to change that with a single OPSEC rating the whole industry agrees on. Think of a Moody's rating: people want one because everyone recognizes what it means. Teams that earn an A, AA or AAA get their tier on a public board. That's it, just the tier. We will never publish what a team is missing (a public list of weaknesses is a gift to attackers), and teams with unacceptable OPSEC simply don't make the board... which says something all by itself.",
+    "",
+    "## In scope",
+    "",
+    "- Coordinating at least 6 OPSEC auditing companies to agree on one scoring template and the A / AA / AAA tier definitions",
+    "- Onboarding those firms as the first accredited raters, with whatever materials they need to run the template inside their existing audit flow",
+    "- A simple public board of rated teams and their tiers, with valid-until and last check-in dates... tiers only, no details, no gaps",
+    "- Standing up the membership body: the charter (one firm, one vote), how raters get certified, the verification committee, the fixed fee schedule and the pooled funding model",
+    "- The 12-month rating cycle with the six-month check-in and the event-based suspension process",
+    "- The handoff: transferring the standard, the board and the name to the membership body",
+    "",
+    "## Out of scope",
+    "",
+    "- Performing the underlying OPSEC audits (the accredited firms do that)",
+    "- Publishing any team's specific weaknesses, unmet controls, or the reasons behind a tier",
+    "- A heavy platform build. The board is deliberately simple.",
+    "",
+    "## Existing work",
+    "",
+    "- [Security Frameworks by SEAL](https://frameworks.securityalliance.org/): the Security Alliance's open framework covering operational security, infrastructure, DevOps, incident response and more. Bidders should read it before proposing a scoring template.",
+    "",
+    "## Who we expect to do this",
+    "",
+    "Nobody is pre-selected. Once this RFP is fully funded the bidding opens to anyone. The dream candidate is a credible coordinator in the security community: someone who can bring 6+ OPSEC auditing firms to the same table and get them all to sign the same document. (If you have ever tried to get six companies to agree on anything, you know that's the real work here.)",
+    "",
+    "Ideally the coordinator is not an OPSEC auditing firm, because whoever holds the pen on the standard walks away with an edge over the firms they convened. That is a preference, not a requirement, and it will weigh in selection. An audit firm that coordinates takes no rater role during the grant and no ownership of the board. The best pitch a bidder can make is simple: here is why the other firms can trust me to run this.",
+    "",
+    "Co-drafted by the submitter with input from the SEAL frameworks working group. The submitter runs no OPSEC auditing firm and will not bid.",
+    "",
+    "## Hard requirements",
+    "",
+    "1. **Six firms minimum.** At least 6 OPSEC auditing companies formally agree to the scoring template and tier definitions, and commit to issuing ratings with it.",
+    "2. **Tiers only.** The public board shows a team's tier, its valid-until date and its last check-in, and nothing more. No gaps, no unmet controls, no explanations.",
+    "3. **Open and versioned.** The scoring template and tier definitions are public, open source and versioned, with changes dated and attributable, revised through a defined change process no more than once a year.",
+    "4. **Tool-agnostic.** Every tier is reachable no matter which tools or frameworks a team uses. No vendor's product is ever required.",
+    "5. **One firm, one vote.** Every founding firm gets equal governance rights in the membership body, regardless of who convened whom.",
+    "6. **Neutral name.** The standard and the board are not branded after the coordinator or any single firm.",
+    "7. **Mandatory handoff.** The standard, the board, the name and any secretariat function transfer to the membership body no later than six months after the final milestone. The coordinator keeps no veto and no unilateral control.",
+    "8. **Fixed fees, pooled.** Rated teams pay a fixed, outcome-independent fee. Fees flow to the membership body, which pays raters from the pool and funds the verification committee from it. No tier-contingent pricing, no \"we'll get you to AA\" upsell.",
+    "9. **Twelve months, checked at six, suspended on events.** A rating is valid for 12 months, lapses without the six-month self-attestation and check-in, and is suspended automatically on a disclosed incident or a material change until the team is re-rated.",
+    "",
+    "## What this actually pays for",
+    "",
+    "Let's be clear about what this RFP is: a coordination effort. The money pays for the social exercise of getting the OPSEC auditing firms around one table to agree on one standard. The website is the easy part.",
+    "",
+    "## Milestones (draft)",
+    "",
+    "### Agreed standard - $50,000",
+    "",
+    "- [ ] A public, versioned scoring template plus the A / AA / AAA tier definitions, with the change process for future revisions",
+    "- [ ] At least 6 OPSEC auditing companies formally signed on and committed to rating with it, with the signed template published",
+    "- [ ] The membership body's charter published: one firm, one vote, rater certification, the verification committee and its stipends, the fixed fee schedule, the pooled funding model, and the handoff agreement with a transfer date no later than six months after the final milestone",
+    "",
+    "### Board and first ratings - $25,000",
+    "",
+    "- [ ] The public board is live, showing rated teams, their tiers, valid-until dates and last check-ins (and nothing else)",
+    "- [ ] At least 6 accredited firms have issued ratings inside their normal audit flow, each listed on the public board",
+    "- [ ] At least 5 teams rated end to end, with their fees paid through the membership body's pool",
+    "",
+    "### Adoption evidence - $75,000 (adoption)",
+    "",
+    "- [ ] 20 teams publicly rated on the board by accredited firms",
+    "- [ ] The six-month check-in running: every rating older than six months shows a check-in date on the board, and the event-based suspension process is live with a public change log",
+    "- [ ] The membership body running on pooled fees, with the verification committee active and its spot-check sample published, both shown on the body's public page",
+    "- [ ] A public metrics page: teams rated, tiers awarded, firms participating, check-ins completed, suspensions and renewals",
+    "",
+    "## Who is likely to fund this",
+    "",
+    "Ethereum Foundation | funds public-goods security tooling | met once at Devconnect | warm intro? yes | $50,000",
+    "Safe Ecosystem Foundation | multisig OPSEC is their core risk surface | no contact yet | warm intro? no | $25,000",
+    "Security Alliance (SEAL) | published the framework this builds on | co-drafted the standard question | warm intro? yes | suggested ask $25,000",
+    "",
+    "## Contact",
+    "",
+    "opsec-coalition@example.org"
+  ].join("\n");
+
+  /* ------------------------------------------------- 3. the splitter */
+  /* Known headings, exact names plus a short alias list. Two aliases depend on
+     the type, because the old format used one heading for two different jobs. */
+  function headingKey(rawName, type) {
+    var n = String(rawName).toLowerCase()
+      .replace(/[*_`#]/g, "").replace(/\s+/g, " ").trim().replace(/[:.]+$/, "");
+
+    if (n === "what already exists") { return type === "grant" ? "why_grant" : "existing"; }
+    if (n === "the recipient" || n === "recipient team and why them") {
+      return type === "grant" ? "team" : "who";
+    }
+
+    var map = {
+      /* page fields */
+      "title": "title",
+      "short summary": "summary", "summary": "summary",
+      "funding goal": "goal", "funding goal (usd)": "goal", "budget": "goal", "funding": "goal",
+      "expected duration": "duration", "expected duration (months)": "duration",
+      "duration": "duration", "indicative duration": "duration",
+      "recipient team": "recipient",
+      "backers": "backers", "backers already committed": "backers",
+      "already committed": "backers", "already committed (usd)": "backers",
+      "links": "links", "link": "links",
+      "who is likely to fund this": "funders", "who is likely to fund this?": "funders",
+      "funders": "funders", "contact": "contact",
+      /* sections */
+      "why this matters": "why",
+      "in scope": "in_scope", "scope": "in_scope",
+      "out of scope": "out_scope",
+      "existing work": "existing", "prior art": "existing",
+      "who we expect to do this": "who", "who we expect to do this work": "who",
+      "hard requirements": "hard_req", "requirements": "hard_req",
+      "the team": "team", "team": "team",
+      "why a grant": "why_grant", "why a grant what already exists": "why_grant",
+      "why a grant: what already exists": "why_grant",
+      "commitments": "commitments",
+      /* milestones */
+      "milestones": "milestones", "milestones (draft)": "milestones",
+      "draft milestones": "milestones", "milestone plan": "milestones"
+    };
+    return map[n] || null;
+  }
+
+  var PAGE_KEYS = ["title", "summary", "goal", "duration", "recipient", "backers",
+                   "links", "funders", "contact"];
+
+  function splitDraft(text, type) {
+    var out = { page: {}, fields: {}, milestones: [], unsorted: "" };
+    var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    var buckets = {}, msLines = [], unsorted = [], cur = null;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var h = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+
+      if (h) {
+        var level = h[1].length, name = h[2];
+        /* a lone top-level heading is the title, with any type prefix removed */
+        if (level === 1 && !out.page.title) {
+          out.page.title = name.replace(/^\s*(rfp|grant)\s*:\s*/i, "").trim();
+          cur = null;
+          continue;
+        }
+        /* inside the milestones block, deeper headings are milestone rows */
+        if (cur === "milestones" && level >= 3) { msLines.push(line); continue; }
+
+        var key = headingKey(name, type);
+        if (key) { cur = key; if (!buckets[key]) { buckets[key] = []; } continue; }
+
+        /* no heading is allowed inside a field: keep the text, drop the heading */
+        if (cur && cur !== "milestones" && cur !== "unsorted" && level >= 3) {
+          buckets[cur].push("**" + name + "**");
+          continue;
+        }
+        cur = "unsorted";
+        unsorted.push(line);
+        continue;
+      }
+
+      if (cur === "milestones") { msLines.push(line); continue; }
+      if (cur && cur !== "unsorted") { buckets[cur].push(line); continue; }
+      unsorted.push(line);
+    }
+
+    Object.keys(buckets).forEach(function (k) {
+      var text2 = buckets[k].join("\n").replace(/\n{3,}/g, "\n\n").trim();
+      if (PAGE_KEYS.indexOf(k) >= 0) { out.page[k] = text2; } else { out.fields[k] = text2; }
+    });
+
+    out.milestones = parseMilestones(msLines, function (spill) { unsorted.push(spill); });
+    out.unsorted = unsorted.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+    return out;
+  }
+
+  /* "### Agreed standard - $50,000 (adoption)" becomes a row, and the bullet
+     lines under it become its acceptance criteria. A leading "A - " from the
+     old format is accepted and thrown away: the letter is the row's position. */
+  function rowFromHeading(s) {
+    var row = { name: "", amount: 0, adoption: false, done: false, link: "", month: "", criteria: [] };
+    var t = String(s).trim();
+    if (/\(adoption\)/i.test(t)) { row.adoption = true; t = t.replace(/\(adoption\)/ig, "").trim(); }
+    if (/\(done\)/i.test(t)) { row.done = true; t = t.replace(/\(done\)/ig, "").trim(); }
+    t = t.replace(/[*_`]/g, "").trim();
+
+    var parts = t.split(/\s+-\s+/);
+    if (parts.length >= 3 && parts[0].trim().length <= 3) {
+      row.amount = parseAmount(parts[parts.length - 1]);
+      row.name = parts.slice(1, -1).join(" - ").trim();
+    } else if (parts.length >= 2 && parseAmount(parts[parts.length - 1]) > 0) {
+      row.amount = parseAmount(parts[parts.length - 1]);
+      row.name = parts.slice(0, -1).join(" - ").trim();
+    } else {
+      row.name = t;
+    }
+    return row;
+  }
+
+  function parseMilestones(lines, spill) {
+    var rows = [], cur = null, preamble = [];
+    lines.forEach(function (line) {
+      var h = line.match(/^#{2,6}\s+(.+?)\s*#*\s*$/);
+      if (h) { cur = rowFromHeading(h[1]); rows.push(cur); return; }
+      var t = line.trim();
+      if (!t) { return; }
+      if (!cur) { preamble.push(line); return; }
+      /* guide v3 conventions for top-ups: first lines under the heading */
+      var mm = t.match(/^target month:\s*(\d{4}-\d{2})\b/i);
+      if (mm) { cur.month = mm[1]; return; }
+      var dl = t.match(/^delivered:\s*(\S+)/i);
+      if (dl) { cur.link = dl[1]; return; }
+      var crit = t.replace(/^[-*+]\s+/, "").replace(/^\d+[.)]\s+/, "")
+                  .replace(/^\[[ xX]\]\s*/, "").trim();
+      if (crit) { cur.criteria.push(crit); }
+    });
+    /* the old milestones preamble is not a criterion, it goes to unsorted */
+    if (preamble.length && spill) { spill(preamble.join("\n").trim()); }
+    return rows;
+  }
+
+  /* "Security Alliance (SEAL) | $20,000 | https://..." becomes a backer row.
+     Logos are never text, so a pasted draft never carries one: the proposer
+     uploads the organization's own logo file in the form. */
+  function parseBackers(text) {
+    return String(text || "").split("\n").map(function (line) {
+      return line.replace(/^[-*+]\s+/, "").trim();
+    }).filter(function (line) { return line.indexOf("|") > 0; }).map(function (line) {
+      var p = line.split("|");
+      return {
+        org: (p[0] || "").trim(),
+        amount: parseAmount(p[1] || ""),
+        url: (p[2] || "").trim(),
+        logoName: "", logoData: ""
+      };
+    });
+  }
+
+  /* ---------------------------------------------------- tiny markdown */
+  function mdInline(s) {
+    return esc(s)
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="#" title="$2">$1</a>')
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+  function mdToHtml(src) {
+    var out = [], para = [], list = null;
+    function flushPara() { if (para.length) { out.push("<p>" + mdInline(para.join(" ")) + "</p>"); para = []; } }
+    function flushList() {
+      if (list) {
+        out.push("<" + list.tag + ">" + list.items.map(function (x) {
+          return "<li>" + mdInline(x) + "</li>";
+        }).join("") + "</" + list.tag + ">");
+        list = null;
+      }
+    }
+    String(src || "").replace(/\r\n?/g, "\n").split("\n").forEach(function (line) {
+      var t = line.trim();
+      if (!t) { flushPara(); flushList(); return; }
+      var ul = t.match(/^[-*+]\s+(.*)$/), ol = t.match(/^\d+[.)]\s+(.*)$/);
+      if (ul) {
+        flushPara();
+        if (!list || list.tag !== "ul") { flushList(); list = { tag: "ul", items: [] }; }
+        list.items.push(ul[1].replace(/^\[[ xX]\]\s*/, ""));
+        return;
+      }
+      if (ol) {
+        flushPara();
+        if (!list || list.tag !== "ol") { flushList(); list = { tag: "ol", items: [] }; }
+        list.items.push(ol[1]);
+        return;
+      }
+      flushList();
+      para.push(t);
+    });
+    flushPara(); flushList();
+    return out.join("");
+  }
+
+  /* --------------------------------------------------------- 4. state */
+  var state = {
+    type: "rfp", topup: false, fields: {}, milestones: [], backers: [],
+    previewOpen: false, submitted: false
+  };
+  /* the example toggles read the same parsed example, whether the form is
+     filled or empty */
+  var EXAMPLE_FIELDS = {};
+
+  function emptyMilestone() {
+    return { name: "", amount: 0, adoption: false, done: false, link: "", month: "", criteria: [""] };
+  }
+  function emptyBacker() {
+    return { org: "", amount: 0, url: "", logoName: "", logoData: "" };
+  }
+
+  function rulesKey() { return state.type === "grant" ? (state.topup ? "topup" : "grant") : "rfp"; }
+  function rulesTitle() { return RULES[rulesKey()].title; }
+  /* the top-up title carries a parenthetical that reads badly mid-sentence */
+  function panelName() { return rulesTitle().replace(/\s*\(.*\)\s*$/, ""); }
+  function goal() { return parseAmount(v("f-goal")); }
+  function msTotal() {
+    return state.milestones.reduce(function (a, m) { return a + parseAmount(m.amount); }, 0);
+  }
+  function adoptionTotal() {
+    return state.milestones.reduce(function (a, m) {
+      return a + (m.adoption ? parseAmount(m.amount) : 0);
+    }, 0);
+  }
+  function liveBackers() {
+    return state.backers.filter(function (b) { return nonEmpty(b.org) || b.amount > 0; });
+  }
+  function committedTotal() {
+    return liveBackers().reduce(function (a, b) { return a + parseAmount(b.amount); }, 0);
+  }
+
+  /* ------------------------------------------------------ 4. rendering */
+  function renderRules() {
+    var r = RULES[rulesKey()];
+    $("#rules-title").textContent = r.title;
+    $("#rules-body").innerHTML = "<ol>" + r.items.map(function (li) {
+      return "<li>" + mdInline(li) + "</li>";
+    }).join("") + "</ol>";
+  }
+
+  function exampleHtml(id) {
+    var body = EXAMPLE_FIELDS[id] || GRANT_EX[id] || "";
+    var note = FIELD[id].grantOnly
+      ? '<i>illustrative, the gold-standard example is an RFP</i>'
+      : '<i>from the gold-standard initiative</i>';
+    if (!body) { return '<span class="ex-lbl">Example</span><p class="ex-body">Not written yet.</p>'; }
+    return '<span class="ex-lbl">Example ' + note + '</span>' +
+           '<div class="ex-body">' + mdToHtml(body) + "</div>";
+  }
+
+  function renderSections() {
+    var ids = SECTIONS[state.type];
+    $("#sections").innerHTML = ids.map(function (id, i) {
+      var f = FIELD[id];
+      return '<div class="fld">' +
+        '<span class="eyebrow' + (i === 0 ? " top" : "") + '">Renders as: ' + esc(f.heading) +
+          ' <em class="reqtag sm">Required</em></span>' +
+        '<label class="lbl q" for="s-' + id + '">' + esc(f.q) +
+          '<span class="dim">' + esc(f.helper) + "</span></label>" +
+        '<textarea id="s-' + id + '" data-k="' + id + '" rows="' + f.rows + '">' +
+          esc(state.fields[id] || "") + "</textarea>" +
+        '<div class="fld-foot">' +
+          '<button type="button" class="linklike ex-btn" data-ex="' + id + '" ' +
+            'aria-expanded="false" aria-controls="ex-' + id + '">Show example</button>' +
+          '<span class="wc" data-wc="' + id + '"></span>' +
+        "</div>" +
+        '<div class="exbox" id="ex-' + id + '" hidden>' + exampleHtml(id) + "</div>" +
+      "</div>";
+    }).join("");
+    ids.forEach(updateWordCount);
+  }
+
+  function updateWordCount(id) {
+    var span = document.querySelector('[data-wc="' + id + '"]');
+    if (span) { span.textContent = words(state.fields[id]) + " words"; }
+  }
+
+  /* one backer per row: organization, amount, link, and the organization's own
+     logo file. The chip under the row is the same pill the initiative page and
+     the board card render. */
+  function backerChip(b) {
+    if (!nonEmpty(b.org) && !b.logoData) { return ""; }
+    return '<div class="bk-chip"><span class="eyebrow sm">On the page it looks like this</span>' +
+      '<div class="sponsors"><div class="sponsor-pill">' +
+      (b.logoData ? '<img class="sponsor-logo" src="' + esc(b.logoData) + '" alt="' +
+        esc(b.org || "Backer") + ' logo">' : "") +
+      "<b>" + esc(b.org || "Unnamed backer") + "</b>" +
+      "<span>" + usd(parseAmount(b.amount)) + "</span>" +
+      '<small class="pledged">committed</small>' +
+      "</div></div></div>";
+  }
+
+  function renderBackers() {
+    if (!state.backers.length) {
+      $("#bk-rows").innerHTML = '<p class="emptyrow">No backers listed. Add one for every ' +
+        'organization that has already committed money to this work.</p>';
+      return;
+    }
+    $("#bk-rows").innerHTML = state.backers.map(function (b, i) {
+      var p = "bk-" + i + "-";
+      return '<div class="bk-row" data-i="' + i + '">' +
+        '<div class="row-head"><span class="row-k">Backer ' + (i + 1) + "</span>" +
+          '<button type="button" class="btn ghost sm bk-del" data-del="' + i + '">Remove</button></div>' +
+        '<div class="ms-grid">' +
+          '<label class="ms-f grow"><span class="eyebrow sm">Organization</span>' +
+            '<input type="text" id="' + p + 'org" data-bk="org" value="' + esc(b.org) +
+            '" placeholder="Who committed the money"></label>' +
+          '<label class="ms-f amt"><span class="eyebrow sm">Amount committed (USD)</span>' +
+            '<input type="text" class="money" inputmode="decimal" id="' + p + 'amount" ' +
+            'data-bk="amount" value="' + esc(money(b.amount)) + '">' +
+            '<span class="amt-echo">' + (b.amount ? usd(b.amount) : "") + "</span></label>" +
+        "</div>" +
+        '<label class="ms-f"><span class="eyebrow sm">Link</span>' +
+          '<input type="text" id="' + p + 'url" data-bk="url" placeholder="https://" value="' +
+          esc(b.url) + '"></label>' +
+        '<div class="ms-f"><span class="eyebrow sm">Logo file</span>' +
+          '<input type="file" class="filein" id="' + p + 'logo" data-bk="logo" ' +
+          'accept=".png,.jpg,.jpeg,.webp,.svg">' +
+          '<p class="hint">Upload the organization\'s official logo file (from their press kit, ' +
+          'brand page, or repository). Never a redrawn or AI-made version.</p>' +
+          (b.logoName ? '<p class="hint bk-file">Selected: ' + esc(b.logoName) + "</p>" : "") +
+        "</div>" +
+        backerChip(b) +
+      "</div>";
+    }).join("");
+  }
+
+  function renderBackerHead() {
+    var live = liveBackers(), total = committedTotal(), g = goal();
+    if (!live.length || total <= 0) {
+      $("#bk-head").innerHTML = '<span class="dimline">Nothing committed yet, so this line stays ' +
+        "off your page and your board card.</span>";
+      return;
+    }
+    var names = live.map(function (b) { return b.org || "an unnamed backer"; }).join(", ");
+    var line = usd(total) + " already committed by " + names;
+    if (state.topup && g > total) {
+      line += "; this grant raises the remaining " + usd(g - total);
+    }
+    $("#bk-head").innerHTML = '<span class="okline">' + esc(line) + "</span>";
+  }
+
+  function renderMilestones() {
+    if (!state.milestones.length) {
+      $("#ms-rows").innerHTML = '<p class="emptyrow">No milestones yet. Add the first one, or ' +
+        "paste a draft and we build the rows from it.</p>";
+      return;
+    }
+    $("#ms-rows").innerHTML = state.milestones.map(function (m, i) {
+      var p = "ms-" + i + "-";
+      var crits = m.criteria.length ? m.criteria : [""];
+      return '<div class="ms-row" data-i="' + i + '">' +
+        '<div class="row-head"><span class="row-k">Milestone ' + letter(i) + "</span>" +
+          '<button type="button" class="btn ghost sm ms-del" data-del="' + i + '">Remove</button></div>' +
+        '<div class="ms-grid">' +
+          '<label class="ms-f grow"><span class="eyebrow sm">Name' +
+            ' <em class="reqtag sm">Required</em></span>' +
+            '<input type="text" id="' + p + 'name" data-mk="name" value="' + esc(m.name) + '"></label>' +
+          '<label class="ms-f amt"><span class="eyebrow sm">Amount (USD)' +
+            ' <em class="reqtag sm">Required</em></span>' +
+            '<input type="text" class="money" inputmode="decimal" id="' + p + 'amount" ' +
+            'data-mk="amount" value="' + esc(money(m.amount)) + '">' +
+            '<span class="amt-echo">' + (m.amount ? usd(m.amount) : "") + "</span></label>" +
+        "</div>" +
+        '<div class="ms-flags">' +
+          '<label class="cbrow"><input type="checkbox" data-mk="adoption"' +
+            (m.adoption ? " checked" : "") + "> <span>Adoption milestone</span></label>" +
+          (state.topup
+            ? '<label class="cbrow"><input type="checkbox" data-mk="done"' +
+              (m.done ? " checked" : "") + "> <span>Already done</span></label>"
+            : "") +
+        "</div>" +
+        (state.topup && m.done
+          ? '<label class="ms-f"><span class="eyebrow sm">Link to the delivered work</span>' +
+            '<input type="text" id="' + p + 'link" data-mk="link" placeholder="https://" value="' +
+            esc(m.link) + '"></label>'
+          : "") +
+        (state.topup && !m.done
+          ? '<label class="ms-f mth"><span class="eyebrow sm">Target month</span>' +
+            '<input type="month" id="' + p + 'month" data-mk="month" value="' + esc(m.month) +
+            '"></label>'
+          : "") +
+        '<div class="crit-block eb" id="' + p + 'crit">' +
+          '<span class="eyebrow sm">Acceptance criteria, one per row' +
+            ' <em class="reqtag sm">Required</em></span>' +
+          '<div class="crit-list">' + crits.map(function (c, j) {
+            return '<div class="crit"><span class="crit-box" aria-hidden="true"></span>' +
+              '<input type="text" id="' + p + "c" + j + '" data-mk="crit" data-ci="' + j +
+              '" value="' + esc(c) + '" placeholder="One checkable outcome">' +
+              '<button type="button" class="crit-del" data-cdel="' + j +
+              '" title="Remove this criterion" aria-label="Remove this criterion">&#215;</button></div>';
+          }).join("") + "</div>" +
+          '<button type="button" class="linklike crit-add">Add criterion</button>' +
+        "</div>" +
+      "</div>";
+    }).join("");
+  }
+
+  function renderTotals() {
+    var sum = msTotal(), g = goal(), ad = adoptionTotal();
+    var pct = g > 0 ? Math.round((ad / g) * 100) : 0;
+    var okSum = state.milestones.length === 0 || Math.round(sum) === Math.round(g);
+    $("#tot-line").innerHTML = '<span class="' + (okSum ? "okc" : "bad") + '">Milestones total ' +
+      usd(sum) + " of " + usd(g) + " goal</span>";
+    var okAd = g > 0 && ad >= g / 3;
+    $("#adopt-line").innerHTML = '<span class="' + (okAd ? "okc" : "bad") + '">Adoption-tied: ' +
+      usd(ad) + " (" + pct + "%), minimum one third, " + usd(g / 3) + "</span>";
+  }
+
+  function updateAmountEcho(el, n) {
+    var echo = el.parentNode ? el.parentNode.querySelector(".amt-echo") : null;
+    if (echo) { echo.textContent = n ? usd(n) : ""; }
+  }
+
+  /* ------------------------------------------------ 5. checks */
+  /* Two kinds of finding. An error has to be fixed before the submission is
+     any use to a reviewer; a warning is a judgment call the submitter can
+     overrule. Neither disables the button: pressing Submit paints every
+     finding on the question it belongs to and scrolls to the first one.
+     Every finding carries the id of the field it belongs to, which is what
+     the painting uses. */
+  var HEDGES = /\bas needed\b|\bwhere appropriate\b/i;
+
+  function runChecks() {
+    var errs = [], warns = [];
+    function err(target, msg, text) {
+      errs.push({ target: target, msg: msg, text: text || esc(msg), kind: "content" });
+    }
+    function need(target, label, msg) {
+      errs.push({
+        target: target, msg: msg, kind: "missing",
+        text: "<b>" + esc(label) + "</b> is required. " + esc(msg)
+      });
+    }
+    function warn(target, msg, text, lines) {
+      warns.push({ target: target, msg: msg, text: text || esc(msg), lines: lines });
+    }
+
+    if (!nonEmpty(v("f-title"))) { need("f-title", "Title", "Write the title, up to 140 characters."); }
+    if (!nonEmpty(v("f-summary"))) {
+      need("f-summary", "Short summary", "Write the 2 to 4 sentences the board card shows.");
+    }
+    if (goal() <= 0) { need("f-goal", "Funding goal", "Enter the goal in USD, one flat number."); }
+    if (intOf(v("f-duration")) <= 0) {
+      need("f-duration", "Expected duration", "Enter the number of months to the last milestone.");
+    }
+    if (state.type === "grant" && !nonEmpty(v("f-recipient"))) {
+      need("f-recipient", "Recipient team", "Name the team that receives this grant.");
+    }
+    SECTIONS[state.type].forEach(function (id) {
+      if (!nonEmpty(state.fields[id])) {
+        need("s-" + id, FIELD[id].heading, "Answer the question above.");
+      }
+    });
+    if (!nonEmpty(v("f-funders"))) {
+      need("f-funders", "Who is likely to fund this",
+        "Name at least one funder, one per line. Private, never published.");
+    }
+    if (!nonEmpty(v("f-contact"))) {
+      need("f-contact", "Contact", "An email or handle, so we can ask about this submission.");
+    }
+
+    /* backers are optional, but a half-filled row is a mistake */
+    state.backers.forEach(function (b, i) {
+      var p = "bk-" + i + "-";
+      if (nonEmpty(b.org) && parseAmount(b.amount) <= 0) {
+        err(p + "amount", "Add what " + b.org + " committed, or remove the row.");
+      }
+      if (!nonEmpty(b.org) && parseAmount(b.amount) > 0) {
+        err(p + "org", "Name the organization that committed this amount, or remove the row.");
+      }
+    });
+    if (state.topup && !liveBackers().length) {
+      warn("bk-rows", "A top-up says the work is already funded by someone else. List that " +
+        "backer so the header can show the amount and the logo.");
+    }
+
+    if (!state.milestones.length) {
+      need("ms-rows", "Milestones", "Add at least one milestone.");
+    }
+    state.milestones.forEach(function (m, i) {
+      var p = "ms-" + i + "-", L = "Milestone " + letter(i);
+      if (!nonEmpty(m.name)) { need(p + "name", L + " name", "Name this milestone."); }
+      if (parseAmount(m.amount) <= 0) {
+        need(p + "amount", L + " amount", "Enter what this milestone pays.");
+      }
+      if (!m.criteria.filter(nonEmpty).length) {
+        need(p + "crit", L + " criteria", "Write at least one criterion a reviewer can check.");
+      }
+      if (state.topup && m.done && !nonEmpty(m.link)) {
+        warn(p + "link", L + " is marked done with no link to the delivered work.");
+      }
+      if (state.topup && !m.done && !nonEmpty(m.month)) {
+        warn(p + "month", L + " has no target month. Every remaining milestone needs one.");
+      }
+    });
+
+    var sum = msTotal(), g = goal();
+    if (state.milestones.length && g > 0 && Math.round(sum) !== Math.round(g)) {
+      err("f-goal", "Milestone amounts total " + usd(sum) + " against a " + usd(g) +
+        " goal. Change the goal or a milestone amount.",
+        "Milestone amounts total <b>" + usd(sum) + "</b>, the funding goal is <b>" + usd(g) +
+        "</b>. Change one of them before you submit.");
+    }
+
+    /* Item 10: the adoption rule blocks. At least one adoption milestone, and
+       adoption-tied amounts worth at least a third of the goal, which is at
+       least $100,000 once the goal reaches $300,000. A top-up is exempt only
+       when every milestone it lists is already flagged done, because then
+       there is no remaining work left to tie to adoption. */
+    var exempt = state.topup && state.milestones.length > 0 &&
+      state.milestones.every(function (m) { return m.done; });
+    var ad = adoptionTotal(), need3 = g / 3;
+    if (g > 0 && state.milestones.length && !exempt) {
+      if (ad === 0) {
+        err("ms-rows", "No milestone is an adoption milestone. Flag at least one, worth " +
+          usd(need3) + " or more, a third of the goal.");
+      } else if (ad < need3) {
+        err("ms-rows", "Adoption milestones carry " + usd(ad) + ", which is " +
+          Math.round((ad / g) * 100) + "% of the goal. Raise them to at least " + usd(need3) +
+          ", a third.");
+      }
+    }
+
+    state.milestones.forEach(function (m, i) {
+      m.criteria.forEach(function (c, j) {
+        var t = String(c).trim();
+        if (!t) { return; }
+        var reasons = [];
+        if (t.indexOf("[") >= 0) { reasons.push("an unresolved bracket"); }
+        if (/\bTBD\b/i.test(t)) { reasons.push("TBD"); }
+        if (/PLACEHOLDER/i.test(t)) { reasons.push("PLACEHOLDER"); }
+        if (/\d+\s*-\s*\d+/.test(t)) { reasons.push("a range, pick the floor"); }
+        if (HEDGES.test(t)) { reasons.push("a hedge"); }
+        if (reasons.length) {
+          warns.push({
+            target: "ms-" + i + "-c" + j, msg: "Not checkable yet: " + reasons.join(", ") + ".",
+            text: "<b>Milestone " + letter(i) + "</b> " + esc(t) +
+                  " <i>(" + esc(reasons.join(", ")) + ")</i>", group: "criteria"
+          });
+        }
+      });
+    });
+
+    return { errs: errs, warns: warns };
+  }
+
+  function renderChecks(res) {
+    var show = state.submitted;
+    var errs = show ? res.errs : res.errs.filter(function (e) { return e.kind !== "missing"; });
+    var crit = res.warns.filter(function (w) { return w.group === "criteria"; });
+    var other = res.warns.filter(function (w) { return w.group !== "criteria"; });
+
+    var html = errs.map(function (e) {
+      return '<div class="check err"><span class="k">Error</span><span class="t">' + e.text +
+        "</span></div>";
+    }).join("") + other.map(function (w) {
+      return '<div class="check warn"><span class="k">Warning</span><span class="t">' + w.text +
+        "</span></div>";
+    }).join("");
+    if (crit.length) {
+      html += '<div class="check warn"><span class="k">Warning</span><span class="t">' +
+        "These acceptance criteria are not checkable yet:<ul><li>" +
+        crit.map(function (w) { return w.text; }).join("</li><li>") + "</li></ul></span></div>";
+    }
+    if (!errs.length) {
+      html = '<div class="check ok"><span class="k">Clear</span><span class="t">' +
+        (show ? "Nothing blocks this submission" : "Nothing is wrong with what is filled in so far") +
+        (res.warns.length ? ". You can submit past warnings, the reviewer sees them too." : ".") +
+        "</span></div>" + html;
+    }
+    if (!show) {
+      html += '<div class="check note"><span class="k">Note</span><span class="t">Required ' +
+        "questions carry a Required marker. Press Submit for review and anything still missing " +
+        "shows up here and on the question itself.</span></div>";
+    }
+    $("#checks-list").innerHTML = html;
+
+    $("#blockmsg").textContent = show && res.errs.length
+      ? (res.errs.length === 1 ? "One thing needs fixing, marked above."
+                               : res.errs.length + " things need fixing, marked above.")
+      : "";
+  }
+
+  /* red edge, one line of plain instruction under the field, and nothing until
+     the person has pressed Submit once. After that the marks come and go as
+     the fields get fixed. */
+  function paintFindings(res) {
+    all(".has-error,.has-warn").forEach(function (el) {
+      el.classList.remove("has-error");
+      el.classList.remove("has-warn");
+    });
+    all(".fld-msg").forEach(function (el) { el.parentNode.removeChild(el); });
+    if (!state.submitted) { return null; }
+
+    var first = null;
+    res.errs.forEach(function (e) { if (mark(e, "has-error", "fld-err") && !first) { first = e.target; } });
+    res.warns.forEach(function (w) { mark(w, "has-warn", "fld-warn"); });
+    return first;
+  }
+
+  /* scroll something on screen and make sure it really got there: not every
+     browser honours a smooth scroll request, so check once and jump if the
+     element is still off screen. */
+  function bringIntoView(el) {
+    if (!el) { return; }
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(function () {
+      var r = el.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > (window.innerHeight || 0)) {
+        el.scrollIntoView({ block: "center" });
+      }
+    }, 700);
+  }
+
+  function mark(item, cls, msgCls) {
+    if (!item.target || !item.msg) { return false; }
+    var el = document.getElementById(item.target);
+    if (!el || el.offsetParent === null) { return false; }
+    el.classList.add(cls);
+    var p = document.createElement("p");
+    p.className = "fld-msg " + msgCls;
+    p.textContent = item.msg;
+    if (el.nextSibling) { el.parentNode.insertBefore(p, el.nextSibling); }
+    else { el.parentNode.appendChild(p); }
+    return true;
+  }
+
+  /* --------------------------------------------- the page preview */
+  function rulesPanelHtml() {
+    var r = RULES[rulesKey()];
+    return '<details class="rules" open><summary><span>' + esc(r.title) + "</span>" +
+      '<span class="rules-tag">Added by the site</span></summary><ol>' +
+      r.items.map(function (li) { return "<li>" + mdInline(li) + "</li>"; }).join("") +
+      '</ol><p class="rules-ver">Rules v2026-09, shown on every initiative of this type.</p></details>';
+  }
+
+  function backerPillsHtml() {
+    return '<div class="sponsors">' + liveBackers().map(function (b) {
+      return '<div class="sponsor-pill">' +
+        (b.logoData ? '<img class="sponsor-logo" src="' + esc(b.logoData) + '" alt="' +
+          esc(b.org) + ' logo">' : "") +
+        "<b>" + (nonEmpty(b.url)
+          ? '<a href="#" title="' + esc(b.url) + '">' + esc(b.org) + "</a>"
+          : esc(b.org)) + "</b>" +
+        "<span>" + usd(parseAmount(b.amount)) + "</span>" +
+        '<small class="pledged">committed</small></div>';
+    }).join("") + "</div>";
+  }
+
+  function cardMockHtml() {
+    var g = goal(), total = committedTotal();
+    var pct = g > 0 ? Math.min(100, Math.round((total / g) * 100)) : 0;
+    var live = liveBackers(), logos = live.filter(function (b) { return !!b.logoData; });
+    var sum = v("f-summary").trim();
+    return '<div class="card-mock"><div class="rfp-card">' +
+      '<span class="type-badge t-' + state.type + '">' +
+        (state.type === "grant" ? "Grant" : "RFP") + "</span>" +
+      '<a class="card-title" href="#">' + esc(v("f-title") || "Untitled initiative") + "</a>" +
+      '<p class="card-sum">' + esc(sum.slice(0, 210)) + (sum.length > 210 ? "&#8230;" : "") + "</p>" +
+      '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="card-nums' + (total ? "" : " zero") + '"><span><b>' + usd(total) + "</b> of " +
+        usd(g) + (live.length ? ' <span class="sponsor-count">&#183; ' + live.length +
+          " backer" + (live.length === 1 ? "" : "s") + "</span>" : "") + "</span>" +
+        '<span class="pct">' + pct + "%</span></div>" +
+      (logos.length
+        ? '<div class="card-logos"><span class="sponsor-lbl">Backed by</span>' +
+          logos.map(function (b) {
+            return '<img src="' + esc(b.logoData) + '" alt="' + esc(b.org) + '" title="' +
+              esc(b.org) + '">';
+          }).join("") + "</div>"
+        : "") +
+      '<div class="card-actions"><a class="btn ghost sm" href="#">Details</a></div>' +
+      "</div></div>";
+  }
+
+  function renderPreview() {
+    var isGrant = state.type === "grant";
+    var g = goal(), months = intOf(v("f-duration")), total = committedTotal();
+    var live = liveBackers();
+    var h = '<div class="preview-flag"><span>Preview</span>' +
+            "<span>This is what the site publishes</span></div>";
+    h += '<p class="crumb"><a href="#">&#8592; All initiatives</a></p>';
+    h += '<h1 class="rfp-title">' + esc(v("f-title") || "Untitled initiative") + "</h1>";
+    h += '<p class="meta-line"><span class="type-badge inline t-' + state.type + '">' +
+         (isGrant ? "Grant" : "RFP") + "</span>";
+    if (isGrant && nonEmpty(v("f-recipient"))) {
+      h += '<span class="dim">Grant to <b>' + esc(v("f-recipient")) + "</b></span>";
+    }
+    h += '<span class="dim">Goal <b class="mono">' + usd(g) + "</b></span>";
+    h += '<span class="dim">About ' + months + " month" + (months === 1 ? "" : "s") + "</span></p>";
+    if (live.length && total > 0) {
+      var names = live.map(function (b) { return b.org || "an unnamed backer"; }).join(", ");
+      h += '<p class="body-text small">' + usd(total) + " already committed by " + esc(names) +
+        (state.topup && g > total
+          ? "; this grant raises the remaining " + usd(g - total) + "."
+          : ".") + "</p>";
+    }
+    h += "<h2>Summary</h2>";
+    h += '<p class="body-text">' + esc(v("f-summary")) + "</p>";
+
+    SECTIONS[state.type].forEach(function (id) {
+      h += "<h2>" + esc(FIELD[id].heading) + "</h2>";
+      h += '<div class="body-text md">' + mdToHtml(state.fields[id] || "") + "</div>";
+    });
+
+    h += "<h2>" + (isGrant ? "Milestones" : "Milestones (draft)") + "</h2>";
+    h += '<div class="body-text md">';
+    state.milestones.forEach(function (m, i) {
+      h += "<h3>" + esc(letter(i) + " - " + (m.name || "Unnamed") + " - " +
+        usd(parseAmount(m.amount))) +
+        (m.adoption ? ' <span class="ms-flagtag">adoption milestone</span>' : "") +
+        (state.topup && m.done ? ' <span class="ms-flagtag done">done</span>' : "") + "</h3>";
+      if (state.topup && !m.done && nonEmpty(m.month)) {
+        h += '<p class="small dim">Target month: ' + esc(m.month) + "</p>";
+      }
+      var crit = m.criteria.filter(nonEmpty);
+      h += '<ul class="task">' + crit.map(function (c) {
+        return "<li>" + mdInline(c) + "</li>";
+      }).join("") + "</ul>";
+      if (state.topup && m.done && nonEmpty(m.link)) {
+        h += '<p class="small"><a href="#" title="' + esc(m.link) + '">Delivered work: ' +
+          esc(m.link) + "</a></p>";
+      }
+    });
+    h += "</div>";
+
+    var links = v("f-links").split("\n").filter(nonEmpty);
+    if (links.length) {
+      h += '<h2>Links</h2><div class="body-text md"><ul>' + links.map(function (l) {
+        return '<li><a href="#" title="' + esc(l.trim()) + '">' + esc(l.trim()) + "</a></li>";
+      }).join("") + "</ul></div>";
+    }
+
+    if (live.length) {
+      h += '<h2>Backers <span class="n">' + live.length + "</span></h2>" + backerPillsHtml();
+    }
+
+    h += rulesPanelHtml();
+    h += '<div class="preview-flag mid"><span>On the board</span>' +
+         "<span>The card people click</span></div>";
+    h += cardMockHtml();
+    $("#preview").innerHTML = h;
+  }
+
+  /* ---------------------------------------------------- 5. wiring */
+  function updateAll() {
+    renderTotals();
+    renderBackerHead();
+    var res = runChecks();
+    renderChecks(res);
+    paintFindings(res);
+    if (state.previewOpen) { renderPreview(); }
+  }
+
+  function applySplit(silent) {
+    var res = splitDraft(v("f-paste"), state.type);
+    var filled = 0;
+
+    if (res.page.title) { setV("f-title", res.page.title); filled++; }
+    if (res.page.summary) { setV("f-summary", res.page.summary); filled++; }
+    if (res.page.goal) { setV("f-goal", money(parseAmount(res.page.goal))); filled++; }
+    if (res.page.duration) { setV("f-duration", String(intOf(res.page.duration))); filled++; }
+    if (res.page.links) { setV("f-links", res.page.links); filled++; }
+    if (res.page.recipient) { setV("f-recipient", res.page.recipient); filled++; }
+    if (res.page.funders) { setV("f-funders", res.page.funders); }
+    if (res.page.contact) { setV("f-contact", res.page.contact); }
+
+    var backers = res.page.backers ? parseBackers(res.page.backers) : [];
+    if (backers.length) { state.backers = backers; filled++; }
+
+    var sections = 0;
+    Object.keys(res.fields).forEach(function (k) {
+      if (FIELD[k]) { state.fields[k] = res.fields[k]; sections++; }
+    });
+    if (res.milestones.length) { state.milestones = res.milestones; }
+
+    setV("f-unsorted", res.unsorted);
+    $("#unsorted").hidden = !nonEmpty(res.unsorted);
+
+    renderSections();
+    renderBackers();
+    renderMilestones();
+    updateAmountEchoes();
+    updateAll();
+
+    if (!silent) {
+      $("#sort-note").innerHTML = '<span class="sorted-ok">Sorted:</span> ' + sections +
+        " sections, " + res.milestones.length + " milestones, " + filled + " page fields" +
+        (nonEmpty(res.unsorted) ? ", plus text nothing matched." : ".");
+    }
+  }
+
+  /* the goal echo is outside a row, so it gets its own line */
+  function updateAmountEchoes() {
+    var g = goal();
+    $("#echo-goal").textContent = g ? usd(g) : "";
+  }
+
+  /* one code path for a real paste and for the demo button */
+  function sortFromPaste() {
+    applySplit(false);
+    $("#paste-block").hidden = true;
+    $("#paste-again").hidden = false;
+  }
+
+  function setType(type, topup) {
+    state.type = type;
+    state.topup = type === "grant" ? !!topup : false;
+    $("#subopt").hidden = type !== "grant";
+    $("#grant-only").hidden = type !== "grant";
+    renderRules();
+    renderSections();
+    renderMilestones();
+    updateAll();
+  }
+
+  function boot() {
+    EXAMPLE_FIELDS = splitDraft(EXAMPLE_DRAFT, "rfp").fields;
+    state.fields = {};
+    state.milestones = [emptyMilestone()];
+    state.backers = [emptyBacker()];
+    renderRules();
+    renderSections();
+    renderBackers();
+    renderMilestones();
+    updateAmountEchoes();
+    updateAll();
+  }
+
+  /* type radios and the top-up checkbox */
+  document.getElementById("t-rfp").addEventListener("change", function () { setType("rfp", false); });
+  document.getElementById("t-grant").addEventListener("change", function () {
+    setType("grant", document.getElementById("f-topup").checked);
+  });
+  document.getElementById("f-topup").addEventListener("change", function () {
+    setType("grant", this.checked);
+  });
+
+  /* page fields */
+  ["f-title", "f-summary", "f-goal", "f-duration", "f-recipient",
+   "f-links", "f-funders", "f-contact"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", function () {
+      if (id === "f-goal") { updateAmountEchoes(); }
+      updateAll();
+    });
+  });
+  document.getElementById("f-goal").addEventListener("change", function () {
+    var n = parseAmount(this.value);
+    if (n) { this.value = money(n); }
+    updateAmountEchoes();
+    updateAll();
+  });
+
+  /* section fields, example toggles */
+  $("#sections").addEventListener("input", function (e) {
+    var k = e.target.getAttribute("data-k");
+    if (!k) { return; }
+    state.fields[k] = e.target.value;
+    updateWordCount(k);
+    updateAll();
+  });
+  $("#sections").addEventListener("click", function (e) {
+    var btn = e.target.closest(".ex-btn");
+    if (!btn) { return; }
+    var box = document.getElementById("ex-" + btn.getAttribute("data-ex"));
+    var open = box.hidden;
+    box.hidden = !open;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.textContent = open ? "Hide example" : "Show example";
+  });
+
+  /* ------------------------------------------------------ backer rows */
+  function readBk(e) {
+    var row = e.target.closest(".bk-row");
+    if (!row) { return null; }
+    var b = state.backers[parseInt(row.getAttribute("data-i"), 10)];
+    var k = e.target.getAttribute("data-bk");
+    if (!b || !k) { return null; }
+    return { b: b, k: k, el: e.target };
+  }
+  $("#bk-rows").addEventListener("input", function (e) {
+    var r = readBk(e);
+    if (!r) { return; }
+    if (r.k === "amount") {
+      r.b.amount = parseAmount(r.el.value);
+      updateAmountEcho(r.el, r.b.amount);
+    } else if (r.k !== "logo") {
+      r.b[r.k] = r.el.value;
+    }
+    refreshBkChip(r.el);
+    updateAll();
+  });
+  $("#bk-rows").addEventListener("change", function (e) {
+    var r = readBk(e);
+    if (!r) { return; }
+    if (r.k === "amount" && r.b.amount) { r.el.value = money(r.b.amount); }
+    if (r.k === "logo") {
+      var f = r.el.files && r.el.files[0];
+      if (!f) { r.b.logoName = ""; r.b.logoData = ""; refreshBkChip(r.el); updateAll(); return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        r.b.logoName = f.name;
+        r.b.logoData = String(reader.result);
+        refreshBkChip(r.el);
+        updateAll();
+      };
+      reader.readAsDataURL(f);
+      return;
+    }
+    updateAll();
+  });
+  /* the chip redraws in place, so choosing a file does not wipe the row */
+  function refreshBkChip(el) {
+    var row = el.closest(".bk-row");
+    if (!row) { return; }
+    var i = parseInt(row.getAttribute("data-i"), 10);
+    var b = state.backers[i];
+    var old = row.querySelector(".bk-chip");
+    if (old) { old.parentNode.removeChild(old); }
+    var file = row.querySelector(".bk-file");
+    if (file) { file.parentNode.removeChild(file); }
+    if (b.logoName) {
+      var p = document.createElement("p");
+      p.className = "hint bk-file";
+      p.textContent = "Selected: " + b.logoName;
+      row.querySelector('input[data-bk="logo"]').parentNode.appendChild(p);
+    }
+    var chip = backerChip(b);
+    if (chip) { row.insertAdjacentHTML("beforeend", chip); }
+  }
+  $("#bk-rows").addEventListener("click", function (e) {
+    var btn = e.target.closest(".bk-del");
+    if (!btn) { return; }
+    state.backers.splice(parseInt(btn.getAttribute("data-del"), 10), 1);
+    renderBackers();
+    updateAll();
+  });
+  $("#btn-add-bk").addEventListener("click", function () {
+    state.backers.push(emptyBacker());
+    renderBackers();
+    updateAll();
+    var rows = document.querySelectorAll('.bk-row input[data-bk="org"]');
+    if (rows.length) { rows[rows.length - 1].focus(); }
+  });
+
+  /* ------------------------------------------------- milestone rows */
+  function readRow(e) {
+    var row = e.target.closest(".ms-row");
+    if (!row) { return null; }
+    var m = state.milestones[parseInt(row.getAttribute("data-i"), 10)];
+    var k = e.target.getAttribute("data-mk");
+    if (!m || !k) { return null; }
+    return { m: m, k: k, el: e.target, i: parseInt(row.getAttribute("data-i"), 10) };
+  }
+  $("#ms-rows").addEventListener("input", function (e) {
+    var r = readRow(e);
+    if (!r) { return; }
+    if (r.k === "crit") {
+      r.m.criteria[parseInt(r.el.getAttribute("data-ci"), 10)] = r.el.value;
+    } else if (r.k === "amount") {
+      r.m.amount = parseAmount(r.el.value);
+      updateAmountEcho(r.el, r.m.amount);
+    } else if (r.k !== "adoption" && r.k !== "done") {
+      r.m[r.k] = r.el.value;
+    }
+    updateAll();
+  });
+  $("#ms-rows").addEventListener("change", function (e) {
+    var r = readRow(e);
+    if (!r) { return; }
+    if (r.k === "adoption") { r.m.adoption = r.el.checked; }
+    if (r.k === "done") { r.m.done = r.el.checked; renderMilestones(); }
+    if (r.k === "amount" && r.m.amount) { r.el.value = money(r.m.amount); }
+    updateAll();
+  });
+  $("#ms-rows").addEventListener("click", function (e) {
+    var del = e.target.closest(".ms-del");
+    if (del) {
+      state.milestones.splice(parseInt(del.getAttribute("data-del"), 10), 1);
+      renderMilestones();
+      updateAll();
+      return;
+    }
+    var cdel = e.target.closest(".crit-del");
+    if (cdel) {
+      var r1 = readRowFromEl(cdel);
+      if (r1) {
+        r1.m.criteria.splice(parseInt(cdel.getAttribute("data-cdel"), 10), 1);
+        renderMilestones();
+        updateAll();
+      }
+      return;
+    }
+    var add = e.target.closest(".crit-add");
+    if (add) {
+      var r2 = readRowFromEl(add);
+      if (r2) {
+        r2.m.criteria.push("");
+        renderMilestones();
+        updateAll();
+        focusCrit(r2.i, r2.m.criteria.length - 1);
+      }
+    }
+  });
+  /* Enter inside a criterion opens the next one, the way a list should behave.
+     Enter anywhere else in the form does nothing: an accidental Enter should
+     not fire the submit checks. */
+  $("#form").addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" || e.target.tagName !== "INPUT") { return; }
+    if (e.target.getAttribute("data-mk") === "crit") {
+      e.preventDefault();
+      var r = readRowFromEl(e.target);
+      if (!r) { return; }
+      var at = parseInt(e.target.getAttribute("data-ci"), 10) + 1;
+      r.m.criteria.splice(at, 0, "");
+      renderMilestones();
+      updateAll();
+      focusCrit(r.i, at);
+      return;
+    }
+    if (e.target.type !== "submit") { e.preventDefault(); }
+  });
+  function readRowFromEl(el) {
+    var row = el.closest(".ms-row");
+    if (!row) { return null; }
+    var i = parseInt(row.getAttribute("data-i"), 10);
+    return { m: state.milestones[i], i: i };
+  }
+  function focusCrit(i, j) {
+    var el = document.getElementById("ms-" + i + "-c" + j);
+    if (el) { el.focus(); }
+  }
+  $("#btn-add-ms").addEventListener("click", function () {
+    state.milestones.push(emptyMilestone());
+    renderMilestones();
+    updateAll();
+    var rows = document.querySelectorAll(".ms-row input[data-mk='name']");
+    if (rows.length) { rows[rows.length - 1].focus(); }
+  });
+
+  /* -------------------------------------- paste, demo controls, submit */
+  /* The splitter runs on the paste itself. The value arrives after the event,
+     so read it on the next tick. */
+  $("#f-paste").addEventListener("paste", function () {
+    setTimeout(sortFromPaste, 0);
+  });
+  $("#btn-paste-again").addEventListener("click", function () {
+    $("#paste-block").hidden = false;
+    $("#paste-again").hidden = true;
+    document.getElementById("f-paste").focus();
+  });
+
+  $("#btn-example").addEventListener("click", function () {
+    setV("f-paste", EXAMPLE_DRAFT);
+    sortFromPaste();
+    $("#conf").hidden = true;
+  });
+
+  $("#btn-clear").addEventListener("click", function () {
+    ["f-paste", "f-title", "f-summary", "f-goal", "f-duration", "f-recipient", "f-links",
+     "f-funders", "f-contact", "f-unsorted"].forEach(function (id) { setV(id, ""); });
+    state.fields = {};
+    state.milestones = [emptyMilestone()];
+    state.backers = [emptyBacker()];
+    state.submitted = false;
+    document.getElementById("f-topup").checked = false;
+    document.getElementById("t-rfp").checked = true;
+    $("#unsorted").hidden = true;
+    $("#paste-block").hidden = false;
+    $("#paste-again").hidden = true;
+    $("#sort-note").innerHTML = "";
+    $("#conf").hidden = true;
+    setType("rfp", false);
+    renderBackers();
+    updateAmountEchoes();
+    updateAll();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  $("#btn-preview").addEventListener("click", function () {
+    state.previewOpen = !state.previewOpen;
+    $("#preview").hidden = !state.previewOpen;
+    this.setAttribute("aria-expanded", state.previewOpen ? "true" : "false");
+    this.textContent = state.previewOpen ? "Hide the page view" : "See it as a page";
+    if (state.previewOpen) { renderPreview(); }
+  });
+
+  $("#copy-guide").addEventListener("click", function () {
+    var btn = this, original = "Copy the guide";
+    btn.textContent = "Copied!";
+    setTimeout(function () { btn.textContent = original; }, 2000);
+  });
+
+  /* Submit is always clickable. Pressing it runs the checks, marks every
+     problem on the field it belongs to, and scrolls to the first one. */
+  $("#form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    state.submitted = true;
+    var res = runChecks();
+    renderTotals();
+    renderBackerHead();
+    renderChecks(res);
+    var first = paintFindings(res);
+    if (res.errs.length) {
+      $("#conf").hidden = true;
+      var el = first ? document.getElementById(first) : null;
+      if (el) {
+        /* focus first: focus() cancels a smooth scroll that is already running */
+        try { el.focus({ preventScroll: true }); } catch (err) { el.focus(); }
+        bringIntoView(el);
+      } else {
+        bringIntoView($("#checks"));
+      }
+      return;
+    }
+    var conf = $("#conf");
+    conf.innerHTML = "<b>Submitted for review.</b> The site adds the " + esc(panelName()) +
+      " panel to your page. Nothing was actually sent, this is a prototype." +
+      (res.warns.length
+        ? "<p>You submitted past " + res.warns.length + (res.warns.length === 1 ? " warning" : " warnings") +
+          ". The reviewer sees the same list.</p>"
+        : "");
+    conf.hidden = false;
+    bringIntoView(conf);
+  });
+
+  boot();
+})();
+</script>

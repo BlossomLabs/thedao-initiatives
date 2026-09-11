@@ -1,4 +1,4 @@
-/* TheDAO Security Fund — RFP board.
+/* TheDAO Security Fund, RFP board.
    Palette shared with thedao.fund; layout designed for donation conversion:
    one red CTA, preset amounts, progress bars, social proof, minimal clicks. */
 :root{
@@ -670,22 +670,3 @@ tr.reported td{background:rgba(255,59,56,.06)}
 .terms-page .md-body h2{font-size:19px;margin-top:28px}
 td.pre{white-space:pre-wrap;max-width:420px;overflow-wrap:anywhere}
 @media (max-width:420px){.dw-chip{padding:9px 11px;font-size:13px}}
-/* submission redesign, phase 1: page facts, rules panel, form additions */
-.page-facts{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 18px;color:var(--soft);font-size:14px}
-.page-facts b{color:var(--text)}
-.page-facts .committed,.page-facts .reviewer{flex-basis:100%}
-.rules-panel{margin:34px 0 8px;border:1px solid rgba(92,183,90,.35);border-radius:18px;background:var(--card);padding:22px 24px;box-shadow:0 0 34px rgba(92,183,90,.06)}
-.rules-panel h2,.rules-panel h3{margin-top:0}
-.rules-panel .md ol{padding-left:22px}
-.rules-panel .md li{margin:8px 0;line-height:1.55}
-.rules-version{margin:14px 0 0}
-.form-rules{margin:14px 0 22px}
-.topup-row{margin:10px 0 4px}
-.check-lbl{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5;margin:8px 0}
-.check-lbl input{margin-top:4px;accent-color:#00ff88}
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media (max-width:560px){.two-col{grid-template-columns:1fr}}
-.strip-row{border:1px solid var(--edge);border-radius:14px;padding:10px 14px;margin:10px 0;background:var(--card)}
-.strip-row summary{cursor:pointer}
-.strip-row summary .small{display:block;margin-top:4px}
-pre.diff{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.45;max-height:420px;overflow:auto;padding:12px;border-radius:10px;background:rgba(0,0,0,.25)}

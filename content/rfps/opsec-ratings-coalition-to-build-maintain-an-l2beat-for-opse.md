@@ -11,14 +11,8 @@ summary: Fund a single coordinator to bring at least six OPSEC auditing firms
   Rated teams pay a fixed fee into a membership body that owns the standard and
   the board once the coordinator hands off. A simple public board shows who is
   rated; teams with unacceptable OPSEC simply don't appear.
+duration: 18
 ---
-| | |
-|---|---|
-| **Status** | Draft |
-| **Budget** | $150,000 USD |
-| **Proposal window** | 30 days, opening once the RFP is fully funded |
-| **Indicative duration** | 18 months (the team sets the final timeline) |
-
 ## Why this matters
 
 Your keys, your devices, your multisig process, your access controls... these are just as important as your smart contracts. Every serious team already invests in OPSEC, and OPSEC audits happen all the time. But all of that work is invisible. There is no public signal that tells users, investors or partners who is actually running a tight ship.
@@ -53,8 +47,6 @@ Bidders are welcome to propose a different path to get there. The goal is what's
 Nobody is pre-selected. Once the RFP is fully funded there will be an open bidding process, and the winner gets picked through the process below. The dream candidate is a credible coordinator in the security community: someone who can bring 6+ OPSEC auditing firms to the same table and get them all to sign the same document. (If you have ever tried to get six companies to agree on anything, you know that's the real work here.)
 
 Ideally the coordinator is not an OPSEC auditing firm, because whoever holds the pen on the standard walks away with an edge over the firms they convened. That is a preference, not a requirement, and it will weigh in selection. An audit firm that coordinates takes no rater role during the grant and no ownership of the board. The best pitch a bidder can make is simple: here is why the other firms can trust me to run this.
-
-Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
 ## Existing work
 
@@ -91,8 +83,6 @@ Every applicant, including any expected recipient, must disclose their relations
 
 ## Milestones (draft)
 
-These milestones are a draft. Final milestones and payments get negotiated with the winning team and fixed in the grant agreement. If you think this draft is wrong, tell us how in your proposal... improving it is part of winning.
-
 ### A - Agreed standard - $50,000
 
 - [ ] A public, versioned scoring template plus the A / AA / AAA tier definitions, with the change process for future revisions
@@ -111,22 +101,3 @@ These milestones are a draft. Final milestones and payments get negotiated with 
 - [ ] The six-month check-in running: every rating older than six months shows a check-in date on the board, and the event-based suspension process is live with a public change log
 - [ ] The membership body running on pooled fees, with the verification committee active and its spot-check sample published, both shown on the body's public page
 - [ ] A public metrics page: teams rated, tiers awarded, firms participating, check-ins completed, suspensions and renewals
-
-## Milestone review and acceptance
-
-- Criteria with objective public evidence (a live page, a published report, a named party confirming) are accepted on sight.
-- Judgment calls are signed off by an independent technical reviewer with no ties to the selected team, agreed between Giveth and the team before work begins and named in the grant agreement.
-- The reviewer's fee comes out of the milestone payment, or is pro bono. The winning team coordinates their payment.
-
-## Process
-
-- The proposal window opens once the RFP is fully funded and stays open for 30 days.
-- Proposals include: team and track record, technical approach, a milestone plan with per-milestone budget (the draft above, or a stronger version), and full disclosures.
-- Giveth selects the team within 7 days of the window closing, weighing credibility, price, and strength of the proposed milestones.
-- Milestone deliveries are reviewed within 14 days; payment follows acceptance.
-- The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
-- If a milestone stalls, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
-
----
-
-Questions, pushback, better ideas? Post them below.

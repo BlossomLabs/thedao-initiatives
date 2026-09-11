@@ -6,15 +6,9 @@ summary: solc does not emit the debug information debuggers need, so every tool
   reverse-engineers compiler behavior and breaks when the compiler changes. This
   funds implementing the ethdebug format directly in solc, with debug data that
   survives the full optimizer pipeline so it works on production builds.
+topup: true
+reviewer: Nicholas D'Andrea (ethdebug) and Nikola Matic (Solidity)
 ---
-| | |
-|---|---|
-| **Status** | Draft |
-| **Budget** | $236,500 USD |
-| **Anchor backer** | $151,000 committed by Argot Collective; this grant raises the remaining $85,500 |
-| **Proposal window** | None, grant already in progress |
-| **Indicative duration** | 6 to 9 months for the remaining milestones |
-
 ## Why this matters
 
 Debugging Solidity is a longstanding pain point, and the root cause is structural. The compiler (solc) does not emit the rich debug information debuggers need: variable types, scopes, and runtime locations. Without a standard for that data, every debugging tool reverse-engineers compiler behavior, which breaks whenever the compiler changes.
@@ -34,7 +28,6 @@ In the interest of full transparency:
 - This grant is a co-funding opportunity brought by **Argot Collective** and **Walnut**. The ethdebug format is developed by Argot engineer Nicholas D'Andrea. The solc implementation is done by Walnut. We expect them to do this work.
 - This is not a competitive tender. The project is already in progress with the first milestones funded and underway, so there is no open challenge window. A challenger just doesn't make sense in this case.
 - **Argot Collective is the anchor backer.** A public goods nonprofit, Argot has committed $151,000 of the $236,500 project budget. This grant raises the remaining $85,500 to finish the project.
-- Every applicant, including any expected recipient, must disclose their relationships to the teams, codebases, and firms named in this initiative.
 
 ## Existing work
 
@@ -65,8 +58,6 @@ In the interest of full transparency:
 
 ## Milestones
 
-These milestones are the full project plan, scoped with Argot and Walnut. Final milestones and payments for the co-funded portion are negotiated with the team and fixed in the grant agreement.
-
 The total project budget is $236,500. Argot Collective has committed $151,000 as anchor backer, and this grant raises the remaining $85,500 to finish the project.
 
 ### 0 - Testing and validation infrastructure - $13,000 (delivered end of June)
@@ -95,19 +86,6 @@ The total project budget is $236,500. Argot Collective has committed $151,000 as
 - [ ] Implementation merged into solc, or an open pull request under active review, linkable by URL
 - [ ] Published maintenance plan for keeping ethdebug output current across future solc and optimizer changes
 
-## Milestone review and acceptance
-
-- Milestones 0 through 2 are already underway and reviewed under Argot's existing arrangement with Walnut. Their completion status is reported publicly, and payments from this grant begin only once milestones 0 through 2 are accepted.
-- For the remaining milestones, machine-checkable criteria (CI green, merged or open upstream pull requests, published test results) are accepted automatically once the public evidence exists.
-- Judgment-based criteria (whether coverage is complete, whether the walkthrough is credible) are signed off by Nicholas D'Andrea (ethdebug) and Nikola Matic (Solidity).
-- The reviewer's fee comes out of the milestone payment or is pro bono. The team coordinates their payment.
-
-## Process
-
-- This is an already active grant that needs more funding to be completed, and work is already under way.
-- Milestone deliveries are reviewed within 14 days; payment follows acceptance.
-- If a milestone stalls past its expected deadline, the team gets a 21-day deadline to complete it. If they miss it, TheDAO Security Fund reclaims the unspent funds and puts them toward other Ethereum security initiatives.
-
 ## Budget summary
 
 | Milestone | Cost |
@@ -129,7 +107,3 @@ Argot Collective has committed $151,000. This grant raises the remaining $85,500
 - ethdebug GitHub: <https://github.com/ethdebug/format>
 - Walnut: <https://walnut.dev/>
 - Argot Collective: <https://argot.org>
-
----
-
-Questions, pushback, better ideas? Post them below.

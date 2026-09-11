@@ -6,7 +6,7 @@ import { createDb } from "./db/mod.ts";
 import { prefixedKv } from "./db/prefix.ts";
 import { createChain } from "./chain/mod.ts";
 import { createAi } from "./services/ai.ts";
-import { createEns } from "./services/ens.ts";
+import { createEns, onchainEns } from "./services/ens.ts";
 import { createPinata } from "./services/pinata.ts";
 import { syncAll } from "./services/safe-api.ts";
 import { toChecksum } from "./chain/address.ts";
@@ -41,7 +41,7 @@ export async function createServer() {
     fetch,
     now,
     ai: createAi(config, fetch),
-    ens: createEns(fetch, now),
+    ens: createEns(fetch, now, { onchain: onchainEns(config.rpcEndpoints, fetch), log }),
     pinata: createPinata(config, fetch),
     log,
   };

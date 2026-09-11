@@ -2,7 +2,7 @@
 
 /** Name field for a post without a wallet. */
 export const nameInput =
-  "h-[38px] w-full max-w-[360px] rounded-[10px] border border-white/10 bg-[rgba(9,18,30,.5)] px-3.5 font-inter-tight text-[14px] text-white outline-none placeholder:text-muted focus:border-[rgba(92,183,90,.55)]";
+  "h-[38px] w-full max-w-[360px] rounded-[10px] border border-white/10 bg-[rgba(9,18,30,.5)] px-3.5 font-inter-tight text-[14px] text-white outline-none placeholder:text-muted focus:border-[rgba(92,183,90,.55)] disabled:cursor-default disabled:opacity-60";
 
 /** Green submit button (Comment, Post reply). */
 export const submitBtn =

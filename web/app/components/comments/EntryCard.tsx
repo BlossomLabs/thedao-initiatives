@@ -253,11 +253,12 @@ export default function EntryCard({
           {replying && (
             <div className="mt-3 flex flex-col gap-2">
               <textarea
-                className="min-h-[70px] w-full rounded-xl border border-white/10 bg-[rgba(9,18,30,.5)] px-3 py-2.5 font-inter-tight text-[14px] text-white outline-none placeholder:text-muted focus:border-[rgba(92,183,90,.55)]"
+                className="min-h-[70px] w-full rounded-xl border border-white/10 bg-[rgba(9,18,30,.5)] px-3 py-2.5 font-inter-tight text-[14px] text-white outline-none placeholder:text-muted focus:border-[rgba(92,183,90,.55)] disabled:cursor-default disabled:opacity-60"
                 maxLength={2000}
                 placeholder="Write a reply"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
+                disabled={busy}
                 autoFocus
               />
               <div className="flex flex-wrap items-center gap-2.5">
@@ -268,6 +269,7 @@ export default function EntryCard({
                     placeholder="Your name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    disabled={busy}
                   />
                 )}
                 <span className="ml-auto inline-flex flex-wrap items-center gap-2.5">

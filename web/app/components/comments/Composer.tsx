@@ -74,11 +74,12 @@ export default function Composer(
         Join the discussion
       </div>
       <textarea
-        className="min-h-[96px] w-full resize-y rounded-xl border border-white/10 bg-[rgba(9,18,30,.5)] px-4 py-3.5 font-inter-tight text-[14.5px] text-[#f2f6fa] outline-none transition-all duration-150 placeholder:text-muted focus:border-[rgba(92,183,90,.55)] focus:shadow-[0_0_0_3px_rgba(92,183,90,.14)]"
+        className="min-h-[96px] w-full resize-y rounded-xl border border-white/10 bg-[rgba(9,18,30,.5)] px-4 py-3.5 font-inter-tight text-[14.5px] text-[#f2f6fa] outline-none transition-all duration-150 placeholder:text-muted focus:border-[rgba(92,183,90,.55)] focus:shadow-[0_0_0_3px_rgba(92,183,90,.14)] disabled:cursor-default disabled:opacity-60"
         maxLength={2000}
         placeholder="Add a comment"
         value={text}
         onChange={(e) => setText(e.target.value)}
+        disabled={busy}
       />
       <input
         name="website"
@@ -105,6 +106,7 @@ export default function Composer(
               placeholder="Your name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              disabled={busy}
             />
           )}
         <div className="flex flex-wrap items-center gap-2.5">

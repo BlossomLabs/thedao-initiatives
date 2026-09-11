@@ -397,7 +397,7 @@
         var t = String(c).trim();
         if (!t) { return; }
         var reasons = [];
-        if (t.indexOf("[") >= 0) { reasons.push("an unresolved bracket"); }
+        if (t.replace(/\[[^\]]*\]\([^)\s]+\)/g, "").indexOf("[") >= 0) { reasons.push("an unresolved bracket"); }
         if (/\bTBD\b/i.test(t)) { reasons.push("TBD"); }
         if (/PLACEHOLDER/i.test(t)) { reasons.push("PLACEHOLDER"); }
         if (/\d+\s*-\s*\d+/.test(t)) { reasons.push("a range, pick the floor"); }

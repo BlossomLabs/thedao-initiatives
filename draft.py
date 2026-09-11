@@ -329,7 +329,7 @@ def check_submission(itype, topup, page, fields, milestones, backers):
             warn("ms_%d_month" % i, "%s has no target month. Every remaining milestone needs one." % L)
         for j, c in enumerate(crits):
             reasons = []
-            if "[" in c:
+            if "[" in re.sub(r"\[[^\]]*\]\([^)\s]+\)", "", c):  # markdown links are fine
                 reasons.append("an unresolved bracket")
             if re.search(r"\bTBD\b", c, re.I):
                 reasons.append("TBD")

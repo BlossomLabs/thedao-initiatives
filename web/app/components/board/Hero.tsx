@@ -4,7 +4,7 @@ import Shimmer from "~/components/layout/Shimmer";
 // Figma: 72px top, 11px kicker, 100px bold amount, 22px sub, 1052px rule 30px below.
 export default function Hero({ raised, loading }: { raised: number; loading?: boolean }) {
   return (
-    <section className="mx-auto max-w-[1100px] px-6 pb-2 pt-[72px] text-center max-[760px]:pt-16">
+    <section className="mx-auto max-w-[1100px] px-6 pb-2 pt-[72px] text-center max-[760px]:pt-24">
       <p className="kicker m-0">Ecosystem-funded security initiatives</p>
       <div className="mt-3.5 font-inter-tight text-[clamp(40px,10vw,100px)] font-bold leading-none tracking-[-.04em] text-white tnum">
         {loading ? "$0" : (

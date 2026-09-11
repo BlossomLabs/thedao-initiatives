@@ -56,11 +56,11 @@ export default function AiSearch({ onMatches }: { onMatches: (ids: string[] | nu
   // 44px left padding) + 51px red button, 10px apart, 20px above the cards.
   return (
     <>
-      <form className="mb-5 mt-1 flex gap-2.5" autoComplete="off" onSubmit={run}>
+      <form className="mb-5 mt-1 flex gap-2.5 max-[640px]:gap-0" autoComplete="off" onSubmit={run}>
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-white/45" />
           <input
-            className="field border-white/10 pl-11 placeholder:text-white/25"
+            className="field border-white/10 pl-11 placeholder:text-white/25 max-[640px]:rounded-r-none max-[640px]:border-r-0"
             maxLength={300}
             placeholder={phone
               ? "What do you want to fund?"
@@ -76,7 +76,7 @@ export default function AiSearch({ onMatches }: { onMatches: (ids: string[] | nu
           type="submit"
           loading={busy}
           aria-label="Show top matches"
-          className="flex-none max-[640px]:w-[51px] max-[640px]:px-0"
+          className="flex-none max-[640px]:w-[51px] max-[640px]:rounded-l-none max-[640px]:px-0"
         >
           <span className="max-[640px]:hidden">Show top matches</span>
           <ArrowRight className="size-4" />

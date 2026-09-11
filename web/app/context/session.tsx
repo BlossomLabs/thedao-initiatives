@@ -14,6 +14,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { type Connector, useAccount, useConnect, useDisconnect, useSignMessage } from "wagmi";
 import { createSiweMessage } from "viem/siwe";
@@ -63,19 +64,28 @@ interface SessionCtx {
 
 const Ctx = createContext<SessionCtx | null>(null);
 
+const noop = () => () => {};
+/** False for the hydration render (matching the prerendered, signed-out HTML), true after. */
+const useHydrated = () => useSyncExternalStore(noop, () => true, () => false);
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const { address, status, connector } = useAccount();
   const { connectAsync } = useConnect();
   const { disconnectAsync } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
-  const [session, setSession] = useState<SessionInfo | null>(
+  const [stored, setSession] = useState<SessionInfo | null>(
     () => (typeof localStorage === "undefined" ? null : load()),
   );
+  // Prerendered pages were built signed out. Show consumers the stored
+  // session only after hydration so their first render matches that HTML;
+  // requests still carry the token from the first one (sessionRef below).
+  const hydrated = useHydrated();
+  const session = hydrated ? stored : null;
   const [me, setMe] = useState<Me | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const sessionRef = useRef(session);
-  sessionRef.current = session;
+  const sessionRef = useRef(stored);
+  sessionRef.current = stored;
   // Registered during render, not in an effect: child queries fire their first
   // request before a parent effect would run, and must already carry the bearer.
   setTokenProvider(() => sessionRef.current?.token ?? null);
@@ -100,15 +110,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [clear]);
 
   // Validate the stored session once; drop it when the wallet moves. wagmi
-  // starts as "reconnecting" on a reload, so only a settled disconnect counts.
+  // (ssr mode) mounts as "disconnected" and only then reconnects, so a
+  // disconnect counts as settled once a reconnect attempt has been seen.
   useEffect(() => {
     void refreshMe();
   }, [refreshMe]);
+  const walletLive = useRef(false);
   useEffect(() => {
+    if (status !== "disconnected") walletLive.current = true;
     const s = sessionRef.current;
     if (!s) return;
     if (
-      status === "disconnected" || (address && address.toLowerCase() !== s.address.toLowerCase())
+      (status === "disconnected" && walletLive.current) ||
+      (address && address.toLowerCase() !== s.address.toLowerCase())
     ) {
       clear();
     }

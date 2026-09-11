@@ -38,7 +38,9 @@ export const wagmiConfig = createConfig({
       : []),
   ],
   transports: { [mainnet.id]: http(RPC_URL) },
-  ssr: false,
+  // Restore the stored connection in an effect, not during the hydration
+  // render: prerendered pages were built disconnected and must hydrate as such.
+  ssr: true,
 });
 
 declare module "wagmi" {

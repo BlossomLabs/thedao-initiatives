@@ -38,7 +38,9 @@ export default function Board() {
       <Hero raised={data?.totals.raised ?? 0} loading={isLoading} />
       {data && <CommunityStrip entries={data.community} />}
       <PageMain>
-        <SectionHeading id="rfps">Security initiatives looking for funding</SectionHeading>
+        <SectionHeading id="rfps" className="max-[640px]:text-center">
+          Security initiatives looking for funding
+        </SectionHeading>
         {data?.flags.aiSearch && cards.length > 0 && <AiSearch onMatches={setMatches} />}
         {isError && (
           <p className="alert">The board could not be loaded. Please try again in a moment.</p>

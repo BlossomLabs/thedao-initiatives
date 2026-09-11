@@ -2119,7 +2119,7 @@ def admin_rfp(rfp_id):
                               type=itype,
                               duration_months=duration,
                               recipient_team=(request.form.get("recipient_team")
-                                              or "").strip()[:120],
+                                              or "").strip()[:120] if itype == "grant" else "",
                               topup=topup,
                               milestone_reviewer=(request.form.get("milestone_reviewer")
                                                   or "").strip()[:200] if topup else "",

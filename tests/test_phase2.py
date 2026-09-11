@@ -176,6 +176,25 @@ class TestLegacyAndAdmin(Base):
         self.assertIn('name="details"', ahtml)
         self.assertNotIn('name="sec_why"', ahtml)
 
+    def test_admin_form_shows_only_the_fields_for_the_type(self):
+        rid, _ = db.create_rfp("Phase two admin rfp fields", SUMMARY, "", 1000, [], "c@example.org",
+                               status="approved", details="d", type="rfp", funders="Acme")
+        gid, _ = db.create_rfp("Phase two admin grant fields", SUMMARY, "", 1000, [], "c@example.org",
+                               status="approved", details="d", type="grant", funders="Acme", topup=1)
+        self.made += [rid, gid]
+        self.admin()
+        rfp_html = self.client.get("/admin/rfp/%d" % rid).data.decode()
+        self.assertIn("<div data-grant-only hidden>", rfp_html)
+        self.assertNotIn('name="discourse_url"', rfp_html)
+        self.assertNotIn('name="boilerplate"', rfp_html)
+        grant_html = self.client.get("/admin/rfp/%d" % gid).data.decode()
+        self.assertIn("<div data-grant-only >", grant_html)
+        self.assertIn("<div data-topup-only >", grant_html)
+        db.update_rfp(rid, discourse_url="https://forum.example.org/t/1", boilerplate="none")
+        legacy_html = self.client.get("/admin/rfp/%d" % rid).data.decode()
+        self.assertIn('name="discourse_url"', legacy_html)
+        self.assertIn('name="boilerplate"', legacy_html)
+
     def test_admin_edits_one_field_and_the_milestones(self):
         data = form_from_doc(example_doc(), title="Phase two admin probe")
         self.assertEqual(self.post_submit(data).status_code, 200)

@@ -4,17 +4,12 @@
  * (returns "") so ownership checks never pass on a failed lookup. */
 import { createPublicClient, fallback, http } from "viem";
 import { mainnet } from "viem/chains";
-import { getEnsAddress, getEnsName, getEnsText, normalize, parseAvatarRecord } from "viem/ens";
+import { getEnsAddress, getEnsAvatar, getEnsName, normalize } from "viem/ens";
 import { isAddress, toChecksum } from "../chain/address.ts";
 
 const TTL = 3600;
 const MAX = 5000;
 const RPC_TIMEOUT_MS = 5000;
-const ENSDATA_TIMEOUT_MS = 3000;
-const METADATA_TIMEOUT_MS = 4000;
-/** viem fetches NFT metadata with no timeout of its own; a dead host must
- * not hold the whole identity lookup. */
-const AVATAR_PARSE_TIMEOUT_MS = 2500;
 
 /** Primary name + avatar of an address ("" when unset). The avatar is only
  * meaningful with a name (it is a text record on the name). */
@@ -32,11 +27,8 @@ export interface EnsResolver {
   name(address: string): Promise<string | null>;
   /** Address a name forward-resolves to. */
   address(name: string): Promise<string | null>;
-  /** Raw `avatar` text record of a name (https/ipfs/ar URI or an NFT ref). */
-  avatarRecord(name: string): Promise<string | null>;
-  /** The record turned into a fetchable image URL, or null when that is not
-   * possible any more (dead NFT metadata host, unknown scheme). */
-  avatarUrl(record: string): Promise<string | null>;
+  /** Avatar record of a name, already turned into a fetchable URL. */
+  avatar(name: string): Promise<string | null>;
 }
 
 /** Resolver backed by the ENS universal resolver on mainnet, trying the RPC
@@ -71,22 +63,9 @@ export function onchainEns(endpoints: string[], f: typeof fetch = fetch): EnsRes
       const n = norm(name);
       return n ? await getEnsAddress(client, { name: n }) : null;
     },
-    avatarRecord: async (name) => {
+    avatar: async (name) => {
       const n = norm(name);
-      return n ? await getEnsText(client, { name: n, key: "avatar" }) : null;
-    },
-    avatarUrl: async (record) => {
-      let timer: number | undefined;
-      const gaveUp = new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), AVATAR_PARSE_TIMEOUT_MS);
-      });
-      try {
-        return await Promise.race([parseAvatarRecord(client, { record }), gaveUp]);
-      } catch {
-        return null;
-      } finally {
-        clearTimeout(timer);
-      }
+      return n ? await getEnsAvatar(client, { name: n }) : null;
     },
   };
 }
@@ -124,53 +103,10 @@ export function createEns(f: typeof fetch, now: () => number, opts: EnsOptions =
   async function ensdata(path: string): Promise<Record<string, unknown>> {
     const res = await f("https://api.ensdata.net/" + path, {
       headers: { "User-Agent": "thedao-rfps/2.0" },
-      signal: AbortSignal.timeout(ENSDATA_TIMEOUT_MS),
+      signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) throw new Error(`ensdata ${res.status}`);
     return await res.json();
-  }
-  const ensdataAvatar = (d: Record<string, unknown>) =>
-    httpsUrl(d.avatar_url) || httpsUrl(d.avatar);
-
-  /** The ENS metadata service renders most records (NFTs included) itself;
-   * checked with a HEAD so a 404 never ends up as a broken <img>. */
-  async function metadataServiceAvatar(name: string): Promise<string> {
-    const url = "https://metadata.ens.domains/mainnet/avatar/" + encodeURIComponent(name);
-    const res = await f(url, {
-      method: "HEAD",
-      headers: { "User-Agent": "thedao-rfps/2.0" },
-      signal: AbortSignal.timeout(METADATA_TIMEOUT_MS),
-    });
-    if (!res.ok) throw new Error(`metadata service ${res.status}`);
-    if (!(res.headers.get("content-type") ?? "").startsWith("image/")) {
-      throw new Error("metadata service: not an image");
-    }
-    return url;
-  }
-
-  /** Image URL for a name's avatar record: viem's own parsing first, then
-   * the services that keep their own copies (an NFT whose metadata host
-   * went away still has its image on OpenSea, which ensdata serves). */
-  async function avatarFor(chain: EnsResolver, name: string): Promise<string> {
-    const record = (await chain.avatarRecord(name))?.trim() ?? "";
-    if (!record) return "";
-    const own = httpsUrl(await chain.avatarUrl(record));
-    if (own) return own;
-    for (
-      const [source, get] of [
-        ["ensdata", async () => ensdataAvatar(await ensdata(encodeURIComponent(name)))],
-        ["metadata service", () => metadataServiceAvatar(name)],
-      ] as const
-    ) {
-      try {
-        const url = await get();
-        if (url) return url;
-      } catch (e) {
-        log(`ens: ${source} avatar lookup failed for ${name}: ${String(e)}`);
-      }
-    }
-    log(`ens: no usable avatar for ${name} (record ${JSON.stringify(record)})`);
-    return "";
   }
 
   /** Name + avatar from the chain; `undefined` when the chain could not be asked. */
@@ -183,13 +119,13 @@ export function createEns(f: typeof fetch, now: () => number, opts: EnsOptions =
       const [owner, avatar] = await Promise.all([
         chain.address(name),
         // A broken avatar record must not hide the name.
-        avatarFor(chain, name).catch((e) => {
+        chain.avatar(name).catch((e) => {
           log(`ens: avatar lookup failed for ${name}: ${String(e)}`);
-          return "";
+          return null;
         }),
       ]);
       if ((owner ?? "").toLowerCase() !== address.toLowerCase()) return NONE;
-      return { name, avatar };
+      return { name, avatar: httpsUrl(avatar) };
     } catch (e) {
       log(`ens: on-chain reverse lookup failed for ${address}: ${String(e)}`);
       return undefined;
@@ -201,7 +137,7 @@ export function createEns(f: typeof fetch, now: () => number, opts: EnsOptions =
       const data = await ensdata(toChecksum(address));
       const name = String(data.ens ?? data.ens_primary ?? "").trim();
       if (name && String(data.address ?? "").toLowerCase() === address.toLowerCase()) {
-        return { name, avatar: ensdataAvatar(data) };
+        return { name, avatar: httpsUrl(data.avatar_url) || httpsUrl(data.avatar) };
       }
     } catch (e) {
       log(`ens: ensdata reverse lookup failed for ${address}: ${String(e)}`);

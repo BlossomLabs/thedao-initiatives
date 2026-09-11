@@ -911,3 +911,7 @@ input.has-warn,textarea.has-warn{border-color:rgba(240,180,41,.7)}
   .ms-f.amt,.ms-f.mth{width:100%}
   .row-head .btn{height:32px;padding:0 12px;font-size:12px}
 }
+
+/* task-list items: the checkbox glyph is the bullet, wrapped lines hang under the text */
+.md li.tl{list-style:none;padding-left:1.45em;text-indent:-1.45em}
+.md li.tl>p{display:inline}

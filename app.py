@@ -440,7 +440,11 @@ def md(text):
         lambda m: m.group(1) + ("☑" if m.group(2) in "xX" else "☐"),
         text or "")
     html = markdown.markdown(text, extensions=["tables", "sane_lists", "nl2br"])
-    return Markup(nh3.clean(html, tags=MD_TAGS, attributes=MD_ATTRS))
+    html = nh3.clean(html, tags=MD_TAGS, attributes=MD_ATTRS)
+    # the checkbox glyph is the bullet: no list dot in front of it (Griff, 2026-09-11).
+    # Added after the sanitizer so it is the only class attribute that can exist.
+    html = re.sub(r"<li>(\s*(?:<p>)?)(?=[☐☑])", r'<li class="tl">\1', html)
+    return Markup(html)
 
 
 # ------------------------------------------------------------ validation

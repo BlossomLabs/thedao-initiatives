@@ -103,7 +103,7 @@ class TestSubmitEndToEnd(Base):
         self.assertIn("<h2>Milestones (draft)</h2>", html)
         self.assertIn("A - Agreed standard - $50,000", html)
         self.assertIn("C - Adoption evidence - $75,000 (adoption milestone)", html)
-        self.assertIn("☐", html, "criteria render as checkboxes")
+        self.assertIn('<li class="tl">☐', html, "criteria render as checkboxes, glyph is the bullet")
         self.assertIn("Rules v", html)
         self.assertIn("About %s months" % data["duration_months"], html)
         self.assertNotIn(data["contact"], html)

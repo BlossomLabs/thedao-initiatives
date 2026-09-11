@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronDown, CornerDownLeft, Flag, Send, Star, Trash2, Wallet } from "lucide-react";
+import { Check, ChevronDown, CornerDownLeft, Flag, Star, Trash2, Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useSession } from "~/context/session";
 import Identity from "~/components/wallet/Identity";
@@ -12,7 +12,8 @@ import { avatarSrc } from "~/lib/avatar";
 import { cn } from "~/lib/utils";
 import VoteBox from "./VoteBox";
 import ConnectInline from "~/components/wallet/ConnectInline";
-import { nameInput, signedInAs, submitBtn } from "./styles";
+import { nameInput, signedInAs } from "./styles";
+import { FormNote, type Note, SENT_MS, SubmitButton } from "./FormFeedback";
 
 export function IdentityRow({ c }: { c: CommentEntry }) {
   const label = c.roles.includes("ADMIN") ? "TheDAO team" : c.displayName || "Anonymous";
@@ -83,34 +84,41 @@ export default function EntryCard({
   // connect button mounted until then so it can still show a refusal.
   const signedIn = Boolean(address) && !connecting;
   const [text, setText] = useState("");
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState<Note>(null);
+  const [busy, setBusy] = useState(false);
+  const [posted, setPosted] = useState(0);
   const [reported, setReported] = useState(false);
-  const [flash, setFlash] = useState("");
-  const say = (m: string) => {
-    setFlash(m);
-    setTimeout(() => setFlash(""), 6000);
+  const [flash, setFlash] = useState<Note>(null);
+  const say = (text: string, ok = false) => {
+    setFlash({ text, ok });
+    setTimeout(() => setFlash(null), 6000);
   };
 
   async function sendReply() {
     const t = text.trim();
     if (!t) {
-      setNote("Write something first.");
+      setNote({ text: "Write something first." });
       return;
     }
     if (!address && !name.trim()) {
-      setNote("Add your name, or connect a wallet.");
+      setNote({ text: "Add your name, or connect a wallet." });
       return;
     }
+    setBusy(true);
+    setNote(null);
     try {
       const status = await onReply(c.id, t, name.trim());
       setText("");
-      setReplying(false);
-      setNote("");
+      setPosted((n) => n + 1);
       if (status === "held") {
-        say("Thanks. Your reply is waiting for review and will appear once approved.");
+        say("Thanks. Your reply is waiting for review and will appear once approved.", true);
       }
+      // Let the button show its "Posted" state before the box folds away.
+      setTimeout(() => setReplying(false), SENT_MS - 200);
     } catch (e) {
-      setNote(e instanceof Error ? e.message : "Reply failed.");
+      setNote({ text: e instanceof Error ? e.message : "Reply failed." });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -241,7 +249,7 @@ export default function EntryCard({
               </span>
             )}
           </div>
-          {flash && <p className="mt-1.5 text-[13px] text-dao-red">{flash}</p>}
+          <FormNote note={flash} className="mt-1.5" />
           {replying && (
             <div className="mt-3 flex flex-col gap-2">
               <textarea
@@ -271,12 +279,12 @@ export default function EntryCard({
                       </span>
                     )
                     : <ConnectInline />}
-                  <button type="button" className={submitBtn} onClick={sendReply}>
-                    <Send className="size-3.5" />Post reply
-                  </button>
+                  <SubmitButton busy={busy} done={posted} onClick={sendReply}>
+                    Post reply
+                  </SubmitButton>
                 </span>
               </div>
-              {note && <p className="m-0 text-[13px] text-dao-red">{note}</p>}
+              <FormNote note={note} />
             </div>
           )}
         </div>

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Send, Wallet } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useSession } from "~/context/session";
 import { useIdentity } from "~/hooks/use-identity";
 import ConnectInline, { walletBtn } from "~/components/wallet/ConnectInline";
 import { cn } from "~/lib/utils";
-import { nameInput, signedInAs, submitBtn } from "./styles";
+import { nameInput, signedInAs } from "./styles";
+import { FormNote, type Note, SubmitButton } from "./FormFeedback";
 
 /** One generic comment box (the MVP dropped type/topic pickers). */
 export default function Composer(
@@ -24,8 +25,9 @@ export default function Composer(
   const [text, setText] = useState("");
   const [name, setName] = useState("");
   const [website, setWebsite] = useState("");
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState<Note>(null);
   const [busy, setBusy] = useState(false);
+  const [posted, setPosted] = useState(0);
   const signedIn = Boolean(
     session && address && session.address.toLowerCase() === address.toLowerCase(),
   );
@@ -33,7 +35,7 @@ export default function Composer(
   async function post() {
     const t = text.trim();
     if (!t) {
-      setNote("Write something first.");
+      setNote({ text: "Write something first." });
       return;
     }
     let useSession = signedIn;
@@ -42,22 +44,25 @@ export default function Composer(
         await requireSession();
         useSession = true;
       } catch {
-        setNote("Signature was cancelled. Post with just a name instead, or try signing again.");
+        setNote({
+          text: "Signature was cancelled. Post with just a name instead, or try signing again.",
+        });
         return;
       }
     }
     if (!useSession && !name.trim()) {
-      setNote("Add your name, or connect a wallet.");
+      setNote({ text: "Add your name, or connect a wallet." });
       return;
     }
     setBusy(true);
-    setNote("");
+    setNote(null);
     try {
       const msg = await onPost(t, name.trim(), website, useSession);
       setText("");
-      if (msg) setNote(msg);
+      setPosted((n) => n + 1);
+      if (msg) setNote({ text: msg, ok: true });
     } catch (e) {
-      setNote(e instanceof Error ? e.message : "Could not post.");
+      setNote({ text: e instanceof Error ? e.message : "Could not post.", ok: false });
     } finally {
       setBusy(false);
     }
@@ -125,12 +130,10 @@ export default function Composer(
               {signingIn ? "Check your wallet…" : "Sign in"}
             </button>
           )}
-          <button type="button" className={submitBtn} disabled={busy} onClick={post}>
-            <Send className="size-3.5" />Comment
-          </button>
+          <SubmitButton busy={busy} done={posted} onClick={post}>Comment</SubmitButton>
         </div>
       </div>
-      {note && <p className="m-0 mt-2 min-h-[1em] text-[13px] text-dao-red">{note}</p>}
+      <FormNote note={note} className="mt-2" />
     </div>
   );
 }

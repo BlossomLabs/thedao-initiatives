@@ -31,7 +31,7 @@ FIELDS = {
             "helper": "Nobody is pre-selected. Name co-authors and your own relationship to any team or codebase named above."},
     "hard_req": {"heading": "Hard requirements", "rows": 9,
                  "q": "What must every proposal meet or be ignored?",
-                 "helper": "Numbered. Open source under an OSI license where code is delivered, verifiable acceptance, a maintenance plan, plus what the domain demands."},
+                 "helper": "Numbered. Verifiable acceptance, a maintenance plan, plus what the domain demands. Open source is welcome, not required: state the license you expect."},
     "team": {"heading": "The team", "rows": 6, "grant_only": True,
              "q": "Who does the work? Names, roles, track record, links.",
              "helper": "Also state any other funding you have for this work, and your relationships to codebases or firms named in this initiative."},

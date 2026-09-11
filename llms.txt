@@ -77,7 +77,7 @@ Every heading, and the one question it answers:
 - **Out of scope**: what is deliberately not included? Where the expensive misunderstandings get prevented.
 - **Existing work** (RFP): what prior art should bidders build on? Links, and what would justify building on something else. Write "none" if there is nothing.
 - **Who we expect to do this** (RFP): what does a winning team look like, and who co-drafted this initiative? Nobody is pre-selected. Name the co-authors and the proposer's own relationship to any team or codebase named above.
-- **Hard requirements** (RFP): what must every proposal meet or be ignored? Numbered. Open source under an OSI license where code is delivered, acceptance a stranger can verify from public evidence, a maintenance plan, plus what the domain demands.
+- **Hard requirements** (RFP): what must every proposal meet or be ignored? Numbered. Acceptance a stranger can verify from public evidence, a maintenance plan, plus what the domain demands. Open source is welcome, not required: state the license the proposer expects, and closed source is acceptable when the problem only needs a solution.
 - **Commitments** (grant): what does the team commit to on license, maintenance after the money is spent, and pinned targets? One bullet each, and any exception stated plainly.
 - **Milestones**: see Milestone rules.
 - **Who is likely to fund this** (never published): the answer to question 3, one funder per line, in exactly this format:

@@ -53,23 +53,9 @@
       </div>
     </div>
 
-    {% for kind, p in rules_panels().items() if p %}
-    <details class="rules" data-rules="{{ kind }}" {% if kind == fkind %}open{% else %}hidden{% endif %}>
-      <summary><span>{{ p.title }}</span><span class="rules-tag">The site writes this</span></summary>
-      <div class="md">{{ p.body | md }}</div>
-      <p class="rules-ver">Rules v{{ p.version }}, shown on every initiative of this type.</p>
-    </details>
-    {% endfor %}
-
-    <div class="grp">
-      <span class="grp-k">Paste your whole draft</span>
-      <span class="grp-h">One paste, no button. The moment a draft lands in the box we split it on
-      the section headings and fill every field below. Edit anything afterwards, the fields are what
-      gets submitted.</span>
-    </div>
-
     <div id="paste-block">
-      <label class="lbl" for="f-paste">Paste your whole draft here</label>
+      <label class="lbl" for="f-paste">Paste your whole draft here
+        <span class="dim">It splits on the section headings and fills the fields below. The fields are what gets submitted.</span></label>
       <textarea id="f-paste" rows="10" spellcheck="false"
         placeholder="Paste the draft your AI wrote. Sorting starts as soon as it lands."></textarea>
       <p class="hint">Milestone headings look like <code>### Agreed standard - $50,000</code>, in order: the site
@@ -79,9 +65,6 @@
       <code>Organization | amount | link</code>. Headings inside a section become bold text: the site owns the headings.</p>
     </div>
     <p class="hint" id="sort-note"></p>
-    <p class="paste-again" id="paste-again" hidden>
-      <button type="button" class="linklike" id="btn-paste-again">Sort again from the paste box</button>
-    </p>
 
     <div class="unsorted" id="unsorted" hidden>
       <span class="eyebrow top">Unsorted text</span>
@@ -104,23 +87,18 @@
       <span class="dim">2 to 4 sentences. This is the text on the board card.</span></label>
     <textarea id="f-summary" name="summary" rows="5" maxlength="4000">{{ form.summary if form else '' }}</textarea>
 
-    <div class="two-col">
-      <div>
-        <label class="lbl" for="f-goal">Funding goal (USD) <em class="reqtag">Required</em>
-          <span class="dim">One flat number.</span></label>
-        <input type="text" id="f-goal" name="goal" class="mono" inputmode="decimal" placeholder="250,000" value="{{ form.goal if form else '' }}">
-        <span class="amt-echo" id="echo-goal"></span>
-      </div>
-      <div>
-        <label class="lbl" for="f-duration">Expected duration (months) <em class="reqtag">Required</em>
-          <span class="dim">Months from funding until the last milestone is complete.</span></label>
-        <input type="text" id="f-duration" name="duration_months" class="mono" inputmode="numeric" placeholder="12" value="{{ form.duration_months if form else '' }}">
-      </div>
-    </div>
+    <label class="lbl" for="f-goal">Funding goal (USD) <em class="reqtag">Required</em>
+      <span class="dim">One flat number.</span></label>
+    <input type="text" id="f-goal" name="goal" class="mono" inputmode="decimal" placeholder="250,000" value="{{ form.goal if form else '' }}">
+    <span class="amt-echo" id="echo-goal"></span>
+
+    <label class="lbl" for="f-duration">Expected duration (months) <em class="reqtag">Required</em>
+      <span class="dim">Months from funding until the last milestone is complete.</span></label>
+    <input type="text" id="f-duration" name="duration_months" class="mono" inputmode="numeric" placeholder="12" value="{{ form.duration_months if form else '' }}">
 
     <div id="grant-only" {% if ftype != 'grant' %}hidden{% endif %}>
       <label class="lbl" for="f-recipient">Recipient team <em class="reqtag">Required</em>
-        <span class="dim">Short name for the header and the board card, as in "Grant to Verity Labs".</span></label>
+        <span class="dim">Short name for the header and the board card, as in "Grant to the OPSEC ratings coalition".</span></label>
       <input type="text" id="f-recipient" name="recipient_team" maxlength="120" value="{{ form.recipient_team if form else '' }}">
     </div>
 
@@ -219,6 +197,14 @@
       <span class="priv">🔒 Private, never published</span>
       <span class="dim">Email or handle. We use it only to ask about this submission.</span></label>
     <input type="text" id="f-contact" name="contact" maxlength="200" value="{{ form.contact if form else '' }}">
+
+    {% for kind, p in rules_panels().items() if p %}
+    <details class="rules" data-rules="{{ kind }}" {% if kind == fkind %}open{% else %}hidden{% endif %}>
+      <summary><span>{{ p.title }}</span></summary>
+      <div class="md">{{ p.body | md }}</div>
+      <p class="rules-ver">Rules v{{ p.version }}, shown on every initiative of this type.</p>
+    </details>
+    {% endfor %}
 
     <div class="subrow">
       <button class="btn primary" type="submit" id="btn-submit">Submit for review</button>

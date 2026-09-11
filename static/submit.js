@@ -556,7 +556,7 @@
         " milestones, " + filled + " page fields" + (nonEmpty(res.unsorted) ? ", plus text nothing matched." : ".");
     }
   }
-  function sortFromPaste() { applySplit(false); $("#paste-block").hidden = true; $("#paste-again").hidden = false; }
+  function sortFromPaste() { applySplit(false); }
 
   function setType(type, topup) {
     state.type = type; state.topup = type === "grant" ? !!topup : false;
@@ -799,9 +799,6 @@
 
   /* paste, preview, submit */
   $("#f-paste").addEventListener("paste", function () { setTimeout(sortFromPaste, 0); });
-  $("#btn-paste-again").addEventListener("click", function () {
-    $("#paste-block").hidden = false; $("#paste-again").hidden = true; document.getElementById("f-paste").focus();
-  });
   $("#btn-preview").addEventListener("click", function () {
     state.previewOpen = !state.previewOpen;
     $("#preview").hidden = !state.previewOpen;

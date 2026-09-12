@@ -41,6 +41,7 @@ export function previewInitiative(d: Draft): Initiative {
     type: d.type,
     sortRank: null,
     safeAddress: "",
+    paidOutUsd: 0,
     proposer: "",
     durationMonths: parseInt(d.page.duration, 10) || null,
     recipientTeam: grant ? d.page.recipientTeam.trim() : "",
@@ -82,7 +83,14 @@ export default function PreviewPane({ draft, onBack }: { draft: Draft; onBack: (
     createdAt: 0,
   }));
   const pledged = pledges.reduce((a, p) => a + p.amountUsd, 0);
-  const summary: Summary = { pledged, donated: 0, total: pledged };
+  const summary: Summary = {
+    pledged,
+    donated: 0,
+    total: pledged,
+    live: false,
+    ledger: 0,
+    paidOut: 0,
+  };
   const pct = pctOf(pledged, r.goalUsd);
   useEffect(() => {
     globalThis.scrollTo?.({ top: 0, behavior: "smooth" });

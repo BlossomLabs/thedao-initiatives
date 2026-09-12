@@ -9,7 +9,7 @@ import { createAi } from "./services/ai.ts";
 import { createEns, onchainEns } from "./services/ens.ts";
 import { createPinata } from "./services/pinata.ts";
 import { syncAll } from "./services/safe-api.ts";
-import { createSafeSyncQueue } from "./services/sync-queue.ts";
+import { createFunding } from "./services/funding.ts";
 import { toChecksum } from "./chain/address.ts";
 import { BADGE_CONTRACT, CURATOR_ADDRESSES } from "./config.ts";
 import type { Deps } from "./middleware/context.ts";
@@ -41,23 +41,15 @@ export async function createServer() {
     config,
     fetch,
     now,
+    funding: createFunding({ db, chain, now, log }),
     ai: createAi(config, fetch),
     ens: createEns(fetch, now, { onchain: onchainEns(config.rpcEndpoints, fetch), log }),
     pinata: createPinata(config, fetch),
     log,
   };
-  // Webhook-triggered syncs run through the KV queue (see services/sync-queue.ts).
-  deps.syncQueue = createSafeSyncQueue(deps);
-  deps.syncQueue.listen().catch((e) => log(`safe sync queue stopped: ${String(e)}`));
-  if (config.alchemyWebhookSigningKey) {
-    log("alchemy webhook receiver is ON at /api/hooks/alchemy");
-    if (!config.alchemyAuthToken || !config.alchemyWebhookId) {
-      log("ALCHEMY_AUTH_TOKEN / ALCHEMY_WEBHOOK_ID not set; add new Safes to the webhook by hand");
-    }
-  }
-
-  // Donation discovery: one authenticated Safe API request per Safe, on a
-  // schedule. Page reads never call Safe.
+  // Ledger discovery (who gave what): one authenticated Safe API request per
+  // Safe, on a schedule. The headline number on the pages comes from Safe
+  // balances (services/funding.ts) and does not wait for this.
   Deno.cron("sync-donations", config.safeSyncCron, async () => {
     try {
       const n = await syncAll(deps);

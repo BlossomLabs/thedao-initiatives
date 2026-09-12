@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { streamSSE } from "hono/streaming";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { jsonBody, s } from "../lib/body.ts";
@@ -24,7 +23,7 @@ import {
 } from "../config.ts";
 import type { Rfp, Session } from "../db/types.ts";
 import { pickText } from "../db/rfps.ts";
-import { K } from "../db/keys.ts";
+import { cronIntervalMinutes } from "../services/funding.ts";
 import { assertNoErrors, mergeFindings, readBackers, readStructured } from "../lib/structured.ts";
 import { readPageFacts } from "../lib/page-facts.ts";
 import { ownsUpload } from "./uploads.ts";
@@ -37,7 +36,6 @@ import {
 } from "../../shared/draft/mod.ts";
 
 export { onrampLink };
-export const FUNDING_HEARTBEAT_MS = 25_000;
 export const decimalsOf = (sym: string): number | undefined => TOKENS[sym]?.[1];
 
 /** The text rules of an edit: title, summary, sections, milestones against
@@ -105,12 +103,13 @@ export function initiativeRoutes(deps: Deps) {
   r.get("/:slug", async (c) => {
     const user = c.var.user;
     const rfp = await visibleOr404(c.req.param("slug"), user);
-    const [summary, pledges, donations, active, revisions] = await Promise.all([
-      db.fundingSummary(rfp.id),
+    const [summary, pledges, donations, active, revisions, sync] = await Promise.all([
+      deps.funding.summary(rfp),
       db.pledges.list(rfp.id),
       db.donations.list(rfp.id),
       deps.chain.activeTokens(),
       db.revisions.list(rfp.id, Boolean(user?.isAdmin)),
+      rfp.safeAddress ? db.meta.safeSync(rfp.id) : Promise.resolve(null),
     ]);
     const mine = Boolean(user?.isAdmin) || isProposer(rfp, user);
     return c.json({
@@ -125,39 +124,15 @@ export function initiativeRoutes(deps: Deps) {
         Object.keys(active).length && rfp.safeAddress && rfp.status === "approved",
       ),
       onramp: rfp.safeAddress ? onrampLink(config, rfp.safeAddress) : { url: "", prefilled: false },
-    });
-  });
-
-  /**
-   * Live funding updates as Server-Sent Events. One `funding` event per
-   * change to the initiative's donations or pledges, carrying the version
-   * number; the first event is the current version, so a client invalidates
-   * only when a later one differs. `kv.watch` spans every isolate, so a
-   * write made by the cron or the webhook queue reaches every open page.
-   */
-  r.get("/:slug/events", async (c) => {
-    const rfp = await visibleOr404(c.req.param("slug"), c.var.user);
-    const key = K.fundingVersion(rfp.id);
-    return streamSSE(c, async (stream) => {
-      const reader = db.kv.watch<[Deno.KvU64]>([key]).getReader();
-      // Proxies drop silent connections; a comment every 25 s keeps them open.
-      const heartbeat = setInterval(() => {
-        stream.write(": ping\n\n").catch(() => {});
-      }, FUNDING_HEARTBEAT_MS);
-      stream.onAbort(() => {
-        clearInterval(heartbeat);
-        reader.cancel().catch(() => {});
-      });
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const version = value[0].value?.value ?? 0n;
-          await stream.writeSSE({ event: "funding", data: String(version), id: String(version) });
+      // Where the donations table stands: the ledger is filled by the Safe
+      // cron, so the page says when it last ran and how often it does.
+      ledger: rfp.safeAddress
+        ? {
+          checkedAt: sync?.at ?? null,
+          ok: sync?.ok ?? true,
+          intervalMinutes: cronIntervalMinutes(config.safeSyncCron),
         }
-      } finally {
-        clearInterval(heartbeat);
-      }
+        : null,
     });
   });
 

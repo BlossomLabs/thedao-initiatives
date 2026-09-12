@@ -21,6 +21,15 @@ export function dt(ts: number | null | undefined): string {
   });
 }
 
+/** "just now", "4 min ago", "3 h ago", or the date for anything older than a day. */
+export function ago(ts: number, now: number = Date.now() / 1000): string {
+  const s = Math.max(0, now - ts);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  return dt(ts);
+}
+
 export const pct = (total: number, goal: number): number =>
   goal ? Math.min(100, Math.round((1000 * total) / goal) / 10) : 0;
 

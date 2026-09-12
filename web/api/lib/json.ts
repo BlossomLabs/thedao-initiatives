@@ -29,6 +29,7 @@ export function publicRfp(r: Rfp) {
     type: r.type,
     sortRank: r.sortRank,
     safeAddress: r.safeAddress,
+    paidOutUsd: r.paidOutUsd ?? 0,
     proposer: r.proposer ?? "",
     durationMonths: r.durationMonths ?? null,
     recipientTeam: r.recipientTeam ?? "",

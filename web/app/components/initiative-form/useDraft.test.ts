@@ -116,6 +116,7 @@ describe("useDraft reducer", () => {
       type: "grant",
       sortRank: null,
       safeAddress: "",
+      paidOutUsd: 0,
       proposer: "",
       durationMonths: 9,
       recipientTeam: "Team",

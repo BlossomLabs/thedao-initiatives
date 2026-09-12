@@ -13,7 +13,6 @@
     "lint": "deno lint",
     "fmt": "deno fmt",
     "sync-content": "deno run --env-file=.env -A api/scripts/sync-content.ts",
-    "alchemy-register": "deno run --env-file=.env -A api/scripts/alchemy-register.ts",
     "login": "deno run --env-file=.env -A api/scripts/login.ts",
     "import-sqlite": "deno run --env-file=.env -A api/scripts/import-sqlite.ts"
   },

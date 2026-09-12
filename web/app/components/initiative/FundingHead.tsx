@@ -19,6 +19,11 @@ export default function FundingHead(
       <span>
         <b className="text-white">{usd(summary.donated)}</b> donated on-chain
       </span>
+      {summary.paidOut > 0 && (
+        <span>
+          <b className="text-white">{usd(summary.paidOut)}</b> already paid to the team
+        </span>
+      )}
       {!funded && (
         <span>
           <b className="text-white">{pctText(pct)}</b> of goal

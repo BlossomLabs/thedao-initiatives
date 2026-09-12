@@ -5,10 +5,11 @@ import { liveRoles } from "../services/roles.ts";
 import type { Rfp } from "../db/types.ts";
 import { SAFE_OWNER_COUNT, SAFE_THRESHOLD } from "../config.ts";
 import { onrampLink } from "../lib/onramp.ts";
+import type { FundingSummary } from "../services/funding.ts";
 
 export interface Card {
   initiative: ReturnType<typeof publicRfp>;
-  summary: { pledged: number; donated: number; total: number };
+  summary: FundingSummary;
   pct: number;
   backers: number;
   donations: number;
@@ -42,7 +43,7 @@ export function orderCards<
 
 export async function buildCard(deps: Deps, r: Rfp, tokensOk: boolean): Promise<Card> {
   const [summary, pledges, donations] = await Promise.all([
-    deps.db.fundingSummary(r.id),
+    deps.funding.summary(r),
     deps.db.pledges.list(r.id),
     deps.db.donations.list(r.id),
   ]);

@@ -1,12 +1,27 @@
 import SectionHeading from "~/components/layout/SectionHeading";
 import Identity from "~/components/wallet/Identity";
-import type { Donation } from "~/lib/api-types";
-import { dt, shortAddr, usd } from "~/lib/format";
+import type { Donation, LedgerStatus } from "~/lib/api-types";
+import { ago, dt, shortAddr, usd } from "~/lib/format";
 
-export default function DonationsTable({ donations }: { donations: Donation[] }) {
+/** When the ledger was last filled from the Safe, and how long a new transfer can take to show. */
+export function ledgerLine(l: LedgerStatus | null | undefined): string {
+  if (!l) return "";
+  const within = l.intervalMinutes
+    ? ` New transfers appear here within about ${l.intervalMinutes} minutes.`
+    : "";
+  if (l.checkedAt === null) return "Not checked yet." + within;
+  if (!l.ok) return `Last check ${ago(l.checkedAt)} failed; retrying.` + within;
+  return `Checked ${ago(l.checkedAt)}.` + within;
+}
+
+export default function DonationsTable(
+  { donations, ledger }: { donations: Donation[]; ledger?: LedgerStatus | null },
+) {
+  const line = ledgerLine(ledger);
   return (
     <>
       <SectionHeading count={donations.length}>On-chain donations</SectionHeading>
+      {line && <p className="m-0 mb-2 small dim">{line}</p>}
       {donations.length
         ? (
           <div className="tblbox">

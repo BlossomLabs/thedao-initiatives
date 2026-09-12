@@ -15,6 +15,7 @@ const base: Initiative = {
   type: "grant",
   sortRank: null,
   safeAddress: "",
+  paidOutUsd: 0,
   proposer: "",
   durationMonths: 12,
   recipientTeam: "Vyper core team",
@@ -29,7 +30,14 @@ const base: Initiative = {
   createdAt: 0,
   approvedAt: 0,
 };
-const summary: Summary = { pledged: 150_000, donated: 0, total: 150_000 };
+const summary: Summary = {
+  pledged: 150_000,
+  donated: 0,
+  total: 150_000,
+  live: false,
+  ledger: 0,
+  paidOut: 0,
+};
 
 describe("KeyFacts", () => {
   it("shows duration and a linked recipient on a grant", () => {

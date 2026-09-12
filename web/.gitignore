@@ -7,3 +7,6 @@ build
 .DS_Store
 .kv
 .kv-*
+
+# editor swap files
+*.swp

@@ -21,21 +21,16 @@ and `../deno.json` holds the tasks and imports.
   One signature per session instead of one per comment/vote/nickname. A session whose address is in
   `ADMIN_ADDRESSES` is an admin session. No password. The only cookie is the private-preview unlock
   (below).
-- **No background scanner.** Donations are discovered through the Safe Transaction Service: a
+- **"Raised" is the Safe's balance.** `services/funding.ts` reads every accepted token's `balanceOf`
+  and the ETH balance of an initiative's Safe over RPC, prices them with the Chainlink feeds, adds
+  the admin-entered `paidOutUsd`, and caches the result 15 s per Safe. The number moves as soon as a
+  transfer is mined; when the RPC read fails the ledger's confirmed total is used and the summary
+  says `live: false`. Design: `docs/balance-funding-design-2026-09-12.md`.
+- **The ledger is discovered, not scanned.** Donor rows come from the Safe Transaction Service: a
   `Deno.cron` (default every 10 min) makes one authenticated request per Safe, re-verifies each new
-  tx over RPC, and writes the result to KV. Page reads never call Safe. Set `SAFE_API_KEY`.
-- **Webhook trigger.** With `ALCHEMY_WEBHOOK_SIGNING_KEY` set, an Alchemy Address Activity webhook
-  posting to `/api/hooks/alchemy` (outside the site lock, HMAC-verified) queues that Safe's sync on
-  the KV queue about a minute after a transfer, retrying once if the indexer lags. The payload is
-  only a trigger: amounts still come from RPC / the Safe indexer. Confirming a Safe registers it
-  with the webhook when `ALCHEMY_AUTH_TOKEN` + `ALCHEMY_WEBHOOK_ID` are set;
-  `deno task
-  alchemy-register` backfills existing Safes. The cron stays as the safety net (set
-  `SAFE_SYNC_CRON` to hourly once the webhook is live).
-- **Live funding.** `GET /api/initiatives/:slug/events` streams one `funding` SSE per donation or
-  pledge write, driven by `kv.watch` on a per-initiative version counter (bumped inside the same
-  atomic write), so a credit made by the cron or the webhook queue on any isolate reaches every open
-  page. The initiative page invalidates its query on each event.
+  tx over RPC, and writes the row to KV. Nothing on the page waits for it; the initiative page shows
+  when it last ran (`ledger.checkedAt`) and the interval derived from `SAFE_SYNC_CRON`. Set
+  `SAFE_API_KEY`.
 - **Content sync is push-based.** `deno task sync-content` reads `../../content/rfps/*.md` and POSTs
   them to `/api/admin/sync-content`. Files own the words and the goal; the admin panel owns status,
   Safes and money. Run the sync after every deploy that changes content. Besides the keys in
@@ -150,6 +145,4 @@ the two never see each other's rows (changing it on a live deployment starts fro
 - `ADMIN_PRIVATE_KEY=0x… deno task login` — prints a bearer token (dev wallet whose address is in
   `ADMIN_ADDRESSES`).
 - `ADMIN_TOKEN=… deno task sync-content` — pushes the content files.
-- `ADMIN_TOKEN=… deno task alchemy-register` — adds every approved initiative's Safe to the Alchemy
-  webhook (needs `ALCHEMY_AUTH_TOKEN` and `ALCHEMY_WEBHOOK_ID`).
 - `deno task import-sqlite -- --db ../../rfps.db` — one-off import of the MVP database.

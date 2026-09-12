@@ -484,15 +484,21 @@ function EditForm({ r, onSaved }: { r: AdminInitiative; onSaved: (text: string) 
   const extrasOf = () => ({
     sortRank: r.sortRank ? String(r.sortRank) : "",
     proposer: r.proposer,
+    paidOutUsd: r.paidOutUsd ? String(r.paidOutUsd) : "",
   });
   const [extras, setExtras] = useState(extrasOf);
-  useEffect(() => setExtras(extrasOf()), [r.sortRank, r.proposer]);
+  useEffect(() => setExtras(extrasOf()), [r.sortRank, r.proposer, r.paidOutUsd]);
   const [open, setOpen] = useState<Findings | null>(null);
   const [initial] = useState(() => fromInitiative(r));
 
   async function onSubmit(payload: SubmitPayload) {
     const { website: _hp, backers: _bk, ...fields } = payload;
-    const body = { ...fields, sortRank: extras.sortRank, proposer: extras.proposer };
+    const body = {
+      ...fields,
+      sortRank: extras.sortRank,
+      proposer: extras.proposer,
+      paidOutUsd: extras.paidOutUsd,
+    };
     const res = await api<{ initiative: AdminInitiative; findings: Findings }>(
       `/api/admin/initiatives/${r.id}`,
       { method: "PATCH", json: body },
@@ -542,6 +548,19 @@ function EditForm({ r, onSaved }: { r: AdminInitiative; onSaved: (text: string) 
                   className="mono"
                   value={extras.proposer}
                   onChange={(e) => setExtras((s) => ({ ...s, proposer: e.target.value }))}
+                />
+              </Field>
+              <Field
+                label="Paid out to the team (USD)"
+                htmlFor="e-paid"
+                hint="“Raised” is the Safe's balance plus this, so a milestone payment does not lower it."
+              >
+                <Input
+                  id="e-paid"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={extras.paidOutUsd}
+                  onChange={(e) => setExtras((s) => ({ ...s, paidOutUsd: e.target.value }))}
                 />
               </Field>
             </div>

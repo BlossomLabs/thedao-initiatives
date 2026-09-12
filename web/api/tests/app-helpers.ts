@@ -7,7 +7,7 @@ import { createChain } from "../chain/mod.ts";
 import { createAi } from "../services/ai.ts";
 import { createEns } from "../services/ens.ts";
 import { createPinata } from "../services/pinata.ts";
-import { createSafeSyncQueue } from "../services/sync-queue.ts";
+import { createFunding } from "../services/funding.ts";
 import type { Deps } from "../middleware/context.ts";
 import {
   SEL_BALANCE_OF,
@@ -39,6 +39,12 @@ export interface ChainScript {
   ethUsd: number;
   brokenTokens: Set<string>;
   brokenFeeds: Set<string>;
+  /** `"SYM:0xsafe"` (lowercase address) -> raw balance. */
+  tokenBalances: Record<string, bigint>;
+  /** lowercase address -> wei. */
+  ethBalances: Record<string, bigint>;
+  /** Every RPC method called, in order. */
+  calls: string[];
 }
 
 export function scriptedRpc(script: ChainScript, now: () => number) {
@@ -52,8 +58,13 @@ export function scriptedRpc(script: ChainScript, now: () => number) {
     SIGNERS.map((a) => "0".repeat(24) + a.slice(2).toLowerCase()).join("");
   const fbSlot = keccakHex(utf8("fallback_manager.handler.address"));
   return (method: string, params: unknown[]): Promise<unknown> => {
+    script.calls.push(method);
     const p0 = params[0] as { to?: string; data?: string } | string;
     switch (method) {
+      case "eth_getBalance":
+        return Promise.resolve(
+          "0x" + (script.ethBalances[String(p0).toLowerCase()] ?? 0n).toString(16),
+        );
       case "eth_blockNumber":
         return Promise.resolve("0x" + script.head.toString(16));
       case "eth_getTransactionReceipt":
@@ -76,6 +87,10 @@ export function scriptedRpc(script: ChainScript, now: () => number) {
           if (script.brokenTokens.has(tok.sym)) throw new Error("rpc down");
           if (sel === SEL_DECIMALS) return Promise.resolve("0x" + word(tok.d));
           if (sel === SEL_SYMBOL) return Promise.resolve(abiString(tok.sym));
+          if (sel === SEL_BALANCE_OF) {
+            const holder = "0x" + data.slice(-40).toLowerCase();
+            return Promise.resolve("0x" + word(script.tokenBalances[`${tok.sym}:${holder}`] ?? 0n));
+          }
         }
         const feed = feeds.get(to.toLowerCase());
         if (feed && sel === SEL_LATEST_ROUND_DATA) {
@@ -149,6 +164,9 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     ethUsd: 2000,
     brokenTokens: new Set(),
     brokenFeeds: new Set(),
+    tokenBalances: {},
+    ethBalances: {},
+    calls: [],
   };
   const chain = createChain({ rpc: scriptedRpc(script, now), now });
   const fetchLog: FetchLog = [];
@@ -168,6 +186,7 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     config: cfg,
     fetch: f,
     now,
+    funding: createFunding({ db, chain, now }),
     ai: createAi(cfg, f),
     ens: createEns(f, now),
     pinata: createPinata(cfg, f),
@@ -177,9 +196,6 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
         host.endsWith(".invalid") ? [null, "host does not resolve"] : [["93.184.216.34"], null],
       ),
   };
-  // Zero delays so webhook-triggered syncs run as soon as a test calls
-  // `deps.syncQueue.listen()`.
-  deps.syncQueue = createSafeSyncQueue(deps, { firstMs: 0, retryMs: 0 });
   const app = createApp(deps);
   return {
     app,

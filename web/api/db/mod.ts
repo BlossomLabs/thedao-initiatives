@@ -29,7 +29,8 @@ export function createDb(kv: Deno.Kv, now: () => number = () => Date.now() / 100
     meta: metaRepo(kv, now),
     terms: termsRepo(kv, now),
     rateLimit: rateLimiter(kv, now),
-    /** pledged + donated totals for an initiative. */
+    /** Ledger-only totals (pledges + confirmed donation rows). The pages use
+     * services/funding.ts, which prices the Safe's balances instead. */
     async fundingSummary(rfpId: string) {
       const [pledged, donated] = await Promise.all([
         pledges.totalActive(rfpId),

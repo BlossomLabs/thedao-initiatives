@@ -6,6 +6,7 @@ import { useSession } from "~/context/session";
 import { boardKey } from "./use-board";
 
 export const initiativeKey = (slug: string) => ["initiative", slug] as const;
+export const PAGE_POLL_MS = 15_000;
 
 const fetchPage = (slug: string) =>
   api<InitiativePage>(`/api/initiatives/${encodeURIComponent(slug)}`);
@@ -24,6 +25,7 @@ function fromBoard(board: Board | undefined, slug: string): InitiativePage | und
     revisions: [],
     pledges: [],
     donations: [],
+    ledger: null,
   };
 }
 
@@ -43,6 +45,9 @@ export function useInitiative(slug: string) {
     queryKey: initiativeKey(slug),
     queryFn: () => fetchPage(slug),
     retry: false,
+    // "raised" is the Safe's balance, so a poll is enough to keep it live
+    // while the page is open (paused in background tabs by default).
+    refetchInterval: PAGE_POLL_MS,
     placeholderData: () => fromBoard(qc.getQueryData<Board>(boardKey), slug),
   });
 }

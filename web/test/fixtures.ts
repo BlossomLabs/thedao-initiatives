@@ -14,6 +14,7 @@ export const structuredRow = (): Initiative => ({
   type: "grant",
   sortRank: null,
   safeAddress: "",
+  paidOutUsd: 0,
   proposer: "0x1111111111111111111111111111111111111111",
   durationMonths: 12,
   recipientTeam: "Rollup Labs",

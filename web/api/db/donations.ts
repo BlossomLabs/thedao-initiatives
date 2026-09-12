@@ -45,7 +45,6 @@ export function donationsRepo(kv: Deno.Kv, now: () => number) {
       const res = await kv.atomic().check(cur)
         .set(K.donation(rfpId, tx), row)
         .set(K.donationByTx(tx, rfpId), true)
-        .sum(K.fundingVersion(rfpId), 1n)
         .commit();
       if (res.ok) return [row, status];
     }

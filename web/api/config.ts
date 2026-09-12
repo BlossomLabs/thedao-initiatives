@@ -103,11 +103,6 @@ export interface Config {
   safeSyncCron: string;
   /** Alchemy app key: an extra mainnet RPC ahead of the public fallbacks. */
   alchemyApiKey: string;
-  /** Address Activity webhook signing key; the receiver is off without it. */
-  alchemyWebhookSigningKey: string;
-  /** Notify auth token + webhook id: lets safe-confirm add the new Safe itself. */
-  alchemyAuthToken: string;
-  alchemyWebhookId: string;
   pinataJwt: string;
   pinataGateway: string;
   aiSearchApiKey: string;
@@ -167,9 +162,6 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     safeApiKey: (env.SAFE_API_KEY ?? "").trim(),
     safeSyncCron: (env.SAFE_SYNC_CRON ?? "").trim() || "*/10 * * * *",
     alchemyApiKey,
-    alchemyWebhookSigningKey: (env.ALCHEMY_WEBHOOK_SIGNING_KEY ?? "").trim(),
-    alchemyAuthToken: (env.ALCHEMY_AUTH_TOKEN ?? "").trim(),
-    alchemyWebhookId: (env.ALCHEMY_WEBHOOK_ID ?? "").trim(),
     pinataJwt: (env.PINATA_JWT ?? "").trim(),
     pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "ipfs.blossom.software",
     aiSearchApiKey: (env.AI_SEARCH_API_KEY ?? "").trim(),

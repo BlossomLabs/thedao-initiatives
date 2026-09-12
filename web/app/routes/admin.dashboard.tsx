@@ -416,7 +416,17 @@ export default function Dashboard() {
                 </td>
                 <td>{r.title}</td>
                 <td className="amt">{usd(r.goalUsd)}</td>
-                <td className="amt">{usd(summary.total)}</td>
+                <td
+                  className="amt"
+                  title={summary.live
+                    ? `Safe balance; ledger rows total ${usd(summary.ledger)}`
+                    : "Ledger total (balance read unavailable)"}
+                >
+                  {usd(summary.total)}
+                  {!summary.live && r.safeAddress
+                    ? <span className="dim ml-1">(ledger)</span>
+                    : null}
+                </td>
                 <td className="small [overflow-wrap:anywhere]">{r.contact || "–"}</td>
                 <td className="small">
                   {!r.safeAddress

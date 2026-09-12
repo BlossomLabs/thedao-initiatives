@@ -6,7 +6,7 @@ import type { Ai } from "../services/ai.ts";
 import type { Ens } from "../services/ens.ts";
 import type { Pinata } from "../services/pinata.ts";
 import type { resolvePublicIps } from "../lib/validate.ts";
-import type { SafeSyncQueue } from "../services/sync-queue.ts";
+import type { Funding } from "../services/funding.ts";
 
 export interface Deps {
   db: Db;
@@ -20,8 +20,8 @@ export interface Deps {
   log: (msg: string) => void;
   /** DNS -> public IPs check for user-supplied hosts (injectable for tests). */
   resolve?: typeof resolvePublicIps;
-  /** Event-driven Safe syncs (webhook receivers); absent = triggers are dropped. */
-  syncQueue?: SafeSyncQueue;
+  /** Live funding from Safe balances (services/funding.ts). */
+  funding: Funding;
 }
 
 export type Vars = {

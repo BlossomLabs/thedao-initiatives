@@ -21,6 +21,10 @@ export interface Rfp {
   type: RfpType;
   sortRank: number | null;
   safeAddress: string;
+  /** USD already paid out of the Safe to the team (admin-entered), so
+   * "raised" = balance + paid out does not drop after a milestone payment.
+   * Rows written before it lack the key; readers treat it as 0. */
+  paidOutUsd?: number;
   /** Page facts (submission redesign, Sep 2026). Rows written before it lack
    * them; readers treat a missing value as the default. */
   /** Whole months from funding to the last milestone; null = not stated. */

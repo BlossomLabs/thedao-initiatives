@@ -405,11 +405,15 @@ Deno.test("donate: params, confirm, status, totals", async () => {
   const st = await j(await h.req("/api/donate/status/" + tx));
   assertEquals(st.status, "confirmed");
   assertEquals(st.amount, 250);
+  // The confirmed row is in the ledger; the headline "donated" is the Safe's
+  // balance (services/funding.ts), which the scripted chain has at zero here.
   const page = await j(await h.req("/api/initiatives/" + first.slug)) as {
-    summary: { donated: number };
+    summary: { donated: number; ledger: number; live: boolean };
     donations: unknown[];
   };
-  assertEquals(page.summary.donated, 250);
+  assertEquals(page.summary.ledger, 250);
+  assertEquals(page.summary.donated, 0);
+  assert(page.summary.live);
   assertEquals(page.donations.length, 1);
   assertEquals(
     (await h.req("/api/donate/confirm", {

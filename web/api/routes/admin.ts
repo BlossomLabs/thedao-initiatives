@@ -21,7 +21,6 @@ import { safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
 import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
 import { syncSafe } from "../services/safe-api.ts";
-import { registerSafeAddresses } from "../services/alchemy.ts";
 import { liveRoles } from "../services/roles.ts";
 import type { Comment, Pledge, PledgeStatus, Rfp } from "../db/types.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
@@ -60,7 +59,7 @@ export function adminRoutes(deps: Deps) {
     for (const rfp of [...pending, ...approved, ...other]) {
       rows.push({
         initiative: adminRfp(rfp),
-        summary: await db.fundingSummary(rfp.id),
+        summary: await deps.funding.summary(rfp),
         safeSync: rfp.safeAddress ? await db.meta.safeSync(rfp.id) : null,
       });
     }
@@ -98,7 +97,7 @@ export function adminRoutes(deps: Deps) {
     return c.json({
       initiative: adminRfp(rfp),
       revisions: (await db.revisions.list(rfp.id, true)).map(revisionMeta),
-      summary: await db.fundingSummary(rfp.id),
+      summary: await deps.funding.summary(rfp),
       pledges: (await db.pledges.list(rfp.id, true)).map((p) => pledgeJson(config, p)),
       donations: (await db.donations.list(rfp.id, false)).map((d) => donationJson(d, decimalsOf)),
       safeSync: rfp.safeAddress ? await db.meta.safeSync(rfp.id) : null,
@@ -133,6 +132,15 @@ export function adminRoutes(deps: Deps) {
         }
         patch.sortRank = Math.max(1, Math.min(999, n));
       }
+    }
+    // Money already paid to the team, so "raised" (balance + paid out) never goes backwards.
+    if (body.paidOutUsd !== undefined) {
+      const raw = s(body.paidOutUsd, 20).replace(/[,$\s]/g, "");
+      const n = raw ? Number(raw) : 0;
+      if (!Number.isFinite(n) || n < 0) {
+        throw new HttpError(400, "Paid out must be a USD amount of zero or more.");
+      }
+      patch.paidOutUsd = Math.round(n * 100) / 100;
     }
     // Owner: the wallet shown publicly as "Proposed by". Address or ENS name; blank clears.
     if (body.proposer !== undefined) {
@@ -443,14 +451,7 @@ export function adminRoutes(deps: Deps) {
       }, 409);
     }
     if (!rfp.safeAddress) await db.rfps.update(rfp.id, { safeAddress: address });
-    // Push-based discovery: tell the Alchemy webhook to watch this Safe too.
-    const alchemy = await registerSafeAddresses(deps, [address]);
-    const note = alchemy === "registered"
-      ? "; registered with the Alchemy webhook"
-      : alchemy === "skipped"
-      ? ""
-      : `; Alchemy webhook registration failed (${alchemy}); add the address in the dashboard`;
-    return c.json({ status: "ok", address, detail: detail + note, alchemy });
+    return c.json({ status: "ok", address, detail });
   });
 
   /** The patch a moderation action makes on a comment, or a 400/409. */

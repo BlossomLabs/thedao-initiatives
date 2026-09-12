@@ -67,12 +67,7 @@ export function createSiteLock(
 
   async function check(req: Request): Promise<LockVerdict> {
     if (!enabled) return "open";
-    const path = new URL(req.url).pathname;
-    // Health checks and inbound webhooks cannot carry our credentials; the
-    // hook routes authenticate their callers themselves.
-    if (req.method === "OPTIONS" || path === "/healthz" || path.startsWith("/api/hooks/")) {
-      return "open";
-    }
+    if (req.method === "OPTIONS" || new URL(req.url).pathname === "/healthz") return "open";
     const h = req.headers.get("authorization") ?? "";
     const basic = /^Basic\s+(.+)$/i.exec(h);
     if (basic) {

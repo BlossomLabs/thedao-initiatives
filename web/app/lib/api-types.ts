@@ -17,6 +17,7 @@ export interface Initiative {
   type: InitiativeType;
   sortRank: number | null;
   safeAddress: string;
+  paidOutUsd: number;
   /** Wallet that submitted it ("" for imported initiatives). */
   proposer: string;
   /** Whole months from funding to the last milestone; null = not stated. */
@@ -79,8 +80,22 @@ export interface AdminInitiative extends Initiative {
 
 export interface Summary {
   pledged: number;
+  /** Safe balance value + paid out when `live`; the ledger's confirmed total otherwise. */
   donated: number;
   total: number;
+  live: boolean;
+  /** Confirmed donation rows, for reconciliation. */
+  ledger: number;
+  paidOut: number;
+}
+
+/** Where the donations ledger stands (initiatives with a Safe). */
+export interface LedgerStatus {
+  /** Unix seconds of the last Safe sync run, null before the first. */
+  checkedAt: number | null;
+  ok: boolean;
+  /** Minutes between runs, null when the cron shape is unusual. */
+  intervalMinutes: number | null;
 }
 
 export interface Onramp {
@@ -178,6 +193,7 @@ export interface InitiativePage {
   funded: boolean;
   donationsEnabled: boolean;
   onramp: Onramp;
+  ledger: LedgerStatus | null;
 }
 
 export type DonateParams =

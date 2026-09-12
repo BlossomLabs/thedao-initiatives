@@ -54,8 +54,10 @@ Deno.test("admin flag follows ADMIN_ADDRESSES after sign-in, without a new sessi
   const token = await h.mint(PLAIN, false);
   const before = await h.req("/api/admin/dashboard", { token });
   assertEquals(before.status, 403);
-  // ...becomes admin as soon as the address is in the config's list
+  // ...becomes admin once the address is in the config's list (the admin
+  // set is a snapshot refreshed every few seconds; an env change is a restart anyway)
   h.deps.config.adminAddresses.push(PLAIN);
+  h.clock.now += 10;
   const after = await h.req("/api/admin/dashboard", { token });
   assertEquals(after.status, 200);
   const me = await (await h.req("/api/auth/me", { token })).json() as { isAdmin: boolean };

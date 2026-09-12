@@ -13,6 +13,7 @@ import { createFunding } from "./services/funding.ts";
 import { toChecksum } from "./chain/address.ts";
 import { BADGE_CONTRACT, CURATOR_ADDRESSES } from "./config.ts";
 import type { Deps } from "./middleware/context.ts";
+import { createAdmins } from "./services/admins.ts";
 
 export async function createServer() {
   const config = loadConfig(Deno.env.toObject());
@@ -43,6 +44,7 @@ export async function createServer() {
     now,
     funding: createFunding({ db, chain, now, log }),
     ai: createAi(config, fetch),
+    admins: createAdmins(db, config, now),
     ens: createEns(fetch, now, { onchain: onchainEns(config.rpcEndpoints, fetch), log }),
     pinata: createPinata(config, fetch),
     log,

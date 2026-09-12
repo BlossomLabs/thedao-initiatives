@@ -65,7 +65,8 @@ export function commentRoutes(deps: Deps) {
       eligible = user.isAdmin || await voteEligible(deps, user.address, rfp.id);
       viewerRoles = await rolesFor(user.address, rfp.id, user.isAdmin);
     }
-    const live = (row: Comment) => liveRoles(deps.config, row.address, rfp);
+    const admins = await deps.admins.set();
+    const live = (row: Comment) => liveRoles(admins, row.address, rfp);
     const replies = new Map<string, CommentJson[]>();
     const entries: Comment[] = [];
     for (const row of rows) {
@@ -153,7 +154,7 @@ export function commentRoutes(deps: Deps) {
       id: cm.id,
       claimToken: status === "held" ? cm.claimToken : "",
       entry: status === "published"
-        ? commentJson(cm, liveRoles(deps.config, address, rfp), startVote ? { [cm.id]: 1 } : {}, [])
+        ? commentJson(cm, liveRoles(await deps.admins.set(), address, rfp), startVote ? { [cm.id]: 1 } : {}, [])
         : null,
     });
   });
@@ -283,7 +284,10 @@ export function commentRoutes(deps: Deps) {
       ok: true,
       status,
       reply: status === "published"
-        ? commentJson(reply, liveRoles(deps.config, address, await db.rfps.get(parent.rfpId)))
+        ? commentJson(
+          reply,
+          liveRoles(await deps.admins.set(), address, await db.rfps.get(parent.rfpId)),
+        )
         : null,
       claimToken: status === "held" ? reply.claimToken : "",
       answered,

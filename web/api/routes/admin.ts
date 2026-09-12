@@ -22,6 +22,7 @@ import { isAddress, toChecksum } from "../chain/address.ts";
 import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
 import { syncSafe } from "../services/safe-api.ts";
 import { liveRoles } from "../services/roles.ts";
+import type { AdminEntry } from "../services/admins.ts";
 import type { Comment, Pledge, PledgeStatus, Rfp } from "../db/types.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
 
@@ -42,9 +43,10 @@ export function adminRoutes(deps: Deps) {
   };
   const withInitiative = async (rows: Comment[]) => {
     const out = [];
+    const admins = await deps.admins.set();
     for (const cm of rows) {
       const rfp = await db.rfps.get(cm.rfpId);
-      out.push(adminCommentJson(cm, liveRoles(config, cm.address, rfp), rfp));
+      out.push(adminCommentJson(cm, liveRoles(admins, cm.address, rfp), rfp));
     }
     return out;
   };
@@ -89,6 +91,18 @@ export function adminRoutes(deps: Deps) {
         threshold: SAFE_THRESHOLD,
       },
     });
+  });
+
+  // The admin list. ADMIN_ADDRESSES entries are fixed; the rest live in KV.
+  const adminsJson = (admins: AdminEntry[], c: Context<Vars>) =>
+    c.json({ admins, you: c.var.user!.address });
+  r.get("/admins", async (c) => adminsJson(await deps.admins.list(), c));
+  r.post("/admins", async (c) => {
+    const body = await jsonBody(c);
+    return adminsJson(await deps.admins.add(s(body.address, 60)), c);
+  });
+  r.delete("/admins/:address", async (c) => {
+    return adminsJson(await deps.admins.remove(c.req.param("address"), c.var.user!.address), c);
   });
 
   r.get("/initiatives/:id", async (c) => {
@@ -512,7 +526,9 @@ export function adminRoutes(deps: Deps) {
     if (!row) throw new HttpError(404, "not found");
     const next = await db.comments.set(row.id, await commentPatch(row, c.req.param("action")));
     const rfp = await db.rfps.get(row.rfpId);
-    return c.json({ comment: adminCommentJson(next!, liveRoles(config, next!.address, rfp), rfp) });
+    return c.json({
+      comment: adminCommentJson(next!, liveRoles(await deps.admins.set(), next!.address, rfp), rfp),
+    });
   });
 
   /**

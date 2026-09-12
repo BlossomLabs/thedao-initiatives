@@ -6,7 +6,6 @@ import { HttpError } from "../lib/errors.ts";
 import { verifySiwe } from "../chain/siwe.ts";
 import { selfOrigin } from "../lib/origin.ts";
 import { MAX_CONTRACT_SIGNATURE_BYTES } from "../chain/sign.ts";
-import { isAdminAddress } from "../services/roles.ts";
 import { pfpUrl } from "../lib/json.ts";
 import {
   CHAIN_ID,
@@ -60,7 +59,7 @@ export function authRoutes(deps: Deps) {
     if (!(await db.sessions.consumeNonce(m.nonce))) {
       throw new HttpError(401, "nonce invalid or already used");
     }
-    const isAdmin = isAdminAddress(config, m.address);
+    const isAdmin = await deps.admins.isAdmin(m.address);
     const { token, session } = await db.sessions.create(m.address, isAdmin);
     return c.json({
       token,

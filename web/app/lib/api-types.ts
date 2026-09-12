@@ -336,3 +336,10 @@ export interface SafeConfirmResult {
   address?: string;
   detail: string;
 }
+
+/** GET/POST/DELETE /api/admin/admins */
+export interface AdminList {
+  admins: { address: string; fixed: boolean }[];
+  /** The caller's own address (it cannot remove itself). */
+  you: string;
+}

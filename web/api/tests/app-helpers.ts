@@ -19,6 +19,7 @@ import {
 } from "../chain/abi.ts";
 import { keccakHex, utf8 } from "../chain/keccak.ts";
 import { chainlinkRound, SIGNERS, word } from "./helpers.ts";
+import { createAdmins } from "../services/admins.ts";
 
 export const ORIGIN = "http://localhost:5173";
 export const CURATOR = config.CURATOR_ADDRESSES[0];
@@ -188,6 +189,7 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     now,
     funding: createFunding({ db, chain, now }),
     ai: createAi(cfg, f),
+    admins: createAdmins(db, cfg, now),
     ens: createEns(f, now),
     pinata: createPinata(cfg, f),
     log: () => {},

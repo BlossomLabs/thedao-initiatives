@@ -73,10 +73,11 @@ export function boardRoutes(deps: Deps) {
       await Promise.all(rfps.map((x) => buildCard(deps, x, tokensOk))),
     );
     const byId = new Map(rfps.map((x) => [x.id, x]));
+    const admins = await deps.admins.set();
     const community = (await db.comments.frontPage())
       .filter((cm) => byId.has(cm.rfpId)).slice(0, 3)
       .map((cm) => ({
-        ...commentJson(cm, liveRoles(config, cm.address, byId.get(cm.rfpId))),
+        ...commentJson(cm, liveRoles(admins, cm.address, byId.get(cm.rfpId))),
         initiative: { slug: byId.get(cm.rfpId)!.slug, title: byId.get(cm.rfpId)!.title },
       }));
     return c.json({

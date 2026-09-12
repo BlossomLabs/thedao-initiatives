@@ -1,8 +1,8 @@
 /** Role tags and vote eligibility for the community Q&A. */
 import { CURATOR_ADDRESSES, MIN_VOTE_DONATION_USD } from "../config.ts";
-import type { Config } from "../config.ts";
 import type { Db } from "../db/mod.ts";
 import type { Chain } from "../chain/mod.ts";
+import type { Admins } from "./admins.ts";
 
 export const ROLE_FAST_LANE = new Set(["ADMIN", "PROPOSER", "CURATOR", "EXPERT"]);
 
@@ -11,13 +11,13 @@ export const ROLE_FAST_LANE = new Set(["ADMIN", "PROPOSER", "CURATOR", "EXPERT"]
 export const LIVE_ROLES = new Set(["ADMIN", "PROPOSER"]);
 
 export function liveRoles(
-  config: Config,
+  admins: Set<string>,
   address: string,
   rfp: { proposer: string } | null | undefined,
 ): string[] {
   const roles: string[] = [];
   if (!address) return roles;
-  if (isAdminAddress(config, address)) roles.push("ADMIN");
+  if (admins.has(address.toLowerCase())) roles.push("ADMIN");
   if (rfp?.proposer && rfp.proposer.toLowerCase() === address.toLowerCase()) {
     roles.push("PROPOSER");
   }
@@ -26,11 +26,6 @@ export function liveRoles(
 
 /** The roles worth snapshotting on a comment (everything but the live ones). */
 export const storedRoles = (roles: string[]) => roles.filter((r) => !LIVE_ROLES.has(r));
-
-export function isAdminAddress(config: Config, address: string): boolean {
-  const low = address.toLowerCase();
-  return config.adminAddresses.some((a) => a.toLowerCase() === low);
-}
 
 export function isCurator(address: string): boolean {
   const low = address.toLowerCase();
@@ -45,13 +40,13 @@ async function isProposer(db: Db, address: string, rfpId: string): Promise<boole
 
 /** Role tags for an address on THIS initiative, snapshot at post time. */
 export async function commentRoles(
-  deps: { db: Db; chain: Chain; config: Config },
+  deps: { db: Db; chain: Chain; admins: Admins },
   address: string,
   rfpId: string,
 ): Promise<string[]> {
   const roles: string[] = [];
   if (!address) return roles;
-  if (isAdminAddress(deps.config, address)) roles.push("ADMIN");
+  if (await deps.admins.isAdmin(address)) roles.push("ADMIN");
   if (await isProposer(deps.db, address, rfpId)) roles.push("PROPOSER");
   if (isCurator(address)) roles.push("CURATOR");
   if (await deps.chain.hasBadge(address)) roles.push("EXPERT");
@@ -61,12 +56,12 @@ export async function commentRoles(
 
 /** A role, or $20+ confirmed donations to this same initiative. */
 export async function voteEligible(
-  deps: { db: Db; chain: Chain; config: Config },
+  deps: { db: Db; chain: Chain; admins: Admins },
   address: string,
   rfpId: string,
 ): Promise<boolean> {
   if (!address) return false;
-  if (isAdminAddress(deps.config, address) || isCurator(address)) return true;
+  if ((await deps.admins.isAdmin(address)) || isCurator(address)) return true;
   if (await isProposer(deps.db, address, rfpId)) return true;
   if (await deps.chain.hasBadge(address)) return true;
   return (await deps.db.donations.totalFor(rfpId, address)) >= MIN_VOTE_DONATION_USD;

@@ -7,6 +7,7 @@ import type { Ens } from "../services/ens.ts";
 import type { Pinata } from "../services/pinata.ts";
 import type { resolvePublicIps } from "../lib/validate.ts";
 import type { Funding } from "../services/funding.ts";
+import type { Admins } from "../services/admins.ts";
 
 export interface Deps {
   db: Db;
@@ -22,6 +23,8 @@ export interface Deps {
   resolve?: typeof resolvePublicIps;
   /** Live funding from Safe balances (services/funding.ts). */
   funding: Funding;
+  /** The admin list: ADMIN_ADDRESSES plus dashboard additions (services/admins.ts). */
+  admins: Admins;
 }
 
 export type Vars = {

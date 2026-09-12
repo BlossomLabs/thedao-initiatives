@@ -204,20 +204,58 @@ export function adminRoutes(deps: Deps) {
     return c.json({ revision: revisionMeta(rev) });
   });
 
-  r.post("/initiatives/:id/status", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
-    const action = s((await jsonBody(c)).action, 20);
-    const map: Record<string, Rfp["status"]> = {
-      approve: "approved",
-      reject: "rejected",
-      archive: "archived",
-      unarchive: "approved",
-    };
-    const status = map[action];
+  /** `{ ids: string[], action }` for a bulk route: 1 to 100 distinct ids, a known action. */
+  function readBulk(
+    body: Record<string, unknown>,
+    allowed: Record<string, unknown>,
+  ): { ids: string[]; action: string } {
+    const action = s(body.action, 20);
+    if (!(action in allowed)) throw new HttpError(400, "bad action");
+    const raw = Array.isArray(body.ids) ? body.ids : [];
+    const ids = [...new Set(raw.map((v) => s(v, 40)).filter(Boolean))];
+    if (!ids.length) throw new HttpError(400, "Select at least one row.");
+    if (ids.length > 100) throw new HttpError(400, "At most 100 rows at once.");
+    return { ids, action };
+  }
+
+  const STATUS_ACTIONS: Record<string, Rfp["status"]> = {
+    approve: "approved",
+    reject: "rejected",
+    archive: "archived",
+    unarchive: "approved",
+  };
+  async function applyStatus(rfp: Rfp, action: string): Promise<Rfp> {
+    const status = STATUS_ACTIONS[action];
     if (!status) throw new HttpError(400, "bad action");
     const patch: Partial<Rfp> = { status };
     if (status === "approved" && !rfp.approvedAt) patch.approvedAt = deps.now();
-    return c.json({ initiative: adminRfp(await db.rfps.update(rfp.id, patch)) });
+    return await db.rfps.update(rfp.id, patch);
+  }
+
+  r.post("/initiatives/:id/status", async (c) => {
+    const rfp = await rfpOr404(c.req.param("id"));
+    const action = s((await jsonBody(c)).action, 20);
+    return c.json({ initiative: adminRfp(await applyStatus(rfp, action)) });
+  });
+
+  /** The same status change on many initiatives at once. Each id is applied
+   * on its own; the response lists what failed so the rest still lands. */
+  r.post("/initiatives/bulk", async (c) => {
+    const body = await jsonBody(c);
+    const { ids, action } = readBulk(body, STATUS_ACTIONS);
+    const failed: { id: string; error: string }[] = [];
+    let done = 0;
+    for (const id of ids) {
+      try {
+        const rfp = await db.rfps.get(id);
+        if (!rfp) throw new HttpError(404, "not found");
+        await applyStatus(rfp, action);
+        done++;
+      } catch (e) {
+        failed.push({ id, error: e instanceof Error ? e.message : "failed" });
+      }
+    }
+    return c.json({ done, failed });
   });
 
   /** Add a pledge. JSON, or multipart with an optional `logo` image (pinned to IPFS). */
@@ -371,25 +409,20 @@ export function adminRoutes(deps: Deps) {
     return c.json({ status: "ok", address, detail });
   });
 
-  r.post("/comments/:id/:action", async (c) => {
-    const row = await db.comments.get(c.req.param("id"));
-    if (!row) throw new HttpError(404, "not found");
-    const action = c.req.param("action");
+  /** The patch a moderation action makes on a comment, or a 400/409. */
+  async function commentPatch(row: Comment, action: string): Promise<Partial<Comment>> {
     if (
       ["accept", "review", "feature", "feature-front"].includes(action) &&
       (row.parentId || row.status !== "published")
     ) {
       throw new HttpError(400, "only a published top-level entry");
     }
-    let patch: Partial<Comment> | null = null;
-    if (action === "publish") patch = { status: "published" };
-    else if (action === "discard") patch = { status: "discarded" };
-    else if (action === "accept" && row.type === "suggestion") {
-      patch = { accepted: true, reviewed: true };
-    } else if (action === "review" && row.type === "suggestion") {
-      patch = { reviewed: true };
-    } else if (action === "feature") patch = { featured: 1, featuredAt: deps.now() };
-    else if (action === "feature-front") {
+    if (action === "publish") return { status: "published" };
+    if (action === "discard") return { status: "discarded" };
+    if (action === "accept" && row.type === "suggestion") return { accepted: true, reviewed: true };
+    if (action === "review" && row.type === "suggestion") return { reviewed: true };
+    if (action === "feature") return { featured: 1, featuredAt: deps.now() };
+    if (action === "feature-front") {
       // Max 3 on the front page, never automatic: the 4th toggle is refused.
       if (row.featured !== 2 && (await db.comments.frontPage()).length >= 3) {
         throw new HttpError(
@@ -397,11 +430,42 @@ export function adminRoutes(deps: Deps) {
           "The front page already has 3 featured entries. Unfeature one first.",
         );
       }
-      patch = { featured: 2, featuredAt: deps.now() };
-    } else if (action === "unfeature") patch = { featured: 0, featuredAt: 0 };
-    else if (action === "unreport") patch = { reports: 0 };
-    if (!patch) throw new HttpError(400, "bad action");
-    const next = await db.comments.set(row.id, patch);
+      return { featured: 2, featuredAt: deps.now() };
+    }
+    if (action === "unfeature") return { featured: 0, featuredAt: 0 };
+    if (action === "unreport") return { reports: 0 };
+    throw new HttpError(400, "bad action");
+  }
+
+  /** Bulk-safe moderation actions: the ones with no per-row precondition. */
+  const BULK_COMMENT_ACTIONS: Record<string, true> = {
+    publish: true,
+    discard: true,
+    unreport: true,
+  };
+
+  r.post("/comments/bulk", async (c) => {
+    const body = await jsonBody(c);
+    const { ids, action } = readBulk(body, BULK_COMMENT_ACTIONS);
+    const failed: { id: string; error: string }[] = [];
+    let done = 0;
+    for (const id of ids) {
+      try {
+        const row = await db.comments.get(id);
+        if (!row) throw new HttpError(404, "not found");
+        await db.comments.set(row.id, await commentPatch(row, action));
+        done++;
+      } catch (e) {
+        failed.push({ id, error: e instanceof Error ? e.message : "failed" });
+      }
+    }
+    return c.json({ done, failed });
+  });
+
+  r.post("/comments/:id/:action", async (c) => {
+    const row = await db.comments.get(c.req.param("id"));
+    if (!row) throw new HttpError(404, "not found");
+    const next = await db.comments.set(row.id, await commentPatch(row, c.req.param("action")));
     const rfp = await db.rfps.get(row.rfpId);
     return c.json({ comment: adminCommentJson(next!, liveRoles(config, next!.address, rfp), rfp) });
   });

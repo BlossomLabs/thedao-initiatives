@@ -436,3 +436,79 @@ Deno.test("admin PATCH: findings without blocking, details XOR sections, type sw
   assertEquals(asRfp.revision, 2);
   h.close();
 });
+
+Deno.test("bulk admin actions: initiatives and comments, per-id failures reported", async () => {
+  const h = await harness();
+  const admin = await h.mint(ADMIN, true);
+  const a = await h.db.rfps.insert({ title: "Bulk one here", status: "pending" });
+  const b = await h.db.rfps.insert({ title: "Bulk two here", status: "pending" });
+  const res = await j(
+    await h.req("/api/admin/initiatives/bulk", {
+      method: "POST",
+      token: admin,
+      json: { ids: [a.id, b.id, "nope", a.id], action: "approve" },
+    }),
+  ) as { done: number; failed: { id: string; error: string }[] };
+  assertEquals(res.done, 2);
+  assertEquals(res.failed, [{ id: "nope", error: "not found" }]);
+  assertEquals((await h.db.rfps.get(a.id))!.status, "approved");
+  assert((await h.db.rfps.get(b.id))!.approvedAt);
+  const arch = await j(
+    await h.req("/api/admin/initiatives/bulk", {
+      method: "POST",
+      token: admin,
+      json: { ids: [a.id, b.id], action: "archive" },
+    }),
+  ) as { done: number };
+  assertEquals(arch.done, 2);
+  assertEquals((await h.db.rfps.get(b.id))!.status, "archived");
+  for (const json of [{ ids: [a.id], action: "delete" }, { ids: [], action: "approve" }]) {
+    assertEquals(
+      (await h.req("/api/admin/initiatives/bulk", { method: "POST", token: admin, json })).status,
+      400,
+    );
+  }
+  assertEquals(
+    (await h.req("/api/admin/initiatives/bulk", {
+      method: "POST",
+      json: { ids: [a.id], action: "approve" },
+    })).status,
+    401,
+  );
+
+  // comments: publish two held ones at once, "feature" is not a bulk action
+  const heldQ = (body: string) => ({
+    rfpId: a.id,
+    parentId: null,
+    type: "question" as const,
+    topic: "",
+    body,
+    displayName: "Someone",
+    email: "",
+    address: "",
+    roles: [],
+    status: "held" as const,
+    aiSummary: "",
+  });
+  const c1 = await h.db.comments.create(heldQ("One held"));
+  const c2 = await h.db.comments.create(heldQ("Two held"));
+  const pub = await j(
+    await h.req("/api/admin/comments/bulk", {
+      method: "POST",
+      token: admin,
+      json: { ids: [c1.id, c2.id, "missing"], action: "publish" },
+    }),
+  ) as { done: number; failed: { id: string }[] };
+  assertEquals(pub.done, 2);
+  assertEquals(pub.failed.map((f) => f.id), ["missing"]);
+  assertEquals((await h.db.comments.get(c1.id))!.status, "published");
+  assertEquals(
+    (await h.req("/api/admin/comments/bulk", {
+      method: "POST",
+      token: admin,
+      json: { ids: [c1.id], action: "feature" },
+    })).status,
+    400,
+  );
+  h.close();
+});

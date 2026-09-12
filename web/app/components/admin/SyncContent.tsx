@@ -71,6 +71,9 @@ export default function SyncContent() {
       const summary = `${r.created} created, ${r.updated} updated` +
         (r.backers ? `, ${r.backers} pledge${r.backers === 1 ? "" : "s"} from files` : "") +
         (logos.length ? `, ${logos.length} logo${logos.length === 1 ? "" : "s"}` : "");
+      // A file naming a logo that is not pinned: the pick did not carry the
+      // image, so say where it lives rather than only relaying the server.
+      const logoMissing = !logos.length && r.errors.some((e) => e.includes("is not uploaded yet"));
       setMsg(
         r.errors.length
           ? {
@@ -81,6 +84,14 @@ export default function SyncContent() {
                 <ul className="m-0 mt-1 pl-5">
                   {r.errors.map((e) => <li key={e}>{e}</li>)}
                 </ul>
+                {logoMissing && (
+                  <p className="m-0 mt-2">
+                    No logo files were in this pick. Choose the whole{" "}
+                    <span className="mono">content</span> folder, or its{" "}
+                    <span className="mono">logos</span>{" "}
+                    folder on its own, then sync the files again: pinned logos stay.
+                  </p>
+                )}
               </>
             ),
           }

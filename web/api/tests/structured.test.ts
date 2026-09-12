@@ -655,3 +655,72 @@ Deno.test("content logos: pinned once by name, mapped onto the pledge by the syn
   assertStringIncludes(missing.errors[0], "logo nope.png is not uploaded yet");
   h.close();
 });
+
+Deno.test("pledge edit: PATCH takes the same fields as adding, including a new logo", async () => {
+  const h = await harness({
+    env: { PINATA_JWT: "jwt-test" },
+    fetch: (url) =>
+      url.startsWith("https://uploads.pinata.cloud/")
+        ? new Response(JSON.stringify({ data: { cid: "bafy" + "edit".repeat(10) } }), {
+          headers: { "Content-Type": "application/json" },
+        })
+        : new Response("not mocked", { status: 500 }),
+  });
+  const admin = await h.mint(ADMIN, true);
+  const rfp = await h.db.rfps.insert({ title: "Pledge edit here", status: "approved" });
+  const base = `/api/admin/initiatives/${rfp.slug}/pledges`;
+  const created = await j(
+    await h.req(base, { method: "POST", token: admin, json: { company: "Acme", amount: "1000" } }),
+  ) as { pledge: { id: string } };
+  const pid = created.pledge.id;
+  const edited = await j(
+    await h.req(`${base}/${pid}`, {
+      method: "PATCH",
+      token: admin,
+      json: { company: "Acme Security", amount: "2,500", url: "https://acme.example/", note: "n" },
+    }),
+  ) as {
+    pledge: { company: string; amountUsd: number; url: string; note: string; status: string };
+  };
+  assertEquals(edited.pledge.company, "Acme Security");
+  assertEquals(edited.pledge.amountUsd, 2500);
+  assertEquals(edited.pledge.url, "https://acme.example/");
+  assertEquals(edited.pledge.status, "pledged");
+  // status alone still works, and a javascript: link is dropped
+  await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { status: "received" } });
+  const bad = await j(
+    await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { url: "javascript:x" } }),
+  ) as { pledge: { url: string; status: string } };
+  assertEquals(bad.pledge.url, "");
+  assertEquals(bad.pledge.status, "received");
+  // multipart with a logo re-pins and keeps the other fields
+  const form = new FormData();
+  form.set("note", "with logo");
+  form.set(
+    "image",
+    new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]) as BlobPart]),
+  );
+  form.set(
+    "logo",
+    new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]) as BlobPart], {
+      type: "image/png",
+    }),
+    "l.png",
+  );
+  const withLogo = await j(
+    await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, body: form }),
+  ) as { pledge: { company: string; note: string; logoUrl: string } };
+  assertEquals(withLogo.pledge.company, "Acme Security");
+  assertEquals(withLogo.pledge.note, "with logo");
+  assertStringIncludes(withLogo.pledge.logoUrl, "bafyedit");
+  assertEquals(
+    (await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { amount: "-1" } }))
+      .status,
+    400,
+  );
+  assertEquals(
+    (await h.req(`${base}/nope`, { method: "PATCH", token: admin, json: { note: "x" } })).status,
+    404,
+  );
+  h.close();
+});

@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { jsonBody, s } from "../lib/body.ts";
@@ -22,7 +22,7 @@ import { isAddress, toChecksum } from "../chain/address.ts";
 import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
 import { syncSafe } from "../services/safe-api.ts";
 import { liveRoles } from "../services/roles.ts";
-import type { Comment, PledgeStatus, Rfp } from "../db/types.ts";
+import type { Comment, Pledge, PledgeStatus, Rfp } from "../db/types.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
 
 const TEXT_KEYS = ["title", "summary", "details", "sections", "milestones", "links"];
@@ -266,20 +266,21 @@ export function adminRoutes(deps: Deps) {
     return c.json({ done, failed });
   });
 
-  /** Add a pledge. JSON, or multipart with an optional `logo` image (pinned to IPFS). */
-  r.post("/initiatives/:id/pledges", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+  /**
+   * The pledge fields of a request: JSON, or multipart with an optional
+   * `logo` image (pinned to IPFS). Only the keys sent come back, so the same
+   * reader serves adding (everything required) and editing (a subset).
+   */
+  async function readPledge(c: Context<Vars>, rfp: Rfp) {
     const ct = c.req.header("content-type") ?? "";
     let fields: Record<string, unknown> = {};
-    let logoCid = "";
+    let logoCid: string | undefined;
     if (ct.startsWith("multipart/form-data")) {
       const form = await c.req.formData();
       for (const [k, v] of form.entries()) if (typeof v === "string") fields[k] = v;
       const logo = form.get("logo");
       if (logo instanceof File && logo.size) {
-        if (logo.size > LOGO_MAX_BYTES) {
-          throw new HttpError(400, "Logo must be under 1 MB.");
-        }
+        if (logo.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
         const [cid, err] = await deps.pinata.uploadImage(
           new Uint8Array(await logo.arrayBuffer()),
           LOGO_MAX_BYTES,
@@ -289,35 +290,62 @@ export function adminRoutes(deps: Deps) {
         logoCid = cid;
       }
     } else fields = await jsonBody(c);
-    const company = s(fields.company, 120);
-    if (!company) throw new HttpError(400, "Company name is required.");
-    const [amount, err] = parseGoal(fields.amountUsd ?? fields.amount);
-    if (err) throw new HttpError(400, err);
-    const status: PledgeStatus = fields.status === "received" ? "received" : "pledged";
-    let url = s(fields.url, 300);
-    if (url && !/^https?:\/\//i.test(url)) url = ""; // reject javascript:/data: and other schemes
-    if (!logoCid && typeof fields.logoCid === "string") logoCid = s(fields.logoCid, 100);
+    if (logoCid === undefined && typeof fields.logoCid === "string") {
+      logoCid = s(fields.logoCid, 100);
+    }
+    const patch: Partial<Pick<Pledge, "company" | "amountUsd" | "url" | "note" | "logoCid">> = {};
+    if (fields.company !== undefined) {
+      patch.company = s(fields.company, 120);
+      if (!patch.company) throw new HttpError(400, "Company name is required.");
+    }
+    const rawAmount = fields.amountUsd ?? fields.amount;
+    if (rawAmount !== undefined && rawAmount !== "") {
+      const [amount, err] = parseGoal(rawAmount);
+      if (err) throw new HttpError(400, err);
+      patch.amountUsd = amount!;
+    }
+    if (fields.url !== undefined) {
+      const url = s(fields.url, 300);
+      patch.url = /^https?:\/\//i.test(url) ? url : ""; // reject javascript:/data: and other schemes
+    }
+    if (fields.note !== undefined) patch.note = s(fields.note, 300);
+    if (logoCid !== undefined) patch.logoCid = logoCid;
+    const status = typeof fields.status === "string" ? s(fields.status, 20) : undefined;
+    return { patch, status };
+  }
+
+  r.post("/initiatives/:id/pledges", async (c) => {
+    const rfp = await rfpOr404(c.req.param("id"));
+    const { patch, status } = await readPledge(c, rfp);
+    if (!patch.company) throw new HttpError(400, "Company name is required.");
+    if (patch.amountUsd === undefined) throw new HttpError(400, "Amount is required.");
     const p = await db.pledges.add(rfp.id, {
-      company,
-      amountUsd: amount!,
-      status,
-      note: s(fields.note, 300),
-      url,
-      logoCid,
+      company: patch.company,
+      amountUsd: patch.amountUsd,
+      status: status === "received" ? "received" : "pledged",
+      note: patch.note ?? "",
+      url: patch.url ?? "",
+      logoCid: patch.logoCid ?? "",
     });
     return c.json({ pledge: pledgeJson(config, p) }, 201);
   });
 
+  /** Edit a pledge: any of company, amount, url, note, logo (same body as adding), and status. */
   r.patch("/initiatives/:id/pledges/:pid", async (c) => {
     const rfp = await rfpOr404(c.req.param("id"));
-    const status = s((await jsonBody(c)).status, 20);
-    if (!["pledged", "received", "withdrawn"].includes(status)) {
+    const pid = c.req.param("pid");
+    const { patch, status } = await readPledge(c, rfp);
+    if (status !== undefined && !["pledged", "received", "withdrawn"].includes(status)) {
       throw new HttpError(400, "bad status");
     }
-    if (
-      !(await db.pledges.setStatus(rfp.id, c.req.param("pid"), status as PledgeStatus))
-    ) throw new HttpError(404, "not found");
-    return c.json({ ok: true });
+    let next = await db.pledges.get(rfp.id, pid);
+    if (!next) throw new HttpError(404, "not found");
+    if (Object.keys(patch).length) next = await db.pledges.update(rfp.id, pid, patch);
+    if (status !== undefined) {
+      await db.pledges.setStatus(rfp.id, pid, status as PledgeStatus);
+      next = await db.pledges.get(rfp.id, pid);
+    }
+    return c.json({ ok: true, pledge: pledgeJson(config, next!) });
   });
 
   r.delete("/initiatives/:id/pledges/:pid", async (c) => {

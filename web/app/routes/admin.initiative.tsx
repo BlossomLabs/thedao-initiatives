@@ -1,3 +1,4 @@
+import { cn } from "~/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import PageSkeleton from "~/components/layout/PageSkeleton";
 import StickyAside from "~/components/layout/StickyAside";
@@ -10,6 +11,7 @@ import {
   ExternalLink,
   FileText,
   MessageSquare,
+  PencilLine,
   RefreshCw,
   Trash2,
   Upload,
@@ -33,6 +35,7 @@ import type {
   AdminInitiative,
   AdminInitiativePage,
   Findings,
+  Pledge,
   SafeConfirmResult,
   SafeDeployParams,
   SafeSyncState,
@@ -649,10 +652,105 @@ function Revisions({ page, base, run }: { page: AdminInitiativePage; base: strin
   );
 }
 
-function Pledges({ page, base, run }: { page: AdminInitiativePage; base: string; run: Run }) {
+/** Add or edit a pledge: the same fields either way; a new logo replaces the old one. */
+function PledgeForm(
+  { base, run, editing, onDone }: {
+    base: string;
+    run: Run;
+    editing: Pledge | null;
+    onDone: () => void;
+  },
+) {
   const ref = useRef<HTMLFormElement>(null);
   const [busy, setBusy] = useState(false);
   const [logoName, setLogoName] = useState("");
+  useEffect(() => {
+    ref.current?.reset();
+    setLogoName("");
+  }, [editing?.id]);
+  return (
+    <form
+      ref={ref}
+      className="panel"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const form = new FormData(e.currentTarget);
+        setBusy(true);
+        const req = editing
+          ? api(`${base}/pledges/${editing.id}`, { method: "PATCH", form })
+          : api(`${base}/pledges`, { form });
+        run(() => req, editing ? "Pledge updated." : "Pledge added.")
+          .then(() => {
+            ref.current?.reset();
+            setLogoName("");
+            onDone();
+          })
+          .finally(() => setBusy(false));
+      }}
+    >
+      <span className="k">
+        {editing ? `Edit the pledge from ${editing.company}` : "Add a pledge"}
+      </span>
+      <div className="grid grid-cols-[1fr_140px_130px] gap-2.5 max-[640px]:grid-cols-1">
+        <Input
+          name="company"
+          placeholder="Company *"
+          maxLength={120}
+          required
+          defaultValue={editing?.company ?? ""}
+        />
+        <Input
+          name="amount"
+          placeholder="Amount USD *"
+          inputMode="decimal"
+          required
+          defaultValue={editing ? String(editing.amountUsd) : ""}
+        />
+        <Select name="status" defaultValue={editing?.status ?? "pledged"}>
+          <option value="pledged">pledged</option>
+          <option value="received">received</option>
+          {editing && <option value="withdrawn">withdrawn</option>}
+        </Select>
+      </div>
+      <div className="mt-2.5 grid grid-cols-2 gap-2.5 max-[640px]:grid-cols-1">
+        <Input
+          name="url"
+          placeholder="Link (optional)"
+          maxLength={300}
+          defaultValue={editing?.url ?? ""}
+        />
+        <Input
+          name="note"
+          placeholder="Note (optional)"
+          maxLength={300}
+          defaultValue={editing?.note ?? ""}
+        />
+      </div>
+      <div className="mt-3.5 flex flex-wrap items-center gap-3">
+        <Button type="submit" sm loading={busy}>{editing ? "Save pledge" : "Add pledge"}</Button>
+        {editing && <Button type="button" sm variant="ghost" onClick={onDone}>Cancel</Button>}
+        <label className="btn btn-ghost btn-sm cursor-pointer">
+          <Upload className="size-3.5" />
+          {logoName || (editing?.logoUrl ? "Replace logo" : "Logo (optional)")}
+          <input
+            type="file"
+            name="logo"
+            accept=".png,.jpg,.jpeg,.webp"
+            className="sr-only"
+            onChange={(e) => setLogoName(e.target.files?.[0]?.name ?? "")}
+          />
+        </label>
+        {editing?.logoUrl && !logoName && (
+          <img src={editing.logoUrl} alt="" className="h-6 rounded bg-white p-0.5" />
+        )}
+        <span className="small dim">PNG, JPG or WEBP; shown on the public page.</span>
+      </div>
+    </form>
+  );
+}
+
+function Pledges({ page, base, run }: { page: AdminInitiativePage; base: string; run: Run }) {
+  const [editing, setEditing] = useState<Pledge | null>(null);
   return (
     <>
       {page.pledges.length > 0 && (
@@ -669,7 +767,10 @@ function Pledges({ page, base, run }: { page: AdminInitiativePage; base: string;
             </thead>
             <tbody>
               {page.pledges.map((p) => (
-                <tr key={p.id}>
+                <tr
+                  key={p.id}
+                  className={cn(editing?.id === p.id && "[&>td]:bg-[rgba(92,183,90,.08)]")}
+                >
                   <td>
                     {p.logoUrl && (
                       <img
@@ -701,7 +802,15 @@ function Pledges({ page, base, run }: { page: AdminInitiativePage; base: string;
                     </Select>
                   </td>
                   <td className="small dim">{p.note}</td>
-                  <td className="text-right">
+                  <td className="whitespace-nowrap text-right">
+                    <button
+                      type="button"
+                      className="cursor-pointer rounded-[9px] border border-transparent bg-transparent p-1.5 text-muted hover:border-[rgba(92,183,90,.5)] hover:text-dao-green"
+                      title="Edit pledge"
+                      onClick={() => setEditing(p)}
+                    >
+                      <PencilLine className="size-4" />
+                    </button>
                     <button
                       type="button"
                       className="cursor-pointer rounded-[9px] border border-transparent bg-transparent p-1.5 text-[#ffb3b1] hover:border-[rgba(255,59,56,.6)]"
@@ -722,50 +831,7 @@ function Pledges({ page, base, run }: { page: AdminInitiativePage; base: string;
           </table>
         </div>
       )}
-      <form
-        ref={ref}
-        className="panel"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const form = new FormData(e.currentTarget);
-          setBusy(true);
-          run(() => api(`${base}/pledges`, { form }), "Pledge added.")
-            .then(() => {
-              ref.current?.reset();
-              setLogoName("");
-            })
-            .finally(() => setBusy(false));
-        }}
-      >
-        <span className="k">Add a pledge</span>
-        <div className="grid grid-cols-[1fr_140px_130px] gap-2.5 max-[640px]:grid-cols-1">
-          <Input name="company" placeholder="Company *" maxLength={120} required />
-          <Input name="amount" placeholder="Amount USD *" inputMode="decimal" required />
-          <Select name="status">
-            <option value="pledged">pledged</option>
-            <option value="received">received</option>
-          </Select>
-        </div>
-        <div className="mt-2.5 grid grid-cols-2 gap-2.5 max-[640px]:grid-cols-1">
-          <Input name="url" placeholder="Link (optional)" maxLength={300} />
-          <Input name="note" placeholder="Note (optional)" maxLength={300} />
-        </div>
-        <div className="mt-3.5 flex flex-wrap items-center gap-3">
-          <Button type="submit" sm loading={busy}>Add pledge</Button>
-          <label className="btn btn-ghost btn-sm cursor-pointer">
-            <Upload className="size-3.5" />
-            {logoName || "Logo (optional)"}
-            <input
-              type="file"
-              name="logo"
-              accept=".png,.jpg,.jpeg,.webp"
-              className="sr-only"
-              onChange={(e) => setLogoName(e.target.files?.[0]?.name ?? "")}
-            />
-          </label>
-          <span className="small dim">PNG, JPG or WEBP; shown on the public page.</span>
-        </div>
-      </form>
+      <PledgeForm base={base} run={run} editing={editing} onDone={() => setEditing(null)} />
     </>
   );
 }

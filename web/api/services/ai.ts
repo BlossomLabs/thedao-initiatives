@@ -45,6 +45,11 @@ export function createAi(config: Config, f: typeof fetch) {
         response_format: { type: "json_object" },
         temperature: 0,
         max_tokens: config.aiSearchMaxTokens,
+        // Thinking models (Nexus's Qwen) spend 20 s+ reasoning over a board
+        // listing and blow the timeout below; the ranking is as good without it.
+        ...(config.aiSearchReasoningEffort !== "default"
+          ? { reasoning_effort: config.aiSearchReasoningEffort }
+          : {}),
         stream: false,
       }),
       signal: AbortSignal.timeout(25_000),

@@ -109,6 +109,8 @@ export interface Config {
   aiSearchBaseUrl: string;
   aiSearchModel: string;
   aiSearchMaxTokens: number;
+  /** OpenAI-style reasoning_effort sent with every chat call; "default" omits the field. */
+  aiSearchReasoningEffort: string;
   onrampProvider: string;
   onrampApiKey: string;
   walletConnectProjectId: string;
@@ -192,6 +194,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     // Reasoning models spend this budget on hidden thinking before the JSON,
     // so a tight cap truncates the answer mid-object and fails the parse.
     aiSearchMaxTokens: Number(env.AI_SEARCH_MAX_TOKENS ?? "") || 2000,
+    aiSearchReasoningEffort: (env.AI_SEARCH_REASONING_EFFORT ?? "").trim() || "none",
     onrampProvider: ((env.ONRAMP_PROVIDER ?? "").trim() || "transak").toLowerCase(),
     onrampApiKey: (env.ONRAMP_API_KEY ?? "").trim(),
     walletConnectProjectId: (env.WALLETCONNECT_PROJECT_ID ?? "").trim(),

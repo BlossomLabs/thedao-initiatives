@@ -743,9 +743,11 @@ Deno.test("ai-search: mocked provider, unknown ids dropped, cache, disabled", as
   let calls = 0;
   const h = await harness({
     env: { AI_SEARCH_API_KEY: "k" },
-    fetch: (url) => {
+    fetch: (url, init) => {
       if (!url.includes("/chat/completions")) return new Response("", { status: 404 });
       calls++;
+      // The reasoning model must not think out loud: it blew the 25 s budget.
+      assertEquals(JSON.parse(String(init?.body)).reasoning_effort, "none");
       const ids = ["bogus", ...knownIds];
       return Response.json({
         choices: [{ message: { content: JSON.stringify({ ranked_ids: ids }) } }],

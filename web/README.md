@@ -34,8 +34,7 @@ API.
   milestones, links, title and summary are always editable and each save is a new public revision
   that goes live at once; while the initiative is pending the type, goal, duration, recipient, forum
   link and the private fields can change too (locked after approval, admins edit them under
-  `/admin`). A row that still has one text body gets the paste box prefilled to sort it into
-  sections
+  `/admin`)
 - `/submit`, `/submit/thanks`
 - `/donation-terms` (content/donation-terms.md, bundled at build time by `app/data/terms.ts`; the
   donate widget's terms gate links here and logs acceptances by its `version:` line)

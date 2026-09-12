@@ -9,10 +9,6 @@ import { normaliseStructured, sameStructured } from "@shared/draft/mod";
 import type { SubmitPayload } from "~/components/initiative-form/types";
 import type { Initiative } from "~/lib/api-types";
 
-/** Above the paste box of a row that still has one text body. */
-export const LEGACY_NOTE =
-  "This initiative still has a single text body. Paste it here to sort it into sections, then save.";
-
 export const FACT_KEYS = [
   "type",
   "topup",

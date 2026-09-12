@@ -213,7 +213,7 @@ build uses v2's design system and infrastructure.
   lettered cards with the amount, an "adoption milestone" chip, and on top-ups a "done" chip
   with the delivered link or a "target Nov 2026" chip; criteria are the checkbox-as-bullet list;
   links are a list. "What happens next" is per type in the side card.
-- **Submit form.** Paste box first, with a "Sort this text" button and Undo (v1 was paste-only);
+- **Submit form.** Paste box first, mirrored with the fields below in both directions (v1 was paste-only);
   the live checks moved to the sticky sidebar: required questions answered, milestone total
   against the goal, adoption line, and every error or warning as a jump link, with the same
   copy line as v1. Findings still paint on the field they belong to, missing answers stay quiet

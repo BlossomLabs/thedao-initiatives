@@ -50,8 +50,6 @@ export interface InitiativeFormProps {
   enforce?: boolean;
   /** Shown above the locked fields; defaults to the "Locked after approval" line. */
   lockNote?: React.ReactNode;
-  /** A line above the paste box (a legacy row's migration hint). */
-  pasteNote?: React.ReactNode;
   /** "grid": the sidebar carries the checks (submit and edit pages).
    * "inline": the checks card sits above the button, inside the column. */
   layout?: "grid" | "inline";
@@ -60,8 +58,6 @@ export interface InitiativeFormProps {
   showRules?: boolean;
   showTypePicker?: boolean;
   showPaste?: boolean;
-  /** A legacy body to prefill the paste box with (migration). */
-  pasteText?: string;
   /** localStorage key, null to disable (edit pages). */
   autosaveKey?: string | null;
   /** Whether the API accepts logo uploads right now. */
@@ -109,7 +105,6 @@ export default function InitiativeForm({
   showRules = true,
   showTypePicker = true,
   showPaste = true,
-  pasteText,
   autosaveKey = mode === "submit" ? AUTOSAVE_KEY : null,
   uploads = true,
   asideTop,
@@ -118,10 +113,9 @@ export default function InitiativeForm({
   before,
   enforce = true,
   lockNote = LOCK_NOTE,
-  pasteNote,
   layout = "grid",
 }: InitiativeFormProps) {
-  const { draft, actions, canUndo, reset } = useDraft(initial);
+  const { draft, actions, reset } = useDraft(initial);
   const [submitted, setSubmitted] = useState(false);
   const [serverFindings, setServerFindings] = useState<Findings | null>(null);
   const [alert, setAlert] = useState("");
@@ -272,16 +266,11 @@ export default function InitiativeForm({
           </Status>
         )}
         {showTypePicker && <TypePicker draft={draft} actions={actions} locked={locked} />}
-        {showPaste && pasteNote && <Status kind="wait" className="mt-6 -mb-3">{pasteNote}</Status>}
         {showPaste && (
           <PasteBox
-            type={draft.type}
-            onSplit={actions.applySplit}
-            onUndo={actions.undoSplit}
-            canUndo={canUndo}
-            unsorted={draft.unsorted}
+            draft={draft}
+            onText={actions.replaceText}
             onUnsorted={actions.setUnsorted}
-            initialText={pasteText}
           />
         )}
 
@@ -317,7 +306,10 @@ export default function InitiativeForm({
 
         <FormGroup title="Milestones">
           Each row renders as a heading with a checklist under it. The site letters them A, B, C in
-          the order they sit here. The amounts add up against your funding goal.
+          the order they sit here. The amounts add up against your funding goal. An adoption
+          milestone is all adoption: every criterion is evidence that other people use the work, and
+          its payment divided by the users or integrations it buys has to be a number a funder would
+          pay.
         </FormGroup>
         <MilestonesEditor draft={draft} actions={actions} totals={checks.totals} />
 

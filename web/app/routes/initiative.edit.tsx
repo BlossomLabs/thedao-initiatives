@@ -14,7 +14,7 @@ import { useSession } from "~/context/session";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { api, ApiError, errorMessage } from "~/lib/api";
 import type { Initiative } from "~/lib/api-types";
-import { LEGACY_NOTE, pageFactsPatch, textBody, textChanged } from "~/lib/edit-initiative";
+import { pageFactsPatch, textBody, textChanged } from "~/lib/edit-initiative";
 import { CONTACT_EMAIL, CONTACT_MAILTO, SITE_NAME } from "~/data/site";
 import { generateMeta } from "~/utils/meta";
 
@@ -217,8 +217,6 @@ function EditForm({ r }: { r: Initiative }) {
       showTypePicker={pending}
       showRules={false}
       autosaveKey={null}
-      pasteText={r.structured ? undefined : r.details}
-      pasteNote={r.structured ? undefined : LEGACY_NOTE}
       asideTop={<WhatYouCanChange status={r.status} />}
       asideBottom={<RevisionsCard />}
       footer={

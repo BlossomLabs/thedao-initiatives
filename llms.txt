@@ -168,7 +168,7 @@ Never do these:
 
 ## Step 3: Deliver the document plus the scorecard
 
-Hand over the whole document in one markdown block the proposer can copy in one go, then tell them what to do with it: pick the type at https://fund.thedao.fund/submit, paste the document into "Paste your whole draft here", and the fields fill themselves. Anything landing in the Unsorted box means a heading name is wrong. Then this scorecard, filled honestly:
+Hand over the whole document in one markdown block the proposer can copy in one go, then tell them what to do with it: pick the type at https://fund.thedao.fund/submit, paste the document into "Your whole draft as one text", and the fields fill themselves; that text and the fields mirror each other from then on, so either can be edited. Anything landing in the Unsorted box means a heading name is wrong. Then this scorecard, filled honestly:
 
 ```
 READINESS: READY | NOT READY

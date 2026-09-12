@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { splitDraft } from "@shared/draft/mod";
 import {
-  applySplit,
   draftReducer,
   type DraftState,
   emptyBacker,
@@ -15,7 +14,7 @@ import {
 } from "./useDraft";
 import type { Initiative } from "~/lib/api-types";
 
-const state = (): DraftState => ({ draft: emptyDraft(), undo: null });
+const state = (): DraftState => ({ draft: emptyDraft() });
 
 describe("useDraft reducer", () => {
   it("setType to rfp clears the top-up; a grant keeps it", () => {
@@ -65,64 +64,6 @@ describe("useDraft reducer", () => {
     expect(s.draft.milestones[0].criteria[1].text).toBe("one line only");
     s = draftReducer(s, { t: "removeCriterion", ms: ms.id, id: first.id });
     expect(s.draft.milestones[0].criteria.map((c) => c.id)).toEqual([inserted.id, tail.id]);
-  });
-
-  it("applySplit fills only what the paste has, and undo restores the draft", () => {
-    let s = state();
-    s = draftReducer(s, { t: "setPage", key: "summary", value: "kept summary" });
-    s = draftReducer(s, { t: "setSection", key: "why", value: "old why" });
-    const res = splitDraft(
-      [
-        "# RFP: A pasted title",
-        "## Funding goal",
-        "$150,000",
-        "## Why this matters",
-        "new why",
-        "## Milestones",
-        "### First - $150,000 (adoption)",
-        "- [ ] Checkable thing",
-        "## Something unknown",
-        "stray line",
-      ].join("\n"),
-      "rfp",
-    );
-    const before = s.draft;
-    s = draftReducer(s, { t: "applySplit", result: res });
-    expect(s.draft.page.title).toBe("A pasted title");
-    expect(s.draft.page.goal).toBe("150,000");
-    expect(s.draft.page.summary).toBe("kept summary");
-    expect(s.draft.sections.why).toBe("new why");
-    expect(s.draft.milestones).toHaveLength(1);
-    expect(s.draft.milestones[0].name).toBe("First");
-    expect(s.draft.milestones[0].amount).toBe("150,000");
-    expect(s.draft.milestones[0].adoption).toBe(true);
-    expect(s.draft.milestones[0].criteria[0].text).toBe("Checkable thing");
-    expect(s.draft.unsorted).toContain("stray line");
-    expect(s.undo).toBe(before);
-    s = draftReducer(s, { t: "undoSplit" });
-    expect(s.draft).toBe(before);
-    expect(s.undo).toBeNull();
-  });
-
-  it("applySplit keeps milestones and backers when the paste has none", () => {
-    const d = emptyDraft();
-    d.milestones[0].name = "Mine";
-    d.backers = [{ ...emptyBacker(), org: "Org" }];
-    const res = splitDraft("## Why this matters\nx", "rfp");
-    const out = applySplit(d, res);
-    expect(out.milestones[0].name).toBe("Mine");
-    expect(out.backers[0].org).toBe("Org");
-    const withBackers = splitDraft(
-      "## Backers already committed\nEF | $20,000 | https://ethereum.org\n",
-      "rfp",
-    );
-    const out2 = applySplit(d, withBackers);
-    expect(out2.backers).toHaveLength(1);
-    expect(out2.backers[0]).toMatchObject({
-      org: "EF",
-      amount: "20,000",
-      url: "https://ethereum.org",
-    });
   });
 
   it("splitReport counts the type's sections and flags the other type's", () => {

@@ -40,7 +40,6 @@ import type {
   SafeDeployParams,
   SafeSyncState,
 } from "~/lib/api-types";
-import { LEGACY_NOTE } from "~/lib/edit-initiative";
 import { walletErrorMessage } from "~/lib/donate";
 import { dt, shortAddr, usd } from "~/lib/format";
 import { discussionKind } from "~/lib/discussion";
@@ -517,8 +516,6 @@ function EditForm({ r, onSaved }: { r: AdminInitiative; onSaved: (text: string) 
         showTypePicker
         showRules={false}
         autosaveKey={null}
-        pasteText={r.structured ? undefined : r.details}
-        pasteNote={r.structured ? undefined : LEGACY_NOTE}
         before={
           <>
             <div className="grid grid-cols-2 gap-x-4 max-[640px]:grid-cols-1 [&>*:first-child]:mt-[18px]">

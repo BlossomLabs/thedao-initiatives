@@ -1,7 +1,8 @@
 /**
  * The draft reducer: one action per thing the form can do, plus the two
  * conversions at the edges (an initiative from the API -> a draft, a draft ->
- * the POST body). Pure functions first, the hook at the bottom.
+ * the POST body). Pure functions first, the hook at the bottom. The paste
+ * box mirror lives in draft-text.ts.
  */
 import { useCallback, useMemo, useReducer } from "react";
 import {
@@ -18,6 +19,7 @@ import {
 } from "@shared/draft/mod";
 import type { Initiative } from "~/lib/api-types";
 import type { Draft, DraftBacker, DraftCriterion, DraftMilestone, SubmitPayload } from "./types";
+import { replaceFromText } from "./draft-text";
 
 let seq = 0;
 export const newId = (): string => `d${++seq}${Math.random().toString(36).slice(2, 7)}`;
@@ -68,11 +70,6 @@ export const emptyDraft = (): Draft => ({
 /** "150000" -> "150,000"; "" for nothing. What the amount inputs show after blur. */
 export const money = (n: number): string =>
   n ? n.toLocaleString("en-US", { maximumFractionDigits: 2 }) : "";
-
-const intText = (raw: string): string => {
-  const n = parseInt(String(raw).replace(/[^0-9]/g, ""), 10);
-  return Number.isFinite(n) && n > 0 ? String(n) : "";
-};
 
 /** One line per criterion: newlines (typed or pasted) become spaces. */
 export const flatten = (s: string): string => s.replace(/[\r\n]+/g, " ");
@@ -231,14 +228,11 @@ export type DraftAction =
   | { t: "removeBacker"; id: string }
   | { t: "setBacker"; id: string; patch: Partial<Omit<DraftBacker, "id" | "logo">> }
   | { t: "setLogo"; id: string; file: File | null }
-  | { t: "applySplit"; result: SplitResult }
-  | { t: "undoSplit" }
+  | { t: "replaceText"; text: string }
   | { t: "replace"; draft: Draft };
 
 export interface DraftState {
   draft: Draft;
-  /** The draft as it was before the last paste, for Undo. */
-  undo: Draft | null;
 }
 
 const mapMs = (
@@ -251,38 +245,6 @@ const mapBk = (d: Draft, id: string, fn: (b: DraftBacker) => DraftBacker): Draft
   ...d,
   backers: d.backers.map((b) => (b.id === id ? fn(b) : b)),
 });
-
-/** Fill the draft from a sorted paste: only what the paste contains is
- * overwritten; milestones and backers are replaced only when present. */
-export function applySplit(d: Draft, res: SplitResult): Draft {
-  const page = { ...d.page };
-  const p = res.page;
-  if (p.title) page.title = p.title;
-  if (p.summary) page.summary = p.summary;
-  if (p.goal) page.goal = money(parseAmount(p.goal));
-  if (p.duration) page.duration = intText(p.duration);
-  if (p.links) page.links = p.links;
-  if (p.recipient) page.recipientTeam = p.recipient;
-  const priv = { ...d.priv };
-  if (p.funders) priv.funders = p.funders;
-  if (p.contact) priv.contact = p.contact;
-  const sections: Sections = { ...d.sections };
-  for (const key of SECTION_KEYS) {
-    const t = res.fields[key];
-    if (t) sections[key] = t;
-  }
-  const pasted = p.backers ? parseBackers(p.backers) : [];
-  const backers = pasted.length
-    ? pasted.map((b) => ({
-      ...emptyBacker(),
-      org: b.org,
-      amount: money(b.amountUsd),
-      url: b.url,
-    }))
-    : d.backers;
-  const milestones = res.milestones.length ? res.milestones.map(draftMilestone) : d.milestones;
-  return { ...d, page, priv, sections, backers, milestones, unsorted: res.unsorted };
-}
 
 /** What a paste changed, for the "Sorted: …" line. */
 export function splitReport(res: SplitResult, type: DraftType) {
@@ -376,19 +338,16 @@ export function draftReducer(s: DraftState, a: DraftAction): DraftState {
     case "setLogo":
       // a new file invalidates the receipt of the old upload
       return { ...s, draft: mapBk(d, a.id, (b) => ({ ...b, logo: a.file, logoCid: "" })) };
-    case "applySplit":
-      return { undo: d, draft: applySplit(d, a.result) };
-    case "undoSplit":
-      return s.undo ? { undo: null, draft: s.undo } : s;
+    case "replaceText":
+      return { draft: replaceFromText(d, a.text) };
     case "replace":
-      return { undo: null, draft: a.draft };
+      return { draft: a.draft };
   }
 }
 
 export function useDraft(initial?: Draft) {
   const [state, dispatch] = useReducer(draftReducer, initial, (init) => ({
     draft: init ?? emptyDraft(),
-    undo: null,
   }));
   const actions = useMemo(
     () => ({
@@ -426,18 +385,16 @@ export function useDraft(initial?: Draft) {
       setBacker: (id: string, patch: Partial<Omit<DraftBacker, "id" | "logo">>) =>
         dispatch({ t: "setBacker", id, patch }),
       setLogo: (id: string, file: File | null) => dispatch({ t: "setLogo", id, file }),
-      applySplit: (result: SplitResult) => dispatch({ t: "applySplit", result }),
-      undoSplit: () => dispatch({ t: "undoSplit" }),
+      replaceText: (text: string) => dispatch({ t: "replaceText", text }),
       replace: (draft: Draft) => dispatch({ t: "replace", draft }),
     }),
     [],
   );
-  const canUndo = state.undo !== null;
   const reset = useCallback(
     (d?: Draft) => dispatch({ t: "replace", draft: d ?? emptyDraft() }),
     [],
   );
-  return { draft: state.draft, actions, canUndo, reset };
+  return { draft: state.draft, actions, reset };
 }
 
 export type DraftActions = ReturnType<typeof useDraft>["actions"];

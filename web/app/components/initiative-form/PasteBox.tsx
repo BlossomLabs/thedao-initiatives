@@ -1,17 +1,23 @@
 /**
- * The paste box: the whole AI-written draft lands here and is sorted into
- * the fields below on paste (or with the button). The report says what was
- * filled; lines that matched nothing go to the amber Unsorted box, kept in
- * the draft for the proposer and never posted.
+ * The paste box: the whole draft as one text, mirrored with the fields
+ * below. Paste or type here and the fields follow; edit a field and this
+ * text follows. Whichever side holds the caret is the source, and the box
+ * is never rewritten while it is focused. The report under it says what a
+ * paste filled; lines that matched nothing go to the amber Unsorted box,
+ * kept in the draft for the proposer and never posted.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type DraftType, FIELDS, splitDraft } from "@shared/draft/mod";
 import { Button } from "~/components/ui/Button";
 import { Textarea } from "~/components/ui/Field";
+import { renderDraft, textMatchesDraft } from "./draft-text";
+import type { Draft } from "./types";
 import { splitReport } from "./useDraft";
-import type { SplitResult } from "@shared/draft/mod";
 
 type Report = ReturnType<typeof splitReport>;
+
+/** How long after the last keystroke in the box the fields follow. */
+export const MIRROR_DELAY = 300;
 
 export function reportLine(r: Report): string {
   return `Sorted: ${r.sections} section${r.sections === 1 ? "" : "s"}, ${r.milestones} milestone${
@@ -27,7 +33,7 @@ const list = (letters: string[]) =>
     : `Milestones ${letters.join(", ").replace(/, ([^,]*)$/, " and $1")}`;
 
 /**
- * Hints only for what did not read as intended, shown after a sort: nobody
+ * Hints only for what did not read as intended, shown after a paste: nobody
  * reads format rules before pasting, they read them when something did not
  * land. Each names the shape the site expects.
  */
@@ -112,96 +118,100 @@ export const PASTE_PLACEHOLDER = [
 ].join("\n");
 
 export default function PasteBox(
-  { type, onSplit, onUndo, canUndo, unsorted, onUnsorted, initialText = "", disabled }: {
-    type: DraftType;
-    onSplit: (result: SplitResult) => void;
-    onUndo: () => void;
-    canUndo: boolean;
-    unsorted: string;
+  { draft, onText, onUnsorted, disabled }: {
+    draft: Draft;
+    /** The box changed: replace the text half of the draft with it. */
+    onText: (text: string) => void;
     onUnsorted: (text: string) => void;
-    /** A legacy body to migrate (edit pages). */
-    initialText?: string;
     disabled?: boolean;
   },
 ) {
-  const [text, setText] = useState(initialText);
+  const type: DraftType = draft.type;
+  const [text, setText] = useState("");
   const [report, setReport] = useState<Report | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const focused = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<string | null>(null);
+
+  const flush = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    if (pending.current !== null) {
+      const t = pending.current;
+      pending.current = null;
+      onText(t);
+    }
+  };
+  const push = (t: string, delay: number) => {
+    pending.current = t;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(flush, delay);
+  };
+
+  // The fields changed: the box follows, unless the change came from the box
+  // or the caret is in it.
+  const rendered = useMemo(() => renderDraft(draft), [draft]);
+  useEffect(() => {
+    if (focused.current || pending.current !== null) return;
+    if (rendered === text || textMatchesDraft(draft, text)) return;
+    setText(rendered);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rendered]);
+
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
 
-  const sort = (src?: string) => {
-    const t = src ?? ref.current?.value ?? text;
-    if (!t.trim()) return;
-    const res = splitDraft(t, type);
-    onSplit(res);
-    setReport(splitReport(res, type));
-  };
   const grantHint = report && type === "rfp" && report.otherType.length > 0;
   const hints = report ? formatHints(report) : [];
 
   return (
     <div className="mt-6" data-field="paste">
       <label className="label" htmlFor="f-paste">
-        Paste your whole draft here
-        <span className="hint">
-          It splits on the section headings and fills the fields below. The fields are what gets
-          submitted.
-        </span>
+        Your whole draft as one text
+        <span className="hint">Paste the draft your AI wrote, or write here.</span>
       </label>
       <textarea
         ref={ref}
         id="f-paste"
         className="field mono mt-1.5 min-h-[160px] text-[13px] leading-[1.5] placeholder:text-white/30"
-        rows={text ? 8 : 17}
+        rows={text ? 12 : 17}
         spellCheck={false}
         placeholder={PASTE_PLACEHOLDER}
         value={text}
         disabled={disabled}
-        onChange={(e) => setText(e.target.value)}
+        onFocus={() => {
+          focused.current = true;
+        }}
+        onBlur={() => {
+          focused.current = false;
+          flush();
+        }}
+        onChange={(e) => {
+          setText(e.target.value);
+          setReport(null);
+          push(e.target.value, MIRROR_DELAY);
+        }}
         onPaste={() => {
           // the textarea has the pasted text one tick later
-          timer.current = setTimeout(() => sort(), 0);
+          timer.current = setTimeout(() => {
+            const t = ref.current?.value ?? "";
+            pending.current = t;
+            flush();
+            if (t.trim()) setReport(splitReport(splitDraft(t, type), type));
+          }, 0);
         }}
       />
-      <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-        <Button variant="ghost" sm disabled={disabled || !text.trim()} onClick={() => sort()}>
-          Sort this text
-        </Button>
-        <Button
-          variant="ghost"
-          sm
-          disabled={disabled || !text}
-          onClick={() => {
-            setText("");
-            setReport(null);
-          }}
-        >
-          Clear
-        </Button>
-        {report && (
-          <span role="status" className="small flex flex-wrap items-center gap-2">
-            <span>
-              <b className="text-dao-green">Sorted:</b>{" "}
-              {reportLine(report).slice("Sorted: ".length)}
-            </span>
-            {canUndo && (
-              <button
-                type="button"
-                className="cursor-pointer border-0 bg-transparent p-0 text-dao-green underline-offset-2 hover:underline"
-                onClick={() => {
-                  onUndo();
-                  setReport(null);
-                }}
-              >
-                Undo
-              </button>
-            )}
-          </span>
-        )}
-      </div>
+      <p className="hint m-0 mt-1.5" data-field="paste-note">
+        What you write here fills the fields below, and what you type in a field shows up here. Both
+        are the same draft; the fields are what gets submitted.
+      </p>
+      {report && (
+        <p role="status" className="small m-0 mt-2.5">
+          <b className="text-dao-green">Sorted:</b> {reportLine(report).slice("Sorted: ".length)}
+        </p>
+      )}
       {hints.length > 0 && (
         <ul className="hint m-0 mt-1.5 list-none p-0 text-[#ffe9b8]" data-field="paste-hints">
           {hints.map((h) => <li key={h.key}>{h.text}</li>)}
@@ -214,7 +224,7 @@ export default function PasteBox(
             .replace(/, ([^,]*)$/, " and $1")}.
         </p>
       )}
-      {unsorted.trim() && (
+      {draft.unsorted.trim() && (
         <div
           className="mt-4 rounded-2xl border border-[rgba(240,180,41,.5)] bg-[rgba(240,180,41,.06)] px-5 py-4"
           data-field="unsorted"
@@ -228,7 +238,7 @@ export default function PasteBox(
             id="f-unsorted"
             className="mono mt-2 min-h-0 text-[13px]"
             rows={5}
-            value={unsorted}
+            value={draft.unsorted}
             onChange={(e) => onUnsorted(e.target.value)}
           />
           <Button variant="ghost" sm className="mt-2" onClick={() => onUnsorted("")}>

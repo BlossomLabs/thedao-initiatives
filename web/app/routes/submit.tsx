@@ -157,7 +157,7 @@ function Gate({ children, aside }: { children: React.ReactNode; aside: React.Rea
 const STEPS = [
   "Copy the guide",
   "Answer the questions the AI asks",
-  "Paste the whole draft here, we sort it into the sections",
+  "Paste the whole draft here, it fills the fields",
 ];
 
 /** "Give this guide to your AI": the three steps and the copy button. Glows until the draft has text. */

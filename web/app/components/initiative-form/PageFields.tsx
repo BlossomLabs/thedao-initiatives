@@ -116,7 +116,7 @@ export default function PageFields(
       </FormField>
       <FormField
         field="links"
-        label="Links"
+        label="Other links"
         hint="Optional. Repo, site, prior write-up. One per line."
       >
         <Textarea

@@ -1,38 +1,50 @@
 import { describe, expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { readFileSync } from "node:fs";
-import PasteBox from "./PasteBox";
+import PasteBox, { MIRROR_DELAY } from "./PasteBox";
 import { useDraft } from "./useDraft";
 
 const EXAMPLE = readFileSync("../docs/llms-v3-example-output.md", "utf8");
 
-/** PasteBox on a real draft, with the bits of the draft the tests read. */
-function Harness({ type = "rfp" as const }) {
-  const { draft, actions, canUndo } = useDraft();
+/** PasteBox on a real draft, with the bits of the draft the tests read and
+ * one section field to edit from the other side. */
+function Harness() {
+  const { draft, actions } = useDraft();
   return (
     <>
       <PasteBox
-        type={type}
-        onSplit={actions.applySplit}
-        onUndo={actions.undoSplit}
-        canUndo={canUndo}
-        unsorted={draft.unsorted}
+        draft={draft}
+        onText={actions.replaceText}
         onUnsorted={actions.setUnsorted}
       />
       <span data-testid="title">{draft.page.title}</span>
       <span data-testid="goal">{draft.page.goal}</span>
       <span data-testid="why">{draft.sections.why ?? ""}</span>
       <span data-testid="ms">{draft.milestones.map((m) => m.name).join("|")}</span>
+      <input
+        aria-label="Title field"
+        value={draft.page.title}
+        onChange={(e) => actions.setPage("title", e.target.value)}
+      />
+      <textarea
+        aria-label="Why field"
+        value={draft.sections.why ?? ""}
+        onChange={(e) => actions.setSection("why", e.target.value)}
+      />
     </>
   );
 }
 
+const box = () => screen.getByLabelText(/Your whole draft as one text/) as HTMLTextAreaElement;
+
 const paste = (text: string) => {
-  const ta = screen.getByLabelText(/Paste your whole draft here/) as HTMLTextAreaElement;
+  const ta = box();
   fireEvent.change(ta, { target: { value: text } });
   fireEvent.paste(ta);
   return ta;
 };
+
+const settle = () => new Promise((r) => setTimeout(r, MIRROR_DELAY + 50));
 
 describe("PasteBox", () => {
   it("sorts the guide's example on paste and reports what it filled", async () => {
@@ -49,10 +61,8 @@ describe("PasteBox", () => {
       "Agreed standard|Board and first ratings|Adoption evidence",
     );
     expect(screen.queryByText("Unsorted text")).not.toBeInTheDocument();
-    // Undo puts the draft back
-    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-    expect(screen.getByTestId("title")).toHaveTextContent("");
-    expect(screen.getByTestId("ms")).toHaveTextContent("");
+    // the pasted text stays as pasted: the box is not rewritten by its own edit
+    expect(box().value).toBe(EXAMPLE);
   });
 
   it("shows the unsorted box for lines that matched nothing", async () => {
@@ -63,19 +73,47 @@ describe("PasteBox", () => {
       "Sorted: 1 section, 0 milestones, 0 page fields, plus text nothing matched.",
     );
     expect(screen.getByText("Unsorted text")).toBeInTheDocument();
-    const box = document.getElementById("f-unsorted") as HTMLTextAreaElement;
-    expect(box.value).toContain("## Random heading");
-    expect(box.value).toContain("stray line");
+    const unsorted = document.getElementById("f-unsorted") as HTMLTextAreaElement;
+    expect(unsorted.value).toContain("## Random heading");
+    expect(unsorted.value).toContain("stray line");
     fireEvent.click(screen.getByRole("button", { name: "Clear the box" }));
     expect(screen.queryByText("Unsorted text")).not.toBeInTheDocument();
+    // clearing the amber box drops those lines from the draft text too
+    expect(box().value).toBe("## Why this matters\n\nBecause.");
   });
 
-  it("the Sort button sorts typed text, and hints when grant headings land on an RFP", () => {
+  it("typed text fills the fields after a pause, without rewriting the box", async () => {
     render(<Harness />);
-    const ta = screen.getByLabelText(/Paste your whole draft here/);
-    fireEvent.change(ta, { target: { value: "## The team\n\nUs.\n\n## Commitments\n\nMIT.\n" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sort this text" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Sorted: 0 sections");
+    const ta = box();
+    fireEvent.focus(ta);
+    fireEvent.change(ta, { target: { value: "## Title\n\nTyped\n\n## Why this matters\n\nx" } });
+    expect(screen.getByTestId("title")).toHaveTextContent("");
+    await act(settle);
+    expect(screen.getByTestId("title")).toHaveTextContent("Typed");
+    expect(screen.getByTestId("why")).toHaveTextContent("x");
+    expect(ta.value).toBe("## Title\n\nTyped\n\n## Why this matters\n\nx");
+    // deleting a heading empties its field
+    fireEvent.change(ta, { target: { value: "## Why this matters\n\nx" } });
+    await act(settle);
+    expect(screen.getByTestId("title")).toHaveTextContent("");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("editing a field rewrites the box in the paste format", async () => {
+    render(<Harness />);
+    paste("## Title\n\nOld\n");
+    await screen.findByRole("status");
+    fireEvent.change(screen.getByLabelText("Title field"), { target: { value: "New" } });
+    fireEvent.change(screen.getByLabelText("Why field"), { target: { value: "Because." } });
+    await waitFor(() =>
+      expect(box().value).toBe("## Title\n\nNew\n\n## Why this matters\n\nBecause.")
+    );
+  });
+
+  it("hints when grant headings land on an RFP", async () => {
+    render(<Harness />);
+    paste("## The team\n\nUs.\n\n## Commitments\n\nMIT.\n");
+    expect(await screen.findByRole("status")).toHaveTextContent("Sorted: 0 sections");
     expect(screen.getByText(/Switch to Grant to sort The team and Commitments/))
       .toBeInTheDocument();
   });
@@ -84,12 +122,12 @@ describe("PasteBox", () => {
 describe("PasteBox placeholder", () => {
   it("shows a skeleton draft while empty and shrinks once text is in", () => {
     render(<Harness />);
-    const ta = screen.getByLabelText(/Paste your whole draft here/) as HTMLTextAreaElement;
+    const ta = box();
     expect(ta.placeholder).toContain("### Agreed standard - $50,000");
     expect(ta.placeholder).toContain("Organization | $20,000 | https://link");
     expect(ta.rows).toBe(17);
     fireEvent.change(ta, { target: { value: "## Why this matters\n\nx" } });
-    expect(ta.rows).toBe(8);
+    expect(ta.rows).toBe(12);
   });
 });
 

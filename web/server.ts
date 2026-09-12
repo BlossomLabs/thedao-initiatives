@@ -8,6 +8,7 @@
 import { serveDir } from "@std/http/file-server";
 import { createServer } from "./api/bootstrap.ts";
 import { LOCK_MESSAGE, LOCK_REALM } from "./api/lib/sitelock.ts";
+import { isInitiativeMarkdown } from "./api/routes/markdown.ts";
 
 const { app, lock, config } = await createServer();
 // Mirrors app/data/site.ts (which is Vite-only code).
@@ -15,7 +16,8 @@ const SITE_URL = (Deno.env.get("VITE_SITE_URL") ?? "").replace(/\/+$/, "") ||
   "https://fund.thedao.fund";
 const ROOT = new URL("./build/client", import.meta.url).pathname;
 
-const isApi = (path: string) => path === "/healthz" || path === "/api" || path.startsWith("/api/");
+const isApi = (path: string) =>
+  path === "/healthz" || path === "/api" || path.startsWith("/api/") || isInitiativeMarkdown(path);
 
 /** Prerendered pages bake SITE_URL into their meta; rewrite for staging origins. */
 async function rewriteOrigin(res: Response, origin: string): Promise<Response> {

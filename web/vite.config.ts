@@ -41,11 +41,14 @@ export default defineConfig({
     proxy: {
       "/api": process.env.API_PROXY || "http://localhost:8000",
       "/healthz": process.env.API_PROXY || "http://localhost:8000",
+      "^/initiative/[a-z0-9-]+\\.md$": process.env.API_PROXY || "http://localhost:8000",
     },
   },
   resolve: {
     alias: {
-      "react-dom/server": fileURLToPath(new URL("./app/lib/react-dom-server.node.mjs", import.meta.url)),
+      "react-dom/server": fileURLToPath(
+        new URL("./app/lib/react-dom-server.node.mjs", import.meta.url),
+      ),
     },
   },
   test: {

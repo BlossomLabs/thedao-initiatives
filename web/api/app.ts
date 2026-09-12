@@ -5,6 +5,7 @@ import type { Deps, Vars } from "./middleware/context.ts";
 import { HttpError } from "./lib/errors.ts";
 import { clientIp } from "./middleware/ip.ts";
 import { sessionLoader } from "./middleware/auth.ts";
+import { markdownRoutes } from "./routes/markdown.ts";
 import { originGuard, securityHeaders, siteLock } from "./middleware/headers.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { boardRoutes } from "./routes/board.ts";
@@ -63,6 +64,7 @@ export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
   app.route("/api", commentRoutes(deps));
   app.route("/api", aiRoutes(deps));
   app.route("/api/admin", adminRoutes(deps));
+  app.route("/initiative", markdownRoutes(deps));
 
   return app;
 }

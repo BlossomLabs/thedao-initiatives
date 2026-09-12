@@ -512,3 +512,43 @@ Deno.test("bulk admin actions: initiatives and comments, per-id failures reporte
   );
   h.close();
 });
+
+Deno.test("GET /initiative/<slug>.md: the content-file shape, public rows only, round-trips", async () => {
+  const h = await harness();
+  const admin = await h.mint(ADMIN, true);
+  const { loadContentFiles } = await import("./app-helpers.ts");
+  await h.req("/api/admin/sync-content", {
+    method: "POST",
+    token: admin,
+    json: { files: await loadContentFiles() },
+  });
+  const first = (await h.db.rfps.list(["approved"])).find((r) => r.type === "rfp")!;
+  await h.req(`/api/admin/initiatives/${first.id}/pledges`, {
+    method: "POST",
+    token: admin,
+    json: { company: "Argot Collective", amountUsd: "151000", url: "https://argot.org/" },
+  });
+  const res = await h.req(`/initiative/${first.slug}.md`);
+  assertEquals(res.status, 200);
+  assertStringIncludes(res.headers.get("content-type") ?? "", "text/markdown");
+  const md = await res.text();
+  assertStringIncludes(md, `title: ${first.title}`);
+  assertStringIncludes(md, `goal: ${first.goalUsd}`);
+  assertStringIncludes(md, "## Why this matters");
+  assertStringIncludes(md, "## Milestones");
+  assertStringIncludes(md, "backers:\n  Argot Collective | $151000 | https://argot.org/");
+  // what comes out goes back in unchanged
+  const { parseRfpFile } = await import("../services/content.ts");
+  const again = parseRfpFile(md);
+  assertEquals(again.sections, first.sections);
+  assertEquals(again.milestones, first.milestones);
+  assertEquals(again.links, first.links);
+  assertEquals(again.goalUsd, first.goalUsd);
+  assertEquals(again.backers.map((b) => b.org), ["Argot Collective"]);
+  // pending rows and unknown slugs are 404; the path shape is strict
+  const pending = await h.db.rfps.insert({ title: "Hidden pending one", status: "pending" });
+  assertEquals((await h.req(`/initiative/${pending.slug}.md`)).status, 404);
+  assertEquals((await h.req(`/initiative/nope.md`)).status, 404);
+  assertEquals((await h.req(`/initiative/${first.slug}`)).status, 404);
+  h.close();
+});

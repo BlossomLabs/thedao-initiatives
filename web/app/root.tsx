@@ -10,7 +10,7 @@ import type { Route } from "./+types/root";
 import { Providers } from "~/context/providers";
 import TopBar from "~/components/layout/TopBar";
 import Footer from "~/components/layout/Footer";
-import PageSkeleton from "~/components/layout/PageSkeleton";
+import ShellSkeleton, { SHELL_SCRIPT } from "~/components/layout/ShellSkeleton";
 import "./app.css";
 
 // Fonts as a <link> rather than an @import inside app.css: the browser fetches
@@ -48,7 +48,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         />
         <script
           dangerouslySetInnerHTML={{
-            __html: "setTimeout(function(){document.body.style.visibility='visible'},4000)",
+            __html: "setTimeout(function(){document.body.style.visibility='visible'},4000);" +
+              SHELL_SCRIPT,
           }}
         />
         <Meta />
@@ -85,14 +86,16 @@ export default function App() {
 }
 
 /**
- * Prerendered SPA shell for non-prerendered URLs (initiative pages): no
- * wallet/session providers (browser-only), static top bar, and the detail
+ * Prerendered SPA shell for non-prerendered URLs (initiative and admin
+ * pages): no wallet/session providers (browser-only), static top bar, and a
  * skeleton in the page area so a direct hit does not start with the footer.
+ * The skeleton's shape follows the URL (SHELL_SCRIPT), so the route's own
+ * loading state continues it instead of replacing it.
  */
 export function HydrateFallback() {
   return (
     <Shell staticShell>
-      <PageSkeleton />
+      <ShellSkeleton />
     </Shell>
   );
 }

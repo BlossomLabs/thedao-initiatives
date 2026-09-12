@@ -690,3 +690,10 @@
 body {
   visibility: visible;
 }
+
+/* The SPA shell skeleton (ShellSkeleton) carries both page shapes; the head
+   script in root.tsx marks the dashboard URL and this shows the matching one. */
+html[data-shell="dashboard"] .shell-detail,
+html:not([data-shell="dashboard"]) .shell-dashboard {
+  display: none;
+}

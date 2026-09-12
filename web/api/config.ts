@@ -132,7 +132,15 @@ function flag(v: string | undefined): boolean {
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const rpcOverride = (env.RPC_URL ?? "").trim();
   const alchemyApiKey = (env.ALCHEMY_API_KEY ?? "").trim();
-  const webOrigins = list(env.WEB_ORIGIN);
+  // Bare origins: the browser's Origin header has no trailing slash or path,
+  // and the guard compares exact strings (a "https://host/" entry matched nothing).
+  const webOrigins = list(env.WEB_ORIGIN).map((o) => {
+    try {
+      return new URL(o).origin;
+    } catch {
+      return o;
+    }
+  });
   if (webOrigins.length === 0) webOrigins.push("http://localhost:5173");
   let siweDomains = list(env.SIWE_DOMAINS);
   if (siweDomains.length === 0) {

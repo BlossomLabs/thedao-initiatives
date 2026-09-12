@@ -24,3 +24,15 @@ Deno.test("selfOrigin: platform hosts only; X-Forwarded-Proto only when the prox
   );
   assertEquals(selfOrigin(new Request("https://x.deno.net/"), custom), null);
 });
+
+Deno.test("config: WEB_ORIGIN entries are normalized to bare origins (trailing slash, path, case)", () => {
+  const cfg = loadConfig({
+    WEB_ORIGIN: "https://initiatives.thedao.fund/, HTTPS://Fund.TheDAO.fund/board , http://localhost:5173",
+  });
+  assertEquals(cfg.webOrigins, [
+    "https://initiatives.thedao.fund",
+    "https://fund.thedao.fund",
+    "http://localhost:5173",
+  ]);
+  assertEquals(cfg.siweDomains, ["initiatives.thedao.fund", "fund.thedao.fund", "localhost:5173"]);
+});

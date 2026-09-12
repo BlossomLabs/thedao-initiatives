@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import Skeleton from "~/components/ui/Skeleton";
 import { Link } from "react-router";
 import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
@@ -80,7 +81,14 @@ export default function Leads() {
         Private fundraising intelligence from the "Who is likely to fund this?" field. Never
         published. The CSV is the interchange for the CRM.
       </p>
-      {isLoading && <p className="text-muted">Loading…</p>}
+      {isLoading && (
+        <div aria-busy="true" aria-label="Loading">
+          <Skeleton className="mt-4 h-[46px] rounded-t-2xl" />
+          <Skeleton className="mt-px h-12" />
+          <Skeleton className="mt-px h-12" />
+          <Skeleton className="mt-px h-12 rounded-b-2xl" />
+        </div>
+      )}
       {error && (
         <p className="alert">{error instanceof Error ? error.message : "Could not load leads."}</p>
       )}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import PageSkeleton from "~/components/layout/PageSkeleton";
 import StickyAside from "~/components/layout/StickyAside";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
@@ -72,15 +73,7 @@ export default function AdminInitiativeEditor() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <PageMain detail>
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="mt-4 h-10 w-2/3" />
-        <Skeleton className="mt-8 h-32" />
-      </PageMain>
-    );
-  }
+  if (isLoading) return <PageSkeleton />;
   if (error || !data) {
     return (
       <PageMain detail>

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import Skeleton from "~/components/ui/Skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { Bell } from "lucide-react";
@@ -28,6 +29,29 @@ function CommentCell({ c }: { c: AdminComment }) {
         {truncate(c.body, 200)}
       </span>
     </td>
+  );
+}
+
+/** The dashboard's shape while it loads: title, three status cards, sync bar, two tables. */
+function DashboardSkeleton() {
+  return (
+    <PageMain detail aria-busy="true" aria-label="Loading">
+      <Skeleton className="h-4 w-28" />
+      <div className="mt-4 flex items-center justify-between gap-5">
+        <Skeleton className="h-11 w-72" />
+        <Skeleton className="h-8 w-48 rounded-full" />
+      </div>
+      <div className="mt-3.5 grid grid-cols-3 gap-3 max-[860px]:grid-cols-1">
+        <Skeleton className="h-[68px] rounded-2xl" />
+        <Skeleton className="h-[68px] rounded-2xl" />
+        <Skeleton className="h-[68px] rounded-2xl" />
+      </div>
+      <Skeleton className="mt-3 h-[76px] rounded-2xl" />
+      <Skeleton className="mt-[46px] h-3.5 w-52" />
+      <Skeleton className="mt-4 h-[140px] rounded-2xl" />
+      <Skeleton className="mt-[46px] h-3.5 w-36" />
+      <Skeleton className="mt-4 h-[260px] rounded-2xl" />
+    </PageMain>
   );
 }
 
@@ -62,13 +86,7 @@ export default function Dashboard() {
   };
   const bulkComments = bulk("/api/admin/comments/bulk");
   const bulkInitiatives = bulk("/api/admin/initiatives/bulk");
-  if (isLoading) {
-    return (
-      <PageMain detail>
-        <p className="text-muted">Loading…</p>
-      </PageMain>
-    );
-  }
+  if (isLoading) return <DashboardSkeleton />;
   if (error || !data) {
     return (
       <PageMain detail>

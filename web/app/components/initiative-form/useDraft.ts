@@ -293,7 +293,9 @@ export function splitReport(res: SplitResult, type: DraftType) {
   for (const k of ["title", "summary", "goal", "duration", "links", "recipient"] as const) {
     if (p[k]) fields++;
   }
-  if (p.backers && parseBackers(p.backers).length) fields++;
+  const backerRows = p.backers ? parseBackers(p.backers).length : 0;
+  if (backerRows) fields++;
+  const letter = (i: number) => String.fromCharCode(65 + (i % 26));
   return {
     sections,
     milestones: res.milestones.length,
@@ -301,6 +303,13 @@ export function splitReport(res: SplitResult, type: DraftType) {
     unsorted: Boolean(res.unsorted.trim()),
     /** Section keys that only the other type has (the paste was for a grant). */
     otherType: others,
+    /** What did not read as intended, for the hints under the box. */
+    noAmount: res.milestones.map((m, i) => (m.amount > 0 ? "" : letter(i))).filter(Boolean),
+    noCriteria: res.milestones.map((m, i) => (m.criteria.length ? "" : letter(i))).filter(
+      Boolean,
+    ),
+    /** A "Backers already committed" heading with no `Org | amount | link` line under it. */
+    backersUnread: Boolean(p.backers?.trim()) && backerRows === 0,
   };
 }
 

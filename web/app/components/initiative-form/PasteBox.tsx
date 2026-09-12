@@ -11,20 +11,6 @@ import { Textarea } from "~/components/ui/Field";
 import { splitReport } from "./useDraft";
 import type { SplitResult } from "@shared/draft/mod";
 
-export const PASTE_HINT = (
-  <>
-    Milestone headings look like{" "}
-    <code>### Agreed standard - $50,000</code>, in order: the site letters them A, B, C. Add{" "}
-    <code>(adoption)</code> to a milestone that pays only on evidence of adoption, and{" "}
-    <code>(done)</code>{" "}
-    to a top-up milestone that is already finished. Bullet lines under a milestone become its
-    acceptance criteria, one per line. Under{" "}
-    <code>## Backers already committed</code>, one backer per line as{" "}
-    <code>Organization | amount | link</code>. Headings inside a section become bold text: the site
-    owns the headings.
-  </>
-);
-
 type Report = ReturnType<typeof splitReport>;
 
 export function reportLine(r: Report): string {
@@ -33,6 +19,76 @@ export function reportLine(r: Report): string {
   }, ${r.fields} page field${r.fields === 1 ? "" : "s"}${
     r.unsorted ? ", plus text nothing matched." : "."
   }`;
+}
+
+const list = (letters: string[]) =>
+  letters.length === 1
+    ? `Milestone ${letters[0]}`
+    : `Milestones ${letters.join(", ").replace(/, ([^,]*)$/, " and $1")}`;
+
+/**
+ * Hints only for what did not read as intended, shown after a sort: nobody
+ * reads format rules before pasting, they read them when something did not
+ * land. Each names the shape the site expects.
+ */
+export function formatHints(r: Report): { key: string; text: React.ReactNode }[] {
+  const out: { key: string; text: React.ReactNode }[] = [];
+  if (r.unsorted) {
+    out.push({
+      key: "unsorted",
+      text: (
+        <>
+          Text under a heading the site does not know went to the Unsorted box below. Headings
+          inside a section become bold text; the site owns the section headings.
+        </>
+      ),
+    });
+  }
+  if (r.milestones === 0) {
+    out.push({
+      key: "no-milestones",
+      text: (
+        <>
+          No milestones found. Put them under <code>## Milestones</code> as{" "}
+          <code>### Name - $50,000</code>, one bullet line per acceptance criterion; add{" "}
+          <code>(adoption)</code> to the one that pays only on evidence of adoption.
+        </>
+      ),
+    });
+  }
+  if (r.noAmount.length) {
+    out.push({
+      key: "no-amount",
+      text: (
+        <>
+          {list(r.noAmount)} {r.noAmount.length === 1 ? "has" : "have"} no amount: heading as{" "}
+          <code>### Name - $50,000</code>.
+        </>
+      ),
+    });
+  }
+  if (r.noCriteria.length) {
+    out.push({
+      key: "no-criteria",
+      text: (
+        <>
+          {list(r.noCriteria)} {r.noCriteria.length === 1 ? "has" : "have"}{" "}
+          no acceptance criteria: bullet lines under the heading become them, one per line.
+        </>
+      ),
+    });
+  }
+  if (r.backersUnread) {
+    out.push({
+      key: "backers",
+      text: (
+        <>
+          Backers go one per line as <code>Organization | $20,000 | https://link</code>.
+        </>
+      ),
+    });
+  }
+  return out;
 }
 
 export default function PasteBox(
@@ -64,6 +120,7 @@ export default function PasteBox(
     setReport(splitReport(res, type));
   };
   const grantHint = report && type === "rfp" && report.otherType.length > 0;
+  const hints = report ? formatHints(report) : [];
 
   return (
     <div className="mt-6" data-field="paste">
@@ -89,7 +146,6 @@ export default function PasteBox(
           timer.current = setTimeout(() => sort(), 0);
         }}
       />
-      <p className="hint m-0">{PASTE_HINT}</p>
       <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
         <Button variant="ghost" sm disabled={disabled || !text.trim()} onClick={() => sort()}>
           Sort this text
@@ -126,6 +182,11 @@ export default function PasteBox(
           </span>
         )}
       </div>
+      {hints.length > 0 && (
+        <ul className="hint m-0 mt-1.5 list-none p-0 text-[#ffe9b8]" data-field="paste-hints">
+          {hints.map((h) => <li key={h.key}>{h.text}</li>)}
+        </ul>
+      )}
       {grantHint && (
         <p className="hint m-0 mt-1.5 text-[#ffe9b8]">
           Switch to Grant to sort{" "}

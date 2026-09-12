@@ -80,3 +80,36 @@ describe("PasteBox", () => {
       .toBeInTheDocument();
   });
 });
+
+describe("PasteBox hints", () => {
+  it("says nothing when the example sorts cleanly", async () => {
+    render(<Harness />);
+    paste(EXAMPLE);
+    await screen.findByRole("status");
+    expect(document.querySelector('[data-field="paste-hints"]')).toBeNull();
+  });
+
+  it("names exactly what did not read: amounts, criteria, backers, missing milestones", async () => {
+    render(<Harness />);
+    paste(
+      "## Why this matters\n\nBecause.\n\n## Backers already committed\n\nArgot 20000\n\n" +
+        "## Milestones\n\n### First\n- done\n\n### Second - $10,000\n\n### Third - $5,000\n- x\n",
+    );
+    await screen.findByRole("status");
+    const hints = document.querySelector('[data-field="paste-hints"]')!.textContent!;
+    expect(hints).toContain("Milestone A has no amount");
+    expect(hints).toContain("Milestone B has no acceptance criteria");
+    expect(hints).toContain("Backers go one per line");
+    expect(hints).not.toContain("No milestones found");
+    expect(hints).not.toContain("Unsorted box");
+  });
+
+  it("points at the milestones heading when none were found", async () => {
+    render(<Harness />);
+    paste("## Why this matters\n\nBecause.\n\n## Random\n\nlost\n");
+    await screen.findByRole("status");
+    const hints = document.querySelector('[data-field="paste-hints"]')!.textContent!;
+    expect(hints).toContain("No milestones found");
+    expect(hints).toContain("Unsorted box");
+  });
+});

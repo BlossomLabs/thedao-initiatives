@@ -43,6 +43,7 @@ import type {
 import { LEGACY_NOTE } from "~/lib/edit-initiative";
 import { walletErrorMessage } from "~/lib/donate";
 import { dt, shortAddr, usd } from "~/lib/format";
+import { discussionKind } from "~/lib/discussion";
 
 type Msg = { kind: StatusKind; text: string } | null;
 type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<void>;
@@ -233,7 +234,9 @@ export default function AdminInitiativeEditor() {
                 <li>
                   <a href={r.discourseUrl} target="_blank" rel="noopener">
                     <MessageSquare className="mr-1.5 inline size-3.5 align-[-2px]" />
-                    Forum thread
+                    {discussionKind(r.discourseUrl) === "telegram"
+                      ? "Group discussion"
+                      : "Forum thread"}
                   </a>
                 </li>
               )}

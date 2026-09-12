@@ -6,6 +6,7 @@ import RevisionPanel, { type ViewMode } from "~/components/initiative/RevisionBa
 import KeyFacts from "~/components/initiative/KeyFacts";
 import { useSession } from "~/context/session";
 import type { InitiativePage } from "~/lib/api-types";
+import { openDiscussion } from "~/lib/discussion";
 import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
 import { WHAT_NEXT } from "~/data/what-next";
 
@@ -58,7 +59,8 @@ export default function SideCards(
             target="_blank"
             rel="noopener"
           >
-            <MessageSquare className="size-[15px]" />Open the forum thread
+            <MessageSquare className="size-[15px]" />
+            {openDiscussion(r.discourseUrl)}
           </a>
         </div>
       )}

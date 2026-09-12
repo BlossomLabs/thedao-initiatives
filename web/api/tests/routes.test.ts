@@ -804,7 +804,7 @@ Deno.test("submit: blank title is read from the Discourse topic; forum errors ar
   assertStringIncludes(String((await j(noTitle)).error), "could not read a title");
   const nothing = await h.req("/api/initiatives", { method: "POST", token, json: good });
   assertEquals(nothing.status, 400);
-  assertStringIncludes(String((await j(nothing)).error), "forum link");
+  assertStringIncludes(String((await j(nothing)).error), "Discourse link");
   const badHost = await h.req("/api/initiatives", {
     method: "POST",
     token,

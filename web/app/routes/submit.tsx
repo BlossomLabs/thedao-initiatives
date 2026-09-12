@@ -244,8 +244,9 @@ export default function Submit() {
         Suggest an initiative
       </h1>
       <p className="mt-3.5 max-w-[760px] font-inter-tight text-[15px] font-light leading-[1.65] text-muted">
-        The strongest initiatives start as a forum post where the idea gets discussed in public;
-        link it here if you have one. Submissions are reviewed before they appear on the site.
+        The strongest initiatives start as a forum post or a group chat where the idea gets
+        discussed in public; link it here if you have one. Submissions are reviewed before they
+        appear on the site.
       </p>
       <Shimmer soft />
 

@@ -28,6 +28,7 @@ import { diffRevisions } from "~/lib/revision-diff";
 import type { RevisionText } from "~/lib/api-types";
 import { SITE_NAME } from "~/data/site";
 import { dt } from "~/lib/format";
+import { discussionKind } from "~/lib/discussion";
 import { generateMeta } from "~/utils/meta";
 import { isStructured } from "@shared/draft/mod";
 
@@ -163,7 +164,9 @@ export default function Initiative() {
                         <>
                           Follow and shape it{" "}
                           <a href={r.discourseUrl} target="_blank" rel="noopener">
-                            on the forum thread
+                            {discussionKind(r.discourseUrl) === "telegram"
+                              ? "in the group discussion"
+                              : "on the forum thread"}
                           </a>.
                         </>
                       )}

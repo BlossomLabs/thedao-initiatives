@@ -36,7 +36,8 @@ Frontmatter keys:
 - `goal` (required, USD number; `600000` or `$600,000` both work)
 - `summary` (recommended, the board-card text; long values may wrap onto
   indented continuation lines as shown above)
-- `forum` (optional, the Discourse discussion link)
+- `forum` (optional, the discussion link: a Discourse topic, or a Telegram
+  group as a `t.me` link; the page labels each accordingly)
 - `status` (optional, `approved` or `pending`; only used when the file is
   first created, default `approved`)
 - `pin` (optional, board position 1 = top; sets the admin pin)

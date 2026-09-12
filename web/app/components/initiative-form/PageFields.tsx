@@ -102,8 +102,8 @@ export default function PageFields(
       )}
       <FormField
         field="discourse_url"
-        label="Forum link"
-        hint="Optional Discourse topic where this initiative is discussed."
+        label="Discussion link"
+        hint="Optional Discourse topic or Telegram group where this initiative is discussed."
       >
         <Input
           type="url"

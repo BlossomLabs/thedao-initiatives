@@ -249,8 +249,8 @@ export function initiativeRoutes(deps: Deps) {
       throw new HttpError(
         400,
         discourseUrl && !s(body.title)
-          ? "We could not read a title from that forum link. Please give the initiative a title (at least 8 characters)."
-          : "Please give the initiative a title (at least 8 characters), or a forum link we can read it from.",
+          ? "We could not read a title from that discussion link. Please give the initiative a title (at least 8 characters)."
+          : "Please give the initiative a title (at least 8 characters), or a Discourse link we can read it from.",
       );
     }
     const summary = cleanText(body.summary, "summary");

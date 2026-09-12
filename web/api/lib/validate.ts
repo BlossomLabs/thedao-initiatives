@@ -88,13 +88,13 @@ export async function resolvePublicIps(
   return [ips, null];
 }
 
-/** Accept an https link to a (Discourse) forum topic. */
+/** Accept an https discussion link: a (Discourse) forum topic or a Telegram group. */
 export async function validateForumUrl(
   raw: unknown,
   resolve: typeof resolvePublicIps = resolvePublicIps,
 ): Promise<[string, null] | [null, string]> {
   const s = String(raw ?? "").trim();
-  if (!s) return [null, "A forum link is required."];
+  if (!s) return [null, "A discussion link is required."];
   if (s.length > 500) return [null, "Link is too long."];
   let u: URL;
   try {
@@ -102,13 +102,13 @@ export async function validateForumUrl(
   } catch {
     return [null, "That does not look like a valid URL."];
   }
-  if (u.protocol !== "https:") return [null, "The forum link must be https."];
+  if (u.protocol !== "https:") return [null, "The discussion link must be https."];
   const host = u.hostname.toLowerCase();
   if (!host || !FORUM_HOST_RE.test(host) || !host.includes(".")) {
-    return [null, "That does not look like a valid forum host."];
+    return [null, "That does not look like a valid discussion link host."];
   }
   const [ips] = await resolve(host);
-  if (!ips) return [null, "That forum host is not reachable."];
+  if (!ips) return [null, "That discussion link host is not reachable."];
   u.hash = "";
   return [u.toString(), null];
 }

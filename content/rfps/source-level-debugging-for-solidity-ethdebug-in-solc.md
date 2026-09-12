@@ -1,6 +1,8 @@
 ---
 title: Source-Level Debugging for Solidity: ethdebug in solc
 type: grant
+recipient: Walnut
+recipient_url: https://walnut.dev/
 goal: 236500
 summary: solc does not emit the debug information debuggers need, so every tool
   reverse-engineers compiler behavior and breaks when the compiler changes. This
@@ -8,6 +10,8 @@ summary: solc does not emit the debug information debuggers need, so every tool
   survives the full optimizer pipeline so it works on production builds.
 topup: true
 reviewer: Nicholas D'Andrea (ethdebug) and Nikola Matic (Solidity)
+backers:
+  Argot Collective | $151,000 | https://argot.org/
 ---
 ## Why this matters
 

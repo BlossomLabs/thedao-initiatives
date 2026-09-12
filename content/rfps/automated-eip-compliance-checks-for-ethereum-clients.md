@@ -1,6 +1,8 @@
 ---
 title: Automated EIP Compliance Checks for Ethereum Clients
 type: grant
+recipient: Safi El-Hassanine (PRSpec)
+recipient_url: https://github.com/Fosurero/PRSpec
 goal: 20000
 summary: Ethereum's client teams implement EIPs by reading specification text
   and writing code, and conformance test suites only catch the divergences

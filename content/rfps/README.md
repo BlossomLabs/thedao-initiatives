@@ -49,6 +49,14 @@ Frontmatter keys:
   another funder: the page shows the top-up rules panel and "raises the
   remaining" from the pledges)
 - `reviewer` (top-ups only, who decides whether the remaining milestones pass)
+- `backers` (optional, the pledges already committed: one indented line per
+  backer, `Org | $amount | https://link`, the link optional, at most 12)
+
+  ```markdown
+  backers:
+    Ethereum Foundation | $100,000 | https://ethereum.foundation/
+    Acme Security | 25000
+  ```
 
 The process rules are NOT part of the body any more: the site renders the
 panel for the type from `content/boilerplate/*.md`. Do not paste a header
@@ -60,7 +68,14 @@ warns when a file still carries a Process or Milestone review heading.
 
 - Files own the **words and the goal**. The admin panel owns the
   **lifecycle**: editing a file never changes an initiative's status, its Safe,
-  or any donation/pledge data.
+  or any donation data.
+- Pledges: a backer named in the file is created on the first sync and kept
+  in step afterwards (amount, link, spelling), matched by organization name.
+  Whether a pledge is received or withdrawn stays the admin's call, and
+  removing a line withdraws nothing: mark it withdrawn in the admin panel.
+  Pledges added in the admin panel that the file does not name are left alone.
+- An archived initiative stays archived when its file syncs again (same
+  filename, same slug). Bring it back with Unarchive in the admin panel.
 - Deleting a file never deletes the initiative (archive it in the admin panel
   instead).
 - A file with an error (missing title, bad goal) is skipped and reported in

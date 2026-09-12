@@ -2,6 +2,8 @@
 title: Decentralized, Privacy-Preserving EDR
 goal: 300000
 type: grant
+recipient: Auditware
+recipient_url: https://auditware.io/
 status: approved
 summary: Endpoint Detection and Response is one of the highest-value security
   controls a team can run, and almost nobody in crypto runs it, because

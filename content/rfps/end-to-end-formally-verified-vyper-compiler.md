@@ -1,6 +1,8 @@
 ---
 title: End-to-End Formally Verified Vyper Compiler
 type: grant
+recipient: Vyper core team
+recipient_url: https://vyperlang.org/
 goal: 600000
 summary: Vyper is the second most widely used EVM language, securing billions of
   dollars in production protocols like Curve, Yearn, and Lido, yet the

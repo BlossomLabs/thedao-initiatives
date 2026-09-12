@@ -1,15 +1,23 @@
 import type { MiddlewareHandler } from "hono";
 import type { Vars } from "./context.ts";
 import type { Db } from "../db/mod.ts";
+import type { Config } from "../config.ts";
 import { HttpError } from "../lib/errors.ts";
+import { isAdminAddress } from "../services/roles.ts";
 
-/** Reads `Authorization: Bearer <token>` into c.var.user (null when absent/invalid). */
-export function sessionLoader(db: Db): MiddlewareHandler<Vars> {
+/** Reads `Authorization: Bearer <token>` into c.var.user (null when absent/invalid).
+ * The admin flag follows the current ADMIN_ADDRESSES, not the one at sign-in,
+ * so a wallet added to (or removed from) the list needs no new session. */
+export function sessionLoader(db: Db, config?: Config): MiddlewareHandler<Vars> {
   return async (c, next) => {
     const h = c.req.header("authorization") ?? "";
     const token = /^Bearer\s+(.+)$/i.exec(h)?.[1]?.trim() ?? "";
     c.set("token", token);
-    c.set("user", token ? await db.sessions.get(token) : null);
+    const user = token ? await db.sessions.get(token) : null;
+    c.set(
+      "user",
+      user && config ? { ...user, isAdmin: isAdminAddress(config, user.address) } : user,
+    );
     await next();
   };
 }

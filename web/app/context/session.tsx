@@ -103,7 +103,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      setMe(await api<Me>("/api/auth/me", { token: s.token }));
+      const m = await api<Me>("/api/auth/me", { token: s.token });
+      setMe(m);
+      // The admin flag follows the API's current admin list, not sign-in time.
+      if (m.isAdmin !== s.isAdmin && sessionRef.current?.token === s.token) {
+        const next = { ...s, isAdmin: m.isAdmin };
+        setSession(next);
+        save(next);
+      }
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) clear();
     }

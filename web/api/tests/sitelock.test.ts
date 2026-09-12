@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { ADMIN, harness } from "./app-helpers.ts";
+import { ADMIN, harness, PLAIN } from "./app-helpers.ts";
 import { LOCK_COOKIE } from "../lib/sitelock.ts";
 
 const BASIC = "Basic " + btoa("preview:s3cret");
@@ -46,4 +46,19 @@ Deno.test("site lock: basic -> cookie -> bearer session; healthz stays open", as
   } finally {
     h.close();
   }
+});
+
+Deno.test("admin flag follows ADMIN_ADDRESSES after sign-in, without a new session", async () => {
+  const h = await harness();
+  // a session minted as a plain user...
+  const token = await h.mint(PLAIN, false);
+  const before = await h.req("/api/admin/dashboard", { token });
+  assertEquals(before.status, 403);
+  // ...becomes admin as soon as the address is in the config's list
+  h.deps.config.adminAddresses.push(PLAIN);
+  const after = await h.req("/api/admin/dashboard", { token });
+  assertEquals(after.status, 200);
+  const me = await (await h.req("/api/auth/me", { token })).json() as { isAdmin: boolean };
+  assertEquals(me.isAdmin, true);
+  h.close();
 });

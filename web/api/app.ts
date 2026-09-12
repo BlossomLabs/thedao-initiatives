@@ -50,7 +50,7 @@ export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
   app.use("*", clientIp(deps.config.trustProxy));
   app.use("*", originGuard(deps.config));
   app.use("*", bodyLimit({ maxSize: 2 * 1024 * 1024 }));
-  app.use("*", sessionLoader(deps.db));
+  app.use("*", sessionLoader(deps.db, deps.config));
 
   app.route("/healthz", healthRoutes(deps));
   app.route("/api/auth", authRoutes(deps));

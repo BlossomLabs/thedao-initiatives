@@ -91,6 +91,26 @@ export function formatHints(r: Report): { key: string; text: React.ReactNode }[]
   return out;
 }
 
+/** The empty box teaches by example: a skeleton draft in the placeholder. */
+export const PASTE_PLACEHOLDER = [
+  "Paste the draft your AI wrote. It sorts as soon as it lands. The shape it reads:",
+  "",
+  "## Title",
+  'One line, no "RFP:" prefix',
+  "",
+  "## Why this matters",
+  "One heading per section, in the guide's order; headings inside a section become bold.",
+  "",
+  "## Milestones",
+  "### Agreed standard - $50,000",
+  "- One checkable outcome per bullet line",
+  "### Adoption evidence - $75,000 (adoption)",
+  "- The (adoption) one pays only on evidence of adoption; (done) marks a finished top-up milestone",
+  "",
+  "## Backers already committed",
+  "Organization | $20,000 | https://link",
+].join("\n");
+
 export default function PasteBox(
   { type, onSplit, onUndo, canUndo, unsorted, onUnsorted, initialText = "", disabled }: {
     type: DraftType;
@@ -134,10 +154,10 @@ export default function PasteBox(
       <textarea
         ref={ref}
         id="f-paste"
-        className="field mono mt-1.5 min-h-[160px] text-[13px] leading-[1.5]"
-        rows={8}
+        className="field mono mt-1.5 min-h-[160px] text-[13px] leading-[1.5] placeholder:text-white/30"
+        rows={text ? 8 : 17}
         spellCheck={false}
-        placeholder="Paste the draft your AI wrote. Sorting starts as soon as it lands."
+        placeholder={PASTE_PLACEHOLDER}
         value={text}
         disabled={disabled}
         onChange={(e) => setText(e.target.value)}

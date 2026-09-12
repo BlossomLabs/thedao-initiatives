@@ -81,6 +81,18 @@ describe("PasteBox", () => {
   });
 });
 
+describe("PasteBox placeholder", () => {
+  it("shows a skeleton draft while empty and shrinks once text is in", () => {
+    render(<Harness />);
+    const ta = screen.getByLabelText(/Paste your whole draft here/) as HTMLTextAreaElement;
+    expect(ta.placeholder).toContain("### Agreed standard - $50,000");
+    expect(ta.placeholder).toContain("Organization | $20,000 | https://link");
+    expect(ta.rows).toBe(17);
+    fireEvent.change(ta, { target: { value: "## Why this matters\n\nx" } });
+    expect(ta.rows).toBe(8);
+  });
+});
+
 describe("PasteBox hints", () => {
   it("says nothing when the example sorts cleanly", async () => {
     render(<Harness />);

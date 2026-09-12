@@ -14,9 +14,9 @@ import { cn } from "~/lib/utils";
 /**
  * Figma card: 16px radius, 24px padding, white/5 fill, white/10 border; Inter
  * Tight 16px medium title, 13px/1.6 white/55 summary, then a bottom block
- * pinned to the card's end (6px bar, 13px numbers, "Backed by" 40px chips,
- * 38px buttons). Cards in a row share a height, so the block sits at the same
- * level across the row.
+ * pinned to the card's end (6px bar, 13px numbers, then one row: 38px buttons
+ * on the left, "Backed by" 40px chips on the right). Cards in a row share a
+ * height, so the block sits at the same level across the row.
  */
 export default function InitiativeCard({
   card,
@@ -95,20 +95,7 @@ export default function InitiativeCard({
             </span>
           )}
       </div>
-      {(logos.length > 0 || backers > 0) && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="mr-0.5 font-inter-tight text-[12px] text-white/30">Backed by</span>
-          {logos.length
-            ? logos.map((l) => (
-              <BackerLogo key={l.logoUrl} logoUrl={l.logoUrl} company={l.company} />
-            ))
-            : Array.from(
-              { length: Math.min(backers, 4) },
-              (_, i) => <BackerLogo key={i} logoUrl="" company="" />,
-            )}
-        </div>
-      )}
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {canDonate && (
           <Button variant="primary" sm onClick={() => setOpen((o) => !o)}>
             {open ? "Close" : "Donate"}
@@ -124,6 +111,20 @@ export default function InitiativeCard({
         >
           Details <ArrowRight className="size-3.5" />
         </LinkButton>
+        {(logos.length > 0 || backers > 0) && (
+          // Right of the buttons; on a card too narrow for both, its own line, still right-aligned.
+          <div className="ml-auto flex items-center gap-2">
+            <span className="mr-0.5 font-inter-tight text-[12px] text-white/30">Backed by</span>
+            {logos.length
+              ? logos.map((l) => (
+                <BackerLogo key={l.logoUrl} logoUrl={l.logoUrl} company={l.company} />
+              ))
+              : Array.from(
+                { length: Math.min(backers, 4) },
+                (_, i) => <BackerLogo key={i} logoUrl="" company="" />,
+              )}
+          </div>
+        )}
       </div>
       {canDonate && open && (
         <div className="mt-3.5 border-t border-edge pt-3.5">

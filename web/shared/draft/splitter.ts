@@ -64,7 +64,7 @@ export interface PastedBacker {
   org: string;
   amountUsd: number;
   url: string;
-  /** Optional 4th field: an image file name (content/logos/<name>), pinned by the sync. */
+  /** Optional 4th field: an image file name (content/rfps/logos/<name>), pinned by the sync. */
   logo: string;
 }
 

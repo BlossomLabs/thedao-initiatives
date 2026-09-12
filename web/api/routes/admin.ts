@@ -527,7 +527,7 @@ export function adminRoutes(deps: Deps) {
   });
 
   /**
-   * A content logo (content/logos/<name>), pinned to IPFS once: the same bytes
+   * A content logo (content/rfps/logos/<name>), pinned to IPFS once: the same bytes
    * come back with the stored CID, new bytes replace it. The sync then maps
    * the name in a backers line to the CID. Multipart: `name`, `image`.
    */

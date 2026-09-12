@@ -225,11 +225,11 @@ export async function loadContentFiles(): Promise<{ name: string; text: string }
 }
 
 /**
- * The repo's content/logos, registered as already pinned (fake CIDs) so the
+ * The repo's content/rfps/logos, registered as already pinned (fake CIDs) so the
  * real content files, whose backers lines name them, sync without Pinata.
  */
 export async function seedContentLogos(h: Harness): Promise<string[]> {
-  const dir = new URL("../../../content/logos/", import.meta.url);
+  const dir = new URL("../../../content/rfps/logos/", import.meta.url);
   const names: string[] = [];
   for await (const e of Deno.readDir(dir)) {
     if (!e.isFile || !/\.(png|jpe?g|webp)$/i.test(e.name)) continue;

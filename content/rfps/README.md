@@ -52,7 +52,7 @@ Frontmatter keys:
 - `reviewer` (top-ups only, who decides whether the remaining milestones pass)
 - `backers` (optional, the pledges already committed: one indented line per
   backer, `Org | $amount | https://link | logo.png`, the link and the logo
-  optional, at most 12). The logo is a file name in `content/logos/` (png,
+  optional, at most 12). The logo is a file name in `content/rfps/logos/` (png,
   jpg or webp, under 1 MB): the sync pins it to IPFS once and puts the
   picture on the pledge; the image never lives in the database as text.
 

@@ -13,7 +13,7 @@ interface SyncResult {
   errors: string[];
 }
 
-/** What the sync takes: content/rfps/*.md, and content/logos/* for backer logos. */
+/** What the sync takes: content/rfps/*.md, and content/rfps/logos/* for backer logos. */
 async function readContent(list: FileList | null) {
   const files: { name: string; text: string }[] = [];
   const logos: File[] = [];
@@ -86,10 +86,10 @@ export default function SyncContent() {
                 </ul>
                 {logoMissing && (
                   <p className="m-0 mt-2">
-                    No logo files were in this pick. Choose the whole{" "}
-                    <span className="mono">content</span> folder, or its{" "}
+                    No logo files were in this pick. Choose the{" "}
+                    <span className="mono">content/rfps</span> folder, which carries its{" "}
                     <span className="mono">logos</span>{" "}
-                    folder on its own, then sync the files again: pinned logos stay.
+                    subfolder, then sync again: pinned logos stay.
                   </p>
                 )}
               </>
@@ -115,9 +115,9 @@ export default function SyncContent() {
       <div className="min-w-[220px] flex-1">
         <b className="block font-inter-tight text-[14px] font-semibold">Sync content files</b>
         <small className="block text-[12px] text-muted">
-          Pick the repo's <span className="mono">content</span>{" "}
+          Pick the repo's <span className="mono">content/rfps</span>{" "}
           folder (or its markdown files). Files own the words and the goal; status, Safes and money
-          stay as they are. Backer logos in <span className="mono">content/logos</span>{" "}
+          stay as they are. Backer logos in <span className="mono">content/rfps/logos</span>{" "}
           are pinned to IPFS on the way.
         </small>
       </div>

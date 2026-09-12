@@ -26,10 +26,10 @@ if (!token) {
   token = (await siweLogin({ apiUrl, webOrigin, privateKey: key })).token;
 }
 
-// Logos first: content/logos/<name> is pinned once (same bytes = same CID),
+// Logos first: content/rfps/logos/<name> is pinned once (same bytes = same CID),
 // so a backers line can name the file.
 const logosDir = env("CONTENT_LOGOS_DIR") ||
-  new URL("../../../content/logos/", import.meta.url).pathname;
+  new URL("../../../content/rfps/logos/", import.meta.url).pathname;
 let logos = 0;
 try {
   for await (const e of Deno.readDir(logosDir)) {

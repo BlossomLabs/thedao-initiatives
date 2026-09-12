@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Lock, UserPlus, X } from "lucide-react";
+import { Loader2, Lock, Trash2, UserPlus } from "lucide-react";
 import { Button } from "~/components/ui/Button";
 import { Input } from "~/components/ui/Field";
 import Status, { type StatusKind } from "~/components/ui/Status";
@@ -74,17 +74,18 @@ export default function Admins() {
                   </span>
                 )
                 : (
-                  <Button
-                    variant="ghost"
-                    sm
+                  <button
+                    type="button"
+                    className="inline-flex cursor-pointer items-center rounded border-0 bg-transparent p-0.5 text-[#ff9a9a] hover:text-[#ffb3b3] disabled:cursor-default disabled:opacity-40"
                     aria-label={`Remove ${shortAddr(a.address)}`}
                     title={you ? "You cannot remove yourself" : "Remove"}
                     disabled={you || Boolean(busy)}
-                    loading={busy === a.address}
                     onClick={() => void remove(a.address)}
                   >
-                    <X className="size-4" />
-                  </Button>
+                    {busy === a.address
+                      ? <Loader2 className="size-4 animate-spin" />
+                      : <Trash2 className="size-4" />}
+                  </button>
                 )}
             </li>
           );

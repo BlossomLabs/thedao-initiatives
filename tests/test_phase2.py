@@ -142,6 +142,29 @@ class TestSubmitEndToEnd(Base):
         self.assertIn("<h2>The team</h2>", html)
         self.assertNotIn("<h2>Hard requirements</h2>", html)
 
+    def test_links_only_keep_http_urls(self):
+        """Stored XSS report (Sem, 2026-09-11): a javascript: line in Links must never reach the page."""
+        rows = draft.milestones_from_json(form_from_doc(example_doc())["milestones_json"])
+        rows[0]["done"] = True
+        rows[0]["link"] = "javascript:alert(1)"
+        data = form_from_doc(example_doc(), title="Phase two links probe",
+                             links="javascript:alert(1)\nhttps://example.org/ok\n data:text/html,hi \nnot a url\nhttps://example.org/ok",
+                             milestones_json=draft.milestones_to_json(rows))
+        self.assertEqual(self.post_submit(data).status_code, 200)
+        row = self.approve("phase-two-links-probe")
+        self.assertEqual(row["links"], "https://example.org/ok")
+        self.assertEqual(draft.milestones_from_json(row["milestones_json"])[0]["link"], "")
+        html = self.client.get("/initiative/" + row["slug"]).data.decode()
+        self.assertNotIn("javascript:", html)
+        self.assertNotIn("data:text", html)
+        self.assertIn('href="https://example.org/ok"', html)
+        # admin edit path and legacy stored data go through the same filter
+        self.admin()
+        db.update_rfp(row["id"], links="javascript:alert(2)\nhttps://example.org/two")
+        html = self.client.get("/initiative/" + row["slug"]).data.decode()
+        self.assertNotIn("javascript:", html)
+        self.assertIn('href="https://example.org/two"', html)
+
     def test_same_text_twice_is_a_duplicate(self):
         data = form_from_doc(example_doc(), title="Phase two duplicate probe one")
         data["why"] += "\n\nA sentence that makes this body unlike the other probes."

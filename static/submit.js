@@ -504,10 +504,10 @@
         (m.adoption ? ' <span class="ms-flagtag">adoption milestone</span>' : "") + (state.topup && m.done ? ' <span class="ms-flagtag done">done</span>' : "") + "</h3>";
       if (state.topup && !m.done && nonEmpty(m.month)) { h += '<p class="small dim">Target month: ' + esc(m.month) + "</p>"; }
       h += '<ul class="task">' + m.criteria.filter(nonEmpty).map(function (c) { return "<li>" + mdInline(c) + "</li>"; }).join("") + "</ul>";
-      if (state.topup && m.done && nonEmpty(m.link)) { h += '<p class="small"><a href="' + esc(m.link) + '" target="_blank" rel="noopener">Delivered work: ' + esc(m.link) + "</a></p>"; }
+      if (state.topup && m.done && /^https?:\/\/\S+$/i.test(String(m.link).trim())) { h += '<p class="small"><a href="' + esc(m.link.trim()) + '" target="_blank" rel="noopener">Delivered work: ' + esc(m.link.trim()) + "</a></p>"; }
     });
     h += "</div>";
-    var links = v("f-links").split("\n").filter(nonEmpty);
+    var links = v("f-links").split("\n").map(function (l) { return l.trim(); }).filter(function (l) { return /^https?:\/\/\S+$/i.test(l); });
     if (links.length) { h += "<h2>Links</h2><ul class=\"body-text links\">" + links.map(function (l) { return '<li><a href="' + esc(l.trim()) + '" target="_blank" rel="noopener">' + esc(l.trim()) + "</a></li>"; }).join("") + "</ul>"; }
     if (live.length) {
       h += '<h2>Backers <span class="n">' + live.length + '</span></h2><div class="sponsors">' + live.map(function (b) {

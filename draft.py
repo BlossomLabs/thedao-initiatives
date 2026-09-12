@@ -247,6 +247,24 @@ def split_draft(text, itype):
     return out
 
 
+def safe_url(u):
+    """Only http(s) URLs are ever stored or rendered as links: anything else
+    (javascript:, data:, vbscript:, bare words) is dropped. Stored XSS report
+    from Sem, 2026-09-11."""
+    u = str(u or "").strip()
+    return u if re.match(r"^https?://[^\s<>\"']+$", u, re.I) else ""
+
+
+def clean_links(text):
+    """One URL per line -> the http(s) ones, in order, deduplicated."""
+    out = []
+    for line in str(text or "").replace("\r\n", "\n").split("\n"):
+        u = safe_url(line)
+        if u and u not in out:
+            out.append(u)
+    return out
+
+
 def strip_inline_headings(text):
     """No heading is allowed inside a field: a '### Foo' line becomes '**Foo**'."""
     out = []
@@ -386,7 +404,7 @@ def milestones_from_json(s):
             continue
         out.append({"name": str(r.get("name") or "")[:200], "amount": parse_amount(r.get("amount")),
                     "adoption": bool(r.get("adoption")), "done": bool(r.get("done")),
-                    "link": str(r.get("link") or "")[:300], "month": str(r.get("month") or "")[:7],
+                    "link": safe_url(str(r.get("link") or "")[:300]), "month": str(r.get("month") or "")[:7],
                     "criteria": [str(c)[:500] for c in (r.get("criteria") or []) if str(c).strip()][:40]})
     return out[:40]
 

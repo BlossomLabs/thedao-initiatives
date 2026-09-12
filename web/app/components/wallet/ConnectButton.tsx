@@ -23,7 +23,12 @@ import { cn } from "~/lib/utils";
 export default function ConnectButton() {
   const { address, isConnected, connector } = useAccount();
   const usable = useConnectors();
-  const { session, connect, connecting, signOut } = useSession();
+  const { session, connect, connecting, signingIn, signIn, signOut } = useSession();
+  // "Connected" in the UI means signed in with this wallet; a bare wagmi
+  // connection (the context is about to disconnect or sign it in) shows as not connected.
+  const signedIn = Boolean(
+    isConnected && address && session && session.address.toLowerCase() === address.toLowerCase(),
+  );
   const identity = useIdentity(address);
   const { profileOpen, openProfile } = useProfileDialog();
   const { openEmailSignIn } = useEmailSignIn();
@@ -78,8 +83,13 @@ export default function ConnectButton() {
 
   function onClick() {
     setError("");
-    if (isConnected) {
+    if (signedIn) {
       setMenu(menu === "account" ? "none" : "account");
+      return;
+    }
+    if (isConnected && address) {
+      // Connected but not signed in (session expired): ask for the signature.
+      signIn(address).catch((e) => setError("Not signed in: " + walletErrorMessage(e)));
       return;
     }
     if (usable.length === 1) void connectWith(usable[0]);
@@ -136,18 +146,18 @@ export default function ConnectButton() {
     <div className="relative">
       <button
         type="button"
-        className={cn("btn btn-wallet", isConnected && "connected")}
+        className={cn("btn btn-wallet", signedIn && "connected")}
         onClick={onClick}
-        disabled={connecting}
+        disabled={connecting || signingIn}
         aria-haspopup="menu"
         aria-expanded={menu !== "none"}
       >
-        {isConnected && address
+        {signedIn
           ? <Avatar src={identity.avatar} size={20} />
           : <Wallet className="size-4 opacity-80" />}
-        {connecting
+        {connecting || signingIn
           ? "Check your wallet…"
-          : isConnected && address
+          : signedIn
           ? identity.name
           : "Connect wallet"}
       </button>

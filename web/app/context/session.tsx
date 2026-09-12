@@ -197,22 +197,27 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [connectAsync, disconnectAsync, signIn]);
 
-  // Keep "connected" meaning "signed in" outside connect(): a wallet that comes
-  // back on reload without a stored session is disconnected again, and an
-  // account switched inside the wallet is asked to sign in (or disconnected).
+  // Keep "connected" meaning "signed in" outside connect(): whenever a wallet is
+  // connected with no matching session (reload without a stored session, an
+  // expired session dropped by refreshMe, a session for another address), it is
+  // either asked to sign in (an account switched inside the wallet) or
+  // disconnected, so the UI never shows a connected wallet that cannot act.
   const prev = useRef<{ status: typeof status; address: typeof address }>({ status, address });
   useEffect(() => {
     const before = prev.current;
     prev.current = { status, address };
     if (status !== "connected" || !address || skipsSignIn(connector)) return;
+    if (connecting || signingIn) return; // connect() signs in right after connecting
     const s = sessionRef.current;
     if (s && s.address.toLowerCase() === address.toLowerCase()) return;
-    if (before.status === "reconnecting") {
-      void disconnectAsync().catch(() => {});
-    } else if (before.status === "connected" && before.address && before.address !== address) {
+    const switched = before.status === "connected" && before.address &&
+      before.address.toLowerCase() !== address.toLowerCase();
+    if (switched) {
       void signIn(address).catch(() => disconnectAsync().catch(() => {}));
+    } else {
+      void disconnectAsync().catch(() => {});
     }
-  }, [status, address, connector, signIn, disconnectAsync]);
+  }, [status, address, connector, connecting, signingIn, stored, signIn, disconnectAsync]);
 
   const requireSession = useCallback(async () => {
     const s = sessionRef.current;

@@ -29,16 +29,34 @@ async function rewriteOrigin(res: Response, origin: string): Promise<Response> {
   return new Response(html, { status: res.status, headers });
 }
 
+/**
+ * Vite names every asset by content hash, so those can be cached for good;
+ * the HTML shell must be revalidated on every load (the ETag makes that a
+ * cheap 304) or a browser keeps running the previous deploy's bundle.
+ */
+function withCaching(res: Response, path: string): Response {
+  if (res.status !== 200) return res;
+  const html = res.headers.get("Content-Type")?.includes("text/html");
+  const value = path.startsWith("/assets/")
+    ? "public, max-age=31536000, immutable"
+    : html
+    ? "no-cache"
+    : "public, max-age=300";
+  const headers = new Headers(res.headers);
+  headers.set("Cache-Control", value);
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
 async function serveStatic(req: Request): Promise<Response> {
-  const origin = new URL(req.url).origin;
+  const { origin, pathname } = new URL(req.url);
   const res = await serveDir(req, { fsRoot: ROOT, quiet: true });
-  if (res.status !== 404) return rewriteOrigin(res, origin);
+  if (res.status !== 404) return withCaching(await rewriteOrigin(res, origin), pathname);
   for (const fallback of ["/__spa-fallback.html", "/index.html"]) {
     const fb = await serveDir(new Request(new URL(fallback, req.url), req), {
       fsRoot: ROOT,
       quiet: true,
     });
-    if (fb.status === 200) return rewriteOrigin(fb, origin);
+    if (fb.status === 200) return withCaching(await rewriteOrigin(fb, origin), pathname);
   }
   return res;
 }

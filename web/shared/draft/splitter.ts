@@ -64,6 +64,8 @@ export interface PastedBacker {
   org: string;
   amountUsd: number;
   url: string;
+  /** Optional 4th field: an image file name (content/logos/<name>), pinned by the sync. */
+  logo: string;
 }
 
 /** 'Org | $20,000 | https://...' lines -> backer rows (no logo: a pasted
@@ -78,6 +80,7 @@ export function parseBackers(text: string): PastedBacker[] {
       org: p[0].trim(),
       amountUsd: parseAmount(p[1] ?? ""),
       url: (p[2] ?? "").trim(),
+      logo: (p[3] ?? "").trim(),
     });
   }
   return out;

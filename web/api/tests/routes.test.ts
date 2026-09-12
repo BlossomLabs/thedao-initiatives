@@ -8,6 +8,7 @@ import {
   PLAIN,
   proposerToken,
   SAFE_ADDR,
+  seedContentLogos,
 } from "./app-helpers.ts";
 import { transferLog, wallet } from "./helpers.ts";
 import { grantBody, minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
@@ -20,6 +21,7 @@ const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2
 
 async function seedApproved(h: Awaited<ReturnType<typeof harness>>, safe = SAFE_ADDR) {
   const admin = await h.mint(ADMIN, true);
+  await seedContentLogos(h);
   const files = await loadContentFiles();
   const res = await h.req("/api/admin/sync-content", {
     method: "POST",

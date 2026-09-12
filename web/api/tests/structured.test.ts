@@ -2,7 +2,7 @@
  * facts, the admin editor's findings. */
 import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
 import { ADMIN, type Harness, harness, j, PLAIN, proposerToken } from "./app-helpers.ts";
-import { exampleSubmission, minimalSubmission } from "./fixtures.ts";
+import { exampleSubmission, grantBody, minimalSubmission } from "./fixtures.ts";
 import { LIMITS, SECTIONS, TOO_LONG_MSG } from "../../shared/draft/mod.ts";
 import type { Rfp } from "../db/types.ts";
 
@@ -516,7 +516,8 @@ Deno.test("bulk admin actions: initiatives and comments, per-id failures reporte
 Deno.test("GET /initiative/<slug>.md: the content-file shape, public rows only, round-trips", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
-  const { loadContentFiles } = await import("./app-helpers.ts");
+  const { loadContentFiles, seedContentLogos } = await import("./app-helpers.ts");
+  await seedContentLogos(h);
   await h.req("/api/admin/sync-content", {
     method: "POST",
     token: admin,
@@ -585,5 +586,72 @@ Deno.test("<slug>-PRIVATE.md: admins only, any status, carries contact and funde
   const bySlug = await h.req(`/api/admin/initiatives/${row.slug}`, { token: admin });
   assertEquals(bySlug.status, 200);
   assertEquals(((await bySlug.json()) as { initiative: { id: string } }).initiative.id, row.id);
+  h.close();
+});
+
+Deno.test("content logos: pinned once by name, mapped onto the pledge by the sync", async () => {
+  let pins = 0;
+  const h = await harness({
+    env: { PINATA_JWT: "jwt-test" },
+    fetch: (url) => {
+      if (url.startsWith("https://uploads.pinata.cloud/")) {
+        pins++;
+        return new Response(JSON.stringify({ data: { cid: "bafy" + "logo".repeat(9) + pins } }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response("not mocked", { status: 500 });
+    },
+  });
+  const admin = await h.mint(ADMIN, true);
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  const upload = (name: string, bytes: Uint8Array) => {
+    const form = new FormData();
+    form.set("name", name);
+    form.set("image", new Blob([bytes as BlobPart], { type: "image/png" }), name);
+    return h.req("/api/admin/logos", { method: "POST", token: admin, body: form });
+  };
+  const first = await j(await upload("argot.png", png)) as { cid: string; reused: boolean };
+  assertEquals(first.reused, false);
+  const again = await j(await upload("argot.png", png)) as { cid: string; reused: boolean };
+  assertEquals(again, { ...again, cid: first.cid, reused: true });
+  assertEquals(pins, 1);
+  assertEquals((await upload("Bad Name.png", png)).status, 400);
+  assertEquals((await upload("argot.png", new Uint8Array([1, 2, 3]))).status, 400); // not an image
+
+  const file = (logo: string) =>
+    "---\ntitle: Logo grant here\ntype: grant\ngoal: 100\nrecipient: T\nbackers:\n" +
+    `  Argot Collective | $50 | https://argot.org/${logo ? " | " + logo : ""}\n---\n` +
+    grantBody(100);
+  const ok = await j(
+    await h.req("/api/admin/sync-content", {
+      method: "POST",
+      token: admin,
+      json: { files: [{ name: "logo-grant.md", text: file("argot.png") }] },
+    }),
+  ) as { created: number; errors: string[] };
+  assertEquals(ok.errors, []);
+  const rfp = (await h.db.rfps.bySlug("logo-grant"))!;
+  const pledges = await h.db.pledges.list(rfp.id);
+  assertEquals(pledges.length, 1);
+  assertEquals(pledges[0].logoCid, first.cid);
+  // a line without a logo keeps it; an unknown logo name is an error for that file
+  const keep = await j(
+    await h.req("/api/admin/sync-content", {
+      method: "POST",
+      token: admin,
+      json: { files: [{ name: "logo-grant.md", text: file("") }] },
+    }),
+  ) as { errors: string[] };
+  assertEquals(keep.errors, []);
+  assertEquals((await h.db.pledges.list(rfp.id))[0].logoCid, first.cid);
+  const missing = await j(
+    await h.req("/api/admin/sync-content", {
+      method: "POST",
+      token: admin,
+      json: { files: [{ name: "logo-grant.md", text: file("nope.png") }] },
+    }),
+  ) as { errors: string[] };
+  assertStringIncludes(missing.errors[0], "logo nope.png is not uploaded yet");
   h.close();
 });

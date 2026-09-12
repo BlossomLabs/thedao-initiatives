@@ -13,19 +13,24 @@ interface SyncResult {
   errors: string[];
 }
 
-/** Files the API's sync accepts: content/rfps/*.md. */
-async function readMarkdown(list: FileList | null) {
-  const out: { name: string; text: string }[] = [];
+/** What the sync takes: content/rfps/*.md, and content/logos/* for backer logos. */
+async function readContent(list: FileList | null) {
+  const files: { name: string; text: string }[] = [];
+  const logos: File[] = [];
   for (const f of Array.from(list ?? [])) {
     const name = f.name;
+    const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath ?? "";
+    if (/\.(png|jpe?g|webp)$/i.test(name) && (!rel || /(^|\/)logos\/[^/]+$/.test(rel))) {
+      logos.push(f);
+      continue;
+    }
     if (!name.endsWith(".md") || name === "README.md") continue;
     // README aside, only rfps/<slug>.md is content the API takes (the donation
     // terms are bundled into the site at build time).
-    const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath ?? "";
     if (rel && !/(^|\/)rfps\/[^/]+\.md$/.test(rel)) continue;
-    out.push({ name, text: await f.text() });
+    files.push({ name, text: await f.text() });
   }
-  return out;
+  return { files, logos };
 }
 
 /**
@@ -41,7 +46,7 @@ export default function SyncContent() {
   const [msg, setMsg] = useState<{ kind: StatusKind; text: React.ReactNode } | null>(null);
 
   const send = async (list: FileList | null) => {
-    const picked = await readMarkdown(list);
+    const { files: picked, logos } = await readContent(list);
     if (!picked.length) {
       setMsg({
         kind: "err",
@@ -55,9 +60,17 @@ export default function SyncContent() {
       text: `Syncing ${picked.length} file${picked.length === 1 ? "" : "s"}…`,
     });
     try {
+      // Logos first, so the backers lines can name them.
+      for (const logo of logos) {
+        const form = new FormData();
+        form.set("name", logo.name.toLowerCase());
+        form.set("image", logo);
+        await api("/api/admin/logos", { form });
+      }
       const r = await api<SyncResult>("/api/admin/sync-content", { json: { files: picked } });
       const summary = `${r.created} created, ${r.updated} updated` +
-        (r.backers ? `, ${r.backers} pledge${r.backers === 1 ? "" : "s"} from files` : "");
+        (r.backers ? `, ${r.backers} pledge${r.backers === 1 ? "" : "s"} from files` : "") +
+        (logos.length ? `, ${logos.length} logo${logos.length === 1 ? "" : "s"}` : "");
       setMsg(
         r.errors.length
           ? {
@@ -93,7 +106,8 @@ export default function SyncContent() {
         <small className="block text-[12px] text-muted">
           Pick the repo's <span className="mono">content</span>{" "}
           folder (or its markdown files). Files own the words and the goal; status, Safes and money
-          stay as they are. The donation terms come along too.
+          stay as they are. Backer logos in <span className="mono">content/logos</span>{" "}
+          are pinned to IPFS on the way.
         </small>
       </div>
       <input
@@ -109,7 +123,7 @@ export default function SyncContent() {
         type="file"
         hidden
         multiple
-        accept=".md,text/markdown"
+        accept=".md,text/markdown,.png,.jpg,.jpeg,.webp"
         onChange={(e) => void send(e.target.files)}
       />
       <div className="flex flex-none gap-2">

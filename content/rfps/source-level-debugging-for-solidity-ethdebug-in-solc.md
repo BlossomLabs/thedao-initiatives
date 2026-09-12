@@ -11,7 +11,7 @@ summary: solc does not emit the debug information debuggers need, so every tool
 topup: true
 reviewer: Nicholas D'Andrea (ethdebug) and Nikola Matic (Solidity)
 backers:
-  Argot Collective | $151,000 | https://argot.org/
+  Argot Collective | $151,000 | https://argot.org/ | argot.png
 ---
 ## Why this matters
 

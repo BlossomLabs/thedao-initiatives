@@ -69,12 +69,23 @@ export function parseContentBackers(raw: string): PastedBacker[] {
     const [url, err] = validateHttpsLink(b.url);
     if (err) throw new Error(`backers: ${b.org}: ${err}`);
     b.url = url!;
+    if (b.logo && !LOGO_NAME_RE.test(b.logo)) {
+      throw new Error(
+        `backers: ${b.org}: the logo is a file name in content/logos (png, jpg or webp), got "${b.logo}"`,
+      );
+    }
     const k = b.org.toLowerCase();
     if (seen.has(k)) throw new Error(`backers: ${b.org} is listed twice`);
     seen.add(k);
   }
   return out;
 }
+
+/** content/logos/<name>: lowercase, no paths. */
+export const LOGO_NAME_RE = /^[a-z0-9][a-z0-9._-]{0,80}\.(png|jpe?g|webp)$/;
+
+/** Looks up the pinned CID for a content logo name; null when never uploaded. */
+export type LogoResolver = (name: string) => Promise<string | null>;
 
 /**
  * The body must split cleanly into the guide's sections and milestones:
@@ -197,11 +208,29 @@ export interface SyncResult {
  * added and the file does not name are left alone, and so is every status:
  * received and withdrawn are the admin's call. Returns how many rows changed.
  */
-export async function syncBackers(db: Db, rfpId: string, backers: PastedBacker[]) {
+export async function syncBackers(
+  db: Db,
+  rfpId: string,
+  backers: PastedBacker[],
+  logos: LogoResolver = (name) => db.logos.get(name).then((l) => l?.cid ?? null),
+) {
   if (!backers.length) return 0;
   let changed = 0;
   const have = await db.pledges.list(rfpId, true);
   for (const b of backers) {
+    // A named logo must already be pinned (the sync script and the admin
+    // dialog upload content/logos first); a line without one keeps whatever
+    // logo the pledge has.
+    let logoCid: string | undefined;
+    if (b.logo) {
+      const cid = await logos(b.logo);
+      if (!cid) {
+        throw new Error(
+          `backers: ${b.org}: logo ${b.logo} is not uploaded yet (the sync uploads content/logos first)`,
+        );
+      }
+      logoCid = cid;
+    }
     const cur = have.find((p) => p.company.toLowerCase() === b.org.toLowerCase());
     if (!cur) {
       await db.pledges.add(rfpId, {
@@ -210,14 +239,18 @@ export async function syncBackers(db: Db, rfpId: string, backers: PastedBacker[]
         status: "pledged",
         note: "",
         url: b.url,
-        logoCid: "",
+        logoCid: logoCid ?? "",
       });
       changed++;
-    } else if (cur.company !== b.org || cur.amountUsd !== b.amountUsd || cur.url !== b.url) {
+    } else if (
+      cur.company !== b.org || cur.amountUsd !== b.amountUsd || cur.url !== b.url ||
+      (logoCid !== undefined && cur.logoCid !== logoCid)
+    ) {
       await db.pledges.update(rfpId, cur.id, {
         company: b.org,
         amountUsd: b.amountUsd,
         url: b.url,
+        ...(logoCid !== undefined ? { logoCid } : {}),
       });
       changed++;
     }

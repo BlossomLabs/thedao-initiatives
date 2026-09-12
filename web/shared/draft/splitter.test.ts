@@ -86,11 +86,11 @@ test("unknown headings land in unsorted until the next known one", () => {
   expect(r.unsorted).toBe("## Random\nlost");
 });
 
-test("backer lines", () => {
-  expect(parseBackers("- Argot | $20,000 | https://argot.org\nno pipe here\nOrg2 | 5.000")).toEqual(
-    [
-      { org: "Argot", amountUsd: 20000, url: "https://argot.org" },
-      { org: "Org2", amountUsd: 5000, url: "" },
-    ],
-  );
+test("backer lines, with an optional logo file as the 4th field", () => {
+  expect(
+    parseBackers("- Argot | $20,000 | https://argot.org | argot.png\nno pipe here\nOrg2 | 5.000"),
+  ).toEqual([
+    { org: "Argot", amountUsd: 20000, url: "https://argot.org", logo: "argot.png" },
+    { org: "Org2", amountUsd: 5000, url: "", logo: "" },
+  ]);
 });

@@ -27,6 +27,7 @@ export const K = {
   rl: (bucket: string, windowStart: number) => ["rl", bucket, windowStart] as const,
   /** Receipt of a logo upload: who pinned this CID (expires after a day). */
   upload: (cid: string) => ["upload", cid] as const,
+  contentLogo: (name: string) => ["content_logo", name] as const,
   aiBudget: (day: string) => ["ai_budget", day] as const,
   safeSync: (rfpId: string) => ["safe_sync", rfpId] as const,
   lock: (name: string) => ["lock", name] as const,

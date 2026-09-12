@@ -32,7 +32,7 @@ export function pledgesRepo(kv: Deno.Kv, now: () => number) {
   async function update(
     rfpId: string,
     id: string,
-    patch: Partial<Pick<Pledge, "company" | "amountUsd" | "url" | "note">>,
+    patch: Partial<Pick<Pledge, "company" | "amountUsd" | "url" | "note" | "logoCid">>,
   ): Promise<Pledge | null> {
     const cur = await kv.get<Pledge>(K.pledge(rfpId, id));
     if (!cur.value) return null;

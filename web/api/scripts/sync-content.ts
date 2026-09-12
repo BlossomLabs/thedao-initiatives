@@ -26,6 +26,36 @@ if (!token) {
   token = (await siweLogin({ apiUrl, webOrigin, privateKey: key })).token;
 }
 
+// Logos first: content/logos/<name> is pinned once (same bytes = same CID),
+// so a backers line can name the file.
+const logosDir = env("CONTENT_LOGOS_DIR") ||
+  new URL("../../../content/logos/", import.meta.url).pathname;
+let logos = 0;
+try {
+  for await (const e of Deno.readDir(logosDir)) {
+    if (!e.isFile || !/\.(png|jpe?g|webp)$/i.test(e.name)) continue;
+    const bytes = await Deno.readFile(`${logosDir.replace(/\/+$/, "")}/${e.name}`);
+    const form = new FormData();
+    form.set("name", e.name.toLowerCase());
+    form.set("image", new Blob([bytes]), e.name);
+    const up = await fetch(apiUrl + "/api/admin/logos", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, Origin: webOrigin },
+      body: form,
+    });
+    const out = await up.json();
+    if (!up.ok) {
+      console.error(`logo ${e.name} failed:`, up.status, out);
+      Deno.exit(1);
+    }
+    console.error(`logo ${e.name}: ${out.reused ? "already pinned" : "pinned"} ${out.cid}`);
+    logos++;
+  }
+} catch (e) {
+  if (!(e instanceof Deno.errors.NotFound)) throw e;
+}
+console.error(`${logos} logo(s) from ${logosDir}`);
+
 const files: { name: string; text: string }[] = [];
 for await (const e of Deno.readDir(dir)) {
   if (e.isFile && e.name.endsWith(".md") && e.name !== "README.md") {

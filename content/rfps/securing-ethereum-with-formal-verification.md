@@ -11,7 +11,7 @@ forum: https://t.me/+PHZekKhdjPAxOWU0
 duration: 12
 recipient: Verity Labs
 backers:
-  Ethereum Foundation | $100,000 | https://ethereum.foundation/
+  Ethereum Foundation | $100,000 | https://ethereum.foundation/ | ethereum-foundation.png
 ---
 ## Why this matters
 

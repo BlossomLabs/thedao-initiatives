@@ -1,4 +1,5 @@
 import { rfpsRepo } from "./rfps.ts";
+import { logosRepo } from "./logos.ts";
 import { revisionsRepo } from "./revisions.ts";
 import { pledgesRepo } from "./pledges.ts";
 import { donationsRepo } from "./donations.ts";
@@ -18,6 +19,7 @@ export function createDb(kv: Deno.Kv, now: () => number = () => Date.now() / 100
     kv,
     now,
     rfps: rfpsRepo(kv, now),
+    logos: logosRepo(kv, now),
     revisions: revisionsRepo(kv),
     pledges,
     donations,

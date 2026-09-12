@@ -3,7 +3,14 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAdmin } from "../middleware/auth.ts";
-import { adminCommentJson, adminRfp, donationJson, pledgeJson, revisionMeta } from "../lib/json.ts";
+import {
+  adminCommentJson,
+  adminRfp,
+  donationJson,
+  ipfsUrl,
+  pledgeJson,
+  revisionMeta,
+} from "../lib/json.ts";
 import { DOMAIN_RE, parseGoal, TX_HASH_RE, validateText } from "../lib/validate.ts";
 import { decimalsOf, editChecks } from "./initiatives.ts";
 import { readPageFacts } from "../lib/page-facts.ts";
@@ -12,7 +19,7 @@ import { pickText, type RfpText } from "../db/rfps.ts";
 import { type Findings, isStructured } from "../../shared/draft/mod.ts";
 import { safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
-import { syncContent } from "../services/content.ts";
+import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
 import { syncSafe } from "../services/safe-api.ts";
 import { liveRoles } from "../services/roles.ts";
 import type { Comment, PledgeStatus, Rfp } from "../db/types.ts";
@@ -489,6 +496,34 @@ export function adminRoutes(deps: Deps) {
       createdAt: x.createdAt,
     }));
     return c.json({ rows });
+  });
+
+  /**
+   * A content logo (content/logos/<name>), pinned to IPFS once: the same bytes
+   * come back with the stored CID, new bytes replace it. The sync then maps
+   * the name in a backers line to the CID. Multipart: `name`, `image`.
+   */
+  r.post("/logos", async (c) => {
+    if (!deps.pinata.enabled) throw new HttpError(503, "Uploads are not enabled.");
+    const form = await c.req.formData().catch(() => null);
+    const name = s(form?.get("name"), 100).toLowerCase();
+    if (!LOGO_NAME_RE.test(name)) {
+      throw new HttpError(400, "Logo names are lowercase file names: png, jpg or webp.");
+    }
+    const image = form?.get("image");
+    if (!(image instanceof File) || !image.size) throw new HttpError(400, "Send the image file.");
+    if (image.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
+    const bytes = new Uint8Array(await image.arrayBuffer());
+    const sha256 = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+      .map((b) => b.toString(16).padStart(2, "0")).join("");
+    const have = await db.logos.get(name);
+    if (have && have.sha256 === sha256) {
+      return c.json({ name, cid: have.cid, logoUrl: ipfsUrl(config, have.cid), reused: true });
+    }
+    const [cid, err] = await deps.pinata.uploadImage(bytes, LOGO_MAX_BYTES, "content-logo-" + name);
+    if (err) throw new HttpError(400, err);
+    await db.logos.set(name, cid!, sha256);
+    return c.json({ name, cid, logoUrl: ipfsUrl(config, cid!), reused: false });
   });
 
   /** Push-based content sync: the repo's content/rfps/*.md, sent by scripts/sync-content.ts. */

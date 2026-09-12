@@ -100,34 +100,6 @@ export default function AdminInitiativeEditor() {
         <span className="small dim">
           created {dt(r.createdAt)} · <span className="mono">{r.slug}</span>
         </span>
-        <span className="ml-auto flex items-center gap-2">
-          <a
-            className="btn btn-ghost btn-sm"
-            href={`/initiative/${r.slug}.md`}
-            target="_blank"
-            rel="noopener"
-            title="The public initiative as a content file"
-          >
-            <FileText className="size-[15px]" />Public .md
-          </a>
-          <Button
-            variant="ghost"
-            sm
-            title="With status, proposer, contact and funders. Never share it."
-            onClick={() =>
-              run(async () => {
-                const md = await apiText(`/initiative/${r.slug}-PRIVATE.md`);
-                const url = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `${r.slug}-PRIVATE.md`;
-                a.click();
-                setTimeout(() => URL.revokeObjectURL(url), 1000);
-              })}
-          >
-            <Download className="size-[15px]" />Private .md
-          </Button>
-        </span>
       </p>
       {msg && <Status kind={msg.kind} className="mt-4">{msg.text}</Status>}
 
@@ -222,6 +194,37 @@ export default function AdminInitiativeEditor() {
                 <Link to={`/initiative/${r.slug}`}>
                   Public page{r.status !== "approved" && " (unlisted)"}
                 </Link>
+              </li>
+              <li>
+                <a
+                  href={`/initiative/${r.slug}.md`}
+                  target="_blank"
+                  rel="noopener"
+                  title="The public initiative as a content file"
+                >
+                  <FileText className="mr-1.5 inline size-3.5 align-[-2px]" />
+                  Public markdown file
+                </a>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="cursor-pointer border-0 bg-transparent p-0 text-dao-green hover:underline"
+                  title="With status, proposer, contact and funders. Never share it."
+                  onClick={() =>
+                    run(async () => {
+                      const md = await apiText(`/initiative/${r.slug}-PRIVATE.md`);
+                      const url = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `${r.slug}-PRIVATE.md`;
+                      a.click();
+                      setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    })}
+                >
+                  <Download className="mr-1.5 inline size-3.5 align-[-2px]" />
+                  Private markdown file (download)
+                </button>
               </li>
               {r.discourseUrl && (
                 <li>

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageSquare } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
@@ -91,16 +90,6 @@ export default function Initiative() {
         {diff ? <DiffBlock chunks={diff.title} /> : text.title}
       </h1>
       <p className="m-0 flex flex-wrap items-center gap-3">
-        {r.discourseUrl && (
-          <a
-            className="btn btn-discuss btn-sm"
-            href={r.discourseUrl}
-            target="_blank"
-            rel="noopener"
-          >
-            <MessageSquare className="size-[15px]" />Discuss this initiative on the forum
-          </a>
-        )}
         <TypeBadge type={r.type} inline />
         {r.status === "archived" && <span className="chip chip-badge st-archived">archived</span>}
         {r.status === "pending" && (

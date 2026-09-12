@@ -6,6 +6,9 @@ import { tokenQty } from "../lib/json.ts";
 import { decimalsOf } from "./initiatives.ts";
 import { CHAIN_ID, MIN_ETH_DONATION } from "../config.ts";
 
+/** Acceptance record ids are ULIDs (26 Crockford base32 characters). */
+const ACCEPTANCE_ID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
 export function donateRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const { db, chain } = deps;
@@ -42,6 +45,11 @@ export function donateRoutes(deps: Deps) {
     const body = await jsonBody(c);
     const slug = s(body.slug, 200);
     const txHash = s(body.txHash, 80).toLowerCase();
+    // The widget's terms acceptance record (a ULID); the tx hash gets attached to it once.
+    const acceptanceId = s(body.acceptanceId, 27);
+    if (acceptanceId && !ACCEPTANCE_ID_RE.test(acceptanceId)) {
+      throw new HttpError(400, "bad acceptance id");
+    }
     const rfp = await db.rfps.bySlug(slug);
     if (!rfp || rfp.status !== "approved") throw new HttpError(404, "not found");
     if (!rfp.safeAddress) {
@@ -58,7 +66,15 @@ export function donateRoutes(deps: Deps) {
     if (!v.found && v.detail.includes("malformed")) {
       return c.json({ status: "error", detail: v.detail }, 400);
     }
-    let [, status] = await db.donations.record(rfp.id, txHash, v, "tx");
+    const acceptance = acceptanceId ? await db.terms.acceptance(acceptanceId) : null;
+    let [, status] = await db.donations.record(
+      rfp.id,
+      txHash,
+      v,
+      "tx",
+      acceptance ? { acceptanceId: acceptance.id, termsVersion: acceptance.version } : undefined,
+    );
+    if (acceptance) await db.terms.linkTx(acceptance.id, txHash);
     if (status === "already-confirmed") status = "confirmed";
     return c.json({
       status,

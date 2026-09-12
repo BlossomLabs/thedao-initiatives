@@ -99,6 +99,38 @@ export interface Donation {
   source: "tx" | "safe-api";
   createdAt: number;
   confirmedAt: number | null;
+  /** The donor's terms acceptance record, when the donation came through the widget. */
+  acceptanceId?: string | null;
+  /** The terms version id (content hash) the donor accepted. */
+  termsVersion?: string | null;
+}
+
+/** A published version of the donation terms. Never overwritten: the id is the
+ * SHA-256 of the effective date plus the text, so the same text is the same version. */
+export interface TermsVersion {
+  id: string;
+  /** YYYY-MM-DD */
+  effectiveDate: string;
+  /** A material change shows a notice on the terms page and under the widget for 30 days. */
+  material: boolean;
+  text: string;
+  publishedAt: number;
+  publishedBy: string;
+}
+
+/** One checkbox acceptance. Immutable: the only later write is the tx hash, set once. */
+export interface TermsAcceptance {
+  id: string;
+  /** Terms version id (content hash) that was displayed and accepted. */
+  version: string;
+  /** Checksummed wallet address, or "" while no wallet is connected. */
+  address: string;
+  /** ISO 8601 timestamp of the checkbox acceptance. */
+  acceptedAt: string;
+  createdAt: number;
+  ip: string;
+  txHash: string | null;
+  txLinkedAt?: number;
 }
 
 export type CommentType = "suggestion" | "question" | "other";

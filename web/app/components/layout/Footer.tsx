@@ -14,6 +14,10 @@ export default function Footer() {
           <a className="text-white/35" href={TRANSPARENCY_URL} target="_blank" rel="noopener">
             Transparency
           </a>
+          {" · "}
+          <a className="text-white/35" href="/donation-terms">
+            Donation Terms
+          </a>
         </p>
       </footer>
       <div className="flex min-h-[88px] flex-wrap items-center justify-between gap-5 border-t border-white/[.08] bg-dao-blue-legal px-12 py-4 max-[620px]:justify-center max-[620px]:px-5 max-[620px]:text-center">

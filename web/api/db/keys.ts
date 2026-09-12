@@ -35,6 +35,11 @@ export const K = {
   termsAccept: (version: string, id: string) => ["terms_accept", version, id] as const,
   termsAcceptByAddr: (version: string, addr: string) =>
     ["terms_accept_addr", version, addr.toLowerCase()] as const,
+  /** One immutable acceptance record per checkbox acceptance (linked to a tx once known). */
+  termsAcceptance: (id: string) => ["terms_acceptance", id] as const,
+  /** Every published version of the donation terms, keyed by its content hash. */
+  termsVersion: (id: string) => ["terms_version", id] as const,
+  termsVersions: () => ["terms_version"] as const,
 };
 
 export async function collect<T>(iter: Deno.KvListIterator<T>): Promise<T[]> {

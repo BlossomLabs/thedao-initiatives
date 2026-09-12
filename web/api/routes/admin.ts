@@ -567,5 +567,31 @@ export function adminRoutes(deps: Deps) {
     return c.json(await syncContent(db, clean));
   });
 
+  /**
+   * Publish a version of the donation terms. Every version is kept under its
+   * content hash; publishing never overwrites an earlier one. `material` shows
+   * the change notice on the terms page and under the widget for 30 days.
+   */
+  r.post("/terms", async (c) => {
+    const body = await jsonBody(c);
+    const text = s(body.text, 200_000);
+    const effectiveDate = s(body.effectiveDate, 10);
+    if (text.length < 200) throw new HttpError(400, "terms text is too short");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate) || Number.isNaN(Date.parse(effectiveDate))) {
+      throw new HttpError(400, "effectiveDate must be YYYY-MM-DD");
+    }
+    const material = body.material === true || body.material === "true" || body.material === "1";
+    const [v, outcome] = await db.terms.publish(text, effectiveDate, material, c.var.user!.address);
+    return c.json({
+      outcome,
+      version: {
+        id: v.id,
+        effectiveDate: v.effectiveDate,
+        material: v.material,
+        publishedAt: v.publishedAt,
+      },
+    });
+  });
+
   return r;
 }

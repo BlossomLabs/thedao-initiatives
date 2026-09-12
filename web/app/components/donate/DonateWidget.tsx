@@ -4,6 +4,8 @@ import { CreditCard, Landmark, Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useDonateParams } from "~/hooks/use-donate-params";
 import { TERMS } from "~/data/terms";
+import { useTerms } from "~/hooks/use-terms";
+import TermsChangeNotice from "~/components/TermsChangeNotice";
 import { api } from "~/lib/api";
 import type { DonateResult, Onramp } from "~/lib/api-types";
 import { parseUsd, tokenQty } from "~/lib/donate";
@@ -45,7 +47,10 @@ export default function DonateWidget({
 }) {
   const { data: params } = useDonateParams();
   const { address, connector } = useAccount();
-  const d = useDonation({ slug, safeAddress, params, onConfirmed });
+  // The acceptance record the API handed back for this donor's checkbox; the
+  // confirm call sends it so the transaction hash gets attached to that record.
+  const acceptance = useRef<string | null>(null);
+  const d = useDonation({ slug, safeAddress, params, onConfirmed, acceptance });
   const [amount, setAmount] = useState("");
   const [symbol, setSymbol] = useState("");
   const [method, setMethod] = useState<Method>("wallet");
@@ -54,9 +59,12 @@ export default function DonateWidget({
   const [manualHash, setManualHash] = useState("");
 
   // ---- donation terms gate: every method stays locked until the box is checked.
-  // Acceptance is logged server-side (anonymous, then once more with the wallet
-  // address when one connects) so the trail can bind acceptances to donors.
-  const termsVersion = TERMS.version;
+  // The version shown is the API's current published one (content hash), the
+  // bundled file only until something is published. Each acceptance writes one
+  // record server-side (anonymous, then once more with the wallet address when
+  // one connects); the latest record id rides along with the donation confirm.
+  const { data: terms } = useTerms();
+  const termsVersion = terms?.id ?? TERMS.version;
   const [accepted, setAccepted] = useState(false);
   const lastLogged = useRef<string | null>(null);
   useEffect(() => {
@@ -67,9 +75,11 @@ export default function DonateWidget({
     const who = address ?? "";
     if (lastLogged.current === who) return;
     lastLogged.current = who;
-    void api("/api/terms/accept", {
+    void api<{ acceptanceId?: string }>("/api/terms/accept", {
       json: { version: termsVersion, ...(address ? { address } : {}) },
       token: null,
+    }).then((r) => {
+      if (r?.acceptanceId) acceptance.current = r.acceptanceId;
     }).catch(() => {});
   }, [accepted, termsVersion, address]);
   const toggleTerms = (on: boolean) => {
@@ -78,7 +88,10 @@ export default function DonateWidget({
       if (on) localStorage.setItem(termsKey(termsVersion), "1");
       else localStorage.removeItem(termsKey(termsVersion));
     } catch { /* private mode: the gate still works for this page view */ }
-    if (!on) lastLogged.current = null;
+    if (!on) {
+      lastLogged.current = null;
+      acceptance.current = null;
+    }
   };
   const gated = () => {
     if (accepted) return true;
@@ -286,6 +299,12 @@ export default function DonateWidget({
               {copied ? "Copied ✓" : "Copy"}
             </Button>
           </div>
+          <p className="m-0 small dim" data-testid="governed-exchange">
+            Transfers to this address are governed by the{" "}
+            <Link to="/donation-terms" target="_blank" rel="noopener" className="underline">
+              Donation Terms
+            </Link>.
+          </p>
           {manual && (
             <>
               <p className="m-0 small dim">Impatient? Paste the transaction hash:</p>
@@ -329,7 +348,12 @@ export default function DonateWidget({
         >
           {shortAddr(safeAddress)}
         </a>
+        . Transfers to this address are governed by the{" "}
+        <Link to="/donation-terms" target="_blank" rel="noopener" className="underline">
+          Donation Terms
+        </Link>.
       </p>
+      <TermsChangeNotice terms={terms} compact />
     </div>
   );
 }

@@ -28,12 +28,16 @@ export interface UseDonationArgs {
   safeAddress: string;
   params: DonateParams | undefined;
   onConfirmed?: (r: DonateResult) => void;
+  /** The donor's terms acceptance record id, sent with the confirm so the tx hash gets attached to it. */
+  acceptance?: React.RefObject<string | null>;
 }
 
 const POLL_MS = 6000;
 const MAX_POLLS = 50;
 
-export function useDonation({ slug, safeAddress, params, onConfirmed }: UseDonationArgs) {
+export function useDonation(
+  { slug, safeAddress, params, onConfirmed, acceptance }: UseDonationArgs,
+) {
   const config = useConfig();
   const { address, isConnected } = useAccount();
   const { connectors, connectAsync } = useConnect();
@@ -100,8 +104,9 @@ export function useDonation({ slug, safeAddress, params, onConfirmed }: UseDonat
     stopPolling();
     setBusy("Confirming…");
     try {
+      const acceptanceId = acceptance?.current ?? null;
       const res = await api<DonateResult>("/api/donate/confirm", {
-        json: { slug, txHash },
+        json: { slug, txHash, ...(acceptanceId ? { acceptanceId } : {}) },
         token: null,
       });
       handle(txHash, res, 0);

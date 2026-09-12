@@ -7,6 +7,7 @@ import DashboardSkeleton from "~/components/layout/DashboardSkeleton";
 import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import SyncContent from "~/components/admin/SyncContent";
+import PublishTerms from "~/components/admin/PublishTerms";
 import BulkBar, { type BulkResult, HeadCheck, RowCheck } from "~/components/admin/BulkBar";
 import { useSelection } from "~/hooks/use-selection";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
@@ -163,6 +164,8 @@ export default function Dashboard() {
       </div>
 
       <SyncContent />
+
+      <PublishTerms />
 
       <SectionHeading id="moderation">Community moderation</SectionHeading>
       <h3 className="h3">

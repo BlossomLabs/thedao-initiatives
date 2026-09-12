@@ -17,6 +17,8 @@ export function donationsRepo(kv: Deno.Kv, now: () => number) {
     txHash: string,
     v: Verification,
     source: Donation["source"] = "tx",
+    /** The donor's terms acceptance, when the donation came through the widget. */
+    accepted?: { acceptanceId: string; termsVersion: string },
   ): Promise<[Donation, DonationStatus | "already-confirmed"]> {
     const tx = txHash.toLowerCase();
     const status: DonationStatus = v.ok
@@ -41,6 +43,8 @@ export function donationsRepo(kv: Deno.Kv, now: () => number) {
         source,
         createdAt: cur.value?.createdAt ?? t,
         confirmedAt: status === "confirmed" ? t : null,
+        acceptanceId: accepted?.acceptanceId ?? cur.value?.acceptanceId ?? null,
+        termsVersion: accepted?.termsVersion ?? cur.value?.termsVersion ?? null,
       };
       const res = await kv.atomic().check(cur)
         .set(K.donation(rfpId, tx), row)

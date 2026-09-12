@@ -413,6 +413,10 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
         >
           {r.safeAddress}
         </a>
+        <p className="m-0 mt-1.5 small dim">
+          Transfers to this address are governed by the{" "}
+          <Link to="/donation-terms" className="underline">Donation Terms</Link>.
+        </p>
         <p className="m-0 mt-2.5 small dim">
           Indexer sync: {syncState
             ? (syncState.ok

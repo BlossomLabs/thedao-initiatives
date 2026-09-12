@@ -36,8 +36,16 @@ API.
   link and the private fields can change too (locked after approval, admins edit them under
   `/admin`)
 - `/submit`, `/submit/thanks`
-- `/donation-terms` (content/donation-terms.md, bundled at build time by `app/data/terms.ts`; the
-  donate widget's terms gate links here and logs acceptances by its `version:` line)
+- `/donation-terms` (the version in force from the API's versioned store, `GET /api/terms`; the
+  bundled content/donation-terms.md via `app/data/terms.ts` is the prerendered fallback until an
+  admin publishes one), `/donation-terms/v/:id` (any earlier version, as it was). Every published
+  version is kept under its content hash (SHA-256 of the effective date plus the text) and never
+  overwritten; the terms page lists previous versions with their dates. A version flagged as a
+  material change shows a notice on the terms page and under the donate widget for 30 days.
+  Publishing: "Donation terms" on `/admin`, or `deno task sync-content --publish-terms [--material]`
+  (the first sync seeds the store from the file). The widget's checkbox writes one immutable
+  acceptance record per acceptance (terms version id, wallet address, ISO timestamp, and the
+  transaction hash attached once when the donation is confirmed); the record never leaves the API.
 - `/admin` (SIWE-gated dashboard, incl. "Sync content files": pick the repo's `content`
   folder in the browser, no private key needed), `/admin/initiatives/:id`, `/admin/leads` (private
   funder leads + CSV)

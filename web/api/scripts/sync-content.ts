@@ -6,13 +6,15 @@
  *   ADMIN_TOKEN=... deno task sync-content
  *   ADMIN_PRIVATE_KEY=0x... deno task sync-content      (logs in first)
  *
- * Env: API_URL (default http://localhost:8000), WEB_ORIGIN, CONTENT_DIR
- * (default content/rfps at the repo root).
+ * Env: API_URL (default http://localhost:8000), WEB_ORIGIN or VITE_SITE_URL
+ * (resolved like the API does), CONTENT_DIR (default content/rfps at the
+ * repo root).
  */
 import { env, siweLogin } from "./lib.ts";
+import { webOriginsFrom } from "../config.ts";
 
 const apiUrl = env("API_URL", "http://localhost:8000").replace(/\/+$/, "");
-const webOrigin = env("WEB_ORIGIN", "http://localhost:5173").split(",")[0].trim();
+const webOrigin = webOriginsFrom(Deno.env.toObject())[0];
 const dir = env("CONTENT_DIR") ||
   new URL("../../../content/rfps/", import.meta.url).pathname;
 

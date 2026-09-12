@@ -36,3 +36,15 @@ Deno.test("config: WEB_ORIGIN entries are normalized to bare origins (trailing s
   ]);
   assertEquals(cfg.siweDomains, ["initiatives.thedao.fund", "fund.thedao.fund", "localhost:5173"]);
 });
+
+Deno.test("config: WEB_ORIGIN falls back to VITE_SITE_URL's origin, then localhost", () => {
+  const fromSite = loadConfig({ VITE_SITE_URL: "https://fund.thedao.fund/" });
+  assertEquals(fromSite.webOrigins, ["https://fund.thedao.fund"]);
+  assertEquals(fromSite.siweDomains, ["fund.thedao.fund"]);
+  const explicit = loadConfig({
+    VITE_SITE_URL: "https://fund.thedao.fund",
+    WEB_ORIGIN: "http://localhost:5173",
+  });
+  assertEquals(explicit.webOrigins, ["http://localhost:5173"]);
+  assertEquals(loadConfig({}).webOrigins, ["http://localhost:5173"]);
+});

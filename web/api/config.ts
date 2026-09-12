@@ -129,19 +129,32 @@ function flag(v: string | undefined): boolean {
   return ["1", "true", "yes"].includes((v ?? "").trim().toLowerCase());
 }
 
+const bareOrigin = (o: string): string => {
+  try {
+    return new URL(o).origin;
+  } catch {
+    return o;
+  }
+};
+
+/**
+ * Browser origins allowed to call the API: WEB_ORIGIN when set (a list, for
+ * local dev or a second domain), else the public site URL the client was
+ * built with, else the Vite dev server. Entries are reduced to bare origins:
+ * the browser's Origin header has no trailing slash or path, and the guard
+ * compares exact strings (a "https://host/" entry once matched nothing).
+ */
+export function webOriginsFrom(env: Record<string, string | undefined>): string[] {
+  const listed = list(env.WEB_ORIGIN).map(bareOrigin);
+  if (listed.length) return listed;
+  const site = (env.VITE_SITE_URL ?? "").trim();
+  return [site ? bareOrigin(site) : "http://localhost:5173"];
+}
+
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const rpcOverride = (env.RPC_URL ?? "").trim();
   const alchemyApiKey = (env.ALCHEMY_API_KEY ?? "").trim();
-  // Bare origins: the browser's Origin header has no trailing slash or path,
-  // and the guard compares exact strings (a "https://host/" entry matched nothing).
-  const webOrigins = list(env.WEB_ORIGIN).map((o) => {
-    try {
-      return new URL(o).origin;
-    } catch {
-      return o;
-    }
-  });
-  if (webOrigins.length === 0) webOrigins.push("http://localhost:5173");
+  const webOrigins = webOriginsFrom(env);
   let siweDomains = list(env.SIWE_DOMAINS);
   if (siweDomains.length === 0) {
     siweDomains = webOrigins.map((o) => {

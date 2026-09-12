@@ -131,7 +131,8 @@ const { token } = await (await fetch(API + "/api/auth/verify", {
 // then: Authorization: Bearer <token>
 ```
 
-`domain` must be in `SIWE_DOMAINS` and `uri`'s origin in `WEB_ORIGIN`.
+`domain` must be in `SIWE_DOMAINS` and `uri`'s origin in the allowed origins (`WEB_ORIGIN`, or
+`VITE_SITE_URL`'s origin when that is unset).
 
 ## Deploy (Deno Deploy)
 

@@ -1,6 +1,6 @@
 import PageMain from "~/components/layout/PageMain";
-import Markdown from "~/components/Markdown";
-import { TERMS } from "~/data/terms";
+import TermsDocument from "~/components/terms/TermsDocument";
+import { TERMS, TERMS_VERSIONS } from "~/data/terms";
 import { generateMeta } from "~/utils/meta";
 
 export function meta() {
@@ -11,12 +11,15 @@ export function meta() {
   });
 }
 
-/** content/donation-terms.md, bundled at build time and prerendered. The donate widget links here. */
+/**
+ * The donation terms in force: the latest content/donation-terms/<date>.md,
+ * bundled at build time and prerendered, with every earlier version linked.
+ * The donate widget and the footer link here.
+ */
 export default function TermsPage() {
   return (
     <PageMain narrow detail className="terms-page min-h-[50vh]">
-      <p className="k mb-4">Terms version {TERMS.version}</p>
-      <Markdown text={TERMS.body} className="terms-body" />
+      <TermsDocument terms={TERMS} versions={TERMS_VERSIONS} current />
     </PageMain>
   );
 }

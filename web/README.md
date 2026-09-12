@@ -36,14 +36,33 @@ API.
   link and the private fields can change too (locked after approval, admins edit them under
   `/admin`)
 - `/submit`, `/submit/thanks`
-- `/donation-terms` (content/donation-terms.md, bundled at build time by `app/data/terms.ts`; the
-  donate widget's terms gate links here and logs acceptances by its `version:` line)
+- `/donation-terms` (the version in force of `content/donation-terms/<date>.md`, bundled at build
+  time by `app/data/terms.ts`, with every earlier version listed; the donate widget's gate and the
+  footer link here), `/donation-terms/v/:id` (one earlier version by its content hash)
 - `/admin` (SIWE-gated dashboard, incl. "Sync content files": pick the repo's `content`
   folder in the browser, no private key needed), `/admin/initiatives/:id`, `/admin/leads` (private
   funder leads + CSV)
 
 `/`, `/submit`, `/submit/thanks`, `/donation-terms` and `/admin` are prerendered; everything else is
 served from the SPA fallback by `server.ts`. `/api/*` and `/healthz` go to the Hono app.
+
+### Publishing a new version of the donation terms
+
+Every version is a file in `content/donation-terms/`, named by its effective date, and git history is
+the audit trail. Nothing is stored in the API and there is no admin action: publishing is a merge.
+
+1. Copy the current file to `content/donation-terms/<YYYY-MM-DD>.md` and set its first line to
+   `version: <YYYY-MM-DD>` (the same date as the file name).
+2. For a material change add a second header line, `material: true`. It shows a notice on the terms
+   page and under the donate widget for 30 days from the effective date. The flag is not part of
+   the version id, so it can be corrected later without minting a new version.
+3. Edit the body, then run `deno task test` (it validates the header, the date and the file name).
+4. Merge and deploy on the effective date: the highest date is the version in force as soon as it
+   ships. Never edit or delete a published file.
+
+A version's id is the SHA-256 of `<effective date>\n<body>`. The widget remembers acceptance per id,
+so every new version asks donors to accept again, and each donation's acceptance record names the
+id the donor saw (see `api/README.md`).
 
 ## Wallet and sign-in
 

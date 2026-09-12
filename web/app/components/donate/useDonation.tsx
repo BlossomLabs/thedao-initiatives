@@ -6,7 +6,8 @@ import { useCallback, useRef, useState } from "react";
 import { getBalance, readContract, sendTransaction, switchChain } from "wagmi/actions";
 import { erc20Abi } from "viem";
 import { useAccount, useConfig, useConnect } from "wagmi";
-import { api, errorMessage } from "~/lib/api";
+import { api, ApiError, errorMessage } from "~/lib/api";
+import { TERMS } from "~/data/terms";
 import type { DonateParams, DonateResult } from "~/lib/api-types";
 import {
   parseUsd,
@@ -28,14 +29,27 @@ export interface UseDonationArgs {
   safeAddress: string;
   params: DonateParams | undefined;
   onConfirmed?: (r: DonateResult) => void;
+  /** ISO timestamp of the donor's terms checkbox tick, or null while unticked. */
+  acceptedAt?: string | null;
 }
 
 const POLL_MS = 6000;
 const MAX_POLLS = 50;
+/** A confirm that fails on the network is retried this many times before polling takes over. */
+const CONFIRM_RETRIES = 2;
+const CONFIRM_RETRY_MS = 1500;
+const PENDING: DonateResult = { status: "pending", detail: "", amount: 0, token: "", amountUsd: 0 };
 
-export function useDonation({ slug, safeAddress, params, onConfirmed }: UseDonationArgs) {
+export function useDonation(
+  { slug, safeAddress, params, onConfirmed, acceptedAt }: UseDonationArgs,
+) {
   const config = useConfig();
   const { address, isConnected } = useAccount();
+  // Read at confirm time through refs so confirmTx keeps a stable identity.
+  const acceptedRef = useRef<string | null>(null);
+  acceptedRef.current = acceptedAt ?? null;
+  const addressRef = useRef(address);
+  addressRef.current = address;
   const { connectors, connectAsync } = useConnect();
   const [status, setStatus] = useState<DonationStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -95,26 +109,41 @@ export function useDonation({ slug, safeAddress, params, onConfirmed }: UseDonat
     }, POLL_MS);
   }, [params, onConfirmed]);
 
-  /** Verify a tx hash with the API (used after sending and for manual paste). */
+  /**
+   * Verify a tx hash with the API (used after sending and for manual paste).
+   * The confirm also carries the donor's terms acceptance, which the API binds
+   * to this tx, so a network blip is retried before polling takes over.
+   */
   const confirmTx = useCallback(async (txHash: string) => {
     stopPolling();
     setBusy("Confirming…");
-    try {
-      const res = await api<DonateResult>("/api/donate/confirm", {
-        json: { slug, txHash },
-        token: null,
-      });
-      handle(txHash, res, 0);
-    } catch (e) {
-      // Network hiccup: fall back to polling the status endpoint.
-      if (e instanceof Error && /\(4\d\d\)|malformed|not found/.test(e.message)) {
-        setBusy(null);
-        setStatus({ kind: "err", text: errorMessage(e) });
-      } else {handle(
-          txHash,
-          { status: "pending", detail: "", amount: 0, token: "", amountUsd: 0 },
-          0,
-        );}
+    const acceptedAt = acceptedRef.current;
+    const terms = acceptedAt
+      ? {
+        version: TERMS.id,
+        acceptedAt,
+        ...(addressRef.current ? { address: addressRef.current } : {}),
+      }
+      : undefined;
+    const json = { slug, txHash, ...(terms ? { terms } : {}) };
+    for (let attempt = 0;; attempt++) {
+      try {
+        handle(txHash, await api<DonateResult>("/api/donate/confirm", { json, token: null }), 0);
+        return;
+      } catch (e) {
+        if (e instanceof ApiError && e.status < 500) {
+          setBusy(null);
+          setStatus({ kind: "err", text: errorMessage(e) });
+          return;
+        }
+        if (attempt < CONFIRM_RETRIES) {
+          await new Promise((r) => setTimeout(r, CONFIRM_RETRY_MS * (attempt + 1)));
+          continue;
+        }
+        // Still failing: fall back to polling the status endpoint.
+        handle(txHash, PENDING, 0);
+        return;
+      }
     }
   }, [slug, handle]);
 

@@ -29,7 +29,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     watch: { ignored: ["**/*.tmp.*"] },
-    // app/data/terms.ts imports ../content/donation-terms.md from outside web/.
+    // app/data/terms.ts imports ../content/donation-terms/*.md from outside web/.
     fs: {
       allow: [
         ".",

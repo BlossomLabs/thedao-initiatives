@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { CreditCard, Landmark, Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useDonateParams } from "~/hooks/use-donate-params";
 import { TERMS } from "~/data/terms";
-import { api } from "~/lib/api";
+import GovernedBy from "~/components/terms/GovernedBy";
+import TermsChangeNotice from "~/components/terms/TermsChangeNotice";
 import type { DonateResult, Onramp } from "~/lib/api-types";
 import { parseUsd, tokenQty } from "~/lib/donate";
 import { shortAddr } from "~/lib/format";
@@ -17,13 +18,18 @@ import { WALLETCONNECT_PROJECT_ID } from "~/lib/wagmi";
 const CHIPS = ["50", "500", "5000", "50000"];
 type Method = "wallet" | "card" | "exchange";
 
-/** Acceptance is remembered per terms version; a version bump re-asks. */
-const termsKey = (version: string) => "thedao:terms:" + version;
-function readAccepted(version: string): boolean {
+/**
+ * Acceptance is remembered per terms version id as the ISO time of the tick,
+ * so every new version re-asks. Older values ("1") never match.
+ */
+const termsKey = (id: string) => "thedao:terms:" + id;
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+function readAcceptedAt(id: string): string | null {
   try {
-    return Boolean(version) && localStorage.getItem(termsKey(version)) === "1";
+    const v = id ? localStorage.getItem(termsKey(id)) : null;
+    return v && ISO_RE.test(v) && !Number.isNaN(Date.parse(v)) ? v : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -45,7 +51,23 @@ export default function DonateWidget({
 }) {
   const { data: params } = useDonateParams();
   const { address, connector } = useAccount();
-  const d = useDonation({ slug, safeAddress, params, onConfirmed });
+  // ---- donation terms gate: every method stays locked until the box is checked.
+  // The tick time rides along with the donation confirm, where the API writes
+  // one acceptance record per transaction (see api/db/terms.ts).
+  const [acceptedAt, setAcceptedAt] = useState<string | null>(null);
+  const accepted = acceptedAt !== null;
+  useEffect(() => {
+    setAcceptedAt(readAcceptedAt(TERMS.id));
+  }, []);
+  const toggleTerms = (on: boolean) => {
+    const at = on ? new Date().toISOString() : null;
+    setAcceptedAt(at);
+    try {
+      if (at) localStorage.setItem(termsKey(TERMS.id), at);
+      else localStorage.removeItem(termsKey(TERMS.id));
+    } catch { /* private mode: the gate still works for this page view */ }
+  };
+  const d = useDonation({ slug, safeAddress, params, onConfirmed, acceptedAt });
   const [amount, setAmount] = useState("");
   const [symbol, setSymbol] = useState("");
   const [method, setMethod] = useState<Method>("wallet");
@@ -53,33 +75,6 @@ export default function DonateWidget({
   const [copied, setCopied] = useState(false);
   const [manualHash, setManualHash] = useState("");
 
-  // ---- donation terms gate: every method stays locked until the box is checked.
-  // Acceptance is logged server-side (anonymous, then once more with the wallet
-  // address when one connects) so the trail can bind acceptances to donors.
-  const termsVersion = TERMS.version;
-  const [accepted, setAccepted] = useState(false);
-  const lastLogged = useRef<string | null>(null);
-  useEffect(() => {
-    setAccepted(readAccepted(termsVersion));
-  }, [termsVersion]);
-  useEffect(() => {
-    if (!accepted || !termsVersion) return;
-    const who = address ?? "";
-    if (lastLogged.current === who) return;
-    lastLogged.current = who;
-    void api("/api/terms/accept", {
-      json: { version: termsVersion, ...(address ? { address } : {}) },
-      token: null,
-    }).catch(() => {});
-  }, [accepted, termsVersion, address]);
-  const toggleTerms = (on: boolean) => {
-    setAccepted(on);
-    try {
-      if (on) localStorage.setItem(termsKey(termsVersion), "1");
-      else localStorage.removeItem(termsKey(termsVersion));
-    } catch { /* private mode: the gate still works for this page view */ }
-    if (!on) lastLogged.current = null;
-  };
   const gated = () => {
     if (accepted) return true;
     d.setStatus({ kind: "err", text: "Please agree to the donation terms first." });
@@ -286,6 +281,7 @@ export default function DonateWidget({
               {copied ? "Copied ✓" : "Copy"}
             </Button>
           </div>
+          <GovernedBy />
           {manual && (
             <>
               <p className="m-0 small dim">Impatient? Paste the transaction hash:</p>
@@ -328,8 +324,9 @@ export default function DonateWidget({
           rel="noopener"
         >
           {shortAddr(safeAddress)}
-        </a>
+        </a>. <GovernedBy inline />
       </p>
+      <TermsChangeNotice compact />
     </div>
   );
 }

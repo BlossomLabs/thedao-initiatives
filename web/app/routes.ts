@@ -8,6 +8,7 @@ export default [
   route("submit", "routes/submit.tsx"),
   route("submit/thanks", "routes/submitted.tsx"),
   route("donation-terms", "routes/terms.tsx"),
+  route("donation-terms/v/:id", "routes/terms.version.tsx"),
   route("admin", "routes/admin.tsx", [
     index("routes/admin.dashboard.tsx"),
     route("initiatives/:slug", "routes/admin.initiative.tsx"),

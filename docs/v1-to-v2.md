@@ -41,7 +41,7 @@ and the reason behind it.
   next to the app. v2 has no disk, so `deno task sync-content` (or the admin dashboard, picking the
   folder in the browser) pushes the files to the API. Files still own the words and the goal; the
   admin panel still owns status, Safes and money. The donation terms skip the API altogether:
-  `content/donation-terms.md` is bundled into the site at build time.
+  `content/donation-terms/<date>.md` (one file per version) is bundled into the site at build time.
 
 ## Authentication and identity
 

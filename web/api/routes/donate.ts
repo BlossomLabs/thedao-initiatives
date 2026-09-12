@@ -5,6 +5,43 @@ import { jsonBody, s } from "../lib/body.ts";
 import { tokenQty } from "../lib/json.ts";
 import { decimalsOf } from "./initiatives.ts";
 import { CHAIN_ID, MIN_ETH_DONATION } from "../config.ts";
+import { isAddress, toChecksum } from "../chain/address.ts";
+import type { TermsAcceptance } from "../db/terms.ts";
+
+const TX_HASH_RE = /^0x[0-9a-f]{64}$/;
+const TERMS_VERSION_RE = /^[0-9a-f]{64}$/;
+const ISO_UTC_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+/** How far ahead of the server clock a donor's checkbox timestamp may be. */
+const ACCEPTED_AT_SKEW_SECS = 300;
+
+/**
+ * The widget's `terms` block on a confirm: the version it displayed, when the
+ * box was ticked, and the wallet connected at the time. Anything malformed is
+ * a 400 rather than a silently dropped record, so a client bug cannot leave
+ * donations without their acceptance.
+ */
+export function parseTermsAcceptance(
+  raw: unknown,
+  txHash: string,
+  now: number,
+): Omit<TermsAcceptance, "recordedAt"> {
+  const bad = () => new HttpError(400, "bad terms acceptance");
+  if (!TX_HASH_RE.test(txHash)) throw bad();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw bad();
+  const t = raw as Record<string, unknown>;
+  const version = s(t.version, 65);
+  if (!TERMS_VERSION_RE.test(version)) throw bad();
+  const acceptedAt = s(t.acceptedAt, 40);
+  const acceptedSecs = Date.parse(acceptedAt) / 1000;
+  if (!ISO_UTC_RE.test(acceptedAt) || Number.isNaN(acceptedSecs)) throw bad();
+  if (acceptedSecs > now + ACCEPTED_AT_SKEW_SECS) throw bad();
+  let address = s(t.address, 64);
+  if (address) {
+    if (!isAddress(address)) throw bad();
+    address = toChecksum(address);
+  }
+  return { txHash, version, address, acceptedAt };
+}
 
 export function donateRoutes(deps: Deps) {
   const r = new Hono<Vars>();
@@ -49,6 +86,11 @@ export function donateRoutes(deps: Deps) {
         status: "error",
         detail: "this initiative has no donation address yet",
       }, 503);
+    }
+    // The donor's terms acceptance, bound to this tx before the chain is
+    // consulted so an RPC outage cannot lose it. First write wins.
+    if (body.terms !== undefined) {
+      await db.terms.record(parseTermsAcceptance(body.terms, txHash, db.now()));
     }
     const state = await chain.state();
     if (!Object.keys(await chain.activeTokens()).length) {

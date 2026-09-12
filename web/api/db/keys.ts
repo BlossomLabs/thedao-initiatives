@@ -32,9 +32,8 @@ export const K = {
   safeSync: (rfpId: string) => ["safe_sync", rfpId] as const,
   lock: (name: string) => ["lock", name] as const,
   meta: (key: string) => ["meta", key] as const,
-  termsAccept: (version: string, id: string) => ["terms_accept", version, id] as const,
-  termsAcceptByAddr: (version: string, addr: string) =>
-    ["terms_accept_addr", version, addr.toLowerCase()] as const,
+  /** One immutable donation-terms acceptance per donation, keyed by its tx hash. */
+  termsAcceptance: (txHash: string) => ["terms_accept", txHash.toLowerCase()] as const,
 };
 
 export async function collect<T>(iter: Deno.KvListIterator<T>): Promise<T[]> {

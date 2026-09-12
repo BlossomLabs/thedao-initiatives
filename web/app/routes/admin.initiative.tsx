@@ -4,6 +4,7 @@ import PageSkeleton from "~/components/layout/PageSkeleton";
 import StickyAside from "~/components/layout/StickyAside";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
+import GovernedBy from "~/components/terms/GovernedBy";
 import { sendTransaction } from "wagmi/actions";
 import { useAccount, useConfig } from "wagmi";
 import {
@@ -413,6 +414,7 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
         >
           {r.safeAddress}
         </a>
+        <GovernedBy className="mt-1.5" />
         <p className="m-0 mt-2.5 small dim">
           Indexer sync: {syncState
             ? (syncState.ok

@@ -43,10 +43,17 @@ and `../deno.json` holds the tasks and imports.
 - **The process rules are not in the API.** `content/boilerplate/{rfp,grant,topup}.md` are bundled
   at build time (`app/data/rules.ts`) and render as a panel on every initiative page; the kind is
   picked from the initiative's type and top-up flag.
-- **The donation terms are not in the API.** `content/donation-terms.md` is bundled into the site at
-  build time (`app/data/terms.ts`, prerendered at `/donation-terms`). Its first line
-  `version: YYYY-MM-DD` is the donate widget's gate version; `POST /api/terms/accept` logs the
-  version accepted (anonymous, or once per wallet and version) to KV.
+- **The donation terms are not in the API.** Every version is a file in `content/donation-terms/`,
+  bundled into the site at build time (`app/data/terms.ts`, prerendered at `/donation-terms`); the
+  version id is the SHA-256 of the effective date plus the text. What the API keeps is one
+  **acceptance record per donation**: `POST /api/donate/confirm` takes an optional
+  `terms: { version, acceptedAt, address? }` block (the id the widget displayed, the ISO time of the
+  checkbox tick, the wallet connected at the time) and writes `["terms_accept", <txHash>]` before
+  consulting the chain. First write wins and the record is never changed; it joins the donation row
+  by tx hash, and a tx that never confirms simply leaves an orphan record. A malformed block is a
+  400 rather than a dropped record. Donations found by the Safe indexer (exchange withdrawals,
+  card on-ramps) have no record. Rows written by the old `POST /api/terms/accept` (3-part keys) are
+  left in place.
 - **Uploads go to Pinata** (backer logos, profile pictures); only the CID is stored. Set
   `PINATA_JWT`; until then uploads answer 503.
 - **Initiatives are structured** (submission redesign, Sep 2026): the text of a row is `sections`

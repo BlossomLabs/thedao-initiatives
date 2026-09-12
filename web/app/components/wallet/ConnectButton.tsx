@@ -11,6 +11,7 @@ import { Avatar } from "./Avatar";
 import WalletMenu, { connectorItem, type WalletMenuItem } from "./WalletMenu";
 import { PRIVY_CONNECTOR_ID } from "~/lib/privy";
 import { walletErrorMessage } from "~/lib/donate";
+import { shortAddr } from "~/lib/format";
 import { cn } from "~/lib/utils";
 
 /**
@@ -35,6 +36,14 @@ export default function ConnectButton() {
   const navigate = useNavigate();
   const [menu, setMenu] = useState<"none" | "pick" | "account">("none");
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const copyAddress = () => {
+    if (!address) return;
+    navigator.clipboard.writeText(address).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  };
   useEffect(() => {
     if (isConnected) setError("");
   }, [isConnected]);
@@ -101,6 +110,18 @@ export default function ConnectButton() {
   );
 
   const accountItems: WalletMenuItem[] = [
+    // The connected address, click to copy (Griff, 2026-09-12). Stays open to show "Copied".
+    ...(address
+      ? [{
+        key: "addr",
+        label: copied ? "Copied ✓" : shortAddr(address),
+        title: address,
+        lucide: "copy" as const,
+        mono: true,
+        keepOpen: true,
+        onClick: copyAddress,
+      }]
+      : []),
     ...(session
       ? [{
         key: "signed",

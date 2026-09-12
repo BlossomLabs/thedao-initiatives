@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import {
+  Copy,
   LayoutDashboard,
   LogOut,
   Mail,
@@ -16,14 +17,21 @@ export interface WalletMenuItem {
   key: string;
   label: string;
   icon?: string;
-  lucide?: "wallet" | "mail" | "switch" | "edit" | "power" | "sign" | "admin";
+  lucide?: "wallet" | "mail" | "switch" | "edit" | "power" | "sign" | "admin" | "copy";
   active?: boolean;
   danger?: boolean;
   separator?: boolean;
+  /** Monospace label (an address). */
+  mono?: boolean;
+  /** Full text for the tooltip (the whole address behind a shortened label). */
+  title?: string;
+  /** The menu stays open after the click (copy actions that show "Copied"). */
+  keepOpen?: boolean;
   onClick: () => void;
 }
 
 const ICONS = {
+  copy: Copy,
   wallet: Wallet,
   mail: Mail,
   switch: RefreshCw,
@@ -78,8 +86,9 @@ export default function WalletMenu(
               it.active && "text-dao-green",
               it.danger && "text-[#ff9a9a] hover:bg-[rgba(255,90,90,.12)] hover:text-[#ffb3b3]",
             )}
+            title={it.title}
             onClick={() => {
-              onClose();
+              if (!it.keepOpen) onClose();
               it.onClick();
             }}
           >
@@ -88,7 +97,10 @@ export default function WalletMenu(
               : Icon
               ? <Icon className="size-[18px] opacity-80" />
               : <span className="size-6" />}
-            <span className="flex-1 whitespace-nowrap">{it.label}{it.active ? " ✓" : ""}</span>
+            <span className={cn("flex-1 whitespace-nowrap", it.mono && "mono text-[12.5px]")}>
+              {it.label}
+              {it.active ? " ✓" : ""}
+            </span>
           </button>
         );
       })}

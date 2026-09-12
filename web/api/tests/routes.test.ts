@@ -541,7 +541,7 @@ Deno.test("profile: nickname rules, .eth ownership, pfp presets and upload", asy
   assertEquals(up.status, 200);
   const upj = await j(up) as { pfp: string; pfpUrl: string };
   assert(upj.pfp.startsWith("ipfs:bafy"));
-  assertStringIncludes(upj.pfpUrl, "gateway.pinata.cloud/ipfs/bafy");
+  assertStringIncludes(upj.pfpUrl, "ipfs.blossom.software/ipfs/bafy");
   assertEquals(pinataAuth, "Bearer jwt-test");
   const junk = new FormData();
   junk.append(

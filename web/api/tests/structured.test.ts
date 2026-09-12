@@ -225,7 +225,7 @@ Deno.test("uploads: auth, disabled, junk, ok, rate limit; a CID someone else pin
   assertEquals(ok.status, 200);
   const up = await j(ok) as { cid: string; logoUrl: string };
   assert(up.cid.startsWith("bafylogo"));
-  assertStringIncludes(up.logoUrl, "gateway.pinata.cloud/ipfs/" + up.cid);
+  assertStringIncludes(up.logoUrl, "ipfs.blossom.software/ipfs/" + up.cid);
   const receipt = (await h.kv.get<{ address: string }>(["upload", up.cid])).value;
   assertEquals(receipt?.address, PLAIN);
   // the junk and the empty form counted too: 12 an hour, then 429

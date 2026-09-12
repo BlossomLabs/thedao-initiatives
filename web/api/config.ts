@@ -157,7 +157,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     safeApiKey: (env.SAFE_API_KEY ?? "").trim(),
     safeSyncCron: (env.SAFE_SYNC_CRON ?? "").trim() || "*/10 * * * *",
     pinataJwt: (env.PINATA_JWT ?? "").trim(),
-    pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "gateway.pinata.cloud",
+    pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "ipfs.blossom.software",
     aiSearchApiKey: (env.AI_SEARCH_API_KEY ?? "").trim(),
     aiSearchBaseUrl: ((env.AI_SEARCH_BASE_URL ?? "").trim() || "https://api.deepseek.com")
       .replace(/\/+$/, ""),

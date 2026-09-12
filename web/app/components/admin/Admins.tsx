@@ -4,6 +4,7 @@ import { Loader2, Lock, Trash2, UserPlus } from "lucide-react";
 import { Button } from "~/components/ui/Button";
 import { Input } from "~/components/ui/Field";
 import Status, { type StatusKind } from "~/components/ui/Status";
+import Identity from "~/components/wallet/Identity";
 import { api, errorMessage } from "~/lib/api";
 import type { AdminList } from "~/lib/api-types";
 import { shortAddr } from "~/lib/format";
@@ -60,9 +61,7 @@ export default function Admins() {
           const you = a.address.toLowerCase() === data?.you.toLowerCase();
           return (
             <li key={a.address} className="flex flex-wrap items-center gap-2">
-              <span className="mono text-[12.5px]" title={a.address}>
-                {shortAddr(a.address)}
-              </span>
+              <Identity address={a.address} size={18} nameClassName="text-[13px]" />
               {you && <span className="text-[12px] text-muted">(you)</span>}
               {a.fixed
                 ? (

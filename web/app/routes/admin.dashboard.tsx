@@ -437,7 +437,7 @@ export default function Dashboard() {
                     : <span className="text-[#ffb3b1]" title={safeSync.error}>error</span>}
                 </td>
                 <td>
-                  <Link className="btn btn-ghost btn-sm" to={`/admin/initiatives/${r.id}`}>
+                  <Link className="btn btn-ghost btn-sm" to={`/admin/initiatives/${r.slug}`}>
                     Manage
                   </Link>
                 </td>

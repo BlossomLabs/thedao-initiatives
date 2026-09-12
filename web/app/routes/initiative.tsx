@@ -14,6 +14,7 @@ import Backers from "~/components/initiative/Backers";
 import DonationsTable from "~/components/initiative/DonationsTable";
 import SideCards from "~/components/initiative/SideCards";
 import RulesPanel from "~/components/initiative/RulesPanel";
+import MarkdownLink from "~/components/initiative/MarkdownLink";
 import Sections from "~/components/initiative/Sections";
 import Milestones from "~/components/initiative/Milestones";
 import Links from "~/components/initiative/Links";
@@ -191,12 +192,15 @@ export default function Initiative() {
               </>
             )
             : <DonationsTable donations={page.donations} />}
-          {r.proposer && (
-            <p className="mt-7 flex flex-wrap items-center gap-2 border-t border-white/[.08] pt-4 text-[13.5px] text-muted">
-              Proposed by <Identity address={r.proposer} size={20} />
-              <span>on {dt(r.createdAt)}</span>
-            </p>
-          )}
+          <p className="mt-7 flex flex-wrap items-center gap-2 border-t border-white/[.08] pt-4 text-[13.5px] text-muted">
+            {r.proposer && (
+              <>
+                Proposed by <Identity address={r.proposer} size={20} />
+                <span>on {dt(r.createdAt)}</span>
+              </>
+            )}
+            {(r.status === "approved" || r.status === "archived") && <MarkdownLink slug={r.slug} />}
+          </p>
         </div>
         <SideCards
           page={page}

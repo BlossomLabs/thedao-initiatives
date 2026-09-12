@@ -3,7 +3,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { sendTransaction } from "wagmi/actions";
 import { useAccount, useConfig } from "wagmi";
-import { ExternalLink, MessageSquare, RefreshCw, Trash2, Upload } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  FileText,
+  MessageSquare,
+  RefreshCw,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { RevisionAuthor } from "~/components/initiative/RevisionBar";
 import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
@@ -18,7 +26,7 @@ import InitiativeForm from "~/components/initiative-form/InitiativeForm";
 import type { SubmitPayload } from "~/components/initiative-form/types";
 import { fromInitiative } from "~/components/initiative-form/useDraft";
 import Identity from "~/components/wallet/Identity";
-import { api, errorMessage } from "~/lib/api";
+import { api, apiText, errorMessage } from "~/lib/api";
 import type {
   AdminInitiative,
   AdminInitiativePage,
@@ -43,12 +51,12 @@ const STATUS_HELP: Record<string, string> = {
 
 /** Admin editor for one initiative: same two-column layout as the public page. */
 export default function AdminInitiativeEditor() {
-  const { id = "" } = useParams();
+  const { slug = "" } = useParams();
   const qc = useQueryClient();
-  const key = ["admin", "initiative", id] as const;
+  const key = ["admin", "initiative", slug] as const;
   const { data, isLoading, error } = useQuery({
     queryKey: key,
-    queryFn: () => api<AdminInitiativePage>(`/api/admin/initiatives/${id}`),
+    queryFn: () => api<AdminInitiativePage>(`/api/admin/initiatives/${slug}`),
   });
   const refresh = () => void qc.invalidateQueries({ queryKey: ["admin"] });
   const [msg, setMsg] = useState<Msg>(null);
@@ -97,6 +105,34 @@ export default function AdminInitiativeEditor() {
         <StatusChip status={r.status} />
         <span className="small dim">
           created {dt(r.createdAt)} · <span className="mono">{r.slug}</span>
+        </span>
+        <span className="ml-auto flex items-center gap-2">
+          <a
+            className="btn btn-ghost btn-sm"
+            href={`/initiative/${r.slug}.md`}
+            target="_blank"
+            rel="noopener"
+            title="The public initiative as a content file"
+          >
+            <FileText className="size-[15px]" />Public .md
+          </a>
+          <Button
+            variant="ghost"
+            sm
+            title="With status, proposer, contact and funders. Never share it."
+            onClick={() =>
+              run(async () => {
+                const md = await apiText(`/initiative/${r.slug}-PRIVATE.md`);
+                const url = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${r.slug}-PRIVATE.md`;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              })}
+          >
+            <Download className="size-[15px]" />Private .md
+          </Button>
         </span>
       </p>
       {msg && <Status kind={msg.kind} className="mt-4">{msg.text}</Status>}

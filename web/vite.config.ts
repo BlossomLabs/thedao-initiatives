@@ -41,7 +41,7 @@ export default defineConfig({
     proxy: {
       "/api": process.env.API_PROXY || "http://localhost:8000",
       "/healthz": process.env.API_PROXY || "http://localhost:8000",
-      "^/initiative/[a-z0-9-]+\\.md$": process.env.API_PROXY || "http://localhost:8000",
+      "^/initiative/[a-z0-9-]+(-PRIVATE)?\\.md$": process.env.API_PROXY || "http://localhost:8000",
     },
   },
   resolve: {

@@ -104,7 +104,7 @@ export default function Leads() {
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td>
-                    <Link to={`/admin/initiatives/${r.id}`}>{r.title}</Link>
+                    <Link to={`/admin/initiatives/${r.slug}`}>{r.title}</Link>
                   </td>
                   <td>
                     <TypeBadge type={r.type} inline />

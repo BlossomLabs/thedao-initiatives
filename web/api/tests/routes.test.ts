@@ -26,7 +26,7 @@ async function seedApproved(h: Awaited<ReturnType<typeof harness>>, safe = SAFE_
     token: admin,
     json: { files },
   });
-  assertEquals(await j(res), { created: 6, updated: 0, backers: 2, errors: [] });
+  assertEquals(await j(res), { created: 13, updated: 0, backers: 2, errors: [] });
   const first = (await h.db.rfps.list(["approved"]))[0];
   if (safe) await h.db.rfps.update(first.id, { safeAddress: safe });
   return { admin, first: (await h.db.rfps.get(first.id))! };
@@ -41,7 +41,7 @@ Deno.test("content sync publishes the repo files as structured rows; public JSON
   });
   const board = await j(await h.req("/api/board"));
   const cards = board.cards as { initiative: Record<string, unknown> }[];
-  assertEquals(cards.length, 6);
+  assertEquals(cards.length, 13);
   const bySlug = Object.fromEntries(
     cards.map((c) => [c.initiative.slug as string, c.initiative]),
   );
@@ -92,7 +92,7 @@ Deno.test("content sync publishes the repo files as structured rows; public JSON
       json: { files: await loadContentFiles() },
     }),
   );
-  assertEquals(again, { created: 0, updated: 6, backers: 0, errors: [] });
+  assertEquals(again, { created: 0, updated: 13, backers: 0, errors: [] });
   for (const r of await h.db.rfps.list(["approved", "pending", "archived"])) {
     assertEquals((await h.db.revisions.list(r.id)).length, 1); // unchanged: no new revision
   }

@@ -11,8 +11,17 @@ import { isStructured } from "../../shared/draft/normalise.ts";
 /** A front-matter value: one line, or indented continuation lines. */
 const value = (v: string) => v.replace(/\r?\n/g, " ").trim();
 
-export function initiativeMarkdown(r: Rfp, pledges: Pledge[]): string {
+export interface MarkdownOptions {
+  /** Admin export: status, proposer, and the private contact and funders. */
+  privateFields?: boolean;
+}
+
+export function initiativeMarkdown(r: Rfp, pledges: Pledge[], opts: MarkdownOptions = {}): string {
   const fm: string[] = ["---", `title: ${value(r.title)}`, `type: ${r.type}`];
+  if (opts.privateFields) {
+    fm.push(`status: ${r.status}`);
+    if (r.proposer) fm.push(`proposer: ${r.proposer}`);
+  }
   if (r.type === "grant" && r.recipientTeam) {
     fm.push(`recipient: ${value(r.recipientTeam)}`);
     if (r.recipientUrl) fm.push(`recipient_url: ${r.recipientUrl}`);
@@ -30,6 +39,14 @@ export function initiativeMarkdown(r: Rfp, pledges: Pledge[]): string {
     fm.push("backers:");
     for (const p of backers) {
       fm.push(`  ${value(p.company)} | $${p.amountUsd}${p.url ? ` | ${p.url}` : ""}`);
+    }
+  }
+  if (opts.privateFields) {
+    // Never on the public file: the same two fields the admin JSON adds.
+    if (r.contact.trim()) fm.push(`contact: ${value(r.contact)}`);
+    if (r.funders.trim()) {
+      fm.push("funders:");
+      for (const line of r.funders.split(/\r?\n/)) if (line.trim()) fm.push(`  ${line.trim()}`);
     }
   }
   fm.push("---");

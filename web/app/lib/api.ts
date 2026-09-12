@@ -63,3 +63,19 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
 
 export const errorMessage = (e: unknown): string =>
   e instanceof Error ? e.message : typeof e === "string" ? e : "Something went wrong.";
+
+/** A non-JSON GET with the bearer (markdown exports). Throws ApiError on failure. */
+export async function apiText(path: string): Promise<string> {
+  const headers = new Headers();
+  const token = tokenProvider();
+  if (token) headers.set("Authorization", "Bearer " + token);
+  const res = await fetch(API_URL + path, { headers });
+  if (!res.ok) {
+    let msg = res.statusText || "Request failed";
+    try {
+      msg = ((await res.json()) as { error?: string }).error ?? msg;
+    } catch { /* not JSON */ }
+    throw new ApiError(res.status, msg);
+  }
+  return await res.text();
+}

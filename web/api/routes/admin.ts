@@ -27,8 +27,9 @@ export function adminRoutes(deps: Deps) {
   const { db, config, chain, ens } = deps;
   r.use("*", requireAdmin);
 
-  const rfpOr404 = async (id: string): Promise<Rfp> => {
-    const rfp = await db.rfps.get(id);
+  /** Admin routes address an initiative by slug (the URL) or by id (older links). */
+  const rfpOr404 = async (idOrSlug: string): Promise<Rfp> => {
+    const rfp = (await db.rfps.bySlug(idOrSlug)) ?? (await db.rfps.get(idOrSlug));
     if (!rfp) throw new HttpError(404, "not found");
     return rfp;
   };

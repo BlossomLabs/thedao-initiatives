@@ -1,6 +1,6 @@
 /** Structured initiatives: submit, logo uploads, proposer edits and page
  * facts, the admin editor's findings. */
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
 import { ADMIN, type Harness, harness, j, PLAIN, proposerToken } from "./app-helpers.ts";
 import { exampleSubmission, minimalSubmission } from "./fixtures.ts";
 import { LIMITS, SECTIONS, TOO_LONG_MSG } from "../../shared/draft/mod.ts";
@@ -550,5 +550,40 @@ Deno.test("GET /initiative/<slug>.md: the content-file shape, public rows only, 
   assertEquals((await h.req(`/initiative/${pending.slug}.md`)).status, 404);
   assertEquals((await h.req(`/initiative/nope.md`)).status, 404);
   assertEquals((await h.req(`/initiative/${first.slug}`)).status, 404);
+  h.close();
+});
+
+Deno.test("<slug>-PRIVATE.md: admins only, any status, carries contact and funders; admin API by slug", async () => {
+  const h = await harness();
+  const admin = await h.mint(ADMIN, true);
+  const plain = await h.mint(PLAIN, false);
+  const row = await h.db.rfps.insert({
+    title: "Pending private one",
+    status: "pending",
+    contact: "griff@example.com",
+    funders: "Some L2 | why | none | no | $50k\nA wallet co | why | met once | yes | $20k",
+    proposer: PLAIN,
+  });
+  assertEquals((await h.req(`/initiative/${row.slug}-PRIVATE.md`)).status, 401);
+  assertEquals((await h.req(`/initiative/${row.slug}-PRIVATE.md`, { token: plain })).status, 403);
+  const res = await h.req(`/initiative/${row.slug}-PRIVATE.md`, { token: admin });
+  assertEquals(res.status, 200);
+  assertEquals(res.headers.get("cache-control"), "no-store");
+  const md = await res.text();
+  assertStringIncludes(md, "status: pending");
+  assertStringIncludes(md, `proposer: ${PLAIN}`);
+  assertStringIncludes(md, "contact: griff@example.com");
+  assertStringIncludes(md, "funders:\n  Some L2 | why | none | no | $50k\n  A wallet co |");
+  // the public file never carries them, and hides the pending row anyway
+  assertEquals((await h.req(`/initiative/${row.slug}.md`)).status, 404);
+  await h.db.rfps.update(row.id, { status: "approved" });
+  const pub = await (await h.req(`/initiative/${row.slug}.md`)).text();
+  assertFalse(pub.includes("contact:"));
+  assertFalse(pub.includes("funders:"));
+  assertFalse(pub.includes("griff@example.com"));
+  // admin JSON routes take the slug as well as the id
+  const bySlug = await h.req(`/api/admin/initiatives/${row.slug}`, { token: admin });
+  assertEquals(bySlug.status, 200);
+  assertEquals(((await bySlug.json()) as { initiative: { id: string } }).initiative.id, row.id);
   h.close();
 });

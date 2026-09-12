@@ -13,3 +13,13 @@ test("the footer links to the donation terms on every page", () => {
     "/donation-terms",
   );
 });
+
+test("no transparency link anywhere in the footer (Griff, 2026-09-12)", () => {
+  render(
+    <MemoryRouter>
+      <Footer />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByRole("link", { name: /transparency/i })).toBeNull();
+  expect(document.body.textContent).not.toMatch(/transparency/i);
+});

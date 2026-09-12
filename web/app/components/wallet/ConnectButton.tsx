@@ -110,25 +110,19 @@ export default function ConnectButton() {
   );
 
   const accountItems: WalletMenuItem[] = [
-    // The connected address, click to copy (Griff, 2026-09-12). Stays open to show "Copied".
+    // The connected address, click to copy (Griff, 2026-09-12); the "(admin)"
+    // tag and the check mark mark the signed-in session on the same row.
+    // Stays open to show "Copied".
     ...(address
       ? [{
         key: "addr",
-        label: copied ? "Copied ✓" : shortAddr(address),
+        label: (copied ? "Copied" : shortAddr(address)) + (session?.isAdmin ? " (admin)" : ""),
         title: address,
         lucide: "copy" as const,
         mono: true,
         keepOpen: true,
+        active: Boolean(session),
         onClick: copyAddress,
-      }]
-      : []),
-    ...(session
-      ? [{
-        key: "signed",
-        label: "Signed in" + (session.isAdmin ? " (admin)" : ""),
-        lucide: "sign" as const,
-        active: true,
-        onClick: () => {},
       }]
       : []),
     ...(session?.isAdmin

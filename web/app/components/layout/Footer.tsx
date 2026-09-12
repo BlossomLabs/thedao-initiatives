@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { CONTACT_EMAIL, CONTACT_MAILTO, SOCIAL_LINKS, TRANSPARENCY_URL } from "~/data/site";
+import { CONTACT_EMAIL, CONTACT_MAILTO, SOCIAL_LINKS } from "~/data/site";
 
 // Figma: two 12.5px muted lines (30px above, 46px below), then an 88px legal bar.
 export default function Footer() {
@@ -11,10 +11,6 @@ export default function Footer() {
         </p>
         <p className="my-1.5">
           To back an initiative, email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>
-          {" · "}
-          <a className="text-white/35" href={TRANSPARENCY_URL} target="_blank" rel="noopener">
-            Transparency
-          </a>
           {" · "}
           <Link className="text-white/35" to="/donation-terms">Donation Terms</Link>
         </p>

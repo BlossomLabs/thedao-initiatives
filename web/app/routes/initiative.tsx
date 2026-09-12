@@ -21,6 +21,7 @@ import { DiffBlock, type ViewMode } from "~/components/initiative/RevisionBar";
 import CommentsSection from "~/components/comments/CommentsSection";
 import Identity from "~/components/wallet/Identity";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
+import { useFundingEvents } from "~/hooks/use-funding-events";
 import { useRevision } from "~/hooks/use-revision";
 import { useBoard } from "~/hooks/use-board";
 import { ApiError } from "~/lib/api";
@@ -41,6 +42,8 @@ export default function Initiative() {
   const { data: page, isLoading, error, isPlaceholderData } = useInitiative(slug);
   const board = useBoard();
   const qc = useQueryClient();
+  // Donations and pledges land on the page as they happen (SSE over kv.watch).
+  useFundingEvents(slug, Boolean(page));
 
   // ?rev=N opens an older revision in place of the current text. The history
   // list comes with the page; the older text is fetched on demand.

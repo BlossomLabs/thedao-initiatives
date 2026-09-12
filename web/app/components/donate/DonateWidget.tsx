@@ -38,14 +38,12 @@ export default function DonateWidget({
   slug,
   safeAddress,
   onramp,
-  manual,
   safeThreshold = 3,
   onConfirmed,
 }: {
   slug: string;
   safeAddress: string;
   onramp?: Onramp;
-  manual?: boolean;
   safeThreshold?: number;
   onConfirmed?: (r: DonateResult) => void;
 }) {
@@ -73,7 +71,6 @@ export default function DonateWidget({
   const [method, setMethod] = useState<Method>("wallet");
   const [balances, setBalances] = useState<Record<string, number | null>>({});
   const [copied, setCopied] = useState(false);
-  const [manualHash, setManualHash] = useState("");
 
   const gated = () => {
     if (accepted) return true;
@@ -258,9 +255,7 @@ export default function DonateWidget({
         <div className="flex flex-col gap-2">
           <p className="m-0 small dim">
             Send an accepted stablecoin or ETH from any exchange or wallet to this initiative's
-            address. It is counted automatically, usually within a couple of minutes{manual
-              ? ", or paste the transaction hash below to check it right away"
-              : ""}.
+            address. It shows up on this page on its own, usually within a couple of minutes.
           </p>
           <div className="flex items-center gap-2 rounded-[14px] border border-edge bg-black/15 px-3 py-2">
             <span
@@ -280,35 +275,6 @@ export default function DonateWidget({
             </Button>
           </div>
           <GovernedBy />
-          {manual && (
-            <>
-              <p className="m-0 small dim">Impatient? Paste the transaction hash:</p>
-              <input
-                className="field mono py-2.5"
-                placeholder="0x…"
-                value={manualHash}
-                onChange={(e) => setManualHash(e.target.value)}
-              />
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  const h = manualHash.trim();
-                  if (!/^0x[0-9a-fA-F]{64}$/.test(h)) {
-                    d.setStatus({
-                      kind: "err",
-                      text: "That does not look like a transaction hash (0x + 64 hex characters).",
-                    });
-                    return;
-                  }
-                  d.setStatus({ kind: "wait", text: "Verifying transaction on mainnet…" });
-                  void d.confirmTx(h.toLowerCase());
-                }}
-                disabled={Boolean(d.busy)}
-              >
-                Verify now
-              </Button>
-            </>
-          )}
         </div>
       )}
 

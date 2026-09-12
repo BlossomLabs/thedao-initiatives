@@ -35,7 +35,6 @@ export default function SideCards(
               slug={r.slug}
               safeAddress={r.safeAddress}
               onramp={page.onramp}
-              manual
               safeThreshold={safeThreshold}
               onConfirmed={onDonated}
             />

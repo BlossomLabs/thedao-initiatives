@@ -32,6 +32,10 @@ and `../deno.json` holds the tasks and imports.
   `deno task
   alchemy-register` backfills existing Safes. The cron stays as the safety net (set
   `SAFE_SYNC_CRON` to hourly once the webhook is live).
+- **Live funding.** `GET /api/initiatives/:slug/events` streams one `funding` SSE per donation or
+  pledge write, driven by `kv.watch` on a per-initiative version counter (bumped inside the same
+  atomic write), so a credit made by the cron or the webhook queue on any isolate reaches every open
+  page. The initiative page invalidates its query on each event.
 - **Content sync is push-based.** `deno task sync-content` reads `../../content/rfps/*.md` and POSTs
   them to `/api/admin/sync-content`. Files own the words and the goal; the admin panel owns status,
   Safes and money. Run the sync after every deploy that changes content. Besides the keys in

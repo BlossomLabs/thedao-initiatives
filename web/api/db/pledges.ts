@@ -8,9 +8,16 @@ export function pledgesRepo(kv: Deno.Kv, now: () => number) {
     p: Omit<Pledge, "id" | "rfpId" | "createdAt">,
   ): Promise<Pledge> {
     const pledge: Pledge = { ...p, id: newId(), rfpId, createdAt: now() };
-    await kv.set(K.pledge(rfpId, pledge.id), pledge);
+    await write(rfpId, pledge.id, pledge);
     return pledge;
   }
+  /** Every pledge write also bumps the initiative's funding version (live pages watch it). */
+  const write = (rfpId: string, id: string, value: Pledge | null) => {
+    const op = kv.atomic();
+    if (value) op.set(K.pledge(rfpId, id), value);
+    else op.delete(K.pledge(rfpId, id));
+    return op.sum(K.fundingVersion(rfpId), 1n).commit();
+  };
   const get = async (rfpId: string, id: string) =>
     (await kv.get<Pledge>(K.pledge(rfpId, id))).value;
   async function list(rfpId: string, includeWithdrawn = false): Promise<Pledge[]> {
@@ -25,7 +32,7 @@ export function pledgesRepo(kv: Deno.Kv, now: () => number) {
   ): Promise<boolean> {
     const cur = await kv.get<Pledge>(K.pledge(rfpId, id));
     if (!cur.value) return false;
-    await kv.set(K.pledge(rfpId, id), { ...cur.value, status });
+    await write(rfpId, id, { ...cur.value, status });
     return true;
   }
   /** Patch the words and the amount; status has its own setter. */
@@ -37,10 +44,10 @@ export function pledgesRepo(kv: Deno.Kv, now: () => number) {
     const cur = await kv.get<Pledge>(K.pledge(rfpId, id));
     if (!cur.value) return null;
     const next = { ...cur.value, ...patch };
-    await kv.set(K.pledge(rfpId, id), next);
+    await write(rfpId, id, next);
     return next;
   }
-  const remove = (rfpId: string, id: string) => kv.delete(K.pledge(rfpId, id));
+  const remove = (rfpId: string, id: string) => write(rfpId, id, null).then(() => {});
   async function totalActive(rfpId: string): Promise<number> {
     return (await list(rfpId)).reduce((s, p) => s + p.amountUsd, 0);
   }

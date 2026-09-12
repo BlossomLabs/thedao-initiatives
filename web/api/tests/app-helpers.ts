@@ -7,6 +7,7 @@ import { createChain } from "../chain/mod.ts";
 import { createAi } from "../services/ai.ts";
 import { createEns } from "../services/ens.ts";
 import { createPinata } from "../services/pinata.ts";
+import { createSafeSyncQueue } from "../services/sync-queue.ts";
 import type { Deps } from "../middleware/context.ts";
 import {
   SEL_BALANCE_OF,
@@ -176,6 +177,9 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
         host.endsWith(".invalid") ? [null, "host does not resolve"] : [["93.184.216.34"], null],
       ),
   };
+  // Zero delays so webhook-triggered syncs run as soon as a test calls
+  // `deps.syncQueue.listen()`.
+  deps.syncQueue = createSafeSyncQueue(deps, { firstMs: 0, retryMs: 0 });
   const app = createApp(deps);
   return {
     app,

@@ -257,11 +257,9 @@ export default function DonateWidget({
       {method === "exchange" && (
         <div className="flex flex-col gap-2">
           <p className="m-0 small dim">
-            Send an accepted stablecoin from any exchange or wallet to this initiative's address and
-            it is counted automatically within a few minutes.{" "}
-            <b>Sending ETH this way isn't auto-counted</b>{" "}
-            — donate ETH through the Wallet tab instead{manual
-              ? " (or paste its transaction hash below)"
+            Send an accepted stablecoin or ETH from any exchange or wallet to this initiative's
+            address. It is counted automatically, usually within a couple of minutes{manual
+              ? ", or paste the transaction hash below to check it right away"
               : ""}.
           </p>
           <div className="flex items-center gap-2 rounded-[14px] border border-edge bg-black/15 px-3 py-2">

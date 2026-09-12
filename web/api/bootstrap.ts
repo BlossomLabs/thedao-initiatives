@@ -9,6 +9,7 @@ import { createAi } from "./services/ai.ts";
 import { createEns, onchainEns } from "./services/ens.ts";
 import { createPinata } from "./services/pinata.ts";
 import { syncAll } from "./services/safe-api.ts";
+import { createSafeSyncQueue } from "./services/sync-queue.ts";
 import { toChecksum } from "./chain/address.ts";
 import { BADGE_CONTRACT, CURATOR_ADDRESSES } from "./config.ts";
 import type { Deps } from "./middleware/context.ts";
@@ -45,6 +46,15 @@ export async function createServer() {
     pinata: createPinata(config, fetch),
     log,
   };
+  // Webhook-triggered syncs run through the KV queue (see services/sync-queue.ts).
+  deps.syncQueue = createSafeSyncQueue(deps);
+  deps.syncQueue.listen().catch((e) => log(`safe sync queue stopped: ${String(e)}`));
+  if (config.alchemyWebhookSigningKey) {
+    log("alchemy webhook receiver is ON at /api/hooks/alchemy");
+    if (!config.alchemyAuthToken || !config.alchemyWebhookId) {
+      log("ALCHEMY_AUTH_TOKEN / ALCHEMY_WEBHOOK_ID not set; add new Safes to the webhook by hand");
+    }
+  }
 
   // Donation discovery: one authenticated Safe API request per Safe, on a
   // schedule. Page reads never call Safe.

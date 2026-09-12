@@ -46,9 +46,19 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
     return id ? get(id) : null;
   };
 
+  /**
+   * The initiative a Safe belongs to. Rows imported from the SQLite MVP
+   * predate the by-Safe index, so a miss falls back to a scan and writes the
+   * index for next time.
+   */
   const bySafe = async (addr: string): Promise<Rfp | null> => {
     const id = (await kv.get<string>(K.rfpBySafe(addr))).value;
-    return id ? get(id) : null;
+    if (id) return get(id);
+    const low = addr.toLowerCase();
+    const all = await collect(kv.list<Rfp>({ prefix: ["rfp"] }));
+    const hit = all.find((r) => r.safeAddress.toLowerCase() === low) ?? null;
+    if (hit) await kv.set(K.rfpBySafe(hit.safeAddress), hit.id);
+    return hit;
   };
 
   const revisionOf = (
@@ -108,12 +118,19 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
         createdAt: t,
         approvedAt: fields.approvedAt ?? (status === "approved" ? t : null),
       };
-      const res = await kv.atomic()
+      const op = kv.atomic()
         .check({ key: K.rfpBySlug(s), versionstamp: null })
         .set(K.rfpBySlug(s), rfp.id)
         .set(K.rfp(rfp.id), rfp)
-        .set(K.revision(rfp.id, 1), revisionOf(rfp, 1, rfp, origin, t))
-        .commit();
+        .set(K.revision(rfp.id, 1), revisionOf(rfp, 1, rfp, origin, t));
+      if (rfp.safeAddress) {
+        if ((await kv.get(K.rfpBySafe(rfp.safeAddress))).value) {
+          throw new Error(`Safe already assigned: ${rfp.safeAddress}`);
+        }
+        op.check({ key: K.rfpBySafe(rfp.safeAddress), versionstamp: null })
+          .set(K.rfpBySafe(rfp.safeAddress), rfp.id);
+      }
+      const res = await op.commit();
       if (res.ok) return rfp;
     }
     throw new Error("could not allocate a unique slug");

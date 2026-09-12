@@ -101,6 +101,13 @@ export interface Config {
   operationalSigners: string[];
   safeApiKey: string;
   safeSyncCron: string;
+  /** Alchemy app key: an extra mainnet RPC ahead of the public fallbacks. */
+  alchemyApiKey: string;
+  /** Address Activity webhook signing key; the receiver is off without it. */
+  alchemyWebhookSigningKey: string;
+  /** Notify auth token + webhook id: lets safe-confirm add the new Safe itself. */
+  alchemyAuthToken: string;
+  alchemyWebhookId: string;
   pinataJwt: string;
   pinataGateway: string;
   aiSearchApiKey: string;
@@ -129,6 +136,7 @@ function flag(v: string | undefined): boolean {
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const rpcOverride = (env.RPC_URL ?? "").trim();
+  const alchemyApiKey = (env.ALCHEMY_API_KEY ?? "").trim();
   const webOrigins = list(env.WEB_ORIGIN);
   if (webOrigins.length === 0) webOrigins.push("http://localhost:5173");
   let siweDomains = list(env.SIWE_DOMAINS);
@@ -142,9 +150,11 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     });
   }
   return {
-    rpcEndpoints: rpcOverride
-      ? [rpcOverride, ...DEFAULT_RPC_ENDPOINTS]
-      : [...DEFAULT_RPC_ENDPOINTS],
+    rpcEndpoints: [
+      ...(rpcOverride ? [rpcOverride] : []),
+      ...(alchemyApiKey ? [`https://eth-mainnet.g.alchemy.com/v2/${alchemyApiKey}`] : []),
+      ...DEFAULT_RPC_ENDPOINTS,
+    ],
     webOrigins,
     siweDomains,
     selfHostSuffixes: list(env.SELF_HOST_SUFFIXES).length
@@ -156,6 +166,10 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     operationalSigners: list(env.OPERATIONAL_SIGNERS),
     safeApiKey: (env.SAFE_API_KEY ?? "").trim(),
     safeSyncCron: (env.SAFE_SYNC_CRON ?? "").trim() || "*/10 * * * *",
+    alchemyApiKey,
+    alchemyWebhookSigningKey: (env.ALCHEMY_WEBHOOK_SIGNING_KEY ?? "").trim(),
+    alchemyAuthToken: (env.ALCHEMY_AUTH_TOKEN ?? "").trim(),
+    alchemyWebhookId: (env.ALCHEMY_WEBHOOK_ID ?? "").trim(),
     pinataJwt: (env.PINATA_JWT ?? "").trim(),
     pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "ipfs.blossom.software",
     aiSearchApiKey: (env.AI_SEARCH_API_KEY ?? "").trim(),

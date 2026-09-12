@@ -24,6 +24,14 @@ and `../deno.json` holds the tasks and imports.
 - **No background scanner.** Donations are discovered through the Safe Transaction Service: a
   `Deno.cron` (default every 10 min) makes one authenticated request per Safe, re-verifies each new
   tx over RPC, and writes the result to KV. Page reads never call Safe. Set `SAFE_API_KEY`.
+- **Webhook trigger.** With `ALCHEMY_WEBHOOK_SIGNING_KEY` set, an Alchemy Address Activity webhook
+  posting to `/api/hooks/alchemy` (outside the site lock, HMAC-verified) queues that Safe's sync on
+  the KV queue about a minute after a transfer, retrying once if the indexer lags. The payload is
+  only a trigger: amounts still come from RPC / the Safe indexer. Confirming a Safe registers it
+  with the webhook when `ALCHEMY_AUTH_TOKEN` + `ALCHEMY_WEBHOOK_ID` are set;
+  `deno task
+  alchemy-register` backfills existing Safes. The cron stays as the safety net (set
+  `SAFE_SYNC_CRON` to hourly once the webhook is live).
 - **Content sync is push-based.** `deno task sync-content` reads `../../content/rfps/*.md` and POSTs
   them to `/api/admin/sync-content`. Files own the words and the goal; the admin panel owns status,
   Safes and money. Run the sync after every deploy that changes content. Besides the keys in
@@ -51,9 +59,9 @@ and `../deno.json` holds the tasks and imports.
   checkbox tick, the wallet connected at the time) and writes `["terms_accept", <txHash>]` before
   consulting the chain. First write wins and the record is never changed; it joins the donation row
   by tx hash, and a tx that never confirms simply leaves an orphan record. A malformed block is a
-  400 rather than a dropped record. Donations found by the Safe indexer (exchange withdrawals,
-  card on-ramps) have no record. Rows written by the old `POST /api/terms/accept` (3-part keys) are
-  left in place.
+  400 rather than a dropped record. Donations found by the Safe indexer (exchange withdrawals, card
+  on-ramps) have no record. Rows written by the old `POST /api/terms/accept` (3-part keys) are left
+  in place.
 - **Uploads go to Pinata** (backer logos, profile pictures); only the CID is stored. Set
   `PINATA_JWT`; until then uploads answer 503.
 - **Initiatives are structured** (submission redesign, Sep 2026): the text of a row is `sections`
@@ -138,4 +146,6 @@ the two never see each other's rows (changing it on a live deployment starts fro
 - `ADMIN_PRIVATE_KEY=0x… deno task login` — prints a bearer token (dev wallet whose address is in
   `ADMIN_ADDRESSES`).
 - `ADMIN_TOKEN=… deno task sync-content` — pushes the content files.
+- `ADMIN_TOKEN=… deno task alchemy-register` — adds every approved initiative's Safe to the Alchemy
+  webhook (needs `ALCHEMY_AUTH_TOKEN` and `ALCHEMY_WEBHOOK_ID`).
 - `deno task import-sqlite -- --db ../../rfps.db` — one-off import of the MVP database.

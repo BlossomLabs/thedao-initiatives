@@ -21,6 +21,7 @@ import { safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
 import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
 import { syncSafe } from "../services/safe-api.ts";
+import { registerSafeAddresses } from "../services/alchemy.ts";
 import { liveRoles } from "../services/roles.ts";
 import type { Comment, Pledge, PledgeStatus, Rfp } from "../db/types.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
@@ -442,7 +443,14 @@ export function adminRoutes(deps: Deps) {
       }, 409);
     }
     if (!rfp.safeAddress) await db.rfps.update(rfp.id, { safeAddress: address });
-    return c.json({ status: "ok", address, detail });
+    // Push-based discovery: tell the Alchemy webhook to watch this Safe too.
+    const alchemy = await registerSafeAddresses(deps, [address]);
+    const note = alchemy === "registered"
+      ? "; registered with the Alchemy webhook"
+      : alchemy === "skipped"
+      ? ""
+      : `; Alchemy webhook registration failed (${alchemy}); add the address in the dashboard`;
+    return c.json({ status: "ok", address, detail: detail + note, alchemy });
   });
 
   /** The patch a moderation action makes on a comment, or a 400/409. */

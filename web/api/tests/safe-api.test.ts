@@ -259,3 +259,45 @@ Deno.test("safe sync: a time budget cuts a backfill short, progress persists, th
   assertEquals(requests, 5); // incremental: one request, stops on the cursor
   h.close();
 });
+
+Deno.test("safe sync: a failed manual verification does not block the indexer fallback", async () => {
+  // An exchange sends ETH through a contract: `tx.to` is the contract, so a
+  // donor who pastes the hash gets a `failed` row. The indexer knows better.
+  let pageBody: unknown[] = [];
+  const h = await harness({
+    fetch: (url) =>
+      url.startsWith("https://api.safe.global/")
+        ? Response.json({ count: pageBody.length, next: null, results: pageBody })
+        : new Response("", { status: 404 }),
+  });
+  const rfp = await h.db.rfps.insert({
+    title: "Exchange ETH initiative",
+    status: "approved",
+    goalUsd: 1000,
+    safeAddress: SAFE_ADDR,
+  });
+  h.script.receipts[TX_ETH] = { status: "0x1", blockNumber: "0x258", logs: [] };
+  h.script.txs[TX_ETH] = { to: "0x" + "77".repeat(20), from: DONOR, value: "0x0" };
+  const paste = await h.req("/api/donate/confirm", {
+    method: "POST",
+    json: { slug: rfp.slug, txHash: TX_ETH },
+  });
+  assertEquals((await j(paste)).status, "failed");
+  assertEquals((await h.db.donations.get(rfp.id, TX_ETH))!.status, "failed");
+
+  pageBody = [
+    row({
+      transactionHash: TX_ETH,
+      type: "ETHER_TRANSFER",
+      tokenAddress: null,
+      value: (10n ** 18n).toString(),
+      blockNumber: 600,
+    }),
+  ];
+  await syncSafe(h.deps, rfp);
+  const d = (await h.db.donations.get(rfp.id, TX_ETH))!;
+  assertEquals(d.status, "confirmed");
+  assertEquals(d.source, "safe-api");
+  assertEquals(d.amountUsd, 2000);
+  h.close();
+});

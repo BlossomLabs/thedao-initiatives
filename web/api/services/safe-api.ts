@@ -198,8 +198,11 @@ export async function syncSafe(
           hitCursor = true;
           break;
         }
+        // Pending rows wait on confirmations or a price; failed rows may be a
+        // donor's manual paste of an internal ETH send the RPC path cannot
+        // see, which the indexer fallback in creditTx can still credit.
         const known = await deps.db.donations.get(rfp.id, tx);
-        if (!known || known.status === "pending") {
+        if (known?.status !== "confirmed") {
           allKnown = false;
           const list = byTx.get(tx) ?? [];
           list.push(row);

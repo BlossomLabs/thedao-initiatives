@@ -22,7 +22,7 @@ export interface LoginOptions {
 }
 
 /** Basic credentials for a site behind the private-preview lock (no session yet). */
-function siteLockHeader(): Record<string, string> {
+export function siteLockHeader(): Record<string, string> {
   const u = env("SITE_USERNAME"), p = env("SITE_PASSWORD");
   return u && p ? { Authorization: "Basic " + btoa(`${u}:${p}`) } : {};
 }

@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "react-router";
 import { FundedChip, TypeBadge } from "~/components/ui/Badge";
 import Bar from "~/components/ui/Bar";
+import Money from "~/components/ui/Money";
 import { Button, LinkButton } from "~/components/ui/Button";
 import DonateWidget from "~/components/donate/DonateWidget";
 import type { Card } from "~/lib/api-types";
@@ -80,7 +81,7 @@ export default function InitiativeCard({
               zero ? "text-white/40" : "text-dao-green",
             )}
           >
-            {usd(summary.total)}
+            <Money value={summary.total} />
           </b>{" "}
           of {usd(r.goalUsd)}
           {backers > 0 && (

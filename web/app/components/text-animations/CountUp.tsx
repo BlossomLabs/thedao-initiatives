@@ -61,11 +61,11 @@ export default function CountUp({
     [maxDecimals, separator],
   );
 
+  // First paint shows the start value; a later change of `to` keeps the
+  // current number on screen and animates from there (see the effect below).
   useEffect(() => {
-    if (ref.current) {
-      ref.current.textContent = formatValue(direction === "down" ? to : from);
-    }
-  }, [from, to, direction, formatValue]);
+    if (ref.current) ref.current.textContent = formatValue(motionValue.get());
+  }, [motionValue, formatValue]);
 
   useEffect(() => {
     if (isInView && startWhen) {

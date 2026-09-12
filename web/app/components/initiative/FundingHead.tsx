@@ -1,5 +1,6 @@
 import { Trophy } from "lucide-react";
 import Bar from "~/components/ui/Bar";
+import Money from "~/components/ui/Money";
 import type { Summary } from "~/lib/api-types";
 import { pctText, usd } from "~/lib/format";
 
@@ -10,18 +11,30 @@ export default function FundingHead(
     <div className="mt-2.5 flex flex-wrap gap-[26px] text-[13px] text-muted">
       {funded && (
         <span>
-          <b className="text-white">{usd(summary.total)}</b> raised of {usd(goal)}
+          <b className="text-white">
+            <Money value={summary.total} />
+          </b>{" "}
+          raised of {usd(goal)}
         </span>
       )}
       <span>
-        <b className="text-white">{usd(summary.pledged)}</b> pledged by backers
+        <b className="text-white">
+          <Money value={summary.pledged} />
+        </b>{" "}
+        pledged by backers
       </span>
       <span>
-        <b className="text-white">{usd(summary.donated)}</b> donated on-chain
+        <b className="text-white">
+          <Money value={summary.donated} />
+        </b>{" "}
+        donated on-chain
       </span>
       {summary.paidOut > 0 && (
         <span>
-          <b className="text-white">{usd(summary.paidOut)}</b> already paid to the team
+          <b className="text-white">
+            <Money value={summary.paidOut} />
+          </b>{" "}
+          already paid to the team
         </span>
       )}
       {!funded && (
@@ -45,7 +58,9 @@ export default function FundingHead(
   return (
     <div className="panel mt-2 px-6">
       <div className="font-inter-tight text-[26px] font-light">
-        <b className="font-bold">{usd(summary.total)}</b>{" "}
+        <b className="font-bold">
+          <Money value={summary.total} />
+        </b>{" "}
         <span className="text-muted">of {usd(goal)}</span>
       </div>
       <Bar pct={pct} big />

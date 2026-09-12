@@ -434,6 +434,12 @@
   .bar > i {
     @apply block h-full rounded-full min-w-[2px] bg-gradient-to-r from-dao-green to-dao-bright
       shadow-bar;
+    transition: width 0.7s ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bar > i {
+      transition: none;
+    }
   }
   .bar-big {
     @apply h-3 max-w-[760px];

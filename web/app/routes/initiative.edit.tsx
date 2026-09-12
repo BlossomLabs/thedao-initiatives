@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import StickyAside from "~/components/layout/StickyAside";
 import { Link, useNavigate, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import Crumbs from "~/components/layout/Crumbs";
@@ -132,10 +133,10 @@ export default function EditInitiative() {
         : (
           <div className="mt-4 grid grid-cols-[1fr_340px] items-start gap-9 max-[960px]:grid-cols-1">
             <div className="min-w-0">{body}</div>
-            <aside className="sticky top-[86px] flex flex-col gap-3.5 max-[960px]:static max-[960px]:order-first">
+            <StickyAside className="flex flex-col gap-3.5 max-[960px]:static max-[960px]:order-first">
               <WhatYouCanChange status={r?.status} />
               <RevisionsCard />
-            </aside>
+            </StickyAside>
           </div>
         )}
     </PageMain>

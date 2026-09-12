@@ -4,6 +4,7 @@
  * findings paint through the FindingsProvider, and the sidebar carries the
  * live checks. Errors never disable the button: pressing it paints them.
  */
+import StickyAside from "~/components/layout/StickyAside";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Lock, Send } from "lucide-react";
 import { type CheckScope, type Findings, SECTIONS } from "@shared/draft/mod";
@@ -80,9 +81,9 @@ export function FormGrid({ main, aside }: { main: React.ReactNode; aside: React.
   return (
     <div className="mt-4 grid grid-cols-[1fr_340px] items-start gap-9 max-[960px]:grid-cols-1">
       <div className="min-w-0">{main}</div>
-      <aside className="sticky top-[86px] flex flex-col gap-3.5 max-[960px]:contents">
+      <StickyAside className="flex flex-col gap-3.5 max-[960px]:contents">
         {aside}
-      </aside>
+      </StickyAside>
     </div>
   );
 }

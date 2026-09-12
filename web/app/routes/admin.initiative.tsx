@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import StickyAside from "~/components/layout/StickyAside";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { sendTransaction } from "wagmi/actions";
@@ -166,7 +167,7 @@ export default function AdminInitiativeEditor() {
           <Donations page={data} base={base} run={run} />
         </div>
 
-        <aside className="sticky top-[86px] flex flex-col gap-3.5 max-[960px]:static">
+        <StickyAside className="flex flex-col gap-3.5 max-[960px]:static">
           <div className="panel">
             <span className="k">Status</span>
             <p className="m-0 flex items-center gap-2.5">
@@ -262,7 +263,7 @@ export default function AdminInitiativeEditor() {
               )}
             </ul>
           </div>
-        </aside>
+        </StickyAside>
       </div>
     </PageMain>
   );

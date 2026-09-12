@@ -1,4 +1,5 @@
 import { MessageSquare, PencilLine, Settings2 } from "lucide-react";
+import StickyAside from "~/components/layout/StickyAside";
 import DonateWidget from "~/components/donate/DonateWidget";
 import { LinkButton } from "~/components/ui/Button";
 import RevisionPanel, { type ViewMode } from "~/components/initiative/RevisionBar";
@@ -24,7 +25,7 @@ export default function SideCards(
   );
   const editable = r.status === "pending" || r.status === "approved";
   return (
-    <aside className="sticky top-[86px] flex flex-col gap-3.5 max-[960px]:static">
+    <StickyAside className="flex flex-col gap-3.5 max-[960px]:static">
       <div className="panel border-[rgba(92,183,90,.35)] shadow-[0_0_34px_rgba(92,183,90,.07)]">
         <span className="k">Donate to this initiative</span>
         {page.donationsEnabled
@@ -96,6 +97,6 @@ export default function SideCards(
           </LinkButton>
         </div>
       )}
-    </aside>
+    </StickyAside>
   );
 }

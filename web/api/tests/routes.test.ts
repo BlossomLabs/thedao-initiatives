@@ -26,7 +26,7 @@ async function seedApproved(h: Awaited<ReturnType<typeof harness>>, safe = SAFE_
     token: admin,
     json: { files },
   });
-  assertEquals(await j(res), { created: 5, updated: 0, errors: [] });
+  assertEquals(await j(res), { created: 6, updated: 0, backers: 2, errors: [] });
   const first = (await h.db.rfps.list(["approved"]))[0];
   if (safe) await h.db.rfps.update(first.id, { safeAddress: safe });
   return { admin, first: (await h.db.rfps.get(first.id))! };
@@ -41,7 +41,7 @@ Deno.test("content sync publishes the repo files as structured rows; public JSON
   });
   const board = await j(await h.req("/api/board"));
   const cards = board.cards as { initiative: Record<string, unknown> }[];
-  assertEquals(cards.length, 5);
+  assertEquals(cards.length, 6);
   const bySlug = Object.fromEntries(
     cards.map((c) => [c.initiative.slug as string, c.initiative]),
   );
@@ -92,7 +92,7 @@ Deno.test("content sync publishes the repo files as structured rows; public JSON
       json: { files: await loadContentFiles() },
     }),
   );
-  assertEquals(again, { created: 0, updated: 5, errors: [] });
+  assertEquals(again, { created: 0, updated: 6, backers: 0, errors: [] });
   for (const r of await h.db.rfps.list(["approved", "pending", "archived"])) {
     assertEquals((await h.db.revisions.list(r.id)).length, 1); // unchanged: no new revision
   }
@@ -824,6 +824,83 @@ Deno.test("submit: blank title is read from the Discourse topic; forum errors ar
   assert(card.onramp.prefilled);
   assertStringIncludes(card.onramp.url, "walletAddress=" + SAFE_ADDR);
   h.close();
+});
+
+Deno.test("content backers: file pledges are created once, kept in step, never own the status", async () => {
+  const h = await harness();
+  const { admin } = await seedApproved(h);
+  // the repo files: one backer each on ethdebug and formal verification
+  const fv = (await h.db.rfps.bySlug("securing-ethereum-with-formal-verification"))!;
+  assertEquals(fv.discourseUrl, "https://t.me/+PHZekKhdjPAxOWU0");
+  assertEquals(fv.recipientTeam, "Verity Labs");
+  const fvPledges = await h.db.pledges.list(fv.id);
+  assertEquals(fvPledges.length, 1);
+  assertEquals(fvPledges[0].company, "Ethereum Foundation");
+  assertEquals(fvPledges[0].amountUsd, 100000);
+  assertEquals(fvPledges[0].url, "https://ethereum.foundation/");
+  assertEquals(fvPledges[0].status, "pledged");
+  const eth = (await h.db.rfps.bySlug("source-level-debugging-for-solidity-ethdebug-in-solc"))!;
+  const ethPledges = await h.db.pledges.list(eth.id);
+  assertEquals(ethPledges.map((p) => [p.company, p.amountUsd]), [["Argot Collective", 151000]]);
+  const board = await j(await h.req("/api/board"));
+  const card = (board.cards as { initiative: { slug: string }; summary: { pledged: number } }[])
+    .find((c) => c.initiative.slug === fv.slug)!;
+  assertEquals(card.summary.pledged, 100000);
+
+  const sync = async (files: { name: string; text: string }[]) =>
+    j(await h.req("/api/admin/sync-content", { method: "POST", token: admin, json: { files } }));
+  const file = (backers: string) => ({
+    name: "grant-b.md",
+    text: "---\ntitle: Grant B\ngoal: 100\ntype: grant\nrecipient: Team B\nbackers:\n" +
+      backers + "---\n" + grantBody(100),
+  });
+  // created with two pledges; the admin marks one received and adds a third
+  const s1 = await sync([file("  Acme | $60 | https://acme.example/\n  - Beta Org | 40\n")]);
+  assertEquals([s1.created, s1.backers, s1.errors], [1, 2, []]);
+  const gb = (await h.db.rfps.bySlug("grant-b"))!;
+  let rows = await h.db.pledges.list(gb.id);
+  assertEquals(rows.map((p) => [p.company, p.amountUsd, p.url]), [
+    ["Acme", 60, "https://acme.example/"],
+    ["Beta Org", 40, ""],
+  ]);
+  await h.db.pledges.setStatus(gb.id, rows[0].id, "received");
+  await h.db.pledges.add(gb.id, {
+    company: "Admin Only",
+    amountUsd: 5,
+    status: "pledged",
+    note: "",
+    url: "",
+    logoCid: "",
+  });
+  // the same file again: nothing changes
+  const s2 = await sync([file("  Acme | $60 | https://acme.example/\n  Beta Org | 40\n")]);
+  assertEquals([s2.updated, s2.backers, s2.errors], [1, 0, []]);
+  // a new amount and spelling update the matching row; status and the admin's row survive
+  const s3 = await sync([file("  ACME | $70 | https://acme.example/\n  Beta Org | 40\n")]);
+  assertEquals([s3.updated, s3.backers], [1, 1]);
+  rows = await h.db.pledges.list(gb.id, true);
+  assertEquals(
+    rows.map((p) => [p.company, p.amountUsd, p.status]).sort(),
+    [["ACME", 70, "received"], ["Admin Only", 5, "pledged"], ["Beta Org", 40, "pledged"]].sort(),
+  );
+  // dropping a line withdraws nothing: that stays the admin's call
+  const s4 = await sync([file("  ACME | $70 | https://acme.example/\n")]);
+  assertEquals(s4.backers, 0);
+  assertEquals((await h.db.pledges.list(gb.id, true)).length, 3);
+  // bad blocks are file errors, and no row is written
+  for (
+    const bad of [
+      "  Acme\n",
+      "  Acme | 0\n",
+      "  Acme | 5 | http://x.example/\n",
+      "  A | 1\n  a | 2\n",
+    ]
+  ) {
+    const r = await sync([{ ...file(bad), name: "grant-bad.md" }]);
+    assertEquals(r.created, 0);
+    assertStringIncludes((r.errors as string[])[0], "backers");
+  }
+  assertEquals(await h.db.rfps.bySlug("grant-bad"), null);
 });
 
 Deno.test("page facts: content keys sync, admin patch validates and clears per type", async () => {

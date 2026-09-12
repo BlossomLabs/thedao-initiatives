@@ -13,6 +13,8 @@ import {
   type Milestone,
   milestonesTotal,
   normaliseStructured,
+  parseBackers,
+  type PastedBacker,
   type SectionKey,
   SECTIONS,
   type Sections,
@@ -41,6 +43,37 @@ export interface ContentFields {
   recipientUrl: string;
   topup: boolean;
   milestoneReviewer: string;
+  /** `backers:` block, one 'Org | $amount | https://link' per line. */
+  backers: PastedBacker[];
+}
+
+/** Frontmatter keys whose indented continuation lines stay separate lines. */
+const LINE_KEYS = new Set(["backers"]);
+
+/**
+ * The `backers:` block: an org per line, an amount each, an https link at most,
+ * no org twice. The same line format the guide asks for under "Backers".
+ */
+export function parseContentBackers(raw: string): PastedBacker[] {
+  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  const out = parseBackers(lines.join("\n"));
+  if (out.length !== lines.length) {
+    throw new Error("backers: each line is 'Org | $amount | https://link' (link optional)");
+  }
+  if (out.length > LIMITS.BACKERS) throw new Error(`backers: at most ${LIMITS.BACKERS}`);
+  const seen = new Set<string>();
+  for (const b of out) {
+    if (!b.org) throw new Error("backers: a line has no organization");
+    if (b.org.length > 120) throw new Error(`backers: ${b.org.slice(0, 40)}… is too long`);
+    if (!(b.amountUsd > 0)) throw new Error(`backers: ${b.org} needs an amount`);
+    const [url, err] = validateHttpsLink(b.url);
+    if (err) throw new Error(`backers: ${b.org}: ${err}`);
+    b.url = url!;
+    const k = b.org.toLowerCase();
+    if (seen.has(k)) throw new Error(`backers: ${b.org} is listed twice`);
+    seen.add(k);
+  }
+  return out;
 }
 
 /**
@@ -89,7 +122,7 @@ export function parseRfpFile(text: string): ContentFields {
   let key: string | null = null;
   for (const line of head.split("\n")) {
     if (/^[ \t]/.test(line) && key) {
-      fields[key] += " " + line.trim();
+      fields[key] += (LINE_KEYS.has(key) ? "\n" : " ") + line.trim();
       continue;
     }
     const idx = line.indexOf(":");
@@ -140,6 +173,7 @@ export function parseRfpFile(text: string): ContentFields {
     recipientUrl: recipientUrl!,
     topup,
     milestoneReviewer: topup ? (fields.reviewer ?? "").trim().slice(0, 200) : "",
+    backers: parseContentBackers(fields.backers ?? ""),
   };
 }
 
@@ -152,7 +186,43 @@ export const slugFromFilename = (name: string): string =>
 export interface SyncResult {
   created: number;
   updated: number;
+  /** Pledges added or changed from the files' `backers:` blocks. */
+  backers: number;
   errors: string[];
+}
+
+/**
+ * Pledges named in the file: added when missing, kept in step (amount, link,
+ * spelling) when present, matched by organization name. Pledges the admin
+ * added and the file does not name are left alone, and so is every status:
+ * received and withdrawn are the admin's call. Returns how many rows changed.
+ */
+export async function syncBackers(db: Db, rfpId: string, backers: PastedBacker[]) {
+  if (!backers.length) return 0;
+  let changed = 0;
+  const have = await db.pledges.list(rfpId, true);
+  for (const b of backers) {
+    const cur = have.find((p) => p.company.toLowerCase() === b.org.toLowerCase());
+    if (!cur) {
+      await db.pledges.add(rfpId, {
+        company: b.org,
+        amountUsd: b.amountUsd,
+        status: "pledged",
+        note: "",
+        url: b.url,
+        logoCid: "",
+      });
+      changed++;
+    } else if (cur.company !== b.org || cur.amountUsd !== b.amountUsd || cur.url !== b.url) {
+      await db.pledges.update(rfpId, cur.id, {
+        company: b.org,
+        amountUsd: b.amountUsd,
+        url: b.url,
+      });
+      changed++;
+    }
+  }
+  return changed;
 }
 
 /** Upsert every file; bad files are reported and skipped, never blocking. */
@@ -161,7 +231,7 @@ export async function syncContent(
   db: Db,
   files: { name: string; text: string }[],
 ): Promise<SyncResult> {
-  const out: SyncResult = { created: 0, updated: 0, errors: [] };
+  const out: SyncResult = { created: 0, updated: 0, backers: 0, errors: [] };
   for (const f of [...files].sort((a, b) => a.name.localeCompare(b.name))) {
     if (!f.name.endsWith(".md") || f.name === "README.md") continue;
     const slug = slugFromFilename(f.name);
@@ -174,6 +244,8 @@ export async function syncContent(
       const r = await db.rfps.upsertContent(slug, fields);
       if (r === "created") out.created++;
       else out.updated++;
+      const rfp = await db.rfps.bySlug(slug);
+      if (rfp) out.backers += await syncBackers(db, rfp.id, fields.backers);
     } catch (e) {
       out.errors.push(`${f.name}: ${(e as Error).message}`);
     }

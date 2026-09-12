@@ -49,6 +49,7 @@ describe("KeyFacts", () => {
       />,
     );
     expect(screen.getByText("Duration not stated")).toBeInTheDocument();
+    expect(screen.getByText("Work already under way with another funder")).toBeInTheDocument();
     expect(screen.getByText("Already committed")).toBeInTheDocument();
     expect(screen.getByText("$150,000")).toBeInTheDocument();
     expect(screen.getByText("$450,000")).toBeInTheDocument();

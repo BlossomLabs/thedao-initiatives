@@ -9,6 +9,7 @@ import { api, errorMessage } from "~/lib/api";
 interface SyncResult {
   created: number;
   updated: number;
+  backers: number;
   errors: string[];
 }
 
@@ -55,7 +56,8 @@ export default function SyncContent() {
     });
     try {
       const r = await api<SyncResult>("/api/admin/sync-content", { json: { files: picked } });
-      const summary = `${r.created} created, ${r.updated} updated`;
+      const summary = `${r.created} created, ${r.updated} updated` +
+        (r.backers ? `, ${r.backers} pledge${r.backers === 1 ? "" : "s"} from files` : "");
       setMsg(
         r.errors.length
           ? {

@@ -28,7 +28,6 @@ import { diffRevisions } from "~/lib/revision-diff";
 import type { RevisionText } from "~/lib/api-types";
 import { SITE_NAME } from "~/data/site";
 import { dt } from "~/lib/format";
-import { httpsHref } from "~/lib/utils";
 import { generateMeta } from "~/utils/meta";
 import { isStructured } from "@shared/draft/mod";
 
@@ -102,22 +101,6 @@ export default function Initiative() {
           </a>
         )}
         <TypeBadge type={r.type} inline />
-        {r.type === "grant" && r.topup && (
-          <span className="chip chip-badge" title="Work already under way with another funder">
-            top-up, work under way
-          </span>
-        )}
-        {r.type === "grant" && r.recipientTeam && (
-          <span className="chip chip-badge">
-            to {httpsHref(r.recipientUrl)
-              ? (
-                <a href={httpsHref(r.recipientUrl)} target="_blank" rel="noopener noreferrer">
-                  {r.recipientTeam}
-                </a>
-              )
-              : r.recipientTeam}
-          </span>
-        )}
         {r.status === "archived" && <span className="chip chip-badge st-archived">archived</span>}
         {r.status === "pending" && (
           <span

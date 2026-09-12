@@ -28,9 +28,21 @@ export function pledgesRepo(kv: Deno.Kv, now: () => number) {
     await kv.set(K.pledge(rfpId, id), { ...cur.value, status });
     return true;
   }
+  /** Patch the words and the amount; status has its own setter. */
+  async function update(
+    rfpId: string,
+    id: string,
+    patch: Partial<Pick<Pledge, "company" | "amountUsd" | "url" | "note">>,
+  ): Promise<Pledge | null> {
+    const cur = await kv.get<Pledge>(K.pledge(rfpId, id));
+    if (!cur.value) return null;
+    const next = { ...cur.value, ...patch };
+    await kv.set(K.pledge(rfpId, id), next);
+    return next;
+  }
   const remove = (rfpId: string, id: string) => kv.delete(K.pledge(rfpId, id));
   async function totalActive(rfpId: string): Promise<number> {
     return (await list(rfpId)).reduce((s, p) => s + p.amountUsd, 0);
   }
-  return { add, get, list, setStatus, remove, totalActive };
+  return { add, get, list, setStatus, update, remove, totalActive };
 }

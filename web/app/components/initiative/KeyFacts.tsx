@@ -15,6 +15,9 @@ export default function KeyFacts({ r, summary }: { r: Initiative; summary: Summa
     label: "Expected duration",
     value: r.durationMonths ? `About ${plural(r.durationMonths, "month")}` : "Duration not stated",
   });
+  if (topup) {
+    rows.push({ label: "Top-up", value: "Work already under way with another funder" });
+  }
   if (grant && r.recipientTeam) {
     rows.push({
       label: "Recipient",

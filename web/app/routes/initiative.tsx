@@ -175,7 +175,12 @@ export default function Initiative() {
               </>
             )}
           <RulesPanel r={r} />
-          <CommentsSection slug={r.slug} open={r.status === "approved"} />
+          <CommentsSection
+            key={r.id}
+            initiativeId={r.id}
+            slug={r.slug}
+            open={r.status === "approved"}
+          />
           {isPlaceholderData
             ? (
               <>

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import {
@@ -80,8 +81,13 @@ export function initiativeRoutes(deps: Deps) {
     Boolean(user && rfp.proposer && rfp.proposer.toLowerCase() === user.address.toLowerCase());
 
   /** Published rows for everyone; a pending one for its proposer and admins (so it can be edited). */
-  const visibleOr404 = async (slug: string, user: Session | null): Promise<Rfp> => {
+  const visibleOr404 = async (
+    slug: string,
+    user: Session | null,
+    mutation?: Record<string, unknown>,
+  ): Promise<Rfp> => {
     const rfp = await db.rfps.bySlug(slug);
+    if (rfp && mutation) await assertInitiativeIdentity(db, slug, rfp, mutation.initiativeId);
     const ok = rfp && (
       ["approved", "archived"].includes(rfp.status) ||
       (rfp.status === "pending" && (user?.isAdmin || isProposer(rfp, user)))
@@ -91,8 +97,8 @@ export function initiativeRoutes(deps: Deps) {
   };
 
   /** The proposer (or an admin) may act on this row; everyone else is refused. */
-  const editableBy = async (slug: string, user: Session) => {
-    const rfp = await visibleOr404(slug, user);
+  const editableBy = async (slug: string, user: Session, body: Record<string, unknown>) => {
+    const rfp = await visibleOr404(slug, user, body);
     const proposer = isProposer(rfp, user);
     if (!proposer && !user.isAdmin) {
       throw new HttpError(403, "Only the proposer can edit this initiative.");
@@ -154,7 +160,8 @@ export function initiativeRoutes(deps: Deps) {
    */
   r.post("/:slug/revisions", requireAuth, async (c) => {
     const user = c.var.user!;
-    const { rfp, proposer } = await editableBy(c.req.param("slug"), user);
+    const body = await jsonBody(c);
+    const { rfp, proposer } = await editableBy(c.req.param("slug"), user, body);
     if (rfp.status !== "pending" && rfp.status !== "approved") {
       throw new HttpError(403, "This initiative is no longer open for edits.");
     }
@@ -167,7 +174,6 @@ export function initiativeRoutes(deps: Deps) {
     ) {
       throw new HttpError(429, "Too many edits; try again in an hour.");
     }
-    const body = await jsonBody(c);
     const cur = pickText(rfp);
     const structuredBody = ["sections", "milestones", "links"].some((k) => body[k] !== undefined);
     if (!structuredBody && isStructured(cur)) {
@@ -212,11 +218,12 @@ export function initiativeRoutes(deps: Deps) {
    */
   r.patch("/:slug", requireAuth, async (c) => {
     const user = c.var.user!;
-    const { rfp } = await editableBy(c.req.param("slug"), user);
+    const body = await jsonBody(c);
+    const { rfp } = await editableBy(c.req.param("slug"), user, body);
     if (!user.isAdmin && rfp.status !== "pending") {
       throw new HttpError(403, "Locked after approval; email the team.");
     }
-    const patch = await readPageFacts(await jsonBody(c), rfp, deps);
+    const patch = await readPageFacts(body, rfp, deps);
     const next = Object.keys(patch).length ? await db.rfps.update(rfp.id, patch) : rfp;
     return c.json({ initiative: proposerRfp(next) });
   });
@@ -303,10 +310,10 @@ export function initiativeRoutes(deps: Deps) {
         extra.push({ field: `bk_logo_${i}`, msg: "Upload the logo again.", kind: "content" });
       }
     }
-    // The same text submitted twice (whatever the status of the first copy).
+    // Archived proposals may be resubmitted; other statuses still block copies.
     if (isStructured(structured)) {
       const key = bodyKey(structured.sections, structured.milestones);
-      const all = await db.rfps.list(["pending", "approved", "rejected", "archived"]);
+      const all = await db.rfps.list(["pending", "approved", "rejected"]);
       const dup = all.find((x) => {
         const t = pickText(x);
         return isStructured(t) && bodyKey(t.sections, t.milestones) === key;
@@ -322,24 +329,29 @@ export function initiativeRoutes(deps: Deps) {
     }
     const findings = mergeFindings(caps, backerCaps, checks, { errors: extra, warnings: [] });
     assertNoErrors(findings);
-    const rfp = await db.rfps.insert({
-      title,
-      summary,
-      details: "",
-      ...structured,
-      discourseUrl,
-      goalUsd: goal,
-      contact,
-      type,
-      funders,
-      proposer,
-      status: "pending",
-      durationMonths: /^\d+$/.test(duration) ? Number(duration) : null,
-      recipientTeam,
-      recipientUrl,
-      topup,
-      milestoneReviewer,
-    });
+    const rfp = await db.rfps.insert(
+      {
+        title,
+        summary,
+        details: "",
+        ...structured,
+        discourseUrl,
+        goalUsd: goal,
+        contact,
+        type,
+        funders,
+        proposer,
+        status: "pending",
+        durationMonths: /^\d+$/.test(duration) ? Number(duration) : null,
+        recipientTeam,
+        recipientUrl,
+        topup,
+        milestoneReviewer,
+      },
+      undefined,
+      undefined,
+      { reclaimArchivedSlug: true },
+    );
     for (const b of backers) {
       if (!b.org) continue;
       await db.pledges.add(rfp.id, {

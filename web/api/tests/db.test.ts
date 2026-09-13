@@ -86,7 +86,8 @@ Deno.test("rfps: content upsert never touches lifecycle or money", async () => {
     topup: false,
     milestoneReviewer: "",
   };
-  assertEquals(await db.rfps.upsertContent("my-slug", f), "created");
+  const created = await db.rfps.upsertContent("my-slug", f);
+  assertEquals(created.action, "created");
   const r = (await db.rfps.bySlug("my-slug"))!;
   await db.rfps.update(r.id, {
     status: "archived",
@@ -99,7 +100,7 @@ Deno.test("rfps: content upsert never touches lifecycle or money", async () => {
       goalUsd: 200,
       status: "pending",
     }),
-    "updated",
+    { action: "updated", id: r.id },
   );
   const r2 = (await db.rfps.bySlug("my-slug"))!;
   assertEquals(r2.title, "T2");

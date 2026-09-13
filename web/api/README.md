@@ -80,6 +80,32 @@ and `../deno.json` holds the tasks and imports.
   snapshotted as revision 1 on their first edit.
 - Ids are ULID strings. Rate limits live in KV so they hold across isolates.
 
+## Reusing proposal URLs
+
+A submission can take its title-derived slug from an archived proposal. The archived row moves to
+`<slug>-archived-<lowercase-id>` (with an additional numeric suffix if needed), retaining its ID,
+history, funds and Safe. The transfer and creation commit atomically. The replacement starts
+pending, so its clean URL is private until approval. Archived text may also be resubmitted; pending,
+approved and rejected proposals still block duplicate content. Other name collisions retain the
+normal suffix allocation. Existing numbered proposals are not renamed automatically.
+
+Unarchiving recalculates the slug from the current title: the clean slug if available, otherwise
+`-2`, `-3`, etc. It never displaces another proposal. Generated archive URLs remain reserved aliases
+to their original ID, including after unarchiving and another archival. Rejecting a replacement does
+not return its clean URL to the original proposal.
+
+Content sync and SQLite imports resolve filenames through a persistent source-slug-to-ID index,
+initialized lazily for older rows. Reusing a public URL cannot retarget the source file or its
+backers. Safe deployment uses an immutable ID-based key for new proposals; existing and imported
+proposals keep their legacy salt input, frozen before their URL changes. These metadata fields are
+internal and cannot be edited through proposal APIs. No bulk migration is required.
+
+Slug-addressed edits, comment posts and donation confirmations accept `initiativeId`, the ID from
+the displayed initiative. A mismatched ID returns 409 with a refresh message. Missing IDs remain
+accepted for URLs that have never been released or reused; reused URLs require the ID. Admin
+mutations and Safe deployment requests must use the permanent ID for reused URLs. The admin editor
+switches to its ID route after loading, and the web client includes IDs in writes.
+
 ## Endpoints
 
 Public: `GET /healthz`, `GET /api/board`, `GET /api/initiatives/:slug` (a pending one only for its

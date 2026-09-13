@@ -6,7 +6,7 @@
  * Integer ids become fresh ULIDs; slugs, tx hashes, addresses and timestamps
  * are preserved. Uploaded logos / pfps lived on disk and are not migrated
  * (re-upload through the admin panel, which now pins to IPFS). Safe to re-run:
- * initiatives are matched by slug, donations by (slug, tx hash).
+ * initiatives are matched by their original source slug, donations by (id, tx hash).
  */
 import { DatabaseSync } from "node:sqlite";
 import { parseArgs } from "jsr:@std/cli@^1/parse-args";
@@ -30,7 +30,7 @@ const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 type OldRfp = Record<string, unknown> & { id: number; slug: string };
 const rfpIds = new Map<number, string>();
 for (const r of rows<OldRfp>("SELECT * FROM rfps")) {
-  let existing = await db.rfps.bySlug(r.slug);
+  let existing = await db.rfps.bySourceSlug(r.slug);
   if (!existing) {
     existing = await db.rfps.insert(
       {
@@ -49,11 +49,8 @@ for (const r of rows<OldRfp>("SELECT * FROM rfps")) {
       },
       r.slug,
       { author: "", source: "import" },
+      { createdAt: Number(r.created_at) },
     );
-    // preserve the original creation time
-    await kv.set(["rfp", existing.id], { ...existing, createdAt: Number(r.created_at) });
-    const rev1 = (await db.revisions.get(existing.id, 1))!;
-    await kv.set(["revision", existing.id, 1], { ...rev1, createdAt: Number(r.created_at) });
     console.log(`rfp ${r.slug}: created`);
   } else console.log(`rfp ${r.slug}: exists, skipped`);
   rfpIds.set(r.id, existing.id);

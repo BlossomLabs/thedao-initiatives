@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { tokenQty } from "../lib/json.ts";
 import { decimalsOf } from "./initiatives.ts";
@@ -80,7 +81,9 @@ export function donateRoutes(deps: Deps) {
     const slug = s(body.slug, 200);
     const txHash = s(body.txHash, 80).toLowerCase();
     const rfp = await db.rfps.bySlug(slug);
-    if (!rfp || rfp.status !== "approved") throw new HttpError(404, "not found");
+    if (!rfp) throw new HttpError(404, "not found");
+    await assertInitiativeIdentity(db, slug, rfp, body.initiativeId);
+    if (rfp.status !== "approved") throw new HttpError(404, "not found");
     if (!rfp.safeAddress) {
       return c.json({
         status: "error",

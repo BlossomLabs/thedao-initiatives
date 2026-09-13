@@ -24,12 +24,16 @@ import Composer from "./Composer";
 
 const PAGE = 20;
 
-export default function CommentsSection({ slug, open }: { slug: string; open: boolean }) {
+export default function CommentsSection({ initiativeId, slug, open }: {
+  initiativeId: string;
+  slug: string;
+  open: boolean;
+}) {
   const { session, requireSession } = useSession();
   const { isConnected } = useAccount();
   const qc = useQueryClient();
   const token = session?.token ?? null;
-  const key = commentsKey(slug, token);
+  const key = commentsKey(slug, token, initiativeId);
   const q = useQuery({ queryKey: key, queryFn: () => fetchComments(slug) });
   const [tokens, setTokens] = useState<string[]>(
     () => (typeof localStorage === "undefined" ? [] : myClaimTokens()),
@@ -112,7 +116,7 @@ export default function CommentsSection({ slug, open }: { slug: string; open: bo
   ): Promise<string | null> => {
     const r = await postComment(
       slug,
-      { type: "other", topic: "", body, name, email: "", website },
+      { initiativeId, type: "other", topic: "", body, name, email: "", website },
       signedIn ? token : null,
     );
     if (r.status === "published" && r.entry) {

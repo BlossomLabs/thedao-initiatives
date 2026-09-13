@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import PageSkeleton from "~/components/layout/PageSkeleton";
 import StickyAside from "~/components/layout/StickyAside";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import GovernedBy from "~/components/terms/GovernedBy";
 import { sendTransaction } from "wagmi/actions";
 import { useAccount, useConfig } from "wagmi";
@@ -24,7 +24,6 @@ import SectionHeading from "~/components/layout/SectionHeading";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
 import { Field, Input, Select } from "~/components/ui/Field";
-import Skeleton from "~/components/ui/Skeleton";
 import Status, { type StatusKind } from "~/components/ui/Status";
 import FundingHead from "~/components/initiative/FundingHead";
 import InitiativeForm from "~/components/initiative-form/InitiativeForm";
@@ -58,12 +57,20 @@ const STATUS_HELP: Record<string, string> = {
 /** Admin editor for one initiative: same two-column layout as the public page. */
 export default function AdminInitiativeEditor() {
   const { slug = "" } = useParams();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const key = ["admin", "initiative", slug] as const;
   const { data, isLoading, error } = useQuery({
     queryKey: key,
     queryFn: () => api<AdminInitiativePage>(`/api/admin/initiatives/${slug}`),
   });
+  // Once resolved, keep the editor on this ID even if its public URL is reused.
+  const initiativeId = data?.initiative.id;
+  useEffect(() => {
+    if (initiativeId && slug !== initiativeId) {
+      navigate(`/admin/initiatives/${initiativeId}`, { replace: true });
+    }
+  }, [initiativeId, slug, navigate]);
   const refresh = () => void qc.invalidateQueries({ queryKey: ["admin"] });
   const [msg, setMsg] = useState<Msg>(null);
   const run: Run = async (fn, ok) => {

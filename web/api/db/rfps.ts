@@ -46,6 +46,30 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
     return id ? get(id) : null;
   };
 
+  const isReusedSlug = async (slug: string): Promise<boolean> =>
+    (await kv.get<boolean>(K.reusedRfpSlug(slug))).value === true;
+
+  /** Source filenames retain their original target even when a public URL is reused.
+   * Bind older rows lazily, checking the URL index against concurrent reclamation. */
+  async function bySourceSlug(slug: string): Promise<Rfp | null> {
+    for (let retry = 0; retry < 8; retry++) {
+      const source = await kv.get<string>(K.rfpBySourceSlug(slug));
+      if (source.value) {
+        const row = await get(source.value);
+        if (!row) throw new Error(`missing source proposal: ${slug}`);
+        return row;
+      }
+      const index = await kv.get<string>(K.rfpBySlug(slug));
+      if (!index.value) return null;
+      const row = await kv.get<Rfp>(K.rfp(index.value));
+      if (!row.value) throw new Error(`missing proposal: ${slug}`);
+      const res = await kv.atomic().check(source, index, row)
+        .set(K.rfpBySourceSlug(slug), row.value.id).commit();
+      if (res.ok) return row.value;
+    }
+    throw new Error("source binding conflict");
+  }
+
   /**
    * The initiative a Safe belongs to. Rows imported from the SQLite MVP
    * predate the by-Safe index, so a miss falls back to a scan and writes the
@@ -85,8 +109,10 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
     fields: RfpInput,
     slug?: string,
     origin: RevisionOrigin = { author: fields.proposer ?? "", source: "submit" },
+    options: { reclaimArchivedSlug?: boolean; createdAt?: number } = {},
   ): Promise<Rfp> {
     const base = slug ?? slugify(fields.title);
+    const id = newId();
     for (let attempt = 0; attempt < 8; attempt++) {
       const s = attempt === 0
         ? base
@@ -94,11 +120,12 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
         ? `${base}-${attempt + 1}`
         : `${base}-${1000 + Math.floor(Math.random() * 9000)}`;
       if (slug && attempt > 0) throw new Error(`slug already exists: ${slug}`);
-      const t = now();
+      const t = options.createdAt ?? now();
       const status: RfpStatus = fields.status ?? "pending";
       const rfp: Rfp = {
-        id: newId(),
+        id,
         slug: s,
+        safeDeploymentKey: origin.source === "import" ? s : `rfp:${id}`,
         ...pickText(fields),
         discourseUrl: fields.discourseUrl ?? "",
         goalUsd: fields.goalUsd ?? 0,
@@ -119,20 +146,60 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
         createdAt: t,
         approvedAt: fields.approvedAt ?? (status === "approved" ? t : null),
       };
-      const op = kv.atomic()
-        .check({ key: K.rfpBySlug(s), versionstamp: null })
-        .set(K.rfpBySlug(s), rfp.id)
-        .set(K.rfp(rfp.id), rfp)
-        .set(K.revision(rfp.id, 1), revisionOf(rfp, 1, rfp, origin, t));
-      if (rfp.safeAddress) {
-        if ((await kv.get(K.rfpBySafe(rfp.safeAddress))).value) {
-          throw new Error(`Safe already assigned: ${rfp.safeAddress}`);
+      for (let retry = 0; retry < 8; retry++) {
+        const index = await kv.get<string>(K.rfpBySlug(s));
+        const owner = index.value ? await kv.get<Rfp>(K.rfp(index.value)) : null;
+        if (index.value && !owner?.value) throw new Error(`missing proposal: ${s}`);
+        const reclaim = slug === undefined && attempt === 0 && options.reclaimArchivedSlug &&
+          owner?.value?.status === "archived" && owner.value.archiveSlug !== s;
+        if (index.value && !reclaim) break;
+
+        const op = kv.atomic().check(index)
+          .check({ key: K.rfp(id), versionstamp: null })
+          .check({ key: K.revision(id, 1), versionstamp: null })
+          .set(K.rfpBySlug(s), id)
+          .set(K.rfp(id), rfp)
+          .set(K.revision(id, 1), revisionOf(rfp, 1, rfp, origin, t));
+        if (reclaim && owner?.value) {
+          const old = owner.value;
+          const archiveBase = `${s}-archived-${old.id.toLowerCase()}`;
+          let archiveSlug = old.archiveSlug ?? archiveBase;
+          let suffix = 2;
+          let archiveIndex = await kv.get<string>(K.rfpBySlug(archiveSlug));
+          while (archiveIndex.value !== null && archiveIndex.value !== old.id) {
+            archiveSlug = `${archiveBase}-${suffix++}`;
+            archiveIndex = await kv.get<string>(K.rfpBySlug(archiveSlug));
+          }
+          op.check(owner)
+            .check(archiveIndex)
+            .set(K.rfpBySlug(archiveSlug), old.id)
+            .set(K.rfp(old.id), {
+              ...old,
+              slug: archiveSlug,
+              archiveSlug,
+              safeDeploymentKey: old.safeDeploymentKey ?? old.slug,
+            })
+            .set(K.reusedRfpSlug(s), true);
+          // Pin even legacy filenames before handing their public URL away.
+          const source = await kv.get<string>(K.rfpBySourceSlug(s));
+          op.check(source);
+          if (!source.value) op.set(K.rfpBySourceSlug(s), old.id);
         }
-        op.check({ key: K.rfpBySafe(rfp.safeAddress), versionstamp: null })
-          .set(K.rfpBySafe(rfp.safeAddress), rfp.id);
+        if (origin.source === "content" || origin.source === "import") {
+          const source = await kv.get<string>(K.rfpBySourceSlug(s));
+          if (source.value) throw new Error(`source already exists: ${s}`);
+          op.check(source).set(K.rfpBySourceSlug(s), id);
+        }
+        if (rfp.safeAddress) {
+          if ((await kv.get(K.rfpBySafe(rfp.safeAddress))).value) {
+            throw new Error(`Safe already assigned: ${rfp.safeAddress}`);
+          }
+          op.check({ key: K.rfpBySafe(rfp.safeAddress), versionstamp: null })
+            .set(K.rfpBySafe(rfp.safeAddress), id);
+        }
+        if ((await op.commit()).ok) return rfp;
+        if (retry === 7) throw new Error("proposal insertion conflict");
       }
-      const res = await op.commit();
-      if (res.ok) return rfp;
     }
     throw new Error("could not allocate a unique slug");
   }
@@ -142,6 +209,48 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
     return all.filter((r) => statuses.includes(r.status))
       .sort((a, b) => b.createdAt - a.createdAt);
   };
+
+  /** Restore with a freshly allocated title slug; archive URLs remain aliases.
+   * Unlike submission, restoring never displaces another archived proposal. */
+  async function unarchive(id: string): Promise<Rfp> {
+    for (let retry = 0; retry < 8; retry++) {
+      const cur = await kv.get<Rfp>(K.rfp(id));
+      if (!cur.value) throw new Error("rfp not found");
+      const old = cur.value;
+      // Approving a pending row or repeating the action keeps its URL. Read
+      // status inside this transaction so a concurrent archive gets retried.
+      const base = old.status === "archived" ? slugify(old.title) : old.slug;
+      let slug = base;
+      let suffix = 2;
+      let index = await kv.get<string>(K.rfpBySlug(slug));
+      while (index.value !== null && index.value !== id) {
+        slug = `${base}-${suffix++}`;
+        index = await kv.get<string>(K.rfpBySlug(slug));
+      }
+      const next: Rfp = {
+        ...old,
+        slug,
+        status: "approved",
+        approvedAt: old.approvedAt ?? now(),
+        safeDeploymentKey: old.safeDeploymentKey ?? old.slug,
+      };
+      const op = kv.atomic().check(cur, index).set(K.rfp(id), next)
+        .set(K.rfpBySlug(slug), id);
+      if (slug !== old.slug) {
+        const source = await kv.get<string>(K.rfpBySourceSlug(old.slug));
+        op.check(source);
+        if (!source.value) op.set(K.rfpBySourceSlug(old.slug), id);
+        if (old.slug !== old.archiveSlug) {
+          const previous = await kv.get<string>(K.rfpBySlug(old.slug));
+          if (previous.value !== id) continue;
+          op.check(previous).delete(K.rfpBySlug(old.slug))
+            .set(K.reusedRfpSlug(old.slug), true);
+        }
+      }
+      if ((await op.commit()).ok) return next;
+    }
+    throw new Error("unarchive conflict");
+  }
 
   /** Everything but the text fields, which only change through revise(). */
   const ALLOWED = new Set<keyof Rfp>([
@@ -257,9 +366,9 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
       topup: boolean;
       milestoneReviewer: string;
     },
-  ): Promise<"created" | "updated"> {
+  ): Promise<{ action: "created" | "updated"; id: string }> {
     const origin: RevisionOrigin = { author: "", source: "content" };
-    const existing = await bySlug(slug);
+    const existing = await bySourceSlug(slug);
     if (existing) {
       const patch: Partial<Rfp> = {
         goalUsd: f.goalUsd,
@@ -274,11 +383,23 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
       if (f.sortRank !== null) patch.sortRank = f.sortRank;
       await update(existing.id, patch);
       await revise(existing.id, f, origin);
-      return "updated";
+      return { action: "updated", id: existing.id };
     }
-    await insert({ ...f }, slug, origin);
-    return "created";
+    const row = await insert({ ...f }, slug, origin);
+    return { action: "created", id: row.id };
   }
 
-  return { get, bySlug, bySafe, insert, list, update, revise, upsertContent };
+  return {
+    get,
+    bySlug,
+    bySourceSlug,
+    isReusedSlug,
+    bySafe,
+    insert,
+    list,
+    update,
+    unarchive,
+    revise,
+    upsertContent,
+  };
 }

@@ -33,13 +33,14 @@ export function signersConfigured(signers: string[]): [boolean, string] {
   return [true, "ok"];
 }
 
-/** Deterministic per-initiative salt: keccak256(slug) as uint256. */
-export const safeSaltNonce = (slug: string): bigint => BigInt(keccakHex(utf8(slug)));
+/** Deterministic per-initiative salt, independent of reusable public URLs. */
+export const safeSaltNonce = (deploymentKey: string): bigint =>
+  BigInt(keccakHex(utf8(deploymentKey)));
 
 /** The exact factory calldata the admin wallet sends to deploy an RFP Safe. */
-export function safeDeployCalldata(signers: string[], slug: string): string {
+export function safeDeployCalldata(signers: string[], deploymentKey: string): string {
   const init = encodeSafeSetup(signers, SAFE_THRESHOLD, SAFE_FALLBACK_HANDLER);
-  return encodeCreateProxy(SAFE_SINGLETON, init, safeSaltNonce(slug));
+  return encodeCreateProxy(SAFE_SINGLETON, init, safeSaltNonce(deploymentKey));
 }
 
 /** Parse a deploy tx receipt for the canonical factory's ProxyCreation event. */

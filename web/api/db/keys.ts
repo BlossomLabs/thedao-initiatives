@@ -2,6 +2,8 @@
 export const K = {
   rfp: (id: string) => ["rfp", id] as const,
   rfpBySlug: (slug: string) => ["rfp_by_slug", slug] as const,
+  rfpBySourceSlug: (slug: string) => ["rfp_by_source_slug", slug] as const,
+  reusedRfpSlug: (slug: string) => ["reused_rfp_slug", slug] as const,
   rfpBySafe: (addr: string) => ["rfp_by_safe", addr.toLowerCase()] as const,
   revision: (rfpId: string, n: number) => ["revision", rfpId, n] as const,
   revisions: (rfpId: string) => ["revision", rfpId] as const,

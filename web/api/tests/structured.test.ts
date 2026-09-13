@@ -152,7 +152,7 @@ Deno.test("submit: an all-done top-up needs no adoption milestone and warns inst
   h.close();
 });
 
-Deno.test("submit: the same text twice is refused, whatever the first copy's status", async () => {
+Deno.test("submit: rejected proposals still block the same text", async () => {
   const h = await harness();
   const token = await proposerToken(h);
   const good = minimalSubmission(1000);

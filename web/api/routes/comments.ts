@@ -3,6 +3,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { type CommentJson, commentJson } from "../lib/json.ts";
@@ -87,8 +88,10 @@ export function commentRoutes(deps: Deps) {
 
   r.post("/initiatives/:slug/comments", async (c) => {
     const rfp = await db.rfps.bySlug(c.req.param("slug"));
-    if (!rfp || rfp.status !== "approved") throw new HttpError(404, "not found");
     const body = await jsonBody(c);
+    if (!rfp) throw new HttpError(404, "not found");
+    await assertInitiativeIdentity(db, c.req.param("slug"), rfp, body.initiativeId);
+    if (rfp.status !== "approved") throw new HttpError(404, "not found");
     // honeypot: accept and discard silently
     if (s(body.website)) return c.json({ status: "published", id: "", claimToken: "" });
     const ctype = s(body.type, 20) as CommentType;
@@ -154,7 +157,12 @@ export function commentRoutes(deps: Deps) {
       id: cm.id,
       claimToken: status === "held" ? cm.claimToken : "",
       entry: status === "published"
-        ? commentJson(cm, liveRoles(await deps.admins.set(), address, rfp), startVote ? { [cm.id]: 1 } : {}, [])
+        ? commentJson(
+          cm,
+          liveRoles(await deps.admins.set(), address, rfp),
+          startVote ? { [cm.id]: 1 } : {},
+          [],
+        )
         : null,
     });
   });

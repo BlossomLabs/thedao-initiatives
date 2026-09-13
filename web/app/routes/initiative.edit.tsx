@@ -129,7 +129,7 @@ export default function EditInitiative() {
       </p>
 
       {body === null && r
-        ? <EditForm key={r.slug} r={r} />
+        ? <EditForm key={r.id} r={r} />
         : (
           <div className="mt-4 grid grid-cols-[1fr_340px] items-start gap-9 max-[960px]:grid-cols-1">
             <div className="min-w-0">{body}</div>
@@ -191,10 +191,12 @@ function EditForm({ r }: { r: Initiative }) {
     let patched = false;
     try {
       if (facts) {
-        await api(path, { method: "PATCH", json: facts });
+        await api(path, { method: "PATCH", json: { ...facts, initiativeId: r.id } });
         patched = true;
       }
-      if (text) await api(`${path}/revisions`, { json: textBody(payload) });
+      if (text) {
+        await api(`${path}/revisions`, { json: { ...textBody(payload), initiativeId: r.id } });
+      }
     } catch (err) {
       // the facts are saved even when the text was refused: show the row as it is now
       if (patched) void qc.invalidateQueries({ queryKey: initiativeKey(r.slug) });

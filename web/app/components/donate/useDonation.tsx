@@ -25,6 +25,7 @@ export interface DonationStatus {
 }
 
 export interface UseDonationArgs {
+  initiativeId: string;
   slug: string;
   safeAddress: string;
   params: DonateParams | undefined;
@@ -41,7 +42,7 @@ const CONFIRM_RETRY_MS = 1500;
 const PENDING: DonateResult = { status: "pending", detail: "", amount: 0, token: "", amountUsd: 0 };
 
 export function useDonation(
-  { slug, safeAddress, params, onConfirmed, acceptedAt }: UseDonationArgs,
+  { initiativeId, slug, safeAddress, params, onConfirmed, acceptedAt }: UseDonationArgs,
 ) {
   const config = useConfig();
   const { address, isConnected } = useAccount();
@@ -125,7 +126,7 @@ export function useDonation(
         ...(addressRef.current ? { address: addressRef.current } : {}),
       }
       : undefined;
-    const json = { slug, txHash, ...(terms ? { terms } : {}) };
+    const json = { initiativeId, slug, txHash, ...(terms ? { terms } : {}) };
     for (let attempt = 0;; attempt++) {
       try {
         handle(txHash, await api<DonateResult>("/api/donate/confirm", { json, token: null }), 0);
@@ -145,7 +146,7 @@ export function useDonation(
         return;
       }
     }
-  }, [slug, handle]);
+  }, [initiativeId, slug, handle]);
 
   const donate = useCallback(
     async (symbol: string, usdRaw: string, balances: Record<string, number | null>) => {

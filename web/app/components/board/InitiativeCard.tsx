@@ -130,6 +130,7 @@ export default function InitiativeCard({
       {canDonate && open && (
         <div className="mt-3.5 border-t border-edge pt-3.5">
           <DonateWidget
+            initiativeId={r.id}
             slug={r.slug}
             safeAddress={r.safeAddress}
             onramp={card.onramp}

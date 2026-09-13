@@ -1,8 +1,8 @@
 import { api } from "~/lib/api";
 import type { CommentEntry, CommentsResponse, HeldMine, PostCommentResult } from "~/lib/api-types";
 
-export const commentsKey = (slug: string, token: string | null) =>
-  ["comments", slug, token ?? ""] as const;
+export const commentsKey = (slug: string, token: string | null, initiativeId: string) =>
+  ["comments", slug, token ?? "", initiativeId] as const;
 export const mineKey = (tokens: string[]) => ["comments-mine", tokens.join(",")] as const;
 
 export const fetchComments = (slug: string) =>

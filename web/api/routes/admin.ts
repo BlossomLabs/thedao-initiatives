@@ -1,6 +1,7 @@
 import { type Context, Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { INITIATIVE_CHANGED } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAdmin } from "../middleware/auth.ts";
 import {
@@ -36,8 +37,13 @@ export function adminRoutes(deps: Deps) {
   r.use("*", requireAdmin);
 
   /** Admin routes address an initiative by slug (the URL) or by id (older links). */
-  const rfpOr404 = async (idOrSlug: string): Promise<Rfp> => {
-    const rfp = (await db.rfps.bySlug(idOrSlug)) ?? (await db.rfps.get(idOrSlug));
+  const rfpOr404 = async (idOrSlug: string, mutation = false): Promise<Rfp> => {
+    const byId = await db.rfps.get(idOrSlug);
+    if (byId) return byId;
+    const rfp = await db.rfps.bySlug(idOrSlug);
+    if (mutation && await db.rfps.isReusedSlug(idOrSlug)) {
+      throw new HttpError(409, INITIATIVE_CHANGED);
+    }
     if (!rfp) throw new HttpError(404, "not found");
     return rfp;
   };
@@ -133,7 +139,7 @@ export function adminRoutes(deps: Deps) {
    * back as `findings` for the form to show without blocking.
    */
   r.patch("/initiatives/:id", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+    const rfp = await rfpOr404(c.req.param("id"), true);
     const body = await jsonBody(c);
     const patch = await readPageFacts(body, rfp, deps);
     if (body.sortRank !== undefined) {
@@ -218,7 +224,7 @@ export function adminRoutes(deps: Deps) {
 
   /** Hide a superseded revision from the public history, or show it again. */
   r.post("/initiatives/:id/revisions/:n", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+    const rfp = await rfpOr404(c.req.param("id"), true);
     const n = Number(c.req.param("n"));
     const action = s((await jsonBody(c)).action, 20);
     if (action !== "archive" && action !== "unarchive") throw new HttpError(400, "bad action");
@@ -258,13 +264,12 @@ export function adminRoutes(deps: Deps) {
   async function applyStatus(rfp: Rfp, action: string): Promise<Rfp> {
     const status = STATUS_ACTIONS[action];
     if (!status) throw new HttpError(400, "bad action");
-    const patch: Partial<Rfp> = { status };
-    if (status === "approved" && !rfp.approvedAt) patch.approvedAt = deps.now();
-    return await db.rfps.update(rfp.id, patch);
+    if (status === "approved") return await db.rfps.unarchive(rfp.id);
+    return await db.rfps.update(rfp.id, { status });
   }
 
   r.post("/initiatives/:id/status", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+    const rfp = await rfpOr404(c.req.param("id"), true);
     const action = s((await jsonBody(c)).action, 20);
     return c.json({ initiative: adminRfp(await applyStatus(rfp, action)) });
   });
@@ -338,7 +343,7 @@ export function adminRoutes(deps: Deps) {
   }
 
   r.post("/initiatives/:id/pledges", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+    const rfp = await rfpOr404(c.req.param("id"), true);
     const { patch, status } = await readPledge(c, rfp);
     if (!patch.company) throw new HttpError(400, "Company name is required.");
     if (patch.amountUsd === undefined) throw new HttpError(400, "Amount is required.");
@@ -355,7 +360,7 @@ export function adminRoutes(deps: Deps) {
 
   /** Edit a pledge: any of company, amount, url, note, logo (same body as adding), and status. */
   r.patch("/initiatives/:id/pledges/:pid", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+    const rfp = await rfpOr404(c.req.param("id"), true);
     const pid = c.req.param("pid");
     const { patch, status } = await readPledge(c, rfp);
     if (status !== undefined && !["pledged", "received", "withdrawn"].includes(status)) {
@@ -372,13 +377,13 @@ export function adminRoutes(deps: Deps) {
   });
 
   r.delete("/initiatives/:id/pledges/:pid", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+    const rfp = await rfpOr404(c.req.param("id"), true);
     await db.pledges.remove(rfp.id, c.req.param("pid"));
     return c.json({ ok: true });
   });
 
   r.post("/initiatives/:id/donations/recheck", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+    const rfp = await rfpOr404(c.req.param("id"), true);
     const tx = s((await jsonBody(c)).txHash, 80).toLowerCase();
     if (!TX_HASH_RE.test(tx)) throw new HttpError(400, "malformed tx hash");
     if (!rfp.safeAddress || !Object.keys(await chain.activeTokens()).length) {
@@ -390,7 +395,7 @@ export function adminRoutes(deps: Deps) {
   });
 
   r.post("/initiatives/:id/sync-donations", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+    const rfp = await rfpOr404(c.req.param("id"), true);
     if (!rfp.safeAddress) throw new HttpError(400, "no Safe deployed");
     if (!(await db.rateLimit("safesync:" + rfp.id, 1, 60))) {
       throw new HttpError(429, "synced less than a minute ago");
@@ -399,14 +404,14 @@ export function adminRoutes(deps: Deps) {
   });
 
   r.get("/initiatives/:id/safe-deploy-params", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+    const rfp = await rfpOr404(c.req.param("id"), true);
     const [ok, why] = signersConfigured(config.operationalSigners);
     if (!ok) return c.json({ enabled: false, reason: why }, 503);
     return c.json({
       enabled: true,
       chainId: CHAIN_ID,
       factory: SAFE_PROXY_FACTORY,
-      calldata: safeDeployCalldata(config.operationalSigners, rfp.slug),
+      calldata: safeDeployCalldata(config.operationalSigners, rfp.safeDeploymentKey ?? rfp.slug),
       signers: config.operationalSigners,
       threshold: SAFE_THRESHOLD,
       alreadyDeployed: rfp.safeAddress || null,
@@ -420,7 +425,7 @@ export function adminRoutes(deps: Deps) {
    * through the same on-chain check (owners, threshold, canonical proxy).
    */
   r.post("/initiatives/:id/safe-confirm", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+    const rfp = await rfpOr404(c.req.param("id"), true);
     const body = await jsonBody(c);
     let address: string;
     if (s(body.address, 64)) {

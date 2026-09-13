@@ -35,12 +35,14 @@ function readAcceptedAt(id: string): string | null {
 
 /** The MVP's donate widget: chips, $ amount, token, wallet / card / exchange tabs. */
 export default function DonateWidget({
+  initiativeId,
   slug,
   safeAddress,
   onramp,
   safeThreshold = 3,
   onConfirmed,
 }: {
+  initiativeId: string;
   slug: string;
   safeAddress: string;
   onramp?: Onramp;
@@ -65,7 +67,7 @@ export default function DonateWidget({
       else localStorage.removeItem(termsKey(TERMS.id));
     } catch { /* private mode: the gate still works for this page view */ }
   };
-  const d = useDonation({ slug, safeAddress, params, onConfirmed, acceptedAt });
+  const d = useDonation({ initiativeId, slug, safeAddress, params, onConfirmed, acceptedAt });
   const [amount, setAmount] = useState("");
   const [symbol, setSymbol] = useState("");
   const [method, setMethod] = useState<Method>("wallet");

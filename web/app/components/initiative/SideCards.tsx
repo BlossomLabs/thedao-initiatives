@@ -32,6 +32,8 @@ export default function SideCards(
         {page.donationsEnabled
           ? (
             <DonateWidget
+              key={r.id}
+              initiativeId={r.id}
               slug={r.slug}
               safeAddress={r.safeAddress}
               onramp={page.onramp}

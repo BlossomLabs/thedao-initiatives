@@ -6,6 +6,10 @@ export type RfpType = "rfp" | "grant";
 export interface Rfp {
   id: string;
   slug: string;
+  /** Internal: a displaced proposal's permanent, non-reclaimable URL. */
+  archiveSlug?: string;
+  /** Internal, immutable Safe salt input. Missing on legacy rows: use slug. */
+  safeDeploymentKey?: string;
   title: string;
   summary: string;
   details: string;

@@ -1,7 +1,7 @@
 /**
  * Content as code: an initiative is a markdown file with a small frontmatter
- * header. The filename is the permanent slug. Files own the words and the
- * goal; the admin panel owns the lifecycle.
+ * header. The filename is a permanent source key; its original proposal ID
+ * survives public URL changes. Files own words and goal; admins own lifecycle.
  */
 import { MAX_SUMMARY, MAX_TITLE } from "../config.ts";
 import { parseDuration, parseGoal, validateHttpsLink } from "../lib/validate.ts";
@@ -275,10 +275,9 @@ export async function syncContent(
     try {
       const fields = parseRfpFile(f.text);
       const r = await db.rfps.upsertContent(slug, fields);
-      if (r === "created") out.created++;
+      if (r.action === "created") out.created++;
       else out.updated++;
-      const rfp = await db.rfps.bySlug(slug);
-      if (rfp) out.backers += await syncBackers(db, rfp.id, fields.backers);
+      out.backers += await syncBackers(db, r.id, fields.backers);
     } catch (e) {
       out.errors.push(`${f.name}: ${(e as Error).message}`);
     }

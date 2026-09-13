@@ -188,10 +188,10 @@ export default function DonateWidget({
           onChange={(e) => toggleTerms(e.target.checked)}
         />
         <span>
-          I agree to the{" "}
+          I agree to these{" "}
           <Link to="/donation-terms" target="_blank" rel="noopener" className="underline">
-            donation terms
-          </Link>
+            Donation Terms
+          </Link>.
         </span>
       </label>
 

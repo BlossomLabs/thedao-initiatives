@@ -143,7 +143,8 @@ class TestWidgetGate(unittest.TestCase):
         html = self._render()
         self.assertRegex(html, r'<input[^>]*type="checkbox"[^>]*class="[^"]*dw-terms')
         self.assertRegex(html, r'<a[^>]*href="/donation-terms"[^>]*target="_blank"')
-        self.assertIn("I agree to the", html)
+        self.assertIn("I agree to these", html)
+        self.assertIn("Donation Terms</a>.", html)
         self.assertIn('data-terms-version="2026-09-06"', html)
 
     def test_checkbox_precedes_method_tabs(self):

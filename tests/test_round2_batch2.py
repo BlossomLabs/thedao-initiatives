@@ -49,10 +49,10 @@ class TestTermsPage(unittest.TestCase):
         r = self.client.get("/donation-terms")
         self.assertEqual(r.status_code, 200)
         html = r.data.decode()
-        self.assertIn("Donation Terms of Service", html)
-        self.assertIn("2026-09-06", html)  # version exposed to the template
+        self.assertIn("Donation Terms", html)
+        self.assertIn("2026-09-14", html)  # version exposed to the template
         # the raw "version:" header line is stripped before rendering
-        self.assertNotRegex(html, r"version:\s*2026-09-06")
+        self.assertNotRegex(html, r"version:\s*2026-09-14")
 
     def test_terms_page_not_in_nav(self):
         r = self.client.get("/")
@@ -78,11 +78,11 @@ class TestTermsAccept(unittest.TestCase):
 
     def test_accept_without_address_logs_row(self):
         r = self.client.post("/api/terms/accept",
-                             json={"version": "2026-09-06"}, headers=_origin())
+                             json={"version": "2026-09-14"}, headers=_origin())
         self.assertEqual(r.status_code, 200)
         rows = self._rows()
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["version"], "2026-09-06")
+        self.assertEqual(rows[0]["version"], "2026-09-14")
         self.assertEqual(rows[0]["address"], "")
         self.assertTrue(rows[0]["ip"])
 
@@ -90,7 +90,7 @@ class TestTermsAccept(unittest.TestCase):
         addr = "0x839395e20bbB182fa440d08F850E6c7A8f6F0780"
         for _ in range(2):
             r = self.client.post("/api/terms/accept",
-                                 json={"version": "2026-09-06", "address": addr},
+                                 json={"version": "2026-09-14", "address": addr},
                                  headers=_origin())
             self.assertEqual(r.status_code, 200)
         rows = self._rows()
@@ -99,10 +99,10 @@ class TestTermsAccept(unittest.TestCase):
 
     def test_anonymous_then_address_both_logged(self):
         addr = "0x839395e20bbB182fa440d08F850E6c7A8f6F0780"
-        self.client.post("/api/terms/accept", json={"version": "2026-09-06"},
+        self.client.post("/api/terms/accept", json={"version": "2026-09-14"},
                          headers=_origin())
         self.client.post("/api/terms/accept",
-                         json={"version": "2026-09-06", "address": addr},
+                         json={"version": "2026-09-14", "address": addr},
                          headers=_origin())
         self.assertEqual([r["address"] for r in self._rows()], ["", addr])
 
@@ -110,19 +110,19 @@ class TestTermsAccept(unittest.TestCase):
         r = self.client.post("/api/terms/accept", json={}, headers=_origin())
         self.assertEqual(r.status_code, 400)
         r = self.client.post("/api/terms/accept",
-                             json={"version": "2026-09-06", "address": "nope"},
+                             json={"version": "2026-09-14", "address": "nope"},
                              headers=_origin())
         self.assertEqual(r.status_code, 400)
         self.assertEqual(self._rows(), [])
 
     def test_accept_rejects_cross_origin(self):
-        r = self.client.post("/api/terms/accept", json={"version": "2026-09-06"},
+        r = self.client.post("/api/terms/accept", json={"version": "2026-09-14"},
                              headers={"Origin": "https://evil.example"})
         self.assertEqual(r.status_code, 403)
 
     def test_acceptances_never_public(self):
         self.client.post("/api/terms/accept",
-                         json={"version": "2026-09-06",
+                         json={"version": "2026-09-14",
                                "address": "0x839395e20bbB182fa440d08F850E6c7A8f6F0780"},
                          headers=_origin())
         for path in ("/", "/donation-terms", "/llms.txt"):
@@ -145,7 +145,7 @@ class TestWidgetGate(unittest.TestCase):
         self.assertRegex(html, r'<a[^>]*href="/donation-terms"[^>]*target="_blank"')
         self.assertIn("I agree to these", html)
         self.assertIn("Donation Terms</a>.", html)
-        self.assertIn('data-terms-version="2026-09-06"', html)
+        self.assertIn('data-terms-version="2026-09-14"', html)
 
     def test_checkbox_precedes_method_tabs(self):
         html = self._render()

@@ -22,7 +22,7 @@ version: 2026-09-14
 
 **2.1 Donations through the Site.** You accept these Donation Terms by checking the box confirming your agreement and completing a donation through the Site.
 
-**2.2 Direct transfers.** These Donation Terms also apply to any transfer of digital assets you send directly to an Initiative's multisignature wallet address, whether or not you use the Site interface to do it.
+**2.2 Direct transfers.** These Donation Terms also apply to any transfer of digital assets you send directly to an Initiative's multisignature wallet address, whether or not you use the Site interface to do it and regardless of how you obtained the address, including from a cryptocurrency exchange, a block explorer, or any other third party.
 
 **2.3 If you do not agree.** If you do not agree to these Donation Terms, do not donate.
 
@@ -140,7 +140,7 @@ version: 2026-09-14
 
 **8.3 Pseudonymous, not anonymous.** Donations are pseudonymous rather than anonymous. TheDAO does not represent that any donation is anonymous, and TheDAO reserves the right to obtain and to disclose information about a donation or a donor where required by applicable law or by a competent authority, or where TheDAO reasonably believes disclosure is necessary to act under Section 5.5 or Section 6.
 
-**8.4 Donor data collected.** The Site does not collect donor names or email addresses. The only donor data the Site records is wallet and transaction data read from the blockchain, together with any information you choose to provide to TheDAO directly, for example in response to a source of funds request. TheDAO does not sell donor data.
+**8.4 Donor data collected.** The Site does not require donor names or email addresses. The only donor data the Site records is wallet and transaction data read from the blockchain, together with any information you choose to provide to TheDAO directly, including a name, donation amount, or currency you voluntarily provide to help TheDAO match a deposit made from an exchange or another external source, for example in response to a source of funds request. TheDAO does not sell donor data.
 
 **8.5 Record retention.** TheDAO keeps written records of screenings, compliance decisions, and donations for seven (7) years, in line with its record retention practice, or longer where required by applicable law, litigation, or an ongoing regulatory matter.
 

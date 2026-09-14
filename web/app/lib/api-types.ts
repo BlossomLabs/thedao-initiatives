@@ -5,6 +5,16 @@ export type { Finding, Findings, Milestone, SectionKey, Sections };
 export type InitiativeType = "rfp" | "grant";
 export type InitiativeStatus = "pending" | "approved" | "rejected" | "archived";
 
+/** One row of GET /api/initiatives/mine: what the signed-in wallet submitted. */
+export interface MineItem {
+  slug: string;
+  title: string;
+  status: InitiativeStatus;
+  type: InitiativeType;
+  goalUsd: number;
+  createdAt: number;
+}
+
 export interface Initiative {
   id: string;
   slug: string;

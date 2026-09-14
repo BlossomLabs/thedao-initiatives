@@ -133,6 +133,15 @@ export default function ConnectButton() {
         onClick: () => void navigate("/admin"),
       }]
       : []),
+    // Where a proposer finds a pending submission again (Griff, 2026-09-14).
+    ...(session
+      ? [{
+        key: "mine",
+        label: "My initiatives",
+        lucide: "list" as const,
+        onClick: () => void navigate("/mine"),
+      }]
+      : []),
     {
       key: "name",
       label: identity.nameFromEns && identity.avatarFromEns

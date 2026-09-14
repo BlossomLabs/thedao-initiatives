@@ -236,7 +236,7 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
     })).status,
     400,
   );
-  h.clock.now += 3601; // invalid attempts count against the 5/hour budget, as in the MVP
+  // Refused attempts do not count against the 5/hour budget (Griff, 2026-09-14).
   const res = await h.req("/api/initiatives", {
     method: "POST",
     token,
@@ -251,13 +251,50 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
   assertEquals(row.funders, good.funders);
   assertEquals((await h.req("/api/initiatives/" + slug)).status, 404);
   assertEquals(((await j(await h.req("/api/board"))).cards as unknown[]).length, 0);
-  for (let i = 0; i < 4; i++) {
-    await h.req("/api/initiatives", { method: "POST", token, json: good });
+  // Four more accepted (different text each time, the duplicate check would refuse copies).
+  for (let i = 1; i <= 4; i++) {
+    h.clock.now += 1;
+    assertEquals(
+      (await h.req("/api/initiatives", {
+        method: "POST",
+        token,
+        json: minimalSubmission(25000 + i),
+      }))
+        .status,
+      201,
+    );
   }
+  const sixth = await h.req("/api/initiatives", {
+    method: "POST",
+    token,
+    json: minimalSubmission(26000),
+  });
+  assertEquals(sixth.status, 429);
+  assertStringIncludes(String((await j(sixth)).error ?? ""), "wallet");
+  // The limit is per wallet, not per IP: another wallet on the same connection may submit.
+  const other = await proposerToken(h, ADMIN);
   assertEquals(
-    (await h.req("/api/initiatives", { method: "POST", token, json: good })).status,
-    429,
+    (await h.req("/api/initiatives", {
+      method: "POST",
+      token: other,
+      json: minimalSubmission(27000),
+    }))
+      .status,
+    201,
   );
+  // /mine: the first wallet sees its five pending rows, newest first; the other sees one.
+  const mine = await j(await h.req("/api/initiatives/mine", { token })) as {
+    initiatives: { slug: string; status: string; goalUsd: number }[];
+  };
+  assertEquals(mine.initiatives.length, 5);
+  assertEquals(mine.initiatives[0].goalUsd, 25004);
+  assertEquals(mine.initiatives.every((x) => x.status === "pending"), true);
+  assertEquals(
+    ((await j(await h.req("/api/initiatives/mine", { token: other }))).initiatives as unknown[])
+      .length,
+    1,
+  );
+  assertEquals((await h.req("/api/initiatives/mine")).status, 401);
   h.close();
 });
 

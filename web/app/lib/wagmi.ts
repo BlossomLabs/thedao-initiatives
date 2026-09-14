@@ -1,7 +1,7 @@
 import { http } from "viem";
 import { mainnet } from "viem/chains";
 import { createConfig } from "wagmi";
-import { injected, mock, walletConnect } from "wagmi/connectors";
+import { injected, metaMask, mock, walletConnect } from "wagmi/connectors";
 import { SITE_LOGO, SITE_NAME, SITE_URL } from "~/data/site";
 import { privy, PRIVY_APP_ID } from "./privy";
 
@@ -22,6 +22,13 @@ export const wagmiConfig = createConfig({
     // Email sign-in (Privy embedded wallet), first so people without a wallet see it.
     ...(PRIVY_APP_ID ? [privy()] : []),
     injected(),
+    // MetaMask SDK: on a phone browser (no injected provider) it deep-links
+    // into the MetaMask app, on desktop without the extension it shows a QR.
+    // Griff, RFPs group 2026-09-14: "Injected" was the only wallet option on
+    // mobile and always failed with "Provider not found".
+    metaMask({
+      dappMetadata: { name: SITE_NAME, url: SITE_URL, iconUrl: SITE_URL + SITE_LOGO },
+    }),
     ...(WALLETCONNECT_PROJECT_ID
       ? [
         walletConnect({

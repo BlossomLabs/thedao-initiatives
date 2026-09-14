@@ -22,11 +22,16 @@ export async function bumpCounter(
 /**
  * Fixed-window counter in KV so limits hold across isolates. The key
  * expires with its window. Returns true when the call is allowed.
+ * `bump: false` only asks whether one more would be allowed, without counting
+ * it: a route checks first and counts after the request actually succeeded, so
+ * refused attempts do not eat the budget (Griff, 2026-09-14).
  */
 export function rateLimiter(kv: Deno.Kv, now: () => number) {
-  return async (bucket: string, max: number, windowSecs: number): Promise<boolean> => {
+  return async (bucket: string, max: number, windowSecs: number, bump = true): Promise<boolean> => {
     const start = Math.floor(now() / windowSecs) * windowSecs;
-    const count = await bumpCounter(kv, K.rl(bucket, start), (windowSecs + 5) * 1000);
+    const key = K.rl(bucket, start);
+    if (!bump) return ((await kv.get<number>(key)).value ?? 0) < max;
+    const count = await bumpCounter(kv, key, (windowSecs + 5) * 1000);
     return count <= max;
   };
 }

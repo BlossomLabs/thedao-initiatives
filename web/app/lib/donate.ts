@@ -39,6 +39,11 @@ export function walletErrorMessage(e: unknown): string {
     return "your wallet already has a request open. Open the wallet and finish or dismiss it, then try again.";
   }
   const raw = String(err?.shortMessage || err?.message || err?.reason || "");
+  // wagmi's injected connector on a browser with no wallet extension (every
+  // mobile browser outside the MetaMask app; Griff, RFPs group 2026-09-14).
+  if (/provider not found/i.test(raw)) {
+    return "no wallet found in this browser. On a phone, pick MetaMask from the list to open the app, or open this page inside your wallet app's browser.";
+  }
   if (/insufficient funds/i.test(raw)) {
     return "the wallet does not have enough ETH to pay the network fee.";
   }

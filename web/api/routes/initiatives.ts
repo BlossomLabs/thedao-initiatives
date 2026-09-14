@@ -19,7 +19,7 @@ import { fetchDiscourseTitle } from "../services/forum.ts";
 import {
   MAX_FUNDERS,
   REVISIONS_PER_HOUR_PER_ADDRESS,
-  SUBMISSIONS_PER_HOUR_PER_IP,
+  SUBMISSIONS_PER_HOUR_PER_WALLET,
   TOKENS,
 } from "../config.ts";
 import type { Rfp, Session } from "../db/types.ts";
@@ -105,6 +105,28 @@ export function initiativeRoutes(deps: Deps) {
     }
     return { rfp, proposer };
   };
+
+  /**
+   * Everything the signed-in wallet submitted, newest first, whatever the
+   * status, so a proposer can find a pending row again without its URL
+   * (Griff, RFPs group 2026-09-14). Registered before "/:slug" on purpose.
+   */
+  r.get("/mine", requireAuth, async (c) => {
+    const me = c.var.user!.address.toLowerCase();
+    const all = await db.rfps.list(["pending", "approved", "rejected", "archived"]);
+    const initiatives = all
+      .filter((x) => x.proposer.toLowerCase() === me)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((x) => ({
+        slug: x.slug,
+        title: x.title,
+        status: x.status,
+        type: x.type,
+        goalUsd: x.goalUsd,
+        createdAt: x.createdAt,
+      }));
+    return c.json({ initiatives });
+  });
 
   r.get("/:slug", async (c) => {
     const user = c.var.user;
@@ -242,10 +264,14 @@ export function initiativeRoutes(deps: Deps) {
     if (!(await hasDisplayName(proposer))) {
       throw new HttpError(403, "Set a display name (or an ENS primary name) before submitting.");
     }
-    if (!(await db.rateLimit("submit:" + c.var.ip, SUBMISSIONS_PER_HOUR_PER_IP, 3600))) {
+    // Per wallet, and only accepted submissions count (the bump is after the
+    // insert): Griff hit the old per-IP limit with nothing but refused attempts
+    // (RFPs group, 2026-09-14).
+    const submitBucket = "submit:" + proposer.toLowerCase();
+    if (!(await db.rateLimit(submitBucket, SUBMISSIONS_PER_HOUR_PER_WALLET, 3600, false))) {
       throw new HttpError(
         429,
-        "Too many submissions from your address; try again in an hour.",
+        `This wallet already had ${SUBMISSIONS_PER_HOUR_PER_WALLET} initiatives accepted in the last hour; try again later.`,
       );
     }
     let discourseUrl = "";
@@ -352,6 +378,7 @@ export function initiativeRoutes(deps: Deps) {
       undefined,
       { reclaimArchivedSlug: true },
     );
+    await db.rateLimit(submitBucket, SUBMISSIONS_PER_HOUR_PER_WALLET, 3600);
     for (const b of backers) {
       if (!b.org) continue;
       await db.pledges.add(rfp.id, {

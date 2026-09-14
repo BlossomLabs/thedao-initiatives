@@ -56,6 +56,7 @@ export default function Submitted() {
             See your initiative (pending review)
           </LinkButton>
         )}
+        <Link className="btn" to="/mine">All your submissions</Link>
         <Link className="btn" to="/">Back to the board</Link>
       </p>
     </PageMain>

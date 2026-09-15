@@ -77,7 +77,7 @@ beforeEach(() => {
         signers: SIGNERS,
         threshold: 3,
         address: SAFE,
-        deployed: Boolean(current.initiative.safeAddress),
+        deployed: Boolean(current.initiative.safeAddress) || onChain,
       });
     }
     if (p.endsWith("/safe-confirm")) {
@@ -126,6 +126,32 @@ it("Approve goes straight to the status change when the Safe is already there", 
   await waitFor(() => expect(indexOf("/status")).toBeGreaterThan(-1));
   expect(sendTransaction).not.toHaveBeenCalled();
   expect(indexOf("/safe-deploy-params")).toBe(-1);
+});
+
+it("a Safe already on-chain but unbound: the card offers to link it, no wallet needed", async () => {
+  onChain = true; // mined earlier under a hash the browser lost track of
+  wallet.connected = false;
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: "Link the Safe" }));
+  await screen.findByText("deployed and verified");
+  expect(sendTransaction).not.toHaveBeenCalled();
+  expect(indexOf("/safe-confirm")).toBeGreaterThan(-1);
+  expect(screen.queryByRole("button", { name: /Deploy Safe now/ })).toBeNull();
+});
+
+it("linking a Safe that does not match the spec is refused and reported", async () => {
+  onChain = true;
+  const base = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, opts) =>
+    String(path).endsWith("/safe-confirm")
+      ? Promise.reject(new Error("Safe at 0x9239 REJECTED: threshold is 2, expected 3"))
+      : base(path, opts)
+  );
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: "Link the Safe" }));
+  await screen.findByText(/REJECTED: threshold is 2/);
+  expect(screen.queryByText("deployed and verified")).toBeNull();
+  await screen.findByRole("button", { name: "Link the Safe" }); // still unbound
 });
 
 it("a reverted deploy is reported and nothing is approved", async () => {

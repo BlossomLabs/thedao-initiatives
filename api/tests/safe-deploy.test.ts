@@ -156,3 +156,18 @@ Deno.test("bulk approve: rows without a Safe fail one by one, the rest land", as
   assertEquals((await h.db.rfps.get(bare.id))!.status, "pending");
   h.close();
 });
+
+Deno.test("a Safe already on-chain but not yet bound: the panel reports it deployed, so no second (reverting) factory tx", async () => {
+  const h = await harness();
+  const admin = await h.mint(ADMIN, true);
+  const rfp = await h.db.rfps.insert({ title: "Mined, unbound", status: "pending", goalUsd: 1000 });
+  // the wallet mined the deploy under a hash the browser lost track of; safe-confirm never ran
+  h.script.code[predicted(rfp).toLowerCase()] = "0x6080";
+  assertEquals((await h.db.rfps.get(rfp.id))!.safeAddress, "");
+  const params = await j(await h.req(url(rfp.id) + "/safe-deploy-params", { token: admin })) as {
+    address: string;
+    deployed: boolean;
+  };
+  assertEquals(params.address, predicted(rfp));
+  assertEquals(params.deployed, true);
+});

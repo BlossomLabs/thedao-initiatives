@@ -340,7 +340,7 @@ export type SafeDeployParams =
     calldata: string;
     signers: string[];
     threshold: number;
-    /** Where the calldata deploys to (CREATE2), and whether that Safe is already bound. */
+    /** Where the calldata deploys to (CREATE2), and whether a Safe is already there (bound or not). */
     address: string;
     deployed: boolean;
   }

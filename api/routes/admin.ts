@@ -421,6 +421,11 @@ export function adminRoutes(deps: Deps) {
     const [ok, why] = signersConfigured(config.operationalSigners);
     if (!ok) return c.json({ enabled: false, reason: why }, 503);
     const key = rfp.safeDeploymentKey ?? rfp.slug;
+    const address = rfp.safeAddress || predictSafeAddress(config.operationalSigners, key);
+    // "Deployed" is on-chain truth, not just our binding: a deploy the browser
+    // lost track of (wallet mined it under another hash) must not be sent
+    // again, since CREATE2 at an occupied address can only revert.
+    const deployed = Boolean(rfp.safeAddress) || await chain.hasCode(address);
     return c.json({
       enabled: true,
       chainId: CHAIN_ID,
@@ -428,8 +433,8 @@ export function adminRoutes(deps: Deps) {
       calldata: safeDeployCalldata(config.operationalSigners, key),
       signers: config.operationalSigners,
       threshold: SAFE_THRESHOLD,
-      address: rfp.safeAddress || predictSafeAddress(config.operationalSigners, key),
-      deployed: Boolean(rfp.safeAddress),
+      address,
+      deployed,
     });
   });
 

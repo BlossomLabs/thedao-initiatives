@@ -362,6 +362,34 @@ function SafeCard(
   const [busy, setBusy] = useState(false);
   const [syncState, setSyncState] = useState<SafeSyncState | null>(page.safeSync);
   useEffect(() => setSyncState(page.safeSync), [page.safeSync]);
+  // Unbound: is the Safe already at its CREATE2 address (a deploy the browser
+  // lost track of, or one made from another environment)? Then it is linked,
+  // not deployed again: the factory would only revert at an occupied address.
+  const params = useQuery({
+    queryKey: ["admin", "safe-deploy-params", r.id],
+    queryFn: () => api<SafeDeployParams>(`/api/admin/initiatives/${r.id}/safe-deploy-params`),
+    enabled: !r.safeAddress && page.signers.ok,
+  });
+  const existing = !r.safeAddress && params.data?.enabled && params.data.deployed
+    ? params.data.address
+    : null;
+
+  const link = async () => {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const res = await api<SafeConfirmResult>(`/api/admin/initiatives/${r.id}/safe-confirm`, {
+        json: {},
+      }).catch((e) => ({ status: "error", detail: errorMessage(e) } as SafeConfirmResult));
+      if (res.status !== "ok") throw new Error(res.detail);
+      setStatus({ kind: "ok", text: `Safe ${res.address} linked: ${res.detail}` });
+      onChange();
+    } catch (e) {
+      setStatus({ kind: "err", text: errorMessage(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const sync = async () => {
     setBusy(true);
@@ -422,6 +450,22 @@ function SafeCard(
       <p className="m-0 small">
         Safe deployment is disabled: <b>{page.signers.detail}</b>.
       </p>
+    );
+  } else if (existing) {
+    body = (
+      <>
+        <p className="m-0 small dim">
+          A Safe already exists at this initiative's address but is not linked yet. Linking checks
+          on-chain that it is a {page.signers.threshold}-of-{page.signers.list.length}{" "}
+          Safe owned by the operational signers on the canonical singleton before binding it.
+        </p>
+        <span className="mono mt-2.5 block rounded-[10px] border border-edge bg-black/15 px-3 py-2 text-[11.5px] [overflow-wrap:anywhere]">
+          {existing}
+        </span>
+        <Button variant="ghost" sm className="mt-3 w-full" loading={busy} onClick={link}>
+          Link the Safe
+        </Button>
+      </>
     );
   } else {
     body = (

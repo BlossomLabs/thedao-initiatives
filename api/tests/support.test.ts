@@ -91,3 +91,14 @@ Deno.test("support: 5 messages per hour per IP", async () => {
   assertEquals(h.fetchLog.length, 5);
   h.close();
 });
+
+Deno.test("support: the board's flags.support says whether the widget can show", async () => {
+  const off = await setup();
+  const offFlags = (await j(await off.req("/api/board")) as { flags: { support: boolean } }).flags;
+  assertEquals(offFlags.support, false);
+  off.close();
+  const on = await setup({ url: UPSTREAM });
+  const onFlags = (await j(await on.req("/api/board")) as { flags: { support: boolean } }).flags;
+  assertEquals(onFlags.support, true);
+  on.close();
+});

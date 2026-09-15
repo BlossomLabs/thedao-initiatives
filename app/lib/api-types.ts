@@ -154,6 +154,8 @@ export interface BoardFlags {
   tokensOk: boolean;
   chainDetail: string;
   uploads: boolean;
+  /** SUPPORT_URL is set: the floating Support button may show. */
+  support: boolean;
   onramp: boolean;
   walletConnectProjectId: string;
   safeThreshold: number;

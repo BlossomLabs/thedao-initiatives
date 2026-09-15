@@ -95,6 +95,7 @@ export function boardRoutes(deps: Deps) {
         tokensOk,
         chainDetail: state.detail,
         uploads: deps.pinata.enabled,
+        support: Boolean(config.supportUrl),
         onramp: Boolean(config.onrampApiKey),
         walletConnectProjectId: config.walletConnectProjectId,
         safeThreshold: SAFE_THRESHOLD,

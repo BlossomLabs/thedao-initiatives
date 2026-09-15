@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import SupportWidget from "./SupportWidget";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import SupportWidget, { SupportPanel } from "./SupportWidget";
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -13,12 +14,43 @@ afterEach(() => {
 });
 
 function openPicker() {
-  render(<SupportWidget />);
+  render(<SupportPanel />);
   fireEvent.click(screen.getByRole("button", { name: /support/i }));
   return screen.getByRole("dialog");
 }
 
-describe("SupportWidget", () => {
+/** The gate: the board's flags decide whether the trigger exists at all. */
+function renderGated(support: boolean) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((url: string) =>
+      Promise.resolve(
+        url === "/api/board" ? json(200, { flags: { support } }) : json(404, { error: "no" }),
+      )
+    ),
+  );
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={qc}>
+      <SupportWidget />
+    </QueryClientProvider>,
+  );
+}
+
+describe("SupportWidget gate", () => {
+  it("shows no button until the board says support is configured", async () => {
+    renderGated(false);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: /support/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the button once the board says support is configured", async () => {
+    renderGated(true);
+    expect(await screen.findByRole("button", { name: /support/i })).toBeInTheDocument();
+  });
+});
+
+describe("SupportPanel", () => {
   it("opens to the category picker and closes on Escape", () => {
     const dialog = openPicker();
     expect(dialog).toHaveTextContent("How can we help?");

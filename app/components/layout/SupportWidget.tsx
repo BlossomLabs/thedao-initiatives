@@ -20,6 +20,7 @@ import {
   type SupportCategory,
 } from "@shared/support";
 import { api } from "~/lib/api";
+import { useBoard } from "~/hooks/use-board";
 import { Button } from "~/components/ui/Button";
 import { Input, Textarea } from "~/components/ui/Field";
 import { cn } from "~/lib/utils";
@@ -39,13 +40,23 @@ const ICON_BTN =
   "inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white";
 
 /**
- * Floating "Support" button (bottom right) that opens a small panel: pick a
- * category, write a message (email and a full-page screenshot optional), and
- * it goes to POST /api/support. Modelled on Octo's widget, in this site's
- * glass buttons and navy modal panel. Portaled to <body> after mount so the
- * prerender never sees it. Sits under the site's modals (z 100 vs 200).
+ * Floating "Support" button (bottom right), only once the board's flags say
+ * SUPPORT_URL is configured: without a destination there is nothing to show.
  */
 export default function SupportWidget() {
+  const { data } = useBoard();
+  if (!data?.flags.support) return null;
+  return <SupportPanel />;
+}
+
+/**
+ * The button and its panel: pick a category, write a message (email and a
+ * full-page screenshot optional), and it goes to POST /api/support. Modelled
+ * on Octo's widget, in this site's glass buttons and navy modal panel.
+ * Portaled to <body> after mount so the prerender never sees it. Sits under
+ * the site's modals (z 100 vs 200).
+ */
+export function SupportPanel() {
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>("picker");

@@ -23,9 +23,7 @@ export function Input({ className, ...rest }: React.InputHTMLAttributes<HTMLInpu
   return <input className={cn("field", className)} {...rest} />;
 }
 
-export function Textarea(
-  { className, ...rest }: React.TextareaHTMLAttributes<HTMLTextAreaElement>,
-) {
+export function Textarea({ className, ...rest }: React.ComponentProps<"textarea">) {
   return <textarea className={cn("field", className)} {...rest} />;
 }
 

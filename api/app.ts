@@ -14,6 +14,7 @@ import { donateRoutes } from "./routes/donate.ts";
 import { profileRoutes } from "./routes/profile.ts";
 import { commentRoutes } from "./routes/comments.ts";
 import { aiRoutes } from "./routes/ai.ts";
+import { supportRoutes } from "./routes/support.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
@@ -61,6 +62,7 @@ export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
   app.route("/api", profileRoutes(deps));
   app.route("/api", commentRoutes(deps));
   app.route("/api", aiRoutes(deps));
+  app.route("/api", supportRoutes(deps));
   app.route("/api/admin", adminRoutes(deps));
   app.route("/initiative", markdownRoutes(deps));
 

@@ -42,6 +42,7 @@ export const REVISIONS_PER_HOUR_PER_ADDRESS = 20;
 /** Backer logos pinned before a submission (POST /api/uploads/logo). */
 export const LOGO_UPLOADS_PER_HOUR_PER_ADDRESS = 12;
 export const LOGIN_ATTEMPTS_PER_MINUTE_PER_IP = 5;
+export const SUPPORT_MESSAGES_PER_HOUR_PER_IP = 5;
 export const LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL = 60;
 
 // ---------------------------------------------------------- community roles
@@ -109,6 +110,8 @@ export interface Config {
   alchemyApiKey: string;
   pinataJwt: string;
   pinataGateway: string;
+  /** Where the support widget's messages are forwarded; empty = widget disabled (503). */
+  supportUrl: string;
   aiSearchApiKey: string;
   aiSearchBaseUrl: string;
   aiSearchModel: string;
@@ -191,6 +194,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     alchemyApiKey,
     pinataJwt: (env.PINATA_JWT ?? "").trim(),
     pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "ipfs.blossom.software",
+    supportUrl: (env.SUPPORT_URL ?? "").trim(),
     aiSearchApiKey: (env.AI_SEARCH_API_KEY ?? "").trim(),
     aiSearchBaseUrl: ((env.AI_SEARCH_BASE_URL ?? "").trim() || "https://api.deepseek.com")
       .replace(/\/+$/, ""),

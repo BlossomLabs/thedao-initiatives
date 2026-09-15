@@ -114,7 +114,10 @@ always pending: the form as JSON, backers become `pledged` rows), `GET /api/dona
 `POST /api/donate/confirm`, `GET /api/donate/status/:txHash`, `GET /api/ens-name/:addr`,
 `GET /api/nickname/:addr`, `POST /api/ai-search`, `GET /api/initiatives/:slug/comments`,
 `POST /api/initiatives/:slug/comments`, `GET /api/comments/mine?tokens=`,
-`POST /api/comments/:id/report`.
+`POST /api/comments/:id/report`, `POST /api/support` (the floating Support widget:
+`{category,
+message, email?, page?, screenshot?}`, tagged and forwarded to `SUPPORT_URL`; 503 until
+it is set, 5 per hour per IP).
 
 Signed in: `GET /api/auth/me`, `POST /api/auth/logout`, `POST /api/auth/logout-all`,
 `POST /api/nickname`, `POST /api/pfp`, `POST /api/pfp/upload`, `POST /api/comments/:id/vote`,
@@ -164,9 +167,9 @@ const { token } = await (await fetch(API + "/api/auth/verify", {
 
 One Deno Deploy app for API and site: root directory `/`, entrypoint `server.ts` (the table in the
 root README). Set the variables from `.env.example` (no `KV_PATH`). KV and cron are provided by the
-platform; each timeline gets its own database. If two deployments must
-share one KV database, give each its own `DB_PREFIX`: every key is stored under that first part, so
-the two never see each other's rows (changing it on a live deployment starts from empty).
+platform; each timeline gets its own database. If two deployments must share one KV database, give
+each its own `DB_PREFIX`: every key is stored under that first part, so the two never see each
+other's rows (changing it on a live deployment starts from empty).
 
 ## Scripts
 

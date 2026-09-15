@@ -22,7 +22,6 @@ import CommentsSection from "~/components/comments/CommentsSection";
 import Identity from "~/components/wallet/Identity";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { useRevision } from "~/hooks/use-revision";
-import { useBoard } from "~/hooks/use-board";
 import { ApiError } from "~/lib/api";
 import { diffRevisions } from "~/lib/revision-diff";
 import type { RevisionText } from "~/lib/api-types";
@@ -39,7 +38,6 @@ export function meta() {
 export default function Initiative() {
   const { slug = "" } = useParams();
   const { data: page, isLoading, error, isPlaceholderData } = useInitiative(slug);
-  const board = useBoard();
   const qc = useQueryClient();
 
   // ?rev=N opens an older revision in place of the current text. The history

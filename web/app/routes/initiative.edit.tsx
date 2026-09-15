@@ -13,7 +13,7 @@ import { fromInitiative } from "~/components/initiative-form/useDraft";
 import { useSession } from "~/context/session";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { api, ApiError, errorMessage } from "~/lib/api";
-import type { Initiative } from "~/lib/api-types";
+import type { Initiative, Pledge } from "~/lib/api-types";
 import { pageFactsPatch, textBody, textChanged } from "~/lib/edit-initiative";
 import { CONTACT_EMAIL, CONTACT_MAILTO, SITE_NAME } from "~/data/site";
 import { generateMeta } from "~/utils/meta";
@@ -47,7 +47,8 @@ export default function EditInitiative() {
   const open = r?.status === "pending" || r?.status === "approved";
 
   let body: React.ReactNode;
-  if (isLoading || (page && isPlaceholderData && !session)) {
+  // the board placeholder has no pledges, and the form reads its draft once
+  if (isLoading || isPlaceholderData) {
     body = (
       <div className="panel mt-2 flex flex-col gap-3">
         <Skeleton className="h-10 w-full" />
@@ -129,7 +130,7 @@ export default function EditInitiative() {
       </p>
 
       {body === null && r
-        ? <EditForm key={r.id} r={r} />
+        ? <EditForm key={r.id} r={r} pledges={page.pledges} />
         : (
           <div className="mt-4 grid grid-cols-[1fr_340px] items-start gap-9 max-[960px]:grid-cols-1">
             <div className="min-w-0">{body}</div>
@@ -175,12 +176,12 @@ function RevisionsCard() {
   );
 }
 
-function EditForm({ r }: { r: Initiative }) {
+function EditForm({ r, pledges }: { r: Initiative; pledges: Pledge[] }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { requireSession } = useSession();
   const pending = r.status === "pending";
-  const initial = useMemo(() => fromInitiative(r), [r]);
+  const initial = useMemo(() => fromInitiative(r, pledges), [r, pledges]);
   const path = `/api/initiatives/${encodeURIComponent(r.slug)}`;
 
   async function onSubmit(payload: SubmitPayload) {

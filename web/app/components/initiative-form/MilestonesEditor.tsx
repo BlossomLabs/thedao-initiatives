@@ -8,7 +8,7 @@ import { cn } from "~/lib/utils";
 import { domId, edgeClass, FieldMsg, useFinding } from "./findings";
 import MilestoneRow from "./MilestoneRow";
 import type { Draft } from "./types";
-import type { Checks } from "./useChecks";
+import { adoptionLine, type Checks } from "./useChecks";
 import type { DraftActions } from "./useDraft";
 
 export default function MilestonesEditor(
@@ -20,7 +20,6 @@ export default function MilestonesEditor(
   },
 ) {
   const f = useFinding("milestones");
-  const pct = totals.goal > 0 ? Math.round((totals.adoption / totals.goal) * 100) : 0;
   return (
     <div id={domId("milestones")} data-field="milestones" className={cn("mt-5", edgeClass(f))}>
       {draft.milestones.length
@@ -68,7 +67,7 @@ export default function MilestonesEditor(
             Milestones total {usd(totals.sum)} of {usd(totals.goal)} goal
           </span>
           <span className={totals.adoptionOk ? "text-dao-green" : "text-[#ffd7d6]"}>
-            Adoption-tied: {usd(totals.adoption)} ({pct}%), minimum {usd(totals.floor)}
+            Adoption-tied: {adoptionLine(totals)}
           </span>
         </div>
       </div>

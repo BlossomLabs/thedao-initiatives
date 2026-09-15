@@ -22,7 +22,7 @@ import {
   SUBMISSIONS_PER_HOUR_PER_IP,
   TOKENS,
 } from "../config.ts";
-import type { Rfp, Session } from "../db/types.ts";
+import type { Pledge, Rfp, Session } from "../db/types.ts";
 import { pickText } from "../db/rfps.ts";
 import { cronIntervalMinutes } from "../services/funding.ts";
 import { assertNoErrors, mergeFindings, readBackers, readStructured } from "../lib/structured.ts";
@@ -30,6 +30,7 @@ import { readPageFacts } from "../lib/page-facts.ts";
 import { ownsUpload } from "./uploads.ts";
 import {
   bodyKey,
+  type CheckBacker,
   checkSubmission,
   type Finding,
   isStructured,
@@ -39,16 +40,22 @@ import {
 export { onrampLink };
 export const decimalsOf = (sym: string): number | undefined => TOKENS[sym]?.[1];
 
+/** Stored pledges as the backers the rules read (withdrawn ones do not count). */
+export const pledgeBackers = (pledges: Pledge[]): CheckBacker[] =>
+  pledges.filter((p) => p.status !== "withdrawn" && p.company)
+    .map((p) => ({ org: p.company, amountUsd: p.amountUsd, url: p.url }));
+
 /** The text rules of an edit: title, summary, sections, milestones against
  * the stored goal, links. Page facts and backers are checked where they are
- * edited. */
+ * edited; the stored pledges still count as backers here, since a top-up's
+ * adoption floor is measured against what this grant raises. */
 export function editChecks(rfp: Pick<Rfp, "type" | "topup" | "goalUsd">, text: {
   title: string;
   summary: string;
   sections: Rfp["sections"];
   milestones: Rfp["milestones"];
   links: Rfp["links"];
-}) {
+}, backers: CheckBacker[]) {
   return checkSubmission({
     type: rfp.type,
     topup: Boolean(rfp.topup),
@@ -64,7 +71,7 @@ export function editChecks(rfp: Pick<Rfp, "type" | "topup" | "goalUsd">, text: {
     sections: text.sections,
     milestones: text.milestones,
     links: text.links,
-    backers: [],
+    backers,
   }, "edit");
 }
 
@@ -192,7 +199,8 @@ export function initiativeRoutes(deps: Deps) {
         milestones: body.milestones ?? cur.milestones,
         links: body.links ?? cur.links,
       }, rfp.type);
-      const findings = mergeFindings(caps, editChecks(rfp, { ...base, ...structured }));
+      const backers = pledgeBackers(await db.pledges.list(rfp.id));
+      const findings = mergeFindings(caps, editChecks(rfp, { ...base, ...structured }, backers));
       assertNoErrors(findings);
       warnings = findings.warnings;
       text = { ...base, ...structured };

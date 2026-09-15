@@ -5,10 +5,8 @@ import { useAccount } from "wagmi";
 import { useDonateParams } from "~/hooks/use-donate-params";
 import { TERMS } from "~/data/terms";
 import GovernedBy from "~/components/terms/GovernedBy";
-import TermsChangeNotice from "~/components/terms/TermsChangeNotice";
 import type { DonateResult, Onramp } from "~/lib/api-types";
 import { parseUsd, tokenQty } from "~/lib/donate";
-import { shortAddr } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import Status from "~/components/ui/Status";
 import { Button } from "~/components/ui/Button";
@@ -39,14 +37,12 @@ export default function DonateWidget({
   slug,
   safeAddress,
   onramp,
-  safeThreshold = 3,
   onConfirmed,
 }: {
   initiativeId: string;
   slug: string;
   safeAddress: string;
   onramp?: Onramp;
-  safeThreshold?: number;
   onConfirmed?: (r: DonateResult) => void;
 }) {
   const { data: params } = useDonateParams();
@@ -281,18 +277,6 @@ export default function DonateWidget({
       )}
 
       {d.status && <Status kind={d.status.kind}>{d.status.text}</Status>}
-      <p className="m-0 small dim">
-        Every donation goes to this initiative's own {safeThreshold}-of-5 Safe{" "}
-        <a
-          className="mono"
-          href={`https://etherscan.io/address/${safeAddress}`}
-          target="_blank"
-          rel="noopener"
-        >
-          {shortAddr(safeAddress)}
-        </a>. <GovernedBy inline />
-      </p>
-      <TermsChangeNotice compact />
     </div>
   );
 }

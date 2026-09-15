@@ -65,7 +65,6 @@ export default function Board() {
                 card={c}
                 tokensOk={data.flags.tokensOk}
                 aiTop={Boolean(matches?.includes(c.initiative.id))}
-                safeThreshold={data.flags.safeThreshold}
                 onDonated={() => void qc.invalidateQueries({ queryKey: boardKey })}
                 style={{ animationDelay: `${i * 60}ms` }}
               />

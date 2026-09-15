@@ -264,67 +264,13 @@ export async function reverifyPending(deps: SafeApiDeps): Promise<void> {
   }
 }
 
-/**
- * Give the initiative its donation Safe: the CREATE2 address its deploy
- * lands on, which the chain confirms (the factory's own simulation, or the
- * Safe itself if a deploy already happened). Donations open on it right
- * away; deploying is only needed for the first payout. The signers are
- * frozen with it so a later rotation cannot move the deploy elsewhere.
- * Throws when the chain disagrees or another initiative holds the address
- * (a manual mix-up, left to the admin). Idempotent once assigned.
- */
-export async function assignSafe(deps: SafeApiDeps, rfp: Rfp): Promise<Rfp> {
-  if (rfp.safeAddress) return rfp;
-  const signers = deps.config.operationalSigners;
-  const { address, deployed } = await deps.chain.resolveSafe(
-    signers,
-    rfp.safeDeploymentKey ?? rfp.slug,
-  );
-  const holder = await deps.db.rfps.bySafe(address);
-  if (holder && holder.id !== rfp.id) {
-    throw new Error(`Safe ${address} is assigned to another initiative (${holder.slug})`);
-  }
-  return await deps.db.rfps.update(rfp.id, {
-    safeAddress: address,
-    safeSigners: signers,
-    safeDeployedAt: deployed ? deps.now() : 0,
-  });
-}
-
-/**
- * Record the deploy once code is at the assigned address and the Safe
- * verifies (owners, threshold, canonical proxy). Returns the verification
- * detail when deployed, null while there is nothing on-chain yet; throws
- * when what is there is not our Safe.
- */
-export async function activateSafe(deps: SafeApiDeps, rfp: Rfp): Promise<string | null> {
-  if (!rfp.safeAddress) return null;
-  if (rfp.safeDeployedAt) return "verified earlier";
-  if (!(await deps.chain.hasCode(rfp.safeAddress))) return null;
-  const [ok, detail] = await deps.chain.verifySafe(
-    rfp.safeAddress,
-    rfp.safeSigners ?? deps.config.operationalSigners,
-  );
-  if (!ok) throw new Error(`Safe at ${rfp.safeAddress} REJECTED: ${detail}`);
-  await deps.db.rfps.update(rfp.id, { safeDeployedAt: deps.now() });
-  return detail;
-}
-
-/** Cron entry: every approved initiative with a deployed Safe, under one
- * lock. Rows without an address get one here (the backfill), and a deploy
- * that finished after the admin's tab closed is noticed here too. */
+/** Cron entry: every approved initiative with a Safe, under one lock. */
 export async function syncAll(deps: SafeApiDeps): Promise<number> {
   if (!(await deps.db.meta.lock("safe-sync", 60))) return 0;
   let n = 0;
   try {
-    for (let rfp of await deps.db.rfps.list(["approved"])) {
-      try {
-        rfp = await assignSafe(deps, rfp);
-        if (!(await activateSafe(deps, rfp))) continue; // not deployed yet: nothing to index
-      } catch (e) {
-        deps.log?.(`safe ${rfp.slug}: ${e instanceof Error ? e.message : String(e)}`);
-        continue; // rpc blip or a mix-up for the admin; next cycle
-      }
+    for (const rfp of await deps.db.rfps.list(["approved"])) {
+      if (!rfp.safeAddress) continue;
       const s = await syncSafe(deps, rfp);
       if (s.error && /HTTP 429/.test(s.error)) break; // quota: stop the cycle
       n++;

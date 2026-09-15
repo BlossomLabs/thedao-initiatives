@@ -5,7 +5,7 @@ import { activeTokens, type TokenCheck, verifyTokens } from "./tokens.ts";
 import { createPricer, type UsdRate } from "./price.ts";
 import { type Verification, verifyDonationTx } from "./verify.ts";
 import { createBadgeChecker, type HasBadge } from "./badge.ts";
-import { extractDeployedSafe, hasCode, resolveSafe, verifySafe } from "./safe.ts";
+import { hasCode, verifySafe } from "./safe.ts";
 
 export const CHAIN_REFRESH_SECS = 6 * 3600;
 
@@ -23,13 +23,7 @@ export interface Chain {
   activeTokens(): Promise<Record<string, [string, number]>>;
   donorTokens(): Promise<Record<string, [string, number]>>;
   verifyDonation(txHash: string, recipient: string): Promise<Verification>;
-  extractDeployedSafe(txHash: string): Promise<[string, null] | [null, string]>;
   verifySafe(address: string, signers: string[]): Promise<[boolean, string]>;
-  /** The CREATE2 address of this initiative's Safe, chain-checked; throws if unsure. */
-  resolveSafe(
-    signers: string[],
-    deploymentKey: string,
-  ): Promise<{ address: string; deployed: boolean }>;
   hasCode(address: string): Promise<boolean>;
   blockNumber(): Promise<number>;
 }
@@ -87,9 +81,7 @@ export function createChain(opts: ChainOptions = {}): Chain {
     },
     verifyDonation: async (txHash, recipient) =>
       verifyDonationTx(rpc, usdRate, txHash, recipient, await active()),
-    extractDeployedSafe: (txHash) => extractDeployedSafe(rpc, txHash),
     verifySafe: (address, signers) => verifySafe(rpc, address, signers),
-    resolveSafe: (signers, key) => resolveSafe(rpc, signers, key),
     hasCode: (address) => hasCode(rpc, address),
     blockNumber: () => getBlockNumber(rpc),
   };

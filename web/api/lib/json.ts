@@ -29,7 +29,6 @@ export function publicRfp(r: Rfp) {
     type: r.type,
     sortRank: r.sortRank,
     safeAddress: r.safeAddress,
-    safeDeployed: Boolean(r.safeDeployedAt),
     paidOutUsd: r.paidOutUsd ?? 0,
     proposer: r.proposer ?? "",
     durationMonths: r.durationMonths ?? null,

@@ -260,8 +260,6 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
     "status",
     "approvedAt",
     "safeAddress",
-    "safeSigners",
-    "safeDeployedAt",
     "paidOutUsd",
     "sortRank",
     "type",

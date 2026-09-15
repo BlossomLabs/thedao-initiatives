@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
 import {
   ADMIN,
+  deploySafe,
   harness,
   j,
   loadContentFiles,
@@ -14,8 +15,6 @@ import { DONOR, SIGNERS, transferLog, wallet } from "./helpers.ts";
 import { grantBody, minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
 import { TOKENS } from "../config.ts";
 import { predictSafeAddress } from "../chain/safe.ts";
-import { toChecksum } from "../chain/address.ts";
-import { SAFE_PROXY_FACTORY } from "../config.ts";
 
 const USDC = TOKENS.USDC[0];
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
@@ -181,6 +180,7 @@ Deno.test("submit: needs a signed-in wallet with a display name; records the pro
   assertEquals(row.proposer, PLAIN);
   // public once approved, proposer included
   const admin = await h.mint(ADMIN, true);
+  await deploySafe(h, admin, row.id);
   await h.req(`/api/admin/initiatives/${row.id}/status`, {
     method: "POST",
     token: admin,
@@ -693,15 +693,28 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     })).status,
     400,
   );
+  // deploy the Safe (deploy first, approve second)
+  const key = (await h.db.rfps.get(id))!.safeDeploymentKey!;
+  h.script.code[predictSafeAddress(SIGNERS, key).toLowerCase()] = "0x6080";
+  const conf = await j(
+    await h.req("/api/admin/initiatives/" + id + "/safe-confirm", {
+      method: "POST",
+      token: admin,
+      json: {},
+    }),
+  ) as { status: string; address: string };
+  assertEquals(conf.status, "ok");
+  assertEquals(conf.address, predictSafeAddress(SIGNERS, key));
   const approved = await j(
     await h.req("/api/admin/initiatives/" + id + "/status", {
       method: "POST",
       token: admin,
       json: { action: "approve" },
     }),
-  ) as { initiative: { status: string; approvedAt: number } };
+  ) as { initiative: { status: string; approvedAt: number; safeAddress: string } };
   assertEquals(approved.initiative.status, "approved");
   assert(approved.initiative.approvedAt);
+  assertEquals(approved.initiative.safeAddress, conf.address);
   // pledges: JSON then multipart with logo
   const p1 = await h.req("/api/admin/initiatives/" + id + "/pledges", {
     method: "POST",
@@ -737,62 +750,6 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     json: { status: "withdrawn" },
   });
   assertEquals((await h.db.fundingSummary(id)).pledged, 500);
-  // Safe deploy: approval assigned the address; the panel deploys to exactly it
-  const assigned = (await h.db.rfps.get(id))!.safeAddress;
-  assertEquals(
-    assigned,
-    predictSafeAddress(SIGNERS, (await h.db.rfps.get(id))!.safeDeploymentKey!),
-  );
-  const params = await j(
-    await h.req("/api/admin/initiatives/" + id + "/safe-deploy-params", { token: admin }),
-  ) as { enabled: boolean; calldata: string; factory: string; address: string; deployed: boolean };
-  assert(params.enabled);
-  assert(params.calldata.startsWith("0x1688f0b9"));
-  assertEquals(params.factory, SAFE_PROXY_FACTORY);
-  assertEquals(params.address, assigned);
-  assertEquals(params.deployed, false);
-  const deployTx = "0x" + "ee".repeat(32);
-  h.script.receipts[deployTx] = { status: "0x1", logs: [] };
-  h.script.code[assigned.toLowerCase()] = "0x6080";
-  const conf = await j(
-    await h.req("/api/admin/initiatives/" + id + "/safe-confirm", {
-      method: "POST",
-      token: admin,
-      json: { txHash: deployTx },
-    }),
-  ) as { status: string; address: string };
-  assertEquals(conf.status, "ok");
-  assertEquals(conf.address, assigned);
-  assert((await h.db.rfps.get(id))!.safeDeployedAt);
-  assertEquals(
-    (await h.req("/api/admin/initiatives/" + id + "/safe-confirm", {
-      method: "POST",
-      token: admin,
-      json: { txHash: "0x12" },
-    })).status,
-    400,
-  );
-  // an already-deployed Safe can be attached by address: same checks, same conflicts
-  const other = await h.db.rfps.insert({ title: "Another initiative", status: "approved" });
-  const byAddr = (rfpId: string, address: string) =>
-    h.req("/api/admin/initiatives/" + rfpId + "/safe-confirm", {
-      method: "POST",
-      token: admin,
-      json: { address },
-    });
-  assertEquals((await byAddr(other.id, "0x1234")).status, 400);
-  assertEquals((await byAddr(other.id, assigned)).status, 409); // bound to `id` already
-  const third = await h.db.rfps.insert({ title: "Third initiative", status: "approved" });
-  const existing = "0x" + "a1".repeat(20);
-  const attached = await j(await byAddr(third.id, existing.toLowerCase())) as {
-    status: string;
-    address: string;
-  };
-  assertEquals(attached.status, "ok");
-  assertEquals(attached.address, toChecksum(existing));
-  const thirdRow = (await h.db.rfps.get(third.id))!;
-  assertEquals(thirdRow.safeAddress, attached.address);
-  assert(thirdRow.safeDeployedAt); // attached by address = verified on-chain = deployed
   h.close();
 });
 
@@ -884,17 +841,17 @@ Deno.test("submit: blank title is read from the Discourse topic; forum errors ar
   // board cards carry the card-checkout template once a Safe exists
   const admin = await h.mint(ADMIN, true);
   const id = (await h.db.rfps.bySlug(slug))!.id;
+  const safe = await deploySafe(h, admin, id);
   await h.req(`/api/admin/initiatives/${id}/status`, {
     method: "POST",
     token: admin,
     json: { action: "approve" },
   });
-  await h.db.rfps.update(id, { safeAddress: SAFE_ADDR });
   const card = ((await j(await h.req("/api/board"))).cards as {
     onramp: { url: string; prefilled: boolean };
   }[])[0];
   assert(card.onramp.prefilled);
-  assertStringIncludes(card.onramp.url, "walletAddress=" + SAFE_ADDR);
+  assertStringIncludes(card.onramp.url, "walletAddress=" + safe);
   h.close();
 });
 

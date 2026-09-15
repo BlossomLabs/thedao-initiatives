@@ -5,7 +5,7 @@ import StickyAside from "~/components/layout/StickyAside";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
 import GovernedBy from "~/components/terms/GovernedBy";
-import { sendTransaction } from "wagmi/actions";
+import { sendTransaction, waitForTransactionReceipt } from "wagmi/actions";
 import { useAccount, useConfig } from "wagmi";
 import {
   Download,
@@ -49,8 +49,7 @@ type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<void>;
 
 const STATUS_HELP: Record<string, string> = {
   pending: "Submitted and waiting for review. It is not on the board yet.",
-  approved:
-    "Live on the board with its donation address assigned. Deploy the Safe before the first payout.",
+  approved: "Live on the board; its Safe takes donations.",
   rejected: "Hidden from the board. Approve it to publish it after all.",
   archived: "Hidden from the board; its public page stays reachable.",
 };
@@ -74,6 +73,8 @@ export default function AdminInitiativeEditor() {
   }, [initiativeId, slug, navigate]);
   const refresh = () => void qc.invalidateQueries({ queryKey: ["admin"] });
   const [msg, setMsg] = useState<Msg>(null);
+  const { isConnected } = useAccount();
+  const safe = useSafeDeploy(data?.initiative.id ?? "", refresh);
   const run: Run = async (fn, ok) => {
     setMsg(null);
     try {
@@ -99,6 +100,13 @@ export default function AdminInitiativeEditor() {
   const r = data.initiative;
   const base = `/api/admin/initiatives/${r.id}`;
   const pct = r.goalUsd > 0 ? (data.summary.total / r.goalUsd) * 100 : 0;
+  // Deploy first, approve second: the wallet prompt is the admin's sign-off on the Safe.
+  const canApprove = Boolean(r.safeAddress) || isConnected;
+  const approve = (action: "approve" | "unarchive", ok: string) =>
+    run(async () => {
+      if (!r.safeAddress) await safe.ensureDeployed();
+      await api(`${base}/status`, { json: { action } });
+    }, ok);
 
   return (
     <PageMain detail>
@@ -156,8 +164,10 @@ export default function AdminInitiativeEditor() {
                 <Button
                   variant="primary"
                   sm
-                  onClick={() =>
-                    run(() => api(`${base}/status`, { json: { action: "approve" } }), "Approved.")}
+                  disabled={!canApprove}
+                  loading={safe.busy}
+                  title={canApprove ? undefined : "Connect a wallet: approving deploys the Safe"}
+                  onClick={() => approve("approve", "Safe deployed and initiative approved.")}
                 >
                   Approve
                 </Button>
@@ -185,11 +195,10 @@ export default function AdminInitiativeEditor() {
               {r.status === "archived" && (
                 <Button
                   sm
-                  onClick={() =>
-                    run(
-                      () => api(`${base}/status`, { json: { action: "unarchive" } }),
-                      "Re-approved.",
-                    )}
+                  disabled={!canApprove}
+                  loading={safe.busy}
+                  title={canApprove ? undefined : "Connect a wallet: approving deploys the Safe"}
+                  onClick={() => approve("unarchive", "Re-approved.")}
                 >
                   Re-approve
                 </Button>
@@ -197,7 +206,7 @@ export default function AdminInitiativeEditor() {
             </div>
           </div>
 
-          <SafeCard page={data} onChange={refresh} />
+          <SafeCard page={data} safe={safe} onChange={refresh} />
 
           <div className="panel">
             <span className="k">Links</span>
@@ -279,132 +288,79 @@ export default function AdminInitiativeEditor() {
   );
 }
 
-function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () => void }) {
-  const r = page.initiative;
+/** The deploy flow shared by the Approve button and the Safe card. */
+function useSafeDeploy(id: string, onChange: () => void) {
   const config = useConfig();
-  const { isConnected } = useAccount();
   const [status, setStatus] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [syncState, setSyncState] = useState<SafeSyncState | null>(page.safeSync);
-  useEffect(() => setSyncState(page.safeSync), [page.safeSync]);
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+  const base = `/api/admin/initiatives/${id}`;
 
-  const [existing, setExisting] = useState("");
-  /** Bind a Safe that already exists: verified on-chain like a fresh deploy. */
-  const attach = async () => {
-    const address = existing.trim();
-    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
-      setStatus({ kind: "err", text: "That is not an Ethereum address (0x + 40 hex characters)." });
-      return;
-    }
-    setStatus({ kind: "wait", text: "Verifying the Safe's owners and threshold on-chain…" });
-    setBusy(true);
-    const res = await api<SafeConfirmResult>(`/api/admin/initiatives/${r.id}/safe-confirm`, {
-      json: { address },
-    }).catch((e) => ({ status: "error", detail: errorMessage(e) } as SafeConfirmResult));
-    setBusy(false);
-    if (res.status === "ok") {
-      setStatus({ kind: "ok", text: `Safe ${res.address} verified: ${res.detail}` });
-      setExisting("");
-      onChange();
-    } else setStatus({ kind: "err", text: res.detail });
-  };
-  const attachForm = (
-    <form
-      className="mt-4 border-t border-edge pt-3.5"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void attach();
-      }}
-    >
-      <label className="small dim block" htmlFor="safe-existing">
-        Or use a Safe that is already deployed
-      </label>
-      <div className="mt-1.5 flex gap-2">
-        <Input
-          id="safe-existing"
-          className="mono min-w-0 flex-1 py-2 text-[12px]"
-          placeholder="0x…"
-          spellCheck={false}
-          value={existing}
-          onChange={(e) => setExisting(e.target.value)}
-        />
-        <Button type="submit" sm variant="ghost" className="m-0 flex-none" loading={busy}>
-          Use this Safe
-        </Button>
-      </div>
-      <p className="m-0 mt-1.5 small dim">
-        Must be a {page.signers.threshold}-of-{page.signers.list.length}{" "}
-        canonical Safe owned by the operational signers; anything else is rejected.
-      </p>
-    </form>
-  );
-
-  const confirmDeploy = async (txHash: string) => {
-    const res = await api<SafeConfirmResult>(`/api/admin/initiatives/${r.id}/safe-confirm`, {
-      json: { txHash },
-    }).catch((e) => ({ status: "error", detail: errorMessage(e) } as SafeConfirmResult));
-    if (res.status === "pending") {
-      setStatus({ kind: "wait", text: "Waiting for the deploy transaction to be mined…" });
-      timer.current = globalThis.setTimeout(() => void confirmDeploy(txHash), 6000);
-      return;
-    }
-    setBusy(false);
-    if (res.status === "ok") {
-      setStatus({ kind: "ok", text: `Safe ${res.address} verified: ${res.detail}` });
-      onChange();
-    } else setStatus({ kind: "err", text: res.detail });
-  };
-
-  /** Assign the address (approval normally did; this is the retry after a chain hiccup). */
-  const assign = async () => {
+  /**
+   * Make sure the initiative's Safe exists and is bound, deploying it from the
+   * admin's wallet if not. The server binds on code at the predicted CREATE2
+   * address (a Safe wallet or a sped-up tx mines under another hash), so the
+   * browser watches its own receipt for a revert and then asks the server
+   * until the Safe is there. Resolves to the address; throws on failure.
+   */
+  const ensureDeployed = async (): Promise<string> => {
     setStatus(null);
     setBusy(true);
     try {
-      const p = await api<SafeDeployParams>(`/api/admin/initiatives/${r.id}/safe-deploy-params`);
+      const p = await api<SafeDeployParams>(`${base}/safe-deploy-params`);
       if (!p.enabled) throw new Error(p.reason);
-      setStatus({ kind: "ok", text: `Donation address assigned: ${p.address}` });
-      onChange();
+      if (!p.deployed) {
+        setStatus({
+          kind: "wait",
+          text:
+            `Confirm the Safe deploy in your wallet (${p.threshold}-of-${p.signers.length} via the canonical factory, to ${p.address}).`,
+        });
+        const hash = await sendTransaction(config, {
+          to: p.factory as `0x${string}`,
+          data: p.calldata as `0x${string}`,
+          chainId: 1,
+        });
+        setStatus({ kind: "wait", text: `Sent ${shortAddr(hash)}. Waiting for it to be mined…` });
+        const receipt = await waitForTransactionReceipt(config, { hash, chainId: 1 });
+        if (receipt.status !== "success") {
+          throw new Error("The deploy transaction reverted; nothing was deployed.");
+        }
+      }
+      for (let attempt = 0;; attempt++) {
+        const res = await api<SafeConfirmResult>(`${base}/safe-confirm`, { json: {} })
+          .catch((e) => ({ status: "error", detail: errorMessage(e) } as SafeConfirmResult));
+        if (res.status === "ok") {
+          setStatus({ kind: "ok", text: `Safe ${res.address} verified: ${res.detail}` });
+          onChange();
+          return res.address!;
+        }
+        if (res.status !== "pending" || attempt >= 20) throw new Error(res.detail);
+        setStatus({ kind: "wait", text: "Waiting for the Safe to show up on-chain…" });
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
     } catch (e) {
-      setStatus({ kind: "err", text: errorMessage(e) });
+      setStatus({ kind: "err", text: walletErrorMessage(e) });
+      throw e;
     } finally {
       setBusy(false);
     }
   };
 
-  const deploy = async () => {
-    setStatus(null);
-    setBusy(true);
-    try {
-      const p = await api<SafeDeployParams>(`/api/admin/initiatives/${r.id}/safe-deploy-params`);
-      if (!p.enabled) throw new Error(p.reason);
-      if (p.deployed) {
-        // Deployed after this page loaded (another tab, a Safe-wallet tx that mined late).
-        setBusy(false);
-        setStatus({ kind: "ok", text: `Safe ${p.address} is already deployed.` });
-        onChange();
-        return;
-      }
-      setStatus({
-        kind: "wait",
-        text:
-          `Confirm the deploy transaction in your wallet (${p.threshold}-of-${p.signers.length} Safe via the canonical factory, to ${p.address}).`,
-      });
-      const txHash = await sendTransaction(config, {
-        to: p.factory as `0x${string}`,
-        data: p.calldata as `0x${string}`,
-        chainId: 1,
-      });
-      setStatus({ kind: "wait", text: `Sent ${shortAddr(txHash)}. Waiting for confirmation…` });
-      await confirmDeploy(txHash.toLowerCase());
-    } catch (e) {
-      setBusy(false);
-      setStatus({ kind: "err", text: walletErrorMessage(e) });
-    }
-  };
+  return { ensureDeployed, status, busy };
+}
+
+function SafeCard(
+  { page, safe, onChange }: {
+    page: AdminInitiativePage;
+    safe: ReturnType<typeof useSafeDeploy>;
+    onChange: () => void;
+  },
+) {
+  const r = page.initiative;
+  const { isConnected } = useAccount();
+  const [status, setStatus] = useState<Msg>(null);
+  const [busy, setBusy] = useState(false);
+  const [syncState, setSyncState] = useState<SafeSyncState | null>(page.safeSync);
+  useEffect(() => setSyncState(page.safeSync), [page.safeSync]);
 
   const sync = async () => {
     setBusy(true);
@@ -427,49 +383,8 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
     }
   };
 
-  const addressBox = r.safeAddress && (
-    <a
-      className="mono mt-2.5 block rounded-[10px] border border-edge bg-black/15 px-3 py-2 text-[11.5px] [overflow-wrap:anywhere]"
-      href={`https://etherscan.io/address/${r.safeAddress}`}
-      target="_blank"
-      rel="noopener"
-    >
-      {r.safeAddress}
-    </a>
-  );
-
   let body: React.ReactNode;
-  if (r.safeAddress && !r.safeDeployed) {
-    // Counterfactual: the address is fixed (CREATE2) and takes donations now;
-    // the deploy is what the first payout needs.
-    body = (
-      <>
-        <p className="m-0 flex flex-wrap items-center gap-2">
-          <span className="chip st-approved">
-            {page.signers.threshold}-of-{page.signers.list.length}
-          </span>
-          <span className="small text-soft">address assigned, not deployed yet</span>
-        </p>
-        {addressBox}
-        <GovernedBy className="mt-1.5" />
-        <p className="m-0 mt-2.5 small dim">
-          Donations can already go to this address. Deploy the Safe before the first payout: one
-          transaction from your wallet via the canonical factory, which can only land on this
-          address.
-        </p>
-        <Button
-          variant="primary"
-          sm
-          className="mt-3 w-full"
-          loading={busy}
-          disabled={!isConnected}
-          onClick={deploy}
-        >
-          {isConnected ? "Deploy Safe" : "Connect a wallet to deploy"}
-        </Button>
-      </>
-    );
-  } else if (r.safeAddress) {
+  if (r.safeAddress) {
     body = (
       <>
         <p className="m-0 flex flex-wrap items-center gap-2">
@@ -478,7 +393,14 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
           </span>
           <span className="small text-dao-green">deployed and verified</span>
         </p>
-        {addressBox}
+        <a
+          className="mono mt-2.5 block rounded-[10px] border border-edge bg-black/15 px-3 py-2 text-[11.5px] [overflow-wrap:anywhere]"
+          href={`https://etherscan.io/address/${r.safeAddress}`}
+          target="_blank"
+          rel="noopener"
+        >
+          {r.safeAddress}
+        </a>
         <GovernedBy className="mt-1.5" />
         <p className="m-0 mt-2.5 small dim">
           Indexer sync: {syncState
@@ -500,37 +422,33 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
         Safe deployment is disabled: <b>{page.signers.detail}</b>.
       </p>
     );
-  } else if (r.status !== "approved") {
-    body = (
-      <>
-        <p className="m-0 small dim">
-          Approve this initiative first: approval assigns its donation address.
-        </p>
-        {attachForm}
-      </>
-    );
   } else {
-    // Approved without an address: the chain check failed at approval (or the
-    // predicted address is held by another initiative). The cron retries too.
     body = (
       <>
         <p className="m-0 small dim">
-          No donation address yet. It is the {page.signers.threshold}-of-{page.signers.list.length}
-          {" "}
-          Safe the operational signers' deploy lands on; assigning it checks that with the factory.
+          Approving deploys a {page.signers.threshold}-of-{page.signers.list.length}{" "}
+          Safe owned by the operational signers: one transaction from your wallet via the canonical
+          factory, verified on-chain before the initiative goes live. Or deploy it ahead of time:
         </p>
-        <Button variant="primary" sm className="mt-3 w-full" loading={busy} onClick={assign}>
-          Assign donation address
+        <Button
+          variant="ghost"
+          sm
+          className="mt-3 w-full"
+          loading={safe.busy}
+          disabled={!isConnected}
+          onClick={() => void safe.ensureDeployed().catch(() => {})}
+        >
+          {isConnected ? "Deploy Safe now" : "Connect a wallet to deploy"}
         </Button>
-        {attachForm}
       </>
     );
   }
+  const shown = safe.status ?? status;
   return (
     <div className="panel">
       <span className="k">Donation Safe</span>
       {body}
-      {status && <Status kind={status.kind} className="mt-3">{status.text}</Status>}
+      {shown && <Status kind={shown.kind} className="mt-3">{shown.text}</Status>}
     </div>
   );
 }

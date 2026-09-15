@@ -116,7 +116,7 @@ export default function InitiativeCard({
             <span className="mr-0.5 font-inter-tight text-[12px] text-white/30">Backed by</span>
             {logos.length
               ? logos.map((l) => (
-                <BackerLogo key={l.logoUrl} logoUrl={l.logoUrl} company={l.company} />
+                <BackerLogo key={l.logoUrl} logoUrl={l.logoUrl} company={l.company} url={l.url} />
               ))
               : Array.from(
                 { length: Math.min(backers, 4) },

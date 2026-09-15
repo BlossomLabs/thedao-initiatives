@@ -5,10 +5,15 @@ import { cn } from "~/lib/utils";
  * Shared by the board card's "Backed by" strip and the initiative's Backers list.
  */
 export default function BackerLogo(
-  { logoUrl, company, className }: { logoUrl: string; company: string; className?: string },
+  { logoUrl, company, url, className }: {
+    logoUrl: string;
+    company: string;
+    url?: string;
+    className?: string;
+  },
 ) {
   if (logoUrl) {
-    return (
+    const image = (
       <img
         src={logoUrl}
         alt={company}
@@ -19,6 +24,18 @@ export default function BackerLogo(
         )}
       />
     );
+    return url
+      ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex flex-none rounded-full"
+        >
+          {image}
+        </a>
+      )
+      : image;
   }
   return (
     <span

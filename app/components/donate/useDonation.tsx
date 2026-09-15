@@ -273,7 +273,7 @@ export function useDonation(
                 className="mono"
                 target="_blank"
                 rel="noopener"
-                href={`https://etherscan.io/tx/${txHash}`}
+                href={`https://eth.blockscout.com/tx/${txHash}`}
               >
                 {shortAddr(txHash)}
               </a>

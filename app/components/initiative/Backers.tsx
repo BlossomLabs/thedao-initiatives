@@ -16,7 +16,7 @@ export default function Backers({ pledges }: { pledges: Pledge[] }) {
             key={p.id}
             className="flex items-center gap-3 rounded-[14px] border border-edge2 bg-card px-4 py-2.5"
           >
-            <BackerLogo logoUrl={p.logoUrl} company={p.company} className="flex-none" />
+            <BackerLogo logoUrl={p.logoUrl} company={p.company} url={p.url} className="flex-none" />
             <div>
               <b className="mr-2 font-inter-tight text-[14px] font-semibold">
                 {p.url ? <a href={p.url} target="_blank" rel="noopener">{p.company}</a> : p.company}

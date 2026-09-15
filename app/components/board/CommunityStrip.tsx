@@ -28,7 +28,7 @@ export default function CommunityStrip({ entries }: { entries: CommunityEntry[] 
                   <Identity
                     address={c.address}
                     size={18}
-                    revealable={false}
+                    linked={false}
                     nameClassName="text-[13.5px] font-semibold"
                   />
                 )

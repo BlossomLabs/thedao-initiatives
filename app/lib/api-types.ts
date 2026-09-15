@@ -120,7 +120,7 @@ export interface Card {
   pct: number;
   backers: number;
   donations: number;
-  logos: { company: string; logoUrl: string }[];
+  logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
   onramp?: Onramp;

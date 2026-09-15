@@ -54,7 +54,7 @@ export default function DonationsTable(
                     <td>{d.tokenSymbol}</td>
                     <td className="mono">
                       <a
-                        href={`https://etherscan.io/tx/${d.txHash}`}
+                        href={`https://eth.blockscout.com/tx/${d.txHash}`}
                         target="_blank"
                         rel="noopener"
                       >

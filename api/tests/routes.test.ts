@@ -725,6 +725,7 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
   assertEquals(((await j(p1)).pledge as { url: string }).url, "");
   const form = new FormData();
   form.append("company", "Logo Co");
+  form.append("url", "https://logo.example");
   form.append("amount", "250");
   form.append("status", "received");
   form.append("logo", new Blob([PNG], { type: "image/png" }), "logo.png");
@@ -742,7 +743,11 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     summary: { pledged: number };
   }[])[0];
   assertEquals(card.backers, 2);
-  assertEquals(card.logos.length, 1);
+  assertEquals(card.logos, [{
+    company: "Logo Co",
+    logoUrl: p2.pledge.logoUrl,
+    url: "https://logo.example",
+  }]);
   assertEquals(card.summary.pledged, 750);
   await h.req("/api/admin/initiatives/" + id + "/pledges/" + p2.pledge.id, {
     method: "PATCH",

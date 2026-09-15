@@ -261,12 +261,12 @@ export default function AdminInitiativeEditor() {
               {r.safeAddress && (
                 <li>
                   <a
-                    href={`https://etherscan.io/address/${r.safeAddress}`}
+                    href={`https://eth.blockscout.com/address/${r.safeAddress}`}
                     target="_blank"
                     rel="noopener"
                   >
                     <ExternalLink className="mr-1.5 inline size-3.5 align-[-2px]" />
-                    Safe on Etherscan
+                    Safe on Blockscout
                   </a>
                 </li>
               )}
@@ -424,7 +424,7 @@ function SafeCard(
         </p>
         <a
           className="mono mt-2.5 block rounded-[10px] border border-edge bg-black/15 px-3 py-2 text-[11.5px] [overflow-wrap:anywhere]"
-          href={`https://etherscan.io/address/${r.safeAddress}`}
+          href={`https://eth.blockscout.com/address/${r.safeAddress}`}
           target="_blank"
           rel="noopener"
         >
@@ -942,7 +942,7 @@ function Donations({ page, base, run }: { page: AdminInitiativePage; base: strin
                     <td className="small dim">{d.detail}</td>
                     <td className="mono">
                       <a
-                        href={`https://etherscan.io/tx/${d.txHash}`}
+                        href={`https://eth.blockscout.com/tx/${d.txHash}`}
                         target="_blank"
                         rel="noopener"
                       >

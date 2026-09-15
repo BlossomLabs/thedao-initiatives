@@ -13,7 +13,7 @@ export interface Card {
   pct: number;
   backers: number;
   donations: number;
-  logos: { company: string; logoUrl: string }[];
+  logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
   onramp: { url: string; prefilled: boolean };
@@ -54,7 +54,7 @@ export async function buildCard(deps: Deps, r: Rfp, tokensOk: boolean): Promise<
     backers: pledges.length,
     donations: donations.length,
     logos: pledges.filter((p) => p.logoCid).slice(0, 4)
-      .map((p) => ({ company: p.company, logoUrl: ipfsUrl(deps.config, p.logoCid) })),
+      .map((p) => ({ company: p.company, logoUrl: ipfsUrl(deps.config, p.logoCid), url: p.url })),
     funded: Boolean(r.goalUsd && summary.total >= r.goalUsd),
     donationsEnabled: Boolean(tokensOk && r.safeAddress && r.status === "approved"),
     onramp: r.safeAddress ? onrampLink(deps.config, r.safeAddress) : { url: "", prefilled: false },

@@ -8,6 +8,7 @@
 import { serveDir } from "@std/http/file-server";
 import { createServer } from "./api/bootstrap.ts";
 import { LOCK_MESSAGE, LOCK_REALM } from "./api/lib/sitelock.ts";
+import { collectScriptHashes, sitePolicy, withSiteHeaders } from "./api/lib/site-headers.ts";
 import { isInitiativeMarkdown } from "./api/routes/markdown.ts";
 
 const { app, lock, config } = await createServer();
@@ -15,6 +16,16 @@ const { app, lock, config } = await createServer();
 const SITE_URL = (Deno.env.get("VITE_SITE_URL") ?? "").replace(/\/+$/, "") ||
   "https://fund.thedao.fund";
 const ROOT = new URL("./build/client", import.meta.url).pathname;
+
+// The prerendered pages carry inline scripts (root.tsx's shell script and
+// React Router's hydration data); their hashes go into script-src so the CSP
+// can allow exactly those and nothing else. Computed once, at startup.
+const scriptHashes = await collectScriptHashes(ROOT);
+const policy = sitePolicy({ cspEnforce: config.cspEnforce, scriptHashes });
+console.log(
+  `site headers: CSP ${config.cspEnforce ? "enforced" : "report-only"}, ` +
+    `${scriptHashes.length} inline script hash(es)`,
+);
 
 const isApi = (path: string) =>
   path === "/healthz" || path === "/api" || path.startsWith("/api/") || isInitiativeMarkdown(path);
@@ -76,6 +87,6 @@ Deno.serve({ port: config.port }, async (req) => {
       headers: { "WWW-Authenticate": LOCK_REALM, "Cache-Control": "no-store" },
     });
   }
-  const res = await serveStatic(req);
+  const res = withSiteHeaders(await serveStatic(req), policy);
   return verdict === "basic" ? withHeader(res, "Set-Cookie", await lock.cookie()) : res;
 });

@@ -106,6 +106,8 @@ export interface Config {
   operationalSigners: string[];
   safeApiKey: string;
   safeSyncCron: string;
+  /** DISABLE_RATE_LIMITS=true: every KV rate limit answers "allowed" (live sessions where a room shares one IP). */
+  rateLimitsDisabled: boolean;
   /** Alchemy app key: an extra mainnet RPC ahead of the public fallbacks. */
   alchemyApiKey: string;
   pinataJwt: string;
@@ -191,6 +193,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     operationalSigners: list(env.OPERATIONAL_SIGNERS),
     safeApiKey: (env.SAFE_API_KEY ?? "").trim(),
     safeSyncCron: (env.SAFE_SYNC_CRON ?? "").trim() || "*/10 * * * *",
+    rateLimitsDisabled: /^(1|true|yes)$/i.test((env.DISABLE_RATE_LIMITS ?? "").trim()),
     alchemyApiKey,
     pinataJwt: (env.PINATA_JWT ?? "").trim(),
     pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "ipfs.blossom.software",

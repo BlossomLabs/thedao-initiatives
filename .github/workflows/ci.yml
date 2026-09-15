@@ -1,7 +1,5 @@
 name: CI
 
-# Every push to main that goes green deploys itself to the VPS (the `deploy`
-# job at the bottom). Pull requests run the checks only.
 on:
   push:
     branches: [main]
@@ -12,8 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  # Supersede in-flight runs on a PR branch; never cancel a main run, because
-  # cancelling one halfway can leave a deploy half-applied.
+  # Supersede in-flight runs on a PR branch.
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -128,45 +125,3 @@ jobs:
       - name: stop gunicorn
         if: always()
         run: kill "$(cat gunicorn.pid)" 2>/dev/null || true
-
-  deploy:
-    name: deploy to production
-    needs: [test, checks, smoke]
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    concurrency:
-      # One deploy at a time, and never cancel one in flight.
-      group: deploy-production
-      cancel-in-progress: false
-    environment:
-      name: production
-      url: https://fund.thedao.fund/
-    steps:
-      - name: set up the ssh key
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
-        run: |
-          mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          # Pinned host key: this never falls back to trust-on-first-use.
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-
-      - name: deploy ${{ github.sha }}
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          REV: ${{ github.sha }}
-        run: |
-          # The key is locked to deploy/deploy.sh by a forced command in the
-          # rfps user's authorized_keys, so this string is all it can ask for.
-          # deploy.sh checks out $REV, restarts the unit, waits for /healthz,
-          # and rolls back by itself if the new revision does not come up.
-          ssh -i ~/.ssh/deploy_key \
-              -o BatchMode=yes \
-              -o StrictHostKeyChecking=yes \
-              -p "${DEPLOY_PORT:-22}" \
-              "rfps@$DEPLOY_HOST" "deploy $REV"

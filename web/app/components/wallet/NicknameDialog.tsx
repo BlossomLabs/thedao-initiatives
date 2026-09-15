@@ -4,6 +4,7 @@ import { Dialog } from "~/components/ui/Dialog";
 import { Button } from "~/components/ui/Button";
 import { api, errorMessage } from "~/lib/api";
 import { avatarSrc, PRESET_COUNT, presetUri } from "~/lib/avatar";
+import { prepareAvatar } from "~/lib/avatar-image";
 import { useSession } from "~/context/session";
 import { useIdentity } from "~/hooks/use-identity";
 import { cn } from "~/lib/utils";
@@ -37,6 +38,7 @@ export default function NicknameDialog({
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const nameLocked = identity.nameFromEns;
   const avatarLocked = identity.avatarFromEns;
@@ -53,6 +55,23 @@ export default function NicknameDialog({
 
   const currentSrc = avatarLocked ? identity.avatar : preview ??
     (pfp.startsWith("preset:") ? presetUri(parseInt(pfp.slice(7), 10) || 0) : identity.avatar);
+
+  /** Square, shrink and re-encode in the browser so any picture fits the server's limits. */
+  async function pickFile(f: File | null) {
+    if (fileRef.current) fileRef.current.value = ""; // allow re-picking the same file
+    if (!f) return;
+    setPreparing(true);
+    setError("");
+    try {
+      const prepared = await prepareAvatar(f);
+      setFile(prepared);
+      setPreview(URL.createObjectURL(prepared));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setPreparing(false);
+    }
+  }
 
   async function submit() {
     if (!address) return;
@@ -157,16 +176,17 @@ export default function NicknameDialog({
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/webp"
+                  accept="image/*"
                   className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    setFile(f);
-                    setPreview(f ? URL.createObjectURL(f) : null);
-                  }}
+                  onChange={(e) => void pickFile(e.target.files?.[0] ?? null)}
                 />
-                <Button sm variant="ghost" onClick={() => fileRef.current?.click()}>
-                  Upload a picture (PNG/JPG/WEBP, under 500 KB)
+                <Button
+                  sm
+                  variant="ghost"
+                  loading={preparing}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  Upload a picture
                 </Button>
               </div>
             )}

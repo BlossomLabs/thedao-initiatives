@@ -1,17 +1,14 @@
-.venv/
-__pycache__/
-*.db
-*.db-wal
-*.db-shm
 .env
+*.local
 .claude/
-uploads/
+.DS_Store
 
-server.log
-*.db.bak.*
-.DS_Store
-*.db.bak-*
-.DS_Store
-.scanner.lock
-rfp-app.log
-backups/
+node_modules
+build
+.react-router
+.kv
+.kv-*
+*.log
+
+# editor swap files
+*.swp

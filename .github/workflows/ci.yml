@@ -1,5 +1,7 @@
 name: CI
 
+# Pull requests and pushes to main run the checks. Deno Deploy builds and
+# deploys main itself, so there is no deploy job here.
 on:
   push:
     branches: [main]
@@ -15,113 +17,31 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
-    name: tests (python ${{ matrix.python }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # The floor the target VPS can give us (Ubuntu 22.04) and what a
-        # current box gives us (24.04). The code itself is 3.9+ clean.
-        python: ["3.10", "3.12"]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-          cache: pip
-          cache-dependency-path: requirements.txt
-
-      - run: pip install -r requirements.txt
-
-      - name: unittest
-        env:
-          # The live-mainnet checks run on a schedule in live-chain.yml. Out of
-          # PR CI they cannot fail an unrelated change when a public RPC
-          # endpoint is rate-limiting.
-          RFPS_SKIP_LIVE: "1"
-        run: python -m unittest discover tests -v
-
   checks:
-    name: static checks
+    name: typecheck, lint, tests, build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: denoland/setup-deno@v2
         with:
-          python-version: "3.12"
+          deno-version: v2.x
 
-      - name: byte-compile every module
-        run: python -m compileall -q app.py chain.py config.py db.py seed.py gunicorn.conf.py tests
+      - run: deno i
 
-      - name: shellcheck the launchers and deploy scripts
-        run: shellcheck --severity=warning run.sh serve-prod.sh deploy/*.sh
+      - name: typecheck (react-router typegen + tsc)
+        run: deno task typecheck
 
-      - name: the systemd unit still points at serve-prod.sh
-        # Cheap guard: the unit is copied to /etc/systemd/system once and then
-        # forgotten, so a rename here would only surface as a dead service.
-        run: |
-          grep -q 'ExecStart=.*/serve-prod\.sh$' deploy/thedao-rfps.service
-          test -x serve-prod.sh
-          test -x deploy/deploy.sh
+      - name: type-check api + server + scripts
+        run: deno task check:api
 
-  smoke:
-    name: production boot smoke test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      - run: deno task lint
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: requirements.txt
+      - name: web tests (vitest)
+        run: deno task test
 
-      - run: pip install -r requirements.txt
+      - name: api tests (deno test, in-memory KV)
+        run: deno task test:api
 
-      - name: write a throwaway .env
-        # No secrets: SECRET_KEY and ADMIN_PASSWORD get generated on first
-        # import. SITE_USERNAME/SITE_PASSWORD stay unset so the private-preview
-        # gate is off and / is reachable. The signer set is the real public one
-        # from .env.production.template, which makes the "Safe deploys" assert
-        # below a genuine test of the checksum validation.
-        run: |
-          cat > .env <<'EOF'
-          BIND_HOST=127.0.0.1
-          PORT=4482
-          OPERATIONAL_SIGNERS=0x839395e20bbB182fa440d08F850E6c7A8f6F0780,0xC46c67Bb7E84490D7EbdD0b8ecDaca68Cf3823F4,0x939E50655cf6dA7D643CFf8Cfa31c3033b16328A,0xb760FE1bbC4A2752aBCBb28291a57Cb0cA99fF44,0x5256d6d94eD14667fa1661a99F5B142B1e051B8e
-          EOF
-
-      - name: boot under gunicorn the way systemd does
-        # RFPS_SCANNER=0 overrides the setdefault in gunicorn.conf.py: CI must
-        # not start a background thread polling mainnet for donations.
-        run: |
-          RFPS_SCANNER=0 gunicorn -c gunicorn.conf.py app:app > gunicorn.log 2>&1 &
-          echo $! > gunicorn.pid
-
-      - name: it answers, and Safe deploys are enabled
-        run: |
-          for i in $(seq 1 30); do
-            if curl -fsS --max-time 5 http://127.0.0.1:4482/healthz > healthz.json; then
-              break
-            fi
-            sleep 2
-          done
-          echo "--- /healthz ---"; cat healthz.json; echo
-          python -c "import json; assert json.load(open('healthz.json'))['ok']"
-          # The public pages render (templates + markdown pipeline are wired up).
-          curl -fsS --max-time 10 -o /dev/null http://127.0.0.1:4482/
-          curl -fsS --max-time 10 -o /dev/null http://127.0.0.1:4482/llms.txt
-          # Acceptance check 3 from HANDOFF-DEVOPS.md, run before we deploy
-          # rather than by reading journalctl afterwards.
-          grep -q 'Safe deploys: ENABLED' gunicorn.log
-
-      - name: gunicorn log
-        if: always()
-        run: cat gunicorn.log || true
-
-      - name: stop gunicorn
-        if: always()
-        run: kill "$(cat gunicorn.pid)" 2>/dev/null || true
+      - name: build + prerender
+        run: deno task build

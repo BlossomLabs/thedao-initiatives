@@ -47,6 +47,7 @@ Deno.test("safe sync: groups rows per tx, verifies over RPC, sends bearer, incre
     goalUsd: 1000,
     safeAddress: SAFE_ADDR,
   });
+  h.script.code[SAFE_ADDR.toLowerCase()] = "0x6080"; // a legacy row: deployed, flag not yet set
   // TX1: two USDC rows in one tx (batched) + TX2: one ETH internal transfer the RPC path can't see
   pageBody = [
     row({
@@ -161,6 +162,7 @@ Deno.test("safe sync: shallow transfers wait for confirmations, pending rows get
     goalUsd: 1000,
     safeAddress: SAFE_ADDR,
   });
+  h.script.code[SAFE_ADDR.toLowerCase()] = "0x6080";
   h.script.head = 1000;
   pageBody = [row({ transactionHash: TX1, blockNumber: 999 })]; // only 2 deep
   h.script.receipts[TX1] = {

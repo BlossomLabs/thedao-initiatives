@@ -432,7 +432,9 @@ export default function Dashboard() {
                 <td className="small [overflow-wrap:anywhere]">{r.contact || "–"}</td>
                 <td className="small">
                   {!r.safeAddress
-                    ? <span className="dim">no Safe</span>
+                    ? <span className="dim">no address</span>
+                    : !r.safeDeployed
+                    ? <span className="dim">not deployed</span>
                     : !safeSync
                     ? <span className="dim">never</span>
                     : safeSync.ok

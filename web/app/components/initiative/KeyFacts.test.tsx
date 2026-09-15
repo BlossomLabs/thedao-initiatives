@@ -15,6 +15,7 @@ const base: Initiative = {
   type: "grant",
   sortRank: null,
   safeAddress: "",
+  safeDeployed: false,
   paidOutUsd: 0,
   proposer: "",
   durationMonths: 12,

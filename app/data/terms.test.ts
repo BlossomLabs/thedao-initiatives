@@ -2,7 +2,6 @@ import { readdirSync, readFileSync } from "node:fs";
 import { sha256, stringToBytes } from "viem";
 import {
   formatEffectiveDate,
-  materialNoticeActive,
   parseTermsFile,
   TERMS,
   TERMS_VERSIONS,
@@ -55,16 +54,6 @@ test("the bundled versions are content/donation-terms/*.md, newest first, the cu
   expect(new Set(TERMS_VERSIONS.map((v) => v.id)).size).toBe(TERMS_VERSIONS.length);
   expect(termsById(TERMS.id)).toBe(TERMS);
   expect(termsById("f".repeat(64))).toBeUndefined();
-});
-
-test("material notice: from the effective date for 30 days", () => {
-  const v = { ...parseTermsFile("version: 2026-09-06\nmaterial: true\n\n# T\n", "2026-09-06.md") };
-  const day = (n: number) => new Date(Date.UTC(2026, 8, 6 + n, 12));
-  expect(materialNoticeActive(v, day(-1))).toBe(false);
-  expect(materialNoticeActive(v, day(0))).toBe(true);
-  expect(materialNoticeActive(v, day(29))).toBe(true);
-  expect(materialNoticeActive(v, day(30))).toBe(false);
-  expect(materialNoticeActive({ ...v, material: false }, day(0))).toBe(false);
 });
 
 test("formatEffectiveDate is a long UTC date", () => {

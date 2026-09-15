@@ -23,14 +23,12 @@ export default function InitiativeCard({
   card,
   tokensOk,
   aiTop,
-  safeThreshold,
   onDonated,
   style,
 }: {
   card: Card;
   tokensOk: boolean;
   aiTop?: boolean;
-  safeThreshold?: number;
   onDonated?: () => void;
   style?: React.CSSProperties;
 }) {
@@ -134,7 +132,6 @@ export default function InitiativeCard({
             slug={r.slug}
             safeAddress={r.safeAddress}
             onramp={card.onramp}
-            safeThreshold={safeThreshold}
             onConfirmed={onDonated}
           />
         </div>

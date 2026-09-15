@@ -11,9 +11,8 @@ import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
 import { WHAT_NEXT } from "~/data/what-next";
 
 export default function SideCards(
-  { page, safeThreshold, onDonated, revisions }: {
+  { page, onDonated, revisions }: {
     page: InitiativePage;
-    safeThreshold?: number;
     onDonated?: () => void;
     /** History navigation state owned by the page; omitted when there is nothing to browse. */
     revisions?: { viewing: number; current: number; mode: ViewMode; onMode: (m: ViewMode) => void };
@@ -37,7 +36,6 @@ export default function SideCards(
               slug={r.slug}
               safeAddress={r.safeAddress}
               onramp={page.onramp}
-              safeThreshold={safeThreshold}
               onConfirmed={onDonated}
             />
           )

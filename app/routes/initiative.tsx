@@ -209,7 +209,6 @@ export default function Initiative() {
         </div>
         <SideCards
           page={page}
-          safeThreshold={board.data?.flags.safeThreshold}
           onDonated={refresh}
           revisions={showBar ? { viewing, current, mode, onMode: setMode } : undefined}
         />

@@ -6,7 +6,7 @@
  *
  * File header: leading `key: value` lines up to the first blank line.
  *   version: YYYY-MM-DD    the effective date; must equal the file name
- *   material: true         optional; shows the 30-day change notice
+ *   material: true         optional; labels the version a material change
  *
  * A version's id is the SHA-256 of `<effective date>\n<body>` (the same
  * canonicalisation as api/lib/ids.ts sha256Hex). The material flag is not part
@@ -92,17 +92,6 @@ export const termsById = (id: string): TermsVersion | undefined =>
   TERMS_VERSIONS.find((v) => v.id === id);
 
 export const shortTermsId = (id: string): string => id.slice(0, 8);
-
-/** A material change is announced on the terms page and under the widget this long. */
-export const MATERIAL_NOTICE_DAYS = 30;
-
-/** True from the effective date until MATERIAL_NOTICE_DAYS later, for material versions. */
-export function materialNoticeActive(v: TermsVersion, now: Date): boolean {
-  if (!v.material) return false;
-  const start = Date.parse(v.effectiveDate + "T00:00:00Z");
-  const t = now.getTime();
-  return t >= start && t < start + MATERIAL_NOTICE_DAYS * 86_400_000;
-}
 
 /** "2026-09-06" -> "September 6, 2026" (UTC, so the date never shifts by timezone). */
 export function formatEffectiveDate(date: string): string {

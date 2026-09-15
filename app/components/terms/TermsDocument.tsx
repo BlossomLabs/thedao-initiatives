@@ -1,6 +1,5 @@
 import { Link } from "react-router";
 import Markdown from "~/components/Markdown";
-import TermsChangeNotice from "~/components/terms/TermsChangeNotice";
 import { formatEffectiveDate, shortTermsId, type TermsVersion } from "~/data/terms";
 
 /**
@@ -32,7 +31,6 @@ export default function TermsDocument({
           </>
         )}
       </p>
-      {current && <TermsChangeNotice terms={terms} />}
       <Markdown text={terms.body} className="terms-body" />
       <section
         className="mt-10 border-t border-white/[.08] pt-6"

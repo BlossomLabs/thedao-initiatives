@@ -245,3 +245,23 @@ build uses v2's design system and infrastructure.
 - The v1 admin migrations "Strip canned text" and "Structure" (v2 has no legacy rows to convert
   in bulk; a single row migrates through the paste box).
 - The `links` field's v1 rendering; v2 renders links only when they are https.
+
+## v1 removed on 2026-09-15
+
+initiatives.thedao.fund, served by v2 on Deno Deploy, is the live site and fund.thedao.fund is
+deprecated, so the Flask app left the repository: `app.py` and the other Python modules,
+`templates/`, `static/`, `tests/`, the VPS deploy scripts, DEPLOY.md and HANDOFF-DEVOPS.md, the CI
+deploy job and the weekly live-chain check, and the one-off `import-sqlite` script (the SQLite to KV
+import is done). The v2 tree moved from `web/` to the repository root, next to `content/` and
+`docs/`, which keep their paths, so the `../` reach-outs and the Vite `fs.allow` entries are gone.
+The repo-root `llms.txt` and its mirror test went too: `public/llms.txt` is the one guide, served
+as-is at `/llms.txt` and bundled into the submit form. Before the removal the v1 tests were checked for cases v2 lacked: `tests/test_draft.py` was
+already covered case for case by `shared/draft/*.test.ts`; `tests/test_markdown.py` (GFM rendering
+and HTML sanitisation) became `app/components/Markdown.test.tsx`.
+
+Upstream (giveth/thedao-rfps) still carries v1. `git merge upstream/main` keeps working for
+`content/` and `docs/`; changes to the Python files and to upstream's root `llms.txt` arrive as
+modify/delete conflicts, resolved with `git rm` (apply a guide change to `public/llms.txt` by
+hand), and their intent is ported by hand and noted here. Watch one thing: git's rename detection can pair upstream's
+single `content/donation-terms.md` with a published `content/donation-terms/<date>.md` and edit it.
+A published terms file is never edited, so restore it from `main` after every merge.

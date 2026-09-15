@@ -1,9 +1,10 @@
-# Pinned, exact versions in requirements.txt mean a security release only
-# reaches the box when someone bumps it. Dependabot opens that PR; CI proves it
-# still boots before anyone merges.
+# The npm dependencies in package.json are pinned by deno.lock, so a security
+# release only reaches production when someone bumps it. Dependabot opens that
+# PR; CI proves it still builds before anyone merges. The JSR imports in
+# deno.json are bumped by hand.
 version: 2
 updates:
-  - package-ecosystem: pip
+  - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly

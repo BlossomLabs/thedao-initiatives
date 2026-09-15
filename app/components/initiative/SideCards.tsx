@@ -35,7 +35,6 @@ export default function SideCards(
               initiativeId={r.id}
               slug={r.slug}
               safeAddress={r.safeAddress}
-              onramp={page.onramp}
               onConfirmed={onDonated}
             />
           )

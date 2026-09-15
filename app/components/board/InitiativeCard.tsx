@@ -131,7 +131,6 @@ export default function InitiativeCard({
             initiativeId={r.id}
             slug={r.slug}
             safeAddress={r.safeAddress}
-            onramp={card.onramp}
             onConfirmed={onDonated}
           />
         </div>

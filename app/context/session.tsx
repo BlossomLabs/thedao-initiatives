@@ -96,6 +96,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  // React state is for rendering. These synchronous guards own the wallet
+  // requests, including the gap before React commits a busy-state update.
+  const connectingRef = useRef<{ connector: Connector; promise: Promise<void> } | null>(null);
+  const signingInRef = useRef<
+    {
+      account: string;
+      connector: Connector | undefined;
+      promise: Promise<SessionInfo>;
+    } | null
+  >(null);
   const sessionRef = useRef(stored);
   sessionRef.current = stored;
 
@@ -163,10 +173,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [address, status, drop]);
 
   const signIn = useCallback(
-    async (account: `0x${string}` | undefined = address): Promise<SessionInfo> => {
-      if (!account) throw new Error("Connect a wallet first.");
+    (
+      account: `0x${string}` | undefined = address,
+      signingConnector: Connector | undefined = connector,
+    ): Promise<SessionInfo> => {
+      if (!account) return Promise.reject(new Error("Connect a wallet first."));
+      const active = signingInRef.current;
+      if (active) {
+        if (
+          active.account === account.toLowerCase() &&
+          active.connector?.uid === signingConnector?.uid
+        ) return active.promise;
+        return Promise.reject(new Error("Finish the pending wallet sign-in first."));
+      }
       setSigningIn(true);
-      try {
+      const promise = Promise.resolve().then(async () => {
         const { nonce } = await api<{ nonce: string }>("/api/auth/nonce");
         const message = createSiweMessage({
           domain: globalThis.location.host,
@@ -178,7 +199,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           statement: "Sign in to TheDAO Security Fund",
           issuedAt: new Date(),
         });
-        const signature = await signMessageAsync({ message, account });
+        const signature = await signMessageAsync({ message, account, connector: signingConnector });
         // cookie: true -> the token comes back as an HttpOnly cookie, not in the body.
         const s = await api<SessionInfo>("/api/auth/verify", {
           json: { message, signature, cookie: true },
@@ -188,11 +209,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         sessionRef.current = s;
         await refreshMe();
         return s;
-      } finally {
+      }).finally(() => {
+        signingInRef.current = null;
         setSigningIn(false);
-      }
+      });
+      signingInRef.current = {
+        account: account.toLowerCase(),
+        connector: signingConnector,
+        promise,
+      };
+      return promise;
     },
-    [address, signMessageAsync, refreshMe],
+    [address, connector, signMessageAsync, refreshMe],
   );
 
   const signOut = useCallback(async () => {
@@ -208,20 +236,31 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     } catch { /* not connected */ }
   }, [clear, disconnectAsync]);
 
-  const connect = useCallback(async (c: Connector) => {
+  const connect = useCallback((c: Connector): Promise<void> => {
+    const active = connectingRef.current;
+    if (active) {
+      if (active.connector.uid === c.uid) return active.promise;
+      return Promise.reject(new Error("Finish the pending wallet connection first."));
+    }
+    if (signingInRef.current) {
+      return Promise.reject(new Error("Finish the pending wallet sign-in first."));
+    }
     setConnecting(true);
-    try {
+    const promise = Promise.resolve().then(async () => {
       const { accounts } = await connectAsync({ connector: c, chainId: 1 });
       if (skipsSignIn(c)) return;
       try {
-        await signIn(accounts[0]);
+        await signIn(accounts[0], c);
       } catch (e) {
         await disconnectAsync({ connector: c }).catch(() => {});
         throw e;
       }
-    } finally {
+    }).finally(() => {
+      connectingRef.current = null;
       setConnecting(false);
-    }
+    });
+    connectingRef.current = { connector: c, promise };
+    return promise;
   }, [connectAsync, disconnectAsync, signIn]);
 
   // Keep "connected" meaning "signed in" outside connect(): whenever a wallet is
@@ -234,7 +273,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const before = prev.current;
     prev.current = { status, address };
     if (status !== "connected" || !address || skipsSignIn(connector)) return;
-    if (connecting || signingIn) return; // connect() signs in right after connecting
+    if (connectingRef.current || signingInRef.current) return;
     const s = sessionRef.current;
     if (s && s.address.toLowerCase() === address.toLowerCase()) return;
     const switched = before.status === "connected" && before.address &&

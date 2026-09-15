@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { CreditCard, Landmark, Wallet } from "lucide-react";
+import { Landmark, Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useDonateParams } from "~/hooks/use-donate-params";
 import { TERMS } from "~/data/terms";
 import GovernedBy from "~/components/terms/GovernedBy";
-import type { DonateResult, Onramp } from "~/lib/api-types";
+import type { DonateResult } from "~/lib/api-types";
 import { parseUsd, tokenQty } from "~/lib/donate";
 import { cn } from "~/lib/utils";
 import Status from "~/components/ui/Status";
@@ -14,7 +14,7 @@ import { useDonation } from "./useDonation";
 import { WALLETCONNECT_PROJECT_ID } from "~/lib/wagmi";
 
 const CHIPS = ["50", "500", "5000", "50000"];
-type Method = "wallet" | "card" | "exchange";
+type Method = "wallet" | "exchange";
 
 /**
  * Acceptance is remembered per terms version id as the ISO time of the tick,
@@ -31,18 +31,16 @@ function readAcceptedAt(id: string): string | null {
   }
 }
 
-/** The MVP's donate widget: chips, $ amount, token, wallet / card / exchange tabs. */
+/** The donate widget: chips, $ amount, token, wallet / exchange tabs. */
 export default function DonateWidget({
   initiativeId,
   slug,
   safeAddress,
-  onramp,
   onConfirmed,
 }: {
   initiativeId: string;
   slug: string;
   safeAddress: string;
-  onramp?: Onramp;
   onConfirmed?: (r: DonateResult) => void;
 }) {
   const { data: params } = useDonateParams();
@@ -94,14 +92,14 @@ export default function DonateWidget({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, params]);
-  // No wallet in this browser: lead with card if available, else exchange.
+  // No wallet in this browser: lead with the exchange tab.
   useEffect(() => {
     const hasInjected = typeof window !== "undefined" &&
       Boolean((window as { ethereum?: unknown }).ethereum);
     if (!hasInjected && !WALLETCONNECT_PROJECT_ID && !connector) {
-      setMethod(onramp?.prefilled ? "card" : "exchange");
+      setMethod("exchange");
     }
-  }, [connector, onramp?.prefilled]);
+  }, [connector]);
 
   const rate = params?.enabled ? params.rates[symbol] || 1 : 1;
   const usd = parseUsd(amount);
@@ -113,9 +111,6 @@ export default function DonateWidget({
 
   const methods: { id: Method; label: string; icon: React.ReactNode }[] = [
     { id: "wallet", label: "Wallet", icon: <Wallet className="size-[15px]" /> },
-    ...(onramp?.prefilled
-      ? [{ id: "card" as Method, label: "Card", icon: <CreditCard className="size-[15px]" /> }]
-      : []),
     { id: "exchange", label: "Exchange", icon: <Landmark className="size-[15px]" /> },
   ];
 
@@ -225,36 +220,33 @@ export default function DonateWidget({
           {d.busy ?? "Donate"}
         </Button>
       )}
-      {method === "card" && onramp?.prefilled && (
-        <div className="flex flex-col gap-2">
-          <p className="m-0 small dim">
-            Buy USDC with a card (Visa, Mastercard, Apple Pay, Google Pay). It is delivered straight
-            to this initiative's fund address on Ethereum mainnet, already filled in for you, and
-            shows up here automatically once it lands.
-          </p>
-          <a
-            className={cn("btn btn-primary", !accepted && "pointer-events-none opacity-40")}
-            href={onramp.url.replace("{AMT}", encodeURIComponent(amount || "100"))}
-            target="_blank"
-            rel="noopener"
-            aria-disabled={!accepted}
-            onClick={(e) =>
-              !gated() ? e.preventDefault() : d.setStatus({
-                kind: "wait",
-                text:
-                  "Card checkout opened in a new tab. Your donation appears here automatically once the USDC arrives (typically a few minutes after the purchase).",
-              })}
-          >
-            Open card checkout ↗
-          </a>
-        </div>
-      )}
       {method === "exchange" && (
         <div className="flex flex-col gap-2">
           <p className="m-0 small dim">
-            Send an accepted stablecoin or ETH from any exchange or wallet to this initiative's
-            address. It shows up on this page on its own, usually within a couple of minutes.
+            Send from an exchange or another wallet to the address below. It shows up on this page
+            on its own, usually within a few minutes.
           </p>
+          <ul className="m-0 small dim list-disc pl-4 [&>li+li]:mt-1">
+            <li>
+              <b className="text-white">Network: Ethereum Mainnet only.</b>{" "}
+              Exchanges call it "Ethereum", "ETH" or "ERC-20". Not Arbitrum, Optimism, Base,
+              Polygon, BNB Smart Chain (BEP-20), Tron (TRC-20) or Solana: funds sent on another
+              network cannot be recovered.
+            </li>
+            <li>
+              <b className="text-white">Tokens:</b> {params?.enabled
+                ? Object.keys(params.tokens).join(", ")
+                : "an accepted stablecoin or ETH"}. Anything else is not counted.
+            </li>
+            <li>
+              No memo or destination tag. If the withdrawal form asks for one, the network is wrong.
+            </li>
+            <li>
+              Sending a large amount? Send a small one first, wait for it to appear here, then send
+              the rest.
+            </li>
+          </ul>
+          <span className="k">Ethereum Mainnet (ERC-20) address</span>
           <div className="flex items-center gap-2 rounded-[14px] border border-edge bg-black/15 px-3 py-2">
             <span
               className="mono min-w-0 flex-1 text-[11.5px] [overflow-wrap:anywhere]"

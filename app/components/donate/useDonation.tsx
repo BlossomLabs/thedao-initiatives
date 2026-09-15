@@ -207,7 +207,7 @@ export function useDonation(
           if (!usable.length) {
             setStatus({
               kind: "err",
-              text: "No wallet detected in this browser. Use the card or exchange options instead.",
+              text: "No wallet detected in this browser. Use the exchange option instead.",
             });
             return;
           }
@@ -224,7 +224,7 @@ export function useDonation(
               ? `This wallet holds no ${symbol}. You do hold: ${held.join(", ")}.`
               : `This wallet holds none of the accepted tokens (${
                 Object.keys(params.tokens).join(", ")
-              }). Top it up, switch wallets (button top right), or use the card or exchange options.`,
+              }). Top it up, switch wallets (button top right), or use the exchange option.`,
           });
           return;
         }

@@ -1,8 +1,40 @@
 /** Shared test utilities: fake RPC, wallet signing, canned chain data. */
-import type { Hex } from "viem";
+import {
+  concatHex,
+  decodeFunctionData,
+  getContractAddress,
+  type Hex,
+  keccak256,
+  pad,
+  parseAbi,
+  toHex,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import type { Rpc } from "../chain/rpc.ts";
 import { TRANSFER_TOPIC } from "../chain/verify.ts";
+import { SAFE_PROXY_CREATION_CODE, SAFE_PROXY_FACTORY } from "../config.ts";
+
+const FACTORY_ABI = parseAbi([
+  "function createProxyWithNonce(address singleton, bytes initializer, uint256 saltNonce) returns (address)",
+]);
+
+/**
+ * What an eth_call of createProxyWithNonce would return: the CREATE2 address,
+ * computed here with viem (independently of chain/safe.ts) from the calldata
+ * the app built. salt = keccak(keccak(initializer) ++ saltNonce),
+ * initCode = proxyCreationCode ++ singleton.
+ */
+export function simulateCreateProxy(calldata: string): string {
+  const { args } = decodeFunctionData({ abi: FACTORY_ABI, data: calldata as Hex });
+  const [singleton, initializer, saltNonce] = args as [Hex, Hex, bigint];
+  const salt = keccak256(concatHex([keccak256(initializer), pad(toHex(saltNonce), { size: 32 })]));
+  return getContractAddress({
+    opcode: "CREATE2",
+    from: SAFE_PROXY_FACTORY as Hex,
+    salt,
+    bytecode: concatHex([SAFE_PROXY_CREATION_CODE as Hex, pad(singleton, { size: 32 })]),
+  });
+}
 
 export const SIGNERS = [
   "0x839395e20bbB182fa440d08F850E6c7A8f6F0780",

@@ -10,10 +10,11 @@ import {
   SAFE_ADDR,
   seedContentLogos,
 } from "./app-helpers.ts";
-import { DONOR, transferLog, wallet } from "./helpers.ts";
+import { DONOR, SIGNERS, transferLog, wallet } from "./helpers.ts";
 import { grantBody, minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
 import { TOKENS } from "../config.ts";
-import { TOPIC_PROXY_CREATION } from "../chain/safe.ts";
+import { predictSafeAddress } from "../chain/safe.ts";
+import { toChecksum } from "../chain/address.ts";
 import { SAFE_PROXY_FACTORY } from "../config.ts";
 
 const USDC = TOKENS.USDC[0];
@@ -736,25 +737,23 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     json: { status: "withdrawn" },
   });
   assertEquals((await h.db.fundingSummary(id)).pledged, 500);
-  // Safe deploy
+  // Safe deploy: approval assigned the address; the panel deploys to exactly it
+  const assigned = (await h.db.rfps.get(id))!.safeAddress;
+  assertEquals(
+    assigned,
+    predictSafeAddress(SIGNERS, (await h.db.rfps.get(id))!.safeDeploymentKey!),
+  );
   const params = await j(
     await h.req("/api/admin/initiatives/" + id + "/safe-deploy-params", { token: admin }),
-  ) as { enabled: boolean; calldata: string; factory: string };
+  ) as { enabled: boolean; calldata: string; factory: string; address: string; deployed: boolean };
   assert(params.enabled);
   assert(params.calldata.startsWith("0x1688f0b9"));
   assertEquals(params.factory, SAFE_PROXY_FACTORY);
+  assertEquals(params.address, assigned);
+  assertEquals(params.deployed, false);
   const deployTx = "0x" + "ee".repeat(32);
-  h.script.receipts[deployTx] = {
-    status: "0x1",
-    logs: [{
-      address: SAFE_PROXY_FACTORY.toLowerCase(),
-      topics: [
-        TOPIC_PROXY_CREATION,
-        "0x" + "0".repeat(24) + SAFE_ADDR.slice(2).toLowerCase(),
-      ],
-      data: "0x",
-    }],
-  };
+  h.script.receipts[deployTx] = { status: "0x1", logs: [] };
+  h.script.code[assigned.toLowerCase()] = "0x6080";
   const conf = await j(
     await h.req("/api/admin/initiatives/" + id + "/safe-confirm", {
       method: "POST",
@@ -763,19 +762,8 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     }),
   ) as { status: string; address: string };
   assertEquals(conf.status, "ok");
-  assertEquals(conf.address, SAFE_ADDR);
-  assertEquals((await h.db.rfps.get(id))!.safeAddress, SAFE_ADDR);
-  // same Safe cannot bind to another initiative
-  const other = await h.db.rfps.insert({
-    title: "Another initiative",
-    status: "approved",
-  });
-  const dup = await h.req("/api/admin/initiatives/" + other.id + "/safe-confirm", {
-    method: "POST",
-    token: admin,
-    json: { txHash: deployTx },
-  });
-  assertEquals(dup.status, 409);
+  assertEquals(conf.address, assigned);
+  assert((await h.db.rfps.get(id))!.safeDeployedAt);
   assertEquals(
     (await h.req("/api/admin/initiatives/" + id + "/safe-confirm", {
       method: "POST",
@@ -785,6 +773,7 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     400,
   );
   // an already-deployed Safe can be attached by address: same checks, same conflicts
+  const other = await h.db.rfps.insert({ title: "Another initiative", status: "approved" });
   const byAddr = (rfpId: string, address: string) =>
     h.req("/api/admin/initiatives/" + rfpId + "/safe-confirm", {
       method: "POST",
@@ -792,7 +781,7 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
       json: { address },
     });
   assertEquals((await byAddr(other.id, "0x1234")).status, 400);
-  assertEquals((await byAddr(other.id, SAFE_ADDR)).status, 409); // bound to `id` already
+  assertEquals((await byAddr(other.id, assigned)).status, 409); // bound to `id` already
   const third = await h.db.rfps.insert({ title: "Third initiative", status: "approved" });
   const existing = "0x" + "a1".repeat(20);
   const attached = await j(await byAddr(third.id, existing.toLowerCase())) as {
@@ -800,8 +789,10 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     address: string;
   };
   assertEquals(attached.status, "ok");
-  assertEquals(attached.address.toLowerCase(), existing);
-  assertEquals((await h.db.rfps.get(third.id))!.safeAddress, attached.address);
+  assertEquals(attached.address, toChecksum(existing));
+  const thirdRow = (await h.db.rfps.get(third.id))!;
+  assertEquals(thirdRow.safeAddress, attached.address);
+  assert(thirdRow.safeDeployedAt); // attached by address = verified on-chain = deployed
   h.close();
 });
 

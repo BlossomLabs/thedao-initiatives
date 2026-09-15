@@ -590,3 +590,15 @@ Deno.test("verifySiwe: a valid EOA signature never touches the rpc", async () =>
   assertEquals(err, null);
   assertEquals(m!.address, w.address);
 });
+
+import { predictSafeAddress } from "../chain/safe.ts";
+
+Deno.test("predictSafeAddress matches a Safe deployed from the panel on mainnet", () => {
+  // initiatives.thedao.fund, 2026-09-15: the Safe bound to a-unified-platform-for-web3-opsec
+  // sits at the CREATE2 address of its slug salt.
+  assertEquals(
+    predictSafeAddress(SIGNERS, "a-unified-platform-for-web3-opsec"),
+    "0x4534fA9FaEdE981FF7b9c9bFe112067ECA216609",
+  );
+  assert(predictSafeAddress(SIGNERS, "another-slug") !== predictSafeAddress(SIGNERS, "a-slug"));
+});

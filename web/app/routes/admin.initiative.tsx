@@ -49,7 +49,8 @@ type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<void>;
 
 const STATUS_HELP: Record<string, string> = {
   pending: "Submitted and waiting for review. It is not on the board yet.",
-  approved: "Live on the board. Donations count once its Safe is deployed.",
+  approved:
+    "Live on the board with its donation address assigned. Deploy the Safe before the first payout.",
   rejected: "Hidden from the board. Approve it to publish it after all.",
   archived: "Hidden from the board; its public page stays reachable.",
 };
@@ -358,16 +359,39 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
     } else setStatus({ kind: "err", text: res.detail });
   };
 
+  /** Assign the address (approval normally did; this is the retry after a chain hiccup). */
+  const assign = async () => {
+    setStatus(null);
+    setBusy(true);
+    try {
+      const p = await api<SafeDeployParams>(`/api/admin/initiatives/${r.id}/safe-deploy-params`);
+      if (!p.enabled) throw new Error(p.reason);
+      setStatus({ kind: "ok", text: `Donation address assigned: ${p.address}` });
+      onChange();
+    } catch (e) {
+      setStatus({ kind: "err", text: errorMessage(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const deploy = async () => {
     setStatus(null);
     setBusy(true);
     try {
       const p = await api<SafeDeployParams>(`/api/admin/initiatives/${r.id}/safe-deploy-params`);
       if (!p.enabled) throw new Error(p.reason);
+      if (p.deployed) {
+        // Deployed after this page loaded (another tab, a Safe-wallet tx that mined late).
+        setBusy(false);
+        setStatus({ kind: "ok", text: `Safe ${p.address} is already deployed.` });
+        onChange();
+        return;
+      }
       setStatus({
         kind: "wait",
         text:
-          `Confirm the deploy transaction in your wallet (${p.threshold}-of-${p.signers.length} Safe via the canonical factory).`,
+          `Confirm the deploy transaction in your wallet (${p.threshold}-of-${p.signers.length} Safe via the canonical factory, to ${p.address}).`,
       });
       const txHash = await sendTransaction(config, {
         to: p.factory as `0x${string}`,
@@ -403,8 +427,49 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
     }
   };
 
+  const addressBox = r.safeAddress && (
+    <a
+      className="mono mt-2.5 block rounded-[10px] border border-edge bg-black/15 px-3 py-2 text-[11.5px] [overflow-wrap:anywhere]"
+      href={`https://etherscan.io/address/${r.safeAddress}`}
+      target="_blank"
+      rel="noopener"
+    >
+      {r.safeAddress}
+    </a>
+  );
+
   let body: React.ReactNode;
-  if (r.safeAddress) {
+  if (r.safeAddress && !r.safeDeployed) {
+    // Counterfactual: the address is fixed (CREATE2) and takes donations now;
+    // the deploy is what the first payout needs.
+    body = (
+      <>
+        <p className="m-0 flex flex-wrap items-center gap-2">
+          <span className="chip st-approved">
+            {page.signers.threshold}-of-{page.signers.list.length}
+          </span>
+          <span className="small text-soft">address assigned, not deployed yet</span>
+        </p>
+        {addressBox}
+        <GovernedBy className="mt-1.5" />
+        <p className="m-0 mt-2.5 small dim">
+          Donations can already go to this address. Deploy the Safe before the first payout: one
+          transaction from your wallet via the canonical factory, which can only land on this
+          address.
+        </p>
+        <Button
+          variant="primary"
+          sm
+          className="mt-3 w-full"
+          loading={busy}
+          disabled={!isConnected}
+          onClick={deploy}
+        >
+          {isConnected ? "Deploy Safe" : "Connect a wallet to deploy"}
+        </Button>
+      </>
+    );
+  } else if (r.safeAddress) {
     body = (
       <>
         <p className="m-0 flex flex-wrap items-center gap-2">
@@ -413,14 +478,7 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
           </span>
           <span className="small text-dao-green">deployed and verified</span>
         </p>
-        <a
-          className="mono mt-2.5 block rounded-[10px] border border-edge bg-black/15 px-3 py-2 text-[11.5px] [overflow-wrap:anywhere]"
-          href={`https://etherscan.io/address/${r.safeAddress}`}
-          target="_blank"
-          rel="noopener"
-        >
-          {r.safeAddress}
-        </a>
+        {addressBox}
         <GovernedBy className="mt-1.5" />
         <p className="m-0 mt-2.5 small dim">
           Indexer sync: {syncState
@@ -446,28 +504,23 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
     body = (
       <>
         <p className="m-0 small dim">
-          Approve this initiative first, then deploy its donation Safe.
+          Approve this initiative first: approval assigns its donation address.
         </p>
         {attachForm}
       </>
     );
   } else {
+    // Approved without an address: the chain check failed at approval (or the
+    // predicted address is held by another initiative). The cron retries too.
     body = (
       <>
         <p className="m-0 small dim">
-          Deploys a {page.signers.threshold}-of-{page.signers.list.length}{" "}
-          Gnosis Safe owned by the operational signers. One transaction from your wallet; the app
-          verifies owners and threshold on-chain before showing the address to donors.
+          No donation address yet. It is the {page.signers.threshold}-of-{page.signers.list.length}
+          {" "}
+          Safe the operational signers' deploy lands on; assigning it checks that with the factory.
         </p>
-        <Button
-          variant="primary"
-          sm
-          className="mt-3 w-full"
-          loading={busy}
-          disabled={!isConnected}
-          onClick={deploy}
-        >
-          {isConnected ? "Deploy Safe" : "Connect a wallet to deploy"}
+        <Button variant="primary" sm className="mt-3 w-full" loading={busy} onClick={assign}>
+          Assign donation address
         </Button>
         {attachForm}
       </>

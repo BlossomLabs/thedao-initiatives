@@ -24,7 +24,14 @@ export interface Rfp {
   status: RfpStatus;
   type: RfpType;
   sortRank: number | null;
+  /** The donation Safe: assigned at approval as the CREATE2 address its deploy
+   * will land on (counterfactual), so donations open before it is deployed. */
   safeAddress: string;
+  /** The operational signers the address was computed from, frozen so the
+   * deploy calldata still reaches it after a signer rotation. */
+  safeSigners?: string[];
+  /** Unix seconds when code was first seen at safeAddress; unset = not yet. */
+  safeDeployedAt?: number;
   /** USD already paid out of the Safe to the team (admin-entered), so
    * "raised" = balance + paid out does not drop after a milestone payment.
    * Rows written before it lack the key; readers treat it as 0. */

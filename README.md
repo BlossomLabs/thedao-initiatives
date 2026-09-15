@@ -13,11 +13,14 @@ Then open http://127.0.0.1:4482 — admin panel at /admin, password in `.env`.
 
 ## How money flows
 
-- Every approved RFP gets its **own 3-of-5 Gnosis Safe**, deployed one-click
-  from the admin panel via the canonical Safe v1.4.1 factory. The server
+- Every approved RFP gets its **own 3-of-5 Gnosis Safe**. Its address is
+  assigned at approval: it is the CREATE2 address the canonical Safe v1.4.1
+  factory will put the Safe at, checked against the factory itself before
+  donors see it, so donations open before the deploy. The one-click deploy
+  from the admin panel (signed by the admin's wallet; the server holds no
+  keys and no funds) is needed before the first payout. The server
   re-verifies owners, threshold, singleton, and fallback handler on-chain
-  before it will show the address to donors. The server never holds funds
-  and has no keys; deploy transactions are signed by the admin's wallet.
+  once the Safe exists.
 - Donations are ERC-20 transfers (or plain ETH sends) straight from the
   donor's wallet to the RFP's Safe. Accepted tokens — USDC, USDT, DAI, USDS,
   crvUSD, BOLD, fxUSD, EURC, ZCHF — are re-verified against mainnet
@@ -37,7 +40,8 @@ Then open http://127.0.0.1:4482 — admin panel at /admin, password in `.env`.
 - `ONRAMP_API_KEY` + `ONRAMP_PROVIDER` (transak/moonpay) — card checkout tab
   that delivers USDC straight to the RFP's Safe.
 - `OPERATIONAL_SIGNERS` — the 5 checksummed addresses that own every RFP
-  Safe; Safe deployment stays disabled until set.
+  Safe; no Safe address is assigned until set. Each initiative freezes the
+  set it was assigned with, so rotating signers never moves an address.
 
 ## Tests
 

@@ -26,7 +26,10 @@ export interface Initiative {
   status: InitiativeStatus;
   type: InitiativeType;
   sortRank: number | null;
+  /** The donation Safe's address: assigned at approval (CREATE2, before any
+   * deploy), so it can take donations while `safeDeployed` is still false. */
   safeAddress: string;
+  safeDeployed: boolean;
   paidOutUsd: number;
   /** Wallet that submitted it ("" for imported initiatives). */
   proposer: string;
@@ -337,7 +340,9 @@ export type SafeDeployParams =
     calldata: string;
     signers: string[];
     threshold: number;
-    alreadyDeployed: string | null;
+    /** The assigned address the calldata deploys to, and whether it already has code. */
+    address: string;
+    deployed: boolean;
   }
   | { enabled: false; reason: string };
 

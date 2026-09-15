@@ -21,7 +21,7 @@ import { type Findings, isStructured } from "../../shared/draft/mod.ts";
 import { safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
 import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
-import { syncSafe } from "../services/safe-api.ts";
+import { activateSafe, assignSafe, syncSafe } from "../services/safe-api.ts";
 import { liveRoles } from "../services/roles.ts";
 import type { AdminEntry } from "../services/admins.ts";
 import type { Comment, Pledge, PledgeStatus, Rfp } from "../db/types.ts";
@@ -162,6 +162,14 @@ export function adminRoutes(deps: Deps) {
       }
       patch.paidOutUsd = Math.round(n * 100) / 100;
     }
+    // A Safe is assigned by the app (chain-checked); this can only unbind one.
+    if (body.safeAddress !== undefined) {
+      if (s(body.safeAddress, 64)) {
+        throw new HttpError(400, "The Safe address is assigned by the app; send blank to detach.");
+      }
+      patch.safeAddress = "";
+      patch.safeDeployedAt = 0;
+    }
     // Owner: the wallet shown publicly as "Proposed by". Address or ENS name; blank clears.
     if (body.proposer !== undefined) {
       const raw = s(body.proposer, 100);
@@ -264,8 +272,15 @@ export function adminRoutes(deps: Deps) {
   async function applyStatus(rfp: Rfp, action: string): Promise<Rfp> {
     const status = STATUS_ACTIONS[action];
     if (!status) throw new HttpError(400, "bad action");
-    if (status === "approved") return await db.rfps.unarchive(rfp.id);
-    return await db.rfps.update(rfp.id, { status });
+    if (status !== "approved") return await db.rfps.update(rfp.id, { status });
+    const approved = await db.rfps.unarchive(rfp.id);
+    // Its donation address is known now (CREATE2); a chain hiccup is retried by the cron.
+    try {
+      return await assignSafe(deps, approved);
+    } catch (e) {
+      deps.log?.(`safe ${approved.slug}: ${e instanceof Error ? e.message : String(e)}`);
+      return approved;
+    }
   }
 
   r.post("/initiatives/:id/status", async (c) => {
@@ -396,7 +411,9 @@ export function adminRoutes(deps: Deps) {
 
   r.post("/initiatives/:id/sync-donations", async (c) => {
     const rfp = await rfpOr404(c.req.param("id"), true);
-    if (!rfp.safeAddress) throw new HttpError(400, "no Safe deployed");
+    if (!(await activateSafe(deps, rfp).catch(() => null))) {
+      throw new HttpError(400, "the Safe is not deployed yet");
+    }
     if (!(await db.rateLimit("safesync:" + rfp.id, 1, 60))) {
       throw new HttpError(429, "synced less than a minute ago");
     }
@@ -404,28 +421,40 @@ export function adminRoutes(deps: Deps) {
   });
 
   r.get("/initiatives/:id/safe-deploy-params", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"), true);
-    const [ok, why] = signersConfigured(config.operationalSigners);
-    if (!ok) return c.json({ enabled: false, reason: why }, 503);
+    let rfp = await rfpOr404(c.req.param("id"), true);
+    if (!rfp.safeAddress) {
+      const [ok, why] = signersConfigured(config.operationalSigners);
+      if (!ok) return c.json({ enabled: false, reason: why }, 503);
+      try {
+        rfp = await assignSafe(deps, rfp);
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : String(e);
+        return c.json({ enabled: false, reason }, 503);
+      }
+    }
+    // The snapshot, not the live config: the deploy must land on the assigned address.
+    const signers = rfp.safeSigners ?? config.operationalSigners;
     return c.json({
       enabled: true,
       chainId: CHAIN_ID,
       factory: SAFE_PROXY_FACTORY,
-      calldata: safeDeployCalldata(config.operationalSigners, rfp.safeDeploymentKey ?? rfp.slug),
-      signers: config.operationalSigners,
+      calldata: safeDeployCalldata(signers, rfp.safeDeploymentKey ?? rfp.slug),
+      signers,
       threshold: SAFE_THRESHOLD,
-      alreadyDeployed: rfp.safeAddress || null,
+      address: rfp.safeAddress,
+      deployed: Boolean(rfp.safeDeployedAt),
     });
   });
 
-  /** Verify a deploy tx on-chain, then store the verified Safe address. */
   /**
-   * Bind a Safe to the initiative: either the tx hash of a deploy made from
-   * the admin panel, or the address of a Safe that already exists. Both go
-   * through the same on-chain check (owners, threshold, canonical proxy).
+   * Record the Safe as deployed. With a tx hash (the admin panel's deploy):
+   * the truth is code at the assigned address, not the hash, since a Safe
+   * wallet or a sped-up tx mines under another hash; the hash only serves
+   * to report a revert. With an address: bind a Safe that already exists,
+   * after the same on-chain check (owners, threshold, canonical proxy).
    */
   r.post("/initiatives/:id/safe-confirm", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"), true);
+    let rfp = await rfpOr404(c.req.param("id"), true);
     const body = await jsonBody(c);
     let address: string;
     if (s(body.address, 64)) {
@@ -439,15 +468,22 @@ export function adminRoutes(deps: Deps) {
       if (!TX_HASH_RE.test(tx)) {
         return c.json({ status: "error", detail: "malformed tx hash" }, 400);
       }
-      const [found, err] = await chain.extractDeployedSafe(tx);
-      if (err === "pending") {
-        return c.json({
-          status: "pending",
-          detail: "waiting for the deploy tx to be mined",
-        });
+      const fail = (e: unknown) =>
+        c.json({ status: "error", detail: e instanceof Error ? e.message : String(e) }, 400);
+      try {
+        rfp = await assignSafe(deps, rfp);
+        const detail = await activateSafe(deps, rfp);
+        if (detail) return c.json({ status: "ok", address: rfp.safeAddress, detail });
+      } catch (e) {
+        return fail(e);
       }
-      if (err) return c.json({ status: "error", detail: err }, 400);
-      address = found!;
+      // Nothing at the address yet: is the tx still on its way, or did it fail?
+      const [found, err] = await chain.extractDeployedSafe(tx);
+      const landing = found?.toLowerCase() === rfp.safeAddress.toLowerCase();
+      if (err === "pending" || landing) {
+        return c.json({ status: "pending", detail: "waiting for the deploy tx to be mined" });
+      }
+      return fail(`${err ?? `it created ${found}`}; no Safe at ${rfp.safeAddress} yet`);
     }
     const [ok, detail] = await chain.verifySafe(address, config.operationalSigners);
     if (!ok) {
@@ -469,7 +505,11 @@ export function adminRoutes(deps: Deps) {
         detail: `that Safe is already assigned to another initiative (${other.slug})`,
       }, 409);
     }
-    if (!rfp.safeAddress) await db.rfps.update(rfp.id, { safeAddress: address });
+    await db.rfps.update(rfp.id, {
+      safeAddress: address,
+      safeSigners: config.operationalSigners,
+      safeDeployedAt: rfp.safeDeployedAt || deps.now(),
+    });
     return c.json({ status: "ok", address, detail });
   });
 

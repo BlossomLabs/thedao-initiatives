@@ -7,6 +7,7 @@ import { verifySiwe } from "../chain/siwe.ts";
 import { selfOrigin } from "../lib/origin.ts";
 import { MAX_CONTRACT_SIGNATURE_BYTES } from "../chain/sign.ts";
 import { pfpUrl } from "../lib/json.ts";
+import { clearSessionCookie, setSessionCookie } from "../lib/session-cookie.ts";
 import {
   CHAIN_ID,
   LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL,
@@ -61,12 +62,17 @@ export function authRoutes(deps: Deps) {
     }
     const isAdmin = await deps.admins.isAdmin(m.address);
     const { token, session } = await db.sessions.create(m.address, isAdmin);
-    return c.json({
-      token,
-      address: session.address,
-      isAdmin,
-      expiresAt: session.expiresAt,
-    });
+    const info = { address: session.address, isAdmin, expiresAt: session.expiresAt };
+    // The browser asks for the cookie and never sees the token; scripts get
+    // it in the body and send it back as a bearer.
+    if (body.cookie === true) {
+      c.header(
+        "Set-Cookie",
+        setSessionCookie(c.req.raw, config, token, session.expiresAt - deps.now()),
+      );
+      return c.json(info);
+    }
+    return c.json({ token, ...info });
   });
 
   r.get("/me", requireAuth, async (c) => {
@@ -82,13 +88,31 @@ export function authRoutes(deps: Deps) {
     });
   });
 
+  /**
+   * One-time migration for sessions minted before the cookie existed: the
+   * browser presents its stored bearer once, gets the same session back as the
+   * HttpOnly cookie, and forgets the token. Same expiry, nothing new minted.
+   * Remove once every pre-cookie session has expired (SESSION_TTL_SECS after
+   * the deploy that introduced the cookie, 2026-09-15).
+   */
+  r.post("/cookie", requireAuth, (c) => {
+    const u = c.var.user!;
+    c.header(
+      "Set-Cookie",
+      setSessionCookie(c.req.raw, config, c.var.token, u.expiresAt - deps.now()),
+    );
+    return c.json({ address: u.address, isAdmin: u.isAdmin, expiresAt: u.expiresAt });
+  });
+
   r.post("/logout", requireAuth, async (c) => {
     await db.sessions.revoke(c.var.token);
+    c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
     return c.json({ ok: true });
   });
 
   r.post("/logout-all", requireAuth, async (c) => {
     const n = await db.sessions.revokeAll(c.var.user!.address);
+    c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
     return c.json({ ok: true, revoked: n });
   });
 

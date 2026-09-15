@@ -1,5 +1,9 @@
 /**
- * SIWE session: one signature per session, stored as a bearer token.
+ * SIWE session: one signature per session. The token itself lives in an
+ * HttpOnly cookie the API sets on verify (`cookie: true`), so no script on the
+ * page can read it; localStorage only remembers who is signed in
+ * ({address, isAdmin, expiresAt}) and that record is checked against
+ * /api/auth/me once per load, so a cookie that is gone clears it.
  * Connecting a wallet and signing in are one step (connect()): the signature
  * request opens right after the wallet connects, and a refused or dismissed
  * signature disconnects the wallet again, so a connected address is always a
@@ -18,10 +22,15 @@ import {
 } from "react";
 import { type Connector, useAccount, useConnect, useDisconnect, useSignMessage } from "wagmi";
 import { createSiweMessage } from "viem/siwe";
-import { api, ApiError, setTokenProvider } from "~/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { api, ApiError } from "~/lib/api";
 import type { Me, SessionInfo } from "~/lib/api-types";
+import { migrateLegacySession, SESSION_KEY as KEY } from "~/lib/session-migration";
 
-const KEY = "thedao:session";
+/** Identifies a sign-in (a new one gets a new expiry), for effects and query
+ * keys that must react to "someone else is signed in now". */
+export const sessionKey = (s: SessionInfo | null | undefined): string | null =>
+  s ? `${s.address.toLowerCase()}:${s.expiresAt}` : null;
 
 /** Dev-only fake wallet: it cannot sign, so it connects without a session. */
 const skipsSignIn = (c: Connector | undefined) => c?.id === "mock";
@@ -29,8 +38,11 @@ const skipsSignIn = (c: Connector | undefined) => c?.id === "mock";
 function load(): SessionInfo | null {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "null") as SessionInfo | null;
-    if (!s || typeof s.token !== "string" || s.expiresAt * 1000 < Date.now()) return null;
-    return s;
+    if (
+      !s || typeof s.address !== "string" || typeof s.expiresAt !== "number" ||
+      s.expiresAt * 1000 < Date.now()
+    ) return null;
+    return { address: s.address, isAdmin: Boolean(s.isAdmin), expiresAt: s.expiresAt };
   } catch {
     return null;
   }
@@ -78,7 +90,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   );
   // Prerendered pages were built signed out. Show consumers the stored
   // session only after hydration so their first render matches that HTML;
-  // requests still carry the token from the first one (sessionRef below).
+  // requests carry the cookie regardless.
   const hydrated = useHydrated();
   const session = hydrated ? stored : null;
   const [me, setMe] = useState<Me | null>(null);
@@ -86,15 +98,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [connecting, setConnecting] = useState(false);
   const sessionRef = useRef(stored);
   sessionRef.current = stored;
-  // Registered during render, not in an effect: child queries fire their first
-  // request before a parent effect would run, and must already carry the bearer.
-  setTokenProvider(() => sessionRef.current?.token ?? null);
 
   const clear = useCallback(() => {
     setSession(null);
     setMe(null);
     save(null);
   }, []);
+  // Forget the session here and end it on the API too (clearing the cookie),
+  // so a browser whose wallet moved on does not keep acting as the old address.
+  const drop = useCallback(() => {
+    void api("/api/auth/logout", { method: "POST" }).catch(() => {});
+    clear();
+  }, [clear]);
 
   const refreshMe = useCallback(async () => {
     const s = sessionRef.current;
@@ -103,10 +118,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const m = await api<Me>("/api/auth/me", { token: s.token });
+      const m = await api<Me>("/api/auth/me");
       setMe(m);
       // The admin flag follows the API's current admin list, not sign-in time.
-      if (m.isAdmin !== s.isAdmin && sessionRef.current?.token === s.token) {
+      if (m.isAdmin !== s.isAdmin && sessionKey(sessionRef.current) === sessionKey(s)) {
         const next = { ...s, isAdmin: m.isAdmin };
         setSession(next);
         save(next);
@@ -119,9 +134,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // Validate the stored session once; drop it when the wallet moves. wagmi
   // (ssr mode) mounts as "disconnected" and only then reconnects, so a
   // disconnect counts as settled once a reconnect attempt has been seen.
+  // A record from before the cookie (it still carries the bearer) is first
+  // exchanged for the cookie, so nobody signed in at the switch is signed out;
+  // queries that already ran without the cookie are then refetched.
+  const qc = useQueryClient();
   useEffect(() => {
-    void refreshMe();
-  }, [refreshMe]);
+    void (async () => {
+      const r = await migrateLegacySession(localStorage);
+      if (r.kind === "migrated") {
+        sessionRef.current = r.session;
+        setSession(r.session);
+        await qc.invalidateQueries();
+      } else if (r.kind === "cleared") clear();
+      await refreshMe();
+    })();
+  }, [refreshMe, clear, qc]);
   const walletLive = useRef(false);
   useEffect(() => {
     if (status !== "disconnected") walletLive.current = true;
@@ -131,16 +158,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       (status === "disconnected" && walletLive.current) ||
       (address && address.toLowerCase() !== s.address.toLowerCase())
     ) {
-      clear();
+      drop();
     }
-  }, [address, status, clear]);
+  }, [address, status, drop]);
 
   const signIn = useCallback(
     async (account: `0x${string}` | undefined = address): Promise<SessionInfo> => {
       if (!account) throw new Error("Connect a wallet first.");
       setSigningIn(true);
       try {
-        const { nonce } = await api<{ nonce: string }>("/api/auth/nonce", { token: null });
+        const { nonce } = await api<{ nonce: string }>("/api/auth/nonce");
         const message = createSiweMessage({
           domain: globalThis.location.host,
           address: account,
@@ -152,9 +179,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           issuedAt: new Date(),
         });
         const signature = await signMessageAsync({ message, account });
+        // cookie: true -> the token comes back as an HttpOnly cookie, not in the body.
         const s = await api<SessionInfo>("/api/auth/verify", {
-          json: { message, signature },
-          token: null,
+          json: { message, signature, cookie: true },
         });
         setSession(s);
         save(s);
@@ -172,7 +199,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const s = sessionRef.current;
     if (s) {
       try {
-        await api("/api/auth/logout", { method: "POST", token: s.token });
+        await api("/api/auth/logout", { method: "POST" });
       } catch { /* already gone */ }
     }
     clear();

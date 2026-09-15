@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import { api } from "~/lib/api";
 import type { Board, InitiativePage } from "~/lib/api-types";
-import { useSession } from "~/context/session";
+import { sessionKey, useSession } from "~/context/session";
 import { boardKey } from "./use-board";
 
 export const initiativeKey = (slug: string) => ["initiative", slug] as const;
@@ -34,13 +34,13 @@ export function useInitiative(slug: string) {
   // What the API answers depends on who asks (a pending initiative is only
   // visible to its proposer and admins, archived revisions only to admins),
   // so a sign-in or sign-out refetches the page.
-  const token = useSession().session?.token ?? null;
-  const seen = useRef(token);
+  const who = sessionKey(useSession().session);
+  const seen = useRef(who);
   useEffect(() => {
-    if (seen.current === token) return;
-    seen.current = token;
+    if (seen.current === who) return;
+    seen.current = who;
     void qc.invalidateQueries({ queryKey: initiativeKey(slug) });
-  }, [token, slug, qc]);
+  }, [who, slug, qc]);
   return useQuery({
     queryKey: initiativeKey(slug),
     queryFn: () => fetchPage(slug),

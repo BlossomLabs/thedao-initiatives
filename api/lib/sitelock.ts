@@ -2,13 +2,15 @@
  * Private-preview gate shared by the API middleware and the static server.
  *
  * HTTP Basic Auth unlocks the site; a stateless HMAC cookie keeps it unlocked
- * so the browser's `Authorization: Bearer` calls (which can never carry Basic
- * credentials as well) keep working. A live bearer session also passes, since
- * it could only have been created by someone who was already let in: that is
- * what keeps the token-based dev scripts working.
+ * so the browser's later API calls (which can never carry Basic credentials as
+ * well) keep working. A live session also passes, whether it arrives as the
+ * browser's session cookie or as a bearer, since it could only have been
+ * created by someone who was already let in: that is what keeps a signed-in
+ * browser and the token-based dev scripts working.
  */
 import { encodeHex } from "@std/encoding";
 import type { Config } from "../config.ts";
+import { readCookie, readSessionCookie } from "./session-cookie.ts";
 
 export type LockVerdict = "open" | "basic" | "cookie" | "session" | "denied";
 
@@ -34,16 +36,8 @@ function same(a: string, b: string): boolean {
   return d === 0;
 }
 
-function readCookie(header: string | null, name: string): string {
-  for (const part of (header ?? "").split(";")) {
-    const i = part.indexOf("=");
-    if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim();
-  }
-  return "";
-}
-
 export function createSiteLock(
-  config: Pick<Config, "siteUsername" | "sitePassword">,
+  config: Pick<Config, "siteUsername" | "sitePassword" | "trustProxy">,
   hasSession: (token: string) => Promise<boolean>,
 ): SiteLock {
   const user = config.siteUsername;
@@ -78,7 +72,8 @@ export function createSiteLock(
     }
     const ck = readCookie(req.headers.get("cookie"), LOCK_COOKIE);
     if (ck && same(ck, await cookieValue())) return "cookie";
-    const token = /^Bearer\s+(.+)$/i.exec(h)?.[1]?.trim();
+    const token = /^Bearer\s+(.+)$/i.exec(h)?.[1]?.trim() ||
+      readSessionCookie(req, config);
     if (token && await hasSession(token)) return "session";
     return "denied";
   }

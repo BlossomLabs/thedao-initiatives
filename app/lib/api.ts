@@ -1,4 +1,8 @@
-/** Typed fetch client for the RFP board API. */
+/** Typed fetch client for the RFP board API.
+ *
+ * The session travels as an HttpOnly cookie set by `POST /api/auth/verify`
+ * (see context/session.tsx), so nothing here ever holds a token: every call
+ * just sends credentials. */
 /** Same origin by default (the site server hosts the API under /api; the dev
  * server proxies it). Set VITE_API_URL only to point at a remote API. */
 export const API_URL = ((import.meta.env?.VITE_API_URL as string | undefined) ?? "").replace(
@@ -12,24 +16,15 @@ export class ApiError extends Error {
   }
 }
 
-let tokenProvider: () => string | null = () => null;
-/** Registered by the session context so every call carries the bearer. */
-export function setTokenProvider(fn: () => string | null) {
-  tokenProvider = fn;
-}
-
 export interface ApiOptions {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   json?: unknown;
   form?: FormData;
-  token?: string | null;
   signal?: AbortSignal;
 }
 
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const headers = new Headers();
-  const token = opts.token === undefined ? tokenProvider() : opts.token;
-  if (token) headers.set("Authorization", "Bearer " + token);
   let body: BodyInit | undefined;
   if (opts.json !== undefined) {
     headers.set("Content-Type", "application/json");
@@ -39,6 +34,9 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     method: opts.method ?? (body ? "POST" : "GET"),
     headers,
     body,
+    // "include" rather than the default "same-origin" so a build pointed at a
+    // remote VITE_API_URL still sends the session cookie.
+    credentials: "include",
     signal: opts.signal,
   });
   const text = await res.text();
@@ -64,12 +62,9 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
 export const errorMessage = (e: unknown): string =>
   e instanceof Error ? e.message : typeof e === "string" ? e : "Something went wrong.";
 
-/** A non-JSON GET with the bearer (markdown exports). Throws ApiError on failure. */
+/** A non-JSON GET with the session (markdown exports). Throws ApiError on failure. */
 export async function apiText(path: string): Promise<string> {
-  const headers = new Headers();
-  const token = tokenProvider();
-  if (token) headers.set("Authorization", "Bearer " + token);
-  const res = await fetch(API_URL + path, { headers });
+  const res = await fetch(API_URL + path, { credentials: "include" });
   if (!res.ok) {
     let msg = res.statusText || "Request failed";
     try {

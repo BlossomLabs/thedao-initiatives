@@ -17,10 +17,13 @@ at the repository root until 2026-09-15 (see `docs/v1-to-v2.md`). `../server.ts`
 
 - **Sign-In with Ethereum** (EIP-4361) is the only auth. EOA signatures are recovered locally; when
   that fails the message address is asked via EIP-1271 (one `eth_call`), so Safes and smart wallets
-  can sign in too. `GET /api/auth/nonce`, sign the message, `POST /api/auth/verify` → bearer token.
-  One signature per session instead of one per comment/vote/nickname. A session whose address is in
-  `ADMIN_ADDRESSES` is an admin session. No password. The only cookie is the private-preview unlock
-  (below).
+  can sign in too. `GET /api/auth/nonce`, sign the message, `POST /api/auth/verify` → a session
+  token, either as an HttpOnly cookie (the browser sends `cookie: true`) or in the JSON body as a
+  bearer (scripts). One signature per session instead of one per comment/vote/nickname. A session
+  whose address is in `ADMIN_ADDRESSES` is an admin session. No password. The cookies are the
+  session (`lib/session-cookie.ts`) and the private-preview unlock (below). `POST /api/auth/cookie`
+  (bearer in, same session back as the cookie) migrates records stored before 2026-09-15; remove it,
+  `app/lib/session-migration.ts` and its call in `app/context/session.tsx` a week after that deploy.
 - **"Raised" is the Safe's balance.** `services/funding.ts` reads every accepted token's `balanceOf`
   and the ETH balance of an initiative's Safe over RPC, prices them with the Chainlink feeds, adds
   the admin-entered `paidOutUsd`, and caches the result 15 s per Safe. The number moves as soon as a
@@ -140,8 +143,12 @@ comment `email`) only appear in admin responses.
 
 ## SIWE from the frontend
 
+The token is an opaque random string, stored hashed in KV (7 days, 12 h for admins). The browser
+never sees it: with `cookie: true` the verify response carries it in an HttpOnly cookie and the body
+is just `{address, isAdmin, expiresAt}`.
+
 ```js
-const { nonce } = await (await fetch(API + "/api/auth/nonce")).json();
+const { nonce } = await (await fetch(API + "/api/auth/nonce", { credentials: "include" })).json();
 const message = createSiweMessage({
   address,
   chainId: 1,
@@ -152,13 +159,24 @@ const message = createSiweMessage({
   statement: "Sign in to TheDAO Security Fund",
 });
 const signature = await walletClient.signMessage({ account: address, message });
-const { token } = await (await fetch(API + "/api/auth/verify", {
+const { address: who, isAdmin, expiresAt } = await (await fetch(API + "/api/auth/verify", {
   method: "POST",
+  credentials: "include",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ message, signature }),
+  body: JSON.stringify({ message, signature, cookie: true }),
 })).json();
-// then: Authorization: Bearer <token>
+// then: every fetch with credentials: "include"; POST /api/auth/logout clears the cookie
 ```
+
+The cookie is `__Host-session` with `Secure` when the request came over https (with `TRUST_PROXY`
+the proxy's `X-Forwarded-Proto` decides), else plain `session` so local http dev works; always
+`HttpOnly; SameSite=Lax; Path=/; Max-Age=<ttl>`. Cross-site writes are refused by the Origin
+allow-list (`middleware/headers.ts`), and CORS is the same allow-list with credentials.
+
+Scripts and other non-browser clients leave `cookie` out and get
+`{token, address, isAdmin,
+expiresAt}` back; they send `Authorization: Bearer <token>` (that is what
+`scripts/lib.ts` does). A bearer, when present, wins over the cookie.
 
 `domain` must be in `SIWE_DOMAINS` and `uri`'s origin in the allowed origins (`WEB_ORIGIN`, or
 `VITE_SITE_URL`'s origin when that is unset).

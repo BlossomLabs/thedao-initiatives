@@ -98,7 +98,7 @@ export function useDonation(
       return;
     }
     pollTimer.current = globalThis.setTimeout(() => {
-      api<DonateResult>(`/api/donate/status/${txHash}`, { token: null })
+      api<DonateResult>(`/api/donate/status/${txHash}`)
         .then((r) => handle(txHash, r, attempt + 1))
         .catch(() =>
           handle(
@@ -129,7 +129,7 @@ export function useDonation(
     const json = { initiativeId, slug, txHash, ...(terms ? { terms } : {}) };
     for (let attempt = 0;; attempt++) {
       try {
-        handle(txHash, await api<DonateResult>("/api/donate/confirm", { json, token: null }), 0);
+        handle(txHash, await api<DonateResult>("/api/donate/confirm", { json }), 0);
         return;
       } catch (e) {
         if (e instanceof ApiError && e.status < 500) {

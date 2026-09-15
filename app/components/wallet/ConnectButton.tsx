@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Wallet } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAccount } from "wagmi";
-import { useSession } from "~/context/session";
+import { sessionKey, useSession } from "~/context/session";
 import { useProfileDialog } from "~/context/profile-dialog";
 import { useEmailSignIn } from "~/context/email-sign-in";
 import { useConnectors } from "~/hooks/use-connectors";
@@ -49,15 +49,15 @@ export default function ConnectButton() {
   }, [isConnected]);
   // Set on a fresh sign-in; consumed once the identity lookups have settled.
   const [promptPending, setPromptPending] = useState(false);
-  const lastToken = useRef(session?.token);
+  const who = sessionKey(session);
+  const lastKey = useRef(who);
 
   // Detect a sign-in made in this page (a stored session on reload is not one).
   // Skipped while the dialog itself triggered the sign-in on save.
   useEffect(() => {
-    const token = session?.token;
-    if (token && token !== lastToken.current && !profileOpen) setPromptPending(true);
-    lastToken.current = token;
-  }, [session?.token, profileOpen]);
+    if (who && who !== lastKey.current && !profileOpen) setPromptPending(true);
+    lastKey.current = who;
+  }, [who, profileOpen]);
 
   // Once signed in: if ENS and the site profile still leave the name or the
   // picture unset, offer to complete them.

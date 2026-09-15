@@ -23,7 +23,6 @@ export default function AiSearch({ onMatches }: { onMatches: (ids: string[] | nu
     try {
       const { matches } = await api<{ matches: string[] }>("/api/ai-search", {
         json: { query },
-        token: null,
       });
       onMatches(matches);
       setNote(

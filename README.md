@@ -94,8 +94,14 @@ id the donor saw (see `api/README.md`).
 
 wagmi + viem: injected wallets (EIP-6963), WalletConnect when `VITE_WALLETCONNECT_PROJECT_ID` is
 set, and "Email" when `VITE_PRIVY_APP_ID` is set. Sign-In with Ethereum happens only when an action
-needs it (vote, reply, name, admin): nonce → `createSiweMessage` → `personal_sign` → bearer token in
-`localStorage` (`thedao:session`). See `app/context/session.tsx`.
+needs it (vote, reply, name, admin): nonce → `createSiweMessage` → `personal_sign` →
+`POST /api/auth/verify` with `cookie: true`, which answers with the session in an HttpOnly cookie
+(`__Host-session` over https, `session` on plain-http dev; `SameSite=Lax`, `Path=/`) and no token
+in the body, so no script on the page can read it. `localStorage` (`thedao:session`) only keeps
+`{address, isAdmin, expiresAt}` to know who is signed in, and that record is checked against
+`/api/auth/me` once per load and dropped on a 401. Every API call sends the cookie
+(`credentials: "include"`); state-changing calls are also gated by the Origin allow-list. Scripts
+keep the bearer instead (`api/README.md`). See `app/context/session.tsx`.
 
 Email sign-in is [Privy](https://docs.privy.io) used headless: our own dialog
 (`app/components/wallet/EmailSignInDialog.tsx`) sends and checks the one-time code, Privy creates an

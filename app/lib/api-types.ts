@@ -262,8 +262,8 @@ export interface HeldMine {
   createdAt: number;
 }
 
+/** What the browser keeps of a session (the token itself is an HttpOnly cookie). */
 export interface SessionInfo {
-  token: string;
   address: string;
   isAdmin: boolean;
   expiresAt: number;

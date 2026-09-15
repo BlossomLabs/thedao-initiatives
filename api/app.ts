@@ -44,6 +44,7 @@ export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
       origin: deps.config.webOrigins,
       allowHeaders: ["Authorization", "Content-Type"],
       allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+      credentials: true,
       maxAge: 600,
     }),
   );
@@ -51,7 +52,7 @@ export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
   app.use("*", clientIp(deps.config.trustProxy));
   app.use("*", originGuard(deps.config));
   app.use("*", bodyLimit({ maxSize: 2 * 1024 * 1024 }));
-  app.use("*", sessionLoader(deps.db, deps.admins));
+  app.use("*", sessionLoader(deps.db, deps.admins, deps.config));
 
   app.route("/healthz", healthRoutes(deps));
   app.route("/api/auth", authRoutes(deps));

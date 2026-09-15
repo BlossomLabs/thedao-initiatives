@@ -7,6 +7,7 @@ import CommentsSection from "./CommentsSection";
 vi.mock("wagmi", () => ({ useAccount: () => ({ isConnected: false }) }));
 vi.mock("~/context/session", () => ({
   useSession: () => ({ session: null, requireSession: vi.fn() }),
+  sessionKey: () => null,
 }));
 vi.mock("~/lib/api", () => ({ api: vi.fn() }));
 vi.mock("./EntryCard", () => ({ default: () => null }));

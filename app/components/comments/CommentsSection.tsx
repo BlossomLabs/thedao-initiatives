@@ -4,7 +4,7 @@ import { MessageSquare } from "lucide-react";
 import { useAccount } from "wagmi";
 import SectionHeading from "~/components/layout/SectionHeading";
 import { QaChip } from "~/components/ui/Badge";
-import { useSession } from "~/context/session";
+import { sessionKey, useSession } from "~/context/session";
 import type { CommentEntry, CommentsResponse } from "~/lib/api-types";
 import { myClaimTokens, rememberClaimToken } from "~/lib/claims";
 import { cn } from "~/lib/utils";
@@ -32,8 +32,7 @@ export default function CommentsSection({ initiativeId, slug, open }: {
   const { session, requireSession } = useSession();
   const { isConnected } = useAccount();
   const qc = useQueryClient();
-  const token = session?.token ?? null;
-  const key = commentsKey(slug, token, initiativeId);
+  const key = commentsKey(slug, sessionKey(session), initiativeId);
   const q = useQuery({ queryKey: key, queryFn: () => fetchComments(slug) });
   const [tokens, setTokens] = useState<string[]>(
     () => (typeof localStorage === "undefined" ? [] : myClaimTokens()),
@@ -74,11 +73,12 @@ export default function CommentsSection({ initiativeId, slug, open }: {
       entries: d.entries.map((e) => (e.id === id ? { ...e, votes: r.votes, myvote: r.myvote } : e)),
     }));
   };
-  // A connected wallet replies signed in (connecting signs in); otherwise the
-  // reply carries a name, like an anonymous top-level post.
+  // A connected wallet replies signed in (connecting signs in; the session
+  // cookie does the rest); otherwise the reply carries a name, like an
+  // anonymous top-level post.
   const onReply = async (id: string, body: string, name: string) => {
-    const token = isConnected ? (await requireSession()).token : null;
-    const r = await reply(id, body, name, token);
+    if (isConnected) await requireSession();
+    const r = await reply(id, body, name);
     if (r.claimToken) {
       rememberClaimToken(r.claimToken);
       setTokens(myClaimTokens());
@@ -112,12 +112,10 @@ export default function CommentsSection({ initiativeId, slug, open }: {
     body: string,
     name: string,
     website: string,
-    signedIn: boolean,
   ): Promise<string | null> => {
     const r = await postComment(
       slug,
       { initiativeId, type: "other", topic: "", body, name, email: "", website },
-      signedIn ? token : null,
     );
     if (r.status === "published" && r.entry) {
       const entry: CommentEntry = r.entry;

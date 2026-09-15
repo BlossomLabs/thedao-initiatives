@@ -29,13 +29,11 @@ it("binds confirmations to the displayed ID even when two proposals share a slug
     }), { initialProps: { initiativeId: "original-id" } });
   await act(() => result.current.confirmTx("original-tx"));
   expect(api).toHaveBeenLastCalledWith("/api/donate/confirm", {
-    token: null,
     json: { initiativeId: "original-id", slug: "reused-slug", txHash: "original-tx" },
   });
   rerender({ initiativeId: "replacement-id" });
   await act(() => result.current.confirmTx("replacement-tx"));
   expect(api).toHaveBeenLastCalledWith("/api/donate/confirm", {
-    token: null,
     json: { initiativeId: "replacement-id", slug: "reused-slug", txHash: "replacement-tx" },
   });
 });

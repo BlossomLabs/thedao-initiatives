@@ -5,7 +5,7 @@
  * live checks. Errors never disable the button: pressing it paints them.
  */
 import StickyAside from "~/components/layout/StickyAside";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { Lock, Send } from "lucide-react";
 import { type CheckScope, type Findings, SECTIONS } from "@shared/draft/mod";
 import RulesPanel from "~/components/initiative/RulesPanel";
@@ -117,21 +117,24 @@ export default function InitiativeForm({
 }: InitiativeFormProps) {
   const { draft, actions, reset } = useDraft(initial);
   const [submitted, setSubmitted] = useState(false);
-  const [serverFindings, setServerFindings] = useState<Findings | null>(null);
-  const [alert, setAlert] = useState("");
+  const [serverFeedback, setServerFeedback] = useState<
+    {
+      draft: Draft;
+      findings: Findings | null;
+      alert: string;
+    } | null
+  >(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [website, setWebsite] = useState("");
 
-  const checks = useChecks(draft, { submitted, serverFindings, scope });
+  // Findings and alerts describe only the submitted draft, including when
+  // a response arrives after the user has already edited it.
+  const feedback = serverFeedback?.draft === draft ? serverFeedback : null;
+  const alert = feedback?.alert;
+  const checks = useChecks(draft, { submitted, serverFindings: feedback?.findings, scope });
   const autosave = useAutosave(draft, { key: autosaveKey, onRestore: actions.replace });
-
-  // the server's findings describe the draft as it was posted
-  const lastPosted = useRef<Draft | null>(null);
-  useEffect(() => {
-    if (serverFindings && lastPosted.current !== draft) setServerFindings(null);
-  }, [draft, serverFindings]);
 
   const jump = useCallback((field: string) => {
     setPreviewing(false);
@@ -142,7 +145,7 @@ export default function InitiativeForm({
     e.preventDefault();
     if (busy) return;
     setSubmitted(true);
-    setAlert("");
+    setServerFeedback(null);
     const res = runChecks(draft, scope);
     if (res.errors.length && enforce) {
       setFailed(true);
@@ -161,16 +164,13 @@ export default function InitiativeForm({
       setFailed(false);
       if (hasFindings(open)) {
         // saved, with open points: painted like the server's, no alert
-        lastPosted.current = draft;
-        setServerFindings(open);
-      } else setServerFindings(null);
+        setServerFeedback({ draft, findings: open, alert: "" });
+      }
     } catch (err) {
       const findings = findingsOf(err);
       setFailed(true);
+      setServerFeedback({ draft, findings, alert: errorMessage(err) });
       if (findings) {
-        lastPosted.current = draft;
-        setServerFindings(findings);
-        setAlert(errorMessage(err));
         const first = firstOnPage(
           findings.errors.map((x) => paintField(x.field)).filter(Boolean),
         );
@@ -178,7 +178,6 @@ export default function InitiativeForm({
           if (!first || !focusField(first)) globalThis.scrollTo?.({ top: 0, behavior: "smooth" });
         }, 0);
       } else {
-        setAlert(errorMessage(err));
         globalThis.scrollTo?.({ top: 0, behavior: "smooth" });
       }
     } finally {

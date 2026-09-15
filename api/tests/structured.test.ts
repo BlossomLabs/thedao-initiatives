@@ -181,9 +181,42 @@ Deno.test("submit: rejected proposals still block the same text", async () => {
   assertEquals(body.findings.errors.map((e) => e.field), [""]);
   assertStringIncludes(
     body.findings.errors[0].msg,
-    'This exact text is already submitted ("A proper initiative title"). Edit it before submitting again.',
+    'The section text and milestone names and criteria match an existing submission ("A proper initiative title"). Revise that content before submitting again; changing only the title does not make it a new submission.',
   );
   h.close();
+});
+
+Deno.test("submit: renaming a duplicate explains the match; revising its section text permits submission", async () => {
+  const h = await harness();
+  try {
+    const token = await proposerToken(h);
+    const original = {
+      ...minimalSubmission(1000),
+      title: "Open Source Ethereum Security Monitor",
+    };
+    assertEquals((await submit(h, token, original)).status, 201);
+
+    const renamed = { ...original, title: "Ethereum Security Monitor - test" };
+    const duplicate = await submit(h, token, renamed);
+    assertEquals(duplicate.status, 400);
+    const { findings } = await j(duplicate) as unknown as Fail;
+    assertEquals(fields(findings.errors), [""]);
+    assertStringIncludes(findings.errors[0].msg, original.title);
+    assertStringIncludes(findings.errors[0].msg, "section text and milestone names and criteria");
+    assertStringIncludes(findings.errors[0].msg, "changing only the title");
+    assertEquals((await h.db.rfps.list(["pending"])).length, 1);
+
+    const revised = await submit(h, token, {
+      ...renamed,
+      sections: { ...renamed.sections, why: "A revised reason for funding this security monitor." },
+    });
+    assertEquals(revised.status, 201);
+    const { slug } = await j(revised) as { slug: string };
+    assertEquals((await h.db.rfps.bySlug(slug))!.title, renamed.title);
+    assertEquals((await h.db.rfps.list(["pending"])).length, 2);
+  } finally {
+    h.close();
+  }
 });
 
 Deno.test("submit: links must be https; the body has a byte cap", async () => {

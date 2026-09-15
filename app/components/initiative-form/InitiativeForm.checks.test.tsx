@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import InitiativeForm from "./InitiativeForm";
 import type { Draft } from "./types";
 import { emptyCriterion, emptyDraft } from "./useDraft";
@@ -123,5 +123,73 @@ describe("InitiativeForm checks", () => {
     await waitFor(() =>
       expect(document.getElementById("f-ms_0_amount")).not.toHaveClass("has-error")
     );
+    expect(screen.queryByText("This exact text is already submitted.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["title", "Ethereum Security Monitor - test"],
+    ["why", "An updated reason to fund this work"],
+    ["ms_0_c0", "A revised criterion a reviewer can check"],
+  ])(
+    "clears duplicate feedback after editing %s and submits the updated draft",
+    async (field, value) => {
+      const duplicate =
+        'This exact text is already submitted ("Open Source Ethereum Security Monitor"). Edit it before submitting again.';
+      const onSubmit = vi.fn(async () => {}).mockRejectedValueOnce(
+        new ApiError(400, "Please fix the problems marked on the form.", {
+          findings: { errors: [{ field: "", msg: duplicate }], warnings: [] },
+        }),
+      );
+      setup(validDraft(), onSubmit);
+      fireEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+      expect(await screen.findByText(duplicate)).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+
+      fireEvent.change(document.getElementById(`f-${field}`)!, { target: { value } });
+      expect(screen.queryByText(duplicate)).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
+      const [payload] = onSubmit.mock.calls[1] as unknown as [Record<string, unknown>];
+      expect(payload).toMatchObject(
+        field === "title"
+          ? { title: value }
+          : field === "why"
+          ? { sections: { why: value } }
+          : { milestones: [{ criteria: [value] }] },
+      );
+    },
+  );
+
+  it("ignores duplicate feedback arriving after the submitted draft was edited", async () => {
+    let reject!: (reason: unknown) => void;
+    const pending = new Promise<void>((_, fail) => {
+      reject = fail;
+    });
+    const onSubmit = vi.fn(() => pending);
+    setup(validDraft(), onSubmit);
+    fireEvent.click(screen.getByRole("button", { name: "Submit for review" }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    fireEvent.change(document.getElementById("f-title")!, {
+      target: { value: "Ethereum Security Monitor - test" },
+    });
+
+    await act(async () => {
+      reject(
+        new ApiError(400, "Please fix the problems marked on the form.", {
+          findings: {
+            errors: [{ field: "", msg: "This exact text is already submitted." }],
+            warnings: [],
+          },
+        }),
+      );
+      await pending.catch(() => {});
+    });
+    expect(screen.queryByText("This exact text is already submitted.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(document.getElementById("f-title")).toHaveValue("Ethereum Security Monitor - test");
+    expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled();
   });
 });

@@ -351,7 +351,7 @@ export function initiativeRoutes(deps: Deps) {
         extra.push({
           field: "",
           msg:
-            `This exact text is already submitted ("${dup.title}"). Edit it before submitting again.`,
+            `The section text and milestone names and criteria match an existing submission ("${dup.title}"). Revise that content before submitting again; changing only the title does not make it a new submission.`,
           kind: "content",
         });
       }

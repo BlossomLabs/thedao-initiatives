@@ -9,6 +9,8 @@ You hand over one markdown document. The form at https://fund.thedao.fund/submit
 - Interview first. Ask questions 1 to 7 and wait for replies before drafting.
 - Nothing is READY until the weak parts are fixed.
 
+The site blocks submissions whose section text and milestone names and criteria match a pending, approved, or rejected initiative, ignoring case and whitespace. Changing only the title does not make it a new submission. Revise the matching content before submitting again. Archived initiatives may be resubmitted.
+
 ## Step 1: Interview the proposer. Do not draft yet.
 
 If the proposer already has a written proposal, read it first, ask only the questions it leaves open, and follow "Reformatting a proposal the proposer already wrote". Ask whether a companion initiative exists.

@@ -92,6 +92,10 @@ pending, so its clean URL is private until approval. Archived text may also be r
 approved and rejected proposals still block duplicate content. Other name collisions retain the
 normal suffix allocation. Existing numbered proposals are not renamed automatically.
 
+Duplicate content means matching section text plus milestone names and criteria, ignoring case and
+whitespace. Changing only the title or other page facts does not bypass this check. A duplicate
+finding names the existing proposal and explains which content must change.
+
 Unarchiving recalculates the slug from the current title: the clean slug if available, otherwise
 `-2`, `-3`, etc. It never displaces another proposal. Generated archive URLs remain reserved aliases
 to their original ID, including after unarchiving and another archival. Rejecting a replacement does

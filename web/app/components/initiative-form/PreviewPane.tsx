@@ -41,7 +41,6 @@ export function previewInitiative(d: Draft): Initiative {
     type: d.type,
     sortRank: null,
     safeAddress: "",
-    safeDeployed: false,
     paidOutUsd: 0,
     proposer: "",
     durationMonths: parseInt(d.page.duration, 10) || null,

@@ -11,7 +11,6 @@ import { createFunding } from "../services/funding.ts";
 import type { Deps } from "../middleware/context.ts";
 import {
   SEL_BALANCE_OF,
-  SEL_CREATE_PROXY,
   SEL_DECIMALS,
   SEL_GET_OWNERS,
   SEL_GET_THRESHOLD,
@@ -19,7 +18,8 @@ import {
   SEL_SYMBOL,
 } from "../chain/abi.ts";
 import { keccakHex, utf8 } from "../chain/keccak.ts";
-import { chainlinkRound, SIGNERS, simulateCreateProxy, word } from "./helpers.ts";
+import { predictSafeAddress } from "../chain/safe.ts";
+import { chainlinkRound, SIGNERS, word } from "./helpers.ts";
 import { createAdmins } from "../services/admins.ts";
 
 export const ORIGIN = "http://localhost:5173";
@@ -49,9 +49,6 @@ export interface ChainScript {
   calls: string[];
   /** lowercase address -> bytecode, for eth_getCode ("0x" when absent). */
   code: Record<string, string>;
-  /** eth_call of the proxy factory: "" = the real CREATE2 answer for the
-   * calldata, "revert" = the call reverts, anything else = that address. */
-  factorySim: string;
   /** Every Safe answers getThreshold() with the wrong number. */
   brokenSafe: boolean;
 }
@@ -120,12 +117,6 @@ export function scriptedRpc(script: ChainScript, now: () => number) {
             "0x" + word(script.badgeHolders.has(addr.toLowerCase()) ? 1 : 0),
           );
         }
-        if (to.toLowerCase() === config.SAFE_PROXY_FACTORY.toLowerCase()) {
-          if (sel !== SEL_CREATE_PROXY) return Promise.resolve("0x");
-          if (script.factorySim === "revert") throw new Error("execution reverted");
-          const addr = script.factorySim || simulateCreateProxy(data);
-          return Promise.resolve("0x" + word(BigInt(addr)));
-        }
         if (sel === SEL_GET_THRESHOLD) {
           return Promise.resolve("0x" + word(script.brokenSafe ? 1 : config.SAFE_THRESHOLD));
         }
@@ -157,6 +148,20 @@ export interface Harness {
   close(): void;
 }
 
+/** Put the initiative's Safe on the fake chain and bind it, as the deploy panel would. */
+export async function deploySafe(h: Harness, admin: string, id: string): Promise<string> {
+  const rfp = (await h.db.rfps.get(id))!;
+  const address = predictSafeAddress(SIGNERS, rfp.safeDeploymentKey ?? rfp.slug);
+  h.script.code[address.toLowerCase()] = "0x6080";
+  const res = await h.req(`/api/admin/initiatives/${id}/safe-confirm`, {
+    method: "POST",
+    token: admin,
+    json: {},
+  });
+  if (res.status !== 200) throw new Error(`safe-confirm ${res.status}: ${await res.text()}`);
+  return address;
+}
+
 export interface HarnessOptions {
   env?: Record<string, string>;
   fetch?: (url: string, init?: RequestInit) => Promise<Response> | Response;
@@ -185,7 +190,6 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     ethBalances: {},
     calls: [],
     code: {},
-    factorySim: "",
     brokenSafe: false,
   };
   const chain = createChain({ rpc: scriptedRpc(script, now), now });

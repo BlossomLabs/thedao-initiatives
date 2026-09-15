@@ -16,10 +16,8 @@ import {
   SEL_GET_OWNERS,
   SEL_GET_THRESHOLD,
 } from "./abi.ts";
-import { eventTopic, hexToBytes, keccak256, keccakHex, utf8 } from "./keccak.ts";
+import { hexToBytes, keccak256, keccakHex, utf8 } from "./keccak.ts";
 import { type Rpc } from "./rpc.ts";
-
-export const TOPIC_PROXY_CREATION = eventTopic("ProxyCreation(address,address)");
 
 /** Exactly SAFE_OWNER_COUNT distinct, checksummed signer addresses. */
 export function signersConfigured(signers: string[]): [boolean, string] {
@@ -49,8 +47,9 @@ export function safeDeployCalldata(signers: string[], deploymentKey: string): st
 /**
  * Where createProxyWithNonce(singleton, initializer, saltNonce) puts this
  * initiative's Safe: CREATE2 from the canonical factory, salt =
- * keccak(keccak(initializer) ++ saltNonce). Pure, so it also answers "was it
- * ever deployed?" without a tx hash: check for code at this address.
+ * keccak(keccak(initializer) ++ saltNonce). Pure: the deploy panel sends the
+ * wallet there, and "is it deployed?" is "is there code at this address?",
+ * whatever hash the wallet ended up mining the tx under.
  */
 export function predictSafeAddress(signers: string[], deploymentKey: string): string {
   const init = encodeSafeSetup(signers, SAFE_THRESHOLD, SAFE_FALLBACK_HANDLER);
@@ -68,64 +67,6 @@ export function predictSafeAddress(signers: string[], deploymentKey: string): st
 export async function hasCode(rpc: Rpc, address: string): Promise<boolean> {
   const code = String(await rpc("eth_getCode", [address, "latest"]) ?? "0x");
   return code !== "0x" && code !== "";
-}
-
-/**
- * The Safe this initiative's deploy lands on, checked against the chain
- * before anyone is told to send money there. Already deployed: it must pass
- * verifySafe. Not yet: the factory's own answer to an eth_call of the deploy
- * calldata must equal the local prediction. Throws when either disagrees.
- */
-export async function resolveSafe(
-  rpc: Rpc,
-  signers: string[],
-  deploymentKey: string,
-): Promise<{ address: string; deployed: boolean }> {
-  const [ok, why] = signersConfigured(signers);
-  if (!ok) throw new Error(why);
-  const address = predictSafeAddress(signers, deploymentKey);
-  if (await hasCode(rpc, address)) {
-    const [good, detail] = await verifySafe(rpc, address, signers);
-    if (!good) throw new Error(`Safe at ${address} REJECTED: ${detail}`);
-    return { address, deployed: true };
-  }
-  let simulated = "";
-  try {
-    const raw = await rpc("eth_call", [
-      { to: SAFE_PROXY_FACTORY, data: safeDeployCalldata(signers, deploymentKey) },
-      "latest",
-    ]);
-    simulated = toChecksum("0x" + decodeHexInt(raw).toString(16).padStart(40, "0"));
-  } catch (e) {
-    throw new Error(`could not predict the Safe address: factory call failed: ${String(e)}`);
-  }
-  if (simulated !== address) {
-    throw new Error(
-      `could not predict the Safe address: factory says ${simulated}, computed ${address}`,
-    );
-  }
-  return { address, deployed: false };
-}
-
-/** Parse a deploy tx receipt for the canonical factory's ProxyCreation event. */
-export async function extractDeployedSafe(
-  rpc: Rpc,
-  txHash: string,
-): Promise<[string, null] | [null, string]> {
-  const receipt = await rpc("eth_getTransactionReceipt", [txHash]) as
-    | { status?: string; logs?: { address?: string; topics?: string[]; data?: string }[] }
-    | null;
-  if (!receipt) return [null, "pending"];
-  if (receipt.status !== "0x1") return [null, "deploy transaction reverted"];
-  for (const log of receipt.logs ?? []) {
-    if ((log.address ?? "").toLowerCase() !== SAFE_PROXY_FACTORY.toLowerCase()) continue;
-    const topics = log.topics ?? [];
-    if (!topics.length || topics[0].toLowerCase() !== TOPIC_PROXY_CREATION) continue;
-    if (topics.length >= 2) return [toChecksum("0x" + topics[1].slice(-40)), null];
-    const data = log.data ?? "";
-    if (data.length >= 66) return [toChecksum("0x" + data.slice(2, 66).slice(-40)), null];
-  }
-  return [null, "no ProxyCreation event from the canonical factory in this tx"];
 }
 
 /** Verify a deployed Safe matches our exact spec before trusting it. */

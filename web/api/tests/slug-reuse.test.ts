@@ -4,7 +4,7 @@ import type { Rfp } from "../db/types.ts";
 import { K } from "../db/keys.ts";
 import { safeDeployCalldata } from "../chain/safe.ts";
 import { SIGNERS } from "./helpers.ts";
-import { ADMIN, harness, j, proposerToken, SAFE_ADDR } from "./app-helpers.ts";
+import { ADMIN, deploySafe, harness, j, proposerToken, SAFE_ADDR } from "./app-helpers.ts";
 import { minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
 import { syncContent } from "../services/content.ts";
 import { DatabaseSync } from "node:sqlite";
@@ -355,8 +355,10 @@ Deno.test("submission reuses archived text and URL; approval and unarchive prese
         token: admin,
         json: { action },
       });
+    await deploySafe(h, admin, next.id);
     assertEquals((await status(next.id, "approve")).status, 200);
     assertEquals((await h.req(`/api/initiatives/${slug}`)).status, 200);
+    if (!(await h.db.rfps.get(old.id))!.safeAddress) await deploySafe(h, admin, old.id);
     assertEquals((await status(old.id, "unarchive")).status, 200);
     assertEquals((await h.db.rfps.get(old.id))?.slug, `${slug}-2`);
     assertEquals((await h.req(`/api/initiatives/${archive.slug}`)).status, 200);

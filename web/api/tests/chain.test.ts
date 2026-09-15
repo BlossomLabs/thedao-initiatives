@@ -18,13 +18,7 @@ import {
 import { TRANSFER_TOPIC, verifyDonationTx } from "../chain/verify.ts";
 import { createPricer, RATE_MAX_STALENESS } from "../chain/price.ts";
 import { RpcError } from "../chain/rpc.ts";
-import {
-  extractDeployedSafe,
-  safeDeployCalldata,
-  signersConfigured,
-  TOPIC_PROXY_CREATION,
-  verifySafe,
-} from "../chain/safe.ts";
+import { safeDeployCalldata, signersConfigured, verifySafe } from "../chain/safe.ts";
 import {
   encodeIsValidSignature,
   isValidContractSignature,
@@ -66,10 +60,6 @@ Deno.test("keccak constants match published values", () => {
   assertEquals(SEL_SETUP, "0xb63e800d");
   assertEquals(SEL_GET_OWNERS, "0xa0e67e2b");
   assertEquals(SEL_GET_THRESHOLD, "0xe75235b8");
-  assertEquals(
-    TOPIC_PROXY_CREATION,
-    "0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9ec9070a6199ad418e235",
-  );
 });
 
 Deno.test("EIP-55 reference vectors and config addresses", () => {
@@ -286,38 +276,6 @@ Deno.test("Safe setup / createProxy encoding layout", () => {
   assertEquals(ln, blob.length);
   assertEquals(raw.slice(initOff * 2 + 64, initOff * 2 + 64 + ln * 2), encodeHex(blob));
   assert(safeDeployCalldata(SIGNERS, "some-slug").startsWith("0x1688f0b9"));
-});
-
-Deno.test("extractDeployedSafe trusts only the canonical factory", async () => {
-  const proxy = "0xAbcDabCDabcdAbCdAbCdABCDabcDABcDABCDabCD";
-  const log = (address: string) => ({
-    address,
-    topics: [TOPIC_PROXY_CREATION, "0x" + "0".repeat(24) + proxy.slice(2).toLowerCase()],
-    data: "0x",
-  });
-  const good = fakeRpc({
-    eth_getTransactionReceipt: () => ({
-      status: "0x1",
-      logs: [log(config.SAFE_PROXY_FACTORY.toLowerCase())],
-    }),
-  });
-  const [addr, err] = await extractDeployedSafe(good, TX);
-  assertEquals(err, null);
-  assertEquals(addr?.toLowerCase(), proxy.toLowerCase());
-  const bad = fakeRpc({
-    eth_getTransactionReceipt: () => ({
-      status: "0x1",
-      logs: [log("0x" + "99".repeat(20))],
-    }),
-  });
-  const [a2, e2] = await extractDeployedSafe(bad, TX);
-  assertEquals(a2, null);
-  assertStringIncludes(e2!, "no ProxyCreation");
-  const [, e3] = await extractDeployedSafe(
-    fakeRpc({ eth_getTransactionReceipt: () => null }),
-    TX,
-  );
-  assertEquals(e3, "pending");
 });
 
 Deno.test("verifySafe checks owner set, threshold, singleton, handler", async () => {

@@ -1,7 +1,15 @@
 /** Structured initiatives: submit, logo uploads, proposer edits and page
  * facts, the admin editor's findings. */
 import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
-import { ADMIN, type Harness, harness, j, PLAIN, proposerToken } from "./app-helpers.ts";
+import {
+  ADMIN,
+  deploySafe,
+  type Harness,
+  harness,
+  j,
+  PLAIN,
+  proposerToken,
+} from "./app-helpers.ts";
 import { exampleSubmission, grantBody, minimalSubmission } from "./fixtures.ts";
 import { LIMITS, SECTIONS, TOO_LONG_MSG } from "../../shared/draft/mod.ts";
 import type { Rfp } from "../db/types.ts";
@@ -79,6 +87,7 @@ Deno.test("submit: the guide's example lands structured, with its backers as ple
   assertEquals(mine.initiative.contact, "opsec-coalition@example.org");
   assertEquals((mine.initiative.sections as Record<string, string>).why, row.sections.why);
   const admin = await h.mint(ADMIN, true);
+  await deploySafe(h, admin, row.id);
   await h.req(`/api/admin/initiatives/${row.id}/status`, {
     method: "POST",
     token: admin,
@@ -353,6 +362,7 @@ Deno.test("proposer PATCH: page facts while pending, locked after approval, admi
   // the text is untouched: no revision for a facts change
   const row = (await h.db.rfps.bySlug(slug))!;
   assertEquals(row.revision, 1);
+  await deploySafe(h, admin, row.id);
   await h.req(`/api/admin/initiatives/${row.id}/status`, {
     method: "POST",
     token: admin,
@@ -442,6 +452,8 @@ Deno.test("bulk admin actions: initiatives and comments, per-id failures reporte
   const admin = await h.mint(ADMIN, true);
   const a = await h.db.rfps.insert({ title: "Bulk one here", status: "pending" });
   const b = await h.db.rfps.insert({ title: "Bulk two here", status: "pending" });
+  await deploySafe(h, admin, a.id);
+  await deploySafe(h, admin, b.id);
   const res = await j(
     await h.req("/api/admin/initiatives/bulk", {
       method: "POST",

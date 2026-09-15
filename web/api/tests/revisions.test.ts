@@ -1,6 +1,6 @@
 /** Proposer edits and the public revision history. */
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
-import { ADMIN, harness, j, PLAIN, proposerToken } from "./app-helpers.ts";
+import { ADMIN, deploySafe, harness, j, PLAIN, proposerToken } from "./app-helpers.ts";
 import type { Revision, Rfp } from "../db/types.ts";
 import { minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
 
@@ -18,6 +18,7 @@ async function submitted(h: Awaited<ReturnType<typeof harness>>, approve = true)
   const { slug } = await j(res) as { slug: string };
   const row = (await h.db.rfps.bySlug(slug))!;
   if (approve) {
+    await deploySafe(h, admin, row.id);
     await h.req(`/api/admin/initiatives/${row.id}/status`, {
       method: "POST",
       token: admin,

@@ -1022,3 +1022,21 @@ Deno.test("page facts: content keys sync, admin patch validates and clears per t
   assert("topup" in page.initiative);
   h.close();
 });
+
+Deno.test("DISABLE_RATE_LIMITS=true: the submit limit stops counting", async () => {
+  const h = await harness({ env: { DISABLE_RATE_LIMITS: "true" } });
+  const token = await proposerToken(h);
+  for (let i = 0; i < 8; i++) {
+    const res = await h.req("/api/initiatives", {
+      method: "POST",
+      token,
+      json: {
+        ...minimalSubmission(25_000 + i * 1_000), // a different body each time: the exact-text guard is not the limit
+        title: `Initiative number ${i} of the session`,
+        summary: `Submission ${i} from a room that shares one IP address during a live session.`,
+      },
+    });
+    assertEquals(res.status, 201, await res.text());
+  }
+  h.close();
+});

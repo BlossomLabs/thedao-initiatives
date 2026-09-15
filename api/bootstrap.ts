@@ -34,7 +34,10 @@ export async function createServer() {
   // DB_PREFIX namespaces the keys so deployments can share one KV database.
   const kv = prefixedKv(await Deno.openKv(config.kvPath), config.dbPrefix);
   if (config.dbPrefix) log(`kv keys namespaced under DB_PREFIX=${JSON.stringify(config.dbPrefix)}`);
-  const db = createDb(kv, now);
+  const db = createDb(kv, now, { rateLimitsDisabled: config.rateLimitsDisabled });
+  if (config.rateLimitsDisabled) {
+    log("WARNING: DISABLE_RATE_LIMITS is set; no rate limit is enforced");
+  }
   const chain = createChain({ endpoints: config.rpcEndpoints, now });
   const deps: Deps = {
     db,

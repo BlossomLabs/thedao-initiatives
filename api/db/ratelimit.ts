@@ -23,8 +23,9 @@ export async function bumpCounter(
  * Fixed-window counter in KV so limits hold across isolates. The key
  * expires with its window. Returns true when the call is allowed.
  */
-export function rateLimiter(kv: Deno.Kv, now: () => number) {
+export function rateLimiter(kv: Deno.Kv, now: () => number, disabled = false) {
   return async (bucket: string, max: number, windowSecs: number): Promise<boolean> => {
+    if (disabled) return true;
     const start = Math.floor(now() / windowSecs) * windowSecs;
     const count = await bumpCounter(kv, K.rl(bucket, start), (windowSecs + 5) * 1000);
     return count <= max;

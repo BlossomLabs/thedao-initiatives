@@ -4,7 +4,7 @@
  * (returns "") so ownership checks never pass on a failed lookup. */
 import { createPublicClient, fallback, http } from "viem";
 import { mainnet } from "viem/chains";
-import { getEnsAddress, getEnsAvatar, getEnsName, normalize } from "viem/ens";
+import { getEnsAddress, getEnsName, getEnsText, normalize } from "viem/ens";
 import { isAddress, toChecksum } from "../chain/address.ts";
 
 const TTL = 3600;
@@ -65,13 +65,17 @@ export function onchainEns(endpoints: string[], f: typeof fetch = fetch): EnsRes
     },
     avatar: async (name) => {
       const n = norm(name);
-      return n ? await getEnsAvatar(client, { name: n }) : null;
+      const record = n ? await getEnsText(client, { name: n, key: "avatar" }) : null;
+      // Let ENS serve the image without probing the record's image host here.
+      return n && record
+        ? `https://metadata.ens.domains/mainnet/avatar/${encodeURIComponent(n)}`
+        : null;
     },
   };
 }
 
-/** Only https URLs are safe to put in an <img src>. viem and ensdata both
- * turn ipfs://, ar:// and NFT avatar records into gateway URLs. */
+/** Only https URLs are safe to put in an <img src>. ENS metadata and ensdata
+ * serve ipfs://, ar:// and NFT avatar records over HTTPS. */
 function httpsUrl(v: unknown): string {
   const s = String(v ?? "").trim();
   return /^https:\/\/[^\s"'<>]+$/.test(s) && s.length <= 500 ? s : "";

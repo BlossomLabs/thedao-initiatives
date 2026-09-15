@@ -11,7 +11,7 @@ Suggest an initiative), expressed as Tailwind v4 tokens in `app/app.css`. Data c
 `api/` (Deno + Hono + KV, see `api/README.md`), hosted by the same package: `server.ts` serves the API
 under `/api` and the built SPA for everything else, from one Deno Deploy app. The initiative texts,
 the process rules and the donation terms are files under `content/`; the proposer's AI guide is
-`llms.txt`. The Flask MVP this replaced is described in `docs/v1-to-v2.md`.
+`public/llms.txt`. The Flask MVP this replaced is described in `docs/v1-to-v2.md`.
 
 ## How money flows
 

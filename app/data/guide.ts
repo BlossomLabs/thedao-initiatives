@@ -1,6 +1,5 @@
 /**
- * The proposer's guide (public/llms.txt, the byte-identical mirror of the repo-root
- * llms.txt that app/data/llms.test.ts enforces), bundled
+ * The proposer's guide (public/llms.txt, served as-is at /llms.txt), bundled
  * so the copy button needs no fetch, and its two ```markdown blocks sorted
  * with the real splitter: the gold-standard RFP gives every RFP section, the
  * funding goal and the milestones their example; the second block gives the

@@ -66,9 +66,10 @@ export default function SideCards(
       <div className="panel">
         <span className="k">Back this initiative</span>
         <p className="m-0 small dim">
-          Companies can pledge instead of donating: you commit publicly now and pay only when the
-          work is completed and verified. Email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>{" "}
-          and your name appears here.
+          You can also pledge instead of donating: you commit publicly now and pay only when the
+          entire funding goal has been reached. Email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>
+          {" "}
+          to add your pledge.
         </p>
       </div>
       <div className="panel">

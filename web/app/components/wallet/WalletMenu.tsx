@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import {
   Copy,
   LayoutDashboard,
+  List,
   LogOut,
   Mail,
   Pencil,
@@ -17,7 +18,7 @@ export interface WalletMenuItem {
   key: string;
   label: string;
   icon?: string;
-  lucide?: "wallet" | "mail" | "switch" | "edit" | "power" | "sign" | "admin" | "copy";
+  lucide?: "wallet" | "mail" | "switch" | "edit" | "power" | "sign" | "admin" | "copy" | "list";
   active?: boolean;
   danger?: boolean;
   separator?: boolean;
@@ -39,6 +40,7 @@ const ICONS = {
   power: LogOut,
   sign: ShieldCheck,
   admin: LayoutDashboard,
+  list: List,
 };
 
 /** The MVP's wallet picker / account menu, anchored under the top-bar button. */

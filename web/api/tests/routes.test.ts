@@ -10,7 +10,7 @@ import {
   SAFE_ADDR,
   seedContentLogos,
 } from "./app-helpers.ts";
-import { transferLog, wallet } from "./helpers.ts";
+import { DONOR, transferLog, wallet } from "./helpers.ts";
 import { grantBody, minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
 import { TOKENS } from "../config.ts";
 import { TOPIC_PROXY_CREATION } from "../chain/safe.ts";
@@ -257,6 +257,79 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
   assertEquals(
     (await h.req("/api/initiatives", { method: "POST", token, json: good })).status,
     429,
+  );
+  h.close();
+});
+
+Deno.test("mine: a proposer lists and opens their own submissions, rejected ones only for them and admins", async () => {
+  const h = await harness();
+  const token = await proposerToken(h);
+  const stranger = await proposerToken(h, DONOR);
+  const admin = await h.mint(ADMIN, true);
+  const submit = async (tok: string, goal: number) => {
+    const res = await h.req("/api/initiatives", {
+      method: "POST",
+      token: tok,
+      json: minimalSubmission(goal),
+    });
+    assertEquals(res.status, 201);
+    return (await j(res)).slug as string;
+  };
+  const first = await submit(token, 25000);
+  h.clock.now += 1;
+  const second = await submit(token, 26000);
+  const theirs = await submit(stranger, 27000);
+  const rejected = (await h.db.rfps.bySlug(first))!;
+  await h.req(`/api/admin/initiatives/${rejected.id}/status`, {
+    method: "POST",
+    token: admin,
+    json: { action: "reject" },
+  });
+
+  assertEquals((await h.req("/api/initiatives/mine")).status, 401);
+  const mine = (await j(await h.req("/api/initiatives/mine", { token }))).initiatives as Record<
+    string,
+    unknown
+  >[];
+  assertEquals(mine.map((x) => [x.slug, x.status]), [[second, "pending"], [first, "rejected"]]);
+  assertEquals(Object.keys(mine[0]).sort(), [
+    "createdAt",
+    "goalUsd",
+    "slug",
+    "status",
+    "title",
+    "type",
+  ]);
+  const others = (await j(await h.req("/api/initiatives/mine", { token: stranger })))
+    .initiatives as { slug: string }[];
+  assertEquals(others.map((x) => x.slug), [theirs]);
+
+  // A rejected row opens for its proposer and admins, and nobody else.
+  assertEquals((await h.req("/api/initiatives/" + first, { token })).status, 200);
+  assertEquals((await h.req("/api/initiatives/" + first, { token: admin })).status, 200);
+  assertEquals((await h.req("/api/initiatives/" + first, { token: stranger })).status, 404);
+  assertEquals((await h.req("/api/initiatives/" + first)).status, 404);
+  assertEquals((await h.req(`/api/initiatives/${first}/revisions/1`, { token })).status, 200);
+  assertEquals(
+    (await h.req(`/api/initiatives/${first}/revisions/1`, { token: stranger })).status,
+    404,
+  );
+  // Viewable is not editable.
+  assertEquals(
+    (await h.req("/api/initiatives/" + first, {
+      method: "PATCH",
+      token,
+      json: { initiativeId: rejected.id, goal: "30000" },
+    })).status,
+    403,
+  );
+  assertEquals(
+    (await h.req(`/api/initiatives/${first}/revisions`, {
+      method: "POST",
+      token,
+      json: { initiativeId: rejected.id, ...minimalSubmission(31000) },
+    })).status,
+    403,
   );
   h.close();
 });

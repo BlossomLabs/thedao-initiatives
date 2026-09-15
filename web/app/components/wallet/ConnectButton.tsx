@@ -133,6 +133,14 @@ export default function ConnectButton() {
         onClick: () => void navigate("/admin"),
       }]
       : []),
+    ...(session
+      ? [{
+        key: "mine",
+        label: "My initiatives",
+        lucide: "list" as const,
+        onClick: () => void navigate("/mine"),
+      }]
+      : []),
     {
       key: "name",
       label: identity.nameFromEns && identity.avatarFromEns

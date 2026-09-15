@@ -80,7 +80,10 @@ export function initiativeRoutes(deps: Deps) {
   const isProposer = (rfp: Rfp, user: Session | null) =>
     Boolean(user && rfp.proposer && rfp.proposer.toLowerCase() === user.address.toLowerCase());
 
-  /** Published rows for everyone; a pending one for its proposer and admins (so it can be edited). */
+  /**
+   * Published rows for everyone; a pending or rejected one for its proposer and
+   * admins (pending so it can be edited, rejected so it can be read again).
+   */
   const visibleOr404 = async (
     slug: string,
     user: Session | null,
@@ -90,7 +93,7 @@ export function initiativeRoutes(deps: Deps) {
     if (rfp && mutation) await assertInitiativeIdentity(db, slug, rfp, mutation.initiativeId);
     const ok = rfp && (
       ["approved", "archived"].includes(rfp.status) ||
-      (rfp.status === "pending" && (user?.isAdmin || isProposer(rfp, user)))
+      (["pending", "rejected"].includes(rfp.status) && (user?.isAdmin || isProposer(rfp, user)))
     );
     if (!ok) throw new HttpError(404, "not found");
     return rfp;
@@ -105,6 +108,24 @@ export function initiativeRoutes(deps: Deps) {
     }
     return { rfp, proposer };
   };
+
+  /** What the signed-in wallet proposed, any status, newest first. Before "/:slug". */
+  r.get("/mine", requireAuth, async (c) => {
+    const user = c.var.user!;
+    const rows = await db.rfps.list(["pending", "approved", "rejected", "archived"]);
+    const initiatives = rows
+      .filter((x) => isProposer(x, user))
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((x) => ({
+        slug: x.slug,
+        title: x.title,
+        type: x.type,
+        status: x.status,
+        goalUsd: x.goalUsd,
+        createdAt: x.createdAt,
+      }));
+    return c.json({ initiatives });
+  });
 
   r.get("/:slug", async (c) => {
     const user = c.var.user;

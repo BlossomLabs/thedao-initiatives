@@ -101,6 +101,14 @@ export default function Initiative() {
             pending review
           </span>
         )}
+        {r.status === "rejected" && (
+          <span
+            className="chip chip-badge st-rejected"
+            title="Only you and the team can see it"
+          >
+            not accepted
+          </span>
+        )}
         {showingOld && (
           <span
             className="chip chip-badge st-pending"

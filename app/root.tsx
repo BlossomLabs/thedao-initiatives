@@ -10,6 +10,7 @@ import type { Route } from "./+types/root";
 import { Providers } from "~/context/providers";
 import TopBar from "~/components/layout/TopBar";
 import Footer from "~/components/layout/Footer";
+import SupportWidget from "~/components/layout/SupportWidget";
 import ShellSkeleton, { SHELL_SCRIPT } from "~/components/layout/ShellSkeleton";
 import "./app.css";
 
@@ -81,6 +82,7 @@ export default function App() {
       <Shell>
         <Outlet />
       </Shell>
+      <SupportWidget />
     </Providers>
   );
 }

@@ -74,6 +74,9 @@ export default function AdminInitiativeEditor() {
   }, [initiativeId, slug, navigate]);
   const refresh = () => void qc.invalidateQueries({ queryKey: ["admin"] });
   const [msg, setMsg] = useState<Msg>(null);
+  // Bumped by an approval: the Safe card then asks the admin's wallet for the
+  // deploy as soon as the refreshed row carries its assigned address.
+  const [deployNow, setDeployNow] = useState(0);
   const run: Run = async (fn, ok) => {
     setMsg(null);
     try {
@@ -157,7 +160,10 @@ export default function AdminInitiativeEditor() {
                   variant="primary"
                   sm
                   onClick={() =>
-                    run(() => api(`${base}/status`, { json: { action: "approve" } }), "Approved.")}
+                    run(async () => {
+                      await api(`${base}/status`, { json: { action: "approve" } });
+                      setDeployNow((n) => n + 1);
+                    }, "Approved.")}
                 >
                   Approve
                 </Button>
@@ -186,10 +192,10 @@ export default function AdminInitiativeEditor() {
                 <Button
                   sm
                   onClick={() =>
-                    run(
-                      () => api(`${base}/status`, { json: { action: "unarchive" } }),
-                      "Re-approved.",
-                    )}
+                    run(async () => {
+                      await api(`${base}/status`, { json: { action: "unarchive" } });
+                      setDeployNow((n) => n + 1);
+                    }, "Re-approved.")}
                 >
                   Re-approve
                 </Button>
@@ -197,7 +203,7 @@ export default function AdminInitiativeEditor() {
             </div>
           </div>
 
-          <SafeCard page={data} onChange={refresh} />
+          <SafeCard page={data} onChange={refresh} deployNow={deployNow} />
 
           <div className="panel">
             <span className="k">Links</span>
@@ -279,7 +285,14 @@ export default function AdminInitiativeEditor() {
   );
 }
 
-function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () => void }) {
+function SafeCard(
+  { page, onChange, deployNow = 0 }: {
+    page: AdminInitiativePage;
+    onChange: () => void;
+    /** Each increment asks the wallet for the deploy once the row has its address. */
+    deployNow?: number;
+  },
+) {
   const r = page.initiative;
   const config = useConfig();
   const { isConnected } = useAccount();
@@ -291,6 +304,17 @@ function SafeCard({ page, onChange }: { page: AdminInitiativePage; onChange: () 
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
+  // Approval deploys in the same motion: the wallet prompt is the admin's
+  // sign-off on the Safe. Without a wallet the address still stands and the
+  // Deploy button below does it later.
+  const deployed = useRef(0);
+  useEffect(() => {
+    if (!deployNow || deployNow === deployed.current) return;
+    if (!r.safeAddress || r.safeDeployed) return; // the refreshed row is not here yet, or no need
+    deployed.current = deployNow;
+    if (isConnected) void deploy();
+    else setStatus({ kind: "err", text: "Connect a wallet to deploy the Safe now, or later." });
+  }, [deployNow, r.safeAddress, r.safeDeployed, isConnected]);
 
   const [existing, setExisting] = useState("");
   /** Bind a Safe that already exists: verified on-chain like a fresh deploy. */

@@ -136,6 +136,7 @@ export default function AdminInitiativeEditor() {
           <EditForm
             key={r.id}
             r={r}
+            pledges={data.pledges}
             onSaved={(text) => {
               setMsg({ kind: "ok", text });
               refresh();
@@ -458,7 +459,13 @@ function SafeCard(
  * button, the server's editorial findings come back as open points. The
  * admin-only knobs (board pin, owner) ride the same PATCH.
  */
-function EditForm({ r, onSaved }: { r: AdminInitiative; onSaved: (text: string) => void }) {
+function EditForm(
+  { r, pledges, onSaved }: {
+    r: AdminInitiative;
+    pledges: Pledge[];
+    onSaved: (text: string) => void;
+  },
+) {
   const extrasOf = () => ({
     sortRank: r.sortRank ? String(r.sortRank) : "",
     proposer: r.proposer,
@@ -467,7 +474,7 @@ function EditForm({ r, onSaved }: { r: AdminInitiative; onSaved: (text: string) 
   const [extras, setExtras] = useState(extrasOf);
   useEffect(() => setExtras(extrasOf()), [r.sortRank, r.proposer, r.paidOutUsd]);
   const [open, setOpen] = useState<Findings | null>(null);
-  const [initial] = useState(() => fromInitiative(r));
+  const [initial] = useState(() => fromInitiative(r, pledges));
 
   async function onSubmit(payload: SubmitPayload) {
     const { website: _hp, backers: _bk, ...fields } = payload;

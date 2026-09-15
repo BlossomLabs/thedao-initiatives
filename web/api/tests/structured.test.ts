@@ -736,3 +736,77 @@ Deno.test("pledge edit: PATCH takes the same fields as adding, including a new l
   );
   h.close();
 });
+
+Deno.test("edit: a top-up measures the adoption floor against the goal minus the stored pledges", async () => {
+  const h = await harness();
+  const token = await proposerToken(h);
+  const admin = await h.mint(ADMIN, true);
+  // ethdebug in solc, 2026-09-15: goal 281,000, Argot committed 150,000
+  const good = minimalSubmission(281_000, "grant");
+  const ms = (build: number, adoption: number) => [
+    {
+      name: "Build",
+      amount: build,
+      adoption: false,
+      done: true,
+      link: "https://x.org/a",
+      month: "",
+      criteria: ["Merged."],
+    },
+    {
+      name: "Adoption",
+      amount: adoption,
+      adoption: true,
+      done: false,
+      link: "",
+      month: "2027-06",
+      criteria: ["Used."],
+    },
+  ];
+  const res = await submit(h, token, {
+    ...good,
+    topup: true,
+    milestoneReviewer: "The reviewer",
+    backers: [{ org: "Argot", amountUsd: 150_000, url: "" }],
+    milestones: ms(236_000, 45_000),
+  });
+  assertEquals(res.status, 201);
+  const { slug } = await j(res) as { slug: string };
+  const id = (await h.db.rfps.bySlug(slug))!.id;
+  const post = (json: unknown) =>
+    h.req(`/api/initiatives/${slug}/revisions`, { method: "POST", token, json });
+  const patch = (json: unknown) =>
+    h.req(`/api/admin/initiatives/${id}`, { method: "PATCH", token: admin, json });
+  const TOO_LOW = "of the $131,000 this grant raises. Raise them to at least $43,667";
+  // 45,000 is 34% of the 131,000 left to raise: an edit keeps passing
+  const edited = await post({
+    ...good,
+    sections: { ...good.sections, why: "Edited." },
+    milestones: ms(236_000, 45_000),
+  });
+  assertEquals(edited.status, 201);
+  assertEquals((await j(edited) as Out).warnings, []);
+  // 40,000 is 31%: refused, and the message names the base
+  const low = await post({ ...good, milestones: ms(241_000, 40_000) });
+  assertEquals(low.status, 400);
+  const lowErr = (await j(low) as Fail).findings.errors.find((e) => e.field === "milestones")!;
+  assertStringIncludes(lowErr.msg, TOO_LOW);
+  // the admin editor reports the same rule without blocking
+  const ok = await j(await patch({ milestones: ms(236_000, 45_000) })) as Out;
+  assertEquals(fields(ok.findings!.errors), []);
+  const warned = await j(await patch({ milestones: ms(241_000, 40_000) })) as Out;
+  assertStringIncludes(
+    warned.findings!.errors.find((e) => e.field === "milestones")!.msg,
+    TOO_LOW,
+  );
+  // a withdrawn pledge no longer counts: the whole goal is the base again
+  const [pledge] = await h.db.pledges.list(id);
+  await h.db.pledges.setStatus(id, pledge.id, "withdrawn");
+  const whole = await post({ ...good, milestones: ms(236_000, 45_000) });
+  assertEquals(whole.status, 400);
+  assertStringIncludes(
+    (await j(whole) as Fail).findings.errors.find((e) => e.field === "milestones")!.msg,
+    "16% of the goal. Raise them to at least $93,667",
+  );
+  h.close();
+});

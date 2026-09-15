@@ -9,11 +9,13 @@ import {
   adoptionTotal,
   type CheckScope,
   checkSubmission,
+  committedTotal,
   type Finding,
   type Findings,
   milestonesTotal,
   parseAmount,
   SECTIONS,
+  usd,
 } from "@shared/draft/mod";
 import type { Draft } from "./types";
 import { liveBackers, payloadMilestones, toCheckInput } from "./useDraft";
@@ -35,11 +37,27 @@ export interface Checks {
     sum: number;
     goal: number;
     adoption: number;
+    /** What other backers committed; counted on a top-up only. */
+    committed: number;
+    /** What the adoption share is measured against: the goal, minus the
+     * committed amount on a top-up. */
+    base: number;
     floor: number;
     /** Milestones add up to the goal (or there are none yet). */
     ok: boolean;
     adoptionOk: boolean;
+    /** A top-up with every milestone done, or fully covered by its backers. */
+    exempt: boolean;
   };
+}
+
+/** The adoption line both totals displays print:
+ * "$45,000 (34% of the $131,000 this grant raises), minimum $43,667". */
+export function adoptionLine(t: Checks["totals"]): string {
+  if (t.exempt && t.base <= 0) return `${usd(t.adoption)}, no adoption milestone needed`;
+  const pct = t.base > 0 ? Math.round((100 * t.adoption) / t.base) : 0;
+  const of = t.committed > 0 ? ` of the ${usd(t.base)} this grant raises` : "";
+  return `${usd(t.adoption)} (${pct}%${of}), minimum ${usd(t.floor)}`;
 }
 
 /** The element a finding paints: sub-fields of a list fold into the list. */
@@ -118,8 +136,14 @@ export function useChecks(
     const goal = parseAmount(draft.page.goal);
     const sum = milestonesTotal(rows);
     const adoption = adoptionTotal(rows);
-    const floor = adoptionFloor(goal);
-    const exempt = draft.topup && rows.length > 0 && rows.every((m) => m.done);
+    const committed = committedTotal(
+      draft.topup,
+      liveBackers(draft).map((b) => ({ amountUsd: parseAmount(b.amount) })),
+    );
+    const base = Math.max(0, goal - committed);
+    const floor = adoptionFloor(goal, committed);
+    const exempt = draft.topup && rows.length > 0 &&
+      (rows.every((m) => m.done) || committed >= goal);
     return {
       errors,
       warnings,
@@ -129,9 +153,12 @@ export function useChecks(
         sum,
         goal,
         adoption,
+        committed,
+        base,
         floor,
         ok: rows.length === 0 || Math.round(sum) === Math.round(goal),
         adoptionOk: exempt || (goal > 0 && adoption >= floor),
+        exempt,
       },
     };
   }, [draft, submitted, serverFindings, scope]);

@@ -8,7 +8,7 @@ import Bar from "~/components/ui/Bar";
 import { Button } from "~/components/ui/Button";
 import Status from "~/components/ui/Status";
 import { cn } from "~/lib/utils";
-import { paintField } from "./useChecks";
+import { adoptionLine, paintField } from "./useChecks";
 import type { Checks } from "./useChecks";
 
 export const CHECKS_INTRO =
@@ -67,7 +67,6 @@ export default function ChecksCard(
   const { errors, warnings, required, totals } = checks;
   const { rows, more } = checkRows(errors, warnings);
   const pct = required.total ? Math.round((100 * required.answered) / required.total) : 0;
-  const adoptionPct = totals.goal > 0 ? Math.round((100 * totals.adoption) / totals.goal) : 0;
   const globals = errors.filter((e) => !e.field);
   return (
     <div
@@ -95,7 +94,7 @@ export default function ChecksCard(
         <div className="grid grid-cols-[88px_1fr] gap-x-4 py-2 last:pb-0">
           <dt className="dim">Adoption</dt>
           <dd className={cn("m-0 tnum", totals.adoptionOk ? "text-dao-green" : "text-[#ffd7d6]")}>
-            {usd(totals.adoption)} ({adoptionPct}%), minimum {usd(totals.floor)}
+            {adoptionLine(totals)}
           </dd>
         </div>
       </dl>

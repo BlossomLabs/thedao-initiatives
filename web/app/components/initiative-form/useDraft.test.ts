@@ -10,9 +10,11 @@ import {
   fromInitiative,
   isEmptyDraft,
   splitReport,
+  toCheckInput,
   toPayload,
 } from "./useDraft";
 import type { Initiative } from "~/lib/api-types";
+import { structuredRow } from "../../../test/fixtures";
 
 const state = (): DraftState => ({ draft: emptyDraft() });
 
@@ -154,6 +156,25 @@ describe("useDraft reducer", () => {
       links: ["https://l.example"],
     });
     expect(p.milestones[0]).toEqual(r.milestones[0]);
+  });
+
+  it("fromInitiative seeds read-only backers from the live pledges", () => {
+    const r = { ...structuredRow(), topup: true, goalUsd: 281_000 };
+    const d = fromInitiative(r, [
+      { company: "Argot", amountUsd: 150_000, url: "https://argot.org", status: "pledged" },
+      { company: "Gone", amountUsd: 1_000_000, url: "", status: "withdrawn" },
+    ]);
+    expect(d.backers).toHaveLength(1);
+    expect(d.backers[0]).toMatchObject({
+      org: "Argot",
+      amount: "150,000",
+      url: "https://argot.org",
+      logo: null,
+      logoCid: "",
+    });
+    expect(toCheckInput(d).backers).toEqual([
+      { org: "Argot", amountUsd: 150_000, url: "https://argot.org" },
+    ]);
   });
 
   it("isEmptyDraft is true for a fresh draft only", () => {

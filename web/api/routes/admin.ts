@@ -13,7 +13,7 @@ import {
   revisionMeta,
 } from "../lib/json.ts";
 import { DOMAIN_RE, parseGoal, TX_HASH_RE, validateText } from "../lib/validate.ts";
-import { decimalsOf, editChecks } from "./initiatives.ts";
+import { decimalsOf, editChecks, pledgeBackers } from "./initiatives.ts";
 import { readPageFacts } from "../lib/page-facts.ts";
 import { assertNoErrors, mergeFindings, readStructured } from "../lib/structured.ts";
 import { pickText, type RfpText } from "../db/rfps.ts";
@@ -212,6 +212,7 @@ export function adminRoutes(deps: Deps) {
             goalUsd: patch.goalUsd ?? rfp.goalUsd,
           },
           { ...base, ...structured },
+          pledgeBackers(await db.pledges.list(rfp.id)),
         );
         const hard = checks.errors.filter((e) => HARD_FIELD_RE.test(e.field));
         assertNoErrors(mergeFindings(caps, { errors: hard, warnings: [] }));

@@ -17,7 +17,7 @@ import {
   type Sections,
   type SplitResult,
 } from "@shared/draft/mod";
-import type { Initiative } from "~/lib/api-types";
+import type { Initiative, Pledge } from "~/lib/api-types";
 import type { Draft, DraftBacker, DraftCriterion, DraftMilestone, SubmitPayload } from "./types";
 import { replaceFromText } from "./draft-text";
 
@@ -98,9 +98,12 @@ export function isEmptyDraft(d: Draft): boolean {
 }
 
 /** An initiative from the API as a draft (edit pages). Backers are pledges
- * there, managed by the admin, so the list starts empty. */
+ * there, managed by the admin: the rows are seeded from the live pledges so
+ * the checks and the preview see what other backers committed, and the edit
+ * pages never post them. */
 export function fromInitiative(
   r: Initiative & Partial<{ funders: string; contact: string }>,
+  pledges: Pick<Pledge, "company" | "amountUsd" | "url" | "status">[] = [],
 ): Draft {
   const d = emptyDraft();
   d.type = r.type;
@@ -121,6 +124,8 @@ export function fromInitiative(
     ? (r.milestones ?? []).map(draftMilestone)
     : [emptyMilestone()];
   d.priv = { funders: r.funders ?? "", contact: r.contact ?? "" };
+  d.backers = pledges.filter((p) => p.status !== "withdrawn" && p.company.trim())
+    .map((p) => ({ ...emptyBacker(), org: p.company, amount: money(p.amountUsd), url: p.url }));
   return d;
 }
 

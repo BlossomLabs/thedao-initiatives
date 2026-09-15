@@ -9,6 +9,7 @@ import {
   adoptionTotal,
   type CheckScope,
   checkSubmission,
+  committedTotal,
   type Finding,
   type Findings,
   milestonesTotal,
@@ -118,8 +119,13 @@ export function useChecks(
     const goal = parseAmount(draft.page.goal);
     const sum = milestonesTotal(rows);
     const adoption = adoptionTotal(rows);
-    const floor = adoptionFloor(goal);
-    const exempt = draft.topup && rows.length > 0 && rows.every((m) => m.done);
+    const committed = committedTotal(
+      draft.topup,
+      liveBackers(draft).map((b) => ({ amountUsd: parseAmount(b.amount) })),
+    );
+    const floor = adoptionFloor(goal, committed);
+    const exempt = draft.topup && rows.length > 0 &&
+      (rows.every((m) => m.done) || committed >= goal);
     return {
       errors,
       warnings,

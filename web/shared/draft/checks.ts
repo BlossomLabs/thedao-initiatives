@@ -25,13 +25,19 @@ export function isHttpsUrl(raw: string): boolean {
   return Boolean(host) && HOST_RE.test(host) && host.includes(".");
 }
 
-/** A third of the goal, and at least $100,000 once the goal reaches $300,000. */
-export function adoptionFloor(goal: number): number {
-  const g = Number(goal) || 0;
-  let floor = g / 3;
+/** A third of the goal, and at least $100,000 once the goal reaches $300,000.
+ * On a top-up the base is what this grant still has to raise: the goal minus
+ * what other backers have already committed (Griff, 2026-09-15). */
+export function adoptionFloor(goal: number, committed = 0): number {
+  const g = Math.max(0, (Number(goal) || 0) - (Number(committed) || 0));
+  let floor = Math.ceil(g / 3);
   if (g >= 300_000) floor = Math.max(floor, 100_000);
   return floor;
 }
+
+/** What other backers have committed, counted only on a top-up. */
+export const committedTotal = (topup: boolean, backers: { amountUsd: number }[]): number =>
+  topup ? backers.reduce((a, b) => a + (Number(b.amountUsd) || 0), 0) : 0;
 
 export interface CheckBacker {
   org: string;
@@ -213,9 +219,14 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
       }. Change one of them.`,
     );
   }
-  const exempt = Boolean(topup && milestones.length && milestones.every((m) => m.done));
+  const committed = committedTotal(topup, backers);
+  const exempt = Boolean(
+    topup && milestones.length && (milestones.every((m) => m.done) || committed >= goal),
+  );
   if (goal > 0 && milestones.length && !exempt) {
-    const floor = adoptionFloor(goal);
+    const base = goal - committed;
+    const floor = adoptionFloor(goal, committed);
+    const of = committed > 0 ? `of the ${usd(base)} this grant raises` : "of the goal";
     if (adoption === 0) {
       err(
         "milestones",
@@ -225,8 +236,8 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
       err(
         "milestones",
         `Adoption milestones carry ${usd(adoption)}, which is ${
-          Math.round(100 * adoption / goal)
-        }% of the goal. Raise them to at least ${usd(floor)}.`,
+          Math.round(100 * adoption / base)
+        }% ${of}. Raise them to at least ${usd(floor)}.`,
       );
     }
   }

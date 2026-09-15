@@ -79,6 +79,34 @@ test("a top-up is exempt only when every milestone is done", () => {
   expect(fields(checkSubmission(i).warnings)).toContain("backers");
 });
 
+test("a top-up measures the adoption share against what this grant still raises", () => {
+  // ethdebug in solc, 2026-09-15: goal 281,000, Argot committed 150,000
+  expect(adoptionFloor(281_000, 150_000)).toBe(43_667);
+  expect(adoptionFloor(500_000, 100_000)).toBe(133_334);
+  const i = minimal(281_000, "grant");
+  i.topup = true;
+  i.backers = [{ org: "Argot", amountUsd: 150_000, url: "" }];
+  i.milestones = [
+    ms("Build", 236_000, { done: true, link: "https://x.org/a" }),
+    ms("Adoption", 45_000, { adoption: true, month: "2027-06" }),
+  ];
+  expect(checkSubmission(i).errors).toEqual([]);
+  i.topup = false;
+  expect(checkSubmission(i).errors[0].msg).toMatch(
+    /16% of the goal\. Raise them to at least \$93,667/,
+  );
+  i.topup = true;
+  i.milestones[1].amount = 40_000;
+  i.milestones[0].amount = 241_000;
+  expect(checkSubmission(i).errors[0].msg).toMatch(
+    /carry \$40,000, which is 31% of the \$131,000 this grant raises\. Raise them to at least \$43,667/,
+  );
+  // committed covers the whole goal: nothing left to raise, no adoption rule
+  i.backers[0].amountUsd = 281_000;
+  i.milestones[1].adoption = false;
+  expect(checkSubmission(i).errors).toEqual([]);
+});
+
 test("missing fields, grant sections, and the missing kind", () => {
   const i = minimal(1000, "grant");
   i.page.contact = "";

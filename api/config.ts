@@ -37,7 +37,8 @@ export const DEFAULT_RPC_ENDPOINTS = [
   "https://eth.drpc.org",
 ];
 
-export const SUBMISSIONS_PER_HOUR_PER_IP = 5;
+/** Per signed-in wallet, not per IP: a room on one Wi-Fi is many proposers (Griff, 2026-09-15). */
+export const SUBMISSIONS_PER_HOUR_PER_WALLET = 5;
 export const REVISIONS_PER_HOUR_PER_ADDRESS = 20;
 /** Backer logos pinned before a submission (POST /api/uploads/logo). */
 export const LOGO_UPLOADS_PER_HOUR_PER_ADDRESS = 12;

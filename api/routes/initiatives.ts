@@ -19,7 +19,7 @@ import { fetchDiscourseTitle } from "../services/forum.ts";
 import {
   MAX_FUNDERS,
   REVISIONS_PER_HOUR_PER_ADDRESS,
-  SUBMISSIONS_PER_HOUR_PER_IP,
+  SUBMISSIONS_PER_HOUR_PER_WALLET,
   TOKENS,
 } from "../config.ts";
 import type { Pledge, Rfp, Session } from "../db/types.ts";
@@ -271,10 +271,16 @@ export function initiativeRoutes(deps: Deps) {
     if (!(await hasDisplayName(proposer))) {
       throw new HttpError(403, "Set a display name (or an ENS primary name) before submitting.");
     }
-    if (!(await db.rateLimit("submit:" + c.var.ip, SUBMISSIONS_PER_HOUR_PER_IP, 3600))) {
+    if (
+      !(await db.rateLimit(
+        "submit:" + proposer.toLowerCase(),
+        SUBMISSIONS_PER_HOUR_PER_WALLET,
+        3600,
+      ))
+    ) {
       throw new HttpError(
         429,
-        "Too many submissions from your address; try again in an hour.",
+        "Too many submissions from this wallet; try again in an hour.",
       );
     }
     let discourseUrl = "";

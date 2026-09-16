@@ -113,8 +113,13 @@ URI is ready, so navigation happens directly on the user's tap (including on iOS
 keeps that request alive; either connect button reopens it. Selecting another app reuses the same
 pairing URI. The chooser stays available through the SIWE signature step and offers an "Open wallet"
 link to return to the selected app. Rejecting or expiring a request clears the URI and permits retry.
-The QR renderer is `qrcode.react` (no runtime dependencies); no per-wallet SDK is added. Existing transitive dependencies from
-Privy are unchanged, and disabling WalletConnect telemetry does not disable telemetry in other SDKs.
+The QR renderer is `qrcode.react` (no runtime dependencies); no per-wallet SDK is added.
+The `package.json` override for `x402` reuses wagmi 3, removing the older wagmi 2 connector tree that
+pulled in MetaMask's SDK, analytics, communication layer, and install modal through Privy. Privy uses
+`x402/client`, which does not import wagmi; the separate `x402/paywall` entry point is unused here.
+The lockfile contains no `@metamask/*` packages. Recheck this when updating Privy or x402, especially
+before adding paywall features. Disabling WalletConnect telemetry does not disable telemetry in
+other SDKs.
 
 Refresh the directory explicitly with `deno task sync-wallets` (requires the existing
 `VITE_WALLETCONNECT_PROJECT_ID` in `.env`). The script downloads Ethereum-mainnet, mobile,

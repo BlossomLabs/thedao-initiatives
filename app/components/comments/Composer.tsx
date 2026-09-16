@@ -3,7 +3,7 @@ import { Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useSession } from "~/context/session";
 import { useIdentity } from "~/hooks/use-identity";
-import ConnectInline, { walletBtn } from "~/components/wallet/ConnectInline";
+import ConnectInline from "~/components/wallet/ConnectInline";
 import { cn } from "~/lib/utils";
 import { nameInput, signedInAs } from "./styles";
 import { FormNote, type Note, SubmitButton } from "./FormFeedback";
@@ -20,7 +20,7 @@ export default function Composer(
   },
 ) {
   const { address, isConnected } = useAccount();
-  const { session, requireSession, signingIn, connecting } = useSession();
+  const { session, requireSession, connecting } = useSession();
   const identity = useIdentity(address);
   const [text, setText] = useState("");
   const [name, setName] = useState("");
@@ -96,7 +96,7 @@ export default function Composer(
             <span className="text-[12px] text-muted">
               {signedIn
                 ? "Posting as a verified participant."
-                : "Connect your wallet to post as a verified participant."}
+                : "Sign in with your wallet to post as a verified participant."}
             </span>
           )
           : (
@@ -114,23 +114,12 @@ export default function Composer(
             /* Kept mounted while connecting: the wallet is briefly connected before
               the signature, and the button must survive to show a refusal. */
           }
-          {(!isConnected || connecting) && <ConnectInline />}
+          {(!signedIn || connecting) && <ConnectInline />}
           {isConnected && !connecting && signedIn && (
             <span className={signedInAs}>
               <Wallet className="size-3.5" />
               Signed in as {identity.name}
             </span>
-          )}
-          {isConnected && !connecting && !signedIn && (
-            <button
-              type="button"
-              className={walletBtn}
-              onClick={() => void requireSession().catch(() => {})}
-              disabled={signingIn}
-            >
-              <Wallet className="size-3.5" />
-              {signingIn ? "Check your wallet…" : "Sign in"}
-            </button>
           )}
           <SubmitButton busy={busy} done={posted} onClick={post}>Comment</SubmitButton>
         </div>

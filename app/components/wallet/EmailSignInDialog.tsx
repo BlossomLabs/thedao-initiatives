@@ -16,8 +16,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /**
  * Sign in with an email code (Privy, headless). After the code checks out
  * Privy creates or restores the user's embedded wallet, and the site then
- * signs in with Ethereum through it exactly as with a browser wallet, so
- * "connected" still means "signed in".
+ * signs in with Ethereum through it exactly as with a browser wallet.
  */
 export default function EmailSignInDialog({
   open,
@@ -64,7 +63,7 @@ export default function EmailSignInDialog({
       if (alive.current) onOpenChange(false);
     } catch (e) {
       if (!alive.current) return;
-      // connect() already logged out of Privy on failure; start over.
+      // Keep the authenticated Privy wallet available for another SIWE attempt.
       setError("Not signed in: " + walletErrorMessage(e));
       setStep("email");
       setCode("");

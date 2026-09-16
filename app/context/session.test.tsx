@@ -1,12 +1,13 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, startTransition } from "react";
+import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createConfig, http, WagmiProvider } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { mainnet } from "viem/chains";
 import type { EIP1193Provider } from "viem";
-import { api } from "~/lib/api";
+import { api, ApiError } from "~/lib/api";
 import { SESSION_KEY } from "~/lib/session-migration";
 import { SessionProvider, useSession } from "./session";
 
@@ -28,7 +29,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function setup() {
+function setup(sharedProvider?: EIP1193Provider, reconnectOnMount = false) {
   const signature = deferred<`0x${string}`>();
   const request = vi.fn(async ({ method }: { method: string }): Promise<unknown> => {
     if (method === "wallet_requestPermissions") {
@@ -46,7 +47,8 @@ function setup() {
       target: {
         id: "io.metamask",
         name: "MetaMask",
-        provider: { request, on: vi.fn(), removeListener: vi.fn() } as unknown as EIP1193Provider,
+        provider: sharedProvider ??
+          { request, on: vi.fn(), removeListener: vi.fn() } as unknown as EIP1193Provider,
       },
     })],
     transports: { [mainnet.id]: http() },
@@ -55,7 +57,7 @@ function setup() {
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <WagmiProvider config={config} reconnectOnMount={false}>
+    <WagmiProvider config={config} reconnectOnMount={reconnectOnMount}>
       <QueryClientProvider client={queryClient}>
         <SessionProvider>{children}</SessionProvider>
       </QueryClientProvider>
@@ -203,7 +205,7 @@ it("does not let an overlapping prompt failure disconnect the active sign-in", a
   expect(result.current.session).toEqual(SESSION);
 });
 
-it("disconnects after a refused signature and allows a fresh retry", async () => {
+it("keeps wallet permissions after a refused signature and retries without reconnecting", async () => {
   const { result, config, request, signature } = setup();
   let pending!: Promise<void>;
   act(() => {
@@ -218,7 +220,9 @@ it("disconnects after a refused signature and allows a fresh retry", async () =>
     signature.reject(Object.assign(new Error("User rejected request"), { code: 4001 }));
     await rejected;
   });
-  expect(config.state.status).toBe("disconnected");
+  expect(config.state.status).toBe("connected");
+  expect(request.mock.calls.some(([args]) => args.method === "wallet_revokePermissions"))
+    .toBe(false);
   expect(result.current.session).toBeNull();
   expect(result.current.connecting).toBe(false);
   expect(result.current.signingIn).toBe(false);
@@ -230,6 +234,9 @@ it("disconnects after a refused signature and allows a fresh retry", async () =>
   await act(() => result.current.connect(config.connectors[0]));
   expect(config.state.status).toBe("connected");
   expect(result.current.session).toEqual(SESSION);
+  expect(request.mock.calls.filter(([args]) => args.method === "wallet_requestPermissions"))
+    .toHaveLength(1);
+  expect(request.mock.calls.filter(([args]) => args.method === "personal_sign")).toHaveLength(2);
 });
 
 it.each([false, true])("handles a restored wallet (stored session: %s)", async (stored) => {
@@ -239,7 +246,148 @@ it.each([false, true])("handles a restored wallet (stored session: %s)", async (
     config.connectors[0].emitter.emit("connect", { accounts: [ADDRESS], chainId: 1 });
     await Promise.resolve();
   });
-  expect(config.state.status).toBe(stored ? "connected" : "disconnected");
+  expect(config.state.status).toBe("connected");
   expect(result.current.session).toEqual(stored ? SESSION : null);
   expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(false);
+  expect(request.mock.calls.some(([args]) => args.method === "wallet_revokePermissions"))
+    .toBe(false);
+});
+
+it.each([false, true])(
+  "does not let another tab cancel SIWE (second tab opens during sign-in: %s)",
+  async (opensDuringSignIn) => {
+    // Both page instances receive the same origin's MetaMask account events.
+    // Use real wagmi connectors so disconnect would actually request revocation.
+    const events = new EventEmitter();
+    const signature = deferred<`0x${string}`>();
+    let authorized = false;
+    const request = vi.fn(async ({ method }: { method: string }) => {
+      if (method === "wallet_requestPermissions") {
+        authorized = true;
+        events.emit("accountsChanged", [ADDRESS]);
+        return [{ parentCapability: "eth_accounts", caveats: [{ value: [ADDRESS] }] }];
+      }
+      if (method === "eth_accounts") return authorized ? [ADDRESS] : [];
+      if (method === "eth_chainId") return "0x1";
+      if (method === "personal_sign") return await signature.promise;
+      if (method === "wallet_revokePermissions") {
+        authorized = false;
+        events.emit("accountsChanged", []);
+        return null;
+      }
+      throw new Error("Unexpected wallet request: " + method);
+    });
+    const provider = {
+      request,
+      on: events.on.bind(events),
+      removeListener: events.removeListener.bind(events),
+    } as unknown as EIP1193Provider;
+    const first = setup(provider);
+    let second = opensDuringSignIn ? undefined : setup(provider, true);
+    if (second) await waitFor(() => expect(second!.config.state.status).toBe("disconnected"));
+    let pending!: Promise<void>;
+    act(() => {
+      pending = first.result.current.connect(first.config.connectors[0]);
+      void pending.catch(() => {});
+    });
+    await waitFor(() =>
+      expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(true)
+    );
+    if (opensDuringSignIn) second = setup(provider, true);
+    await waitFor(() => expect(second!.config.state.status).toBe("connected"));
+    expect(second!.result.current.session).toBeNull();
+    expect(first.result.current.signingIn).toBe(true);
+    expect(request.mock.calls.some(([args]) => args.method === "wallet_revokePermissions"))
+      .toBe(false);
+    expect(request.mock.calls.filter(([args]) => args.method === "personal_sign")).toHaveLength(1);
+    await act(async () => {
+      signature.resolve("0x1234");
+      await pending;
+    });
+    expect(first.result.current.session).toEqual(SESSION);
+    expect(first.config.state.status).toBe("connected");
+    expect(second!.config.state.status).toBe("connected");
+  },
+);
+
+it("requires SIWE before a restored connection can use a protected action", async () => {
+  const { result, config, request, signature } = setup();
+  await act(async () => {
+    config.connectors[0].emitter.emit("connect", { accounts: [ADDRESS], chainId: 1 });
+    await Promise.resolve();
+  });
+  expect(result.current.session).toBeNull();
+  let pending!: ReturnType<typeof result.current.requireSession>;
+  act(() => {
+    pending = result.current.requireSession();
+  });
+  await waitFor(() => expect(result.current.signingIn).toBe(true));
+  expect(result.current.session).toBeNull();
+  expect(vi.mocked(api).mock.calls.some(([path]) => path === "/api/auth/verify")).toBe(false);
+  await act(async () => {
+    signature.resolve("0x1234");
+    expect(await pending).toEqual(SESSION);
+  });
+  expect(result.current.session).toEqual(SESSION);
+  expect(request.mock.calls.filter(([args]) => args.method === "personal_sign")).toHaveLength(1);
+});
+
+it("clears an expired API session without revoking wallet permissions", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const originalApi = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, options) =>
+    path === "/api/auth/me"
+      ? Promise.reject(new ApiError(401, "session expired"))
+      : originalApi(path, options)
+  );
+  const { result, config, request } = setup();
+  await act(async () => {
+    config.connectors[0].emitter.emit("connect", { accounts: [ADDRESS], chainId: 1 });
+    await Promise.resolve();
+  });
+  await waitFor(() => expect(result.current.session).toBeNull());
+  expect(config.state.status).toBe("connected");
+  expect(request.mock.calls.some(([args]) => args.method === "wallet_revokePermissions"))
+    .toBe(false);
+  expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(false);
+});
+
+it("clears the old session on account changes without prompting or revoking permissions", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const { result, config, request } = setup();
+  await act(async () => {
+    config.connectors[0].emitter.emit("connect", { accounts: [ADDRESS], chainId: 1 });
+    await Promise.resolve();
+  });
+  await act(async () => {
+    config.connectors[0].emitter.emit("change", {
+      accounts: ["0x1111111111111111111111111111111111111111"],
+    });
+    await Promise.resolve();
+  });
+  expect(result.current.session).toBeNull();
+  expect(localStorage.getItem(SESSION_KEY)).toBeNull();
+  expect(api).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+  expect(config.state.status).toBe("connected");
+  expect(request.mock.calls.some(([args]) => args.method === "wallet_revokePermissions"))
+    .toBe(false);
+  expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(false);
+});
+
+it("still revokes wallet permissions and the API session on explicit sign-out", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const { result, config, request } = setup();
+  await act(async () => {
+    config.connectors[0].emitter.emit("connect", { accounts: [ADDRESS], chainId: 1 });
+    await Promise.resolve();
+  });
+  await act(() => result.current.signOut());
+  expect(result.current.session).toBeNull();
+  expect(localStorage.getItem(SESSION_KEY)).toBeNull();
+  expect(config.state.status).toBe("disconnected");
+  expect(api).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+  expect(request).toHaveBeenCalledWith({
+    method: "wallet_revokePermissions",
+    params: [{ eth_accounts: {} }],
+  });
 });

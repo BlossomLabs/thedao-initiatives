@@ -11,15 +11,15 @@ and the reason behind it.
 
 - **There is no server to run any more.** v1 needed a VPS with systemd, gunicorn, Caddy, a
   persistent disk for `rfps.db` and `uploads/`, and a nightly backup cron. v2 is one Deno Deploy
-  app (root `web/`, entrypoint `server.ts`) with the database and cron provided by the platform,
+  app (root `web/`, entrypoint `server.ts`) with the database provided by the platform,
   so deploying is a push and there is nothing to patch, back up or reboot.
 - **The background donation scanner is gone; donations come from the Safe Transaction Service.**
   v1 ran a thread inside the app that polled mainnet every few minutes for every initiative's
   Safe, held a file lock so only one process scanned, and depended on a paid RPC key to avoid rate
-  limits. v2 asks Safe's own indexer (one authenticated request per Safe, on a `Deno.cron`
-  schedule, time-boxed with a resume cursor) which transfers reached each Safe, and still
+  limits. v2 asks Safe's own indexer when a viewed page's saved donation data is stale (one authenticated
+  request per Safe, time-boxed with a resume cursor) which transfers reached each Safe, and still
   re-verifies every new transaction over RPC before crediting it, so amounts keep coming from the
-  chain. Page reads never touch Safe or the chain.
+  chain. Snapshot reads never touch Safe or the chain; explicit refresh requests do.
 - **One origin for site and API.** The API lives under `/api` on the same domain as the pages, so
   there is no CORS, no second deployment and one `.env`. The private-preview lock covers pages,
   assets and API alike: HTTP Basic Auth once, then a stateless signed cookie, because browser

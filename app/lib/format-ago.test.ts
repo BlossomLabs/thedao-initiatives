@@ -17,17 +17,17 @@ describe("ago", () => {
 });
 
 describe("ledgerLine", () => {
-  it("says when the ledger was checked and how long a transfer can take", () => {
+  it("says when the ledger was checked and explains refreshes happen when viewed", () => {
     expect(ledgerLine(null)).toBe("");
     expect(ledgerLine({ checkedAt: null, ok: true, intervalMinutes: 10 })).toBe(
-      "Not checked yet. New transfers appear here within about 10 minutes.",
+      "Not checked yet. Refreshes when viewed after 10 minutes.",
     );
     const recent = Date.now() / 1000 - 30;
     expect(ledgerLine({ checkedAt: recent, ok: true, intervalMinutes: 10 })).toBe(
-      "Checked just now. New transfers appear here within about 10 minutes.",
+      "Checked just now. Refreshes when viewed after 10 minutes.",
     );
     expect(ledgerLine({ checkedAt: recent, ok: false, intervalMinutes: null })).toBe(
-      "Last check just now failed; retrying.",
+      "Last check just now failed. Showing saved donations; will retry.",
     );
   });
 });

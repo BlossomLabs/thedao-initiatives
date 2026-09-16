@@ -138,7 +138,7 @@ export default function Dashboard() {
               Safe API {data.safeApi.configured ? "authenticated" : "NOT configured"}
             </b>
             <small className="block text-[12px] text-muted">
-              cron {data.safeApi.cron}
+              Refreshes when viewed after {data.safeApi.refreshMinutes} minutes
               {data.safeApi.quota ? ` · ${data.safeApi.quota.remaining} requests left` : ""}
             </small>
           </div>

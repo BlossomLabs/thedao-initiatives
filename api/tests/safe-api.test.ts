@@ -2,7 +2,11 @@ import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/as
 import { ADMIN, harness, j, SAFE_ADDR } from "./app-helpers.ts";
 import { transferLog } from "./helpers.ts";
 import { TOKENS } from "../config.ts";
-import { syncAll, syncSafe } from "../services/safe-api.ts";
+import { type SafeApiDeps, syncSafe } from "../services/safe-api.ts";
+import { refreshLedgers } from "../services/ledger.ts";
+
+const syncAll = async (deps: SafeApiDeps) =>
+  await refreshLedgers(deps, await deps.db.rfps.list(["approved"]), true);
 
 const USDC = TOKENS.USDC[0];
 const DONOR = "0x4444444444444444444444444444444444444444";
@@ -84,6 +88,7 @@ Deno.test("safe sync: groups rows per tx, verifies over RPC, sends bearer, incre
 
   const state = await syncSafe(h.deps, rfp);
   assert(state.ok, state.error);
+  assertEquals(h.script.calls.filter((m) => m === "eth_blockNumber").length, 1);
   const safeCalls = h.fetchLog.filter((f) => f.url.startsWith("https://api.safe.global/"));
   assertEquals(safeCalls.length, 1);
   assertEquals(
@@ -109,7 +114,9 @@ Deno.test("safe sync: groups rows per tx, verifies over RPC, sends bearer, incre
   );
 
   // second sync: nothing new -> exactly one request, stops on the known hash
+  h.script.calls.length = 0;
   await syncSafe(h.deps, rfp);
+  assertEquals(h.script.calls, [], "known transfers must not trigger RPC");
   assertEquals(
     h.fetchLog.filter((f) => f.url.startsWith("https://api.safe.global/")).length,
     2,
@@ -172,10 +179,14 @@ Deno.test("safe sync: shallow transfers wait for confirmations, pending rows get
   };
   await syncSafe(h.deps, rfp);
   assertEquals(await h.db.donations.get(rfp.id, TX1), null);
+  assertEquals((await h.db.meta.safeSync(rfp.id))!.lastTxHash, "");
+  assertEquals(h.script.calls, ["eth_blockNumber"]);
   h.script.head = 1002;
+  h.script.calls.length = 0;
   await syncAll(h.deps);
+  assertEquals(h.script.calls.filter((m) => m === "eth_blockNumber").length, 1);
   assertEquals((await h.db.donations.get(rfp.id, TX1))!.status, "confirmed");
-  // price feed outage -> pending, then the cron's reverify confirms it
+  // price feed outage -> pending, then the page refresh's reverify confirms it
   pageBody = [
     row({
       transactionHash: TX2,
@@ -201,6 +212,179 @@ Deno.test("safe sync: shallow transfers wait for confirmations, pending rows get
   assertEquals(d2.amountUsd, 5.72); // 5 EURC * 1.143
   assertEquals((await h.db.fundingSummary(rfp.id)).donated, 6.72);
   h.close();
+});
+
+Deno.test("safe refresh: 19 idle Safes use zero RPC, including unaccepted transfers and API errors", async () => {
+  let pageBody: unknown[] = [];
+  let status = 200;
+  const h = await harness({
+    fetch: () =>
+      status === 200
+        ? Response.json({ count: pageBody.length, next: null, results: pageBody })
+        : new Response("{}", { status }),
+  });
+  try {
+    for (let i = 1; i <= 19; i++) {
+      await h.db.rfps.insert({
+        title: `Idle initiative ${i}`,
+        status: "approved",
+        safeAddress: "0x" + i.toString(16).padStart(40, "0"),
+      });
+    }
+    assertEquals(await syncAll(h.deps), 19);
+    assertEquals(h.fetchLog.length, 19);
+    assertEquals(h.script.calls, [], "even a cold process must not touch RPC on an idle run");
+
+    pageBody = [row({ tokenAddress: "0x" + "99".repeat(20) })];
+    assertEquals(await syncAll(h.deps), 19);
+    assertEquals(h.fetchLog.length, 38);
+    assertEquals(h.script.calls, [], "irrelevant tokens need no confirmation checks");
+
+    status = 429;
+    assertEquals(await syncAll(h.deps), 0);
+    assertEquals(h.script.calls, [], "a failed discovery request must not trigger RPC");
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("safe refresh: one head serves all Safes and pending receipts, with a fresh head next run", async () => {
+  const secondSafe = "0x" + "55".repeat(20);
+  const pendingTx = "0x" + "a4".repeat(32);
+  const h = await harness({
+    fetch: (url) =>
+      Response.json({
+        count: 1,
+        next: null,
+        results: [
+          url.includes(secondSafe)
+            ? row({ transactionHash: TX2, to: secondSafe })
+            : row({ transactionHash: TX1 }),
+        ],
+      }),
+  });
+  try {
+    const first = await h.db.rfps.insert({
+      title: "First active Safe",
+      status: "approved",
+      safeAddress: SAFE_ADDR,
+    });
+    const second = await h.db.rfps.insert({
+      title: "Second active Safe",
+      status: "approved",
+      safeAddress: secondSafe,
+    });
+    for (
+      const [tx, safe, block] of [
+        [TX1, SAFE_ADDR, 500],
+        [TX2, secondSafe, 500],
+        [pendingTx, SAFE_ADDR, 501],
+      ] as const
+    ) {
+      h.script.receipts[tx] = {
+        status: "0x1",
+        blockNumber: "0x" + block.toString(16),
+        logs: [transferLog(USDC, DONOR, safe, 1_000_000n)],
+      };
+    }
+    h.script.head = 502;
+    // This manually submitted donation is absent from discovery results.
+    await h.db.donations.record(
+      first.id,
+      pendingTx,
+      await h.deps.chain.verifyDonation(pendingTx, SAFE_ADDR),
+    );
+    h.script.calls.length = 0;
+    assertEquals(await syncAll(h.deps), 2);
+    assertEquals(h.script.calls.filter((m) => m === "eth_blockNumber").length, 1);
+    assertEquals(h.script.calls.filter((m) => m === "eth_getTransactionReceipt").length, 3);
+    assertEquals((await h.db.donations.get(first.id, TX1))!.status, "confirmed");
+    assertEquals((await h.db.donations.get(second.id, TX2))!.status, "confirmed");
+    assertEquals((await h.db.donations.get(first.id, pendingTx))!.status, "pending");
+
+    h.script.head = 503;
+    h.script.calls.length = 0;
+    await syncAll(h.deps);
+    assertEquals(h.script.calls, ["eth_getTransactionReceipt", "eth_blockNumber"]);
+    assertEquals((await h.db.donations.get(first.id, pendingTx))!.status, "confirmed");
+
+    h.script.calls.length = 0;
+    await syncAll(h.deps);
+    assertEquals(h.script.calls, [], "once confirmed, every Safe can sync without RPC");
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("safe refresh: a failed head is shared, preserves cursors, and retries next run", async () => {
+  const secondSafe = "0x" + "55".repeat(20);
+  const h = await harness({
+    fetch: (url) =>
+      Response.json({
+        count: 1,
+        next: null,
+        results: [
+          url.includes(secondSafe)
+            ? row({
+              transactionHash: TX_ETH,
+              to: secondSafe,
+              type: "ETHER_TRANSFER",
+              tokenAddress: null,
+              value: (10n ** 18n).toString(),
+            })
+            : row({}),
+        ],
+      }),
+  });
+  try {
+    const first = await h.db.rfps.insert({
+      title: "RPC retry token Safe",
+      status: "approved",
+      safeAddress: SAFE_ADDR,
+    });
+    const second = await h.db.rfps.insert({
+      title: "RPC retry ETH Safe",
+      status: "approved",
+      safeAddress: secondSafe,
+    });
+    h.script.receipts[TX1] = {
+      status: "0x1",
+      blockNumber: "0x1f4",
+      logs: [transferLog(USDC, DONOR, SAFE_ADDR, 1_000_000n)],
+    };
+    h.script.receipts[TX_ETH] = { status: "0x1", blockNumber: "0x1f4", logs: [] };
+    h.script.txs[TX_ETH] = { to: DONOR, from: DONOR, value: "0x0" };
+    const blockNumber = h.deps.chain.blockNumber;
+    let failed = true;
+    let attempts = 0;
+    h.deps.chain.blockNumber = () => {
+      attempts++;
+      if (failed) return Promise.reject(new Error("RPC unavailable"));
+      return blockNumber();
+    };
+    await syncAll(h.deps);
+    assertEquals(attempts, 1);
+    assertEquals(h.script.calls, []);
+    for (const rfp of [first, second]) {
+      const state = (await h.db.meta.safeSync(rfp.id))!;
+      assertFalse(state.ok);
+      assertStringIncludes(state.error, "RPC unavailable");
+      assertEquals(state.lastTxHash, "");
+      assertFalse(state.backfilled);
+      assertEquals(await h.db.donations.list(rfp.id, false), []);
+    }
+
+    failed = false;
+    await syncAll(h.deps);
+    assertEquals(attempts, 2, "the next run must retry once, shared across both Safes");
+    assertEquals(h.script.calls.filter((m) => m === "eth_blockNumber").length, 1);
+    assertEquals((await h.db.donations.get(first.id, TX1))!.status, "confirmed");
+    const eth = (await h.db.donations.get(second.id, TX_ETH))!;
+    assertEquals(eth.status, "confirmed");
+    assertEquals(eth.source, "safe-api");
+  } finally {
+    h.close();
+  }
 });
 
 Deno.test("safe sync: a time budget cuts a backfill short, progress persists, the next run completes", async () => {

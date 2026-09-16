@@ -32,6 +32,7 @@ export const K = {
   contentLogo: (name: string) => ["content_logo", name] as const,
   aiBudget: (day: string) => ["ai_budget", day] as const,
   safeSync: (rfpId: string) => ["safe_sync", rfpId] as const,
+  safeBalances: (safe: string) => ["safe_balances", safe.toLowerCase()] as const,
   lock: (name: string) => ["lock", name] as const,
   meta: (key: string) => ["meta", key] as const,
   /** One immutable donation-terms acceptance per donation, keyed by its tx hash. */

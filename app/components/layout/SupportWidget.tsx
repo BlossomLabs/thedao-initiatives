@@ -20,7 +20,7 @@ import {
   type SupportCategory,
 } from "@shared/support";
 import { api } from "~/lib/api";
-import { useBoard } from "~/hooks/use-board";
+import { useSiteSettings } from "~/hooks/use-site-settings";
 import { Button } from "~/components/ui/Button";
 import { Input, Textarea } from "~/components/ui/Field";
 import { cn } from "~/lib/utils";
@@ -40,12 +40,12 @@ const ICON_BTN =
   "inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white";
 
 /**
- * Floating "Support" button (bottom right), only once the board's flags say
+ * Floating "Support" button (bottom right), only once the site settings say
  * SUPPORT_URL is configured: without a destination there is nothing to show.
  */
 export default function SupportWidget() {
-  const { data } = useBoard();
-  if (!data?.flags.support) return null;
+  const { data } = useSiteSettings();
+  if (!data?.support) return null;
   return <SupportPanel />;
 }
 

@@ -479,9 +479,14 @@ Deno.test("donate: params, confirm, status, totals", async () => {
   const st = await j(await h.req("/api/donate/status/" + tx));
   assertEquals(st.status, "confirmed");
   assertEquals(st.amount, 250);
-  // The confirmed row is in the ledger; the headline "donated" is the Safe's
-  // balance (services/funding.ts), which the scripted chain has at zero here.
-  const page = await j(await h.req("/api/initiatives/" + first.slug)) as {
+  // Before a balance snapshot exists, paint the ledger immediately.
+  const snapshot = await j(await h.req("/api/initiatives/" + first.slug)) as {
+    summary: { donated: number; live: boolean };
+  };
+  assertEquals(snapshot.summary.donated, 250);
+  assertFalse(snapshot.summary.live);
+  // Refresh replaces that fallback with the Safe's balance (zero on this fake chain).
+  const page = await j(await h.req("/api/initiatives/" + first.slug + "?refresh=1")) as {
     summary: { donated: number; ledger: number; live: boolean };
     donations: unknown[];
   };

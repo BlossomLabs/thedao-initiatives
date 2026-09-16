@@ -19,13 +19,13 @@ function openPicker() {
   return screen.getByRole("dialog");
 }
 
-/** The gate: the board's flags decide whether the trigger exists at all. */
+/** The gate reads configuration without loading the funding board. */
 function renderGated(support: boolean) {
   vi.stubGlobal(
     "fetch",
     vi.fn((url: string) =>
       Promise.resolve(
-        url === "/api/board" ? json(200, { flags: { support } }) : json(404, { error: "no" }),
+        url === "/api/board/settings" ? json(200, { support }) : json(404, { error: "no" }),
       )
     ),
   );

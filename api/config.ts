@@ -105,7 +105,7 @@ export interface Config {
   adminAddresses: string[];
   operationalSigners: string[];
   safeApiKey: string;
-  safeSyncCron: string;
+  safeSyncTtlSecs: number;
   /** DISABLE_RATE_LIMITS=true: every KV rate limit answers "allowed" (live sessions where a room shares one IP). */
   rateLimitsDisabled: boolean;
   /** Alchemy app key: an extra mainnet RPC ahead of the public fallbacks. */
@@ -165,6 +165,7 @@ export function webOriginsFrom(env: Record<string, string | undefined>): string[
 }
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
+  const syncTtl = Number(env.SAFE_SYNC_TTL_SECS);
   const rpcOverride = (env.RPC_URL ?? "").trim();
   const alchemyApiKey = (env.ALCHEMY_API_KEY ?? "").trim();
   const webOrigins = webOriginsFrom(env);
@@ -194,7 +195,9 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
       : [...DEFAULT_ADMIN_ADDRESSES],
     operationalSigners: list(env.OPERATIONAL_SIGNERS),
     safeApiKey: (env.SAFE_API_KEY ?? "").trim(),
-    safeSyncCron: (env.SAFE_SYNC_CRON ?? "").trim() || "*/10 * * * *",
+    safeSyncTtlSecs: Number.isFinite(syncTtl) && syncTtl > 0
+      ? Math.max(60, Math.floor(syncTtl))
+      : 600,
     rateLimitsDisabled: /^(1|true|yes)$/i.test((env.DISABLE_RATE_LIMITS ?? "").trim()),
     alchemyApiKey,
     pinataJwt: (env.PINATA_JWT ?? "").trim(),

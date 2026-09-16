@@ -3,7 +3,7 @@ import { NATIVE_ETH, TOKENS } from "../config.ts";
 import { createRpc, getBlockNumber, type Rpc } from "./rpc.ts";
 import { activeTokens, type TokenCheck, verifyTokens } from "./tokens.ts";
 import { createPricer, type UsdRate } from "./price.ts";
-import { type Verification, verifyDonationTx } from "./verify.ts";
+import { type Verification, verifyDonationTx, type VerifyOptions } from "./verify.ts";
 import { createBadgeChecker, type HasBadge } from "./badge.ts";
 import { hasCode, verifySafe } from "./safe.ts";
 
@@ -15,14 +15,22 @@ export interface ChainState {
   checkedAt: number;
 }
 
+export const chainStateFresh = (state: ChainState, now: number): boolean =>
+  now - state.checkedAt < CHAIN_REFRESH_SECS && Object.keys(state.tokens).length > 0;
+
 export interface Chain {
   rpc: Rpc;
   usdRate: UsdRate;
   hasBadge: HasBadge;
-  state(): Promise<ChainState>;
+  /** Pass false for a snapshot that never waits on token verification. */
+  state(refresh?: boolean): Promise<ChainState>;
   activeTokens(): Promise<Record<string, [string, number]>>;
   donorTokens(): Promise<Record<string, [string, number]>>;
-  verifyDonation(txHash: string, recipient: string): Promise<Verification>;
+  verifyDonation(
+    txHash: string,
+    recipient: string,
+    opts?: Pick<VerifyOptions, "getBlockNumber">,
+  ): Promise<Verification>;
   verifySafe(address: string, signers: string[]): Promise<[boolean, string]>;
   hasCode(address: string): Promise<boolean>;
   blockNumber(): Promise<number>;
@@ -60,9 +68,8 @@ export function createChain(opts: ChainOptions = {}): Chain {
     return { ...st };
   }
 
-  const state = async () => {
-    const fresh = now() - st.checkedAt < CHAIN_REFRESH_SECS;
-    if (fresh && Object.keys(st.tokens).length) return { ...st };
+  const state = async (revalidate = true) => {
+    if (!revalidate || chainStateFresh(st, now())) return { ...st };
     if (!inflight) inflight = refresh().finally(() => (inflight = null));
     return await inflight;
   };
@@ -79,8 +86,8 @@ export function createChain(opts: ChainOptions = {}): Chain {
       if (NATIVE_ETH) out.ETH = ["native", 18];
       return out;
     },
-    verifyDonation: async (txHash, recipient) =>
-      verifyDonationTx(rpc, usdRate, txHash, recipient, await active()),
+    verifyDonation: async (txHash, recipient, opts) =>
+      verifyDonationTx(rpc, usdRate, txHash, recipient, await active(), opts),
     verifySafe: (address, signers) => verifySafe(rpc, address, signers),
     hasCode: (address) => hasCode(rpc, address),
     blockNumber: () => getBlockNumber(rpc),

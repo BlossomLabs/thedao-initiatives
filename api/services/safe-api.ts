@@ -1,7 +1,7 @@
 /**
  * Donation discovery through the Safe Transaction Service.
  *
- * Page reads never call this. Only the cron and the admin button do, one
+ * Snapshot reads never call this. Stale refreshes and the admin button do, one
  * authenticated request per Safe, stopping at the first tx hash already
  * recorded. Each new hash is re-verified over RPC (amounts come from the
  * chain); only ETH sends the RPC path cannot see are credited from the
@@ -49,6 +49,12 @@ export const MAX_PAGES_PER_RUN = 10;
 /** Wall-clock budget per Safe per run; the next run picks up where this stopped. */
 export const DEFAULT_BUDGET_MS = 20_000;
 
+/** Nothing calls RPC until needed; reuse successes and failures for this run. */
+export function lazyBlockNumber(deps: SafeApiDeps): () => Promise<number> {
+  let head: Promise<number> | undefined;
+  return () => head ??= Promise.resolve().then(() => deps.chain.blockNumber());
+}
+
 export class SafeApiError extends Error {
   constructor(public status: number, msg: string) {
     super(msg);
@@ -79,10 +85,13 @@ async function creditTx(
   rfp: Rfp,
   txHash: string,
   rows: SafeTransfer[],
+  getBlockNumber: () => Promise<number>,
 ): Promise<void> {
   const existing = await deps.db.donations.get(rfp.id, txHash);
   if (existing?.status === "confirmed") return;
-  let v: Verification = await deps.chain.verifyDonation(txHash, rfp.safeAddress);
+  let v: Verification = await deps.chain.verifyDonation(txHash, rfp.safeAddress, {
+    getBlockNumber,
+  });
   if (v.ok || (v.found && v.pending)) {
     await deps.db.donations.record(rfp.id, txHash, v, "tx");
     return;
@@ -149,6 +158,8 @@ export async function syncSafe(
   deps: SafeApiDeps,
   rfp: Rfp,
   budgetMs = DEFAULT_BUDGET_MS,
+  getBlockNumber = lazyBlockNumber(deps),
+  persist = true,
 ): Promise<SafeSyncState> {
   const prev = await deps.db.meta.safeSync(rfp.id);
   const started = Date.now();
@@ -167,11 +178,6 @@ export async function syncSafe(
   let credited = 0;
   let requests = 0;
   try {
-    let head = 0;
-    try {
-      head = await deps.chain.blockNumber();
-    } catch { /* depth check degrades to "credit" */ }
-    const safeHead = head ? head - (MIN_CONFIRMATIONS - 1) : Number.MAX_SAFE_INTEGER;
     let url: string | null = state.resumeUrl || firstUrl;
     let newest = "";
     let complete = false;
@@ -184,10 +190,6 @@ export async function syncSafe(
       let hitCursor = false;
       for (const row of data.results) {
         const tx = row.transactionHash.toLowerCase();
-        // Too shallow: leave it for the next run. It must not advance the
-        // cursor either, or it would be skipped forever once deep enough.
-        if (row.blockNumber > safeHead) continue;
-        if (!newest) newest = tx;
         if (
           row.type !== "ETHER_TRANSFER" &&
           !(row.tokenAddress && ACCEPTED.has(row.tokenAddress.toLowerCase()))
@@ -195,6 +197,7 @@ export async function syncSafe(
           continue; // not an accepted token: skip, but it does not end the walk
         }
         if (state.backfilled && state.lastTxHash && tx === state.lastTxHash) {
+          if (!newest) newest = tx;
           hitCursor = true;
           break;
         }
@@ -204,15 +207,21 @@ export async function syncSafe(
         const known = await deps.db.donations.get(rfp.id, tx);
         if (known?.status !== "confirmed") {
           allKnown = false;
+          // Only unknown/pending accepted transfers need a confirmation check.
+          // Too-shallow transfers must not advance the cursor. A failed head
+          // lookup aborts this Safe's pass without crediting or advancing it.
+          const safeHead = await getBlockNumber() - (MIN_CONFIRMATIONS - 1);
+          if (row.blockNumber > safeHead) continue;
           const list = byTx.get(tx) ?? [];
           list.push(row);
           byTx.set(tx, list);
         }
+        if (!newest) newest = tx;
       }
       let pageCredited = 0;
       for (const [tx, rows] of byTx) {
         if (overBudget()) break;
-        await creditTx(deps, rfp, tx, rows);
+        await creditTx(deps, rfp, tx, rows, getBlockNumber);
         credited++;
         pageCredited++;
       }
@@ -246,38 +255,27 @@ export async function syncSafe(
     state.error = e instanceof Error ? e.message : String(e);
     deps.log?.(`safe sync ${rfp.slug}: ${state.error}`);
   }
-  await deps.db.meta.setSafeSync(rfp.id, state);
+  if (persist) await deps.db.meta.setSafeSync(rfp.id, state);
   return state;
 }
 
 /** Re-verify pending rows (price feed hiccups, shallow confirmations). */
-export async function reverifyPending(deps: SafeApiDeps): Promise<void> {
-  for (const d of await deps.db.donations.pending()) {
-    const rfp = await deps.db.rfps.get(d.rfpId);
+export async function reverifyPending(
+  deps: SafeApiDeps,
+  getBlockNumber = lazyBlockNumber(deps),
+  initiative?: Rfp,
+): Promise<void> {
+  const pending = initiative
+    ? (await deps.db.donations.list(initiative.id, false)).filter((d) => d.status === "pending")
+    : await deps.db.donations.pending();
+  for (const d of pending) {
+    const rfp = initiative ?? await deps.db.rfps.get(d.rfpId);
     if (!rfp?.safeAddress) continue;
     try {
-      const v = await deps.chain.verifyDonation(d.txHash, rfp.safeAddress);
+      const v = await deps.chain.verifyDonation(d.txHash, rfp.safeAddress, { getBlockNumber });
       if (v.found && !v.pending) {
         await deps.db.donations.record(rfp.id, d.txHash, v, d.source);
       }
     } catch { /* transient; next cycle */ }
   }
-}
-
-/** Cron entry: every approved initiative with a Safe, under one lock. */
-export async function syncAll(deps: SafeApiDeps): Promise<number> {
-  if (!(await deps.db.meta.lock("safe-sync", 60))) return 0;
-  let n = 0;
-  try {
-    for (const rfp of await deps.db.rfps.list(["approved"])) {
-      if (!rfp.safeAddress) continue;
-      const s = await syncSafe(deps, rfp);
-      if (s.error && /HTTP 429/.test(s.error)) break; // quota: stop the cycle
-      n++;
-    }
-    await reverifyPending(deps);
-  } finally {
-    await deps.db.meta.unlock("safe-sync");
-  }
-  return n;
 }

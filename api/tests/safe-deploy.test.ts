@@ -8,7 +8,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { ADMIN, harness, j, SAFE_ADDR } from "./app-helpers.ts";
 import { SIGNERS } from "./helpers.ts";
 import { predictSafeAddress } from "../chain/safe.ts";
-import { syncAll } from "../services/safe-api.ts";
+import { refreshLedgers } from "../services/ledger.ts";
 import type { Rfp } from "../db/types.ts";
 
 type H = Awaited<ReturnType<typeof harness>>;
@@ -64,7 +64,8 @@ Deno.test("approval needs a deployed Safe: the panel targets the predicted addre
   };
   assertEquals(ok.initiative.status, "approved");
   assertEquals(ok.initiative.safeAddress, predicted(rfp));
-  const page = await j(await h.req(`/api/initiatives/${rfp.slug}`)) as {
+  // The browser follows the cold snapshot with token verification and a balance refresh.
+  const page = await j(await h.req(`/api/initiatives/${rfp.slug}?refresh=1`)) as {
     donationsEnabled: boolean;
   };
   assertEquals(page.donationsEnabled, true);
@@ -122,11 +123,11 @@ Deno.test("the predicted address held by another initiative is a 409 until the a
   h.close();
 });
 
-Deno.test("the cron only syncs initiatives with a Safe; it never assigns one", async () => {
+Deno.test("page refresh only syncs initiatives with a Safe; it never assigns one", async () => {
   const h = await harness();
   const bare = await h.db.rfps.insert({ title: "Approved without a Safe", status: "approved" });
   await h.db.rfps.insert({ title: "With a Safe", status: "approved", safeAddress: SAFE_ADDR });
-  assertEquals(await syncAll(h.deps), 1);
+  assertEquals(await refreshLedgers(h.deps, await h.db.rfps.list(["approved"])), 1);
   assertEquals((await h.db.rfps.get(bare.id))!.safeAddress, "");
   assertEquals(safeCalls(h).length, 1);
   assertStringIncludes(safeCalls(h)[0].url, SAFE_ADDR);

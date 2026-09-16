@@ -174,6 +174,38 @@ Deno.test("verifyDonationTx: confirmation depth", async () => {
   assert(deep.ok);
 });
 
+Deno.test("verifyDonationTx: shared head failure stays pending without a separate RPC lookup", async () => {
+  let headReads = 0;
+  let separateReads = 0;
+  let mined = false;
+  const rpc = fakeRpc({
+    eth_getTransactionReceipt: () =>
+      mined ? receipt("0x1", [transferLog(USDC, DONOR, SAFE, 10n ** 6n)]) : null,
+    eth_getTransactionByHash: () => ({ hash: TX }),
+    eth_blockNumber: () => {
+      separateReads++;
+      return "0x100";
+    },
+  });
+  const opts = {
+    getBlockNumber: () => {
+      headReads++;
+      return Promise.reject(new Error("RPC unavailable"));
+    },
+  };
+  const unmined = await verifyDonationTx(rpc, one, TX, SAFE, config.TOKENS, opts);
+  assert(unmined.pending);
+  assertEquals(headReads, 0, "an unmined receipt does not need the head");
+
+  mined = true;
+  const waiting = await verifyDonationTx(rpc, one, TX, SAFE, config.TOKENS, opts);
+  assert(waiting.pending);
+  assertFalse(waiting.ok);
+  assertStringIncludes(waiting.detail, "confirmations (0/3)");
+  assertEquals(headReads, 1);
+  assertEquals(separateReads, 0, "a failed shared lookup must not cause another head request");
+});
+
 Deno.test("verifyDonationTx: native ETH", async () => {
   const run = (valueWei: bigint, to = SAFE) => {
     const rpc = fakeRpc({

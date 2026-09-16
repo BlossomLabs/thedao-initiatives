@@ -104,6 +104,7 @@ export function donateRoutes(deps: Deps) {
       return c.json({ status: "error", detail: v.detail }, 400);
     }
     let [, status] = await db.donations.record(rfp.id, txHash, v, "tx");
+    if (status === "confirmed") await deps.funding.invalidate(rfp.safeAddress);
     if (status === "already-confirmed") status = "confirmed";
     return c.json({
       status,
@@ -124,6 +125,7 @@ export function donateRoutes(deps: Deps) {
         const v = await chain.verifyDonation(txHash, rfp.safeAddress);
         if (v.found && !v.pending) {
           await db.donations.record(rfp.id, txHash, v, row.source);
+          if (v.ok) await deps.funding.invalidate(rfp.safeAddress);
           row = (await db.donations.get(rfp.id, txHash)) ?? row;
         }
       }

@@ -21,7 +21,7 @@ import { type Findings, isStructured } from "../../shared/draft/mod.ts";
 import { predictSafeAddress, safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
 import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
-import { syncSafe } from "../services/safe-api.ts";
+import { refreshLedger } from "../services/ledger.ts";
 import { liveRoles } from "../services/roles.ts";
 import type { AdminEntry } from "../services/admins.ts";
 import type { Comment, Pledge, PledgeStatus, Rfp } from "../db/types.ts";
@@ -67,7 +67,7 @@ export function adminRoutes(deps: Deps) {
     for (const rfp of [...pending, ...approved, ...other]) {
       rows.push({
         initiative: adminRfp(rfp),
-        summary: await deps.funding.summary(rfp),
+        summary: await deps.funding.summary(rfp, true),
         safeSync: rfp.safeAddress ? await db.meta.safeSync(rfp.id) : null,
       });
     }
@@ -88,7 +88,7 @@ export function adminRoutes(deps: Deps) {
       safeApi: {
         configured: Boolean(config.safeApiKey),
         quota: await db.meta.get("safe_api_quota"),
-        cron: config.safeSyncCron,
+        refreshMinutes: config.safeSyncTtlSecs / 60,
       },
       signers: {
         ok: signersOk,
@@ -117,7 +117,7 @@ export function adminRoutes(deps: Deps) {
     return c.json({
       initiative: adminRfp(rfp),
       revisions: (await db.revisions.list(rfp.id, true)).map(revisionMeta),
-      summary: await deps.funding.summary(rfp),
+      summary: await deps.funding.summary(rfp, true),
       pledges: (await db.pledges.list(rfp.id, true)).map((p) => pledgeJson(config, p)),
       donations: (await db.donations.list(rfp.id, false)).map((d) => donationJson(d, decimalsOf)),
       safeSync: rfp.safeAddress ? await db.meta.safeSync(rfp.id) : null,
@@ -412,7 +412,7 @@ export function adminRoutes(deps: Deps) {
     if (!(await db.rateLimit("safesync:" + rfp.id, 1, 60))) {
       throw new HttpError(429, "synced less than a minute ago");
     }
-    return c.json({ safeSync: await syncSafe(deps, rfp) });
+    return c.json({ safeSync: await refreshLedger(deps, rfp, true) });
   });
 
   /** What the admin's wallet sends to deploy this initiative's Safe, and where it lands. */

@@ -6,6 +6,9 @@ import type { Rfp } from "../db/types.ts";
 import { SAFE_OWNER_COUNT, SAFE_THRESHOLD } from "../config.ts";
 import { onrampLink } from "../lib/onramp.ts";
 import type { FundingSummary } from "../services/funding.ts";
+import { chainStateFresh } from "../chain/mod.ts";
+import { activeTokens } from "../chain/tokens.ts";
+import { ledgerStatus, refreshLedgers } from "../services/ledger.ts";
 
 export interface Card {
   initiative: ReturnType<typeof publicRfp>;
@@ -13,6 +16,7 @@ export interface Card {
   pct: number;
   backers: number;
   donations: number;
+  ledger: Awaited<ReturnType<typeof ledgerStatus>>;
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
@@ -41,11 +45,17 @@ export function orderCards<
   });
 }
 
-export async function buildCard(deps: Deps, r: Rfp, tokensOk: boolean): Promise<Card> {
-  const [summary, pledges, donations] = await Promise.all([
-    deps.funding.summary(r),
+export async function buildCard(
+  deps: Deps,
+  r: Rfp,
+  tokensOk: boolean,
+  refresh = false,
+): Promise<Card> {
+  const [summary, pledges, donations, ledger] = await Promise.all([
+    deps.funding.summary(r, refresh),
     deps.db.pledges.list(r.id),
     deps.db.donations.list(r.id),
+    ledgerStatus(deps, r),
   ]);
   return {
     initiative: publicRfp(r),
@@ -53,6 +63,7 @@ export async function buildCard(deps: Deps, r: Rfp, tokensOk: boolean): Promise<
     pct: pctOf(summary.total, r.goalUsd),
     backers: pledges.length,
     donations: donations.length,
+    ledger,
     logos: pledges.filter((p) => p.logoCid).slice(0, 4)
       .map((p) => ({ company: p.company, logoUrl: ipfsUrl(deps.config, p.logoCid), url: p.url })),
     funded: Boolean(r.goalUsd && summary.total >= r.goalUsd),
@@ -65,12 +76,24 @@ export function boardRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const { db, config } = deps;
 
+  // The global profile/support UI must not load or poll the funding board.
+  r.get(
+    "/settings",
+    (c) => c.json({ uploads: deps.pinata.enabled, support: Boolean(config.supportUrl) }),
+  );
+
   r.get("/", async (c) => {
-    const state = await deps.chain.state();
-    const tokensOk = Object.keys(await deps.chain.activeTokens()).length > 0;
+    const refresh = c.req.query("refresh") === "1";
     const rfps = await db.rfps.list(["approved"]);
+    const [state] = await Promise.all([
+      deps.chain.state(refresh),
+      refresh ? refreshLedgers(deps, rfps) : Promise.resolve(),
+    ]);
+    const tokensOk = Object.keys(activeTokens(state.tokens)).length > 0;
     const cards = orderCards(
-      await Promise.all(rfps.map((x) => buildCard(deps, x, tokensOk))),
+      await Promise.all(
+        rfps.map((x) => buildCard(deps, x, tokensOk, refresh)),
+      ),
     );
     const byId = new Map(rfps.map((x) => [x.id, x]));
     const admins = await deps.admins.set();
@@ -81,6 +104,7 @@ export function boardRoutes(deps: Deps) {
         initiative: { slug: byId.get(cm.rfpId)!.slug, title: byId.get(cm.rfpId)!.title },
       }));
     return c.json({
+      refreshDue: !chainStateFresh(state, deps.now()),
       cards,
       totals: {
         count: cards.length,

@@ -168,4 +168,7 @@ export interface SafeSyncState {
   backfilled: boolean;
   /** Where an incomplete walk (budget / page cap) continues next run. */
   resumeUrl: string;
+  /** Freshness deadline, failure cooldown, or refresh lease expiry. */
+  refreshAfter?: number;
+  updating?: boolean;
 }

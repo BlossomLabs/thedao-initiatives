@@ -23,10 +23,17 @@ the process rules and the donation terms are files under `content/`; the propose
 - Donations are ERC-20 transfers (or plain ETH sends) straight from the donor's wallet to the
   initiative's Safe. Accepted tokens: USDC, USDT, DAI, USDS, crvUSD, BOLD, fxUSD, EURC, ZCHF; the
   non-USD ones are priced by Chainlink feeds with staleness checks.
-- "Raised" is the Safe's balance, read over RPC and priced with Chainlink, so it moves as soon as a
-  transfer is mined. The donor ledger comes from the Safe Transaction Service on a `Deno.cron`
-  schedule, and every new transaction is re-verified over RPC, `MIN_CONFIRMATIONS` blocks deep,
-  before it is credited. Amounts come from the chain, never from the browser.
+- "Raised" uses the Safe's saved balance, priced with Chainlink. Pages show that snapshot first,
+  then refresh stale balances in the background, at most once per Safe every two minutes across
+  server instances. A newly confirmed wallet donation makes its Safe eligible sooner. The donor
+  ledger follows the same request-driven flow: show saved donations immediately, display an
+  updating indicator when stale, then show the refreshed rows after they reach KV. Its cache lasts
+  ten minutes by default (`SAFE_SYNC_TTL_SECS`). A daily fallback at 03:00 UTC refreshes stale
+  balances and donation rows for approved initiatives only when `DENO_TIMELINE` is `production`.
+  It reuses the same KV leases and skips fresh data. Branches, previews and local runs do no
+  scheduled refresh work. There is no startup chain check.
+  New transactions are re-verified over RPC, `MIN_CONFIRMATIONS` blocks deep, before they are
+  credited. Amounts come from the chain, never from the browser.
 
 ## Run it
 

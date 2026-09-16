@@ -1,4 +1,4 @@
-/** Builds the API (deps, cron, Hono app) from the environment. Shared by the
+/** Builds the API (deps, Hono app) from the environment. Shared by the
  * standalone `main.ts` and the combined site server in `../server.ts`. */
 import { createApp, siteLockFor } from "./app.ts";
 import { loadConfig } from "./config.ts";
@@ -8,7 +8,6 @@ import { createChain } from "./chain/mod.ts";
 import { createAi } from "./services/ai.ts";
 import { createEns, onchainEns } from "./services/ens.ts";
 import { createPinata } from "./services/pinata.ts";
-import { syncAll } from "./services/safe-api.ts";
 import { createFunding } from "./services/funding.ts";
 import { toChecksum } from "./chain/address.ts";
 import { BADGE_CONTRACT, CURATOR_ADDRESSES } from "./config.ts";
@@ -52,21 +51,8 @@ export async function createServer() {
     pinata: createPinata(config, fetch),
     log,
   };
-  // Ledger discovery (who gave what): one authenticated Safe API request per
-  // Safe, on a schedule. The headline number on the pages comes from Safe
-  // balances (services/funding.ts) and does not wait for this.
-  Deno.cron("sync-donations", config.safeSyncCron, async () => {
-    try {
-      const n = await syncAll(deps);
-      log(`safe sync: ${n} Safe(s) checked`);
-    } catch (e) {
-      log(`safe sync failed: ${String(e)}`);
-    }
-  });
-
   const lock = siteLockFor(deps);
   const app = createApp(deps, lock);
-  chain.state().then((s) => log(s.detail)).catch(() => {});
   if (lock.enabled) log("site lock is ON (SITE_USERNAME/SITE_PASSWORD set)");
   return { app, lock, config, deps };
 }

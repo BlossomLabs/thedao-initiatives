@@ -15,7 +15,7 @@ import type { Draft } from "~/components/initiative-form/types";
 import { useSession } from "~/context/session";
 import { useProfileDialog } from "~/context/profile-dialog";
 import { useIdentity } from "~/hooks/use-identity";
-import { useBoard } from "~/hooks/use-board";
+import { useSiteSettings } from "~/hooks/use-site-settings";
 import { GUIDE_TEXT } from "~/data/guide";
 import { rulesKindFor } from "~/data/rules";
 import { WHAT_NEXT } from "~/data/what-next";
@@ -222,8 +222,8 @@ export default function Submit() {
   const navigate = useNavigate();
   const { requireSession } = useSession();
   const submitter = useSubmitter();
-  const board = useBoard();
-  const uploads = board.data?.flags.uploads ?? true;
+  const settings = useSiteSettings();
+  const uploads = settings.data?.uploads ?? true;
 
   async function onSubmit(_payload: unknown, draft: Draft) {
     await requireSession();

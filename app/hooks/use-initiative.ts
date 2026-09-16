@@ -1,15 +1,22 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import { api } from "~/lib/api";
 import type { Board, InitiativePage } from "~/lib/api-types";
 import { sessionKey, useSession } from "~/context/session";
 import { boardKey } from "./use-board";
+import { cachedFunding } from "~/lib/cached-funding";
 
 export const initiativeKey = (slug: string) => ["initiative", slug] as const;
 export const PAGE_POLL_MS = 15_000;
 
-const fetchPage = (slug: string) =>
-  api<InitiativePage>(`/api/initiatives/${encodeURIComponent(slug)}`);
+const fetchPage = (slug: string, qc: QueryClient, signal: AbortSignal) =>
+  cachedFunding<InitiativePage>(
+    qc,
+    initiativeKey(slug),
+    `/api/initiatives/${encodeURIComponent(slug)}`,
+    (p) => p.refreshDue === true || p.summary.refreshDue === true || p.ledger?.refreshDue === true,
+    signal,
+  );
 
 /** The board card holds everything but pledges and donations: enough to paint the page at once. */
 function fromBoard(board: Board | undefined, slug: string): InitiativePage | undefined {
@@ -41,15 +48,24 @@ export function useInitiative(slug: string) {
     seen.current = who;
     void qc.invalidateQueries({ queryKey: initiativeKey(slug) });
   }, [who, slug, qc]);
-  return useQuery({
+  const query = useQuery<InitiativePage>({
     queryKey: initiativeKey(slug),
-    queryFn: () => fetchPage(slug),
+    queryFn: ({ signal }) => fetchPage(slug, qc, signal),
     retry: false,
-    // "raised" is the Safe's balance, so a poll is enough to keep it live
-    // while the page is open (paused in background tabs by default).
-    refetchInterval: PAGE_POLL_MS,
+    // Poll the saved snapshot while visible; RPC runs only when the shared
+    // server cache is stale. Fresh numbers animate without replacing the page.
+    // A different visitor may own the refresh. Read KV more often until its
+    // result arrives; these snapshot polls never duplicate the upstream work.
+    refetchInterval: (q) => q.state.data?.ledger?.updating ? 2_000 : PAGE_POLL_MS,
     placeholderData: () => fromBoard(qc.getQueryData<Board>(boardKey), slug),
   });
+  return {
+    ...query,
+    isUpdatingLedger: Boolean(
+      query.data?.ledger?.updating ||
+        (query.isFetching && query.data?.ledger?.refreshDue),
+    ),
+  };
 }
 
 /** Warm the initiative query on hover/focus so the click lands on cached data. */
@@ -58,7 +74,9 @@ export function usePrefetchInitiative(slug: string) {
   return useCallback(() => {
     void qc.prefetchQuery({
       queryKey: initiativeKey(slug),
-      queryFn: () => fetchPage(slug),
+      // Hover only warms the saved snapshot, without triggering RPC work.
+      queryFn: ({ signal }) =>
+        api<InitiativePage>(`/api/initiatives/${encodeURIComponent(slug)}`, { signal }),
       staleTime: 30_000,
     });
   }, [qc, slug]);

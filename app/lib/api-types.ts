@@ -95,6 +95,8 @@ export interface Summary {
   donated: number;
   total: number;
   live: boolean;
+  /** The saved Safe balance is due for a shared server refresh. */
+  refreshDue?: boolean;
   /** Confirmed donation rows, for reconciliation. */
   ledger: number;
   paidOut: number;
@@ -105,8 +107,10 @@ export interface LedgerStatus {
   /** Unix seconds of the last Safe sync run, null before the first. */
   checkedAt: number | null;
   ok: boolean;
-  /** Minutes between runs, null when the cron shape is unusual. */
+  /** Cache lifetime in minutes; refreshes only run while a page is viewed. */
   intervalMinutes: number | null;
+  refreshDue?: boolean;
+  updating?: boolean;
 }
 
 export interface Onramp {
@@ -120,6 +124,7 @@ export interface Card {
   pct: number;
   backers: number;
   donations: number;
+  ledger?: LedgerStatus | null;
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
@@ -163,6 +168,8 @@ export interface BoardFlags {
 }
 
 export interface Board {
+  /** The server's token verification needs a background refresh. */
+  refreshDue?: boolean;
   cards: Card[];
   totals: { count: number; goal: number; raised: number; backers: number; donations: number };
   community: CommunityEntry[];
@@ -196,6 +203,8 @@ export interface Donation {
 }
 
 export interface InitiativePage {
+  /** The server's token verification needs a background refresh. */
+  refreshDue?: boolean;
   initiative: Initiative;
   /** Public history, oldest first (archived entries only for admins). */
   revisions: RevisionMeta[];
@@ -297,6 +306,8 @@ export interface SafeSyncState {
   error: string;
   backfilled: boolean;
   resumeUrl: string;
+  refreshAfter?: number;
+  updating?: boolean;
 }
 
 export interface AdminComment extends CommentEntry {
@@ -318,7 +329,11 @@ export interface AdminDashboard {
   reported: AdminComment[];
   weekAgo: number;
   bell: number;
-  safeApi: { configured: boolean; quota: { remaining: number; at: number } | null; cron: string };
+  safeApi: {
+    configured: boolean;
+    quota: { remaining: number; at: number } | null;
+    refreshMinutes: number;
+  };
   signers: { ok: boolean; detail: string; list: string[]; threshold: number };
 }
 

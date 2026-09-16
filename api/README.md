@@ -26,14 +26,34 @@ at the repository root until 2026-09-15 (see `docs/v1-to-v2.md`). `../server.ts`
   `app/lib/session-migration.ts` and its call in `app/context/session.tsx` a week after that deploy.
 - **"Raised" is the Safe's balance.** `services/funding.ts` reads every accepted token's `balanceOf`
   and the ETH balance of an initiative's Safe over RPC, prices them with the Chainlink feeds, adds
-  the admin-entered `paidOutUsd`, and caches the result 15 s per Safe. The number moves as soon as a
-  transfer is mined; when the RPC read fails the ledger's confirmed total is used and the summary
-  says `live: false`. Design: `docs/balance-funding-design-2026-09-12.md`.
-- **The ledger is discovered, not scanned.** Donor rows come from the Safe Transaction Service: a
-  `Deno.cron` (default every 10 min) makes one authenticated request per Safe, re-verifies each new
-  tx over RPC, and writes the row to KV. Nothing on the page waits for it; the initiative page shows
-  when it last ran (`ledger.checkedAt`) and the interval derived from `SAFE_SYNC_CRON`. Set
-  `SAFE_API_KEY`.
+  the admin-entered `paidOutUsd`, and saves balances in shared KV for two minutes per Safe. Normal
+  board/initiative GETs return that snapshot without reading balances over RPC. When a summary's
+  `refreshDue` is true, the browser paints it and fetches the same URL with `?refresh=1`; that request
+  rechecks freshness, acquires a shared lease, and returns refreshed values for the existing number
+  animation. A failed refresh keeps the old snapshot and waits 60 seconds before retrying. Before
+  the first successful read, the ledger total is the fallback (`live: false`). Global UI reads
+  `/api/board/settings` without subscribing to funding. Design: `docs/balance-funding-design-2026-09-12.md`.
+- **The ledger refreshes when viewed.** Normal board/initiative GETs read saved donations and
+  `ledger` status from KV. When `ledger.refreshDue` is true, the browser shows those rows and an
+  updating indicator while `?refresh=1` refreshes the Safe indexer's results, verifies new and
+  pending donations, saves them in KV, and returns the updated page. The board refreshes its
+  published initiatives; an initiative page refreshes only its own Safe. A per-initiative KV lease
+  shares work across visitors and server instances; other visitors poll KV every two seconds
+  while `ledger.updating` is true. Fresh results are reused for `SAFE_SYNC_TTL_SECS` (default 600,
+  minimum 60). Failures and incomplete backfills retry after 60 seconds while viewed, preserving
+  old rows and the resume cursor. The admin sync button can refresh early but respects the lease.
+  Startup does not check the chain. The removed `SAFE_SYNC_CRON` setting is ignored.
+  Set `SAFE_API_KEY` for authenticated indexer access.
+  Empty/known indexer results need no ledger RPC calls. Donation verification shares one lazy
+  block-number lookup per refresh batch; receipt and price reads still use RPC. Failed head
+  lookups never bypass the confirmation requirement.
+- **A daily production fallback keeps quiet-day snapshots recent.** `server.ts` registers
+  `refresh-public-cache-daily` at module scope for 03:00 UTC. Its handler checks the runtime
+  `DENO_TIMELINE` before reading KV or calling any upstream service; only the exact value
+  `production` proceeds. It refreshes approved initiatives' ledgers and balances through the same
+  functions as visitor requests, respecting freshness, cooldowns and active KV leases. Branch,
+  preview, local and unknown timelines do no refresh work, even if the job appears in their Cron
+  dashboard. Deno supplies `DENO_TIMELINE`; no additional environment configuration is needed.
 - **Content sync is push-based.** `deno task sync-content` reads `../../content/rfps/*.md` and POSTs
   them to `/api/admin/sync-content`. Files own the words and the goal; the admin panel owns status,
   Safes and money. Run the sync after every deploy that changes content. Besides the keys in

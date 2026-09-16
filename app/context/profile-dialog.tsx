@@ -4,7 +4,7 @@
  */
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import NicknameDialog from "~/components/wallet/NicknameDialog";
-import { useBoard } from "~/hooks/use-board";
+import { useSiteSettings } from "~/hooks/use-site-settings";
 
 interface ProfileDialogCtx {
   profileOpen: boolean;
@@ -17,7 +17,7 @@ const Ctx = createContext<ProfileDialogCtx | null>(null);
 export function ProfileDialogProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [firstTime, setFirstTime] = useState(false);
-  const board = useBoard();
+  const settings = useSiteSettings();
   const openProfile = useCallback((first = false) => {
     setFirstTime(first);
     setOpen(true);
@@ -30,7 +30,7 @@ export function ProfileDialogProvider({ children }: { children: React.ReactNode 
         open={open}
         onOpenChange={setOpen}
         firstTime={firstTime}
-        uploadsEnabled={board.data?.flags.uploads}
+        uploadsEnabled={settings.data?.uploads}
       />
     </Ctx.Provider>
   );

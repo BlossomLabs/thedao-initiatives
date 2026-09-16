@@ -24,6 +24,8 @@ export interface VerifyOptions {
   minConfirmations?: number;
   nativeEth?: boolean;
   minEth?: number;
+  /** Server-side batch context: reuse one head for confirmation checks. */
+  getBlockNumber?: () => Promise<number>;
 }
 
 interface Log {
@@ -86,7 +88,7 @@ export async function verifyDonationTx(
   const mined = Number(decodeHexInt(receipt.blockNumber));
   let depth = 0;
   try {
-    const head = await getBlockNumber(rpc);
+    const head = await (opts.getBlockNumber?.() ?? getBlockNumber(rpc));
     depth = mined ? head - mined + 1 : 0;
   } catch {
     depth = 0;

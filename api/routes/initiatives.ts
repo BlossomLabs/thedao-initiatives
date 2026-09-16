@@ -24,7 +24,9 @@ import {
 } from "../config.ts";
 import type { Pledge, Rfp, Session } from "../db/types.ts";
 import { pickText } from "../db/rfps.ts";
-import { cronIntervalMinutes } from "../services/funding.ts";
+import { ledgerStatus, refreshLedger } from "../services/ledger.ts";
+import { chainStateFresh } from "../chain/mod.ts";
+import { activeTokens } from "../chain/tokens.ts";
 import { assertNoErrors, mergeFindings, readBackers, readStructured } from "../lib/structured.ts";
 import { readPageFacts } from "../lib/page-facts.ts";
 import { ownsUpload } from "./uploads.ts";
@@ -137,16 +139,19 @@ export function initiativeRoutes(deps: Deps) {
   r.get("/:slug", async (c) => {
     const user = c.var.user;
     const rfp = await visibleOr404(c.req.param("slug"), user);
-    const [summary, pledges, donations, active, revisions, sync] = await Promise.all([
-      deps.funding.summary(rfp),
+    const refresh = c.req.query("refresh") === "1";
+    if (refresh) await refreshLedger(deps, rfp);
+    const [summary, pledges, donations, chainState, revisions, ledger] = await Promise.all([
+      deps.funding.summary(rfp, refresh),
       db.pledges.list(rfp.id),
       db.donations.list(rfp.id),
-      deps.chain.activeTokens(),
+      deps.chain.state(refresh),
       db.revisions.list(rfp.id, Boolean(user?.isAdmin)),
-      rfp.safeAddress ? db.meta.safeSync(rfp.id) : Promise.resolve(null),
+      ledgerStatus(deps, rfp),
     ]);
     const mine = Boolean(user?.isAdmin) || isProposer(rfp, user);
     return c.json({
+      refreshDue: !chainStateFresh(chainState, deps.now()),
       initiative: mine ? proposerRfp(rfp) : publicRfp(rfp),
       revisions: revisions.map(revisionMeta),
       summary,
@@ -155,18 +160,11 @@ export function initiativeRoutes(deps: Deps) {
       donations: donations.map((d) => donationJson(d, decimalsOf)),
       funded: Boolean(rfp.goalUsd && summary.total >= rfp.goalUsd),
       donationsEnabled: Boolean(
-        Object.keys(active).length && rfp.safeAddress && rfp.status === "approved",
+        Object.keys(activeTokens(chainState.tokens)).length && rfp.safeAddress &&
+          rfp.status === "approved",
       ),
       onramp: rfp.safeAddress ? onrampLink(config, rfp.safeAddress) : { url: "", prefilled: false },
-      // Where the donations table stands: the ledger is filled by the Safe
-      // cron, so the page says when it last ran and how often it does.
-      ledger: rfp.safeAddress
-        ? {
-          checkedAt: sync?.at ?? null,
-          ok: sync?.ok ?? true,
-          intervalMinutes: cronIntervalMinutes(config.safeSyncCron),
-        }
-        : null,
+      ledger,
     });
   });
 

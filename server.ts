@@ -10,8 +10,14 @@ import { createServer } from "./api/bootstrap.ts";
 import { LOCK_MESSAGE, LOCK_REALM } from "./api/lib/sitelock.ts";
 import { collectScriptHashes, sitePolicy, withSiteHeaders } from "./api/lib/site-headers.ts";
 import { isInitiativeMarkdown } from "./api/routes/markdown.ts";
+import { refreshDailyCache } from "./api/services/daily-cache.ts";
 
-const { app, lock, config } = await createServer();
+const { app, lock, config, deps } = await createServer();
+// Register at module scope so Deploy discovers the job. The handler checks
+// DENO_TIMELINE before doing any work; branch timelines immediately return.
+Deno.cron("refresh-public-cache-daily", "0 3 * * *", async () => {
+  await refreshDailyCache(deps, Deno.env.get("DENO_TIMELINE"));
+});
 // Mirrors app/data/site.ts (which is Vite-only code).
 const SITE_URL = (Deno.env.get("VITE_SITE_URL") ?? "").replace(/\/+$/, "") ||
   "https://fund.thedao.fund";

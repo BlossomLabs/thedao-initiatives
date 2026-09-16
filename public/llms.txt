@@ -208,7 +208,7 @@ Never hide a gap. When the honest answer is that nobody would fund this, say so 
 
 ## What the site shows next to every initiative (do not paste any of this)
 
-Every initiative page carries the panel for its type, and so does the submit form. Nobody writes it and nobody edits it. It is here so you can answer the proposer's questions about how the process works. The site prints "Rules v2026-09, shown on every initiative of this type" under each panel.
+Every initiative page carries the panel for its type, and so does the submit form. Nobody writes it and nobody edits it. It is here so you can answer the proposer's questions about how the process works. The site prints the rules version under each panel.
 
 ### How RFPs work
 

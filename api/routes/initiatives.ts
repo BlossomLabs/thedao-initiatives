@@ -15,7 +15,6 @@ import {
 import { cleanText, validateForumUrl, validateText } from "../lib/validate.ts";
 import { pctOf } from "./board.ts";
 import { onrampLink } from "../lib/onramp.ts";
-import { fetchDiscourseTitle } from "../services/forum.ts";
 import {
   MAX_FUNDERS,
   REVISIONS_PER_HOUR_PER_ADDRESS,
@@ -281,22 +280,12 @@ export function initiativeRoutes(deps: Deps) {
       if (err) throw new HttpError(400, err);
       discourseUrl = clean!;
     }
-    // The title may be left blank when a forum link is given: we read the
-    // topic's title from Discourse (SSRF-hardened, best effort).
-    let title = cleanText(body.title, "title");
-    if (!title && discourseUrl) {
-      title = cleanText(
-        await fetchDiscourseTitle(discourseUrl, deps.fetch, deps.resolve),
-        "title",
-      );
-    }
+    // Discussion links are stored as links, never fetched by the server.
+    // Requiring an explicit title also removes the DNS-rebinding window
+    // that a separate hostname check followed by fetch would leave open.
+    const title = cleanText(body.title, "title");
     if (title.length < 8) {
-      throw new HttpError(
-        400,
-        discourseUrl && !s(body.title)
-          ? "We could not read a title from that discussion link. Please give the initiative a title (at least 8 characters)."
-          : "Please give the initiative a title (at least 8 characters), or a Discourse link we can read it from.",
-      );
+      throw new HttpError(400, "Please give the initiative a title (at least 8 characters).");
     }
     const summary = cleanText(body.summary, "summary");
     const type = body.type === "grant" ? "grant" : "rfp";

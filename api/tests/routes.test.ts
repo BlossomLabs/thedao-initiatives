@@ -807,19 +807,11 @@ Deno.test("ai-search: mocked provider, unknown ids dropped, cache, disabled", as
   h.close();
 });
 
-Deno.test("submit: blank title is read from the Discourse topic; forum errors are honest", async () => {
+Deno.test("submit: discussion links are stored without fetching; title is required", async () => {
   const h = await harness({
     env: { ONRAMP_API_KEY: "tk" },
-    fetch: (url, init) => {
-      if (url === "https://forum.example.org/t/my-initiative/123.json") {
-        assertEquals((init as RequestInit).redirect, "manual");
-        return Response.json({ title: "Source-level debugging for Solidity", id: 123 });
-      }
-      if (url.endsWith("/no-title/9.json")) return Response.json({ id: 9 });
-      return new Response("", { status: 404 });
-    },
   });
-  const { title: _noTitle, ...good } = minimalSubmission(1000);
+  const good = minimalSubmission(1000);
   const token = await proposerToken(h);
   const res = await h.req("/api/initiatives", {
     method: "POST",
@@ -828,26 +820,27 @@ Deno.test("submit: blank title is read from the Discourse topic; forum errors ar
   });
   assertEquals(res.status, 201);
   const { slug } = await j(res) as { slug: string };
-  assertEquals(
-    (await h.db.rfps.bySlug(slug))!.title,
-    "Source-level debugging for Solidity",
-  );
+  const row = (await h.db.rfps.bySlug(slug))!;
+  assertEquals(row.title, good.title);
+  assertEquals(row.discourseUrl, "https://forum.example.org/t/my-initiative/123");
   const noTitle = await h.req("/api/initiatives", {
     method: "POST",
     token,
-    json: { ...good, discourseUrl: "https://forum.example.org/t/no-title/9" },
+    json: { ...good, title: "", discourseUrl: "https://forum.example.org/t/no-title/9" },
   });
   assertEquals(noTitle.status, 400);
-  assertStringIncludes(String((await j(noTitle)).error), "could not read a title");
-  const nothing = await h.req("/api/initiatives", { method: "POST", token, json: good });
+  assertStringIncludes(String((await j(noTitle)).error), "give the initiative a title");
+  const { title: _noTitle, ...withoutTitle } = good;
+  const nothing = await h.req("/api/initiatives", { method: "POST", token, json: withoutTitle });
   assertEquals(nothing.status, 400);
-  assertStringIncludes(String((await j(nothing)).error), "Discourse link");
+  assertStringIncludes(String((await j(nothing)).error), "give the initiative a title");
   const badHost = await h.req("/api/initiatives", {
     method: "POST",
     token,
     json: { ...good, discourseUrl: "https://forum.invalid/t/x/1" },
   });
   assertEquals(badHost.status, 400);
+  assertEquals(h.fetchLog, []);
   // board cards carry the card-checkout template once a Safe exists
   const admin = await h.mint(ADMIN, true);
   const id = (await h.db.rfps.bySlug(slug))!.id;

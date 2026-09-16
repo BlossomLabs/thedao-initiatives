@@ -19,6 +19,8 @@ import { adminRoutes } from "./routes/admin.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 import { createSiteLock, type SiteLock } from "./lib/sitelock.ts";
+import { auditIntent, securityAudit } from "./services/audit.ts";
+import { auditRoutes } from "./routes/audit.ts";
 
 /** The lock is shared with the static server so one gate covers the whole site. */
 export function siteLockFor(deps: Deps): SiteLock {
@@ -32,12 +34,12 @@ export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
     if (err instanceof HttpError) {
       return c.json({ error: err.message, ...err.extra }, err.status as 400);
     }
-    deps.log(`unhandled: ${err.stack ?? err}`);
     return c.json({ error: "internal error" }, 500);
   });
   app.notFound((c) => c.json({ error: "not found" }, 404));
 
   app.use("*", securityHeaders);
+  app.use("*", securityAudit(deps));
   app.use(
     "*",
     cors({
@@ -53,6 +55,7 @@ export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
   app.use("*", originGuard(deps.config));
   app.use("*", bodyLimit({ maxSize: 2 * 1024 * 1024 }));
   app.use("*", sessionLoader(deps.db, deps.admins, deps.config));
+  app.use("*", auditIntent(deps));
 
   app.route("/healthz", healthRoutes(deps));
   app.route("/api/auth", authRoutes(deps));
@@ -64,6 +67,7 @@ export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
   app.route("/api", commentRoutes(deps));
   app.route("/api", aiRoutes(deps));
   app.route("/api", supportRoutes(deps));
+  app.route("/api/admin/audit", auditRoutes(deps));
   app.route("/api/admin", adminRoutes(deps));
   app.route("/initiative", markdownRoutes(deps));
 

@@ -1,6 +1,7 @@
 import { type Context, Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { auditContext, auditedItem, recordAudit } from "../services/audit.ts";
 import { INITIATIVE_CHANGED } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAdmin, requireRecentAuth } from "../middleware/auth.ts";
@@ -41,6 +42,7 @@ export function adminRoutes(deps: Deps) {
     const body = await jsonBody(c);
     const address = s(body.address, 60);
     if (!isAddress(address)) throw new HttpError(400, "that is not an Ethereum address");
+    auditContext(c, { target: address });
     const revoked = await db.sessions.revokeAll(address);
     if (address.toLowerCase() === c.var.user!.address.toLowerCase()) {
       c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
@@ -127,10 +129,27 @@ export function adminRoutes(deps: Deps) {
   r.get("/admins", async (c) => adminsJson(await deps.admins.list(), c));
   r.post("/admins", async (c) => {
     const body = await jsonBody(c);
-    return adminsJson(await deps.admins.add(s(body.address, 60)), c);
+    const address = s(body.address, 60);
+    auditContext(c, { target: address });
+    const admins = await deps.admins.add(address);
+    recordAudit(deps, c, {
+      action: "session.admin_revoke",
+      targetKind: "wallet",
+      target: address,
+      outcome: "success",
+    });
+    return adminsJson(admins, c);
   });
   r.delete("/admins/:address", async (c) => {
-    return adminsJson(await deps.admins.remove(c.req.param("address"), c.var.user!.address), c);
+    const address = c.req.param("address");
+    const admins = await deps.admins.remove(address, c.var.user!.address);
+    recordAudit(deps, c, {
+      action: "session.admin_revoke",
+      targetKind: "wallet",
+      target: address,
+      outcome: "success",
+    });
+    return adminsJson(admins, c);
   });
 
   r.get("/initiatives/:id", async (c) => {
@@ -257,6 +276,7 @@ export function adminRoutes(deps: Deps) {
     const rfp = await rfpOr404(c.req.param("id"), true);
     const n = Number(c.req.param("n"));
     const action = s((await jsonBody(c)).action, 20);
+    auditContext(c, { target: `${rfp.id}:${n}`, detail: action });
     if (action !== "archive" && action !== "unarchive") throw new HttpError(400, "bad action");
     if (action === "archive" && n === rfp.revision) {
       throw new HttpError(
@@ -305,6 +325,7 @@ export function adminRoutes(deps: Deps) {
   r.post("/initiatives/:id/status", async (c) => {
     const rfp = await rfpOr404(c.req.param("id"), true);
     const action = s((await jsonBody(c)).action, 20);
+    auditContext(c, { target: rfp.id, detail: action });
     return c.json({ initiative: adminRfp(await applyStatus(rfp, action)) });
   });
 
@@ -313,18 +334,27 @@ export function adminRoutes(deps: Deps) {
   r.post("/initiatives/bulk", async (c) => {
     const body = await jsonBody(c);
     const { ids, action } = readBulk(body, STATUS_ACTIONS);
+    auditContext(c, { detail: action });
     const failed: { id: string; error: string }[] = [];
     let done = 0;
     for (const id of ids) {
       try {
-        const rfp = await db.rfps.get(id);
-        if (!rfp) throw new HttpError(404, "not found");
-        await applyStatus(rfp, action);
+        await auditedItem(deps, c, {
+          action: "initiative.status",
+          targetKind: "initiative",
+          target: id,
+          detail: action,
+        }, async () => {
+          const rfp = await db.rfps.get(id);
+          if (!rfp) throw new HttpError(404, "not found");
+          await applyStatus(rfp, action);
+        });
         done++;
       } catch (e) {
         failed.push({ id, error: e instanceof Error ? e.message : "failed" });
       }
     }
+    auditContext(c, { outcome: failed.length ? done ? "partial" : "failure" : "success" });
     return c.json({ done, failed });
   });
 
@@ -479,6 +509,7 @@ export function adminRoutes(deps: Deps) {
       rfp.safeDeploymentKey ?? rfp.slug,
     );
     if (!(await chain.hasCode(address))) {
+      auditContext(c, { outcome: "pending" });
       return c.json({ status: "pending", detail: `no Safe at ${address} yet` });
     }
     const [good, detail] = await chain.verifySafe(address, config.operationalSigners);
@@ -534,22 +565,32 @@ export function adminRoutes(deps: Deps) {
   r.post("/comments/bulk", async (c) => {
     const body = await jsonBody(c);
     const { ids, action } = readBulk(body, BULK_COMMENT_ACTIONS);
+    auditContext(c, { detail: action });
     const failed: { id: string; error: string }[] = [];
     let done = 0;
     for (const id of ids) {
       try {
-        const row = await db.comments.get(id);
-        if (!row) throw new HttpError(404, "not found");
-        await db.comments.set(row.id, await commentPatch(row, action));
+        await auditedItem(deps, c, {
+          action: "comment.moderate",
+          targetKind: "comment",
+          target: id,
+          detail: action,
+        }, async () => {
+          const row = await db.comments.get(id);
+          if (!row) throw new HttpError(404, "not found");
+          await db.comments.set(row.id, await commentPatch(row, action));
+        });
         done++;
       } catch (e) {
         failed.push({ id, error: e instanceof Error ? e.message : "failed" });
       }
     }
+    auditContext(c, { outcome: failed.length ? done ? "partial" : "failure" : "success" });
     return c.json({ done, failed });
   });
 
   r.post("/comments/:id/:action", async (c) => {
+    auditContext(c, { detail: c.req.param("action") });
     const row = await db.comments.get(c.req.param("id"));
     if (!row) throw new HttpError(404, "not found");
     const next = await db.comments.set(row.id, await commentPatch(row, c.req.param("action")));
@@ -591,6 +632,7 @@ export function adminRoutes(deps: Deps) {
     if (!LOGO_NAME_RE.test(name)) {
       throw new HttpError(400, "Logo names are lowercase file names: png, jpg or webp.");
     }
+    auditContext(c, { target: name });
     const image = form?.get("image");
     if (!(image instanceof File) || !image.size) throw new HttpError(400, "Send the image file.");
     if (image.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
@@ -617,7 +659,18 @@ export function adminRoutes(deps: Deps) {
         typeof f.text === "string"
       )
       .map((f) => ({ name: f.name.slice(0, 200), text: f.text.slice(0, 200_000) }));
-    return c.json(await syncContent(db, clean));
+    const result = await syncContent(
+      db,
+      clean,
+      (name, run) =>
+        auditedItem(deps, c, { action: "content.item", targetKind: "content", target: name }, run),
+    );
+    auditContext(c, {
+      outcome: result.errors.length
+        ? result.created + result.updated ? "partial" : "failure"
+        : "success",
+    });
+    return c.json(result);
   });
 
   return r;

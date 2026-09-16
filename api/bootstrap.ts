@@ -17,7 +17,10 @@ import { createAdmins } from "./services/admins.ts";
 export async function createServer() {
   const config = loadConfig(Deno.env.toObject());
   const now = () => Date.now() / 1000;
-  const log = (msg: string) => console.log(`[${new Date().toISOString()}] ${msg}`);
+  const log = (msg: string) =>
+    console.log(
+      msg.startsWith('{"securityAudit":true,') ? msg : `[${new Date().toISOString()}] ${msg}`,
+    );
 
   // Config addresses are load-bearing (role tags, admin sessions): a typo'd
   // address must stop the app, not silently grant or deny roles.

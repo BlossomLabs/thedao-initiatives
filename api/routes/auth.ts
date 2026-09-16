@@ -3,6 +3,7 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { requireAuth, requireRecentAuth } from "../middleware/auth.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
+import { auditContext } from "../services/audit.ts";
 import { verifySiwe } from "../chain/siwe.ts";
 import { selfOrigin } from "../lib/origin.ts";
 import { MAX_CONTRACT_SIGNATURE_BYTES } from "../chain/sign.ts";
@@ -62,6 +63,11 @@ export function authRoutes(deps: Deps) {
     }
     const isAdmin = await deps.admins.isAdmin(m.address);
     const { token, session } = await db.sessions.create(m.address, isAdmin, c.var.token);
+    auditContext(c, {
+      actor: session.address,
+      target: session.address,
+      detail: c.var.user ? "reauthenticate" : "login",
+    });
     const info = { address: session.address, isAdmin, expiresAt: session.expiresAt };
     // The browser asks for the cookie and never sees the token; scripts get
     // it in the body and send it back as a bearer.

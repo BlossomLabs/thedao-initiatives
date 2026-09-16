@@ -1,0 +1,145 @@
+{
+  "at": "2026-09-15T20:57:17.587Z",
+  "address": "0x6829fdC49A4a96D9A325740FB55A4f5F1e01afDa",
+  "privateKeyPersisted": false,
+  "records": [
+    {
+      "check": "SIWE cookie sign-in",
+      "status": 200,
+      "identity": {
+        "address": "0x6829fdC49A4a96D9A325740FB55A4f5F1e01afDa",
+        "isAdmin": false,
+        "expiresAt": 1790110633.099
+      },
+      "cookieName": "__Host-session",
+      "attributes": " Path=/; Max-Age=604799; HttpOnly; SameSite=Lax; Secure",
+      "tokenInBody": false
+    },
+    {
+      "check": "Authenticated identity",
+      "path": "/api/auth/me",
+      "status": 200,
+      "response": {
+        "address": "0x6829fdC49A4a96D9A325740FB55A4f5F1e01afDa",
+        "isAdmin": false,
+        "expiresAt": 1790110633.099,
+        "nickname": null,
+        "pfp": "",
+        "pfpUrl": ""
+      }
+    },
+    {
+      "check": "Ordinary-user authorization",
+      "path": "/api/admin/admins",
+      "status": 403,
+      "response": {
+        "error": "admin only"
+      }
+    },
+    {
+      "check": "Ordinary-user authorization",
+      "path": "/api/admin/leads",
+      "status": 403,
+      "response": {
+        "error": "admin only"
+      }
+    },
+    {
+      "check": "Ordinary-user authorization",
+      "path": "/api/admin/dashboard",
+      "status": 403,
+      "response": {
+        "error": "admin only"
+      }
+    },
+    {
+      "check": "Ordinary-user authorization",
+      "path": "/api/initiatives/mine",
+      "status": 200,
+      "response": {
+        "initiatives": []
+      }
+    },
+    {
+      "check": "Foreign Origin rejected before logout",
+      "path": "/api/auth/logout",
+      "status": 403,
+      "response": {
+        "error": "cross-site request refused"
+      }
+    },
+    {
+      "check": "Null Origin rejected before logout",
+      "path": "/api/auth/logout",
+      "status": 403,
+      "response": {
+        "error": "cross-site request refused"
+      }
+    },
+    {
+      "check": "Signed nonce replay",
+      "status": 401,
+      "response": {
+        "error": "nonce invalid or already used"
+      }
+    },
+    {
+      "check": "SIWE cookie sign-in",
+      "status": 200,
+      "identity": {
+        "address": "0x6829fdC49A4a96D9A325740FB55A4f5F1e01afDa",
+        "isAdmin": false,
+        "expiresAt": 1790110635.729
+      },
+      "cookieName": "__Host-session",
+      "attributes": " Path=/; Max-Age=604799; HttpOnly; SameSite=Lax; Secure",
+      "tokenInBody": false
+    },
+    {
+      "check": "Previous session after re-authentication",
+      "path": "/api/auth/me",
+      "status": 200,
+      "response": {
+        "address": "0x6829fdC49A4a96D9A325740FB55A4f5F1e01afDa",
+        "isAdmin": false,
+        "expiresAt": 1790110633.099,
+        "nickname": null,
+        "pfp": "",
+        "pfpUrl": ""
+      }
+    },
+    {
+      "check": "Logout new session",
+      "path": "/api/auth/logout",
+      "status": 200,
+      "response": {
+        "ok": true
+      }
+    },
+    {
+      "check": "Logged-out session rejected",
+      "path": "/api/auth/me",
+      "status": 401,
+      "response": {
+        "error": "sign in with your wallet first"
+      }
+    },
+    {
+      "check": "Logout all sessions",
+      "path": "/api/auth/logout-all",
+      "status": 200,
+      "response": {
+        "ok": true,
+        "revoked": 1
+      }
+    },
+    {
+      "check": "Original session rejected after logout-all",
+      "path": "/api/auth/me",
+      "status": 401,
+      "response": {
+        "error": "sign in with your wallet first"
+      }
+    }
+  ]
+}

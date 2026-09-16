@@ -1,0 +1,86 @@
+╭ Axios: Prototype pollution gadgets can alter axios request construction
+│ Severity:   moderate
+│ Package:    axios
+│ Vulnerable: >=1.0.0 <1.18.0
+╰ Info:       https://github.com/advisories/GHSA-mmx7-hfxf-jppx
+
+╭ Axios: Deep formToJSON Key Recursion Can Cause Denial of Service
+│ Severity:   moderate
+│ Package:    axios
+│ Vulnerable: >=1.0.0 <1.18.0
+╰ Info:       https://github.com/advisories/GHSA-pmv8-rq9r-6j72
+
+╭ Axios: Nested axios option objects can consume polluted prototype values
+│ Severity:   moderate
+│ Package:    axios
+│ Vulnerable: >=1.0.0 <1.18.0
+╰ Info:       https://github.com/advisories/GHSA-7q8q-rj6j-mhjq
+
+╭ Axios: Excessive recursion in formDataToJSON can cause denial of service
+│ Severity:   moderate
+│ Package:    axios
+│ Vulnerable: >=1.0.0 <1.18.0
+╰ Info:       https://github.com/advisories/GHSA-42h9-826w-cgv3
+
+╭ Axios: HTTP/2 streamed uploads bypass `maxBodyLength`
+│ Severity:   moderate
+│ Package:    axios
+│ Vulnerable: >=1.13.0 <1.18.0
+╰ Info:       https://github.com/advisories/GHSA-mwf2-3pr3-8698
+
+╭ Axios: NO_PROXY bypass for 0.0.0.0 local addresses in axios
+│ Severity:   moderate
+│ Package:    axios
+│ Vulnerable: >=1.15.0 <1.18.0
+╰ Info:       https://github.com/advisories/GHSA-f4gw-2p7v-4548
+
+╭ Axios form serializer maxDepth bypass via {} metatoken
+│ Severity:   moderate
+│ Package:    axios
+│ Vulnerable: >=1.15.1 <1.18.0
+╰ Info:       https://github.com/advisories/GHSA-hcpx-6fm6-wx23
+
+╭ Axios: Prototype pollution auth subfields can inject Basic auth
+│ Severity:   moderate
+│ Package:    axios
+│ Vulnerable: >=1.15.2 <1.18.0
+╰ Info:       https://github.com/advisories/GHSA-xj6q-8x83-jv6g
+
+╭ Axios Node HTTP adapter can use an inherited proxy after interceptor config cloning
+│ Severity:   high
+│ Package:    axios
+│ Vulnerable: >=1.15.2 <1.18.0
+╰ Info:       https://github.com/advisories/GHSA-gcfj-64vw-6mp9
+
+╭ Axios: Fetch adapter `ReadableStream` uploads bypass `maxBodyLength`
+│ Severity:   moderate
+│ Package:    axios
+│ Vulnerable: >=1.7.0 <1.18.0
+╰ Info:       https://github.com/advisories/GHSA-jqh4-m9w3-8hp9
+
+╭ decode-uri-component: Denial of service via exponential decoding of malformed percent-encoded input
+│ Severity:   moderate
+│ Package:    decode-uri-component
+│ Vulnerable: <=0.4.2
+╰ Info:       https://github.com/advisories/GHSA-vcc3-ghjq-m6fr
+
+╭ uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided
+│ Severity:   moderate
+│ Package:    uuid
+│ Vulnerable: <11.1.1
+╰ Info:       https://github.com/advisories/GHSA-w5hq-g745-h8pq
+
+╭ ws: Uninitialized memory disclosure
+│ Severity:   moderate
+│ Package:    ws
+│ Vulnerable: >=8.0.0 <8.20.1
+╰ Info:       https://github.com/advisories/GHSA-58qx-3vcg-4xpx
+
+╭ ws: Memory exhaustion DoS from tiny fragments and data chunks
+│ Severity:   high
+│ Package:    ws
+│ Vulnerable: >=8.0.0 <8.21.0
+╰ Info:       https://github.com/advisories/GHSA-96hv-2xvq-fx4p
+
+Found 14 vulnerabilities
+Severity: 0 low, 12 moderate, 2 high, 0 critical

@@ -79,7 +79,7 @@ describe("RulesPanel", () => {
     expect(screen.getByText(/30-day proposal window/)).toBeInTheDocument();
     rerender(<RulesPanel r={{ type: "grant", topup: true }} />);
     expect(screen.getByRole("heading", { name: /How top-up grants work/ })).toBeInTheDocument();
-    expect(screen.getByText(/no proposal window and no challenge period/)).toBeInTheDocument();
+    expect(screen.getByText(/no proposal window/)).toBeInTheDocument();
   });
 });
 

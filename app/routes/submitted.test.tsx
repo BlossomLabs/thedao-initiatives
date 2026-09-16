@@ -33,7 +33,7 @@ describe("Submitted", () => {
   it("uses the top-up copy and the singular warning", () => {
     show({ title: "T", slug: "t", kind: "topup", warnings: [{ field: "", msg: "x" }] });
     expect(screen.getByText(/How top-up grants work/)).toBeInTheDocument();
-    expect(screen.getByText(/no proposal window and no challenge period/)).toBeInTheDocument();
+    expect(screen.getByText(/no proposal window/)).toBeInTheDocument();
     expect(screen.getByText(/past 1 warning\./)).toBeInTheDocument();
   });
 

@@ -68,8 +68,8 @@ export default function TypePicker(
             <span>Work is already under way with another funder</span>
           </label>
           <p className="hint m-0">
-            This makes it a top-up. No proposal window, no challenge period. Completed milestones
-            get a link to the delivered work, and every remaining one carries a target month.
+            This makes it a top-up. No proposal window. Completed milestones get a link to the
+            delivered work, and every remaining one carries a target month.
           </p>
           {draft.topup && (
             <FormField

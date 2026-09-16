@@ -15,12 +15,16 @@ import {
   LIMITS,
   normaliseStructured,
   parseAmount,
+  SECTION_KEYS,
   SECTIONS,
   type Structured,
   structuredBytes,
   TOO_LONG_MSG,
 } from "../../shared/draft/mod.ts";
 import { HttpError } from "./errors.ts";
+import { assertFields } from "./body.ts";
+
+export const TEXT_FIELDS = ["title", "summary", "sections", "milestones", "links"] as const;
 
 export const FINDINGS_MSG = "Please fix the problems marked on the form.";
 export const LOGO_CID_RE = /^[A-Za-z0-9]{40,100}$/;
@@ -44,6 +48,20 @@ export function readStructured(
   body: Record<string, unknown>,
   type: DraftType,
 ): { structured: Structured; findings: Findings } {
+  if (body.sections && typeof body.sections === "object") {
+    assertFields(body.sections, SECTION_KEYS, "sections.");
+  }
+  if (Array.isArray(body.milestones)) {
+    body.milestones.forEach((row, i) => {
+      if (row && typeof row === "object") {
+        assertFields(
+          row,
+          ["name", "amount", "adoption", "done", "link", "month", "criteria"],
+          `milestones[${i}].`,
+        );
+      }
+    });
+  }
   const structured = normaliseStructured(body, type);
   const f = empty();
   const err = (field: string, msg: string) => f.errors.push({ field, msg, kind: "content" });
@@ -87,6 +105,15 @@ export function readBackers(
   const f = empty();
   const err = (field: string, msg: string) => f.errors.push({ field, msg, kind: "content" });
   const raw = Array.isArray(body.backers) ? body.backers : [];
+  raw.forEach((row, i) => {
+    if (row && typeof row === "object") {
+      assertFields(
+        row,
+        ["org", "company", "amountUsd", "amount", "url", "logoCid"],
+        `backers[${i}].`,
+      );
+    }
+  });
   const backers: BackerInput[] = [];
   raw.slice(0, LIMITS.BACKERS + 1).forEach((r, i) => {
     const b = r && typeof r === "object" ? r as Record<string, unknown> : {};

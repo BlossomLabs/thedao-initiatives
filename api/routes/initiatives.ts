@@ -27,8 +27,14 @@ import { pickText } from "../db/rfps.ts";
 import { ledgerStatus, refreshLedger } from "../services/ledger.ts";
 import { chainStateFresh } from "../chain/mod.ts";
 import { activeTokens } from "../chain/tokens.ts";
-import { assertNoErrors, mergeFindings, readBackers, readStructured } from "../lib/structured.ts";
-import { readPageFacts } from "../lib/page-facts.ts";
+import {
+  assertNoErrors,
+  mergeFindings,
+  readBackers,
+  readStructured,
+  TEXT_FIELDS,
+} from "../lib/structured.ts";
+import { PAGE_FACT_FIELDS, readPageFacts } from "../lib/page-facts.ts";
 import { ownsUpload } from "./uploads.ts";
 import {
   bodyKey,
@@ -180,13 +186,12 @@ export function initiativeRoutes(deps: Deps) {
 
   /**
    * The proposer (or an admin) replaces the text. Goes live at once; the
-   * previous text stays in the history. A body with `sections`, `milestones`
-   * or `links` takes the structured path (the rules of the form, "edit"
-   * scope, block); a legacy `details` body is accepted on legacy rows only.
+   * previous text stays in the history. Edits use structured sections,
+   * milestones and links, migrating legacy rows when necessary.
    */
   r.post("/:slug/revisions", requireAuth, async (c) => {
     const user = c.var.user!;
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["initiativeId", ...TEXT_FIELDS]);
     const { rfp, proposer } = await editableBy(c.req.param("slug"), user, body);
     if (rfp.status !== "pending" && rfp.status !== "approved") {
       throw new HttpError(403, "This initiative is no longer open for edits.");
@@ -202,34 +207,24 @@ export function initiativeRoutes(deps: Deps) {
     }
     const cur = pickText(rfp);
     const structuredBody = ["sections", "milestones", "links"].some((k) => body[k] !== undefined);
-    if (!structuredBody && isStructured(cur)) {
+    if (!structuredBody) {
       throw new HttpError(
         400,
-        "This initiative uses sections; send sections, milestones and links.",
+        "Send sections, milestones and links to edit initiative text.",
       );
     }
     const origin = { author: user.address, source: proposer ? "proposer" : "admin" } as const;
-    let warnings: Finding[] = [];
-    let text;
-    if (structuredBody) {
-      const base = validateText({ title: s(body.title), summary: s(body.summary), details: "" });
-      const { structured, findings: caps } = readStructured({
-        sections: body.sections ?? cur.sections,
-        milestones: body.milestones ?? cur.milestones,
-        links: body.links ?? cur.links,
-      }, rfp.type);
-      const backers = pledgeBackers(await db.pledges.list(rfp.id));
-      const findings = mergeFindings(caps, editChecks(rfp, { ...base, ...structured }, backers));
-      assertNoErrors(findings);
-      warnings = findings.warnings;
-      text = { ...base, ...structured };
-    } else {
-      text = validateText({
-        title: s(body.title),
-        summary: s(body.summary),
-        details: s(body.details, 100_000),
-      });
-    }
+    const base = validateText({ title: s(body.title), summary: s(body.summary), details: "" });
+    const { structured, findings: caps } = readStructured({
+      sections: body.sections ?? cur.sections,
+      milestones: body.milestones ?? cur.milestones,
+      links: body.links ?? cur.links,
+    }, rfp.type);
+    const backers = pledgeBackers(await db.pledges.list(rfp.id));
+    const findings = mergeFindings(caps, editChecks(rfp, { ...base, ...structured }, backers));
+    assertNoErrors(findings);
+    const { warnings } = findings;
+    const text = { ...base, ...structured };
     const { rfp: next, revision } = await db.rfps.revise(rfp.id, text, origin);
     if (!revision) throw new HttpError(400, "Nothing changed.");
     return c.json(
@@ -245,7 +240,7 @@ export function initiativeRoutes(deps: Deps) {
    */
   r.patch("/:slug", requireAuth, async (c) => {
     const user = c.var.user!;
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["initiativeId", ...PAGE_FACT_FIELDS]);
     const { rfp } = await editableBy(c.req.param("slug"), user, body);
     if (!user.isAdmin && rfp.status !== "pending") {
       throw new HttpError(403, "Locked after approval; email the team.");
@@ -264,7 +259,7 @@ export function initiativeRoutes(deps: Deps) {
    */
   r.post("/", requireAuth, async (c) => {
     const proposer = c.var.user!.address;
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, [...TEXT_FIELDS, ...PAGE_FACT_FIELDS, "backers", "website"]);
     if (s(body.website)) throw new HttpError(400, "bad request"); // honeypot
     if (!(await hasDisplayName(proposer))) {
       throw new HttpError(403, "Set a display name (or an ENS primary name) before submitting.");
@@ -295,9 +290,9 @@ export function initiativeRoutes(deps: Deps) {
     const { backers, findings: backerCaps } = readBackers(body);
     // Page facts. Amounts are read the forgiving way ("150,000", "150.000");
     // a leading minus survives so the range rule can refuse it.
-    const rawGoal = String(body.goal ?? body.goalUsd ?? "");
+    const rawGoal = String(body.goal ?? "");
     const goal = Math.round((/^\s*-/.test(rawGoal) ? -1 : 1) * parseAmount(rawGoal) * 100) / 100;
-    const duration = s(body.durationMonths ?? body.duration, 10);
+    const duration = s(body.durationMonths, 10);
     const recipientTeam = type === "grant" ? s(body.recipientTeam, 120) : "";
     const recipientUrl = type === "grant" ? s(body.recipientUrl, 300) : "";
     const milestoneReviewer = topup ? s(body.milestoneReviewer, 200) : "";

@@ -112,12 +112,14 @@ at the repository root until 2026-09-15 (see `docs/v1-to-v2.md`). `../server.ts`
   the same on the form and here; failures come back as
   `{error, findings: {errors: [{field, msg, kind}], warnings: [{field, msg}]}}` with the form's
   field ids.
-- **Text is revisioned.** Every change to title, summary, sections, milestones, links or the legacy
-  details (the proposer's edit page, the admin editor, content sync) appends an immutable revision
+- **Text is revisioned.** Every change to title, summary, sections, milestones or links
+  (the proposer's edit page, the admin editor, content sync) appends an immutable revision
   under `["revision", rfpId, n]`; the initiative row carries the current number. A revision carries
   the structured fields too. Revisions are public; admins can archive a superseded one (hidden from
   the public history, never the current one). Rows written before revisions existed get their text
-  snapshotted as revision 1 on their first edit.
+  snapshotted as revision 1 on their first edit. Historical `details` remain readable in proposals
+  and revisions, but new text edits must use structured fields. Editing an old proposal migrates it;
+  changing only its page facts preserves the old body.
 - Ids are ULID strings. Rate limits live in KV so they hold across isolates.
 
 ## Reusing proposal URLs
@@ -168,7 +170,7 @@ Signed in: `GET /api/auth/me`, `POST /api/auth/logout`, `POST /api/auth/logout-a
 `POST /api/comments/:id/reply` (role-gated), `POST /api/uploads/logo` (multipart `image`, a backer
 logo pinned before submitting; returns `{cid, logoUrl}`, the CID is only accepted on a submission
 from the same wallet within a day), `POST /api/initiatives/:slug/revisions` (proposer or admin:
-title, summary, sections, milestones, links; a legacy row also takes `details`),
+title, summary, sections, milestones, links; legacy rows migrate to this format),
 `PATCH /api/initiatives/:slug` (proposer while pending, admin always: type, topup, goal,
 durationMonths, recipientTeam, recipientUrl, milestoneReviewer, discourseUrl, funders, contact;
 after approval a proposer gets 403).
@@ -180,7 +182,32 @@ Admin (`/api/admin/...`): `GET dashboard`, `GET|PATCH initiatives/:id`,
 `POST initiatives/:id/safe-confirm`, `POST comments/:id/:action`, `POST sync-content`.
 
 All bodies and responses are JSON (`{error}` on failure). Private fields (`contact`, `funders`,
-comment `email`) only appear in admin responses.
+historical comment `email`) only appear in admin responses.
+
+### Write fields
+
+- New comments take `initiativeId`, `body`, `name` and the `website` honeypot. They are generic
+  comments; category selection, topics and email collection are no longer supported. Previous
+  browser bundles sending `type: "other"`, `topic: ""`, `email: ""` still work. Historical
+  questions/suggestions remain readable and can be answered/reviewed; the `accept` moderation
+  action has been removed.
+- Initiative submission and page-fact edits use `goal` and `durationMonths`. The request aliases
+  `goalUsd` and `duration` are rejected; response objects still expose `goalUsd`. Text edits reject
+  `details` and use sections, milestones and links.
+- Safe binding goes through on-chain verification at `safe-confirm`. The initiative editor cannot
+  set or clear `safeAddress`.
+- Admin pledge writes use `amount` (responses still expose `amountUsd`) and accept a multipart
+  `logo` image for a logo change. Direct `logoCid` and `amountUsd` request fields are rejected.
+  This does not change submission `backers[].amountUsd` or `backers[].logoCid`, whose uploaded CIDs
+  remain bound to the submitting wallet. JSON status-only pledge updates still work.
+
+All write endpoints reject unknown fields with `400 {"error":"Unsupported field: <field>."}`.
+Removed fields follow the same rule. This covers JSON and multipart fields (including file fields),
+and nested sections, milestones, backers, donation acceptance details and content-sync files; nested errors name
+the path, such as `milestones[0].amout`. Validation happens before applying edits or uploading files.
+Bodyless actions accept an empty body or `{}` and reject additional fields. Malformed JSON or a
+non-object JSON body returns 400, as do unsupported actions. No historical records are deleted by
+this API cleanup.
 
 ## SIWE from the frontend
 

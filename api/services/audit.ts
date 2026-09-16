@@ -60,7 +60,6 @@ const DETAILS = [
   "unarchive",
   "publish",
   "discard",
-  "accept",
   "review",
   "feature",
   "feature-front",

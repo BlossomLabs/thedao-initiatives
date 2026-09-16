@@ -2,7 +2,7 @@
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { ADMIN, deploySafe, harness, j, PLAIN, proposerToken } from "./app-helpers.ts";
 import type { Revision, Rfp } from "../db/types.ts";
-import { minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
+import { minimalSubmission, revisionBody, syntheticContentFiles } from "./fixtures.ts";
 
 const OTHER = "0x2222222222222222222222222222222222222222";
 const GOOD = minimalSubmission(25000);
@@ -38,7 +38,7 @@ Deno.test("submit writes revision 1; the proposer's edit goes live as revision 2
   ]);
 
   const edit = {
-    ...GOOD,
+    ...revisionBody(GOOD),
     title: "A better initiative title",
     sections: { ...GOOD.sections, why: "Second draft." },
   };
@@ -134,7 +134,10 @@ Deno.test("pending initiative: visible and editable for its proposer and admins 
   const res = await h.req(`/api/initiatives/${slug}/revisions`, {
     method: "POST",
     token,
-    json: { ...GOOD, summary: GOOD.summary + " Now with an extra sentence for reviewers." },
+    json: {
+      ...revisionBody(GOOD),
+      summary: GOOD.summary + " Now with an extra sentence for reviewers.",
+    },
   });
   assertEquals(res.status, 201);
   assertEquals((await h.db.rfps.bySlug(slug))!.status, "pending");
@@ -166,7 +169,7 @@ Deno.test("admin editor: text changes become admin revisions, other fields do no
     method: "POST",
     token: admin,
     json: {
-      ...GOOD,
+      ...revisionBody(GOOD),
       title: "Renamed again by the team",
       milestones: [{ ...GOOD.milestones[0], amount: 30000 }],
     },
@@ -208,7 +211,7 @@ Deno.test("archive: hides a superseded revision publicly, never the current one,
   await h.req(`/api/initiatives/${slug}/revisions`, {
     method: "POST",
     token,
-    json: { ...GOOD, title: "A second title for this one" },
+    json: { ...revisionBody(GOOD), title: "A second title for this one" },
   });
   const act = (n: number | string, action: string) =>
     h.req(`/api/admin/initiatives/${id}/revisions/${n}`, {

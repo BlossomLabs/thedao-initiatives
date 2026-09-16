@@ -115,7 +115,7 @@ export default function CommentsSection({ initiativeId, slug, open }: {
   ): Promise<string | null> => {
     const r = await postComment(
       slug,
-      { initiativeId, type: "other", topic: "", body, name, email: "", website },
+      { initiativeId, body, name, website },
     );
     if (r.status === "published" && r.entry) {
       const entry: CommentEntry = r.entry;

@@ -5,7 +5,7 @@ import { K } from "../db/keys.ts";
 import { safeDeployCalldata } from "../chain/safe.ts";
 import { SIGNERS } from "./helpers.ts";
 import { ADMIN, deploySafe, harness, j, proposerToken, SAFE_ADDR } from "./app-helpers.ts";
-import { minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
+import { minimalSubmission, revisionBody, syntheticContentFiles } from "./fixtures.ts";
 import { syncContent } from "../services/content.ts";
 
 const reclaim = { reclaimArchivedSlug: true };
@@ -322,14 +322,14 @@ Deno.test("reused URLs reject stale writes and admin slug actions; matching IDs 
     );
     const slug = next.slug;
     const writes = [
-      { path: `/api/initiatives/${slug}`, method: "PATCH", json: { goalUsd: 25 } },
+      { path: `/api/initiatives/${slug}`, method: "PATCH", json: { goal: "1000" } },
       {
         path: `/api/initiatives/${slug}/revisions`,
         method: "POST",
         json: {
+          ...revisionBody(minimalSubmission(1000)),
           title: "Edited title",
           summary: "An updated summary that meets the forty character minimum.",
-          details: "updated",
         },
       },
       {
@@ -373,7 +373,7 @@ Deno.test("reused URLs reject stale writes and admin slug actions; matching IDs 
       503,
     );
     const unsafeAdminActions = [
-      { path: `/api/admin/initiatives/${slug}`, method: "PATCH", json: { goalUsd: 500 } },
+      { path: `/api/admin/initiatives/${slug}`, method: "PATCH", json: { goal: "500" } },
       {
         path: `/api/admin/initiatives/${slug}/status`,
         method: "POST",

@@ -16,7 +16,7 @@ export function aiRoutes(deps: Deps) {
 
   r.post("/ai-search", async (c) => {
     if (!deps.ai.enabled) throw new HttpError(503, "search is not configured");
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["query"]);
     const query = s(body.query, AI_QUERY_MAX_CHARS);
     if (query.length < 3) throw new HttpError(400, "describe what you want to fund");
     const rfps = await db.rfps.list(["approved"]);

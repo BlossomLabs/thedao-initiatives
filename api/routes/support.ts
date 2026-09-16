@@ -26,7 +26,7 @@ export function supportRoutes(deps: Deps) {
 
   r.post("/support", async (c) => {
     if (!config.supportUrl) throw new HttpError(503, "support is not configured");
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["category", "message", "email", "screenshot", "page"]);
     const category = body.category;
     if (!isSupportCategory(category)) throw new HttpError(400, "pick a category");
     const message = s(body.message, SUPPORT_MESSAGE_MAX);

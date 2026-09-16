@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { requireClientIp } from "../middleware/ip.ts";
-import { jsonBody, s } from "../lib/body.ts";
+import { formBody, jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { isAddress } from "../chain/address.ts";
 import { DOMAIN_RE, NICK_RE, PRESET_RE } from "../lib/validate.ts";
@@ -45,7 +45,7 @@ export function profileRoutes(deps: Deps) {
    */
   r.post("/nickname", requireAuth, async (c) => {
     const addr = c.var.user!.address;
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["nickname"]);
     const raw = s(body.nickname, 100);
     if (!raw) throw new HttpError(400, "Pick a name first.");
     if (raw.length > 40 || !NICK_RE.test(raw)) {
@@ -78,7 +78,7 @@ export function profileRoutes(deps: Deps) {
 
   r.post("/pfp", requireAuth, async (c) => {
     const addr = c.var.user!.address;
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["pfp"]);
     const pfp = s(body.pfp, 20);
     if (!PRESET_RE.test(pfp)) throw new HttpError(400, "Pick one of the preset avatars.");
     if (!(await db.rateLimit("pfp:" + addr.toLowerCase(), 20, 60))) {
@@ -97,8 +97,8 @@ export function profileRoutes(deps: Deps) {
     if (!(await db.rateLimit("pfpup:" + addr.toLowerCase(), 10, 3600))) {
       throw new HttpError(429, "Too many uploads, slow down.");
     }
-    const form = await c.req.formData().catch(() => null);
-    const file = form?.get("image");
+    const form = await formBody(c, ["image"]);
+    const file = form.get("image");
     if (!(file instanceof File) || !file.size) {
       throw new HttpError(400, "Choose an image.");
     }

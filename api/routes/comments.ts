@@ -1,5 +1,4 @@
-/** Community Questions & Suggestions per initiative (SPEC-community-qa v1),
- * with SIWE sessions in place of per-action signatures. */
+/** Initiative comments, with historical question/suggestion threads kept readable. */
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
@@ -8,7 +7,6 @@ import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { type CommentJson, commentJson } from "../lib/json.ts";
-import { EMAIL_RE } from "../lib/validate.ts";
 import { assertEthNameOwned } from "../services/names.ts";
 import {
   commentRoles,
@@ -17,18 +15,8 @@ import {
   storedRoles,
   voteEligible,
 } from "../services/roles.ts";
-import type { Comment, CommentType } from "../db/types.ts";
+import type { Comment } from "../db/types.ts";
 import { COMMENT_BODY_MAX } from "../config.ts";
-
-export const COMMENT_TYPES = new Set<CommentType>(["suggestion", "question", "other"]);
-export const COMMENT_TOPICS = new Set([
-  "budget",
-  "milestones",
-  "scope",
-  "process",
-  "other",
-  "",
-]);
 
 /** Two tiers exactly: featured first (newest featured first), then votes desc, newest breaking ties. */
 export function sortEntries<
@@ -89,25 +77,31 @@ export function commentRoutes(deps: Deps) {
 
   r.post("/initiatives/:slug/comments", async (c) => {
     const rfp = await db.rfps.bySlug(c.req.param("slug"));
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, [
+      "initiativeId",
+      "body",
+      "name",
+      "website",
+      "type",
+      "topic",
+      "email",
+    ]);
     if (!rfp) throw new HttpError(404, "not found");
     await assertInitiativeIdentity(db, c.req.param("slug"), rfp, body.initiativeId);
     if (rfp.status !== "approved") throw new HttpError(404, "not found");
     // honeypot: accept and discard silently
     if (s(body.website)) return c.json({ status: "published", id: "", claimToken: "" });
-    const ctype = s(body.type, 20) as CommentType;
-    const topic = s(body.topic, 20);
+    // Older browser bundles send these fixed defaults. They cannot create
+    // categorized comments or collect contact information.
+    if (
+      (body.type !== undefined && body.type !== "other") ||
+      (body.topic !== undefined && body.topic !== "") ||
+      (body.email !== undefined && body.email !== "")
+    ) throw new HttpError(400, "Comments do not accept categories, topics or email addresses.");
     const text = s(body.body, COMMENT_BODY_MAX + 1);
     const name = s(body.name, 60);
-    const email = s(body.email, 200);
-    if (!COMMENT_TYPES.has(ctype) || !COMMENT_TOPICS.has(topic)) {
-      throw new HttpError(400, "bad type or topic");
-    }
     if (!text || text.length > COMMENT_BODY_MAX) {
       throw new HttpError(400, `the text must be 1 to ${COMMENT_BODY_MAX} characters`);
-    }
-    if (email && !EMAIL_RE.test(email)) {
-      throw new HttpError(400, "that email does not look right");
     }
     const user = c.var.user;
     const address = user?.address ?? "";
@@ -128,8 +122,8 @@ export function commentRoutes(deps: Deps) {
     if (roles.some((x) => ROLE_FAST_LANE.has(x))) {
       [status, summary] = ["published", "role fast-lane"];
     } else {[status, summary] = await deps.ai.screenComment(
-        ctype,
-        topic,
+        "other",
+        "",
         text,
         name,
         () => db.meta.aiBudgetOk(),
@@ -143,11 +137,11 @@ export function commentRoutes(deps: Deps) {
     const cm = await db.comments.create({
       rfpId: rfp.id,
       parentId: null,
-      type: ctype,
-      topic,
+      type: "other",
+      topic: "",
       body: text,
       displayName: name,
-      email,
+      email: "",
       address,
       roles: storedRoles(roles),
       status,
@@ -196,7 +190,7 @@ export function commentRoutes(deps: Deps) {
     if (!row || row.status !== "published" || row.parentId) {
       throw new HttpError(404, "not found");
     }
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["dir"]);
     const dir = s(body.dir, 10) || "up";
     if (dir !== "up" && dir !== "down") throw new HttpError(400, "bad vote direction");
     if (!user.isAdmin && !(await voteEligible(deps, user.address, row.rfpId))) {
@@ -210,6 +204,7 @@ export function commentRoutes(deps: Deps) {
   });
 
   r.post("/comments/:id/report", async (c) => {
+    await jsonBody(c, []);
     if (!(await db.rateLimit("crep:" + requireClientIp(c), 10, 86400))) {
       throw new HttpError(429, "too many reports today");
     }
@@ -229,7 +224,7 @@ export function commentRoutes(deps: Deps) {
     if (!parent || parent.status !== "published" || parent.parentId) {
       throw new HttpError(404, "not found");
     }
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["body", "name"]);
     const text = s(body.body, COMMENT_BODY_MAX + 1);
     if (!text || text.length > COMMENT_BODY_MAX) {
       throw new HttpError(400, `the text must be 1 to ${COMMENT_BODY_MAX} characters`);

@@ -77,7 +77,6 @@ export function commentsRepo(kv: Deno.Kv, now: () => number) {
     "status",
     "answered",
     "reviewed",
-    "accepted",
     "featured",
     "featuredAt",
     "aiSummary",

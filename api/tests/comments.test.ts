@@ -3,6 +3,7 @@ import { ADMIN, CURATOR, harness, j, PLAIN } from "./app-helpers.ts";
 import { sortEntries } from "../routes/comments.ts";
 import { TOKENS } from "../config.ts";
 import { transferLog } from "./helpers.ts";
+import { K } from "../db/keys.ts";
 
 const EXPERT = "0x3333333333333333333333333333333333333333";
 const DONOR = "0x4444444444444444444444444444444444444444";
@@ -36,7 +37,7 @@ async function setup(aiFetch?: (url: string) => Response) {
     h.req(`/api/initiatives/${rfp.slug}/comments`, {
       method: "POST",
       token,
-      json: { type: "question", topic: "scope", body: "Why?", ...body },
+      json: { body: "Why?", ...body },
     });
   return { h, rfp, post };
 }
@@ -86,6 +87,34 @@ Deno.test("comments: anonymous needs a name; without AI, anon posts are held wit
   h.close();
 });
 
+Deno.test("new comments are generic and cannot collect categories, topics or email", async () => {
+  const { h, rfp, post } = await setup();
+  try {
+    const admin = await h.mint(ADMIN, true);
+    for (
+      const retired of [
+        { type: "question" },
+        { type: "suggestion" },
+        { topic: "budget" },
+        { email: "person@example.org" },
+      ]
+    ) {
+      assertEquals((await post(admin, retired)).status, 400);
+    }
+    assertEquals(await h.db.comments.forRfp(rfp.id), []);
+    // Current requests and the previous browser's harmless defaults both work.
+    for (const body of [{}, { type: "other", topic: "", email: "" }]) {
+      const response = await post(admin, body);
+      assertEquals(response.status, 200);
+      const { id } = await j(response) as { id: string };
+      const row = (await h.db.comments.get(id))!;
+      assertEquals([row.type, row.topic, row.email], ["other", "", ""]);
+    }
+  } finally {
+    h.close();
+  }
+});
+
 Deno.test("AI screen: constructive publishes, unclear holds, spam discards but looks held, failure holds", async () => {
   let verdict = "constructive";
   let fail = false;
@@ -128,7 +157,8 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   assertEquals(c1.entry.roles, ["CURATOR"]);
   assertEquals(c1.entry.votes, 1);
   assertEquals(c1.entry.myvote, 1);
-  const e1 = await j(await post(expert, { body: "expert q", type: "suggestion" })) as {
+  const e1 = await j(await post(expert, { body: "expert q" })) as {
+    id: string;
     entry: { roles: string[] };
   };
   assertEquals(e1.entry.roles, ["EXPERT"]);
@@ -222,6 +252,16 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   ) as { viewerCanVote: boolean };
   assertEquals(asPlain.viewerCanVote, false);
 
+  // Historical question/suggestion rows still support replies and review.
+  await h.db.kv.set(K.comment(rfp.id, c1.id), {
+    ...(await h.db.comments.get(c1.id))!,
+    type: "question",
+    topic: "scope",
+  });
+  await h.db.kv.set(K.comment(rfp.id, e1.id), {
+    ...(await h.db.comments.get(e1.id))!,
+    type: "suggestion",
+  });
   // replies: any signed-in wallet; without a role they are screened (held here,
   // there is no AI) and do not answer the question. Roles publish at once.
   assertEquals(
@@ -301,23 +341,24 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   assertEquals((await h.db.comments.get(c1.id))!.reports, 0);
   assertEquals((await h.db.comments.reported()).length, 0);
 
-  // admin actions: accept only suggestions; feature-front max 3
+  // Acceptance was removed even for historical suggestions; review still works.
   assertEquals(
     (await h.req(`/api/admin/comments/${c1.id}/accept`, { method: "POST", token: admin }))
       .status,
     400,
   );
   assertEquals(
-    (await h.req(
-      `/api/admin/comments/${
-        e1.entry
-          ? (await h.db.comments.forRfp(rfp.id)).find((c) => c.type === "suggestion")!.id
-          : ""
-      }/accept`,
-      { method: "POST", token: admin },
-    )).status,
+    (await h.req(`/api/admin/comments/${e1.id}/accept`, { method: "POST", token: admin })).status,
+    400,
+  );
+  assertEquals((await h.db.comments.get(e1.id))!.accepted, false);
+  assertEquals((await h.db.comments.get(e1.id))!.reviewed, false);
+  assertEquals(
+    (await h.req(`/api/admin/comments/${e1.id}/review`, { method: "POST", token: admin })).status,
     200,
   );
+  assertEquals((await h.db.comments.get(e1.id))!.reviewed, true);
+  // feature-front max 3
   const ids = (await h.db.comments.forRfp(rfp.id)).filter((c) => !c.parentId).map((c) => c.id);
   for (const id of ids.slice(0, 3)) {
     assertEquals(
@@ -384,7 +425,7 @@ Deno.test("names: .eth is only allowed as the poster's own ENS name", async () =
     h.req(`/api/initiatives/${rfp.slug}/comments`, {
       method: "POST",
       token,
-      json: { type: "question", topic: "scope", body: "Why?", ...body },
+      json: { body: "Why?", ...body },
     });
   const admin = await h.mint(ADMIN, true);
   const plain = await h.mint(PLAIN);

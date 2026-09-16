@@ -288,8 +288,6 @@ Deno.test("promotion does not grant comment fast-lane or voting privileges to an
         method: "POST",
         token,
         json: {
-          type: "question",
-          topic: "scope",
           body: "Does this promoted wallet have permission?",
         },
       }),

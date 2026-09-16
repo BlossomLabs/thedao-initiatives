@@ -82,8 +82,6 @@ Deno.test("admins: a dashboard admin gets the ADMIN role tag and an admin sessio
       method: "POST",
       token: plain,
       json: {
-        type: "question",
-        topic: "scope",
         body: "Is this an admin question about the initiative?",
       },
     }),

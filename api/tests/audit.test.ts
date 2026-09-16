@@ -225,11 +225,14 @@ Deno.test("audit: controlled test requires a recently authenticated admin and hi
       (await h.req("/api/admin/audit/test", { method: "POST", token: plain })).status,
       403,
     );
-    const test = await h.req("/api/admin/audit/test", {
+    const invalid = await h.req("/api/admin/audit/test", {
       method: "POST",
       token: admin,
       json: { text: "IGNORED_PAYLOAD" },
     });
+    assertEquals(invalid.status, 400);
+    assertFalse(JSON.stringify(forRequest(h, invalid)).includes("IGNORED_PAYLOAD"));
+    const test = await h.req("/api/admin/audit/test", { method: "POST", token: admin });
     assertEquals(test.status, 200);
     assert(
       forRequest(h, test).some((e) => e.action === "audit.test" && e.outcome === "success"),

@@ -3,7 +3,7 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { requireClientIp } from "../middleware/ip.ts";
 import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
-import { jsonBody, s } from "../lib/body.ts";
+import { assertFields, jsonBody, s } from "../lib/body.ts";
 import { tokenQty } from "../lib/json.ts";
 import { decimalsOf } from "./initiatives.ts";
 import { CHAIN_ID, MIN_ETH_DONATION } from "../config.ts";
@@ -16,12 +16,6 @@ import { matchDonation } from "../services/donation-matching.ts";
 
 const TX_HASH_RE = /^0x[0-9a-f]{64}$/;
 const ATTEMPT_RE = /^[A-Za-z0-9_-]{43}$/;
-
-function exactFields(raw: Record<string, unknown>, fields: string[]) {
-  if (Object.keys(raw).some((key) => !fields.includes(key))) {
-    throw new HttpError(400, "Unexpected acceptance field");
-  }
-}
 
 function optionalText(value: unknown, max: number): string | undefined {
   if (value === undefined || value === "") return undefined;
@@ -50,8 +44,7 @@ export function donateRoutes(deps: Deps) {
     if (!(await db.rateLimit("checkbox:" + requireClientIp(c), 30, 3600))) {
       throw new HttpError(429, "slow down");
     }
-    const body = await jsonBody(c);
-    exactFields(body, [
+    const body = await jsonBody(c, [
       "slug",
       "initiativeId",
       "chainId",
@@ -92,7 +85,7 @@ export function donateRoutes(deps: Deps) {
         throw new HttpError(400, "Invalid wallet intent");
       }
       const w = body.wallet as Record<string, unknown>;
-      exactFields(w, ["address", "token", "amountRaw"]);
+      assertFields(w, ["address", "token", "amountRaw"], "wallet.");
       const tokens = await chain.donorTokens();
       if (
         typeof w.address !== "string" || !isAddress(w.address) || typeof w.token !== "string" ||
@@ -121,7 +114,7 @@ export function donateRoutes(deps: Deps) {
           throw new HttpError(400, "Invalid donation details");
         }
         const d = body.details as Record<string, unknown>;
-        exactFields(d, ["name", "amount", "currency"]);
+        assertFields(d, ["name", "amount", "currency"], "details.");
         details = {
           name: optionalText(d.name, 120),
           amount: optionalText(d.amount, 80),
@@ -191,7 +184,7 @@ export function donateRoutes(deps: Deps) {
     if (!(await db.rateLimit("confirm:" + requireClientIp(c), 30, 600))) {
       throw new HttpError(429, "slow down");
     }
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["slug", "initiativeId", "txHash", "attemptId"]);
     const slug = s(body.slug, 200);
     const txHash = s(body.txHash, 80).toLowerCase();
     const rfp = await db.rfps.bySlug(slug);
@@ -205,12 +198,6 @@ export function donateRoutes(deps: Deps) {
       }, 503);
     }
     if (!TX_HASH_RE.test(txHash)) throw new HttpError(400, "malformed transaction hash");
-    if (body.terms !== undefined) {
-      throw new HttpError(
-        400,
-        "Use a recorded checkbox attempt; terms signatures are no longer requested.",
-      );
-    }
     let association;
     if (body.attemptId !== undefined) {
       requireDonationOrigin(c, deps);

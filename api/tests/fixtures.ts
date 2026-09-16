@@ -36,6 +36,12 @@ export function minimalSubmission(goal: number, type: FixtureType = "rfp") {
   };
 }
 
+/** The text-only payload sent by the proposer editor, without submission fields. */
+export function revisionBody(draft: ReturnType<typeof minimalSubmission>) {
+  const { title, summary, sections, milestones, links } = draft;
+  return { title, summary, sections, milestones, links };
+}
+
 /** docs/llms-v3-example-output.md (the guide's worked example) as the JSON
  * the form would post after the paste box sorted it. */
 export async function exampleSubmission() {

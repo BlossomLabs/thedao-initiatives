@@ -13,7 +13,7 @@ import {
   testConnection,
 } from "./app-helpers.ts";
 import { DONOR, SIGNERS, transferLog, wallet } from "./helpers.ts";
-import { grantBody, minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
+import { grantBody, minimalSubmission, revisionBody, syntheticContentFiles } from "./fixtures.ts";
 import { TOKENS } from "../config.ts";
 import { predictSafeAddress } from "../chain/safe.ts";
 
@@ -330,7 +330,7 @@ Deno.test("mine: a proposer lists and opens their own submissions, rejected ones
     (await h.req(`/api/initiatives/${first}/revisions`, {
       method: "POST",
       token,
-      json: { initiativeId: rejected.id, ...minimalSubmission(31000) },
+      json: { initiativeId: rejected.id, ...revisionBody(minimalSubmission(31000)) },
     })).status,
     403,
   );

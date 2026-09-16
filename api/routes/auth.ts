@@ -37,7 +37,7 @@ export function authRoutes(deps: Deps) {
     if (!(await db.rateLimit("login-global", LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL, 60))) {
       throw new HttpError(429, "Too many attempts; wait a minute.");
     }
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["message", "signature", "cookie"]);
     const message = String(body.message ?? "");
     // EOA signatures are 132 chars; contract signatures (EIP-1271) can be longer.
     const signature = s(body.signature, 2 + 2 * MAX_CONTRACT_SIGNATURE_BYTES);
@@ -103,7 +103,8 @@ export function authRoutes(deps: Deps) {
    * Remove once every pre-cookie session has expired (SESSION_TTL_SECS after
    * the deploy that introduced the cookie, 2026-09-15).
    */
-  r.post("/cookie", requireAuth, (c) => {
+  r.post("/cookie", requireAuth, async (c) => {
+    await jsonBody(c, []);
     const u = c.var.user!;
     c.header(
       "Set-Cookie",
@@ -113,6 +114,7 @@ export function authRoutes(deps: Deps) {
   });
 
   r.post("/logout", requireAuth, async (c) => {
+    await jsonBody(c, []);
     await db.sessions.revoke(c.var.token);
     c.header("Set-Cookie", clearSessionCookie(c.req.raw));
     return c.json({ ok: true });
@@ -123,6 +125,7 @@ export function authRoutes(deps: Deps) {
   });
 
   r.delete("/sessions/:id", requireAuth, requireRecentAuth(deps.now), async (c) => {
+    await jsonBody(c, []);
     const id = c.req.param("id");
     if (!/^[A-Za-z0-9_-]{22}$/.test(id)) throw new HttpError(400, "Invalid session identifier.");
     if (!(await db.sessions.revokeId(c.var.user!.address, id))) {
@@ -135,6 +138,7 @@ export function authRoutes(deps: Deps) {
   });
 
   r.post("/logout-all", requireAuth, requireRecentAuth(deps.now), async (c) => {
+    await jsonBody(c, []);
     const n = await db.sessions.revokeAll(c.var.user!.address);
     c.header("Set-Cookie", clearSessionCookie(c.req.raw));
     return c.json({ ok: true, revoked: n });

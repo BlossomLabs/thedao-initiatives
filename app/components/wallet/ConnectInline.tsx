@@ -15,12 +15,12 @@ export const walletBtn =
 
 /**
  * "Connect wallet" for use next to a form's submit button. Same flow as the
- * top-bar button: connect and sign in in one step, and a dismissed signature
- * leaves the wallet disconnected so the button can simply be clicked again.
+ * top-bar button: connect and sign in in one step, or retry signing in with
+ * an already-connected wallet after a restore or dismissed signature.
  */
 export default function ConnectInline({ className }: { className?: string }) {
   const connectors = useConnectors();
-  const { connect, connecting } = useSession();
+  const { connect, connecting, signIn, signingIn } = useSession();
   const { openEmailSignIn } = useEmailSignIn();
   const { isConnected } = useAccount();
   const [pick, setPick] = useState(false);
@@ -40,7 +40,7 @@ export default function ConnectInline({ className }: { className?: string }) {
     try {
       await connect(c);
     } catch (e) {
-      setError("Not connected: " + walletErrorMessage(e));
+      setError("Sign-in failed: " + walletErrorMessage(e));
     }
   }
 
@@ -49,18 +49,25 @@ export default function ConnectInline({ className }: { className?: string }) {
       <button
         type="button"
         className={walletBtn}
-        disabled={connecting}
-        aria-haspopup={connectors.length > 1 ? "menu" : undefined}
-        aria-expanded={connectors.length > 1 ? pick : undefined}
+        disabled={connecting || signingIn}
+        aria-haspopup={!isConnected && connectors.length > 1 ? "menu" : undefined}
+        aria-expanded={!isConnected && connectors.length > 1 ? pick : undefined}
         onClick={() => {
-          if (connectors.length === 1) void connectWith(connectors[0]);
+          setError("");
+          if (isConnected) {
+            void signIn().catch((e) => setError("Sign-in failed: " + walletErrorMessage(e)));
+          } else if (connectors.length === 1) void connectWith(connectors[0]);
           else setPick((v) => !v);
         }}
       >
         <Wallet className="size-3.5" />
-        {connecting ? "Check your wallet…" : "Connect wallet"}
+        {connecting || signingIn
+          ? "Check your wallet…"
+          : isConnected
+          ? "Sign in"
+          : "Connect wallet"}
       </button>
-      {pick && (
+      {pick && !isConnected && (
         <WalletMenu
           className="left-0 right-auto top-[40px]"
           onClose={() => setPick(false)}

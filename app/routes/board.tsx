@@ -18,7 +18,7 @@ export function meta() {
   return generateMeta({ url: "/" });
 }
 
-const SUGGEST_LAST_FROM = 20;
+const SUGGEST_LAST_FROM = 69;
 
 export default function Board() {
   const { data, isLoading, isError, isUpdatingLedger } = useBoard();
@@ -64,7 +64,7 @@ export default function Board() {
         )}
         {data && (
           <div className="grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
-            {/* Under 20 approved initiatives the suggest card leads the grid (Griff, Sep 2026). */}
+            {/* Under 69 approved initiatives the suggest card leads the grid (Griff, 20 -> 69 on 2026-09-16). */}
             {cards.length < SUGGEST_LAST_FROM && <SuggestCard />}
             {cards.map((c, i) => (
               <InitiativeCard

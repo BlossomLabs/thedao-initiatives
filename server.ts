@@ -21,7 +21,7 @@ Deno.cron("refresh-public-cache-daily", "0 3 * * *", async () => {
 });
 // Mirrors app/data/site.ts (which is Vite-only code).
 const SITE_URL = (Deno.env.get("VITE_SITE_URL") ?? "").replace(/\/+$/, "") ||
-  "https://fund.thedao.fund";
+  "https://initiatives.thedao.fund";
 const ROOT = new URL("./build/client", import.meta.url).pathname;
 
 // The prerendered pages carry inline scripts (root.tsx's shell script and

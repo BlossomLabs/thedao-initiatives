@@ -13,7 +13,7 @@ url.search = new URLSearchParams({
 const response = await fetch(url, {
   headers: {
     "User-Agent": "TheDAO wallet directory sync",
-    Origin: new URL(Deno.env.get("VITE_SITE_URL") || "https://fund.thedao.fund").origin,
+    Origin: new URL(Deno.env.get("VITE_SITE_URL") || "https://initiatives.thedao.fund").origin,
   },
 });
 if (!response.ok) throw new Error(`Wallet directory request failed (${response.status}).`);

@@ -1,40 +1,98 @@
+import type { CheckboxAcceptance, DonationAssociation } from "../../shared/terms.ts";
+import { HttpError } from "../lib/errors.ts";
+import { randomToken, sha256Hex } from "../lib/ids.ts";
 import { K } from "./keys.ts";
 
-/**
- * One donation-terms acceptance per donation: what the donor saw and ticked,
- * bound to the transaction they then sent. Written by the donate confirm the
- * moment the tx hash exists (before the chain has verified anything), never
- * read publicly, never changed. A tx that never confirms simply leaves a
- * record whose donation row never reaches "confirmed"; the two join by hash.
- *
- * The terms text is not in the API: `version` is the content hash minted by
- * app/data/terms.ts from content/donation-terms/<date>.md, so the accepted
- * text is recoverable from git for any record.
- */
-export interface TermsAcceptance {
-  /** Lowercase 0x + 64 hex. */
-  txHash: string;
-  /** Terms version id: 64 hex, sha256(effective date + "\n" + text). */
-  version: string;
-  /** Checksummed wallet connected when the donation was sent, or "" for none. */
-  address: string;
-  /** ISO 8601 (UTC) timestamp of the checkbox tick, as reported by the widget. */
-  acceptedAt: string;
-  /** Unix seconds when the API wrote the record. */
-  recordedAt: number;
-}
+export const CHECKBOX_SESSION_SECS = 7 * 86400;
 
+/** Browser evidence has its own namespace. Never overwrite historical signed or legacy records. */
 export function termsRepo(kv: Deno.Kv, now: () => number) {
-  /** First write wins: returns false when a record for this tx already exists. */
-  async function record(rec: Omit<TermsAcceptance, "recordedAt">): Promise<boolean> {
-    const key = K.termsAcceptance(rec.txHash);
-    const row: TermsAcceptance = { ...rec, txHash: rec.txHash.toLowerCase(), recordedAt: now() };
-    const res = await kv.atomic().check({ key, versionstamp: null }).set(key, row).commit();
-    return res.ok;
+  async function session(token: string): Promise<string | null> {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+    const hash = sha256Hex(token);
+    const entry = await kv.get<number>(K.checkboxSession(hash));
+    return entry.value && entry.value > now() ? hash : null;
+  }
+  async function createSession() {
+    const token = randomToken();
+    const hash = sha256Hex(token);
+    await kv.set(K.checkboxSession(hash), now() + CHECKBOX_SESSION_SECS, {
+      expireIn: CHECKBOX_SESSION_SECS * 1000,
+    });
+    return { token, hash };
+  }
+  async function record(
+    input: Omit<CheckboxAcceptance, "id" | "recordedAt" | "evidence" | "donorAuthenticated">,
+  ) {
+    const row: CheckboxAcceptance = {
+      ...input,
+      id: randomToken(),
+      recordedAt: now(),
+      evidence: "browser-checkbox-v1",
+      donorAuthenticated: false,
+    };
+    await kv.set(K.checkboxAcceptance(row.id), row);
+    return row;
+  }
+  const get = async (id: string) =>
+    (await kv.get<CheckboxAcceptance>(K.checkboxAcceptance(id))).value;
+  const association = async (id: string) =>
+    (await kv.get<DonationAssociation>(K.donationAssociation(id))).value;
+
+  async function attach(row: CheckboxAcceptance, txHash: string) {
+    const key = K.donationAssociation(row.id);
+    const previous = await kv.get<DonationAssociation>(key);
+    if (previous.value) {
+      if (previous.value.txHash !== txHash) {
+        throw new HttpError(
+          409,
+          "This attempt already has a transaction. Start a new attempt for another transfer.",
+        );
+      }
+      return previous.value;
+    }
+    if (now() - row.recordedAt > CHECKBOX_SESSION_SECS) {
+      throw new HttpError(410, "This donation attempt has expired. Start a new attempt.");
+    }
+    const link: DonationAssociation = {
+      attemptId: row.id,
+      initiativeId: row.initiativeId,
+      chainId: row.chainId,
+      recipient: row.recipient,
+      txHash,
+      submittedAt: now(),
+      state: "pending",
+      evidence: row.method === "wallet" ? "wallet-flow-correlated" : "visitor-reported",
+      donorAuthenticated: false,
+    };
+    const result = await kv.atomic().check(previous)
+      .set(key, link)
+      .set(K.pendingAssociation(row.initiativeId, row.id), true).commit();
+    if (!result.ok) return await attach(row, txHash);
+    return link;
   }
 
-  const get = async (txHash: string): Promise<TermsAcceptance | null> =>
-    (await kv.get<TermsAcceptance>(K.termsAcceptance(txHash))).value;
-
-  return { record, get };
+  async function resolve(
+    id: string,
+    state: Exclude<DonationAssociation["state"], "pending">,
+    detail: string,
+  ) {
+    const key = K.donationAssociation(id);
+    const entry = await kv.get<DonationAssociation>(key);
+    if (!entry.value || entry.value.state !== "pending") return;
+    await kv.atomic().check(entry)
+      .set(key, { ...entry.value, state, detail, checkedAt: now() })
+      .delete(K.pendingAssociation(entry.value.initiativeId, id)).commit();
+  }
+  async function pending(initiativeId: string, limit = 30) {
+    const out: DonationAssociation[] = [];
+    for await (
+      const entry of kv.list({ prefix: ["pending_association", initiativeId] }, { limit })
+    ) {
+      const row = await association(String(entry.key[2]));
+      if (row?.state === "pending") out.push(row);
+    }
+    return out;
+  }
+  return { session, createSession, record, get, attach, association, resolve, pending };
 }

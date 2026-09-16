@@ -73,17 +73,34 @@ at the repository root until 2026-09-15 (see `docs/v1-to-v2.md`). `../server.ts`
 - **The process rules are not in the API.** `content/boilerplate/{rfp,grant,topup}.md` are bundled
   at build time (`app/data/rules.ts`) and render as a panel on every initiative page; the kind is
   picked from the initiative's type and top-up flag.
-- **The donation terms are not in the API.** Every version is a file in `content/donation-terms/`,
-  bundled into the site at build time (`app/data/terms.ts`, prerendered at `/donation-terms`); the
-  version id is the SHA-256 of the effective date plus the text. What the API keeps is one
-  **acceptance record per donation**: `POST /api/donate/confirm` takes an optional
-  `terms: { version, acceptedAt, address? }` block (the id the widget displayed, the ISO time of the
-  checkbox tick, the wallet connected at the time) and writes `["terms_accept", <txHash>]` before
-  consulting the chain. First write wins and the record is never changed; it joins the donation row
-  by tx hash, and a tx that never confirms simply leaves an orphan record. A malformed block is a
-  400 rather than a dropped record. Donations found by the Safe indexer (exchange withdrawals, card
-  on-ramps) have no record. Rows written by the old `POST /api/terms/accept` (3-part keys) are left
-  in place.
+- **Checkbox evidence and transfers are separate.** Versions live in `content/donation-terms/`;
+  deploy this directory with the API and restart after publishing terms. `POST /api/donate/accept`
+  takes `slug`, `initiativeId`, `chainId`, `recipient`, `version`, `agreed: true`, and `method`.
+  Wallet attempts include `wallet: {address, token, amountRaw}`; exchange attempts may include
+  any subset of `details: {name, amount, currency}` (amount is token units, not USD).
+  The API validates the published/effective document and recipient, records server time and an
+  immutable attempt, and establishes a dedicated anonymous HttpOnly/SameSite cookie (Secure on
+  HTTPS). Mutation requests require an allowed nonempty Origin and JSON; no wallet login or
+  terms message signature is required. The wallet still authorizes the transfer itself.
+  `POST /api/donate/confirm` optionally attaches `attemptId` using the same browser cookie.
+  Hash attachment is persisted before RPC verification and is idempotent for the same hash;
+  another hash requires a new attempt. Ledger refreshes and the production daily fallback retry
+  queued matches for seven days, up to 30 per initiative per refresh. Public confirmations remain
+  accounting-only. Legacy `terms` envelopes are rejected rather than silently discarded.
+  Wallet matching requires a single eligible transfer, the intended sender/token/base-unit amount,
+  and a block after the head observed at acceptance. Multi-transfer/ambiguous receipts remain
+  unmatched even when credited. Exchange hashes are visitor-reported; optional details alone do
+  not automatically match a donation. Names are private labels, not identity proof.
+  Acceptance rows use `browser-checkbox-v1`; separate association rows use
+  `wallet-flow-correlated` or `visitor-reported`, always `donorAuthenticated: false`. A public hash
+  never grants control over another attempt, blocks another claim, or changes donation rights.
+  `GET /api/donate/attempt/:id` is private to its browser session. Acceptance and association data
+  have no automatic deletion (apply the published retention policy operationally); anonymous
+  credentials and hash-submission windows expire after seven days. No additional IP/user-agent evidence is collected. Historical `terms_accept`,
+  `terms_verified`, and correction records are preserved unchanged with their original assurance.
+  This mitigates ASVS-03's first-writer poisoning by changing the evidence model; it does not
+  claim cryptographic donor consent or establish ASVS compliance. See
+  `docs/donation-checkbox-evidence.md` for the residual spoofing risk and validation criteria.
 - **Uploads go to Pinata** (backer logos, profile pictures); only the CID is stored. Set
   `PINATA_JWT`; until then uploads answer 503.
 - **Initiatives are structured** (submission redesign, Sep 2026): the text of a row is `sections`

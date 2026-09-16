@@ -1,5 +1,6 @@
 /** Request-driven donation discovery. Snapshots only read KV; explicit refresh
  * requests claim a shared lease and await persisted results before responding. */
+import { retryDonationMatches } from "./donation-matching.ts";
 import { K } from "../db/keys.ts";
 import type { Rfp, SafeSyncState } from "../db/types.ts";
 import {
@@ -64,6 +65,7 @@ export async function refreshLedger(
     // Manual submissions may not be in the indexer's latest page. Only retry
     // this initiative's pending rows, reusing this request's confirmation head.
     await reverifyPending(deps, getBlockNumber, rfp);
+    await retryDonationMatches(deps.db, deps.chain, rfp.id);
   } catch (e) {
     next = { ...saved, ok: false, error: e instanceof Error ? e.message : String(e) };
   }

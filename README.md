@@ -82,7 +82,8 @@ served from the SPA fallback by `server.ts`. `/api/*` and `/healthz` go to the H
 ### Publishing a new version of the donation terms
 
 Every version is a file in `content/donation-terms/`, named by its effective date, and git history is
-the audit trail. Nothing is stored in the API and there is no admin action: publishing is a merge.
+the audit trail. The API recognizes those deployed documents and records browser checkbox acceptance;
+there is no admin publishing action.
 
 1. Copy the current file to `content/donation-terms/<YYYY-MM-DD>.md` and set its first line to
    `version: <YYYY-MM-DD>` (the same date as the file name).
@@ -91,11 +92,12 @@ the audit trail. Nothing is stored in the API and there is no admin action: publ
    the version id, so it can be corrected later without minting a new version.
 3. Edit the body, then run `deno task test` (it validates the header, the date and the file name).
 4. Merge and deploy on the effective date: the highest date is the version in force as soon as it
-   ships. Never edit or delete a published file.
+   ships. Deploy the content directory with the API and restart it to refresh the recognized versions.
+   Never edit or delete a published file.
 
-A version's id is the SHA-256 of `<effective date>\n<body>`. The widget remembers acceptance per id,
-so every new version asks donors to accept again, and each donation's acceptance record names the
-id the donor saw (see `api/README.md`).
+A version's id is the SHA-256 of `<effective date>\n<body>`. The widget requires a checkbox and
+records its version on the server before sending or showing the exchange address. Transaction
+matching provides browser correlation, not authenticated donor consent (see `api/README.md`).
 
 ## Wallet and sign-in
 

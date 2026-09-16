@@ -2,11 +2,12 @@
  * Wallet donation flow (port of static/app.js initWidget/donate/confirmTx):
  * USD amount -> token quantity -> wallet tx -> API confirm + status polling.
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getBalance, readContract, sendTransaction, switchChain } from "wagmi/actions";
 import { erc20Abi } from "viem";
 import { useAccount, useConfig, useConnect } from "wagmi";
 import { api, ApiError, errorMessage } from "~/lib/api";
+import type { AcceptanceReceipt, ExchangeDetails, WalletIntent } from "../../../shared/terms.ts";
 import { TERMS } from "~/data/terms";
 import type { DonateParams, DonateResult } from "~/lib/api-types";
 import {
@@ -30,11 +31,13 @@ export interface UseDonationArgs {
   safeAddress: string;
   params: DonateParams | undefined;
   onConfirmed?: (r: DonateResult) => void;
-  /** ISO timestamp of the donor's terms checkbox tick, or null while unticked. */
-  acceptedAt?: string | null;
+  /** Current explicit checkbox state; never restored from a local timestamp. */
+  accepted?: boolean;
 }
 
 const POLL_MS = 6000;
+// Confirm submissions share an IP quota of 30 / 10 min; leave room for retries.
+const ATTEMPT_POLL_MS = 30_000;
 const MAX_POLLS = 50;
 /** A confirm that fails on the network is retried this many times before polling takes over. */
 const CONFIRM_RETRIES = 2;
@@ -42,18 +45,26 @@ const CONFIRM_RETRY_MS = 1500;
 const PENDING: DonateResult = { status: "pending", detail: "", amount: 0, token: "", amountUsd: 0 };
 
 export function useDonation(
-  { initiativeId, slug, safeAddress, params, onConfirmed, acceptedAt }: UseDonationArgs,
+  { initiativeId, slug, safeAddress, params, onConfirmed, accepted }: UseDonationArgs,
 ) {
   const config = useConfig();
   const { address, isConnected } = useAccount();
   // Read at confirm time through refs so confirmTx keeps a stable identity.
-  const acceptedRef = useRef<string | null>(null);
-  acceptedRef.current = acceptedAt ?? null;
-  const addressRef = useRef(address);
-  addressRef.current = address;
+  const acceptedRef = useRef(false);
+  acceptedRef.current = accepted ?? false;
+  const sending = useRef(false);
   const { connectors, connectAsync } = useConnect();
   const [status, setStatus] = useState<DonationStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // Keep the attempt through retries until the server has persisted the transaction hash.
+  const confirmations = useRef(
+    new Map<string, {
+      initiativeId: string;
+      slug: string;
+      txHash: string;
+      attemptId: string;
+    }>(),
+  );
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stopPolling = () => {
@@ -63,6 +74,10 @@ export function useDonation(
 
   const handle = useCallback((txHash: string, res: DonateResult, attempt: number) => {
     if (res.status === "confirmed") {
+      confirmations.current.delete(txHash);
+      try {
+        sessionStorage.removeItem("thedao:donation:" + initiativeId);
+      } catch { /* unavailable */ }
       setBusy(null);
       const rate = params?.enabled ? params.rates[res.token] : undefined;
       const dollars = "$" + Number(res.amountUsd).toFixed(2);
@@ -92,47 +107,85 @@ export function useDonation(
       setBusy(null);
       setStatus({
         kind: "wait",
-        text:
-          "Still pending. It will be credited automatically once it confirms. You can close this page.",
+        text: confirmations.current.has(txHash)
+          ? (
+            <>
+              Still pending. Your transfer will be credited automatically. Keep this page open to
+              finish submitting your transaction reference.{" "}
+              <button
+                type="button"
+                className="underline"
+                onClick={() => {
+                  setBusy("Confirming…");
+                  handle(txHash, PENDING, 0);
+                }}
+              >
+                Retry confirmation
+              </button>
+            </>
+          )
+          : "Still pending. It will be credited automatically once it confirms. You can close this page.",
       });
       return;
     }
     pollTimer.current = globalThis.setTimeout(() => {
-      api<DonateResult>(`/api/donate/status/${txHash}`)
+      const confirmation = confirmations.current.get(txHash);
+      const request = confirmation
+        ? api<DonateResult>("/api/donate/confirm", { json: confirmation, passive: true })
+        : api<DonateResult>(`/api/donate/status/${txHash}`, { passive: true });
+      request
         .then((r) => handle(txHash, r, attempt + 1))
-        .catch(() =>
-          handle(
-            txHash,
-            { status: "pending", detail: "", amount: 0, token: "", amountUsd: 0 },
-            attempt + 1,
-          )
-        );
-    }, POLL_MS);
-  }, [params, onConfirmed]);
+        .catch((error) => {
+          if (error instanceof ApiError && error.status < 500 && error.status !== 429) {
+            setBusy(null);
+            setStatus({ kind: "err", text: errorMessage(error) });
+            return;
+          }
+          handle(txHash, PENDING, attempt + 1);
+        });
+    }, confirmations.current.has(txHash) ? ATTEMPT_POLL_MS : POLL_MS);
+  }, [params, onConfirmed, initiativeId]);
 
-  /**
-   * Verify a tx hash with the API (used after sending and for manual paste).
-   * The confirm also carries the donor's terms acceptance, which the API binds
-   * to this tx, so a network blip is retried before polling takes over.
-   */
-  const confirmTx = useCallback(async (txHash: string) => {
+  const recordAcceptance = useCallback(async (
+    method: "wallet" | "exchange",
+    details?: ExchangeDetails,
+    wallet?: Omit<WalletIntent, "afterBlock">,
+  ) => {
+    if (!acceptedRef.current) throw new Error("Please agree to the donation terms first.");
+    return await api<AcceptanceReceipt>("/api/donate/accept", {
+      json: {
+        initiativeId,
+        slug,
+        recipient: safeAddress,
+        chainId: 1,
+        version: TERMS.id,
+        agreed: true,
+        method,
+        ...(details ? { details } : {}),
+        ...(wallet ? { wallet } : {}),
+      },
+    });
+  }, [initiativeId, slug, safeAddress]);
+
+  /** A public hash is accounting data, never evidence of wallet ownership. */
+  const confirmTx = useCallback(async (txHash: string, attemptId?: string) => {
     stopPolling();
     setBusy("Confirming…");
-    const acceptedAt = acceptedRef.current;
-    const terms = acceptedAt
-      ? {
-        version: TERMS.id,
-        acceptedAt,
-        ...(addressRef.current ? { address: addressRef.current } : {}),
-      }
-      : undefined;
-    const json = { initiativeId, slug, txHash, ...(terms ? { terms } : {}) };
+    const json = attemptId ? { initiativeId, slug, txHash, attemptId } : undefined;
+    if (json) {
+      confirmations.current.set(txHash, json);
+      // Only public references; the session credential stays in an HttpOnly cookie.
+      try {
+        sessionStorage.setItem("thedao:donation:" + initiativeId, JSON.stringify(json));
+      } catch { /* unavailable */ }
+    }
+    const request = json ?? { initiativeId, slug, txHash };
     for (let attempt = 0;; attempt++) {
       try {
-        handle(txHash, await api<DonateResult>("/api/donate/confirm", { json }), 0);
+        handle(txHash, await api<DonateResult>("/api/donate/confirm", { json: request }), 0);
         return;
       } catch (e) {
-        if (e instanceof ApiError && e.status < 500) {
+        if (e instanceof ApiError && e.status < 500 && e.status !== 429) {
           setBusy(null);
           setStatus({ kind: "err", text: errorMessage(e) });
           return;
@@ -141,16 +194,37 @@ export function useDonation(
           await new Promise((r) => setTimeout(r, CONFIRM_RETRY_MS * (attempt + 1)));
           continue;
         }
-        // Still failing: fall back to polling the status endpoint.
+        // Keep retrying submission until the server has the attempt and hash.
         handle(txHash, PENDING, 0);
         return;
       }
     }
   }, [initiativeId, slug, handle]);
 
+  const restored = useRef<string | null>(null);
+  useEffect(() => {
+    if (restored.current === initiativeId) return;
+    restored.current = initiativeId;
+    try {
+      const raw = sessionStorage.getItem("thedao:donation:" + initiativeId);
+      const saved = raw ? JSON.parse(raw) : null;
+      if (
+        saved?.initiativeId === initiativeId && saved.slug === slug &&
+        /^0x[0-9a-f]{64}$/.test(saved.txHash) && /^[A-Za-z0-9_-]{43}$/.test(saved.attemptId)
+      ) {
+        void confirmTx(saved.txHash, saved.attemptId);
+      }
+    } catch { /* unavailable or stale browser data */ }
+  }, [initiativeId, slug, confirmTx]);
+  useEffect(() => () => stopPolling(), []);
+
   const donate = useCallback(
     async (symbol: string, usdRaw: string, balances: Record<string, number | null>) => {
-      if (busy) return;
+      if (busy || sending.current) return;
+      if (!acceptedRef.current) {
+        setStatus({ kind: "err", text: "Please agree to the donation terms first." });
+        return;
+      }
       if (!/^0x[0-9a-fA-F]{40}$/.test(safeAddress)) {
         setStatus({ kind: "err", text: "This initiative's donation address is not set up yet." });
         return;
@@ -200,6 +274,7 @@ export function useDonation(
         });
         return;
       }
+      sending.current = true;
       try {
         let account = address;
         if (!isConnected || !account) {
@@ -248,6 +323,12 @@ export function useDonation(
             </>
           ),
         });
+        setBusy("Recording agreement…");
+        const acceptance = await recordAcceptance("wallet", undefined, {
+          address: account!,
+          token: tok.address,
+          amountRaw: base.toString(),
+        });
         setBusy("Confirm in wallet…");
         await switchChain(config, { chainId: 1 }).catch(() => {});
         const txHash = isNative
@@ -280,13 +361,26 @@ export function useDonation(
             </>
           ),
         });
-        await confirmTx(txHash.toLowerCase());
+        await confirmTx(txHash.toLowerCase(), acceptance.attemptId);
       } catch (e) {
         setBusy(null);
         setStatus({ kind: "err", text: "Not sent: " + walletErrorMessage(e) });
+      } finally {
+        sending.current = false;
       }
     },
-    [busy, safeAddress, params, address, isConnected, connectors, connectAsync, config, confirmTx],
+    [
+      busy,
+      safeAddress,
+      params,
+      address,
+      isConnected,
+      connectors,
+      connectAsync,
+      config,
+      confirmTx,
+      recordAcceptance,
+    ],
   );
 
   /** Token balances of the connected wallet (null = unknown yet). */
@@ -314,5 +408,15 @@ export function useDonation(
     return out;
   }, [address, params, config]);
 
-  return { status, setStatus, busy, donate, confirmTx, loadBalances, address, isConnected };
+  return {
+    status,
+    setStatus,
+    busy,
+    donate,
+    confirmTx,
+    recordAcceptance,
+    loadBalances,
+    address,
+    isConnected,
+  };
 }

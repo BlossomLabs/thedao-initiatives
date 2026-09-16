@@ -242,6 +242,7 @@ export interface FunderLead {
 }
 
 export interface DonateResult {
+  association?: import("../../shared/terms.ts").DonationAssociation;
   status: "confirmed" | "pending" | "failed" | "error";
   detail: string;
   amount: number;

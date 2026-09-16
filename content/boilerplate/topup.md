@@ -1,7 +1,7 @@
-version: 2026-09-15
+version: 2026-09-17
 # How top-up grants work (work already under way with another funder)
 
-1. This grant tops up work that is already under way. There is no proposal window and no challenge period.
+1. This grant tops up work that is already under way. There is no proposal window.
 2. The funding goal on this page is the total project budget. The amount already committed, and by whom, is shown in the header with each backer's logo; this grant raises the remainder.
 3. Completed milestones are marked done with a link to the delivered work. Each remaining milestone carries a target month.
 4. Payments from this grant start only once the earlier milestones have been accepted.

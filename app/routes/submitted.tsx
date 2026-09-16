@@ -22,7 +22,7 @@ export const KIND_NEXT: Record<RulesKind, string> = {
   grant:
     "Once it is approved and funded, your team has 15 days to finalize the milestone terms and deadlines, and is paid out as the milestones complete.",
   topup:
-    "A top-up has no proposal window and no challenge period: once it is approved and funded, the remaining milestones are paid out as the reviewer passes them.",
+    "A top-up has no proposal window: once it is approved and funded, the remaining milestones are paid out as the reviewer passes them.",
 };
 
 export default function Submitted() {

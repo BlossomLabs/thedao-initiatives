@@ -77,9 +77,14 @@ describe("RulesPanel", () => {
     expect(screen.getByRole("heading", { name: "How RFPs work" })).toBeInTheDocument();
     expect(screen.getByText(/^Rules v\d{4}-\d{2}, shown on every initiative/)).toBeInTheDocument();
     expect(screen.getByText(/30-day proposal window/)).toBeInTheDocument();
+    rerender(<RulesPanel r={{ type: "grant", topup: false }} />);
+    expect(screen.getByRole("heading", { name: "How grants work" })).toBeInTheDocument();
+    expect(screen.getByText(/15-day window/)).toBeInTheDocument();
+    expect(screen.queryByText(/challenge/i)).not.toBeInTheDocument();
     rerender(<RulesPanel r={{ type: "grant", topup: true }} />);
     expect(screen.getByRole("heading", { name: /How top-up grants work/ })).toBeInTheDocument();
-    expect(screen.getByText(/no proposal window and no challenge period/)).toBeInTheDocument();
+    expect(screen.getByText(/no proposal window/)).toBeInTheDocument();
+    expect(screen.queryByText(/challenge/i)).not.toBeInTheDocument();
   });
 });
 

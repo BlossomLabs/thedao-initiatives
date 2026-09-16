@@ -20,8 +20,8 @@ Ask two or three questions at a time and wait for real answers. Questions 1 to 7
 1. **What exactly gets built?** The concrete deliverables, in their own words.
 2. **What gap does this close?** What can people do afterwards that they cannot today, and who is stuck without it? An incident or a loss is one kind of evidence for the gap, welcome but not required.
 3. **Who would fund this, and why?** Push hardest here. TheDAO never funds an initiative alone: expect roughly 25% or more of the goal from ecosystem stakeholders, and TheDAO's own share tops out around $200,000. Ask which L2s, wallets, exchanges, protocols, security firms, or large Ethereum teams benefit enough to pay serious money, on the order of $50,000 from one stakeholder on a large initiative and less on smaller asks. Commitments are not required before submitting: Giveth raises money alongside the proposer and can approach stakeholders directly, and the proposer still names plausible funders and says why each would pay. For each one, get the relationship (none, met once, know them well), whether a warm intro is possible, and the size of the ask. If neither of you can name anyone, say so. This initiative is not viable yet.
-4. **RFP or grant?** A grant is only justified when already-done work gives a named team a decisive head start: they built the prototype, they did half the verification, they hold expertise nobody else has. An idea with no prototype is an RFP. Grants still open for challenges once funded, so make them defend the head start.
-5. **Is this work already under way with another funder?** Ask it right after question 4, because a top-up changes the rules: no proposal window, no challenge period, the goal is the whole project budget, milestones another funder paid for are marked done with a link, and every remaining milestone carries a target month.
+4. **RFP or grant?** A grant is only justified when already-done work gives a named team a decisive head start: they built the prototype, they did half the verification, they hold expertise nobody else has. An idea with no prototype is an RFP. Make them defend the head start.
+5. **Is this work already under way with another funder?** Ask it right after question 4, because a top-up changes the rules: no proposal window, the goal is the whole project budget, milestones another funder paid for are marked done with a link, and every remaining milestone carries a target month.
 6. **Which organizations have already committed money?** Name, amount in USD, and a link for each. Read Logos before you go looking for a logo.
 7. **For a grant, who is on the team?** Names, roles, a link that shows each person's track record, and what other funding they have for this work.
 8. **Who will use the result**, and what public evidence of adoption could a stranger check? A demo is not adoption.
@@ -208,7 +208,7 @@ Never hide a gap. When the honest answer is that nobody would fund this, say so 
 
 ## What the site shows next to every initiative (do not paste any of this)
 
-Every initiative page carries the panel for its type, and so does the submit form. Nobody writes it and nobody edits it. It is here so you can answer the proposer's questions about how the process works. The site prints "Rules v2026-09, shown on every initiative of this type" under each panel.
+Every initiative page carries the panel for its type, and so does the submit form. Nobody writes it and nobody edits it. It is here so you can answer the proposer's questions about how the process works. The site prints the rules version under each panel.
 
 ### How RFPs work
 
@@ -227,7 +227,7 @@ Every initiative page carries the panel for its type, and so does the submit for
 ### How grants work
 
 1. Funding comes first. Nothing starts until the initiative is fully funded.
-2. When funding completes, a 15-day window opens. In that window the recipient submits the formal proposal: the final milestone plan, the per-milestone budget, and full disclosures. The same window is an open challenge period: anyone who can credibly deliver the same scope for the same money or less may submit a challenge.
+2. When funding completes, a 15-day window opens. In that window the recipient submits the formal proposal: the final milestone plan, the per-milestone budget, and full disclosures.
 3. Giveth reviews within 7 days of the window closing and fixes the final plan in the grant agreement. Until then, the milestones on this page are a draft.
 4. Before work begins, an independent technical reviewer with no ties to the team is appointed and named in the grant agreement. The reviewer decides whether each milestone passes or fails. Giveth is not the reviewer unless explicitly named, and Giveth oversees the arrangement so the reviewer stays independent of the team. The reviewer's fee comes out of the milestone payment, or the reviewer works pro bono; the team coordinates that payment.
 5. The first milestone can be paid up to 50% in advance so the team has funding to start. If more funds are needed mid-milestone, the team is expected to reach out to the ecosystem for a stop-gap loan.
@@ -237,7 +237,7 @@ Every initiative page carries the panel for its type, and so does the submit for
 
 ### How top-up grants work (work already under way with another funder)
 
-1. This grant tops up work that is already under way. There is no proposal window and no challenge period.
+1. This grant tops up work that is already under way. There is no proposal window.
 2. The funding goal on this page is the total project budget. The amount already committed, and by whom, is shown in the header with each backer's logo; this grant raises the remainder.
 3. Completed milestones are marked done with a link to the delivered work. Each remaining milestone carries a target month.
 4. Payments from this grant start only once the earlier milestones have been accepted.

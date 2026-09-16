@@ -193,7 +193,7 @@ Deno.test("submit: needs a signed-in wallet with a display name; records the pro
 
 Deno.test("submit: validation, honeypot, rate limit, pending never on board", async () => {
   const h = await harness();
-  const token = await proposerToken(h);
+  let token = await proposerToken(h);
   const good = minimalSubmission(25000);
   assertEquals(
     (await h.req("/api/initiatives", {
@@ -238,6 +238,7 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
     400,
   );
   h.clock.now += 3601; // invalid attempts count against the 5/hour budget, as in the MVP
+  token = await proposerToken(h); // the earlier session has passed its inactivity limit
   const res = await h.req("/api/initiatives", {
     method: "POST",
     token,

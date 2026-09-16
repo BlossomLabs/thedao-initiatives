@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { ADMIN, harness, PLAIN } from "./app-helpers.ts";
+import { ADMIN, harness, ORIGIN, PLAIN } from "./app-helpers.ts";
 import { LOCK_COOKIE } from "../lib/sitelock.ts";
+import { wallet } from "./helpers.ts";
 
 const BASIC = "Basic " + btoa("preview:s3cret");
 
@@ -48,19 +49,40 @@ Deno.test("site lock: basic -> cookie -> bearer session; healthz stays open", as
   }
 });
 
-Deno.test("admin flag follows ADMIN_ADDRESSES after sign-in, without a new session", async () => {
+Deno.test("admin promotion requires fresh authentication; demotion removes access immediately", async () => {
   const h = await harness();
-  // a session minted as a plain user...
-  const token = await h.mint(PLAIN, false);
-  const before = await h.req("/api/admin/dashboard", { token });
-  assertEquals(before.status, 403);
-  // ...becomes admin once the address is in the config's list (the admin
-  // set is a snapshot refreshed every few seconds; an env change is a restart anyway)
-  h.deps.config.adminAddresses.push(PLAIN);
-  h.clock.now += 10;
-  const after = await h.req("/api/admin/dashboard", { token });
-  assertEquals(after.status, 200);
-  const me = await (await h.req("/api/auth/me", { token })).json() as { isAdmin: boolean };
-  assertEquals(me.isAdmin, true);
-  h.close();
+  try {
+    const token = await h.mint(PLAIN, false);
+    assertEquals((await h.req("/api/admin/dashboard", { token })).status, 403);
+    h.deps.config.adminAddresses.push(PLAIN);
+    assertEquals((await h.req("/api/admin/dashboard", { token })).status, 403);
+    assertEquals((await (await h.req("/api/auth/me", { token })).json()).isAdmin, false);
+
+    const signer = wallet("0x" + "22".repeat(32));
+    const nonce = await h.db.sessions.issueNonce();
+    const message =
+      `localhost:5173 wants you to sign in with your Ethereum account:\n${signer.address}\n\n` +
+      `Sign in\n\nURI: ${ORIGIN}\nVersion: 1\nChain ID: 1\nNonce: ${nonce}\n` +
+      `Issued At: ${new Date(h.clock.now * 1000).toISOString()}`;
+    const login = await h.req("/api/auth/verify", {
+      method: "POST",
+      token,
+      json: { message, signature: await signer.sign(message) },
+    });
+    assertEquals(login.status, 200);
+    const fresh = await login.json() as { token: string; isAdmin: boolean };
+    assertEquals(fresh.isAdmin, true);
+    assertEquals((await h.req("/api/admin/dashboard", { token: fresh.token })).status, 200);
+    assertEquals((await h.req("/api/auth/me", { token })).status, 401);
+
+    // No clock advance: authorization must not wait for a cached role snapshot.
+    h.deps.config.adminAddresses.splice(h.deps.config.adminAddresses.indexOf(PLAIN), 1);
+    assertEquals((await h.req("/api/admin/dashboard", { token: fresh.token })).status, 403);
+    assertEquals(
+      (await (await h.req("/api/auth/me", { token: fresh.token })).json()).isAdmin,
+      false,
+    );
+  } finally {
+    h.close();
+  }
 });

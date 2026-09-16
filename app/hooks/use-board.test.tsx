@@ -45,7 +45,7 @@ it("shows saved values before a slow refresh, then animates the mounted number",
   });
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
   const fresh = deferred<Response>();
-  const fetchMock = vi.fn((path: string) =>
+  const fetchMock = vi.fn((path: string, _init?: RequestInit) =>
     path.includes("?refresh=1") ? fresh.promise : Promise.resolve(Response.json(board(100, true)))
   );
   vi.stubGlobal("fetch", fetchMock);
@@ -57,6 +57,9 @@ it("shows saved values before a slow refresh, then animates the mounted number",
   const number = await screen.findByText("$100.00");
   expect(screen.queryByText("Loading")).not.toBeInTheDocument();
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  for (const [, init] of fetchMock.mock.calls) {
+    expect(new Headers(init?.headers).get("X-Session-Activity")).toBe("passive");
+  }
   expect(number).not.toHaveAttribute("data-changed");
   act(() => fresh.resolve(Response.json(board(200, false))));
   await waitFor(() => expect(number).toHaveAttribute("data-changed", "true"));

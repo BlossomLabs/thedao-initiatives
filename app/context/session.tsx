@@ -130,7 +130,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     try {
       const m = await api<Me>("/api/auth/me");
       setMe(m);
-      // The admin flag follows the API's current admin list, not sign-in time.
+      // The API may remove privileges; newly granted privileges need another sign-in.
       if (m.isAdmin !== s.isAdmin && sessionKey(sessionRef.current) === sessionKey(s)) {
         const next = { ...s, isAdmin: m.isAdmin };
         setSession(next);

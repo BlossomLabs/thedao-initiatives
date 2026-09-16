@@ -3,10 +3,10 @@ import { ADMIN, harness, j, PLAIN } from "./app-helpers.ts";
 
 const OTHER = "0x839395e20bbB182fa440d08F850E6c7A8f6F0780";
 
-Deno.test("admins: env addresses are fixed, dashboard additions grant and revoke on the next request", async () => {
+Deno.test("admins: env addresses are fixed, dashboard changes invalidate existing sessions", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
-  const plain = await h.mint(PLAIN);
+  let plain = await h.mint(PLAIN);
   const list = (token: string) => h.req("/api/admin/admins", { token });
 
   // Not an admin yet.
@@ -17,23 +17,35 @@ Deno.test("admins: env addresses are fixed, dashboard additions grant and revoke
 
   // Add (lowercase input is stored checksummed); dupes and junk are refused.
   res = await j(
-    await h.req("/api/admin/admins", { method: "POST", token: admin, json: { address: PLAIN.toLowerCase() } }),
+    await h.req("/api/admin/admins", {
+      method: "POST",
+      token: admin,
+      json: { address: PLAIN.toLowerCase() },
+    }),
   );
   assertEquals(res.admins, [{ address: ADMIN, fixed: true }, { address: PLAIN, fixed: false }]);
   assertEquals(
-    (await h.req("/api/admin/admins", { method: "POST", token: admin, json: { address: PLAIN } })).status,
+    (await h.req("/api/admin/admins", { method: "POST", token: admin, json: { address: PLAIN } }))
+      .status,
     409,
   );
   assertEquals(
-    (await h.req("/api/admin/admins", { method: "POST", token: admin, json: { address: ADMIN } })).status,
+    (await h.req("/api/admin/admins", { method: "POST", token: admin, json: { address: ADMIN } }))
+      .status,
     409,
   );
   assertEquals(
-    (await h.req("/api/admin/admins", { method: "POST", token: admin, json: { address: "0x1234" } })).status,
+    (await h.req("/api/admin/admins", {
+      method: "POST",
+      token: admin,
+      json: { address: "0x1234" },
+    })).status,
     400,
   );
 
-  // The added wallet is an admin on its next request, with its existing session.
+  // Promotion invalidates the old session; privilege requires fresh authentication.
+  assertEquals((await list(plain)).status, 401);
+  plain = await h.mint(PLAIN, true);
   assertEquals((await list(plain)).status, 200);
   assertEquals((await j(await list(plain))).you, PLAIN);
 
@@ -44,12 +56,17 @@ Deno.test("admins: env addresses are fixed, dashboard additions grant and revoke
   r = await h.req(`/api/admin/admins/${PLAIN}`, { method: "DELETE", token: plain });
   assertEquals(r.status, 400);
   assertEquals((await j(r)).error, "you cannot remove yourself");
-  assertEquals((await h.req(`/api/admin/admins/${OTHER}`, { method: "DELETE", token: admin })).status, 404);
+  assertEquals(
+    (await h.req(`/api/admin/admins/${OTHER}`, { method: "DELETE", token: admin })).status,
+    404,
+  );
 
   // Removal by another admin revokes on the next request.
-  res = await j(await h.req(`/api/admin/admins/${PLAIN.toLowerCase()}`, { method: "DELETE", token: admin }));
+  res = await j(
+    await h.req(`/api/admin/admins/${PLAIN.toLowerCase()}`, { method: "DELETE", token: admin }),
+  );
   assertEquals(res.admins, [{ address: ADMIN, fixed: true }]);
-  assertEquals((await list(plain)).status, 403);
+  assertEquals((await list(plain)).status, 401);
   h.close();
 });
 
@@ -59,12 +76,16 @@ Deno.test("admins: a dashboard admin gets the ADMIN role tag and an admin sessio
   await h.req("/api/admin/admins", { method: "POST", token: admin, json: { address: PLAIN } });
   await h.deps.db.rfps.insert({ title: "Alpha", status: "approved" });
   const rfp = (await h.deps.db.rfps.list(["approved"]))[0];
-  const plain = await h.mint(PLAIN);
+  const plain = await h.mint(PLAIN, true);
   const posted = await j(
     await h.req(`/api/initiatives/${rfp.slug}/comments`, {
       method: "POST",
       token: plain,
-      json: { type: "question", topic: "scope", body: "Is this an admin question about the initiative?" },
+      json: {
+        type: "question",
+        topic: "scope",
+        body: "Is this an admin question about the initiative?",
+      },
     }),
   ) as { status: string; entry: { roles: string[] } | null };
   assertEquals(posted.status, "published"); // admins skip the AI screen

@@ -265,7 +265,7 @@ Deno.test("POST /api/auth/cookie: a pre-cookie bearer session gets its cookie, s
     // A session minted the old way (bearer in the body, no cookie).
     const res = await h.req("/api/auth/verify", { method: "POST", json: await signed(h) });
     const { token, expiresAt } = await j(res) as { token: string; expiresAt: number };
-    h.clock.now += 3600;
+    h.clock.now += 600;
 
     const mig = await h.req("/api/auth/cookie", { method: "POST", token });
     assertEquals(mig.status, 200);
@@ -278,7 +278,7 @@ Deno.test("POST /api/auth/cookie: a pre-cookie bearer session gets its cookie, s
     assert(attrs.includes("httponly"), setCookie);
     assert(attrs.includes("samesite=lax"), setCookie);
     // The remaining lifetime, not a fresh TTL.
-    assert(attrs.includes(`max-age=${ADMIN_SESSION_TTL_SECS - 3600}`), setCookie);
+    assert(attrs.includes(`max-age=${ADMIN_SESSION_TTL_SECS - 600}`), setCookie);
 
     // The cookie alone now authenticates, and it is the same session (one row
     // to revoke).

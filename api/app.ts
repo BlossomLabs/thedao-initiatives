@@ -22,7 +22,7 @@ import { createSiteLock, type SiteLock } from "./lib/sitelock.ts";
 
 /** The lock is shared with the static server so one gate covers the whole site. */
 export function siteLockFor(deps: Deps): SiteLock {
-  return createSiteLock(deps.config, async (t) => Boolean(await deps.db.sessions.get(t)));
+  return createSiteLock(deps.config, async (t) => Boolean(await deps.db.sessions.get(t, false)));
 }
 
 export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
@@ -42,7 +42,7 @@ export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
     "*",
     cors({
       origin: deps.config.webOrigins,
-      allowHeaders: ["Authorization", "Content-Type"],
+      allowHeaders: ["Authorization", "Content-Type", "X-Session-Activity"],
       allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
       maxAge: 600,

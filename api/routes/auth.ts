@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
-import { requireAuth } from "../middleware/auth.ts";
+import { requireAuth, requireRecentAuth } from "../middleware/auth.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
 import { verifySiwe } from "../chain/siwe.ts";
@@ -61,7 +61,7 @@ export function authRoutes(deps: Deps) {
       throw new HttpError(401, "nonce invalid or already used");
     }
     const isAdmin = await deps.admins.isAdmin(m.address);
-    const { token, session } = await db.sessions.create(m.address, isAdmin);
+    const { token, session } = await db.sessions.create(m.address, isAdmin, c.var.token);
     const info = { address: session.address, isAdmin, expiresAt: session.expiresAt };
     // The browser asks for the cookie and never sees the token; scripts get
     // it in the body and send it back as a bearer.
@@ -110,7 +110,23 @@ export function authRoutes(deps: Deps) {
     return c.json({ ok: true });
   });
 
-  r.post("/logout-all", requireAuth, async (c) => {
+  r.get("/sessions", requireAuth, async (c) => {
+    return c.json({ sessions: await db.sessions.list(c.var.user!.address, c.var.token) });
+  });
+
+  r.delete("/sessions/:id", requireAuth, requireRecentAuth(deps.now), async (c) => {
+    const id = c.req.param("id");
+    if (!/^[A-Za-z0-9_-]{22}$/.test(id)) throw new HttpError(400, "Invalid session identifier.");
+    if (!(await db.sessions.revokeId(c.var.user!.address, id))) {
+      throw new HttpError(404, "Session not found.");
+    }
+    if (c.var.user!.id === id) {
+      c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
+    }
+    return c.json({ ok: true });
+  });
+
+  r.post("/logout-all", requireAuth, requireRecentAuth(deps.now), async (c) => {
     const n = await db.sessions.revokeAll(c.var.user!.address);
     c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
     return c.json({ ok: true, revoked: n });

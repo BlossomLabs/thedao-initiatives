@@ -21,10 +21,13 @@ export interface ApiOptions {
   json?: unknown;
   form?: FormData;
   signal?: AbortSignal;
+  /** Background refreshes authenticate without extending session inactivity. */
+  passive?: boolean;
 }
 
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const headers = new Headers();
+  if (opts.passive) headers.set("X-Session-Activity", "passive");
   let body: BodyInit | undefined;
   if (opts.json !== undefined) {
     headers.set("Content-Type", "application/json");

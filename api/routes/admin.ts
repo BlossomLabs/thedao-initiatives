@@ -3,7 +3,8 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { INITIATIVE_CHANGED } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
-import { requireAdmin } from "../middleware/auth.ts";
+import { requireAdmin, requireRecentAuth } from "../middleware/auth.ts";
+import { clearSessionCookie } from "../lib/session-cookie.ts";
 import {
   adminCommentJson,
   adminRfp,
@@ -35,6 +36,27 @@ export function adminRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const { db, config, chain, ens } = deps;
   r.use("*", requireAdmin);
+
+  r.post("/sessions/revoke", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c);
+    const address = s(body.address, 60);
+    if (!isAddress(address)) throw new HttpError(400, "that is not an Ethereum address");
+    const revoked = await db.sessions.revokeAll(address);
+    if (address.toLowerCase() === c.var.user!.address.toLowerCase()) {
+      c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
+    }
+    return c.json({ ok: true, revoked });
+  });
+
+  r.post("/sessions/revoke-all", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c);
+    if (body.confirmation !== "revoke all sessions") {
+      throw new HttpError(400, "Confirm global revocation with: revoke all sessions");
+    }
+    await db.sessions.revokeGlobal();
+    c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
+    return c.json({ ok: true });
+  });
 
   /** Admin routes address an initiative by slug (the URL) or by id (older links). */
   const rfpOr404 = async (idOrSlug: string, mutation = false): Promise<Rfp> => {

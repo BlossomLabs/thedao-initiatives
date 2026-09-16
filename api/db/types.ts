@@ -153,10 +153,16 @@ export interface Profile {
 }
 
 export interface Session {
+  /** Public inventory identifier, independent of the secret bearer and its hash. */
+  id: string;
   address: string;
+  /** Privilege at authentication: current membership can remove, never grant it. */
   isAdmin: boolean;
   createdAt: number;
+  lastSeenAt: number;
   expiresAt: number;
+  addressEpoch: string;
+  globalEpoch: string;
 }
 
 export interface SafeSyncState {

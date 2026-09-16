@@ -11,12 +11,12 @@ export async function cachedFunding<T>(
   refreshDue: (data: T) => boolean,
   signal: AbortSignal,
 ): Promise<T> {
-  const snapshot = await api<T>(path, { signal });
+  const snapshot = await api<T>(path, { signal, passive: true });
   signal.throwIfAborted();
   if (!refreshDue(snapshot)) return snapshot;
   qc.setQueryData(key, snapshot);
   try {
-    return await api<T>(`${path}?refresh=1`, { signal });
+    return await api<T>(`${path}?refresh=1`, { signal, passive: true });
   } catch (e) {
     if (signal.aborted || (e instanceof ApiError && e.status < 500)) throw e;
     // Keep the last saved numbers on screen when the refresh is unavailable.

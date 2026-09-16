@@ -26,6 +26,8 @@ export const K = {
   sessionsByAddr: (addr: string, tokenHash: string) =>
     ["sessions_by_addr", addr.toLowerCase(), tokenHash] as const,
   sessionsOf: (addr: string) => ["sessions_by_addr", addr.toLowerCase()] as const,
+  sessionRevocation: (addr: string) => ["session_revocation", addr.toLowerCase()] as const,
+  globalSessionRevocation: ["session_revocation_global"] as const,
   rl: (bucket: string, windowStart: number) => ["rl", bucket, windowStart] as const,
   /** Receipt of a logo upload: who pinned this CID (expires after a day). */
   upload: (cid: string) => ["upload", cid] as const,

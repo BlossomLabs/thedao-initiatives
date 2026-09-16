@@ -255,7 +255,7 @@ Deno.test("uploads: auth, disabled, junk, ok, rate limit; a CID someone else pin
   off.close();
 
   const h = await pinataHarness();
-  const token = await proposerToken(h);
+  let token = await proposerToken(h);
   const junk = await uploadLogo(h, token, new Uint8Array(16));
   assertEquals(junk.status, 400);
   const empty = new FormData();
@@ -274,6 +274,7 @@ Deno.test("uploads: auth, disabled, junk, ok, rate limit; a CID someone else pin
   for (let i = 0; i < 9; i++) assertEquals((await uploadLogo(h, token)).status, 200);
   assertEquals((await uploadLogo(h, token)).status, 429);
   h.clock.now += 3601;
+  token = await proposerToken(h); // refresh the session after its inactivity deadline
   assertEquals((await uploadLogo(h, token)).status, 200);
 
   // another wallet's receipt, a made-up CID, and a malformed one all fail the backer row

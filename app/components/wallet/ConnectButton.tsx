@@ -156,6 +156,12 @@ export default function ConnectButton() {
       key: "sw-" + c.uid,
     })),
     {
+      key: "sessions",
+      label: "Manage sessions",
+      lucide: "list",
+      onClick: () => void navigate("/sessions"),
+    },
+    {
       key: "out",
       label: session ? "Sign out" : "Disconnect wallet",
       lucide: "power",

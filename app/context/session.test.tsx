@@ -243,3 +243,33 @@ it.each([false, true])("handles a restored wallet (stored session: %s)", async (
   expect(result.current.session).toEqual(stored ? SESSION : null);
   expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(false);
 });
+
+it("signs with the wallet's current account when the connected one is no longer authorized", async () => {
+  // MetaMask answers 4100 when the user switched accounts while the prompt was open.
+  const OTHER = "0x000000000000000000000000000000000000dEaD";
+  const { result, config, request } = setup();
+  const original = request.getMockImplementation()!;
+  let signs = 0;
+  request.mockImplementation(async (args: { method: string; params?: unknown[] }) => {
+    if (args.method === "personal_sign") {
+      signs++;
+      if (signs === 1) {
+        throw Object.assign(
+          new Error("The requested account and/or method has not been authorized by the user."),
+          { code: 4100 },
+        );
+      }
+      return "0x9999";
+    }
+    if (args.method === "eth_accounts" && signs >= 1) return [OTHER];
+    return original(args);
+  });
+  await act(() => result.current.connect(config.connectors[0]));
+  expect(signs).toBe(2);
+  const [, second] = request.mock.calls.filter(([a]) => a.method === "personal_sign");
+  expect(String((second[0] as unknown as { params: unknown[] }).params[1]).toLowerCase()).toBe(
+    OTHER.toLowerCase(),
+  );
+  expect(result.current.session).toEqual(SESSION);
+  expect(config.state.status).toBe("connected");
+});

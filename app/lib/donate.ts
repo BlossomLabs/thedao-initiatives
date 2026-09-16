@@ -35,6 +35,9 @@ export function walletErrorMessage(e: unknown): string {
     | { code?: number; message?: string; shortMessage?: string; reason?: string }
     | null;
   if (err?.code === 4001) return "you rejected the request in the wallet.";
+  if (err?.code === 4100 || /not been authorized/i.test(String(err?.message ?? ""))) {
+    return "the wallet is on a different account than the one that connected. Switch back to it in the wallet, or disconnect this site in the wallet and connect again.";
+  }
   if (err?.code === -32002) {
     return "your wallet already has a request open. Open the wallet and finish or dismiss it, then try again.";
   }

@@ -35,6 +35,14 @@ export const sessionKey = (s: SessionInfo | null | undefined): string | null =>
 /** Dev-only fake wallet: it cannot sign, so it connects without a session. */
 const skipsSignIn = (c: Connector | undefined) => c?.id === "mock";
 
+/** EIP-1193 4100: the wallet will not act for that account. MetaMask answers
+ * this when the account the site connected is no longer the wallet's selected
+ * one (the user switched accounts while the prompt was open). */
+const notAuthorized = (e: unknown): boolean => {
+  const err = e as { code?: number; message?: string } | null;
+  return err?.code === 4100 || /not been authorized/i.test(String(err?.message ?? ""));
+};
+
 function load(): SessionInfo | null {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "null") as SessionInfo | null;
@@ -187,19 +195,44 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         return Promise.reject(new Error("Finish the pending wallet sign-in first."));
       }
       setSigningIn(true);
+      const connected = account;
       const promise = Promise.resolve().then(async () => {
         const { nonce } = await api<{ nonce: string }>("/api/auth/nonce");
-        const message = createSiweMessage({
-          domain: globalThis.location.host,
-          address: account,
-          uri: globalThis.location.origin,
-          version: "1",
-          chainId: 1,
-          nonce,
-          statement: "Sign in to TheDAO Security Fund",
-          issuedAt: new Date(),
-        });
-        const signature = await signMessageAsync({ message, account, connector: signingConnector });
+        const messageFor = (address: `0x${string}`) =>
+          createSiweMessage({
+            domain: globalThis.location.host,
+            address,
+            uri: globalThis.location.origin,
+            version: "1",
+            chainId: 1,
+            nonce,
+            statement: "Sign in to TheDAO Security Fund",
+            issuedAt: new Date(),
+          });
+        let signer = connected;
+        let message = messageFor(signer);
+        let signature: `0x${string}`;
+        try {
+          signature = await signMessageAsync({
+            message,
+            account: signer,
+            connector: signingConnector,
+          });
+        } catch (e) {
+          // The wallet moved to another account between connect and sign
+          // (2026-09-16, Griff: "clicked around while waiting"). Sign with the
+          // account the wallet holds now instead of failing as "rejected".
+          if (!notAuthorized(e) || !signingConnector) throw e;
+          const current = (await signingConnector.getAccounts().catch(() => []))[0];
+          if (!current || current.toLowerCase() === signer.toLowerCase()) throw e;
+          signer = current;
+          message = messageFor(signer);
+          signature = await signMessageAsync({
+            message,
+            account: signer,
+            connector: signingConnector,
+          });
+        }
         // cookie: true -> the token comes back as an HttpOnly cookie, not in the body.
         const s = await api<SessionInfo>("/api/auth/verify", {
           json: { message, signature, cookie: true },

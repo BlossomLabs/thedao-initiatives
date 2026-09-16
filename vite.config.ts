@@ -3,7 +3,6 @@ import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 // Editors save files atomically via short-lived `<file>.tmp.*` files. Deno's
 // fs.watch rejects when a watcher is attached to one that has already been
@@ -24,7 +23,7 @@ if (g.Deno && g.addEventListener) {
 }
 
 export default defineConfig({
-  plugins: [tailwindcss(), !process.env.VITEST && reactRouter(), tsconfigPaths()],
+  plugins: [tailwindcss(), !process.env.VITEST && reactRouter()],
   server: {
     port: 5173,
     strictPort: true,
@@ -37,11 +36,18 @@ export default defineConfig({
     },
   },
   resolve: {
+    // `~/*` and `@shared/*` come from tsconfig.json `paths`.
+    tsconfigPaths: true,
     alias: {
       "react-dom/server": fileURLToPath(
         new URL("./app/lib/react-dom-server.node.mjs", import.meta.url),
       ),
     },
+  },
+  build: {
+    // Privy's SDK is one lazily loaded chunk (see app/lib/privy.ts) of ~540 kB
+    // minified; it is already code-split, so only warn above that.
+    chunkSizeWarningLimit: 600,
   },
   test: {
     environment: "jsdom",

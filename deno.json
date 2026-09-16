@@ -12,6 +12,7 @@
     "check:api": "deno check api/main.ts server.ts api/scripts/*.ts shared/draft/mod.ts",
     "lint": "deno lint",
     "fmt": "deno fmt",
+    "sync-wallets": "deno run --env-file=.env --allow-env --allow-net=explorer-api.walletconnect.com --allow-write=public/wallets.json scripts/sync-wallets.ts",
     "sync-content": "deno run --env-file=.env -A api/scripts/sync-content.ts",
     "login": "deno run --env-file=.env -A api/scripts/login.ts"
   },

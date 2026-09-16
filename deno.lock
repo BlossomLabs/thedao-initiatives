@@ -37,6 +37,7 @@
     "npm:lucide-react@^1.45.0": "1.46.0_react@19.3.0",
     "npm:motion@^12.23.26": "12.43.0_react@19.3.0_react-dom@19.3.0",
     "npm:ogl@^1.0.11": "1.0.11",
+    "npm:qrcode.react@4.2.0": "4.2.0_react@19.3.0",
     "npm:react-dom@^19.2.0": "19.3.0_react@19.3.0",
     "npm:react-markdown@^10.1.0": "10.1.0_@types+react@19.3.0_react@19.3.0",
     "npm:react-router@^8.4.0": "8.4.0_react@19.3.0_react-dom@19.3.0",
@@ -4002,6 +4003,12 @@
     "punycode@2.3.1": {
       "integrity": "sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg=="
     },
+    "qrcode.react@4.2.0_react@19.3.0": {
+      "integrity": "sha512-QpgqWi8rD9DsS9EP3z7BT+5lY5SFhsqGjpgW5DY/i3mK4M9DTBNz3ErMi8BWYEfI3L0d8GIbGmcdFAS1uIRGjA==",
+      "dependencies": [
+        "react"
+      ]
+    },
     "qrcode@1.5.3": {
       "integrity": "sha512-puyri6ApkEHYiVl4CFzo1tDkAZ+ATcnbJrJ6RiBM1Fhctdn/ix9MTE3hRph33omisEbC/2fcfemsseiKgBPKZg==",
       "dependencies": [
@@ -4873,6 +4880,7 @@
         "npm:lucide-react@^1.45.0",
         "npm:motion@^12.23.26",
         "npm:ogl@^1.0.11",
+        "npm:qrcode.react@4.2.0",
         "npm:react-dom@^19.2.0",
         "npm:react-markdown@^10.1.0",
         "npm:react-router@^8.4.0",

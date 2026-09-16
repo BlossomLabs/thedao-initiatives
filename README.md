@@ -101,6 +101,29 @@ matching provides browser correlation, not authenticated donor consent (see `api
 
 ## Wallet and sign-in
 
+The header and inline connect buttons share a lazy-loaded wallet chooser. Installed browser wallets
+use wagmi's injected connector; mobile wallets share one WalletConnect connector with telemetry and
+the bundled Reown modal disabled. The chooser serves a searchable, alphabetically sorted directory
+from `public/wallets.json`, so browsing wallets does not contact an external wallet directory or load
+remote logos. Wallet rows use local monograms. Selecting an app follows its registered deep link;
+QR code and copy URI remain available for other compatible wallets. "Open in MetaMask browser" is
+an explicit fallback, including when WalletConnect is not configured.
+
+Pairing starts when the user selects "Mobile wallets / QR code". App links become available once the
+URI is ready, so navigation happens directly on the user's tap (including on iOS). Closing the dialog
+keeps that request alive; either connect button reopens it. Selecting another app reuses the same
+pairing URI. The chooser stays available through the SIWE signature step and offers an "Open wallet"
+link to return to the selected app. Rejecting or expiring a request clears the URI and permits retry.
+The QR renderer is `qrcode.react` (no runtime dependencies); no per-wallet SDK is added. Existing transitive dependencies from
+Privy are unchanged, and disabling WalletConnect telemetry does not disable telemetry in other SDKs.
+
+Refresh the directory explicitly with `deno task sync-wallets` (requires the existing
+`VITE_WALLETCONNECT_PROJECT_ID` in `.env`). The script downloads Ethereum-mainnet, mobile,
+WalletConnect-v2 listings, validates links, strips any stale pairing URI, and writes the snapshot.
+Review that diff before shipping it. Wallets with missing or ambiguous links remain searchable and
+use QR/copy. A registry entry is not a guarantee that a particular app/version handles its link;
+device testing should cover iOS/Android app launch, return, sign-in, rejection, and reconnect.
+
 wagmi + viem: injected wallets (EIP-6963), WalletConnect when `VITE_WALLETCONNECT_PROJECT_ID` is
 set, and "Email" when `VITE_PRIVY_APP_ID` is set. Sign-In with Ethereum happens only when an action
 needs it (vote, reply, name, admin): nonce → `createSiweMessage` → `personal_sign` →

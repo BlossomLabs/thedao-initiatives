@@ -32,7 +32,9 @@ export const wagmiConfig = createConfig({
             url: SITE_URL,
             icons: [SITE_URL + SITE_LOGO],
           },
-          showQrModal: true,
+          // Our chooser handles QR codes and wallet-specific app links.
+          showQrModal: false,
+          telemetryEnabled: false,
         }),
       ]
       : []),

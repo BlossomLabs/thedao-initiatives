@@ -4,27 +4,24 @@ import { useNavigate } from "react-router";
 import { useAccount } from "wagmi";
 import { sessionKey, useSession } from "~/context/session";
 import { useProfileDialog } from "~/context/profile-dialog";
-import { useEmailSignIn } from "~/context/email-sign-in";
-import { useConnectors } from "~/hooks/use-connectors";
+import { useWalletPicker } from "~/context/wallet-picker";
 import { useIdentity } from "~/hooks/use-identity";
 import { Avatar } from "./Avatar";
-import WalletMenu, { connectorItem, type WalletMenuItem } from "./WalletMenu";
-import { PRIVY_CONNECTOR_ID } from "~/lib/privy";
+import WalletMenu, { type WalletMenuItem } from "./WalletMenu";
 import { walletErrorMessage } from "~/lib/donate";
 import { shortAddr } from "~/lib/format";
 import { cn } from "~/lib/utils";
 
 /**
- * Top-bar wallet button. Disconnected: opens the connector list (or connects
- * directly when only one wallet exists); connecting signs in with Ethereum
+ * Top-bar wallet button. Disconnected: opens the shared wallet chooser;
+ * connecting signs in with Ethereum
  * in the same step, and a dismissed signature leaves the wallet disconnected
  * so the button can simply be clicked again. Connected: account menu with
  * name/picture, switch wallet, sign out.
  */
 export default function ConnectButton() {
-  const { address, isConnected, connector } = useAccount();
-  const usable = useConnectors();
-  const { session, connect, connecting, signingIn, signIn, signOut } = useSession();
+  const { address, isConnected } = useAccount();
+  const { session, connecting, signingIn, signIn, signOut } = useSession();
   // "Connected" in the UI means signed in with this wallet; a bare wagmi
   // connection (the context is about to disconnect or sign it in) shows as not connected.
   const signedIn = Boolean(
@@ -32,9 +29,9 @@ export default function ConnectButton() {
   );
   const identity = useIdentity(address);
   const { profileOpen, openProfile } = useProfileDialog();
-  const { openEmailSignIn } = useEmailSignIn();
+  const { openWalletPicker, walletPickerOpen } = useWalletPicker();
   const navigate = useNavigate();
-  const [menu, setMenu] = useState<"none" | "pick" | "account">("none");
+  const [menu, setMenu] = useState<"none" | "account">("none");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const copyAddress = () => {
@@ -77,21 +74,12 @@ export default function ConnectButton() {
     openProfile,
   ]);
 
-  async function connectWith(c: (typeof usable)[number]) {
-    setError("");
-    if (c.id === PRIVY_CONNECTOR_ID) {
-      openEmailSignIn();
-      return;
-    }
-    try {
-      await connect(c);
-    } catch (e) {
-      setError("Not connected: " + walletErrorMessage(e));
-    }
-  }
-
   function onClick() {
     setError("");
+    if (connecting || signingIn) {
+      openWalletPicker();
+      return;
+    }
     if (signedIn) {
       setMenu(menu === "account" ? "none" : "account");
       return;
@@ -101,13 +89,8 @@ export default function ConnectButton() {
       signIn(address).catch((e) => setError("Not signed in: " + walletErrorMessage(e)));
       return;
     }
-    if (usable.length === 1) void connectWith(usable[0]);
-    else setMenu(menu === "pick" ? "none" : "pick");
+    openWalletPicker();
   }
-
-  const pickItems: WalletMenuItem[] = usable.map((c) =>
-    connectorItem(c, () => void connectWith(c))
-  );
 
   const accountItems: WalletMenuItem[] = [
     // The connected address, click to copy (Griff, 2026-09-12); the "(admin)"
@@ -151,10 +134,12 @@ export default function ConnectButton() {
       lucide: "edit",
       onClick: () => openProfile(false),
     },
-    ...usable.filter((c) => c.uid !== connector?.uid).map((c) => ({
-      ...connectorItem(c, () => void signOut().then(() => connectWith(c)), "Switch to " + c.name),
-      key: "sw-" + c.uid,
-    })),
+    {
+      key: "switch",
+      label: "Switch wallet",
+      lucide: "switch",
+      onClick: () => void signOut().then(openWalletPicker),
+    },
     {
       key: "sessions",
       label: "Manage sessions",
@@ -177,9 +162,8 @@ export default function ConnectButton() {
         type="button"
         className={cn("btn btn-wallet", signedIn && "connected")}
         onClick={onClick}
-        disabled={connecting || signingIn}
-        aria-haspopup="menu"
-        aria-expanded={menu !== "none"}
+        aria-haspopup={signedIn ? "menu" : "dialog"}
+        aria-expanded={signedIn ? menu !== "none" : walletPickerOpen}
       >
         {signedIn
           ? <Avatar src={identity.avatar} size={20} />
@@ -190,7 +174,6 @@ export default function ConnectButton() {
           ? identity.name
           : "Connect wallet"}
       </button>
-      {menu === "pick" && <WalletMenu items={pickItems} onClose={() => setMenu("none")} />}
       {menu === "account" && <WalletMenu items={accountItems} onClose={() => setMenu("none")} />}
       {error && (
         <div

@@ -1,0 +1,2484 @@
+{
+  "source": "https://docs.reown.com/cloud/explorer",
+  "updatedAt": "2026-09-16",
+  "wallets": [
+    {
+      "id": "c286eebc742a537cd1d6818363e9dc53b21759a1e8e5d9b263d0c03ec7703576",
+      "name": "1inch Wallet",
+      "native": "oneinch://open/nobodywilleveruseit",
+      "universal": "https://wallet.1inch.io/app/nobodywilleveruseit"
+    },
+    {
+      "id": "6d1d5b892e02d4c992ae67f18f522398481360c64269f5cdf5e4b80435b20e3d",
+      "name": "3S Wallet",
+      "native": "bhcwallet://",
+      "universal": null
+    },
+    {
+      "id": "ffd38ccd0e31fcdeb222359b0261a0c922c3a7d8ad00531f50f3ad8b93e46e15",
+      "name": "88wallet",
+      "native": "com.wallabr.wallet://",
+      "universal": "https://88wallet.app/wc"
+    },
+    {
+      "id": "c36b25db7e48aa7ca19acbae35f79d6486b694f4d12def467592daa78c4cd5b7",
+      "name": "AB Pay",
+      "native": "abpay://walletconnect",
+      "universal": null
+    },
+    {
+      "id": "b956da9052132e3dabdcd78feb596d5194c99b7345d8c4bd7a47cabdcb69a25f",
+      "name": "ABC Wallet",
+      "native": "abc-wallet://abcwc",
+      "universal": null
+    },
+    {
+      "id": "c8c8f44329b9b826ded9a2ac330745f584a61aed6b1d0ed2a093b64bca7fc3bb",
+      "name": "Abra Wallet",
+      "native": "abra://",
+      "universal": null
+    },
+    {
+      "id": "4f854044eea00196b92017037b384bf16118c6606b3a90c60e998af1fb2c01b0",
+      "name": "ADF Wallet",
+      "native": "adf://",
+      "universal": null
+    },
+    {
+      "id": "6b16d70ace02b208c67e06ad00ed8110f46e91cc075e0fd98c68b825587d4076",
+      "name": "Aktionariat Wallet",
+      "native": "aktionariat://",
+      "universal": "https://app.aktionariat.com"
+    },
+    {
+      "id": "d50cc807305f886f712206c9a8a7e47a776a266a7367bc080fe8ce939fcfa2b8",
+      "name": "Alicebob Wallet",
+      "native": "crypto.ab.wallet://",
+      "universal": null
+    },
+    {
+      "id": "138f51c8d00ac7b9ac9d8dc75344d096a7dfe370a568aa167eabc0a21830ed98",
+      "name": "AlphaWallet",
+      "native": "awallet://",
+      "universal": "https://aw.app"
+    },
+    {
+      "id": "94135dbd7aaca4908de49c44e49b8920a79c90164a7ce5803ddb33054c7edc57",
+      "name": "Altme",
+      "native": "wc-altme://",
+      "universal": null
+    },
+    {
+      "id": "5d12c54d33abc6af163bc0344eed8df90765281c4973ada8863ed9ae12aa137f",
+      "name": "AmazeWallet",
+      "native": "amazeapp://amazewallet.com",
+      "universal": null
+    },
+    {
+      "id": "541517cf964687d18414ff05d2623b9c0a122a7a06ac5a5702fd92c4f2b87b1c",
+      "name": "Ammer Wallet",
+      "native": "ammerwallet://",
+      "universal": null
+    },
+    {
+      "id": "82e648053152b18d863d85a467c0ba20bde86e892eb6189e47e260bb78c1e653",
+      "name": "Anchorage Digital",
+      "native": null,
+      "universal": "https://anchorage.com"
+    },
+    {
+      "id": "fd69c39a6ef4fbc717171573441c3b70fbedf73b6f6bc9aa79aa4d94d44a221f",
+      "name": "Anybit",
+      "native": "anybit://",
+      "universal": null
+    },
+    {
+      "id": "63f5b2024d710b30f7cec57fb8312f4261a67074dc5043c50f2d59f4d982141a",
+      "name": "Ape Wallet",
+      "native": "ape://",
+      "universal": "https://zkape.io"
+    },
+    {
+      "id": "0e4915107da5b3408b38e248f7a710f4529d54cd30e9d12ff0eb886d45c18e92",
+      "name": "Arculus Wallet",
+      "native": "arculuswc://",
+      "universal": "https://gw.arculus.co/app/wc"
+    },
+    {
+      "id": "bc949c5d968ae81310268bf9193f9c9fb7bb4e1283e1284af8f2bd4992535fd6",
+      "name": "Argent",
+      "native": "argent://app/",
+      "universal": "https://www.argent.xyz/app"
+    },
+    {
+      "id": "dbb64ad8f55b4ed333d909a6d53670cf97d136c22eb1dca800c539ecea165a53",
+      "name": "Arianee Wallet",
+      "native": "com.arianee.wallet://",
+      "universal": "https://i.arian.ee"
+    },
+    {
+      "id": "aa01d13483db4c065b7a619b813f9eae1cb60c19bf0fc0ed3c36444a07257bd0",
+      "name": "AT.Wallet",
+      "native": "atwallet://",
+      "universal": null
+    },
+    {
+      "id": "f8ab37d6a2194f367aff64b5363cf5cd1ec9422237d662597fdfb488aad1089a",
+      "name": "Atom Wallets",
+      "native": "atomwallet://",
+      "universal": "https://atomwallets.com"
+    },
+    {
+      "id": "380efff687c7d2222d62378c588d45d2e0ff40a0fc4d8f778c4d6fbe58cec5ed",
+      "name": "Atomic Wallet",
+      "native": "atomicwallet://",
+      "universal": null
+    },
+    {
+      "id": "32f356ddf5d2e2f52513cfb84fc78a954e7f130eb53cc1405b9da84bce4c4b51",
+      "name": "AurasPay",
+      "native": "auraspay://wc",
+      "universal": null
+    },
+    {
+      "id": "94f785c0c8fb8c4f38cd9cd704416430bcaa2137f27e1468782d624bcd155a43",
+      "name": "Avacus",
+      "native": "avacus://",
+      "universal": "https://avacus.app.link"
+    },
+    {
+      "id": "60ce5c2246a0808b32dd4eab598435e1c5bd122cc3e9fab7b0542871ac2a35c7",
+      "name": "AZCoiner",
+      "native": "azcoiner://",
+      "universal": "https://azcoiner.com/"
+    },
+    {
+      "id": "2bd8c14e035c2d48f184aaa168559e86b0e3433228d3c4075900a221785019b0",
+      "name": "Backpack",
+      "native": "backpack://",
+      "universal": "https://backpack.app/ul/v1"
+    },
+    {
+      "id": "6bd4cf3fa61dafe9088f9e93e5d1178c7e792fe349489d9a8141cf4354359712",
+      "name": "Ballet Crypto",
+      "native": "balletcrypto://",
+      "universal": null
+    },
+    {
+      "id": "0d0972488cb7fc332af5ac3be6b679a1699518ab4d0048d74cb9b4268ec0263a",
+      "name": "BankSocial",
+      "native": null,
+      "universal": "https://banksocial.app.link/download"
+    },
+    {
+      "id": "fd20dc426fb37566d803205b19bbc1d4096b248ac04548e3cfb6b3a38bd033aa",
+      "name": "Base (formerly Coinbase Wallet)",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "08739356e3fc0efd9498696b7831e8b42b0ad7390af663cd3ba3c30866195b34",
+      "name": "BCERTin wallet",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "e1882224c4c09a84575c533867d434267c46384f5a365b889605d28b061747c4",
+      "name": "BeeWallet",
+      "native": "bee://",
+      "universal": "https://main.apple.bee9527.com"
+    },
+    {
+      "id": "fe68cea63541aa53ce020de7398968566dfe8f3725663a564cac89490247ed49",
+      "name": "Best Wallet",
+      "native": "bw://app/connect",
+      "universal": "https://best-wallet-prod.web.app/connect"
+    },
+    {
+      "id": "f6488493aa7713ec6f915ebe80070d7a4dd17da9d162d72f53117cc4f230bd75",
+      "name": "Bexo",
+      "native": "beexo://",
+      "universal": null
+    },
+    {
+      "id": "4eca426b5c9debee28d1954b646c1a2bc79582c3c2b7e6da79ebc4ad460d8b75",
+      "name": "BharatBox App",
+      "native": "bharatbox://",
+      "universal": null
+    },
+    {
+      "id": "37a686ab6223cd42e2886ed6e5477fce100a4fb565dcd57ed4f81f7c12e93053",
+      "name": "Bifrost Wallet",
+      "native": "bifrostwallet://",
+      "universal": "https://app.bifrostwallet.com/"
+    },
+    {
+      "id": "34af9f895e03259fb008e8ff4ea5ca5d75fcfcb606ec563c332004f39ab47803",
+      "name": "Billion",
+      "native": "billionwallet://",
+      "universal": "https://w.billionwallet.io"
+    },
+    {
+      "id": "8a0ee50d1f22f6651afcae7eb4253e52a3310b90af5daef78a8c4929a9bb99d4",
+      "name": "Binance Wallet",
+      "native": "bnc://app.binance.com/cedefi/",
+      "universal": "https://app.binance.com/cedefi"
+    },
+    {
+      "id": "339bf62ce7500206b17f7b9d370dd7fabf0efe62518f29b656415528d8b1f763",
+      "name": "Binance.US Wallet",
+      "native": "bncus://binance.us/cedefi",
+      "universal": null
+    },
+    {
+      "id": "21cb3fe9675909aede5dbf4c27f654c0c66d8fb1272f497adb0f12ed01b0a599",
+      "name": "Binox Wallet",
+      "native": "binox://",
+      "universal": "https://binox.space/wc.html"
+    },
+    {
+      "id": "f1f4ce9c495cb3db6862230ad961edca8563bf85c245bd774d4d78b7de884641",
+      "name": "BitBox",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "107bb20463699c4e614d3a2fb7b961e66f48774cb8f6d6c1aee789853280972c",
+      "name": "Bitcoin.com Wallet",
+      "native": "bitcoincom://",
+      "universal": "https://wallet.bitcoin.com/"
+    },
+    {
+      "id": "38f5d18bd8522c244bdd70cb4a68e0e718865155811c043f052fb9f1c51de662",
+      "name": "Bitget Wallet",
+      "native": "bitkeep://",
+      "universal": "https://bkapp.vip"
+    },
+    {
+      "id": "21c3a371f72f0057186082edb2ddd43566f7e908508ac3e85373c6d1966ed614",
+      "name": "Bitget Wallet Lite",
+      "native": null,
+      "universal": "https://mini-app.bitkeep.com"
+    },
+    {
+      "id": "41f20106359ff63cf732adf1f7dc1a157176c9b02fd266b50da6dcc1e9b86071",
+      "name": "Bitizen",
+      "native": "bitizen://wallet/",
+      "universal": "https://bitizen.org/wallet/"
+    },
+    {
+      "id": "ee789e749e9af71b1a57a78d9066085d1da1eedbcfd221100963f10cc8452cd6",
+      "name": "Bitnovo Wallet",
+      "native": "bitnovowallet://",
+      "universal": null
+    },
+    {
+      "id": "b4678fefcc469583ed4ef58a5bd90ce86208b82803f3c45f2de3e0973d268835",
+      "name": "BitPay Wallet",
+      "native": "bitpay://",
+      "universal": "https://link.bitpay.com"
+    },
+    {
+      "id": "1531a2c7dd4506df2ec8660da31c7d4a5f3c9ebbc121c7996c688e12a097f26b",
+      "name": "Bitpie",
+      "native": "bitpiewc://",
+      "universal": null
+    },
+    {
+      "id": "3b9f67c2c0887f71e4f9ba1bd2bf5b4eb6cda94419abd3f0c5c12931a60928b0",
+      "name": "Bitski",
+      "native": "bitski://",
+      "universal": "https://wallet.bitski.com/walletconnect/wc"
+    },
+    {
+      "id": "372945354184bfbf3eb51e38d8fafde15a4bc11b88904334e7bad7c8229e6bb1",
+      "name": "Bitso Web3 Wallet",
+      "native": "bitso://bitso.com/web3-wallet",
+      "universal": "https://bitso.com/web3-wallet"
+    },
+    {
+      "id": "e6db14424618cf309697eb50dc330ec18b0ad63395f5ac4669233716df5c18be",
+      "name": "Bitverse",
+      "native": "bitverseapp://open/wallet",
+      "universal": null
+    },
+    {
+      "id": "19c54e02e79e8628512fae334d6dbbac7e2e8b53848a68a06191f3769ede92ff",
+      "name": "BlackFort Wallet",
+      "native": "blackfortwc://",
+      "universal": null
+    },
+    {
+      "id": "a9104b630bac1929ad9ac2a73a17ed4beead1889341f307bff502f89b46c8501",
+      "name": "Blade Wallet",
+      "native": "org.bladelabs.bladewallet://",
+      "universal": null
+    },
+    {
+      "id": "c3d4800aeb5eb7b00dd5e97247993461df84e6630cc3a89bdf2ca522f0ec07d1",
+      "name": "Blanq",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "84b43e8ddfcd18e5fcb5d21e7277733f9cccef76f7d92c836d0e481db0c70c04",
+      "name": "Blockchain.com",
+      "native": "blockchain-wallet://",
+      "universal": "https://login.blockchain.com/app"
+    },
+    {
+      "id": "14e7176536cb3706e221daaa3cfd7b88b7da8c7dfb64d1d241044164802c6bdd",
+      "name": "Blocto",
+      "native": "blocto://",
+      "universal": "https://blocto.app"
+    },
+    {
+      "id": "9207486640ccbe5641b581b9c63d14f9dfdc446b6039a8d22935adb364d6d0a7",
+      "name": "BloFin Wallet",
+      "native": "blofin-wallet://",
+      "universal": "https://wallet.blofin.com/app/"
+    },
+    {
+      "id": "2c5b687e9f6ce2b5d53541ffdf6aa23d7f645c57dc553dbabd465471c1347689",
+      "name": "bonuz Social Wallet",
+      "native": "bonuzapp://",
+      "universal": "https://bonuz.id/"
+    },
+    {
+      "id": "2b858484a62504879b7a760a0e62136616b9fdeb53b72f0ba1ab9ded3ffd78c5",
+      "name": "Bridge Wallet",
+      "native": null,
+      "universal": "https://bridge.mtpelerin.com/wc"
+    },
+    {
+      "id": "8ff6eccefefa7506339201bc33346f92a43118d6ff7d6e71d499d8187a1c56a2",
+      "name": "Broearn Wallet",
+      "native": "broearn://wallet/",
+      "universal": "https://www.broearn.com/link/wallet"
+    },
+    {
+      "id": "d757db40fd0987092673c8c4f33398ac48bb52aa12abb027a652fb4c50b2dce0",
+      "name": "Bron",
+      "native": "bron-mobile://wallet-connect",
+      "universal": null
+    },
+    {
+      "id": "53a2e01781ee6c0d841e6c844f2733899b8f4082a1452986d87a550800aa13ca",
+      "name": "BSC Wallet",
+      "native": "bscwalletapp://",
+      "universal": null
+    },
+    {
+      "id": "8821748c25de9dbc4f72a691b25a6ddad9d7df12fa23333fd9c8b5fdc14cc819",
+      "name": "Burrito",
+      "native": "burrito://",
+      "universal": "https://app.burritowallet.com"
+    },
+    {
+      "id": "4972842b1c1a3552831f7c29ec53229d1ce00b4d43988a262c59d26dae0627d7",
+      "name": "BUZZUP",
+      "native": "buzzup://",
+      "universal": null
+    },
+    {
+      "id": "15c8b91ade1a4e58f3ce4e7a0dd7f42b47db0c8df7e0d84f63eb39bcb96c4e0f",
+      "name": "Bybit Wallet",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "7468ebbf5e14bd146c4fa12a08fb1a0d8d9af3b66409a5b682b64cffc4f21919",
+      "name": "ByteBank",
+      "native": "hideoutWallet://",
+      "universal": null
+    },
+    {
+      "id": "9aa288a4c66884bec28af54056921660ebde9debd848ef03902363ed534c96d4",
+      "name": "Caesium",
+      "native": "caesium-app://walletconnect",
+      "universal": null
+    },
+    {
+      "id": "32caff85195f843b19e79669e63bf3f4ad97b23b3a48b65b3781c0d193a3fcae",
+      "name": "Cake Wallet",
+      "native": "cakewallet://",
+      "universal": null
+    },
+    {
+      "id": "0e9aa50bb3211c93ab48626d53dd631518e33b1eb6cf88638a83e2a0a377e3d0",
+      "name": "Catecoin Wallet",
+      "native": "catecoin://",
+      "universal": "https://catecoin.app/apple-app-site-association"
+    },
+    {
+      "id": "39f230db1d706c54b139aa79cdf1e7f1b0dee05d61ecc7a1b4f8d86c1a10354c",
+      "name": "CFCX",
+      "native": "cfcx://",
+      "universal": "https://cfcx.io/"
+    },
+    {
+      "id": "70d09ca3f616bcb1488542830055ec82d270ce17986a97b1f72f15a6af9f0b3f",
+      "name": "Chain",
+      "native": "chainapp://",
+      "universal": null
+    },
+    {
+      "id": "e86b5fc56c3661726248a7a3f99fae68dca0cc7fa503e2ce96c1873973fea3f5",
+      "name": "CipherTrade",
+      "native": "ciphertrade://wc",
+      "universal": "https://ciphertrade.org/wc"
+    },
+    {
+      "id": "8a0153a6a099bb8dbacd0300327cd2e6c89502c4bb76ccba2eb568dd56c155a6",
+      "name": "Clot",
+      "native": "clot://",
+      "universal": null
+    },
+    {
+      "id": "34fca0f0eaa51af856cc7f205bacc36ede45545fa987fd81274e53db7718a183",
+      "name": "COCA Wallet",
+      "native": "wirexwallet://",
+      "universal": null
+    },
+    {
+      "id": "8bee2c65ad37240fab769ff3c9f56f94914e53c8d99087e1a805cc5ef39a44f3",
+      "name": "Cogni",
+      "native": "getcogni://web3/",
+      "universal": "https://getcogni.com/web3_wc_connect"
+    },
+    {
+      "id": "f384f4e9274c6e15ee1fd6f96a00ae22bb7de0053df8fbd3fcf0457de480be96",
+      "name": "Coin Wallet",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "2a3c89040ac3b723a1972a33a125b1db11e258a6975d3a61252cd64e6ea5ea01",
+      "name": "Coin98 Super Wallet",
+      "native": "coin98://",
+      "universal": "https://coin98.com/"
+    },
+    {
+      "id": "4a4d5b02a47ef7f7162da22983431ee1cf8392a8d4929ed8c69d2759b24e17f0",
+      "name": "CoinEx Wallet",
+      "native": "myApp://https://wallet.coinex.com",
+      "universal": null
+    },
+    {
+      "id": "15d7610042217f691385d20e640869dc7273e991b04e8f476417cdc5ec856955",
+      "name": "Coinomi",
+      "native": "coinomi://",
+      "universal": "https://coinomi.page.link"
+    },
+    {
+      "id": "bcaec16e531fb5f6dc690d7b70d570421e0209af9a0fe77c6419d516fe0098c2",
+      "name": "CoinStats",
+      "native": "coinstats://",
+      "universal": null
+    },
+    {
+      "id": "2ba89f94faff121a7c1091c3cea124167dc4291ebe87123620c66e0f120197cc",
+      "name": "CoinWallet",
+      "native": "coinwallet://",
+      "universal": null
+    },
+    {
+      "id": "dd15a3530dc4de4c50ebb22010824c41337403efec713f1187695c72934fb94c",
+      "name": "Cold Wallet",
+      "native": "pluswallet://",
+      "universal": "https://coldwallet.com/"
+    },
+    {
+      "id": "1f69170bf7a9bdcf89403ec012659b7124e158f925cdd4a2be49274c24cf5e5d",
+      "name": "CoolWallet",
+      "native": "coolwallet://",
+      "universal": null
+    },
+    {
+      "id": "f323633c1f67055a45aac84e321af6ffe46322da677ffdd32f9bc1e33bafe29c",
+      "name": "Core",
+      "native": "core://",
+      "universal": "https://core.app"
+    },
+    {
+      "id": "62bc9f93a77fbf6e807ea2a3a4aab0ca2e942f7e5bf28d10dbb158b2f203805e",
+      "name": "CornWallet",
+      "native": null,
+      "universal": "https://www.cornwallet.io/"
+    },
+    {
+      "id": "55f4872b498731cab13f104e8aa0ff987060b1eb7859521afd6627ae87b88491",
+      "name": "Cosine Wallet",
+      "native": "cosine://",
+      "universal": null
+    },
+    {
+      "id": "feb6ff1fb426db18110f5a80c7adbde846d0a7e96b2bc53af4b73aaf32552bea",
+      "name": "Cosmostation",
+      "native": "cosmostation://",
+      "universal": null
+    },
+    {
+      "id": "ce02f1ae74686234eabfa7d31876c442779b730dfe7924a3ca0e6559a7afa30f",
+      "name": "Credit Wallet",
+      "native": "creditwallet://",
+      "universal": null
+    },
+    {
+      "id": "594898896007b2e49d4064043871093620867d18cae558ce9782ad1303f371e6",
+      "name": "Cryptic",
+      "native": "cypherchat://wc",
+      "universal": null
+    },
+    {
+      "id": "bae2ab14ef450f307f24a395a3c2766a2ef8a9c0e61856985d23f6445e8db03f",
+      "name": "Cryptnox Wallet",
+      "native": "cryptnox://",
+      "universal": null
+    },
+    {
+      "id": "f2436c67184f158d1beda5df53298ee84abfc367581e4505134b5bcf5f46697d",
+      "name": "Crypto.com Onchain",
+      "native": "dfw://",
+      "universal": "https://wallet.crypto.com/deeplink"
+    },
+    {
+      "id": "45aa096282002911a77c9e1dba16dade905960e6386e681c2f8d7966f4e475b1",
+      "name": "Cryptokara",
+      "native": "cryptokara://StartScreen",
+      "universal": null
+    },
+    {
+      "id": "835dc63f69f65113220e700112363fef2a5f1d72d6c0eef4f2c7dc66bf64b955",
+      "name": "CVL Wallet",
+      "native": null,
+      "universal": "https://app.cvl.network/"
+    },
+    {
+      "id": "ce216ac7310971159adda1ac271fc6e6590d2c02da43b894ac11919084196e40",
+      "name": "CyberWallet",
+      "native": null,
+      "universal": "https://wallet.cyber.co"
+    },
+    {
+      "id": "71719738d0ed2eaba05884b7acb3582f99f224cef9385e4dd5bab1fcd1229cea",
+      "name": "Cyper",
+      "native": "cyper://app/wallet/index",
+      "universal": null
+    },
+    {
+      "id": "44ca80bba6838e116e8d0a2c1a1f37041ea322379cc65a71479b6a240b6fcab2",
+      "name": "Cypher Wallet",
+      "native": "cypherwallet://",
+      "universal": "https://app.cypherhq.io"
+    },
+    {
+      "id": "078d94b4c8706e12fe379e85242ce963380acfd678518e2d8ea73ee532d9bacc",
+      "name": "DaffiOne",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "bf842c1e1e729282583c4c53d5cd6bb01d7685ae8361fa20bdfa9a843ad2e46f",
+      "name": "Daily Wallet",
+      "native": "dailywallet://",
+      "universal": null
+    },
+    {
+      "id": "a1f506a38f39b672b369bd13b68abbbd81f83a0489e6625f2bf12aa0389c22ae",
+      "name": "DCENT",
+      "native": "dcent://",
+      "universal": "https://link.dcentwallet.com"
+    },
+    {
+      "id": "9a8f7601d24db36d0cc82df4b7adc11eb80451b2f651bf203b4e2f8696f16586",
+      "name": "DeBox Wallet",
+      "native": "Debox://",
+      "universal": "https://debox.pro/wc"
+    },
+    {
+      "id": "063c520962a445617ad3fc9ccb9744c81104dd11e34e3d61c6a6a42cc0a6beb3",
+      "name": "Dexari",
+      "native": "dexari://",
+      "universal": "https://dexari.com/join"
+    },
+    {
+      "id": "7e6f68b033a19fd6c2999598f9791e24014f9870c626901d254da50660fda578",
+      "name": "Dfinn Wallet",
+      "native": "dfinnwallet://",
+      "universal": "https://dfinnwallet-link.vercel.app/"
+    },
+    {
+      "id": "221eb19f9cfdf577c2f75190fc4fa24523624f604904ced78089bc82ebdb983e",
+      "name": "DGG Wallet",
+      "native": "dgg://",
+      "universal": "https://dggnetwork.app.link"
+    },
+    {
+      "id": "78a926e8758e4464162818353637b11fead41489598dd7f47e4b247eaf8008c3",
+      "name": "DIAM Wallet",
+      "native": "diamwallet://wc",
+      "universal": "https://dwconnect.diamante.io/wc"
+    },
+    {
+      "id": "a93e0fd6a25178b2fa80eb882150f6b8da53c1e9f3e6d0d92019076671bb07f0",
+      "name": "DIDWallet",
+      "native": "abt://didwallet.io/i",
+      "universal": "https://didwallet.io/i"
+    },
+    {
+      "id": "6ccad459120e00737c6001a576e62867ea68b74388278de2c62deddc86f356f6",
+      "name": "Digital Shield",
+      "native": "digitalshield-wallet://wc",
+      "universal": "https://app.ds.pro/wc/connect"
+    },
+    {
+      "id": "71ba37d08c477ba46d681022a574544b742f66fbe51383b422a916456960c123",
+      "name": "DLICOM",
+      "native": null,
+      "universal": "https://dlicom.me"
+    },
+    {
+      "id": "a77eaf6509774b780b22f678fa15168c4e12f71f7eb3102edf85112a222bb503",
+      "name": "Dokwallet",
+      "native": "dokwallet://",
+      "universal": "https://www.dokwallet.app"
+    },
+    {
+      "id": "2a40b26b3a69de566720e8e5134aaa8cf767b14d66fa8e27faca971984a6a545",
+      "name": "Dollet",
+      "native": "dolletwc://",
+      "universal": null
+    },
+    {
+      "id": "a2f18257975707ca7dd59322fdcc3ea0282badec2363e0a1db6901e3262856fa",
+      "name": "DomaWallet",
+      "native": "goldwallet://",
+      "universal": null
+    },
+    {
+      "id": "c7a7721cf4b6deb311e9b2e4bc2ebf07ef05d818149fd373bfb785fa47088823",
+      "name": "Dropmate",
+      "native": "dropmate://app",
+      "universal": null
+    },
+    {
+      "id": "c4a289db34ed1b8e29d7e87a2e97c236bb82d72d60c8d73e27e02769facabd4a",
+      "name": "DTTD",
+      "native": "dotted://",
+      "universal": null
+    },
+    {
+      "id": "53dd23581ff2ac3473a517c2995ad41cb214e105ebc99a122bda032051bb54c6",
+      "name": "Earth Wallet",
+      "native": "earthwallet://",
+      "universal": "https://wallet.earth"
+    },
+    {
+      "id": "5fb52d5d1316eb09e2a3f7e6e3620e5e78450f3107684166ef7ee36459ebc09c",
+      "name": "Echooo Wallet",
+      "native": "echooo://echooo.valleysound.xyz/vss/walletconnect",
+      "universal": "https://api.valleysound.xyz/vss/*"
+    },
+    {
+      "id": "297bf3864322ce81262df9a40b9a0fdcb504e737ad900bfe8ef47710729456ce",
+      "name": "ECOIN Wallet",
+      "native": "ecoinwallet://",
+      "universal": "https://ecoinwallet.org/link"
+    },
+    {
+      "id": "7faed13451e675679e2af297c492914ee4fda540fc82d2993a91e1d73c64d96b",
+      "name": "Edge",
+      "native": "edge://",
+      "universal": "https://deep.edge.app/wc"
+    },
+    {
+      "id": "035ded0f263e4a64bf2c84db06b73e6b4c5115929ea407cc2a3127ee6f392e0e",
+      "name": "Elastos Essentials",
+      "native": "essentials://",
+      "universal": "https://essentials.web3essentials.io"
+    },
+    {
+      "id": "fe9127f49fd95e20e6d877d0e224da6a75062f52d8fb9784856a5cb7ef39e9d2",
+      "name": "ELLIPAL",
+      "native": "ELLIPAL://",
+      "universal": "https://www.ellipal.com"
+    },
+    {
+      "id": "bdc9433ffdaee55d31737d83b931caa1f17e30666f5b8e03eea794bac960eb4a",
+      "name": "Enjin Wallet",
+      "native": "enjinwallet://",
+      "universal": "https://deeplink.wallet.enjin.io/"
+    },
+    {
+      "id": "022e8ff84519e427bff394b3a58308bc9838196a8efb45158da0ab7c3228abfb",
+      "name": "Essentials",
+      "native": null,
+      "universal": "https://essentials.web3essentials.io"
+    },
+    {
+      "id": "9ec7dc26973b1a7bd708aaae749002fe3bc509254472939a8d8d2ae1f2d483b2",
+      "name": "EtherMail",
+      "native": "ethermail://",
+      "universal": null
+    },
+    {
+      "id": "50cca6f943812d2852752b7e021f251d50d410878b54c18a81ad71bcaa439035",
+      "name": "Ethos Self-Custody Vault",
+      "native": "myapp://home",
+      "universal": null
+    },
+    {
+      "id": "e9ff15be73584489ca4a66f64d32c4537711797e30b6660dbcb71ea72a42b1f4",
+      "name": "Exodus",
+      "native": "exodus://",
+      "universal": "https://exodus.com/m"
+    },
+    {
+      "id": "445ced0f482742632dfa6684f802eb1a2bb3cb97531bd06e02fb297c6ad21de1",
+      "name": "Family",
+      "native": "familywallet://",
+      "universal": null
+    },
+    {
+      "id": "79a37a33816cfba8b2ab936c440a69efdd555414e3eed7f43a2f12dab5e8807b",
+      "name": "FINTOKEN",
+      "native": "fintoken://",
+      "universal": "https://ios.fintoken.pro/app"
+    },
+    {
+      "id": "5864e2ced7c293ed18ac35e0db085c09ed567d67346ccb6f58a0327a75137489",
+      "name": "Fireblocks",
+      "native": "fireblocks-wc://",
+      "universal": null
+    },
+    {
+      "id": "17a4ec96ceb34ade8e5215220df2051614aeebb832cc80ef19ddd7f33d5ba862",
+      "name": "Fizen Wallet",
+      "native": "fw://",
+      "universal": null
+    },
+    {
+      "id": "c18e114130f221c8960e75bfa4b86478e70e27465e2d6b22ac8945c08a031a7e",
+      "name": "Flash Wallet",
+      "native": "flashwallet://",
+      "universal": null
+    },
+    {
+      "id": "184f15ea2cd5f65e25ed72efdd2ed1979179eddf0c0741ab0dd23c1eb7e0eee5",
+      "name": "Flooz",
+      "native": "floozwallet://",
+      "universal": "https://wallet.flooz.trade/wc"
+    },
+    {
+      "id": "e6a8cb6abe47f88d7511b0698829eab01d76e78bad82b8ccca66004055055d89",
+      "name": "Flow Wallet",
+      "native": "frw://",
+      "universal": "https://frw-link.lilico.app"
+    },
+    {
+      "id": "c16e0e172fe80ebdc26bcdc9d24d962b7a9474b6db8ce9e6b2022e86195728cd",
+      "name": "Flutter Sample Wallet",
+      "native": "wcflutterwallet-internal://",
+      "universal": "https://lab.reown.com/flutter_walletkit_internal"
+    },
+    {
+      "id": "105bc5cd0cf9126c1050e6f88fbdcc3e6b47bbfe4ff08b79ed189198374008c9",
+      "name": "Fncy Mobile Wallet",
+      "native": "metaCubeWallet://",
+      "universal": null
+    },
+    {
+      "id": "c7708575a2c3c9e6a8ab493d56cdcc56748f03956051d021b8cd8d697d9a3fd2",
+      "name": "FoxWallet",
+      "native": "foxwallet://",
+      "universal": "https://link.foxwallet.com"
+    },
+    {
+      "id": "6bb31b6f40516f9f638741ee0237f009ebb464f79e00ac24972f7c487591ae3a",
+      "name": "Freehold Wallet",
+      "native": "freeholdapp://walletconnect/wc",
+      "universal": "https://freehold.finance/wc"
+    },
+    {
+      "id": "85db431492aa2e8672e93f4ea7acf10c88b97b867b0d373107af63dc4880f041",
+      "name": "Frontier",
+      "native": "frontier://",
+      "universal": null
+    },
+    {
+      "id": "b56e7a5fe4500d5765726912b6863a92ffc6aee88a7d3a94905e93e1b3e01c2e",
+      "name": "Frostfire",
+      "native": "frostfire://wc",
+      "universal": null
+    },
+    {
+      "id": "30eb3e6d71fd0727d154e451748815e04a99c06972a84b10dfe7ae1b923c0c92",
+      "name": "FxWallet",
+      "native": "fxwallet://",
+      "universal": null
+    },
+    {
+      "id": "b1998499e7502d1d10eddb209edc25b1a7aa7977d6ce6664b066474d66f43bdf",
+      "name": "Gamic",
+      "native": "gamic://",
+      "universal": "https://www.gamic.app/wc"
+    },
+    {
+      "id": "aba1f652e61fd536e8a7a5cd5e0319c9047c435ef8f7e907717361ff33bb3588",
+      "name": "GateWallet",
+      "native": "gtweb3wallet://",
+      "universal": null
+    },
+    {
+      "id": "2c69b45f625add0acd3354df4ab757067143b7f54b937311966f55be60a89c41",
+      "name": "Gaya Wallet",
+      "native": null,
+      "universal": "https://gayawallet.com"
+    },
+    {
+      "id": "dcb5cd7bb4a8849288f8b43dea7bf20d7b7e2b096b630964f9ca5bf808531edd",
+      "name": "Gem Wallet",
+      "native": "gem://",
+      "universal": "https://gemwallet.com"
+    },
+    {
+      "id": "7de190d03faf1f15027a834801f045bc66640045b0d5a0daa4686d7fa89fab74",
+      "name": "Gems Pocket",
+      "native": "ancrypto://app",
+      "universal": null
+    },
+    {
+      "id": "cb47371469a5958b1b0a4ffc80e9ecc9b3ee5d4ff15cac193699626a2a85271f",
+      "name": "GGP Wallet",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "a5f729636bd307a509e8814d8553d224550e4c35fee2b4e2f71bb1ade63ee4a9",
+      "name": "GK8",
+      "native": "gk8://main",
+      "universal": null
+    },
+    {
+      "id": "aad1cc72005d28969c5c5f92d7ed93e43ab02671c601576eebff361b29770278",
+      "name": "GM² Social",
+      "native": "gm2://home",
+      "universal": null
+    },
+    {
+      "id": "6e688d84a60a65115eb07fda37fd36a3e727af8ac03fe6e878f401b425aa5787",
+      "name": "Goldaxis",
+      "native": "goldaxis://",
+      "universal": null
+    },
+    {
+      "id": "80ef1e74b7abdcd96dbac45e61235cade99e4fa516daf5f26b6e42d35c6ff408",
+      "name": "GoldPocket",
+      "native": "gp://wc",
+      "universal": null
+    },
+    {
+      "id": "689e621a3585ca018fd44ff404bc89079a0e55e9c632574e8bf8d2b1c7918911",
+      "name": "GoodDollar",
+      "native": "gooddollar://",
+      "universal": "https://wallet.gooddollar.org/"
+    },
+    {
+      "id": "8631ca765defdf51cd72444ec0284b866c835a947ed082d41c0c756a3b2eb1c2",
+      "name": "Gridlock Wallet",
+      "native": "network.gridlock.AppGridlock://",
+      "universal": "https://gridlock.page.link/Fihx"
+    },
+    {
+      "id": "bccfdfe020b6df7bf7bdec60297be63b8ca4ab6468bd0e0fd95a472da076baa3",
+      "name": "GRRNPay",
+      "native": "grrnpay://wc",
+      "universal": "https://grrnpay.grrn.io/wc"
+    },
+    {
+      "id": "b123d9d4aa6b384aed6c45e7738861a28a2eabdf4adb72ad1e408d8578bc9b81",
+      "name": "GUARDIIAN Wallet",
+      "native": "guardiianwallet://",
+      "universal": null
+    },
+    {
+      "id": "719bd888109f5e8dd23419b20e749900ce4d2fc6858cf588395f19c82fd036b3",
+      "name": "HaHa",
+      "native": "haha://",
+      "universal": "https://haha.me"
+    },
+    {
+      "id": "95b58bd89109b2bd9989c9956a8e3f5822003126bae800d9f77455c4009db5ba",
+      "name": "hAI by Hacken",
+      "native": "hai://",
+      "universal": "https://hacken.ai"
+    },
+    {
+      "id": "24fd8104e07aa1802aef51426222f23868013b83655fb6686c8478744dd2fda1",
+      "name": "Halo Wallet",
+      "native": "halowallet://",
+      "universal": "https://link.kuwallet.com/universallink"
+    },
+    {
+      "id": "47c5a25372f22ccf2df09a8431ccd00c02df19f4b73fa0e7c04c1573b90aec7a",
+      "name": "HAQQ Wallet",
+      "native": "haqq://",
+      "universal": null
+    },
+    {
+      "id": "bd44a349197c9d22659b98f0db579589f1e99f0ef51ccc06ffab2544b86e68e7",
+      "name": "HARTi Wallet",
+      "native": "HARTi://",
+      "universal": null
+    },
+    {
+      "id": "38633830ef578a1249c345848a8d6487551a346b923d21ce197ea57f423f3113",
+      "name": "HashPort Wallet",
+      "native": "expo2025-wallet://",
+      "universal": "https://link.wallet.hashport.com"
+    },
+    {
+      "id": "e7b5947f9960c3026e42ebc575027ba7d78ded8140093e800ce91c7f9d3b3111",
+      "name": "HASHWallet",
+      "native": "hashwallet://app/wc",
+      "universal": null
+    },
+    {
+      "id": "2125ab6a3e8be0d73e6d48f9db39c34925a790a631b4b67b84502d823aa47ad3",
+      "name": "HB WALLET",
+      "native": "hbwallet://",
+      "universal": null
+    },
+    {
+      "id": "48e53d96460308a1734614b5d4fdf7ea169e6f998e01eb7b4e18014f57904d67",
+      "name": "helix id",
+      "native": "helix-id://helix-id.com",
+      "universal": null
+    },
+    {
+      "id": "b1b0a0916c431f46a062ee2a757d93454c82ff1f22e00bf83ba1a9abd09570ab",
+      "name": "HERE Wallet",
+      "native": "herewallet://",
+      "universal": "https://my.herewallet"
+    },
+    {
+      "id": "a1f3f8956346e2ba29e25bc5252c6dc0b2afa9ee17aa13ecd026abafedaf8696",
+      "name": "Hero Wallet",
+      "native": "herowallet://wc",
+      "universal": "https://wallet.hero.io/signin/wc"
+    },
+    {
+      "id": "16181134503608bc683a3f071b99ebc2581f134dafb350756b86fc984726dd94",
+      "name": "Hex Trust",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "664b505fea4c2117b8a55c054ef209664e0a68ddaafd7534df739f97a293fa1d",
+      "name": "Hippo Wallet",
+      "native": "hippowallet://",
+      "universal": "https://hippowallet.io"
+    },
+    {
+      "id": "b83a346877b71c02b8531f53485ce12bc00033eabcc1213ca3329cbc744813a5",
+      "name": "Holdstation Wallet",
+      "native": "holdstation://",
+      "universal": "https://staging-referral.holdstation.com/wallet-connect"
+    },
+    {
+      "id": "2225e93edb4eda791e19e26817b94976607132bdb248684a39a5fc5ac9103782",
+      "name": "HootArk",
+      "native": "HootArk://",
+      "universal": null
+    },
+    {
+      "id": "aee5083aac025c4c3f1c9afc31ea89dbddca0b1c248195bef469fc4886ae3ab2",
+      "name": "HOT Wallet",
+      "native": "hotwallet://",
+      "universal": "https://app.hot-labs.org"
+    },
+    {
+      "id": "a94328bcaff3ed69de88cb6347b6933370d16455af591e4a46e7e0d7c2a485c8",
+      "name": "HyperPay",
+      "native": "hyperPay://",
+      "universal": null
+    },
+    {
+      "id": "d6071018d2199b47d48c9590423f17afe222c35a12727db3f64ca2962a5e5709",
+      "name": "IApp",
+      "native": "ivirse://",
+      "universal": null
+    },
+    {
+      "id": "fea98faf8b5ae216c1091bb33dfc41ee27278059b871bf1d5b1b7af3744eca72",
+      "name": "IBVM Wallet",
+      "native": "ibvm://",
+      "universal": null
+    },
+    {
+      "id": "e3c0732167495b407aeaab7cd968cac73db3351421242c9eae717f4032dba411",
+      "name": "icewal",
+      "native": "icewal://",
+      "universal": null
+    },
+    {
+      "id": "6289878a2ef8c49944cf428184bba626b161b0974f0b4f8b31a15e0317d8861c",
+      "name": "ID Pocket",
+      "native": "wc://",
+      "universal": null
+    },
+    {
+      "id": "24475df43f0272e91e800eca2698f62db94c3a973e7cda4abfd546d995013b77",
+      "name": "iLuminaryAi Wallet",
+      "native": "iluminary://",
+      "universal": "https://ilumi.app.link"
+    },
+    {
+      "id": "0affd4bdebe5b35806bf52bbf6130de91208d4d3593e4b221b7813441141df13",
+      "name": "iMe Messenger & Crypto Wallet",
+      "native": null,
+      "universal": "https://imem.app/download"
+    },
+    {
+      "id": "b6329af78b11719de52ca0426fb50d64b9b965335fc53dafed994ec22680614e",
+      "name": "Imota",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "ef333840daf915aafdc4a004525502d6d49d77bd9c65e0642dbaefb3c2893bef",
+      "name": "imToken",
+      "native": "imtokenv2://",
+      "universal": null
+    },
+    {
+      "id": "dd43441a6368ec9046540c46c5fdc58f79926d17ce61a176444568ca7c970dcd",
+      "name": "Internet Money",
+      "native": "internetmoney://",
+      "universal": "https://internetmoney.io"
+    },
+    {
+      "id": "1a5f2435e8e31c4034f1d142e85d9f7d3be2a09ddf710e5ef1ad4e36c719d3c0",
+      "name": "ioPay",
+      "native": "iopay://",
+      "universal": null
+    },
+    {
+      "id": "376cc8495e1b9387084dce611446bc6086780b39b338934ae057ed11c5739735",
+      "name": "IronWallet",
+      "native": "myApp://app.ironwallet.io",
+      "universal": "https://app.ironwallet.io"
+    },
+    {
+      "id": "226d8a12a2e6e5c4185fa9c24313824bfb144c2a180325bddbd121844f497afa",
+      "name": "ISLAMIwallet",
+      "native": "islamiwallet://islami.com/path/",
+      "universal": "https://islamicoin.finance/.well-known/assetlinks.json"
+    },
+    {
+      "id": "953f348baef1a985ba440822202fee7485e7ae0cae3b29a04f17a712c1a9490a",
+      "name": "ITLX Wallet",
+      "native": "interlinkid://",
+      "universal": "https://interlinklabs.ai/deeplink/wallet"
+    },
+    {
+      "id": "13e0cd9c08c3b5788030abce5337e2acaaba259bc93f279332202d4078be8f58",
+      "name": "Jade Wallet",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "ca3f372788f7eaceda2429be20dd4f9c8c148f0d103bb7ba8576f8138104f18c",
+      "name": "Jambo",
+      "native": "jbw://walletconnect",
+      "universal": null
+    },
+    {
+      "id": "cbb71bbea17d8cb15f28d636d0e95f62bcdc6ec760f38bf299ff57fa75f0fdb6",
+      "name": "Keeper",
+      "native": "tonkeeper://",
+      "universal": "https://app.tonkeeper.com"
+    },
+    {
+      "id": "6adb6082c909901b9e7189af3a4a0223102cd6f8d5c39e39f3d49acb92b578bb",
+      "name": "Keplr",
+      "native": "keplrwallet://wcV2",
+      "universal": "https://deeplink.keplr.app/"
+    },
+    {
+      "id": "66b20f508f561b7c54602f221b1f9d8d43bd1df5cb5d6ee60b2808ddce9e196b",
+      "name": "Key3",
+      "native": "walletapp://",
+      "universal": "https://www.key3.ai/"
+    },
+    {
+      "id": "47bb07617af518642f3413a201ec5859faa63acb1dd175ca95085d35d38afb83",
+      "name": "KEYRING PRO",
+      "native": "keyring://",
+      "universal": "https://keyring.app/"
+    },
+    {
+      "id": "d5fa5b2ef55ee183de99b34b790c2b4966e641b2a32427ab3321c89fb1fae1ad",
+      "name": "KGeN Wallet",
+      "native": "kgen://app/wallet",
+      "universal": null
+    },
+    {
+      "id": "43c76a3d2a84cb7a10f6329a34261eb6794ac830e74bc8136b42ee05ee54efb1",
+      "name": "Kigo",
+      "native": "kigo-mobile-app://",
+      "universal": "https://kigo-digital.app.link/"
+    },
+    {
+      "id": "1c014fb8651d0ea111cec6c02546db5079e1512c47a827c64e6319025156664f",
+      "name": "KIML Wallet",
+      "native": "kimlwallet://",
+      "universal": "https://app.kimlwallet.com"
+    },
+    {
+      "id": "fbea6f68df4e6ce163c144df86da89f24cb244f19b53903e26aea9ab7de6393c",
+      "name": "Klever Wallet",
+      "native": "klever-wallet://dp/walletconnect",
+      "universal": "https://klever.page.link"
+    },
+    {
+      "id": "3c2c985c0adff6f46a0d0e466b3924ed8a059043882cd1944ad7f2adf697ed54",
+      "name": "klip",
+      "native": "klipwallet://",
+      "universal": "https://klipwallet.com"
+    },
+    {
+      "id": "e401b54ca287ce5c4c4579a91220e79816cff07cdf18b388fde84449c3be8a51",
+      "name": "Koala Wallet",
+      "native": "kowallet://",
+      "universal": null
+    },
+    {
+      "id": "1a090919fa32185977f65bcab3435d250fa7e7e47c8410e31136f3f297517e27",
+      "name": "Komet",
+      "native": "komet://",
+      "universal": null
+    },
+    {
+      "id": "7ef48bf6722bd9694ab35f1fa9f8239ef1d44dc721c6950b9afe2468a77aad5a",
+      "name": "Kotai Wallet",
+      "native": "kotaiwallet://",
+      "universal": null
+    },
+    {
+      "id": "7f3449afd0516845236c4f15f73cf3e106cb5706a349a8d6d7e1490b9c2cb0da",
+      "name": "Kotlin Sample Wallet",
+      "native": "kotlin-web3wallet://",
+      "universal": "https://appkit-lab.reown.com/wallet_internal"
+    },
+    {
+      "id": "18450873727504ae9315a084fa7624b5297d2fe5880f0982979c17345a138277",
+      "name": "Kraken Wallet",
+      "native": "krakenwallet://",
+      "universal": null
+    },
+    {
+      "id": "56bec983b47c8b6eb774890c1c8ae9d95334e10bdb126ab6c11dfaf56fb2b31c",
+      "name": "Kresus SuperApp",
+      "native": "com.kresus.superapp://",
+      "universal": null
+    },
+    {
+      "id": "488797489e6207d284a796381596453da60399d2d2ef8a88c6126ff4aaf9491c",
+      "name": "KriptoK",
+      "native": "kriptok://wc",
+      "universal": "https://dev-api.kriptok.io/wc"
+    },
+    {
+      "id": "01925725cdc7a5008824c8f19eff85769903fbcc53c62639feb0d4f8d3a6cf52",
+      "name": "Kriptomat",
+      "native": "kriptomatapp://wallet-connect",
+      "universal": null
+    },
+    {
+      "id": "50df7da345f84e5a79aaf617df5167335a4b6751626df2e8a38f07029b3dde7b",
+      "name": "Kriptonio",
+      "native": "kriptonio://",
+      "universal": "https://app.kriptonio.com/mobile"
+    },
+    {
+      "id": "19418ecfd44963883e4d6abca1adeb2036f3b5ffb9bee0ec61f267a9641f878b",
+      "name": "KryptoGO Wallet",
+      "native": "kryptogo://",
+      "universal": "https://kryptogo.page.link"
+    },
+    {
+      "id": "92dec31cb291452a58043db64f26b20c886607661fd82e921be6362d5fee7f49",
+      "name": "Krystal",
+      "native": "krystalwallet://",
+      "universal": "https://wallet.krystal.app/"
+    },
+    {
+      "id": "014d1c4aaa277b04791ac27433485d1440a6aabbcb6b8228719ed1574eac4472",
+      "name": "KUB Wallet",
+      "native": "kubwallet://wc",
+      "universal": "https://applink.kubwallet.com/wc"
+    },
+    {
+      "id": "67f1ec404dbf3bddc509b5fcf615850e05b28c287ccd7167b4fe81b4293ac9df",
+      "name": "KuCoin Web3 Wallet",
+      "native": "kucoin:///wallet/walletConnect",
+      "universal": null
+    },
+    {
+      "id": "3ed8cc046c6211a798dc5ec70f1302b43e07db9639fd287de44a9aa115a21ed6",
+      "name": "Leap",
+      "native": "leapcosmos://",
+      "universal": null
+    },
+    {
+      "id": "19177a98252e07ddfc9af2083ba8e07ef627cb6103467ffebb3f8f4205fd7927",
+      "name": "Ledger Wallet",
+      "native": "ledgerlive://",
+      "universal": null
+    },
+    {
+      "id": "8141668a92aad85f9f9f4b00e59914061df0f189b5b11fb35a15dc2708bb4596",
+      "name": "Legacy Wallet",
+      "native": "legacy://network.io",
+      "universal": null
+    },
+    {
+      "id": "080f1b10c1a55922037a4bda62f42c7ff2b5384bc9b5d6ebf0c7cd93e70489a2",
+      "name": "LegionNetwork",
+      "native": "legionapp://",
+      "universal": null
+    },
+    {
+      "id": "d496d30a1213ee22d7b7b93c1f0ed3d96c9dc5800634b6e319efe7b70b65d694",
+      "name": "LF Wallet App",
+      "native": "lfwallet://",
+      "universal": "https://lflabs.fund/wallet"
+    },
+    {
+      "id": "dc8ac638c6fd002950f9404dbb0639ae25bab667bf1a60a419bf8f44a89ed3a7",
+      "name": "Lif3 Wallet",
+      "native": "lif3wallet://walletview",
+      "universal": null
+    },
+    {
+      "id": "063ab1cdc9123ed56b7e73cbee664d24ecb7fc710ad1e0bded6cc2db0d562055",
+      "name": "Life DeFi",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "dd8ee41915d967e547c80266e883d77ee808427405f4e8026a85ac1308104221",
+      "name": "Linen",
+      "native": "linen://",
+      "universal": "https://linen.app/"
+    },
+    {
+      "id": "3968c3f5e1aa69375e71bfc3da08a1d24791ac0b3d1c3b1c7e3a2676d175c856",
+      "name": "Loopring",
+      "native": "loopring://",
+      "universal": null
+    },
+    {
+      "id": "4c33e497bf4017e7df2db570282d27e6e866006d3e0fae5e283c73c10a96df46",
+      "name": "Lumina Wallet",
+      "native": "lumina://wc",
+      "universal": "https://luminawallet.org/wc"
+    },
+    {
+      "id": "9ada0299bef5372a03049e5f5ab0f35c48fe944f7b57a70a399dbcdbf56b8a75",
+      "name": "Lumo Wallet",
+      "native": null,
+      "universal": "https://lumowallet.com/download"
+    },
+    {
+      "id": "cb1864a17d4dd1742fb97e95c738543b95f908cea806ff8f090641b6cdebc627",
+      "name": "Lunascape Browser",
+      "native": "lunascape://",
+      "universal": null
+    },
+    {
+      "id": "51a21ac39435d61d28bdc1261862bac41a918f9a06269d68749d10f6def2b604",
+      "name": "LxxDaoWallet",
+      "native": "lxxdao://",
+      "universal": "https://lxxdao.net"
+    },
+    {
+      "id": "8b830a2b724a9c3fbab63af6f55ed29c9dfa8a55e732dc88c80a196a2ba136c6",
+      "name": "Magic Eden",
+      "native": "magiceden://",
+      "universal": null
+    },
+    {
+      "id": "7674bb4e353bf52886768a3ddc2a4562ce2f4191c80831291218ebd90f5f5e26",
+      "name": "MathWallet",
+      "native": "mathwallet://",
+      "universal": "https://www.mathwallet.org"
+    },
+    {
+      "id": "0db9b539a5e519dab9097250f5abb6f0b2a11c2e17dee313b650401e089945b8",
+      "name": "MaxWallet",
+      "native": "maxwallet://",
+      "universal": null
+    },
+    {
+      "id": "540148afe64558bb238cab6c43bd963055ed9248c094eaebff94d7bbb59f9aba",
+      "name": "MDAO Wallet",
+      "native": "ttmwalletapp://",
+      "universal": null
+    },
+    {
+      "id": "7e6bb17d0f776c0449f5e79f8df3b34e7be388c9c527befc4ba92ef8cbe55c44",
+      "name": "Me Wallet",
+      "native": "astrox://me/wcx",
+      "universal": null
+    },
+    {
+      "id": "9f6fbf4b0a22ef57cf40acf45bc75b83b9b1bd802c8fe2fbc6a380259a05e8f7",
+      "name": "MeCo Wallet",
+      "native": "mecowallet://",
+      "universal": null
+    },
+    {
+      "id": "c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96",
+      "name": "MetaMask",
+      "native": "metamask://",
+      "universal": "https://metamask.app.link"
+    },
+    {
+      "id": "f5b4eeb6015d66be3f5940a895cbaa49ef3439e518cd771270e6b553b48f31d2",
+      "name": "MEW wallet",
+      "native": "mewwallet://",
+      "universal": "https://mewwallet.com"
+    },
+    {
+      "id": "73232eaed7a1e4876f3efb13c3d526dfe4e293a152e1380095a62eb4c5814a87",
+      "name": "midoin",
+      "native": "midoin://",
+      "universal": "https://midoin.app.link"
+    },
+    {
+      "id": "49bb9d698dbdf2c3d4627d66f99dd9fe90bba1eec84b143f56c64a51473c60bd",
+      "name": "Minerva Wallet",
+      "native": "minerva://",
+      "universal": "https://minerva.digital"
+    },
+    {
+      "id": "66a1b8d00aa8da714ae07a123a565f6226c44156a54ed04ffc6ee5ffe1f56e64",
+      "name": "Mirai App",
+      "native": "miraiapp://",
+      "universal": "https://go.miraiapp.io"
+    },
+    {
+      "id": "9be416fd7b5a20dfe115930b759e9a69a5dd6299b42f3eab0f3f70ee6ac5331f",
+      "name": "Mixin",
+      "native": "mixin://",
+      "universal": null
+    },
+    {
+      "id": "a18aeec9fab0c08ca41e7bdaae06cac5700bb628ec75c6381bacd9b2df574895",
+      "name": "Monarch Wallet",
+      "native": null,
+      "universal": "https://monarchwallet.com"
+    },
+    {
+      "id": "482b0925a9355574e46629ac396ed48232746bd32f72a7b813767a3fa876ad93",
+      "name": "mOne superapp",
+      "native": "mone://",
+      "universal": "https://mone.my/app"
+    },
+    {
+      "id": "f5971a12f71b352c3abb3c9fc29818f1044a87d791ce28db6e5ab1962bfff717",
+      "name": "MOONSTAKE",
+      "native": "moonstake://",
+      "universal": "https://moonstake.io/launchApp"
+    },
+    {
+      "id": "d69877e50c4aa2360d723065716609f1e2698e45fc210438da8c325b65922735",
+      "name": "MPCVault | Team crypto wallet",
+      "native": "com.mpcvault.mobileapp://wccallback",
+      "universal": "https://ulink.mpcvault.com/wccallback"
+    },
+    {
+      "id": "26a582067b4f960e9104768704ec6fa642970450acefa04c782dbbccc575b3b8",
+      "name": "My Wallet",
+      "native": "mywallet-wc://",
+      "universal": "https://my.tt/wc/"
+    },
+    {
+      "id": "e3d6117850435b1359b81d7cef869f6851c00ad2125cadb04f4e003be8074af6",
+      "name": "MynaWallet",
+      "native": "mynawallet://wc",
+      "universal": null
+    },
+    {
+      "id": "a76633b85db65d78992ff51c18492a72f442aa5ea2bf7bdf49d991a94107734d",
+      "name": "Nabox",
+      "native": "nabox://",
+      "universal": "https://nabox.io/app"
+    },
+    {
+      "id": "7be8d8b5e39bbcee13867c50e47387cd752c12e03b3e6fdf2e0638c7b4e3b69f",
+      "name": "Nash",
+      "native": "nash://",
+      "universal": null
+    },
+    {
+      "id": "df1d89401c7320e6d62fa5bc4a516e8df21b604b10a7eedefbee9ada66b20c5d",
+      "name": "Nest Wallet",
+      "native": "nestwallet://",
+      "universal": null
+    },
+    {
+      "id": "e41335615dc17532477792bb63034f69d430d73dc39ff8da622d17f3bad0b96a",
+      "name": "Nicegram Wallet",
+      "native": "ncg://wallet/home",
+      "universal": "https://nicegram.app/"
+    },
+    {
+      "id": "9a4cddbdbc19005be790f37cc9176dd24eae51aa2a49fa3edeb3b6a8b089b7be",
+      "name": "Nightly",
+      "native": "nightly://",
+      "universal": null
+    },
+    {
+      "id": "25f2e87390f32e4a132c27cbbbca95bc0434f5cba32db613defff0ea2bbf6cd3",
+      "name": "NodeVault",
+      "native": "awallet://wc",
+      "universal": "https://chain.dolphinode.world/wc"
+    },
+    {
+      "id": "dbe30fc296ccd75fbf5bc7157fcfe23d839c0cea83c4883ab9601677e0a9a738",
+      "name": "NonBank",
+      "native": "nonbank://",
+      "universal": "https://id.nonbank.io/wc"
+    },
+    {
+      "id": "eae2c4b9da3b33b72b20d929a6342830bf54b541665e54c3a46024118e9e0e81",
+      "name": "Noone Wallet",
+      "native": "crypto.noone.wallet://walletcon",
+      "universal": null
+    },
+    {
+      "id": "fdfbbd04bb3871bd7853f343081275edab999e5573c63c2c64c0caf73df51d1f",
+      "name": "NOVA",
+      "native": "nova://",
+      "universal": null
+    },
+    {
+      "id": "43fd1a0aeb90df53ade012cca36692a46d265f0b99b7561e645af42d752edb92",
+      "name": "Nova Wallet",
+      "native": "novawallet://",
+      "universal": null
+    },
+    {
+      "id": "c482dfe368d4f004479977fd88e80dc9e81107f3245d706811581a6dfe69c534",
+      "name": "NOW Wallet",
+      "native": "nowwallet://",
+      "universal": "https://walletnow.app.link"
+    },
+    {
+      "id": "dccbd717df77b395445cc6080e01fffada9d8b92dacfda312a26c70c2e9af673",
+      "name": "Nufinetes",
+      "native": "vimwallet://",
+      "universal": "https://apple.vimworld.org"
+    },
+    {
+      "id": "531df9c5bd5343e0c3d9383a25301572699a8ad0ccfc55984b379f400a7a052e",
+      "name": "NVXO Wallet",
+      "native": "nvxowallet://wc",
+      "universal": "https://www.nvxowallet.com/wc"
+    },
+    {
+      "id": "37aacf1e6bf6793c892e42c3f7623a61d9ffcb4337010804cc3193c4d596cf5c",
+      "name": "Oasys Passport",
+      "native": "oasys-wallet://",
+      "universal": "https://www.oasys-wallet.com/wc/"
+    },
+    {
+      "id": "031f0187049b7f96c6f039d1c9c8138ff7a17fd75d38b34350c7182232cc29aa",
+      "name": "Obvious",
+      "native": "obvious://",
+      "universal": "https://wallet.obvious.technology"
+    },
+    {
+      "id": "971e689d0a5be527bac79629b4ee9b925e82208e5168b733496a09c0faed0709",
+      "name": "OKX Wallet",
+      "native": "okex://main",
+      "universal": null
+    },
+    {
+      "id": "5d9f1395b3a8e848684848dc4147cbd05c8d54bb737eac78fe103901fe6b01a1",
+      "name": "OKX Wallet",
+      "native": "okxwallet://main",
+      "universal": "https://web3.okx.com/download"
+    },
+    {
+      "id": "afbd95522f4041c71dd4f1a065f971fd32372865b416f95a0b1db759ae33f2a7",
+      "name": "Omni",
+      "native": "omni://",
+      "universal": "https://links.omni.app"
+    },
+    {
+      "id": "1aedbcfc1f31aade56ca34c38b0a1607b41cccfa3de93c946ef3b4ba2dfab11c",
+      "name": "OneKey",
+      "native": "onekey-wallet://",
+      "universal": "https://app.onekey.so/wc/connect"
+    },
+    {
+      "id": "a426707faffe9032ac1d037be88f5419a29547736a86bf2c8f252751938219f8",
+      "name": "onewallet",
+      "native": "onewallet://wallet",
+      "universal": "https://onewallet.it.com/ws"
+    },
+    {
+      "id": "22eafea695da55c0a8c3a37c5dd6ecd7ee45927a859b9536ae068e5dba4eeed2",
+      "name": "OnlyBulls Wallet",
+      "native": "onlybulls://",
+      "universal": "https://onlybulls.com"
+    },
+    {
+      "id": "0f5eca2c7f2c9d11c992fdc707575c484ffb751e58e43eaeeea24510bfe8b8dd",
+      "name": "ONTO",
+      "native": "ontoprovider://",
+      "universal": null
+    },
+    {
+      "id": "e6005646c187fc5e5141247933253346168242dd5ed8f46480f3b5f73a4d1ac9",
+      "name": "Onyx Wallet",
+      "native": "onyxwallet:///",
+      "universal": "https://wallet.onyx.org"
+    },
+    {
+      "id": "2f0e39323be165a0972147140c7b822be17e5eb464a5e8558ac0e0ab01c48944",
+      "name": "Open Wallet",
+      "native": "x-app-open-wallet://",
+      "universal": null
+    },
+    {
+      "id": "25626b660052d4fe15926a48bf3e0ae9ade5b8b6dacdd3d072795c662dbdb3ee",
+      "name": "Openloop Connect",
+      "native": "openloop://",
+      "universal": "https://www.crypto.haudi.jp/wc"
+    },
+    {
+      "id": "0e3c4838e5a7c44b6b16299b7dbc7a2bc147ad9c056588d6190e11ec5804fba9",
+      "name": "OPZ Wallet",
+      "native": "opz-wallet://",
+      "universal": null
+    },
+    {
+      "id": "56919a2ce95dfb8db63744da593c3bd70ffe14d2ec901d7a7ab58f2a319f157b",
+      "name": "Orion",
+      "native": "orion://wc",
+      "universal": null
+    },
+    {
+      "id": "022076fddebdd81c287239a7397ef625ef432db168b884f1b8ed8e148ce23a84",
+      "name": "Outlaw Wallet",
+      "native": "outlaw://",
+      "universal": null
+    },
+    {
+      "id": "5a2b2db3d2ed90458a41d2a0c5e4bd28ec67b6fa272b0e201cc8508dc3d4be87",
+      "name": "OWallet",
+      "native": "owallet://",
+      "universal": null
+    },
+    {
+      "id": "62c919a311e06050620349bf1e0442ba4b5473c4fc47733c53d21a64ace9f07a",
+      "name": "OXPAY",
+      "native": null,
+      "universal": "https://oxpaywallet.com/wc"
+    },
+    {
+      "id": "981ee0b205893921cdb52c94070acedd39283e911de238c478652dedf0e1d76d",
+      "name": "Pali Wallet",
+      "native": "paliwallet://",
+      "universal": null
+    },
+    {
+      "id": "259d07628a06aee49007266630381867688fbe96c331adc1b285aa7995380815",
+      "name": "Panaroma Wallet",
+      "native": "panaromawallet://walletconnect",
+      "universal": null
+    },
+    {
+      "id": "fa737fa41e6e5ad02c536bd21afea4e21c061885a039e17237e08802ca5bf0bf",
+      "name": "Pandoshi Wallet",
+      "native": "pandoshiwallet://",
+      "universal": null
+    },
+    {
+      "id": "ca1d3f91b9233ff1f3a64fbaf2bd4a718e9ea0489ec71938d9da030a9f98ef8f",
+      "name": "ParaSwap Wallet",
+      "native": "paraswap://",
+      "universal": null
+    },
+    {
+      "id": "34cc55786257a50b0d0446e197cfd0935216192616787022c6b2819d2874d34a",
+      "name": "Paribu Self",
+      "native": "self://",
+      "universal": null
+    },
+    {
+      "id": "a562f133f272c97dd0eb1cbe4629a2ded5fd6e4854a2a3acd44ddb61907ca781",
+      "name": "Pass App",
+      "native": "passwallet://",
+      "universal": "https://pass.app/connect"
+    },
+    {
+      "id": "0769b03b40fa93ff2cca28cf68582b3554cf10e3f4608e6c81b3089b2a3fcf01",
+      "name": "PassPay Wallet",
+      "native": "com.wallet.passpay://",
+      "universal": null
+    },
+    {
+      "id": "d6fbaf5c2026e050920ed6e6ffbf96c8a6145b93a8b79d102def9653bedc9821",
+      "name": "Payperless",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "00ee7b0d5c47fa12142b37c1cf3a6a847fdd277c23d2f40fea45c1d5166e0084",
+      "name": "PEAKDEFI",
+      "native": "wc://",
+      "universal": null
+    },
+    {
+      "id": "f3379d4ac112b75ce80222d6e0d18f36667c87086fa65b6d10f118815d224940",
+      "name": "Pillar",
+      "native": "pillarwallet://",
+      "universal": null
+    },
+    {
+      "id": "bb71b54ced62aa11f76e4f3edacb37a41300807506db840b98b740379f99cc71",
+      "name": "Pintu",
+      "native": "pintu://web3wallet",
+      "universal": null
+    },
+    {
+      "id": "e5276850a2559a0fd4eb37207e3c9325cfb20b84ebb28a2d6ad5ade43a2a77bd",
+      "name": "PioneWallet",
+      "native": "tobewallet://",
+      "universal": null
+    },
+    {
+      "id": "14e5d957c6eb62d3ee8fc6239703ac2d537d7e3552154836ca0beef775f630bc",
+      "name": "Pitaka",
+      "native": "pitaka://",
+      "universal": "https://app.pitaka.io"
+    },
+    {
+      "id": "cbe13eb482c76f1fa401ff4c84d9acd0b8bc9af311ca0620a0b192fb28359b4e",
+      "name": "Plasma Wallet",
+      "native": "plasmawallet://",
+      "universal": "https://plasma-wallet.com"
+    },
+    {
+      "id": "576c90ceaea34f29ff0104837cf2b2e23d201be43be1433feeb18d375430e1fd",
+      "name": "PLTwallet",
+      "native": "pltwallet://",
+      "universal": "https://pltwallet.io/"
+    },
+    {
+      "id": "ff8c6f405f14cbb21fa9b0ab5338159b85822f7cab7f1040d4c4e26bf63ff233",
+      "name": "plug",
+      "native": "plug://",
+      "universal": null
+    },
+    {
+      "id": "91b9a02134bc834b96ebfa333a0bf27ac6372ac56682b5e77bf8577abe0eea78",
+      "name": "Plutope",
+      "native": "plutope://",
+      "universal": null
+    },
+    {
+      "id": "016f8161cd78dd01003cf466292b9690c0fd251f2d69415a3cc96659d975e398",
+      "name": "pockie",
+      "native": "pockie://",
+      "universal": "https://pockie.app.link"
+    },
+    {
+      "id": "f957ccc70ab232638964242c24cc6286ef75aa7fd0d4d348f46213d2fea0b88c",
+      "name": "PortaWallet",
+      "native": "porta://",
+      "universal": null
+    },
+    {
+      "id": "26f021a08d4271860423d778a9b82e39f4ff52acc7c3f6d92a504eba11e3b893",
+      "name": "PrettyGood Keyboard",
+      "native": "pgk://wallet",
+      "universal": "https://x.prettygood.io/wallet"
+    },
+    {
+      "id": "2ebc33a02906094b8ea5d21a7c6e1673ecdefb33dca723897d13c7de3446d354",
+      "name": "Pundi Wallet",
+      "native": "fxwallet://",
+      "universal": "https://fx.wallet/wc"
+    },
+    {
+      "id": "f92b6491e9cccaec7dca667d61c012816629e7e759392c55d3f523a90ec1a584",
+      "name": "PureWallet",
+      "native": "purewalletp://",
+      "universal": "https://purewallet.ai/api"
+    },
+    {
+      "id": "1aecb6762373f96100f941347bd554d6bdbf6c30a1368c47bf391432021d6ce9",
+      "name": "PureWallet app",
+      "native": "purewalletp://",
+      "universal": null
+    },
+    {
+      "id": "4be461920c1fd1762d71c00cdf554ce5693437e123c4a966faf7e1056d2c6f17",
+      "name": "PWC Super App",
+      "native": "pwc://wallet",
+      "universal": null
+    },
+    {
+      "id": "7eb95f5e01a3c45f7f0111f736d73e5c88aa5f268256c6a38b7f631216f620fb",
+      "name": "QIE Wallet",
+      "native": "qiemobilewalletconnect://",
+      "universal": "https://www.qiewallet.me/"
+    },
+    {
+      "id": "6148e2d844e21c546354d04255e9c2bb7f87aaccf3113709f09212c5f3277a9b",
+      "name": "Qoin Wallet",
+      "native": "wcqoin://",
+      "universal": null
+    },
+    {
+      "id": "80afbf1e261cc241e8227127592879c6ebd753c7c7a0a714c75923fa76730e0c",
+      "name": "QubeticsWallet",
+      "native": "qubetics://",
+      "universal": null
+    },
+    {
+      "id": "9034d54985807aaf3d7780f50f155f954daa468fb58d7b14b216fc79d68bbd14",
+      "name": "Qubic Wallet",
+      "native": "qubic://",
+      "universal": "https://wallet.qubic.app"
+    },
+    {
+      "id": "090447a8ce11f1f55f3016fe933044b6e06cb21fbf57d902e7ccc207892b86c6",
+      "name": "R0AR Mobile Wallet",
+      "native": "roarwallet://",
+      "universal": null
+    },
+    {
+      "id": "18388be9ac2d02726dbac9777c96efaac06d744b2f6d580fccdd4127a6d01fd1",
+      "name": "Rabby",
+      "native": "rabby://",
+      "universal": null
+    },
+    {
+      "id": "1ae92b26df02f0abca6304df07debccd18262fdf5fe82daa81593582dac9a369",
+      "name": "Rainbow",
+      "native": "rainbow://",
+      "universal": "https://rnbwapp.com"
+    },
+    {
+      "id": "6880782cf8ff712bf8772b585960346290fd2499c1f1c51df9fe713d9d2e9384",
+      "name": "React Native Sample Wallet",
+      "native": "rn-web3wallet-internal://",
+      "universal": "https://lab.reown.com/rn_walletkit_internal"
+    },
+    {
+      "id": "b377ed60cd1f72a9c84ba0095cb28eea166389787c6763e590d4a1a651a315a7",
+      "name": "React Wallet",
+      "native": null,
+      "universal": "https://reactwalletback.com/app-link/"
+    },
+    {
+      "id": "71aca34c569bda617eea36c774d941e57b3656060bca575fe898d2f8029553ea",
+      "name": "Ready",
+      "native": "readywallet://",
+      "universal": null
+    },
+    {
+      "id": "2bc58b1c76e6572fa6cd68c3a448128ce90f7442d563f02e9f9db3b58d01d810",
+      "name": "Renegade",
+      "native": "renegade-web3wallet://",
+      "universal": "https://webapp.myrenegade.net"
+    },
+    {
+      "id": "10a885156cc07e3a8e424c9dea9eafdb62b5640b77cbf9d2e07295dbd3a334c8",
+      "name": "Rewardy Wallet",
+      "native": "rewardywallet://",
+      "universal": "https://www.rewardywallet.com/wc"
+    },
+    {
+      "id": "b248559bff6b18d0d776a23698990641f8d7704c35faa7de60865cc8429818b9",
+      "name": "Rezor",
+      "native": "rezor://app",
+      "universal": null
+    },
+    {
+      "id": "1896aa67ce33d5bde764369c7541a75074baa1b8da97e703c9ee3a4b61e56e65",
+      "name": "Ripio Portal",
+      "native": "ripio://portal",
+      "universal": null
+    },
+    {
+      "id": "9051a97842275b8157ed5df27b77096def499f002a2f227ef6df0c6c6a0e69fb",
+      "name": "Roam",
+      "native": "roam://",
+      "universal": null
+    },
+    {
+      "id": "8837dd9413b1d9b585ee937d27a816590248386d9dbf59f5cd3422dbbb65683e",
+      "name": "Robinhood Wallet",
+      "native": "robinhood-wallet://",
+      "universal": null
+    },
+    {
+      "id": "541d5dcd4ede02f3afaf75bf8e3e4c4f1fb09edb5fa6c4377ebf31c2785d9adf",
+      "name": "Ronin Wallet",
+      "native": "roninwallet://",
+      "universal": "https://wallet.roninchain.com"
+    },
+    {
+      "id": "fa6a09c7efd73c6fe3bc5a68969d0def71b5d760b99a16985e3e8e79d84b0156",
+      "name": "SA ASSISTANT",
+      "native": "saas://success",
+      "universal": null
+    },
+    {
+      "id": "394631c96f2c3201ffd5b3f3f249028163a893ae2ff9076882350e70f3450cb0",
+      "name": "Saakuru All-in-One crypto App",
+      "native": "metaone://",
+      "universal": null
+    },
+    {
+      "id": "6577b7c91453a7047f1c31c5897bd59087a8cca35181e069656079255542abb4",
+      "name": "Sabay Wallet App",
+      "native": "myApp://kh.com.sabay.sabaywallet",
+      "universal": null
+    },
+    {
+      "id": "225affb176778569276e484e1b92637ad061b01e13a048b35a9d280c3b58970f",
+      "name": "Safe",
+      "native": "safe://",
+      "universal": "https://app.safe.global/"
+    },
+    {
+      "id": "a0e04f1086aac204d4ebdd5f985c12ed226cd0006323fd8143715f9324da58d1",
+      "name": "SafeMoon",
+      "native": "safemoon://",
+      "universal": "https://safemoon.com/wc/wc"
+    },
+    {
+      "id": "0b415a746fb9ee99cce155c2ceca0c6f6061b1dbca2d722b3ba16381d0562150",
+      "name": "SafePal",
+      "native": "safepalwallet://",
+      "universal": "https://link.safepal.io"
+    },
+    {
+      "id": "32e6edcfbd770996fed2f4088b76a5c0151903d4ab9771feb92e5cf75080b131",
+      "name": "SafeWallet",
+      "native": "safewallet://",
+      "universal": null
+    },
+    {
+      "id": "5265dcf66be0553328dbc727414ab329e22f9a480e593bd2e927b279e4ab244d",
+      "name": "Sahal Wallet",
+      "native": "sahalwallet://",
+      "universal": null
+    },
+    {
+      "id": "a0c4b25a00028162432d173d110dbd8ee086a01c3a00f94d97f70b779d25c794",
+      "name": "Saify",
+      "native": "saify://",
+      "universal": null
+    },
+    {
+      "id": "bd8a799aed39b284cf4a2c1a765a3d047a2cd709e06db21baa369ac5c1ffe774",
+      "name": "Satu Wallet",
+      "native": "satuwallet://wc",
+      "universal": "https://satuwallet.com/wc"
+    },
+    {
+      "id": "b48cefc7ff96f9bf4e6db66fd93d277d4ee6f4199d7f996c25a56b0b0bb2c352",
+      "name": "ScramberryWallet",
+      "native": "io.scramberry.v7bmfgda1vo42ue385xc://deeplink",
+      "universal": "https://link1.bsg.scramberry.io"
+    },
+    {
+      "id": "6464873279d46030c0b6b005b33da6be5ed57a752be3ef1f857dc10eaf8028aa",
+      "name": "SecuX",
+      "native": "secux://",
+      "universal": "https://wsweb.secuxtech.com"
+    },
+    {
+      "id": "4457c130df49fb3cb1f8b99574b97b35208bd3d0d13b8d25d2b5884ed2cad13a",
+      "name": "ShapeShift",
+      "native": "shapeshift://",
+      "universal": "https://shapeshift.app.link/"
+    },
+    {
+      "id": "2b9085b314023231adf4ba051274a20b9a4b5f64fd85251a7a329e386da1811b",
+      "name": "SheFi",
+      "native": "shefi://",
+      "universal": null
+    },
+    {
+      "id": "582506d3ac795e1d72b1674e0ee54b45431ad6fac9b51c0c8c4c1893d923c5f0",
+      "name": "Shido App",
+      "native": "shido://",
+      "universal": null
+    },
+    {
+      "id": "51d2c02e306827d2d0f0dadaa00f22575c623aa19c403f09f4b9c42c67098bb1",
+      "name": "Shinobi-Wallet",
+      "native": "shinobi-wallet://",
+      "universal": null
+    },
+    {
+      "id": "cb9d66ecab6a3a98bff2de2653e4e1ce44e84130a7ab323a2892a5c456956ffe",
+      "name": "Sinohope",
+      "native": "sinohopeapp://",
+      "universal": null
+    },
+    {
+      "id": "2564a702f3b709b000a7747ccfc6f6dcc58b638c57f29791cd01514fe91cc5f8",
+      "name": "Sinum",
+      "native": "sinum://",
+      "universal": null
+    },
+    {
+      "id": "edfc9f7ad62c49cb0d98f3852fb2c5e8af83bd8292fc7c0ad1369141fe19c87f",
+      "name": "Sirius MX",
+      "native": null,
+      "universal": "https://applink.multixw.com"
+    },
+    {
+      "id": "d11e890cc208235fd14e5234b4fc180eb36ade32808c980ee85cc57fe4a08ebb",
+      "name": "Smart.Baby",
+      "native": "smartbody://",
+      "universal": null
+    },
+    {
+      "id": "28b60a29a8ffd15f52a33cc0d0ee4f8b1cd234b68f554195a823bf16a40cab29",
+      "name": "SOC Wallet",
+      "native": "socwallet://",
+      "universal": "https://soc.socjsc.com/wc"
+    },
+    {
+      "id": "1897fdb811ff53a69f9217a98696798b0227c7d77fddf103e8295be551a1e3b6",
+      "name": "Spot On Chain App",
+      "native": "spotonchain://",
+      "universal": "https://spotonchain.ai/"
+    },
+    {
+      "id": "716187d401fb156b08b222b3a624902cf06e3ab5d4dc7d7dfcc37572359e6d9d",
+      "name": "Squirrel Wallet",
+      "native": "squirrel-wallet://",
+      "universal": null
+    },
+    {
+      "id": "855481a23310c2bccf2a6134367449d61bd2f1c8793f929516c4f68a6aaace7a",
+      "name": "Stablez",
+      "native": "nptwc://",
+      "universal": null
+    },
+    {
+      "id": "af9a6dfff9e63977bbde28fb23518834f08b696fe8bff6dd6827acad1814c6be",
+      "name": "Status Legacy",
+      "native": "status-app://",
+      "universal": "https://status.app"
+    },
+    {
+      "id": "71a83ffbaa7fa38419e8f548a6499c78c8d429163631cf483483fc7efc6b7aae",
+      "name": "Stickey Wallet",
+      "native": "stickyapp://",
+      "universal": "https://stickeyapp.page.link"
+    },
+    {
+      "id": "5a2b2b6e41df46ea80709c11b4f902d31271f01f660f1c892102107fbc2bf88c",
+      "name": "Streakk Wallet",
+      "native": "streakk://",
+      "universal": null
+    },
+    {
+      "id": "36dbd7f82df78f406723eb71599640fbbf703b2583682ba1e419a9098a2d4945",
+      "name": "StrikeX Wallet",
+      "native": "strikex://",
+      "universal": null
+    },
+    {
+      "id": "9ce87712b99b3eb57396cc8621db8900ac983c712236f48fb70ad28760be3f6a",
+      "name": "SubWallet",
+      "native": "subwallet://",
+      "universal": "https://mobile.subwallet.app/"
+    },
+    {
+      "id": "d15c9975084e5bc349d63aa83be8d9a053941483aa2c3934d00d4c4d73d45667",
+      "name": "Superhero Wallet",
+      "native": "superhero://",
+      "universal": "https://wallet.superhero.com"
+    },
+    {
+      "id": "37ef631ba83835cae97dbbfe270ff828cdf4c9326e998927bcb03f262f98f144",
+      "name": "SuperWallet",
+      "native": "superwallet://",
+      "universal": "https://www.superex.live"
+    },
+    {
+      "id": "dab33dac227aad5740856cb0a2d84dd27fcf311ca0b3fd7612fec041fbbb4d43",
+      "name": "Sweat Wallet",
+      "native": "sweat:///",
+      "universal": "https://wallet.sweateconomy.com"
+    },
+    {
+      "id": "dfa04e5a17584aa9b3a9637f10ce2e95fcd6343fb81e8c634922b21a28cc66a8",
+      "name": "Swift Sample Wallet",
+      "native": "walletapp://",
+      "universal": "https://lab.web3modal.com/wallet"
+    },
+    {
+      "id": "a4604022bf9199ca6d762c5663d8a6186a9ca4b607b9dcb29bcb81054d6f1091",
+      "name": "SwiftEx Wallet",
+      "native": "swiftEx://app.swiftexchange.io",
+      "universal": "https://app.swiftexchange.io/"
+    },
+    {
+      "id": "8d14be896cc1660c604525abaa9911630da87127cbb70f712432fcf2e056b4d8",
+      "name": "SWOP",
+      "native": "swopmobileexpo://",
+      "universal": "https://www.swopme.app"
+    },
+    {
+      "id": "c3b76dabb8b8161b2848a4c313b559a2cd719b43732c3e0da00f345e571241e5",
+      "name": "T+ Wallet",
+      "native": "talkapp://",
+      "universal": null
+    },
+    {
+      "id": "93244de23ba91e52e0d2a92ac1370b0ef0ab32120eb8e83c4bd014f3d5d6b709",
+      "name": "Talisman",
+      "native": "talisman://",
+      "universal": "https://talisman.xyz/wc"
+    },
+    {
+      "id": "ede21300a22965815031c9bf07d72f05f3d4bf26ad00e5fc4f348a1ee4c838b8",
+      "name": "Talken Wallet",
+      "native": "talken-wallet://",
+      "universal": null
+    },
+    {
+      "id": "21030f20fba1a77115858ee3a8bc5841c739ab4537441316e2f4b1d0a8d218af",
+      "name": "Tangem Wallet",
+      "native": "tangem://",
+      "universal": "https://app.tangem.com"
+    },
+    {
+      "id": "a92d512c649e87a5acba5885ac03f62662cff1f647c20a63833eb45a71a6f877",
+      "name": "TAP WALLET",
+      "native": "humblwallet://",
+      "universal": "https://wallet.search3.com"
+    },
+    {
+      "id": "e9a73053c7d8cf7f8eb732e3da6a8dfd3cc211ea4dc00e0274b9dec6e3316605",
+      "name": "tastycrypto",
+      "native": "tastycrypto://",
+      "universal": null
+    },
+    {
+      "id": "ad29e6ba814865dc84111a311f0d64692a6f3fdc220aa1c151034b1e948fe2ef",
+      "name": "Tellaw Wallet",
+      "native": "tellaw://walletconnect",
+      "universal": null
+    },
+    {
+      "id": "a2eb8a1c403a4440b2f578e9deb185b8e22cf4ec2a2a58441032b84b13aaab87",
+      "name": "The Pulse Wallet",
+      "native": "wallet.pulse://",
+      "universal": null
+    },
+    {
+      "id": "21af5c7a9c01793077b61aecbb4bb5648e9be62a6a0a42c5f4d2ff05d4e00d5c",
+      "name": "Tholos",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "19fcea5bdddbf5abbb9ecdcb53acf6fb17da23ab0984ee1dbe487688d8d4ffe7",
+      "name": "THORWallet",
+      "native": "thorwallet://",
+      "universal": null
+    },
+    {
+      "id": "ca331388cfe708d3c0fb094f4b08fb3c7ebd7778d3dfdcecb728990e178a3d81",
+      "name": "Tidus Wallet",
+      "native": "tiduswallet://walletconnect",
+      "universal": null
+    },
+    {
+      "id": "344d0e58b139eb1b6da0c29ea71d52a8eace8b57897c6098cb9b46012665c193",
+      "name": "Timeless X",
+      "native": "timeless-x://connect",
+      "universal": "https://timelesswallet.xyz/x"
+    },
+    {
+      "id": "fa977f7d37f533bd283e44268d020c6852433f091f5373dd33ae7dc0d4522e9a",
+      "name": "Tobi",
+      "native": null,
+      "universal": "https://api.tobiwallet.app/dapp/wallet-connect/redirect"
+    },
+    {
+      "id": "07ec86ddaacafca12de3be87d07ffd13c2d67586bdb9aa00911a103306e8cb4d",
+      "name": "Tofee Wallet Official",
+      "native": "tofee://wallet",
+      "universal": "https://tofee.app/"
+    },
+    {
+      "id": "d64f041c77e248e6c24b791616f9bcd652fd2183dd590a1156e13ebfa0d15f74",
+      "name": "TokenB",
+      "native": "tokenb-web3wallet://",
+      "universal": "https://tokenb.com/"
+    },
+    {
+      "id": "20459438007b75f4f4acb98bf29aa3b800550309646d375da5fd4aac6c2a2c66",
+      "name": "TokenPocket",
+      "native": "tpoutside://",
+      "universal": null
+    },
+    {
+      "id": "dacf9f750e579e7aa93a752117fb3870a5bfc2e967441b477cef5e6f1458e33d",
+      "name": "Tokoin | My-T Wallet",
+      "native": "mtwallet://app",
+      "universal": null
+    },
+    {
+      "id": "e053718e3e968b085a0ae5d11ce1c3d74ba6918c27319c70fc358a48138a5cc4",
+      "name": "tomi Wallet",
+      "native": "tomiwallet://",
+      "universal": null
+    },
+    {
+      "id": "5e4a8cc31d062b78a7ad9e017135574809b01c4dbbf30e4dbb467ddd43025618",
+      "name": "Tomo Wallet",
+      "native": "tomo://",
+      "universal": null
+    },
+    {
+      "id": "02d7e6551ab805d301bde5c9d8cd51d791a73effab6a8b2460e4d9e9e81fdee9",
+      "name": "Transi",
+      "native": "transi://",
+      "universal": null
+    },
+    {
+      "id": "6b0182d679b72eb2733dec38d9dee70551cc16a6ce5e7a7f4155ffb6f493c521",
+      "name": "Trezor Suite",
+      "native": null,
+      "universal": "https://connect.trezor.io/9/deeplink/"
+    },
+    {
+      "id": "4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0",
+      "name": "Trust Wallet",
+      "native": "trust://",
+      "universal": "https://link.trustwallet.com"
+    },
+    {
+      "id": "63488e0e0679da829dd964a670f2d0bf8643f52aa2d5a8a8539c3a4fcad6a78a",
+      "name": "Trustee Wallet",
+      "native": "tw://",
+      "universal": "https://trusteeglobal.com/link/Pxxum8Yt"
+    },
+    {
+      "id": "38692c32358198bc36b2775615ae615ad0f40404452993de2384ef64b2c5ca61",
+      "name": "TrustKeys Web3 SocialFi",
+      "native": "TKwc://",
+      "universal": "https://trustkeys.network/"
+    },
+    {
+      "id": "9d53d12a6d7e1d80d3cea3d7d29d9549c0c0c7af1bdae5e44db87cc9edad7ebf",
+      "name": "Tychi Wallet",
+      "native": null,
+      "universal": "https://tychiwallet.com/wc"
+    },
+    {
+      "id": "9e14926bb64fa2ff359c3acbd75bb675b09efa6f72aed049616a053827140025",
+      "name": "U2U Wallet",
+      "native": "u2uwc://",
+      "universal": null
+    },
+    {
+      "id": "ec1fddec78ac2ae4d3c2e1215740399885381819c91a4254006177df0e86688d",
+      "name": "UKey Wallet",
+      "native": "ukey-wallet://",
+      "universal": "https://app.ukey.io/wc/connect"
+    },
+    {
+      "id": "bfad79e3d89bfb915b1e230000179a8ffc8e04f3f78a396d2e4f3e1a51223529",
+      "name": "UKISS Hub",
+      "native": "ukisshub://",
+      "universal": null
+    },
+    {
+      "id": "09d3f710148d94993ca9f3ed095594d7cc90ba46137dd803a8904b6dbb4bd89c",
+      "name": "Ultimate",
+      "native": "ultimate://",
+      "universal": null
+    },
+    {
+      "id": "8eefa62c2f86b4c73bd68cf5cb178e09d15cbf21399ac5aea234d2b616e9ae9d",
+      "name": "una Wallet",
+      "native": "unaWallet://",
+      "universal": null
+    },
+    {
+      "id": "1796b3d91d6dcaa47a23f7eeb751b89e95d9ced769ade41caa18a8e9759b673c",
+      "name": "Unido",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "c03dfee351b6fcc421b4494ea33b9d4b92a984f87aa76d1663bb28705e95034a",
+      "name": "Uniswap Wallet",
+      "native": "uniswap://",
+      "universal": "https://uniswap.org/app"
+    },
+    {
+      "id": "cb7d4e00e9c6ba5ca1ef3b3464ce1ccf0468f7526fbda116106302525f929807",
+      "name": "Unity Wallet",
+      "native": "savl://",
+      "universal": null
+    },
+    {
+      "id": "8308656f4548bb81b3508afe355cfbb7f0cb6253d1cc7f998080601f838ecee3",
+      "name": "Unstoppable Domains",
+      "native": "unstoppabledomains://",
+      "universal": "https://unstoppabledomains.com/mobile"
+    },
+    {
+      "id": "b3adea6c0b9172c4a49da31d264a7c4aacd70ea04f6af8e8977ecb974298b13c",
+      "name": "Unstoppable Wallet",
+      "native": "unstoppable.money://",
+      "universal": null
+    },
+    {
+      "id": "d9a4512e145f350693f9beea76326ca17a9af19857af17b3ccfd47f4ecc8bb65",
+      "name": "UP.io",
+      "native": "up-io://",
+      "universal": "https://up.io/app/"
+    },
+    {
+      "id": "6af02afbc4ac21d339fb4290d048d48f9f73c3b1a307a994f0474329948c0e5a",
+      "name": "UTORG",
+      "native": "utorg://mainactivity",
+      "universal": "https://link.utorg.com/zp0f"
+    },
+    {
+      "id": "fd3a59ae11f279a8cce8ec9b8b9a4eb3a7d8183ae11e1bf1df08d7bffaa52102",
+      "name": "UXUY Wallet",
+      "native": "uxuyapp://",
+      "universal": "https://link.uxuy.id"
+    },
+    {
+      "id": "d01c7758d741b363e637a817a09bcf579feae4db9f5bb16f599fdd1f66e2f974",
+      "name": "Valora",
+      "native": "celo://wallet",
+      "universal": "https://valoraapp.com"
+    },
+    {
+      "id": "a21d06c656c8b1de253686e06fc2f1b3d4aa39c46df2bfda8a6cc524ef32c20c",
+      "name": "Venly",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "0563e0724f434298dda37acaa704857ab293b48f1b39b765569a0072de43c0cf",
+      "name": "Verso",
+      "native": "verso://",
+      "universal": null
+    },
+    {
+      "id": "c5e9f8fa3db105e4cdf47523e01651c3ec4355efe800579e2457c595b86ec179",
+      "name": "VGX Wallet",
+      "native": "safemoon://",
+      "universal": "https://safemoon.com/wc/wc"
+    },
+    {
+      "id": "f6beeb5941e6853084ca2177339120e1c55a28a19ec4e504553cf402ed65c815",
+      "name": "VIVE Wallet",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "918b02c222329263fcf7cd555f4a511b55f4211ede0c3aa6b481fc790da0cd2f",
+      "name": "VKX WALLET",
+      "native": "vkxwallet://wc",
+      "universal": "https://vkinha.com/wallet"
+    },
+    {
+      "id": "bc661d7eabed5234520e4c26f9cc03377898f5add94b8d66f9fc3d795dd16fac",
+      "name": "Volsungar",
+      "native": "volsungar://",
+      "universal": "https://link.volsungar.com/wc"
+    },
+    {
+      "id": "565c5bf4c46b4e1945867d8df722473ee8adc812c10d39da50c2fca4afd18726",
+      "name": "W3 Wallet",
+      "native": "w3wallet://",
+      "universal": null
+    },
+    {
+      "id": "fd17a3e21cd546a9e3d3f1ec9ff7ce7760978c2579b8d0bb6144c50bca16b86c",
+      "name": "Wali Wallet",
+      "native": "wali://wali.network",
+      "universal": null
+    },
+    {
+      "id": "2c724cd7e745016e6e4acccebdcc49464e13ec17ee23141c4fb2fe8004be2504",
+      "name": "Wallacy",
+      "native": "wallacy://",
+      "universal": null
+    },
+    {
+      "id": "4e31b586738468554eefc1df9ec954ac81398b7660ded4e32750299ba7ea52df",
+      "name": "Wallet Today",
+      "native": "wallettoday://",
+      "universal": "https://wallet2day.com/wc"
+    },
+    {
+      "id": "cce5ade88eff235ffae06f65c16f371ef8fa885cea6e01070e9e4878edcb05e7",
+      "name": "Wallet V",
+      "native": "virgowallet://",
+      "universal": null
+    },
+    {
+      "id": "fb89797a75f4547b3c90c1eeb378d0df0423ea75606bb0193c4d873ef2e2150b",
+      "name": "Walletverse",
+      "native": "walletverse://",
+      "universal": "https://wvv.to"
+    },
+    {
+      "id": "e4a1c7bbe47145640f527c91d25e5d8a4d3db0979668f2d3a95268cfb209f248",
+      "name": "walllet.com",
+      "native": "walllet://",
+      "universal": "https://walllet.com/"
+    },
+    {
+      "id": "c34de246586459b8a33e82efe825fec5f75ac6cee50098e76abfd8161de827f2",
+      "name": "WebAuth",
+      "native": "proton://",
+      "universal": null
+    },
+    {
+      "id": "8b68d7428a3a80a7390a21c1a0019348d58b3d29bd4efbd9da3cb9f231251933",
+      "name": "Whitewallet",
+      "native": "whitewallet://",
+      "universal": "https://whitewalletapp.io"
+    },
+    {
+      "id": "0cb0c532b518aa842786d5167e13df22046bc9301b6677808d7134c3d7366a9d",
+      "name": "Wigwam",
+      "native": "wigwam://",
+      "universal": "https://wigwam.app/"
+    },
+    {
+      "id": "bcd6b23290587a75bccb08d4ddd0718ac1c9305baa509b35049d9106eb4a7b11",
+      "name": "Wok Wallet",
+      "native": "wokwallet://wc",
+      "universal": "https://wokwallet.com"
+    },
+    {
+      "id": "cb604c517064f096976972384dc89948a5c850bca9b04866a443e10171d5965d",
+      "name": "Wombat",
+      "native": "wombat-wc://",
+      "universal": null
+    },
+    {
+      "id": "b06656d0b04f34279945f36452bc4089e8b62a44e1d58f9e98807525ac37af06",
+      "name": "WOW EARN",
+      "native": "ullawallet://",
+      "universal": null
+    },
+    {
+      "id": "7819f9cd07e8d7101a483087869f1e57b7d448f3ec5f4ef3eda63c19b926dc17",
+      "name": "Xellar",
+      "native": "xellar://",
+      "universal": null
+    },
+    {
+      "id": "48e11e0de0448147be34e0cccdeb84e90e7355e7f01f6f2bc5a31ad73a184985",
+      "name": "XENEA Wallet",
+      "native": "xenea://",
+      "universal": "https://xenea.app"
+    },
+    {
+      "id": "1cf4c1fcf6bea70a78e28518698b8a10636c0305dd0d24463021d85e71f21841",
+      "name": "Xova",
+      "native": "xova://wc",
+      "universal": "https://xova.com/wc"
+    },
+    {
+      "id": "4119a5b3e5ebc809b6a3680a280ae517b92fead02e4c07b7cec0d3385c87aee2",
+      "name": "xPortal",
+      "native": "xportal://",
+      "universal": "https://xportal.app.link"
+    },
+    {
+      "id": "3e2f036d9c513d07af5468ad7672e42a27432a54eb1242e498d1a1be1f488c4d",
+      "name": "Xucre",
+      "native": "xucre.expo.client://",
+      "universal": null
+    },
+    {
+      "id": "6db5c2cd78ea5a09e820b7543dacc90bf3b1727e5bbaddff544b301de1f74f39",
+      "name": "Yo Wallet",
+      "native": "yo-wallet://",
+      "universal": null
+    },
+    {
+      "id": "682095eadf8c068064ffc2777e7e9d936469debda32c997b301b79f9cd87cd54",
+      "name": "Youba",
+      "native": null,
+      "universal": null
+    },
+    {
+      "id": "f9b40e3615afddce7aea739d37d543b922e5f70a4f30b886b6b59062c43b2437",
+      "name": "YoWallet",
+      "native": "yo-wallet://",
+      "universal": null
+    },
+    {
+      "id": "4b0ef81be0008b86e873d57554e533a7b93b99dd6e9376ae4cbb4fea29b64269",
+      "name": "Yuse Wallet",
+      "native": "yuse://wallet://",
+      "universal": "https://yusewallet.page.link/tobR"
+    },
+    {
+      "id": "d166c283d59164538cdc50e414546a7433d5f62b9410c9aa563e4e2ec496a106",
+      "name": "Zelcore",
+      "native": "zel://",
+      "universal": null
+    },
+    {
+      "id": "32074fa3b78ad30b7847e28ce1ffd6aecbd36415156cfe9f5fe5aa15f31c596e",
+      "name": "Zelus Wallet",
+      "native": "zeluswallet://",
+      "universal": null
+    },
+    {
+      "id": "9414d5a85c8f4eabc1b5b15ebe0cd399e1a2a9d35643ab0ad22a6e4a32f596f0",
+      "name": "Zengo Wallet",
+      "native": "zengo://get.zengo.com/",
+      "universal": "https://get.zengo.com/"
+    },
+    {
+      "id": "ecc4036f814562b41a5268adc86270fba1365471402006302e70169465b7ac18",
+      "name": "Zerion",
+      "native": "zerion://",
+      "universal": "https://wallet.zerion.io/wc"
+    },
+    {
+      "id": "482779b01ffd93b70c1f62e7905658ca1a6b02799f498b07cce423f7841aed75",
+      "name": "Zypto",
+      "native": "zypto://",
+      "universal": null
+    }
+  ]
+}

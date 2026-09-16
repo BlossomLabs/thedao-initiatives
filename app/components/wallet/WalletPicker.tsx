@@ -8,12 +8,7 @@ import { useEmailSignIn } from "~/context/email-sign-in";
 import { useConnectors } from "~/hooks/use-connectors";
 import { walletErrorMessage } from "~/lib/donate";
 import { PRIVY_CONNECTOR_ID } from "~/lib/privy";
-import {
-  metaMaskBrowserLink,
-  type MobileWallet,
-  normalizeWallets,
-  walletDeepLink,
-} from "~/lib/mobile-wallets";
+import { type MobileWallet, normalizeWallets, walletDeepLink } from "~/lib/mobile-wallets";
 import { cn } from "~/lib/utils";
 
 const row =
@@ -153,7 +148,6 @@ export default function WalletPicker({ open, onOpenChange }: {
   const selectedLink = selected
     ? walletDeepLink(selected, signingIn ? undefined : uri ?? undefined)
     : null;
-  const browserLink = typeof location === "undefined" ? undefined : metaMaskBrowserLink(location);
 
   return (
     <Dialog
@@ -222,8 +216,8 @@ export default function WalletPicker({ open, onOpenChange }: {
             </button>
             {!wc && (
               <p role="status" className="text-sm text-muted">
-                Mobile pairing is unavailable on this site. You can open the site in your wallet’s
-                browser, including MetaMask below.
+                Mobile pairing is unavailable on this site. Open the site in your wallet’s browser
+                to connect.
               </p>
             )}
             {wc && (
@@ -415,14 +409,6 @@ export default function WalletPicker({ open, onOpenChange }: {
           window keeps the request open. Use Connect wallet to return.
         </p>
       )}
-      <div className="mt-1 border-t border-edge2 pt-3">
-        <a
-          href={browserLink}
-          className="inline-flex items-center gap-1 text-xs text-muted underline underline-offset-4 hover:text-white"
-        >
-          Open in MetaMask browser<ArrowUpRight className="size-3" />
-        </a>
-      </div>
     </Dialog>
   );
 }

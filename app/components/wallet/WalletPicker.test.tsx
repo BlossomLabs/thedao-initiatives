@@ -168,7 +168,7 @@ test("directory failure leaves QR and copy functional", async () => {
   expect(screen.getByRole("button", { name: "Copy connection URI" })).toBeEnabled();
 });
 
-test("offers installed and email wallets, plus the MetaMask browser fallback without WalletConnect", () => {
+test("offers installed and email wallets without a branded browser fallback", () => {
   mocks.connectors = [injected, email];
   const onOpenChange = vi.fn();
   render(<WalletPicker open onOpenChange={onOpenChange} />);
@@ -176,10 +176,7 @@ test("offers installed and email wallets, plus the MetaMask browser fallback wit
   fireEvent.click(screen.getByRole("button", { name: "Email" }));
   expect(mocks.email).toHaveBeenCalledTimes(1);
   expect(onOpenChange).toHaveBeenCalledWith(false);
-  expect(screen.getByRole("link", { name: "Open in MetaMask browser" })).toHaveAttribute(
-    "href",
-    expect.stringContaining("https://metamask.app.link/dapp/"),
-  );
+  expect(screen.queryByRole("link", { name: "Open in MetaMask browser" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /Mobile wallets/ }));
   expect(screen.getByRole("status")).toHaveTextContent("Mobile pairing is unavailable");
   expect(mocks.connect).not.toHaveBeenCalled();

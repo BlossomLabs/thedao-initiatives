@@ -56,9 +56,3 @@ export function normalizeWallets(listings: unknown): MobileWallet[] {
   return [...new Map(wallets.map((w) => [w.id, w])).values()]
     .sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
 }
-
-export function metaMaskBrowserLink(
-  location: Pick<Location, "host" | "pathname" | "search" | "hash">,
-) {
-  return `https://metamask.app.link/dapp/${location.host}${location.pathname}${location.search}${location.hash}`;
-}

@@ -106,8 +106,7 @@ use wagmi's injected connector; mobile wallets share one WalletConnect connector
 the bundled Reown modal disabled. The chooser serves a searchable, alphabetically sorted directory
 from `public/wallets.json`, so browsing wallets does not contact an external wallet directory or load
 remote logos. Wallet rows use local monograms. Selecting an app follows its registered deep link;
-QR code and copy URI remain available for other compatible wallets. "Open in MetaMask browser" is
-an explicit fallback, including when WalletConnect is not configured.
+QR code and copy URI remain available for other compatible wallets.
 
 Pairing starts when the user selects "Mobile wallets / QR code". App links become available once the
 URI is ready, so navigation happens directly on the user's tap (including on iOS). Closing the dialog

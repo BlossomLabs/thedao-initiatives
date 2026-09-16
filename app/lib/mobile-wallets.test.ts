@@ -1,9 +1,4 @@
-import {
-  metaMaskBrowserLink,
-  normalizeWallets,
-  safeWalletLink,
-  walletDeepLink,
-} from "./mobile-wallets";
+import { normalizeWallets, safeWalletLink, walletDeepLink } from "./mobile-wallets";
 import snapshot from "../../public/wallets.json";
 
 const uri = "wc:pairing-topic@2?relay-protocol=irn&symKey=abc123";
@@ -56,15 +51,4 @@ test("normalizes existing wc paths and strips stale pairing URIs", () => {
     universal: null,
   }]);
   expect(walletDeepLink(wallet, uri)).toBe(`wallet://wc?uri=${encodeURIComponent(uri)}`);
-});
-
-test("MetaMask browser fallback retains the current route, query and fragment", () => {
-  expect(
-    metaMaskBrowserLink({
-      host: "fund.thedao.fund",
-      pathname: "/initiative/test",
-      search: "?tab=comments",
-      hash: "#reply",
-    }),
-  ).toBe("https://metamask.app.link/dapp/fund.thedao.fund/initiative/test?tab=comments#reply");
 });

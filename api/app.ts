@@ -51,10 +51,10 @@ export function createApp(deps: Deps, lock: SiteLock = siteLockFor(deps)) {
     }),
   );
   app.use("*", siteLock(lock));
-  app.use("*", clientIp(deps.config.trustProxy));
+  app.use("*", clientIp());
   app.use("*", originGuard(deps.config));
   app.use("*", bodyLimit({ maxSize: 2 * 1024 * 1024 }));
-  app.use("*", sessionLoader(deps.db, deps.admins, deps.config));
+  app.use("*", sessionLoader(deps.db, deps.admins));
   app.use("*", auditIntent(deps));
 
   app.route("/healthz", healthRoutes(deps));

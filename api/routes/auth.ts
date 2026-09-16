@@ -3,6 +3,7 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { requireAuth, requireRecentAuth } from "../middleware/auth.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
+import { requireClientIp } from "../middleware/ip.ts";
 import { auditContext } from "../services/audit.ts";
 import { verifySiwe } from "../chain/siwe.ts";
 import { selfOrigin } from "../lib/origin.ts";
@@ -21,7 +22,7 @@ export function authRoutes(deps: Deps) {
   const { db, config } = deps;
 
   r.get("/nonce", async (c) => {
-    if (!(await db.rateLimit("nonce:" + c.var.ip, 30, 60))) {
+    if (!(await db.rateLimit("nonce:" + requireClientIp(c), 30, 60))) {
       throw new HttpError(429, "slow down");
     }
     return c.json({ nonce: await db.sessions.issueNonce() });
@@ -29,7 +30,7 @@ export function authRoutes(deps: Deps) {
 
   r.post("/verify", async (c) => {
     if (
-      !(await db.rateLimit("login:" + c.var.ip, LOGIN_ATTEMPTS_PER_MINUTE_PER_IP, 60))
+      !(await db.rateLimit("login:" + requireClientIp(c), LOGIN_ATTEMPTS_PER_MINUTE_PER_IP, 60))
     ) {
       throw new HttpError(429, "Too many attempts; wait a minute.");
     }
@@ -74,7 +75,7 @@ export function authRoutes(deps: Deps) {
     if (body.cookie === true) {
       c.header(
         "Set-Cookie",
-        setSessionCookie(c.req.raw, config, token, session.expiresAt - deps.now()),
+        setSessionCookie(c.req.raw, token, session.expiresAt - deps.now()),
       );
       return c.json(info);
     }
@@ -105,14 +106,14 @@ export function authRoutes(deps: Deps) {
     const u = c.var.user!;
     c.header(
       "Set-Cookie",
-      setSessionCookie(c.req.raw, config, c.var.token, u.expiresAt - deps.now()),
+      setSessionCookie(c.req.raw, c.var.token, u.expiresAt - deps.now()),
     );
     return c.json({ address: u.address, isAdmin: u.isAdmin, expiresAt: u.expiresAt });
   });
 
   r.post("/logout", requireAuth, async (c) => {
     await db.sessions.revoke(c.var.token);
-    c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
+    c.header("Set-Cookie", clearSessionCookie(c.req.raw));
     return c.json({ ok: true });
   });
 
@@ -127,14 +128,14 @@ export function authRoutes(deps: Deps) {
       throw new HttpError(404, "Session not found.");
     }
     if (c.var.user!.id === id) {
-      c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
+      c.header("Set-Cookie", clearSessionCookie(c.req.raw));
     }
     return c.json({ ok: true });
   });
 
   r.post("/logout-all", requireAuth, requireRecentAuth(deps.now), async (c) => {
     const n = await db.sessions.revokeAll(c.var.user!.address);
-    c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
+    c.header("Set-Cookie", clearSessionCookie(c.req.raw));
     return c.json({ ok: true, revoked: n });
   });
 

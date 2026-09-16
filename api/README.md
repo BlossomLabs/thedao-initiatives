@@ -192,8 +192,8 @@ const { address: who, isAdmin, expiresAt } = await (await fetch(API + "/api/auth
 // then: every fetch with credentials: "include"; POST /api/auth/logout clears the cookie
 ```
 
-The cookie is `__Host-session` with `Secure` when the request came over https (with `TRUST_PROXY`
-the proxy's `X-Forwarded-Proto` decides), else plain `session` so local http dev works; always
+The cookie is `__Host-session` with `Secure` when the Deno request URL uses https, else plain
+`session` so local http dev works. Forwarding headers are ignored. The cookie is always
 `HttpOnly; SameSite=Lax; Path=/; Max-Age=<ttl>`. Cross-site writes are refused by the Origin
 allow-list (`middleware/headers.ts`), and CORS is the same allow-list with credentials.
 

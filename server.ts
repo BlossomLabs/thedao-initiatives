@@ -11,6 +11,7 @@ import { LOCK_MESSAGE, LOCK_REALM } from "./api/lib/sitelock.ts";
 import { collectScriptHashes, sitePolicy, withSiteHeaders } from "./api/lib/site-headers.ts";
 import { isInitiativeMarkdown } from "./api/routes/markdown.ts";
 import { refreshDailyCache } from "./api/services/daily-cache.ts";
+import { dispatchApi } from "./api/lib/dispatch.ts";
 
 const { app, lock, config, deps } = await createServer();
 // Register at module scope so Deploy discovers the job. The handler checks
@@ -84,8 +85,8 @@ function withHeader(res: Response, name: string, value: string): Response {
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
-Deno.serve({ port: config.port }, async (req) => {
-  if (isApi(new URL(req.url).pathname)) return app.fetch(req);
+Deno.serve({ port: config.port }, async (req, info) => {
+  if (isApi(new URL(req.url).pathname)) return dispatchApi(app, req, info);
   const verdict = await lock.check(req);
   if (verdict === "denied") {
     return new Response(LOCK_MESSAGE, {

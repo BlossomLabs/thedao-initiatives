@@ -6,6 +6,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { requireClientIp } from "../middleware/ip.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { EMAIL_RE } from "../lib/validate.ts";
 import { SUPPORT_MESSAGES_PER_HOUR_PER_IP } from "../config.ts";
@@ -45,7 +46,9 @@ export function supportRoutes(deps: Deps) {
     const pageUrl = page.startsWith("/") && !page.startsWith("//")
       ? config.webOrigins[0] + page
       : "";
-    if (!(await db.rateLimit("support:" + c.var.ip, SUPPORT_MESSAGES_PER_HOUR_PER_IP, 3600))) {
+    if (
+      !(await db.rateLimit("support:" + requireClientIp(c), SUPPORT_MESSAGES_PER_HOUR_PER_IP, 3600))
+    ) {
       throw new HttpError(429, "too many messages, try again in an hour");
     }
     const header = [

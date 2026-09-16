@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { requireClientIp } from "../middleware/ip.ts";
 import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
@@ -268,7 +269,7 @@ export function initiativeRoutes(deps: Deps) {
     if (!(await hasDisplayName(proposer))) {
       throw new HttpError(403, "Set a display name (or an ENS primary name) before submitting.");
     }
-    if (!(await db.rateLimit("submit:" + c.var.ip, SUBMISSIONS_PER_HOUR_PER_IP, 3600))) {
+    if (!(await db.rateLimit("submit:" + requireClientIp(c), SUBMISSIONS_PER_HOUR_PER_IP, 3600))) {
       throw new HttpError(
         429,
         "Too many submissions from your address; try again in an hour.",

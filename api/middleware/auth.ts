@@ -3,7 +3,7 @@ import type { Vars } from "./context.ts";
 import type { Db } from "../db/mod.ts";
 import type { Admins } from "../services/admins.ts";
 import { HttpError } from "../lib/errors.ts";
-import { type CookieConfig, readSessionCookie } from "../lib/session-cookie.ts";
+import { readSessionCookie } from "../lib/session-cookie.ts";
 import { SESSION_REAUTH_SECS } from "../config.ts";
 
 /** Reads the session token into c.var.user (null when absent/invalid): from
@@ -14,14 +14,13 @@ import { SESSION_REAUTH_SECS } from "../config.ts";
 export function sessionLoader(
   db: Db,
   admins?: Admins,
-  config: CookieConfig = { trustProxy: false },
 ): MiddlewareHandler<Vars> {
   return async (c, next) => {
     // Behind the preview lock the browser may resend its cached Basic
     // credentials with every fetch, so anything but a bearer defers to the cookie.
     const h = c.req.header("authorization") ?? "";
     const token = /^Bearer\s+(.+)$/i.exec(h)?.[1]?.trim() ||
-      readSessionCookie(c.req.raw, config);
+      readSessionCookie(c.req.raw);
     c.set("token", token);
     // Funding polls carry the cookie for authorization, but an unattended tab
     // must not indefinitely refresh its inactivity deadline.

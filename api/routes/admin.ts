@@ -45,7 +45,7 @@ export function adminRoutes(deps: Deps) {
     auditContext(c, { target: address });
     const revoked = await db.sessions.revokeAll(address);
     if (address.toLowerCase() === c.var.user!.address.toLowerCase()) {
-      c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
+      c.header("Set-Cookie", clearSessionCookie(c.req.raw));
     }
     return c.json({ ok: true, revoked });
   });
@@ -56,7 +56,7 @@ export function adminRoutes(deps: Deps) {
       throw new HttpError(400, "Confirm global revocation with: revoke all sessions");
     }
     await db.sessions.revokeGlobal();
-    c.header("Set-Cookie", clearSessionCookie(c.req.raw, config));
+    c.header("Set-Cookie", clearSessionCookie(c.req.raw));
     return c.json({ ok: true });
   });
 

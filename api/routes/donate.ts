@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { requireClientIp } from "../middleware/ip.ts";
 import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { tokenQty } from "../lib/json.ts";
@@ -74,7 +75,7 @@ export function donateRoutes(deps: Deps) {
   });
 
   r.post("/confirm", async (c) => {
-    if (!(await db.rateLimit("confirm:" + c.var.ip, 30, 600))) {
+    if (!(await db.rateLimit("confirm:" + requireClientIp(c), 30, 600))) {
       throw new HttpError(429, "slow down");
     }
     const body = await jsonBody(c);

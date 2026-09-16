@@ -1,6 +1,6 @@
 /** HttpOnly session cookie for the browser (lib/session-cookie.ts); bearer for scripts. */
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { ADMIN, type Harness, harness, j, ORIGIN } from "./app-helpers.ts";
+import { ADMIN, type Harness, harness, j, ORIGIN, testConnection } from "./app-helpers.ts";
 import { wallet } from "./helpers.ts";
 import {
   clearSessionCookie,
@@ -187,45 +187,42 @@ Deno.test("site lock: a valid session cookie passes, a stale one does not", asyn
   }
 });
 
-Deno.test("cookie name: __Host- + Secure over https, plain over http, proxy-aware", async () => {
-  const off = { trustProxy: false };
-  const on = { trustProxy: true };
+Deno.test("cookie name: __Host- + Secure over https, plain over http, forwarding headers ignored", async () => {
   const https = new Request("https://initiatives.thedao.fund/api/auth/verify");
   const http = new Request("http://localhost:8000/api/auth/verify");
-  assertEquals(sessionCookieName(https, off), SECURE_SESSION_COOKIE);
-  assertEquals(sessionCookieName(http, off), PLAIN_SESSION_COOKIE);
+  assertEquals(sessionCookieName(https), SECURE_SESSION_COOKIE);
+  assertEquals(sessionCookieName(http), PLAIN_SESSION_COOKIE);
 
-  const secure = setSessionCookie(https, off, "tok", 60);
+  const secure = setSessionCookie(https, "tok", 60);
   assertEquals(
     secure,
     "__Host-session=tok; Path=/; Max-Age=60; HttpOnly; SameSite=Lax; Secure",
   );
   assertEquals(
-    setSessionCookie(http, off, "tok", 60),
+    setSessionCookie(http, "tok", 60),
     "session=tok; Path=/; Max-Age=60; HttpOnly; SameSite=Lax",
   );
   assertEquals(
-    clearSessionCookie(https, off),
+    clearSessionCookie(https),
     "__Host-session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure",
   );
   assertEquals(
-    clearSessionCookie(http, off),
+    clearSessionCookie(http),
     "session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
   );
 
-  // Behind a TLS-terminating proxy the runtime sees http; TRUST_PROXY restores https.
+  // Forwarding headers cannot select or downgrade the session cookie.
   const fwd = new Request("http://app.internal/api", { headers: { "X-Forwarded-Proto": "https" } });
-  assertEquals(sessionCookieName(fwd, off), PLAIN_SESSION_COOKIE);
-  assertEquals(sessionCookieName(fwd, on), SECURE_SESSION_COOKIE);
+  assertEquals(sessionCookieName(fwd), PLAIN_SESSION_COOKIE);
   const back = new Request("https://app/api", { headers: { "X-Forwarded-Proto": "http, https" } });
-  assertEquals(sessionCookieName(back, on), PLAIN_SESSION_COOKIE);
+  assertEquals(sessionCookieName(back), SECURE_SESSION_COOKIE);
 
   // Reading follows the same name, so a plain cookie is ignored on https.
   const withBoth = (url: string) =>
     new Request(url, { headers: { Cookie: "session=plain; __Host-session=host; other=x" } });
-  assertEquals(readSessionCookie(withBoth("https://x/"), off), "host");
-  assertEquals(readSessionCookie(withBoth("http://x/"), off), "plain");
-  assertEquals(readSessionCookie(new Request("https://x/"), off), "");
+  assertEquals(readSessionCookie(withBoth("https://x/")), "host");
+  assertEquals(readSessionCookie(withBoth("http://x/")), "plain");
+  assertEquals(readSessionCookie(new Request("https://x/")), "");
 
   // End to end: verify over an https URL gets the __Host- cookie and it authenticates.
   const h = await harness({ env: { WEB_ORIGIN: "https://preview.deno.net" } });
@@ -239,7 +236,7 @@ Deno.test("cookie name: __Host- + Secure over https, plain over http, proxy-awar
       method: "POST",
       headers: { Origin: "https://preview.deno.net", "Content-Type": "application/json" },
       body: JSON.stringify({ message, signature: await w.sign(message), cookie: true }),
-    });
+    }, testConnection());
     assertEquals(res.status, 200);
     const setCookie = res.headers.get("Set-Cookie") ?? "";
     assertStringIncludes(setCookie, SECURE_SESSION_COOKIE + "=");

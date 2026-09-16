@@ -37,7 +37,7 @@ function same(a: string, b: string): boolean {
 }
 
 export function createSiteLock(
-  config: Pick<Config, "siteUsername" | "sitePassword" | "trustProxy">,
+  config: Pick<Config, "siteUsername" | "sitePassword">,
   hasSession: (token: string) => Promise<boolean>,
 ): SiteLock {
   const user = config.siteUsername;
@@ -73,7 +73,7 @@ export function createSiteLock(
     const ck = readCookie(req.headers.get("cookie"), LOCK_COOKIE);
     if (ck && same(ck, await cookieValue())) return "cookie";
     const token = /^Bearer\s+(.+)$/i.exec(h)?.[1]?.trim() ||
-      readSessionCookie(req, config);
+      readSessionCookie(req);
     if (token && await hasSession(token)) return "session";
     return "denied";
   }

@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { requireClientIp } from "../middleware/ip.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { AI_QUERY_MAX_CHARS, aiFilterRanked, aiTopK } from "../services/ai.ts";
 
@@ -30,7 +31,7 @@ export function aiRoutes(deps: Deps) {
     const key = query.toLowerCase() + "|" + [...known].sort().join(",");
     const hit = cache.get(key);
     if (hit && deps.now() - hit[1] < CACHE_TTL) return c.json({ matches: hit[0] });
-    if (!(await db.rateLimit("ai:" + c.var.ip, 6, 60))) {
+    if (!(await db.rateLimit("ai:" + requireClientIp(c), 6, 60))) {
       throw new HttpError(429, "too many searches, wait a minute");
     }
     if (!(await db.rateLimit("ai:global", 30, 60))) {

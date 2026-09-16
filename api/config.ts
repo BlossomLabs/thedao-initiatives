@@ -130,7 +130,6 @@ export interface Config {
   walletConnectProjectId: string;
   siteUsername: string;
   sitePassword: string;
-  trustProxy: boolean;
   /** CSP_ENFORCE=true: the static site's full Content-Security-Policy is enforced instead of report-only (lib/site-headers.ts). */
   cspEnforce: boolean;
   port: number;
@@ -221,7 +220,6 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     walletConnectProjectId: (env.WALLETCONNECT_PROJECT_ID ?? "").trim(),
     siteUsername: (env.SITE_USERNAME ?? "").trim(),
     sitePassword: (env.SITE_PASSWORD ?? "").trim(),
-    trustProxy: flag(env.TRUST_PROXY),
     cspEnforce: flag(env.CSP_ENFORCE),
     port: Number(env.PORT ?? "8000") || 8000,
     kvPath: (env.KV_PATH ?? "").trim() || undefined,

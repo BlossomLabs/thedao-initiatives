@@ -3,6 +3,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { requireClientIp } from "../middleware/ip.ts";
 import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
@@ -49,7 +50,7 @@ export function commentRoutes(deps: Deps) {
     );
 
   r.get("/initiatives/:slug/comments", async (c) => {
-    if (!(await db.rateLimit("cml:" + c.var.ip, 60, 60))) {
+    if (!(await db.rateLimit("cml:" + requireClientIp(c), 60, 60))) {
       throw new HttpError(429, "slow down");
     }
     const rfp = await db.rfps.bySlug(c.req.param("slug"));
@@ -114,11 +115,11 @@ export function commentRoutes(deps: Deps) {
       throw new HttpError(400, "a name is required without a wallet");
     }
     await assertEthNameOwned(deps.ens, name, address);
-    const who = user ? "addr:" + user.address.toLowerCase() : "ip:" + c.var.ip;
+    const who = user ? "addr:" + user.address.toLowerCase() : "ip:" + requireClientIp(c);
     if (!(await db.rateLimit("cpost:" + who, 5, 3600))) {
       throw new HttpError(429, "too many posts from your address, try again in an hour");
     }
-    if (!user && !(await db.rateLimit("cpostanon:" + c.var.ip, 3, 3600))) {
+    if (!user && !(await db.rateLimit("cpostanon:" + requireClientIp(c), 3, 3600))) {
       throw new HttpError(429, "too many posts from your address, try again in an hour");
     }
     const roles = await rolesFor(address, rfp.id, Boolean(user?.isAdmin));
@@ -168,7 +169,7 @@ export function commentRoutes(deps: Deps) {
   });
 
   r.get("/comments/mine", async (c) => {
-    if (!(await db.rateLimit("cmine:" + c.var.ip, 30, 60))) {
+    if (!(await db.rateLimit("cmine:" + requireClientIp(c), 30, 60))) {
       throw new HttpError(429, "slow down");
     }
     const tokens = (c.req.query("tokens") ?? "").split(",").filter((t) => /^[0-9a-f]{32}$/.test(t))
@@ -209,7 +210,7 @@ export function commentRoutes(deps: Deps) {
   });
 
   r.post("/comments/:id/report", async (c) => {
-    if (!(await db.rateLimit("crep:" + c.var.ip, 10, 86400))) {
+    if (!(await db.rateLimit("crep:" + requireClientIp(c), 10, 86400))) {
       throw new HttpError(429, "too many reports today");
     }
     const row = await db.comments.get(c.req.param("id"));
@@ -239,11 +240,11 @@ export function commentRoutes(deps: Deps) {
       throw new HttpError(400, "a name is required without a wallet");
     }
     await assertEthNameOwned(deps.ens, name, address);
-    const who = user ? "addr:" + user.address.toLowerCase() : "ip:" + c.var.ip;
+    const who = user ? "addr:" + user.address.toLowerCase() : "ip:" + requireClientIp(c);
     if (!(await db.rateLimit("creply:" + who, 20, 3600))) {
       throw new HttpError(429, "too many replies, slow down");
     }
-    if (!user && !(await db.rateLimit("creplyanon:" + c.var.ip, 3, 3600))) {
+    if (!user && !(await db.rateLimit("creplyanon:" + requireClientIp(c), 3, 3600))) {
       throw new HttpError(429, "too many replies from your address, try again in an hour");
     }
     const roles = user ? await rolesFor(user.address, parent.rfpId, user.isAdmin) : [];

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { requireClientIp } from "../middleware/ip.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { isAddress } from "../chain/address.ts";
@@ -19,7 +20,7 @@ export function profileRoutes(deps: Deps) {
     const address = c.req.param("address").trim();
     if (!isAddress(address)) throw new HttpError(400, "bad address");
     // Cache misses hit an external API: throttle uncached lookups per client.
-    if (!ens.has(address) && !(await db.rateLimit("ens:" + c.var.ip, 30, 60))) {
+    if (!ens.has(address) && !(await db.rateLimit("ens:" + requireClientIp(c), 30, 60))) {
       return c.json({ name: null, avatar: null, detail: "rate limited" }, 429);
     }
     const id = await ens.reverse(address);

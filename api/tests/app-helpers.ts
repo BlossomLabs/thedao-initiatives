@@ -28,6 +28,11 @@ export const ADMIN = "0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A"; // wallet("0x
 export const PLAIN = "0x1563915e194D8CfBA1943570603F7606A3115508"; // wallet("0x22..22")
 export const SAFE_ADDR = "0xD5Cf05f24727C83976652E3586c0e26DD39884e9";
 
+/** Realistic Deno socket metadata; tests must not depend on an unknown-IP fallback. */
+export function testConnection(hostname = "203.0.113.42"): Deno.ServeHandlerInfo<Deno.NetAddr> {
+  return { remoteAddr: { transport: "tcp", hostname, port: 43210 }, completed: Promise.resolve() };
+}
+
 function abiString(s: string): string {
   const hex = Array.from(utf8(s)).map((b) => b.toString(16).padStart(2, "0")).join("");
   return "0x" + word(32) + word(s.length) + hex.padEnd(64, "0");
@@ -243,7 +248,7 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
         body = JSON.stringify(init.json);
       }
       return Promise.resolve(
-        app.request("http://api.test" + path, { ...init, headers, body }),
+        app.request("http://api.test" + path, { ...init, headers, body }, testConnection()),
       );
     },
     close: () => kv.close(),

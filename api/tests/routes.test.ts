@@ -10,6 +10,7 @@ import {
   proposerToken,
   SAFE_ADDR,
   seedContentLogos,
+  testConnection,
 } from "./app-helpers.ts";
 import { DONOR, SIGNERS, transferLog, wallet } from "./helpers.ts";
 import { grantBody, minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
@@ -363,7 +364,7 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
     method: "POST",
     headers: { Origin: "https://preview.deno.net", "Content-Type": "application/json" },
     body: JSON.stringify({ message: own, signature: await w.sign(own) }),
-  });
+  }, testConnection());
   assertEquals(onSelf.status, 200);
   // A forged Host outside the platform suffixes does not widen the binding.
   const { nonce: n1 } = await j(await h.req("/api/auth/nonce")) as { nonce: string };
@@ -372,7 +373,7 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message: forged, signature: await w.sign(forged) }),
-  });
+  }, testConnection());
   assertEquals(onForged.status, 401);
   const res = await h.req("/api/auth/verify", {
     method: "POST",

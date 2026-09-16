@@ -237,11 +237,12 @@ Deno.test("revocation wins a concurrent session activity write", async () => {
   }
 });
 
-Deno.test("legacy session rows require authentication instead of acquiring new privileges or idle life", async () => {
+Deno.test("partially upgraded session rows cannot acquire a fresh inactivity window", async () => {
   const h = await harness();
   try {
     const token = "legacy-token";
     await h.kv.set(K.session(sha256Hex(token)), {
+      id: "partial-upgrade",
       address: ADMIN,
       isAdmin: true,
       createdAt: h.clock.now,

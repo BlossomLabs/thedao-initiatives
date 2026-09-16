@@ -4,7 +4,9 @@
  * Until 2026-09-15 the browser kept the bearer token in localStorage. A
  * record that still carries `token` is sent once to `POST /api/auth/cookie`,
  * which answers with the same session as a cookie; the record is then saved
- * without the token. A token the API no longer knows (expired, revoked)
+ * without the token. The API also upgrades older server-side session metadata
+ * without changing its original authentication time or absolute expiry.
+ * A token the API no longer knows (expired, revoked)
  * clears the record, exactly as a stale session would. Delete this module,
  * its call in context/session.tsx and the endpoint once every pre-cookie
  * session has expired (a week after that deploy).

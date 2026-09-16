@@ -98,7 +98,8 @@ export function authRoutes(deps: Deps) {
   /**
    * One-time migration for sessions minted before the cookie existed: the
    * browser presents its stored bearer once, gets the same session back as the
-   * HttpOnly cookie, and forgets the token. Same expiry, nothing new minted.
+   * HttpOnly cookie, and forgets the token. The session repository also upgrades
+   * old metadata automatically, preserving authentication age and absolute expiry.
    * Remove once every pre-cookie session has expired (SESSION_TTL_SECS after
    * the deploy that introduced the cookie, 2026-09-15).
    */

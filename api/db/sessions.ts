@@ -2,6 +2,7 @@ import { K } from "./keys.ts";
 import type { Session } from "./types.ts";
 import { randomNonce, randomToken, sha256Hex } from "../lib/ids.ts";
 import { HttpError } from "../lib/errors.ts";
+import { isAddress } from "../chain/address.ts";
 import {
   ADMIN_SESSION_IDLE_SECS,
   ADMIN_SESSION_TTL_SECS,
@@ -9,6 +10,11 @@ import {
   SESSION_IDLE_SECS,
   SESSION_TTL_SECS,
 } from "../config.ts";
+
+type StoredSession =
+  & Pick<Session, "address" | "isAdmin" | "createdAt" | "expiresAt">
+  & Partial<Pick<Session, "id" | "lastSeenAt" | "addressEpoch" | "globalEpoch">>;
+const SESSION_METADATA = ["id", "lastSeenAt", "addressEpoch", "globalEpoch"] as const;
 
 export function sessionsRepo(kv: Deno.Kv, now: () => number) {
   async function issueNonce(): Promise<string> {
@@ -75,36 +81,60 @@ export function sessionsRepo(kv: Deno.Kv, now: () => number) {
 
   async function byHash(hash: string, touch: boolean): Promise<Session | null> {
     for (let attempt = 0; attempt < 5; attempt++) {
-      const entry = await kv.get<Session>(K.session(hash));
+      const entry = await kv.get<StoredSession>(K.session(hash));
       const s = entry.value;
-      // Older rows lack the inventory/idle/revocation metadata. Require a fresh
-      // signature instead of silently granting them a new lifetime on deploy.
-      if (!s?.id || !Number.isFinite(s.lastSeenAt)) return null;
       const time = now();
+      if (
+        !s || !isAddress(s.address) || typeof s.isAdmin !== "boolean" ||
+        !Number.isFinite(s.createdAt) || !Number.isFinite(s.expiresAt) ||
+        s.createdAt > time
+      ) return null;
       const expiresAt = Math.min(
         s.expiresAt,
         s.createdAt + (s.isAdmin ? ADMIN_SESSION_TTL_SECS : SESSION_TTL_SECS),
       );
+      if (expiresAt <= time) return null;
+      // Only the original four-field schema qualifies. A damaged/partially
+      // upgraded row must never acquire another initial inactivity window.
+      const legacy = SESSION_METADATA.every((key) => !Object.hasOwn(s, key));
       const idle = s.isAdmin ? ADMIN_SESSION_IDLE_SECS : SESSION_IDLE_SECS;
-      if (expiresAt <= time || s.lastSeenAt + idle <= time) return null;
+      if (
+        !legacy && (
+          typeof s.id !== "string" || !s.id || !Number.isFinite(s.lastSeenAt) ||
+          typeof s.addressEpoch !== "string" || typeof s.globalEpoch !== "string" ||
+          s.lastSeenAt! + idle <= time
+        )
+      ) return null;
       const [addressEpoch, globalEpoch] = await epochs(s.address);
       if (
-        s.addressEpoch !== (addressEpoch.value ?? "") ||
-        s.globalEpoch !== (globalEpoch.value ?? "")
+        legacy
+          // Old sessions predate epochs: any revocation marker invalidates
+          // them. Attaching the latest epoch would resurrect revoked access.
+          ? addressEpoch.versionstamp !== null || globalEpoch.versionstamp !== null
+          : s.addressEpoch !== (addressEpoch.value ?? "") ||
+            s.globalEpoch !== (globalEpoch.value ?? "")
       ) return null;
-      const session = {
-        ...s,
+      const session: Session = {
+        id: legacy ? randomToken(16) : s.id!,
+        address: s.address,
+        isAdmin: s.isAdmin,
+        createdAt: s.createdAt,
         expiresAt,
-        lastSeenAt: touch ? Math.max(s.lastSeenAt, time) : s.lastSeenAt,
+        // There is no historical activity timestamp to recover. Initialize
+        // it once, without renewing the original expiry or authentication age.
+        lastSeenAt: legacy ? time : touch ? Math.max(s.lastSeenAt!, time) : s.lastSeenAt!,
+        addressEpoch: legacy ? "" : s.addressEpoch!,
+        globalEpoch: legacy ? "" : s.globalEpoch!,
       };
-      if (!touch) return session;
+      if (!legacy && !touch) return session;
       // CAS checks prevent an in-flight activity update from resurrecting a
-      // revoked token, or from crossing a per-wallet/global revocation.
-      if (
-        (await kv.atomic().check(entry, addressEpoch, globalEpoch)
-          .set(entry.key, session, { expireIn: Math.max(1, Math.ceil((expiresAt - time) * 1000)) })
-          .commit()).ok
-      ) return session;
+      // revoked token, or from crossing a per-wallet/global revocation. The
+      // same checks protect migration, even on passive site-lock reads.
+      const options = { expireIn: Math.max(1, Math.ceil((expiresAt - time) * 1000)) };
+      const op = kv.atomic().check(entry, addressEpoch, globalEpoch)
+        .set(entry.key, session, options);
+      if (legacy) op.set(K.sessionsByAddr(s.address, hash), true, options);
+      if ((await op.commit()).ok) return session;
     }
     return null;
   }

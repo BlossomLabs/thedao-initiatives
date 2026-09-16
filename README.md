@@ -8,8 +8,8 @@ funding gap.
 
 React Router v7 SPA built and served with Deno. The design is the Figma file "TheDAO Sites" (board +
 Suggest an initiative), expressed as Tailwind v4 tokens in `app/app.css`. Data comes from the API in
-`api/` (Deno + Hono + KV, see `api/README.md`), hosted by the same package: `server.ts` serves the API
-under `/api` and the built SPA for everything else, from one Deno Deploy app. The initiative texts,
+`api/` (Deno + Hono + KV, see `api/README.md`), hosted by the same package: `server.ts` starts one
+Hono app serving the API under `/api` and the built SPA, from one Deno Deploy app. The initiative texts,
 the process rules and the donation terms are files under `content/`; the proposer's AI guide is
 `public/llms.txt`. The Flask MVP this replaced is described in `docs/v1-to-v2.md`.
 
@@ -77,7 +77,14 @@ and pull request. Deno Deploy builds and deploys `main` itself; there is no depl
   funder leads + CSV)
 
 `/`, `/submit`, `/submit/thanks`, `/donation-terms` and `/admin` are prerendered; everything else is
-served from the SPA fallback by `server.ts`. `/api/*` and `/healthz` go to the Hono app.
+served from the SPA fallback by the same Hono app. API, health and Markdown routes are registered
+before static files and the SPA fallback; unknown API URLs remain JSON 404s.
+
+`server.ts` only boots the app and registers the daily job. `api/app.ts` owns routing, shared
+security headers and the preview lock; `api/site.ts` serves the built files with their existing
+cache rules and staging-origin rewriting. API sessions, auditing, CORS and request guards run only
+on API, health and Markdown routes. HTML keeps its inline-script hashes and `CSP_ENFORCE` behavior;
+API responses keep their resource-blocking CSP. Shared headers also cover preview-lock denials.
 
 ### Publishing a new version of the donation terms
 

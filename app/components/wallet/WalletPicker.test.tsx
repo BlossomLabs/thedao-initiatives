@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import type { Connector } from "wagmi";
 import WalletPicker from "./WalletPicker";
@@ -51,13 +51,14 @@ beforeEach(() => {
   mocks.connect.mockImplementation(() => pending);
   fetched.mockResolvedValue({
     ok: true,
-    json: async () => ({
-      wallets: [
-        { id: "meta", name: "MetaMask", native: "metamask://", universal: null },
-        { id: "rainbow", name: "Rainbow", native: "rainbow://", universal: null },
-        { id: "other", name: "Other Wallet", native: null, universal: null },
-      ],
-    }),
+    json: () =>
+      Promise.resolve({
+        wallets: [
+          { id: "meta", name: "MetaMask", native: "metamask://", universal: null },
+          { id: "rainbow", name: "Rainbow", native: "rainbow://", universal: null },
+          { id: "other", name: "Other Wallet", native: null, universal: null },
+        ],
+      }),
   });
   copied.mockResolvedValue(undefined);
   vi.stubGlobal("fetch", fetched);

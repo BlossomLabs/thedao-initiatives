@@ -173,7 +173,7 @@ Deno.test("site lock: a valid session cookie passes, a stale one does not", asyn
     const gone = await h.req("/api/board", { headers: { Cookie: cookie } });
     assertEquals(gone.status, 401);
     assertStringIncludes(gone.headers.get("WWW-Authenticate") ?? "", "Basic");
-    // The lock's own check() is what server.ts calls for static pages.
+    // The shared Hono gate uses the same lock for static pages.
     const { siteLockFor } = await import("../app.ts");
     const lock = siteLockFor(h.deps);
     const live = await h.mint(ADMIN, true);

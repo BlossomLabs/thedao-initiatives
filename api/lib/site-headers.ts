@@ -1,7 +1,6 @@
 /**
- * Security headers for the static site (server.ts). The API gets its own set
- * from middleware/headers.ts; this one covers every non-API response: the
- * prerendered pages, the SPA fallbacks and the hashed assets.
+ * CSP policy for the static site. Shared Hono middleware applies the headers;
+ * API routes select their own resource-blocking policy.
  *
  * The full Content-Security-Policy ships report-only by default, so
  * violations show up in the browser console without breaking wallet flows
@@ -57,20 +56,6 @@ export function sitePolicy(
   return opts.cspEnforce
     ? { enforced: full, reportOnly: null }
     : { enforced: MINIMAL_CSP, reportOnly: full };
-}
-
-/** Adds the site headers to a static response, keeping whatever it already carries. */
-export function withSiteHeaders(res: Response, policy: SitePolicy): Response {
-  const headers = new Headers(res.headers);
-  headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
-  headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("X-Frame-Options", "DENY");
-  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  headers.set("Content-Security-Policy", policy.enforced);
-  if (policy.reportOnly) headers.set("Content-Security-Policy-Report-Only", policy.reportOnly);
-  else headers.delete("Content-Security-Policy-Report-Only");
-  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
 // -------------------------------------------------------- inline script hashes

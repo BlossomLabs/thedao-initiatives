@@ -2,7 +2,6 @@ import { assertEquals } from "@std/assert";
 import { Hono } from "hono";
 import type { Vars } from "../middleware/context.ts";
 import { canonicalIp, clientIp } from "../middleware/ip.ts";
-import { dispatchApi } from "../lib/dispatch.ts";
 import { harness, j, testConnection } from "./app-helpers.ts";
 
 Deno.test("client IP: canonical forms cannot create distinct quota identities", () => {
@@ -40,8 +39,7 @@ function attribution() {
 Deno.test("client IP: real server dispatch preserves distinct socket peers and ignores spoofed forwarding", async () => {
   const app = attribution();
   for (const ip of ["203.0.113.42", "203.0.113.43", "2001:db8::42"]) {
-    const response = await dispatchApi(
-      app,
+    const response = await app.fetch(
       new Request("http://api.test/", {
         headers: {
           "X-Forwarded-For": "198.51.100.1",
@@ -87,8 +85,7 @@ Deno.test("client IP: socket peers have independent quotas; IPv4-mapped aliases 
   try {
     let forged = 0;
     const nonce = async (peer: string) =>
-      await dispatchApi(
-        h.app,
+      await h.app.fetch(
         new Request("http://api.test/api/auth/nonce", {
           headers: { "X-Forwarded-For": `198.51.100.${++forged}` },
         }),
@@ -111,8 +108,7 @@ Deno.test("client IP: global quotas remain effective when clients change address
     const start = Math.floor(h.clock.now / 60) * 60;
     await h.kv.set(["rl", "login-global", start], 60);
     for (const peer of ["203.0.113.42", "203.0.113.43"]) {
-      const res = await dispatchApi(
-        h.app,
+      const res = await h.app.fetch(
         new Request("http://api.test/api/auth/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

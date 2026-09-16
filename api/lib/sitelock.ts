@@ -1,5 +1,5 @@
 /**
- * Private-preview gate shared by the API middleware and the static server.
+ * Private-preview gate applied once by Hono to pages, assets and the API.
  *
  * HTTP Basic Auth unlocks the site; a stateless HMAC cookie keeps it unlocked
  * so the browser's later API calls (which can never carry Basic credentials as

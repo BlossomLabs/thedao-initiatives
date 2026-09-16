@@ -24,7 +24,7 @@ vi.mock(
       busy: null,
       status: null,
       donate: vi.fn(),
-      loadBalances: async () => ({}),
+      loadBalances: () => Promise.resolve({}),
     }),
   }),
 );
@@ -59,7 +59,7 @@ it("keeps the address hidden until the checked acceptance is persisted, with eve
   fireEvent.click(button);
   expect(mock.recordAcceptance).toHaveBeenCalledWith("exchange", {});
   expect(screen.queryByText(SAFE)).toBeNull();
-  await act(async () => finish({ attemptId: "attempt" }));
+  await act(() => Promise.resolve(finish({ attemptId: "attempt" })));
   expect(screen.getByText(SAFE)).toBeInTheDocument();
   const hash = "0x" + "aa".repeat(32);
   fireEvent.change(screen.getByLabelText("Transaction hash after withdrawal (optional)"), {
@@ -74,8 +74,8 @@ it("keeps the address hidden after a recording failure and sends optional detail
   renderWidget();
   fireEvent.click(screen.getByRole("checkbox"));
   fireEvent.change(screen.getByLabelText("Name (optional)"), { target: { value: "Donor" } });
-  await act(async () =>
-    fireEvent.click(screen.getByRole("button", { name: "Show donation address" }))
+  await act(() =>
+    Promise.resolve(fireEvent.click(screen.getByRole("button", { name: "Show donation address" })))
   );
   expect(mock.recordAcceptance).toHaveBeenCalledWith("exchange", { name: "Donor" });
   expect(screen.queryByText(SAFE)).toBeNull();

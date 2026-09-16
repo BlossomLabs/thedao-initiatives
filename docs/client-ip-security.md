@@ -1,6 +1,7 @@
 # Client identity from Deno
 
-Both Deno entrypoints pass runtime handler information to Hono through `dispatchApi`.
+Both Deno entrypoints call `app.fetch(req, info)` directly, passing runtime handler information
+to Hono. The deployed app routes both the website and API within Hono.
 IP quotas use Deno's `remoteAddr.hostname`. The application ignores `X-Forwarded-For`,
 `X-Real-IP`, and `Forwarded`; request origins and cookie security use the request URL's scheme
 and ignore `X-Forwarded-Proto`. There are no application-level proxy-trust settings.
@@ -35,5 +36,5 @@ client addresses in general-purpose logs. Remove diagnostics after verification.
 Regression checks:
 
 ```sh
-deno test -A api/tests/ip.test.ts api/tests/origin.test.ts api/tests/session-cookie.test.ts
+deno test -A api/tests/ip.test.ts api/tests/origin.test.ts api/tests/session-cookie.test.ts api/tests/site.test.ts
 ```

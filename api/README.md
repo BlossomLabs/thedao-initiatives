@@ -1,8 +1,11 @@
 # TheDAO Security Fund — API
 
 JSON API for the initiatives board, on Deno + Hono + Deno KV. It replaced the Flask app that lived
-at the repository root until 2026-09-15 (see `docs/v1-to-v2.md`). `../server.ts` serves it under
-`/api` next to the built SPA, and `../deno.json` holds the tasks and imports.
+at the repository root until 2026-09-15 (see `docs/v1-to-v2.md`). `../server.ts` starts a single
+Hono app serving `/api` and the built SPA; `../deno.json` holds the tasks and imports.
+`app.ts` applies shared headers and the preview lock once. API middleware is scoped to API,
+health and Markdown routes, and `site.ts` handles static files and SPA fallbacks. `main.ts`
+starts the same app without static files for API-only development.
 
 ## Run it (from the repository root)
 

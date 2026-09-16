@@ -1,5 +1,4 @@
-/** Builds the API (deps, Hono app) from the environment. Shared by the
- * standalone `main.ts` and the combined site server in `../server.ts`. */
+/** Builds the Hono app from the environment, optionally with the built website. */
 import { createApp, siteLockFor } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { createDb } from "./db/mod.ts";
@@ -13,8 +12,9 @@ import { toChecksum } from "./chain/address.ts";
 import { BADGE_CONTRACT, CURATOR_ADDRESSES } from "./config.ts";
 import type { Deps } from "./middleware/context.ts";
 import { createAdmins } from "./services/admins.ts";
+import { createStaticSite, type SiteOptions } from "./site.ts";
 
-export async function createServer() {
+export async function createServer(siteOptions?: SiteOptions) {
   const config = loadConfig(Deno.env.toObject());
   const now = () => Date.now() / 1000;
   const log = (msg: string) =>
@@ -55,7 +55,10 @@ export async function createServer() {
     log,
   };
   const lock = siteLockFor(deps);
-  const app = createApp(deps, lock);
+  const site = siteOptions
+    ? await createStaticSite(siteOptions, config.cspEnforce, log)
+    : undefined;
+  const app = createApp(deps, lock, site);
   if (lock.enabled) log("site lock is ON (SITE_USERNAME/SITE_PASSWORD set)");
   return { app, lock, config, deps };
 }

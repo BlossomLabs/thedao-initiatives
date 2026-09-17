@@ -48,6 +48,11 @@ import DraftLogoutDialog, { type DraftLogoutChoice } from "~/components/wallet/D
 export const sessionKey = (s: SessionInfo | null | undefined): string | null =>
   s ? `${s.address.toLowerCase()}:${s.isAdmin}` : null;
 
+/** The server refused the signed message because its issuedAt is older than
+ * its clock-skew window (the wallet prompt sat open too long). */
+const isStaleMessage = (e: unknown) =>
+  e instanceof ApiError && e.status === 401 && e.message === "issuedAt out of window";
+
 /** Dev-only fake wallet: it cannot sign, so it connects without a session. */
 const skipsSignIn = (c: Connector | undefined) => c?.id === "mock";
 
@@ -285,7 +290,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const stillActive = () => {
         if (generation !== authGeneration.current) throw new Error("Sign-in was cancelled.");
       };
-      const promise = Promise.resolve().then(async () => {
+      const attempt = async (): Promise<SessionInfo> => {
         const { nonce } = await api<{ nonce: string }>("/api/auth/nonce");
         const message = createSiweMessage({
           domain: globalThis.location.host,
@@ -309,9 +314,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         const signature = await signMessageAsync({ message, account, connector: signingConnector });
         stillActive();
         // cookie: true -> the token comes back as an HttpOnly cookie, not in the body.
-        const s = await api<SessionInfo>("/api/auth/verify", {
+        return await api<SessionInfo>("/api/auth/verify", {
           json: { message, signature, cookie: true },
         });
+      };
+      const promise = Promise.resolve().then(async () => {
+        let s: SessionInfo;
+        try {
+          s = await attempt();
+        } catch (e) {
+          // The timestamp is part of what the wallet signed, so a prompt left
+          // open past the server's window can only be fixed by signing again.
+          if (!isStaleMessage(e)) throw e;
+          stillActive();
+          s = await attempt();
+        }
         stillActive();
         if (
           sessionRef.current?.address.toLowerCase() !== s.address.toLowerCase() ||

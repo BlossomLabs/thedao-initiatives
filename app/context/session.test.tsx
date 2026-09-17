@@ -656,3 +656,54 @@ it("switching wallets retains every draft without showing a deletion popup", asy
   expect(localStorage.getItem(key)).toBe("wallet A draft");
   expect(localStorage.getItem("thedao:submit-draft:wallet-b")).toBe("wallet B draft");
 });
+
+/** A wallet prompt left open for a while: the signed message is older than the
+ * server's window. The client fetches a fresh nonce and asks for one more signature. */
+it("retries once with a fresh nonce when the signed message aged out of the server window", async () => {
+  const { result, config, request } = setup();
+  const originalRequest = request.getMockImplementation()!;
+  request.mockImplementation((args) =>
+    args.method === "personal_sign" ? Promise.resolve("0x1234") : originalRequest(args)
+  );
+  const originalApi = vi.mocked(api).getMockImplementation()!;
+  let nonces = 0;
+  let verifies = 0;
+  vi.mocked(api).mockImplementation((path, options) => {
+    if (path === "/api/auth/nonce") return Promise.resolve({ nonce: `abcdefgh1234567${++nonces}` });
+    if (path === "/api/auth/verify" && ++verifies === 1) {
+      return Promise.reject(new ApiError(401, "issuedAt out of window"));
+    }
+    return originalApi(path, options);
+  });
+  await act(() => result.current.connect(config.connectors[0]));
+  expect(nonces).toBe(2);
+  expect(request.mock.calls.filter(([args]) => args.method === "personal_sign")).toHaveLength(2);
+  const verifyBodies = vi.mocked(api).mock.calls
+    .filter(([path]) => path === "/api/auth/verify")
+    .map(([, options]) => (options!.json as { message: string }).message);
+  expect(verifyBodies[0]).toContain("abcdefgh12345671");
+  expect(verifyBodies[1]).toContain("abcdefgh12345672");
+  expect(result.current.session).toEqual(SESSION);
+  expect(result.current.signingIn).toBe(false);
+});
+
+it("gives up after one retry when the message is still out of the server window", async () => {
+  const { result, config, request } = setup();
+  const originalRequest = request.getMockImplementation()!;
+  request.mockImplementation((args) =>
+    args.method === "personal_sign" ? Promise.resolve("0x1234") : originalRequest(args)
+  );
+  const originalApi = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, options) =>
+    path === "/api/auth/verify"
+      ? Promise.reject(new ApiError(401, "issuedAt out of window"))
+      : originalApi(path, options)
+  );
+  await act(async () => {
+    await expect(result.current.connect(config.connectors[0])).rejects.toThrow(/out of window/);
+  });
+  expect(vi.mocked(api).mock.calls.filter(([path]) => path === "/api/auth/verify")).toHaveLength(2);
+  expect(request.mock.calls.filter(([args]) => args.method === "personal_sign")).toHaveLength(2);
+  expect(result.current.session).toBeNull();
+  expect(result.current.signingIn).toBe(false);
+});

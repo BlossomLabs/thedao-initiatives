@@ -7,7 +7,7 @@ import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { type CommentJson, commentJson } from "../lib/json.ts";
-import { EMAIL_RE } from "../lib/validate.ts";
+import { capped, EMAIL_RE } from "../lib/validate.ts";
 import { assertEthNameOwned } from "../services/names.ts";
 import {
   commentRoles,
@@ -18,6 +18,7 @@ import {
 } from "../services/roles.ts";
 import type { Comment, CommentType } from "../db/types.ts";
 import { COMMENT_BODY_MAX } from "../config.ts";
+import { COMMENT_NAME_MAX } from "../../shared/comments.ts";
 
 export const COMMENT_TYPES = new Set<CommentType>(["suggestion", "question", "other"]);
 export const COMMENT_TOPICS = new Set([
@@ -97,7 +98,7 @@ export function commentRoutes(deps: Deps) {
     const ctype = s(body.type, 20) as CommentType;
     const topic = s(body.topic, 20);
     const text = s(body.body, COMMENT_BODY_MAX + 1);
-    const name = s(body.name, 60);
+    const name = capped(body.name, COMMENT_NAME_MAX, "The name");
     const email = s(body.email, 200);
     if (!COMMENT_TYPES.has(ctype) || !COMMENT_TOPICS.has(topic)) {
       throw new HttpError(400, "bad type or topic");
@@ -233,7 +234,7 @@ export function commentRoutes(deps: Deps) {
     if (!text || text.length > COMMENT_BODY_MAX) {
       throw new HttpError(400, `the text must be 1 to ${COMMENT_BODY_MAX} characters`);
     }
-    const name = s(body.name, 60);
+    const name = capped(body.name, COMMENT_NAME_MAX, "The name");
     const address = user?.address ?? "";
     if (!address && !name) {
       throw new HttpError(400, "a name is required without a wallet");

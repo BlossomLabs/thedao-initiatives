@@ -14,6 +14,8 @@ import VoteBox from "./VoteBox";
 import ConnectInline from "~/components/wallet/ConnectInline";
 import { nameInput, signedInAs } from "./styles";
 import { FormNote, type Note, SENT_MS, SubmitButton } from "./FormFeedback";
+import { COMMENT_BODY_MAX, COMMENT_NAME_MAX } from "@shared/comments";
+import { inputMax, tooLong } from "@shared/draft/mod";
 
 export function IdentityRow({ c }: { c: CommentEntry }) {
   const label = c.roles.includes("ADMIN") ? "TheDAO team" : c.displayName || "Anonymous";
@@ -98,6 +100,14 @@ export default function EntryCard({
     const t = text.trim();
     if (!t) {
       setNote({ text: "Write something first." });
+      return;
+    }
+    if (t.length > COMMENT_BODY_MAX) {
+      setNote({ text: tooLong("The reply", COMMENT_BODY_MAX) });
+      return;
+    }
+    if (name.trim().length > COMMENT_NAME_MAX) {
+      setNote({ text: tooLong("The name", COMMENT_NAME_MAX) });
       return;
     }
     if (!address && !name.trim()) {
@@ -254,7 +264,7 @@ export default function EntryCard({
             <div className="mt-3 flex flex-col gap-2">
               <textarea
                 className="min-h-[70px] w-full rounded-xl border border-white/10 bg-[rgba(9,18,30,.5)] px-3 py-2.5 font-inter-tight text-[14px] text-white outline-none placeholder:text-muted focus:border-[rgba(92,183,90,.55)] disabled:cursor-default disabled:opacity-60"
-                maxLength={2000}
+                maxLength={inputMax(COMMENT_BODY_MAX)}
                 placeholder="Write a reply"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -265,7 +275,7 @@ export default function EntryCard({
                 {!address && (
                   <input
                     className={cn(nameInput, "w-auto min-w-[200px] flex-1")}
-                    maxLength={60}
+                    maxLength={inputMax(COMMENT_NAME_MAX)}
                     placeholder="Your name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}

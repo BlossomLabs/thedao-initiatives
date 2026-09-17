@@ -2,7 +2,7 @@
  * The page fields: what renders in the header of the initiative page and on
  * the board card, never inside a body section.
  */
-import { LIMITS } from "@shared/draft/mod";
+import { inputMax, LIMITS } from "@shared/draft/mod";
 import { Input, Textarea } from "~/components/ui/Field";
 import AmountInput from "./AmountInput";
 import FormField from "./FormField";
@@ -25,7 +25,7 @@ export default function PageFields(
         required
         hint={`Up to ${LIMITS.TITLE_CHARS} characters. No "RFP:" or "Grant:" prefix, the badge says it.`}
       >
-        <Input maxLength={LIMITS.TITLE_CHARS + 1} value={p.title} onChange={set("title")} />
+        <Input maxLength={inputMax(LIMITS.TITLE_CHARS)} value={p.title} onChange={set("title")} />
       </FormField>
       <FormField
         field="summary"
@@ -36,7 +36,7 @@ export default function PageFields(
         <Textarea
           className="min-h-[104px]"
           rows={5}
-          maxLength={LIMITS.SUMMARY_CHARS + 1}
+          maxLength={inputMax(LIMITS.SUMMARY_CHARS)}
           value={p.summary}
           onChange={set("summary")}
         />
@@ -79,7 +79,7 @@ export default function PageFields(
             hint='Short name for the header and the board card, as in "Grant to the OPSEC ratings coalition".'
           >
             <Input
-              maxLength={LIMITS.RECIPIENT_CHARS + 1}
+              maxLength={inputMax(LIMITS.RECIPIENT_CHARS)}
               value={p.recipientTeam}
               disabled={locked}
               onChange={set("recipientTeam")}
@@ -93,7 +93,7 @@ export default function PageFields(
             <Input
               type="url"
               placeholder="https://"
-              maxLength={LIMITS.LINK_CHARS + 1}
+              maxLength={inputMax(LIMITS.LINK_CHARS)}
               value={p.recipientUrl}
               disabled={locked}
               onChange={set("recipientUrl")}
@@ -109,7 +109,7 @@ export default function PageFields(
         <Input
           type="url"
           placeholder="https://forum.example.org/t/my-initiative/123"
-          maxLength={300}
+          maxLength={inputMax(LIMITS.LINK_CHARS)}
           value={p.discourseUrl}
           disabled={locked}
           onChange={set("discourseUrl")}

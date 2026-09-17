@@ -43,6 +43,27 @@ const setup = (initial?: Draft, onSubmit = vi.fn(async () => {})) => {
 };
 
 describe("InitiativeForm checks", () => {
+  it("paints a discussion link past the cap as too long, live, instead of cutting it", () => {
+    const d = validDraft();
+    d.page.discourseUrl = "https://forum.example.org/t/" + "a".repeat(301);
+    setup(d);
+    expect(document.getElementById("f-discourse_url")).toHaveClass("has-error");
+    expect(
+      screen.getAllByText("The discussion link is too long (300 characters at most).").length,
+    ).toBeGreaterThan(0);
+    // one whole character of room past the cap, even an emoji
+    expect(document.getElementById("f-discourse_url")).toHaveAttribute("maxlength", "302");
+  });
+
+  it("names an other link past the cap as too long, not as not-https", () => {
+    const d = validDraft();
+    d.page.links = "https://example.org/" + "a".repeat(301);
+    setup(d);
+    expect(screen.getAllByText("Link 1 is too long (300 characters at most).").length)
+      .toBeGreaterThan(0);
+    expect(screen.queryByText(/must be an https URL/)).toBeNull();
+  });
+
   it("hides missing-kind errors until the first submit attempt", () => {
     setup();
     expect(document.querySelector(".has-error")).toBeNull();

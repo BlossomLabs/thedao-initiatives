@@ -19,6 +19,7 @@ import {
   SUPPORT_SCREENSHOT_MAX,
   type SupportCategory,
 } from "@shared/support";
+import { inputMax, tooLong } from "@shared/draft/mod";
 import { api } from "~/lib/api";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { Button } from "~/components/ui/Button";
@@ -161,7 +162,8 @@ export function SupportPanel() {
     }
   };
 
-  const canSend = Boolean(category) && text.trim().length > 0 && !sending;
+  const overCap = text.trim().length > SUPPORT_MESSAGE_MAX;
+  const canSend = Boolean(category) && text.trim().length > 0 && !overCap && !sending;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,7 +287,7 @@ export function SupportPanel() {
                   setText(e.target.value)}
                 placeholder={CATEGORY_UI[category].placeholder}
                 rows={4}
-                maxLength={SUPPORT_MESSAGE_MAX}
+                maxLength={inputMax(SUPPORT_MESSAGE_MAX)}
                 required
                 className="resize-none py-2.5 text-[13.5px]"
               />
@@ -333,6 +335,11 @@ export function SupportPanel() {
                   Send
                 </Button>
               </div>
+              {overCap && (
+                <p className="m-0 text-[12.5px] text-[#ffb3b1]" role="alert">
+                  {tooLong("The message", SUPPORT_MESSAGE_MAX)}
+                </p>
+              )}
               {error && <p className="m-0 text-[12.5px] text-[#ffb3b1]" role="alert">{error}</p>}
             </form>
           )}

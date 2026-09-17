@@ -66,7 +66,7 @@ export const DEFAULT_ADMIN_ADDRESSES = [
 ];
 
 export const MIN_VOTE_DONATION_USD = 20;
-export const COMMENT_BODY_MAX = 2000;
+export { COMMENT_BODY_MAX } from "../shared/comments.ts";
 
 /** A donation is credited only once its tx is this many blocks deep. */
 export const MIN_CONFIRMATIONS = 3;

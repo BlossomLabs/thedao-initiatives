@@ -6,7 +6,7 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { Button } from "~/components/ui/Button";
-import { LIMITS } from "@shared/draft/mod";
+import { inputMax, LIMITS } from "@shared/draft/mod";
 import { cn } from "~/lib/utils";
 import { domId, edgeClass, FieldMsg, useFinding } from "./findings";
 import type { DraftCriterion } from "./types";
@@ -99,7 +99,7 @@ function CriterionInput(
       id={domId(field)}
       className={cn("field min-h-0 py-2.5 text-[13.5px] leading-[1.45]", f.cls)}
       rows={2}
-      maxLength={LIMITS.CRITERION_CHARS + 1}
+      maxLength={inputMax(LIMITS.CRITERION_CHARS)}
       placeholder="One checkable outcome"
       value={value}
       disabled={disabled}

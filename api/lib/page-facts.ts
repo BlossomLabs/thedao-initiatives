@@ -32,7 +32,7 @@ export async function readPageFacts(
     patch.goalUsd = goal!;
   }
   if (body.discourseUrl !== undefined) {
-    const raw = s(body.discourseUrl, 500);
+    const raw = s(body.discourseUrl, LIMITS.LINK_CHARS + 1);
     if (raw) {
       const [clean, err] = await validateForumUrl(raw, deps.resolve);
       if (err) throw new HttpError(400, err);

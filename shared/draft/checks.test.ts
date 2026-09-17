@@ -228,3 +228,36 @@ test("backer half rows and the edit scope", () => {
   i.page.duration = "";
   expect(checkSubmission(i, "edit").errors).toEqual([]);
 });
+
+test("a discussion link past the cap is too long on submit, never cut in silence", () => {
+  const i = minimal(90_000);
+  i.page.discourseUrl = "https://forum.example.org/t/" + "a".repeat(LIMITS.LINK_CHARS);
+  const r = checkSubmission(i);
+  expect(r.errors.filter((e) => e.field === "discourse_url").map((e) => [e.msg, e.kind])).toEqual(
+    [[tooLong("The discussion link", LIMITS.LINK_CHARS), "cap"]],
+  );
+  // the edit scope leaves the page facts to the route that edits them
+  expect(fields(checkSubmission(i, "edit").errors)).toEqual([]);
+});
+
+test("an other link past the cap says too long, not not-https", () => {
+  const i = minimal(90_000);
+  i.links = ["https://example.org/" + "a".repeat(LIMITS.LINK_CHARS), "https://ok.example/path"];
+  const r = checkSubmission(i);
+  expect(
+    r.errors.filter((e) => e.field.startsWith("links")).map((e) => [e.field, e.msg, e.kind]),
+  ).toEqual([["links_0", tooLong("Link 1", LIMITS.LINK_CHARS), "cap"]]);
+});
+
+test("a backer whose name is itself over the cap is called by its row in the link message", () => {
+  const i = minimal(90_000);
+  i.backers = [{
+    org: "O".repeat(LIMITS.BACKER_ORG + 1),
+    amountUsd: 1000,
+    url: "https://example.org/" + "a".repeat(LIMITS.LINK_CHARS),
+  }];
+  const r = checkSubmission(i);
+  expect(r.errors.filter((e) => e.field === "bk_url_0").map((e) => e.msg)).toEqual([
+    tooLong("Backer 1: the link", LIMITS.LINK_CHARS),
+  ]);
+});

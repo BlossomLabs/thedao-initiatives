@@ -102,3 +102,18 @@ Deno.test("support: the board's flags.support says whether the widget can show",
   assertEquals(onFlags.support, true);
   on.close();
 });
+
+Deno.test("support: a message past its cap is refused as too long, never cut", async () => {
+  const h = await setup({ url: UPSTREAM });
+  const res = await h.req("/api/support", {
+    method: "POST",
+    json: { ...good, message: "m".repeat(4001) },
+  });
+  assertEquals(res.status, 400);
+  assertStringIncludes(
+    String((await j(res)).error),
+    "The message is too long (4,000 characters at most)",
+  );
+  assertEquals(h.fetchLog.length, 0);
+  h.close();
+});

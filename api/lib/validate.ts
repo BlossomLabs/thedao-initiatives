@@ -109,7 +109,9 @@ export async function validateForumUrl(
 ): Promise<[string, null] | [null, string]> {
   const s = String(raw ?? "").trim();
   if (!s) return [null, "A discussion link is required."];
-  if (s.length > 500) return [null, "Link is too long."];
+  if (s.length > LIMITS.LINK_CHARS) {
+    return [null, tooLong("The discussion link", LIMITS.LINK_CHARS)];
+  }
   let u: URL;
   try {
     u = new URL(s);
@@ -166,7 +168,7 @@ export function validateHttpsLink(raw: unknown): [string, null] | [null, string]
 
 export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const TX_HASH_RE = /^0x[0-9a-f]{64}$/;
-export const NICK_RE = /^[A-Za-z0-9 ._-]{1,40}$/;
+export { NICK_RE } from "../../shared/profile.ts";
 export const DOMAIN_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 export const PRESET_RE = /^preset:[0-9]$/;
 

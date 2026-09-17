@@ -429,3 +429,14 @@ Deno.test("names: .eth is only allowed as the poster's own ENS name", async () =
   );
   h.close();
 });
+
+Deno.test("comments: a name past its cap is refused as too long, never cut", async () => {
+  const { h, post } = await setup();
+  const res = await post(undefined, { name: "N".repeat(61) });
+  assertEquals(res.status, 400);
+  assertStringIncludes(
+    String((await j(res)).error),
+    "The name is too long (60 characters at most)",
+  );
+  h.close();
+});

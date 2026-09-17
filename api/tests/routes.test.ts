@@ -14,6 +14,7 @@ import {
 import { DONOR, SIGNERS, transferLog, wallet } from "./helpers.ts";
 import { grantBody, minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
 import { MAX_TITLE, TOKENS } from "../config.ts";
+import { LIMITS } from "../../shared/draft/mod.ts";
 import { predictSafeAddress } from "../chain/safe.ts";
 
 const USDC = TOKENS.USDC[0];
@@ -1065,5 +1066,24 @@ Deno.test("DISABLE_RATE_LIMITS=true: the submit limit stops counting", async () 
     });
     assertEquals(res.status, 201, await res.text());
   }
+  h.close();
+});
+
+Deno.test("submit: a discussion link past the form's cap is too long, not silently accepted", async () => {
+  const h = await harness();
+  const token = await proposerToken(h);
+  const res = await h.req("/api/initiatives", {
+    method: "POST",
+    token,
+    json: {
+      ...minimalSubmission(25000),
+      discourseUrl: "https://forum.example.org/t/" + "a".repeat(LIMITS.LINK_CHARS),
+    },
+  });
+  assertEquals(res.status, 400);
+  assertStringIncludes(
+    String((await j(res)).error),
+    "The discussion link is too long (300 characters at most)",
+  );
   h.close();
 });

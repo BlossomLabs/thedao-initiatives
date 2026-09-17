@@ -4,7 +4,7 @@
  */
 import { Input } from "~/components/ui/Field";
 import { cn } from "~/lib/utils";
-import { type DraftType, LIMITS } from "@shared/draft/mod";
+import { type DraftType, inputMax, LIMITS } from "@shared/draft/mod";
 import FormField from "./FormField";
 import type { Draft } from "./types";
 import type { DraftActions } from "./useDraft";
@@ -79,7 +79,7 @@ export default function TypePicker(
               className="mt-3.5 first:mt-3.5"
             >
               <Input
-                maxLength={LIMITS.REVIEWER_CHARS + 1}
+                maxLength={inputMax(LIMITS.REVIEWER_CHARS)}
                 value={draft.milestoneReviewer}
                 disabled={locked}
                 onChange={(e) => actions.setReviewer(e.target.value)}

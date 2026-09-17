@@ -1,5 +1,6 @@
 import { bodyKey } from "./body-key.ts";
 import {
+  inputMax,
   isStructured,
   LIMITS,
   normaliseStructured,
@@ -99,4 +100,12 @@ test("body key normalises whitespace and case and includes milestones", () => {
   }]);
   expect(k1).toBe(k2);
   expect(bodyKey({}, [])).toBe("");
+});
+
+test("inputMax leaves room for a whole emoji past the cap, so the checks can report it", () => {
+  // 71 emoji are 142 UTF-16 units: over the 140 cap by one character. A
+  // maxLength of cap+1 would make the browser drop the 71st in silence.
+  const title = "🔥".repeat(LIMITS.TITLE_CHARS / 2 + 1);
+  expect(title.length).toBeLessThanOrEqual(inputMax(LIMITS.TITLE_CHARS));
+  expect(title.length).toBeGreaterThan(LIMITS.TITLE_CHARS);
 });

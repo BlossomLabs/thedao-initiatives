@@ -56,6 +56,8 @@ export interface CheckInput {
     duration: string;
     recipient: string;
     recipientUrl?: string;
+    /** Submit only; the server validates the host too. */
+    discourseUrl?: string;
     funders: string;
     contact: string;
     /** Top-up only. */
@@ -131,6 +133,9 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
     if (over(page.recipient, LIMITS.RECIPIENT_CHARS)) {
       cap("recipient_team", tooLong("The recipient team", LIMITS.RECIPIENT_CHARS));
     }
+    if (over(page.discourseUrl, LIMITS.LINK_CHARS)) {
+      cap("discourse_url", tooLong("The discussion link", LIMITS.LINK_CHARS));
+    }
     if (over(page.reviewer, LIMITS.REVIEWER_CHARS)) {
       cap("milestone_reviewer", tooLong("The reviewer", LIMITS.REVIEWER_CHARS));
     }
@@ -172,7 +177,8 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
           "Name the organization that committed this amount, or remove the row.",
         );
       }
-      const who = b.org || "Backer " + (i + 1);
+      // An organisation name that is itself over its cap makes no label.
+      const who = b.org && !over(b.org, LIMITS.BACKER_ORG) ? b.org : "Backer " + (i + 1);
       if (over(b.url, LIMITS.LINK_CHARS)) {
         cap(`bk_url_${i}`, tooLong(`${who}: the link`, LIMITS.LINK_CHARS));
       } else if ((b.url ?? "").trim() && !isHttpsUrl(b.url)) {
@@ -279,7 +285,11 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
   }
 
   links.forEach((l, i) => {
-    if (!isHttpsUrl(l)) err(`links_${i}`, `Link ${i + 1} must be an https URL: ${l.slice(0, 60)}`);
+    if (l.length > LIMITS.LINK_CHARS) {
+      cap(`links_${i}`, tooLong(`Link ${i + 1}`, LIMITS.LINK_CHARS));
+    } else if (!isHttpsUrl(l)) {
+      err(`links_${i}`, `Link ${i + 1} must be an https URL: ${l.slice(0, 60)}`);
+    }
   });
   if (links.length > LIMITS.LINKS) err("links", `At most ${LIMITS.LINKS} links.`);
 

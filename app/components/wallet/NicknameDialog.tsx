@@ -8,6 +8,8 @@ import { prepareAvatar } from "~/lib/avatar-image";
 import { useSession } from "~/context/session";
 import { useIdentity } from "~/hooks/use-identity";
 import { cn } from "~/lib/utils";
+import { NICKNAME_MAX } from "@shared/profile";
+import { inputMax, tooLong } from "@shared/draft/mod";
 
 const ENS_APP = "https://app.ens.domains";
 
@@ -75,11 +77,15 @@ export default function NicknameDialog({
 
   async function submit() {
     if (!address) return;
+    const trimmed = name.trim();
+    if (!nameLocked && trimmed.length > NICKNAME_MAX) {
+      setError(tooLong("The name", NICKNAME_MAX));
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       await requireSession();
-      const trimmed = name.trim();
       if (!nameLocked && trimmed && trimmed !== identity.nickname) {
         await api("/api/nickname", { json: { nickname: trimmed } });
       }
@@ -134,7 +140,7 @@ export default function NicknameDialog({
           <input
             className="field rounded-xl px-[13px] py-[11px]"
             value={name}
-            maxLength={40}
+            maxLength={inputMax(NICKNAME_MAX)}
             placeholder="Your name"
             onChange={(e) => setName(e.target.value)}
             autoFocus

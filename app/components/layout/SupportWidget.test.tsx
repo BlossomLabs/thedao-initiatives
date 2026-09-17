@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { SUPPORT_MESSAGE_MAX } from "@shared/support";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SupportWidget, { SupportPanel } from "./SupportWidget";
 
@@ -123,5 +124,20 @@ describe("SupportPanel", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("hello");
+  });
+});
+
+describe("SupportWidget message cap", () => {
+  it("names an over-long message under the box and will not send it", () => {
+    const dialog = openPicker();
+    fireEvent.click(within(dialog).getByRole("button", { name: /problem/i }));
+    const box = within(dialog).getByLabelText("Message");
+    // jsdom does not enforce maxLength: this is the paste that lands past the cap
+    fireEvent.change(box, { target: { value: "m".repeat(SUPPORT_MESSAGE_MAX + 1) } });
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "The message is too long (4,000 characters at most).",
+    );
+    expect(within(dialog).getByRole("button", { name: /send/i })).toBeDisabled();
+    expect(box).toHaveAttribute("maxlength", String(SUPPORT_MESSAGE_MAX + 2));
   });
 });

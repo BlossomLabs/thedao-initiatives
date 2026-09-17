@@ -4,7 +4,7 @@
  */
 import { useEffect, useMemo, useRef } from "react";
 import { ImagePlus } from "lucide-react";
-import { LIMITS, parseAmount, usd } from "@shared/draft/mod";
+import { inputMax, LIMITS, parseAmount, usd } from "@shared/draft/mod";
 import { Button } from "~/components/ui/Button";
 import BackerLogo from "~/components/ui/BackerLogo";
 import { Input } from "~/components/ui/Field";
@@ -58,7 +58,7 @@ export default function BackerRow(
       <div className="grid grid-cols-[1fr_200px] gap-x-4 max-[640px]:grid-cols-1">
         <FormField field={`bk_org_${idx}`} label="Organization" className="mt-3.5 first:mt-3.5">
           <Input
-            maxLength={LIMITS.BACKER_ORG + 1}
+            maxLength={inputMax(LIMITS.BACKER_ORG)}
             placeholder="Who committed the money"
             value={b.org}
             disabled={disabled}
@@ -85,7 +85,7 @@ export default function BackerRow(
         <Input
           type="url"
           placeholder="https://"
-          maxLength={LIMITS.BACKER_URL + 1}
+          maxLength={inputMax(LIMITS.BACKER_URL)}
           value={b.url}
           disabled={disabled}
           onChange={(e) => actions.setBacker(b.id, { url: e.target.value })}

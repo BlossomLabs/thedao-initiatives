@@ -4,7 +4,6 @@ import { commentJson, ipfsUrl, publicRfp } from "../lib/json.ts";
 import { liveRoles } from "../services/roles.ts";
 import type { Rfp } from "../db/types.ts";
 import { SAFE_OWNER_COUNT, SAFE_THRESHOLD } from "../config.ts";
-import { onrampLink } from "../lib/onramp.ts";
 import type { FundingSummary } from "../services/funding.ts";
 import { chainStateFresh } from "../chain/mod.ts";
 import { activeTokens } from "../chain/tokens.ts";
@@ -20,7 +19,6 @@ export interface Card {
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
-  onramp: { url: string; prefilled: boolean };
 }
 
 export const pctOf = (total: number, goal: number): number =>
@@ -68,7 +66,6 @@ export async function buildCard(
       .map((p) => ({ company: p.company, logoUrl: ipfsUrl(deps.config, p.logoCid), url: p.url })),
     funded: Boolean(r.goalUsd && summary.total >= r.goalUsd),
     donationsEnabled: Boolean(tokensOk && r.safeAddress && r.status === "approved"),
-    onramp: r.safeAddress ? onrampLink(deps.config, r.safeAddress) : { url: "", prefilled: false },
   };
 }
 
@@ -120,7 +117,6 @@ export function boardRoutes(deps: Deps) {
         chainDetail: state.detail,
         uploads: deps.pinata.enabled,
         support: Boolean(config.supportUrl),
-        onramp: Boolean(config.onrampApiKey),
         walletConnectProjectId: config.walletConnectProjectId,
         safeThreshold: SAFE_THRESHOLD,
         safeOwnerCount: SAFE_OWNER_COUNT,

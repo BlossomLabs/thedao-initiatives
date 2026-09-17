@@ -113,11 +113,6 @@ export interface LedgerStatus {
   updating?: boolean;
 }
 
-export interface Onramp {
-  url: string;
-  prefilled: boolean;
-}
-
 export interface Card {
   initiative: Initiative;
   summary: Summary;
@@ -128,7 +123,6 @@ export interface Card {
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
-  onramp?: Onramp;
 }
 
 export interface CommentEntry {
@@ -161,7 +155,6 @@ export interface BoardFlags {
   uploads: boolean;
   /** SUPPORT_URL is set: the floating Support button may show. */
   support: boolean;
-  onramp: boolean;
   walletConnectProjectId: string;
   safeThreshold: number;
   safeOwnerCount: number;
@@ -214,7 +207,6 @@ export interface InitiativePage {
   donations: Donation[];
   funded: boolean;
   donationsEnabled: boolean;
-  onramp: Onramp;
   ledger: LedgerStatus | null;
 }
 

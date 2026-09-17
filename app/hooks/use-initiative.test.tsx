@@ -44,7 +44,6 @@ const page = (refreshDue: boolean, count = 1, updating = false): InitiativePage 
   pct: 1,
   funded: false,
   donationsEnabled: true,
-  onramp: { url: "", prefilled: false },
   ledger: { checkedAt: 1_800_000_000, ok: true, intervalMinutes: 10, refreshDue, updating },
 });
 function deferred<T>() {

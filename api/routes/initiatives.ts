@@ -15,7 +15,6 @@ import {
 } from "../lib/json.ts";
 import { cleanText, validateForumUrl } from "../lib/validate.ts";
 import { pctOf } from "./board.ts";
-import { onrampLink } from "../lib/onramp.ts";
 import {
   MAX_FUNDERS,
   REVISIONS_PER_HOUR_PER_ADDRESS,
@@ -46,7 +45,6 @@ import {
   parseAmount,
 } from "../../shared/draft/mod.ts";
 
-export { onrampLink };
 export const decimalsOf = (sym: string): number | undefined => TOKENS[sym]?.[1];
 
 /** Stored pledges as the backers the rules read (withdrawn ones do not count). */
@@ -170,7 +168,6 @@ export function initiativeRoutes(deps: Deps) {
         Object.keys(activeTokens(chainState.tokens)).length && rfp.safeAddress &&
           rfp.status === "approved",
       ),
-      onramp: rfp.safeAddress ? onrampLink(config, rfp.safeAddress) : { url: "", prefilled: false },
       ledger,
     });
   });

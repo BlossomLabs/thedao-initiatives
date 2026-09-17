@@ -29,7 +29,6 @@ function fromBoard(board: Board | undefined, slug: string): InitiativePage | und
     pct: card.pct,
     funded: card.funded,
     donationsEnabled: card.donationsEnabled,
-    onramp: card.onramp ?? { url: "", prefilled: false },
     revisions: [],
     pledges: [],
     donations: [],

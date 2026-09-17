@@ -812,9 +812,7 @@ Deno.test("ai-search: mocked provider, unknown ids dropped, cache, disabled", as
 });
 
 Deno.test("submit: discussion links are stored without fetching; title is required", async () => {
-  const h = await harness({
-    env: { ONRAMP_API_KEY: "tk" },
-  });
+  const h = await harness();
   const good = minimalSubmission(1000);
   const token = await proposerToken(h);
   const res = await h.req("/api/initiatives", {
@@ -845,20 +843,6 @@ Deno.test("submit: discussion links are stored without fetching; title is requir
   });
   assertEquals(badHost.status, 400);
   assertEquals(h.fetchLog, []);
-  // board cards carry the card-checkout template once a Safe exists
-  const admin = await h.mint(ADMIN, true);
-  const id = (await h.db.rfps.bySlug(slug))!.id;
-  const safe = await deploySafe(h, admin, id);
-  await h.req(`/api/admin/initiatives/${id}/status`, {
-    method: "POST",
-    token: admin,
-    json: { action: "approve" },
-  });
-  const card = ((await j(await h.req("/api/board"))).cards as {
-    onramp: { url: string; prefilled: boolean };
-  }[])[0];
-  assert(card.onramp.prefilled);
-  assertStringIncludes(card.onramp.url, "walletAddress=" + safe);
   h.close();
 });
 

@@ -28,7 +28,7 @@ import {
   useDisconnect,
   useSignMessage,
 } from "wagmi";
-import { getConnection } from "wagmi/actions";
+import { getConnection, switchChain } from "wagmi/actions";
 import { createSiweMessage } from "viem/siwe";
 import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "~/lib/api";
@@ -209,6 +209,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           statement: "Sign in to TheDAO Security Fund",
           issuedAt: new Date(),
         });
+        // The message says chain 1 and the API verifies it there (EIP-1271 for
+        // smart accounts), so the wallet must be on Ethereum before it signs.
+        // Ambire keeps a chain per site and refuses personal_sign (EIP-1193
+        // 4901) while that chain is not one of its enabled networks; a switch
+        // request is what resets it.
+        const onChain = signingConnector
+          ? await signingConnector.getChainId()
+          : getConnection(config).chainId;
+        if (onChain !== 1) await switchChain(config, { chainId: 1, connector: signingConnector });
         const signature = await signMessageAsync({ message, account, connector: signingConnector });
         // cookie: true -> the token comes back as an HttpOnly cookie, not in the body.
         const s = await api<SessionInfo>("/api/auth/verify", {
@@ -230,7 +239,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       };
       return promise;
     },
-    [address, connector, signMessageAsync, refreshMe],
+    [address, connector, config, signMessageAsync, refreshMe],
   );
 
   const signOut = useCallback(async () => {

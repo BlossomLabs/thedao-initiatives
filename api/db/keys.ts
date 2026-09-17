@@ -26,6 +26,8 @@ export const K = {
   sessionsByAddr: (addr: string, tokenHash: string) =>
     ["sessions_by_addr", addr.toLowerCase(), tokenHash] as const,
   sessionsOf: (addr: string) => ["sessions_by_addr", addr.toLowerCase()] as const,
+  sessionRevocation: (addr: string) => ["session_revocation", addr.toLowerCase()] as const,
+  globalSessionRevocation: ["session_revocation_global"] as const,
   rl: (bucket: string, windowStart: number) => ["rl", bucket, windowStart] as const,
   /** Receipt of a logo upload: who pinned this CID (expires after a day). */
   upload: (cid: string) => ["upload", cid] as const,
@@ -35,8 +37,29 @@ export const K = {
   safeBalances: (safe: string) => ["safe_balances", safe.toLowerCase()] as const,
   lock: (name: string) => ["lock", name] as const,
   meta: (key: string) => ["meta", key] as const,
-  /** One immutable donation-terms acceptance per donation, keyed by its tx hash. */
+  checkboxSession: (hash: string) => ["checkbox_session", hash] as const,
+  checkboxAcceptance: (id: string) => ["checkbox_acceptance", id] as const,
+  donationAssociation: (id: string) => ["donation_association", id] as const,
+  pendingAssociation: (initiativeId: string, id: string) =>
+    ["pending_association", initiativeId, id] as const,
+  /** Legacy tx-wide claim, migrated only when scoped verified evidence is recorded. */
   termsAcceptance: (txHash: string) => ["terms_accept", txHash.toLowerCase()] as const,
+  verifiedTermsAcceptance: (
+    chainId: number,
+    txHash: string,
+    initiativeId: string,
+    recipient: string,
+  ) =>
+    [
+      "terms_verified",
+      chainId,
+      txHash.toLowerCase(),
+      initiativeId,
+      recipient.toLowerCase(),
+    ] as const,
+  termsHistory: (txHash: string) => ["terms_accept_history", txHash.toLowerCase()] as const,
+  termsCorrection: (txHash: string, versionstamp: string) =>
+    ["terms_accept_history", txHash.toLowerCase(), versionstamp] as const,
 };
 
 export async function collect<T>(iter: Deno.KvListIterator<T>): Promise<T[]> {

@@ -12,6 +12,7 @@
  */
 import {
   createContext,
+  Fragment,
   useCallback,
   useContext,
   useEffect,
@@ -31,14 +32,21 @@ import {
 import { getConnection, switchChain } from "wagmi/actions";
 import { createSiweMessage } from "viem/siwe";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  clearPrivateQueries,
+  deletePrivateDraft,
+  flushPrivateDrafts,
+  hasPrivateDraft,
+  preserveLegacyDraft,
+} from "~/lib/browser-privacy";
 import { api, ApiError } from "~/lib/api";
 import type { Me, SessionInfo } from "~/lib/api-types";
 import { migrateLegacySession, SESSION_KEY as KEY } from "~/lib/session-migration";
+import DraftLogoutDialog, { type DraftLogoutChoice } from "~/components/wallet/DraftLogoutDialog";
 
-/** Identifies a sign-in (a new one gets a new expiry), for effects and query
- * keys that must react to "someone else is signed in now". */
+/** Viewer and authorization scope. Credential renewal preserves this viewer's UI. */
 export const sessionKey = (s: SessionInfo | null | undefined): string | null =>
-  s ? `${s.address.toLowerCase()}:${s.expiresAt}` : null;
+  s ? `${s.address.toLowerCase()}:${s.isAdmin}` : null;
 
 /** Dev-only fake wallet: it cannot sign, so it connects without a session. */
 const skipsSignIn = (c: Connector | undefined) => c?.id === "mock";
@@ -63,6 +71,16 @@ function save(s: SessionInfo | null) {
   } catch { /* private mode */ }
 }
 
+/** An expired identity is only a draft-owner hint, never an authenticated session. */
+function storedWallet(): string | undefined {
+  try {
+    const address = JSON.parse(localStorage.getItem(KEY) || "null")?.address;
+    return typeof address === "string" ? address.toLowerCase() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 interface SessionCtx {
   session: SessionInfo | null;
   me: Me | null;
@@ -75,8 +93,10 @@ interface SessionCtx {
    * the wallet connected for a retry, without granting a session. */
   connect(connector: Connector): Promise<void>;
   signIn(account?: `0x${string}`): Promise<SessionInfo>;
-  /** Ends the session and disconnects the wallet. */
-  signOut(): Promise<void>;
+  /** Ask about an unfinished draft before logout; false means the user cancelled. */
+  signOut(beforeLogout?: () => Promise<void>): Promise<boolean>;
+  /** End this session for a wallet switch, retaining every wallet's draft. */
+  switchWallet(): Promise<void>;
   /** Session for the connected wallet, signing in first if needed. */
   requireSession(): Promise<SessionInfo>;
   refreshMe(): Promise<void>;
@@ -89,6 +109,7 @@ const noop = () => () => {};
 const useHydrated = () => useSyncExternalStore(noop, () => true, () => false);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
+  const qc = useQueryClient();
   const config = useConfig();
   const { address, status, connector } = useAccount();
   const { connectAsync } = useConnect();
@@ -115,15 +136,32 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       promise: Promise<SessionInfo>;
     } | null
   >(null);
+  const authGeneration = useRef(0);
   const sessionRef = useRef(stored);
   sessionRef.current = stored;
+  const legacyDraftOwner = useRef(storedWallet());
+  const [logoutPrompt, setLogoutPrompt] = useState<
+    {
+      wallet: string;
+      resolve: (choice: DraftLogoutChoice) => void;
+    } | null
+  >(null);
+  const pendingLogout = useRef<Promise<boolean> | null>(null);
 
-  const clear = useCallback(() => {
+  const clear = useCallback((rememberExpiredIdentity = false) => {
+    const previous = sessionRef.current;
+    flushPrivateDrafts();
+    if (legacyDraftOwner.current) preserveLegacyDraft(legacyDraftOwner.current);
+    authGeneration.current++;
     sessionRef.current = null;
+    clearPrivateQueries(qc);
     setSession(null);
     setMe(null);
-    save(null);
-  }, []);
+    // An expired identity is a recovery hint; retained drafts are always wallet-scoped.
+    save(
+      rememberExpiredIdentity && previous ? { ...previous, isAdmin: false, expiresAt: 0 } : null,
+    );
+  }, [qc]);
   // Forget the session here and end it on the API too (clearing the cookie),
   // so a browser whose wallet moved on does not keep acting as the old address.
   const drop = useCallback(() => {
@@ -138,18 +176,41 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const m = await api<Me>("/api/auth/me");
+      const m = await api<Me>("/api/auth/me", { passive: true });
+      if (sessionRef.current !== s) return;
+      if (m.address.toLowerCase() !== s.address.toLowerCase()) {
+        clear();
+        return;
+      }
+      if (legacyDraftOwner.current === s.address.toLowerCase()) preserveLegacyDraft(s.address);
       setMe(m);
-      // The admin flag follows the API's current admin list, not sign-in time.
+      // The API may remove privileges; newly granted privileges need another sign-in.
       if (m.isAdmin !== s.isAdmin && sessionKey(sessionRef.current) === sessionKey(s)) {
         const next = { ...s, isAdmin: m.isAdmin };
+        clearPrivateQueries(qc);
+        sessionRef.current = next;
         setSession(next);
         save(next);
       }
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) clear();
+      if (sessionRef.current === s && e instanceof ApiError && e.status === 401) clear(true);
     }
-  }, [clear]);
+  }, [clear, qc]);
+
+  // Notice remote revocation/role changes without keeping an idle session alive.
+  useEffect(() => {
+    const check = () => {
+      if (document.visibilityState !== "hidden") void refreshMe();
+    };
+    const timer = setInterval(check, 60_000);
+    globalThis.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      clearInterval(timer);
+      globalThis.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [refreshMe]);
 
   // Validate the stored session once; drop it when the wallet moves. wagmi
   // (ssr mode) mounts as "disconnected" and only then reconnects, so a
@@ -157,10 +218,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // A record from before the cookie (it still carries the bearer) is first
   // exchanged for the cookie, so nobody signed in at the switch is signed out;
   // queries that already ran without the cookie are then refetched.
-  const qc = useQueryClient();
   useEffect(() => {
+    let active = true;
+    const original = sessionRef.current;
     void (async () => {
       const r = await migrateLegacySession(localStorage);
+      if (!active || sessionRef.current !== original) return;
       if (r.kind === "migrated") {
         sessionRef.current = r.session;
         setSession(r.session);
@@ -168,7 +231,28 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       } else if (r.kind === "cleared") clear();
       await refreshMe();
     })();
+    return () => {
+      active = false;
+    };
   }, [refreshMe, clear, qc]);
+
+  useEffect(() => {
+    const changed = (e: StorageEvent) => {
+      if (e.key !== KEY && e.key !== null) return;
+      // A different tab changed the shared cookie. Drop this tab's private state first.
+      authGeneration.current++;
+      clearPrivateQueries(qc);
+      const next = load();
+      flushPrivateDrafts();
+      if (legacyDraftOwner.current) preserveLegacyDraft(legacyDraftOwner.current);
+      sessionRef.current = next;
+      setSession(next);
+      setMe(null);
+      void refreshMe();
+    };
+    globalThis.addEventListener("storage", changed);
+    return () => globalThis.removeEventListener("storage", changed);
+  }, [qc, refreshMe]);
   const walletLive = useRef(false);
   useEffect(() => {
     if (status !== "disconnected") walletLive.current = true;
@@ -197,6 +281,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         return Promise.reject(new Error("Finish the pending wallet sign-in first."));
       }
       setSigningIn(true);
+      const generation = authGeneration.current;
+      const stillActive = () => {
+        if (generation !== authGeneration.current) throw new Error("Sign-in was cancelled.");
+      };
       const promise = Promise.resolve().then(async () => {
         const { nonce } = await api<{ nonce: string }>("/api/auth/nonce");
         const message = createSiweMessage({
@@ -219,10 +307,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           : getConnection(config).chainId;
         if (onChain !== 1) await switchChain(config, { chainId: 1, connector: signingConnector });
         const signature = await signMessageAsync({ message, account, connector: signingConnector });
+        stillActive();
         // cookie: true -> the token comes back as an HttpOnly cookie, not in the body.
         const s = await api<SessionInfo>("/api/auth/verify", {
           json: { message, signature, cookie: true },
         });
+        stillActive();
+        if (
+          sessionRef.current?.address.toLowerCase() !== s.address.toLowerCase() ||
+          sessionRef.current?.isAdmin !== s.isAdmin
+        ) clearPrivateQueries(qc);
+        flushPrivateDrafts();
+        if (legacyDraftOwner.current) preserveLegacyDraft(legacyDraftOwner.current);
         setSession(s);
         save(s);
         sessionRef.current = s;
@@ -239,21 +335,55 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       };
       return promise;
     },
-    [address, connector, config, signMessageAsync, refreshMe],
+    [address, connector, config, signMessageAsync, refreshMe, qc],
   );
 
-  const signOut = useCallback(async () => {
+  const endSession = useCallback(async () => {
     const s = sessionRef.current;
+    clear(); // Clear locally immediately, even if logout is slow or offline.
     if (s) {
       try {
         await api("/api/auth/logout", { method: "POST" });
       } catch { /* already gone */ }
     }
-    clear();
     try {
       await disconnectAsync();
     } catch { /* not connected */ }
   }, [clear, disconnectAsync]);
+
+  const chooseLogout = useCallback((choice: DraftLogoutChoice) => {
+    logoutPrompt?.resolve(choice);
+    setLogoutPrompt(null);
+  }, [logoutPrompt]);
+
+  useEffect(() => {
+    if (logoutPrompt && logoutPrompt.wallet !== session?.address.toLowerCase()) {
+      chooseLogout("cancel");
+    }
+  }, [session?.address, logoutPrompt, chooseLogout]);
+
+  const signOut = useCallback((beforeLogout?: () => Promise<void>): Promise<boolean> => {
+    if (pendingLogout.current) return pendingLogout.current;
+    const generation = authGeneration.current;
+    const wallet = sessionRef.current?.address.toLowerCase();
+    flushPrivateDrafts();
+    if (legacyDraftOwner.current) preserveLegacyDraft(legacyDraftOwner.current);
+    const promise = Promise.resolve().then(async () => {
+      const choice = wallet && hasPrivateDraft(wallet)
+        ? await new Promise<DraftLogoutChoice>((resolve) => setLogoutPrompt({ wallet, resolve }))
+        : "keep";
+      if (choice === "cancel" || generation !== authGeneration.current) return false;
+      await beforeLogout?.();
+      if (generation !== authGeneration.current) return false;
+      if (choice === "delete" && wallet) deletePrivateDraft(wallet);
+      await endSession();
+      return true;
+    }).finally(() => {
+      pendingLogout.current = null;
+    });
+    pendingLogout.current = promise;
+    return promise;
+  }, [endSession]);
 
   const connect = useCallback((c: Connector): Promise<void> => {
     const active = connectingRef.current;
@@ -304,6 +434,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       connect,
       signIn,
       signOut,
+      switchWallet: endSession,
       requireSession,
       refreshMe,
     }),
@@ -316,11 +447,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       connect,
       signIn,
       signOut,
+      endSession,
       requireSession,
       refreshMe,
     ],
   );
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      <Fragment key={session ? session.address.toLowerCase() : "anonymous"}>
+        {children}
+      </Fragment>
+      <DraftLogoutDialog open={Boolean(logoutPrompt)} onChoose={chooseLogout} />
+    </Ctx.Provider>
+  );
 }
 
 export function useSession(): SessionCtx {

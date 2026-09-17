@@ -3,4 +3,4 @@
 import { createServer } from "./bootstrap.ts";
 
 const { app, config } = await createServer();
-Deno.serve({ port: config.port }, app.fetch);
+Deno.serve({ port: config.port }, (req, info) => app.fetch(req, info));

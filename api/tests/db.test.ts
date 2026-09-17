@@ -327,10 +327,13 @@ Deno.test("sessions + nonces: single-use nonce, expiry, revoke all", async () =>
   const { token: t2 } = await db.sessions.create(addr, true);
   assertEquals((await db.sessions.get(token))?.address, addr);
   assert((await db.sessions.get(t2))?.isAdmin);
-  clock += 13 * 3600;
+  for (let i = 0; i < 26; i++) {
+    clock += 1800;
+    assert(await db.sessions.get(token));
+  }
   assertEquals(await db.sessions.get(t2), null); // admin sessions last 12h
   assert(await db.sessions.get(token));
-  assertEquals(await db.sessions.revokeAll(addr), 2);
+  assertEquals(await db.sessions.revokeAll(addr), 1);
   assertEquals(await db.sessions.get(token), null);
   kv.close();
 });

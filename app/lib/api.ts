@@ -21,10 +21,15 @@ export interface ApiOptions {
   json?: unknown;
   form?: FormData;
   signal?: AbortSignal;
+  /** Background refreshes authenticate without extending session inactivity. */
+  passive?: boolean;
+  /** Public reads after local logout must not reuse a cookie left by an offline logout. */
+  anonymous?: boolean;
 }
 
 export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const headers = new Headers();
+  if (opts.passive) headers.set("X-Session-Activity", "passive");
   let body: BodyInit | undefined;
   if (opts.json !== undefined) {
     headers.set("Content-Type", "application/json");
@@ -36,7 +41,7 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     body,
     // "include" rather than the default "same-origin" so a build pointed at a
     // remote VITE_API_URL still sends the session cookie.
-    credentials: "include",
+    credentials: opts.anonymous ? "omit" : "include",
     signal: opts.signal,
   });
   const text = await res.text();

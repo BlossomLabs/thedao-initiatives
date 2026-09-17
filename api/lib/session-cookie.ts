@@ -14,10 +14,6 @@
  * sides, setting and reading, derive the name from the same request, so the
  * two never mix.
  */
-import type { Config } from "../config.ts";
-
-export type CookieConfig = Pick<Config, "trustProxy">;
-
 export const SECURE_SESSION_COOKIE = "__Host-session";
 export const PLAIN_SESSION_COOKIE = "session";
 
@@ -30,44 +26,36 @@ export function readCookie(header: string | null, name: string): string {
   return "";
 }
 
-/** Whether the client reached us over HTTPS (through the proxy when trusted). */
-export function isSecureRequest(req: Request, config: CookieConfig): boolean {
-  let proto = new URL(req.url).protocol.replace(/:$/, "");
-  if (config.trustProxy) {
-    const fwd = req.headers.get("x-forwarded-proto")?.split(",")[0].trim();
-    if (fwd === "http" || fwd === "https") proto = fwd;
-  }
-  return proto === "https";
+/** Deno supplies the public request scheme; forwarding headers are ignored. */
+export function isSecureRequest(req: Request): boolean {
+  return new URL(req.url).protocol === "https:";
 }
 
-export function sessionCookieName(req: Request, config: CookieConfig): string {
-  return isSecureRequest(req, config) ? SECURE_SESSION_COOKIE : PLAIN_SESSION_COOKIE;
+export function sessionCookieName(req: Request): string {
+  return isSecureRequest(req) ? SECURE_SESSION_COOKIE : PLAIN_SESSION_COOKIE;
 }
 
-function attrs(req: Request, config: CookieConfig, maxAge: number): string {
-  const secure = isSecureRequest(req, config);
+function attrs(req: Request, maxAge: number): string {
+  const secure = isSecureRequest(req);
   return `Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax` + (secure ? "; Secure" : "");
 }
 
 /** `Set-Cookie` value carrying the session token for `ttlSecs`. */
 export function setSessionCookie(
   req: Request,
-  config: CookieConfig,
   token: string,
   ttlSecs: number,
 ): string {
   // Max-Age is an integer; the clock (Date.now()/1000) is not.
-  return `${sessionCookieName(req, config)}=${token}; ${
-    attrs(req, config, Math.max(0, Math.floor(ttlSecs)))
-  }`;
+  return `${sessionCookieName(req)}=${token}; ${attrs(req, Math.max(0, Math.floor(ttlSecs)))}`;
 }
 
 /** `Set-Cookie` value that removes the session cookie. */
-export function clearSessionCookie(req: Request, config: CookieConfig): string {
-  return `${sessionCookieName(req, config)}=; ${attrs(req, config, 0)}`;
+export function clearSessionCookie(req: Request): string {
+  return `${sessionCookieName(req)}=; ${attrs(req, 0)}`;
 }
 
 /** The session token from the cookie, "" when the request carries none. */
-export function readSessionCookie(req: Request, config: CookieConfig): string {
-  return readCookie(req.headers.get("cookie"), sessionCookieName(req, config));
+export function readSessionCookie(req: Request): string {
+  return readCookie(req.headers.get("cookie"), sessionCookieName(req));
 }

@@ -1,9 +1,11 @@
 import { type Context, Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { auditContext, auditedItem, recordAudit } from "../services/audit.ts";
 import { INITIATIVE_CHANGED } from "../lib/initiative-identity.ts";
-import { jsonBody, s } from "../lib/body.ts";
-import { requireAdmin } from "../middleware/auth.ts";
+import { assertFields, formBody, jsonBody, s } from "../lib/body.ts";
+import { assertRecentAuth, requireAdmin, requireRecentAuth } from "../middleware/auth.ts";
+import { clearSessionCookie } from "../lib/session-cookie.ts";
 import {
   adminCommentJson,
   adminRfp,
@@ -18,11 +20,12 @@ import {
   DOMAIN_RE,
   parseGoal,
   TX_HASH_RE,
+  validateHttpsLink,
   validateText,
 } from "../lib/validate.ts";
 import { decimalsOf, editChecks, pledgeBackers } from "./initiatives.ts";
-import { readPageFacts } from "../lib/page-facts.ts";
-import { assertNoErrors, mergeFindings, readStructured } from "../lib/structured.ts";
+import { PAGE_FACT_FIELDS, readPageFacts } from "../lib/page-facts.ts";
+import { assertNoErrors, mergeFindings, readStructured, TEXT_FIELDS } from "../lib/structured.ts";
 import { pickText, type RfpText } from "../db/rfps.ts";
 import { type Findings, isStructured, LIMITS } from "../../shared/draft/mod.ts";
 import { predictSafeAddress, safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
@@ -34,7 +37,6 @@ import type { AdminEntry } from "../services/admins.ts";
 import type { Comment, Pledge, PledgeStatus, Rfp } from "../db/types.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
 
-const TEXT_KEYS = ["title", "summary", "details", "sections", "milestones", "links"];
 /** Findings that block an admin save: shape rules, not editorial ones. Every
  * cap finding blocks too (the limits are the same for everyone). */
 const HARD_FIELD_RE = /^(links(_\d+)?|ms_\d+_(link|month))$/;
@@ -44,6 +46,28 @@ export function adminRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const { db, config, chain, ens } = deps;
   r.use("*", requireAdmin);
+
+  r.post("/sessions/revoke", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["address"]);
+    const address = s(body.address, 60);
+    if (!isAddress(address)) throw new HttpError(400, "that is not an Ethereum address");
+    auditContext(c, { target: address });
+    const revoked = await db.sessions.revokeAll(address);
+    if (address.toLowerCase() === c.var.user!.address.toLowerCase()) {
+      c.header("Set-Cookie", clearSessionCookie(c.req.raw));
+    }
+    return c.json({ ok: true, revoked });
+  });
+
+  r.post("/sessions/revoke-all", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["confirmation"]);
+    if (body.confirmation !== "revoke all sessions") {
+      throw new HttpError(400, "Confirm global revocation with: revoke all sessions");
+    }
+    await db.sessions.revokeGlobal();
+    c.header("Set-Cookie", clearSessionCookie(c.req.raw));
+    return c.json({ ok: true });
+  });
 
   /** Admin routes address an initiative by slug (the URL) or by id (older links). */
   const rfpOr404 = async (idOrSlug: string, mutation = false): Promise<Rfp> => {
@@ -112,12 +136,30 @@ export function adminRoutes(deps: Deps) {
   const adminsJson = (admins: AdminEntry[], c: Context<Vars>) =>
     c.json({ admins, you: c.var.user!.address });
   r.get("/admins", async (c) => adminsJson(await deps.admins.list(), c));
-  r.post("/admins", async (c) => {
-    const body = await jsonBody(c);
-    return adminsJson(await deps.admins.add(s(body.address, 60)), c);
+  r.post("/admins", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["address"]);
+    const address = s(body.address, 60);
+    auditContext(c, { target: address });
+    const admins = await deps.admins.add(address);
+    recordAudit(deps, c, {
+      action: "session.admin_revoke",
+      targetKind: "wallet",
+      target: address,
+      outcome: "success",
+    });
+    return adminsJson(admins, c);
   });
-  r.delete("/admins/:address", async (c) => {
-    return adminsJson(await deps.admins.remove(c.req.param("address"), c.var.user!.address), c);
+  r.delete("/admins/:address", requireRecentAuth(deps.now), async (c) => {
+    await jsonBody(c, []);
+    const address = c.req.param("address");
+    const admins = await deps.admins.remove(address, c.var.user!.address);
+    recordAudit(deps, c, {
+      action: "session.admin_revoke",
+      targetKind: "wallet",
+      target: address,
+      outcome: "success",
+    });
+    return adminsJson(admins, c);
   });
 
   r.get("/initiatives/:id", async (c) => {
@@ -141,15 +183,22 @@ export function adminRoutes(deps: Deps) {
 
   /**
    * The admin editor. Page facts go through `readPageFacts`; the text
-   * (title, summary, and the structured body or the legacy details) is
+   * (title, summary, and the structured body) is
    * revisioned together, fields not sent carrying over from the row. Shape
-   * rules block (caps, https links, month format, byte cap, structured XOR
-   * details); the editorial rules (required sections, sums, adoption) come
+   * rules block (caps, https links, month format, byte cap);
+   * the editorial rules (required sections, sums, adoption) come
    * back as `findings` for the form to show without blocking.
    */
   r.patch("/initiatives/:id", async (c) => {
     const rfp = await rfpOr404(c.req.param("id"), true);
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, [
+      ...TEXT_FIELDS,
+      ...PAGE_FACT_FIELDS,
+      "sortRank",
+      "paidOutUsd",
+      "proposer",
+    ]);
+    if (body.paidOutUsd !== undefined || body.proposer !== undefined) assertRecentAuth(c, deps.now);
     const patch = await readPageFacts(body, rfp, deps);
     if (body.sortRank !== undefined) {
       const raw = s(body.sortRank, 10);
@@ -171,13 +220,6 @@ export function adminRoutes(deps: Deps) {
       }
       patch.paidOutUsd = Math.round(n * 100) / 100;
     }
-    // A Safe binds only through safe-confirm (verified on-chain); this can only unbind one.
-    if (body.safeAddress !== undefined) {
-      if (s(body.safeAddress, 64)) {
-        throw new HttpError(400, "A Safe is bound by deploying it; send blank to detach.");
-      }
-      patch.safeAddress = "";
-    }
     // Owner: the wallet shown publicly as "Proposed by". Address or ENS name; blank clears.
     if (body.proposer !== undefined) {
       const raw = s(body.proposer, 100);
@@ -192,43 +234,42 @@ export function adminRoutes(deps: Deps) {
     }
     const nextType = patch.type ?? rfp.type;
     const cur = pickText(rfp);
-    const textGiven = TEXT_KEYS.some((k) => body[k] !== undefined);
+    const textGiven = TEXT_FIELDS.some((k) => body[k] !== undefined);
     // A type switch re-normalises a structured body: other-type sections go.
     const reshape = nextType !== rfp.type && isStructured(cur);
     let text: RfpText | null = null;
     let findings: Findings = { errors: [], warnings: [] };
     if (textGiven || reshape) {
+      if (
+        !isStructured(cur) &&
+        !["sections", "milestones", "links"].some((key) => body[key] !== undefined)
+      ) throw new HttpError(400, "Send sections, milestones and links to edit initiative text.");
       // One character past each cap survives so the checks paint "too long"
       // on the field; the length floors are validateText's, below.
       const base = textGiven
         ? {
           title: cleanText(body.title === undefined ? cur.title : body.title, "title"),
           summary: cleanText(body.summary === undefined ? cur.summary : body.summary, "summary"),
-          details: cleanText(body.details === undefined ? cur.details : body.details, "details"),
+          details: "",
         }
-        : { title: cur.title, summary: cur.summary, details: cur.details };
+        : { title: cur.title, summary: cur.summary, details: "" };
       const { structured, findings: caps } = readStructured({
         sections: body.sections === undefined ? cur.sections : body.sections,
         milestones: body.milestones === undefined ? cur.milestones : body.milestones,
         links: body.links === undefined ? cur.links : body.links,
       }, nextType);
-      if (isStructured(structured)) {
-        // Sending sections to a legacy row migrates it; sending both is a mistake.
-        if (body.details === undefined) base.details = "";
-        if (base.details) throw new HttpError(400, "Send either details or sections, not both.");
-        const checks = editChecks(
-          {
-            type: nextType,
-            topup: patch.topup ?? rfp.topup,
-            goalUsd: patch.goalUsd ?? rfp.goalUsd,
-          },
-          { ...base, ...structured },
-          pledgeBackers(await db.pledges.list(rfp.id)),
-        );
-        const hard = checks.errors.filter(blocks);
-        assertNoErrors(mergeFindings(caps, { errors: hard, warnings: [] }));
-        findings = mergeFindings(caps, checks);
-      } else assertNoErrors(caps);
+      const checks = editChecks(
+        {
+          type: nextType,
+          topup: patch.topup ?? rfp.topup,
+          goalUsd: patch.goalUsd ?? rfp.goalUsd,
+        },
+        { ...base, ...structured },
+        pledgeBackers(await db.pledges.list(rfp.id)),
+      );
+      const hard = checks.errors.filter(blocks);
+      assertNoErrors(mergeFindings(caps, { errors: hard, warnings: [] }));
+      findings = mergeFindings(caps, checks);
       if (textGiven) validateText(base);
       text = { ...base, ...structured };
     }
@@ -246,7 +287,8 @@ export function adminRoutes(deps: Deps) {
   r.post("/initiatives/:id/revisions/:n", async (c) => {
     const rfp = await rfpOr404(c.req.param("id"), true);
     const n = Number(c.req.param("n"));
-    const action = s((await jsonBody(c)).action, 20);
+    const action = s((await jsonBody(c, ["action"])).action, 20);
+    auditContext(c, { target: `${rfp.id}:${n}`, detail: action });
     if (action !== "archive" && action !== "unarchive") throw new HttpError(400, "bad action");
     if (action === "archive" && n === rfp.revision) {
       throw new HttpError(
@@ -267,7 +309,7 @@ export function adminRoutes(deps: Deps) {
     allowed: Record<string, unknown>,
   ): { ids: string[]; action: string } {
     const action = s(body.action, 20);
-    if (!(action in allowed)) throw new HttpError(400, "bad action");
+    if (!Object.hasOwn(allowed, action)) throw new HttpError(400, "bad action");
     const raw = Array.isArray(body.ids) ? body.ids : [];
     const ids = [...new Set(raw.map((v) => s(v, 40)).filter(Boolean))];
     if (!ids.length) throw new HttpError(400, "Select at least one row.");
@@ -282,8 +324,8 @@ export function adminRoutes(deps: Deps) {
     unarchive: "approved",
   };
   async function applyStatus(rfp: Rfp, action: string): Promise<Rfp> {
+    if (!Object.hasOwn(STATUS_ACTIONS, action)) throw new HttpError(400, "bad action");
     const status = STATUS_ACTIONS[action];
-    if (!status) throw new HttpError(400, "bad action");
     if (status !== "approved") return await db.rfps.update(rfp.id, { status });
     // Deploy first, approve second: a live initiative always has its Safe.
     if (!rfp.safeAddress) {
@@ -292,29 +334,39 @@ export function adminRoutes(deps: Deps) {
     return await db.rfps.unarchive(rfp.id);
   }
 
-  r.post("/initiatives/:id/status", async (c) => {
+  r.post("/initiatives/:id/status", requireRecentAuth(deps.now), async (c) => {
     const rfp = await rfpOr404(c.req.param("id"), true);
-    const action = s((await jsonBody(c)).action, 20);
+    const action = s((await jsonBody(c, ["action"])).action, 20);
+    auditContext(c, { target: rfp.id, detail: action });
     return c.json({ initiative: adminRfp(await applyStatus(rfp, action)) });
   });
 
   /** The same status change on many initiatives at once. Each id is applied
    * on its own; the response lists what failed so the rest still lands. */
-  r.post("/initiatives/bulk", async (c) => {
-    const body = await jsonBody(c);
+  r.post("/initiatives/bulk", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["ids", "action"]);
     const { ids, action } = readBulk(body, STATUS_ACTIONS);
+    auditContext(c, { detail: action });
     const failed: { id: string; error: string }[] = [];
     let done = 0;
     for (const id of ids) {
       try {
-        const rfp = await db.rfps.get(id);
-        if (!rfp) throw new HttpError(404, "not found");
-        await applyStatus(rfp, action);
+        await auditedItem(deps, c, {
+          action: "initiative.status",
+          targetKind: "initiative",
+          target: id,
+          detail: action,
+        }, async () => {
+          const rfp = await db.rfps.get(id);
+          if (!rfp) throw new HttpError(404, "not found");
+          await applyStatus(rfp, action);
+        });
         done++;
       } catch (e) {
         failed.push({ id, error: e instanceof Error ? e.message : "failed" });
       }
     }
+    auditContext(c, { outcome: failed.length ? done ? "partial" : "failure" : "success" });
     return c.json({ done, failed });
   });
 
@@ -328,42 +380,43 @@ export function adminRoutes(deps: Deps) {
     const ct = c.req.header("content-type") ?? "";
     let fields: Record<string, unknown> = {};
     let logoCid: string | undefined;
+    let logo: FormDataEntryValue | null = null;
+    const allowed = ["company", "amount", "url", "note", "status"];
     if (ct.startsWith("multipart/form-data")) {
-      const form = await c.req.formData();
+      const form = await formBody(c, [...allowed, "logo"]);
       for (const [k, v] of form.entries()) if (typeof v === "string") fields[k] = v;
-      const logo = form.get("logo");
-      if (logo instanceof File && logo.size) {
-        if (logo.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
-        const [cid, err] = await deps.pinata.uploadImage(
-          new Uint8Array(await logo.arrayBuffer()),
-          LOGO_MAX_BYTES,
-          "logo-" + rfp.slug,
-        );
-        if (!cid) throw new HttpError(400, err ?? "upload failed");
-        logoCid = cid;
-      }
-    } else fields = await jsonBody(c);
-    if (logoCid === undefined && typeof fields.logoCid === "string") {
-      logoCid = s(fields.logoCid, 100);
-    }
+      logo = form.get("logo");
+    } else fields = await jsonBody(c, allowed);
     const patch: Partial<Pick<Pledge, "company" | "amountUsd" | "url" | "note" | "logoCid">> = {};
     // Past a cap is refused with the message, never cut.
     if (fields.company !== undefined) {
       patch.company = capped(fields.company, LIMITS.BACKER_ORG, "The company name");
       if (!patch.company) throw new HttpError(400, "Company name is required.");
     }
-    const rawAmount = fields.amountUsd ?? fields.amount;
+    const rawAmount = fields.amount;
     if (rawAmount !== undefined && rawAmount !== "") {
       const [amount, err] = parseGoal(rawAmount);
       if (err) throw new HttpError(400, err);
       patch.amountUsd = amount!;
     }
     if (fields.url !== undefined) {
-      const url = capped(fields.url, LIMITS.BACKER_URL, "The link");
-      patch.url = /^https?:\/\//i.test(url) ? url : ""; // reject javascript:/data: and other schemes
+      const [url, err] = validateHttpsLink(fields.url);
+      if (err) throw new HttpError(400, err);
+      patch.url = url!;
     }
     if (fields.note !== undefined) {
       patch.note = capped(fields.note, PLEDGE_NOTE_CHARS, "The note");
+    }
+    // Validate fields before uploading anything to the external provider.
+    if (logo instanceof File && logo.size) {
+      if (logo.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
+      const [cid, err] = await deps.pinata.uploadImage(
+        new Uint8Array(await logo.arrayBuffer()),
+        LOGO_MAX_BYTES,
+        "logo-" + rfp.slug,
+      );
+      if (!cid) throw new HttpError(400, err ?? "upload failed");
+      logoCid = cid;
     }
     if (logoCid !== undefined) patch.logoCid = logoCid;
     const status = typeof fields.status === "string" ? s(fields.status, 20) : undefined;
@@ -405,6 +458,7 @@ export function adminRoutes(deps: Deps) {
   });
 
   r.delete("/initiatives/:id/pledges/:pid", async (c) => {
+    await jsonBody(c, []);
     const rfp = await rfpOr404(c.req.param("id"), true);
     await db.pledges.remove(rfp.id, c.req.param("pid"));
     return c.json({ ok: true });
@@ -412,7 +466,7 @@ export function adminRoutes(deps: Deps) {
 
   r.post("/initiatives/:id/donations/recheck", async (c) => {
     const rfp = await rfpOr404(c.req.param("id"), true);
-    const tx = s((await jsonBody(c)).txHash, 80).toLowerCase();
+    const tx = s((await jsonBody(c, ["txHash"])).txHash, 80).toLowerCase();
     if (!TX_HASH_RE.test(tx)) throw new HttpError(400, "malformed tx hash");
     if (!rfp.safeAddress || !Object.keys(await chain.activeTokens()).length) {
       throw new HttpError(503, "chain unavailable or no Safe");
@@ -423,6 +477,7 @@ export function adminRoutes(deps: Deps) {
   });
 
   r.post("/initiatives/:id/sync-donations", async (c) => {
+    await jsonBody(c, []);
     const rfp = await rfpOr404(c.req.param("id"), true);
     if (!rfp.safeAddress) throw new HttpError(400, "no Safe deployed");
     if (!(await db.rateLimit("safesync:" + rfp.id, 1, 60))) {
@@ -461,7 +516,8 @@ export function adminRoutes(deps: Deps) {
    * until the Safe is there. What is there must pass the on-chain check
    * (owners, threshold, canonical proxy) and be unbound elsewhere.
    */
-  r.post("/initiatives/:id/safe-confirm", async (c) => {
+  r.post("/initiatives/:id/safe-confirm", requireRecentAuth(deps.now), async (c) => {
+    await jsonBody(c, []);
     const rfp = await rfpOr404(c.req.param("id"), true);
     if (rfp.safeAddress) {
       return c.json({ status: "ok", address: rfp.safeAddress, detail: "verified earlier" });
@@ -473,6 +529,7 @@ export function adminRoutes(deps: Deps) {
       rfp.safeDeploymentKey ?? rfp.slug,
     );
     if (!(await chain.hasCode(address))) {
+      auditContext(c, { outcome: "pending" });
       return c.json({ status: "pending", detail: `no Safe at ${address} yet` });
     }
     const [good, detail] = await chain.verifySafe(address, config.operationalSigners);
@@ -493,14 +550,13 @@ export function adminRoutes(deps: Deps) {
   /** The patch a moderation action makes on a comment, or a 400/409. */
   async function commentPatch(row: Comment, action: string): Promise<Partial<Comment>> {
     if (
-      ["accept", "review", "feature", "feature-front"].includes(action) &&
+      ["review", "feature", "feature-front"].includes(action) &&
       (row.parentId || row.status !== "published")
     ) {
       throw new HttpError(400, "only a published top-level entry");
     }
     if (action === "publish") return { status: "published" };
     if (action === "discard") return { status: "discarded" };
-    if (action === "accept" && row.type === "suggestion") return { accepted: true, reviewed: true };
     if (action === "review" && row.type === "suggestion") return { reviewed: true };
     if (action === "feature") return { featured: 1, featuredAt: deps.now() };
     if (action === "feature-front") {
@@ -526,24 +582,35 @@ export function adminRoutes(deps: Deps) {
   };
 
   r.post("/comments/bulk", async (c) => {
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["ids", "action"]);
     const { ids, action } = readBulk(body, BULK_COMMENT_ACTIONS);
+    auditContext(c, { detail: action });
     const failed: { id: string; error: string }[] = [];
     let done = 0;
     for (const id of ids) {
       try {
-        const row = await db.comments.get(id);
-        if (!row) throw new HttpError(404, "not found");
-        await db.comments.set(row.id, await commentPatch(row, action));
+        await auditedItem(deps, c, {
+          action: "comment.moderate",
+          targetKind: "comment",
+          target: id,
+          detail: action,
+        }, async () => {
+          const row = await db.comments.get(id);
+          if (!row) throw new HttpError(404, "not found");
+          await db.comments.set(row.id, await commentPatch(row, action));
+        });
         done++;
       } catch (e) {
         failed.push({ id, error: e instanceof Error ? e.message : "failed" });
       }
     }
+    auditContext(c, { outcome: failed.length ? done ? "partial" : "failure" : "success" });
     return c.json({ done, failed });
   });
 
   r.post("/comments/:id/:action", async (c) => {
+    await jsonBody(c, []);
+    auditContext(c, { detail: c.req.param("action") });
     const row = await db.comments.get(c.req.param("id"));
     if (!row) throw new HttpError(404, "not found");
     const next = await db.comments.set(row.id, await commentPatch(row, c.req.param("action")));
@@ -580,16 +647,18 @@ export function adminRoutes(deps: Deps) {
    */
   r.post("/logos", async (c) => {
     if (!deps.pinata.enabled) throw new HttpError(503, "Uploads are not enabled.");
-    const form = await c.req.formData().catch(() => null);
-    const name = s(form?.get("name"), 100).toLowerCase();
+    const form = await formBody(c, ["name", "image"]);
+    const name = s(form.get("name"), 100).toLowerCase();
     if (!LOGO_NAME_RE.test(name)) {
       throw new HttpError(400, "Logo names are lowercase file names: png, jpg or webp.");
     }
-    const image = form?.get("image");
+    auditContext(c, { target: name });
+    const image = form.get("image");
     if (!(image instanceof File) || !image.size) throw new HttpError(400, "Send the image file.");
     if (image.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
     const bytes = new Uint8Array(await image.arrayBuffer());
-    const sha256 = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+    // Legacy pins were not decoded. Only reuse pins produced by this normalization policy.
+    const sha256 = "raster-v1:" + [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
       .map((b) => b.toString(16).padStart(2, "0")).join("");
     const have = await db.logos.get(name);
     if (have && have.sha256 === sha256) {
@@ -602,16 +671,30 @@ export function adminRoutes(deps: Deps) {
   });
 
   /** Push-based content sync: the repo's content/rfps/*.md, sent by scripts/sync-content.ts. */
-  r.post("/sync-content", async (c) => {
-    const body = await jsonBody(c);
+  r.post("/sync-content", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["files"]);
     const files = Array.isArray(body.files) ? body.files : [];
+    files.forEach((file, i) => {
+      if (file && typeof file === "object") assertFields(file, ["name", "text"], `files[${i}].`);
+    });
     const clean = files
       .filter((f): f is { name: string; text: string } =>
         f && typeof f === "object" && typeof f.name === "string" &&
         typeof f.text === "string"
       )
       .map((f) => ({ name: f.name.slice(0, 200), text: f.text.slice(0, 200_000) }));
-    return c.json(await syncContent(db, clean));
+    const result = await syncContent(
+      db,
+      clean,
+      (name, run) =>
+        auditedItem(deps, c, { action: "content.item", targetKind: "content", target: name }, run),
+    );
+    auditContext(c, {
+      outcome: result.errors.length
+        ? result.created + result.updated ? "partial" : "failure"
+        : "success",
+    });
+    return c.json(result);
   });
 
   return r;

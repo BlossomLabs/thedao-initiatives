@@ -225,7 +225,7 @@ function GuideCard({ glow }: { glow: boolean }) {
 
 export default function Submit() {
   const navigate = useNavigate();
-  const { requireSession } = useSession();
+  const { requireSession, session } = useSession();
   const submitter = useSubmitter();
   const settings = useSiteSettings();
   const uploads = settings.data?.uploads ?? true;
@@ -270,6 +270,7 @@ export default function Submit() {
       >
         <InitiativeForm
           mode="submit"
+          autosaveKey={session ? `thedao:submit-draft:${session.address.toLowerCase()}` : null}
           onSubmit={onSubmit}
           submitLabel="Submit for review"
           uploads={uploads}

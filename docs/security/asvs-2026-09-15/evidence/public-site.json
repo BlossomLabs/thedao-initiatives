@@ -1,0 +1,678 @@
+{
+  "records": [
+    {
+      "at": "2026-09-15T20:56:00.210783+00:00",
+      "url": "https://initiatives.thedao.fund/",
+      "method": "GET",
+      "request_headers": {},
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "cache-control": "no-cache",
+        "content-security-policy": "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'sha256-KRViAyI9JF3pGoBCEGs0uvHO3iiDKb2/qPY4sVbiSNA=' 'sha256-a9BFc6lCjVxiDgZrOQeZOz3pxKbiuFqGfNSp2s9aw1c=' 'sha256-wDD4BBKGvyI2/JKrurnHOtgPehFBZ4uytOIXvyvQZq0=' 'sha256-duhaxWNI+6QAukUMmlYrkl97X+e0pxobkwS+TpY5/CQ=' 'sha256-RBZNiG3Ztb26Xi/69+VRecU4BPhrfxcvspLXMRrrCNE=' 'sha256-dNy0y48tFd3Ueh+izbVssQPVSHSkZce1VpirT2wc1j4=' 'sha256-tcdtdShcG1MCFbiCzu48gBk0dJmif5vYpwsr2tZRe6w=' 'sha256-PLG+KQa7bwJeW5pbIg7AQ3N8afw68FXOohALKiyG14o=' 'sha256-7mu4H06fwDCjmnxxr/xNHyuQC6pLTHr4M2E4jXw5WZs=' 'sha256-QAlSewaQLi/NPCznjAZSyvQ72heD0VdxmNDDkZeCxgc=' 'sha256-p7GE78bbMHDrE4IWzpiMSttAsTpUu7wwi5/wvnH54Os=' 'sha256-ot4uWMULOgQERJVeW+1RS4LiQazeh9VYa+IzbwCX43U=' 'sha256-n4myEP4rd+TJ7Qpk9+Xxv+6aAKKAPyYdv2i7F3tQmk0=' 'sha256-kyaKBybsHvqmdq5RcfhCZ+crfD0hW2GQeUy0Bp1fWNg=' 'sha256-jxpmuzEyvVmGf1uu3rLnVb++ac4Q0kh49VFIlwUf6Q0=' 'sha256-yvvbS9zsoL1R+t3TN+nkX+DmORiDf+s8TdUpUpE8ouU=' 'sha256-kFwaHbtj/ilkuwWVI8dQ+lqS/tSqKBTHvoFmrC3YuQI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src https://*.privy.io https://verify.walletconnect.com https://verify.walletconnect.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "content-type": "text/html; charset=UTF-8",
+        "etag": "W/\"40e3-H4z6s2Z7hiS1qdD7v5wqLT9md9+\"",
+        "last-modified": "Tue, 15 Sep 2026 20:42:38 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "server": "deployd",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-length": "16611",
+        "date": "Tue, 15 Sep 2026 20:56:00 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=bypass; detail=no-cache-or-private",
+        "x-deno-trace-id": "72cf5dd749f1427af43cd6cd00b4cfd9",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net"
+      },
+      "body_bytes_sampled": 16611,
+      "body_sha256": "b75ecf32ec59b05ccd21e217f60f98e94983564cfef099f1d3fcb19a1e22f89a"
+    },
+    {
+      "at": "2026-09-15T20:56:00.391385+00:00",
+      "url": "https://initiatives.thedao.fund/admin",
+      "method": "GET",
+      "request_headers": {},
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "cache-control": "no-cache",
+        "content-security-policy": "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'sha256-KRViAyI9JF3pGoBCEGs0uvHO3iiDKb2/qPY4sVbiSNA=' 'sha256-a9BFc6lCjVxiDgZrOQeZOz3pxKbiuFqGfNSp2s9aw1c=' 'sha256-wDD4BBKGvyI2/JKrurnHOtgPehFBZ4uytOIXvyvQZq0=' 'sha256-duhaxWNI+6QAukUMmlYrkl97X+e0pxobkwS+TpY5/CQ=' 'sha256-RBZNiG3Ztb26Xi/69+VRecU4BPhrfxcvspLXMRrrCNE=' 'sha256-dNy0y48tFd3Ueh+izbVssQPVSHSkZce1VpirT2wc1j4=' 'sha256-tcdtdShcG1MCFbiCzu48gBk0dJmif5vYpwsr2tZRe6w=' 'sha256-PLG+KQa7bwJeW5pbIg7AQ3N8afw68FXOohALKiyG14o=' 'sha256-7mu4H06fwDCjmnxxr/xNHyuQC6pLTHr4M2E4jXw5WZs=' 'sha256-QAlSewaQLi/NPCznjAZSyvQ72heD0VdxmNDDkZeCxgc=' 'sha256-p7GE78bbMHDrE4IWzpiMSttAsTpUu7wwi5/wvnH54Os=' 'sha256-ot4uWMULOgQERJVeW+1RS4LiQazeh9VYa+IzbwCX43U=' 'sha256-n4myEP4rd+TJ7Qpk9+Xxv+6aAKKAPyYdv2i7F3tQmk0=' 'sha256-kyaKBybsHvqmdq5RcfhCZ+crfD0hW2GQeUy0Bp1fWNg=' 'sha256-jxpmuzEyvVmGf1uu3rLnVb++ac4Q0kh49VFIlwUf6Q0=' 'sha256-yvvbS9zsoL1R+t3TN+nkX+DmORiDf+s8TdUpUpE8ouU=' 'sha256-kFwaHbtj/ilkuwWVI8dQ+lqS/tSqKBTHvoFmrC3YuQI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src https://*.privy.io https://verify.walletconnect.com https://verify.walletconnect.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "content-type": "text/html; charset=UTF-8",
+        "etag": "W/\"2be1-8JpQw6C47vi8eFtXHEbz3pqDShO\"",
+        "last-modified": "Tue, 15 Sep 2026 20:42:39 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "server": "deployd",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-length": "11233",
+        "date": "Tue, 15 Sep 2026 20:56:00 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=bypass; detail=no-cache-or-private",
+        "x-deno-trace-id": "08e080420297a163520cb0daabb3adb5",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net"
+      },
+      "body_bytes_sampled": 11233,
+      "body_sha256": "566de54fc7ad38858bd589295630e25e7db1bf1c231081b67d7dfe42f46ab168"
+    },
+    {
+      "at": "2026-09-15T20:56:00.503676+00:00",
+      "url": "https://initiatives.thedao.fund/submit",
+      "method": "GET",
+      "request_headers": {},
+      "status": 301,
+      "headers": {
+        "content-security-policy": "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'sha256-KRViAyI9JF3pGoBCEGs0uvHO3iiDKb2/qPY4sVbiSNA=' 'sha256-a9BFc6lCjVxiDgZrOQeZOz3pxKbiuFqGfNSp2s9aw1c=' 'sha256-wDD4BBKGvyI2/JKrurnHOtgPehFBZ4uytOIXvyvQZq0=' 'sha256-duhaxWNI+6QAukUMmlYrkl97X+e0pxobkwS+TpY5/CQ=' 'sha256-RBZNiG3Ztb26Xi/69+VRecU4BPhrfxcvspLXMRrrCNE=' 'sha256-dNy0y48tFd3Ueh+izbVssQPVSHSkZce1VpirT2wc1j4=' 'sha256-tcdtdShcG1MCFbiCzu48gBk0dJmif5vYpwsr2tZRe6w=' 'sha256-PLG+KQa7bwJeW5pbIg7AQ3N8afw68FXOohALKiyG14o=' 'sha256-7mu4H06fwDCjmnxxr/xNHyuQC6pLTHr4M2E4jXw5WZs=' 'sha256-QAlSewaQLi/NPCznjAZSyvQ72heD0VdxmNDDkZeCxgc=' 'sha256-p7GE78bbMHDrE4IWzpiMSttAsTpUu7wwi5/wvnH54Os=' 'sha256-ot4uWMULOgQERJVeW+1RS4LiQazeh9VYa+IzbwCX43U=' 'sha256-n4myEP4rd+TJ7Qpk9+Xxv+6aAKKAPyYdv2i7F3tQmk0=' 'sha256-kyaKBybsHvqmdq5RcfhCZ+crfD0hW2GQeUy0Bp1fWNg=' 'sha256-jxpmuzEyvVmGf1uu3rLnVb++ac4Q0kh49VFIlwUf6Q0=' 'sha256-yvvbS9zsoL1R+t3TN+nkX+DmORiDf+s8TdUpUpE8ouU=' 'sha256-kFwaHbtj/ilkuwWVI8dQ+lqS/tSqKBTHvoFmrC3YuQI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src https://*.privy.io https://verify.walletconnect.com https://verify.walletconnect.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "location": "https://initiatives.thedao.fund/submit/",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "date": "Tue, 15 Sep 2026 20:56:00 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=bypass; detail=zero-ttl",
+        "x-deno-trace-id": "9e5024a9c9cdebe4a84b4a013f49525a",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "server": "deployd",
+        "content-length": "0"
+      },
+      "body_bytes_sampled": 0,
+      "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "at": "2026-09-15T20:56:02.349038+00:00",
+      "url": "https://initiatives.thedao.fund/api/board",
+      "method": "GET",
+      "request_headers": {},
+      "status": 200,
+      "headers": {
+        "access-control-allow-credentials": "true",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "vary": "Origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "cache-control": "no-store",
+        "content-length": "198896",
+        "date": "Tue, 15 Sep 2026 20:56:02 GMT",
+        "connection": "close",
+        "age": "1",
+        "cache-status": "deno; fwd=bypass; detail=not-cacheable",
+        "x-deno-trace-id": "ef4d35c33dca640c974d00ca8e963df6",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "server": "deployd"
+      },
+      "body_bytes_sampled": 198896,
+      "body_sha256": "56e472d1d54b41f7f6386e7f4b58c3b4124139479dc7b46cc3ec869d1b83f425",
+      "json_keys": [
+        "cards",
+        "totals",
+        "community",
+        "flags"
+      ]
+    },
+    {
+      "at": "2026-09-15T20:56:02.452434+00:00",
+      "url": "https://initiatives.thedao.fund/api/auth/me",
+      "method": "GET",
+      "request_headers": {},
+      "status": 401,
+      "headers": {
+        "access-control-allow-credentials": "true",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "vary": "Origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "cache-control": "no-store",
+        "content-length": "42",
+        "date": "Tue, 15 Sep 2026 20:56:02 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=bypass; detail=not-cacheable",
+        "x-deno-trace-id": "1f79e2c3732e6cfd9be9d2a5baaa1cd9",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "server": "deployd"
+      },
+      "body_bytes_sampled": 42,
+      "body_sha256": "44cdc1ccec979dd61511850b5ad163e74a5f9a1d70b2a6faf3f0849b86700331",
+      "json_keys": [
+        "error"
+      ],
+      "response": {
+        "error": "sign in with your wallet first"
+      }
+    },
+    {
+      "at": "2026-09-15T20:56:02.581676+00:00",
+      "url": "https://initiatives.thedao.fund/api/admin/dashboard",
+      "method": "GET",
+      "request_headers": {},
+      "status": 401,
+      "headers": {
+        "access-control-allow-credentials": "true",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "vary": "Origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "cache-control": "no-store",
+        "content-length": "42",
+        "date": "Tue, 15 Sep 2026 20:56:02 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=bypass; detail=not-cacheable",
+        "x-deno-trace-id": "7edeb56f138ad03534d5d5523c8797d1",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "server": "deployd"
+      },
+      "body_bytes_sampled": 42,
+      "body_sha256": "44cdc1ccec979dd61511850b5ad163e74a5f9a1d70b2a6faf3f0849b86700331",
+      "json_keys": [
+        "error"
+      ],
+      "response": {
+        "error": "sign in with your wallet first"
+      }
+    },
+    {
+      "at": "2026-09-15T20:56:02.708053+00:00",
+      "url": "https://initiatives.thedao.fund/api/admin/leads",
+      "method": "GET",
+      "request_headers": {},
+      "status": 401,
+      "headers": {
+        "access-control-allow-credentials": "true",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "vary": "Origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "cache-control": "no-store",
+        "content-length": "42",
+        "date": "Tue, 15 Sep 2026 20:56:02 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=bypass; detail=not-cacheable",
+        "x-deno-trace-id": "846a3565e7ae3321272fd522234afc58",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "server": "deployd"
+      },
+      "body_bytes_sampled": 42,
+      "body_sha256": "44cdc1ccec979dd61511850b5ad163e74a5f9a1d70b2a6faf3f0849b86700331",
+      "json_keys": [
+        "error"
+      ],
+      "response": {
+        "error": "sign in with your wallet first"
+      }
+    },
+    {
+      "at": "2026-09-15T20:56:02.833754+00:00",
+      "url": "https://initiatives.thedao.fund/api/admin/admins",
+      "method": "GET",
+      "request_headers": {},
+      "status": 401,
+      "headers": {
+        "access-control-allow-credentials": "true",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "vary": "Origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "cache-control": "no-store",
+        "content-length": "42",
+        "date": "Tue, 15 Sep 2026 20:56:02 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=bypass; detail=not-cacheable",
+        "x-deno-trace-id": "31798ece0d9be42d97e27a17698a04aa",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "server": "deployd"
+      },
+      "body_bytes_sampled": 42,
+      "body_sha256": "44cdc1ccec979dd61511850b5ad163e74a5f9a1d70b2a6faf3f0849b86700331",
+      "json_keys": [
+        "error"
+      ],
+      "response": {
+        "error": "sign in with your wallet first"
+      }
+    },
+    {
+      "at": "2026-09-15T20:56:02.955478+00:00",
+      "url": "https://initiatives.thedao.fund/api/initiatives/mine",
+      "method": "GET",
+      "request_headers": {},
+      "status": 401,
+      "headers": {
+        "access-control-allow-credentials": "true",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "vary": "Origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "cache-control": "no-store",
+        "content-length": "42",
+        "date": "Tue, 15 Sep 2026 20:56:02 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=bypass; detail=not-cacheable",
+        "x-deno-trace-id": "790fc41752bc2c9aa754dd2e32625550",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "server": "deployd"
+      },
+      "body_bytes_sampled": 42,
+      "body_sha256": "44cdc1ccec979dd61511850b5ad163e74a5f9a1d70b2a6faf3f0849b86700331",
+      "json_keys": [
+        "error"
+      ],
+      "response": {
+        "error": "sign in with your wallet first"
+      }
+    },
+    {
+      "at": "2026-09-15T20:56:03.077578+00:00",
+      "url": "https://initiatives.thedao.fund/healthz",
+      "method": "GET",
+      "request_headers": {},
+      "status": 200,
+      "headers": {
+        "access-control-allow-credentials": "true",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "vary": "Origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "cache-control": "no-store",
+        "content-length": "129",
+        "date": "Tue, 15 Sep 2026 20:56:02 GMT",
+        "connection": "close",
+        "age": "1",
+        "cache-status": "deno; fwd=bypass; detail=not-cacheable",
+        "x-deno-trace-id": "5e0fa8d0607519a4359fdcfeef625229",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "server": "deployd"
+      },
+      "body_bytes_sampled": 129,
+      "body_sha256": "c697111872d5089925ee87ca2348897d12a17f9ddb61b70fcf293020ab727f34",
+      "json_keys": [
+        "ok",
+        "tokensOk",
+        "detail"
+      ]
+    },
+    {
+      "at": "2026-09-15T20:56:03.185739+00:00",
+      "url": "https://initiatives.thedao.fund/api/asvs-nonexistent",
+      "method": "GET",
+      "request_headers": {},
+      "status": 404,
+      "headers": {
+        "access-control-allow-credentials": "true",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "content-type": "application/json",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "vary": "Origin",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "cache-control": "no-store",
+        "content-length": "21",
+        "date": "Tue, 15 Sep 2026 20:56:03 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=bypass; detail=not-cacheable",
+        "x-deno-trace-id": "9702bb1b3a3f08b381497bced2da4098",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "server": "deployd"
+      },
+      "body_bytes_sampled": 21,
+      "body_sha256": "51d0a9e3bd9ffc25483790aaffe7a3597e642edd040dddb16aafc324e6e922ed",
+      "json_keys": [
+        "error"
+      ],
+      "response": {
+        "error": "not found"
+      }
+    },
+    {
+      "at": "2026-09-15T20:56:03.330955+00:00",
+      "url": "https://initiatives.thedao.fund/robots.txt",
+      "method": "GET",
+      "request_headers": {},
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "cache-control": "public, max-age=300",
+        "content-security-policy": "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'sha256-KRViAyI9JF3pGoBCEGs0uvHO3iiDKb2/qPY4sVbiSNA=' 'sha256-a9BFc6lCjVxiDgZrOQeZOz3pxKbiuFqGfNSp2s9aw1c=' 'sha256-wDD4BBKGvyI2/JKrurnHOtgPehFBZ4uytOIXvyvQZq0=' 'sha256-duhaxWNI+6QAukUMmlYrkl97X+e0pxobkwS+TpY5/CQ=' 'sha256-RBZNiG3Ztb26Xi/69+VRecU4BPhrfxcvspLXMRrrCNE=' 'sha256-dNy0y48tFd3Ueh+izbVssQPVSHSkZce1VpirT2wc1j4=' 'sha256-tcdtdShcG1MCFbiCzu48gBk0dJmif5vYpwsr2tZRe6w=' 'sha256-PLG+KQa7bwJeW5pbIg7AQ3N8afw68FXOohALKiyG14o=' 'sha256-7mu4H06fwDCjmnxxr/xNHyuQC6pLTHr4M2E4jXw5WZs=' 'sha256-QAlSewaQLi/NPCznjAZSyvQ72heD0VdxmNDDkZeCxgc=' 'sha256-p7GE78bbMHDrE4IWzpiMSttAsTpUu7wwi5/wvnH54Os=' 'sha256-ot4uWMULOgQERJVeW+1RS4LiQazeh9VYa+IzbwCX43U=' 'sha256-n4myEP4rd+TJ7Qpk9+Xxv+6aAKKAPyYdv2i7F3tQmk0=' 'sha256-kyaKBybsHvqmdq5RcfhCZ+crfD0hW2GQeUy0Bp1fWNg=' 'sha256-jxpmuzEyvVmGf1uu3rLnVb++ac4Q0kh49VFIlwUf6Q0=' 'sha256-yvvbS9zsoL1R+t3TN+nkX+DmORiDf+s8TdUpUpE8ouU=' 'sha256-kFwaHbtj/ilkuwWVI8dQ+lqS/tSqKBTHvoFmrC3YuQI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src https://*.privy.io https://verify.walletconnect.com https://verify.walletconnect.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "content-type": "text/plain; charset=UTF-8",
+        "etag": "W/\"41-5/yimxHQ23ogVsZAlYJSNGR2bDR\"",
+        "last-modified": "Tue, 15 Sep 2026 20:42:33 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "server": "deployd",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-length": "65",
+        "date": "Tue, 15 Sep 2026 20:56:03 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=uri-miss; stored",
+        "x-deno-trace-id": "9ac88521554136abca66d92d2d30542c",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net"
+      },
+      "body_bytes_sampled": 65,
+      "body_sha256": "42c2ae379ae688b12c741cd7a5ea6dc7abade46c6f48ddbf088fc54e41a442a9"
+    },
+    {
+      "at": "2026-09-15T20:56:03.459675+00:00",
+      "url": "https://initiatives.thedao.fund/.git/HEAD",
+      "method": "GET",
+      "request_headers": {},
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "cache-control": "no-cache",
+        "content-security-policy": "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'sha256-KRViAyI9JF3pGoBCEGs0uvHO3iiDKb2/qPY4sVbiSNA=' 'sha256-a9BFc6lCjVxiDgZrOQeZOz3pxKbiuFqGfNSp2s9aw1c=' 'sha256-wDD4BBKGvyI2/JKrurnHOtgPehFBZ4uytOIXvyvQZq0=' 'sha256-duhaxWNI+6QAukUMmlYrkl97X+e0pxobkwS+TpY5/CQ=' 'sha256-RBZNiG3Ztb26Xi/69+VRecU4BPhrfxcvspLXMRrrCNE=' 'sha256-dNy0y48tFd3Ueh+izbVssQPVSHSkZce1VpirT2wc1j4=' 'sha256-tcdtdShcG1MCFbiCzu48gBk0dJmif5vYpwsr2tZRe6w=' 'sha256-PLG+KQa7bwJeW5pbIg7AQ3N8afw68FXOohALKiyG14o=' 'sha256-7mu4H06fwDCjmnxxr/xNHyuQC6pLTHr4M2E4jXw5WZs=' 'sha256-QAlSewaQLi/NPCznjAZSyvQ72heD0VdxmNDDkZeCxgc=' 'sha256-p7GE78bbMHDrE4IWzpiMSttAsTpUu7wwi5/wvnH54Os=' 'sha256-ot4uWMULOgQERJVeW+1RS4LiQazeh9VYa+IzbwCX43U=' 'sha256-n4myEP4rd+TJ7Qpk9+Xxv+6aAKKAPyYdv2i7F3tQmk0=' 'sha256-kyaKBybsHvqmdq5RcfhCZ+crfD0hW2GQeUy0Bp1fWNg=' 'sha256-jxpmuzEyvVmGf1uu3rLnVb++ac4Q0kh49VFIlwUf6Q0=' 'sha256-yvvbS9zsoL1R+t3TN+nkX+DmORiDf+s8TdUpUpE8ouU=' 'sha256-kFwaHbtj/ilkuwWVI8dQ+lqS/tSqKBTHvoFmrC3YuQI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src https://*.privy.io https://verify.walletconnect.com https://verify.walletconnect.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "content-type": "text/html; charset=UTF-8",
+        "etag": "W/\"2be1-8JpQw6C47vi8eFtXHEbz3pqDShO\"",
+        "last-modified": "Tue, 15 Sep 2026 20:42:39 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "server": "deployd",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-length": "11233",
+        "date": "Tue, 15 Sep 2026 20:56:03 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=bypass; detail=no-cache-or-private",
+        "x-deno-trace-id": "072310f0b553af8e1ebb3cc29b1b54cf",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net"
+      },
+      "body_bytes_sampled": 11233,
+      "body_sha256": "566de54fc7ad38858bd589295630e25e7db1bf1c231081b67d7dfe42f46ab168"
+    },
+    {
+      "at": "2026-09-15T20:56:03.600423+00:00",
+      "url": "https://initiatives.thedao.fund/.env",
+      "method": "GET",
+      "request_headers": {},
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "cache-control": "no-cache",
+        "content-security-policy": "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'sha256-KRViAyI9JF3pGoBCEGs0uvHO3iiDKb2/qPY4sVbiSNA=' 'sha256-a9BFc6lCjVxiDgZrOQeZOz3pxKbiuFqGfNSp2s9aw1c=' 'sha256-wDD4BBKGvyI2/JKrurnHOtgPehFBZ4uytOIXvyvQZq0=' 'sha256-duhaxWNI+6QAukUMmlYrkl97X+e0pxobkwS+TpY5/CQ=' 'sha256-RBZNiG3Ztb26Xi/69+VRecU4BPhrfxcvspLXMRrrCNE=' 'sha256-dNy0y48tFd3Ueh+izbVssQPVSHSkZce1VpirT2wc1j4=' 'sha256-tcdtdShcG1MCFbiCzu48gBk0dJmif5vYpwsr2tZRe6w=' 'sha256-PLG+KQa7bwJeW5pbIg7AQ3N8afw68FXOohALKiyG14o=' 'sha256-7mu4H06fwDCjmnxxr/xNHyuQC6pLTHr4M2E4jXw5WZs=' 'sha256-QAlSewaQLi/NPCznjAZSyvQ72heD0VdxmNDDkZeCxgc=' 'sha256-p7GE78bbMHDrE4IWzpiMSttAsTpUu7wwi5/wvnH54Os=' 'sha256-ot4uWMULOgQERJVeW+1RS4LiQazeh9VYa+IzbwCX43U=' 'sha256-n4myEP4rd+TJ7Qpk9+Xxv+6aAKKAPyYdv2i7F3tQmk0=' 'sha256-kyaKBybsHvqmdq5RcfhCZ+crfD0hW2GQeUy0Bp1fWNg=' 'sha256-jxpmuzEyvVmGf1uu3rLnVb++ac4Q0kh49VFIlwUf6Q0=' 'sha256-yvvbS9zsoL1R+t3TN+nkX+DmORiDf+s8TdUpUpE8ouU=' 'sha256-kFwaHbtj/ilkuwWVI8dQ+lqS/tSqKBTHvoFmrC3YuQI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src https://*.privy.io https://verify.walletconnect.com https://verify.walletconnect.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "content-type": "text/html; charset=UTF-8",
+        "etag": "W/\"2be1-8JpQw6C47vi8eFtXHEbz3pqDShO\"",
+        "last-modified": "Tue, 15 Sep 2026 20:42:39 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "server": "deployd",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-length": "11233",
+        "date": "Tue, 15 Sep 2026 20:56:03 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=bypass; detail=no-cache-or-private",
+        "x-deno-trace-id": "d4ce74300adb21496e453638cb950b2a",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net"
+      },
+      "body_bytes_sampled": 11233,
+      "body_sha256": "566de54fc7ad38858bd589295630e25e7db1bf1c231081b67d7dfe42f46ab168"
+    },
+    {
+      "at": "2026-09-15T20:56:03.760386+00:00",
+      "url": "https://initiatives.thedao.fund/assets/",
+      "method": "GET",
+      "request_headers": {},
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-security-policy": "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'sha256-KRViAyI9JF3pGoBCEGs0uvHO3iiDKb2/qPY4sVbiSNA=' 'sha256-a9BFc6lCjVxiDgZrOQeZOz3pxKbiuFqGfNSp2s9aw1c=' 'sha256-wDD4BBKGvyI2/JKrurnHOtgPehFBZ4uytOIXvyvQZq0=' 'sha256-duhaxWNI+6QAukUMmlYrkl97X+e0pxobkwS+TpY5/CQ=' 'sha256-RBZNiG3Ztb26Xi/69+VRecU4BPhrfxcvspLXMRrrCNE=' 'sha256-dNy0y48tFd3Ueh+izbVssQPVSHSkZce1VpirT2wc1j4=' 'sha256-tcdtdShcG1MCFbiCzu48gBk0dJmif5vYpwsr2tZRe6w=' 'sha256-PLG+KQa7bwJeW5pbIg7AQ3N8afw68FXOohALKiyG14o=' 'sha256-7mu4H06fwDCjmnxxr/xNHyuQC6pLTHr4M2E4jXw5WZs=' 'sha256-QAlSewaQLi/NPCznjAZSyvQ72heD0VdxmNDDkZeCxgc=' 'sha256-p7GE78bbMHDrE4IWzpiMSttAsTpUu7wwi5/wvnH54Os=' 'sha256-ot4uWMULOgQERJVeW+1RS4LiQazeh9VYa+IzbwCX43U=' 'sha256-n4myEP4rd+TJ7Qpk9+Xxv+6aAKKAPyYdv2i7F3tQmk0=' 'sha256-kyaKBybsHvqmdq5RcfhCZ+crfD0hW2GQeUy0Bp1fWNg=' 'sha256-jxpmuzEyvVmGf1uu3rLnVb++ac4Q0kh49VFIlwUf6Q0=' 'sha256-yvvbS9zsoL1R+t3TN+nkX+DmORiDf+s8TdUpUpE8ouU=' 'sha256-kFwaHbtj/ilkuwWVI8dQ+lqS/tSqKBTHvoFmrC3YuQI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src https://*.privy.io https://verify.walletconnect.com https://verify.walletconnect.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "content-type": "text/html; charset=UTF-8",
+        "etag": "W/\"2be1-8JpQw6C47vi8eFtXHEbz3pqDShO\"",
+        "last-modified": "Tue, 15 Sep 2026 20:42:39 GMT",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "server": "deployd",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "content-length": "11233",
+        "date": "Tue, 15 Sep 2026 20:56:03 GMT",
+        "connection": "close",
+        "age": "0",
+        "cache-status": "deno; fwd=uri-miss; stored",
+        "x-deno-trace-id": "510ad7f2fc3b110d6f274a4cc1797fc6",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net"
+      },
+      "body_bytes_sampled": 11233,
+      "body_sha256": "566de54fc7ad38858bd589295630e25e7db1bf1c231081b67d7dfe42f46ab168"
+    },
+    {
+      "at": "2026-09-15T20:56:03.917773+00:00",
+      "url": "https://initiatives.thedao.fund/assets/manifest-b646eaa6.js",
+      "method": "GET",
+      "request_headers": {},
+      "status": 200,
+      "headers": {
+        "accept-ranges": "bytes",
+        "age": "631",
+        "cache-control": "public, max-age=31536000, immutable",
+        "content-length": "18810",
+        "content-security-policy": "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "content-security-policy-report-only": "default-src 'self'; script-src 'self' 'sha256-KRViAyI9JF3pGoBCEGs0uvHO3iiDKb2/qPY4sVbiSNA=' 'sha256-a9BFc6lCjVxiDgZrOQeZOz3pxKbiuFqGfNSp2s9aw1c=' 'sha256-wDD4BBKGvyI2/JKrurnHOtgPehFBZ4uytOIXvyvQZq0=' 'sha256-duhaxWNI+6QAukUMmlYrkl97X+e0pxobkwS+TpY5/CQ=' 'sha256-RBZNiG3Ztb26Xi/69+VRecU4BPhrfxcvspLXMRrrCNE=' 'sha256-dNy0y48tFd3Ueh+izbVssQPVSHSkZce1VpirT2wc1j4=' 'sha256-tcdtdShcG1MCFbiCzu48gBk0dJmif5vYpwsr2tZRe6w=' 'sha256-PLG+KQa7bwJeW5pbIg7AQ3N8afw68FXOohALKiyG14o=' 'sha256-7mu4H06fwDCjmnxxr/xNHyuQC6pLTHr4M2E4jXw5WZs=' 'sha256-QAlSewaQLi/NPCznjAZSyvQ72heD0VdxmNDDkZeCxgc=' 'sha256-p7GE78bbMHDrE4IWzpiMSttAsTpUu7wwi5/wvnH54Os=' 'sha256-ot4uWMULOgQERJVeW+1RS4LiQazeh9VYa+IzbwCX43U=' 'sha256-n4myEP4rd+TJ7Qpk9+Xxv+6aAKKAPyYdv2i7F3tQmk0=' 'sha256-kyaKBybsHvqmdq5RcfhCZ+crfD0hW2GQeUy0Bp1fWNg=' 'sha256-jxpmuzEyvVmGf1uu3rLnVb++ac4Q0kh49VFIlwUf6Q0=' 'sha256-yvvbS9zsoL1R+t3TN+nkX+DmORiDf+s8TdUpUpE8ouU=' 'sha256-kFwaHbtj/ilkuwWVI8dQ+lqS/tSqKBTHvoFmrC3YuQI='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src https://*.privy.io https://verify.walletconnect.com https://verify.walletconnect.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+        "content-type": "text/javascript; charset=UTF-8",
+        "date": "Tue, 15 Sep 2026 20:45:31 GMT",
+        "etag": "W/\"497a-KfM79KJ3hAMQYk2QJkzZGjh6eTX\"",
+        "last-modified": "Tue, 15 Sep 2026 20:42:36 GMT",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "server": "deployd",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "cache-status": "deno; hit",
+        "x-deno-trace-id": "e2408cdbeb1e32343a0a7379a3cc05f3",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "connection": "close"
+      },
+      "body_bytes_sampled": 18810,
+      "body_sha256": "005f398edb6d0de3bc789bc3e8980ed0511aaf0986c4d2d97e1fdbeeb34f66cd"
+    },
+    {
+      "at": "2026-09-15T20:56:04.015655+00:00",
+      "url": "https://initiatives.thedao.fund/api/auth/verify",
+      "method": "OPTIONS",
+      "request_headers": {
+        "Origin": "https://asvs.invalid",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type"
+      },
+      "status": 204,
+      "headers": {
+        "access-control-allow-credentials": "true",
+        "access-control-allow-headers": "Authorization,Content-Type",
+        "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
+        "access-control-max-age": "600",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "vary": "Origin, Access-Control-Request-Headers",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "cache-control": "no-store",
+        "date": "Tue, 15 Sep 2026 20:56:03 GMT",
+        "connection": "close",
+        "cache-status": "deno; fwd=method",
+        "x-deno-trace-id": "c826cb9ccebec8544a492f5212f80ec1",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "server": "deployd"
+      },
+      "body_bytes_sampled": 0,
+      "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "at": "2026-09-15T20:56:04.139056+00:00",
+      "url": "https://initiatives.thedao.fund/api/auth/verify",
+      "method": "OPTIONS",
+      "request_headers": {
+        "Origin": "https://initiatives.thedao.fund",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type"
+      },
+      "status": 204,
+      "headers": {
+        "access-control-allow-credentials": "true",
+        "access-control-allow-headers": "Authorization,Content-Type",
+        "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
+        "access-control-allow-origin": "https://initiatives.thedao.fund",
+        "access-control-max-age": "600",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "vary": "Origin, Access-Control-Request-Headers",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "cache-control": "no-store",
+        "date": "Tue, 15 Sep 2026 20:56:03 GMT",
+        "connection": "close",
+        "cache-status": "deno; fwd=method",
+        "x-deno-trace-id": "c400ebe3ca6f517b5ae38a64dbd0db34",
+        "via": "HTTP/1.1 ams.vultr.prod.deno-cluster.net",
+        "server": "deployd"
+      },
+      "body_bytes_sampled": 0,
+      "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "at": "2026-09-15T20:56:04.220520+00:00",
+      "url": "http://initiatives.thedao.fund/",
+      "method": "GET",
+      "request_headers": {},
+      "status": 301,
+      "headers": {
+        "location": "https://initiatives.thedao.fund/",
+        "connection": "close",
+        "content-length": "0",
+        "date": "Tue, 15 Sep 2026 20:56:04 GMT"
+      },
+      "body_bytes_sampled": 0,
+      "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "at": "2026-09-15T20:56:04.280004+00:00",
+      "url": "http://initiatives.thedao.fund/api/auth/me",
+      "method": "GET",
+      "request_headers": {},
+      "status": 301,
+      "headers": {
+        "location": "https://initiatives.thedao.fund/api/auth/me",
+        "connection": "close",
+        "content-length": "0",
+        "date": "Tue, 15 Sep 2026 20:56:04 GMT"
+      },
+      "body_bytes_sampled": 0,
+      "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "tls": [
+    {
+      "requested": "TLSv1_2",
+      "negotiated": "TLSv1.2",
+      "cipher": [
+        "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "TLSv1.2",
+        256
+      ],
+      "issuer": [
+        [
+          [
+            "countryName",
+            "US"
+          ]
+        ],
+        [
+          [
+            "organizationName",
+            "Let's Encrypt"
+          ]
+        ],
+        [
+          [
+            "commonName",
+            "YE1"
+          ]
+        ]
+      ],
+      "notAfter": "Dec 11 17:30:38 2026 GMT",
+      "subjectAltName": [
+        [
+          "DNS",
+          "initiatives.thedao.fund"
+        ]
+      ]
+    },
+    {
+      "requested": "TLSv1_3",
+      "negotiated": "TLSv1.3",
+      "cipher": [
+        "TLS_AES_256_GCM_SHA384",
+        "TLSv1.3",
+        256
+      ],
+      "issuer": [
+        [
+          [
+            "countryName",
+            "US"
+          ]
+        ],
+        [
+          [
+            "organizationName",
+            "Let's Encrypt"
+          ]
+        ],
+        [
+          [
+            "commonName",
+            "YE1"
+          ]
+        ]
+      ],
+      "notAfter": "Dec 11 17:30:38 2026 GMT",
+      "subjectAltName": [
+        [
+          "DNS",
+          "initiatives.thedao.fund"
+        ]
+      ]
+    }
+  ]
+}

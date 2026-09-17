@@ -68,7 +68,7 @@ for await (const e of Deno.readDir(dir)) {
   }
 }
 console.error(`syncing ${files.length} file(s) from ${dir} to ${apiUrl}`);
-const res = await fetch(apiUrl + "/api/admin/sync-content", {
+const send = () => fetch(apiUrl + "/api/admin/sync-content", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
@@ -77,7 +77,18 @@ const res = await fetch(apiUrl + "/api/admin/sync-content", {
   },
   body: JSON.stringify({ files }),
 });
-const body = await res.json();
+let res = await send();
+let body = await res.json();
+if (res.status === 403 && body.reauthenticate === true) {
+  const privateKey = env("ADMIN_PRIVATE_KEY");
+  if (!privateKey) {
+    console.error("Content sync needs recent authentication. Run `deno task login` and retry with the new ADMIN_TOKEN.");
+    Deno.exit(1);
+  }
+  token = (await siweLogin({ apiUrl, webOrigin, privateKey, previousToken: token })).token;
+  res = await send();
+  body = await res.json();
+}
 if (!res.ok) {
   console.error("sync failed:", res.status, body);
   Deno.exit(1);

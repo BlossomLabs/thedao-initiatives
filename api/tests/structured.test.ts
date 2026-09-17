@@ -1,3 +1,4 @@
+import { PNG } from "./image-fixtures.ts";
 /** Structured initiatives: submit, logo uploads, proposer edits and page
  * facts, the admin editor's findings. */
 import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
@@ -10,11 +11,10 @@ import {
   PLAIN,
   proposerToken,
 } from "./app-helpers.ts";
-import { exampleSubmission, grantBody, minimalSubmission } from "./fixtures.ts";
+import { exampleSubmission, grantBody, minimalSubmission, revisionBody } from "./fixtures.ts";
 import { LIMITS, SECTIONS, TOO_LONG_MSG, tooLong } from "../../shared/draft/mod.ts";
 import type { Rfp } from "../db/types.ts";
 
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const OTHER = "0x2222222222222222222222222222222222222222";
 
 type Finding = { field: string; msg: string; kind?: string };
@@ -125,7 +125,7 @@ Deno.test("submit: a missing section and a bad sum come back as findings, nothin
   assertEquals(sum.kind, "content");
   assertStringIncludes(sum.msg, "Milestone amounts total $900, the funding goal is $1,000");
   assertEquals((await h.db.rfps.list(["pending", "approved", "rejected", "archived"])).length, 0);
-  // a legacy details-only payload is a form with nothing answered
+  // Legacy text cannot be submitted instead of structured fields.
   const legacy = await submit(h, token, {
     title: good.title,
     summary: good.summary,
@@ -134,11 +134,45 @@ Deno.test("submit: a missing section and a bad sum come back as findings, nothin
     details: "## Why this matters\n\nAll of it in one blob.",
   });
   assertEquals(legacy.status, 400);
-  const lf = (await j(legacy) as unknown as Fail).findings.errors;
-  assert(fields(lf).includes("why"));
-  assert(fields(lf).includes("milestones"));
-  assert(fields(lf).includes("duration_months"));
+  assertEquals((await j(legacy)).error, "Unsupported field: details.");
   h.close();
+});
+
+Deno.test("initiative writes reject retired amount/duration aliases without partial updates", async () => {
+  const h = await harness();
+  try {
+    const token = await proposerToken(h);
+    const admin = await h.mint(ADMIN, true);
+    const good = minimalSubmission(1000);
+    for (const retired of [{ goalUsd: 2000 }, { duration: "12" }]) {
+      assertEquals((await submit(h, token, { ...good, ...retired })).status, 400);
+    }
+    assertEquals(await h.db.rfps.list(["pending"]), []);
+    const response = await submit(h, token, good);
+    assertEquals(response.status, 201);
+    const { slug } = await j(response) as { slug: string };
+    const before = (await h.db.rfps.bySlug(slug))!;
+    for (
+      const [path, t] of [
+        [`/api/initiatives/${slug}`, token],
+        [`/api/admin/initiatives/${before.id}`, admin],
+      ]
+    ) {
+      for (const retired of [{ goalUsd: 2000 }, { duration: "12" }]) {
+        assertEquals(
+          (await h.req(path, {
+            method: "PATCH",
+            token: t,
+            json: { goal: "3000", ...retired },
+          })).status,
+          400,
+        );
+        assertEquals(await h.db.rfps.get(before.id), before);
+      }
+    }
+  } finally {
+    h.close();
+  }
 });
 
 Deno.test("submit: an all-done top-up needs no adoption milestone and warns instead", async () => {
@@ -277,7 +311,7 @@ Deno.test("uploads: auth, disabled, junk, ok, rate limit; a CID someone else pin
   off.close();
 
   const h = await pinataHarness();
-  const token = await proposerToken(h);
+  let token = await proposerToken(h);
   const junk = await uploadLogo(h, token, new Uint8Array(16));
   assertEquals(junk.status, 400);
   const empty = new FormData();
@@ -296,6 +330,7 @@ Deno.test("uploads: auth, disabled, junk, ok, rate limit; a CID someone else pin
   for (let i = 0; i < 9; i++) assertEquals((await uploadLogo(h, token)).status, 200);
   assertEquals((await uploadLogo(h, token)).status, 429);
   h.clock.now += 3601;
+  token = await proposerToken(h); // refresh the session after its inactivity deadline
   assertEquals((await uploadLogo(h, token)).status, 200);
 
   // another wallet's receipt, a made-up CID, and a malformed one all fail the backer row
@@ -321,7 +356,7 @@ Deno.test("proposer edit: structured revisions, unchanged, legacy body on a stru
   const post = (json: unknown) =>
     h.req(`/api/initiatives/${slug}/revisions`, { method: "POST", token, json });
   const edited = await post({
-    ...good,
+    ...revisionBody(good),
     sections: { ...good.sections, why: "A better reason." },
     links: ["https://ref.example/"],
   });
@@ -335,7 +370,7 @@ Deno.test("proposer edit: structured revisions, unchanged, legacy body on a stru
   assertEquals(rev2.details, "");
   // the same text again, keys reordered and padded: nothing changed
   const same = await post({
-    ...good,
+    ...revisionBody(good),
     links: ["https://ref.example/"],
     sections: { hard_req: "Answered.", ...good.sections, why: "  A better reason.\n" },
     milestones: good.milestones,
@@ -343,24 +378,27 @@ Deno.test("proposer edit: structured revisions, unchanged, legacy body on a stru
   assertEquals(same.status, 400);
   assertEquals((await j(same)).error, "Nothing changed.");
   // the edit scope blocks on the text rules: a missing section, a sum off the stored goal
-  const broken = await post({ ...good, sections: { why: "Only this one." } });
+  const broken = await post({ ...revisionBody(good), sections: { why: "Only this one." } });
   assertEquals(broken.status, 400);
   const bf = (await j(broken) as unknown as Fail).findings.errors;
   assert(fields(bf).includes("in_scope"));
-  const sum = await post({ ...good, milestones: [{ ...good.milestones[0], amount: 500 }] });
+  const sum = await post({
+    ...revisionBody(good),
+    milestones: [{ ...good.milestones[0], amount: 500 }],
+  });
   assertEquals(fields((await j(sum) as unknown as Fail).findings.errors), ["goal"]);
   // a legacy body cannot downgrade a structured row
   const legacy = await post({ title: good.title, summary: good.summary, details: "One blob." });
   assertEquals(legacy.status, 400);
   assertEquals(
     (await j(legacy)).error,
-    "This initiative uses sections; send sections, milestones and links.",
+    "Unsupported field: details.",
   );
   assertEquals((await h.db.rfps.bySlug(slug))!.revision, 2);
   h.close();
 });
 
-Deno.test("proposer edit: a legacy row keeps taking details, and can be upgraded", async () => {
+Deno.test("proposer edit: legacy text stays readable but edits must migrate to sections", async () => {
   const h = await harness();
   const token = await proposerToken(h);
   const row = await h.db.rfps.insert({
@@ -374,15 +412,19 @@ Deno.test("proposer edit: a legacy row keeps taking details, and can be upgraded
   const post = (json: unknown) =>
     h.req(`/api/initiatives/${row.slug}/revisions`, { method: "POST", token, json });
   const legacy = await post({ title: row.title, summary: row.summary, details: "Newer text." });
-  assertEquals(legacy.status, 201);
-  assertEquals((await h.db.rfps.get(row.id))!.details, "Newer text.");
+  assertEquals(legacy.status, 400);
+  assertEquals(await h.db.rfps.get(row.id), row);
+  const visible = await j(await h.req(`/api/initiatives/${row.slug}`)) as Out;
+  assertEquals(visible.initiative.details, row.details);
+  assertEquals((await post({ title: row.title, summary: row.summary })).status, 400);
   const good = minimalSubmission(1000);
-  const upgraded = await post({ ...good, title: row.title, summary: row.summary });
+  const upgraded = await post({ ...revisionBody(good), title: row.title, summary: row.summary });
   assertEquals(upgraded.status, 201);
   const out = await j(upgraded) as Out;
   assertEquals(out.initiative.structured, true);
   assertEquals(out.initiative.details, "");
-  assertEquals((await h.db.rfps.get(row.id))!.revision, 3);
+  assertEquals((await h.db.rfps.get(row.id))!.revision, 2);
+  assertEquals((await h.db.revisions.get(row.id, 1))!.details, row.details);
   h.close();
 });
 
@@ -437,7 +479,7 @@ Deno.test("proposer PATCH: page facts while pending, locked after approval, admi
   h.close();
 });
 
-Deno.test("admin PATCH: findings without blocking, details XOR sections, type switch, hard rules", async () => {
+Deno.test("admin PATCH: structured findings, legacy migration, type switch, hard rules", async () => {
   const h = await harness();
   const token = await proposerToken(h);
   const admin = await h.mint(ADMIN, true);
@@ -458,10 +500,10 @@ Deno.test("admin PATCH: findings without blocking, details XOR sections, type sw
   const again = await j(await patch({ sections })) as Out;
   assertEquals(fields(again.findings!.errors), ["team"]);
   assertEquals((await h.db.rfps.get(id))!.revision, 2);
-  // both bodies at once
+  // Retired details cannot be mixed into structured writes.
   const both = await patch({ details: "A blob.", sections: good.sections });
   assertEquals(both.status, 400);
-  assertEquals((await j(both)).error, "Send either details or sections, not both.");
+  assertEquals((await j(both)).error, "Unsupported field: details.");
   // shape rules block: a non-https milestone link, a bad month, too many milestones
   const link = await patch({
     milestones: [{ ...good.milestones[0], link: "http://x.example/", month: "11/2026" }],
@@ -485,25 +527,35 @@ Deno.test("admin PATCH: findings without blocking, details XOR sections, type sw
   assert(fields(switched.findings!.errors).includes("hard_req"));
   const row = (await h.db.rfps.get(id))!;
   assertEquals([row.type, row.revision, row.recipientTeam], ["rfp", 3, ""]);
-  // a legacy row: text edits stay legacy, findings are empty
+  // A legacy row keeps its text during facts-only edits, then migrates on a structured edit.
   const legacy = await h.db.rfps.insert({
     title: "Legacy initiative",
     summary: "This summary is comfortably longer than the forty character minimum required.",
     details: "Legacy body.",
     status: "approved",
+    goalUsd: 1000,
   });
-  const lp = await j(
+  assertEquals(
     await h.req(`/api/admin/initiatives/${legacy.id}`, {
       method: "PATCH",
       token: admin,
-      json: { details: "Legacy body, edited." },
-    }),
-  ) as Out;
-  assertEquals(lp.findings, { errors: [], warnings: [] });
-  assertEquals(lp.initiative.structured, false);
-  assertEquals(lp.initiative.details, "Legacy body, edited.");
+      json: { details: "Legacy body, edited.", paidOutUsd: 99 },
+    }).then((res) => res.status),
+    400,
+  );
+  assertEquals(await h.db.rfps.get(legacy.id), legacy);
+  const legacyPatch = (json: unknown) =>
+    h.req(`/api/admin/initiatives/${legacy.id}`, { method: "PATCH", token: admin, json });
+  assertEquals((await legacyPatch({ title: "A changed title" })).status, 400);
+  const facts = await j(await legacyPatch({ paidOutUsd: 50 })) as Out;
+  assertEquals(facts.initiative.details, legacy.details);
+  assertEquals(facts.initiative.paidOutUsd, 50);
+  const lp = await j(await legacyPatch(revisionBody(minimalSubmission(1000)))) as Out;
+  assertEquals(lp.initiative.structured, true);
+  assertEquals(lp.initiative.details, "");
   const asRfp: Rfp = (await h.db.rfps.get(legacy.id))!;
   assertEquals(asRfp.revision, 2);
+  assertEquals((await h.db.revisions.get(legacy.id, 1))!.details, legacy.details);
   h.close();
 });
 
@@ -599,7 +651,7 @@ Deno.test("GET /initiative/<slug>.md: the content-file shape, public rows only, 
   await h.req(`/api/admin/initiatives/${first.id}/pledges`, {
     method: "POST",
     token: admin,
-    json: { company: "Argot Collective", amountUsd: "151000", url: "https://argot.org/" },
+    json: { company: "Argot Collective", amount: "151000", url: "https://argot.org/" },
   });
   const res = await h.req(`/initiative/${first.slug}.md`);
   assertEquals(res.status, 200);
@@ -676,7 +728,7 @@ Deno.test("content logos: pinned once by name, mapped onto the pledge by the syn
     },
   });
   const admin = await h.mint(ADMIN, true);
-  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  const png = PNG;
   const upload = (name: string, bytes: Uint8Array) => {
     const form = new FormData();
     form.set("name", name);
@@ -728,6 +780,51 @@ Deno.test("content logos: pinned once by name, mapped onto the pledge by the syn
   h.close();
 });
 
+Deno.test("admin pledges reject direct CIDs and amount aliases before changing data or uploading", async () => {
+  const h = await pinataHarness();
+  try {
+    const admin = await h.mint(ADMIN, true);
+    const rfp = await h.db.rfps.insert({ title: "Pledge fields", status: "approved" });
+    const base = `/api/admin/initiatives/${rfp.id}/pledges`;
+    const created = await h.req(base, {
+      method: "POST",
+      token: admin,
+      json: { company: "Acme", amount: "1000" },
+    });
+    assertEquals(created.status, 201);
+    const [before] = await h.db.pledges.list(rfp.id);
+    for (const [path, method] of [[base, "POST"], [`${base}/${before.id}`, "PATCH"]]) {
+      for (
+        const retired of [{ logoCid: "bafy" + "x".repeat(50) }, { logoCid: "" }, {
+          amountUsd: 2500,
+        }]
+      ) {
+        assertEquals(
+          (await h.req(path, {
+            method,
+            token: admin,
+            json: { company: "Changed", amount: "2000", ...retired },
+          })).status,
+          400,
+        );
+        const form = new FormData();
+        form.set("company", "Changed");
+        form.set("amount", "2000");
+        for (const [key, value] of Object.entries(retired)) form.set(key, String(value));
+        form.set("logo", new Blob([PNG], { type: "image/png" }), "logo.png");
+        assertEquals((await h.req(path, { method, token: admin, body: form })).status, 400);
+        assertEquals(await h.db.pledges.list(rfp.id), [before]);
+      }
+    }
+    assertEquals(
+      h.fetchLog.filter((entry) => entry.url.startsWith("https://uploads.pinata.cloud/")),
+      [],
+    );
+  } finally {
+    h.close();
+  }
+});
+
 Deno.test("pledge edit: PATCH takes the same fields as adding, including a new logo", async () => {
   const h = await harness({
     env: { PINATA_JWT: "jwt-test" },
@@ -758,27 +855,52 @@ Deno.test("pledge edit: PATCH takes the same fields as adding, including a new l
   assertEquals(edited.pledge.amountUsd, 2500);
   assertEquals(edited.pledge.url, "https://acme.example/");
   assertEquals(edited.pledge.status, "pledged");
-  // status alone still works, and a javascript: link is dropped
+  // Invalid links reject the change and preserve the existing pledge.
   await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { status: "received" } });
-  const bad = await j(
-    await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { url: "javascript:x" } }),
-  ) as { pledge: { url: string; status: string } };
-  assertEquals(bad.pledge.url, "");
-  assertEquals(bad.pledge.status, "received");
+  for (const url of ["javascript:x", "http://acme.example/", "https://", "not a URL"]) {
+    assertEquals(
+      (await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { url } })).status,
+      400,
+    );
+    assertEquals(
+      (await h.req(base, {
+        method: "POST",
+        token: admin,
+        json: { company: "Bad", amount: 1000, url },
+      })).status,
+      400,
+    );
+  }
+  const unchanged = (await h.db.pledges.get(rfp.id, pid))!;
+  assertEquals(unchanged.url, "https://acme.example/");
+  assertEquals(unchanged.status, "received");
+  assertEquals(
+    (await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { url: "" } })).status,
+    200,
+  );
+  assertEquals((await h.db.pledges.get(rfp.id, pid))?.url, "");
   // multipart with a logo re-pins and keeps the other fields
   const form = new FormData();
   form.set("note", "with logo");
   form.set(
     "image",
-    new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]) as BlobPart]),
+    new Blob([PNG as BlobPart]),
   );
   form.set(
     "logo",
-    new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]) as BlobPart], {
+    new Blob([PNG as BlobPart], {
       type: "image/png",
     }),
     "l.png",
   );
+  const unexpectedImage = await h.req(`${base}/${pid}`, {
+    method: "PATCH",
+    token: admin,
+    body: form,
+  });
+  assertEquals(unexpectedImage.status, 400);
+  assertEquals((await j(unexpectedImage)).error, "Unsupported field: image.");
+  form.delete("image");
   const withLogo = await j(
     await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, body: form }),
   ) as { pledge: { company: string; note: string; logoUrl: string } };
@@ -840,14 +962,14 @@ Deno.test("edit: a top-up measures the adoption floor against the goal minus the
   const TOO_LOW = "of the $131,000 this grant raises. Raise them to at least $43,667";
   // 45,000 is 34% of the 131,000 left to raise: an edit keeps passing
   const edited = await post({
-    ...good,
+    ...revisionBody(good),
     sections: { ...good.sections, why: "Edited." },
     milestones: ms(236_000, 45_000),
   });
   assertEquals(edited.status, 201);
   assertEquals((await j(edited) as Out).warnings, []);
   // 40,000 is 31%: refused, and the message names the base
-  const low = await post({ ...good, milestones: ms(241_000, 40_000) });
+  const low = await post({ ...revisionBody(good), milestones: ms(241_000, 40_000) });
   assertEquals(low.status, 400);
   const lowErr = (await j(low) as Fail).findings.errors.find((e) => e.field === "milestones")!;
   assertStringIncludes(lowErr.msg, TOO_LOW);
@@ -862,7 +984,7 @@ Deno.test("edit: a top-up measures the adoption floor against the goal minus the
   // a withdrawn pledge no longer counts: the whole goal is the base again
   const [pledge] = await h.db.pledges.list(id);
   await h.db.pledges.setStatus(id, pledge.id, "withdrawn");
-  const whole = await post({ ...good, milestones: ms(236_000, 45_000) });
+  const whole = await post({ ...revisionBody(good), milestones: ms(236_000, 45_000) });
   assertEquals(whole.status, 400);
   assertStringIncludes(
     (await j(whole) as Fail).findings.errors.find((e) => e.field === "milestones")!.msg,
@@ -900,7 +1022,7 @@ Deno.test("caps: a long link, an edited long title and a long pledge company are
   const edited = await h.req(`/api/initiatives/${slug}/revisions`, {
     method: "POST",
     token,
-    json: { ...good, title: "t".repeat(LIMITS.TITLE_CHARS + 1) },
+    json: { ...revisionBody(good), title: "t".repeat(LIMITS.TITLE_CHARS + 1) },
   });
   assertEquals(edited.status, 400);
   const ef = (await j(edited) as unknown as Fail).findings.errors;

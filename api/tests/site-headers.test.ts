@@ -7,9 +7,18 @@ import {
   scriptHash,
   scriptHashes,
   sitePolicy,
-  withSiteHeaders,
 } from "../lib/site-headers.ts";
+import { Hono } from "hono";
+import { securityHeaders } from "../middleware/headers.ts";
+import type { SitePolicy } from "../lib/site-headers.ts";
 import { loadConfig } from "../config.ts";
+
+async function withHeaders(response: Response, policy: SitePolicy): Promise<Response> {
+  const app = new Hono();
+  app.use("*", securityHeaders(policy));
+  app.get("/", () => response);
+  return await app.request("/");
+}
 
 const FIXTURE = `<!DOCTYPE html><html><head>
 <script>setTimeout(function(){document.body.style.visibility='visible'},4000);</script>
@@ -21,12 +30,12 @@ const FIXTURE = `<!DOCTYPE html><html><head>
 <script>setTimeout(function(){document.body.style.visibility='visible'},4000);</script>
 </body></html>`;
 
-Deno.test("site headers: every header is present and Cache-Control survives", () => {
+Deno.test("site headers: every header is present and Cache-Control survives", async () => {
   const cached = new Response("<html></html>", {
     status: 200,
     headers: { "Content-Type": "text/html", "Cache-Control": "no-cache" },
   });
-  const res = withSiteHeaders(cached, sitePolicy({ cspEnforce: false }));
+  const res = await withHeaders(cached, sitePolicy({ cspEnforce: false }));
   assertEquals(res.status, 200);
   assertEquals(res.headers.get("Cache-Control"), "no-cache");
   assertEquals(res.headers.get("Content-Type"), "text/html");
@@ -41,7 +50,7 @@ Deno.test("site headers: every header is present and Cache-Control survives", ()
   assert(res.headers.has("Content-Security-Policy"));
   assert(res.headers.has("Content-Security-Policy-Report-Only"));
   // Fallbacks and 404s get the same treatment.
-  const notFound = withSiteHeaders(
+  const notFound = await withHeaders(
     new Response("nope", { status: 404 }),
     sitePolicy({
       cspEnforce: false,
@@ -51,9 +60,9 @@ Deno.test("site headers: every header is present and Cache-Control survives", ()
   assertEquals(notFound.headers.get("X-Frame-Options"), "DENY");
 });
 
-Deno.test("site headers: report-only by default, full policy enforced with CSP_ENFORCE", () => {
+Deno.test("site headers: report-only by default, full policy enforced with CSP_ENFORCE", async () => {
   const hashes = ["'sha256-AAAA'"];
-  const reporting = withSiteHeaders(
+  const reporting = await withHeaders(
     new Response(""),
     sitePolicy({
       cspEnforce: false,
@@ -63,7 +72,7 @@ Deno.test("site headers: report-only by default, full policy enforced with CSP_E
   assertEquals(reporting.headers.get("Content-Security-Policy"), MINIMAL_CSP);
   assertEquals(reporting.headers.get("Content-Security-Policy-Report-Only"), fullCsp(hashes));
 
-  const enforcing = withSiteHeaders(
+  const enforcing = await withHeaders(
     new Response(""),
     sitePolicy({
       cspEnforce: true,
@@ -76,17 +85,19 @@ Deno.test("site headers: report-only by default, full policy enforced with CSP_E
   const full = fullCsp(hashes);
   assertStringIncludes(full, "script-src 'self' 'sha256-AAAA'");
   assertStringIncludes(full, "frame-ancestors 'none'");
-  assertStringIncludes(full, "base-uri 'self'");
+  assertStringIncludes(full, "base-uri 'none'");
   assertStringIncludes(full, "form-action 'self'");
   assertStringIncludes(full, "object-src 'none'");
   assertStringIncludes(full, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com");
-  assertStringIncludes(full, "connect-src 'self' https: wss:");
+  assertStringIncludes(full, "connect-src 'self' https://auth.privy.io");
+  assert(!full.includes(" https: "));
+  assertStringIncludes(full, "report-uri /api/csp-report");
   assertStringIncludes(MINIMAL_CSP, "frame-ancestors 'none'");
   assert(!MINIMAL_CSP.includes("script-src"));
 });
 
 Deno.test("config: CSP_ENFORCE flag", () => {
-  assertEquals(loadConfig({}).cspEnforce, false);
+  assertEquals(loadConfig({}).cspEnforce, true);
   assertEquals(loadConfig({ CSP_ENFORCE: "true" }).cspEnforce, true);
   assertEquals(loadConfig({ CSP_ENFORCE: "1" }).cspEnforce, true);
   assertEquals(loadConfig({ CSP_ENFORCE: "false" }).cspEnforce, false);
@@ -128,4 +139,27 @@ Deno.test("collectScriptHashes: walks a directory of HTML; missing directory yie
     await Deno.remove(dir, { recursive: true });
   }
   assertEquals(await collectScriptHashes(`${dir}/does-not-exist`), []);
+});
+
+Deno.test("CSP connections only accept explicit secure deployment origins", () => {
+  const p = fullCsp([], ["https://rpc.example/api/private-key", "wss://socket.example/path"]);
+  assertStringIncludes(p, "https://rpc.example");
+  assert(!p.includes("private-key"));
+  for (
+    const origin of [
+      "https:",
+      "https://*.example",
+      "http://example.com",
+      "https://a.example; script-src *",
+      "https://user:secret@example.com",
+    ]
+  ) {
+    let rejected = false;
+    try {
+      fullCsp([], [origin]);
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, origin);
+  }
 });

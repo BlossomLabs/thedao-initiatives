@@ -1,8 +1,9 @@
 /**
- * Autosave to this browser only, so a closed tab does not lose an hour of
- * work. Debounced 400 ms; logo files and upload receipts never persist.
+ * Autosave under the wallet's key for reload and browser-restart recovery.
+ * Debounced 400 ms; flushed before logout/switch/unmount. Deleted only by explicit choice.
  * Restore happens once on mount; the form shows a banner with Discard.
  */
+import { cancelDraftWrites, draftVersion, registerDraftFlusher } from "~/lib/browser-privacy";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Draft } from "./types";
 import { emptyDraft, isEmptyDraft, newId } from "./useDraft";
@@ -67,6 +68,7 @@ export function readAutosave(key = AUTOSAVE_KEY): Draft | null {
 }
 
 export function clearAutosave(key = AUTOSAVE_KEY) {
+  cancelDraftWrites(key);
   try {
     localStorage.removeItem(key);
   } catch { /* storage blocked: fine */ }
@@ -84,20 +86,32 @@ export function useAutosave(
   const restoreRef = useRef(onRestore);
   restoreRef.current = onRestore;
   const armed = useRef(false);
+  const latest = useRef(draft);
+  latest.current = draft;
+  const version = useRef(key ? draftVersion(key) : 0);
 
   useEffect(() => {
     if (!key) return;
-    const stored = readAutosave(key);
-    if (stored) {
-      restoreRef.current(stored);
-      setRestored(true);
-    }
+    const restore = () => {
+      const stored = readAutosave(key);
+      if (stored) {
+        latest.current = stored;
+        restoreRef.current(stored);
+        setRestored(true);
+      }
+    };
+    restore();
+    globalThis.addEventListener("draft-migrated", restore);
     armed.current = true;
+    return () => globalThis.removeEventListener("draft-migrated", restore);
   }, [key]);
 
   useEffect(() => {
     if (!key || !armed.current) return;
+    version.current = draftVersion(key);
+    const generation = version.current;
     const t = setTimeout(() => {
+      if (generation !== draftVersion(key)) return;
       try {
         if (isEmptyDraft(draft)) localStorage.removeItem(key);
         else localStorage.setItem(key, JSON.stringify(snapshot(draft)));
@@ -105,6 +119,28 @@ export function useAutosave(
     }, AUTOSAVE_DELAY);
     return () => clearTimeout(t);
   }, [draft, key]);
+
+  useEffect(() => {
+    if (!key) return;
+    const flush = () => {
+      if (!armed.current || version.current !== draftVersion(key)) return;
+      try {
+        const d = latest.current;
+        if (isEmptyDraft(d)) localStorage.removeItem(key);
+        else localStorage.setItem(key, JSON.stringify(snapshot(d)));
+      } catch { /* storage blocked */ }
+    };
+    const unregister = registerDraftFlusher(key, flush);
+    const changed = (event: StorageEvent) => {
+      if (event.key === key && event.newValue === null) cancelDraftWrites(key);
+    };
+    globalThis.addEventListener("storage", changed);
+    return () => {
+      flush();
+      unregister();
+      globalThis.removeEventListener("storage", changed);
+    };
+  }, [key]);
 
   const clear = useCallback(() => {
     if (key) clearAutosave(key);

@@ -1,3 +1,4 @@
+import { PNG } from "./image-fixtures.ts";
 import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
 import {
   ADMIN,
@@ -10,15 +11,15 @@ import {
   proposerToken,
   SAFE_ADDR,
   seedContentLogos,
+  testConnection,
 } from "./app-helpers.ts";
 import { DONOR, SIGNERS, transferLog, wallet } from "./helpers.ts";
-import { grantBody, minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
-import { MAX_TITLE, TOKENS } from "../config.ts";
+import { grantBody, minimalSubmission, revisionBody, syntheticContentFiles } from "./fixtures.ts";
+import { TOKENS } from "../config.ts";
 import { LIMITS } from "../../shared/draft/mod.ts";
 import { predictSafeAddress } from "../chain/safe.ts";
 
 const USDC = TOKENS.USDC[0];
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 
 async function seedApproved(h: Awaited<ReturnType<typeof harness>>, safe = SAFE_ADDR) {
   const admin = await h.mint(ADMIN, true);
@@ -195,7 +196,7 @@ Deno.test("submit: needs a signed-in wallet with a display name; records the pro
 
 Deno.test("submit: validation, honeypot, rate limit, pending never on board", async () => {
   const h = await harness();
-  const token = await proposerToken(h);
+  let token = await proposerToken(h);
   const good = minimalSubmission(25000);
   assertEquals(
     (await h.req("/api/initiatives", {
@@ -240,6 +241,7 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
     400,
   );
   h.clock.now += 3601; // invalid attempts count against the 5/hour budget, as in the MVP
+  token = await proposerToken(h); // the earlier session has passed its inactivity limit
   const res = await h.req("/api/initiatives", {
     method: "POST",
     token,
@@ -330,7 +332,7 @@ Deno.test("mine: a proposer lists and opens their own submissions, rejected ones
     (await h.req(`/api/initiatives/${first}/revisions`, {
       method: "POST",
       token,
-      json: { initiativeId: rejected.id, ...minimalSubmission(31000) },
+      json: { initiativeId: rejected.id, ...revisionBody(minimalSubmission(31000)) },
     })).status,
     403,
   );
@@ -364,7 +366,7 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
     method: "POST",
     headers: { Origin: "https://preview.deno.net", "Content-Type": "application/json" },
     body: JSON.stringify({ message: own, signature: await w.sign(own) }),
-  });
+  }, testConnection());
   assertEquals(onSelf.status, 200);
   // A forged Host outside the platform suffixes does not widen the binding.
   const { nonce: n1 } = await j(await h.req("/api/auth/nonce")) as { nonce: string };
@@ -373,7 +375,7 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message: forged, signature: await w.sign(forged) }),
-  });
+  }, testConnection());
   assertEquals(onForged.status, 401);
   const res = await h.req("/api/auth/verify", {
     method: "POST",
@@ -726,10 +728,10 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
   const p1 = await h.req("/api/admin/initiatives/" + id + "/pledges", {
     method: "POST",
     token: admin,
-    json: { company: "Acme", amount: "500", url: "javascript:alert(1)" },
+    json: { company: "Acme", amount: "500", url: "https://acme.example/" },
   });
   assertEquals(p1.status, 201);
-  assertEquals(((await j(p1)).pledge as { url: string }).url, "");
+  assertEquals(((await j(p1)).pledge as { url: string }).url, "https://acme.example/");
   const form = new FormData();
   form.append("company", "Logo Co");
   form.append("url", "https://logo.example");
@@ -753,7 +755,7 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
   assertEquals(card.logos, [{
     company: "Logo Co",
     logoUrl: p2.pledge.logoUrl,
-    url: "https://logo.example",
+    url: "https://logo.example/",
   }]);
   assertEquals(card.summary.pledged, 750);
   await h.req("/api/admin/initiatives/" + id + "/pledges/" + p2.pledge.id, {
@@ -809,22 +811,11 @@ Deno.test("ai-search: mocked provider, unknown ids dropped, cache, disabled", as
   h.close();
 });
 
-Deno.test("submit: blank title is read from the Discourse topic; forum errors are honest", async () => {
+Deno.test("submit: discussion links are stored without fetching; title is required", async () => {
   const h = await harness({
     env: { ONRAMP_API_KEY: "tk" },
-    fetch: (url, init) => {
-      if (url === "https://forum.example.org/t/my-initiative/123.json") {
-        assertEquals((init as RequestInit).redirect, "manual");
-        return Response.json({ title: "Source-level debugging for Solidity", id: 123 });
-      }
-      if (url.endsWith("/no-title/9.json")) return Response.json({ id: 9 });
-      if (url.endsWith("/long-title/7.json")) {
-        return Response.json({ title: "L".repeat(MAX_TITLE + 20), id: 7 });
-      }
-      return new Response("", { status: 404 });
-    },
   });
-  const { title: _noTitle, ...good } = minimalSubmission(1000);
+  const good = minimalSubmission(1000);
   const token = await proposerToken(h);
   const res = await h.req("/api/initiatives", {
     method: "POST",
@@ -833,39 +824,27 @@ Deno.test("submit: blank title is read from the Discourse topic; forum errors ar
   });
   assertEquals(res.status, 201);
   const { slug } = await j(res) as { slug: string };
-  assertEquals(
-    (await h.db.rfps.bySlug(slug))!.title,
-    "Source-level debugging for Solidity",
-  );
-  // a forum title past the cap is not the user's text: clipped, never refused
-  const longTitle = await h.req("/api/initiatives", {
-    method: "POST",
-    token,
-    json: {
-      ...good,
-      sections: { ...good.sections, why: "A different body, so it is not a duplicate." },
-      discourseUrl: "https://forum.example.org/t/long-title/7",
-    },
-  });
-  assertEquals(longTitle.status, 201);
-  const longSlug = (await j(longTitle) as { slug: string }).slug;
-  assertEquals((await h.db.rfps.bySlug(longSlug))!.title, "L".repeat(MAX_TITLE));
+  const row = (await h.db.rfps.bySlug(slug))!;
+  assertEquals(row.title, good.title);
+  assertEquals(row.discourseUrl, "https://forum.example.org/t/my-initiative/123");
   const noTitle = await h.req("/api/initiatives", {
     method: "POST",
     token,
-    json: { ...good, discourseUrl: "https://forum.example.org/t/no-title/9" },
+    json: { ...good, title: "", discourseUrl: "https://forum.example.org/t/no-title/9" },
   });
   assertEquals(noTitle.status, 400);
-  assertStringIncludes(String((await j(noTitle)).error), "could not read a title");
-  const nothing = await h.req("/api/initiatives", { method: "POST", token, json: good });
+  assertStringIncludes(String((await j(noTitle)).error), "give the initiative a title");
+  const { title: _noTitle, ...withoutTitle } = good;
+  const nothing = await h.req("/api/initiatives", { method: "POST", token, json: withoutTitle });
   assertEquals(nothing.status, 400);
-  assertStringIncludes(String((await j(nothing)).error), "Discourse link");
+  assertStringIncludes(String((await j(nothing)).error), "give the initiative a title");
   const badHost = await h.req("/api/initiatives", {
     method: "POST",
     token,
     json: { ...good, discourseUrl: "https://forum.invalid/t/x/1" },
   });
   assertEquals(badHost.status, 400);
+  assertEquals(h.fetchLog, []);
   // board cards carry the card-checkout template once a Safe exists
   const admin = await h.mint(ADMIN, true);
   const id = (await h.db.rfps.bySlug(slug))!.id;
@@ -1051,8 +1030,8 @@ Deno.test("page facts: content keys sync, admin patch validates and clears per t
   h.close();
 });
 
-Deno.test("DISABLE_RATE_LIMITS=true: the submit limit stops counting", async () => {
-  const h = await harness({ env: { DISABLE_RATE_LIMITS: "true" } });
+Deno.test("RATE_LIMIT_MODE=off: the submit limit stops counting", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
   const token = await proposerToken(h);
   for (let i = 0; i < 8; i++) {
     const res = await h.req("/api/initiatives", {

@@ -4,6 +4,11 @@ import { vi } from "vitest";
 import Admins from "./Admins";
 import type { AdminList } from "~/lib/api-types";
 
+vi.mock("~/context/session", () => ({
+  useSession: () => ({ session: { address: "admin", isAdmin: true }, signIn: vi.fn() }),
+  sessionKey: () => "admin:true",
+}));
+
 const api = vi.fn();
 vi.mock("~/lib/api", async (orig) => ({
   ...(await orig<typeof import("~/lib/api")>()),
@@ -17,10 +22,15 @@ const NEW = "0x839395e20bbB182fa440d08F850E6c7A8f6F0780";
 function mount(list: AdminList) {
   api.mockReset();
   api.mockImplementation((path: string, opts?: { method?: string; json?: { address: string } }) => {
-    if (path === "/api/admin/admins" && !opts) return Promise.resolve(list);
+    if (path === "/api/admin/admins" && !opts?.json) return Promise.resolve(list);
     if (path === "/api/admin/admins" && opts?.json) {
-      if (opts.json.address === "0xbad") return Promise.reject(new Error("that is not an Ethereum address"));
-      return Promise.resolve({ ...list, admins: [...list.admins, { address: opts.json.address, fixed: false }] });
+      if (opts.json.address === "0xbad") {
+        return Promise.reject(new Error("that is not an Ethereum address"));
+      }
+      return Promise.resolve({
+        ...list,
+        admins: [...list.admins, { address: opts.json.address, fixed: false }],
+      });
     }
     if (opts?.method === "DELETE") {
       const a = path.split("/").pop()!;
@@ -37,7 +47,10 @@ function mount(list: AdminList) {
 }
 
 test("fixed admins show a lock and no remove button; you cannot remove yourself", async () => {
-  mount({ admins: [{ address: FIXED, fixed: true }, { address: ADDED, fixed: false }], you: ADDED });
+  mount({
+    admins: [{ address: FIXED, fixed: true }, { address: ADDED, fixed: false }],
+    you: ADDED,
+  });
   expect(await screen.findByText("0x19E7…ff2A")).toBeInTheDocument();
   expect(screen.getByTitle("Set in ADMIN_ADDRESSES")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Remove 0x19E7…ff2A" })).toBeNull();
@@ -62,7 +75,10 @@ test("adding an address posts it and shows the new row; errors show inline", asy
 });
 
 test("removing another admin deletes it and drops the row", async () => {
-  mount({ admins: [{ address: FIXED, fixed: true }, { address: ADDED, fixed: false }], you: FIXED });
+  mount({
+    admins: [{ address: FIXED, fixed: true }, { address: ADDED, fixed: false }],
+    you: FIXED,
+  });
   await screen.findByText("0x1563…5508");
   fireEvent.click(screen.getByRole("button", { name: "Remove 0x1563…5508" }));
   await waitFor(() => expect(screen.queryByText("0x1563…5508")).toBeNull());

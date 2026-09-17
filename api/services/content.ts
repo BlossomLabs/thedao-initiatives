@@ -298,21 +298,21 @@ export async function syncBackers(
 export async function syncContent(
   db: Db,
   files: { name: string; text: string }[],
+  audit: <T>(name: string, run: () => Promise<T>) => Promise<T> = (_name, run) => run(),
 ): Promise<SyncResult> {
   const out: SyncResult = { created: 0, updated: 0, backers: 0, errors: [] };
   for (const f of [...files].sort((a, b) => a.name.localeCompare(b.name))) {
     if (!f.name.endsWith(".md") || f.name === "README.md") continue;
     const slug = slugFromFilename(f.name);
-    if (!slug) {
-      out.errors.push(`${f.name}: filename makes an empty slug`);
-      continue;
-    }
     try {
-      const fields = parseRfpFile(f.text);
-      const r = await db.rfps.upsertContent(slug, fields);
-      if (r.action === "created") out.created++;
-      else out.updated++;
-      out.backers += await syncBackers(db, r.id, fields.backers);
+      await audit(f.name, async () => {
+        if (!slug) throw new Error("filename makes an empty slug");
+        const fields = parseRfpFile(f.text);
+        const r = await db.rfps.upsertContent(slug, fields);
+        if (r.action === "created") out.created++;
+        else out.updated++;
+        out.backers += await syncBackers(db, r.id, fields.backers);
+      });
     } catch (e) {
       out.errors.push(`${f.name}: ${(e as Error).message}`);
     }

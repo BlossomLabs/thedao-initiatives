@@ -5,6 +5,7 @@ import { wagmiConfig } from "~/lib/wagmi";
 import { SessionProvider } from "./session";
 import { EmailSignInProvider } from "./email-sign-in";
 import { ProfileDialogProvider } from "./profile-dialog";
+import { WalletPickerProvider } from "./wallet-picker";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -18,7 +19,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
           <EmailSignInProvider>
-            <ProfileDialogProvider>{children}</ProfileDialogProvider>
+            <WalletPickerProvider>
+              <ProfileDialogProvider>{children}</ProfileDialogProvider>
+            </WalletPickerProvider>
           </EmailSignInProvider>
         </SessionProvider>
       </QueryClientProvider>

@@ -47,6 +47,26 @@ export const LOGIN_ATTEMPTS_PER_MINUTE_PER_IP = 5;
 export const SUPPORT_MESSAGES_PER_HOUR_PER_IP = 5;
 export const LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL = 60;
 
+export type RateLimitMode = "enforce" | "observe" | "off";
+/** Bucket prefixes that refuse even under RATE_LIMIT_MODE=observe: each hit spends a real
+ * resource (an admin queue entry, a forwarded email, an IPFS pin). */
+export const ALWAYS_ENFORCED_RATE_LIMITS: readonly string[] = [
+  "submit:",
+  "support:",
+  "logoup:",
+  "pfpup:",
+];
+export const RATE_LIMIT_MODES: readonly RateLimitMode[] = ["enforce", "observe", "off"];
+
+function rateLimitMode(env: Record<string, string | undefined>): RateLimitMode {
+  const raw = (env.RATE_LIMIT_MODE ?? "").trim().toLowerCase();
+  if (!raw) return "enforce";
+  if (!(RATE_LIMIT_MODES as string[]).includes(raw)) {
+    throw new Error(`RATE_LIMIT_MODE must be one of ${RATE_LIMIT_MODES.join(", ")}: ${raw}`);
+  }
+  return raw as RateLimitMode;
+}
+
 // ---------------------------------------------------------- community roles
 /** ETHSecurity badge (ERC-721). balanceOf > 0 grants the EXPERT tag. */
 export const BADGE_CONTRACT = "0xf67C0aDe41c607EfeBf198F9D6065Ab1ec5aD4cd";
@@ -95,6 +115,11 @@ export const AI_QUERY_MAX_CHARS = 300;
 export const AI_DAILY_CALL_CAP = 500;
 export const SESSION_TTL_SECS = 7 * 86400;
 export const ADMIN_SESSION_TTL_SECS = 12 * 3600;
+/** Inactivity is enforced server-side independently of the absolute lifetime. */
+export const SESSION_IDLE_SECS = 3600;
+export const ADMIN_SESSION_IDLE_SECS = 15 * 60;
+/** Managing other sessions requires a recently signed wallet challenge. */
+export const SESSION_REAUTH_SECS = 5 * 60;
 export const NONCE_TTL_SECS = 300;
 export const SIWE_CLOCK_SKEW_SECS = 300;
 
@@ -108,8 +133,10 @@ export interface Config {
   operationalSigners: string[];
   safeApiKey: string;
   safeSyncTtlSecs: number;
-  /** DISABLE_RATE_LIMITS=true: every KV rate limit answers "allowed" (live sessions where a room shares one IP). */
-  rateLimitsDisabled: boolean;
+  /** RATE_LIMIT_MODE: `enforce` refuses over the cap; `observe` counts and logs a breach but
+   * allows (except ALWAYS_ENFORCED_RATE_LIMITS); `off` neither counts nor logs (live sessions
+   * where a room shares one IP). */
+  rateLimitMode: RateLimitMode;
   /** Alchemy app key: an extra mainnet RPC ahead of the public fallbacks. */
   alchemyApiKey: string;
   pinataJwt: string;
@@ -127,9 +154,9 @@ export interface Config {
   walletConnectProjectId: string;
   siteUsername: string;
   sitePassword: string;
-  trustProxy: boolean;
-  /** CSP_ENFORCE=true: the static site's full Content-Security-Policy is enforced instead of report-only (lib/site-headers.ts). */
+  /** Enforced by default; explicitly false supports a temporary diagnostic rollout. */
   cspEnforce: boolean;
+  cspConnectOrigins: string[];
   port: number;
   kvPath: string | undefined;
   /** First key part every KV key is stored under; empty = bare keys. */
@@ -200,7 +227,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     safeSyncTtlSecs: Number.isFinite(syncTtl) && syncTtl > 0
       ? Math.max(60, Math.floor(syncTtl))
       : 600,
-    rateLimitsDisabled: /^(1|true|yes)$/i.test((env.DISABLE_RATE_LIMITS ?? "").trim()),
+    rateLimitMode: rateLimitMode(env),
     alchemyApiKey,
     pinataJwt: (env.PINATA_JWT ?? "").trim(),
     pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "ipfs.blossom.software",
@@ -218,8 +245,12 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     walletConnectProjectId: (env.WALLETCONNECT_PROJECT_ID ?? "").trim(),
     siteUsername: (env.SITE_USERNAME ?? "").trim(),
     sitePassword: (env.SITE_PASSWORD ?? "").trim(),
-    trustProxy: flag(env.TRUST_PROXY),
-    cspEnforce: flag(env.CSP_ENFORCE),
+    cspEnforce: env.CSP_ENFORCE === undefined || env.CSP_ENFORCE.trim() === "" ||
+      flag(env.CSP_ENFORCE),
+    cspConnectOrigins: [
+      ...list(env.CSP_CONNECT_ORIGINS),
+      ...[env.VITE_RPC_URL, env.VITE_API_URL].filter((v): v is string => Boolean(v?.trim())),
+    ],
     port: Number(env.PORT ?? "8000") || 8000,
     kvPath: (env.KV_PATH ?? "").trim() || undefined,
     dbPrefix: (env.DB_PREFIX ?? "").trim(),

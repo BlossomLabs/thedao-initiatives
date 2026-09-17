@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Landmark, Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
@@ -10,26 +10,12 @@ import { parseUsd, tokenQty } from "~/lib/donate";
 import { cn } from "~/lib/utils";
 import Status from "~/components/ui/Status";
 import { Button } from "~/components/ui/Button";
+import { errorMessage } from "~/lib/api";
 import { useDonation } from "./useDonation";
 import { WALLETCONNECT_PROJECT_ID } from "~/lib/wagmi";
 
 const CHIPS = ["50", "500", "5000", "50000"];
 type Method = "wallet" | "exchange";
-
-/**
- * Acceptance is remembered per terms version id as the ISO time of the tick,
- * so every new version re-asks. Older values ("1") never match.
- */
-const termsKey = (id: string) => "thedao:terms:" + id;
-const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
-function readAcceptedAt(id: string): string | null {
-  try {
-    const v = id ? localStorage.getItem(termsKey(id)) : null;
-    return v && ISO_RE.test(v) && !Number.isNaN(Date.parse(v)) ? v : null;
-  } catch {
-    return null;
-  }
-}
 
 /** The donate widget: chips, $ amount, token, wallet / exchange tabs. */
 export default function DonateWidget({
@@ -45,23 +31,42 @@ export default function DonateWidget({
 }) {
   const { data: params } = useDonateParams();
   const { address, connector } = useAccount();
-  // ---- donation terms gate: every method stays locked until the box is checked.
-  // The tick time rides along with the donation confirm, where the API writes
-  // one acceptance record per transaction (see api/db/terms.ts).
-  const [acceptedAt, setAcceptedAt] = useState<string | null>(null);
-  const accepted = acceptedAt !== null;
-  useEffect(() => {
-    setAcceptedAt(readAcceptedAt(TERMS.id));
-  }, []);
+  const [accepted, setAccepted] = useState(false);
+  const [exchangeAttempt, setExchangeAttempt] = useState<string | null>(null);
+  const [recording, setRecording] = useState(false);
+  const recordingRef = useRef(false);
+  const [name, setName] = useState("");
+  const [exchangeAmount, setExchangeAmount] = useState("");
+  const [currency, setCurrency] = useState("");
+  const [txHash, setTxHash] = useState("");
+  const d = useDonation({ initiativeId, slug, safeAddress, params, onConfirmed, accepted });
   const toggleTerms = (on: boolean) => {
-    const at = on ? new Date().toISOString() : null;
-    setAcceptedAt(at);
-    try {
-      if (at) localStorage.setItem(termsKey(TERMS.id), at);
-      else localStorage.removeItem(termsKey(TERMS.id));
-    } catch { /* private mode: the gate still works for this page view */ }
+    setAccepted(on);
+    setExchangeAttempt(null);
   };
-  const d = useDonation({ initiativeId, slug, safeAddress, params, onConfirmed, acceptedAt });
+  useEffect(() => {
+    setAccepted(false);
+    setExchangeAttempt(null);
+  }, [initiativeId, safeAddress]);
+  const revealAddress = async () => {
+    if (!accepted || recordingRef.current) return;
+    recordingRef.current = true;
+    setRecording(true);
+    try {
+      const receipt = await d.recordAcceptance("exchange", {
+        ...(name.trim() ? { name: name.trim() } : {}),
+        ...(exchangeAmount.trim() ? { amount: exchangeAmount.trim() } : {}),
+        ...(currency ? { currency } : {}),
+      });
+      setExchangeAttempt(receipt.attemptId);
+      d.setStatus(null);
+    } catch (error) {
+      d.setStatus({ kind: "err", text: errorMessage(error) });
+    } finally {
+      recordingRef.current = false;
+      setRecording(false);
+    }
+  };
   const [amount, setAmount] = useState("");
   const [symbol, setSymbol] = useState("");
   const [method, setMethod] = useState<Method>("wallet");
@@ -115,7 +120,7 @@ export default function DonateWidget({
   ];
 
   const copy = () => {
-    if (!gated()) return;
+    if (!gated() || !exchangeAttempt) return;
     navigator.clipboard.writeText(safeAddress).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -126,63 +131,75 @@ export default function DonateWidget({
 
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex flex-wrap gap-2">
-        {CHIPS.map((c) => (
-          <button
-            key={c}
-            type="button"
-            className={cn(
-              "cursor-pointer rounded-full border px-4 py-2 font-inter-tight text-[13px] transition-all duration-150 max-[760px]:px-4 max-[760px]:py-[11px]",
-              amount === c
-                ? "border-dao-green bg-dao-green font-medium text-white"
-                : "border-edge2 bg-white/5 text-soft hover:border-[rgba(92,183,90,.6)] hover:text-dao-green",
-            )}
-            onClick={() => setAmount(c)}
-          >
-            ${Number(c).toLocaleString("en-US")}
-          </button>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <label className="flex min-w-0 flex-1 items-center gap-0.5 rounded-xl border border-edge2 bg-card pl-3.5 focus-within:border-[rgba(92,183,90,.6)]">
-          <span className="flex-none font-inter-tight text-[14px] font-light text-muted">$</span>
-          <input
-            className="min-w-0 flex-1 bg-transparent py-2.5 pl-1 pr-3.5 font-inter-tight text-[14px] font-light text-white outline-none placeholder:text-white/35"
-            inputMode="decimal"
-            placeholder="Custom amount ($1 minimum)"
-            aria-label="Amount in US dollars"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </label>
-        <select
-          className="field w-[110px] flex-none py-2.5 pl-3 pr-2"
-          aria-label="Donation token"
-          value={symbol}
-          onChange={(e) => setSymbol(e.target.value)}
-        >
-          {(tokens.length ? tokens : ["USDC"]).map((t) => (
-            <option key={t} value={t}>
-              {t}
-              {typeof balances[t] === "number" && balances[t]! > 0
-                ? ` (${balances[t]!.toFixed(2)})`
-                : ""}
-            </option>
-          ))}
-        </select>
-      </div>
-      {conv && <p className="-mt-0.5 ml-0.5 m-0 small dim">{conv}</p>}
+      {method === "wallet" && (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {CHIPS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                className={cn(
+                  "cursor-pointer rounded-full border px-4 py-2 font-inter-tight text-[13px] transition-all duration-150 max-[760px]:px-4 max-[760px]:py-[11px]",
+                  amount === c
+                    ? "border-dao-green bg-dao-green font-medium text-white"
+                    : "border-edge2 bg-white/5 text-soft hover:border-[rgba(92,183,90,.6)] hover:text-dao-green",
+                )}
+                onClick={() => setAmount(c)}
+              >
+                ${Number(c).toLocaleString("en-US")}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <label className="flex min-w-0 flex-1 items-center gap-0.5 rounded-xl border border-edge2 bg-card pl-3.5 focus-within:border-[rgba(92,183,90,.6)]">
+              <span className="flex-none font-inter-tight text-[14px] font-light text-muted">
+                $
+              </span>
+              <input
+                className="min-w-0 flex-1 bg-transparent py-2.5 pl-1 pr-3.5 font-inter-tight text-[14px] font-light text-white outline-none placeholder:text-white/35"
+                inputMode="decimal"
+                placeholder="Custom amount ($1 minimum)"
+                aria-label="Amount in US dollars"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </label>
+            <select
+              className="field w-[110px] flex-none py-2.5 pl-3 pr-2"
+              aria-label="Donation token"
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value)}
+            >
+              {(tokens.length ? tokens : ["USDC"]).map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                  {typeof balances[t] === "number" && balances[t]! > 0
+                    ? ` (${balances[t]!.toFixed(2)})`
+                    : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          {conv && <p className="-mt-0.5 ml-0.5 m-0 small dim">{conv}</p>}
+        </>
+      )}
 
       <label className="my-0.5 flex cursor-pointer items-center gap-2 small text-soft">
         <input
           type="checkbox"
           className="size-4"
           checked={accepted}
+          disabled={recording || Boolean(d.busy)}
           onChange={(e) => toggleTerms(e.target.checked)}
         />
         <span>
           I agree to these{" "}
-          <Link to="/donation-terms" target="_blank" rel="noopener" className="underline">
+          <Link
+            to={`/donation-terms/v/${TERMS.id}`}
+            target="_blank"
+            rel="noopener"
+            className="underline"
+          >
             Donation Terms
           </Link>.
         </span>
@@ -198,6 +215,7 @@ export default function DonateWidget({
             key={m.id}
             type="button"
             aria-pressed={method === m.id}
+            disabled={recording || Boolean(d.busy)}
             onClick={() => setMethod(m.id)}
             className={cn(
               "flex flex-1 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[9px] border border-transparent px-1.5 py-2 font-inter-tight text-[12.5px] font-medium text-muted transition-all duration-150 hover:text-white max-[760px]:py-3",
@@ -214,7 +232,12 @@ export default function DonateWidget({
       {method === "wallet" && (
         <Button
           variant="primary"
-          onClick={() => gated() && d.donate(symbol, amount, balances)}
+          onClick={async () => {
+            if (gated()) {
+              await d.donate(symbol, amount, balances);
+              setAccepted(false);
+            }
+          }}
           disabled={Boolean(d.busy) || !accepted}
         >
           {d.busy ?? "Donate"}
@@ -246,24 +269,94 @@ export default function DonateWidget({
               the rest.
             </li>
           </ul>
+          {!exchangeAttempt && (
+            <>
+              <p className="m-0 small dim">
+                Optional details to help us match your deposit. You can leave all fields blank.
+              </p>
+              <label className="flex flex-col gap-1 small">
+                Name (optional)
+                <input
+                  className="field"
+                  autoComplete="name"
+                  maxLength={120}
+                  value={name}
+                  disabled={recording}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
+              <div className="flex gap-2">
+                <label className="flex min-w-0 flex-1 flex-col gap-1 small">
+                  Amount (optional)
+                  <input
+                    className="field w-full"
+                    inputMode="decimal"
+                    maxLength={80}
+                    value={exchangeAmount}
+                    disabled={recording}
+                    onChange={(e) => setExchangeAmount(e.target.value)}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 small">
+                  Currency (optional)
+                  <select
+                    className="field"
+                    value={currency}
+                    disabled={recording}
+                    onChange={(e) => setCurrency(e.target.value)}
+                  >
+                    <option value="">Not specified</option>
+                    {tokens.map((token) => <option key={token} value={token}>{token}</option>)}
+                  </select>
+                </label>
+              </div>
+              <Button variant="primary" onClick={revealAddress} disabled={!accepted || recording}>
+                {recording ? "Recording agreement…" : "Show donation address"}
+              </Button>
+            </>
+          )}
           <span className="k">Ethereum Mainnet (ERC-20) address</span>
           <div className="flex items-center gap-2 rounded-[14px] border border-edge bg-black/15 px-3 py-2">
             <span
               className="mono min-w-0 flex-1 text-[11.5px] [overflow-wrap:anywhere]"
-              data-address={safeAddress}
+              data-address={exchangeAttempt ? safeAddress : undefined}
             >
-              {accepted ? safeAddress : "0x····…····"}
+              {accepted && exchangeAttempt ? safeAddress : "0x····…····"}
             </span>
             <Button
               variant="ghost"
               sm
               className="m-0 flex-none"
               onClick={copy}
-              disabled={!accepted}
+              disabled={!accepted || !exchangeAttempt}
             >
               {copied ? "Copied ✓" : "Copy"}
             </Button>
           </div>
+          {exchangeAttempt && (
+            <>
+              <label className="flex flex-col gap-1 small">
+                Transaction hash after withdrawal (optional)
+                <input
+                  className="field"
+                  placeholder="0x…"
+                  maxLength={66}
+                  value={txHash}
+                  onChange={(e) => setTxHash(e.target.value)}
+                />
+              </label>
+              <Button
+                variant="ghost"
+                disabled={Boolean(d.busy) || !/^0x[0-9a-fA-F]{64}$/.test(txHash.trim())}
+                onClick={() => d.confirmTx(txHash.trim().toLowerCase(), exchangeAttempt)}
+              >
+                {d.busy ?? "Match my deposit"}
+              </Button>
+              <p className="m-0 small dim">
+                These details stay private. A transaction hash helps us identify the deposit.
+              </p>
+            </>
+          )}
           <GovernedBy />
         </div>
       )}

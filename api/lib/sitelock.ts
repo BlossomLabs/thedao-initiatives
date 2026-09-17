@@ -1,5 +1,5 @@
 /**
- * Private-preview gate shared by the API middleware and the static server.
+ * Private-preview gate applied once by Hono to pages, assets and the API.
  *
  * HTTP Basic Auth unlocks the site; a stateless HMAC cookie keeps it unlocked
  * so the browser's later API calls (which can never carry Basic credentials as
@@ -37,7 +37,7 @@ function same(a: string, b: string): boolean {
 }
 
 export function createSiteLock(
-  config: Pick<Config, "siteUsername" | "sitePassword" | "trustProxy">,
+  config: Pick<Config, "siteUsername" | "sitePassword">,
   hasSession: (token: string) => Promise<boolean>,
 ): SiteLock {
   const user = config.siteUsername;
@@ -73,7 +73,7 @@ export function createSiteLock(
     const ck = readCookie(req.headers.get("cookie"), LOCK_COOKIE);
     if (ck && same(ck, await cookieValue())) return "cookie";
     const token = /^Bearer\s+(.+)$/i.exec(h)?.[1]?.trim() ||
-      readSessionCookie(req, config);
+      readSessionCookie(req);
     if (token && await hasSession(token)) return "session";
     return "denied";
   }

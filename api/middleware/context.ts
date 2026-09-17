@@ -31,7 +31,7 @@ export type Vars = {
   Variables: {
     user: Session | null;
     token: string;
-    ip: string;
+    ip: string | null;
   };
 };
 

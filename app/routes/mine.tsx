@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import PageMain from "~/components/layout/PageMain";
 import { TypeBadge } from "~/components/ui/Badge";
 import ConnectInline from "~/components/wallet/ConnectInline";
-import { useSession } from "~/context/session";
+import { sessionKey, useSession } from "~/context/session";
 import { api, errorMessage } from "~/lib/api";
 import type { InitiativeStatus, MineItem } from "~/lib/api-types";
 import { dt, usd } from "~/lib/format";
@@ -24,8 +24,8 @@ const STATUS: Record<InitiativeStatus, string> = {
 export default function Mine() {
   const { session } = useSession();
   const { data, isLoading, error } = useQuery({
-    queryKey: ["mine", session?.address],
-    queryFn: () => api<{ initiatives: MineItem[] }>("/api/initiatives/mine"),
+    queryKey: ["mine", sessionKey(session)],
+    queryFn: ({ signal }) => api<{ initiatives: MineItem[] }>("/api/initiatives/mine", { signal }),
     enabled: Boolean(session),
   });
   const rows = data?.initiatives ?? [];

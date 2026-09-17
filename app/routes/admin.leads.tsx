@@ -1,3 +1,4 @@
+import { sessionKey, useSession } from "~/context/session";
 import { useQuery } from "@tanstack/react-query";
 import Skeleton from "~/components/ui/Skeleton";
 import { Link } from "react-router";
@@ -9,53 +10,27 @@ import { api } from "~/lib/api";
 import type { FunderLead } from "~/lib/api-types";
 import { dt } from "~/lib/format";
 import { generateMeta } from "~/utils/meta";
+import { leadsCsv } from "~/lib/leads-csv";
 
 export function meta() {
   return generateMeta({ title: "Funder leads", url: "/admin/leads", noIndex: true });
 }
 
-/** RFC 4180 CSV; the interchange for the CRM. Built here because the API is bearer-authed,
- * so a plain download link could not carry the session. */
-export function leadsCsv(rows: FunderLead[]): string {
-  const cell = (v: unknown) => {
-    const s = String(v ?? "");
-    return /[",\n\r]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-  };
-  const head = [
-    "initiative",
-    "slug",
-    "type",
-    "status",
-    "goal_usd",
-    "funders",
-    "contact",
-    "created_at",
-  ];
-  const lines = rows.map((r) =>
-    [
-      r.title,
-      r.slug,
-      r.type,
-      r.status,
-      Number.isInteger(r.goalUsd) ? r.goalUsd : r.goalUsd,
-      r.funders,
-      r.contact,
-      new Date(r.createdAt * 1000).toISOString().replace(/\.\d{3}Z$/, "Z"),
-    ].map(cell).join(",")
-  );
-  return [head.join(","), ...lines].join("\n") + "\n";
-}
+// Keep the route export for callers that already consume this helper.
+export { leadsCsv } from "~/lib/leads-csv";
 
 /**
  * Private fundraising intelligence from the "Who is likely to fund this?" field.
  * Never linked from a public page.
  */
 export default function Leads() {
+  const { session } = useSession();
   const { data, isLoading, error } = useQuery({
-    queryKey: ["admin", "leads"] as const,
-    queryFn: () => api<{ rows: FunderLead[] }>("/api/admin/leads"),
+    queryKey: ["admin", "leads", sessionKey(session)] as const,
+    queryFn: ({ signal }) => api<{ rows: FunderLead[] }>("/api/admin/leads", { signal }),
+    enabled: Boolean(session?.isAdmin),
   });
-  const rows = data?.rows ?? [];
+  const rows = error ? [] : data?.rows ?? [];
   const download = () => {
     const blob = new Blob([leadsCsv(rows)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -79,7 +54,8 @@ export default function Leads() {
       </div>
       <p className="small dim mt-2.5">
         Private fundraising intelligence from the "Who is likely to fund this?" field. Never
-        published. The CSV is the interchange for the CRM.
+        published. The CSV is the interchange for the CRM. Values that could be interpreted as
+        formulas start with “Text: ”.
       </p>
       {isLoading && (
         <div aria-busy="true" aria-label="Loading">

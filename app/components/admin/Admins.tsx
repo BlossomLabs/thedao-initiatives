@@ -1,3 +1,6 @@
+import { useAdminApi } from "~/hooks/use-admin-api";
+import { sessionKey, useSession } from "~/context/session";
+import { privateCacheGeneration } from "~/lib/browser-privacy";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Lock, Trash2, UserPlus } from "lucide-react";
@@ -14,13 +17,17 @@ export const adminsKey = ["admin", "admins"] as const;
 /**
  * Who can open this dashboard. Addresses from ADMIN_ADDRESSES are fixed (a
  * lock, no remove button); the rest are added and removed here and take
- * effect on the wallet's next request, no new sign-in needed.
+ * effect on the wallet's next request; newly promoted admins sign in again.
  */
 export default function Admins() {
+  const adminApi = useAdminApi();
+  const { session } = useSession();
   const qc = useQueryClient();
+  const queryKey = [...adminsKey, sessionKey(session)];
   const { data, error } = useQuery({
-    queryKey: adminsKey,
-    queryFn: () => api<AdminList>("/api/admin/admins"),
+    queryKey,
+    queryFn: ({ signal }) => api<AdminList>("/api/admin/admins", { signal }),
+    enabled: Boolean(session?.isAdmin),
   });
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState("");
@@ -29,8 +36,11 @@ export default function Admins() {
   const run = async (key: string, req: () => Promise<AdminList>, done: string) => {
     setBusy(key);
     setMsg(null);
+    const generation = privateCacheGeneration();
     try {
-      qc.setQueryData(adminsKey, await req());
+      const result = await req();
+      if (generation !== privateCacheGeneration()) return;
+      qc.setQueryData(queryKey, result);
       setMsg({ kind: "ok", text: done });
     } catch (e) {
       setMsg({ kind: "err", text: errorMessage(e) });
@@ -41,11 +51,19 @@ export default function Admins() {
   const add = () => {
     const a = address.trim();
     if (!a) return;
-    void run("add", () => api<AdminList>("/api/admin/admins", { json: { address: a } }), `${shortAddr(a)} is an admin now.`)
+    void run(
+      "add",
+      () => adminApi<AdminList>("/api/admin/admins", { json: { address: a } }),
+      `${shortAddr(a)} is an admin now.`,
+    )
       .then(() => setAddress(""));
   };
   const remove = (a: string) =>
-    run(a, () => api<AdminList>(`/api/admin/admins/${a}`, { method: "DELETE" }), `${shortAddr(a)} is no longer an admin.`);
+    run(
+      a,
+      () => adminApi<AdminList>(`/api/admin/admins/${a}`, { method: "DELETE" }),
+      `${shortAddr(a)} is no longer an admin.`,
+    );
 
   return (
     <div className="mt-3 rounded-2xl border border-edge bg-card px-[18px] py-3.5">
@@ -105,7 +123,13 @@ export default function Admins() {
           onChange={(e) => setAddress(e.target.value)}
           disabled={Boolean(busy)}
         />
-        <Button type="submit" variant="ghost" sm loading={busy === "add"} disabled={Boolean(busy) || !address.trim()}>
+        <Button
+          type="submit"
+          variant="ghost"
+          sm
+          loading={busy === "add"}
+          disabled={Boolean(busy) || !address.trim()}
+        >
           <UserPlus className="size-4" /> Add admin
         </Button>
       </form>

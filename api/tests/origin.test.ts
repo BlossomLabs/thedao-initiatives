@@ -2,18 +2,20 @@ import { assertEquals } from "@std/assert";
 import { selfOrigin } from "../lib/origin.ts";
 import { loadConfig } from "../config.ts";
 
-Deno.test("selfOrigin: platform hosts only; X-Forwarded-Proto only when the proxy is trusted", () => {
+Deno.test("selfOrigin: platform hosts only; forwarding headers cannot change the scheme", () => {
   const cfg = loadConfig({});
-  const trusting = loadConfig({ TRUST_PROXY: "1" });
   const plain = new Request("https://fund-abc.deno.net/api/x");
   assertEquals(selfOrigin(plain, cfg), "https://fund-abc.deno.net");
   const proxied = new Request("http://fund-abc.deno.net/api/x", {
     headers: { "x-forwarded-proto": "https" },
   });
   assertEquals(selfOrigin(proxied, cfg), "http://fund-abc.deno.net");
-  assertEquals(selfOrigin(proxied, trusting), "https://fund-abc.deno.net");
   const junk = new Request("http://x.deno.dev/", { headers: { "x-forwarded-proto": "gopher" } });
-  assertEquals(selfOrigin(junk, trusting), "http://x.deno.dev");
+  assertEquals(selfOrigin(junk, cfg), "http://x.deno.dev");
+  const downgrade = new Request("https://fund-abc.deno.net/api/x", {
+    headers: { "x-forwarded-proto": "http" },
+  });
+  assertEquals(selfOrigin(downgrade, cfg), "https://fund-abc.deno.net");
   // An arbitrary Host header buys nothing.
   assertEquals(selfOrigin(new Request("https://evil.example/api/x"), cfg), null);
   assertEquals(selfOrigin(new Request("https://deno.net.evil.example/"), cfg), null);
@@ -27,7 +29,8 @@ Deno.test("selfOrigin: platform hosts only; X-Forwarded-Proto only when the prox
 
 Deno.test("config: WEB_ORIGIN entries are normalized to bare origins (trailing slash, path, case)", () => {
   const cfg = loadConfig({
-    WEB_ORIGIN: "https://initiatives.thedao.fund/, HTTPS://Fund.TheDAO.fund/board , http://localhost:5173",
+    WEB_ORIGIN:
+      "https://initiatives.thedao.fund/, HTTPS://Fund.TheDAO.fund/board , http://localhost:5173",
   });
   assertEquals(cfg.webOrigins, [
     "https://initiatives.thedao.fund",

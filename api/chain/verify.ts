@@ -8,6 +8,9 @@ import type { UsdRate } from "./price.ts";
 export const TRANSFER_TOPIC = eventTopic("Transfer(address,address,uint256)");
 
 export interface Verification {
+  /** Matching metadata is only provided by RPC verification, never indexer fallback. */
+  blockNumber?: number;
+  singleTransfer?: boolean;
   found: boolean;
   pending: boolean;
   ok: boolean;
@@ -86,6 +89,7 @@ export async function verifyDonationTx(
     return r;
   }
   const mined = Number(decodeHexInt(receipt.blockNumber));
+  r.blockNumber = mined;
   let depth = 0;
   try {
     const head = await (opts.getBlockNumber?.() ?? getBlockNumber(rpc));
@@ -114,6 +118,7 @@ export async function verifyDonationTx(
   let totalRaw = 0n;
   let donor = "";
   let extraTokens = false;
+  let matchingLogs = 0;
   for (const log of receipt.logs ?? []) {
     const addr = (log.address ?? "").toLowerCase();
     const topics = log.topics ?? [];
@@ -123,6 +128,7 @@ export async function verifyDonationTx(
     if (topics[2].toLowerCase() !== wantTo) continue;
     const raw = decodeHexInt(log.data);
     if (raw <= 0n) continue;
+    matchingLogs++;
     if (creditedSym === null) {
       [creditedSym, creditedDec] = tok;
       creditedAddr = addr;
@@ -146,6 +152,7 @@ export async function verifyDonationTx(
       r.detail = `price feed unavailable, will retry: ${String(e)}`;
       return r;
     }
+    r.singleTransfer = matchingLogs === 1;
     r.ok = true;
     r.tokenSymbol = creditedSym;
     r.tokenAddress = toChecksum(creditedAddr);
@@ -178,6 +185,7 @@ export async function verifyDonationTx(
           r.detail = `price feed unavailable, will retry: ${String(e)}`;
           return r;
         }
+        r.singleTransfer = true;
         r.ok = true;
         r.tokenSymbol = "ETH";
         r.tokenAddress = "";

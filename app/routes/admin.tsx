@@ -31,7 +31,7 @@ export default function AdminLayout() {
             Connect your wallet with the button in the top right; you will be asked to sign in.
           </p>
         )}
-        {isConnected && !session && (
+        {isConnected && !session?.isAdmin && (
           <Button
             variant="primary"
             loading={signingIn}
@@ -42,8 +42,8 @@ export default function AdminLayout() {
         )}
         {session && !session.isAdmin && (
           <p className="m-0 small text-[#ffd7d6]">
-            That wallet ({session.address.slice(0, 6)}…) is not an admin. Switch to the admin wallet
-            and sign in again.
+            This session has no administrator access. If this wallet was recently added as an
+            administrator, sign in again to activate that access.
           </p>
         )}
         {error && <p className="m-0 small text-[#ffd7d6]">{error}</p>}

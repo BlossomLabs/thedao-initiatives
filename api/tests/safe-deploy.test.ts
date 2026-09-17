@@ -89,7 +89,7 @@ Deno.test("a contract at the predicted address that is not our Safe is rejected,
   h.close();
 });
 
-Deno.test("the predicted address held by another initiative is a 409 until the admin detaches it", async () => {
+Deno.test("a Safe held by another initiative cannot be reassigned or detached through the editor", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
   const rfp = await h.db.rfps.insert({ title: "Mixed up", status: "pending" });
@@ -102,7 +102,7 @@ Deno.test("the predicted address held by another initiative is a 409 until the a
   const dup = await confirm(h, admin, rfp.id);
   assertEquals(dup.status, 409);
   assertStringIncludes((await j(dup) as { detail: string }).detail, holder.slug);
-  // the admin can detach (blank), never bind by hand
+  // The editor cannot change the Safe binding, including by clearing it.
   assertEquals(
     (await h.req(url(holder.id), {
       method: "PATCH",
@@ -115,11 +115,11 @@ Deno.test("the predicted address held by another initiative is a 409 until the a
   assertEquals(
     (await h.req(url(holder.id), { method: "PATCH", token: admin, json: { safeAddress: "" } }))
       .status,
-    200,
+    400,
   );
-  assertEquals((await h.db.rfps.get(holder.id))!.safeAddress, "");
-  assertEquals((await j(await confirm(h, admin, rfp.id)) as { status: string }).status, "ok");
-  assertEquals((await h.db.rfps.get(rfp.id))!.safeAddress, predicted(rfp));
+  assertEquals((await h.db.rfps.get(holder.id))!.safeAddress, predicted(rfp));
+  assertEquals((await confirm(h, admin, rfp.id)).status, 409);
+  assertEquals((await h.db.rfps.get(rfp.id))!.safeAddress, "");
   h.close();
 });
 

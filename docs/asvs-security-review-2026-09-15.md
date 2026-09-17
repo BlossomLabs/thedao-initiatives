@@ -194,6 +194,7 @@ No injection, authentication bypass, authorization bypass, or secret leak was fo
 - **ID**: NDC-2026-011
 - **Location**: `api/config.ts:196`, `api/db/ratelimit.ts:26-28`, `api/bootstrap.ts:38-40`.
 - **Note**: The flag switches off every limit, including login throttling. It logs a warning at boot, which is good. Consider surfacing it on the admin dashboard as a red banner so it is not forgotten after a live session, and consider excluding the login limits from the switch.
+- **Update (2026-09-17)**: `DISABLE_RATE_LIMITS` is removed. `RATE_LIMIT_MODE=observe` replaces the all-or-nothing switch for production: every bucket keeps counting and reports breaches as structured log lines, while submissions, support messages and uploads keep refusing. `off` remains available for live sessions. IPv6 quota identities are the /64 prefix.
 
 ## ASVS 5.0 chapter coverage
 

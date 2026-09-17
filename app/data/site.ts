@@ -1,7 +1,7 @@
 export const SITE_NAME = "TheDAO Security Fund";
 export const SITE_URL =
   (import.meta.env?.VITE_SITE_URL as string | undefined)?.replace(/\/+$/, "") ||
-  "https://fund.thedao.fund";
+  "https://initiatives.thedao.fund";
 export const SITE_PUNCHLINE = "Initiatives";
 export const SITE_DESCRIPTION =
   "Ecosystem-funded Ethereum security initiatives. Browse open initiatives, donate by wallet or from an exchange, back initiatives with pledges that pay on completion.";

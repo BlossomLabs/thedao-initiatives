@@ -2,7 +2,6 @@
 import { CURATOR_ADDRESSES, MIN_VOTE_DONATION_USD } from "../config.ts";
 import type { Db } from "../db/mod.ts";
 import type { Chain } from "../chain/mod.ts";
-import type { Admins } from "./admins.ts";
 
 export const ROLE_FAST_LANE = new Set(["ADMIN", "PROPOSER", "CURATOR", "EXPERT"]);
 
@@ -38,15 +37,15 @@ async function isProposer(db: Db, address: string, rfpId: string): Promise<boole
   return Boolean(rfp?.proposer) && rfp!.proposer.toLowerCase() === address.toLowerCase();
 }
 
-/** Role tags for an address on THIS initiative, snapshot at post time. */
+/** Non-administrator authorization roles on THIS initiative. Callers add
+ * ADMIN only from the authenticated session; live membership is display-only. */
 export async function commentRoles(
-  deps: { db: Db; chain: Chain; admins: Admins },
+  deps: { db: Db; chain: Chain },
   address: string,
   rfpId: string,
 ): Promise<string[]> {
   const roles: string[] = [];
   if (!address) return roles;
-  if (await deps.admins.isAdmin(address)) roles.push("ADMIN");
   if (await isProposer(deps.db, address, rfpId)) roles.push("PROPOSER");
   if (isCurator(address)) roles.push("CURATOR");
   if (await deps.chain.hasBadge(address)) roles.push("EXPERT");
@@ -54,14 +53,15 @@ export async function commentRoles(
   return roles;
 }
 
-/** A role, or $20+ confirmed donations to this same initiative. */
+/** Non-administrator eligibility, or $20+ confirmed donations to this initiative.
+ * Callers separately allow administrator-authenticated sessions. */
 export async function voteEligible(
-  deps: { db: Db; chain: Chain; admins: Admins },
+  deps: { db: Db; chain: Chain },
   address: string,
   rfpId: string,
 ): Promise<boolean> {
   if (!address) return false;
-  if ((await deps.admins.isAdmin(address)) || isCurator(address)) return true;
+  if (isCurator(address)) return true;
   if (await isProposer(deps.db, address, rfpId)) return true;
   if (await deps.chain.hasBadge(address)) return true;
   return (await deps.db.donations.totalFor(rfpId, address)) >= MIN_VOTE_DONATION_USD;

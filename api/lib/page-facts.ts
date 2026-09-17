@@ -20,14 +20,27 @@ import {
 import { MAX_FUNDERS } from "../config.ts";
 import { LIMITS } from "../../shared/draft/mod.ts";
 
+export const PAGE_FACT_FIELDS = [
+  "type",
+  "topup",
+  "goal",
+  "durationMonths",
+  "recipientTeam",
+  "recipientUrl",
+  "milestoneReviewer",
+  "discourseUrl",
+  "funders",
+  "contact",
+] as const;
+
 export async function readPageFacts(
   body: Record<string, unknown>,
   current: Rfp,
   deps: Pick<Deps, "resolve">,
 ): Promise<Partial<Rfp>> {
   const patch: Partial<Rfp> = {};
-  if (body.goal !== undefined || body.goalUsd !== undefined) {
-    const [goal, err] = parseGoal(body.goalUsd ?? body.goal);
+  if (body.goal !== undefined) {
+    const [goal, err] = parseGoal(body.goal);
     if (err) throw new HttpError(400, err);
     patch.goalUsd = goal!;
   }

@@ -390,12 +390,14 @@ Deno.test("safe refresh: a failed head is shared, preserves cursors, and retries
 Deno.test("safe sync: a time budget cuts a backfill short, progress persists, the next run completes", async () => {
   const pages: Record<string, unknown[]> = {};
   let requests = 0;
+  let advanceBudgetClock: (() => void) | undefined;
   const h = await harness({
     fetch: (url) => {
       if (!url.startsWith("https://api.safe.global/")) {
         return new Response("", { status: 404 });
       }
       requests++;
+      advanceBudgetClock?.();
       const key = url.includes("offset=20") ? "p2" : "p1";
       return Response.json({
         count: 40,
@@ -423,8 +425,21 @@ Deno.test("safe sync: a time budget cuts a backfill short, progress persists, th
       logs: [transferLog(USDC, DONOR, SAFE_ADDR, 1_000_000n)],
     };
   }
-  // budget 0 ms: the first page is fetched, then the very first credit trips the budget
-  const s1 = await syncSafe(h.deps, rfp, 0);
+  // Cross the deadline at the first response, independent of machine speed.
+  // A real zero-ms budget can otherwise expire before the first fetch even starts.
+  const realNow = Date.now;
+  let budgetNow = realNow();
+  advanceBudgetClock = () => {
+    budgetNow++;
+  };
+  Date.now = () => budgetNow;
+  let s1;
+  try {
+    s1 = await syncSafe(h.deps, rfp, 0);
+  } finally {
+    Date.now = realNow;
+    advanceBudgetClock = undefined;
+  }
   assert(s1.ok);
   assertFalse(s1.backfilled);
   assertEquals(s1.lastTxHash, "");

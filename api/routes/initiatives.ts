@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { requireClientIp } from "../middleware/ip.ts";
 import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
@@ -12,13 +13,11 @@ import {
   revisionJson,
   revisionMeta,
 } from "../lib/json.ts";
-import { cleanText, validateForumUrl, validateText } from "../lib/validate.ts";
+import { cleanText, validateForumUrl } from "../lib/validate.ts";
 import { pctOf } from "./board.ts";
 import { onrampLink } from "../lib/onramp.ts";
-import { fetchDiscourseTitle } from "../services/forum.ts";
 import {
   MAX_FUNDERS,
-  MAX_TITLE,
   REVISIONS_PER_HOUR_PER_ADDRESS,
   SUBMISSIONS_PER_HOUR_PER_IP,
   TOKENS,
@@ -28,8 +27,14 @@ import { pickText } from "../db/rfps.ts";
 import { ledgerStatus, refreshLedger } from "../services/ledger.ts";
 import { chainStateFresh } from "../chain/mod.ts";
 import { activeTokens } from "../chain/tokens.ts";
-import { assertNoErrors, mergeFindings, readBackers, readStructured } from "../lib/structured.ts";
-import { readPageFacts } from "../lib/page-facts.ts";
+import {
+  assertNoErrors,
+  mergeFindings,
+  readBackers,
+  readStructured,
+  TEXT_FIELDS,
+} from "../lib/structured.ts";
+import { PAGE_FACT_FIELDS, readPageFacts } from "../lib/page-facts.ts";
 import { ownsUpload } from "./uploads.ts";
 import {
   bodyKey,
@@ -182,13 +187,12 @@ export function initiativeRoutes(deps: Deps) {
 
   /**
    * The proposer (or an admin) replaces the text. Goes live at once; the
-   * previous text stays in the history. A body with `sections`, `milestones`
-   * or `links` takes the structured path (the rules of the form, "edit"
-   * scope, block); a legacy `details` body is accepted on legacy rows only.
+   * previous text stays in the history. Edits use structured sections,
+   * milestones and links, migrating legacy rows when necessary.
    */
   r.post("/:slug/revisions", requireAuth, async (c) => {
     const user = c.var.user!;
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["initiativeId", ...TEXT_FIELDS]);
     const { rfp, proposer } = await editableBy(c.req.param("slug"), user, body);
     if (rfp.status !== "pending" && rfp.status !== "approved") {
       throw new HttpError(403, "This initiative is no longer open for edits.");
@@ -204,40 +208,30 @@ export function initiativeRoutes(deps: Deps) {
     }
     const cur = pickText(rfp);
     const structuredBody = ["sections", "milestones", "links"].some((k) => body[k] !== undefined);
-    if (!structuredBody && isStructured(cur)) {
+    if (!structuredBody) {
       throw new HttpError(
         400,
-        "This initiative uses sections; send sections, milestones and links.",
+        "Send sections, milestones and links to edit initiative text.",
       );
     }
     const origin = { author: user.address, source: proposer ? "proposer" : "admin" } as const;
-    let warnings: Finding[] = [];
-    let text;
-    if (structuredBody) {
-      // The text rules (length floors and caps included) come back as
-      // findings painted on the fields, the same as on submit.
-      const base = {
-        title: cleanText(body.title, "title"),
-        summary: cleanText(body.summary, "summary"),
-        details: "",
-      };
-      const { structured, findings: caps } = readStructured({
-        sections: body.sections ?? cur.sections,
-        milestones: body.milestones ?? cur.milestones,
-        links: body.links ?? cur.links,
-      }, rfp.type);
-      const backers = pledgeBackers(await db.pledges.list(rfp.id));
-      const findings = mergeFindings(caps, editChecks(rfp, { ...base, ...structured }, backers));
-      assertNoErrors(findings);
-      warnings = findings.warnings;
-      text = { ...base, ...structured };
-    } else {
-      text = validateText({
-        title: s(body.title),
-        summary: s(body.summary),
-        details: s(body.details, 100_000),
-      });
-    }
+    // The text rules (length floors and caps included) come back as
+    // findings painted on the fields, the same as on submit.
+    const base = {
+      title: cleanText(body.title, "title"),
+      summary: cleanText(body.summary, "summary"),
+      details: "",
+    };
+    const { structured, findings: caps } = readStructured({
+      sections: body.sections ?? cur.sections,
+      milestones: body.milestones ?? cur.milestones,
+      links: body.links ?? cur.links,
+    }, rfp.type);
+    const backers = pledgeBackers(await db.pledges.list(rfp.id));
+    const findings = mergeFindings(caps, editChecks(rfp, { ...base, ...structured }, backers));
+    assertNoErrors(findings);
+    const { warnings } = findings;
+    const text = { ...base, ...structured };
     const { rfp: next, revision } = await db.rfps.revise(rfp.id, text, origin);
     if (!revision) throw new HttpError(400, "Nothing changed.");
     return c.json(
@@ -253,7 +247,7 @@ export function initiativeRoutes(deps: Deps) {
    */
   r.patch("/:slug", requireAuth, async (c) => {
     const user = c.var.user!;
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["initiativeId", ...PAGE_FACT_FIELDS]);
     const { rfp } = await editableBy(c.req.param("slug"), user, body);
     if (!user.isAdmin && rfp.status !== "pending") {
       throw new HttpError(403, "Locked after approval; email the team.");
@@ -272,12 +266,12 @@ export function initiativeRoutes(deps: Deps) {
    */
   r.post("/", requireAuth, async (c) => {
     const proposer = c.var.user!.address;
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, [...TEXT_FIELDS, ...PAGE_FACT_FIELDS, "backers", "website"]);
     if (s(body.website)) throw new HttpError(400, "bad request"); // honeypot
     if (!(await hasDisplayName(proposer))) {
       throw new HttpError(403, "Set a display name (or an ENS primary name) before submitting.");
     }
-    if (!(await db.rateLimit("submit:" + c.var.ip, SUBMISSIONS_PER_HOUR_PER_IP, 3600))) {
+    if (!(await db.rateLimit("submit:" + requireClientIp(c), SUBMISSIONS_PER_HOUR_PER_IP, 3600))) {
       throw new HttpError(
         429,
         "Too many submissions from your address; try again in an hour.",
@@ -289,23 +283,12 @@ export function initiativeRoutes(deps: Deps) {
       if (err) throw new HttpError(400, err);
       discourseUrl = clean!;
     }
-    // The title may be left blank when a forum link is given: we read the
-    // topic's title from Discourse (SSRF-hardened, best effort).
-    let title = cleanText(body.title, "title");
-    if (!title && discourseUrl) {
-      // Not the user's text: a forum title past the cap is clipped, not refused.
-      title = cleanText(
-        await fetchDiscourseTitle(discourseUrl, deps.fetch, deps.resolve),
-        "title",
-      ).slice(0, MAX_TITLE);
-    }
+    // Discussion links are stored as links, never fetched by the server.
+    // Requiring an explicit title also removes the DNS-rebinding window
+    // that a separate hostname check followed by fetch would leave open.
+    const title = cleanText(body.title, "title");
     if (title.length < 8) {
-      throw new HttpError(
-        400,
-        discourseUrl && !s(body.title)
-          ? "We could not read a title from that discussion link. Please give the initiative a title (at least 8 characters)."
-          : "Please give the initiative a title (at least 8 characters), or a Discourse link we can read it from.",
-      );
+      throw new HttpError(400, "Please give the initiative a title (at least 8 characters).");
     }
     const summary = cleanText(body.summary, "summary");
     const type = body.type === "grant" ? "grant" : "rfp";
@@ -314,9 +297,9 @@ export function initiativeRoutes(deps: Deps) {
     const { backers, findings: backerCaps } = readBackers(body);
     // Page facts. Amounts are read the forgiving way ("150,000", "150.000");
     // a leading minus survives so the range rule can refuse it.
-    const rawGoal = String(body.goal ?? body.goalUsd ?? "");
+    const rawGoal = String(body.goal ?? "");
     const goal = Math.round((/^\s*-/.test(rawGoal) ? -1 : 1) * parseAmount(rawGoal) * 100) / 100;
-    const duration = s(body.durationMonths ?? body.duration, 10);
+    const duration = s(body.durationMonths, 10);
     // One character past each cap survives so checkSubmission reports "too long".
     const recipientTeam = type === "grant" ? s(body.recipientTeam, LIMITS.RECIPIENT_CHARS + 1) : "";
     const recipientUrl = type === "grant" ? s(body.recipientUrl, LIMITS.LINK_CHARS + 1) : "";

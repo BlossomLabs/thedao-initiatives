@@ -8,16 +8,11 @@ import type { Config } from "../config.ts";
  * value. The request's own host is only trustworthy when the edge in front of
  * us routes by hostname, so it is accepted solely for hosts under
  * SELF_HOST_SUFFIXES (the platform's own domains, which nobody else can point
- * at this app); everything else must be listed in WEB_ORIGIN. Behind a
- * TLS-terminating proxy the runtime sees plain http; with TRUST_PROXY the
- * proxy's X-Forwarded-Proto restores the public scheme.
+ * at this app); everything else must be listed in WEB_ORIGIN.
+ * Deno supplies the public request scheme; forwarding headers are ignored.
  */
 export function selfOrigin(req: Request, config: Config): string | null {
   const url = new URL(req.url);
   if (!config.selfHostSuffixes.some((s) => url.hostname.endsWith(s))) return null;
-  if (config.trustProxy) {
-    const proto = req.headers.get("x-forwarded-proto")?.split(",")[0].trim();
-    if (proto === "http" || proto === "https") url.protocol = proto + ":";
-  }
   return url.origin;
 }

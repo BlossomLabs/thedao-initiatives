@@ -8,8 +8,8 @@ funding gap.
 
 React Router v7 SPA built and served with Deno. The design is the Figma file "TheDAO Sites" (board +
 Suggest an initiative), expressed as Tailwind v4 tokens in `app/app.css`. Data comes from the API in
-`api/` (Deno + Hono + KV, see `api/README.md`), hosted by the same package: `server.ts` serves the API
-under `/api` and the built SPA for everything else, from one Deno Deploy app. The initiative texts,
+`api/` (Deno + Hono + KV, see `api/README.md`), hosted by the same package: `server.ts` starts one
+Hono app serving the API under `/api` and the built SPA, from one Deno Deploy app. The initiative texts,
 the process rules and the donation terms are files under `content/`; the proposer's AI guide is
 `public/llms.txt`. The Flask MVP this replaced is described in `docs/v1-to-v2.md`.
 
@@ -77,12 +77,20 @@ and pull request. Deno Deploy builds and deploys `main` itself; there is no depl
   funder leads + CSV)
 
 `/`, `/submit`, `/submit/thanks`, `/donation-terms` and `/admin` are prerendered; everything else is
-served from the SPA fallback by `server.ts`. `/api/*` and `/healthz` go to the Hono app.
+served from the SPA fallback by the same Hono app. API, health and Markdown routes are registered
+before static files and the SPA fallback; unknown API URLs remain JSON 404s.
+
+`server.ts` only boots the app and registers the daily job. `api/app.ts` owns routing, shared
+security headers and the preview lock; `api/site.ts` serves the built files with their existing
+cache rules and staging-origin rewriting. API sessions, auditing, CORS and request guards run only
+on API, health and Markdown routes. HTML keeps its inline-script hashes and `CSP_ENFORCE` behavior;
+API responses keep their resource-blocking CSP. Shared headers also cover preview-lock denials.
 
 ### Publishing a new version of the donation terms
 
 Every version is a file in `content/donation-terms/`, named by its effective date, and git history is
-the audit trail. Nothing is stored in the API and there is no admin action: publishing is a merge.
+the audit trail. The API recognizes those deployed documents and records browser checkbox acceptance;
+there is no admin publishing action.
 
 1. Copy the current file to `content/donation-terms/<YYYY-MM-DD>.md` and set its first line to
    `version: <YYYY-MM-DD>` (the same date as the file name).
@@ -91,13 +99,41 @@ the audit trail. Nothing is stored in the API and there is no admin action: publ
    the version id, so it can be corrected later without minting a new version.
 3. Edit the body, then run `deno task test` (it validates the header, the date and the file name).
 4. Merge and deploy on the effective date: the highest date is the version in force as soon as it
-   ships. Never edit or delete a published file.
+   ships. Deploy the content directory with the API and restart it to refresh the recognized versions.
+   Never edit or delete a published file.
 
-A version's id is the SHA-256 of `<effective date>\n<body>`. The widget remembers acceptance per id,
-so every new version asks donors to accept again, and each donation's acceptance record names the
-id the donor saw (see `api/README.md`).
+A version's id is the SHA-256 of `<effective date>\n<body>`. The widget requires a checkbox and
+records its version on the server before sending or showing the exchange address. Transaction
+matching provides browser correlation, not authenticated donor consent (see `api/README.md`).
 
 ## Wallet and sign-in
+
+The header and inline connect buttons share a lazy-loaded wallet chooser. Installed browser wallets
+use wagmi's injected connector; mobile wallets share one WalletConnect connector with telemetry and
+the bundled Reown modal disabled. The chooser serves a searchable, alphabetically sorted directory
+from `public/wallets.json`, so browsing wallets does not contact an external wallet directory or load
+remote logos. Wallet rows use local monograms. Selecting an app follows its registered deep link;
+QR code and copy URI remain available for other compatible wallets.
+
+Pairing starts when the user selects "Mobile wallets / QR code". App links become available once the
+URI is ready, so navigation happens directly on the user's tap (including on iOS). Closing the dialog
+keeps that request alive; either connect button reopens it. Selecting another app reuses the same
+pairing URI. The chooser stays available through the SIWE signature step and offers an "Open wallet"
+link to return to the selected app. Rejecting or expiring a request clears the URI and permits retry.
+The QR renderer is `qrcode.react` (no runtime dependencies); no per-wallet SDK is added.
+The `package.json` override for `x402` reuses wagmi 3, removing the older wagmi 2 connector tree that
+pulled in MetaMask's SDK, analytics, communication layer, and install modal through Privy. Privy uses
+`x402/client`, which does not import wagmi; the separate `x402/paywall` entry point is unused here.
+The lockfile contains no `@metamask/*` packages. Recheck this when updating Privy or x402, especially
+before adding paywall features. Disabling WalletConnect telemetry does not disable telemetry in
+other SDKs.
+
+Refresh the directory explicitly with `deno task sync-wallets` (requires the existing
+`VITE_WALLETCONNECT_PROJECT_ID` in `.env`). The script downloads Ethereum-mainnet, mobile,
+WalletConnect-v2 listings, validates links, strips any stale pairing URI, and writes the snapshot.
+Review that diff before shipping it. Wallets with missing or ambiguous links remain searchable and
+use QR/copy. A registry entry is not a guarantee that a particular app/version handles its link;
+device testing should cover iOS/Android app launch, return, sign-in, rejection, and reconnect.
 
 wagmi + viem: injected wallets (EIP-6963), WalletConnect when `VITE_WALLETCONNECT_PROJECT_ID` is
 set, and "Email" when `VITE_PRIVY_APP_ID` is set. Sign-In with Ethereum happens only when an action

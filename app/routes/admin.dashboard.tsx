@@ -1,3 +1,4 @@
+import { useAdminApi } from "~/hooks/use-admin-api";
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
@@ -12,7 +13,7 @@ import BulkBar, { type BulkResult, HeadCheck, RowCheck } from "~/components/admi
 import { useSelection } from "~/hooks/use-selection";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { Button, LinkButton } from "~/components/ui/Button";
-import { useSession } from "~/context/session";
+import { sessionKey, useSession } from "~/context/session";
 import { api } from "~/lib/api";
 import type { AdminComment, AdminDashboard } from "~/lib/api-types";
 import { dt, shortAddr, truncate, usd } from "~/lib/format";
@@ -34,11 +35,13 @@ function CommentCell({ c }: { c: AdminComment }) {
 }
 
 export default function Dashboard() {
-  const { signOut } = useSession();
+  const adminApi = useAdminApi();
+  const { signOut, session } = useSession();
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({
-    queryKey: dashKey,
-    queryFn: () => api<AdminDashboard>("/api/admin/dashboard"),
+    queryKey: [...dashKey, sessionKey(session)],
+    queryFn: ({ signal }) => api<AdminDashboard>("/api/admin/dashboard", { signal }),
+    enabled: Boolean(session?.isAdmin),
   });
   const act = async (id: string, action: string) => {
     if (action === "discard" && !confirm("Discard this comment?")) return;
@@ -58,7 +61,7 @@ export default function Dashboard() {
   const reportedSel = useSelection(reportedIds);
   const rowSel = useSelection(rowIds);
   const bulk = (path: string) => async (action: string, ids: string[]) => {
-    const r = await api<BulkResult>(path, { json: { ids, action } });
+    const r = await adminApi<BulkResult>(path, { json: { ids, action } });
     await qc.invalidateQueries({ queryKey: dashKey });
     return r;
   };

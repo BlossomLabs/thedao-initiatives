@@ -8,12 +8,15 @@ import { HttpError } from "../lib/errors.ts";
 import { requireAdmin } from "../middleware/auth.ts";
 import { initiativeMarkdown } from "../services/markdown.ts";
 
-export const isInitiativeMarkdown = (path: string) => /^\/initiative\/[a-z0-9-]+\.md$/.test(path);
+export const MARKDOWN_PATHS = {
+  public: "/:file{[a-z0-9-]+\\.md}",
+  private: "/:file{[a-z0-9-]+-PRIVATE\\.md}",
+} as const;
 
 export function markdownRoutes({ db }: Deps) {
   const r = new Hono<Vars>();
   /** <slug>-PRIVATE.md: admins only; any status, plus contact and funders. */
-  r.get("/:file{[a-z0-9-]+-PRIVATE\\.md}", requireAdmin, async (c) => {
+  r.get(MARKDOWN_PATHS.private, requireAdmin, async (c) => {
     const slug = c.req.param("file").slice(0, -"-PRIVATE.md".length);
     const rfp = await db.rfps.bySlug(slug);
     if (!rfp) throw new HttpError(404, "not found");
@@ -26,7 +29,7 @@ export function markdownRoutes({ db }: Deps) {
       "Cache-Control": "no-store",
     });
   });
-  r.get("/:file{[a-z0-9-]+\\.md}", async (c) => {
+  r.get(MARKDOWN_PATHS.public, async (c) => {
     const slug = c.req.param("file").slice(0, -3);
     const rfp = await db.rfps.bySlug(slug);
     if (!rfp || !["approved", "archived"].includes(rfp.status)) {

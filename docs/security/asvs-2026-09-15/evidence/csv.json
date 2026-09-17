@@ -1,0 +1,6 @@
+{
+  "source": "app/routes/admin.leads.tsx:19",
+  "input": "=1+1",
+  "output": "initiative,slug,type,status,goal_usd,funders,contact,created_at\nSafe proposal,safe-proposal,rfp,pending,100,=1+1,test@example.invalid,2027-01-15T08:00:00Z\n",
+  "conclusion": "Formula is preserved as a CSV cell, not neutralized. No spreadsheet or external command executed."
+}

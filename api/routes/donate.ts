@@ -1,52 +1,159 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { requireClientIp } from "../middleware/ip.ts";
 import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
-import { jsonBody, s } from "../lib/body.ts";
+import { assertFields, jsonBody, s } from "../lib/body.ts";
 import { tokenQty } from "../lib/json.ts";
 import { decimalsOf } from "./initiatives.ts";
 import { CHAIN_ID, MIN_ETH_DONATION } from "../config.ts";
-import { isAddress, toChecksum } from "../chain/address.ts";
-import type { TermsAcceptance } from "../db/terms.ts";
+import { addrEq, isAddress, toChecksum } from "../chain/address.ts";
+import { bodyLimit } from "hono/body-limit";
+import type { ExchangeDetails, WalletIntent } from "../../shared/terms.ts";
+import { publishedDonationTerms } from "../services/donation-terms.ts";
+import { donationSession, requireDonationOrigin } from "../lib/donation-session.ts";
+import { matchDonation } from "../services/donation-matching.ts";
 
 const TX_HASH_RE = /^0x[0-9a-f]{64}$/;
-const TERMS_VERSION_RE = /^[0-9a-f]{64}$/;
-const ISO_UTC_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
-/** How far ahead of the server clock a donor's checkbox timestamp may be. */
-const ACCEPTED_AT_SKEW_SECS = 300;
+const ATTEMPT_RE = /^[A-Za-z0-9_-]{43}$/;
 
-/**
- * The widget's `terms` block on a confirm: the version it displayed, when the
- * box was ticked, and the wallet connected at the time. Anything malformed is
- * a 400 rather than a silently dropped record, so a client bug cannot leave
- * donations without their acceptance.
- */
-export function parseTermsAcceptance(
-  raw: unknown,
-  txHash: string,
-  now: number,
-): Omit<TermsAcceptance, "recordedAt"> {
-  const bad = () => new HttpError(400, "bad terms acceptance");
-  if (!TX_HASH_RE.test(txHash)) throw bad();
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw bad();
-  const t = raw as Record<string, unknown>;
-  const version = s(t.version, 65);
-  if (!TERMS_VERSION_RE.test(version)) throw bad();
-  const acceptedAt = s(t.acceptedAt, 40);
-  const acceptedSecs = Date.parse(acceptedAt) / 1000;
-  if (!ISO_UTC_RE.test(acceptedAt) || Number.isNaN(acceptedSecs)) throw bad();
-  if (acceptedSecs > now + ACCEPTED_AT_SKEW_SECS) throw bad();
-  let address = s(t.address, 64);
-  if (address) {
-    if (!isAddress(address)) throw bad();
-    address = toChecksum(address);
+function optionalText(value: unknown, max: number): string | undefined {
+  if (value === undefined || value === "") return undefined;
+  // deno-lint-ignore no-control-regex -- reject controls in private donor labels
+  if (typeof value !== "string" || value.length > max || /[\u0000-\u001f\u007f]/.test(value)) {
+    throw new HttpError(400, "Invalid donation details");
   }
-  return { txHash, version, address, acceptedAt };
+  return value.trim() || undefined;
 }
 
 export function donateRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const { db, chain } = deps;
+
+  r.use(
+    "/accept",
+    bodyLimit({ maxSize: 8192, onError: (c) => c.json({ error: "request too large" }, 413) }),
+  );
+  r.use(
+    "/confirm",
+    bodyLimit({ maxSize: 8192, onError: (c) => c.json({ error: "request too large" }, 413) }),
+  );
+
+  r.post("/accept", async (c) => {
+    requireDonationOrigin(c, deps);
+    if (!(await db.rateLimit("checkbox:" + requireClientIp(c), 30, 3600))) {
+      throw new HttpError(429, "slow down");
+    }
+    const body = await jsonBody(c, [
+      "slug",
+      "initiativeId",
+      "chainId",
+      "recipient",
+      "version",
+      "agreed",
+      "method",
+      "wallet",
+      "details",
+    ]);
+    if (
+      body.agreed !== true || body.chainId !== CHAIN_ID ||
+      !["wallet", "exchange"].includes(String(body.method))
+    ) {
+      throw new HttpError(400, "Please agree to the donation terms first.");
+    }
+    const rfp = await db.rfps.bySlug(s(body.slug, 200));
+    if (!rfp || rfp.status !== "approved" || !rfp.safeAddress) {
+      throw new HttpError(404, "not found");
+    }
+    await assertInitiativeIdentity(db, rfp.slug, rfp, body.initiativeId);
+    if (typeof body.recipient !== "string" || !addrEq(body.recipient, rfp.safeAddress)) {
+      throw new HttpError(409, "Donation address changed. Refresh the page before continuing.");
+    }
+    const published = (await publishedDonationTerms()).find((v) => v.id === body.version);
+    if (
+      !published || published.effectiveDate > new Date(db.now() * 1000).toISOString().slice(0, 10)
+    ) {
+      throw new HttpError(400, "Unknown or not yet effective donation terms");
+    }
+    let wallet: WalletIntent | undefined;
+    let details: ExchangeDetails | undefined;
+    if (body.method === "wallet") {
+      if (
+        body.details !== undefined || !body.wallet || typeof body.wallet !== "object" ||
+        Array.isArray(body.wallet)
+      ) {
+        throw new HttpError(400, "Invalid wallet intent");
+      }
+      const w = body.wallet as Record<string, unknown>;
+      assertFields(w, ["address", "token", "amountRaw"], "wallet.");
+      const tokens = await chain.donorTokens();
+      if (
+        typeof w.address !== "string" || !isAddress(w.address) || typeof w.token !== "string" ||
+        !Object.values(tokens).some(([address]) =>
+          address.toLowerCase() === String(w.token).toLowerCase()
+        ) ||
+        typeof w.amountRaw !== "string" || !/^[1-9][0-9]{0,77}$/.test(w.amountRaw) ||
+        BigInt(w.amountRaw) >= 2n ** 256n
+      ) {
+        throw new HttpError(400, "Invalid wallet intent");
+      }
+      const afterBlock = await chain.blockNumber();
+      if (!Number.isSafeInteger(afterBlock) || afterBlock <= 0) {
+        throw new HttpError(503, "Chain unavailable");
+      }
+      wallet = {
+        address: toChecksum(w.address),
+        token: w.token.toLowerCase(),
+        amountRaw: w.amountRaw,
+        afterBlock,
+      };
+    } else {
+      if (body.wallet !== undefined) throw new HttpError(400, "Unexpected wallet intent");
+      if (body.details !== undefined) {
+        if (!body.details || typeof body.details !== "object" || Array.isArray(body.details)) {
+          throw new HttpError(400, "Invalid donation details");
+        }
+        const d = body.details as Record<string, unknown>;
+        assertFields(d, ["name", "amount", "currency"], "details.");
+        details = {
+          name: optionalText(d.name, 120),
+          amount: optionalText(d.amount, 80),
+          currency: optionalText(d.currency, 12),
+        };
+        if (details.amount && !/^(?:0|[1-9][0-9]{0,59})(?:\.[0-9]{1,18})?$/.test(details.amount)) {
+          throw new HttpError(400, "Invalid amount");
+        }
+        if (
+          details.currency && !Object.keys(await chain.donorTokens()).includes(details.currency)
+        ) throw new HttpError(400, "Invalid currency");
+      }
+    }
+    const sessionHash = await donationSession(c, deps, true);
+    if (!(await db.rateLimit("checkbox-session:" + sessionHash, 30, 3600))) {
+      throw new HttpError(429, "slow down");
+    }
+    const row = await db.terms.record({
+      sessionHash,
+      initiativeId: rfp.id,
+      chainId: CHAIN_ID,
+      recipient: rfp.safeAddress,
+      version: published.id,
+      method: body.method as "wallet" | "exchange",
+      wallet,
+      details,
+    });
+    return c.json({ attemptId: row.id, recordedAt: row.recordedAt });
+  });
+
+  // Private recovery endpoint; never expose acceptance events or volunteered names publicly.
+  r.get("/attempt/:id", async (c) => {
+    const sessionHash = await donationSession(c, deps);
+    const id = c.req.param("id");
+    const row = ATTEMPT_RE.test(id) ? await db.terms.get(id) : null;
+    if (!row || row.sessionHash !== sessionHash) throw new HttpError(404, "not found");
+    const { sessionHash: _sessionHash, ...acceptance } = row;
+    return c.json({ acceptance, association: await db.terms.association(id) });
+  });
 
   /** Accepted tokens + USD rates (the same set for every initiative). */
   r.get("/params", async (c) => {
@@ -74,10 +181,10 @@ export function donateRoutes(deps: Deps) {
   });
 
   r.post("/confirm", async (c) => {
-    if (!(await db.rateLimit("confirm:" + c.var.ip, 30, 600))) {
+    if (!(await db.rateLimit("confirm:" + requireClientIp(c), 30, 600))) {
       throw new HttpError(429, "slow down");
     }
-    const body = await jsonBody(c);
+    const body = await jsonBody(c, ["slug", "initiativeId", "txHash", "attemptId"]);
     const slug = s(body.slug, 200);
     const txHash = s(body.txHash, 80).toLowerCase();
     const rfp = await db.rfps.bySlug(slug);
@@ -90,10 +197,25 @@ export function donateRoutes(deps: Deps) {
         detail: "this initiative has no donation address yet",
       }, 503);
     }
-    // The donor's terms acceptance, bound to this tx before the chain is
-    // consulted so an RPC outage cannot lose it. First write wins.
-    if (body.terms !== undefined) {
-      await db.terms.record(parseTermsAcceptance(body.terms, txHash, db.now()));
+    if (!TX_HASH_RE.test(txHash)) throw new HttpError(400, "malformed transaction hash");
+    let association;
+    if (body.attemptId !== undefined) {
+      requireDonationOrigin(c, deps);
+      const sessionHash = await donationSession(c, deps);
+      const id = body.attemptId;
+      const row = typeof id === "string" && ATTEMPT_RE.test(id) ? await db.terms.get(id) : null;
+      if (!row || row.sessionHash !== sessionHash) throw new HttpError(404, "not found");
+      if (
+        row.initiativeId !== rfp.id || row.chainId !== CHAIN_ID ||
+        !addrEq(row.recipient, rfp.safeAddress)
+      ) {
+        throw new HttpError(
+          409,
+          "Donation attempt belongs to a different initiative or recipient.",
+        );
+      }
+      // Persist the hash before RPC work: refreshes can retry even if this request fails.
+      association = await db.terms.attach(row, txHash);
     }
     const state = await chain.state();
     if (!Object.keys(await chain.activeTokens()).length) {
@@ -103,11 +225,13 @@ export function donateRoutes(deps: Deps) {
     if (!v.found && v.detail.includes("malformed")) {
       return c.json({ status: "error", detail: v.detail }, 400);
     }
+    if (association) await matchDonation(db, association, v);
     let [, status] = await db.donations.record(rfp.id, txHash, v, "tx");
     if (status === "confirmed") await deps.funding.invalidate(rfp.safeAddress);
     if (status === "already-confirmed") status = "confirmed";
     return c.json({
       status,
+      association: association ? await db.terms.association(association.attemptId) : undefined,
       detail: v.detail,
       amount: v.amount,
       token: v.tokenSymbol,

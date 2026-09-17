@@ -1,9 +1,9 @@
 /**
  * Who is an admin: the addresses in ADMIN_ADDRESSES (fixed, only the env
  * can change them) plus the ones added from the admin dashboard, kept in KV.
- * Checks read a snapshot refreshed every few seconds so a change made in
- * one isolate reaches the others, and a wallet added or removed needs no
- * new session: the session loader asks on every request.
+ * Display tags use a short-lived snapshot; authorization reads current KV
+ * membership on every check. Membership changes invalidate the wallet's
+ * sessions, and new administrator access always requires fresh authentication.
  */
 import type { Db } from "../db/mod.ts";
 import type { Config } from "../config.ts";
@@ -24,8 +24,7 @@ export function createAdmins(db: Db, config: Config, now: () => number) {
   const isFixed = (a: string) => fixed.some((f) => addrEq(f, a));
   let snapshot: { set: Set<string>; at: number } | null = null;
 
-  const added = async (): Promise<string[]> =>
-    (await db.meta.get<string[]>(ADMINS_META_KEY)) ?? [];
+  const added = async (): Promise<string[]> => (await db.meta.get<string[]>(ADMINS_META_KEY)) ?? [];
 
   async function set(): Promise<Set<string>> {
     if (snapshot && now() - snapshot.at < SNAPSHOT_TTL_SECS) return snapshot.set;
@@ -34,8 +33,13 @@ export function createAdmins(db: Db, config: Config, now: () => number) {
     return all;
   }
 
-  const isAdmin = async (address: string): Promise<boolean> =>
-    Boolean(address) && (await set()).has(address.toLowerCase());
+  async function isAdmin(address: string): Promise<boolean> {
+    if (!address) return false;
+    if (isFixed(address)) return true;
+    // Never authorize from the display cache: another instance may have just
+    // removed this wallet while an authentication request was in flight.
+    return (await added()).some((a) => addrEq(a, address));
+  }
 
   async function list(): Promise<AdminEntry[]> {
     const extra = (await added()).filter((a) => !isFixed(a));
@@ -49,6 +53,7 @@ export function createAdmins(db: Db, config: Config, now: () => number) {
     if (!isAddress(raw)) throw new HttpError(400, "that is not an Ethereum address");
     const address = toChecksum(raw);
     if (await isAdmin(address)) throw new HttpError(409, "already an admin");
+    await db.sessions.revokeAll(address);
     await db.meta.set(ADMINS_META_KEY, [...(await added()), address]);
     snapshot = null;
     return list();
@@ -63,6 +68,7 @@ export function createAdmins(db: Db, config: Config, now: () => number) {
     const cur = await added();
     const next = cur.filter((a) => !addrEq(a, raw));
     if (next.length === cur.length) throw new HttpError(404, "not an admin");
+    await db.sessions.revokeAll(raw);
     await db.meta.set(ADMINS_META_KEY, next);
     snapshot = null;
     return list();

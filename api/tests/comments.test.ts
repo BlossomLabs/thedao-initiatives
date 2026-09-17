@@ -3,10 +3,86 @@ import { ADMIN, CURATOR, harness, j, PLAIN } from "./app-helpers.ts";
 import { sortEntries } from "../routes/comments.ts";
 import { TOKENS } from "../config.ts";
 import { transferLog } from "./helpers.ts";
+import { K } from "../db/keys.ts";
+import { CLAIM_TTL_SECS } from "../db/comments.ts";
 
 const EXPERT = "0x3333333333333333333333333333333333333333";
 const DONOR = "0x4444444444444444444444444444444444444444";
 const PROPOSER = "0x5555555555555555555555555555555555555555";
+
+Deno.test("comment claim rotation cannot be overwritten by a concurrent review", async () => {
+  const { h, post } = await setup();
+  try {
+    const held = await j(await post(undefined, { name: "Author" })) as {
+      id: string;
+      claimToken: string;
+    };
+    let token = held.claimToken;
+    for (let i = 0; i < 5; i++) {
+      const [rotated] = await Promise.all([
+        h.db.comments.rotateClaimToken(token),
+        h.db.comments.set(held.id, { reviewed: true }),
+      ]);
+      if (rotated) token = rotated.claimToken;
+      assertEquals((await h.db.comments.byClaimTokens([token])).map((c) => c.id), [held.id]);
+      assertEquals((await h.db.comments.get(held.id))?.reviewed, true);
+    }
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("comment claims: POST only, bounded input, rotation, expiry and moderation revocation", async () => {
+  const { h, post } = await setup();
+  try {
+    const logs: string[] = [];
+    h.deps.log = (line) => logs.push(line);
+    const held = await j(await post(undefined, { name: "Author", body: "private held text" })) as {
+      id: string;
+      claimToken: string;
+    };
+    const mine = (tokens: unknown) =>
+      h.req("/api/comments/mine", { method: "POST", json: { tokens } });
+    assertEquals((await h.req("/api/comments/mine?tokens=" + held.claimToken)).status, 404);
+    for (const invalid of ["not-an-array", ["malformed"], Array(21).fill(held.claimToken)]) {
+      assertEquals((await mine(invalid)).status, 400);
+    }
+    assertEquals((await j(await mine(["0".repeat(32)]))).held, []);
+    assertEquals((await mine([held.claimToken])).headers.get("Cache-Control"), "no-store");
+    const rotate = (token: string) =>
+      h.req("/api/comments/claims/rotate", { method: "POST", json: { token } });
+    const result = await rotate(held.claimToken);
+    assertEquals(result.status, 200);
+    const replacement = await j(result) as { claimToken: string };
+    assert(replacement.claimToken !== held.claimToken);
+    assertEquals((await rotate(held.claimToken)).status, 404);
+    assertEquals((await j(await mine([held.claimToken]))).held, []);
+    assertEquals(((await j(await mine([replacement.claimToken]))).held as unknown[]).length, 1);
+    h.clock.now += CLAIM_TTL_SECS;
+    assertEquals((await j(await mine([replacement.claimToken]))).held, []);
+    assertEquals((await rotate(replacement.claimToken)).status, 404);
+    assertEquals((await h.db.comments.get(held.id))?.body, "private held text");
+
+    const next = await j(await post(undefined, { name: "Author" })) as {
+      id: string;
+      claimToken: string;
+    };
+    await h.db.comments.set(next.id, { status: "discarded" });
+    assertEquals((await h.kv.get(K.claim(next.claimToken))).value, null);
+    assertEquals((await rotate(next.claimToken)).status, 404);
+    // Legacy claims have the same absolute lifetime, even when their KV index had no TTL.
+    const row = (await h.db.comments.get(held.id))!;
+    const { claimExpiresAt: _expiry, ...legacy } = row;
+    await h.kv.set(K.comment(row.rfpId, row.id), legacy);
+    assertEquals(await h.db.comments.byClaimTokens([replacement.claimToken]), []);
+    const output = logs.join("\n");
+    for (const secret of [held.claimToken, replacement.claimToken, "private held text"]) {
+      assert(!output.includes(secret), "credential/body must not reach audit logs");
+    }
+  } finally {
+    h.close();
+  }
+});
 
 async function setup(aiFetch?: (url: string) => Response) {
   const h = await harness({
@@ -36,7 +112,7 @@ async function setup(aiFetch?: (url: string) => Response) {
     h.req(`/api/initiatives/${rfp.slug}/comments`, {
       method: "POST",
       token,
-      json: { type: "question", topic: "scope", body: "Why?", ...body },
+      json: { body: "Why?", ...body },
     });
   return { h, rfp, post };
 }
@@ -60,7 +136,9 @@ Deno.test("comments: anonymous needs a name; without AI, anon posts are held wit
     entries: unknown[];
   };
   assertEquals(list.entries.length, 0);
-  const mine = await j(await h.req("/api/comments/mine?tokens=" + held.claimToken)) as {
+  const mine = await j(
+    await h.req("/api/comments/mine", { method: "POST", json: { tokens: [held.claimToken] } }),
+  ) as {
     held: { id: string }[];
   };
   assertEquals(mine.held.map((x) => x.id), [held.id]);
@@ -78,12 +156,42 @@ Deno.test("comments: anonymous needs a name; without AI, anon posts are held wit
   assertEquals(list2.entries[0].displayName, "Anon");
   assertEquals(list2.entries[0].votes, 0);
   assertEquals(
-    (await j(await h.req("/api/comments/mine?tokens=" + held.claimToken)) as {
+    (await j(
+      await h.req("/api/comments/mine", { method: "POST", json: { tokens: [held.claimToken] } }),
+    ) as {
       held: unknown[];
     }).held.length,
     0,
   );
   h.close();
+});
+
+Deno.test("new comments are generic and cannot collect categories, topics or email", async () => {
+  const { h, rfp, post } = await setup();
+  try {
+    const admin = await h.mint(ADMIN, true);
+    for (
+      const retired of [
+        { type: "question" },
+        { type: "suggestion" },
+        { topic: "budget" },
+        { email: "person@example.org" },
+      ]
+    ) {
+      assertEquals((await post(admin, retired)).status, 400);
+    }
+    assertEquals(await h.db.comments.forRfp(rfp.id), []);
+    // Current requests and the previous browser's harmless defaults both work.
+    for (const body of [{}, { type: "other", topic: "", email: "" }]) {
+      const response = await post(admin, body);
+      assertEquals(response.status, 200);
+      const { id } = await j(response) as { id: string };
+      const row = (await h.db.comments.get(id))!;
+      assertEquals([row.type, row.topic, row.email], ["other", "", ""]);
+    }
+  } finally {
+    h.close();
+  }
 });
 
 Deno.test("AI screen: constructive publishes, unclear holds, spam discards but looks held, failure holds", async () => {
@@ -128,7 +236,8 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   assertEquals(c1.entry.roles, ["CURATOR"]);
   assertEquals(c1.entry.votes, 1);
   assertEquals(c1.entry.myvote, 1);
-  const e1 = await j(await post(expert, { body: "expert q", type: "suggestion" })) as {
+  const e1 = await j(await post(expert, { body: "expert q" })) as {
+    id: string;
     entry: { roles: string[] };
   };
   assertEquals(e1.entry.roles, ["EXPERT"]);
@@ -222,6 +331,16 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   ) as { viewerCanVote: boolean };
   assertEquals(asPlain.viewerCanVote, false);
 
+  // Historical question/suggestion rows still support replies and review.
+  await h.db.kv.set(K.comment(rfp.id, c1.id), {
+    ...(await h.db.comments.get(c1.id))!,
+    type: "question",
+    topic: "scope",
+  });
+  await h.db.kv.set(K.comment(rfp.id, e1.id), {
+    ...(await h.db.comments.get(e1.id))!,
+    type: "suggestion",
+  });
   // replies: any signed-in wallet; without a role they are screened (held here,
   // there is no AI) and do not answer the question. Roles publish at once.
   assertEquals(
@@ -237,7 +356,9 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   ) as { status: string; claimToken: string };
   assertEquals(anonReply.status, "held");
   assertEquals(anonReply.claimToken.length, 32);
-  const mineHeld = await j(await h.req("/api/comments/mine?tokens=" + anonReply.claimToken)) as {
+  const mineHeld = await j(
+    await h.req("/api/comments/mine", { method: "POST", json: { tokens: [anonReply.claimToken] } }),
+  ) as {
     held: { parentId: string | null }[];
   };
   assertEquals(mineHeld.held.map((x) => x.parentId), [c1.id]);
@@ -301,23 +422,24 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   assertEquals((await h.db.comments.get(c1.id))!.reports, 0);
   assertEquals((await h.db.comments.reported()).length, 0);
 
-  // admin actions: accept only suggestions; feature-front max 3
+  // Acceptance was removed even for historical suggestions; review still works.
   assertEquals(
     (await h.req(`/api/admin/comments/${c1.id}/accept`, { method: "POST", token: admin }))
       .status,
     400,
   );
   assertEquals(
-    (await h.req(
-      `/api/admin/comments/${
-        e1.entry
-          ? (await h.db.comments.forRfp(rfp.id)).find((c) => c.type === "suggestion")!.id
-          : ""
-      }/accept`,
-      { method: "POST", token: admin },
-    )).status,
+    (await h.req(`/api/admin/comments/${e1.id}/accept`, { method: "POST", token: admin })).status,
+    400,
+  );
+  assertEquals((await h.db.comments.get(e1.id))!.accepted, false);
+  assertEquals((await h.db.comments.get(e1.id))!.reviewed, false);
+  assertEquals(
+    (await h.req(`/api/admin/comments/${e1.id}/review`, { method: "POST", token: admin })).status,
     200,
   );
+  assertEquals((await h.db.comments.get(e1.id))!.reviewed, true);
+  // feature-front max 3
   const ids = (await h.db.comments.forRfp(rfp.id)).filter((c) => !c.parentId).map((c) => c.id);
   for (const id of ids.slice(0, 3)) {
     assertEquals(
@@ -384,7 +506,7 @@ Deno.test("names: .eth is only allowed as the poster's own ENS name", async () =
     h.req(`/api/initiatives/${rfp.slug}/comments`, {
       method: "POST",
       token,
-      json: { type: "question", topic: "scope", body: "Why?", ...body },
+      json: { body: "Why?", ...body },
     });
   const admin = await h.mint(ADMIN, true);
   const plain = await h.mint(PLAIN);

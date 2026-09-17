@@ -73,9 +73,9 @@ export default function Initiative() {
     void qc.invalidateQueries({ queryKey: ["board"] });
   };
   // The text on screen: the current one, or the older revision once loaded.
-  const showingOld = viewing !== current && Boolean(older.data);
+  const showingOld = viewing !== current && !older.error && Boolean(older.data);
   const text: RevisionText = showingOld ? older.data! : r;
-  const diff = mode === "changes" && (prev.data || !prevMeta)
+  const diff = mode === "changes" && !older.error && !prev.error && (prev.data || !prevMeta)
     ? diffRevisions(prev.data ?? null, text, r.type)
     : null;
   // Structured rows render their sections, milestones and links; a legacy

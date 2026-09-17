@@ -6,6 +6,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
+import { formBody } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { ipfsUrl } from "../lib/json.ts";
 import { K } from "../db/keys.ts";
@@ -35,8 +36,8 @@ export function uploadRoutes(deps: Deps) {
     ) {
       throw new HttpError(429, "Too many uploads; try again in an hour.");
     }
-    const form = await c.req.formData().catch(() => null);
-    const file = form?.get("image");
+    const form = await formBody(c, ["image"]);
+    const file = form.get("image");
     if (!(file instanceof File) || !file.size) throw new HttpError(400, "Choose an image.");
     if (file.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
     const [cid, err] = await deps.pinata.uploadImage(

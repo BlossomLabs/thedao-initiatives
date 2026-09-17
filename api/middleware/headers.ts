@@ -4,13 +4,32 @@ import type { Config } from "../config.ts";
 import { HttpError } from "../lib/errors.ts";
 import { LOCK_MESSAGE, LOCK_REALM, type SiteLock } from "../lib/sitelock.ts";
 import { selfOrigin } from "../lib/origin.ts";
+import type { SitePolicy } from "../lib/site-headers.ts";
 
-export const securityHeaders: MiddlewareHandler<Vars> = async (c, next) => {
+const API_CSP = "default-src 'none'; frame-ancestors 'none'";
+
+/** Shared by pages, assets and API responses, including early denials and errors. */
+export function securityHeaders(policy?: SitePolicy): MiddlewareHandler<Vars> {
+  return async (c, next) => {
+    await next();
+    // API middleware has already selected its policy. Otherwise apply the site's policy
+    // here, after static handlers return a raw Response (which can replace earlier headers).
+    if (!c.res.headers.has("Content-Security-Policy")) {
+      c.header("Content-Security-Policy", policy?.enforced ?? API_CSP);
+      if (policy?.reportOnly) c.header("Content-Security-Policy-Report-Only", policy.reportOnly);
+    }
+    c.header("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("X-Frame-Options", "DENY");
+    c.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  };
+}
+
+export const apiHeaders: MiddlewareHandler<Vars> = async (c, next) => {
   await next();
-  c.header("X-Content-Type-Options", "nosniff");
-  c.header("X-Frame-Options", "DENY");
-  c.header("Referrer-Policy", "strict-origin-when-cross-origin");
-  c.header("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+  c.header("Content-Security-Policy", API_CSP);
+  c.header("Content-Security-Policy-Report-Only", undefined);
   c.header("Cache-Control", c.res.headers.get("Cache-Control") ?? "no-store");
 };
 
@@ -40,9 +59,10 @@ export function siteLock(lock: SiteLock): MiddlewareHandler<Vars> {
     const verdict = await lock.check(c.req.raw);
     if (verdict === "denied") {
       c.header("WWW-Authenticate", LOCK_REALM);
+      c.header("Cache-Control", "no-store");
       return c.json({ error: LOCK_MESSAGE }, 401);
     }
     await next();
-    if (verdict === "basic") c.header("Set-Cookie", await lock.cookie());
+    if (verdict === "basic") c.header("Set-Cookie", await lock.cookie(), { append: true });
   };
 }

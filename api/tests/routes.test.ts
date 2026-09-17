@@ -1,3 +1,4 @@
+import { PNG } from "./image-fixtures.ts";
 import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
 import {
   ADMIN,
@@ -18,7 +19,6 @@ import { TOKENS } from "../config.ts";
 import { predictSafeAddress } from "../chain/safe.ts";
 
 const USDC = TOKENS.USDC[0];
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 
 async function seedApproved(h: Awaited<ReturnType<typeof harness>>, safe = SAFE_ADDR) {
   const admin = await h.mint(ADMIN, true);

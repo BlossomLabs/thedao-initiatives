@@ -1,3 +1,4 @@
+import { PNG } from "./image-fixtures.ts";
 /** Structured initiatives: submit, logo uploads, proposer edits and page
  * facts, the admin editor's findings. */
 import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
@@ -14,7 +15,6 @@ import { exampleSubmission, grantBody, minimalSubmission, revisionBody } from ".
 import { LIMITS, SECTIONS, TOO_LONG_MSG } from "../../shared/draft/mod.ts";
 import type { Rfp } from "../db/types.ts";
 
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const OTHER = "0x2222222222222222222222222222222222222222";
 
 type Finding = { field: string; msg: string; kind?: string };
@@ -701,7 +701,7 @@ Deno.test("content logos: pinned once by name, mapped onto the pledge by the syn
     },
   });
   const admin = await h.mint(ADMIN, true);
-  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  const png = PNG;
   const upload = (name: string, bytes: Uint8Array) => {
     const form = new FormData();
     form.set("name", name);

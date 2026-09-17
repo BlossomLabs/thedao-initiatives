@@ -22,6 +22,7 @@
     "test": "deno task test"
   },
   "dependencies": {
+    "@imagemagick/magick-wasm": "^0.0.43",
     "@privy-io/react-auth": "^3.42.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-query": "^5.90.12",

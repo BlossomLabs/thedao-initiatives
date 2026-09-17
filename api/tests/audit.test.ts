@@ -1,3 +1,4 @@
+import { PNG } from "./image-fixtures.ts";
 import { assert, assertEquals, assertFalse, assertMatch } from "@std/assert";
 import {
   ADMIN,
@@ -407,12 +408,7 @@ Deno.test("audit: logo replacement and reuse identify the target without logging
   });
   const name = "private-sponsor.png";
   const logs = h.logs;
-  const png = Uint8Array.from(
-    atob(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=",
-    ),
-    (c) => c.charCodeAt(0),
-  );
+  const png = PNG;
   try {
     const token = await h.mint(ADMIN, true);
     await h.db.logos.set(name, "previous-cid", "previous-content-hash");

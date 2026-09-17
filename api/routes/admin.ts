@@ -645,7 +645,8 @@ export function adminRoutes(deps: Deps) {
     if (!(image instanceof File) || !image.size) throw new HttpError(400, "Send the image file.");
     if (image.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
     const bytes = new Uint8Array(await image.arrayBuffer());
-    const sha256 = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+    // Legacy pins were not decoded. Only reuse pins produced by this normalization policy.
+    const sha256 = "raster-v1:" + [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
       .map((b) => b.toString(16).padStart(2, "0")).join("");
     const have = await db.logos.get(name);
     if (have && have.sha256 === sha256) {

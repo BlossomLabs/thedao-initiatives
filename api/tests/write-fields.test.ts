@@ -9,7 +9,7 @@ const TX = "0x" + "12".repeat(32);
 async function setup() {
   const h = await harness({
     env: {
-      DISABLE_RATE_LIMITS: "true",
+      RATE_LIMIT_MODE: "off",
       PINATA_JWT: "test",
       AI_SEARCH_API_KEY: "test",
       SUPPORT_URL: "https://support.example/",

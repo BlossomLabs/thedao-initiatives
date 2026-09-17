@@ -1028,8 +1028,8 @@ Deno.test("page facts: content keys sync, admin patch validates and clears per t
   h.close();
 });
 
-Deno.test("DISABLE_RATE_LIMITS=true: the submit limit stops counting", async () => {
-  const h = await harness({ env: { DISABLE_RATE_LIMITS: "true" } });
+Deno.test("RATE_LIMIT_MODE=off: the submit limit stops counting", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
   const token = await proposerToken(h);
   for (let i = 0; i < 8; i++) {
     const res = await h.req("/api/initiatives", {

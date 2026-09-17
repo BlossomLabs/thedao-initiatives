@@ -182,7 +182,11 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     ...opts.env,
   });
   const kv = await Deno.openKv(":memory:");
-  const db = createDb(kv, now, { rateLimitsDisabled: cfg.rateLimitsDisabled });
+  const db = createDb(kv, now, {
+    mode: cfg.rateLimitMode,
+    log: (line) => deps.log(line), // tests swap deps.log after construction
+    alwaysEnforce: config.ALWAYS_ENFORCED_RATE_LIMITS,
+  });
   const script: ChainScript = {
     head: 1000,
     receipts: {},

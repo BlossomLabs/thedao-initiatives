@@ -123,7 +123,13 @@ starts the same app without static files for API-only development.
   snapshotted as revision 1 on their first edit. Historical `details` remain readable in proposals
   and revisions, but new text edits must use structured fields. Editing an old proposal migrates it;
   changing only its page facts preserves the old body.
-- Ids are ULID strings. Rate limits live in KV so they hold across isolates.
+- Ids are ULID strings. Rate limits live in KV so they hold across isolates. `RATE_LIMIT_MODE`
+  picks `enforce` (default), `observe` or `off`. Observe counts every bucket and allows the request,
+  except the buckets in `ALWAYS_ENFORCED_RATE_LIMITS` (submissions, support, uploads), which spend
+  a real resource and keep refusing. Enforce and observe both log a breach as one JSON line
+  (`{"rateLimit":true,"event":"ratelimit.breach",...}` with the bucket name, the sha256 of the
+  client key, cap, window and count) when a bucket first passes its cap and again at each 10x
+  multiple, so Grafana can show which caps real traffic reaches without one line per request.
 
 ## Reusing proposal URLs
 

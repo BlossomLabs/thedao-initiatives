@@ -6,7 +6,7 @@ import { donationsRepo } from "./donations.ts";
 import { commentsRepo } from "./comments.ts";
 import { profilesRepo } from "./profiles.ts";
 import { sessionsRepo } from "./sessions.ts";
-import { rateLimiter } from "./ratelimit.ts";
+import { rateLimiter, type RateLimiterOptions } from "./ratelimit.ts";
 import { metaRepo } from "./meta.ts";
 import { termsRepo } from "./terms.ts";
 
@@ -15,7 +15,7 @@ export type * from "./types.ts";
 export function createDb(
   kv: Deno.Kv,
   now: () => number = () => Date.now() / 1000,
-  opts: { rateLimitsDisabled?: boolean } = {},
+  opts: RateLimiterOptions = {},
 ) {
   const pledges = pledgesRepo(kv, now);
   const donations = donationsRepo(kv, now);
@@ -32,7 +32,7 @@ export function createDb(
     sessions: sessionsRepo(kv, now),
     meta: metaRepo(kv, now),
     terms: termsRepo(kv, now),
-    rateLimit: rateLimiter(kv, now, opts.rateLimitsDisabled),
+    rateLimit: rateLimiter(kv, now, opts),
     /** Ledger-only totals (pledges + confirmed donation rows). The pages use
      * services/funding.ts, which prices the Safe's balances instead. */
     async fundingSummary(rfpId: string) {

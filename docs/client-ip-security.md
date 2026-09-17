@@ -7,11 +7,13 @@ IP quotas use Deno's `remoteAddr.hostname`. The application ignores `X-Forwarded
 and ignore `X-Forwarded-Proto`. There are no application-level proxy-trust settings.
 
 Only plain IPv4 and IPv6 addresses are accepted. Equivalent IPv6 forms, including IPv4-mapped
-IPv6, are normalized so they use the same quota. IP quota checks call `requireClientIp` and
+IPv6, are normalized so they use the same quota. An IPv6 client is identified by its /64 prefix
+(`2001:db8::/64`), because one subscriber usually owns the whole prefix and per-address buckets
+would let a single client rotate through them for free. IP quota checks call `requireClientIp` and
 return **503** if runtime identity is missing or invalid, before consuming the quota or starting
 the protected operation. There is no shared `?` bucket. Public reads, cache hits, and account-only
-operations remain available where they do not require an IP quota. `DISABLE_RATE_LIMITS` does
-not waive the requirement to establish a client identity.
+operations remain available where they do not require an IP quota. `RATE_LIMIT_MODE=off` does not waive the requirement to establish a client identity.
+Breach logs carry the sha256 of the quota identity, never the address itself.
 
 ## Deployment verification
 

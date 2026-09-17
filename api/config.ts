@@ -45,6 +45,26 @@ export const LOGIN_ATTEMPTS_PER_MINUTE_PER_IP = 5;
 export const SUPPORT_MESSAGES_PER_HOUR_PER_IP = 5;
 export const LOGIN_ATTEMPTS_PER_MINUTE_GLOBAL = 60;
 
+export type RateLimitMode = "enforce" | "observe" | "off";
+/** Bucket prefixes that refuse even under RATE_LIMIT_MODE=observe: each hit spends a real
+ * resource (an admin queue entry, a forwarded email, an IPFS pin). */
+export const ALWAYS_ENFORCED_RATE_LIMITS: readonly string[] = [
+  "submit:",
+  "support:",
+  "logoup:",
+  "pfpup:",
+];
+export const RATE_LIMIT_MODES: readonly RateLimitMode[] = ["enforce", "observe", "off"];
+
+function rateLimitMode(env: Record<string, string | undefined>): RateLimitMode {
+  const raw = (env.RATE_LIMIT_MODE ?? "").trim().toLowerCase();
+  if (!raw) return "enforce";
+  if (!(RATE_LIMIT_MODES as string[]).includes(raw)) {
+    throw new Error(`RATE_LIMIT_MODE must be one of ${RATE_LIMIT_MODES.join(", ")}: ${raw}`);
+  }
+  return raw as RateLimitMode;
+}
+
 // ---------------------------------------------------------- community roles
 /** ETHSecurity badge (ERC-721). balanceOf > 0 grants the EXPERT tag. */
 export const BADGE_CONTRACT = "0xf67C0aDe41c607EfeBf198F9D6065Ab1ec5aD4cd";
@@ -111,8 +131,10 @@ export interface Config {
   operationalSigners: string[];
   safeApiKey: string;
   safeSyncTtlSecs: number;
-  /** DISABLE_RATE_LIMITS=true: every KV rate limit answers "allowed" (live sessions where a room shares one IP). */
-  rateLimitsDisabled: boolean;
+  /** RATE_LIMIT_MODE: `enforce` refuses over the cap; `observe` counts and logs a breach but
+   * allows (except ALWAYS_ENFORCED_RATE_LIMITS); `off` neither counts nor logs (live sessions
+   * where a room shares one IP). */
+  rateLimitMode: RateLimitMode;
   /** Alchemy app key: an extra mainnet RPC ahead of the public fallbacks. */
   alchemyApiKey: string;
   pinataJwt: string;
@@ -203,7 +225,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     safeSyncTtlSecs: Number.isFinite(syncTtl) && syncTtl > 0
       ? Math.max(60, Math.floor(syncTtl))
       : 600,
-    rateLimitsDisabled: /^(1|true|yes)$/i.test((env.DISABLE_RATE_LIMITS ?? "").trim()),
+    rateLimitMode: rateLimitMode(env),
     alchemyApiKey,
     pinataJwt: (env.PINATA_JWT ?? "").trim(),
     pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "ipfs.blossom.software",

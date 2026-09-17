@@ -38,7 +38,15 @@ export function walletErrorMessage(e: unknown): string {
   if (err?.code === -32002) {
     return "your wallet already has a request open. Open the wallet and finish or dismiss it, then try again.";
   }
+  // EIP-1193 4901: the wallet is not on the chain the request needs (Ambire
+  // answers personal_sign with it when the site's chain is not enabled there).
+  if (err?.code === 4901) {
+    return "the wallet is not on Ethereum. Switch it to Ethereum mainnet and try again.";
+  }
   const raw = String(err?.shortMessage || err?.message || err?.reason || "");
+  if (/not connected to the requested chain/i.test(raw)) {
+    return "the wallet is not on Ethereum. Switch it to Ethereum mainnet and try again.";
+  }
   if (/insufficient funds/i.test(raw)) {
     return "the wallet does not have enough ETH to pay the network fee.";
   }

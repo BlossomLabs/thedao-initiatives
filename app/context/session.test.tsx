@@ -391,3 +391,85 @@ it("still revokes wallet permissions and the API session on explicit sign-out", 
     params: [{ eth_accounts: {} }],
   });
 });
+
+/** A wallet whose site chain is not Ethereum (Ambire keeps one per site and
+ * refuses personal_sign when it is not an enabled network; MetaMask signs
+ * anyway, but a smart account's signature only verifies on the chain it was
+ * made for). */
+function walletOnChain(hex: string) {
+  let chain = hex;
+  const signature = deferred<`0x${string}`>();
+  const request = vi.fn(
+    async ({ method, params }: { method: string; params?: unknown[] }): Promise<unknown> => {
+      if (method === "eth_accounts" || method === "eth_requestAccounts") return [ADDRESS];
+      if (method === "eth_chainId") return chain;
+      if (method === "wallet_switchEthereumChain") {
+        chain = (params![0] as { chainId: string }).chainId;
+        return null;
+      }
+      if (method === "personal_sign") return await signature.promise;
+      throw new Error("Unexpected wallet request: " + method);
+    },
+  );
+  const provider = { request, on: vi.fn(), removeListener: vi.fn() } as unknown as EIP1193Provider;
+  return { provider, request, signature };
+}
+
+it("switches the wallet to Ethereum before asking for the SIWE signature", async () => {
+  const { provider, request, signature } = walletOnChain("0xa");
+  const { result, config } = setup(provider);
+  await act(async () => {
+    config.connectors[0].emitter.emit("connect", { accounts: [ADDRESS], chainId: 10 });
+    await Promise.resolve();
+  });
+  let pending!: Promise<unknown>;
+  act(() => {
+    pending = result.current.signIn(ADDRESS);
+    void pending.catch(() => {});
+  });
+  await waitFor(() =>
+    expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(true)
+  );
+  const methods = request.mock.calls.map(([args]) => args.method);
+  expect(methods.indexOf("wallet_switchEthereumChain")).toBeGreaterThanOrEqual(0);
+  expect(methods.indexOf("wallet_switchEthereumChain")).toBeLessThan(
+    methods.indexOf("personal_sign"),
+  );
+  expect(request).toHaveBeenCalledWith(
+    expect.objectContaining({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: "0x1" }],
+    }),
+  );
+  await act(async () => {
+    signature.resolve("0x1234");
+    await pending;
+  });
+  expect(result.current.session).toEqual(SESSION);
+  expect(config.state.connections.get(config.state.current!)!.chainId).toBe(1);
+});
+
+it("a refused chain switch ends the sign-in without a signature request", async () => {
+  const { provider, request } = walletOnChain("0xa");
+  const { result, config } = setup(provider);
+  request.mockImplementation(({ method }) => {
+    if (method === "eth_accounts") return Promise.resolve([ADDRESS]);
+    if (method === "eth_chainId") return Promise.resolve("0xa");
+    if (method === "wallet_switchEthereumChain") {
+      return Promise.reject(
+        Object.assign(new Error("User rejected the request."), { code: 4001 }),
+      );
+    }
+    return Promise.reject(new Error("Unexpected wallet request: " + method));
+  });
+  await act(async () => {
+    config.connectors[0].emitter.emit("connect", { accounts: [ADDRESS], chainId: 10 });
+    await Promise.resolve();
+  });
+  await act(async () => {
+    await expect(result.current.signIn(ADDRESS)).rejects.toThrow(/rejected/i);
+  });
+  expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(false);
+  expect(result.current.session).toBeNull();
+  expect(result.current.signingIn).toBe(false);
+});

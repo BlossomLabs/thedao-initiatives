@@ -242,6 +242,16 @@ Deno.test("submit: links must be https; the body has a byte cap", async () => {
     links: Array.from({ length: LIMITS.LINKS + 1 }, (_, i) => `https://l${i}.example/`),
   });
   assertEquals(fields((await j(many) as unknown as Fail).findings.errors), ["links"]);
+  // a criterion past the cap is refused on its own row, never silently cut
+  const longCrit = await submit(h, token, {
+    ...good,
+    milestones: [{
+      ...good.milestones[0],
+      criteria: ["x".repeat(400), "y".repeat(LIMITS.CRITERION_CHARS + 1)],
+    }],
+  });
+  assertEquals(longCrit.status, 400);
+  assertEquals(fields((await j(longCrit) as unknown as Fail).findings.errors), ["ms_0_c1"]);
   h.close();
 });
 

@@ -1,4 +1,5 @@
 import { adoptionFloor, type CheckInput, checkSubmission } from "./checks.ts";
+import { criterionTooLong, LIMITS } from "./normalise.ts";
 import { SECTION_KEYS, SECTIONS } from "./sections.ts";
 import type { Milestone, Sections } from "./types.ts";
 
@@ -123,6 +124,15 @@ test("missing fields, grant sections, and the missing kind", () => {
   expect(f.errors.every((e) => e.kind === "missing")).toBe(true);
   const rfp = minimal(1000);
   expect(SECTIONS.rfp.every((k) => k in rfp.sections)).toBe(true);
+});
+
+test("a criterion past the character cap is an error on its own row, a 400-char one is fine", () => {
+  const i = minimal(1000);
+  i.milestones[0].criteria = ["x".repeat(400), "y".repeat(LIMITS.CRITERION_CHARS + 1)];
+  const f = checkSubmission(i);
+  expect(f.errors.map((e) => [e.field, e.msg])).toEqual([
+    ["ms_0_c1", criterionTooLong("A", 1)],
+  ]);
 });
 
 test("criteria warnings do not block; https and month rules do", () => {

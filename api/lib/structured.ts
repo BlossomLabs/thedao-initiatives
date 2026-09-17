@@ -6,6 +6,7 @@
  */
 import {
   type BackerInput,
+  criterionTooLong,
   type DraftType,
   FIELDS,
   type Finding,
@@ -67,6 +68,11 @@ export function readStructured(
         `Milestone ${letter(i)}: at most ${LIMITS.CRITERIA_PER_MILESTONE} criteria.`,
       );
     }
+    m.criteria.forEach((c, j) => {
+      if (c.length > LIMITS.CRITERION_CHARS) {
+        err(`ms_${i}_c${j}`, criterionTooLong(letter(i), j));
+      }
+    });
   });
   if (structured.links.length > LIMITS.LINKS) err("links", `At most ${LIMITS.LINKS} links.`);
   const cap = byteCapFinding(structured);

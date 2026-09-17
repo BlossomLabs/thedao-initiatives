@@ -1,7 +1,7 @@
 import type { DraftType, Finding, Findings, Milestone, Sections } from "./types.ts";
 import { FIELDS, letter, SECTIONS } from "./sections.ts";
 import { usd } from "./amount.ts";
-import { LIMITS } from "./normalise.ts";
+import { criterionTooLong, LIMITS } from "./normalise.ts";
 
 export const HEDGES = /\bas needed\b|\bwhere appropriate\b/i;
 export const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -199,6 +199,7 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
       warn(`ms_${i}_month`, `${L} has no target month. Every remaining milestone needs one.`);
     }
     crits.forEach((c, j) => {
+      if (c.length > LIMITS.CRITERION_CHARS) err(`ms_${i}_c${j}`, criterionTooLong(letter(i), j));
       const reasons: string[] = [];
       if (c.replace(/\[[^\]]*\]\([^)\s]+\)/g, "").includes("[")) {
         reasons.push("an unresolved bracket");

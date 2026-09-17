@@ -11,7 +11,7 @@ export const LIMITS = {
   MILESTONES: 24,
   MILESTONE_NAME: 150,
   CRITERIA_PER_MILESTONE: 20,
-  CRITERION_CHARS: 300,
+  CRITERION_CHARS: 1000,
   LINK_CHARS: 300,
   LINKS: 20,
   BACKERS: 12,
@@ -23,6 +23,11 @@ export const LIMITS = {
 
 export const TOO_LONG_MSG =
   "The sections, milestones and links together are too long (limit about 40,000 characters).";
+
+export const criterionTooLong = (letter: string, j: number): string =>
+  `Milestone ${letter}, criterion ${j + 1} is too long (${
+    LIMITS.CRITERION_CHARS.toLocaleString("en-US")
+  } characters at most). Split it into two rows.`;
 
 const clip = (v: unknown, max: number): string => String(v ?? "").trim().slice(0, max);
 
@@ -54,7 +59,7 @@ export function normaliseMilestones(raw: unknown): Milestone[] {
       link: clip(m.link, LIMITS.LINK_CHARS),
       month: clip(m.month, 7),
       criteria: (Array.isArray(m.criteria) ? m.criteria : [])
-        .map((c) => clip(c, LIMITS.CRITERION_CHARS))
+        .map((c) => clip(c, LIMITS.CRITERION_CHARS + 1))
         .filter(Boolean)
         .slice(0, LIMITS.CRITERIA_PER_MILESTONE + 1),
     });

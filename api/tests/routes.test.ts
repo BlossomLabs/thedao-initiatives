@@ -64,8 +64,9 @@ Deno.test("content sync publishes the repo files as structured rows; public JSON
   assert(delivered.link.startsWith("https://"));
   const boardText = JSON.stringify(board);
   assertFalse(boardText.includes("SECRET"));
-  assertFalse(boardText.includes("funders"));
-  assertFalse(boardText.includes("contact"));
+  // the keys, not the words: a criterion may say "contact" (Safe UI's does)
+  assertFalse(boardText.includes('"funders"'));
+  assertFalse(boardText.includes('"contact"'));
   const page = await j(await h.req("/api/initiatives/" + first.slug));
   assertFalse(JSON.stringify(page).includes("SECRET"));
   const init = page.initiative as {

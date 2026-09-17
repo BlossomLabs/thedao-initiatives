@@ -8,10 +8,16 @@ import { parseAmount } from "./amount.ts";
 export const LIMITS = {
   SECTION_CHARS: 8000,
   SECTIONS_TOTAL_CHARS: 30_000,
+  TITLE_CHARS: 140,
+  SUMMARY_CHARS: 4000,
+  FUNDERS_CHARS: 4000,
+  CONTACT_CHARS: 200,
+  RECIPIENT_CHARS: 120,
+  REVIEWER_CHARS: 200,
   MILESTONES: 24,
   MILESTONE_NAME: 150,
   CRITERIA_PER_MILESTONE: 20,
-  CRITERION_CHARS: 300,
+  CRITERION_CHARS: 1000,
   LINK_CHARS: 300,
   LINKS: 20,
   BACKERS: 12,
@@ -23,6 +29,17 @@ export const LIMITS = {
 
 export const TOO_LONG_MSG =
   "The sections, milestones and links together are too long (limit about 40,000 characters).";
+
+/** The one "too long" wording for every capped field. Normalisers keep one
+ * character past the cap so the checks can report this instead of the field
+ * losing its tail in silence (2026-09-17: 19 criteria cut at 300). */
+export const tooLong = (label: string, cap: number): string =>
+  `${label} is too long (${cap.toLocaleString("en-US")} characters at most).`;
+
+export const criterionTooLong = (letter: string, j: number): string =>
+  `Milestone ${letter}, criterion ${j + 1} is too long (${
+    LIMITS.CRITERION_CHARS.toLocaleString("en-US")
+  } characters at most). Split it into two rows.`;
 
 const clip = (v: unknown, max: number): string => String(v ?? "").trim().slice(0, max);
 
@@ -47,14 +64,14 @@ export function normaliseMilestones(raw: unknown): Milestone[] {
     if (!r || typeof r !== "object") continue;
     const m = r as Record<string, unknown>;
     out.push({
-      name: clip(m.name, LIMITS.MILESTONE_NAME),
+      name: clip(m.name, LIMITS.MILESTONE_NAME + 1),
       amount: Math.round(parseAmount(m.amount) * 100) / 100,
       adoption: Boolean(m.adoption),
       done: Boolean(m.done),
-      link: clip(m.link, LIMITS.LINK_CHARS),
+      link: clip(m.link, LIMITS.LINK_CHARS + 1),
       month: clip(m.month, 7),
       criteria: (Array.isArray(m.criteria) ? m.criteria : [])
-        .map((c) => clip(c, LIMITS.CRITERION_CHARS))
+        .map((c) => clip(c, LIMITS.CRITERION_CHARS + 1))
         .filter(Boolean)
         .slice(0, LIMITS.CRITERIA_PER_MILESTONE + 1),
     });

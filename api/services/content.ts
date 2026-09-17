@@ -8,7 +8,9 @@ import { parseDuration, parseGoal, validateHttpsLink } from "../lib/validate.ts"
 import type { Db } from "../db/mod.ts";
 import type { RfpStatus, RfpType } from "../db/types.ts";
 import {
+  criterionTooLong,
   FIELDS,
+  letter,
   LIMITS,
   type Milestone,
   milestonesTotal,
@@ -22,6 +24,7 @@ import {
   type Structured,
   structuredBytes,
   TOO_LONG_MSG,
+  tooLong,
   usd,
 } from "../../shared/draft/mod.ts";
 
@@ -64,7 +67,9 @@ export function parseContentBackers(raw: string): PastedBacker[] {
   const seen = new Set<string>();
   for (const b of out) {
     if (!b.org) throw new Error("backers: a line has no organization");
-    if (b.org.length > 120) throw new Error(`backers: ${b.org.slice(0, 40)}… is too long`);
+    if (b.org.length > LIMITS.BACKER_ORG) {
+      throw new Error(tooLong("backers: the organization name", LIMITS.BACKER_ORG));
+    }
     if (!(b.amountUsd > 0)) throw new Error(`backers: ${b.org} needs an amount`);
     const [url, err] = validateHttpsLink(b.url);
     if (err) throw new Error(`backers: ${b.org}: ${err}`);
@@ -121,6 +126,26 @@ export function parseStructuredBody(body: string, type: RfpType, goal: number): 
     type,
   );
   if (structuredBytes(structured) > LIMITS.STRUCTURED_BYTES) throw new Error(TOO_LONG_MSG);
+  // Never cut a file's text: a field past its cap is a sync error to fix in git.
+  for (const key of SECTIONS[type]) {
+    if ((structured.sections[key] ?? "").length > LIMITS.SECTION_CHARS) {
+      throw new Error(tooLong(FIELDS[key].heading, LIMITS.SECTION_CHARS));
+    }
+  }
+  structured.milestones.forEach((m, i) => {
+    if (m.name.length > LIMITS.MILESTONE_NAME) {
+      throw new Error(tooLong(`milestone ${letter(i)} name`, LIMITS.MILESTONE_NAME));
+    }
+    if (m.link.length > LIMITS.LINK_CHARS) {
+      throw new Error(tooLong(`milestone ${letter(i)} link`, LIMITS.LINK_CHARS));
+    }
+    m.criteria.forEach((c, j) => {
+      if (c.length > LIMITS.CRITERION_CHARS) throw new Error(criterionTooLong(letter(i), j));
+    });
+  });
+  structured.links.forEach((l, i) => {
+    if (l.length > LIMITS.LINK_CHARS) throw new Error(tooLong(`link ${i + 1}`, LIMITS.LINK_CHARS));
+  });
   return structured;
 }
 
@@ -147,6 +172,9 @@ export function parseRfpFile(text: string): ContentFields {
   if (title.length < 1 || title.length > MAX_TITLE) {
     throw new Error(`title is required (max ${MAX_TITLE} chars)`);
   }
+  // Never cut a file's text: a field past its cap is a sync error to fix in git.
+  const summary = fields.summary ?? "";
+  if (summary.length > MAX_SUMMARY) throw new Error(tooLong("summary", MAX_SUMMARY));
   const [goal, err] = parseGoal(fields.goal ?? "");
   if (err) throw new Error(err);
   const status = (fields.status ?? "approved").toLowerCase();
@@ -163,7 +191,14 @@ export function parseRfpFile(text: string): ContentFields {
   if (durErr) throw new Error(durErr);
   const topup = ["true", "yes", "1"].includes((fields.topup ?? "").trim().toLowerCase());
   if (topup && type !== "grant") throw new Error("topup applies to grants only");
-  const recipientTeam = type === "grant" ? (fields.recipient ?? "").trim().slice(0, 120) : "";
+  const recipientTeam = type === "grant" ? (fields.recipient ?? "").trim() : "";
+  if (recipientTeam.length > LIMITS.RECIPIENT_CHARS) {
+    throw new Error(tooLong("recipient", LIMITS.RECIPIENT_CHARS));
+  }
+  const milestoneReviewer = topup ? (fields.reviewer ?? "").trim() : "";
+  if (milestoneReviewer.length > LIMITS.REVIEWER_CHARS) {
+    throw new Error(tooLong("reviewer", LIMITS.REVIEWER_CHARS));
+  }
   const [recipientUrl, urlErr] = validateHttpsLink(
     recipientTeam ? fields.recipient_url ?? "" : "",
   );
@@ -171,7 +206,7 @@ export function parseRfpFile(text: string): ContentFields {
   const structured = parseStructuredBody(body, type, goal!);
   return {
     title,
-    summary: (fields.summary ?? "").slice(0, MAX_SUMMARY),
+    summary,
     details: "",
     ...structured,
     goalUsd: goal!,
@@ -183,7 +218,7 @@ export function parseRfpFile(text: string): ContentFields {
     recipientTeam,
     recipientUrl: recipientUrl!,
     topup,
-    milestoneReviewer: topup ? (fields.reviewer ?? "").trim().slice(0, 200) : "",
+    milestoneReviewer,
     backers: parseContentBackers(fields.backers ?? ""),
   };
 }

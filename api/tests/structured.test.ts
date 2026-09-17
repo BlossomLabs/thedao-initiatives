@@ -11,7 +11,7 @@ import {
   proposerToken,
 } from "./app-helpers.ts";
 import { exampleSubmission, grantBody, minimalSubmission } from "./fixtures.ts";
-import { LIMITS, SECTIONS, TOO_LONG_MSG } from "../../shared/draft/mod.ts";
+import { LIMITS, SECTIONS, TOO_LONG_MSG, tooLong } from "../../shared/draft/mod.ts";
 import type { Rfp } from "../db/types.ts";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
@@ -242,6 +242,28 @@ Deno.test("submit: links must be https; the body has a byte cap", async () => {
     links: Array.from({ length: LIMITS.LINKS + 1 }, (_, i) => `https://l${i}.example/`),
   });
   assertEquals(fields((await j(many) as unknown as Fail).findings.errors), ["links"]);
+  // a criterion past the cap is refused on its own row, never silently cut
+  const longCrit = await submit(h, token, {
+    ...good,
+    milestones: [{
+      ...good.milestones[0],
+      criteria: ["x".repeat(400), "y".repeat(LIMITS.CRITERION_CHARS + 1)],
+    }],
+  });
+  assertEquals(longCrit.status, 400);
+  assertEquals(fields((await j(longCrit) as unknown as Fail).findings.errors), ["ms_0_c1"]);
+  // the page and private fields and backer names: refused on their own id, never cut
+  const longFields = await submit(h, token, {
+    ...good,
+    title: "t".repeat(LIMITS.TITLE_CHARS + 1),
+    contact: "c".repeat(LIMITS.CONTACT_CHARS + 1),
+    backers: [{ org: "o".repeat(LIMITS.BACKER_ORG + 1), amountUsd: "1", url: "" }],
+  });
+  assertEquals(longFields.status, 400);
+  assertEquals(
+    fields((await j(longFields) as unknown as Fail).findings.errors).sort(),
+    ["bk_org_0", "contact", "title"],
+  );
   h.close();
 });
 
@@ -392,6 +414,11 @@ Deno.test("proposer PATCH: page facts while pending, locked after approval, admi
   assertEquals(out.initiative.funders, "A different funder list here");
   assertEquals((await patch({ durationMonths: "1.5" })).status, 400);
   assertEquals((await patch({ recipientUrl: "http://q.example/" })).status, 400);
+  // a fact past its cap is refused, not cut
+  const longContact = await patch({ contact: "c".repeat(LIMITS.CONTACT_CHARS + 1) });
+  assertEquals(longContact.status, 400);
+  assertEquals((await j(longContact)).error, "The contact is too long (200 characters at most).");
+  assertEquals((await patch({ contact: "c".repeat(LIMITS.CONTACT_CHARS) })).status, 200);
   // the text is untouched: no revision for a facts change
   const row = (await h.db.rfps.bySlug(slug))!;
   assertEquals(row.revision, 1);
@@ -841,5 +868,105 @@ Deno.test("edit: a top-up measures the adoption floor against the goal minus the
     (await j(whole) as Fail).findings.errors.find((e) => e.field === "milestones")!.msg,
     "16% of the goal. Raise them to at least $93,667",
   );
+  h.close();
+});
+
+Deno.test("caps: a long link, an edited long title and a long pledge company are refused with the message", async () => {
+  const h = await harness();
+  const token = await proposerToken(h);
+  const admin = await h.mint(ADMIN, true);
+  const longLink = "https://x.org/" + "a".repeat(LIMITS.LINK_CHARS);
+  // submit: a backer link past the cap is "too long" on its row, not "not https"
+  const good = minimalSubmission(1000, "grant");
+  const longBacker = await submit(h, token, {
+    ...good,
+    backers: [{ org: "Org", amountUsd: 5, url: longLink }],
+  });
+  assertEquals(longBacker.status, 400);
+  const bf = (await j(longBacker) as unknown as Fail).findings.errors;
+  assertEquals(fields(bf), ["bk_url_0"]);
+  assertEquals(bf[0].msg, tooLong("Org: the link", LIMITS.LINK_CHARS));
+  // PATCH: the recipient link has the same cap as submit
+  const { slug } = await j(await submit(h, token, good)) as { slug: string };
+  const patched = await h.req(`/api/initiatives/${slug}`, {
+    method: "PATCH",
+    token,
+    json: { recipientUrl: longLink },
+  });
+  assertEquals(patched.status, 400);
+  assertStringIncludes((await j(patched)).error as string, "too long");
+  assertEquals((await h.db.rfps.bySlug(slug))!.recipientUrl, "https://x.example/");
+  // edit: a long title comes back painted on the field, like submit does
+  const edited = await h.req(`/api/initiatives/${slug}/revisions`, {
+    method: "POST",
+    token,
+    json: { ...good, title: "t".repeat(LIMITS.TITLE_CHARS + 1) },
+  });
+  assertEquals(edited.status, 400);
+  const ef = (await j(edited) as unknown as Fail).findings.errors;
+  assertEquals(fields(ef), ["title"]);
+  assertEquals(ef[0].msg, tooLong("The title", LIMITS.TITLE_CHARS));
+  // admin pledges: company, link and note are refused past the cap, never cut
+  const id = (await h.db.rfps.bySlug(slug))!.id;
+  const base = `/api/admin/initiatives/${id}/pledges`;
+  const longCompany = await h.req(base, {
+    method: "POST",
+    token: admin,
+    json: { company: "c".repeat(LIMITS.BACKER_ORG + 1), amount: "10" },
+  });
+  assertEquals(longCompany.status, 400);
+  assertEquals((await j(longCompany)).error, tooLong("The company name", LIMITS.BACKER_ORG));
+  const created = await h.req(base, {
+    method: "POST",
+    token: admin,
+    json: { company: "c".repeat(LIMITS.BACKER_ORG), amount: "10" },
+  });
+  assertEquals(created.status, 201);
+  const pid = (await j(created) as { pledge: { id: string } }).pledge.id;
+  const longUrl = await h.req(`${base}/${pid}`, {
+    method: "PATCH",
+    token: admin,
+    json: { url: longLink },
+  });
+  assertEquals(longUrl.status, 400);
+  assertEquals((await j(longUrl)).error, tooLong("The link", LIMITS.BACKER_URL));
+  const longNote = await h.req(`${base}/${pid}`, {
+    method: "PATCH",
+    token: admin,
+    json: { note: "n".repeat(301) },
+  });
+  assertEquals(longNote.status, 400);
+  assertEquals((await j(longNote)).error, tooLong("The note", 300));
+  assertEquals((await h.db.pledges.list(id))[0].company, "c".repeat(LIMITS.BACKER_ORG));
+  h.close();
+});
+
+Deno.test("admin editor: a field past its cap blocks the save, an editorial finding does not", async () => {
+  const h = await harness();
+  const token = await proposerToken(h);
+  const admin = await h.mint(ADMIN, true);
+  const good = minimalSubmission(1000);
+  const { slug } = await j(await submit(h, token, good)) as { slug: string };
+  const id = (await h.db.rfps.bySlug(slug))!.id;
+  const patch = (json: unknown) =>
+    h.req(`/api/admin/initiatives/${id}`, { method: "PATCH", token: admin, json });
+  // a blank milestone name is editorial: reported, saved
+  const blank = await patch({ milestones: [{ ...good.milestones[0], name: "" }] });
+  assertEquals(blank.status, 200);
+  assertEquals(fields((await j(blank) as Out).findings!.errors), ["ms_0_name"]);
+  // a name past the cap is refused with the finding on its field
+  const long = await patch({
+    milestones: [{ ...good.milestones[0], name: "n".repeat(LIMITS.MILESTONE_NAME + 1) }],
+  });
+  assertEquals(long.status, 400);
+  const lf = (await j(long) as unknown as Fail).findings.errors;
+  assertEquals(fields(lf), ["ms_0_name"]);
+  assertEquals(lf[0].msg, tooLong("Milestone A: the name", LIMITS.MILESTONE_NAME));
+  assertEquals((await h.db.rfps.get(id))!.milestones[0].name, "");
+  // so is a title past the cap, painted on the field like the proposer's edit
+  const longTitle = await patch({ title: "t".repeat(LIMITS.TITLE_CHARS + 1) });
+  assertEquals(longTitle.status, 400);
+  assertEquals(fields((await j(longTitle) as unknown as Fail).findings.errors), ["title"]);
+  assertEquals((await h.db.rfps.get(id))!.title, good.title);
   h.close();
 });

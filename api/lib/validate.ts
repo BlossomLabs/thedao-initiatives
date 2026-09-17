@@ -1,14 +1,24 @@
 /** Input validation shared by the submit form, the proposer's edit page and the admin editor. */
 import { HttpError } from "./errors.ts";
 import { MAX_DETAILS, MAX_SUMMARY, MAX_TITLE } from "../config.ts";
+import { LIMITS, tooLong } from "../../shared/draft/mod.ts";
 
 export const MIN_TITLE = 8;
 export const MIN_SUMMARY = 40;
 
-/** Clip a text field to its limit; the same rules everywhere the text is written. */
+/** Trim a text field, keeping one character past its limit so the checks can
+ * report "too long" instead of the tail vanishing; the same everywhere the
+ * text is written. */
 export function cleanText(v: unknown, field: "title" | "summary" | "details"): string {
   const max = field === "title" ? MAX_TITLE : field === "summary" ? MAX_SUMMARY : MAX_DETAILS;
-  return String(v ?? "").trim().slice(0, max);
+  return String(v ?? "").trim().slice(0, max + 1);
+}
+
+/** A capped text field: refused with the shared "too long" message, never cut. */
+export function capped(v: unknown, cap: number, label: string): string {
+  const t = String(v ?? "").trim().slice(0, cap + 1);
+  if (t.length > cap) throw new HttpError(400, tooLong(label, cap));
+  return t;
 }
 
 /**
@@ -22,11 +32,15 @@ export function validateText(
   if (title.length < MIN_TITLE) {
     throw new HttpError(400, `Title needs at least ${MIN_TITLE} characters.`);
   }
+  if (title.length > MAX_TITLE) throw new HttpError(400, tooLong("The title", MAX_TITLE));
   const summary = cleanText(text.summary, "summary");
   if (summary.length < MIN_SUMMARY) {
     throw new HttpError(400, `Summary needs at least ${MIN_SUMMARY} characters.`);
   }
-  return { title, summary, details: cleanText(text.details, "details") };
+  if (summary.length > MAX_SUMMARY) throw new HttpError(400, tooLong("The summary", MAX_SUMMARY));
+  const details = cleanText(text.details, "details");
+  if (details.length > MAX_DETAILS) throw new HttpError(400, tooLong("The details", MAX_DETAILS));
+  return { title, summary, details };
 }
 
 export function parseGoal(raw: unknown): [number, null] | [null, string] {
@@ -128,13 +142,14 @@ export function parseDuration(raw: unknown): [number | null, null] | [null, stri
 }
 
 /**
- * An https link the page renders as an anchor (recipient team site). Only the
- * scheme and host shape are checked; nothing fetches it server-side.
+ * An https link the page renders as an anchor (recipient team site, backer
+ * site). Only the scheme and host shape are checked; nothing fetches it
+ * server-side. The cap is the form's, so every writer of a link agrees.
  */
 export function validateHttpsLink(raw: unknown): [string, null] | [null, string] {
   const s = String(raw ?? "").trim();
   if (!s) return ["", null];
-  if (s.length > 500) return [null, "Link is too long."];
+  if (s.length > LIMITS.LINK_CHARS) return [null, tooLong("The link", LIMITS.LINK_CHARS)];
   let u: URL;
   try {
     u = new URL(s);

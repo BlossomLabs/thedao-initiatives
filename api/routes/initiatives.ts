@@ -18,6 +18,7 @@ import { onrampLink } from "../lib/onramp.ts";
 import { fetchDiscourseTitle } from "../services/forum.ts";
 import {
   MAX_FUNDERS,
+  MAX_TITLE,
   REVISIONS_PER_HOUR_PER_ADDRESS,
   SUBMISSIONS_PER_HOUR_PER_IP,
   TOKENS,
@@ -36,6 +37,7 @@ import {
   checkSubmission,
   type Finding,
   isStructured,
+  LIMITS,
   parseAmount,
 } from "../../shared/draft/mod.ts";
 
@@ -212,7 +214,13 @@ export function initiativeRoutes(deps: Deps) {
     let warnings: Finding[] = [];
     let text;
     if (structuredBody) {
-      const base = validateText({ title: s(body.title), summary: s(body.summary), details: "" });
+      // The text rules (length floors and caps included) come back as
+      // findings painted on the fields, the same as on submit.
+      const base = {
+        title: cleanText(body.title, "title"),
+        summary: cleanText(body.summary, "summary"),
+        details: "",
+      };
       const { structured, findings: caps } = readStructured({
         sections: body.sections ?? cur.sections,
         milestones: body.milestones ?? cur.milestones,
@@ -285,10 +293,11 @@ export function initiativeRoutes(deps: Deps) {
     // topic's title from Discourse (SSRF-hardened, best effort).
     let title = cleanText(body.title, "title");
     if (!title && discourseUrl) {
+      // Not the user's text: a forum title past the cap is clipped, not refused.
       title = cleanText(
         await fetchDiscourseTitle(discourseUrl, deps.fetch, deps.resolve),
         "title",
-      );
+      ).slice(0, MAX_TITLE);
     }
     if (title.length < 8) {
       throw new HttpError(
@@ -308,12 +317,13 @@ export function initiativeRoutes(deps: Deps) {
     const rawGoal = String(body.goal ?? body.goalUsd ?? "");
     const goal = Math.round((/^\s*-/.test(rawGoal) ? -1 : 1) * parseAmount(rawGoal) * 100) / 100;
     const duration = s(body.durationMonths ?? body.duration, 10);
-    const recipientTeam = type === "grant" ? s(body.recipientTeam, 120) : "";
-    const recipientUrl = type === "grant" ? s(body.recipientUrl, 300) : "";
-    const milestoneReviewer = topup ? s(body.milestoneReviewer, 200) : "";
+    // One character past each cap survives so checkSubmission reports "too long".
+    const recipientTeam = type === "grant" ? s(body.recipientTeam, LIMITS.RECIPIENT_CHARS + 1) : "";
+    const recipientUrl = type === "grant" ? s(body.recipientUrl, LIMITS.LINK_CHARS + 1) : "";
+    const milestoneReviewer = topup ? s(body.milestoneReviewer, LIMITS.REVIEWER_CHARS + 1) : "";
     // NEVER rendered publicly: private fundraising leads, admin-only like contact.
-    const funders = s(body.funders, MAX_FUNDERS);
-    const contact = s(body.contact, 200);
+    const funders = s(body.funders, MAX_FUNDERS + 1);
+    const contact = s(body.contact, LIMITS.CONTACT_CHARS + 1);
     const checks = checkSubmission({
       type,
       topup,
@@ -326,6 +336,7 @@ export function initiativeRoutes(deps: Deps) {
         recipientUrl,
         funders,
         contact,
+        reviewer: milestoneReviewer,
       },
       ...structured,
       backers,

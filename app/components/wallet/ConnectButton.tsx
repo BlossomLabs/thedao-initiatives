@@ -21,7 +21,7 @@ import { cn } from "~/lib/utils";
  */
 export default function ConnectButton() {
   const { address, isConnected } = useAccount();
-  const { session, connecting, signingIn, signIn, signOut } = useSession();
+  const { session, connecting, signingIn, signIn, signOut, switchWallet } = useSession();
   // "Connected" in the UI means signed in with this wallet; a bare wagmi
   // connection (the context is about to disconnect or sign it in) shows as not connected.
   const signedIn = Boolean(
@@ -138,7 +138,7 @@ export default function ConnectButton() {
       key: "switch",
       label: "Switch wallet",
       lucide: "switch",
-      onClick: () => void signOut().then(openWalletPicker),
+      onClick: () => void switchWallet().then(openWalletPicker),
     },
     {
       key: "sessions",

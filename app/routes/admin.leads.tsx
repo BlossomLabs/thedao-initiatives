@@ -1,3 +1,4 @@
+import { sessionKey, useSession } from "~/context/session";
 import { useQuery } from "@tanstack/react-query";
 import Skeleton from "~/components/ui/Skeleton";
 import { Link } from "react-router";
@@ -23,11 +24,13 @@ export { leadsCsv } from "~/lib/leads-csv";
  * Never linked from a public page.
  */
 export default function Leads() {
+  const { session } = useSession();
   const { data, isLoading, error } = useQuery({
-    queryKey: ["admin", "leads"] as const,
-    queryFn: () => api<{ rows: FunderLead[] }>("/api/admin/leads"),
+    queryKey: ["admin", "leads", sessionKey(session)] as const,
+    queryFn: ({ signal }) => api<{ rows: FunderLead[] }>("/api/admin/leads", { signal }),
+    enabled: Boolean(session?.isAdmin),
   });
-  const rows = data?.rows ?? [];
+  const rows = error ? [] : data?.rows ?? [];
   const download = () => {
     const blob = new Blob([leadsCsv(rows)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);

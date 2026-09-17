@@ -1,3 +1,5 @@
+import { useAdminApi } from "~/hooks/use-admin-api";
+import { sessionKey, useSession } from "~/context/session";
 import { cn } from "~/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import PageSkeleton from "~/components/layout/PageSkeleton";
@@ -56,13 +58,16 @@ const STATUS_HELP: Record<string, string> = {
 
 /** Admin editor for one initiative: same two-column layout as the public page. */
 export default function AdminInitiativeEditor() {
+  const adminApi = useAdminApi();
+  const { session } = useSession();
   const { slug = "" } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const key = ["admin", "initiative", slug] as const;
+  const key = ["admin", "initiative", slug, sessionKey(session)] as const;
   const { data, isLoading, error } = useQuery({
     queryKey: key,
-    queryFn: () => api<AdminInitiativePage>(`/api/admin/initiatives/${slug}`),
+    queryFn: ({ signal }) => api<AdminInitiativePage>(`/api/admin/initiatives/${slug}`, { signal }),
+    enabled: Boolean(session?.isAdmin),
   });
   // Once resolved, keep the editor on this ID even if its public URL is reused.
   const initiativeId = data?.initiative.id;
@@ -105,7 +110,7 @@ export default function AdminInitiativeEditor() {
   const approve = (action: "approve" | "unarchive", ok: string) =>
     run(async () => {
       if (!r.safeAddress) await safe.ensureDeployed();
-      await api(`${base}/status`, { json: { action } });
+      await adminApi(`${base}/status`, { json: { action } });
     }, ok);
 
   return (
@@ -178,7 +183,10 @@ export default function AdminInitiativeEditor() {
                   variant="danger"
                   sm
                   onClick={() =>
-                    run(() => api(`${base}/status`, { json: { action: "reject" } }), "Rejected.")}
+                    run(
+                      () => adminApi(`${base}/status`, { json: { action: "reject" } }),
+                      "Rejected.",
+                    )}
                 >
                   Reject
                 </Button>
@@ -188,7 +196,10 @@ export default function AdminInitiativeEditor() {
                   variant="ghost"
                   sm
                   onClick={() =>
-                    run(() => api(`${base}/status`, { json: { action: "archive" } }), "Archived.")}
+                    run(
+                      () => adminApi(`${base}/status`, { json: { action: "archive" } }),
+                      "Archived.",
+                    )}
                 >
                   Archive
                 </Button>
@@ -291,6 +302,7 @@ export default function AdminInitiativeEditor() {
 
 /** The deploy flow shared by the Approve button and the Safe card. */
 function useSafeDeploy(id: string, onChange: () => void) {
+  const adminApi = useAdminApi();
   const config = useConfig();
   const [status, setStatus] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
@@ -327,7 +339,7 @@ function useSafeDeploy(id: string, onChange: () => void) {
         }
       }
       for (let attempt = 0;; attempt++) {
-        const res = await api<SafeConfirmResult>(`${base}/safe-confirm`, { json: {} })
+        const res = await adminApi<SafeConfirmResult>(`${base}/safe-confirm`, { json: {} })
           .catch((e) => ({ status: "error", detail: errorMessage(e) } as SafeConfirmResult));
         if (res.status === "ok") {
           setStatus({ kind: "ok", text: `Safe ${res.address} verified: ${res.detail}` });
@@ -356,6 +368,8 @@ function SafeCard(
     onChange: () => void;
   },
 ) {
+  const adminApi = useAdminApi();
+  const { session } = useSession();
   const r = page.initiative;
   const { isConnected } = useAccount();
   const [status, setStatus] = useState<Msg>(null);
@@ -366,8 +380,9 @@ function SafeCard(
   // lost track of, or one made from another environment)? Then it is linked,
   // not deployed again: the factory would only revert at an occupied address.
   const params = useQuery({
-    queryKey: ["admin", "safe-deploy-params", r.id],
-    queryFn: () => api<SafeDeployParams>(`/api/admin/initiatives/${r.id}/safe-deploy-params`),
+    queryKey: ["admin", "safe-deploy-params", r.id, sessionKey(session)],
+    queryFn: ({ signal }) =>
+      api<SafeDeployParams>(`/api/admin/initiatives/${r.id}/safe-deploy-params`, { signal }),
     enabled: !r.safeAddress && page.signers.ok,
   });
   const existing = !r.safeAddress && params.data?.enabled && params.data.deployed
@@ -378,7 +393,7 @@ function SafeCard(
     setBusy(true);
     setStatus(null);
     try {
-      const res = await api<SafeConfirmResult>(`/api/admin/initiatives/${r.id}/safe-confirm`, {
+      const res = await adminApi<SafeConfirmResult>(`/api/admin/initiatives/${r.id}/safe-confirm`, {
         json: {},
       }).catch((e) => ({ status: "error", detail: errorMessage(e) } as SafeConfirmResult));
       if (res.status !== "ok") throw new Error(res.detail);
@@ -510,6 +525,7 @@ function EditForm(
     onSaved: (text: string) => void;
   },
 ) {
+  const adminApi = useAdminApi();
   const extrasOf = () => ({
     sortRank: r.sortRank ? String(r.sortRank) : "",
     proposer: r.proposer,
@@ -528,7 +544,7 @@ function EditForm(
       proposer: extras.proposer,
       paidOutUsd: extras.paidOutUsd,
     };
-    const res = await api<{ initiative: AdminInitiative; findings: Findings }>(
+    const res = await adminApi<{ initiative: AdminInitiative; findings: Findings }>(
       `/api/admin/initiatives/${r.id}`,
       { method: "PATCH", json: body },
     );

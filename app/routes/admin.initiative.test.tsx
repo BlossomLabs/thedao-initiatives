@@ -1,3 +1,14 @@
+vi.mock("~/context/session", () => ({
+  useSession: () => ({
+    session: {
+      address: "0x1111111111111111111111111111111111111111",
+      isAdmin: true,
+      expiresAt: 9999999999,
+    },
+    signIn: vi.fn(),
+  }),
+  sessionKey: () => "admin",
+}));
 import { MemoryRouter, Route, Routes } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";

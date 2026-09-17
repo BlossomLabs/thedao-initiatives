@@ -1,4 +1,4 @@
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, renderHook, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, startTransition } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -6,7 +6,7 @@ import { createConfig, http, WagmiProvider } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { mainnet } from "viem/chains";
 import type { EIP1193Provider } from "viem";
-import { api } from "~/lib/api";
+import { api, ApiError } from "~/lib/api";
 import { SESSION_KEY } from "~/lib/session-migration";
 import { SessionProvider, useSession } from "./session";
 
@@ -62,7 +62,7 @@ function setup() {
     </WagmiProvider>
   );
   const hook = renderHook(() => useSession(), { wrapper });
-  return { ...hook, config, request, signature };
+  return { ...hook, config, request, signature, queryClient };
 }
 
 beforeEach(() => {
@@ -242,4 +242,187 @@ it.each([false, true])("handles a restored wallet (stored session: %s)", async (
   expect(config.state.status).toBe(stored ? "connected" : "disconnected");
   expect(result.current.session).toEqual(stored ? SESSION : null);
   expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(false);
+});
+
+it("deletes only the chosen wallet's draft and clears private cache even when logout is offline", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const { result, queryClient } = setup();
+  await waitFor(() => expect(result.current.me).not.toBeNull());
+  queryClient.setQueryData(["admin", "leads"], { secret: "private leads" });
+  localStorage.setItem("thedao:submit-draft", "legacy private draft");
+  localStorage.setItem("thedao:submit-draft:other-wallet", "other wallet's draft");
+  const late = deferred<string>();
+  const fetching = queryClient.fetchQuery({
+    queryKey: ["revision", "private", 1],
+    queryFn: () => late.promise,
+  });
+  void fetching.catch(() => {});
+  const logout = deferred<unknown>();
+  const original = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, opts) =>
+    path === "/api/auth/logout" ? logout.promise : original(path, opts)
+  );
+  let ending!: Promise<boolean>;
+  act(() => {
+    ending = result.current.signOut();
+  });
+  expect(result.current.session).not.toBeNull();
+  fireEvent.click(await screen.findByRole("button", { name: "Delete draft and log out" }));
+  await waitFor(() => expect(result.current.session).toBeNull());
+  expect(result.current.session).toBeNull();
+  expect(queryClient.getQueryData(["admin", "leads"])).toBeUndefined();
+  expect(localStorage.getItem("thedao:submit-draft")).toBeNull();
+  expect(localStorage.getItem(`thedao:submit-draft:${ADDRESS.toLowerCase()}`)).toBeNull();
+  expect(localStorage.getItem("thedao:submit-draft:other-wallet")).toBe("other wallet's draft");
+  await act(async () => {
+    late.resolve("private revision");
+    logout.reject(new Error("offline"));
+    await ending;
+  });
+  expect(queryClient.getQueryData(["revision", "private", 1])).toBeUndefined();
+});
+
+it("purges private state on privilege removal and ignores an identity response arriving after logout", async () => {
+  const admin = { ...SESSION, isAdmin: true };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(admin));
+  const original = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, opts) =>
+    path === "/api/auth/me" ? Promise.resolve({ ...admin }) : original(path, opts)
+  );
+  const { result, queryClient } = setup();
+  await waitFor(() => expect(result.current.me?.isAdmin).toBe(true));
+  queryClient.setQueryData(["admin", "leads"], "secret");
+  vi.mocked(api).mockImplementation((path, opts) =>
+    path === "/api/auth/me" ? Promise.resolve({ ...SESSION }) : original(path, opts)
+  );
+  act(() => {
+    globalThis.dispatchEvent(new Event("focus"));
+  });
+  await waitFor(() => expect(result.current.session?.isAdmin).toBe(false));
+  expect(api).toHaveBeenCalledWith("/api/auth/me", { passive: true });
+  expect(queryClient.getQueryData(["admin", "leads"])).toBeUndefined();
+  const late = deferred<unknown>();
+  vi.mocked(api).mockImplementation((path, opts) =>
+    path === "/api/auth/me" ? late.promise : original(path, opts)
+  );
+  let refreshing!: Promise<void>;
+  act(() => {
+    refreshing = result.current.refreshMe();
+  });
+  await act(() => result.current.signOut());
+  await act(async () => {
+    late.resolve(admin);
+    await refreshing;
+  });
+  expect(result.current.me).toBeNull();
+  expect(result.current.session).toBeNull();
+});
+
+it("preserves the signed-in wallet's draft through reload validation, reauthentication and privilege changes", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const draft = JSON.stringify({ priv: { contact: "my private draft" } });
+  localStorage.setItem("thedao:submit-draft", draft);
+  const { result, signature, config } = setup();
+  act(() => {
+    config.connectors[0].emitter.emit("connect", { accounts: [ADDRESS], chainId: 1 });
+  });
+  const key = `thedao:submit-draft:${ADDRESS.toLowerCase()}`;
+  await waitFor(() => expect(result.current.me).not.toBeNull());
+  expect(localStorage.getItem(key)).toBe(draft);
+  expect(localStorage.getItem("thedao:submit-draft")).toBeNull();
+  let signing!: Promise<unknown>;
+  act(() => {
+    signing = result.current.signIn(ADDRESS);
+  });
+  await act(async () => {
+    signature.resolve("0x1234");
+    await signing;
+  });
+  expect(localStorage.getItem(key)).toBe(draft);
+  vi.mocked(api).mockResolvedValue({ ...SESSION, isAdmin: true });
+  await act(() => result.current.refreshMe());
+  expect(localStorage.getItem(key)).toBe(draft);
+});
+
+it("retains the owner's draft across automatic session expiry and a reload for reauthentication", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const key = `thedao:submit-draft:${ADDRESS.toLowerCase()}`;
+  const draft = JSON.stringify({ priv: { contact: "unfinished private draft" } });
+  localStorage.setItem(key, draft);
+  const first = setup();
+  await waitFor(() => expect(first.result.current.me).not.toBeNull());
+  first.queryClient.setQueryData(["admin", "leads"], "private cached server data");
+  const original = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, opts) =>
+    path === "/api/auth/me"
+      ? Promise.reject(new ApiError(401, "Session expired"))
+      : original(path, opts)
+  );
+  await act(() => first.result.current.refreshMe());
+  expect(first.result.current.session).toBeNull();
+  expect(first.queryClient.getQueryData(["admin", "leads"])).toBeUndefined();
+  expect(localStorage.getItem(key)).toBe(draft);
+  first.unmount();
+  vi.mocked(api).mockImplementation(original);
+  const second = setup();
+  expect(second.result.current.session).toBeNull();
+  expect(localStorage.getItem(key)).toBe(draft);
+  let connecting!: Promise<void>;
+  act(() => {
+    connecting = second.result.current.connect(second.config.connectors[0]);
+  });
+  await waitFor(() => expect(second.result.current.signingIn).toBe(true));
+  await act(async () => {
+    second.signature.resolve("0x1234");
+    await connecting;
+  });
+  expect(second.result.current.session?.address).toBe(ADDRESS);
+  expect(localStorage.getItem(key)).toBe(draft);
+  let ending!: Promise<boolean>;
+  act(() => {
+    ending = second.result.current.signOut();
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "Keep draft and log out" }));
+  await act(async () => {
+    await ending;
+  });
+  expect(second.result.current.session).toBeNull();
+  expect(localStorage.getItem(key)).toBe(draft);
+});
+
+it("cancelling the draft popup leaves the session, draft and revocation action untouched", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const key = `thedao:submit-draft:${ADDRESS.toLowerCase()}`;
+  localStorage.setItem(key, "unfinished draft");
+  const { result } = setup();
+  await waitFor(() => expect(result.current.me).not.toBeNull());
+  const beforeLogout = vi.fn();
+  let ending!: Promise<boolean>;
+  act(() => {
+    ending = result.current.signOut(beforeLogout);
+  });
+  fireEvent.click(await screen.findByRole("button", { name: /^Cancel$/ }));
+  await act(async () => {
+    expect(await ending).toBe(false);
+  });
+  expect(result.current.session).toEqual(SESSION);
+  expect(localStorage.getItem(key)).toBe("unfinished draft");
+  expect(beforeLogout).not.toHaveBeenCalled();
+  expect(api).not.toHaveBeenCalledWith("/api/auth/logout", expect.anything());
+});
+
+it("switching wallets retains every draft without showing a deletion popup", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const key = `thedao:submit-draft:${ADDRESS.toLowerCase()}`;
+  localStorage.setItem(key, "wallet A draft");
+  localStorage.setItem("thedao:submit-draft:wallet-b", "wallet B draft");
+  const { result, queryClient } = setup();
+  await waitFor(() => expect(result.current.me).not.toBeNull());
+  queryClient.setQueryData(["admin", "leads"], "private server data");
+  await act(() => result.current.switchWallet());
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(result.current.session).toBeNull();
+  expect(queryClient.getQueryData(["admin", "leads"])).toBeUndefined();
+  expect(localStorage.getItem(key)).toBe("wallet A draft");
+  expect(localStorage.getItem("thedao:submit-draft:wallet-b")).toBe("wallet B draft");
 });

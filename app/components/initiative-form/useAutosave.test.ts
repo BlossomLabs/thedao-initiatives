@@ -86,3 +86,63 @@ describe("useAutosave", () => {
 });
 
 const AUTOSAVE_KEY_NEVER = "thedao:submit-draft";
+
+it("does not resurrect a cleared draft from a pending autosave", async () => {
+  const { deletePrivateDraft } = await import("~/lib/browser-privacy");
+  vi.useFakeTimers();
+  const d = emptyDraft();
+  d.priv.contact = "private@example.test";
+  const { unmount } = renderHook(() =>
+    useAutosave(d, { key: "thedao:submit-draft:viewer", onRestore: vi.fn() })
+  );
+  deletePrivateDraft("viewer");
+  act(() => {
+    vi.advanceTimersByTime(AUTOSAVE_DELAY * 2);
+  });
+  expect(localStorage.getItem("thedao:submit-draft:viewer")).toBeNull();
+  unmount();
+  expect(localStorage.getItem("thedao:submit-draft:viewer")).toBeNull();
+  vi.useRealTimers();
+});
+
+it("flushes the last keystrokes before switching wallets or showing the logout choice", async () => {
+  const { flushPrivateDrafts } = await import("~/lib/browser-privacy");
+  vi.useFakeTimers();
+  const first = emptyDraft();
+  const { rerender, unmount } = renderHook(({ d }) =>
+    useAutosave(d, {
+      key: "thedao:submit-draft:wallet-a",
+      onRestore: vi.fn(),
+    }), { initialProps: { d: first } });
+  const typed = { ...first, page: { ...first.page, title: "Last keystrokes" } };
+  rerender({ d: typed });
+  flushPrivateDrafts();
+  expect(JSON.parse(localStorage.getItem("thedao:submit-draft:wallet-a")!).page.title).toBe(
+    "Last keystrokes",
+  );
+  unmount();
+  expect(JSON.parse(localStorage.getItem("thedao:submit-draft:wallet-a")!).page.title).toBe(
+    "Last keystrokes",
+  );
+  vi.useRealTimers();
+});
+
+it("restores only the selected wallet's draft", () => {
+  const first = emptyDraft();
+  first.page.title = "Wallet A private draft";
+  const second = emptyDraft();
+  second.page.title = "Wallet B private draft";
+  localStorage.setItem("thedao:submit-draft:wallet-a", JSON.stringify(snapshot(first)));
+  localStorage.setItem("thedao:submit-draft:wallet-b", JSON.stringify(snapshot(second)));
+  const onRestore = vi.fn();
+  const { unmount } = renderHook(() =>
+    useAutosave(second, { key: "thedao:submit-draft:wallet-b", onRestore })
+  );
+  expect(onRestore).toHaveBeenCalledWith(
+    expect.objectContaining({ page: expect.objectContaining({ title: "Wallet B private draft" }) }),
+  );
+  unmount();
+  expect(JSON.parse(localStorage.getItem("thedao:submit-draft:wallet-a")!).page.title).toBe(
+    "Wallet A private draft",
+  );
+});

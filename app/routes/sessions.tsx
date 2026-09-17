@@ -32,7 +32,7 @@ export default function Sessions() {
   const [confirmation, setConfirmation] = useState("");
   const inventory = useQuery({
     queryKey: ["sessions", sessionKey(session)],
-    queryFn: () => api<{ sessions: ManagedSession[] }>("/api/auth/sessions"),
+    queryFn: ({ signal }) => api<{ sessions: ManagedSession[] }>("/api/auth/sessions", { signal }),
     enabled: Boolean(session),
     // Background polling would keep an unattended session alive.
     refetchOnWindowFocus: false,
@@ -46,10 +46,16 @@ export default function Sessions() {
     try {
       // Always request a new wallet signature for remote/global termination.
       // Reauthentication rotates the current token without ending other devices.
-      await signIn();
-      await api(path, json === undefined ? { method: "DELETE" } : { json });
-      if (signOutAfter) await signOut();
-      else await inventory.refetch();
+      const revoke = async () => {
+        await signIn();
+        await api(path, json === undefined ? { method: "DELETE" } : { json });
+      };
+      if (signOutAfter) {
+        if (!await signOut(revoke)) return;
+      } else {
+        await revoke();
+        await inventory.refetch();
+      }
       setNotice("Sessions revoked.");
     } catch (e) {
       setError(errorMessage(e));

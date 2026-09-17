@@ -51,7 +51,10 @@ beforeEach(() => {
     expiresAt: 9999999999,
   };
   state.signIn.mockReset().mockResolvedValue(state.session);
-  state.signOut.mockReset().mockResolvedValue(undefined);
+  state.signOut.mockReset().mockImplementation(async (beforeLogout?: () => Promise<void>) => {
+    await beforeLogout?.();
+    return true;
+  });
   vi.mocked(api).mockReset().mockImplementation((path) => {
     if (path === "/api/auth/sessions") return Promise.resolve({ sessions: rows });
     return Promise.resolve({ ok: true });

@@ -25,6 +25,35 @@ can still apply. The API applies the same recent-wallet-proof rule to every admi
 of a second authentication factor or fresh human confirmation; the assessment's MFA assurance gap
 remains a separate policy/provider-evidence item.
 
+## Browser privacy and draft preservation
+
+Private queries are scoped by wallet and privilege, cancelled and removed on logout, wallet changes
+and privilege changes. Restricted revisions revalidate on mount/focus, and a revalidation the API
+denies (401, 403 or 404, for instance after an administrator archives that revision) erases the
+cached text instead of leaving it on screen behind an error. Local logout clears immediately
+even when the API is offline; subsequent anonymous reads omit the cookie. Wallet changes remount
+viewer-specific UI, and stale responses cannot restore the old session or private cache.
+The visible tab passively checks session validity on focus and once per minute so remote revocation
+or role changes are noticed without extending session inactivity. A hidden/offline tab rechecks when
+it becomes visible and connectivity permits; the API always enforces current privileges independently.
+
+Draft persistence is deliberately retained to protect work in progress. Only the submit form uses
+`thedao:submit-draft:<lowercase wallet address>` in localStorage. It survives reloads, browser restarts
+with a valid stored session, same-wallet reauthentication and role changes. Legacy drafts are copied
+into the validated current wallet's key before the old key is removed; an existing scoped draft is
+never overwritten. Switching wallets retains each wallet's draft under its own key; signing back in
+with that wallet restores it. Logging out with an unfinished draft opens a dialog offering **Keep draft
+and log out**, **Delete draft and log out**, or **Cancel**. Keep is the primary/default action; deletion
+removes only that wallet's draft and legacy backup, and cancels pending writes so it cannot reappear.
+The latest form state is flushed before the decision or wallet switch, including edits still inside
+the autosave debounce window. Session-management actions that also log out ask before revoking any
+session. Automatic session expiry/revocation hides the form and purges server data from cache but
+retains the wallet's own saved draft for reauthentication. An expired identity hint (expiry zero) is
+not accepted as a session. These operations do not delete or modify saved server proposals,
+profiles, contacts or funders. Persistent drafts remain readable to scripts on this origin and to
+someone with browser-profile access; this is the recovery/privacy tradeoff. Shared-device users can
+choose deletion when signing out. No session credential is stored in the draft.
+
 Administrators can revoke a wallet's sessions through `POST /api/admin/sessions/revoke` with `{ "address": "0x…" }`. `POST /api/admin/sessions/revoke-all` requires `{ "confirmation": "revoke all sessions" }` and ends every existing session, including the administrator's. Both controls are available on the sessions page. Durable per-wallet and global revocation epochs make invalidation independent of a potentially incomplete scan, and session creation/activity updates compare those epochs transactionally. Reauthentication after the revocation creates a valid new session. The per-wallet response count is the inventory observed before revocation; concurrent authentications can make that count approximate without escaping revocation.
 
 ## Deployment impact

@@ -24,8 +24,7 @@ import {
 import type { Pledge, Rfp, Session } from "../db/types.ts";
 import { pickText } from "../db/rfps.ts";
 import { ledgerStatus, refreshLedger } from "../services/ledger.ts";
-import { chainStateFresh } from "../chain/mod.ts";
-import { activeTokens } from "../chain/tokens.ts";
+import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
 import {
   assertNoErrors,
   mergeFindings,
@@ -165,8 +164,7 @@ export function initiativeRoutes(deps: Deps) {
       donations: donations.map((d) => donationJson(d, decimalsOf)),
       funded: Boolean(rfp.goalUsd && summary.total >= rfp.goalUsd),
       donationsEnabled: Boolean(
-        Object.keys(activeTokens(chainState.tokens)).length && rfp.safeAddress &&
-          rfp.status === "approved",
+        tokensUsable(chainState) && rfp.safeAddress && rfp.status === "approved",
       ),
       ledger,
     });

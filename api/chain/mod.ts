@@ -18,6 +18,15 @@ export interface ChainState {
 export const chainStateFresh = (state: ChainState, now: number): boolean =>
   now - state.checkedAt < CHAIN_REFRESH_SECS && Object.keys(state.tokens).length > 0;
 
+/** Whether donations may be offered on this state. A process that has not
+ * verified the tokens yet (checkedAt 0: a cold isolate answering a passive
+ * request) is not a failed check; reporting it as one would make the page
+ * flip the donate widget off, then back on once the refresh lands. Only a
+ * check that ran and left no token usable disables donations. The widget's own
+ * /api/donate/params always waits for verification before accepting money. */
+export const tokensUsable = (state: ChainState): boolean =>
+  state.checkedAt === 0 || Object.keys(activeTokens(state.tokens)).length > 0;
+
 export interface Chain {
   rpc: Rpc;
   usdRate: UsdRate;

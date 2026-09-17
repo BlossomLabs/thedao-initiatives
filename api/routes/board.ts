@@ -5,8 +5,7 @@ import { liveRoles } from "../services/roles.ts";
 import type { Rfp } from "../db/types.ts";
 import { SAFE_OWNER_COUNT, SAFE_THRESHOLD } from "../config.ts";
 import type { FundingSummary } from "../services/funding.ts";
-import { chainStateFresh } from "../chain/mod.ts";
-import { activeTokens } from "../chain/tokens.ts";
+import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
 import { ledgerStatus, refreshLedgers } from "../services/ledger.ts";
 
 export interface Card {
@@ -86,7 +85,7 @@ export function boardRoutes(deps: Deps) {
       deps.chain.state(refresh),
       refresh ? refreshLedgers(deps, rfps) : Promise.resolve(),
     ]);
-    const tokensOk = Object.keys(activeTokens(state.tokens)).length > 0;
+    const tokensOk = tokensUsable(state);
     const cards = orderCards(
       await Promise.all(
         rfps.map((x) => buildCard(deps, x, tokensOk, refresh)),

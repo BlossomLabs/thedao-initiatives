@@ -127,8 +127,9 @@ export default function WalletPicker({ open, onOpenChange }: {
   }
 
   function mobile() {
+    if (!wc) return;
     setView("mobile");
-    if (wc && !running.current) void start(wc);
+    if (!running.current) void start(wc);
   }
 
   async function copy() {
@@ -186,23 +187,25 @@ export default function WalletPicker({ open, onOpenChange }: {
                 <ArrowUpRight className="size-4 text-muted" />
               </button>
             ))}
-            <button
-              type="button"
-              className={row}
-              onClick={mobile}
-              disabled={busy && !(pending && pairing)}
-            >
-              <QrCode className="size-5 text-dao-green" />
-              <span className="flex-1">
-                <span className="block">
-                  {pending && pairing ? "Continue wallet connection" : "Mobile wallets / QR code"}
+            {wc && (
+              <button
+                type="button"
+                className={row}
+                onClick={mobile}
+                disabled={busy && !(pending && pairing)}
+              >
+                <QrCode className="size-5 text-dao-green" />
+                <span className="flex-1">
+                  <span className="block">
+                    {pending && pairing ? "Continue wallet connection" : "Mobile wallets / QR code"}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Choose from the WalletConnect directory
+                  </span>
                 </span>
-                <span className="mt-0.5 block text-xs text-muted">
-                  Choose from the WalletConnect directory
-                </span>
-              </span>
-              <ArrowUpRight className="size-4 text-muted" />
-            </button>
+                <ArrowUpRight className="size-4 text-muted" />
+              </button>
+            )}
           </div>
         )
         : (
@@ -214,12 +217,6 @@ export default function WalletPicker({ open, onOpenChange }: {
             >
               <ArrowLeft className="size-3.5" /> All connection methods
             </button>
-            {!wc && (
-              <p role="status" className="text-sm text-muted">
-                Mobile pairing is unavailable on this site. Open the site in your wallet’s browser
-                to connect.
-              </p>
-            )}
             {wc && (
               <>
                 <div

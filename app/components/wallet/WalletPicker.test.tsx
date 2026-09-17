@@ -178,8 +178,8 @@ test("offers installed and email wallets without a branded browser fallback", ()
   expect(mocks.email).toHaveBeenCalledTimes(1);
   expect(onOpenChange).toHaveBeenCalledWith(false);
   expect(screen.queryByRole("link", { name: "Open in MetaMask browser" })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: /Mobile wallets/ }));
-  expect(screen.getByRole("status")).toHaveTextContent("Mobile pairing is unavailable");
+  // No WalletConnect project id: the mobile / QR entry is not offered at all.
+  expect(screen.queryByRole("button", { name: /Mobile wallets/ })).not.toBeInTheDocument();
   expect(mocks.connect).not.toHaveBeenCalled();
 });
 

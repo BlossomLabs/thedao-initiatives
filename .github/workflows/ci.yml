@@ -29,6 +29,9 @@ jobs:
 
       - run: deno i
 
+      - name: audit resolved dependencies
+        run: deno audit --lock=deno.lock --frozen-lockfile
+
       - name: typecheck (react-router typegen + tsc)
         run: deno task typecheck
 

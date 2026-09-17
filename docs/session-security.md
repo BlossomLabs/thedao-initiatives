@@ -13,6 +13,18 @@ Every successful wallet authentication replaces and atomically revokes the crede
 
 The `/sessions` page, linked from the wallet menu, lists the signed-in wallet's active sessions, creation/activity times, and absolute expiry. Users can end individual sessions or sign out everywhere. Remote session termination, sign-out-everywhere, and administrator revocation require authentication within the last five minutes; the page always obtains a new wallet signature first. Ordinary logout remains available without another signature.
 
+Administrator membership changes, initiative status changes (including bulk actions), Safe binding,
+payout totals, proposer reassignment and content sync (which creates approved initiatives) also
+require authentication within five minutes. The browser, and the `sync-content` script when given a
+private key, retry once after a fresh SIWE signature only when the API explicitly challenges before mutation.
+Ordinary permission failures and ambiguous network failures do not trigger a retry.
+
+Privy email users can sign with their existing embedded wallet session. A valid Privy session normally
+does not require another email OTP for this renewal; provider recovery/MFA/expired-session requirements
+can still apply. The API applies the same recent-wallet-proof rule to every admin. This is not evidence
+of a second authentication factor or fresh human confirmation; the assessment's MFA assurance gap
+remains a separate policy/provider-evidence item.
+
 Administrators can revoke a wallet's sessions through `POST /api/admin/sessions/revoke` with `{ "address": "0x…" }`. `POST /api/admin/sessions/revoke-all` requires `{ "confirmation": "revoke all sessions" }` and ends every existing session, including the administrator's. Both controls are available on the sessions page. Durable per-wallet and global revocation epochs make invalidation independent of a potentially incomplete scan, and session creation/activity updates compare those epochs transactionally. Reauthentication after the revocation creates a valid new session. The per-wallet response count is the inventory observed before revocation; concurrent authentications can make that count approximate without escaping revocation.
 
 ## Deployment impact

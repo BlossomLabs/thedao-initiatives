@@ -4,6 +4,7 @@ import { FolderUp, Upload } from "lucide-react";
 import { Button } from "~/components/ui/Button";
 import Status, { type StatusKind } from "~/components/ui/Status";
 import { boardKey } from "~/hooks/use-board";
+import { useAdminApi } from "~/hooks/use-admin-api";
 import { api, errorMessage } from "~/lib/api";
 
 interface SyncResult {
@@ -39,6 +40,7 @@ async function readContent(list: FileList | null) {
  * a private key on any machine.
  */
 export default function SyncContent() {
+  const adminApi = useAdminApi();
   const qc = useQueryClient();
   const folder = useRef<HTMLInputElement>(null);
   const files = useRef<HTMLInputElement>(null);
@@ -67,7 +69,7 @@ export default function SyncContent() {
         form.set("image", logo);
         await api("/api/admin/logos", { form });
       }
-      const r = await api<SyncResult>("/api/admin/sync-content", { json: { files: picked } });
+      const r = await adminApi<SyncResult>("/api/admin/sync-content", { json: { files: picked } });
       const summary = `${r.created} created, ${r.updated} updated` +
         (r.backers ? `, ${r.backers} pledge${r.backers === 1 ? "" : "s"} from files` : "") +
         (logos.length ? `, ${logos.length} logo${logos.length === 1 ? "" : "s"}` : "");

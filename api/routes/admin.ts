@@ -4,7 +4,7 @@ import { HttpError } from "../lib/errors.ts";
 import { auditContext, auditedItem, recordAudit } from "../services/audit.ts";
 import { INITIATIVE_CHANGED } from "../lib/initiative-identity.ts";
 import { assertFields, formBody, jsonBody, s } from "../lib/body.ts";
-import { requireAdmin, requireRecentAuth } from "../middleware/auth.ts";
+import { assertRecentAuth, requireAdmin, requireRecentAuth } from "../middleware/auth.ts";
 import { clearSessionCookie } from "../lib/session-cookie.ts";
 import {
   adminCommentJson,
@@ -132,7 +132,7 @@ export function adminRoutes(deps: Deps) {
   const adminsJson = (admins: AdminEntry[], c: Context<Vars>) =>
     c.json({ admins, you: c.var.user!.address });
   r.get("/admins", async (c) => adminsJson(await deps.admins.list(), c));
-  r.post("/admins", async (c) => {
+  r.post("/admins", requireRecentAuth(deps.now), async (c) => {
     const body = await jsonBody(c, ["address"]);
     const address = s(body.address, 60);
     auditContext(c, { target: address });
@@ -145,7 +145,7 @@ export function adminRoutes(deps: Deps) {
     });
     return adminsJson(admins, c);
   });
-  r.delete("/admins/:address", async (c) => {
+  r.delete("/admins/:address", requireRecentAuth(deps.now), async (c) => {
     await jsonBody(c, []);
     const address = c.req.param("address");
     const admins = await deps.admins.remove(address, c.var.user!.address);
@@ -194,6 +194,7 @@ export function adminRoutes(deps: Deps) {
       "paidOutUsd",
       "proposer",
     ]);
+    if (body.paidOutUsd !== undefined || body.proposer !== undefined) assertRecentAuth(c, deps.now);
     const patch = await readPageFacts(body, rfp, deps);
     if (body.sortRank !== undefined) {
       const raw = s(body.sortRank, 10);
@@ -326,7 +327,7 @@ export function adminRoutes(deps: Deps) {
     return await db.rfps.unarchive(rfp.id);
   }
 
-  r.post("/initiatives/:id/status", async (c) => {
+  r.post("/initiatives/:id/status", requireRecentAuth(deps.now), async (c) => {
     const rfp = await rfpOr404(c.req.param("id"), true);
     const action = s((await jsonBody(c, ["action"])).action, 20);
     auditContext(c, { target: rfp.id, detail: action });
@@ -335,7 +336,7 @@ export function adminRoutes(deps: Deps) {
 
   /** The same status change on many initiatives at once. Each id is applied
    * on its own; the response lists what failed so the rest still lands. */
-  r.post("/initiatives/bulk", async (c) => {
+  r.post("/initiatives/bulk", requireRecentAuth(deps.now), async (c) => {
     const body = await jsonBody(c, ["ids", "action"]);
     const { ids, action } = readBulk(body, STATUS_ACTIONS);
     auditContext(c, { detail: action });
@@ -504,7 +505,7 @@ export function adminRoutes(deps: Deps) {
    * until the Safe is there. What is there must pass the on-chain check
    * (owners, threshold, canonical proxy) and be unbound elsewhere.
    */
-  r.post("/initiatives/:id/safe-confirm", async (c) => {
+  r.post("/initiatives/:id/safe-confirm", requireRecentAuth(deps.now), async (c) => {
     await jsonBody(c, []);
     const rfp = await rfpOr404(c.req.param("id"), true);
     if (rfp.safeAddress) {
@@ -659,7 +660,7 @@ export function adminRoutes(deps: Deps) {
   });
 
   /** Push-based content sync: the repo's content/rfps/*.md, sent by scripts/sync-content.ts. */
-  r.post("/sync-content", async (c) => {
+  r.post("/sync-content", requireRecentAuth(deps.now), async (c) => {
     const body = await jsonBody(c, ["files"]);
     const files = Array.isArray(body.files) ? body.files : [];
     files.forEach((file, i) => {

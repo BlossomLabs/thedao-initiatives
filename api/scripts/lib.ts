@@ -19,6 +19,8 @@ export interface LoginOptions {
   apiUrl: string;
   webOrigin: string;
   privateKey: string;
+  /** Present the credential being renewed so verification atomically replaces it. */
+  previousToken?: string;
 }
 
 /** Basic credentials for a site behind the private-preview lock (no session yet). */
@@ -51,7 +53,10 @@ export async function siweLogin(
   });
   const res = await fetch(o.apiUrl + "/api/auth/verify", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Origin: o.webOrigin, ...siteLockHeader() },
+    headers: {
+      "Content-Type": "application/json", Origin: o.webOrigin, ...siteLockHeader(),
+      ...(o.previousToken ? { Authorization: "Bearer " + o.previousToken } : {}),
+    },
     body: JSON.stringify({ message, signature: await w.sign(message) }),
   });
   if (!res.ok) throw new Error(`verify failed: ${res.status} ${await res.text()}`);

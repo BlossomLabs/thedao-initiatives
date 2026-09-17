@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { Vars } from "./context.ts";
 import type { Db } from "../db/mod.ts";
 import type { Admins } from "../services/admins.ts";
@@ -48,13 +48,19 @@ export const requireAdmin: MiddlewareHandler<Vars> = async (c, next) => {
   await next();
 };
 
-/** Fresh SIWE authentication is required to manage other sessions. */
+export function assertRecentAuth(c: Context<Vars>, now: () => number) {
+  if (!c.var.user) throw new HttpError(401, "sign in with your wallet first");
+  if (c.var.user.createdAt + SESSION_REAUTH_SECS <= now()) {
+    throw new HttpError(403, "Sign in again to confirm this sensitive change.", {
+      reauthenticate: true,
+    });
+  }
+}
+
+/** Check before any side effects; callers may reauthenticate and retry once. */
 export function requireRecentAuth(now: () => number): MiddlewareHandler<Vars> {
   return async (c, next) => {
-    if (!c.var.user) throw new HttpError(401, "sign in with your wallet first");
-    if (c.var.user.createdAt + SESSION_REAUTH_SECS <= now()) {
-      throw new HttpError(403, "Sign in again before managing sessions.", { reauthenticate: true });
-    }
+    assertRecentAuth(c, now);
     await next();
   };
 }

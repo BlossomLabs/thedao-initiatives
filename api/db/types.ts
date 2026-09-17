@@ -137,6 +137,8 @@ export interface Comment {
   reports: number;
   aiSummary: string;
   claimToken: string;
+  /** Legacy claims use createdAt + the claim lifetime. */
+  claimExpiresAt?: number;
   createdAt: number;
 }
 

@@ -2,6 +2,8 @@ import { collect, K } from "./keys.ts";
 import type { Comment, Vote } from "./types.ts";
 import { newId, randomHex } from "../lib/ids.ts";
 
+export const CLAIM_TTL_SECS = 30 * 24 * 3600;
+
 export type CommentInput = Omit<
   Comment,
   | "id"
@@ -13,6 +15,7 @@ export type CommentInput = Omit<
   | "votes"
   | "reports"
   | "claimToken"
+  | "claimExpiresAt"
   | "createdAt"
 >;
 
@@ -33,13 +36,16 @@ export function commentsRepo(kv: Deno.Kv, now: () => number) {
       votes: 0,
       reports: 0,
       claimToken: randomHex(16),
+      claimExpiresAt: now() + CLAIM_TTL_SECS,
       createdAt: now(),
     };
     const op = kv.atomic().set(K.comment(c.rfpId, c.id), c).set(
       K.commentRef(c.id),
       c.rfpId,
     );
-    if (c.status === "held") op.set(K.claim(c.claimToken), c.id);
+    if (c.status === "held") {
+      op.set(K.claim(c.claimToken), c.id, { expireIn: CLAIM_TTL_SECS * 1000 });
+    }
     if (startVote && c.address && c.parentId === null) {
       c.votes = 1;
       op.set(K.comment(c.rfpId, c.id), c);
@@ -64,13 +70,35 @@ export function commentsRepo(kv: Deno.Kv, now: () => number) {
   /** Author-only view: each token unlocks exactly its own held entry. */
   async function byClaimTokens(tokens: string[]): Promise<Comment[]> {
     const out: Comment[] = [];
-    for (const t of tokens) {
+    for (const t of new Set(tokens)) {
       const id = (await kv.get<string>(K.claim(t))).value;
       if (!id) continue;
       const c = await get(id);
-      if (c && c.status === "held") out.push(c);
+      if (
+        c && c.status === "held" && c.claimToken === t &&
+        (c.claimExpiresAt ?? c.createdAt + CLAIM_TTL_SECS) > now()
+      ) out.push(c);
     }
     return out;
+  }
+
+  /** Explicit rotation: a valid holder replaces a claim; the old token immediately stops working. */
+  async function rotateClaimToken(token: string): Promise<Comment | null> {
+    const index = await kv.get<string>(K.claim(token));
+    if (!index.value) return null;
+    const found = await get(index.value);
+    if (!found) return null;
+    const row = await kv.get<Comment>(K.comment(found.rfpId, found.id));
+    const c = row.value;
+    if (
+      !c || c.claimToken !== token || c.status !== "held" ||
+      (c.claimExpiresAt ?? c.createdAt + CLAIM_TTL_SECS) <= now()
+    ) return null;
+    const next = { ...c, claimToken: randomHex(16), claimExpiresAt: now() + CLAIM_TTL_SECS };
+    const result = await kv.atomic().check(index, row).delete(index.key)
+      .set(K.claim(next.claimToken), c.id, { expireIn: CLAIM_TTL_SECS * 1000 })
+      .set(row.key, next).commit();
+    return result.ok ? next : null;
   }
 
   const ALLOWED = new Set<keyof Comment>([
@@ -88,9 +116,16 @@ export function commentsRepo(kv: Deno.Kv, now: () => number) {
     }
     const cur = await get(id);
     if (!cur) return null;
-    const next = { ...cur, ...patch };
-    await kv.set(K.comment(cur.rfpId, cur.id), next);
-    return next;
+    // Do not overwrite a claim rotation that races a moderation update.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const row = await kv.get<Comment>(K.comment(cur.rfpId, id));
+      if (!row.value) return null;
+      const next = { ...row.value, ...patch };
+      const op = kv.atomic().check(row).set(row.key, next);
+      if (next.status !== "held") op.delete(K.claim(row.value.claimToken));
+      if ((await op.commit()).ok) return next;
+    }
+    throw new Error("Comment update contention");
   }
 
   /**
@@ -170,6 +205,7 @@ export function commentsRepo(kv: Deno.Kv, now: () => number) {
     get,
     forRfp,
     byClaimTokens,
+    rotateClaimToken,
     set,
     setVote,
     votesByAddress,

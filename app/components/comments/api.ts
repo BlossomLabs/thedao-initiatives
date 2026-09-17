@@ -3,12 +3,15 @@ import type { CommentEntry, CommentsResponse, HeldMine, PostCommentResult } from
 
 export const commentsKey = (slug: string, who: string | null, initiativeId: string) =>
   ["comments", slug, who ?? "", initiativeId] as const;
-export const mineKey = (tokens: string[]) => ["comments-mine", tokens.join(",")] as const;
+export const mineKey = (scope: string) => ["comments-mine", scope] as const;
 
-export const fetchComments = (slug: string) =>
-  api<CommentsResponse>(`/api/initiatives/${encodeURIComponent(slug)}/comments`);
-export const fetchMine = (tokens: string[]) =>
-  api<{ held: HeldMine[] }>(`/api/comments/mine?tokens=${tokens.join(",")}`);
+export const fetchComments = (slug: string, signal?: AbortSignal, anonymous = false) =>
+  api<CommentsResponse>(`/api/initiatives/${encodeURIComponent(slug)}/comments`, {
+    signal,
+    anonymous,
+  });
+export const fetchMine = (tokens: string[], signal?: AbortSignal) =>
+  api<{ held: HeldMine[] }>("/api/comments/mine", { json: { tokens }, signal, anonymous: true });
 export const postComment = (slug: string, body: Record<string, unknown>) =>
   api<PostCommentResult>(`/api/initiatives/${encodeURIComponent(slug)}/comments`, {
     json: body,

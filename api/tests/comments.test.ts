@@ -4,10 +4,85 @@ import { sortEntries } from "../routes/comments.ts";
 import { TOKENS } from "../config.ts";
 import { transferLog } from "./helpers.ts";
 import { K } from "../db/keys.ts";
+import { CLAIM_TTL_SECS } from "../db/comments.ts";
 
 const EXPERT = "0x3333333333333333333333333333333333333333";
 const DONOR = "0x4444444444444444444444444444444444444444";
 const PROPOSER = "0x5555555555555555555555555555555555555555";
+
+Deno.test("comment claim rotation cannot be overwritten by a concurrent review", async () => {
+  const { h, post } = await setup();
+  try {
+    const held = await j(await post(undefined, { name: "Author" })) as {
+      id: string;
+      claimToken: string;
+    };
+    let token = held.claimToken;
+    for (let i = 0; i < 5; i++) {
+      const [rotated] = await Promise.all([
+        h.db.comments.rotateClaimToken(token),
+        h.db.comments.set(held.id, { reviewed: true }),
+      ]);
+      if (rotated) token = rotated.claimToken;
+      assertEquals((await h.db.comments.byClaimTokens([token])).map((c) => c.id), [held.id]);
+      assertEquals((await h.db.comments.get(held.id))?.reviewed, true);
+    }
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("comment claims: POST only, bounded input, rotation, expiry and moderation revocation", async () => {
+  const { h, post } = await setup();
+  try {
+    const logs: string[] = [];
+    h.deps.log = (line) => logs.push(line);
+    const held = await j(await post(undefined, { name: "Author", body: "private held text" })) as {
+      id: string;
+      claimToken: string;
+    };
+    const mine = (tokens: unknown) =>
+      h.req("/api/comments/mine", { method: "POST", json: { tokens } });
+    assertEquals((await h.req("/api/comments/mine?tokens=" + held.claimToken)).status, 404);
+    for (const invalid of ["not-an-array", ["malformed"], Array(21).fill(held.claimToken)]) {
+      assertEquals((await mine(invalid)).status, 400);
+    }
+    assertEquals((await j(await mine(["0".repeat(32)]))).held, []);
+    assertEquals((await mine([held.claimToken])).headers.get("Cache-Control"), "no-store");
+    const rotate = (token: string) =>
+      h.req("/api/comments/claims/rotate", { method: "POST", json: { token } });
+    const result = await rotate(held.claimToken);
+    assertEquals(result.status, 200);
+    const replacement = await j(result) as { claimToken: string };
+    assert(replacement.claimToken !== held.claimToken);
+    assertEquals((await rotate(held.claimToken)).status, 404);
+    assertEquals((await j(await mine([held.claimToken]))).held, []);
+    assertEquals(((await j(await mine([replacement.claimToken]))).held as unknown[]).length, 1);
+    h.clock.now += CLAIM_TTL_SECS;
+    assertEquals((await j(await mine([replacement.claimToken]))).held, []);
+    assertEquals((await rotate(replacement.claimToken)).status, 404);
+    assertEquals((await h.db.comments.get(held.id))?.body, "private held text");
+
+    const next = await j(await post(undefined, { name: "Author" })) as {
+      id: string;
+      claimToken: string;
+    };
+    await h.db.comments.set(next.id, { status: "discarded" });
+    assertEquals((await h.kv.get(K.claim(next.claimToken))).value, null);
+    assertEquals((await rotate(next.claimToken)).status, 404);
+    // Legacy claims have the same absolute lifetime, even when their KV index had no TTL.
+    const row = (await h.db.comments.get(held.id))!;
+    const { claimExpiresAt: _expiry, ...legacy } = row;
+    await h.kv.set(K.comment(row.rfpId, row.id), legacy);
+    assertEquals(await h.db.comments.byClaimTokens([replacement.claimToken]), []);
+    const output = logs.join("\n");
+    for (const secret of [held.claimToken, replacement.claimToken, "private held text"]) {
+      assert(!output.includes(secret), "credential/body must not reach audit logs");
+    }
+  } finally {
+    h.close();
+  }
+});
 
 async function setup(aiFetch?: (url: string) => Response) {
   const h = await harness({
@@ -61,7 +136,9 @@ Deno.test("comments: anonymous needs a name; without AI, anon posts are held wit
     entries: unknown[];
   };
   assertEquals(list.entries.length, 0);
-  const mine = await j(await h.req("/api/comments/mine?tokens=" + held.claimToken)) as {
+  const mine = await j(
+    await h.req("/api/comments/mine", { method: "POST", json: { tokens: [held.claimToken] } }),
+  ) as {
     held: { id: string }[];
   };
   assertEquals(mine.held.map((x) => x.id), [held.id]);
@@ -79,7 +156,9 @@ Deno.test("comments: anonymous needs a name; without AI, anon posts are held wit
   assertEquals(list2.entries[0].displayName, "Anon");
   assertEquals(list2.entries[0].votes, 0);
   assertEquals(
-    (await j(await h.req("/api/comments/mine?tokens=" + held.claimToken)) as {
+    (await j(
+      await h.req("/api/comments/mine", { method: "POST", json: { tokens: [held.claimToken] } }),
+    ) as {
       held: unknown[];
     }).held.length,
     0,
@@ -277,7 +356,9 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   ) as { status: string; claimToken: string };
   assertEquals(anonReply.status, "held");
   assertEquals(anonReply.claimToken.length, 32);
-  const mineHeld = await j(await h.req("/api/comments/mine?tokens=" + anonReply.claimToken)) as {
+  const mineHeld = await j(
+    await h.req("/api/comments/mine", { method: "POST", json: { tokens: [anonReply.claimToken] } }),
+  ) as {
     held: { parentId: string | null }[];
   };
   assertEquals(mineHeld.held.map((x) => x.parentId), [c1.id]);

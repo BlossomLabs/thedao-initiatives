@@ -33,13 +33,18 @@ export default function CommentsSection({ initiativeId, slug, open }: {
   const { isConnected } = useAccount();
   const qc = useQueryClient();
   const key = commentsKey(slug, sessionKey(session), initiativeId);
-  const q = useQuery({ queryKey: key, queryFn: () => fetchComments(slug) });
+  const q = useQuery({
+    queryKey: key,
+    queryFn: ({ signal }) => fetchComments(slug, signal, !session),
+  });
   const [tokens, setTokens] = useState<string[]>(
     () => (typeof localStorage === "undefined" ? [] : myClaimTokens()),
   );
+  // Use an opaque cache scope so diagnostic query keys cannot disclose claim credentials.
+  const claimScope = useMemo(() => crypto.randomUUID(), [tokens]);
   const mine = useQuery({
-    queryKey: mineKey(tokens),
-    queryFn: () => fetchMine(tokens),
+    queryKey: mineKey(claimScope),
+    queryFn: ({ signal }) => fetchMine(tokens, signal),
     enabled: tokens.length > 0,
   });
   const [sort, setSort] = useState<"top" | "new">("top");

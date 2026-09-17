@@ -162,12 +162,17 @@ export function commentRoutes(deps: Deps) {
     });
   });
 
-  r.get("/comments/mine", async (c) => {
+  r.post("/comments/mine", async (c) => {
     if (!(await db.rateLimit("cmine:" + requireClientIp(c), 30, 60))) {
       throw new HttpError(429, "slow down");
     }
-    const tokens = (c.req.query("tokens") ?? "").split(",").filter((t) => /^[0-9a-f]{32}$/.test(t))
-      .slice(0, 20);
+    const { tokens } = await jsonBody(c, ["tokens"]);
+    if (
+      !Array.isArray(tokens) || tokens.length > 20 ||
+      tokens.some((t) => typeof t !== "string" || !/^[0-9a-f]{32}$/.test(t))
+    ) {
+      throw new HttpError(400, "Expected at most 20 valid comment claims.");
+    }
     const rows = await db.comments.byClaimTokens(tokens);
     return c.json({
       held: rows.map((x) => ({
@@ -179,6 +184,19 @@ export function commentRoutes(deps: Deps) {
         createdAt: x.createdAt,
       })),
     });
+  });
+
+  r.post("/comments/claims/rotate", async (c) => {
+    if (!(await db.rateLimit("crotate:" + requireClientIp(c), 10, 60))) {
+      throw new HttpError(429, "slow down");
+    }
+    const { token } = await jsonBody(c, ["token"]);
+    if (typeof token !== "string" || !/^[0-9a-f]{32}$/.test(token)) {
+      throw new HttpError(400, "Invalid comment claim.");
+    }
+    const row = await db.comments.rotateClaimToken(token);
+    if (!row) throw new HttpError(404, "Comment claim unavailable.");
+    return c.json({ claimToken: row.claimToken, expiresAt: row.claimExpiresAt });
   });
 
   r.post("/comments/:id/vote", requireAuth, async (c) => {

@@ -103,8 +103,11 @@ export function readBackers(
     }
     const url = clip(b.url, LIMITS.BACKER_URL + 1);
     const logoCid = clip(b.logoCid, LIMITS.LOGO_CID + 1);
-    if (url && !isHttpsUrl(url)) {
-      err(`bk_url_${i}`, `${org || "Backer " + (i + 1)}: the link must be an https URL.`);
+    const who = org || "Backer " + (i + 1);
+    if (url.length > LIMITS.BACKER_URL) {
+      err(`bk_url_${i}`, tooLong(`${who}: the link`, LIMITS.BACKER_URL));
+    } else if (url && !isHttpsUrl(url)) {
+      err(`bk_url_${i}`, `${who}: the link must be an https URL.`);
     }
     if (logoCid && !LOGO_CID_RE.test(logoCid)) err(`bk_logo_${i}`, "Upload the logo again.");
     backers.push({

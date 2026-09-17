@@ -10,16 +10,15 @@ import type { Rfp } from "../db/types.ts";
 import type { Deps } from "../middleware/context.ts";
 import { HttpError } from "./errors.ts";
 import { s } from "./body.ts";
-import { parseDuration, parseGoal, validateForumUrl, validateHttpsLink } from "./validate.ts";
+import {
+  capped,
+  parseDuration,
+  parseGoal,
+  validateForumUrl,
+  validateHttpsLink,
+} from "./validate.ts";
 import { MAX_FUNDERS } from "../config.ts";
-import { LIMITS, tooLong } from "../../shared/draft/mod.ts";
-
-/** A capped text field: refused with the shared "too long" message, never cut. */
-function capped(v: unknown, cap: number, label: string): string {
-  const t = s(v, cap + 1);
-  if (t.length > cap) throw new HttpError(400, tooLong(label, cap));
-  return t;
-}
+import { LIMITS } from "../../shared/draft/mod.ts";
 
 export async function readPageFacts(
   body: Record<string, unknown>,

@@ -13,7 +13,7 @@ import {
 } from "./app-helpers.ts";
 import { DONOR, SIGNERS, transferLog, wallet } from "./helpers.ts";
 import { grantBody, minimalSubmission, syntheticContentFiles } from "./fixtures.ts";
-import { TOKENS } from "../config.ts";
+import { MAX_TITLE, TOKENS } from "../config.ts";
 import { predictSafeAddress } from "../chain/safe.ts";
 
 const USDC = TOKENS.USDC[0];
@@ -817,6 +817,9 @@ Deno.test("submit: blank title is read from the Discourse topic; forum errors ar
         return Response.json({ title: "Source-level debugging for Solidity", id: 123 });
       }
       if (url.endsWith("/no-title/9.json")) return Response.json({ id: 9 });
+      if (url.endsWith("/long-title/7.json")) {
+        return Response.json({ title: "L".repeat(MAX_TITLE + 20), id: 7 });
+      }
       return new Response("", { status: 404 });
     },
   });
@@ -833,6 +836,19 @@ Deno.test("submit: blank title is read from the Discourse topic; forum errors ar
     (await h.db.rfps.bySlug(slug))!.title,
     "Source-level debugging for Solidity",
   );
+  // a forum title past the cap is not the user's text: clipped, never refused
+  const longTitle = await h.req("/api/initiatives", {
+    method: "POST",
+    token,
+    json: {
+      ...good,
+      sections: { ...good.sections, why: "A different body, so it is not a duplicate." },
+      discourseUrl: "https://forum.example.org/t/long-title/7",
+    },
+  });
+  assertEquals(longTitle.status, 201);
+  const longSlug = (await j(longTitle) as { slug: string }).slug;
+  assertEquals((await h.db.rfps.bySlug(longSlug))!.title, "L".repeat(MAX_TITLE));
   const noTitle = await h.req("/api/initiatives", {
     method: "POST",
     token,

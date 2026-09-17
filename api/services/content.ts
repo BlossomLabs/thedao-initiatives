@@ -67,7 +67,9 @@ export function parseContentBackers(raw: string): PastedBacker[] {
   const seen = new Set<string>();
   for (const b of out) {
     if (!b.org) throw new Error("backers: a line has no organization");
-    if (b.org.length > 120) throw new Error(`backers: ${b.org.slice(0, 40)}… is too long`);
+    if (b.org.length > LIMITS.BACKER_ORG) {
+      throw new Error(tooLong("backers: the organization name", LIMITS.BACKER_ORG));
+    }
     if (!(b.amountUsd > 0)) throw new Error(`backers: ${b.org} needs an amount`);
     const [url, err] = validateHttpsLink(b.url);
     if (err) throw new Error(`backers: ${b.org}: ${err}`);
@@ -124,13 +126,25 @@ export function parseStructuredBody(body: string, type: RfpType, goal: number): 
     type,
   );
   if (structuredBytes(structured) > LIMITS.STRUCTURED_BYTES) throw new Error(TOO_LONG_MSG);
+  // Never cut a file's text: a field past its cap is a sync error to fix in git.
+  for (const key of SECTIONS[type]) {
+    if ((structured.sections[key] ?? "").length > LIMITS.SECTION_CHARS) {
+      throw new Error(tooLong(FIELDS[key].heading, LIMITS.SECTION_CHARS));
+    }
+  }
   structured.milestones.forEach((m, i) => {
     if (m.name.length > LIMITS.MILESTONE_NAME) {
       throw new Error(tooLong(`milestone ${letter(i)} name`, LIMITS.MILESTONE_NAME));
     }
+    if (m.link.length > LIMITS.LINK_CHARS) {
+      throw new Error(tooLong(`milestone ${letter(i)} link`, LIMITS.LINK_CHARS));
+    }
     m.criteria.forEach((c, j) => {
       if (c.length > LIMITS.CRITERION_CHARS) throw new Error(criterionTooLong(letter(i), j));
     });
+  });
+  structured.links.forEach((l, i) => {
+    if (l.length > LIMITS.LINK_CHARS) throw new Error(tooLong(`link ${i + 1}`, LIMITS.LINK_CHARS));
   });
   return structured;
 }

@@ -11,7 +11,7 @@ import {
   proposerToken,
 } from "./app-helpers.ts";
 import { exampleSubmission, grantBody, minimalSubmission } from "./fixtures.ts";
-import { LIMITS, SECTIONS, TOO_LONG_MSG } from "../../shared/draft/mod.ts";
+import { LIMITS, SECTIONS, TOO_LONG_MSG, tooLong } from "../../shared/draft/mod.ts";
 import type { Rfp } from "../db/types.ts";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
@@ -868,5 +868,75 @@ Deno.test("edit: a top-up measures the adoption floor against the goal minus the
     (await j(whole) as Fail).findings.errors.find((e) => e.field === "milestones")!.msg,
     "16% of the goal. Raise them to at least $93,667",
   );
+  h.close();
+});
+
+Deno.test("caps: a long link, an edited long title and a long pledge company are refused with the message", async () => {
+  const h = await harness();
+  const token = await proposerToken(h);
+  const admin = await h.mint(ADMIN, true);
+  const longLink = "https://x.org/" + "a".repeat(LIMITS.LINK_CHARS);
+  // submit: a backer link past the cap is "too long" on its row, not "not https"
+  const good = minimalSubmission(1000, "grant");
+  const longBacker = await submit(h, token, {
+    ...good,
+    backers: [{ org: "Org", amountUsd: 5, url: longLink }],
+  });
+  assertEquals(longBacker.status, 400);
+  const bf = (await j(longBacker) as unknown as Fail).findings.errors;
+  assertEquals(fields(bf), ["bk_url_0"]);
+  assertEquals(bf[0].msg, tooLong("Org: the link", LIMITS.LINK_CHARS));
+  // PATCH: the recipient link has the same cap as submit
+  const { slug } = await j(await submit(h, token, good)) as { slug: string };
+  const patched = await h.req(`/api/initiatives/${slug}`, {
+    method: "PATCH",
+    token,
+    json: { recipientUrl: longLink },
+  });
+  assertEquals(patched.status, 400);
+  assertStringIncludes((await j(patched)).error as string, "too long");
+  assertEquals((await h.db.rfps.bySlug(slug))!.recipientUrl, "https://x.example/");
+  // edit: a long title comes back painted on the field, like submit does
+  const edited = await h.req(`/api/initiatives/${slug}/revisions`, {
+    method: "POST",
+    token,
+    json: { ...good, title: "t".repeat(LIMITS.TITLE_CHARS + 1) },
+  });
+  assertEquals(edited.status, 400);
+  const ef = (await j(edited) as unknown as Fail).findings.errors;
+  assertEquals(fields(ef), ["title"]);
+  assertEquals(ef[0].msg, tooLong("The title", LIMITS.TITLE_CHARS));
+  // admin pledges: company, link and note are refused past the cap, never cut
+  const id = (await h.db.rfps.bySlug(slug))!.id;
+  const base = `/api/admin/initiatives/${id}/pledges`;
+  const longCompany = await h.req(base, {
+    method: "POST",
+    token: admin,
+    json: { company: "c".repeat(LIMITS.BACKER_ORG + 1), amount: "10" },
+  });
+  assertEquals(longCompany.status, 400);
+  assertEquals((await j(longCompany)).error, tooLong("The company name", LIMITS.BACKER_ORG));
+  const created = await h.req(base, {
+    method: "POST",
+    token: admin,
+    json: { company: "c".repeat(LIMITS.BACKER_ORG), amount: "10" },
+  });
+  assertEquals(created.status, 201);
+  const pid = (await j(created) as { pledge: { id: string } }).pledge.id;
+  const longUrl = await h.req(`${base}/${pid}`, {
+    method: "PATCH",
+    token: admin,
+    json: { url: longLink },
+  });
+  assertEquals(longUrl.status, 400);
+  assertEquals((await j(longUrl)).error, tooLong("The link", LIMITS.BACKER_URL));
+  const longNote = await h.req(`${base}/${pid}`, {
+    method: "PATCH",
+    token: admin,
+    json: { note: "n".repeat(301) },
+  });
+  assertEquals(longNote.status, 400);
+  assertEquals((await j(longNote)).error, tooLong("The note", 300));
+  assertEquals((await h.db.pledges.list(id))[0].company, "c".repeat(LIMITS.BACKER_ORG));
   h.close();
 });

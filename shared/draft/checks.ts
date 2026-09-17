@@ -96,10 +96,12 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
       "Describe the initiative in at least 40 characters.",
     );
   }
-  if ((page.title ?? "").length > LIMITS.TITLE_CHARS) {
+  // The caps measure the trimmed text, as every server reader does.
+  const over = (v: string | undefined, cap: number) => (v ?? "").trim().length > cap;
+  if (over(page.title, LIMITS.TITLE_CHARS)) {
     err("title", tooLong("The title", LIMITS.TITLE_CHARS));
   }
-  if ((page.summary ?? "").length > LIMITS.SUMMARY_CHARS) {
+  if (over(page.summary, LIMITS.SUMMARY_CHARS)) {
     err("summary", tooLong("The summary", LIMITS.SUMMARY_CHARS));
   }
   const goal = Number(page.goal) || 0;
@@ -118,19 +120,23 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
     if (type === "grant" && !(page.recipient ?? "").trim()) {
       miss("recipient_team", "Name the team that receives this grant.");
     }
-    if (type === "grant" && (page.recipientUrl ?? "").trim() && !isHttpsUrl(page.recipientUrl!)) {
+    if (type === "grant" && over(page.recipientUrl, LIMITS.LINK_CHARS)) {
+      err("recipient_url", tooLong("The recipient link", LIMITS.LINK_CHARS));
+    } else if (
+      type === "grant" && (page.recipientUrl ?? "").trim() && !isHttpsUrl(page.recipientUrl!)
+    ) {
       err("recipient_url", "The recipient link must be an https URL.");
     }
-    if ((page.recipient ?? "").length > LIMITS.RECIPIENT_CHARS) {
+    if (over(page.recipient, LIMITS.RECIPIENT_CHARS)) {
       err("recipient_team", tooLong("The recipient team", LIMITS.RECIPIENT_CHARS));
     }
-    if ((page.reviewer ?? "").length > LIMITS.REVIEWER_CHARS) {
+    if (over(page.reviewer, LIMITS.REVIEWER_CHARS)) {
       err("milestone_reviewer", tooLong("The reviewer", LIMITS.REVIEWER_CHARS));
     }
-    if ((page.funders ?? "").length > LIMITS.FUNDERS_CHARS) {
+    if (over(page.funders, LIMITS.FUNDERS_CHARS)) {
       err("funders", tooLong("The funder list", LIMITS.FUNDERS_CHARS));
     }
-    if ((page.contact ?? "").length > LIMITS.CONTACT_CHARS) {
+    if (over(page.contact, LIMITS.CONTACT_CHARS)) {
       err("contact", tooLong("The contact", LIMITS.CONTACT_CHARS));
     }
   }
@@ -170,8 +176,11 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
           "Name the organization that committed this amount, or remove the row.",
         );
       }
-      if ((b.url ?? "").trim() && !isHttpsUrl(b.url)) {
-        err(`bk_url_${i}`, `${b.org || "Backer " + (i + 1)}: the link must be an https URL.`);
+      const who = b.org || "Backer " + (i + 1);
+      if (over(b.url, LIMITS.LINK_CHARS)) {
+        err(`bk_url_${i}`, tooLong(`${who}: the link`, LIMITS.LINK_CHARS));
+      } else if ((b.url ?? "").trim() && !isHttpsUrl(b.url)) {
+        err(`bk_url_${i}`, `${who}: the link must be an https URL.`);
       }
     });
     const live = backers.filter((b) => b.org || (Number(b.amountUsd) || 0) > 0);
@@ -185,7 +194,7 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
       err("backers", `At most ${LIMITS.BACKERS} backers.`);
     }
     backers.forEach((b, i) => {
-      if ((b.org ?? "").length > LIMITS.BACKER_ORG) {
+      if (over(b.org, LIMITS.BACKER_ORG)) {
         err(`bk_org_${i}`, tooLong(`Backer ${i + 1}: the organization name`, LIMITS.BACKER_ORG));
       }
     });
@@ -203,7 +212,7 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
     total += amt;
     if (m.adoption) adoption += amt;
     if (!(m.name ?? "").trim()) miss(`ms_${i}_name`, `${L}: name this milestone.`);
-    if ((m.name ?? "").length > LIMITS.MILESTONE_NAME) {
+    if (over(m.name, LIMITS.MILESTONE_NAME)) {
       err(`ms_${i}_name`, tooLong(`${L}: the name`, LIMITS.MILESTONE_NAME));
     }
     if (amt <= 0) miss(`ms_${i}_amount`, `${L}: enter what this milestone pays.`);
@@ -214,7 +223,7 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
     if (crits.length > LIMITS.CRITERIA_PER_MILESTONE) {
       err(`ms_${i}_crit`, `${L}: at most ${LIMITS.CRITERIA_PER_MILESTONE} criteria.`);
     }
-    if ((m.link ?? "").length > LIMITS.LINK_CHARS) {
+    if (over(m.link, LIMITS.LINK_CHARS)) {
       err(`ms_${i}_link`, tooLong(`${L}: the delivered-work link`, LIMITS.LINK_CHARS));
     } else if ((m.link ?? "").trim() && !isHttpsUrl(m.link)) {
       err(`ms_${i}_link`, `${L}: the delivered-work link must be an https URL.`);

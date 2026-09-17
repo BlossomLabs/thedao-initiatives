@@ -12,12 +12,12 @@ import {
   pledgeJson,
   revisionMeta,
 } from "../lib/json.ts";
-import { DOMAIN_RE, parseGoal, TX_HASH_RE, validateText } from "../lib/validate.ts";
+import { capped, DOMAIN_RE, parseGoal, TX_HASH_RE, validateText } from "../lib/validate.ts";
 import { decimalsOf, editChecks, pledgeBackers } from "./initiatives.ts";
 import { readPageFacts } from "../lib/page-facts.ts";
 import { assertNoErrors, mergeFindings, readStructured } from "../lib/structured.ts";
 import { pickText, type RfpText } from "../db/rfps.ts";
-import { type Findings, isStructured } from "../../shared/draft/mod.ts";
+import { type Findings, isStructured, LIMITS } from "../../shared/draft/mod.ts";
 import { predictSafeAddress, safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
 import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
@@ -311,6 +311,7 @@ export function adminRoutes(deps: Deps) {
    * `logo` image (pinned to IPFS). Only the keys sent come back, so the same
    * reader serves adding (everything required) and editing (a subset).
    */
+  const PLEDGE_NOTE_CHARS = 300;
   async function readPledge(c: Context<Vars>, rfp: Rfp) {
     const ct = c.req.header("content-type") ?? "";
     let fields: Record<string, unknown> = {};
@@ -334,8 +335,9 @@ export function adminRoutes(deps: Deps) {
       logoCid = s(fields.logoCid, 100);
     }
     const patch: Partial<Pick<Pledge, "company" | "amountUsd" | "url" | "note" | "logoCid">> = {};
+    // Past a cap is refused with the message, never cut.
     if (fields.company !== undefined) {
-      patch.company = s(fields.company, 120);
+      patch.company = capped(fields.company, LIMITS.BACKER_ORG, "The company name");
       if (!patch.company) throw new HttpError(400, "Company name is required.");
     }
     const rawAmount = fields.amountUsd ?? fields.amount;
@@ -345,10 +347,12 @@ export function adminRoutes(deps: Deps) {
       patch.amountUsd = amount!;
     }
     if (fields.url !== undefined) {
-      const url = s(fields.url, 300);
+      const url = capped(fields.url, LIMITS.BACKER_URL, "The link");
       patch.url = /^https?:\/\//i.test(url) ? url : ""; // reject javascript:/data: and other schemes
     }
-    if (fields.note !== undefined) patch.note = s(fields.note, 300);
+    if (fields.note !== undefined) {
+      patch.note = capped(fields.note, PLEDGE_NOTE_CHARS, "The note");
+    }
     if (logoCid !== undefined) patch.logoCid = logoCid;
     const status = typeof fields.status === "string" ? s(fields.status, 20) : undefined;
     return { patch, status };

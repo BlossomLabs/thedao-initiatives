@@ -1,7 +1,7 @@
 /** Input validation shared by the submit form, the proposer's edit page and the admin editor. */
 import { HttpError } from "./errors.ts";
 import { MAX_DETAILS, MAX_SUMMARY, MAX_TITLE } from "../config.ts";
-import { tooLong } from "../../shared/draft/mod.ts";
+import { LIMITS, tooLong } from "../../shared/draft/mod.ts";
 
 export const MIN_TITLE = 8;
 export const MIN_SUMMARY = 40;
@@ -12,6 +12,13 @@ export const MIN_SUMMARY = 40;
 export function cleanText(v: unknown, field: "title" | "summary" | "details"): string {
   const max = field === "title" ? MAX_TITLE : field === "summary" ? MAX_SUMMARY : MAX_DETAILS;
   return String(v ?? "").trim().slice(0, max + 1);
+}
+
+/** A capped text field: refused with the shared "too long" message, never cut. */
+export function capped(v: unknown, cap: number, label: string): string {
+  const t = String(v ?? "").trim().slice(0, cap + 1);
+  if (t.length > cap) throw new HttpError(400, tooLong(label, cap));
+  return t;
 }
 
 /**
@@ -135,13 +142,14 @@ export function parseDuration(raw: unknown): [number | null, null] | [null, stri
 }
 
 /**
- * An https link the page renders as an anchor (recipient team site). Only the
- * scheme and host shape are checked; nothing fetches it server-side.
+ * An https link the page renders as an anchor (recipient team site, backer
+ * site). Only the scheme and host shape are checked; nothing fetches it
+ * server-side. The cap is the form's, so every writer of a link agrees.
  */
 export function validateHttpsLink(raw: unknown): [string, null] | [null, string] {
   const s = String(raw ?? "").trim();
   if (!s) return ["", null];
-  if (s.length > 500) return [null, "Link is too long."];
+  if (s.length > LIMITS.LINK_CHARS) return [null, tooLong("The link", LIMITS.LINK_CHARS)];
   let u: URL;
   try {
     u = new URL(s);

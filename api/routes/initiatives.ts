@@ -18,6 +18,7 @@ import { onrampLink } from "../lib/onramp.ts";
 import { fetchDiscourseTitle } from "../services/forum.ts";
 import {
   MAX_FUNDERS,
+  MAX_TITLE,
   REVISIONS_PER_HOUR_PER_ADDRESS,
   SUBMISSIONS_PER_HOUR_PER_IP,
   TOKENS,
@@ -213,7 +214,13 @@ export function initiativeRoutes(deps: Deps) {
     let warnings: Finding[] = [];
     let text;
     if (structuredBody) {
-      const base = validateText({ title: s(body.title), summary: s(body.summary), details: "" });
+      // The text rules (length floors and caps included) come back as
+      // findings painted on the fields, the same as on submit.
+      const base = {
+        title: cleanText(body.title, "title"),
+        summary: cleanText(body.summary, "summary"),
+        details: "",
+      };
       const { structured, findings: caps } = readStructured({
         sections: body.sections ?? cur.sections,
         milestones: body.milestones ?? cur.milestones,
@@ -286,10 +293,11 @@ export function initiativeRoutes(deps: Deps) {
     // topic's title from Discourse (SSRF-hardened, best effort).
     let title = cleanText(body.title, "title");
     if (!title && discourseUrl) {
+      // Not the user's text: a forum title past the cap is clipped, not refused.
       title = cleanText(
         await fetchDiscourseTitle(discourseUrl, deps.fetch, deps.resolve),
         "title",
-      );
+      ).slice(0, MAX_TITLE);
     }
     if (title.length < 8) {
       throw new HttpError(

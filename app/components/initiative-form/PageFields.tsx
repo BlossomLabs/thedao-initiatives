@@ -23,7 +23,7 @@ export default function PageFields(
         field="title"
         label="Title"
         required
-        hint='Up to 140 characters. No "RFP:" or "Grant:" prefix, the badge says it.'
+        hint={`Up to ${LIMITS.TITLE_CHARS} characters. No "RFP:" or "Grant:" prefix, the badge says it.`}
       >
         <Input maxLength={LIMITS.TITLE_CHARS + 1} value={p.title} onChange={set("title")} />
       </FormField>

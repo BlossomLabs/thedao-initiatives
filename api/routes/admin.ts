@@ -12,7 +12,14 @@ import {
   pledgeJson,
   revisionMeta,
 } from "../lib/json.ts";
-import { capped, DOMAIN_RE, parseGoal, TX_HASH_RE, validateText } from "../lib/validate.ts";
+import {
+  capped,
+  cleanText,
+  DOMAIN_RE,
+  parseGoal,
+  TX_HASH_RE,
+  validateText,
+} from "../lib/validate.ts";
 import { decimalsOf, editChecks, pledgeBackers } from "./initiatives.ts";
 import { readPageFacts } from "../lib/page-facts.ts";
 import { assertNoErrors, mergeFindings, readStructured } from "../lib/structured.ts";
@@ -28,8 +35,10 @@ import type { Comment, Pledge, PledgeStatus, Rfp } from "../db/types.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
 
 const TEXT_KEYS = ["title", "summary", "details", "sections", "milestones", "links"];
-/** Findings that block an admin save: shape rules, not editorial ones. */
+/** Findings that block an admin save: shape rules, not editorial ones. Every
+ * cap finding blocks too (the limits are the same for everyone). */
 const HARD_FIELD_RE = /^(links(_\d+)?|ms_\d+_(link|month))$/;
+const blocks = (f: Findings["errors"][number]) => f.kind === "cap" || HARD_FIELD_RE.test(f.field);
 
 export function adminRoutes(deps: Deps) {
   const r = new Hono<Vars>();
@@ -189,12 +198,14 @@ export function adminRoutes(deps: Deps) {
     let text: RfpText | null = null;
     let findings: Findings = { errors: [], warnings: [] };
     if (textGiven || reshape) {
+      // One character past each cap survives so the checks paint "too long"
+      // on the field; the length floors are validateText's, below.
       const base = textGiven
-        ? validateText({
-          title: body.title === undefined ? cur.title : s(body.title),
-          summary: body.summary === undefined ? cur.summary : s(body.summary),
-          details: body.details === undefined ? cur.details : s(body.details, 100_000),
-        })
+        ? {
+          title: cleanText(body.title === undefined ? cur.title : body.title, "title"),
+          summary: cleanText(body.summary === undefined ? cur.summary : body.summary, "summary"),
+          details: cleanText(body.details === undefined ? cur.details : body.details, "details"),
+        }
         : { title: cur.title, summary: cur.summary, details: cur.details };
       const { structured, findings: caps } = readStructured({
         sections: body.sections === undefined ? cur.sections : body.sections,
@@ -214,10 +225,11 @@ export function adminRoutes(deps: Deps) {
           { ...base, ...structured },
           pledgeBackers(await db.pledges.list(rfp.id)),
         );
-        const hard = checks.errors.filter((e) => HARD_FIELD_RE.test(e.field));
+        const hard = checks.errors.filter(blocks);
         assertNoErrors(mergeFindings(caps, { errors: hard, warnings: [] }));
         findings = mergeFindings(caps, checks);
       } else assertNoErrors(caps);
+      if (textGiven) validateText(base);
       text = { ...base, ...structured };
     }
     let next = Object.keys(patch).length ? await db.rfps.update(rfp.id, patch) : rfp;

@@ -32,7 +32,7 @@ const empty = (): Findings => ({ errors: [], warnings: [] });
 /** The byte-cap finding for a body, or null when it fits one KV value. */
 export function byteCapFinding(s: Structured): Finding | null {
   return structuredBytes(s) > LIMITS.STRUCTURED_BYTES
-    ? { field: "", msg: TOO_LONG_MSG, kind: "content" }
+    ? { field: "", msg: TOO_LONG_MSG, kind: "cap" }
     : null;
 }
 
@@ -48,15 +48,10 @@ export function readStructured(
 ): { structured: Structured; findings: Findings } {
   const structured = normaliseStructured(body, type);
   const f = empty();
-  const err = (field: string, msg: string) => f.errors.push({ field, msg, kind: "content" });
+  const err = (field: string, msg: string) => f.errors.push({ field, msg, kind: "cap" });
   for (const key of SECTIONS[type]) {
     if ((structured.sections[key] ?? "").length > LIMITS.SECTION_CHARS) {
-      err(
-        key,
-        `${FIELDS[key].heading} is too long (${
-          LIMITS.SECTION_CHARS.toLocaleString("en-US")
-        } characters at most).`,
-      );
+      err(key, tooLong(FIELDS[key].heading, LIMITS.SECTION_CHARS));
     }
   }
   if (structured.milestones.length > LIMITS.MILESTONES) {
@@ -92,20 +87,25 @@ export function readBackers(
   body: Record<string, unknown>,
 ): { backers: BackerInput[]; findings: Findings } {
   const f = empty();
-  const err = (field: string, msg: string) => f.errors.push({ field, msg, kind: "content" });
+  const err = (field: string, msg: string, kind: Finding["kind"] = "content") =>
+    f.errors.push({ field, msg, kind });
   const raw = Array.isArray(body.backers) ? body.backers : [];
   const backers: BackerInput[] = [];
   raw.slice(0, LIMITS.BACKERS + 1).forEach((r, i) => {
     const b = r && typeof r === "object" ? r as Record<string, unknown> : {};
     const org = clip(b.org ?? b.company, LIMITS.BACKER_ORG + 1);
     if (org.length > LIMITS.BACKER_ORG) {
-      err(`bk_org_${i}`, tooLong(`Backer ${i + 1}: the organization name`, LIMITS.BACKER_ORG));
+      err(
+        `bk_org_${i}`,
+        tooLong(`Backer ${i + 1}: the organization name`, LIMITS.BACKER_ORG),
+        "cap",
+      );
     }
     const url = clip(b.url, LIMITS.BACKER_URL + 1);
     const logoCid = clip(b.logoCid, LIMITS.LOGO_CID + 1);
     const who = org || "Backer " + (i + 1);
     if (url.length > LIMITS.BACKER_URL) {
-      err(`bk_url_${i}`, tooLong(`${who}: the link`, LIMITS.BACKER_URL));
+      err(`bk_url_${i}`, tooLong(`${who}: the link`, LIMITS.BACKER_URL), "cap");
     } else if (url && !isHttpsUrl(url)) {
       err(`bk_url_${i}`, `${who}: the link must be an https URL.`);
     }
@@ -117,7 +117,7 @@ export function readBackers(
       logoCid: LOGO_CID_RE.test(logoCid) ? logoCid : "",
     });
   });
-  if (raw.length > LIMITS.BACKERS) err("backers", `At most ${LIMITS.BACKERS} backers.`);
+  if (raw.length > LIMITS.BACKERS) err("backers", `At most ${LIMITS.BACKERS} backers.`, "cap");
   return { backers, findings: f };
 }
 

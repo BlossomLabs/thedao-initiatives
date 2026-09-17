@@ -54,7 +54,7 @@ export interface Structured {
   links: string[];
 }
 
-export type FindingKind = "missing" | "content";
+export type FindingKind = "missing" | "content" | "cap";
 
 export interface Finding {
   /** Form field id: title, summary, goal, duration_months, recipient_team,
@@ -65,7 +65,9 @@ export interface Finding {
   field: string;
   msg: string;
   /** "missing": the answer is empty (the form hides these until the first
-   * submit attempt); "content": what is there is wrong. Warnings omit it. */
+   * submit attempt); "content": what is there is wrong; "cap": past a hard
+   * limit, which blocks every writer, the admin editor included. Warnings
+   * omit it. */
   kind?: FindingKind;
 }
 

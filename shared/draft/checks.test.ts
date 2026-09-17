@@ -130,8 +130,8 @@ test("a criterion past the character cap is an error on its own row, a 400-char 
   const i = minimal(1000);
   i.milestones[0].criteria = ["x".repeat(400), "y".repeat(LIMITS.CRITERION_CHARS + 1)];
   const f = checkSubmission(i);
-  expect(f.errors.map((e) => [e.field, e.msg])).toEqual([
-    ["ms_0_c1", criterionTooLong("A", 1)],
+  expect(f.errors.map((e) => [e.field, e.msg, e.kind])).toEqual([
+    ["ms_0_c1", criterionTooLong("A", 1), "cap"],
   ]);
 });
 
@@ -161,6 +161,8 @@ test("every capped field reports too long on its own id instead of losing its ta
   expect(f.errors.find((e) => e.field === "title")!.msg).toBe(
     "The title is too long (140 characters at most).",
   );
+  // every cap finding carries the "cap" kind, so an admin save can block on it
+  expect(f.errors.map((e) => e.kind)).toEqual(f.errors.map(() => "cap"));
   // at the cap exactly is fine
   i.page.title = "t".repeat(LIMITS.TITLE_CHARS);
   expect(fields(checkSubmission(i).errors)).not.toContain("title");

@@ -940,3 +940,33 @@ Deno.test("caps: a long link, an edited long title and a long pledge company are
   assertEquals((await h.db.pledges.list(id))[0].company, "c".repeat(LIMITS.BACKER_ORG));
   h.close();
 });
+
+Deno.test("admin editor: a field past its cap blocks the save, an editorial finding does not", async () => {
+  const h = await harness();
+  const token = await proposerToken(h);
+  const admin = await h.mint(ADMIN, true);
+  const good = minimalSubmission(1000);
+  const { slug } = await j(await submit(h, token, good)) as { slug: string };
+  const id = (await h.db.rfps.bySlug(slug))!.id;
+  const patch = (json: unknown) =>
+    h.req(`/api/admin/initiatives/${id}`, { method: "PATCH", token: admin, json });
+  // a blank milestone name is editorial: reported, saved
+  const blank = await patch({ milestones: [{ ...good.milestones[0], name: "" }] });
+  assertEquals(blank.status, 200);
+  assertEquals(fields((await j(blank) as Out).findings!.errors), ["ms_0_name"]);
+  // a name past the cap is refused with the finding on its field
+  const long = await patch({
+    milestones: [{ ...good.milestones[0], name: "n".repeat(LIMITS.MILESTONE_NAME + 1) }],
+  });
+  assertEquals(long.status, 400);
+  const lf = (await j(long) as unknown as Fail).findings.errors;
+  assertEquals(fields(lf), ["ms_0_name"]);
+  assertEquals(lf[0].msg, tooLong("Milestone A: the name", LIMITS.MILESTONE_NAME));
+  assertEquals((await h.db.rfps.get(id))!.milestones[0].name, "");
+  // so is a title past the cap, painted on the field like the proposer's edit
+  const longTitle = await patch({ title: "t".repeat(LIMITS.TITLE_CHARS + 1) });
+  assertEquals(longTitle.status, 400);
+  assertEquals(fields((await j(longTitle) as unknown as Fail).findings.errors), ["title"]);
+  assertEquals((await h.db.rfps.get(id))!.title, good.title);
+  h.close();
+});

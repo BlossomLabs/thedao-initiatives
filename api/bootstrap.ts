@@ -7,6 +7,7 @@ import { createChain } from "./chain/mod.ts";
 import { createAi } from "./services/ai.ts";
 import { createEns, onchainEns } from "./services/ens.ts";
 import { createPinata } from "./services/pinata.ts";
+import { warmImageWorker } from "./lib/image.ts";
 import { createFunding } from "./services/funding.ts";
 import { toChecksum } from "./chain/address.ts";
 import { ALWAYS_ENFORCED_RATE_LIMITS, BADGE_CONTRACT, CURATOR_ADDRESSES } from "./config.ts";
@@ -67,6 +68,8 @@ export async function createServer(siteOptions?: SiteOptions) {
     pinata: createPinata(config, fetch),
     log,
   };
+  // Load the image decoder before the first upload asks for it.
+  if (deps.pinata.enabled) warmImageWorker();
   const lock = siteLockFor(deps);
   const site = siteOptions
     ? await createStaticSite(

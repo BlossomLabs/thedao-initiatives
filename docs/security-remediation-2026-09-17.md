@@ -25,8 +25,10 @@ with component tests; the subsequent authenticated browser fixture was blocked b
 ## Image processing policy
 
 Input and normalized output must fit the existing route byte cap (logos 1 MiB; profile images retain
-their configured cap). Raster dimensions are at most 4096 per side and 4,000,000 pixels. A fresh worker
-has an 8-second deadline; at most two decode workers run per server isolate. ImageMagick limits pixel
+their configured cap). Raster dimensions are at most 4096 per side and 4,000,000 pixels. Decode workers are
+initialised once per server isolate (warmed at boot) and reused; each decode has an 8-second deadline
+that starts once the worker is ready, and a worker that misses it is terminated and replaced. At most
+two decode workers run per server isolate. ImageMagick limits pixel
 cache and individual allocation requests to 64 MiB, disables disk cache, limits profiles to 1 MiB and
 limits working-image lists to four. These are decoder limits, not a total runtime heap quota.
 

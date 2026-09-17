@@ -36,6 +36,8 @@ const worker = self as unknown as {
   onmessage: (event: MessageEvent<Uint8Array>) => void;
   postMessage: (data: unknown) => void;
 };
+// The decode deadline on the main thread starts only once this has been received.
+initialized.then(() => worker.postMessage({ ready: true }), () => worker.postMessage({ ready: false }));
 worker.onmessage = async ({ data }) => {
   try {
     await initialized;

@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertFalse } from "@std/assert";
-import { normalizeImage } from "../lib/image.ts";
+import { closeImageWorkers, imageWorkerStats, normalizeImage } from "../lib/image.ts";
 import { JPEG, PNG, PNG_TOO_MANY_PIXELS, PNG_TOO_WIDE, WEBP } from "./image-fixtures.ts";
 import { harness } from "./app-helpers.ts";
 
@@ -19,6 +19,19 @@ Deno.test("uploads decode and re-encode all supported formats and strip metadata
   if (clean) {
     assertFalse(new TextDecoder().decode(clean.bytes).includes("UNTRUSTED-APPENDED-CONTENT"));
   }
+  closeImageWorkers();
+});
+
+Deno.test("the decoder is initialised once per process and reused, so a deadline only covers decoding", async () => {
+  closeImageWorkers();
+  const before = imageWorkerStats().spawned;
+  assert(await normalizeImage(PNG));
+  assert(await normalizeImage(JPEG));
+  assert(await normalizeImage(WEBP));
+  assertEquals(imageWorkerStats().spawned - before, 1, "one worker serves consecutive uploads");
+  assertEquals(imageWorkerStats().pooled, 1);
+  closeImageWorkers();
+  assertEquals(imageWorkerStats().pooled, 0);
 });
 
 Deno.test("invalid, truncated, unsupported and oversized-dimension images never reach the upload provider", async () => {
@@ -41,6 +54,7 @@ Deno.test("invalid, truncated, unsupported and oversized-dimension images never 
     }
     assertFalse(h.fetchLog.some((x) => x.url.includes("pinata.cloud")));
   } finally {
+    closeImageWorkers();
     h.close();
   }
 });

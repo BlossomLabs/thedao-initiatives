@@ -1,30 +1,45 @@
-/**
- * CSP policy for the static site. Shared Hono middleware applies the headers;
- * API routes select their own resource-blocking policy.
- *
- * The full Content-Security-Policy ships report-only by default, so
- * violations show up in the browser console without breaking wallet flows
- * (browser-extension connectors, WalletConnect, Privy, RPC and IPFS hosts)
- * that cannot all be exercised from a test environment. CSP_ENFORCE=true
- * promotes it to the enforced header once the report-only data is clean.
- * Even when not enforcing, the directives that cannot break resource loading
- * (frame-ancestors, base-uri, form-action) are always enforced, so the donate
- * widget and the admin dashboard can never be framed.
- */
+/** Enforced static-site policy. Inline build scripts use hashes; connections use approved origins. */
 import { encodeBase64 } from "@std/encoding/base64";
 
 /** Always enforced: no resource-loading directive, so nothing can break. */
-export const MINIMAL_CSP = "frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+export const MINIMAL_CSP = "frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
-/**
- * The full policy. `connect-src https: wss:` is deliberately broad for the
- * first iteration: the wallet SDKs (wagmi injected connectors, the
- * WalletConnect relay, Privy), the public RPC endpoints (config.ts
- * DEFAULT_RPC_ENDPOINTS plus RPC_URL/Alchemy) and the IPFS gateway
- * (PINATA_GATEWAY) talk to many hosts. Narrow it to an explicit host list
- * once the report-only violations have been watched over a few releases.
- */
-export function fullCsp(scriptHashes: readonly string[] = []): string {
+/** Wallet service origins from the integrations in app/lib/wagmi.ts and app/lib/privy.ts. */
+export const CONNECT_ORIGINS = [
+  "https://auth.privy.io",
+  "https://*.rpc.privy.systems",
+  "https://rpc.walletconnect.com",
+  "https://rpc.walletconnect.org",
+  "https://relay.walletconnect.com",
+  "https://relay.walletconnect.org",
+  "wss://relay.walletconnect.com",
+  "wss://relay.walletconnect.org",
+  "https://pulse.walletconnect.com",
+  "https://pulse.walletconnect.org",
+  "https://explorer-api.walletconnect.com",
+  "https://api.web3modal.com",
+  "https://api.web3modal.org",
+  "https://keys.walletconnect.com",
+  "https://keys.walletconnect.org",
+  "https://ethereum-rpc.publicnode.com",
+  "https://eth.merkle.io",
+  "https://cloudflare-eth.com",
+];
+
+/** Extra deployment origins must be explicit, secure, and free of CSP syntax. */
+export function connectOrigin(raw: string): string {
+  const u = new URL(raw);
+  if (
+    !["https:", "wss:"].includes(u.protocol) || u.username || u.password ||
+    /[\s*;'"<>]/.test(raw)
+  ) throw new Error("Invalid CSP connection origin");
+  return u.origin;
+}
+
+export function fullCsp(
+  scriptHashes: readonly string[] = [],
+  connectOrigins: readonly string[] = [],
+): string {
   const scriptSrc = ["'self'", ...scriptHashes].join(" ");
   return [
     "default-src 'self'",
@@ -32,13 +47,16 @@ export function fullCsp(scriptHashes: readonly string[] = []): string {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https:",
-    "connect-src 'self' https: wss:",
-    "frame-src https://*.privy.io https://verify.walletconnect.com https://verify.walletconnect.org",
+    `connect-src 'self' ${
+      [...new Set([...CONNECT_ORIGINS, ...connectOrigins.map(connectOrigin)])].join(" ")
+    }`,
+    "frame-src https://auth.privy.io https://verify.walletconnect.com https://verify.walletconnect.org https://secure.walletconnect.com https://secure.walletconnect.org",
     "worker-src 'self' blob:",
     "frame-ancestors 'none'",
-    "base-uri 'self'",
+    "base-uri 'none'",
     "form-action 'self'",
     "object-src 'none'",
+    "report-uri /api/csp-report",
   ].join("; ");
 }
 
@@ -50,9 +68,13 @@ export interface SitePolicy {
 }
 
 export function sitePolicy(
-  opts: { cspEnforce: boolean; scriptHashes?: readonly string[] },
+  opts: {
+    cspEnforce: boolean;
+    scriptHashes?: readonly string[];
+    connectOrigins?: readonly string[];
+  },
 ): SitePolicy {
-  const full = fullCsp(opts.scriptHashes ?? []);
+  const full = fullCsp(opts.scriptHashes ?? [], opts.connectOrigins);
   return opts.cspEnforce
     ? { enforced: full, reportOnly: null }
     : { enforced: MINIMAL_CSP, reportOnly: full };

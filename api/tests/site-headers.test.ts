@@ -85,17 +85,19 @@ Deno.test("site headers: report-only by default, full policy enforced with CSP_E
   const full = fullCsp(hashes);
   assertStringIncludes(full, "script-src 'self' 'sha256-AAAA'");
   assertStringIncludes(full, "frame-ancestors 'none'");
-  assertStringIncludes(full, "base-uri 'self'");
+  assertStringIncludes(full, "base-uri 'none'");
   assertStringIncludes(full, "form-action 'self'");
   assertStringIncludes(full, "object-src 'none'");
   assertStringIncludes(full, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com");
-  assertStringIncludes(full, "connect-src 'self' https: wss:");
+  assertStringIncludes(full, "connect-src 'self' https://auth.privy.io");
+  assert(!full.includes(" https: "));
+  assertStringIncludes(full, "report-uri /api/csp-report");
   assertStringIncludes(MINIMAL_CSP, "frame-ancestors 'none'");
   assert(!MINIMAL_CSP.includes("script-src"));
 });
 
 Deno.test("config: CSP_ENFORCE flag", () => {
-  assertEquals(loadConfig({}).cspEnforce, false);
+  assertEquals(loadConfig({}).cspEnforce, true);
   assertEquals(loadConfig({ CSP_ENFORCE: "true" }).cspEnforce, true);
   assertEquals(loadConfig({ CSP_ENFORCE: "1" }).cspEnforce, true);
   assertEquals(loadConfig({ CSP_ENFORCE: "false" }).cspEnforce, false);
@@ -137,4 +139,27 @@ Deno.test("collectScriptHashes: walks a directory of HTML; missing directory yie
     await Deno.remove(dir, { recursive: true });
   }
   assertEquals(await collectScriptHashes(`${dir}/does-not-exist`), []);
+});
+
+Deno.test("CSP connections only accept explicit secure deployment origins", () => {
+  const p = fullCsp([], ["https://rpc.example/api/private-key", "wss://socket.example/path"]);
+  assertStringIncludes(p, "https://rpc.example");
+  assert(!p.includes("private-key"));
+  for (
+    const origin of [
+      "https:",
+      "https://*.example",
+      "http://example.com",
+      "https://a.example; script-src *",
+      "https://user:secret@example.com",
+    ]
+  ) {
+    let rejected = false;
+    try {
+      fullCsp([], [origin]);
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, origin);
+  }
 });

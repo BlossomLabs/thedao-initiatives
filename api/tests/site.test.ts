@@ -14,7 +14,7 @@ const BASIC = "Basic " + btoa("preview:secret");
 const API_CSP = "default-src 'none'; frame-ancestors 'none'";
 
 async function siteHarness(env: Record<string, string> = {}) {
-  const h = await harness({ env });
+  const h = await harness({ env: { CSP_ENFORCE: "false", ...env } });
   const root = await Deno.makeTempDir();
   await Deno.mkdir(`${root}/assets`);
   await Deno.mkdir(`${root}/admin`);
@@ -26,7 +26,12 @@ async function siteHarness(env: Record<string, string> = {}) {
   await Deno.writeTextFile(`${root}/admin/index.html`, "<html>ADMIN PAGE</html>");
   await Deno.writeTextFile(`${root}/assets/app-abc123.js`, SCRIPT);
   await Deno.writeTextFile(`${root}/robots.txt`, "User-agent: *");
-  const site = await createStaticSite({ root, siteUrl: SITE_URL }, h.deps.config.cspEnforce);
+  const site = await createStaticSite({
+    root,
+    siteUrl: SITE_URL,
+    rewriteOrigins: [PREVIEW],
+    selfHostSuffixes: [".deno.net"],
+  }, h.deps.config.cspEnforce);
   const app = createApp(h.deps, undefined, site);
   return {
     ...h,
@@ -53,6 +58,44 @@ function sharedHeaders(res: Response) {
     "max-age=63072000; includeSubDomains; preload",
   );
 }
+
+Deno.test("site: only approved origins rewrite HTML, including hydration hashes", async () => {
+  const h = await siteHarness({ CSP_ENFORCE: "true" });
+  try {
+    await Deno.writeTextFile(
+      `${h.root}/index.html`,
+      `<link rel="canonical" href="${SITE_URL}/"><script>window.site='${SITE_URL}'</script>`,
+    );
+    for (const origin of [PREVIEW, "https://branch-project.deno.net"]) {
+      const res = await h.app.request(origin + "/");
+      assertStringIncludes(await res.text(), `href="${origin}/"`);
+      assertStringIncludes(
+        res.headers.get("Content-Security-Policy")!,
+        await scriptHash(`window.site='${origin}'`),
+      );
+    }
+    for (
+      const origin of [
+        "https://attacker.test",
+        "https://preview.test.attacker.test",
+        "https://evil-deno.net",
+        "https://branch.deno.net.evil.test",
+        "http://branch.deno.net",
+        "https://branch.deno.net:444",
+        "https://preview.test:444",
+      ]
+    ) {
+      const res = await h.app.request(origin + "/", {
+        headers: { "X-Forwarded-Host": "preview.test" },
+      });
+      const html = await res.text();
+      assertStringIncludes(html, `href="${SITE_URL}/"`);
+      assert(!html.includes(origin), origin);
+    }
+  } finally {
+    await h.close();
+  }
+});
 
 Deno.test("site: Hono serves pages, assets and SPA fallbacks without swallowing API routes", async () => {
   const h = await siteHarness();

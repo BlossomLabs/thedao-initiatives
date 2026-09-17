@@ -1,10 +1,19 @@
 /** Static files and SPA fallback, served as the last route in the Hono app. */
 import { serveDir } from "@std/http/file-server";
-import { collectScriptHashes, type SitePolicy, sitePolicy } from "./lib/site-headers.ts";
+import {
+  collectScriptHashes,
+  scriptHashes as hashScripts,
+  type SitePolicy,
+  sitePolicy,
+} from "./lib/site-headers.ts";
 
 export interface SiteOptions {
   root: string;
   siteUrl: string;
+  connectOrigins?: string[];
+  /** Exact browser origins and trusted edge-host suffixes from server configuration. */
+  rewriteOrigins?: string[];
+  selfHostSuffixes?: string[];
 }
 
 export interface StaticSite {
@@ -13,13 +22,15 @@ export interface StaticSite {
 }
 
 export async function createStaticSite(
-  { root, siteUrl }: SiteOptions,
+  { root, siteUrl, connectOrigins, rewriteOrigins = [], selfHostSuffixes = [] }: SiteOptions,
   cspEnforce: boolean,
   log: (message: string) => void = () => {},
 ): Promise<StaticSite> {
   // Hash the prerendered inline scripts once, before accepting requests.
   const scriptHashes = await collectScriptHashes(root);
-  const policy = sitePolicy({ cspEnforce, scriptHashes });
+  const policy = sitePolicy({ cspEnforce, scriptHashes, connectOrigins });
+  const allowedOrigins = new Set(rewriteOrigins);
+  const trustedSuffixes = selfHostSuffixes.filter((suffix) => /^\.[a-z0-9.-]+$/.test(suffix));
   log(
     `site headers: CSP ${cspEnforce ? "enforced" : "report-only"}, ` +
       `${scriptHashes.length} inline script hash(es)`,
@@ -28,10 +39,25 @@ export async function createStaticSite(
   /** Prerendered pages bake the site URL into their meta; rewrite for staging origins. */
   async function rewriteOrigin(res: Response, origin: string): Promise<Response> {
     if (origin === siteUrl || res.status !== 200) return res;
+    const url = new URL(origin);
+    const trustedEdge = url.protocol === "https:" && !url.port &&
+      trustedSuffixes.some((suffix) => url.hostname.endsWith(suffix));
+    if (!allowedOrigins.has(origin) && !trustedEdge) return res;
     if (!res.headers.get("Content-Type")?.includes("text/html")) return res;
     const html = (await res.text()).replaceAll(siteUrl, origin);
     const headers = new Headers(res.headers);
     headers.delete("Content-Length");
+    headers.delete("ETag");
+    // Origin rewriting can change inline hydration scripts. Hash the bytes actually served.
+    const rewritten = sitePolicy({
+      cspEnforce,
+      scriptHashes: await hashScripts([html]),
+      connectOrigins,
+    });
+    headers.set("Content-Security-Policy", rewritten.enforced);
+    if (rewritten.reportOnly) {
+      headers.set("Content-Security-Policy-Report-Only", rewritten.reportOnly);
+    }
     return new Response(html, { status: res.status, headers });
   }
 

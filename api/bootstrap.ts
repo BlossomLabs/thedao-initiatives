@@ -56,7 +56,16 @@ export async function createServer(siteOptions?: SiteOptions) {
   };
   const lock = siteLockFor(deps);
   const site = siteOptions
-    ? await createStaticSite(siteOptions, config.cspEnforce, log)
+    ? await createStaticSite(
+      {
+        ...siteOptions,
+        connectOrigins: config.cspConnectOrigins,
+        rewriteOrigins: config.webOrigins,
+        selfHostSuffixes: config.selfHostSuffixes,
+      },
+      config.cspEnforce,
+      log,
+    )
     : undefined;
   const app = createApp(deps, lock, site);
   if (lock.enabled) log("site lock is ON (SITE_USERNAME/SITE_PASSWORD set)");

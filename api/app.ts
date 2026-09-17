@@ -16,6 +16,7 @@ import { commentRoutes } from "./routes/comments.ts";
 import { aiRoutes } from "./routes/ai.ts";
 import { supportRoutes } from "./routes/support.ts";
 import { adminRoutes } from "./routes/admin.ts";
+import { cspRoutes } from "./routes/csp.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 import { createSiteLock, type SiteLock } from "./lib/sitelock.ts";
@@ -68,6 +69,10 @@ export function createApp(
     clientIp(),
     originGuard(deps.config),
     bodyLimit({ maxSize: 2 * 1024 * 1024 }),
+  );
+  // Reports never load or refresh an authenticated session.
+  app.route("/api/csp-report", cspRoutes(deps));
+  useApi(
     sessionLoader(deps.db, deps.admins),
     auditIntent(deps),
   );

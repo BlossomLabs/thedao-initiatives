@@ -130,8 +130,9 @@ export interface Config {
   walletConnectProjectId: string;
   siteUsername: string;
   sitePassword: string;
-  /** CSP_ENFORCE=true: the static site's full Content-Security-Policy is enforced instead of report-only (lib/site-headers.ts). */
+  /** Enforced by default; explicitly false supports a temporary diagnostic rollout. */
   cspEnforce: boolean;
+  cspConnectOrigins: string[];
   port: number;
   kvPath: string | undefined;
   /** First key part every KV key is stored under; empty = bare keys. */
@@ -220,7 +221,12 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     walletConnectProjectId: (env.WALLETCONNECT_PROJECT_ID ?? "").trim(),
     siteUsername: (env.SITE_USERNAME ?? "").trim(),
     sitePassword: (env.SITE_PASSWORD ?? "").trim(),
-    cspEnforce: flag(env.CSP_ENFORCE),
+    cspEnforce: env.CSP_ENFORCE === undefined || env.CSP_ENFORCE.trim() === "" ||
+      flag(env.CSP_ENFORCE),
+    cspConnectOrigins: [
+      ...list(env.CSP_CONNECT_ORIGINS),
+      ...[env.VITE_RPC_URL, env.VITE_API_URL].filter((v): v is string => Boolean(v?.trim())),
+    ],
     port: Number(env.PORT ?? "8000") || 8000,
     kvPath: (env.KV_PATH ?? "").trim() || undefined,
     dbPrefix: (env.DB_PREFIX ?? "").trim(),

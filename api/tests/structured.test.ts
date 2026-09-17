@@ -828,23 +828,40 @@ Deno.test("pledge edit: PATCH takes the same fields as adding, including a new l
   assertEquals(edited.pledge.amountUsd, 2500);
   assertEquals(edited.pledge.url, "https://acme.example/");
   assertEquals(edited.pledge.status, "pledged");
-  // status alone still works, and a javascript: link is dropped
+  // Invalid links reject the change and preserve the existing pledge.
   await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { status: "received" } });
-  const bad = await j(
-    await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { url: "javascript:x" } }),
-  ) as { pledge: { url: string; status: string } };
-  assertEquals(bad.pledge.url, "");
-  assertEquals(bad.pledge.status, "received");
+  for (const url of ["javascript:x", "http://acme.example/", "https://", "not a URL"]) {
+    assertEquals(
+      (await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { url } })).status,
+      400,
+    );
+    assertEquals(
+      (await h.req(base, {
+        method: "POST",
+        token: admin,
+        json: { company: "Bad", amount: 1000, url },
+      })).status,
+      400,
+    );
+  }
+  const unchanged = (await h.db.pledges.get(rfp.id, pid))!;
+  assertEquals(unchanged.url, "https://acme.example/");
+  assertEquals(unchanged.status, "received");
+  assertEquals(
+    (await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { url: "" } })).status,
+    200,
+  );
+  assertEquals((await h.db.pledges.get(rfp.id, pid))?.url, "");
   // multipart with a logo re-pins and keeps the other fields
   const form = new FormData();
   form.set("note", "with logo");
   form.set(
     "image",
-    new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]) as BlobPart]),
+    new Blob([PNG as BlobPart]),
   );
   form.set(
     "logo",
-    new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]) as BlobPart], {
+    new Blob([PNG as BlobPart], {
       type: "image/png",
     }),
     "l.png",

@@ -14,7 +14,13 @@ import {
   pledgeJson,
   revisionMeta,
 } from "../lib/json.ts";
-import { DOMAIN_RE, parseGoal, TX_HASH_RE, validateText } from "../lib/validate.ts";
+import {
+  DOMAIN_RE,
+  parseGoal,
+  TX_HASH_RE,
+  validateHttpsLink,
+  validateText,
+} from "../lib/validate.ts";
 import { decimalsOf, editChecks, pledgeBackers } from "./initiatives.ts";
 import { PAGE_FACT_FIELDS, readPageFacts } from "../lib/page-facts.ts";
 import { assertNoErrors, mergeFindings, readStructured, TEXT_FIELDS } from "../lib/structured.ts";
@@ -372,16 +378,6 @@ export function adminRoutes(deps: Deps) {
       for (const [k, v] of form.entries()) if (typeof v === "string") fields[k] = v;
       logo = form.get("logo");
     } else fields = await jsonBody(c, allowed);
-    if (logo instanceof File && logo.size) {
-      if (logo.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
-      const [cid, err] = await deps.pinata.uploadImage(
-        new Uint8Array(await logo.arrayBuffer()),
-        LOGO_MAX_BYTES,
-        "logo-" + rfp.slug,
-      );
-      if (!cid) throw new HttpError(400, err ?? "upload failed");
-      logoCid = cid;
-    }
     const patch: Partial<Pick<Pledge, "company" | "amountUsd" | "url" | "note" | "logoCid">> = {};
     if (fields.company !== undefined) {
       patch.company = s(fields.company, 120);
@@ -394,10 +390,22 @@ export function adminRoutes(deps: Deps) {
       patch.amountUsd = amount!;
     }
     if (fields.url !== undefined) {
-      const url = s(fields.url, 300);
-      patch.url = /^https?:\/\//i.test(url) ? url : ""; // reject javascript:/data: and other schemes
+      const [url, err] = validateHttpsLink(fields.url);
+      if (err) throw new HttpError(400, err);
+      patch.url = url!;
     }
     if (fields.note !== undefined) patch.note = s(fields.note, 300);
+    // Validate fields before uploading anything to the external provider.
+    if (logo instanceof File && logo.size) {
+      if (logo.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
+      const [cid, err] = await deps.pinata.uploadImage(
+        new Uint8Array(await logo.arrayBuffer()),
+        LOGO_MAX_BYTES,
+        "logo-" + rfp.slug,
+      );
+      if (!cid) throw new HttpError(400, err ?? "upload failed");
+      logoCid = cid;
+    }
     if (logoCid !== undefined) patch.logoCid = logoCid;
     const status = typeof fields.status === "string" ? s(fields.status, 20) : undefined;
     return { patch, status };

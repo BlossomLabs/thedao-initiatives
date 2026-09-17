@@ -726,10 +726,10 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
   const p1 = await h.req("/api/admin/initiatives/" + id + "/pledges", {
     method: "POST",
     token: admin,
-    json: { company: "Acme", amount: "500", url: "javascript:alert(1)" },
+    json: { company: "Acme", amount: "500", url: "https://acme.example/" },
   });
   assertEquals(p1.status, 201);
-  assertEquals(((await j(p1)).pledge as { url: string }).url, "");
+  assertEquals(((await j(p1)).pledge as { url: string }).url, "https://acme.example/");
   const form = new FormData();
   form.append("company", "Logo Co");
   form.append("url", "https://logo.example");
@@ -753,7 +753,7 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
   assertEquals(card.logos, [{
     company: "Logo Co",
     logoUrl: p2.pledge.logoUrl,
-    url: "https://logo.example",
+    url: "https://logo.example/",
   }]);
   assertEquals(card.summary.pledged, 750);
   await h.req("/api/admin/initiatives/" + id + "/pledges/" + p2.pledge.id, {

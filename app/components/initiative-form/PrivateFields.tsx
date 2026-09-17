@@ -1,3 +1,4 @@
+import { LIMITS } from "@shared/draft/mod";
 import { Input, Textarea } from "~/components/ui/Field";
 import FormField from "./FormField";
 import type { Draft } from "./types";
@@ -18,7 +19,7 @@ export default function PrivateFields(
       >
         <Textarea
           rows={6}
-          maxLength={4000}
+          maxLength={LIMITS.FUNDERS_CHARS + 1}
           placeholder="Ethereum Foundation | funds public-goods security tooling | met once | warm intro? yes | $50,000"
           value={draft.priv.funders}
           disabled={locked}
@@ -33,7 +34,7 @@ export default function PrivateFields(
         hint="Email or handle. We use it only to ask about this submission."
       >
         <Input
-          maxLength={200}
+          maxLength={LIMITS.CONTACT_CHARS + 1}
           value={draft.priv.contact}
           disabled={locked}
           onChange={(e) => actions.setPriv("contact", e.target.value)}

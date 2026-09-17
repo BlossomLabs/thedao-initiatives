@@ -1,14 +1,17 @@
 /** Input validation shared by the submit form, the proposer's edit page and the admin editor. */
 import { HttpError } from "./errors.ts";
 import { MAX_DETAILS, MAX_SUMMARY, MAX_TITLE } from "../config.ts";
+import { tooLong } from "../../shared/draft/mod.ts";
 
 export const MIN_TITLE = 8;
 export const MIN_SUMMARY = 40;
 
-/** Clip a text field to its limit; the same rules everywhere the text is written. */
+/** Trim a text field, keeping one character past its limit so the checks can
+ * report "too long" instead of the tail vanishing; the same everywhere the
+ * text is written. */
 export function cleanText(v: unknown, field: "title" | "summary" | "details"): string {
   const max = field === "title" ? MAX_TITLE : field === "summary" ? MAX_SUMMARY : MAX_DETAILS;
-  return String(v ?? "").trim().slice(0, max);
+  return String(v ?? "").trim().slice(0, max + 1);
 }
 
 /**
@@ -22,11 +25,15 @@ export function validateText(
   if (title.length < MIN_TITLE) {
     throw new HttpError(400, `Title needs at least ${MIN_TITLE} characters.`);
   }
+  if (title.length > MAX_TITLE) throw new HttpError(400, tooLong("The title", MAX_TITLE));
   const summary = cleanText(text.summary, "summary");
   if (summary.length < MIN_SUMMARY) {
     throw new HttpError(400, `Summary needs at least ${MIN_SUMMARY} characters.`);
   }
-  return { title, summary, details: cleanText(text.details, "details") };
+  if (summary.length > MAX_SUMMARY) throw new HttpError(400, tooLong("The summary", MAX_SUMMARY));
+  const details = cleanText(text.details, "details");
+  if (details.length > MAX_DETAILS) throw new HttpError(400, tooLong("The details", MAX_DETAILS));
+  return { title, summary, details };
 }
 
 export function parseGoal(raw: unknown): [number, null] | [null, string] {

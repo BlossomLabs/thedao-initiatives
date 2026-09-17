@@ -12,6 +12,14 @@ import { HttpError } from "./errors.ts";
 import { s } from "./body.ts";
 import { parseDuration, parseGoal, validateForumUrl, validateHttpsLink } from "./validate.ts";
 import { MAX_FUNDERS } from "../config.ts";
+import { LIMITS, tooLong } from "../../shared/draft/mod.ts";
+
+/** A capped text field: refused with the shared "too long" message, never cut. */
+function capped(v: unknown, cap: number, label: string): string {
+  const t = s(v, cap + 1);
+  if (t.length > cap) throw new HttpError(400, tooLong(label, cap));
+  return t;
+}
 
 export async function readPageFacts(
   body: Record<string, unknown>,
@@ -41,7 +49,11 @@ export async function readPageFacts(
   const nextType = patch.type ?? current.type;
   if (body.recipientTeam !== undefined || nextType !== current.type) {
     patch.recipientTeam = nextType === "grant"
-      ? s(body.recipientTeam ?? current.recipientTeam ?? "", 120)
+      ? capped(
+        body.recipientTeam ?? current.recipientTeam ?? "",
+        LIMITS.RECIPIENT_CHARS,
+        "The recipient team",
+      )
       : "";
   }
   if (body.recipientUrl !== undefined || nextType !== current.type) {
@@ -57,10 +69,18 @@ export async function readPageFacts(
   const nextTopup = patch.topup ?? Boolean(current.topup);
   if (body.milestoneReviewer !== undefined || nextTopup !== Boolean(current.topup)) {
     patch.milestoneReviewer = nextTopup
-      ? s(body.milestoneReviewer ?? current.milestoneReviewer ?? "", 200)
+      ? capped(
+        body.milestoneReviewer ?? current.milestoneReviewer ?? "",
+        LIMITS.REVIEWER_CHARS,
+        "The reviewer",
+      )
       : "";
   }
-  if (body.contact !== undefined) patch.contact = s(body.contact, 200);
-  if (body.funders !== undefined) patch.funders = s(body.funders, MAX_FUNDERS);
+  if (body.contact !== undefined) {
+    patch.contact = capped(body.contact, LIMITS.CONTACT_CHARS, "The contact");
+  }
+  if (body.funders !== undefined) {
+    patch.funders = capped(body.funders, MAX_FUNDERS, "The funder list");
+  }
   return patch;
 }

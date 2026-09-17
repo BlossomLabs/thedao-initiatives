@@ -37,6 +37,21 @@ test("a long criterion keeps one character past the cap so the check can report 
   expect(s.milestones[0].criteria[1].length).toBe(LIMITS.CRITERION_CHARS + 1);
 });
 
+test("a milestone name or link past its cap keeps one character over, never a silent cut", () => {
+  const s = normaliseStructured({
+    sections: {},
+    milestones: [{
+      name: "n".repeat(LIMITS.MILESTONE_NAME + 40),
+      amount: 1,
+      link: "https://x.org/" + "a".repeat(LIMITS.LINK_CHARS),
+      criteria: ["x"],
+    }],
+    links: [],
+  }, "rfp");
+  expect(s.milestones[0].name.length).toBe(LIMITS.MILESTONE_NAME + 1);
+  expect(s.milestones[0].link.length).toBe(LIMITS.LINK_CHARS + 1);
+});
+
 test("sameStructured ignores key order and whitespace; bytes count UTF-8", () => {
   const a = normaliseStructured({
     sections: { in_scope: "b", why: "a " },

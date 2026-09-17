@@ -6,7 +6,7 @@
 import { Button } from "~/components/ui/Button";
 import { Input } from "~/components/ui/Field";
 import Letter from "~/components/ui/Letter";
-import { letter } from "@shared/draft/mod";
+import { letter, LIMITS } from "@shared/draft/mod";
 import AmountInput from "./AmountInput";
 import CriteriaList from "./CriteriaList";
 import FormField from "./FormField";
@@ -45,7 +45,7 @@ export default function MilestoneRow(
       <div className="grid grid-cols-[1fr_200px] gap-x-4 max-[640px]:grid-cols-1">
         <FormField field={p + "name"} label="Name" required className="mt-3.5 first:mt-3.5">
           <Input
-            maxLength={150}
+            maxLength={LIMITS.MILESTONE_NAME + 1}
             value={m.name}
             disabled={disabled}
             onChange={(e) => set({ name: e.target.value })}
@@ -97,7 +97,7 @@ export default function MilestoneRow(
           <Input
             type="url"
             placeholder="https://"
-            maxLength={300}
+            maxLength={LIMITS.LINK_CHARS + 1}
             value={m.link}
             disabled={disabled}
             onChange={(e) =>

@@ -135,6 +135,37 @@ test("a criterion past the character cap is an error on its own row, a 400-char 
   ]);
 });
 
+test("every capped field reports too long on its own id instead of losing its tail", () => {
+  const i = minimal(1000, "grant");
+  i.page.title = "t".repeat(LIMITS.TITLE_CHARS + 1);
+  i.page.summary = "s".repeat(LIMITS.SUMMARY_CHARS + 1);
+  i.page.recipient = "r".repeat(LIMITS.RECIPIENT_CHARS + 1);
+  i.page.reviewer = "v".repeat(LIMITS.REVIEWER_CHARS + 1);
+  i.page.funders = "f".repeat(LIMITS.FUNDERS_CHARS + 1);
+  i.page.contact = "c".repeat(LIMITS.CONTACT_CHARS + 1);
+  i.milestones[0].name = "n".repeat(LIMITS.MILESTONE_NAME + 1);
+  i.milestones[0].link = "https://x.org/" + "a".repeat(LIMITS.LINK_CHARS);
+  i.backers = [{ org: "o".repeat(LIMITS.BACKER_ORG + 1), amountUsd: 1, url: "" }];
+  const f = checkSubmission(i);
+  expect([...fields(f.errors)].sort()).toEqual([
+    "bk_org_0",
+    "contact",
+    "funders",
+    "milestone_reviewer",
+    "ms_0_link",
+    "ms_0_name",
+    "recipient_team",
+    "summary",
+    "title",
+  ]);
+  expect(f.errors.find((e) => e.field === "title")!.msg).toBe(
+    "The title is too long (140 characters at most).",
+  );
+  // at the cap exactly is fine
+  i.page.title = "t".repeat(LIMITS.TITLE_CHARS);
+  expect(fields(checkSubmission(i).errors)).not.toContain("title");
+});
+
 test("criteria warnings do not block; https and month rules do", () => {
   const i = minimal(1000);
   i.milestones[0].criteria = [

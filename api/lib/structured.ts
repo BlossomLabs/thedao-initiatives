@@ -20,6 +20,7 @@ import {
   type Structured,
   structuredBytes,
   TOO_LONG_MSG,
+  tooLong,
 } from "../../shared/draft/mod.ts";
 import { HttpError } from "./errors.ts";
 
@@ -96,7 +97,10 @@ export function readBackers(
   const backers: BackerInput[] = [];
   raw.slice(0, LIMITS.BACKERS + 1).forEach((r, i) => {
     const b = r && typeof r === "object" ? r as Record<string, unknown> : {};
-    const org = clip(b.org ?? b.company, LIMITS.BACKER_ORG);
+    const org = clip(b.org ?? b.company, LIMITS.BACKER_ORG + 1);
+    if (org.length > LIMITS.BACKER_ORG) {
+      err(`bk_org_${i}`, tooLong(`Backer ${i + 1}: the organization name`, LIMITS.BACKER_ORG));
+    }
     const url = clip(b.url, LIMITS.BACKER_URL + 1);
     const logoCid = clip(b.logoCid, LIMITS.LOGO_CID + 1);
     if (url && !isHttpsUrl(url)) {

@@ -252,6 +252,18 @@ Deno.test("submit: links must be https; the body has a byte cap", async () => {
   });
   assertEquals(longCrit.status, 400);
   assertEquals(fields((await j(longCrit) as unknown as Fail).findings.errors), ["ms_0_c1"]);
+  // the page and private fields and backer names: refused on their own id, never cut
+  const longFields = await submit(h, token, {
+    ...good,
+    title: "t".repeat(LIMITS.TITLE_CHARS + 1),
+    contact: "c".repeat(LIMITS.CONTACT_CHARS + 1),
+    backers: [{ org: "o".repeat(LIMITS.BACKER_ORG + 1), amountUsd: "1", url: "" }],
+  });
+  assertEquals(longFields.status, 400);
+  assertEquals(
+    fields((await j(longFields) as unknown as Fail).findings.errors).sort(),
+    ["bk_org_0", "contact", "title"],
+  );
   h.close();
 });
 
@@ -402,6 +414,11 @@ Deno.test("proposer PATCH: page facts while pending, locked after approval, admi
   assertEquals(out.initiative.funders, "A different funder list here");
   assertEquals((await patch({ durationMonths: "1.5" })).status, 400);
   assertEquals((await patch({ recipientUrl: "http://q.example/" })).status, 400);
+  // a fact past its cap is refused, not cut
+  const longContact = await patch({ contact: "c".repeat(LIMITS.CONTACT_CHARS + 1) });
+  assertEquals(longContact.status, 400);
+  assertEquals((await j(longContact)).error, "The contact is too long (200 characters at most).");
+  assertEquals((await patch({ contact: "c".repeat(LIMITS.CONTACT_CHARS) })).status, 200);
   // the text is untouched: no revision for a facts change
   const row = (await h.db.rfps.bySlug(slug))!;
   assertEquals(row.revision, 1);

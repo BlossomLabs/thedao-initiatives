@@ -172,6 +172,7 @@ export function toCheckInput(d: Draft): CheckInput {
       recipientUrl: d.page.recipientUrl,
       funders: d.priv.funders,
       contact: d.priv.contact,
+      reviewer: d.type === "grant" && d.topup ? d.milestoneReviewer : "",
     },
     sections: sectionsOf(d),
     milestones: payloadMilestones(d),

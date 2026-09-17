@@ -4,6 +4,8 @@
  * environment. `loadConfig(env)` is pure so tests can build their own.
  */
 
+import { LIMITS } from "../shared/draft/mod.ts";
+
 export const CHAIN_ID = 1; // Ethereum mainnet only
 
 /** symbol -> [contract address, decimals] */
@@ -84,7 +86,7 @@ export const DEFAULT_ADMIN_ADDRESSES = [
 ];
 
 export const MIN_VOTE_DONATION_USD = 20;
-export const COMMENT_BODY_MAX = 2000;
+export { COMMENT_BODY_MAX } from "../shared/comments.ts";
 
 /** A donation is credited only once its tx is this many blocks deep. */
 export const MIN_CONFIRMATIONS = 3;
@@ -103,9 +105,9 @@ export const SAFE_PROXY_CREATION_CODE =
 export const SAFE_TX_SERVICE_BASE = "https://api.safe.global/tx-service/eth/api/v1";
 
 // ------------------------------------------------------------ limits
-export const MAX_TITLE = 140;
-export const MAX_SUMMARY = 4000;
-export const MAX_FUNDERS = 4000;
+export const MAX_TITLE = LIMITS.TITLE_CHARS;
+export const MAX_SUMMARY = LIMITS.SUMMARY_CHARS;
+export const MAX_FUNDERS = LIMITS.FUNDERS_CHARS;
 export const MAX_DETAILS = 20000;
 /** Backer logo (admin pledges and the pre-submit upload). */
 export const LOGO_MAX_BYTES = 1024 * 1024;

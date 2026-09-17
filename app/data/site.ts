@@ -6,7 +6,7 @@ export const SITE_PUNCHLINE = "Initiatives";
 export const SITE_DESCRIPTION =
   "Ecosystem-funded Ethereum security initiatives. Browse open initiatives, donate by wallet or from an exchange, back initiatives with pledges that pay on completion.";
 export const SITE_TWITTER_HANDLE = "@thedaofund";
-export const SITE_OG_IMAGE = "/og-image.png";
+export const SITE_OG_IMAGE = "/og-image.png?v=2";
 export const SITE_LOGO = "/dao-logo.svg";
 
 export const HOME_URL = "https://thedao.fund";

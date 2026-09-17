@@ -26,7 +26,12 @@ import { generateMeta } from "~/utils/meta";
 import type { SubmittedState } from "./submitted";
 
 export function meta() {
-  return generateMeta({ title: "Suggest an initiative", url: "/submit" });
+  return generateMeta({
+    title: "Suggest an initiative",
+    description:
+      "Have an Ethereum security idea? Copy the guide into your AI, draft the initiative and submit it here.",
+    url: "/submit",
+  });
 }
 
 /**

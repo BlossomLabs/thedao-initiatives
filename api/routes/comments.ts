@@ -7,6 +7,7 @@ import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { type CommentJson, commentJson } from "../lib/json.ts";
+import { capped } from "../lib/validate.ts";
 import { assertEthNameOwned } from "../services/names.ts";
 import {
   commentRoles,
@@ -17,6 +18,7 @@ import {
 } from "../services/roles.ts";
 import type { Comment } from "../db/types.ts";
 import { COMMENT_BODY_MAX } from "../config.ts";
+import { COMMENT_NAME_MAX } from "../../shared/comments.ts";
 
 /** Two tiers exactly: featured first (newest featured first), then votes desc, newest breaking ties. */
 export function sortEntries<
@@ -99,7 +101,7 @@ export function commentRoutes(deps: Deps) {
       (body.email !== undefined && body.email !== "")
     ) throw new HttpError(400, "Comments do not accept categories, topics or email addresses.");
     const text = s(body.body, COMMENT_BODY_MAX + 1);
-    const name = s(body.name, 60);
+    const name = capped(body.name, COMMENT_NAME_MAX, "The name");
     if (!text || text.length > COMMENT_BODY_MAX) {
       throw new HttpError(400, `the text must be 1 to ${COMMENT_BODY_MAX} characters`);
     }
@@ -247,7 +249,7 @@ export function commentRoutes(deps: Deps) {
     if (!text || text.length > COMMENT_BODY_MAX) {
       throw new HttpError(400, `the text must be 1 to ${COMMENT_BODY_MAX} characters`);
     }
-    const name = s(body.name, 60);
+    const name = capped(body.name, COMMENT_NAME_MAX, "The name");
     const address = user?.address ?? "";
     if (!address && !name) {
       throw new HttpError(400, "a name is required without a wallet");

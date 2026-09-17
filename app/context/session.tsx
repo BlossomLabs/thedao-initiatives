@@ -5,10 +5,10 @@
  * ({address, isAdmin, expiresAt}) and that record is checked against
  * /api/auth/me once per load, so a cookie that is gone clears it.
  * Connecting a wallet and signing in are one step (connect()): the signature
- * request opens right after the wallet connects, and a refused or dismissed
- * signature disconnects the wallet again, so a connected address is always a
- * signed-in one. A stored session survives reloads; a reconnected wallet
- * without one is dropped.
+ * request opens right after the wallet connects. A restored wallet or failed
+ * signature can leave it connected without a session; protected actions still
+ * require SIWE. Only explicit sign-out disconnects the wallet: revoking wallet
+ * permissions automatically can interrupt a sign-in in another tab.
  */
 import {
   createContext,
@@ -21,7 +21,15 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { type Connector, useAccount, useConnect, useDisconnect, useSignMessage } from "wagmi";
+import {
+  type Connector,
+  useAccount,
+  useConfig,
+  useConnect,
+  useDisconnect,
+  useSignMessage,
+} from "wagmi";
+import { getConnection, switchChain } from "wagmi/actions";
 import { createSiweMessage } from "viem/siwe";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -81,8 +89,8 @@ interface SessionCtx {
   connecting: boolean;
   /** Connected wallet address (may differ from session.address until sign-in). */
   address: string | undefined;
-  /** Connect the wallet and sign in with it in one go. On a refused signature
-   * the wallet is disconnected again and the error rethrown. */
+  /** Connect the wallet and sign in with it in one go. A failed sign-in keeps
+   * the wallet connected for a retry, without granting a session. */
   connect(connector: Connector): Promise<void>;
   signIn(account?: `0x${string}`): Promise<SessionInfo>;
   /** Ask about an unfinished draft before logout; false means the user cancelled. */
@@ -102,6 +110,7 @@ const useHydrated = () => useSyncExternalStore(noop, () => true, () => false);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const qc = useQueryClient();
+  const config = useConfig();
   const { address, status, connector } = useAccount();
   const { connectAsync } = useConnect();
   const { disconnectAsync } = useDisconnect();
@@ -288,6 +297,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           statement: "Sign in to TheDAO Security Fund",
           issuedAt: new Date(),
         });
+        // The message says chain 1 and the API verifies it there (EIP-1271 for
+        // smart accounts), so the wallet must be on Ethereum before it signs.
+        // Ambire keeps a chain per site and refuses personal_sign (EIP-1193
+        // 4901) while that chain is not one of its enabled networks; a switch
+        // request is what resets it.
+        const onChain = signingConnector
+          ? await signingConnector.getChainId()
+          : getConnection(config).chainId;
+        if (onChain !== 1) await switchChain(config, { chainId: 1, connector: signingConnector });
         const signature = await signMessageAsync({ message, account, connector: signingConnector });
         stillActive();
         // cookie: true -> the token comes back as an HttpOnly cookie, not in the body.
@@ -317,7 +335,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       };
       return promise;
     },
-    [address, connector, signMessageAsync, refreshMe, qc],
+    [address, connector, config, signMessageAsync, refreshMe, qc],
   );
 
   const endSession = useCallback(async () => {
@@ -378,43 +396,27 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
     setConnecting(true);
     const promise = Promise.resolve().then(async () => {
-      const { accounts } = await connectAsync({ connector: c, chainId: 1 });
+      // A restored wallet or a refused signature may already be connected.
+      // Retry SIWE without issuing another permission request to that wallet.
+      const current = getConnection(config);
+      const { accounts } =
+        current.isConnected && current.address && current.connector?.uid === c.uid
+          ? { accounts: [current.address] }
+          : await connectAsync({ connector: c, chainId: 1 });
       if (skipsSignIn(c)) return;
-      try {
-        await signIn(accounts[0], c);
-      } catch (e) {
-        await disconnectAsync({ connector: c }).catch(() => {});
-        throw e;
-      }
+      await signIn(accounts[0], c);
     }).finally(() => {
       connectingRef.current = null;
       setConnecting(false);
     });
     connectingRef.current = { connector: c, promise };
     return promise;
-  }, [connectAsync, disconnectAsync, signIn]);
+  }, [config, connectAsync, signIn]);
 
-  // Keep "connected" meaning "signed in" outside connect(): whenever a wallet is
-  // connected with no matching session (reload without a stored session, an
-  // expired session dropped by refreshMe, a session for another address), it is
-  // either asked to sign in (an account switched inside the wallet) or
-  // disconnected, so the UI never shows a connected wallet that cannot act.
-  const prev = useRef<{ status: typeof status; address: typeof address }>({ status, address });
-  useEffect(() => {
-    const before = prev.current;
-    prev.current = { status, address };
-    if (status !== "connected" || !address || skipsSignIn(connector)) return;
-    if (connectingRef.current || signingInRef.current) return;
-    const s = sessionRef.current;
-    if (s && s.address.toLowerCase() === address.toLowerCase()) return;
-    const switched = before.status === "connected" && before.address &&
-      before.address.toLowerCase() !== address.toLowerCase();
-    if (switched) {
-      void signIn(address).catch(() => disconnectAsync().catch(() => {}));
-    } else {
-      void disconnectAsync().catch(() => {});
-    }
-  }, [status, address, connector, connecting, signingIn, stored, signIn, disconnectAsync]);
+  // Wallet events are broadcast to every tab on this origin. An idle tab must
+  // neither prompt for SIWE nor revoke account permissions on those events.
+  // The wallet-move effect above clears obsolete sessions; signing in is an
+  // explicit action through connect(), signIn(), or requireSession().
 
   const requireSession = useCallback(async () => {
     const s = sessionRef.current;

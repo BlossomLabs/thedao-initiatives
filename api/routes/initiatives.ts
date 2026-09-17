@@ -13,7 +13,7 @@ import {
   revisionJson,
   revisionMeta,
 } from "../lib/json.ts";
-import { cleanText, validateForumUrl, validateText } from "../lib/validate.ts";
+import { cleanText, validateForumUrl } from "../lib/validate.ts";
 import { pctOf } from "./board.ts";
 import { onrampLink } from "../lib/onramp.ts";
 import {
@@ -42,6 +42,7 @@ import {
   checkSubmission,
   type Finding,
   isStructured,
+  LIMITS,
   parseAmount,
 } from "../../shared/draft/mod.ts";
 
@@ -214,7 +215,13 @@ export function initiativeRoutes(deps: Deps) {
       );
     }
     const origin = { author: user.address, source: proposer ? "proposer" : "admin" } as const;
-    const base = validateText({ title: s(body.title), summary: s(body.summary), details: "" });
+    // The text rules (length floors and caps included) come back as
+    // findings painted on the fields, the same as on submit.
+    const base = {
+      title: cleanText(body.title, "title"),
+      summary: cleanText(body.summary, "summary"),
+      details: "",
+    };
     const { structured, findings: caps } = readStructured({
       sections: body.sections ?? cur.sections,
       milestones: body.milestones ?? cur.milestones,
@@ -293,12 +300,13 @@ export function initiativeRoutes(deps: Deps) {
     const rawGoal = String(body.goal ?? "");
     const goal = Math.round((/^\s*-/.test(rawGoal) ? -1 : 1) * parseAmount(rawGoal) * 100) / 100;
     const duration = s(body.durationMonths, 10);
-    const recipientTeam = type === "grant" ? s(body.recipientTeam, 120) : "";
-    const recipientUrl = type === "grant" ? s(body.recipientUrl, 300) : "";
-    const milestoneReviewer = topup ? s(body.milestoneReviewer, 200) : "";
+    // One character past each cap survives so checkSubmission reports "too long".
+    const recipientTeam = type === "grant" ? s(body.recipientTeam, LIMITS.RECIPIENT_CHARS + 1) : "";
+    const recipientUrl = type === "grant" ? s(body.recipientUrl, LIMITS.LINK_CHARS + 1) : "";
+    const milestoneReviewer = topup ? s(body.milestoneReviewer, LIMITS.REVIEWER_CHARS + 1) : "";
     // NEVER rendered publicly: private fundraising leads, admin-only like contact.
-    const funders = s(body.funders, MAX_FUNDERS);
-    const contact = s(body.contact, 200);
+    const funders = s(body.funders, MAX_FUNDERS + 1);
+    const contact = s(body.contact, LIMITS.CONTACT_CHARS + 1);
     const checks = checkSubmission({
       type,
       topup,
@@ -311,6 +319,7 @@ export function initiativeRoutes(deps: Deps) {
         recipientUrl,
         funders,
         contact,
+        reviewer: milestoneReviewer,
       },
       ...structured,
       backers,

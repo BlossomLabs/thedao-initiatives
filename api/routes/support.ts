@@ -8,7 +8,7 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { requireClientIp } from "../middleware/ip.ts";
 import { jsonBody, s } from "../lib/body.ts";
-import { EMAIL_RE } from "../lib/validate.ts";
+import { capped, EMAIL_RE } from "../lib/validate.ts";
 import { SUPPORT_MESSAGES_PER_HOUR_PER_IP } from "../config.ts";
 import {
   isSupportCategory,
@@ -29,7 +29,7 @@ export function supportRoutes(deps: Deps) {
     const body = await jsonBody(c, ["category", "message", "email", "screenshot", "page"]);
     const category = body.category;
     if (!isSupportCategory(category)) throw new HttpError(400, "pick a category");
-    const message = s(body.message, SUPPORT_MESSAGE_MAX);
+    const message = capped(body.message, SUPPORT_MESSAGE_MAX, "The message");
     if (!message) throw new HttpError(400, "write a message");
     const email = s(body.email, 200);
     if (email && !EMAIL_RE.test(email)) {

@@ -3,10 +3,12 @@ import { Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useSession } from "~/context/session";
 import { useIdentity } from "~/hooks/use-identity";
-import ConnectInline, { walletBtn } from "~/components/wallet/ConnectInline";
+import ConnectInline from "~/components/wallet/ConnectInline";
 import { cn } from "~/lib/utils";
 import { nameInput, signedInAs } from "./styles";
 import { FormNote, type Note, SubmitButton } from "./FormFeedback";
+import { COMMENT_BODY_MAX, COMMENT_NAME_MAX } from "@shared/comments";
+import { inputMax, tooLong } from "@shared/draft/mod";
 
 /** One generic comment box (the MVP dropped type/topic pickers). */
 export default function Composer(
@@ -20,7 +22,7 @@ export default function Composer(
   },
 ) {
   const { address, isConnected } = useAccount();
-  const { session, requireSession, signingIn, connecting } = useSession();
+  const { session, requireSession, connecting } = useSession();
   const identity = useIdentity(address);
   const [text, setText] = useState("");
   const [name, setName] = useState("");
@@ -36,6 +38,14 @@ export default function Composer(
     const t = text.trim();
     if (!t) {
       setNote({ text: "Write something first." });
+      return;
+    }
+    if (t.length > COMMENT_BODY_MAX) {
+      setNote({ text: tooLong("The comment", COMMENT_BODY_MAX) });
+      return;
+    }
+    if (name.trim().length > COMMENT_NAME_MAX) {
+      setNote({ text: tooLong("The name", COMMENT_NAME_MAX) });
       return;
     }
     let useSession = signedIn;
@@ -75,7 +85,7 @@ export default function Composer(
       </div>
       <textarea
         className="min-h-[96px] w-full resize-y rounded-xl border border-white/10 bg-[rgba(9,18,30,.5)] px-4 py-3.5 font-inter-tight text-[14.5px] text-[#f2f6fa] outline-none transition-all duration-150 placeholder:text-muted focus:border-[rgba(92,183,90,.55)] focus:shadow-[0_0_0_3px_rgba(92,183,90,.14)] disabled:cursor-default disabled:opacity-60"
-        maxLength={2000}
+        maxLength={inputMax(COMMENT_BODY_MAX)}
         placeholder="Add a comment"
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -96,13 +106,13 @@ export default function Composer(
             <span className="text-[12px] text-muted">
               {signedIn
                 ? "Posting as a verified participant."
-                : "Connect your wallet to post as a verified participant."}
+                : "Sign in with your wallet to post as a verified participant."}
             </span>
           )
           : (
             <input
               className={cn(nameInput, "w-auto min-w-[200px] flex-1")}
-              maxLength={60}
+              maxLength={inputMax(COMMENT_NAME_MAX)}
               placeholder="Your name"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -114,23 +124,12 @@ export default function Composer(
             /* Kept mounted while connecting: the wallet is briefly connected before
               the signature, and the button must survive to show a refusal. */
           }
-          {(!isConnected || connecting) && <ConnectInline />}
+          {(!signedIn || connecting) && <ConnectInline />}
           {isConnected && !connecting && signedIn && (
             <span className={signedInAs}>
               <Wallet className="size-3.5" />
               Signed in as {identity.name}
             </span>
-          )}
-          {isConnected && !connecting && !signedIn && (
-            <button
-              type="button"
-              className={walletBtn}
-              onClick={() => void requireSession().catch(() => {})}
-              disabled={signingIn}
-            >
-              <Wallet className="size-3.5" />
-              {signingIn ? "Check your wallet…" : "Sign in"}
-            </button>
           )}
           <SubmitButton busy={busy} done={posted} onClick={post}>Comment</SubmitButton>
         </div>

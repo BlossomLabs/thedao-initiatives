@@ -1,7 +1,7 @@
 import type { DraftType, Finding, Findings, Milestone, Sections } from "./types.ts";
 import { FIELDS, letter, SECTIONS } from "./sections.ts";
 import { usd } from "./amount.ts";
-import { LIMITS } from "./normalise.ts";
+import { criterionTooLong, LIMITS, tooLong } from "./normalise.ts";
 
 export const HEDGES = /\bas needed\b|\bwhere appropriate\b/i;
 export const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -56,8 +56,12 @@ export interface CheckInput {
     duration: string;
     recipient: string;
     recipientUrl?: string;
+    /** Submit only; the server validates the host too. */
+    discourseUrl?: string;
     funders: string;
     contact: string;
+    /** Top-up only. */
+    reviewer?: string;
   };
   sections: Sections;
   milestones: Milestone[];
@@ -78,6 +82,7 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
   const err = (field: string, msg: string, kind: Finding["kind"] = "content") =>
     errors.push({ field, msg, kind });
   const miss = (field: string, msg: string) => err(field, msg, "missing");
+  const cap = (field: string, msg: string) => err(field, msg, "cap");
   const warn = (field: string, msg: string) => warnings.push({ field, msg });
   const { type, topup, page, sections, milestones, links, backers } = input;
   const full = scope === "submit";
@@ -93,6 +98,14 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
       "summary",
       "Describe the initiative in at least 40 characters.",
     );
+  }
+  // The caps measure the trimmed text, as every server reader does.
+  const over = (v: string | undefined, cap: number) => (v ?? "").trim().length > cap;
+  if (over(page.title, LIMITS.TITLE_CHARS)) {
+    cap("title", tooLong("The title", LIMITS.TITLE_CHARS));
+  }
+  if (over(page.summary, LIMITS.SUMMARY_CHARS)) {
+    cap("summary", tooLong("The summary", LIMITS.SUMMARY_CHARS));
   }
   const goal = Number(page.goal) || 0;
   if (full && !(goal > 0 && goal <= MAX_GOAL)) {
@@ -110,8 +123,27 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
     if (type === "grant" && !(page.recipient ?? "").trim()) {
       miss("recipient_team", "Name the team that receives this grant.");
     }
-    if (type === "grant" && (page.recipientUrl ?? "").trim() && !isHttpsUrl(page.recipientUrl!)) {
+    if (type === "grant" && over(page.recipientUrl, LIMITS.LINK_CHARS)) {
+      cap("recipient_url", tooLong("The recipient link", LIMITS.LINK_CHARS));
+    } else if (
+      type === "grant" && (page.recipientUrl ?? "").trim() && !isHttpsUrl(page.recipientUrl!)
+    ) {
       err("recipient_url", "The recipient link must be an https URL.");
+    }
+    if (over(page.recipient, LIMITS.RECIPIENT_CHARS)) {
+      cap("recipient_team", tooLong("The recipient team", LIMITS.RECIPIENT_CHARS));
+    }
+    if (over(page.discourseUrl, LIMITS.LINK_CHARS)) {
+      cap("discourse_url", tooLong("The discussion link", LIMITS.LINK_CHARS));
+    }
+    if (over(page.reviewer, LIMITS.REVIEWER_CHARS)) {
+      cap("milestone_reviewer", tooLong("The reviewer", LIMITS.REVIEWER_CHARS));
+    }
+    if (over(page.funders, LIMITS.FUNDERS_CHARS)) {
+      cap("funders", tooLong("The funder list", LIMITS.FUNDERS_CHARS));
+    }
+    if (over(page.contact, LIMITS.CONTACT_CHARS)) {
+      cap("contact", tooLong("The contact", LIMITS.CONTACT_CHARS));
     }
   }
   for (const key of SECTIONS[type]) {
@@ -121,12 +153,7 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
   }
   for (const key of SECTIONS[type]) {
     if ((sections[key] ?? "").length > LIMITS.SECTION_CHARS) {
-      err(
-        key,
-        `${FIELDS[key].heading} is too long (${
-          LIMITS.SECTION_CHARS.toLocaleString("en-US")
-        } characters at most).`,
-      );
+      cap(key, tooLong(FIELDS[key].heading, LIMITS.SECTION_CHARS));
     }
   }
   if (full) {
@@ -150,8 +177,12 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
           "Name the organization that committed this amount, or remove the row.",
         );
       }
-      if ((b.url ?? "").trim() && !isHttpsUrl(b.url)) {
-        err(`bk_url_${i}`, `${b.org || "Backer " + (i + 1)}: the link must be an https URL.`);
+      // An organisation name that is itself over its cap makes no label.
+      const who = b.org && !over(b.org, LIMITS.BACKER_ORG) ? b.org : "Backer " + (i + 1);
+      if (over(b.url, LIMITS.LINK_CHARS)) {
+        cap(`bk_url_${i}`, tooLong(`${who}: the link`, LIMITS.LINK_CHARS));
+      } else if ((b.url ?? "").trim() && !isHttpsUrl(b.url)) {
+        err(`bk_url_${i}`, `${who}: the link must be an https URL.`);
       }
     });
     const live = backers.filter((b) => b.org || (Number(b.amountUsd) || 0) > 0);
@@ -164,6 +195,11 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
     if (backers.length > LIMITS.BACKERS) {
       err("backers", `At most ${LIMITS.BACKERS} backers.`);
     }
+    backers.forEach((b, i) => {
+      if (over(b.org, LIMITS.BACKER_ORG)) {
+        cap(`bk_org_${i}`, tooLong(`Backer ${i + 1}: the organization name`, LIMITS.BACKER_ORG));
+      }
+    });
   }
 
   if (!milestones.length) miss("milestones", "Add at least one milestone.");
@@ -178,6 +214,9 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
     total += amt;
     if (m.adoption) adoption += amt;
     if (!(m.name ?? "").trim()) miss(`ms_${i}_name`, `${L}: name this milestone.`);
+    if (over(m.name, LIMITS.MILESTONE_NAME)) {
+      cap(`ms_${i}_name`, tooLong(`${L}: the name`, LIMITS.MILESTONE_NAME));
+    }
     if (amt <= 0) miss(`ms_${i}_amount`, `${L}: enter what this milestone pays.`);
     const crits = (m.criteria ?? []).filter((c) => String(c).trim());
     if (!crits.length) {
@@ -186,7 +225,9 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
     if (crits.length > LIMITS.CRITERIA_PER_MILESTONE) {
       err(`ms_${i}_crit`, `${L}: at most ${LIMITS.CRITERIA_PER_MILESTONE} criteria.`);
     }
-    if ((m.link ?? "").trim() && !isHttpsUrl(m.link)) {
+    if (over(m.link, LIMITS.LINK_CHARS)) {
+      cap(`ms_${i}_link`, tooLong(`${L}: the delivered-work link`, LIMITS.LINK_CHARS));
+    } else if ((m.link ?? "").trim() && !isHttpsUrl(m.link)) {
       err(`ms_${i}_link`, `${L}: the delivered-work link must be an https URL.`);
     }
     if ((m.month ?? "").trim() && !MONTH_RE.test(m.month.trim())) {
@@ -199,6 +240,7 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
       warn(`ms_${i}_month`, `${L} has no target month. Every remaining milestone needs one.`);
     }
     crits.forEach((c, j) => {
+      if (c.length > LIMITS.CRITERION_CHARS) cap(`ms_${i}_c${j}`, criterionTooLong(letter(i), j));
       const reasons: string[] = [];
       if (c.replace(/\[[^\]]*\]\([^)\s]+\)/g, "").includes("[")) {
         reasons.push("an unresolved bracket");
@@ -243,7 +285,11 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
   }
 
   links.forEach((l, i) => {
-    if (!isHttpsUrl(l)) err(`links_${i}`, `Link ${i + 1} must be an https URL: ${l.slice(0, 60)}`);
+    if (l.length > LIMITS.LINK_CHARS) {
+      cap(`links_${i}`, tooLong(`Link ${i + 1}`, LIMITS.LINK_CHARS));
+    } else if (!isHttpsUrl(l)) {
+      err(`links_${i}`, `Link ${i + 1} must be an https URL: ${l.slice(0, 60)}`);
+    }
   });
   if (links.length > LIMITS.LINKS) err("links", `At most ${LIMITS.LINKS} links.`);
 

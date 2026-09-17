@@ -4,6 +4,7 @@ import { HttpError } from "../lib/errors.ts";
 import { requireClientIp } from "../middleware/ip.ts";
 import { formBody, jsonBody, s } from "../lib/body.ts";
 import { requireAuth } from "../middleware/auth.ts";
+import { NICKNAME_MAX, NICKNAME_RULE } from "../../shared/profile.ts";
 import { isAddress } from "../chain/address.ts";
 import { DOMAIN_RE, NICK_RE, PRESET_RE } from "../lib/validate.ts";
 import { assertEthNameOwned } from "../services/names.ts";
@@ -48,8 +49,8 @@ export function profileRoutes(deps: Deps) {
     const body = await jsonBody(c, ["nickname"]);
     const raw = s(body.nickname, 100);
     if (!raw) throw new HttpError(400, "Pick a name first.");
-    if (raw.length > 40 || !NICK_RE.test(raw)) {
-      throw new HttpError(400, "Names are 1-40 letters, numbers, spaces or . _ -");
+    if (raw.length > NICKNAME_MAX || !NICK_RE.test(raw)) {
+      throw new HttpError(400, NICKNAME_RULE);
     }
     if (!(await db.rateLimit("nick:" + addr.toLowerCase(), 10, 60))) {
       throw new HttpError(429, "Too many tries, slow down a moment.");

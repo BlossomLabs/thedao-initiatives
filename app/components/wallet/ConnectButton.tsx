@@ -14,16 +14,14 @@ import { cn } from "~/lib/utils";
 
 /**
  * Top-bar wallet button. Disconnected: opens the shared wallet chooser;
- * connecting signs in with Ethereum
- * in the same step, and a dismissed signature leaves the wallet disconnected
- * so the button can simply be clicked again. Connected: account menu with
+ * connecting signs in with Ethereum in the same step. A connected wallet
+ * without a session can retry signing in. Signed in: account menu with
  * name/picture, switch wallet, sign out.
  */
 export default function ConnectButton() {
   const { address, isConnected } = useAccount();
   const { session, connecting, signingIn, signIn, signOut, switchWallet } = useSession();
-  // "Connected" in the UI means signed in with this wallet; a bare wagmi
-  // connection (the context is about to disconnect or sign it in) shows as not connected.
+  // Wallet access alone does not grant a signed-in session.
   const signedIn = Boolean(
     isConnected && address && session && session.address.toLowerCase() === address.toLowerCase(),
   );
@@ -85,7 +83,7 @@ export default function ConnectButton() {
       return;
     }
     if (isConnected && address) {
-      // Connected but not signed in (session expired): ask for the signature.
+      // Restored connection, expired session, or refused signature: retry SIWE.
       signIn(address).catch((e) => setError("Not signed in: " + walletErrorMessage(e)));
       return;
     }
@@ -172,6 +170,8 @@ export default function ConnectButton() {
           ? "Check your wallet…"
           : signedIn
           ? identity.name
+          : isConnected
+          ? "Sign in"
           : "Connect wallet"}
       </button>
       {menu === "account" && <WalletMenu items={accountItems} onClose={() => setMenu("none")} />}

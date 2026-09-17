@@ -4,7 +4,7 @@
  * shows the gold-standard example; a word count sits next to it.
  */
 import { useId, useState } from "react";
-import { FIELDS, LIMITS, type SectionKey } from "@shared/draft/mod";
+import { FIELDS, inputMax, LIMITS, type SectionKey } from "@shared/draft/mod";
 import Markdown from "~/components/Markdown";
 import { Textarea } from "~/components/ui/Field";
 import { exampleFor } from "~/data/guide";
@@ -44,7 +44,7 @@ export default function SectionField(
         id={id}
         className={cn("mt-2.5 min-h-[96px]", f.cls)}
         rows={def.rows}
-        maxLength={LIMITS.SECTION_CHARS + 1}
+        maxLength={inputMax(LIMITS.SECTION_CHARS)}
         value={value}
         disabled={disabled}
         aria-invalid={f.errors.length ? true : undefined}

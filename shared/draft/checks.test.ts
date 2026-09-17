@@ -1,4 +1,5 @@
 import { adoptionFloor, type CheckInput, checkSubmission } from "./checks.ts";
+import { criterionTooLong, LIMITS, tooLong } from "./normalise.ts";
 import { SECTION_KEYS, SECTIONS } from "./sections.ts";
 import type { Milestone, Sections } from "./types.ts";
 
@@ -125,6 +126,71 @@ test("missing fields, grant sections, and the missing kind", () => {
   expect(SECTIONS.rfp.every((k) => k in rfp.sections)).toBe(true);
 });
 
+test("a criterion past the character cap is an error on its own row, a 400-char one is fine", () => {
+  const i = minimal(1000);
+  i.milestones[0].criteria = ["x".repeat(400), "y".repeat(LIMITS.CRITERION_CHARS + 1)];
+  const f = checkSubmission(i);
+  expect(f.errors.map((e) => [e.field, e.msg, e.kind])).toEqual([
+    ["ms_0_c1", criterionTooLong("A", 1), "cap"],
+  ]);
+});
+
+test("every capped field reports too long on its own id instead of losing its tail", () => {
+  const i = minimal(1000, "grant");
+  i.page.title = "t".repeat(LIMITS.TITLE_CHARS + 1);
+  i.page.summary = "s".repeat(LIMITS.SUMMARY_CHARS + 1);
+  i.page.recipient = "r".repeat(LIMITS.RECIPIENT_CHARS + 1);
+  i.page.reviewer = "v".repeat(LIMITS.REVIEWER_CHARS + 1);
+  i.page.funders = "f".repeat(LIMITS.FUNDERS_CHARS + 1);
+  i.page.contact = "c".repeat(LIMITS.CONTACT_CHARS + 1);
+  i.milestones[0].name = "n".repeat(LIMITS.MILESTONE_NAME + 1);
+  i.milestones[0].link = "https://x.org/" + "a".repeat(LIMITS.LINK_CHARS);
+  i.backers = [{ org: "o".repeat(LIMITS.BACKER_ORG + 1), amountUsd: 1, url: "" }];
+  const f = checkSubmission(i);
+  expect([...fields(f.errors)].sort()).toEqual([
+    "bk_org_0",
+    "contact",
+    "funders",
+    "milestone_reviewer",
+    "ms_0_link",
+    "ms_0_name",
+    "recipient_team",
+    "summary",
+    "title",
+  ]);
+  expect(f.errors.find((e) => e.field === "title")!.msg).toBe(
+    "The title is too long (140 characters at most).",
+  );
+  // every cap finding carries the "cap" kind, so an admin save can block on it
+  expect(f.errors.map((e) => e.kind)).toEqual(f.errors.map(() => "cap"));
+  // at the cap exactly is fine
+  i.page.title = "t".repeat(LIMITS.TITLE_CHARS);
+  expect(fields(checkSubmission(i).errors)).not.toContain("title");
+});
+
+test("a recipient or backer link past the cap says too long, not not-https", () => {
+  const i = minimal(1000, "grant");
+  const long = "https://x.org/" + "a".repeat(LIMITS.LINK_CHARS);
+  i.page.recipientUrl = long;
+  i.backers = [{ org: "Org", amountUsd: 5, url: long }];
+  const f = checkSubmission(i);
+  expect(f.errors.map((e) => [e.field, e.msg])).toEqual([
+    ["recipient_url", tooLong("The recipient link", LIMITS.LINK_CHARS)],
+    ["bk_url_0", tooLong("Org: the link", LIMITS.LINK_CHARS)],
+  ]);
+});
+
+test("trailing whitespace at the cap is not too long: the caps measure the trimmed text", () => {
+  const i = minimal(1000, "grant");
+  i.page.title = "t".repeat(LIMITS.TITLE_CHARS) + " ";
+  i.page.summary = "s".repeat(LIMITS.SUMMARY_CHARS) + "\n";
+  i.page.recipient = "r".repeat(LIMITS.RECIPIENT_CHARS) + " ";
+  i.page.funders = "f".repeat(LIMITS.FUNDERS_CHARS) + " ";
+  i.page.contact = "c".repeat(LIMITS.CONTACT_CHARS) + " ";
+  i.milestones[0].name = "n".repeat(LIMITS.MILESTONE_NAME) + " ";
+  expect(checkSubmission(i).errors).toEqual([]);
+});
+
 test("criteria warnings do not block; https and month rules do", () => {
   const i = minimal(1000);
   i.milestones[0].criteria = [
@@ -161,4 +227,37 @@ test("backer half rows and the edit scope", () => {
   i.page.funders = "";
   i.page.duration = "";
   expect(checkSubmission(i, "edit").errors).toEqual([]);
+});
+
+test("a discussion link past the cap is too long on submit, never cut in silence", () => {
+  const i = minimal(90_000);
+  i.page.discourseUrl = "https://forum.example.org/t/" + "a".repeat(LIMITS.LINK_CHARS);
+  const r = checkSubmission(i);
+  expect(r.errors.filter((e) => e.field === "discourse_url").map((e) => [e.msg, e.kind])).toEqual(
+    [[tooLong("The discussion link", LIMITS.LINK_CHARS), "cap"]],
+  );
+  // the edit scope leaves the page facts to the route that edits them
+  expect(fields(checkSubmission(i, "edit").errors)).toEqual([]);
+});
+
+test("an other link past the cap says too long, not not-https", () => {
+  const i = minimal(90_000);
+  i.links = ["https://example.org/" + "a".repeat(LIMITS.LINK_CHARS), "https://ok.example/path"];
+  const r = checkSubmission(i);
+  expect(
+    r.errors.filter((e) => e.field.startsWith("links")).map((e) => [e.field, e.msg, e.kind]),
+  ).toEqual([["links_0", tooLong("Link 1", LIMITS.LINK_CHARS), "cap"]]);
+});
+
+test("a backer whose name is itself over the cap is called by its row in the link message", () => {
+  const i = minimal(90_000);
+  i.backers = [{
+    org: "O".repeat(LIMITS.BACKER_ORG + 1),
+    amountUsd: 1000,
+    url: "https://example.org/" + "a".repeat(LIMITS.LINK_CHARS),
+  }];
+  const r = checkSubmission(i);
+  expect(r.errors.filter((e) => e.field === "bk_url_0").map((e) => e.msg)).toEqual([
+    tooLong("Backer 1: the link", LIMITS.LINK_CHARS),
+  ]);
 });

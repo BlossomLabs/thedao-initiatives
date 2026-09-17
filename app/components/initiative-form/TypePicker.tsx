@@ -4,7 +4,7 @@
  */
 import { Input } from "~/components/ui/Field";
 import { cn } from "~/lib/utils";
-import type { DraftType } from "@shared/draft/mod";
+import { type DraftType, inputMax, LIMITS } from "@shared/draft/mod";
 import FormField from "./FormField";
 import type { Draft } from "./types";
 import type { DraftActions } from "./useDraft";
@@ -68,8 +68,8 @@ export default function TypePicker(
             <span>Work is already under way with another funder</span>
           </label>
           <p className="hint m-0">
-            This makes it a top-up. No proposal window, no challenge period. Completed milestones
-            get a link to the delivered work, and every remaining one carries a target month.
+            This makes it a top-up. No proposal window. Completed milestones get a link to the
+            delivered work, and every remaining one carries a target month.
           </p>
           {draft.topup && (
             <FormField
@@ -79,7 +79,7 @@ export default function TypePicker(
               className="mt-3.5 first:mt-3.5"
             >
               <Input
-                maxLength={200}
+                maxLength={inputMax(LIMITS.REVIEWER_CHARS)}
                 value={draft.milestoneReviewer}
                 disabled={locked}
                 onChange={(e) => actions.setReviewer(e.target.value)}

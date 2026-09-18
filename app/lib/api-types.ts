@@ -366,3 +366,35 @@ export interface AdminList {
   /** The caller's own address (it cannot remove itself). */
   you: string;
 }
+
+/** The write freeze admins toggle from the dashboard (GET /api/admin/maintenance). */
+export interface MaintenanceState {
+  on: boolean;
+  /** The admin who last changed it. */
+  by: string;
+  at: number;
+  /** Shown to visitors in the banner. */
+  note: string;
+}
+
+/** GET /api/board/settings: configuration the global UI needs without the board. */
+export interface SiteSettings {
+  uploads: boolean;
+  support: boolean;
+  maintenance?: Pick<MaintenanceState, "on" | "at" | "note">;
+}
+
+/** GET /api/admin/backup: every stored record, keys and values verbatim. */
+export interface BackupFile {
+  format: "thedao-kv-backup/1";
+  exportedAt: string;
+  prefixes: Record<string, number>;
+  entries: { key: (string | number)[]; value: unknown }[];
+}
+
+/** POST /api/admin/restore. */
+export interface RestoreResult {
+  written: number;
+  skipped: number;
+  claimsRebuilt: number;
+}

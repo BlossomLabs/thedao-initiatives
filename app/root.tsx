@@ -11,6 +11,7 @@ import { Providers } from "~/context/providers";
 import TopBar from "~/components/layout/TopBar";
 import Footer from "~/components/layout/Footer";
 import SupportWidget from "~/components/layout/SupportWidget";
+import MaintenanceBanner from "~/components/layout/MaintenanceBanner";
 import ShellSkeleton, { SHELL_SCRIPT } from "~/components/layout/ShellSkeleton";
 import "./app.css";
 
@@ -66,10 +67,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 /** Column that fills the viewport so the footer never rides up under the top bar. */
-function Shell({ children, staticShell }: { children: React.ReactNode; staticShell?: boolean }) {
+function Shell(
+  { children, staticShell, banner }: {
+    children: React.ReactNode;
+    staticShell?: boolean;
+    /** Needs the query provider, so the static shell renders none. */
+    banner?: React.ReactNode;
+  },
+) {
   return (
     <div className="flex min-h-screen flex-col">
       <TopBar staticShell={staticShell} />
+      {banner}
       <div className="flex-1">{children}</div>
       <Footer />
     </div>
@@ -79,7 +88,7 @@ function Shell({ children, staticShell }: { children: React.ReactNode; staticShe
 export default function App() {
   return (
     <Providers>
-      <Shell>
+      <Shell banner={<MaintenanceBanner />}>
         <Outlet />
       </Shell>
       <SupportWidget />

@@ -64,6 +64,11 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   return data as T;
 }
 
+/** A write refused because an admin paused the site (503 + maintenance flag). */
+export const isMaintenance = (e: unknown): boolean =>
+  e instanceof ApiError && e.status === 503 && Boolean(e.body) && typeof e.body === "object" &&
+  (e.body as { maintenance?: unknown }).maintenance === true;
+
 export const errorMessage = (e: unknown): string =>
   e instanceof Error ? e.message : typeof e === "string" ? e : "Something went wrong.";
 

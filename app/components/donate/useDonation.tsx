@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getBalance, readContract, sendTransaction, switchChain } from "wagmi/actions";
 import { erc20Abi } from "viem";
 import { useAccount, useConfig, useConnect } from "wagmi";
-import { api, ApiError, errorMessage } from "~/lib/api";
+import { api, ApiError, errorMessage, isMaintenance } from "~/lib/api";
 import type { AcceptanceReceipt, ExchangeDetails, WalletIntent } from "../../../shared/terms.ts";
 import { TERMS } from "~/data/terms";
 import type { DonateParams, DonateResult } from "~/lib/api-types";
@@ -41,6 +41,9 @@ const ATTEMPT_POLL_MS = 30_000;
 const MAX_POLLS = 50;
 /** A confirm that fails on the network is retried this many times before polling takes over. */
 const CONFIRM_RETRIES = 2;
+/** Shown instead of retrying while an admin has paused the site. */
+const MAINTENANCE_TEXT =
+  "The site is in maintenance. Your transfer is on-chain and will be credited once maintenance ends; keep the transaction link.";
 const CONFIRM_RETRY_MS = 1500;
 const PENDING: DonateResult = { status: "pending", detail: "", amount: 0, token: "", amountUsd: 0 };
 
@@ -136,6 +139,11 @@ export function useDonation(
       request
         .then((r) => handle(txHash, r, attempt + 1))
         .catch((error) => {
+          if (isMaintenance(error)) {
+            setBusy(null);
+            setStatus({ kind: "wait", text: MAINTENANCE_TEXT });
+            return;
+          }
           if (error instanceof ApiError && error.status < 500 && error.status !== 429) {
             setBusy(null);
             setStatus({ kind: "err", text: errorMessage(error) });
@@ -185,6 +193,12 @@ export function useDonation(
         handle(txHash, await api<DonateResult>("/api/donate/confirm", { json: request }), 0);
         return;
       } catch (e) {
+        if (isMaintenance(e)) {
+          // The hash stays stored, so the next visit confirms it.
+          setBusy(null);
+          setStatus({ kind: "wait", text: MAINTENANCE_TEXT });
+          return;
+        }
         if (e instanceof ApiError && e.status < 500 && e.status !== 429) {
           setBusy(null);
           setStatus({ kind: "err", text: errorMessage(e) });

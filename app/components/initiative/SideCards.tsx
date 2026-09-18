@@ -4,6 +4,7 @@ import DonateWidget from "~/components/donate/DonateWidget";
 import { LinkButton } from "~/components/ui/Button";
 import RevisionPanel, { type ViewMode } from "~/components/initiative/RevisionBar";
 import KeyFacts from "~/components/initiative/KeyFacts";
+import Skeleton from "~/components/ui/Skeleton";
 import { useSession } from "~/context/session";
 import type { InitiativePage } from "~/lib/api-types";
 import { openDiscussion } from "~/lib/discussion";
@@ -11,7 +12,9 @@ import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
 import { WHAT_NEXT } from "~/data/what-next";
 
 export default function SideCards(
-  { page, onDonated, revisions }: {
+  { page, placeholder = false, onDonated, revisions }: {
+    /** The page is still the board card's placeholder: the facts are unknown. */
+    placeholder?: boolean;
     page: InitiativePage;
     onDonated?: () => void;
     /** History navigation state owned by the page; omitted when there is nothing to browse. */
@@ -46,7 +49,7 @@ export default function SideCards(
             </p>
           )}
       </div>
-      <KeyFacts r={r} summary={page.summary} />
+      {placeholder ? <Skeleton className="h-28" /> : <KeyFacts r={r} summary={page.summary} />}
       {r.discourseUrl && (
         <div className="panel border-[rgba(90,200,250,.35)]">
           <span className="k">Join the discussion</span>

@@ -135,7 +135,14 @@ export default function Initiative() {
           {diff
             ? <DiffBlock chunks={diff.summary} className="diff-body" />
             : <p className="md m-0 whitespace-pre-line">{text.summary}</p>}
-          {structured
+          {isPlaceholderData
+            ? (
+              <>
+                <SectionHeading>Full initiative details</SectionHeading>
+                <Skeleton className="h-40" />
+              </>
+            )
+            : structured
             ? (
               <>
                 <Sections type={r.type} sections={text.sections ?? {}} diff={diff} />
@@ -180,7 +187,7 @@ export default function Initiative() {
                   )}
               </>
             )}
-          <RulesPanel r={r} />
+          {!isPlaceholderData && <RulesPanel r={r} />}
           <CommentsSection
             key={r.id}
             initiativeId={r.id}
@@ -202,7 +209,7 @@ export default function Initiative() {
               />
             )}
           <p className="mt-7 flex flex-wrap items-center gap-2 border-t border-white/[.08] pt-4 text-[13.5px] text-muted">
-            {r.proposer && (
+            {!isPlaceholderData && r.proposer && (
               <>
                 Proposed by <Identity address={r.proposer} size={20} />
                 <span>on {dt(r.createdAt)}</span>
@@ -213,6 +220,7 @@ export default function Initiative() {
         </div>
         <SideCards
           page={page}
+          placeholder={isPlaceholderData}
           onDonated={refresh}
           revisions={showBar ? { viewing, current, mode, onMode: setMode } : undefined}
         />

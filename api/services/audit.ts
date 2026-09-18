@@ -66,7 +66,6 @@ const DETAILS = [
   "discard",
   "review",
   "feature",
-  "feature-front",
   "unfeature",
   "unreport",
   "reauthenticate",

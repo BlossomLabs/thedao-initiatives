@@ -134,3 +134,56 @@ it("polls saved results while another visitor refreshes and stops showing updati
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(fetchMock.mock.calls.every(([url]) => !String(url).includes("refresh=1"))).toBe(true);
 });
+
+it("paints the card's identity as a placeholder with an empty body until the page arrives", async () => {
+  const card = {
+    initiative: {
+      id: "1",
+      slug: "audit-tooling",
+      title: "Audit tooling for rollups",
+      summary: "The summary from the card",
+      goalUsd: 150_000,
+      status: "approved",
+      type: "grant",
+      sortRank: null,
+      safeAddress: "",
+      createdAt: 0,
+      approvedAt: null,
+    },
+    summary: page(false).summary,
+    pct: 1,
+    backers: 0,
+    donations: 0,
+    ledger: null,
+    logos: [],
+    funded: false,
+    donationsEnabled: false,
+  };
+  const fresh = deferred<Response>();
+  vi.stubGlobal("fetch", vi.fn(() => fresh.promise));
+  function Placeholder() {
+    const { data, isPlaceholderData } = useInitiative("audit-tooling");
+    if (!data) return <p>Loading</p>;
+    return (
+      <p>
+        {isPlaceholderData ? "placeholder" : "page"}: {data.initiative.title} /{" "}
+        {data.initiative.milestones.length} milestones / rev {data.initiative.revision} /{" "}
+        {data.initiative.structured ? "structured" : "legacy"}
+      </p>
+    );
+  }
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  clients.push(qc);
+  qc.setQueryData(["board"], { cards: [card], totals: {}, flags: {} });
+  render(
+    <QueryClientProvider client={qc}>
+      <Placeholder />
+    </QueryClientProvider>,
+  );
+  expect(
+    screen.getByText("placeholder: Audit tooling for rollups / 0 milestones / rev 0 / structured"),
+  )
+    .toBeInTheDocument();
+  act(() => fresh.resolve(Response.json(page(false))));
+  await screen.findByText("page: Audit tooling for rollups / 1 milestones / rev 2 / structured");
+});

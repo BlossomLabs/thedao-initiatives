@@ -192,13 +192,6 @@ export function commentsRepo(kv: Deno.Kv, now: () => number) {
     return (await all()).filter((c) => c.status === "published" && c.reports > 0)
       .sort((a, b) => b.reports - a.reports || a.createdAt - b.createdAt);
   }
-  /** Entries admin-featured for the front-page strip (featured=2). */
-  async function frontPage(): Promise<Comment[]> {
-    return (await all()).filter((c) =>
-      c.status === "published" && c.featured === 2 && c.parentId === null
-    )
-      .sort((a, b) => b.createdAt - a.createdAt);
-  }
 
   return {
     create,
@@ -213,6 +206,5 @@ export function commentsRepo(kv: Deno.Kv, now: () => number) {
     held,
     unansweredQuestions,
     reported,
-    frontPage,
   };
 }

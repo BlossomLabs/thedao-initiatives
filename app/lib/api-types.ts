@@ -113,8 +113,25 @@ export interface LedgerStatus {
   updating?: boolean;
 }
 
+/** A board card's initiative: identity, pitch and funding facts only. The
+ * text and the page facts come with GET /api/initiatives/:slug. */
+export type CardInitiative = Pick<
+  Initiative,
+  | "id"
+  | "slug"
+  | "title"
+  | "summary"
+  | "goalUsd"
+  | "status"
+  | "type"
+  | "sortRank"
+  | "safeAddress"
+  | "createdAt"
+  | "approvedAt"
+>;
+
 export interface Card {
-  initiative: Initiative;
+  initiative: CardInitiative;
   summary: Summary;
   pct: number;
   backers: number;
@@ -144,10 +161,6 @@ export interface CommentEntry {
   replies?: CommentEntry[];
 }
 
-export interface CommunityEntry extends CommentEntry {
-  initiative: { slug: string; title: string };
-}
-
 export interface BoardFlags {
   aiSearch: boolean;
   tokensOk: boolean;
@@ -165,7 +178,6 @@ export interface Board {
   refreshDue?: boolean;
   cards: Card[];
   totals: { count: number; goal: number; raised: number; backers: number; donations: number };
-  community: CommunityEntry[];
   flags: BoardFlags;
 }
 

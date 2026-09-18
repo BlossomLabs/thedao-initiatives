@@ -439,33 +439,19 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
     200,
   );
   assertEquals((await h.db.comments.get(e1.id))!.reviewed, true);
-  // feature-front max 3
+  // the front-page level is gone: the action is unknown, "feature" still works
   const ids = (await h.db.comments.forRfp(rfp.id)).filter((c) => !c.parentId).map((c) => c.id);
-  for (const id of ids.slice(0, 3)) {
-    assertEquals(
-      (await h.req(`/api/admin/comments/${id}/feature-front`, {
-        method: "POST",
-        token: admin,
-      })).status,
-      200,
-    );
-  }
-  const fourth = await h.req(`/api/admin/comments/${ids[3]}/feature-front`, {
+  const front = await h.req(`/api/admin/comments/${ids[0]}/feature-front`, {
     method: "POST",
     token: admin,
   });
-  assertEquals(fourth.status, 409);
-  assertStringIncludes(String((await j(fourth)).error), "3 featured");
-  const board = await j(await h.req("/api/board")) as {
-    community: { initiative: { slug: string } }[];
-  };
-  assertEquals(board.community.length, 3);
-  assertEquals(board.community[0].initiative.slug, rfp.slug);
-  await h.req(`/api/admin/comments/${ids[0]}/unfeature`, {
-    method: "POST",
-    token: admin,
-  });
-  assertEquals(((await j(await h.req("/api/board"))).community as unknown[]).length, 2);
+  assertEquals(front.status, 400);
+  assertEquals(
+    (await h.req(`/api/admin/comments/${ids[0]}/feature`, { method: "POST", token: admin }))
+      .status,
+    200,
+  );
+  assertEquals((await h.db.comments.get(ids[0]))!.featured, 1);
   h.close();
 });
 

@@ -43,6 +43,30 @@ export function publicRfp(r: Rfp) {
   };
 }
 
+/** What a board card needs: identity, the one-line pitch and the funding
+ * facts. The text (details, sections, milestones, links) and the page facts
+ * stay on the initiative page, which the board never renders. */
+export function cardInitiative(r: Rfp) {
+  return {
+    id: r.id,
+    slug: r.slug,
+    title: r.title,
+    summary: r.summary,
+    goalUsd: r.goalUsd,
+    status: r.status,
+    type: r.type,
+    sortRank: r.sortRank,
+    safeAddress: r.safeAddress,
+    createdAt: r.createdAt,
+    approvedAt: r.approvedAt,
+  };
+}
+
+/** The admin dashboard row: the card plus the contact it shows. */
+export function adminCardInitiative(r: Rfp) {
+  return { ...cardInitiative(r), contact: r.contact };
+}
+
 /** The structured body with defaults for rows written before it existed. */
 function structuredJson(r: Pick<Rfp, "sections" | "milestones" | "links">) {
   const t = pickText({ ...r, title: "", summary: "", details: "" });

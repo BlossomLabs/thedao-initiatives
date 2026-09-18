@@ -4,7 +4,6 @@ import { Link } from "react-router";
 import PageMain from "~/components/layout/PageMain";
 import SectionHeading from "~/components/layout/SectionHeading";
 import Hero from "~/components/board/Hero";
-import CommunityStrip from "~/components/board/CommunityStrip";
 import AiSearch from "~/components/board/AiSearch";
 import InitiativeCard from "~/components/board/InitiativeCard";
 import SuggestCard from "~/components/board/SuggestCard";
@@ -37,7 +36,6 @@ export default function Board() {
   return (
     <>
       <Hero raised={data?.totals.raised ?? 0} loading={isLoading} />
-      {data && <CommunityStrip entries={data.community} />}
       <PageMain>
         <SectionHeading id="rfps" className="max-[640px]:text-center">
           Security initiatives looking for funding

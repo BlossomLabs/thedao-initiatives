@@ -8,8 +8,9 @@ import { assertFields, formBody, jsonBody, s } from "../lib/body.ts";
 import { assertRecentAuth, requireAdmin, requireRecentAuth } from "../middleware/auth.ts";
 import { clearSessionCookie } from "../lib/session-cookie.ts";
 import {
+  adminCardInitiative,
   adminCommentJson,
-  adminRfp,
+  adminInitiative,
   donationJson,
   ipfsUrl,
   pledgeJson,
@@ -27,7 +28,7 @@ import {
 import { decimalsOf, editChecks, pledgeBackers } from "./initiatives.ts";
 import { PAGE_FACT_FIELDS, readPageFacts } from "../lib/page-facts.ts";
 import { assertNoErrors, mergeFindings, readStructured, TEXT_FIELDS } from "../lib/structured.ts";
-import { pickText, type RfpText } from "../db/rfps.ts";
+import { type InitiativeText, pickText } from "../db/initiatives.ts";
 import { type Findings, isStructured, LIMITS } from "../../shared/draft/mod.ts";
 import { predictSafeAddress, safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
@@ -36,7 +37,7 @@ import { refreshLedger } from "../services/ledger.ts";
 import { exportBackup, restoreBackup, validateBackup } from "../services/backup.ts";
 import { liveRoles } from "../services/roles.ts";
 import type { AdminEntry } from "../services/admins.ts";
-import type { Comment, Pledge, PledgeStatus, Rfp } from "../db/types.ts";
+import type { Comment, Initiative, Pledge, PledgeStatus } from "../db/types.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
 
 /** Findings that block an admin save: shape rules, not editorial ones. Every
@@ -72,40 +73,40 @@ export function adminRoutes(deps: Deps) {
   });
 
   /** Admin routes address an initiative by slug (the URL) or by id (older links). */
-  const rfpOr404 = async (idOrSlug: string, mutation = false): Promise<Rfp> => {
-    const byId = await db.rfps.get(idOrSlug);
+  const initiativeOr404 = async (idOrSlug: string, mutation = false): Promise<Initiative> => {
+    const byId = await db.initiatives.get(idOrSlug);
     if (byId) return byId;
-    const rfp = await db.rfps.bySlug(idOrSlug);
-    if (mutation && await db.rfps.isReusedSlug(idOrSlug)) {
+    const initiative = await db.initiatives.bySlug(idOrSlug);
+    if (mutation && await db.initiatives.isReusedSlug(idOrSlug)) {
       throw new HttpError(409, INITIATIVE_CHANGED);
     }
-    if (!rfp) throw new HttpError(404, "not found");
-    return rfp;
+    if (!initiative) throw new HttpError(404, "not found");
+    return initiative;
   };
   const withInitiative = async (rows: Comment[]) => {
     const out = [];
     const admins = await deps.admins.set();
     for (const cm of rows) {
-      const rfp = await db.rfps.get(cm.rfpId);
-      out.push(adminCommentJson(cm, liveRoles(admins, cm.address, rfp), rfp));
+      const initiative = await db.initiatives.get(cm.rfpId);
+      out.push(adminCommentJson(cm, liveRoles(admins, cm.address, initiative), initiative));
     }
     return out;
   };
 
   r.get("/dashboard", async (c) => {
     const [pending, approved, other] = await Promise.all([
-      db.rfps.list(["pending"]),
-      db.rfps.list(["approved"]),
-      db.rfps.list(["rejected", "archived"]),
+      db.initiatives.list(["pending"]),
+      db.initiatives.list(["approved"]),
+      db.initiatives.list(["rejected", "archived"]),
     ]);
     const rows = [];
     // Maintenance pauses the balance refresh the dashboard would trigger.
     const revalidate = !(await deps.maintenance.on());
-    for (const rfp of [...pending, ...approved, ...other]) {
+    for (const initiative of [...pending, ...approved, ...other]) {
       rows.push({
-        initiative: adminRfp(rfp),
-        summary: await deps.funding.summary(rfp, revalidate),
-        safeSync: rfp.safeAddress ? await db.meta.safeSync(rfp.id) : null,
+        initiative: adminCardInitiative(initiative),
+        summary: await deps.funding.summary(initiative, revalidate),
+        safeSync: initiative.safeAddress ? await db.meta.safeSync(initiative.id) : null,
       });
     }
     const held = await db.comments.held();
@@ -214,15 +215,17 @@ export function adminRoutes(deps: Deps) {
   });
 
   r.get("/initiatives/:id", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"));
+    const initiative = await initiativeOr404(c.req.param("id"));
     const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
     return c.json({
-      initiative: adminRfp(rfp),
-      revisions: (await db.revisions.list(rfp.id, true)).map(revisionMeta),
-      summary: await deps.funding.summary(rfp, !(await deps.maintenance.on())),
-      pledges: (await db.pledges.list(rfp.id, true)).map((p) => pledgeJson(config, p)),
-      donations: (await db.donations.list(rfp.id, false)).map((d) => donationJson(d, decimalsOf)),
-      safeSync: rfp.safeAddress ? await db.meta.safeSync(rfp.id) : null,
+      initiative: adminInitiative(initiative),
+      revisions: (await db.revisions.list(initiative.id, true)).map(revisionMeta),
+      summary: await deps.funding.summary(initiative, !(await deps.maintenance.on())),
+      pledges: (await db.pledges.list(initiative.id, true)).map((p) => pledgeJson(config, p)),
+      donations: (await db.donations.list(initiative.id, false)).map((d) =>
+        donationJson(d, decimalsOf)
+      ),
+      safeSync: initiative.safeAddress ? await db.meta.safeSync(initiative.id) : null,
       signers: {
         ok: signersOk,
         detail: signersDetail,
@@ -241,7 +244,7 @@ export function adminRoutes(deps: Deps) {
    * back as `findings` for the form to show without blocking.
    */
   r.patch("/initiatives/:id", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"), true);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
     const body = await jsonBody(c, [
       ...TEXT_FIELDS,
       ...PAGE_FACT_FIELDS,
@@ -250,7 +253,7 @@ export function adminRoutes(deps: Deps) {
       "proposer",
     ]);
     if (body.paidOutUsd !== undefined || body.proposer !== undefined) assertRecentAuth(c, deps.now);
-    const patch = await readPageFacts(body, rfp, deps);
+    const patch = await readPageFacts(body, initiative, deps);
     if (body.sortRank !== undefined) {
       const raw = s(body.sortRank, 10);
       if (!raw) patch.sortRank = null;
@@ -283,12 +286,12 @@ export function adminRoutes(deps: Deps) {
         patch.proposer = resolved;
       } else throw new HttpError(400, "Owner must be a wallet address or an ENS name.");
     }
-    const nextType = patch.type ?? rfp.type;
-    const cur = pickText(rfp);
+    const nextType = patch.type ?? initiative.type;
+    const cur = pickText(initiative);
     const textGiven = TEXT_FIELDS.some((k) => body[k] !== undefined);
     // A type switch re-normalises a structured body: other-type sections go.
-    const reshape = nextType !== rfp.type && isStructured(cur);
-    let text: RfpText | null = null;
+    const reshape = nextType !== initiative.type && isStructured(cur);
+    let text: InitiativeText | null = null;
     let findings: Findings = { errors: [], warnings: [] };
     if (textGiven || reshape) {
       if (
@@ -312,11 +315,11 @@ export function adminRoutes(deps: Deps) {
       const checks = editChecks(
         {
           type: nextType,
-          topup: patch.topup ?? rfp.topup,
-          goalUsd: patch.goalUsd ?? rfp.goalUsd,
+          topup: patch.topup ?? initiative.topup,
+          goalUsd: patch.goalUsd ?? initiative.goalUsd,
         },
         { ...base, ...structured },
-        pledgeBackers(await db.pledges.list(rfp.id)),
+        pledgeBackers(await db.pledges.list(initiative.id)),
       );
       const hard = checks.errors.filter(blocks);
       assertNoErrors(mergeFindings(caps, { errors: hard, warnings: [] }));
@@ -324,31 +327,33 @@ export function adminRoutes(deps: Deps) {
       if (textGiven) validateText(base);
       text = { ...base, ...structured };
     }
-    let next = Object.keys(patch).length ? await db.rfps.update(rfp.id, patch) : rfp;
+    let next = Object.keys(patch).length
+      ? await db.initiatives.update(initiative.id, patch)
+      : initiative;
     if (text) {
-      next = (await db.rfps.revise(rfp.id, text, {
+      next = (await db.initiatives.revise(initiative.id, text, {
         author: c.var.user!.address,
         source: "admin",
-      })).rfp;
+      })).initiative;
     }
-    return c.json({ initiative: adminRfp(next), findings });
+    return c.json({ initiative: adminInitiative(next), findings });
   });
 
   /** Hide a superseded revision from the public history, or show it again. */
   r.post("/initiatives/:id/revisions/:n", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"), true);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
     const n = Number(c.req.param("n"));
     const action = s((await jsonBody(c, ["action"])).action, 20);
-    auditContext(c, { target: `${rfp.id}:${n}`, detail: action });
+    auditContext(c, { target: `${initiative.id}:${n}`, detail: action });
     if (action !== "archive" && action !== "unarchive") throw new HttpError(400, "bad action");
-    if (action === "archive" && n === rfp.revision) {
+    if (action === "archive" && n === initiative.revision) {
       throw new HttpError(
         400,
         "The current revision cannot be archived; save a new revision to replace it.",
       );
     }
     const rev = Number.isInteger(n) && n > 0
-      ? await db.revisions.setArchived(rfp.id, n, action === "archive")
+      ? await db.revisions.setArchived(initiative.id, n, action === "archive")
       : null;
     if (!rev) throw new HttpError(404, "not found");
     return c.json({ revision: revisionMeta(rev) });
@@ -368,28 +373,28 @@ export function adminRoutes(deps: Deps) {
     return { ids, action };
   }
 
-  const STATUS_ACTIONS: Record<string, Rfp["status"]> = {
+  const STATUS_ACTIONS: Record<string, Initiative["status"]> = {
     approve: "approved",
     reject: "rejected",
     archive: "archived",
     unarchive: "approved",
   };
-  async function applyStatus(rfp: Rfp, action: string): Promise<Rfp> {
+  async function applyStatus(initiative: Initiative, action: string): Promise<Initiative> {
     if (!Object.hasOwn(STATUS_ACTIONS, action)) throw new HttpError(400, "bad action");
     const status = STATUS_ACTIONS[action];
-    if (status !== "approved") return await db.rfps.update(rfp.id, { status });
+    if (status !== "approved") return await db.initiatives.update(initiative.id, { status });
     // Deploy first, approve second: a live initiative always has its Safe.
-    if (!rfp.safeAddress) {
+    if (!initiative.safeAddress) {
       throw new HttpError(400, "Deploy the Safe first; approval needs a deployed, verified Safe.");
     }
-    return await db.rfps.unarchive(rfp.id);
+    return await db.initiatives.unarchive(initiative.id);
   }
 
   r.post("/initiatives/:id/status", requireRecentAuth(deps.now), async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"), true);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
     const action = s((await jsonBody(c, ["action"])).action, 20);
-    auditContext(c, { target: rfp.id, detail: action });
-    return c.json({ initiative: adminRfp(await applyStatus(rfp, action)) });
+    auditContext(c, { target: initiative.id, detail: action });
+    return c.json({ initiative: adminInitiative(await applyStatus(initiative, action)) });
   });
 
   /** The same status change on many initiatives at once. Each id is applied
@@ -408,9 +413,9 @@ export function adminRoutes(deps: Deps) {
           target: id,
           detail: action,
         }, async () => {
-          const rfp = await db.rfps.get(id);
-          if (!rfp) throw new HttpError(404, "not found");
-          await applyStatus(rfp, action);
+          const initiative = await db.initiatives.get(id);
+          if (!initiative) throw new HttpError(404, "not found");
+          await applyStatus(initiative, action);
         });
         done++;
       } catch (e) {
@@ -427,7 +432,7 @@ export function adminRoutes(deps: Deps) {
    * reader serves adding (everything required) and editing (a subset).
    */
   const PLEDGE_NOTE_CHARS = 300;
-  async function readPledge(c: Context<Vars>, rfp: Rfp) {
+  async function readPledge(c: Context<Vars>, initiative: Initiative) {
     const ct = c.req.header("content-type") ?? "";
     let fields: Record<string, unknown> = {};
     let logoCid: string | undefined;
@@ -464,7 +469,7 @@ export function adminRoutes(deps: Deps) {
       const [cid, err] = await deps.pinata.uploadImage(
         new Uint8Array(await logo.arrayBuffer()),
         LOGO_MAX_BYTES,
-        "logo-" + rfp.slug,
+        "logo-" + initiative.slug,
       );
       if (!cid) throw new HttpError(400, err ?? "upload failed");
       logoCid = cid;
@@ -475,11 +480,11 @@ export function adminRoutes(deps: Deps) {
   }
 
   r.post("/initiatives/:id/pledges", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"), true);
-    const { patch, status } = await readPledge(c, rfp);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    const { patch, status } = await readPledge(c, initiative);
     if (!patch.company) throw new HttpError(400, "Company name is required.");
     if (patch.amountUsd === undefined) throw new HttpError(400, "Amount is required.");
-    const p = await db.pledges.add(rfp.id, {
+    const p = await db.pledges.add(initiative.id, {
       company: patch.company,
       amountUsd: patch.amountUsd,
       status: status === "received" ? "received" : "pledged",
@@ -492,62 +497,62 @@ export function adminRoutes(deps: Deps) {
 
   /** Edit a pledge: any of company, amount, url, note, logo (same body as adding), and status. */
   r.patch("/initiatives/:id/pledges/:pid", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"), true);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
     const pid = c.req.param("pid");
-    const { patch, status } = await readPledge(c, rfp);
+    const { patch, status } = await readPledge(c, initiative);
     if (status !== undefined && !["pledged", "received", "withdrawn"].includes(status)) {
       throw new HttpError(400, "bad status");
     }
-    let next = await db.pledges.get(rfp.id, pid);
+    let next = await db.pledges.get(initiative.id, pid);
     if (!next) throw new HttpError(404, "not found");
-    if (Object.keys(patch).length) next = await db.pledges.update(rfp.id, pid, patch);
+    if (Object.keys(patch).length) next = await db.pledges.update(initiative.id, pid, patch);
     if (status !== undefined) {
-      await db.pledges.setStatus(rfp.id, pid, status as PledgeStatus);
-      next = await db.pledges.get(rfp.id, pid);
+      await db.pledges.setStatus(initiative.id, pid, status as PledgeStatus);
+      next = await db.pledges.get(initiative.id, pid);
     }
     return c.json({ ok: true, pledge: pledgeJson(config, next!) });
   });
 
   r.delete("/initiatives/:id/pledges/:pid", async (c) => {
     await jsonBody(c, []);
-    const rfp = await rfpOr404(c.req.param("id"), true);
-    await db.pledges.remove(rfp.id, c.req.param("pid"));
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    await db.pledges.remove(initiative.id, c.req.param("pid"));
     return c.json({ ok: true });
   });
 
   r.post("/initiatives/:id/donations/recheck", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"), true);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
     const tx = s((await jsonBody(c, ["txHash"])).txHash, 80).toLowerCase();
     if (!TX_HASH_RE.test(tx)) throw new HttpError(400, "malformed tx hash");
-    if (!rfp.safeAddress || !Object.keys(await chain.activeTokens()).length) {
+    if (!initiative.safeAddress || !Object.keys(await chain.activeTokens()).length) {
       throw new HttpError(503, "chain unavailable or no Safe");
     }
-    const v = await chain.verifyDonation(tx, rfp.safeAddress);
-    if (v.found && !v.pending) await db.donations.record(rfp.id, tx, v, "tx");
+    const v = await chain.verifyDonation(tx, initiative.safeAddress);
+    if (v.found && !v.pending) await db.donations.record(initiative.id, tx, v, "tx");
     return c.json({ verification: v });
   });
 
   r.post("/initiatives/:id/sync-donations", async (c) => {
     await jsonBody(c, []);
-    const rfp = await rfpOr404(c.req.param("id"), true);
-    if (!rfp.safeAddress) throw new HttpError(400, "no Safe deployed");
-    if (!(await db.rateLimit("safesync:" + rfp.id, 1, 60))) {
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    if (!initiative.safeAddress) throw new HttpError(400, "no Safe deployed");
+    if (!(await db.rateLimit("safesync:" + initiative.id, 1, 60))) {
       throw new HttpError(429, "synced less than a minute ago");
     }
-    return c.json({ safeSync: await refreshLedger(deps, rfp, true) });
+    return c.json({ safeSync: await refreshLedger(deps, initiative, true) });
   });
 
   /** What the admin's wallet sends to deploy this initiative's Safe, and where it lands. */
   r.get("/initiatives/:id/safe-deploy-params", async (c) => {
-    const rfp = await rfpOr404(c.req.param("id"), true);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
     const [ok, why] = signersConfigured(config.operationalSigners);
     if (!ok) return c.json({ enabled: false, reason: why }, 503);
-    const key = rfp.safeDeploymentKey ?? rfp.slug;
-    const address = rfp.safeAddress || predictSafeAddress(config.operationalSigners, key);
+    const key = initiative.safeDeploymentKey ?? initiative.slug;
+    const address = initiative.safeAddress || predictSafeAddress(config.operationalSigners, key);
     // "Deployed" is on-chain truth, not just our binding: a deploy the browser
     // lost track of (wallet mined it under another hash) must not be sent
     // again, since CREATE2 at an occupied address can only revert.
-    const deployed = Boolean(rfp.safeAddress) || await chain.hasCode(address);
+    const deployed = Boolean(initiative.safeAddress) || await chain.hasCode(address);
     return c.json({
       enabled: true,
       chainId: CHAIN_ID,
@@ -569,15 +574,15 @@ export function adminRoutes(deps: Deps) {
    */
   r.post("/initiatives/:id/safe-confirm", requireRecentAuth(deps.now), async (c) => {
     await jsonBody(c, []);
-    const rfp = await rfpOr404(c.req.param("id"), true);
-    if (rfp.safeAddress) {
-      return c.json({ status: "ok", address: rfp.safeAddress, detail: "verified earlier" });
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    if (initiative.safeAddress) {
+      return c.json({ status: "ok", address: initiative.safeAddress, detail: "verified earlier" });
     }
     const [ok, why] = signersConfigured(config.operationalSigners);
     if (!ok) return c.json({ status: "error", detail: why }, 503);
     const address = predictSafeAddress(
       config.operationalSigners,
-      rfp.safeDeploymentKey ?? rfp.slug,
+      initiative.safeDeploymentKey ?? initiative.slug,
     );
     if (!(await chain.hasCode(address))) {
       auditContext(c, { outcome: "pending" });
@@ -587,21 +592,21 @@ export function adminRoutes(deps: Deps) {
     if (!good) {
       return c.json({ status: "error", detail: `Safe at ${address} REJECTED: ${detail}` }, 400);
     }
-    const other = await db.rfps.bySafe(address);
-    if (other && other.id !== rfp.id) {
+    const other = await db.initiatives.bySafe(address);
+    if (other && other.id !== initiative.id) {
       return c.json({
         status: "error",
         detail: `that Safe is already assigned to another initiative (${other.slug})`,
       }, 409);
     }
-    await db.rfps.update(rfp.id, { safeAddress: address });
+    await db.initiatives.update(initiative.id, { safeAddress: address });
     return c.json({ status: "ok", address, detail });
   });
 
   /** The patch a moderation action makes on a comment, or a 400/409. */
-  async function commentPatch(row: Comment, action: string): Promise<Partial<Comment>> {
+  function commentPatch(row: Comment, action: string): Partial<Comment> {
     if (
-      ["review", "feature", "feature-front"].includes(action) &&
+      ["review", "feature"].includes(action) &&
       (row.parentId || row.status !== "published")
     ) {
       throw new HttpError(400, "only a published top-level entry");
@@ -610,16 +615,6 @@ export function adminRoutes(deps: Deps) {
     if (action === "discard") return { status: "discarded" };
     if (action === "review" && row.type === "suggestion") return { reviewed: true };
     if (action === "feature") return { featured: 1, featuredAt: deps.now() };
-    if (action === "feature-front") {
-      // Max 3 on the front page, never automatic: the 4th toggle is refused.
-      if (row.featured !== 2 && (await db.comments.frontPage()).length >= 3) {
-        throw new HttpError(
-          409,
-          "The front page already has 3 featured entries. Unfeature one first.",
-        );
-      }
-      return { featured: 2, featuredAt: deps.now() };
-    }
     if (action === "unfeature") return { featured: 0, featuredAt: 0 };
     if (action === "unreport") return { reports: 0 };
     throw new HttpError(400, "bad action");
@@ -648,7 +643,7 @@ export function adminRoutes(deps: Deps) {
         }, async () => {
           const row = await db.comments.get(id);
           if (!row) throw new HttpError(404, "not found");
-          await db.comments.set(row.id, await commentPatch(row, action));
+          await db.comments.set(row.id, commentPatch(row, action));
         });
         done++;
       } catch (e) {
@@ -664,10 +659,14 @@ export function adminRoutes(deps: Deps) {
     auditContext(c, { detail: c.req.param("action") });
     const row = await db.comments.get(c.req.param("id"));
     if (!row) throw new HttpError(404, "not found");
-    const next = await db.comments.set(row.id, await commentPatch(row, c.req.param("action")));
-    const rfp = await db.rfps.get(row.rfpId);
+    const next = await db.comments.set(row.id, commentPatch(row, c.req.param("action")));
+    const initiative = await db.initiatives.get(row.rfpId);
     return c.json({
-      comment: adminCommentJson(next!, liveRoles(await deps.admins.set(), next!.address, rfp), rfp),
+      comment: adminCommentJson(
+        next!,
+        liveRoles(await deps.admins.set(), next!.address, initiative),
+        initiative,
+      ),
     });
   });
 
@@ -676,7 +675,7 @@ export function adminRoutes(deps: Deps) {
    * manage page. Never link from a public page; never add a public route.
    */
   r.get("/leads", requireRecentAuth(deps.now), async (c) => {
-    const all = await db.rfps.list(["pending", "approved", "rejected", "archived"]);
+    const all = await db.initiatives.list(["pending", "approved", "rejected", "archived"]);
     const rows = all.filter((x) => x.funders.trim()).map((x) => ({
       id: x.id,
       title: x.title,
@@ -692,7 +691,7 @@ export function adminRoutes(deps: Deps) {
   });
 
   /**
-   * A content logo (content/rfps/logos/<name>), pinned to IPFS once: the same bytes
+   * A content logo (content/initiatives/logos/<name>), pinned to IPFS once: the same bytes
    * come back with the stored CID, new bytes replace it. The sync then maps
    * the name in a backers line to the CID. Multipart: `name`, `image`.
    */
@@ -721,7 +720,7 @@ export function adminRoutes(deps: Deps) {
     return c.json({ name, cid, logoUrl: ipfsUrl(config, cid!), reused: false });
   });
 
-  /** Push-based content sync: the repo's content/rfps/*.md, sent by scripts/sync-content.ts. */
+  /** Push-based content sync: the repo's content/initiatives/*.md, sent by scripts/sync-content.ts. */
   r.post("/sync-content", requireRecentAuth(deps.now), async (c) => {
     const body = await jsonBody(c, ["files"]);
     const files = Array.isArray(body.files) ? body.files : [];

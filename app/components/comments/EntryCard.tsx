@@ -51,7 +51,6 @@ function Body({ text, className }: { text: string; className?: string }) {
 const FEATURE_LEVELS = [
   { label: "Not featured", action: "unfeature" },
   { label: "Featured", action: "feature" },
-  { label: "Front page", action: "feature-front" },
 ];
 
 const linkBtn =

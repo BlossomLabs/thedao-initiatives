@@ -1,15 +1,14 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
-import { commentJson, ipfsUrl, publicRfp } from "../lib/json.ts";
-import { liveRoles } from "../services/roles.ts";
-import type { Rfp } from "../db/types.ts";
+import { cardInitiative, ipfsUrl } from "../lib/json.ts";
+import type { Initiative } from "../db/types.ts";
 import { SAFE_OWNER_COUNT, SAFE_THRESHOLD } from "../config.ts";
 import type { FundingSummary } from "../services/funding.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
 import { ledgerStatus, refreshLedgers } from "../services/ledger.ts";
 
 export interface Card {
-  initiative: ReturnType<typeof publicRfp>;
+  initiative: ReturnType<typeof cardInitiative>;
   summary: FundingSummary;
   pct: number;
   backers: number;
@@ -44,18 +43,19 @@ export function orderCards<
 
 export async function buildCard(
   deps: Deps,
-  r: Rfp,
+  r: Initiative,
   tokensOk: boolean,
   refresh = false,
 ): Promise<Card> {
-  const [summary, pledges, donations, ledger] = await Promise.all([
-    deps.funding.summary(r, refresh),
+  // One wave of reads, then only the Safe balance snapshot for the summary.
+  const [pledges, donations, ledger] = await Promise.all([
     deps.db.pledges.list(r.id),
     deps.db.donations.list(r.id),
     ledgerStatus(deps, r),
   ]);
+  const summary = await deps.funding.summaryFrom(r, pledges, donations, refresh);
   return {
-    initiative: publicRfp(r),
+    initiative: cardInitiative(r),
     summary,
     pct: pctOf(summary.total, r.goalUsd),
     backers: pledges.length,
@@ -97,25 +97,17 @@ export function boardRoutes(deps: Deps) {
     const asked = c.req.query("refresh") === "1";
     const paused = asked && await deps.maintenance.on();
     const refresh = asked && !paused;
-    const rfps = await db.rfps.list(["approved"]);
-    const [state] = await Promise.all([
+    const [initiatives, state] = await Promise.all([
+      db.initiatives.list(["approved"]),
       deps.chain.state(refresh),
-      refresh ? refreshLedgers(deps, rfps) : Promise.resolve(),
     ]);
+    if (refresh) await refreshLedgers(deps, initiatives);
     const tokensOk = tokensUsable(state);
     const cards = orderCards(
       await Promise.all(
-        rfps.map((x) => buildCard(deps, x, tokensOk, refresh)),
+        initiatives.map((x) => buildCard(deps, x, tokensOk, refresh)),
       ),
     ).map((card) => paused ? quietCard(card) : card);
-    const byId = new Map(rfps.map((x) => [x.id, x]));
-    const admins = await deps.admins.set();
-    const community = (await db.comments.frontPage())
-      .filter((cm) => byId.has(cm.rfpId)).slice(0, 3)
-      .map((cm) => ({
-        ...commentJson(cm, liveRoles(admins, cm.address, byId.get(cm.rfpId))),
-        initiative: { slug: byId.get(cm.rfpId)!.slug, title: byId.get(cm.rfpId)!.title },
-      }));
     return c.json({
       refreshDue: !paused && !chainStateFresh(state, deps.now()),
       cards,
@@ -126,7 +118,6 @@ export function boardRoutes(deps: Deps) {
         backers: cards.reduce((n, x) => n + x.backers, 0),
         donations: cards.reduce((n, x) => n + x.donations, 0),
       },
-      community,
       flags: {
         aiSearch: deps.ai.enabled,
         tokensOk,

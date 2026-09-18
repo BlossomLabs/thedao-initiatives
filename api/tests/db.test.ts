@@ -295,8 +295,6 @@ Deno.test("comments: author starting vote, toggle, switch, ordering data, claim 
   assertEquals((await db.comments.held()).length, 1);
   await db.comments.addReport(c.id);
   assertEquals((await db.comments.reported())[0].reports, 1);
-  await db.comments.set(c.id, { featured: 2, featuredAt: now() });
-  assertEquals((await db.comments.frontPage()).length, 1);
   kv.close();
 });
 

@@ -19,12 +19,31 @@ const fetchPage = (slug: string, qc: QueryClient, signal: AbortSignal, who: stri
     !who,
   );
 
-/** The board card holds everything but pledges and donations: enough to paint the page at once. */
+/** The board card holds the identity, the pitch and the funding numbers:
+ * enough to paint the head of the page at once. The text and the page facts
+ * arrive with the page; until then they are empty and the route shows
+ * skeletons in their place (`isPlaceholderData`). */
 function fromBoard(board: Board | undefined, slug: string): InitiativePage | undefined {
   const card = board?.cards.find((c) => c.initiative.slug === slug);
   if (!card) return undefined;
   return {
-    initiative: card.initiative,
+    initiative: {
+      ...card.initiative,
+      details: "",
+      discourseUrl: "",
+      paidOutUsd: 0,
+      proposer: "",
+      durationMonths: null,
+      recipientTeam: "",
+      recipientUrl: "",
+      topup: false,
+      milestoneReviewer: "",
+      sections: {},
+      milestones: [],
+      links: [],
+      structured: true,
+      revision: 0,
+    },
     summary: card.summary,
     pct: card.pct,
     funded: card.funded,

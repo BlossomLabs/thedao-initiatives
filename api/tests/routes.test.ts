@@ -52,12 +52,13 @@ Deno.test("content sync publishes the repo files as structured rows; public JSON
   assertEquals(bySlug["privacy-preserving-edr"].type, "grant");
   assertEquals(bySlug["privacy-preserving-edr"].goalUsd, 300000);
   assertEquals(bySlug["end-to-end-formally-verified-vyper-compiler"].goalUsd, 600000);
-  // every file split cleanly into the guide's sections and milestones
+  // cards carry what the board renders; the text lives on the initiative page
   for (const c of cards) {
-    assertEquals(c.initiative.details, "");
-    assertEquals(c.initiative.structured, true);
-    assert((c.initiative.milestones as unknown[]).length > 0);
+    for (const key of ["details", "sections", "milestones", "links", "structured", "revision"]) {
+      assertEquals(key in c.initiative, false, `board card carries ${key}`);
+    }
   }
+  assertEquals("community" in board, false);
   const ethdebug = (await h.db.rfps.bySlug(
     "source-level-debugging-for-solidity-ethdebug-in-solc",
   ))!;
@@ -927,11 +928,11 @@ Deno.test("page facts: content keys sync, admin patch validates and clears per t
   const h = await harness();
   const { admin } = await seedApproved(h);
   const board = await j(await h.req("/api/board"));
-  const bySlug = Object.fromEntries(
-    (board.cards as { initiative: Record<string, unknown> }[]).map((
-      c,
-    ) => [c.initiative.slug as string, c.initiative]),
-  );
+  const bySlug: Record<string, Record<string, unknown>> = {};
+  for (const c of board.cards as { initiative: { slug: string } }[]) {
+    const page = await j(await h.req("/api/initiatives/" + c.initiative.slug));
+    bySlug[c.initiative.slug] = page.initiative as Record<string, unknown>;
+  }
   // content/rfps front matter: duration on most files, topup + reviewer on ethdebug
   assertEquals(bySlug["end-to-end-formally-verified-vyper-compiler"].durationMonths, 12);
   assertEquals(bySlug["end-to-end-formally-verified-vyper-compiler"].topup, false);

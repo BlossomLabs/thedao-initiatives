@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertFalse, assertRejects } from "@std/assert";
 import { createDb } from "../db/mod.ts";
+import { ADMIN_SESSION_IDLE_SECS } from "../config.ts";
 import type { Verification } from "../chain/verify.ts";
 
 let clock = 1_800_000_000;
@@ -327,11 +328,13 @@ Deno.test("sessions + nonces: single-use nonce, expiry, revoke all", async () =>
   const { token: t2 } = await db.sessions.create(addr, true);
   assertEquals((await db.sessions.get(token))?.address, addr);
   assert((await db.sessions.get(t2))?.isAdmin);
-  for (let i = 0; i < 26; i++) {
+  // The user session is touched every 30 minutes and stays alive; the admin
+  // session is never touched and hits its inactivity limit.
+  for (let i = 0; i * 1800 <= ADMIN_SESSION_IDLE_SECS; i++) {
     clock += 1800;
     assert(await db.sessions.get(token));
   }
-  assertEquals(await db.sessions.get(t2), null); // admin sessions last 12h
+  assertEquals(await db.sessions.get(t2), null);
   assert(await db.sessions.get(token));
   assertEquals(await db.sessions.revokeAll(addr), 1);
   assertEquals(await db.sessions.get(token), null);

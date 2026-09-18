@@ -114,10 +114,13 @@ export const LOGO_MAX_BYTES = 1024 * 1024;
 export const AI_QUERY_MAX_CHARS = 300;
 export const AI_DAILY_CALL_CAP = 500;
 export const SESSION_TTL_SECS = 7 * 86400;
-export const ADMIN_SESSION_TTL_SECS = 12 * 3600;
+/** Same week as a user session: an admin signs in once a week, not twice a
+ * day (Griff, 2026-09-18). The recent-signature rule below still guards the
+ * actions that move money or membership. */
+export const ADMIN_SESSION_TTL_SECS = 7 * 86400;
 /** Inactivity is enforced server-side independently of the absolute lifetime. */
 export const SESSION_IDLE_SECS = 3600;
-export const ADMIN_SESSION_IDLE_SECS = 15 * 60;
+export const ADMIN_SESSION_IDLE_SECS = 3 * 86400;
 /** Managing other sessions requires a recently signed wallet challenge. */
 export const SESSION_REAUTH_SECS = 5 * 60;
 export const NONCE_TTL_SECS = 300;

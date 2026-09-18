@@ -105,7 +105,8 @@ Deno.test("legacy upgrade initializes idle time once, even through passive site-
         address: isAdmin ? ADMIN : PLAIN,
         isAdmin,
         createdAt: h.clock.now - 3600,
-        expiresAt: h.clock.now + 7200,
+        // The absolute expiry sits beyond the idle window under test.
+        expiresAt: h.clock.now + idle + 7200,
       });
       const request = new Request("http://api.test/", { headers: { Cookie: `session=${token}` } });
       assertEquals(await lock.check(request), "session");

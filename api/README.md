@@ -222,16 +222,17 @@ this API cleanup.
 ## Maintenance mode, backup and restore
 
 **Maintenance mode** is a flag under `["meta","maintenance"]` (`{on, by, at, note}`) that an admin
-toggles from the dashboard: `POST /api/admin/maintenance/enter` `{note?}` and `POST
+toggles from the dashboard: `POST /api/admin/maintenance/enter` `{note?}` and
+`POST
 /api/admin/maintenance/exit` (both need recent authentication and are audited as
 `maintenance.enter` / `maintenance.exit`; `GET /api/admin/maintenance` reads it). While it is on,
 every `POST`, `PATCH` and `DELETE` on the API answers
-`503 {"error":"The site is in maintenance mode; changes are paused. …","maintenance":true}`,
-admins included, except sign-in/out and session management under `/api/auth`, the CSP report, the
-toggle itself, `GET /api/admin/backup`, `POST /api/admin/restore`, and the two reads the API takes
-as POST (`/api/comments/mine`, `/api/ai-search`). Reads are unchanged, but the background writes a
-read can trigger stop too: `?refresh=1` ledger and balance refreshes, the pending-donation re-check
-on `GET /api/donate/status/:tx`, the balance revalidation of the admin views, and the daily cron.
+`503 {"error":"The site is in maintenance mode; changes are paused. …","maintenance":true}`, admins
+included, except sign-in/out and session management under `/api/auth`, the CSP report, the toggle
+itself, `GET /api/admin/backup`, `POST /api/admin/restore`, and the two reads the API takes as POST
+(`/api/comments/mine`, `/api/ai-search`). Reads are unchanged, but the background writes a read can
+trigger stop too: `?refresh=1` ledger and balance refreshes, the pending-donation re-check on
+`GET /api/donate/status/:tx`, the balance revalidation of the admin views, and the daily cron.
 `GET /api/board/settings` carries `maintenance: {on, at, note}` for the site-wide banner; the note
 is public. Each isolate re-reads the flag every 3 seconds, so other instances follow a toggle within
 that window. A refused write is audited as the attempted action with outcome `failure`, not as a

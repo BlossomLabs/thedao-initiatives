@@ -11,7 +11,7 @@ import {
 } from "./app-helpers.ts";
 import { syntheticContentFiles } from "./fixtures.ts";
 import { transferLog } from "./helpers.ts";
-import { CHAIN_ID, TOKENS } from "../config.ts";
+import { CHAIN_ID, SESSION_REAUTH_SECS, TOKENS } from "../config.ts";
 import { K } from "../db/keys.ts";
 import { publishedDonationTerms } from "../services/donation-terms.ts";
 import { retryDonationMatches } from "../services/donation-matching.ts";
@@ -328,6 +328,11 @@ Deno.test("admin leads: only initiatives with funders, private, admin-only", asy
     assertEquals(rows[0].id, all[0].id);
     assertStringIncludes(rows[0].funders, "Acme");
     assertEquals(rows[0].contact, "a@example.com");
+    // Private contacts need a recent signature, not just a live cookie.
+    h.clock.now += SESSION_REAUTH_SECS;
+    const stale = await h.req("/api/admin/leads", { token: admin });
+    assertEquals(stale.status, 403);
+    assertEquals((await j(stale)).reauthenticate, true);
   } finally {
     h.close();
   }

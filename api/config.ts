@@ -114,10 +114,15 @@ export const LOGO_MAX_BYTES = 1024 * 1024;
 export const AI_QUERY_MAX_CHARS = 300;
 export const AI_DAILY_CALL_CAP = 500;
 export const SESSION_TTL_SECS = 7 * 86400;
-export const ADMIN_SESSION_TTL_SECS = 12 * 3600;
-/** Inactivity is enforced server-side independently of the absolute lifetime. */
-export const SESSION_IDLE_SECS = 3600;
-export const ADMIN_SESSION_IDLE_SECS = 15 * 60;
+/** Inactivity is enforced server-side independently of the absolute lifetime.
+ * A day: daily use never signs out midweek, a weekend away does. */
+export const SESSION_IDLE_SECS = 86400;
+/** Administrators share the user lifetimes on purpose (Griff, 2026-09-18: the
+ * old 15-minute limit signed him out every time he left the tab). What sets an
+ * administrator cookie apart is guarded by the recent-signature rule below,
+ * not by a shorter session. Aliased so the equality is deliberate. */
+export const ADMIN_SESSION_TTL_SECS = SESSION_TTL_SECS;
+export const ADMIN_SESSION_IDLE_SECS = SESSION_IDLE_SECS;
 /** Managing other sessions requires a recently signed wallet challenge. */
 export const SESSION_REAUTH_SECS = 5 * 60;
 export const NONCE_TTL_SECS = 300;

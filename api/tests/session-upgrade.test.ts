@@ -101,11 +101,15 @@ Deno.test("legacy upgrade initializes idle time once, even through passive site-
     const lock = siteLockFor(h.deps);
     for (const isAdmin of [false, true]) {
       const idle = isAdmin ? ADMIN_SESSION_IDLE_SECS : SESSION_IDLE_SECS;
+      const ttl = isAdmin ? ADMIN_SESSION_TTL_SECS : SESSION_TTL_SECS;
+      const createdAt = h.clock.now - 3600;
+      // This measures idle, so the absolute expiry must fall outside the window.
+      assert(h.clock.now + idle < createdAt + ttl);
       const { token, hash } = await seedLegacy(h, {
         address: isAdmin ? ADMIN : PLAIN,
         isAdmin,
-        createdAt: h.clock.now - 3600,
-        expiresAt: h.clock.now + 7200,
+        createdAt,
+        expiresAt: createdAt + ttl,
       });
       const request = new Request("http://api.test/", { headers: { Cookie: `session=${token}` } });
       assertEquals(await lock.check(request), "session");

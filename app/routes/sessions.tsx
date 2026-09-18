@@ -84,8 +84,7 @@ export default function Sessions() {
       {session && (
         <>
           <p className="small dim">
-            Sessions end after one hour without activity, or seven days after sign-in. Administrator
-            sessions end after 15 minutes without activity, or 12 hours after sign-in.
+            Sessions end after one day without activity, or seven days after sign-in.
           </p>
           {inventory.isLoading && <p className="small dim">Loading sessions…</p>}
           {inventory.error && <p className="alert" role="alert">{errorMessage(inventory.error)}</p>}

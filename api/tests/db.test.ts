@@ -180,7 +180,7 @@ Deno.test("rfps: revise ignores reordered or trimmed structured text, refuses de
     details: "d2",
   }, origin);
   assertEquals(l2.revision!.n, 2);
-  assertEquals(l2.rfp.sections, {});
+  assertEquals(l2.initiative.sections, {});
   kv.close();
 });
 

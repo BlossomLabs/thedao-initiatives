@@ -45,7 +45,7 @@ Deno.test("safe sync: groups rows per tx, verifies over RPC, sends bearer, incre
       });
     },
   });
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Synced initiative",
     status: "approved",
     goalUsd: 1000,
@@ -83,10 +83,10 @@ Deno.test("safe sync: groups rows per tx, verifies over RPC, sends bearer, incre
 
   const before = h.fetchLog.length;
   await h.req("/api/board");
-  await h.req("/api/initiatives/" + rfp.slug);
+  await h.req("/api/initiatives/" + initiative.slug);
   assertEquals(h.fetchLog.length, before, "page reads must never call the Safe API");
 
-  const state = await syncSafe(h.deps, rfp);
+  const state = await syncSafe(h.deps, initiative);
   assert(state.ok, state.error);
   assertEquals(h.script.calls.filter((m) => m === "eth_blockNumber").length, 1);
   const safeCalls = h.fetchLog.filter((f) => f.url.startsWith("https://api.safe.global/"));
@@ -99,15 +99,15 @@ Deno.test("safe sync: groups rows per tx, verifies over RPC, sends bearer, incre
     safeCalls[0].url,
     `/safes/${SAFE_ADDR}/incoming-transfers/?limit=20`,
   );
-  const d1 = (await h.db.donations.get(rfp.id, TX1))!;
+  const d1 = (await h.db.donations.get(initiative.id, TX1))!;
   assertEquals(d1.status, "confirmed");
   assertEquals(d1.amountUsd, 3); // both rows summed via the RPC verification
   assertEquals(d1.source, "tx");
-  const de = (await h.db.donations.get(rfp.id, TX_ETH))!;
+  const de = (await h.db.donations.get(initiative.id, TX_ETH))!;
   assertEquals(de.status, "confirmed");
   assertEquals(de.source, "safe-api");
   assertEquals(de.amountUsd, 2000);
-  assertEquals(await h.db.donations.get(rfp.id, TX2), null);
+  assertEquals(await h.db.donations.get(initiative.id, TX2), null);
   assertEquals(
     (await h.db.meta.get("safe_api_quota") as { remaining: number }).remaining,
     4990,
@@ -115,33 +115,33 @@ Deno.test("safe sync: groups rows per tx, verifies over RPC, sends bearer, incre
 
   // second sync: nothing new -> exactly one request, stops on the known hash
   h.script.calls.length = 0;
-  await syncSafe(h.deps, rfp);
+  await syncSafe(h.deps, initiative);
   assertEquals(h.script.calls, [], "known transfers must not trigger RPC");
   assertEquals(
     h.fetchLog.filter((f) => f.url.startsWith("https://api.safe.global/")).length,
     2,
   );
-  assertEquals((await h.db.donations.list(rfp.id)).length, 2);
+  assertEquals((await h.db.donations.list(initiative.id)).length, 2);
 
   // quota exhausted: cycle aborts, state records the error, nothing written
   status = 429;
   const n = await syncAll(h.deps);
   assertEquals(n, 0);
-  const st = (await h.db.meta.safeSync(rfp.id))!;
+  const st = (await h.db.meta.safeSync(initiative.id))!;
   assertFalse(st.ok);
   assertStringIncludes(st.error, "429");
 
   // admin button is rate limited to one per minute per Safe and reports state
   status = 200;
   const admin = await h.mint(ADMIN, true);
-  const r1 = await h.req(`/api/admin/initiatives/${rfp.id}/sync-donations`, {
+  const r1 = await h.req(`/api/admin/initiatives/${initiative.id}/sync-donations`, {
     method: "POST",
     token: admin,
   });
   assertEquals(r1.status, 200);
   assert(((await j(r1)).safeSync as { ok: boolean }).ok);
   assertEquals(
-    (await h.req(`/api/admin/initiatives/${rfp.id}/sync-donations`, {
+    (await h.req(`/api/admin/initiatives/${initiative.id}/sync-donations`, {
       method: "POST",
       token: admin,
     })).status,
@@ -163,7 +163,7 @@ Deno.test("safe sync: shallow transfers wait for confirmations, pending rows get
         ? Response.json({ count: 1, next: null, results: pageBody })
         : new Response("", { status: 404 }),
   });
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Shallow initiative",
     status: "approved",
     goalUsd: 1000,
@@ -177,15 +177,15 @@ Deno.test("safe sync: shallow transfers wait for confirmations, pending rows get
     blockNumber: "0x3e7",
     logs: [transferLog(USDC, DONOR, SAFE_ADDR, 1_000_000n)],
   };
-  await syncSafe(h.deps, rfp);
-  assertEquals(await h.db.donations.get(rfp.id, TX1), null);
-  assertEquals((await h.db.meta.safeSync(rfp.id))!.lastTxHash, "");
+  await syncSafe(h.deps, initiative);
+  assertEquals(await h.db.donations.get(initiative.id, TX1), null);
+  assertEquals((await h.db.meta.safeSync(initiative.id))!.lastTxHash, "");
   assertEquals(h.script.calls, ["eth_blockNumber"]);
   h.script.head = 1002;
   h.script.calls.length = 0;
   await syncAll(h.deps);
   assertEquals(h.script.calls.filter((m) => m === "eth_blockNumber").length, 1);
-  assertEquals((await h.db.donations.get(rfp.id, TX1))!.status, "confirmed");
+  assertEquals((await h.db.donations.get(initiative.id, TX1))!.status, "confirmed");
   // price feed outage -> pending, then the page refresh's reverify confirms it
   pageBody = [
     row({
@@ -202,15 +202,15 @@ Deno.test("safe sync: shallow transfers wait for confirmations, pending rows get
     logs: [transferLog(TOKENS.EURC[0], DONOR, SAFE_ADDR, 5_000_000n)],
   };
   h.script.brokenFeeds.add("EURC");
-  await syncSafe(h.deps, rfp);
-  assertEquals((await h.db.donations.get(rfp.id, TX2))!.status, "pending");
-  assertEquals((await h.db.fundingSummary(rfp.id)).donated, 1);
+  await syncSafe(h.deps, initiative);
+  assertEquals((await h.db.donations.get(initiative.id, TX2))!.status, "pending");
+  assertEquals((await h.db.fundingSummary(initiative.id)).donated, 1);
   h.script.brokenFeeds.delete("EURC");
   await syncAll(h.deps);
-  const d2 = (await h.db.donations.get(rfp.id, TX2))!;
+  const d2 = (await h.db.donations.get(initiative.id, TX2))!;
   assertEquals(d2.status, "confirmed");
   assertEquals(d2.amountUsd, 5.72); // 5 EURC * 1.143
-  assertEquals((await h.db.fundingSummary(rfp.id)).donated, 6.72);
+  assertEquals((await h.db.fundingSummary(initiative.id)).donated, 6.72);
   h.close();
 });
 
@@ -365,13 +365,13 @@ Deno.test("safe refresh: a failed head is shared, preserves cursors, and retries
     await syncAll(h.deps);
     assertEquals(attempts, 1);
     assertEquals(h.script.calls, []);
-    for (const rfp of [first, second]) {
-      const state = (await h.db.meta.safeSync(rfp.id))!;
+    for (const initiative of [first, second]) {
+      const state = (await h.db.meta.safeSync(initiative.id))!;
       assertFalse(state.ok);
       assertStringIncludes(state.error, "RPC unavailable");
       assertEquals(state.lastTxHash, "");
       assertFalse(state.backfilled);
-      assertEquals(await h.db.donations.list(rfp.id, false), []);
+      assertEquals(await h.db.donations.list(initiative.id, false), []);
     }
 
     failed = false;
@@ -406,7 +406,7 @@ Deno.test("safe sync: a time budget cuts a backfill short, progress persists, th
       });
     },
   });
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Big initiative",
     status: "approved",
     goalUsd: 1000,
@@ -435,7 +435,7 @@ Deno.test("safe sync: a time budget cuts a backfill short, progress persists, th
   Date.now = () => budgetNow;
   let s1;
   try {
-    s1 = await syncSafe(h.deps, rfp, 0);
+    s1 = await syncSafe(h.deps, initiative, 0);
   } finally {
     Date.now = realNow;
     advanceBudgetClock = undefined;
@@ -446,17 +446,17 @@ Deno.test("safe sync: a time budget cuts a backfill short, progress persists, th
   assertStringIncludes(s1.resumeUrl, "incoming-transfers");
   assertEquals(requests, 1);
   // resumes on the unfinished page, walks to the end of history
-  const s2 = await syncSafe(h.deps, rfp);
+  const s2 = await syncSafe(h.deps, initiative);
   assert(s2.backfilled);
   assertEquals(s2.resumeUrl, "");
   assertEquals(s2.lastTxHash, ""); // a resumed walk never sets the cursor
   assertEquals(requests, 3);
-  assertEquals((await h.db.donations.list(rfp.id)).length, 40);
+  assertEquals((await h.db.donations.list(initiative.id)).length, 40);
   // next run starts at the top: page of known hashes -> done, cursor set
-  const s3 = await syncSafe(h.deps, rfp);
+  const s3 = await syncSafe(h.deps, initiative);
   assertEquals(requests, 4);
   assertEquals(s3.lastTxHash, txs[0]);
-  await syncSafe(h.deps, rfp);
+  await syncSafe(h.deps, initiative);
   assertEquals(requests, 5); // incremental: one request, stops on the cursor
   h.close();
 });
@@ -471,7 +471,7 @@ Deno.test("safe sync: a failed manual verification does not block the indexer fa
         ? Response.json({ count: pageBody.length, next: null, results: pageBody })
         : new Response("", { status: 404 }),
   });
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Exchange ETH initiative",
     status: "approved",
     goalUsd: 1000,
@@ -481,10 +481,10 @@ Deno.test("safe sync: a failed manual verification does not block the indexer fa
   h.script.txs[TX_ETH] = { to: "0x" + "77".repeat(20), from: DONOR, value: "0x0" };
   const paste = await h.req("/api/donate/confirm", {
     method: "POST",
-    json: { slug: rfp.slug, txHash: TX_ETH },
+    json: { slug: initiative.slug, txHash: TX_ETH },
   });
   assertEquals((await j(paste)).status, "failed");
-  assertEquals((await h.db.donations.get(rfp.id, TX_ETH))!.status, "failed");
+  assertEquals((await h.db.donations.get(initiative.id, TX_ETH))!.status, "failed");
 
   pageBody = [
     row({
@@ -495,8 +495,8 @@ Deno.test("safe sync: a failed manual verification does not block the indexer fa
       blockNumber: 600,
     }),
   ];
-  await syncSafe(h.deps, rfp);
-  const d = (await h.db.donations.get(rfp.id, TX_ETH))!;
+  await syncSafe(h.deps, initiative);
+  const d = (await h.db.donations.get(initiative.id, TX_ETH))!;
   assertEquals(d.status, "confirmed");
   assertEquals(d.source, "safe-api");
   assertEquals(d.amountUsd, 2000);

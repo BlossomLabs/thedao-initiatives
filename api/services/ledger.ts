@@ -18,9 +18,9 @@ const refreshAfter = (deps: SafeApiDeps, state: SafeSyncState | null): number =>
   state?.refreshAfter ??
     (state ? state.at + (state.ok ? deps.config.safeSyncTtlSecs : LEDGER_RETRY_SECS) : 0);
 
-export async function ledgerStatus(deps: SafeApiDeps, rfp: Initiative) {
-  if (!rfp.safeAddress) return null;
-  const state = await deps.db.meta.safeSync(rfp.id);
+export async function ledgerStatus(deps: SafeApiDeps, initiative: Initiative) {
+  if (!initiative.safeAddress) return null;
+  const state = await deps.db.meta.safeSync(initiative.id);
   const due = refreshAfter(deps, state) <= deps.now();
   return {
     checkedAt: state?.at || null,
@@ -34,12 +34,12 @@ export async function ledgerStatus(deps: SafeApiDeps, rfp: Initiative) {
 /** Forced admin refreshes still respect a lease held by another request. */
 export async function refreshLedger(
   deps: SafeApiDeps,
-  rfp: Initiative,
+  initiative: Initiative,
   force = false,
   getBlockNumber = lazyBlockNumber(deps),
 ): Promise<SafeSyncState | null> {
-  if (!rfp.safeAddress) return null;
-  const key = K.safeSync(rfp.id);
+  if (!initiative.safeAddress) return null;
+  const key = K.safeSync(initiative.id);
   const previous = await deps.db.kv.get<SafeSyncState>(key);
   if (refreshAfter(deps, previous.value) > deps.now() && (!force || previous.value?.updating)) {
     return previous.value;
@@ -57,15 +57,15 @@ export async function refreshLedger(
     updating: true,
     refreshAfter: deps.now() + LEDGER_LEASE_SECS,
   }).commit();
-  if (!lease.ok) return await deps.db.meta.safeSync(rfp.id);
+  if (!lease.ok) return await deps.db.meta.safeSync(initiative.id);
 
   let next: SafeSyncState;
   try {
-    next = await syncSafe(deps, rfp, DEFAULT_BUDGET_MS, getBlockNumber, false);
+    next = await syncSafe(deps, initiative, DEFAULT_BUDGET_MS, getBlockNumber, false);
     // Manual submissions may not be in the indexer's latest page. Only retry
     // this initiative's pending rows, reusing this request's confirmation head.
-    await reverifyPending(deps, getBlockNumber, rfp);
-    await retryDonationMatches(deps.db, deps.chain, rfp.id);
+    await reverifyPending(deps, getBlockNumber, initiative);
+    await retryDonationMatches(deps.db, deps.chain, initiative.id);
   } catch (e) {
     next = { ...saved, ok: false, error: e instanceof Error ? e.message : String(e) };
   }
@@ -78,23 +78,23 @@ export async function refreshLedger(
   // A worker whose lease expired cannot overwrite a newer result or cursor.
   await deps.db.kv.atomic().check({ key, versionstamp: lease.versionstamp }).set(key, next)
     .commit();
-  return await deps.db.meta.safeSync(rfp.id);
+  return await deps.db.meta.safeSync(initiative.id);
 }
 
 /** Only the initiatives included in the visible page; bounded upstream concurrency. */
 export async function refreshLedgers(
   deps: SafeApiDeps,
-  rfps: Initiative[],
+  initiatives: Initiative[],
   force = false,
 ): Promise<number> {
   const getBlockNumber = lazyBlockNumber(deps);
-  const queue = rfps.filter((rfp) => rfp.safeAddress);
+  const queue = initiatives.filter((initiative) => initiative.safeAddress);
   let checked = 0;
   let limited = false;
   await Promise.all(Array.from({ length: Math.min(3, queue.length) }, async () => {
     while (queue.length && !limited) {
-      const rfp = queue.shift()!;
-      const state = await refreshLedger(deps, rfp, force, getBlockNumber);
+      const initiative = queue.shift()!;
+      const state = await refreshLedger(deps, initiative, force, getBlockNumber);
       if (state?.error && /HTTP 429/.test(state.error)) limited = true;
       else checked++;
     }

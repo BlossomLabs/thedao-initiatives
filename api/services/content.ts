@@ -150,7 +150,7 @@ export function parseStructuredBody(body: string, type: InitiativeType, goal: nu
 }
 
 /** Parse '---' frontmatter then the structured markdown body. Indented lines continue a value. */
-export function parseRfpFile(text: string): ContentFields {
+export function parseInitiativeFile(text: string): ContentFields {
   const m = /^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/.exec(text);
   if (!m) throw new Error("missing '---' frontmatter block");
   const [, head, body] = m;
@@ -184,7 +184,7 @@ export function parseRfpFile(text: string): ContentFields {
   const pin = (fields.pin ?? "").trim();
   if (pin && !/^\d+$/.test(pin)) throw new Error("pin must be a whole number");
   const type = (fields.type ?? "rfp").toLowerCase();
-  if (type !== "rfp" && type !== "grant") throw new Error("type must be rfp or grant");
+  if (type !== "rfp" && type !== "grant") throw new Error("type must be initiative or grant");
   // Page facts. `duration`, `topup` and `reviewer` match the Flask MVP's keys
   // (content/rfps/README.md); `recipient` and `recipient_url` are web-only.
   const [duration, durErr] = parseDuration(fields.duration ?? "");
@@ -307,7 +307,7 @@ export async function syncContent(
     try {
       await audit(f.name, async () => {
         if (!slug) throw new Error("filename makes an empty slug");
-        const fields = parseRfpFile(f.text);
+        const fields = parseInitiativeFile(f.text);
         const r = await db.initiatives.upsertContent(slug, fields);
         if (r.action === "created") out.created++;
         else out.updated++;

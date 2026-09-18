@@ -37,7 +37,7 @@ export function createAi(config: Config, f: typeof fetch) {
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer " + config.aiSearchApiKey,
-        "User-Agent": "thedao-rfps/2.0",
+        "User-Agent": "thedao-initiatives/2.0",
       },
       body: JSON.stringify({
         model: config.aiSearchModel,

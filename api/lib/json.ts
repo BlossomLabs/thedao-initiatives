@@ -190,7 +190,7 @@ export function commentJson(
 export function adminCommentJson(
   c: Comment,
   live: string[],
-  rfp?: { slug: string; title: string } | null,
+  initiative?: { slug: string; title: string } | null,
 ) {
   return {
     ...commentJson(c, live),
@@ -200,6 +200,6 @@ export function adminCommentJson(
     email: c.email,
     reports: c.reports,
     aiSummary: c.aiSummary,
-    initiative: rfp ? { slug: rfp.slug, title: rfp.title } : null,
+    initiative: initiative ? { slug: initiative.slug, title: initiative.title } : null,
   };
 }

@@ -43,22 +43,22 @@ export function commentRoutes(deps: Deps) {
     if (!(await db.rateLimit("cml:" + requireClientIp(c), 60, 60))) {
       throw new HttpError(429, "slow down");
     }
-    const rfp = await db.initiatives.bySlug(c.req.param("slug"));
-    if (!rfp || !["approved", "archived"].includes(rfp.status)) {
+    const initiative = await db.initiatives.bySlug(c.req.param("slug"));
+    if (!initiative || !["approved", "archived"].includes(initiative.status)) {
       throw new HttpError(404, "not found");
     }
-    const rows = await db.comments.forInitiative(rfp.id);
+    const rows = await db.comments.forInitiative(initiative.id);
     const user = c.var.user;
     let myVotes: Record<string, number> = {};
     let eligible = false;
     let viewerRoles: string[] = [];
     if (user) {
-      myVotes = await db.comments.votesByAddress(rfp.id, user.address);
-      eligible = user.isAdmin || await voteEligible(deps, user.address, rfp.id);
-      viewerRoles = await rolesFor(user.address, rfp.id, user.isAdmin);
+      myVotes = await db.comments.votesByAddress(initiative.id, user.address);
+      eligible = user.isAdmin || await voteEligible(deps, user.address, initiative.id);
+      viewerRoles = await rolesFor(user.address, initiative.id, user.isAdmin);
     }
     const admins = await deps.admins.set();
-    const live = (row: Comment) => liveRoles(admins, row.address, rfp);
+    const live = (row: Comment) => liveRoles(admins, row.address, initiative);
     const replies = new Map<string, CommentJson[]>();
     const entries: Comment[] = [];
     for (const row of rows) {
@@ -78,7 +78,7 @@ export function commentRoutes(deps: Deps) {
   });
 
   r.post("/initiatives/:slug/comments", async (c) => {
-    const rfp = await db.initiatives.bySlug(c.req.param("slug"));
+    const initiative = await db.initiatives.bySlug(c.req.param("slug"));
     const body = await jsonBody(c, [
       "initiativeId",
       "body",
@@ -88,9 +88,9 @@ export function commentRoutes(deps: Deps) {
       "topic",
       "email",
     ]);
-    if (!rfp) throw new HttpError(404, "not found");
-    await assertInitiativeIdentity(db, c.req.param("slug"), rfp, body.initiativeId);
-    if (rfp.status !== "approved") throw new HttpError(404, "not found");
+    if (!initiative) throw new HttpError(404, "not found");
+    await assertInitiativeIdentity(db, c.req.param("slug"), initiative, body.initiativeId);
+    if (initiative.status !== "approved") throw new HttpError(404, "not found");
     // honeypot: accept and discard silently
     if (s(body.website)) return c.json({ status: "published", id: "", claimToken: "" });
     // Older browser bundles send these fixed defaults. They cannot create
@@ -118,7 +118,7 @@ export function commentRoutes(deps: Deps) {
     if (!user && !(await db.rateLimit("cpostanon:" + requireClientIp(c), 3, 3600))) {
       throw new HttpError(429, "too many posts from your address, try again in an hour");
     }
-    const roles = await rolesFor(address, rfp.id, Boolean(user?.isAdmin));
+    const roles = await rolesFor(address, initiative.id, Boolean(user?.isAdmin));
     let status: "published" | "held" | "discarded";
     let summary: string;
     if (roles.some((x) => ROLE_FAST_LANE.has(x))) {
@@ -131,13 +131,13 @@ export function commentRoutes(deps: Deps) {
         () => db.meta.aiBudgetOk(),
       );}
     if (status === "discarded") {
-      deps.log(`comment discarded by AI screen (rfp ${rfp.id}): ${summary}`);
+      deps.log(`comment discarded by AI screen (initiative ${initiative.id}): ${summary}`);
       // The author sees the same "waiting" note as held; a spammer learns nothing.
       return c.json({ status: "held", id: "", claimToken: "" });
     }
-    const startVote = Boolean(user?.isAdmin) || await voteEligible(deps, address, rfp.id);
+    const startVote = Boolean(user?.isAdmin) || await voteEligible(deps, address, initiative.id);
     const cm = await db.comments.create({
-      rfpId: rfp.id,
+      rfpId: initiative.id,
       parentId: null,
       type: "other",
       topic: "",
@@ -156,7 +156,7 @@ export function commentRoutes(deps: Deps) {
       entry: status === "published"
         ? commentJson(
           cm,
-          liveRoles(await deps.admins.set(), address, rfp),
+          liveRoles(await deps.admins.set(), address, initiative),
           startVote ? { [cm.id]: 1 } : {},
           [],
         )

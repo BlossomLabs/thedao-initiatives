@@ -12,12 +12,12 @@ export const LIVE_ROLES = new Set(["ADMIN", "PROPOSER"]);
 export function liveRoles(
   admins: Set<string>,
   address: string,
-  rfp: { proposer: string } | null | undefined,
+  initiative: { proposer: string } | null | undefined,
 ): string[] {
   const roles: string[] = [];
   if (!address) return roles;
   if (admins.has(address.toLowerCase())) roles.push("ADMIN");
-  if (rfp?.proposer && rfp.proposer.toLowerCase() === address.toLowerCase()) {
+  if (initiative?.proposer && initiative.proposer.toLowerCase() === address.toLowerCase()) {
     roles.push("PROPOSER");
   }
   return roles;
@@ -33,8 +33,9 @@ export function isCurator(address: string): boolean {
 
 /** The wallet the initiative was submitted from (or set by an admin). */
 async function isProposer(db: Db, address: string, rfpId: string): Promise<boolean> {
-  const rfp = await db.initiatives.get(rfpId);
-  return Boolean(rfp?.proposer) && rfp!.proposer.toLowerCase() === address.toLowerCase();
+  const initiative = await db.initiatives.get(rfpId);
+  return Boolean(initiative?.proposer) &&
+    initiative!.proposer.toLowerCase() === address.toLowerCase();
 }
 
 /** Non-administrator authorization roles on THIS initiative. Callers add

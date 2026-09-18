@@ -14,19 +14,19 @@ type Board = { flags: { tokensOk: boolean }; cards: { donationsEnabled: boolean 
 
 Deno.test("cold snapshot: donations stay enabled until the token check has run", async () => {
   const h = await harness();
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Cold",
     status: "approved",
     goalUsd: 1000,
     safeAddress: SAFE_ADDR,
   });
-  const cold = await j(await h.req(`/api/initiatives/${rfp.slug}`)) as Page;
+  const cold = await j(await h.req(`/api/initiatives/${initiative.slug}`)) as Page;
   assertEquals(cold.donationsEnabled, true);
   assertEquals(cold.refreshDue, true);
   const board = await j(await h.req("/api/board")) as Board;
   assertEquals(board.flags.tokensOk, true);
   assertEquals(board.cards[0].donationsEnabled, true);
-  const warm = await j(await h.req(`/api/initiatives/${rfp.slug}?refresh=1`)) as Page;
+  const warm = await j(await h.req(`/api/initiatives/${initiative.slug}?refresh=1`)) as Page;
   assertEquals(warm.donationsEnabled, true);
   assertEquals(warm.refreshDue, false);
   h.close();
@@ -34,16 +34,16 @@ Deno.test("cold snapshot: donations stay enabled until the token check has run",
 
 Deno.test("a token check that ran and verified nothing disables donations", async () => {
   const h = await harness();
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Broken",
     status: "approved",
     goalUsd: 1000,
     safeAddress: SAFE_ADDR,
   });
   for (const sym of Object.keys(TOKENS)) h.script.brokenTokens.add(sym);
-  const checked = await j(await h.req(`/api/initiatives/${rfp.slug}?refresh=1`)) as Page;
+  const checked = await j(await h.req(`/api/initiatives/${initiative.slug}?refresh=1`)) as Page;
   assertEquals(checked.donationsEnabled, false);
-  const passive = await j(await h.req(`/api/initiatives/${rfp.slug}`)) as Page;
+  const passive = await j(await h.req(`/api/initiatives/${initiative.slug}`)) as Page;
   assertEquals(passive.donationsEnabled, false);
   const board = await j(await h.req("/api/board")) as Board;
   assertEquals(board.flags.tokensOk, false);

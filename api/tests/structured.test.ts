@@ -556,8 +556,8 @@ Deno.test("admin PATCH: structured findings, legacy migration, type switch, hard
   const lp = await j(await legacyPatch(revisionBody(minimalSubmission(1000)))) as Out;
   assertEquals(lp.initiative.structured, true);
   assertEquals(lp.initiative.details, "");
-  const asRfp: Initiative = (await h.db.initiatives.get(legacy.id))!;
-  assertEquals(asRfp.revision, 2);
+  const asInitiative: Initiative = (await h.db.initiatives.get(legacy.id))!;
+  assertEquals(asInitiative.revision, 2);
   assertEquals((await h.db.revisions.get(legacy.id, 1))!.details, legacy.details);
   h.close();
 });
@@ -666,8 +666,8 @@ Deno.test("GET /initiative/<slug>.md: the content-file shape, public rows only, 
   assertStringIncludes(md, "## Milestones");
   assertStringIncludes(md, "backers:\n  Argot Collective | $151000 | https://argot.org/");
   // what comes out goes back in unchanged
-  const { parseRfpFile } = await import("../services/content.ts");
-  const again = parseRfpFile(md);
+  const { parseInitiativeFile } = await import("../services/content.ts");
+  const again = parseInitiativeFile(md);
   assertEquals(again.sections, first.sections);
   assertEquals(again.milestones, first.milestones);
   assertEquals(again.links, first.links);
@@ -758,8 +758,8 @@ Deno.test("content logos: pinned once by name, mapped onto the pledge by the syn
     }),
   ) as { created: number; errors: string[] };
   assertEquals(ok.errors, []);
-  const rfp = (await h.db.initiatives.bySlug("logo-grant"))!;
-  const pledges = await h.db.pledges.list(rfp.id);
+  const initiative = (await h.db.initiatives.bySlug("logo-grant"))!;
+  const pledges = await h.db.pledges.list(initiative.id);
   assertEquals(pledges.length, 1);
   assertEquals(pledges[0].logoCid, first.cid);
   // a line without a logo keeps it; an unknown logo name is an error for that file
@@ -771,7 +771,7 @@ Deno.test("content logos: pinned once by name, mapped onto the pledge by the syn
     }),
   ) as { errors: string[] };
   assertEquals(keep.errors, []);
-  assertEquals((await h.db.pledges.list(rfp.id))[0].logoCid, first.cid);
+  assertEquals((await h.db.pledges.list(initiative.id))[0].logoCid, first.cid);
   const missing = await j(
     await h.req("/api/admin/sync-content", {
       method: "POST",
@@ -787,15 +787,18 @@ Deno.test("admin pledges reject direct CIDs and amount aliases before changing d
   const h = await pinataHarness();
   try {
     const admin = await h.mint(ADMIN, true);
-    const rfp = await h.db.initiatives.insert({ title: "Pledge fields", status: "approved" });
-    const base = `/api/admin/initiatives/${rfp.id}/pledges`;
+    const initiative = await h.db.initiatives.insert({
+      title: "Pledge fields",
+      status: "approved",
+    });
+    const base = `/api/admin/initiatives/${initiative.id}/pledges`;
     const created = await h.req(base, {
       method: "POST",
       token: admin,
       json: { company: "Acme", amount: "1000" },
     });
     assertEquals(created.status, 201);
-    const [before] = await h.db.pledges.list(rfp.id);
+    const [before] = await h.db.pledges.list(initiative.id);
     for (const [path, method] of [[base, "POST"], [`${base}/${before.id}`, "PATCH"]]) {
       for (
         const retired of [{ logoCid: "bafy" + "x".repeat(50) }, { logoCid: "" }, {
@@ -816,7 +819,7 @@ Deno.test("admin pledges reject direct CIDs and amount aliases before changing d
         for (const [key, value] of Object.entries(retired)) form.set(key, String(value));
         form.set("logo", new Blob([PNG], { type: "image/png" }), "logo.png");
         assertEquals((await h.req(path, { method, token: admin, body: form })).status, 400);
-        assertEquals(await h.db.pledges.list(rfp.id), [before]);
+        assertEquals(await h.db.pledges.list(initiative.id), [before]);
       }
     }
     assertEquals(
@@ -839,8 +842,11 @@ Deno.test("pledge edit: PATCH takes the same fields as adding, including a new l
         : new Response("not mocked", { status: 500 }),
   });
   const admin = await h.mint(ADMIN, true);
-  const rfp = await h.db.initiatives.insert({ title: "Pledge edit here", status: "approved" });
-  const base = `/api/admin/initiatives/${rfp.slug}/pledges`;
+  const initiative = await h.db.initiatives.insert({
+    title: "Pledge edit here",
+    status: "approved",
+  });
+  const base = `/api/admin/initiatives/${initiative.slug}/pledges`;
   const created = await j(
     await h.req(base, { method: "POST", token: admin, json: { company: "Acme", amount: "1000" } }),
   ) as { pledge: { id: string } };
@@ -874,14 +880,14 @@ Deno.test("pledge edit: PATCH takes the same fields as adding, including a new l
       400,
     );
   }
-  const unchanged = (await h.db.pledges.get(rfp.id, pid))!;
+  const unchanged = (await h.db.pledges.get(initiative.id, pid))!;
   assertEquals(unchanged.url, "https://acme.example/");
   assertEquals(unchanged.status, "received");
   assertEquals(
     (await h.req(`${base}/${pid}`, { method: "PATCH", token: admin, json: { url: "" } })).status,
     200,
   );
-  assertEquals((await h.db.pledges.get(rfp.id, pid))?.url, "");
+  assertEquals((await h.db.pledges.get(initiative.id, pid))?.url, "");
   // multipart with a logo re-pins and keeps the other fields
   const form = new FormData();
   form.set("note", "with logo");

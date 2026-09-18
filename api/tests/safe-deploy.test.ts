@@ -24,17 +24,19 @@ const safeCalls = (h: H) => h.fetchLog.filter((f) => f.url.startsWith("https://a
 Deno.test("approval needs a deployed Safe: the panel targets the predicted address, safe-confirm binds it once it exists", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Deploy first",
     status: "pending",
     goalUsd: 1000,
   });
-  const refused = await setStatus(h, admin, rfp.id, "approve");
+  const refused = await setStatus(h, admin, initiative.id, "approve");
   assertEquals(refused.status, 400);
   assertStringIncludes((await j(refused) as { error: string }).error, "Deploy");
-  assertEquals((await h.db.initiatives.get(rfp.id))!.status, "pending");
+  assertEquals((await h.db.initiatives.get(initiative.id))!.status, "pending");
   // the panel: where the deploy lands, nothing written yet
-  const params = await j(await h.req(url(rfp.id) + "/safe-deploy-params", { token: admin })) as {
+  const params = await j(
+    await h.req(url(initiative.id) + "/safe-deploy-params", { token: admin }),
+  ) as {
     enabled: boolean;
     calldata: string;
     address: string;
@@ -42,34 +44,39 @@ Deno.test("approval needs a deployed Safe: the panel targets the predicted addre
   };
   assert(params.enabled);
   assert(params.calldata.startsWith("0x1688f0b9"));
-  assertEquals(params.address, predicted(rfp));
+  assertEquals(params.address, predicted(initiative));
   assertEquals(params.deployed, false);
-  assertEquals((await h.db.initiatives.get(rfp.id))!.safeAddress, "");
+  assertEquals((await h.db.initiatives.get(initiative.id))!.safeAddress, "");
   // nothing on-chain yet (the tx is on its way, under whatever hash the wallet mined it as)
-  assertEquals((await j(await confirm(h, admin, rfp.id)) as { status: string }).status, "pending");
+  assertEquals(
+    (await j(await confirm(h, admin, initiative.id)) as { status: string }).status,
+    "pending",
+  );
   // the Safe lands
-  h.script.code[predicted(rfp).toLowerCase()] = "0x6080";
-  const conf = await j(await confirm(h, admin, rfp.id)) as {
+  h.script.code[predicted(initiative).toLowerCase()] = "0x6080";
+  const conf = await j(await confirm(h, admin, initiative.id)) as {
     status: string;
     address: string;
     detail: string;
   };
   assertEquals(conf.status, "ok");
-  assertEquals(conf.address, predicted(rfp));
+  assertEquals(conf.address, predicted(initiative));
   assertStringIncludes(conf.detail, "verified");
-  assertEquals((await h.db.initiatives.get(rfp.id))!.safeAddress, predicted(rfp));
-  const again = await j(await h.req(url(rfp.id) + "/safe-deploy-params", { token: admin })) as {
+  assertEquals((await h.db.initiatives.get(initiative.id))!.safeAddress, predicted(initiative));
+  const again = await j(
+    await h.req(url(initiative.id) + "/safe-deploy-params", { token: admin }),
+  ) as {
     deployed: boolean;
   };
   assertEquals(again.deployed, true);
   // now approval lands, and donations open
-  const ok = await j(await setStatus(h, admin, rfp.id, "approve")) as {
+  const ok = await j(await setStatus(h, admin, initiative.id, "approve")) as {
     initiative: { status: string; safeAddress: string };
   };
   assertEquals(ok.initiative.status, "approved");
-  assertEquals(ok.initiative.safeAddress, predicted(rfp));
+  assertEquals(ok.initiative.safeAddress, predicted(initiative));
   // The browser follows the cold snapshot with token verification and a balance refresh.
-  const page = await j(await h.req(`/api/initiatives/${rfp.slug}?refresh=1`)) as {
+  const page = await j(await h.req(`/api/initiatives/${initiative.slug}?refresh=1`)) as {
     donationsEnabled: boolean;
   };
   assertEquals(page.donationsEnabled, true);
@@ -82,28 +89,28 @@ Deno.test("approval needs a deployed Safe: the panel targets the predicted addre
 Deno.test("a contract at the predicted address that is not our Safe is rejected, never bound", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
-  const rfp = await h.db.initiatives.insert({ title: "Tampered", status: "pending" });
-  h.script.code[predicted(rfp).toLowerCase()] = "0x6080";
+  const initiative = await h.db.initiatives.insert({ title: "Tampered", status: "pending" });
+  h.script.code[predicted(initiative).toLowerCase()] = "0x6080";
   h.script.brokenSafe = true; // getThreshold answers wrong
-  const res = await confirm(h, admin, rfp.id);
+  const res = await confirm(h, admin, initiative.id);
   assertEquals(res.status, 400);
   assertStringIncludes((await j(res) as { detail: string }).detail, "REJECTED");
-  assertEquals((await h.db.initiatives.get(rfp.id))!.safeAddress, "");
-  assertEquals((await setStatus(h, admin, rfp.id, "approve")).status, 400);
+  assertEquals((await h.db.initiatives.get(initiative.id))!.safeAddress, "");
+  assertEquals((await setStatus(h, admin, initiative.id, "approve")).status, 400);
   h.close();
 });
 
 Deno.test("a Safe held by another initiative cannot be reassigned or detached through the editor", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
-  const rfp = await h.db.initiatives.insert({ title: "Mixed up", status: "pending" });
+  const initiative = await h.db.initiatives.insert({ title: "Mixed up", status: "pending" });
   const holder = await h.db.initiatives.insert({
     title: "Holder of the wrong Safe",
     status: "approved",
-    safeAddress: predicted(rfp),
+    safeAddress: predicted(initiative),
   });
-  h.script.code[predicted(rfp).toLowerCase()] = "0x6080";
-  const dup = await confirm(h, admin, rfp.id);
+  h.script.code[predicted(initiative).toLowerCase()] = "0x6080";
+  const dup = await confirm(h, admin, initiative.id);
   assertEquals(dup.status, 409);
   assertStringIncludes((await j(dup) as { detail: string }).detail, holder.slug);
   // The editor cannot change the Safe binding, including by clearing it.
@@ -121,9 +128,9 @@ Deno.test("a Safe held by another initiative cannot be reassigned or detached th
       .status,
     400,
   );
-  assertEquals((await h.db.initiatives.get(holder.id))!.safeAddress, predicted(rfp));
-  assertEquals((await confirm(h, admin, rfp.id)).status, 409);
-  assertEquals((await h.db.initiatives.get(rfp.id))!.safeAddress, "");
+  assertEquals((await h.db.initiatives.get(holder.id))!.safeAddress, predicted(initiative));
+  assertEquals((await confirm(h, admin, initiative.id)).status, 409);
+  assertEquals((await h.db.initiatives.get(initiative.id))!.safeAddress, "");
   h.close();
 });
 
@@ -172,18 +179,20 @@ Deno.test("bulk approve: rows without a Safe fail one by one, the rest land", as
 Deno.test("a Safe already on-chain but not yet bound: the panel reports it deployed, so no second (reverting) factory tx", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Mined, unbound",
     status: "pending",
     goalUsd: 1000,
   });
   // the wallet mined the deploy under a hash the browser lost track of; safe-confirm never ran
-  h.script.code[predicted(rfp).toLowerCase()] = "0x6080";
-  assertEquals((await h.db.initiatives.get(rfp.id))!.safeAddress, "");
-  const params = await j(await h.req(url(rfp.id) + "/safe-deploy-params", { token: admin })) as {
+  h.script.code[predicted(initiative).toLowerCase()] = "0x6080";
+  assertEquals((await h.db.initiatives.get(initiative.id))!.safeAddress, "");
+  const params = await j(
+    await h.req(url(initiative.id) + "/safe-deploy-params", { token: admin }),
+  ) as {
     address: string;
     deployed: boolean;
   };
-  assertEquals(params.address, predicted(rfp));
+  assertEquals(params.address, predicted(initiative));
   assertEquals(params.deployed, true);
 });

@@ -21,7 +21,7 @@ const TX2 = "0x" + "bb".repeat(32);
 
 async function setup() {
   const h = await harness();
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Community initiative",
     status: "approved",
     goalUsd: 1000,
@@ -32,8 +32,8 @@ async function setup() {
   const version =
     [...versions].sort((a, b) => b.effectiveDate.localeCompare(a.effectiveDate))[0].id;
   const payload = {
-    slug: rfp.slug,
-    initiativeId: rfp.id,
+    slug: initiative.slug,
+    initiativeId: initiative.id,
     recipient: SAFE_ADDR,
     chainId: CHAIN_ID,
     agreed: true,
@@ -60,8 +60,8 @@ async function setup() {
       method: "POST",
       headers: { cookie: cookieOverride },
       json: {
-        slug: rfp.slug,
-        initiativeId: rfp.id,
+        slug: initiative.slug,
+        initiativeId: initiative.id,
         txHash: TX,
         ...(attemptId ? { attemptId } : {}),
         ...extra,
@@ -74,7 +74,7 @@ async function setup() {
     h.script.head = 1005;
     h.script.receipts[TX] = { status: "0x1", blockNumber: block, logs };
   };
-  return { h, rfp, payload, accept, confirm, paid, cookie: () => cookie };
+  return { h, initiative, payload, accept, confirm, paid, cookie: () => cookie };
 }
 
 Deno.test("checkbox: records server time before transfer and correlates without authentication or signature", async () => {
@@ -196,7 +196,7 @@ Deno.test("checkbox: other sessions cannot attach or read; a forged first claim 
 });
 
 Deno.test("checkbox: pending/RPC failures queue matching and server retries survive browser closure and prior accounting", async () => {
-  const { h, rfp, accept, confirm, paid } = await setup();
+  const { h, initiative, accept, confirm, paid } = await setup();
   try {
     const id = String((await j(await accept())).attemptId);
     paid();
@@ -206,9 +206,9 @@ Deno.test("checkbox: pending/RPC failures queue matching and server retries surv
     assertEquals((await confirm(id)).status, 500);
     assertEquals((await h.db.terms.association(id))?.state, "pending");
     h.deps.chain.verifyDonation = verify;
-    await retryDonationMatches(h.db, h.deps.chain, rfp.id);
+    await retryDonationMatches(h.db, h.deps.chain, initiative.id);
     assertEquals((await h.db.terms.association(id))?.state, "matched");
-    assertEquals((await h.db.terms.pending(rfp.id)).length, 0);
+    assertEquals((await h.db.terms.pending(initiative.id)).length, 0);
   } finally {
     h.close();
   }
@@ -263,7 +263,7 @@ Deno.test("checkbox: missing, reverted, shallow and wrong-recipient transfers ne
 });
 
 Deno.test("checkbox: forged origins, form posts, stale scopes and expired sessions are rejected", async () => {
-  const { h, rfp, payload, accept, confirm, cookie } = await setup();
+  const { h, initiative, payload, accept, confirm, cookie } = await setup();
   try {
     for (const origin of [undefined, "null", "https://attacker.test"]) {
       const headers: Record<string, string> = { "content-type": "application/json" };
@@ -285,12 +285,12 @@ Deno.test("checkbox: forged origins, form posts, stale scopes and expired sessio
     const forged = await h.app.request("http://api.test/api/donate/confirm", {
       method: "POST",
       headers: { cookie: cookie(), "content-type": "application/json" },
-      body: JSON.stringify({ slug: rfp.slug, txHash: TX, attemptId: id }),
+      body: JSON.stringify({ slug: initiative.slug, txHash: TX, attemptId: id }),
     }, testConnection());
     assertEquals(forged.status, 403);
-    await h.db.initiatives.update(rfp.id, { safeAddress: ADMIN });
+    await h.db.initiatives.update(initiative.id, { safeAddress: ADMIN });
     assertEquals((await confirm(id)).status, 409);
-    await h.db.initiatives.update(rfp.id, { safeAddress: SAFE_ADDR });
+    await h.db.initiatives.update(initiative.id, { safeAddress: SAFE_ADDR });
     h.clock.now += 7 * 86400 + 1;
     assertEquals((await confirm(id)).status, 403);
   } finally {
@@ -361,7 +361,7 @@ Deno.test("checkbox: secure cookie is separate from login and oversized requests
 });
 
 Deno.test("checkbox: native ETH matches and expired pending associations stop retrying", async () => {
-  const { h, rfp, accept, confirm, paid } = await setup();
+  const { h, initiative, accept, confirm, paid } = await setup();
   try {
     const raw = "10000000000000000";
     const id = String(
@@ -375,7 +375,7 @@ Deno.test("checkbox: native ETH matches and expired pending associations stop re
     const pending = String((await j(await accept())).attemptId);
     await confirm(pending, { txHash: TX2 });
     h.clock.now += 7 * 86400 + 1;
-    await retryDonationMatches(h.db, h.deps.chain, rfp.id);
+    await retryDonationMatches(h.db, h.deps.chain, initiative.id);
     assertEquals((await h.db.terms.association(pending))?.state, "expired");
     assert(await h.db.terms.get(pending));
   } finally {

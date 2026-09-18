@@ -144,7 +144,7 @@ export function createFunding(deps: FundingDeps) {
    * confirmed donations, as the repos list them), so a page that shows the
    * rows too reads them once. Only the Safe balance snapshot is fetched here. */
   async function summaryFrom(
-    rfp: Initiative,
+    initiative: Initiative,
     pledges: Pledge[],
     donations: Donation[],
     revalidate = false,
@@ -153,8 +153,10 @@ export function createFunding(deps: FundingDeps) {
       .reduce((s, p) => s + p.amountUsd, 0);
     const ledger = donations.filter((d) => d.status === "confirmed")
       .reduce((s, d) => s + d.amountUsd, 0);
-    const paidOut = rfp.paidOutUsd ?? 0;
-    const snapshot = rfp.safeAddress ? await cached(rfp.safeAddress, revalidate) : null;
+    const paidOut = initiative.paidOutUsd ?? 0;
+    const snapshot = initiative.safeAddress
+      ? await cached(initiative.safeAddress, revalidate)
+      : null;
     const b = snapshot?.value;
     const donated = cents(b ? b.usd + paidOut : ledger);
     return {
@@ -162,18 +164,20 @@ export function createFunding(deps: FundingDeps) {
       donated,
       total: cents(pledged + donated),
       live: Boolean(b),
-      refreshDue: Boolean(rfp.safeAddress && (!snapshot || snapshot.refreshAfter <= deps.now())),
+      refreshDue: Boolean(
+        initiative.safeAddress && (!snapshot || snapshot.refreshAfter <= deps.now()),
+      ),
       ledger: cents(ledger),
       paidOut: cents(paidOut),
     };
   }
 
-  async function summary(rfp: Initiative, revalidate = false): Promise<FundingSummary> {
+  async function summary(initiative: Initiative, revalidate = false): Promise<FundingSummary> {
     const [pledges, donations] = await Promise.all([
-      deps.db.pledges.list(rfp.id),
-      deps.db.donations.list(rfp.id),
+      deps.db.pledges.list(initiative.id),
+      deps.db.donations.list(initiative.id),
     ]);
-    return summaryFrom(rfp, pledges, donations, revalidate);
+    return summaryFrom(initiative, pledges, donations, revalidate);
   }
 
   return { balances, summary, summaryFrom, invalidate };

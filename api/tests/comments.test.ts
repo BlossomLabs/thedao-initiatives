@@ -89,7 +89,7 @@ async function setup(aiFetch?: (url: string) => Response) {
     env: aiFetch ? { AI_SEARCH_API_KEY: "k" } : {},
     fetch: aiFetch,
   });
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Community initiative",
     status: "approved",
     goalUsd: 1000,
@@ -102,23 +102,23 @@ async function setup(aiFetch?: (url: string) => Response) {
   h.script.receipts[tx] = {
     status: "0x1",
     blockNumber: "0x10",
-    logs: [transferLog(TOKENS.USDC[0], DONOR, rfp.safeAddress, 25_000_000n)],
+    logs: [transferLog(TOKENS.USDC[0], DONOR, initiative.safeAddress, 25_000_000n)],
   };
   await h.req("/api/donate/confirm", {
     method: "POST",
-    json: { slug: rfp.slug, txHash: tx },
+    json: { slug: initiative.slug, txHash: tx },
   });
   const post = (token: string | undefined, body: Record<string, unknown>) =>
-    h.req(`/api/initiatives/${rfp.slug}/comments`, {
+    h.req(`/api/initiatives/${initiative.slug}/comments`, {
       method: "POST",
       token,
       json: { body: "Why?", ...body },
     });
-  return { h, rfp, post };
+  return { h, initiative, post };
 }
 
 Deno.test("comments: anonymous needs a name; without AI, anon posts are held with a private claim token", async () => {
-  const { h, rfp, post } = await setup();
+  const { h, initiative, post } = await setup();
   assertEquals((await post(undefined, {})).status, 400);
   assertEquals((await post(undefined, { name: "x", type: "rant" })).status, 400);
   assertEquals((await post(undefined, { name: "x", body: "" })).status, 400);
@@ -132,7 +132,7 @@ Deno.test("comments: anonymous needs a name; without AI, anon posts are held wit
   };
   assertEquals(held.status, "held");
   assertEquals(held.claimToken.length, 32);
-  const list = await j(await h.req(`/api/initiatives/${rfp.slug}/comments`)) as {
+  const list = await j(await h.req(`/api/initiatives/${initiative.slug}/comments`)) as {
     entries: unknown[];
   };
   assertEquals(list.entries.length, 0);
@@ -150,7 +150,7 @@ Deno.test("comments: anonymous needs a name; without AI, anon posts are held wit
   assertEquals(dash.held.length, 1);
   assertEquals(dash.bell, 1);
   await h.req(`/api/admin/comments/${held.id}/publish`, { method: "POST", token: admin });
-  const list2 = await j(await h.req(`/api/initiatives/${rfp.slug}/comments`)) as {
+  const list2 = await j(await h.req(`/api/initiatives/${initiative.slug}/comments`)) as {
     entries: { displayName: string; roles: string[]; votes: number }[];
   };
   assertEquals(list2.entries[0].displayName, "Anon");
@@ -167,7 +167,7 @@ Deno.test("comments: anonymous needs a name; without AI, anon posts are held wit
 });
 
 Deno.test("new comments are generic and cannot collect categories, topics or email", async () => {
-  const { h, rfp, post } = await setup();
+  const { h, initiative, post } = await setup();
   try {
     const admin = await h.mint(ADMIN, true);
     for (
@@ -180,7 +180,7 @@ Deno.test("new comments are generic and cannot collect categories, topics or ema
     ) {
       assertEquals((await post(admin, retired)).status, 400);
     }
-    assertEquals(await h.db.comments.forInitiative(rfp.id), []);
+    assertEquals(await h.db.comments.forInitiative(initiative.id), []);
     // Current requests and the previous browser's harmless defaults both work.
     for (const body of [{}, { type: "other", topic: "", email: "" }]) {
       const response = await post(admin, body);
@@ -220,7 +220,7 @@ Deno.test("AI screen: constructive publishes, unclear holds, spam discards but l
 });
 
 Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, featured cap", async () => {
-  const { h, rfp, post } = await setup();
+  const { h, initiative, post } = await setup();
   const curator = await h.mint(CURATOR);
   const expert = await h.mint(EXPERT);
   const donor = await h.mint(DONOR);
@@ -317,7 +317,7 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
     { myvote: 1, votes: 1 },
   );
   const asDonor = await j(
-    await h.req(`/api/initiatives/${rfp.slug}/comments`, { token: donor }),
+    await h.req(`/api/initiatives/${initiative.slug}/comments`, { token: donor }),
   ) as {
     viewerCanVote: boolean;
     viewerRoles: string[];
@@ -327,17 +327,17 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   assertEquals(asDonor.viewerRoles, ["DONOR"]);
   assertEquals(asDonor.entries.find((e) => e.id === c1.id)!.myvote, -1);
   const asPlain = await j(
-    await h.req(`/api/initiatives/${rfp.slug}/comments`, { token: plain }),
+    await h.req(`/api/initiatives/${initiative.slug}/comments`, { token: plain }),
   ) as { viewerCanVote: boolean };
   assertEquals(asPlain.viewerCanVote, false);
 
   // Historical question/suggestion rows still support replies and review.
-  await h.db.kv.set(K.comment(rfp.id, c1.id), {
+  await h.db.kv.set(K.comment(initiative.id, c1.id), {
     ...(await h.db.comments.get(c1.id))!,
     type: "question",
     topic: "scope",
   });
-  await h.db.kv.set(K.comment(rfp.id, e1.id), {
+  await h.db.kv.set(K.comment(initiative.id, e1.id), {
     ...(await h.db.comments.get(e1.id))!,
     type: "suggestion",
   });
@@ -393,14 +393,14 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
     })).status,
     200,
   );
-  const withReplies = await j(await h.req(`/api/initiatives/${rfp.slug}/comments`)) as {
+  const withReplies = await j(await h.req(`/api/initiatives/${initiative.slug}/comments`)) as {
     entries: { id: string; replies: unknown[]; answered: boolean }[];
   };
   const top = withReplies.entries.find((e) => e.id === c1.id)!;
   assertEquals(top.replies.length, 2);
   assert(top.answered);
   await h.req(`/api/admin/comments/${heldReply.id}/publish`, { method: "POST", token: admin });
-  const published = await j(await h.req(`/api/initiatives/${rfp.slug}/comments`)) as {
+  const published = await j(await h.req(`/api/initiatives/${initiative.slug}/comments`)) as {
     entries: { id: string; replies: unknown[] }[];
   };
   assertEquals(published.entries.find((e) => e.id === c1.id)!.replies.length, 3);
@@ -409,7 +409,7 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   await h.req(`/api/comments/${c1.id}/report`, { method: "POST" });
   assertEquals((await h.db.comments.get(c1.id))!.reports, 1);
   assertEquals(
-    ((await j(await h.req(`/api/initiatives/${rfp.slug}/comments`))).entries as unknown[])
+    ((await j(await h.req(`/api/initiatives/${initiative.slug}/comments`))).entries as unknown[])
       .length,
     5,
   );
@@ -440,9 +440,9 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   );
   assertEquals((await h.db.comments.get(e1.id))!.reviewed, true);
   // the front-page level is gone: the action is unknown, "feature" still works
-  const ids = (await h.db.comments.forInitiative(rfp.id)).filter((c) => !c.parentId).map((c) =>
-    c.id
-  );
+  const ids = (await h.db.comments.forInitiative(initiative.id)).filter((c) => !c.parentId).map((
+    c,
+  ) => c.id);
   const front = await h.req(`/api/admin/comments/${ids[0]}/feature-front`, {
     method: "POST",
     token: admin,
@@ -484,14 +484,14 @@ Deno.test("names: .eth is only allowed as the poster's own ENS name", async () =
       return Response.json({});
     },
   });
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Named initiative",
     status: "approved",
     goalUsd: 1000,
     safeAddress: "0xD5Cf05f24727C83976652E3586c0e26DD39884e9",
   });
   const post = (token: string | undefined, body: Record<string, unknown>) =>
-    h.req(`/api/initiatives/${rfp.slug}/comments`, {
+    h.req(`/api/initiatives/${initiative.slug}/comments`, {
       method: "POST",
       token,
       json: { body: "Why?", ...body },

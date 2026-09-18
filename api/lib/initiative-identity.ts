@@ -9,11 +9,11 @@ export const INITIATIVE_CHANGED =
 export async function assertInitiativeIdentity(
   db: Db,
   slug: string,
-  rfp: Initiative,
+  initiative: Initiative,
   initiativeId: unknown,
 ): Promise<void> {
   if (
-    (initiativeId !== undefined && initiativeId !== rfp.id) ||
+    (initiativeId !== undefined && initiativeId !== initiative.id) ||
     (initiativeId === undefined && await db.initiatives.isReusedSlug(slug))
   ) throw new HttpError(409, INITIATIVE_CHANGED);
 }

@@ -24,20 +24,20 @@ function deferred<T>() {
 Deno.test("funding: settings and cold snapshots do not read balances; the ledger is the first fallback", async () => {
   const h = await harness();
   try {
-    const rfp = await h.db.initiatives.insert({
+    const initiative = await h.db.initiatives.insert({
       title: "Cold cache",
       status: "approved",
       safeAddress: SAFE_ADDR,
     });
     await h.req("/api/board/settings");
     assertEquals(h.script.calls.length, 0, "global UI settings never touch RPC");
-    const first = await h.deps.funding.summary(rfp);
+    const first = await h.deps.funding.summary(initiative);
     assertEquals(first.donated, 0);
     assertFalse(first.live);
     assert(first.refreshDue);
     assertEquals(h.script.calls.length, 0);
     const board = await j(await h.req("/api/board"));
-    const page = await j(await h.req("/api/initiatives/" + rfp.slug));
+    const page = await j(await h.req("/api/initiatives/" + initiative.slug));
     assertEquals(board.refreshDue, true);
     assertEquals(page.refreshDue, true);
     assertEquals(
@@ -54,7 +54,7 @@ Deno.test("funding: old values return during a slow refresh, with one lease acro
   const h = await harness();
   const gate = deferred<void>();
   try {
-    const rfp = await h.db.initiatives.insert({
+    const initiative = await h.db.initiatives.insert({
       title: "Shared cache",
       status: "approved",
       safeAddress: SAFE_ADDR,
@@ -77,14 +77,14 @@ Deno.test("funding: old values return during a slow refresh, with one lease acro
     };
     const refreshing = h.deps.funding.balances(SAFE_ADDR, true);
     await started.promise;
-    const stale = await second.summary(rfp);
+    const stale = await second.summary(initiative);
     assertEquals(stale.donated, 1, "snapshot is available while RPC is blocked");
     assertFalse(stale.refreshDue, "another instance holds the refresh lease");
     assertEquals((await second.balances(SAFE_ADDR, true))?.usd, 1);
     assertEquals(h.script.calls.length, warmCalls, "the other instance must not start RPC");
     gate.resolve();
     assertEquals((await refreshing)?.usd, 2);
-    assertEquals((await second.summary(rfp)).donated, 2);
+    assertEquals((await second.summary(initiative)).donated, 2);
     assertEquals(h.script.calls.length - warmCalls, 10);
   } finally {
     gate.resolve();
@@ -156,7 +156,7 @@ Deno.test("funding: 30-second board polls share one two-minute refresh across 19
 Deno.test("funding: a newly confirmed donation invalidates only its Safe, repeated confirms do not", async () => {
   const h = await harness();
   try {
-    const rfp = await h.db.initiatives.insert({
+    const initiative = await h.db.initiatives.insert({
       title: "Donation refresh",
       status: "approved",
       safeAddress: SAFE_ADDR,
@@ -171,13 +171,13 @@ Deno.test("funding: a newly confirmed donation invalidates only its Safe, repeat
     const confirm = () =>
       h.req("/api/donate/confirm", {
         method: "POST",
-        json: { initiativeId: rfp.id, slug: rfp.slug, txHash: TX },
+        json: { initiativeId: initiative.id, slug: initiative.slug, txHash: TX },
       });
     assertEquals((await confirm()).status, 200);
-    assert((await h.deps.funding.summary(rfp)).refreshDue);
+    assert((await h.deps.funding.summary(initiative)).refreshDue);
     assertEquals((await h.deps.funding.balances(SAFE_ADDR, true))?.usd, 1);
     assertEquals((await confirm()).status, 200);
-    assertFalse((await h.deps.funding.summary(rfp)).refreshDue);
+    assertFalse((await h.deps.funding.summary(initiative)).refreshDue);
   } finally {
     h.close();
   }
@@ -185,7 +185,7 @@ Deno.test("funding: a newly confirmed donation invalidates only its Safe, repeat
 
 Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, plus paid out", async () => {
   const h = await harness();
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Balance initiative",
     status: "approved",
     goalUsd: 3000,
@@ -193,7 +193,7 @@ Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, 
   });
   h.script.tokenBalances["USDC:" + safeKey] = 2_500_000n; // 2.5 USDC
   h.script.ethBalances[safeKey] = 10n ** 18n; // 1 ETH at $2000
-  await h.db.pledges.add(rfp.id, {
+  await h.db.pledges.add(initiative.id, {
     company: "Acme",
     amountUsd: 500,
     url: "",
@@ -202,7 +202,7 @@ Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, 
     status: "pledged",
   });
 
-  const page = await j(await h.req("/api/initiatives/" + rfp.slug + "?refresh=1")) as {
+  const page = await j(await h.req("/api/initiatives/" + initiative.slug + "?refresh=1")) as {
     summary: Record<string, number | boolean>;
     funded: boolean;
     pct: number;
@@ -223,7 +223,7 @@ Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, 
   // a milestone was paid: the balance dropped, the admin records the payout
   h.script.ethBalances[safeKey] = 0n;
   const admin = await h.mint(ADMIN, true);
-  const r = await h.req(`/api/admin/initiatives/${rfp.id}`, {
+  const r = await h.req(`/api/admin/initiatives/${initiative.id}`, {
     method: "PATCH",
     token: admin,
     json: { paidOutUsd: "2,000" },
@@ -239,7 +239,7 @@ Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, 
     }[];
     totals: { raised: number };
   };
-  const card = board.cards.find((c) => c.initiative.slug === rfp.slug)!;
+  const card = board.cards.find((c) => c.initiative.slug === initiative.slug)!;
   assertEquals(card.summary.donated, 2002.5);
   assertEquals(card.summary.total, 2502.5);
   assertEquals(board.totals.raised, 2502.5);
@@ -247,11 +247,13 @@ Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, 
   h.script.tokenBalances["USDC:" + safeKey] = 500_000_000n;
   h.clock.now += BALANCE_TTL_SECS + 1;
   assert(
-    ((await j(await h.req("/api/initiatives/" + rfp.slug + "?refresh=1"))) as { funded: boolean })
+    ((await j(await h.req("/api/initiatives/" + initiative.slug + "?refresh=1"))) as {
+      funded: boolean;
+    })
       .funded,
   );
 
-  const bad = await h.req(`/api/admin/initiatives/${rfp.id}`, {
+  const bad = await h.req(`/api/admin/initiatives/${initiative.id}`, {
     method: "PATCH",
     token: admin,
     json: { paidOutUsd: "-5" },
@@ -262,7 +264,7 @@ Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, 
 
 Deno.test("funding: shared snapshot, explicit refresh, failure cooldown, ledger without a Safe", async () => {
   const h = await harness();
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Cached initiative",
     status: "approved",
     goalUsd: 1000,
@@ -273,7 +275,7 @@ Deno.test("funding: shared snapshot, explicit refresh, failure cooldown, ledger 
   await h.req("/api/board");
   assertEquals(reads(), 0, "the initial page does not wait on balance RPC");
   await h.req("/api/board?refresh=1");
-  await h.req("/api/initiatives/" + rfp.slug);
+  await h.req("/api/initiatives/" + initiative.slug);
   await h.req("/api/board");
   assertEquals(reads(), 1, "page reads share the saved balance");
   h.clock.now += BALANCE_TTL_SECS + 1;
@@ -286,7 +288,7 @@ Deno.test("funding: shared snapshot, explicit refresh, failure cooldown, ledger 
   h.script.tokenBalances["USDC:" + safeKey] = 5_000_000n;
   h.script.brokenTokens.add("USDC");
   h.clock.now += BALANCE_TTL_SECS + 1;
-  const stale = await j(await h.req("/api/initiatives/" + rfp.slug + "?refresh=1")) as {
+  const stale = await j(await h.req("/api/initiatives/" + initiative.slug + "?refresh=1")) as {
     summary: { donated: number; live: boolean };
   };
   assertEquals(stale.summary.donated, 1);
@@ -343,7 +345,7 @@ Deno.test("funding: the page says when the ledger was last checked and whether i
         })
         : new Response("", { status: 404 }),
   });
-  const rfp = await h.db.initiatives.insert({
+  const initiative = await h.db.initiatives.insert({
     title: "Ledger status",
     status: "approved",
     goalUsd: 1000,
@@ -359,7 +361,7 @@ Deno.test("funding: the page says when the ledger was last checked and whether i
     };
     summary: { ledger: number };
   };
-  const before = await j(await h.req("/api/initiatives/" + rfp.slug)) as Page;
+  const before = await j(await h.req("/api/initiatives/" + initiative.slug)) as Page;
   assertEquals(before.ledger, {
     checkedAt: null,
     ok: true,
@@ -373,8 +375,8 @@ Deno.test("funding: the page says when the ledger was last checked and whether i
     blockNumber: "0x1f4",
     logs: [transferLog(USDC, DONOR, SAFE_ADDR, 1_000_000n)],
   };
-  await syncSafe(h.deps, rfp);
-  const after = await j(await h.req("/api/initiatives/" + rfp.slug)) as Page;
+  await syncSafe(h.deps, initiative);
+  const after = await j(await h.req("/api/initiatives/" + initiative.slug)) as Page;
   assertEquals(after.ledger, {
     checkedAt: h.clock.now,
     ok: true,

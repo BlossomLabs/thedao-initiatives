@@ -82,24 +82,24 @@ async function fetchPage(deps: SafeApiDeps, url: string): Promise<Page> {
 /** Credit one tx hash to an initiative: RPC verification first, indexer fallback for ETH. */
 async function creditTx(
   deps: SafeApiDeps,
-  rfp: Initiative,
+  initiative: Initiative,
   txHash: string,
   rows: SafeTransfer[],
   getBlockNumber: () => Promise<number>,
 ): Promise<void> {
-  const existing = await deps.db.donations.get(rfp.id, txHash);
+  const existing = await deps.db.donations.get(initiative.id, txHash);
   if (existing?.status === "confirmed") return;
-  let v: Verification = await deps.chain.verifyDonation(txHash, rfp.safeAddress, {
+  let v: Verification = await deps.chain.verifyDonation(txHash, initiative.safeAddress, {
     getBlockNumber,
   });
   if (v.ok || (v.found && v.pending)) {
-    await deps.db.donations.record(rfp.id, txHash, v, "tx");
+    await deps.db.donations.record(initiative.id, txHash, v, "tx");
     return;
   }
   // RPC saw nothing creditable. Internal ETH transfers (Safe->Safe, exchange
   // contracts) never show as `tx.to == safe`, so trust the indexer for those.
   const eth = rows.filter((r) =>
-    r.type === "ETHER_TRANSFER" && r.to.toLowerCase() === rfp.safeAddress.toLowerCase()
+    r.type === "ETHER_TRANSFER" && r.to.toLowerCase() === initiative.safeAddress.toLowerCase()
   );
   if (eth.length) {
     const wei = eth.reduce((s, r) => s + BigInt(r.value ?? "0"), 0n);
@@ -119,7 +119,7 @@ async function creditTx(
           donor: safeChecksum(eth[0].from),
           detail: `credited from Safe indexer: ${amount} ETH received (internal transfer)`,
         };
-        await deps.db.donations.record(rfp.id, txHash, v, "safe-api");
+        await deps.db.donations.record(initiative.id, txHash, v, "safe-api");
         return;
       } catch (e) {
         v = {
@@ -128,12 +128,12 @@ async function creditTx(
           pending: true,
           detail: `price feed unavailable, will retry: ${String(e)}`,
         };
-        await deps.db.donations.record(rfp.id, txHash, v, "safe-api");
+        await deps.db.donations.record(initiative.id, txHash, v, "safe-api");
         return;
       }
     }
   }
-  if (v.found) await deps.db.donations.record(rfp.id, txHash, v, "tx");
+  if (v.found) await deps.db.donations.record(initiative.id, txHash, v, "tx");
 }
 
 function safeChecksum(a: string): string {
@@ -156,12 +156,12 @@ const ACCEPTED = new Set(Object.values(TOKENS).map(([a]) => a.toLowerCase()));
  */
 export async function syncSafe(
   deps: SafeApiDeps,
-  rfp: Initiative,
+  initiative: Initiative,
   budgetMs = DEFAULT_BUDGET_MS,
   getBlockNumber = lazyBlockNumber(deps),
   persist = true,
 ): Promise<SafeSyncState> {
-  const prev = await deps.db.meta.safeSync(rfp.id);
+  const prev = await deps.db.meta.safeSync(initiative.id);
   const started = Date.now();
   const overBudget = () => Date.now() - started > budgetMs;
   const state: SafeSyncState = {
@@ -173,7 +173,7 @@ export async function syncSafe(
     resumeUrl: prev?.resumeUrl ?? "",
   };
   const firstUrl =
-    `${SAFE_TX_SERVICE_BASE}/safes/${rfp.safeAddress}/incoming-transfers/?limit=${PAGE_LIMIT}`;
+    `${SAFE_TX_SERVICE_BASE}/safes/${initiative.safeAddress}/incoming-transfers/?limit=${PAGE_LIMIT}`;
   const resumed = Boolean(state.resumeUrl);
   let credited = 0;
   let requests = 0;
@@ -204,7 +204,7 @@ export async function syncSafe(
         // Pending rows wait on confirmations or a price; failed rows may be a
         // donor's manual paste of an internal ETH send the RPC path cannot
         // see, which the indexer fallback in creditTx can still credit.
-        const known = await deps.db.donations.get(rfp.id, tx);
+        const known = await deps.db.donations.get(initiative.id, tx);
         if (known?.status !== "confirmed") {
           allKnown = false;
           // Only unknown/pending accepted transfers need a confirmation check.
@@ -221,7 +221,7 @@ export async function syncSafe(
       let pageCredited = 0;
       for (const [tx, rows] of byTx) {
         if (overBudget()) break;
-        await creditTx(deps, rfp, tx, rows, getBlockNumber);
+        await creditTx(deps, initiative, tx, rows, getBlockNumber);
         credited++;
         pageCredited++;
       }
@@ -247,15 +247,15 @@ export async function syncSafe(
       if (!resumed && newest) state.lastTxHash = newest;
     }
     deps.log?.(
-      `safe sync ${rfp.slug}: ${requests} request(s), ${credited} tx credited${
+      `safe sync ${initiative.slug}: ${requests} request(s), ${credited} tx credited${
         complete ? "" : ", continuing next run"
       }`,
     );
   } catch (e) {
     state.error = e instanceof Error ? e.message : String(e);
-    deps.log?.(`safe sync ${rfp.slug}: ${state.error}`);
+    deps.log?.(`safe sync ${initiative.slug}: ${state.error}`);
   }
-  if (persist) await deps.db.meta.setSafeSync(rfp.id, state);
+  if (persist) await deps.db.meta.setSafeSync(initiative.id, state);
   return state;
 }
 
@@ -263,18 +263,20 @@ export async function syncSafe(
 export async function reverifyPending(
   deps: SafeApiDeps,
   getBlockNumber = lazyBlockNumber(deps),
-  initiative?: Initiative,
+  only?: Initiative,
 ): Promise<void> {
-  const pending = initiative
-    ? (await deps.db.donations.list(initiative.id, false)).filter((d) => d.status === "pending")
+  const pending = only
+    ? (await deps.db.donations.list(only.id, false)).filter((d) => d.status === "pending")
     : await deps.db.donations.pending();
   for (const d of pending) {
-    const rfp = initiative ?? await deps.db.initiatives.get(d.rfpId);
-    if (!rfp?.safeAddress) continue;
+    const initiative = only ?? await deps.db.initiatives.get(d.rfpId);
+    if (!initiative?.safeAddress) continue;
     try {
-      const v = await deps.chain.verifyDonation(d.txHash, rfp.safeAddress, { getBlockNumber });
+      const v = await deps.chain.verifyDonation(d.txHash, initiative.safeAddress, {
+        getBlockNumber,
+      });
       if (v.found && !v.pending) {
-        await deps.db.donations.record(rfp.id, d.txHash, v, d.source);
+        await deps.db.donations.record(initiative.id, d.txHash, v, d.source);
       }
     } catch { /* transient; next cycle */ }
   }

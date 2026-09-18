@@ -46,7 +46,7 @@ Deno.test("daily cache: only the exact production timeline may access KV or upst
       ...h.deps,
       db: {
         ...h.db,
-        rfps: {
+        initiatives: {
           ...h.db.initiatives,
           list: () => {
             throw new Error("non-production must not read KV");
@@ -111,14 +111,16 @@ Deno.test("daily cache: production refreshes approved Safes, persists both cache
     assertEquals(h.script.calls.filter((m) => m === "eth_blockNumber").length, 1);
     assertEquals((await h.deps.funding.balances(SAFE_ADDR))!.usd, 2);
     assertEquals((await h.deps.funding.balances(SECOND_SAFE))!.usd, 3);
-    for (const [rfp, tx] of [[first, TX1], [second, TX2]] as const) {
-      assertEquals((await h.db.donations.get(rfp.id, tx))!.status, "confirmed");
-      assert((await h.db.meta.safeSync(rfp.id))!.ok);
-      assertFalse((await h.deps.funding.summary(rfp)).refreshDue);
+    for (const [initiative, tx] of [[first, TX1], [second, TX2]] as const) {
+      assertEquals((await h.db.donations.get(initiative.id, tx))!.status, "confirmed");
+      assert((await h.db.meta.safeSync(initiative.id))!.ok);
+      assertFalse((await h.deps.funding.summary(initiative)).refreshDue);
     }
-    for (const rfp of [bare, pending, archived]) {
-      assertEquals(await h.db.meta.safeSync(rfp.id), null);
-      if (rfp.safeAddress) assertEquals(await h.deps.funding.balances(rfp.safeAddress), null);
+    for (const initiative of [bare, pending, archived]) {
+      assertEquals(await h.db.meta.safeSync(initiative.id), null);
+      if (initiative.safeAddress) {
+        assertEquals(await h.deps.funding.balances(initiative.safeAddress), null);
+      }
     }
 
     h.script.calls.length = 0;
@@ -158,7 +160,7 @@ Deno.test("daily cache: visitor refreshes share the scheduled job's ledger and b
   });
   let job: Promise<void> | undefined;
   try {
-    const rfp = await h.db.initiatives.insert({
+    const initiative = await h.db.initiatives.insert({
       title: "Shared daily refresh",
       status: "approved",
       safeAddress: SAFE_ADDR,
@@ -170,7 +172,7 @@ Deno.test("daily cache: visitor refreshes share the scheduled job's ledger and b
 
     job = refreshDailyCache(h.deps, "production");
     await started.promise;
-    const page = await j(await h.req(`/api/initiatives/${rfp.slug}?refresh=1`)) as {
+    const page = await j(await h.req(`/api/initiatives/${initiative.slug}?refresh=1`)) as {
       ledger: { updating: boolean };
       donations: unknown[];
     };
@@ -180,8 +182,8 @@ Deno.test("daily cache: visitor refreshes share the scheduled job's ledger and b
 
     gate.resolve(transfers());
     await job;
-    assertEquals((await h.db.donations.get(rfp.id, TX1))!.status, "confirmed");
-    assertFalse((await h.db.meta.safeSync(rfp.id))!.updating);
+    assertEquals((await h.db.donations.get(initiative.id, TX1))!.status, "confirmed");
+    assertFalse((await h.db.meta.safeSync(initiative.id))!.updating);
     assertEquals((await h.deps.funding.balances(SAFE_ADDR))!.usd, 1);
     assertEquals(h.fetchLog.length, 1);
     assertEquals(h.script.calls.filter((m) => m === "eth_getBalance").length, 1);

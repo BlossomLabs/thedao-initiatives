@@ -19,15 +19,15 @@ export function aiRoutes(deps: Deps) {
     const body = await jsonBody(c, ["query"]);
     const query = s(body.query, AI_QUERY_MAX_CHARS);
     if (query.length < 3) throw new HttpError(400, "describe what you want to fund");
-    const rfps = await db.initiatives.list(["approved"]);
-    if (!rfps.length) return c.json({ matches: [] });
-    const items = rfps.map((x) => ({
+    const initiatives = await db.initiatives.list(["approved"]);
+    if (!initiatives.length) return c.json({ matches: [] });
+    const items = initiatives.map((x) => ({
       id: x.id,
       title: x.title.slice(0, 120),
       summary: x.summary.slice(0, 300),
     }));
-    const known = new Set(rfps.map((x) => x.id));
-    const k = aiTopK(rfps.length);
+    const known = new Set(initiatives.map((x) => x.id));
+    const k = aiTopK(initiatives.length);
     const key = query.toLowerCase() + "|" + [...known].sort().join(",");
     const hit = cache.get(key);
     if (hit && deps.now() - hit[1] < CACHE_TTL) return c.json({ matches: hit[0] });

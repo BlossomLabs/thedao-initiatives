@@ -75,10 +75,10 @@ Deno.test("admins: a dashboard admin gets the ADMIN role tag and an admin sessio
   const admin = await h.mint(ADMIN, true);
   await h.req("/api/admin/admins", { method: "POST", token: admin, json: { address: PLAIN } });
   await h.deps.db.initiatives.insert({ title: "Alpha", status: "approved" });
-  const rfp = (await h.deps.db.initiatives.list(["approved"]))[0];
+  const initiative = (await h.deps.db.initiatives.list(["approved"]))[0];
   const plain = await h.mint(PLAIN, true);
   const posted = await j(
-    await h.req(`/api/initiatives/${rfp.slug}/comments`, {
+    await h.req(`/api/initiatives/${initiative.slug}/comments`, {
       method: "POST",
       token: plain,
       json: {

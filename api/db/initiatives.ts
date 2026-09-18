@@ -92,13 +92,13 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
   };
 
   const revisionOf = (
-    rfp: Initiative,
+    initiative: Initiative,
     n: number,
     text: InitiativeText,
     origin: RevisionOrigin,
     createdAt: number,
   ): Revision => ({
-    rfpId: rfp.id,
+    rfpId: initiative.id,
     n,
     ...pickText(text),
     author: origin.author,
@@ -128,7 +128,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       if (slug && attempt > 0) throw new Error(`slug already exists: ${slug}`);
       const t = options.createdAt ?? now();
       const status: InitiativeStatus = fields.status ?? "pending";
-      const rfp: Initiative = {
+      const initiative: Initiative = {
         id,
         slug: s,
         safeDeploymentKey: origin.source === "import" ? s : `rfp:${id}`,
@@ -164,8 +164,8 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
           .check({ key: K.initiative(id), versionstamp: null })
           .check({ key: K.revision(id, 1), versionstamp: null })
           .set(K.initiativeBySlug(s), id)
-          .set(K.initiative(id), rfp)
-          .set(K.revision(id, 1), revisionOf(rfp, 1, rfp, origin, t));
+          .set(K.initiative(id), initiative)
+          .set(K.revision(id, 1), revisionOf(initiative, 1, initiative, origin, t));
         if (reclaim && owner?.value) {
           const old = owner.value;
           const archiveBase = `${s}-archived-${old.id.toLowerCase()}`;
@@ -196,14 +196,14 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
           if (source.value) throw new Error(`source already exists: ${s}`);
           op.check(source).set(K.initiativeBySourceSlug(s), id);
         }
-        if (rfp.safeAddress) {
-          if ((await kv.get(K.initiativeBySafe(rfp.safeAddress))).value) {
-            throw new Error(`Safe already assigned: ${rfp.safeAddress}`);
+        if (initiative.safeAddress) {
+          if ((await kv.get(K.initiativeBySafe(initiative.safeAddress))).value) {
+            throw new Error(`Safe already assigned: ${initiative.safeAddress}`);
           }
-          op.check({ key: K.initiativeBySafe(rfp.safeAddress), versionstamp: null })
-            .set(K.initiativeBySafe(rfp.safeAddress), id);
+          op.check({ key: K.initiativeBySafe(initiative.safeAddress), versionstamp: null })
+            .set(K.initiativeBySafe(initiative.safeAddress), id);
         }
-        if ((await op.commit()).ok) return rfp;
+        if ((await op.commit()).ok) return initiative;
         if (retry === 7) throw new Error("proposal insertion conflict");
       }
     }
@@ -316,20 +316,20 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     id: string,
     input: InitiativeTextInput,
     origin: RevisionOrigin,
-  ): Promise<{ rfp: Initiative; revision: Revision | null }> {
+  ): Promise<{ initiative: Initiative; revision: Revision | null }> {
     // Only the text fields, whatever else the caller's record carries.
     const text = pickText(input);
     if (text.details && isStructured(text)) throw new Error("structured rows carry no details");
     for (let i = 0; i < 5; i++) {
       const cur = await kv.get<Initiative>(K.initiative(id));
       if (!cur.value) throw new Error("rfp not found");
-      const rfp = cur.value;
-      if (sameText(rfp, text)) return { rfp, revision: null };
-      const legacy = !(rfp.revision > 0);
-      const n = (legacy ? 1 : rfp.revision) + 1;
+      const initiative = cur.value;
+      if (sameText(initiative, text)) return { initiative, revision: null };
+      const legacy = !(initiative.revision > 0);
+      const n = (legacy ? 1 : initiative.revision) + 1;
       const t = now();
-      const revision = revisionOf(rfp, n, text, origin, t);
-      const next: Initiative = { ...rfp, ...text, revision: n };
+      const revision = revisionOf(initiative, n, text, origin, t);
+      const next: Initiative = { ...initiative, ...text, revision: n };
       const op = kv.atomic()
         .check(cur)
         .check({ key: K.revision(id, n), versionstamp: null })
@@ -338,11 +338,17 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       if (legacy) {
         op.check({ key: K.revision(id, 1), versionstamp: null }).set(
           K.revision(id, 1),
-          revisionOf(rfp, 1, rfp, { author: "", source: "import" }, rfp.createdAt),
+          revisionOf(
+            initiative,
+            1,
+            initiative,
+            { author: "", source: "import" },
+            initiative.createdAt,
+          ),
         );
       }
       const res = await op.commit();
-      if (res.ok) return { rfp: next, revision };
+      if (res.ok) return { initiative: next, revision };
     }
     throw new Error("update conflict");
   }

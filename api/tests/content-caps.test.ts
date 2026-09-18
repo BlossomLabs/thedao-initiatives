@@ -1,7 +1,7 @@
 /** Content sync never cuts a file's text: every capped field past its cap is
  * a sync error to fix in git. */
 import { assertEquals, assertThrows } from "@std/assert";
-import { parseContentBackers, parseRfpFile } from "../services/content.ts";
+import { parseContentBackers, parseInitiativeFile } from "../services/content.ts";
 import { LIMITS, tooLong } from "../../shared/draft/mod.ts";
 import { grantBody } from "./fixtures.ts";
 
@@ -17,7 +17,7 @@ Deno.test("content: a section past its cap is a sync error, not a cut", () => {
     "w".repeat(LIMITS.SECTION_CHARS + 1),
   );
   assertThrows(
-    () => parseRfpFile(file("", body)),
+    () => parseInitiativeFile(file("", body)),
     Error,
     tooLong("Why this matters", LIMITS.SECTION_CHARS),
   );
@@ -30,13 +30,13 @@ Deno.test("content: a milestone link or a page link past the cap is a sync error
     `Delivered: ${long}\n\n- Released.`,
   );
   assertThrows(
-    () => parseRfpFile(file("", withMsLink)),
+    () => parseInitiativeFile(file("", withMsLink)),
     Error,
     tooLong("milestone A link", LIMITS.LINK_CHARS),
   );
   const withPageLink = grantBody(300_000) + `\n## Links\n\n${long}\n`;
   assertThrows(
-    () => parseRfpFile(file("", withPageLink)),
+    () => parseInitiativeFile(file("", withPageLink)),
     Error,
     tooLong("link 1", LIMITS.LINK_CHARS),
   );
@@ -44,8 +44,8 @@ Deno.test("content: a milestone link or a page link past the cap is a sync error
 
 Deno.test("content: the recipient link has the same cap as the form", () => {
   const long = "https://y.example/" + "a".repeat(LIMITS.LINK_CHARS);
-  assertThrows(() => parseRfpFile(file(`recipient_url: ${long}\n`)), Error, "too long");
-  const ok = parseRfpFile(file("recipient_url: https://y.example/\n"));
+  assertThrows(() => parseInitiativeFile(file(`recipient_url: ${long}\n`)), Error, "too long");
+  const ok = parseInitiativeFile(file("recipient_url: https://y.example/\n"));
   assertEquals(ok.recipientUrl, "https://y.example/");
 });
 

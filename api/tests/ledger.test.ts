@@ -47,13 +47,13 @@ type Page = {
 Deno.test("ledger: snapshot first, refresh saves donations to KV, fresh visits do no upstream work", async () => {
   const h = await harness({ fetch: () => result([TX1]) });
   try {
-    const rfp = await h.db.initiatives.insert({
+    const initiative = await h.db.initiatives.insert({
       title: "Viewed ledger",
       status: "approved",
       safeAddress: SAFE_ADDR,
     });
     h.script.receipts[TX1] = receipt();
-    const path = `/api/initiatives/${rfp.slug}`;
+    const path = `/api/initiatives/${initiative.slug}`;
     const before = await j(await h.req(path)) as Page;
     assertEquals(before.donations, []);
     assert(before.ledger.refreshDue);
@@ -65,7 +65,7 @@ Deno.test("ledger: snapshot first, refresh saves donations to KV, fresh visits d
     assertEquals(after.summary.ledger, 1);
     assertFalse(after.ledger.refreshDue);
     assertFalse(after.ledger.updating);
-    assertEquals((await h.db.donations.get(rfp.id, TX1))!.status, "confirmed");
+    assertEquals((await h.db.donations.get(initiative.id, TX1))!.status, "confirmed");
     assertEquals(h.fetchLog.length, 1);
     h.script.calls.length = 0;
     await h.req(path);
@@ -97,14 +97,14 @@ Deno.test("ledger: concurrent visitors share a KV lease and see saved donations 
   });
   let pending: Promise<Response> | undefined;
   try {
-    const rfp = await h.db.initiatives.insert({
+    const initiative = await h.db.initiatives.insert({
       title: "Shared ledger",
       status: "approved",
       safeAddress: SAFE_ADDR,
     });
     h.script.receipts[TX1] = receipt();
     h.script.receipts[TX2] = receipt();
-    const path = `/api/initiatives/${rfp.slug}`;
+    const path = `/api/initiatives/${initiative.slug}`;
     await h.req(path + "?refresh=1");
     slow = true;
     h.clock.now += h.deps.config.safeSyncTtlSecs + 1;
@@ -117,10 +117,10 @@ Deno.test("ledger: concurrent visitors share a KV lease and see saved donations 
     assertFalse(stale.ledger.refreshDue, "another visitor owns the refresh");
     const other = { ...h.deps, db: createDb(h.kv, () => h.clock.now) };
     const concurrent = await Promise.all(
-      Array.from({ length: 8 }, () => refreshLedger(other, rfp)),
+      Array.from({ length: 8 }, () => refreshLedger(other, initiative)),
     );
     assert(concurrent.every((s) => s?.updating));
-    await refreshLedger(other, rfp, true); // admin also respects the running lease
+    await refreshLedger(other, initiative, true); // admin also respects the running lease
     assertEquals(h.fetchLog.length, 2, "only one upstream refresh for all visitors");
 
     gate.resolve(result([TX2, TX1]));
@@ -145,30 +145,30 @@ Deno.test("ledger: failures preserve saved rows and share a retry cooldown", asy
     fetch: () => failed ? new Response("{}", { status: 429 }) : result([TX1]),
   });
   try {
-    const rfp = await h.db.initiatives.insert({
+    const initiative = await h.db.initiatives.insert({
       title: "Retry ledger",
       status: "approved",
       safeAddress: SAFE_ADDR,
     });
     h.script.receipts[TX1] = receipt();
-    await refreshLedger(h.deps, rfp);
+    await refreshLedger(h.deps, initiative);
     h.clock.now += h.deps.config.safeSyncTtlSecs;
     failed = true;
-    await refreshLedger(h.deps, rfp);
-    const status = (await ledgerStatus(h.deps, rfp))!;
+    await refreshLedger(h.deps, initiative);
+    const status = (await ledgerStatus(h.deps, initiative))!;
     assertFalse(status.ok);
     assertFalse(status.updating);
     assertFalse(status.refreshDue);
-    assertEquals((await h.db.donations.list(rfp.id)).length, 1);
-    await refreshLedger(h.deps, rfp);
+    assertEquals((await h.db.donations.list(initiative.id)).length, 1);
+    await refreshLedger(h.deps, initiative);
     h.clock.now += LEDGER_RETRY_SECS - 1;
-    await refreshLedger(h.deps, rfp);
+    await refreshLedger(h.deps, initiative);
     assertEquals(h.fetchLog.length, 2);
     failed = false;
     h.clock.now++;
-    await refreshLedger(h.deps, rfp);
+    await refreshLedger(h.deps, initiative);
     assertEquals(h.fetchLog.length, 3);
-    assert((await ledgerStatus(h.deps, rfp))!.ok);
+    assert((await ledgerStatus(h.deps, initiative))!.ok);
   } finally {
     h.close();
   }
@@ -187,21 +187,21 @@ Deno.test("ledger: an expired lease recovers and its late worker cannot overwrit
   });
   let pending: ReturnType<typeof refreshLedger> | undefined;
   try {
-    const rfp = await h.db.initiatives.insert({
+    const initiative = await h.db.initiatives.insert({
       title: "Recover ledger",
       status: "approved",
       safeAddress: SAFE_ADDR,
     });
     h.script.receipts[TX2] = receipt();
-    pending = refreshLedger(h.deps, rfp);
+    pending = refreshLedger(h.deps, initiative);
     await started.promise;
     h.clock.now += LEDGER_LEASE_SECS + 1;
-    assert((await ledgerStatus(h.deps, rfp))!.refreshDue);
-    const newer = await refreshLedger(h.deps, rfp);
+    assert((await ledgerStatus(h.deps, initiative))!.refreshDue);
+    const newer = await refreshLedger(h.deps, initiative);
     assertEquals(newer?.lastTxHash, TX2);
     gate.resolve(result([]));
     assertEquals(await pending, newer);
-    assertEquals(await h.db.meta.safeSync(rfp.id), newer);
+    assertEquals(await h.db.meta.safeSync(initiative.id), newer);
   } finally {
     gate.resolve(result([]));
     await pending;
@@ -224,12 +224,12 @@ Deno.test("ledger: page refresh retries only that initiative's pending donations
       safeAddress: otherSafe,
     });
     h.script.head = 501;
-    for (const [rfp, tx] of [[first, TX1], [second, TX2]] as const) {
-      h.script.receipts[tx] = receipt(rfp.safeAddress);
+    for (const [initiative, tx] of [[first, TX1], [second, TX2]] as const) {
+      h.script.receipts[tx] = receipt(initiative.safeAddress);
       await h.db.donations.record(
-        rfp.id,
+        initiative.id,
         tx,
-        await h.deps.chain.verifyDonation(tx, rfp.safeAddress),
+        await h.deps.chain.verifyDonation(tx, initiative.safeAddress),
       );
     }
     h.script.head = 502;
@@ -304,21 +304,21 @@ Deno.test("ledger: an incomplete backfill resumes after the short cooldown while
     },
   });
   try {
-    const rfp = await h.db.initiatives.insert({
+    const initiative = await h.db.initiatives.insert({
       title: "Long history",
       status: "approved",
       safeAddress: SAFE_ADDR,
     });
-    const first = await refreshLedger(h.deps, rfp);
+    const first = await refreshLedger(h.deps, initiative);
     assertFalse(first!.backfilled);
     assert(first!.resumeUrl.includes(`page=${MAX_PAGES_PER_RUN}`));
     assertEquals(first!.refreshAfter, h.clock.now + LEDGER_RETRY_SECS);
     assertEquals(h.fetchLog.length, MAX_PAGES_PER_RUN);
     h.clock.now += LEDGER_RETRY_SECS - 1;
-    await refreshLedger(h.deps, rfp);
+    await refreshLedger(h.deps, initiative);
     assertEquals(h.fetchLog.length, MAX_PAGES_PER_RUN);
     h.clock.now++;
-    const complete = await refreshLedger(h.deps, rfp);
+    const complete = await refreshLedger(h.deps, initiative);
     assert(complete!.backfilled);
     assertEquals(complete!.resumeUrl, "");
     assertEquals(complete!.refreshAfter, h.clock.now + h.deps.config.safeSyncTtlSecs);

@@ -18,9 +18,9 @@ export function markdownRoutes({ db }: Deps) {
   /** <slug>-PRIVATE.md: admins only; any status, plus contact and funders. */
   r.get(MARKDOWN_PATHS.private, requireAdmin, async (c) => {
     const slug = c.req.param("file").slice(0, -"-PRIVATE.md".length);
-    const rfp = await db.initiatives.bySlug(slug);
-    if (!rfp) throw new HttpError(404, "not found");
-    const md = initiativeMarkdown(rfp, await db.pledges.list(rfp.id, true), {
+    const initiative = await db.initiatives.bySlug(slug);
+    if (!initiative) throw new HttpError(404, "not found");
+    const md = initiativeMarkdown(initiative, await db.pledges.list(initiative.id, true), {
       privateFields: true,
     });
     return c.body(md, 200, {
@@ -31,11 +31,11 @@ export function markdownRoutes({ db }: Deps) {
   });
   r.get(MARKDOWN_PATHS.public, async (c) => {
     const slug = c.req.param("file").slice(0, -3);
-    const rfp = await db.initiatives.bySlug(slug);
-    if (!rfp || !["approved", "archived"].includes(rfp.status)) {
+    const initiative = await db.initiatives.bySlug(slug);
+    if (!initiative || !["approved", "archived"].includes(initiative.status)) {
       throw new HttpError(404, "not found");
     }
-    const md = initiativeMarkdown(rfp, await db.pledges.list(rfp.id));
+    const md = initiativeMarkdown(initiative, await db.pledges.list(initiative.id));
     return c.body(md, 200, {
       "Content-Type": "text/markdown; charset=utf-8",
       "Content-Disposition": `inline; filename="${slug}.md"`,

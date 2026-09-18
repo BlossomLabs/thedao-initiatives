@@ -279,10 +279,10 @@ Deno.test("promotion does not grant comment fast-lane or voting privileges to an
   try {
     const token = await h.mint(PLAIN);
     await h.db.initiatives.insert({ title: "Promotion test", status: "approved" });
-    const rfp = (await h.db.initiatives.list(["approved"]))[0];
+    const initiative = (await h.db.initiatives.list(["approved"]))[0];
     h.deps.config.adminAddresses.push(PLAIN);
     h.clock.now += 6;
-    const path = `/api/initiatives/${rfp.slug}/comments`;
+    const path = `/api/initiatives/${initiative.slug}/comments`;
     const before = await j(await h.req(path, { token }));
     assertEquals(before.viewerCanVote, false);
     assertFalse((before.viewerRoles as string[]).includes("ADMIN"));

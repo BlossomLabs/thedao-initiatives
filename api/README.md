@@ -188,7 +188,8 @@ Admin (`/api/admin/...`): `GET dashboard`, `GET|PATCH initiatives/:id`,
 `POST initiatives/:id/status`, `POST initiatives/:id/revisions/:n` (archive / unarchive),
 `POST|PATCH|DELETE initiatives/:id/pledges[/:pid]`, `POST initiatives/:id/donations/recheck`,
 `POST initiatives/:id/sync-donations`, `GET initiatives/:id/safe-deploy-params`,
-`POST initiatives/:id/safe-confirm`, `POST comments/:id/:action`, `POST sync-content`.
+`POST initiatives/:id/safe-confirm`, `POST comments/:id/:action`, `POST sync-content`,
+`GET|POST maintenance[/enter|/exit]`, `GET backup`, `POST restore` (see below).
 
 All bodies and responses are JSON (`{error}` on failure). Private fields (`contact`, `funders`,
 historical comment `email`) only appear in admin responses.
@@ -217,6 +218,51 @@ the path, such as `milestones[0].amout`. Validation happens before applying edit
 Bodyless actions accept an empty body or `{}` and reject additional fields. Malformed JSON or a
 non-object JSON body returns 400, as do unsupported actions. No historical records are deleted by
 this API cleanup.
+
+## Maintenance mode, backup and restore
+
+**Maintenance mode** is a flag under `["meta","maintenance"]` (`{on, by, at, note}`) that an admin
+toggles from the dashboard: `POST /api/admin/maintenance/enter` `{note?}` and `POST
+/api/admin/maintenance/exit` (both need recent authentication and are audited as
+`maintenance.enter` / `maintenance.exit`; `GET /api/admin/maintenance` reads it). While it is on,
+every `POST`, `PATCH` and `DELETE` on the API answers
+`503 {"error":"The site is in maintenance mode; changes are paused. …","maintenance":true}`,
+admins included, except sign-in/out and session management under `/api/auth`, the CSP report, the
+toggle itself, `GET /api/admin/backup`, `POST /api/admin/restore`, and the two reads the API takes
+as POST (`/api/comments/mine`, `/api/ai-search`). Reads are unchanged, but the background writes a
+read can trigger stop too: `?refresh=1` ledger and balance refreshes, the pending-donation re-check
+on `GET /api/donate/status/:tx`, the balance revalidation of the admin views, and the daily cron.
+`GET /api/board/settings` carries `maintenance: {on, at, note}` for the site-wide banner; the note
+is public. Each isolate re-reads the flag every 3 seconds, so other instances follow a toggle within
+that window. A refused write is audited as the attempted action with outcome `failure`, not as a
+server fault.
+
+**Backup**: `GET /api/admin/backup` (recent authentication, audited as `backup.export`) downloads
+`thedao-kv-backup-<stamp>.json`:
+
+    { "format": "thedao-kv-backup/1", "exportedAt": "...", "prefixes": {"rfp": 25, ...},
+      "entries": [ { "key": ["rfp", "<id>"], "value": { ...the stored row... } }, ... ] }
+
+Entries are the KV rows verbatim (keys without any `DB_PREFIX`, so a file restores into any
+namespace), prefix by prefix in alphabetical order: `checkbox_acceptance`, `comment`, `comment_ref`,
+`content_logo`, `donation`, `donation_association`, `donation_by_tx`, `meta`, `nick`,
+`pending_association`, `pledge`, `profile`, `reused_rfp_slug`, `revision`, `rfp`, `rfp_by_safe`,
+`rfp_by_slug`, `rfp_by_source_slug`, `safe_balances`, `safe_sync`, `vote`. Left out on purpose:
+sessions, nonces, rate-limit counters, upload receipts, locks and checkbox sessions (rows that
+expire on their own and cannot carry their TTL), the comment claim index (rebuilt on restore), the
+three retired `terms_accept*` shapes, and the maintenance flag itself. The file holds every private
+field (contacts, funders, comment emails): keep it as safely as the database. A stored value the
+format cannot carry (there is none today) fails the export with 500 rather than dropping data.
+
+**Restore**: `POST /api/admin/restore` `{mode?: "merge" | "replace", backup}` (recent
+authentication, up to 32 MB, audited as `backup.restore` with the mode as detail) only while
+maintenance mode is on (409 otherwise). `merge` (the default) writes only the keys that do not exist
+yet; `replace` overwrites existing keys with the file's values. Neither deletes anything, and the
+maintenance flag inside a file is ignored. The whole file is validated first and refused as a whole
+(`400` naming the first bad entry) before any write; a `200 {written, skipped, claimsRebuilt}` means
+every entry was either written or skipped, so re-running a restore is safe. Held comments that were
+written get their claim index back with the remaining lifetime, so their authors can still find
+them. The dashboard card wraps all of this: enter maintenance, download, restore a file, exit.
 
 ## SIWE from the frontend
 

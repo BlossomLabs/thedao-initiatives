@@ -1,6 +1,7 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
+import { compress } from "hono/compress";
 import type { Deps, Vars } from "./middleware/context.ts";
 import { HttpError } from "./lib/errors.ts";
 import { clientIp } from "./middleware/ip.ts";
@@ -56,6 +57,8 @@ export function createApp(
   app.use("*", securityHeaders(site?.policy));
   useApi(
     apiHeaders,
+    // JSON bodies gzip to about a fifth; the board is the one that matters.
+    compress(),
     securityAudit(deps),
     cors({
       origin: deps.config.webOrigins,

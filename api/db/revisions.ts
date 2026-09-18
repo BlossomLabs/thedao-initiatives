@@ -1,14 +1,14 @@
-import { collect, K } from "./keys.ts";
+import { collect, K, type ReadOptions } from "./keys.ts";
 import type { Revision } from "./types.ts";
 
 /** Read side of the revision history; revisions are written by rfpsRepo. */
-export function revisionsRepo(kv: Deno.Kv) {
+export function revisionsRepo(kv: Deno.Kv, read: ReadOptions = undefined) {
   const get = async (rfpId: string, n: number): Promise<Revision | null> =>
-    (await kv.get<Revision>(K.revision(rfpId, n))).value;
+    (await kv.get<Revision>(K.revision(rfpId, n), read)).value;
 
   /** Ascending by number; archived ones only on request. */
   const list = async (rfpId: string, includeArchived = false): Promise<Revision[]> => {
-    const all = await collect(kv.list<Revision>({ prefix: K.revisions(rfpId) }));
+    const all = await collect(kv.list<Revision>({ prefix: K.revisions(rfpId) }, read));
     return all.filter((r) => includeArchived || !r.archived).sort((a, b) => a.n - b.n);
   };
 

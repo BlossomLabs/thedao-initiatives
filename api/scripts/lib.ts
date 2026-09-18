@@ -54,7 +54,9 @@ export async function siweLogin(
   const res = await fetch(o.apiUrl + "/api/auth/verify", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json", Origin: o.webOrigin, ...siteLockHeader(),
+      "Content-Type": "application/json",
+      Origin: o.webOrigin,
+      ...siteLockHeader(),
       ...(o.previousToken ? { Authorization: "Bearer " + o.previousToken } : {}),
     },
     body: JSON.stringify({ message, signature: await w.sign(message) }),

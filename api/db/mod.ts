@@ -7,30 +7,40 @@ import { commentsRepo } from "./comments.ts";
 import { profilesRepo } from "./profiles.ts";
 import { sessionsRepo } from "./sessions.ts";
 import { rateLimiter, type RateLimiterOptions } from "./ratelimit.ts";
+import type { ReadOptions } from "./keys.ts";
 import { metaRepo } from "./meta.ts";
 import { termsRepo } from "./terms.ts";
 
 export type * from "./types.ts";
 
+export interface DbOptions extends RateLimiterOptions {
+  /** Serve the public reads (rows, lists, snapshots) from the nearest KV
+   * replica. Every write keeps strong reads for the entries it checks. */
+  eventualReads?: boolean;
+}
+
 export function createDb(
   kv: Deno.Kv,
   now: () => number = () => Date.now() / 1000,
-  opts: RateLimiterOptions = {},
+  opts: DbOptions = {},
 ) {
-  const pledges = pledgesRepo(kv, now);
-  const donations = donationsRepo(kv, now);
+  const read: ReadOptions = opts.eventualReads ? { consistency: "eventual" } : undefined;
+  const pledges = pledgesRepo(kv, now, read);
+  const donations = donationsRepo(kv, now, read);
   return {
     kv,
     now,
-    rfps: rfpsRepo(kv, now),
+    /** The consistency for public reads outside the repos (funding snapshots). */
+    read,
+    rfps: rfpsRepo(kv, now, read),
     logos: logosRepo(kv, now),
-    revisions: revisionsRepo(kv),
+    revisions: revisionsRepo(kv, read),
     pledges,
     donations,
-    comments: commentsRepo(kv, now),
+    comments: commentsRepo(kv, now, read),
     profiles: profilesRepo(kv, now),
     sessions: sessionsRepo(kv, now),
-    meta: metaRepo(kv, now),
+    meta: metaRepo(kv, now, read),
     terms: termsRepo(kv, now),
     rateLimit: rateLimiter(kv, now, opts),
     /** Ledger-only totals (pledges + confirmed donation rows). The pages use

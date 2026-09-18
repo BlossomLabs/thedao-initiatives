@@ -113,7 +113,7 @@ export function createFunding(deps: FundingDeps) {
 
   async function cached(safe: string, revalidate: boolean): Promise<CachedBalances | null> {
     const key = safe.toLowerCase();
-    if (!revalidate) return (await kv.get<CachedBalances>(K.safeBalances(key))).value;
+    if (!revalidate) return (await kv.get<CachedBalances>(K.safeBalances(key), deps.db.read)).value;
     let p = inflight.get(key);
     if (!p) {
       p = refresh(key).finally(() => inflight.delete(key));

@@ -1,4 +1,4 @@
-import { collect, K } from "./keys.ts";
+import { collect, K, type ReadOptions } from "./keys.ts";
 import type { Comment, Vote } from "./types.ts";
 import { newId, randomHex } from "../lib/ids.ts";
 
@@ -19,7 +19,7 @@ export type CommentInput = Omit<
   | "createdAt"
 >;
 
-export function commentsRepo(kv: Deno.Kv, now: () => number) {
+export function commentsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
   /**
    * Insert an entry or reply. `startVote`: the author is vote-eligible, so the
    * entry starts at 1 vote (their own, so the toggle works).
@@ -63,7 +63,7 @@ export function commentsRepo(kv: Deno.Kv, now: () => number) {
 
   /** Published entries + replies for an initiative, oldest first. */
   async function forRfp(rfpId: string): Promise<Comment[]> {
-    const all = await collect(kv.list<Comment>({ prefix: K.comments(rfpId) }));
+    const all = await collect(kv.list<Comment>({ prefix: K.comments(rfpId) }, read));
     return all.filter((c) => c.status === "published").sort((a, b) => a.createdAt - b.createdAt);
   }
 

@@ -45,7 +45,11 @@ export async function createServer(siteOptions?: SiteOptions) {
     mode: config.rateLimitMode,
     log,
     alwaysEnforce: ALWAYS_ENFORCED_RATE_LIMITS,
+    eventualReads: config.kvEventualReads,
   });
+  if (config.kvEventualReads) {
+    log("KV_EVENTUAL_READS=1; public pages read from the nearest replica");
+  }
   if (config.rateLimitMode === "off") {
     log("WARNING: RATE_LIMIT_MODE=off; no rate limit is counted or enforced");
   } else if (config.rateLimitMode === "observe") {

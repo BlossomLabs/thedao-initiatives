@@ -1,9 +1,9 @@
-import { K } from "./keys.ts";
+import { K, type ReadOptions } from "./keys.ts";
 import type { SafeSyncState } from "./types.ts";
 import { AI_DAILY_CALL_CAP } from "../config.ts";
 import { bumpCounter } from "./ratelimit.ts";
 
-export function metaRepo(kv: Deno.Kv, now: () => number) {
+export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
   const get = async <T = unknown>(key: string): Promise<T | null> =>
     (await kv.get<T>(K.meta(key))).value;
   const set = (key: string, value: unknown) => kv.set(K.meta(key), value);
@@ -28,7 +28,8 @@ export function metaRepo(kv: Deno.Kv, now: () => number) {
     return true;
   }
 
-  const safeSync = async (rfpId: string) => (await kv.get<SafeSyncState>(K.safeSync(rfpId))).value;
+  const safeSync = async (rfpId: string) =>
+    (await kv.get<SafeSyncState>(K.safeSync(rfpId), read)).value;
   const setSafeSync = (rfpId: string, s: SafeSyncState) => kv.set(K.safeSync(rfpId), s);
 
   return { get, set, lock, unlock, aiBudgetOk, safeSync, setSafeSync };

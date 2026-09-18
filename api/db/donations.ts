@@ -1,8 +1,8 @@
-import { collect, K } from "./keys.ts";
+import { collect, K, type ReadOptions } from "./keys.ts";
 import type { Donation, DonationStatus } from "./types.ts";
 import type { Verification } from "../chain/verify.ts";
 
-export function donationsRepo(kv: Deno.Kv, now: () => number) {
+export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
   const get = async (rfpId: string, tx: string) =>
     (await kv.get<Donation>(K.donation(rfpId, tx))).value;
 
@@ -52,7 +52,7 @@ export function donationsRepo(kv: Deno.Kv, now: () => number) {
   }
 
   async function list(rfpId: string, onlyConfirmed = true): Promise<Donation[]> {
-    const all = await collect(kv.list<Donation>({ prefix: K.donations(rfpId) }));
+    const all = await collect(kv.list<Donation>({ prefix: K.donations(rfpId) }, read));
     const rows = onlyConfirmed ? all.filter((d) => d.status === "confirmed") : all;
     return rows.sort((a, b) => (b.confirmedAt ?? b.createdAt) - (a.confirmedAt ?? a.createdAt));
   }

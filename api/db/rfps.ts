@@ -1,4 +1,4 @@
-import { collect, K } from "./keys.ts";
+import { collect, K, type ReadOptions } from "./keys.ts";
 import type { Revision, RevisionSource, Rfp, RfpStatus } from "./types.ts";
 import { newId } from "../lib/ids.ts";
 import { slugify } from "../lib/slug.ts";
@@ -38,11 +38,12 @@ export const sameText = (a: Partial<RfpText>, b: Partial<RfpText>): boolean => {
     sameStructured(x, y);
 };
 
-export function rfpsRepo(kv: Deno.Kv, now: () => number) {
-  const get = async (id: string): Promise<Rfp | null> => (await kv.get<Rfp>(K.rfp(id))).value;
+export function rfpsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
+  // Public reads; every writer re-reads what it checks with strong consistency.
+  const get = async (id: string): Promise<Rfp | null> => (await kv.get<Rfp>(K.rfp(id), read)).value;
 
   const bySlug = async (slug: string): Promise<Rfp | null> => {
-    const id = (await kv.get<string>(K.rfpBySlug(slug))).value;
+    const id = (await kv.get<string>(K.rfpBySlug(slug), read)).value;
     return id ? get(id) : null;
   };
 
@@ -205,7 +206,7 @@ export function rfpsRepo(kv: Deno.Kv, now: () => number) {
   }
 
   const list = async (statuses: RfpStatus[]): Promise<Rfp[]> => {
-    const all = await collect(kv.list<Rfp>({ prefix: ["rfp"] }));
+    const all = await collect(kv.list<Rfp>({ prefix: ["rfp"] }, read));
     return all.filter((r) => statuses.includes(r.status))
       .sort((a, b) => b.createdAt - a.createdAt);
   };

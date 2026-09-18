@@ -1,8 +1,8 @@
-import { collect, K } from "./keys.ts";
+import { collect, K, type ReadOptions } from "./keys.ts";
 import type { Pledge, PledgeStatus } from "./types.ts";
 import { newId } from "../lib/ids.ts";
 
-export function pledgesRepo(kv: Deno.Kv, now: () => number) {
+export function pledgesRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
   async function add(
     rfpId: string,
     p: Omit<Pledge, "id" | "rfpId" | "createdAt">,
@@ -14,7 +14,7 @@ export function pledgesRepo(kv: Deno.Kv, now: () => number) {
   const get = async (rfpId: string, id: string) =>
     (await kv.get<Pledge>(K.pledge(rfpId, id))).value;
   async function list(rfpId: string, includeWithdrawn = false): Promise<Pledge[]> {
-    const all = await collect(kv.list<Pledge>({ prefix: K.pledges(rfpId) }));
+    const all = await collect(kv.list<Pledge>({ prefix: K.pledges(rfpId) }, read));
     return all.filter((p) => includeWithdrawn || p.status !== "withdrawn")
       .sort((a, b) => b.amountUsd - a.amountUsd);
   }

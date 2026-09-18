@@ -2,10 +2,10 @@
 
 JSON API for the initiatives board, on Deno + Hono + Deno KV. It replaced the Flask app that lived
 at the repository root until 2026-09-15 (see `docs/v1-to-v2.md`). `../server.ts` starts a single
-Hono app serving `/api` and the built SPA; `../deno.json` holds the tasks and imports.
-`app.ts` applies shared headers and the preview lock once. API middleware is scoped to API,
-health and Markdown routes, and `site.ts` handles static files and SPA fallbacks. `main.ts`
-starts the same app without static files for API-only development.
+Hono app serving `/api` and the built SPA; `../deno.json` holds the tasks and imports. `app.ts`
+applies shared headers and the preview lock once. API middleware is scoped to API, health and
+Markdown routes, and `site.ts` handles static files and SPA fallbacks. `main.ts` starts the same app
+without static files for API-only development.
 
 ## Run it (from the repository root)
 
@@ -31,25 +31,25 @@ starts the same app without static files for API-only development.
   and the ETH balance of an initiative's Safe over RPC, prices them with the Chainlink feeds, adds
   the admin-entered `paidOutUsd`, and saves balances in shared KV for two minutes per Safe. Normal
   board/initiative GETs return that snapshot without reading balances over RPC. When a summary's
-  `refreshDue` is true, the browser paints it and fetches the same URL with `?refresh=1`; that request
-  rechecks freshness, acquires a shared lease, and returns refreshed values for the existing number
-  animation. A failed refresh keeps the old snapshot and waits 60 seconds before retrying. Before
-  the first successful read, the ledger total is the fallback (`live: false`). Global UI reads
-  `/api/board/settings` without subscribing to funding. Design: `docs/balance-funding-design-2026-09-12.md`.
+  `refreshDue` is true, the browser paints it and fetches the same URL with `?refresh=1`; that
+  request rechecks freshness, acquires a shared lease, and returns refreshed values for the existing
+  number animation. A failed refresh keeps the old snapshot and waits 60 seconds before retrying.
+  Before the first successful read, the ledger total is the fallback (`live: false`). Global UI
+  reads `/api/board/settings` without subscribing to funding. Design:
+  `docs/balance-funding-design-2026-09-12.md`.
 - **The ledger refreshes when viewed.** Normal board/initiative GETs read saved donations and
   `ledger` status from KV. When `ledger.refreshDue` is true, the browser shows those rows and an
   updating indicator while `?refresh=1` refreshes the Safe indexer's results, verifies new and
   pending donations, saves them in KV, and returns the updated page. The board refreshes its
   published initiatives; an initiative page refreshes only its own Safe. A per-initiative KV lease
-  shares work across visitors and server instances; other visitors poll KV every two seconds
-  while `ledger.updating` is true. Fresh results are reused for `SAFE_SYNC_TTL_SECS` (default 600,
-  minimum 60). Failures and incomplete backfills retry after 60 seconds while viewed, preserving
-  old rows and the resume cursor. The admin sync button can refresh early but respects the lease.
-  Startup does not check the chain. The removed `SAFE_SYNC_CRON` setting is ignored.
-  Set `SAFE_API_KEY` for authenticated indexer access.
-  Empty/known indexer results need no ledger RPC calls. Donation verification shares one lazy
-  block-number lookup per refresh batch; receipt and price reads still use RPC. Failed head
-  lookups never bypass the confirmation requirement.
+  shares work across visitors and server instances; other visitors poll KV every two seconds while
+  `ledger.updating` is true. Fresh results are reused for `SAFE_SYNC_TTL_SECS` (default 600, minimum
+  60). Failures and incomplete backfills retry after 60 seconds while viewed, preserving old rows
+  and the resume cursor. The admin sync button can refresh early but respects the lease. Startup
+  does not check the chain. The removed `SAFE_SYNC_CRON` setting is ignored. Set `SAFE_API_KEY` for
+  authenticated indexer access. Empty/known indexer results need no ledger RPC calls. Donation
+  verification shares one lazy block-number lookup per refresh batch; receipt and price reads still
+  use RPC. Failed head lookups never bypass the confirmation requirement.
 - **A daily production fallback keeps quiet-day snapshots recent.** `server.ts` registers
   `refresh-public-cache-daily` at module scope for 03:00 UTC. Its handler checks the runtime
   `DENO_TIMELINE` before reading KV or calling any upstream service; only the exact value
@@ -79,31 +79,31 @@ starts the same app without static files for API-only development.
 - **Checkbox evidence and transfers are separate.** Versions live in `content/donation-terms/`;
   deploy this directory with the API and restart after publishing terms. `POST /api/donate/accept`
   takes `slug`, `initiativeId`, `chainId`, `recipient`, `version`, `agreed: true`, and `method`.
-  Wallet attempts include `wallet: {address, token, amountRaw}`; exchange attempts may include
-  any subset of `details: {name, amount, currency}` (amount is token units, not USD).
-  The API validates the published/effective document and recipient, records server time and an
-  immutable attempt, and establishes a dedicated anonymous HttpOnly/SameSite cookie (Secure on
-  HTTPS). Mutation requests require an allowed nonempty Origin and JSON; no wallet login or
-  terms message signature is required. The wallet still authorizes the transfer itself.
-  `POST /api/donate/confirm` optionally attaches `attemptId` using the same browser cookie.
-  Hash attachment is persisted before RPC verification and is idempotent for the same hash;
-  another hash requires a new attempt. Ledger refreshes and the production daily fallback retry
-  queued matches for seven days, up to 30 per initiative per refresh. Public confirmations remain
-  accounting-only. Legacy `terms` envelopes are rejected rather than silently discarded.
-  Wallet matching requires a single eligible transfer, the intended sender/token/base-unit amount,
-  and a block after the head observed at acceptance. Multi-transfer/ambiguous receipts remain
-  unmatched even when credited. Exchange hashes are visitor-reported; optional details alone do
-  not automatically match a donation. Names are private labels, not identity proof.
-  Acceptance rows use `browser-checkbox-v1`; separate association rows use
-  `wallet-flow-correlated` or `visitor-reported`, always `donorAuthenticated: false`. A public hash
-  never grants control over another attempt, blocks another claim, or changes donation rights.
+  Wallet attempts include `wallet: {address, token, amountRaw}`; exchange attempts may include any
+  subset of `details: {name, amount, currency}` (amount is token units, not USD). The API validates
+  the published/effective document and recipient, records server time and an immutable attempt, and
+  establishes a dedicated anonymous HttpOnly/SameSite cookie (Secure on HTTPS). Mutation requests
+  require an allowed nonempty Origin and JSON; no wallet login or terms message signature is
+  required. The wallet still authorizes the transfer itself. `POST /api/donate/confirm` optionally
+  attaches `attemptId` using the same browser cookie. Hash attachment is persisted before RPC
+  verification and is idempotent for the same hash; another hash requires a new attempt. Ledger
+  refreshes and the production daily fallback retry queued matches for seven days, up to 30 per
+  initiative per refresh. Public confirmations remain accounting-only. Legacy `terms` envelopes are
+  rejected rather than silently discarded. Wallet matching requires a single eligible transfer, the
+  intended sender/token/base-unit amount, and a block after the head observed at acceptance.
+  Multi-transfer/ambiguous receipts remain unmatched even when credited. Exchange hashes are
+  visitor-reported; optional details alone do not automatically match a donation. Names are private
+  labels, not identity proof. Acceptance rows use `browser-checkbox-v1`; separate association rows
+  use `wallet-flow-correlated` or `visitor-reported`, always `donorAuthenticated: false`. A public
+  hash never grants control over another attempt, blocks another claim, or changes donation rights.
   `GET /api/donate/attempt/:id` is private to its browser session. Acceptance and association data
   have no automatic deletion (apply the published retention policy operationally); anonymous
-  credentials and hash-submission windows expire after seven days. No additional IP/user-agent evidence is collected. Historical `terms_accept`,
-  `terms_verified`, and correction records are preserved unchanged with their original assurance.
-  This mitigates ASVS-03's first-writer poisoning by changing the evidence model; it does not
-  claim cryptographic donor consent or establish ASVS compliance. See
-  `docs/donation-checkbox-evidence.md` for the residual spoofing risk and validation criteria.
+  credentials and hash-submission windows expire after seven days. No additional IP/user-agent
+  evidence is collected. Historical `terms_accept`, `terms_verified`, and correction records are
+  preserved unchanged with their original assurance. This mitigates ASVS-03's first-writer poisoning
+  by changing the evidence model; it does not claim cryptographic donor consent or establish ASVS
+  compliance. See `docs/donation-checkbox-evidence.md` for the residual spoofing risk and validation
+  criteria.
 - **Uploads go to Pinata** (backer logos, profile pictures); only the CID is stored. Set
   `PINATA_JWT`; until then uploads answer 503.
 - **Initiatives are structured** (submission redesign, Sep 2026): the text of a row is `sections`
@@ -115,18 +115,18 @@ starts the same app without static files for API-only development.
   the same on the form and here; failures come back as
   `{error, findings: {errors: [{field, msg, kind}], warnings: [{field, msg}]}}` with the form's
   field ids.
-- **Text is revisioned.** Every change to title, summary, sections, milestones or links
-  (the proposer's edit page, the admin editor, content sync) appends an immutable revision
-  under `["revision", rfpId, n]`; the initiative row carries the current number. A revision carries
-  the structured fields too. Revisions are public; admins can archive a superseded one (hidden from
-  the public history, never the current one). Rows written before revisions existed get their text
+- **Text is revisioned.** Every change to title, summary, sections, milestones or links (the
+  proposer's edit page, the admin editor, content sync) appends an immutable revision under
+  `["revision", rfpId, n]`; the initiative row carries the current number. A revision carries the
+  structured fields too. Revisions are public; admins can archive a superseded one (hidden from the
+  public history, never the current one). Rows written before revisions existed get their text
   snapshotted as revision 1 on their first edit. Historical `details` remain readable in proposals
   and revisions, but new text edits must use structured fields. Editing an old proposal migrates it;
   changing only its page facts preserves the old body.
-- Ids are ULID strings. Rate limits live in KV so they hold across isolates. `RATE_LIMIT_MODE`
-  picks `enforce` (default), `observe` or `off`. Observe counts every bucket and allows the request,
-  except the buckets in `ALWAYS_ENFORCED_RATE_LIMITS` (submissions, support, uploads), which spend
-  a real resource and keep refusing. Enforce and observe both log a breach as one JSON line
+- Ids are ULID strings. Rate limits live in KV so they hold across isolates. `RATE_LIMIT_MODE` picks
+  `enforce` (default), `observe` or `off`. Observe counts every bucket and allows the request,
+  except the buckets in `ALWAYS_ENFORCED_RATE_LIMITS` (submissions, support, uploads), which spend a
+  real resource and keep refusing. Enforce and observe both log a breach as one JSON line
   (`{"rateLimit":true,"event":"ratelimit.breach",...}` with the bucket name, the sha256 of the
   client key, cap, window and count) when a bucket first passes its cap and again at each 10x
   multiple, so Grafana can show which caps real traffic reaches without one line per request.
@@ -199,25 +199,25 @@ historical comment `email`) only appear in admin responses.
 - New comments take `initiativeId`, `body`, `name` and the `website` honeypot. They are generic
   comments; category selection, topics and email collection are no longer supported. Previous
   browser bundles sending `type: "other"`, `topic: ""`, `email: ""` still work. Historical
-  questions/suggestions remain readable and can be answered/reviewed; the `accept` moderation
-  action has been removed.
+  questions/suggestions remain readable and can be answered/reviewed; the `accept` moderation action
+  has been removed.
 - Initiative submission and page-fact edits use `goal` and `durationMonths`. The request aliases
   `goalUsd` and `duration` are rejected; response objects still expose `goalUsd`. Text edits reject
   `details` and use sections, milestones and links.
 - Safe binding goes through on-chain verification at `safe-confirm`. The initiative editor cannot
   set or clear `safeAddress`.
 - Admin pledge writes use `amount` (responses still expose `amountUsd`) and accept a multipart
-  `logo` image for a logo change. Direct `logoCid` and `amountUsd` request fields are rejected.
-  This does not change submission `backers[].amountUsd` or `backers[].logoCid`, whose uploaded CIDs
+  `logo` image for a logo change. Direct `logoCid` and `amountUsd` request fields are rejected. This
+  does not change submission `backers[].amountUsd` or `backers[].logoCid`, whose uploaded CIDs
   remain bound to the submitting wallet. JSON status-only pledge updates still work.
 
 All write endpoints reject unknown fields with `400 {"error":"Unsupported field: <field>."}`.
 Removed fields follow the same rule. This covers JSON and multipart fields (including file fields),
-and nested sections, milestones, backers, donation acceptance details and content-sync files; nested errors name
-the path, such as `milestones[0].amout`. Validation happens before applying edits or uploading files.
-Bodyless actions accept an empty body or `{}` and reject additional fields. Malformed JSON or a
-non-object JSON body returns 400, as do unsupported actions. No historical records are deleted by
-this API cleanup.
+and nested sections, milestones, backers, donation acceptance details and content-sync files; nested
+errors name the path, such as `milestones[0].amout`. Validation happens before applying edits or
+uploading files. Bodyless actions accept an empty body or `{}` and reject additional fields.
+Malformed JSON or a non-object JSON body returns 400, as do unsupported actions. No historical
+records are deleted by this API cleanup.
 
 ## Maintenance mode, backup and restore
 
@@ -312,6 +312,12 @@ root README). Set the variables from `.env.example` (no `KV_PATH`). KV and cron 
 platform; each timeline gets its own database. If two deployments must share one KV database, give
 each its own `DB_PREFIX`: every key is stored under that first part, so the two never see each
 other's rows (changing it on a live deployment starts from empty).
+
+`KV_EVENTUAL_READS=1` serves the public pages' reads (initiative rows and lists, pledges, donations,
+revisions, comments, funding snapshots) with Deno KV eventual consistency, from the nearest replica.
+Every write keeps strong reads for the entries it checks. It is an experiment: measure with
+`deno task bench` on a preview before keeping it on, since a page read right after a write may
+briefly show the previous state.
 
 ## Scripts
 

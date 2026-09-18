@@ -162,6 +162,8 @@ export interface Config {
   cspConnectOrigins: string[];
   port: number;
   kvPath: string | undefined;
+  /** Public pages read KV with eventual consistency (nearest replica). */
+  kvEventualReads: boolean;
   /** First key part every KV key is stored under; empty = bare keys. */
   dbPrefix: string;
 }
@@ -254,6 +256,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     ],
     port: Number(env.PORT ?? "8000") || 8000,
     kvPath: (env.KV_PATH ?? "").trim() || undefined,
+    kvEventualReads: flag(env.KV_EVENTUAL_READS),
     dbPrefix: (env.DB_PREFIX ?? "").trim(),
   };
 }

@@ -1,3 +1,7 @@
+/** How a public read may be served: `{ consistency: "eventual" }` lets Deno KV
+ * answer from the nearest replica; undefined is the default strong read. */
+export type ReadOptions = { consistency: Deno.KvConsistencyLevel } | undefined;
+
 /** Single source of truth for every KV key shape. */
 export const K = {
   rfp: (id: string) => ["rfp", id] as const,

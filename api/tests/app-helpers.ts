@@ -187,6 +187,7 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     mode: cfg.rateLimitMode,
     log: (line) => deps.log(line), // tests swap deps.log after construction
     alwaysEnforce: config.ALWAYS_ENFORCED_RATE_LIMITS,
+    eventualReads: cfg.kvEventualReads,
   });
   const script: ChainScript = {
     head: 1000,

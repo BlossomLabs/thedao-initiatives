@@ -13,7 +13,7 @@ import { abiWord, decodeHexInt, SEL_BALANCE_OF } from "../chain/abi.ts";
 import { ethCall } from "../chain/rpc.ts";
 import type { Chain } from "../chain/mod.ts";
 import type { Db } from "../db/mod.ts";
-import type { Rfp } from "../db/types.ts";
+import type { Donation, Pledge, Rfp } from "../db/types.ts";
 import { K } from "../db/keys.ts";
 
 /** How long one Safe's balance read is reused before the chain is asked again. */
@@ -70,16 +70,21 @@ export function createFunding(deps: FundingDeps) {
   async function read(safe: string): Promise<SafeBalances> {
     const tokens = await deps.chain.donorTokens();
     const data = SEL_BALANCE_OF + encodeHex(abiWord(safe));
-    const holdings: Holding[] = [];
-    for (const [symbol, [address, decimals]] of Object.entries(tokens)) {
-      const raw = symbol === "ETH"
-        ? await deps.chain.rpc("eth_getBalance", [safe, "latest"])
-        : await ethCall(deps.chain.rpc, address, data);
-      const amount = Number(decodeHexInt(raw)) / 10 ** decimals;
-      if (amount <= 0) continue;
-      const rate = await deps.chain.usdRate(symbol);
-      holdings.push({ symbol, amount, usd: cents(amount * rate) });
-    }
+    // One wave of balance calls, then one wave of prices for the non-zero ones.
+    const amounts = await Promise.all(
+      Object.entries(tokens).map(async ([symbol, [address, decimals]]) => {
+        const raw = symbol === "ETH"
+          ? await deps.chain.rpc("eth_getBalance", [safe, "latest"])
+          : await ethCall(deps.chain.rpc, address, data);
+        return { symbol, amount: Number(decodeHexInt(raw)) / 10 ** decimals };
+      }),
+    );
+    const holdings: Holding[] = await Promise.all(
+      amounts.filter((t) => t.amount > 0).map(async ({ symbol, amount }) => {
+        const rate = await deps.chain.usdRate(symbol);
+        return { symbol, amount, usd: cents(amount * rate) };
+      }),
+    );
     holdings.sort((a, b) => b.usd - a.usd);
     return { usd: cents(holdings.reduce((s, h) => s + h.usd, 0)), holdings, at: deps.now() };
   }
@@ -135,11 +140,19 @@ export function createFunding(deps: FundingDeps) {
     }
   }
 
-  async function summary(rfp: Rfp, revalidate = false): Promise<FundingSummary> {
-    const [pledged, ledger] = await Promise.all([
-      deps.db.pledges.totalActive(rfp.id),
-      deps.db.donations.confirmedTotal(rfp.id),
-    ]);
+  /** The summary from rows the caller already holds (active pledges and
+   * confirmed donations, as the repos list them), so a page that shows the
+   * rows too reads them once. Only the Safe balance snapshot is fetched here. */
+  async function summaryFrom(
+    rfp: Rfp,
+    pledges: Pledge[],
+    donations: Donation[],
+    revalidate = false,
+  ): Promise<FundingSummary> {
+    const pledged = pledges.filter((p) => p.status !== "withdrawn")
+      .reduce((s, p) => s + p.amountUsd, 0);
+    const ledger = donations.filter((d) => d.status === "confirmed")
+      .reduce((s, d) => s + d.amountUsd, 0);
     const paidOut = rfp.paidOutUsd ?? 0;
     const snapshot = rfp.safeAddress ? await cached(rfp.safeAddress, revalidate) : null;
     const b = snapshot?.value;
@@ -155,7 +168,15 @@ export function createFunding(deps: FundingDeps) {
     };
   }
 
-  return { balances, summary, invalidate };
+  async function summary(rfp: Rfp, revalidate = false): Promise<FundingSummary> {
+    const [pledges, donations] = await Promise.all([
+      deps.db.pledges.list(rfp.id),
+      deps.db.donations.list(rfp.id),
+    ]);
+    return summaryFrom(rfp, pledges, donations, revalidate);
+  }
+
+  return { balances, summary, summaryFrom, invalidate };
 }
 
 export type Funding = ReturnType<typeof createFunding>;

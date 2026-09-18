@@ -8,8 +8,8 @@ import { requireAuth } from "../middleware/auth.ts";
 import {
   donationJson,
   pledgeJson,
-  proposerRfp,
-  publicRfp,
+  proposerInitiative,
+  publicInitiative,
   revisionJson,
   revisionMeta,
 } from "../lib/json.ts";
@@ -21,8 +21,8 @@ import {
   SUBMISSIONS_PER_HOUR_PER_IP,
   TOKENS,
 } from "../config.ts";
-import type { Pledge, Rfp, Session } from "../db/types.ts";
-import { pickText } from "../db/rfps.ts";
+import type { Initiative, Pledge, Session } from "../db/types.ts";
+import { pickText } from "../db/initiatives.ts";
 import { ledgerStatus, refreshLedger } from "../services/ledger.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
 import {
@@ -55,20 +55,20 @@ export const pledgeBackers = (pledges: Pledge[]): CheckBacker[] =>
  * the stored goal, links. Page facts and backers are checked where they are
  * edited; the stored pledges still count as backers here, since a top-up's
  * adoption floor is measured against what this grant raises. */
-export function editChecks(rfp: Pick<Rfp, "type" | "topup" | "goalUsd">, text: {
+export function editChecks(initiative: Pick<Initiative, "type" | "topup" | "goalUsd">, text: {
   title: string;
   summary: string;
-  sections: Rfp["sections"];
-  milestones: Rfp["milestones"];
-  links: Rfp["links"];
+  sections: Initiative["sections"];
+  milestones: Initiative["milestones"];
+  links: Initiative["links"];
 }, backers: CheckBacker[]) {
   return checkSubmission({
-    type: rfp.type,
-    topup: Boolean(rfp.topup),
+    type: initiative.type,
+    topup: Boolean(initiative.topup),
     page: {
       title: text.title,
       summary: text.summary,
-      goal: rfp.goalUsd,
+      goal: initiative.goalUsd,
       duration: "",
       recipient: "",
       funders: "",
@@ -90,8 +90,11 @@ export function initiativeRoutes(deps: Deps) {
     Boolean((await db.profiles.get(address)).nickname) ||
     Boolean((await deps.ens.reverse(address)).name);
 
-  const isProposer = (rfp: Rfp, user: Session | null) =>
-    Boolean(user && rfp.proposer && rfp.proposer.toLowerCase() === user.address.toLowerCase());
+  const isProposer = (initiative: Initiative, user: Session | null) =>
+    Boolean(
+      user && initiative.proposer &&
+        initiative.proposer.toLowerCase() === user.address.toLowerCase(),
+    );
 
   /**
    * Published rows for everyone; a pending or rejected one for its proposer and
@@ -101,31 +104,34 @@ export function initiativeRoutes(deps: Deps) {
     slug: string,
     user: Session | null,
     mutation?: Record<string, unknown>,
-  ): Promise<Rfp> => {
-    const rfp = await db.rfps.bySlug(slug);
-    if (rfp && mutation) await assertInitiativeIdentity(db, slug, rfp, mutation.initiativeId);
-    const ok = rfp && (
-      ["approved", "archived"].includes(rfp.status) ||
-      (["pending", "rejected"].includes(rfp.status) && (user?.isAdmin || isProposer(rfp, user)))
+  ): Promise<Initiative> => {
+    const initiative = await db.initiatives.bySlug(slug);
+    if (initiative && mutation) {
+      await assertInitiativeIdentity(db, slug, initiative, mutation.initiativeId);
+    }
+    const ok = initiative && (
+      ["approved", "archived"].includes(initiative.status) ||
+      (["pending", "rejected"].includes(initiative.status) &&
+        (user?.isAdmin || isProposer(initiative, user)))
     );
     if (!ok) throw new HttpError(404, "not found");
-    return rfp;
+    return initiative;
   };
 
   /** The proposer (or an admin) may act on this row; everyone else is refused. */
   const editableBy = async (slug: string, user: Session, body: Record<string, unknown>) => {
-    const rfp = await visibleOr404(slug, user, body);
-    const proposer = isProposer(rfp, user);
+    const initiative = await visibleOr404(slug, user, body);
+    const proposer = isProposer(initiative, user);
     if (!proposer && !user.isAdmin) {
       throw new HttpError(403, "Only the proposer can edit this initiative.");
     }
-    return { rfp, proposer };
+    return { initiative, proposer };
   };
 
   /** What the signed-in wallet proposed, any status, newest first. Before "/:slug". */
   r.get("/mine", requireAuth, async (c) => {
     const user = c.var.user!;
-    const rows = await db.rfps.list(["pending", "approved", "rejected", "archived"]);
+    const rows = await db.initiatives.list(["pending", "approved", "rejected", "archived"]);
     const initiatives = rows
       .filter((x) => isProposer(x, user))
       .sort((a, b) => b.createdAt - a.createdAt)
@@ -142,32 +148,32 @@ export function initiativeRoutes(deps: Deps) {
 
   r.get("/:slug", async (c) => {
     const user = c.var.user;
-    const rfp = await visibleOr404(c.req.param("slug"), user);
+    const initiative = await visibleOr404(c.req.param("slug"), user);
     const asked = c.req.query("refresh") === "1";
     const paused = asked && await deps.maintenance.on();
     const refresh = asked && !paused;
-    if (refresh) await refreshLedger(deps, rfp);
-    const [summary, pledges, donations, chainState, revisions, ledger] = await Promise.all([
-      deps.funding.summary(rfp, refresh),
-      db.pledges.list(rfp.id),
-      db.donations.list(rfp.id),
+    if (refresh) await refreshLedger(deps, initiative);
+    const [pledges, donations, chainState, revisions, ledger] = await Promise.all([
+      db.pledges.list(initiative.id),
+      db.donations.list(initiative.id),
       deps.chain.state(refresh),
-      db.revisions.list(rfp.id, Boolean(user?.isAdmin)),
-      ledgerStatus(deps, rfp),
+      db.revisions.list(initiative.id, Boolean(user?.isAdmin)),
+      ledgerStatus(deps, initiative),
     ]);
+    const summary = await deps.funding.summaryFrom(initiative, pledges, donations, refresh);
     if (paused) summary.refreshDue = false;
-    const mine = Boolean(user?.isAdmin) || isProposer(rfp, user);
+    const mine = Boolean(user?.isAdmin) || isProposer(initiative, user);
     return c.json({
       refreshDue: !paused && !chainStateFresh(chainState, deps.now()),
-      initiative: mine ? proposerRfp(rfp) : publicRfp(rfp),
+      initiative: mine ? proposerInitiative(initiative) : publicInitiative(initiative),
       revisions: revisions.map(revisionMeta),
       summary,
-      pct: pctOf(summary.total, rfp.goalUsd),
+      pct: pctOf(summary.total, initiative.goalUsd),
       pledges: pledges.map((p) => pledgeJson(config, p)),
       donations: donations.map((d) => donationJson(d, decimalsOf)),
-      funded: Boolean(rfp.goalUsd && summary.total >= rfp.goalUsd),
+      funded: Boolean(initiative.goalUsd && summary.total >= initiative.goalUsd),
       donationsEnabled: Boolean(
-        tokensUsable(chainState) && rfp.safeAddress && rfp.status === "approved",
+        tokensUsable(chainState) && initiative.safeAddress && initiative.status === "approved",
       ),
       ledger: paused && ledger ? { ...ledger, refreshDue: false } : ledger,
     });
@@ -176,9 +182,9 @@ export function initiativeRoutes(deps: Deps) {
   /** One version of the text as it was published; archived ones are for admins only. */
   r.get("/:slug/revisions/:n", async (c) => {
     const user = c.var.user;
-    const rfp = await visibleOr404(c.req.param("slug"), user);
+    const initiative = await visibleOr404(c.req.param("slug"), user);
     const n = Number(c.req.param("n"));
-    const rev = Number.isInteger(n) && n > 0 ? await db.revisions.get(rfp.id, n) : null;
+    const rev = Number.isInteger(n) && n > 0 ? await db.revisions.get(initiative.id, n) : null;
     if (!rev || (rev.archived && !user?.isAdmin)) throw new HttpError(404, "not found");
     return c.json({ revision: revisionJson(rev) });
   });
@@ -191,8 +197,8 @@ export function initiativeRoutes(deps: Deps) {
   r.post("/:slug/revisions", requireAuth, async (c) => {
     const user = c.var.user!;
     const body = await jsonBody(c, ["initiativeId", ...TEXT_FIELDS]);
-    const { rfp, proposer } = await editableBy(c.req.param("slug"), user, body);
-    if (rfp.status !== "pending" && rfp.status !== "approved") {
+    const { initiative, proposer } = await editableBy(c.req.param("slug"), user, body);
+    if (initiative.status !== "pending" && initiative.status !== "approved") {
       throw new HttpError(403, "This initiative is no longer open for edits.");
     }
     if (
@@ -204,7 +210,7 @@ export function initiativeRoutes(deps: Deps) {
     ) {
       throw new HttpError(429, "Too many edits; try again in an hour.");
     }
-    const cur = pickText(rfp);
+    const cur = pickText(initiative);
     const structuredBody = ["sections", "milestones", "links"].some((k) => body[k] !== undefined);
     if (!structuredBody) {
       throw new HttpError(
@@ -224,16 +230,19 @@ export function initiativeRoutes(deps: Deps) {
       sections: body.sections ?? cur.sections,
       milestones: body.milestones ?? cur.milestones,
       links: body.links ?? cur.links,
-    }, rfp.type);
-    const backers = pledgeBackers(await db.pledges.list(rfp.id));
-    const findings = mergeFindings(caps, editChecks(rfp, { ...base, ...structured }, backers));
+    }, initiative.type);
+    const backers = pledgeBackers(await db.pledges.list(initiative.id));
+    const findings = mergeFindings(
+      caps,
+      editChecks(initiative, { ...base, ...structured }, backers),
+    );
     assertNoErrors(findings);
     const { warnings } = findings;
     const text = { ...base, ...structured };
-    const { rfp: next, revision } = await db.rfps.revise(rfp.id, text, origin);
+    const { initiative: next, revision } = await db.initiatives.revise(initiative.id, text, origin);
     if (!revision) throw new HttpError(400, "Nothing changed.");
     return c.json(
-      { initiative: publicRfp(next), revision: revisionMeta(revision), warnings },
+      { initiative: publicInitiative(next), revision: revisionMeta(revision), warnings },
       201,
     );
   });
@@ -246,13 +255,15 @@ export function initiativeRoutes(deps: Deps) {
   r.patch("/:slug", requireAuth, async (c) => {
     const user = c.var.user!;
     const body = await jsonBody(c, ["initiativeId", ...PAGE_FACT_FIELDS]);
-    const { rfp } = await editableBy(c.req.param("slug"), user, body);
-    if (!user.isAdmin && rfp.status !== "pending") {
+    const { initiative } = await editableBy(c.req.param("slug"), user, body);
+    if (!user.isAdmin && initiative.status !== "pending") {
       throw new HttpError(403, "Locked after approval; email the team.");
     }
-    const patch = await readPageFacts(body, rfp, deps);
-    const next = Object.keys(patch).length ? await db.rfps.update(rfp.id, patch) : rfp;
-    return c.json({ initiative: proposerRfp(next) });
+    const patch = await readPageFacts(body, initiative, deps);
+    const next = Object.keys(patch).length
+      ? await db.initiatives.update(initiative.id, patch)
+      : initiative;
+    return c.json({ initiative: proposerInitiative(next) });
   });
 
   /**
@@ -332,7 +343,7 @@ export function initiativeRoutes(deps: Deps) {
     // Archived proposals may be resubmitted; other statuses still block copies.
     if (isStructured(structured)) {
       const key = bodyKey(structured.sections, structured.milestones);
-      const all = await db.rfps.list(["pending", "approved", "rejected"]);
+      const all = await db.initiatives.list(["pending", "approved", "rejected"]);
       const dup = all.find((x) => {
         const t = pickText(x);
         return isStructured(t) && bodyKey(t.sections, t.milestones) === key;
@@ -348,7 +359,7 @@ export function initiativeRoutes(deps: Deps) {
     }
     const findings = mergeFindings(caps, backerCaps, checks, { errors: extra, warnings: [] });
     assertNoErrors(findings);
-    const rfp = await db.rfps.insert(
+    const initiative = await db.initiatives.insert(
       {
         title,
         summary,
@@ -373,7 +384,7 @@ export function initiativeRoutes(deps: Deps) {
     );
     for (const b of backers) {
       if (!b.org) continue;
-      await db.pledges.add(rfp.id, {
+      await db.pledges.add(initiative.id, {
         company: b.org,
         amountUsd: b.amountUsd,
         status: "pledged",
@@ -382,7 +393,10 @@ export function initiativeRoutes(deps: Deps) {
         logoCid: b.logoCid,
       });
     }
-    return c.json({ slug: rfp.slug, status: rfp.status, warnings: findings.warnings }, 201);
+    return c.json(
+      { slug: initiative.slug, status: initiative.status, warnings: findings.warnings },
+      201,
+    );
   });
 
   return r;

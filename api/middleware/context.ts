@@ -8,6 +8,7 @@ import type { Pinata } from "../services/pinata.ts";
 import type { resolvePublicIps } from "../lib/validate.ts";
 import type { Funding } from "../services/funding.ts";
 import type { Admins } from "../services/admins.ts";
+import type { Maintenance } from "../services/maintenance.ts";
 
 export interface Deps {
   db: Db;
@@ -25,6 +26,8 @@ export interface Deps {
   funding: Funding;
   /** The admin list: ADMIN_ADDRESSES plus dashboard additions (services/admins.ts). */
   admins: Admins;
+  /** The write freeze admins toggle from the dashboard (services/maintenance.ts). */
+  maintenance: Maintenance;
 }
 
 export type Vars = {
@@ -32,6 +35,9 @@ export type Vars = {
     user: Session | null;
     token: string;
     ip: string | null;
+    /** Set by the maintenance gate on a refused write, so the audit does not
+     * count it as a server failure. */
+    maintenance?: boolean;
   };
 };
 

@@ -8,6 +8,7 @@ import { createAi } from "./services/ai.ts";
 import { createEns, onchainEns } from "./services/ens.ts";
 import { createPinata } from "./services/pinata.ts";
 import { warmImageWorker } from "./lib/image.ts";
+import { createMaintenance } from "./services/maintenance.ts";
 import { createFunding } from "./services/funding.ts";
 import { toChecksum } from "./chain/address.ts";
 import { ALWAYS_ENFORCED_RATE_LIMITS, BADGE_CONTRACT, CURATOR_ADDRESSES } from "./config.ts";
@@ -64,6 +65,7 @@ export async function createServer(siteOptions?: SiteOptions) {
     funding: createFunding({ db, chain, now, log }),
     ai: createAi(config, fetch),
     admins: createAdmins(db, config, now),
+    maintenance: createMaintenance(db, now),
     ens: createEns(fetch, now, { onchain: onchainEns(config.rpcEndpoints, fetch), log }),
     pinata: createPinata(config, fetch),
     log,

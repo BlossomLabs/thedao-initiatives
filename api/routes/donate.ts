@@ -243,7 +243,10 @@ export function donateRoutes(deps: Deps) {
     const txHash = c.req.param("txHash").trim().toLowerCase();
     let row = await db.donations.byHash(txHash);
     if (!row) throw new HttpError(404, "not found");
-    if (row.status === "pending" && (await db.rateLimit("st:" + txHash, 1, 5))) {
+    if (
+      row.status === "pending" && !(await deps.maintenance.on()) &&
+      (await db.rateLimit("st:" + txHash, 1, 5))
+    ) {
       const rfp = await db.rfps.get(row.rfpId);
       if (rfp?.safeAddress && Object.keys(await chain.activeTokens()).length) {
         const v = await chain.verifyDonation(txHash, rfp.safeAddress);

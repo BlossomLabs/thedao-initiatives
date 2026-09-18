@@ -33,6 +33,10 @@ const ACTIONS = {
   "logo.upload": "administration",
   "content.sync": "administration",
   "content.item": "administration",
+  "maintenance.enter": "administration",
+  "maintenance.exit": "administration",
+  "backup.export": "administration",
+  "backup.restore": "administration",
   "audit.test": "system",
   "authorization.denied": "authorization",
   "validation.rejected": "validation",
@@ -142,6 +146,10 @@ const ROUTES: [string, RegExp, AuditAction, TargetKind, number?][] = [
   ["POST", /^\/api\/admin\/comments\/([^/]+)\/[^/]+$/, "comment.moderate", "comment", 1],
   ["POST", /^\/api\/admin\/logos$/, "logo.upload", "logo"],
   ["POST", /^\/api\/admin\/sync-content$/, "content.sync", "content"],
+  ["POST", /^\/api\/admin\/maintenance\/enter$/, "maintenance.enter", "application"],
+  ["POST", /^\/api\/admin\/maintenance\/exit$/, "maintenance.exit", "application"],
+  ["GET", /^\/api\/admin\/backup$/, "backup.export", "application"],
+  ["POST", /^\/api\/admin\/restore$/, "backup.restore", "application"],
   ["POST", /^\/api\/admin\/audit\/test$/, "audit.test", "audit"],
 ];
 
@@ -243,7 +251,7 @@ export function securityAudit(deps: Deps): MiddlewareHandler<Vars> {
       ? "abuse.limited"
       : [400, 413, 415, 422].includes(status)
       ? "validation.rejected"
-      : status >= 500
+      : status >= 500 && !c.var.maintenance // a paused write is not a server fault
       ? "request.failed"
       : undefined;
     if (state.descriptor) {

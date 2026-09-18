@@ -21,6 +21,7 @@ import { healthRoutes } from "./routes/health.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 import { createSiteLock, type SiteLock } from "./lib/sitelock.ts";
 import { auditIntent, securityAudit } from "./services/audit.ts";
+import { maintenanceGate } from "./services/maintenance.ts";
 import { auditRoutes } from "./routes/audit.ts";
 import type { StaticSite } from "./site.ts";
 
@@ -65,16 +66,19 @@ export function createApp(
     }),
   );
   app.use("*", siteLock(lock));
+  // A backup restore carries the whole database; it sets its own, larger cap.
+  const limit = bodyLimit({ maxSize: 2 * 1024 * 1024 });
   useApi(
     clientIp(),
     originGuard(deps.config),
-    bodyLimit({ maxSize: 2 * 1024 * 1024 }),
+    (c, next) => c.req.path === "/api/admin/restore" ? next() : limit(c, next),
   );
   // Reports never load or refresh an authenticated session.
   app.route("/api/csp-report", cspRoutes(deps));
   useApi(
     sessionLoader(deps.db, deps.admins),
     auditIntent(deps),
+    maintenanceGate(deps),
   );
 
   app.route("/healthz", healthRoutes(deps));

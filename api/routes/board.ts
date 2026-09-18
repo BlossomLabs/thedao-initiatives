@@ -68,18 +68,35 @@ export async function buildCard(
   };
 }
 
+/** The card with every "refresh me" flag off, for a paused refresh. */
+export function quietCard<T extends Card>(card: T): T {
+  return {
+    ...card,
+    summary: { ...card.summary, refreshDue: false },
+    ledger: card.ledger ? { ...card.ledger, refreshDue: false } : card.ledger,
+  };
+}
+
 export function boardRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const { db, config } = deps;
 
   // The global profile/support UI must not load or poll the funding board.
-  r.get(
-    "/settings",
-    (c) => c.json({ uploads: deps.pinata.enabled, support: Boolean(config.supportUrl) }),
-  );
+  r.get("/settings", async (c) => {
+    const { on, at, note } = await deps.maintenance.state();
+    return c.json({
+      uploads: deps.pinata.enabled,
+      support: Boolean(config.supportUrl),
+      maintenance: { on, at, note },
+    });
+  });
 
   r.get("/", async (c) => {
-    const refresh = c.req.query("refresh") === "1";
+    // Maintenance pauses the background refreshes a read may trigger; the
+    // response then says nothing is due so the client stops asking.
+    const asked = c.req.query("refresh") === "1";
+    const paused = asked && await deps.maintenance.on();
+    const refresh = asked && !paused;
     const rfps = await db.rfps.list(["approved"]);
     const [state] = await Promise.all([
       deps.chain.state(refresh),
@@ -90,7 +107,7 @@ export function boardRoutes(deps: Deps) {
       await Promise.all(
         rfps.map((x) => buildCard(deps, x, tokensOk, refresh)),
       ),
-    );
+    ).map((card) => paused ? quietCard(card) : card);
     const byId = new Map(rfps.map((x) => [x.id, x]));
     const admins = await deps.admins.set();
     const community = (await db.comments.frontPage())
@@ -100,7 +117,7 @@ export function boardRoutes(deps: Deps) {
         initiative: { slug: byId.get(cm.rfpId)!.slug, title: byId.get(cm.rfpId)!.title },
       }));
     return c.json({
-      refreshDue: !chainStateFresh(state, deps.now()),
+      refreshDue: !paused && !chainStateFresh(state, deps.now()),
       cards,
       totals: {
         count: cards.length,

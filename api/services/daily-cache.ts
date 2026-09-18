@@ -3,9 +3,11 @@
 import type { Funding } from "./funding.ts";
 import { refreshLedgers } from "./ledger.ts";
 import type { SafeApiDeps } from "./safe-api.ts";
+import type { Maintenance } from "./maintenance.ts";
 
 interface DailyCacheDeps extends SafeApiDeps {
   funding: Funding;
+  maintenance: Maintenance;
 }
 
 export async function refreshDailyCache(
@@ -15,6 +17,8 @@ export async function refreshDailyCache(
   // Check the runtime timeline, not the git branch name. Preview, branch,
   // local, and missing/unknown environments must do no scheduled work.
   if (timeline !== "production") return;
+  // A paused site is being backed up or moved: no background writes.
+  if (await deps.maintenance.on()) return;
 
   const rfps = (await deps.db.rfps.list(["approved"])).filter((rfp) => rfp.safeAddress);
   await refreshLedgers(deps, rfps);

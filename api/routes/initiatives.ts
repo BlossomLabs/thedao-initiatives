@@ -143,7 +143,9 @@ export function initiativeRoutes(deps: Deps) {
   r.get("/:slug", async (c) => {
     const user = c.var.user;
     const rfp = await visibleOr404(c.req.param("slug"), user);
-    const refresh = c.req.query("refresh") === "1";
+    const asked = c.req.query("refresh") === "1";
+    const paused = asked && await deps.maintenance.on();
+    const refresh = asked && !paused;
     if (refresh) await refreshLedger(deps, rfp);
     const [summary, pledges, donations, chainState, revisions, ledger] = await Promise.all([
       deps.funding.summary(rfp, refresh),
@@ -153,9 +155,10 @@ export function initiativeRoutes(deps: Deps) {
       db.revisions.list(rfp.id, Boolean(user?.isAdmin)),
       ledgerStatus(deps, rfp),
     ]);
+    if (paused) summary.refreshDue = false;
     const mine = Boolean(user?.isAdmin) || isProposer(rfp, user);
     return c.json({
-      refreshDue: !chainStateFresh(chainState, deps.now()),
+      refreshDue: !paused && !chainStateFresh(chainState, deps.now()),
       initiative: mine ? proposerRfp(rfp) : publicRfp(rfp),
       revisions: revisions.map(revisionMeta),
       summary,
@@ -166,7 +169,7 @@ export function initiativeRoutes(deps: Deps) {
       donationsEnabled: Boolean(
         tokensUsable(chainState) && rfp.safeAddress && rfp.status === "approved",
       ),
-      ledger,
+      ledger: paused && ledger ? { ...ledger, refreshDue: false } : ledger,
     });
   });
 

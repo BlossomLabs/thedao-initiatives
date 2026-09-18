@@ -97,10 +97,12 @@ export function adminRoutes(deps: Deps) {
       db.rfps.list(["rejected", "archived"]),
     ]);
     const rows = [];
+    // Maintenance pauses the balance refresh the dashboard would trigger.
+    const revalidate = !(await deps.maintenance.on());
     for (const rfp of [...pending, ...approved, ...other]) {
       rows.push({
         initiative: adminRfp(rfp),
-        summary: await deps.funding.summary(rfp, true),
+        summary: await deps.funding.summary(rfp, revalidate),
         safeSync: rfp.safeAddress ? await db.meta.safeSync(rfp.id) : null,
       });
     }
@@ -130,6 +132,17 @@ export function adminRoutes(deps: Deps) {
         threshold: SAFE_THRESHOLD,
       },
     });
+  });
+
+  // Maintenance mode: pause every write on the site (services/maintenance.ts).
+  r.get("/maintenance", async (c) => c.json(await deps.maintenance.fresh()));
+  r.post("/maintenance/enter", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["note"]);
+    return c.json(await deps.maintenance.enter(c.var.user!.address, s(body.note, 200)));
+  });
+  r.post("/maintenance/exit", requireRecentAuth(deps.now), async (c) => {
+    await jsonBody(c, []);
+    return c.json(await deps.maintenance.exit(c.var.user!.address));
   });
 
   // The admin list. ADMIN_ADDRESSES entries are fixed; the rest live in KV.
@@ -168,7 +181,7 @@ export function adminRoutes(deps: Deps) {
     return c.json({
       initiative: adminRfp(rfp),
       revisions: (await db.revisions.list(rfp.id, true)).map(revisionMeta),
-      summary: await deps.funding.summary(rfp, true),
+      summary: await deps.funding.summary(rfp, !(await deps.maintenance.on())),
       pledges: (await db.pledges.list(rfp.id, true)).map((p) => pledgeJson(config, p)),
       donations: (await db.donations.list(rfp.id, false)).map((d) => donationJson(d, decimalsOf)),
       safeSync: rfp.safeAddress ? await db.meta.safeSync(rfp.id) : null,

@@ -20,6 +20,7 @@ import {
 import { keccakHex, utf8 } from "../chain/keccak.ts";
 import { predictSafeAddress } from "../chain/safe.ts";
 import { chainlinkRound, SIGNERS, word } from "./helpers.ts";
+import { createMaintenance } from "../services/maintenance.ts";
 import { createAdmins } from "../services/admins.ts";
 
 export const ORIGIN = "http://localhost:5173";
@@ -222,6 +223,7 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     funding: createFunding({ db, chain, now }),
     ai: createAi(cfg, f),
     admins: createAdmins(db, cfg, now),
+    maintenance: createMaintenance(db, now),
     ens: createEns(f, now),
     pinata: createPinata(cfg, f),
     log: () => {},

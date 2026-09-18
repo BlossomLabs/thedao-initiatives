@@ -4,6 +4,15 @@ import { usd } from "./amount.ts";
 import { criterionTooLong, LIMITS, tooLong } from "./normalise.ts";
 
 export const HEDGES = /\bas needed\b|\bwhere appropriate\b/i;
+
+/** Adoption milestones pay on other people using the result. A criterion that
+ * opens with a delivery verb and names nobody outside the team reads as
+ * building more of the thing (2026-09-16/17: three submissions flagged every
+ * milestone adoption and padded them with "publish", "implement", "build"). */
+export const DELIVERY_OPENER =
+  /^\W*(publish|implement|release|deploy|build|write|deliver|complete|ship|create|develop|add|design|document|define|extend|provide|produce|finali[sz]e|integrate|launch|migrate|refactor|test|convert|store|support)\b/i;
+export const OUTSIDE_USE =
+  /\b(outside|external|independent|third[- ]party|other than|not (operated|run|controlled|affiliated)|unaffiliated|named|in production|used by|deployed by|adopt\w*|integrations?|users?|customers?|paying|revenue|confirm\w*|attest\w*|announce\w*|merged upstream|organi[sz]ations?|teams?|wallets?|protocols?|projects?|firms?|partners?|learners?|attendees?|chains?|explorers?)\b/i;
 export const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 export const MAX_GOAL = 100_000_000;
 export const MAX_DURATION_MONTHS = 120;
@@ -239,6 +248,7 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
     if (topup && !m.done && !(m.month ?? "").trim()) {
       warn(`ms_${i}_month`, `${L} has no target month. Every remaining milestone needs one.`);
     }
+    let delivery = 0;
     crits.forEach((c, j) => {
       if (c.length > LIMITS.CRITERION_CHARS) cap(`ms_${i}_c${j}`, criterionTooLong(letter(i), j));
       const reasons: string[] = [];
@@ -249,8 +259,24 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
       if (/PLACEHOLDER/i.test(c)) reasons.push("PLACEHOLDER");
       if (/\d+\s*-\s*\d+/.test(c)) reasons.push("a range, pick the floor");
       if (HEDGES.test(c)) reasons.push("a hedge");
+      const opener = m.adoption && !m.done && !OUTSIDE_USE.test(c) && DELIVERY_OPENER.exec(c);
+      if (opener) {
+        delivery++;
+        warn(
+          `ms_${i}_c${j}`,
+          `${L} is flagged adoption, but criterion ${j + 1} reads as delivery (it starts with "${
+            opener[1]
+          }"). Say who outside the team uses the result, or move it to its own milestone.`,
+        );
+      }
       if (reasons.length) warn(`ms_${i}_c${j}`, `${L}, not checkable yet: ${reasons.join(", ")}.`);
     });
+    if (crits.length && delivery === crits.length) {
+      warn(
+        `ms_${i}_crit`,
+        `${L}: every criterion is delivery work. Unflag it as adoption, or rewrite the criteria around who uses the result.`,
+      );
+    }
   });
 
   if (milestones.length && goal > 0 && Math.round(total) !== Math.round(goal)) {

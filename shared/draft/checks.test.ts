@@ -191,6 +191,37 @@ test("trailing whitespace at the cap is not too long: the caps measure the trimm
   expect(checkSubmission(i).errors).toEqual([]);
 });
 
+test("an adoption milestone padded with delivery criteria warns per criterion, and once more when all of them are", () => {
+  const i = minimal(1000);
+  i.milestones[0].criteria = [
+    "Publish a versioned and reproducible EVM decompiler benchmark corpus with pinned releases.",
+    "At least 3 wallets other than ours show the warning in production, confirmed on their own pages.",
+  ];
+  let f = checkSubmission(i);
+  expect(f.errors).toEqual([]);
+  expect(f.warnings.map((w) => w.field)).toEqual(["ms_0_c0"]);
+  expect(f.warnings[0].msg).toBe(
+    'Milestone A is flagged adoption, but criterion 1 reads as delivery (it starts with "Publish"). Say who outside the team uses the result, or move it to its own milestone.',
+  );
+  // every criterion is delivery: the row-level nudge follows the per-criterion ones
+  i.milestones[0].criteria = [
+    "Implement the published API/CLI specification in the existing decompiler.",
+    "Release a public CLI and documented public API conforming to the specification.",
+  ];
+  f = checkSubmission(i);
+  expect(f.warnings.map((w) => w.field)).toEqual(["ms_0_c0", "ms_0_c1", "ms_0_crit"]);
+  expect(f.warnings[2].msg).toBe(
+    "Milestone A: every criterion is delivery work. Unflag it as adoption, or rewrite the criteria around who uses the result.",
+  );
+  // the same criteria on a milestone that is not flagged adoption say nothing
+  i.milestones[0].adoption = false;
+  i.milestones.push(
+    ms("Adoption", 0, { adoption: true, criteria: ["Used by 3 named protocols."] }),
+  );
+  i.milestones[0].amount = 1000;
+  expect(checkSubmission(i).warnings.filter((w) => w.field.startsWith("ms_0_"))).toEqual([]);
+});
+
 test("criteria warnings do not block; https and month rules do", () => {
   const i = minimal(1000);
   i.milestones[0].criteria = [

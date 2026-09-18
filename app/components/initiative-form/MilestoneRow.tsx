@@ -92,6 +92,12 @@ export default function MilestoneRow(
           </label>
         )}
       </div>
+      {m.adoption && (
+        <span className="hint">
+          Pays only when people outside the team use the result. Building more of it is its own
+          milestone.
+        </span>
+      )}
       {topup && m.done && (
         <FormField field={p + "link"} label="Link to the delivered work" className="mt-3">
           <Input

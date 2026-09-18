@@ -934,7 +934,7 @@ Deno.test("page facts: content keys sync, admin patch validates and clears per t
     const page = await j(await h.req("/api/initiatives/" + c.initiative.slug));
     bySlug[c.initiative.slug] = page.initiative as Record<string, unknown>;
   }
-  // content/rfps front matter: duration on most files, topup + reviewer on ethdebug
+  // content/initiatives front matter: duration on most files, topup + reviewer on ethdebug
   assertEquals(bySlug["end-to-end-formally-verified-vyper-compiler"].durationMonths, 12);
   assertEquals(bySlug["end-to-end-formally-verified-vyper-compiler"].topup, false);
   const ethdebug = bySlug["source-level-debugging-for-solidity-ethdebug-in-solc"];

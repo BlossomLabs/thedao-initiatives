@@ -1,6 +1,6 @@
 # TheDAO Security Fund — initiatives board
 
-[![CI](https://github.com/BlossomLabs/thedao-rfps/actions/workflows/ci.yml/badge.svg)](https://github.com/BlossomLabs/thedao-rfps/actions/workflows/ci.yml)
+[![CI](https://github.com/BlossomLabs/thedao-initiatives/actions/workflows/ci.yml/badge.svg)](https://github.com/BlossomLabs/thedao-initiatives/actions/workflows/ci.yml)
 
 Public board of Ethereum-security initiatives (RFPs, grants and top-ups) at
 https://initiatives.thedao.fund. Sponsors pledge, anyone donates on-chain, TheDAO completes the

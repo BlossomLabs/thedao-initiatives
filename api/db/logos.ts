@@ -1,6 +1,6 @@
 import { K } from "./keys.ts";
 
-/** A pinned content logo: content/rfps/logos/<name> as the sync last saw it. */
+/** A pinned content logo: content/initiatives/logos/<name> as the sync last saw it. */
 export interface ContentLogo {
   name: string;
   cid: string;

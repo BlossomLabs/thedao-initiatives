@@ -1,5 +1,5 @@
 /**
- * An initiative as one markdown file in the content/rfps format: the front
+ * An initiative as one markdown file in the content/initiatives format: the front
  * matter the sync reads, then the body under the site's headings. What the
  * sync imports comes back out the same way, so a page can be exported,
  * edited and pushed again.

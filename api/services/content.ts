@@ -76,7 +76,7 @@ export function parseContentBackers(raw: string): PastedBacker[] {
     b.url = url!;
     if (b.logo && !LOGO_NAME_RE.test(b.logo)) {
       throw new Error(
-        `backers: ${b.org}: the logo is a file name in content/rfps/logos (png, jpg or webp), got "${b.logo}"`,
+        `backers: ${b.org}: the logo is a file name in content/initiatives/logos (png, jpg or webp), got "${b.logo}"`,
       );
     }
     const k = b.org.toLowerCase();
@@ -86,7 +86,7 @@ export function parseContentBackers(raw: string): PastedBacker[] {
   return out;
 }
 
-/** content/rfps/logos/<name>: lowercase, no paths. */
+/** content/initiatives/logos/<name>: lowercase, no paths. */
 export const LOGO_NAME_RE = /^[a-z0-9][a-z0-9._-]{0,80}\.(png|jpe?g|webp)$/;
 
 /** Looks up the pinned CID for a content logo name; null when never uploaded. */
@@ -186,7 +186,7 @@ export function parseInitiativeFile(text: string): ContentFields {
   const type = (fields.type ?? "rfp").toLowerCase();
   if (type !== "rfp" && type !== "grant") throw new Error("type must be initiative or grant");
   // Page facts. `duration`, `topup` and `reviewer` match the Flask MVP's keys
-  // (content/rfps/README.md); `recipient` and `recipient_url` are web-only.
+  // (content/initiatives/README.md); `recipient` and `recipient_url` are web-only.
   const [duration, durErr] = parseDuration(fields.duration ?? "");
   if (durErr) throw new Error(durErr);
   const topup = ["true", "yes", "1"].includes((fields.topup ?? "").trim().toLowerCase());
@@ -254,14 +254,14 @@ export async function syncBackers(
   const have = await db.pledges.list(rfpId, true);
   for (const b of backers) {
     // A named logo must already be pinned (the sync script and the admin
-    // dialog upload content/rfps/logos first); a line without one keeps whatever
+    // dialog upload content/initiatives/logos first); a line without one keeps whatever
     // logo the pledge has.
     let logoCid: string | undefined;
     if (b.logo) {
       const cid = await logos(b.logo);
       if (!cid) {
         throw new Error(
-          `backers: ${b.org}: logo ${b.logo} is not uploaded yet (the sync uploads content/rfps/logos first)`,
+          `backers: ${b.org}: logo ${b.logo} is not uploaded yet (the sync uploads content/initiatives/logos first)`,
         );
       }
       logoCid = cid;

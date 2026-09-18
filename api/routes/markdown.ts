@@ -1,6 +1,6 @@
 /**
  * GET /initiative/<slug>.md: the published initiative as a markdown file, in
- * the same shape as content/rfps/*.md. Public rows only (approved, archived).
+ * the same shape as content/initiatives/*.md. Public rows only (approved, archived).
  */
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";

@@ -27,7 +27,7 @@ markdown. `api/tests/routes.test.ts` enforces this — keep it green.
 
 ## Content files are permanent
 
-- A file under `content/rfps/` is never renamed: its slug is the initiative's
+- A file under `content/initiatives/` is never renamed: its slug is the initiative's
   public URL. Archive it in the admin panel instead.
 - A published `content/donation-terms/<date>.md` is never edited or deleted;
   publish a new dated file (see "Publishing a new version of the donation

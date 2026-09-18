@@ -40,7 +40,7 @@ export function onchainEns(endpoints: string[], f: typeof fetch = fetch): EnsRes
       endpoints.map((url) =>
         http(url, {
           fetchFn: f,
-          fetchOptions: { headers: { "User-Agent": "thedao-rfps/2.0" } },
+          fetchOptions: { headers: { "User-Agent": "thedao-initiatives/2.0" } },
           timeout: RPC_TIMEOUT_MS,
           retryCount: 0,
         })
@@ -106,7 +106,7 @@ export function createEns(f: typeof fetch, now: () => number, opts: EnsOptions =
   };
   async function ensdata(path: string): Promise<Record<string, unknown>> {
     const res = await f("https://api.ensdata.net/" + path, {
-      headers: { "User-Agent": "thedao-rfps/2.0" },
+      headers: { "User-Agent": "thedao-initiatives/2.0" },
       signal: AbortSignal.timeout(3000),
     });
     if (!res.ok) throw new Error(`ensdata ${res.status}`);

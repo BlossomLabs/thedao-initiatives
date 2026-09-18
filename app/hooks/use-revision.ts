@@ -22,10 +22,13 @@ export function useRevision(slug: string, n: number | null) {
         `/api/initiatives/${encodeURIComponent(slug)}/revisions/${n}`,
         { signal, anonymous: !who },
       ).then((r) => r.revision).catch((error) => {
-        if (!signal.aborted && error instanceof ApiError && [401, 403, 404].includes(error.status)) {
+        if (
+          !signal.aborted && error instanceof ApiError && [401, 403, 404].includes(error.status)
+        ) {
           // A failed background refetch normally retains old data. An access denial must erase it.
           qc.getQueryCache().find({ queryKey: key, exact: true })?.setState({
-            data: undefined, dataUpdatedAt: 0,
+            data: undefined,
+            dataUpdatedAt: 0,
           });
         }
         throw error;

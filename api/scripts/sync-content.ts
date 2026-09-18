@@ -1,5 +1,5 @@
 /**
- * Push content/rfps/*.md to a running API (push-based content sync). The
+ * Push content/initiatives/*.md to a running API (push-based content sync). The
  * donation terms are not content the API takes: the site bundles them at
  * build time (app/data/terms.ts).
  *
@@ -7,7 +7,7 @@
  *   ADMIN_PRIVATE_KEY=0x... deno task sync-content      (logs in first)
  *
  * Env: API_URL (default http://localhost:8000), WEB_ORIGIN or VITE_SITE_URL
- * (resolved like the API does), CONTENT_DIR (default content/rfps at the
+ * (resolved like the API does), CONTENT_DIR (default content/initiatives at the
  * repo root).
  */
 import { env, siweLogin } from "./lib.ts";
@@ -16,7 +16,7 @@ import { webOriginsFrom } from "../config.ts";
 const apiUrl = env("API_URL", "http://localhost:8000").replace(/\/+$/, "");
 const webOrigin = webOriginsFrom(Deno.env.toObject())[0];
 const dir = env("CONTENT_DIR") ||
-  new URL("../../content/rfps/", import.meta.url).pathname;
+  new URL("../../content/initiatives/", import.meta.url).pathname;
 
 let token = env("ADMIN_TOKEN");
 if (!token) {
@@ -28,10 +28,10 @@ if (!token) {
   token = (await siweLogin({ apiUrl, webOrigin, privateKey: key })).token;
 }
 
-// Logos first: content/rfps/logos/<name> is pinned once (same bytes = same CID),
+// Logos first: content/initiatives/logos/<name> is pinned once (same bytes = same CID),
 // so a backers line can name the file.
 const logosDir = env("CONTENT_LOGOS_DIR") ||
-  new URL("../../content/rfps/logos/", import.meta.url).pathname;
+  new URL("../../content/initiatives/logos/", import.meta.url).pathname;
 let logos = 0;
 try {
   for await (const e of Deno.readDir(logosDir)) {

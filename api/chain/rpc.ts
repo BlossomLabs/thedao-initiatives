@@ -28,7 +28,7 @@ export function createRpc(opts: RpcOptions): Rpc {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "User-Agent": "thedao-rfps/2.0",
+            "User-Agent": "thedao-initiatives/2.0",
           },
           body,
           signal: AbortSignal.timeout(timeoutMs),

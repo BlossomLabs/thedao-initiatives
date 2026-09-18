@@ -64,7 +64,7 @@ export class SafeApiError extends Error {
 async function fetchPage(deps: SafeApiDeps, url: string): Promise<Page> {
   const headers: Record<string, string> = {
     Accept: "application/json",
-    "User-Agent": "thedao-rfps/2.0",
+    "User-Agent": "thedao-initiatives/2.0",
   };
   if (deps.config.safeApiKey) headers.Authorization = "Bearer " + deps.config.safeApiKey;
   const res = await deps.fetch(url, { headers, signal: AbortSignal.timeout(15_000) });

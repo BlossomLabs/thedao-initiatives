@@ -57,19 +57,19 @@ without static files for API-only development.
   functions as visitor requests, respecting freshness, cooldowns and active KV leases. Branch,
   preview, local and unknown timelines do no refresh work, even if the job appears in their Cron
   dashboard. Deno supplies `DENO_TIMELINE`; no additional environment configuration is needed.
-- **Content sync is push-based.** `deno task sync-content` reads `../../content/rfps/*.md` and POSTs
-  them to `/api/admin/sync-content`. Files own the words and the goal; the admin panel owns status,
-  Safes and money. Run the sync after every deploy that changes content. Besides the keys in
-  `content/rfps/README.md` (`duration`, `topup`, `reviewer`), the web parser reads two web-only keys
-  on grants: `recipient` (the team the grant goes to) and `recipient_url` (an https link). **Content
-  files must be structured**: the body is split with the guide's headings (`## Why this
-  matters`,
-  `## In scope`, `## Out of scope`, …, `## Milestones` with `### Name - $amount
-  (adoption)` rows
-  and one `- criterion` per line, optionally `## Links`). A file is synced only when every section
-  of its type is present, every milestone has an amount and a criterion, the amounts sum to the
-  goal, no other-type section and no text outside a known heading remain. Any other file is skipped
-  and its sync error lists what is missing
+- **Content sync is push-based.** `deno task sync-content` reads `../../content/initiatives/*.md`
+  and POSTs them to `/api/admin/sync-content`. Files own the words and the goal; the admin panel
+  owns status, Safes and money. Run the sync after every deploy that changes content. Besides the
+  keys in `content/initiatives/README.md` (`duration`, `topup`, `reviewer`), the web parser reads
+  two web-only keys on grants: `recipient` (the team the grant goes to) and `recipient_url` (an
+  https link). **Content files must be structured**: the body is split with the guide's headings
+  (`## Why this
+  matters`, `## In scope`, `## Out of scope`, …, `## Milestones` with
+  `### Name - $amount
+  (adoption)` rows and one `- criterion` per line, optionally `## Links`). A
+  file is synced only when every section of its type is present, every milestone has an amount and a
+  criterion, the amounts sum to the goal, no other-type section and no text outside a known heading
+  remain. Any other file is skipped and its sync error lists what is missing
   (`not structured: missing: Out of
   scope; unsorted text: …`); the row it would have updated is
   left as it was.

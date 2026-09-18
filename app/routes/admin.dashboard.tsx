@@ -461,7 +461,7 @@ export default function Dashboard() {
 
       <SectionHeading>Content files</SectionHeading>
       <p className="small dim">
-        Initiatives in <code className="mono">content/rfps/*.md</code>{" "}
+        Initiatives in <code className="mono">content/initiatives/*.md</code>{" "}
         are published by pushing them to the API from the repo:{" "}
         <code className="mono">cd api && deno task sync-content</code> (with{" "}
         <code className="mono">ADMIN_TOKEN</code> or <code className="mono">ADMIN_PRIVATE_KEY</code>

@@ -14,7 +14,7 @@ interface SyncResult {
   errors: string[];
 }
 
-/** What the sync takes: content/rfps/*.md, and content/rfps/logos/* for backer logos. */
+/** What the sync takes: content/initiatives/*.md, and content/initiatives/logos/* for backer logos. */
 async function readContent(list: FileList | null) {
   const files: { name: string; text: string }[] = [];
   const logos: File[] = [];
@@ -26,9 +26,9 @@ async function readContent(list: FileList | null) {
       continue;
     }
     if (!name.endsWith(".md") || name === "README.md") continue;
-    // README aside, only rfps/<slug>.md is content the API takes (the donation
+    // README aside, only initiatives/<slug>.md is content the API takes (the donation
     // terms are bundled into the site at build time).
-    if (rel && !/(^|\/)rfps\/[^/]+\.md$/.test(rel)) continue;
+    if (rel && !/(^|\/)initiatives\/[^/]+\.md$/.test(rel)) continue;
     files.push({ name, text: await f.text() });
   }
   return { files, logos };
@@ -89,7 +89,7 @@ export default function SyncContent() {
                 {logoMissing && (
                   <p className="m-0 mt-2">
                     No logo files were in this pick. Choose the{" "}
-                    <span className="mono">content/rfps</span> folder, which carries its{" "}
+                    <span className="mono">content/initiatives</span> folder, which carries its{" "}
                     <span className="mono">logos</span>{" "}
                     subfolder, then sync again: pinned logos stay.
                   </p>
@@ -117,9 +117,10 @@ export default function SyncContent() {
       <div className="min-w-[220px] flex-1">
         <b className="block font-inter-tight text-[14px] font-semibold">Sync content files</b>
         <small className="block text-[12px] text-muted">
-          Pick the repo's <span className="mono">content/rfps</span>{" "}
+          Pick the repo's <span className="mono">content/initiatives</span>{" "}
           folder (or its markdown files). Files own the words and the goal; status, Safes and money
-          stay as they are. Backer logos in <span className="mono">content/rfps/logos</span>{" "}
+          stay as they are. Backer logos in <span className="mono">content/initiatives/logos</span>
+          {" "}
           are pinned to IPFS on the way.
         </small>
       </div>

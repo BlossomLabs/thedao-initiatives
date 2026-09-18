@@ -18,7 +18,7 @@ export function markdownRoutes({ db }: Deps) {
   /** <slug>-PRIVATE.md: admins only; any status, plus contact and funders. */
   r.get(MARKDOWN_PATHS.private, requireAdmin, async (c) => {
     const slug = c.req.param("file").slice(0, -"-PRIVATE.md".length);
-    const rfp = await db.rfps.bySlug(slug);
+    const rfp = await db.initiatives.bySlug(slug);
     if (!rfp) throw new HttpError(404, "not found");
     const md = initiativeMarkdown(rfp, await db.pledges.list(rfp.id, true), {
       privateFields: true,
@@ -31,7 +31,7 @@ export function markdownRoutes({ db }: Deps) {
   });
   r.get(MARKDOWN_PATHS.public, async (c) => {
     const slug = c.req.param("file").slice(0, -3);
-    const rfp = await db.rfps.bySlug(slug);
+    const rfp = await db.initiatives.bySlug(slug);
     if (!rfp || !["approved", "archived"].includes(rfp.status)) {
       throw new HttpError(404, "not found");
     }

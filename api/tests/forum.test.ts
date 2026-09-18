@@ -43,7 +43,7 @@ for (const discourseUrl of discussionLinks) {
       });
       assertEquals(blankTitle.status, 400);
       assertEquals(h.fetchLog, []);
-      assertEquals((await h.db.rfps.list(["pending"])).length, 0);
+      assertEquals((await h.db.initiatives.list(["pending"])).length, 0);
 
       // The original exploit used an incomplete form, which must also
       // remain incapable of triggering any outbound HTTP request.
@@ -68,7 +68,7 @@ for (const discourseUrl of discussionLinks) {
       assertEquals(explicitTitle.status, ipv6Literal ? 400 : 201);
       if (!ipv6Literal) {
         const { slug } = await j(explicitTitle) as { slug: string };
-        const row = (await h.db.rfps.bySlug(slug))!;
+        const row = (await h.db.initiatives.bySlug(slug))!;
         assertEquals(row.title, minimalSubmission(1000).title);
         assertEquals(row.discourseUrl, new URL(discourseUrl).toString());
         assertEquals(resolved, [new URL(discourseUrl).hostname]);

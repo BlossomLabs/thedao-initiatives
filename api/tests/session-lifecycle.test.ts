@@ -278,8 +278,8 @@ Deno.test("promotion does not grant comment fast-lane or voting privileges to an
   const h = await harness();
   try {
     const token = await h.mint(PLAIN);
-    await h.db.rfps.insert({ title: "Promotion test", status: "approved" });
-    const rfp = (await h.db.rfps.list(["approved"]))[0];
+    await h.db.initiatives.insert({ title: "Promotion test", status: "approved" });
+    const rfp = (await h.db.initiatives.list(["approved"]))[0];
     h.deps.config.adminAddresses.push(PLAIN);
     h.clock.now += 6;
     const path = `/api/initiatives/${rfp.slug}/comments`;

@@ -269,7 +269,7 @@ export interface PostCommentResult {
 
 export interface HeldMine {
   id: string;
-  rfpId: string;
+  initiativeId: string;
   parentId: string | null;
   type: string;
   body: string;
@@ -316,7 +316,7 @@ export interface SafeSyncState {
 }
 
 export interface AdminComment extends CommentEntry {
-  rfpId: string;
+  initiativeId: string;
   parentId: string | null;
   status: "published" | "held" | "discarded";
   email: string;

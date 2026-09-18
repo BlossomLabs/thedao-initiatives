@@ -24,7 +24,7 @@ function deferred<T>() {
 Deno.test("funding: settings and cold snapshots do not read balances; the ledger is the first fallback", async () => {
   const h = await harness();
   try {
-    const rfp = await h.db.rfps.insert({
+    const rfp = await h.db.initiatives.insert({
       title: "Cold cache",
       status: "approved",
       safeAddress: SAFE_ADDR,
@@ -54,7 +54,7 @@ Deno.test("funding: old values return during a slow refresh, with one lease acro
   const h = await harness();
   const gate = deferred<void>();
   try {
-    const rfp = await h.db.rfps.insert({
+    const rfp = await h.db.initiatives.insert({
       title: "Shared cache",
       status: "approved",
       safeAddress: SAFE_ADDR,
@@ -129,7 +129,7 @@ Deno.test("funding: 30-second board polls share one two-minute refresh across 19
   const h = await harness();
   try {
     for (let i = 1; i <= 19; i++) {
-      await h.db.rfps.insert({
+      await h.db.initiatives.insert({
         title: `Safe ${i}`,
         status: "approved",
         safeAddress: "0x" + i.toString(16).padStart(40, "0"),
@@ -156,7 +156,7 @@ Deno.test("funding: 30-second board polls share one two-minute refresh across 19
 Deno.test("funding: a newly confirmed donation invalidates only its Safe, repeated confirms do not", async () => {
   const h = await harness();
   try {
-    const rfp = await h.db.rfps.insert({
+    const rfp = await h.db.initiatives.insert({
       title: "Donation refresh",
       status: "approved",
       safeAddress: SAFE_ADDR,
@@ -185,7 +185,7 @@ Deno.test("funding: a newly confirmed donation invalidates only its Safe, repeat
 
 Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, plus paid out", async () => {
   const h = await harness();
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Balance initiative",
     status: "approved",
     goalUsd: 3000,
@@ -262,7 +262,7 @@ Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, 
 
 Deno.test("funding: shared snapshot, explicit refresh, failure cooldown, ledger without a Safe", async () => {
   const h = await harness();
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Cached initiative",
     status: "approved",
     goalUsd: 1000,
@@ -305,7 +305,7 @@ Deno.test("funding: shared snapshot, explicit refresh, failure cooldown, ledger 
   assertEquals((await h.deps.funding.balances(SAFE_ADDR))?.usd, 5);
 
   // no Safe yet: the ledger total is all there is
-  const bare = await h.db.rfps.insert({ title: "No Safe", status: "approved", goalUsd: 10 });
+  const bare = await h.db.initiatives.insert({ title: "No Safe", status: "approved", goalUsd: 10 });
   const b = await j(await h.req("/api/initiatives/" + bare.slug)) as {
     summary: Record<string, unknown>;
   };
@@ -343,7 +343,7 @@ Deno.test("funding: the page says when the ledger was last checked and whether i
         })
         : new Response("", { status: 404 }),
   });
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Ledger status",
     status: "approved",
     goalUsd: 1000,
@@ -385,7 +385,7 @@ Deno.test("funding: the page says when the ledger was last checked and whether i
   assertEquals(after.summary.ledger, 1);
 
   // a Safe with no ledger status field for initiatives without a Safe
-  const bare = await h.db.rfps.insert({ title: "No Safe", status: "approved", goalUsd: 10 });
+  const bare = await h.db.initiatives.insert({ title: "No Safe", status: "approved", goalUsd: 10 });
   const b = await j(await h.req("/api/initiatives/" + bare.slug)) as { ledger: unknown };
   assertEquals(b.ledger, null);
   h.close();

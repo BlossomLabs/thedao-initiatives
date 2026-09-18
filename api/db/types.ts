@@ -1,9 +1,9 @@
 import type { Milestone, Sections } from "../../shared/draft/types.ts";
 
-export type RfpStatus = "pending" | "approved" | "rejected" | "archived";
-export type RfpType = "rfp" | "grant";
+export type InitiativeStatus = "pending" | "approved" | "rejected" | "archived";
+export type InitiativeType = "rfp" | "grant";
 
-export interface Rfp {
+export interface Initiative {
   id: string;
   slug: string;
   /** Internal: a displaced proposal's permanent, non-reclaimable URL. */
@@ -21,8 +21,8 @@ export interface Rfp {
   funders: string;
   /** SIWE address that submitted it, shown publicly ("" for imported rows). */
   proposer: string;
-  status: RfpStatus;
-  type: RfpType;
+  status: InitiativeStatus;
+  type: InitiativeType;
   sortRank: number | null;
   /** The donation Safe, set only once it is deployed and verified on-chain;
    * approval requires it. "" until then. */

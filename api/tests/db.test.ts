@@ -27,23 +27,23 @@ const ok = (over: Partial<Verification> = {}): Verification => ({
 
 Deno.test("rfps: slug uniqueness, lookup, list order, update guard", async () => {
   const { kv, db } = await fresh();
-  const a = await db.rfps.insert({ title: "Vyper compiler formal verification" });
+  const a = await db.initiatives.insert({ title: "Vyper compiler formal verification" });
   clock += 10;
-  const b = await db.rfps.insert({ title: "Vyper compiler formal verification" });
+  const b = await db.initiatives.insert({ title: "Vyper compiler formal verification" });
   assertEquals(a.slug, "vyper-compiler-formal-verification");
   assertEquals(b.slug, "vyper-compiler-formal-verification-2");
-  assertEquals((await db.rfps.bySlug(b.slug))?.id, b.id);
-  const listed = await db.rfps.list(["pending"]);
+  assertEquals((await db.initiatives.bySlug(b.slug))?.id, b.id);
+  const listed = await db.initiatives.list(["pending"]);
   assertEquals(listed.map((r) => r.id), [b.id, a.id]); // newest first
   await assertRejects(
-    () => db.rfps.update(a.id, { slug: "x" } as never),
+    () => db.initiatives.update(a.id, { slug: "x" } as never),
     Error,
     "not allowed",
   );
-  await db.rfps.update(a.id, { status: "approved", approvedAt: now() });
-  assertEquals((await db.rfps.list(["approved"])).length, 1);
+  await db.initiatives.update(a.id, { status: "approved", approvedAt: now() });
+  assertEquals((await db.initiatives.list(["approved"])).length, 1);
   await assertRejects(
-    () => db.rfps.insert({ title: "dup" }, a.slug),
+    () => db.initiatives.insert({ title: "dup" }, a.slug),
     Error,
     "already exists",
   );
@@ -52,18 +52,18 @@ Deno.test("rfps: slug uniqueness, lookup, list order, update guard", async () =>
 
 Deno.test("rfps: a Safe address belongs to exactly one initiative", async () => {
   const { kv, db } = await fresh();
-  const a = await db.rfps.insert({ title: "First one here" });
-  const b = await db.rfps.insert({ title: "Second one here" });
+  const a = await db.initiatives.insert({ title: "First one here" });
+  const b = await db.initiatives.insert({ title: "Second one here" });
   const safe = "0xD5Cf05f24727C83976652E3586c0e26DD39884e9";
-  await db.rfps.update(a.id, { safeAddress: safe });
-  assertEquals((await db.rfps.bySafe(safe.toLowerCase()))?.id, a.id);
+  await db.initiatives.update(a.id, { safeAddress: safe });
+  assertEquals((await db.initiatives.bySafe(safe.toLowerCase()))?.id, a.id);
   await assertRejects(
-    () => db.rfps.update(b.id, { safeAddress: safe }),
+    () => db.initiatives.update(b.id, { safeAddress: safe }),
     Error,
     "already assigned",
   );
-  await db.rfps.update(a.id, { safeAddress: "" });
-  assertEquals(await db.rfps.bySafe(safe), null);
+  await db.initiatives.update(a.id, { safeAddress: "" });
+  assertEquals(await db.initiatives.bySafe(safe), null);
   kv.close();
 });
 
@@ -87,15 +87,15 @@ Deno.test("rfps: content upsert never touches lifecycle or money", async () => {
     topup: false,
     milestoneReviewer: "",
   };
-  const created = await db.rfps.upsertContent("my-slug", f);
+  const created = await db.initiatives.upsertContent("my-slug", f);
   assertEquals(created.action, "created");
-  const r = (await db.rfps.bySlug("my-slug"))!;
-  await db.rfps.update(r.id, {
+  const r = (await db.initiatives.bySlug("my-slug"))!;
+  await db.initiatives.update(r.id, {
     status: "archived",
     safeAddress: "0xD5Cf05f24727C83976652E3586c0e26DD39884e9",
   });
   assertEquals(
-    await db.rfps.upsertContent("my-slug", {
+    await db.initiatives.upsertContent("my-slug", {
       ...f,
       title: "T2",
       goalUsd: 200,
@@ -103,7 +103,7 @@ Deno.test("rfps: content upsert never touches lifecycle or money", async () => {
     }),
     { action: "updated", id: r.id },
   );
-  const r2 = (await db.rfps.bySlug("my-slug"))!;
+  const r2 = (await db.initiatives.bySlug("my-slug"))!;
   assertEquals(r2.title, "T2");
   assertEquals(r2.goalUsd, 200);
   assertEquals(r2.status, "archived");
@@ -123,7 +123,7 @@ Deno.test("rfps: revise ignores reordered or trimmed structured text, refuses de
     criteria,
   });
   const origin = { author: "0xabc", source: "proposer" as const };
-  const r = await db.rfps.insert({
+  const r = await db.initiatives.insert({
     title: "Structured from birth",
     summary: "s",
     details: "",
@@ -136,7 +136,7 @@ Deno.test("rfps: revise ignores reordered or trimmed structured text, refuses de
     in_scope: "Things.",
   });
   // Same content, keys in another order, an empty key added: no revision.
-  const same = await db.rfps.revise(r.id, {
+  const same = await db.initiatives.revise(r.id, {
     title: "Structured from birth",
     summary: "s",
     details: "",
@@ -145,9 +145,9 @@ Deno.test("rfps: revise ignores reordered or trimmed structured text, refuses de
     links: ["https://a.example/"],
   }, origin);
   assertEquals(same.revision, null);
-  assertEquals((await db.rfps.get(r.id))!.revision, 1);
+  assertEquals((await db.initiatives.get(r.id))!.revision, 1);
   // A real change is revision 2 and carries the structured fields.
-  const changed = await db.rfps.revise(r.id, {
+  const changed = await db.initiatives.revise(r.id, {
     title: "Structured from birth",
     summary: "s",
     details: "",
@@ -157,11 +157,11 @@ Deno.test("rfps: revise ignores reordered or trimmed structured text, refuses de
   }, origin);
   assertEquals(changed.revision!.n, 2);
   assertEquals(changed.revision!.links, []);
-  assertEquals((await db.rfps.get(r.id))!.sections.why, "Because!");
+  assertEquals((await db.initiatives.get(r.id))!.sections.why, "Because!");
   // Structured XOR details.
   await assertRejects(
     () =>
-      db.rfps.revise(r.id, {
+      db.initiatives.revise(r.id, {
         title: "Structured from birth",
         summary: "s",
         details: "legacy text",
@@ -173,8 +173,8 @@ Deno.test("rfps: revise ignores reordered or trimmed structured text, refuses de
     "structured rows carry no details",
   );
   // A legacy caller (no structured fields) on a legacy row is unchanged.
-  const legacy = await db.rfps.insert({ title: "Legacy row here", details: "d" });
-  const l2 = await db.rfps.revise(legacy.id, {
+  const legacy = await db.initiatives.insert({ title: "Legacy row here", details: "d" });
+  const l2 = await db.initiatives.revise(legacy.id, {
     title: "Legacy row here",
     summary: "",
     details: "d2",
@@ -186,8 +186,8 @@ Deno.test("rfps: revise ignores reordered or trimmed structured text, refuses de
 
 Deno.test("donations: one tx credits two initiatives, idempotent, pending->confirmed", async () => {
   const { kv, db } = await fresh();
-  const a = await db.rfps.insert({ title: "First one here" });
-  const b = await db.rfps.insert({ title: "Second one here" });
+  const a = await db.initiatives.insert({ title: "First one here" });
+  const b = await db.initiatives.insert({ title: "Second one here" });
   const tx = "0x" + "ab".repeat(32);
   const [, s1] = await db.donations.record(a.id, tx, ok());
   const [, s2] = await db.donations.record(b.id, tx, ok({ amountUsd: 20 }));
@@ -225,7 +225,7 @@ Deno.test("donations: one tx credits two initiatives, idempotent, pending->confi
 
 Deno.test("pledges: totals exclude withdrawn", async () => {
   const { kv, db } = await fresh();
-  const r = await db.rfps.insert({ title: "First one here" });
+  const r = await db.initiatives.insert({ title: "First one here" });
   const p = await db.pledges.add(r.id, {
     company: "A",
     amountUsd: 100,
@@ -253,7 +253,7 @@ Deno.test("pledges: totals exclude withdrawn", async () => {
 
 Deno.test("comments: author starting vote, toggle, switch, ordering data, claim tokens", async () => {
   const { kv, db } = await fresh();
-  const r = await db.rfps.insert({ title: "First one here" });
+  const r = await db.initiatives.insert({ title: "First one here" });
   const base = {
     rfpId: r.id,
     parentId: null,
@@ -287,7 +287,7 @@ Deno.test("comments: author starting vote, toggle, switch, ordering data, claim 
     { [c.id]: 1 },
   );
   const held = await db.comments.create({ ...base, status: "held" });
-  assertEquals((await db.comments.forRfp(r.id)).length, 2);
+  assertEquals((await db.comments.forInitiative(r.id)).length, 2);
   assertEquals((await db.comments.byClaimTokens([held.claimToken])).map((x) => x.id), [
     held.id,
   ]);

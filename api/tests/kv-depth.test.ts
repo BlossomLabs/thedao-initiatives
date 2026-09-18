@@ -91,7 +91,7 @@ Deno.test("kv depth: the board and the initiative page stay within a few round t
   const h = await harness();
   const text = "lorem ipsum ".repeat(700);
   for (let i = 0; i < 25; i++) {
-    const r = await h.db.rfps.insert({
+    const r = await h.db.initiatives.insert({
       title: `Initiative ${i}`,
       summary: "s".repeat(200),
       details: text,
@@ -127,7 +127,7 @@ Deno.test("kv depth: the board and the initiative page stay within a few round t
     }
   }
   for (let i = 0; i < 10; i++) {
-    await h.db.rfps.insert({ title: `Pending ${i}`, summary: "", details: text });
+    await h.db.initiatives.insert({ title: `Pending ${i}`, summary: "", details: text });
   }
 
   const board = await timed(() => h.req("/api/board"));

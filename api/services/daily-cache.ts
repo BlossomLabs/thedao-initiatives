@@ -20,7 +20,7 @@ export async function refreshDailyCache(
   // A paused site is being backed up or moved: no background writes.
   if (await deps.maintenance.on()) return;
 
-  const rfps = (await deps.db.rfps.list(["approved"])).filter((rfp) => rfp.safeAddress);
+  const rfps = (await deps.db.initiatives.list(["approved"])).filter((rfp) => rfp.safeAddress);
   await refreshLedgers(deps, rfps);
   // Sequential balance reads reuse price feeds and bound upstream concurrency.
   // `true` requests revalidation; it does not bypass freshness or active leases.

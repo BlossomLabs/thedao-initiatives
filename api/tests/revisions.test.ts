@@ -1,7 +1,7 @@
 /** Proposer edits and the public revision history. */
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { ADMIN, deploySafe, harness, j, PLAIN, proposerToken } from "./app-helpers.ts";
-import type { Revision, Rfp } from "../db/types.ts";
+import type { Initiative, Revision } from "../db/types.ts";
 import { minimalSubmission, revisionBody, syntheticContentFiles } from "./fixtures.ts";
 
 const OTHER = "0x2222222222222222222222222222222222222222";
@@ -16,7 +16,7 @@ async function submitted(h: Awaited<ReturnType<typeof harness>>, approve = true)
   const res = await h.req("/api/initiatives", { method: "POST", token, json: GOOD });
   assertEquals(res.status, 201);
   const { slug } = await j(res) as { slug: string };
-  const row = (await h.db.rfps.bySlug(slug))!;
+  const row = (await h.db.initiatives.bySlug(slug))!;
   if (approve) {
     await deploySafe(h, admin, row.id);
     await h.req(`/api/admin/initiatives/${row.id}/status`, {
@@ -105,11 +105,11 @@ Deno.test("submit writes revision 1; the proposer's edit goes live as revision 2
     })).status,
     400,
   );
-  assertEquals((await h.db.rfps.bySlug(slug))!.goalUsd, 25000);
+  assertEquals((await h.db.initiatives.bySlug(slug))!.goalUsd, 25000);
 
   // an archived initiative is closed for edits
-  const row = (await h.db.rfps.bySlug(slug))!;
-  await h.db.rfps.update(row.id, { status: "archived" });
+  const row = (await h.db.initiatives.bySlug(slug))!;
+  await h.db.initiatives.update(row.id, { status: "archived" });
   assertEquals(
     (await h.req(`/api/initiatives/${slug}/revisions`, {
       method: "POST",
@@ -140,7 +140,7 @@ Deno.test("pending initiative: visible and editable for its proposer and admins 
     },
   });
   assertEquals(res.status, 201);
-  assertEquals((await h.db.rfps.bySlug(slug))!.status, "pending");
+  assertEquals((await h.db.initiatives.bySlug(slug))!.status, "pending");
   h.close();
 });
 
@@ -159,7 +159,7 @@ Deno.test("admin editor: text changes become admin revisions, other fields do no
     ADMIN,
   ]]);
   assertEquals(revs[1].summary, GOOD.summary); // untouched fields carry over
-  assertEquals((await h.db.rfps.get(id))!.goalUsd, 30000);
+  assertEquals((await h.db.initiatives.get(id))!.goalUsd, 30000);
   assertEquals((await patch({ title: "short" })).status, 400);
   assertEquals((await patch({ title: "Renamed by the team" })).status, 200); // no-op, still fine
   assertEquals((await h.db.revisions.list(id)).length, 2);
@@ -189,7 +189,7 @@ Deno.test("content sync: an unchanged file adds no revision, a changed one does"
     h.req("/api/admin/sync-content", { method: "POST", token: admin, json: { files: f } });
   await sync();
   await sync();
-  const rows = await h.db.rfps.list(["approved", "pending"]);
+  const rows = await h.db.initiatives.list(["approved", "pending"]);
   for (const r of rows) {
     const revs = await h.db.revisions.list(r.id);
     assertEquals(revs.map((v) => [v.n, v.source, v.author]), [[1, "content", ""]]);
@@ -252,16 +252,16 @@ Deno.test("archive: hides a superseded revision publicly, never the current one,
 
 Deno.test("legacy rows: the first edit snapshots the old text as revision 1", async () => {
   const h = await harness();
-  const row = await h.db.rfps.insert({ title: "Imported long ago", status: "approved" });
+  const row = await h.db.initiatives.insert({ title: "Imported long ago", status: "approved" });
   // Pretend it predates revisions: no history, no revision counter.
   await h.kv.delete(["revision", row.id, 1]);
   const { revision: _r, ...bare } = row;
-  await h.kv.set(["rfp", row.id], { ...bare, createdAt: 1_700_000_000 } as Rfp);
+  await h.kv.set(["rfp", row.id], { ...bare, createdAt: 1_700_000_000 } as Initiative);
   const page = await j(await h.req("/api/initiatives/" + row.slug)) as unknown as Page;
   assertEquals(page.initiative.revision, 0);
   assertEquals(page.revisions, []);
 
-  const { revision } = await h.db.rfps.revise(row.id, {
+  const { revision } = await h.db.initiatives.revise(row.id, {
     title: "Imported long ago, now edited",
     summary: "",
     details: "",
@@ -272,14 +272,14 @@ Deno.test("legacy rows: the first edit snapshots the old text as revision 1", as
     [1, "import", "Imported long ago", 1_700_000_000],
     [2, "admin", "Imported long ago, now edited", h.clock.now],
   ]);
-  assertEquals((await h.db.rfps.get(row.id))!.revision, 2);
+  assertEquals((await h.db.initiatives.get(row.id))!.revision, 2);
 
   // text fields never go through update()
   await assertRejects(
-    () => h.db.rfps.update(row.id, { title: "x" }),
+    () => h.db.initiatives.update(row.id, { title: "x" }),
     Error,
     "field not allowed",
   );
-  assert((await h.db.rfps.get(row.id))!.title.endsWith("edited"));
+  assert((await h.db.initiatives.get(row.id))!.title.endsWith("edited"));
   h.close();
 });

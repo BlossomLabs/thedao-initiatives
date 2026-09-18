@@ -53,8 +53,8 @@ async function seed(h: H) {
     await h.req("/api/admin/sync-content", { method: "POST", token: admin, json: { files } }),
   );
   assertEquals(synced.errors, []);
-  const first = (await h.db.rfps.list(["approved"]))[0];
-  await h.db.rfps.update(first.id, { safeAddress: SAFE_ADDR, contact: "a@b.c" });
+  const first = (await h.db.initiatives.list(["approved"]))[0];
+  await h.db.initiatives.update(first.id, { safeAddress: SAFE_ADDR, contact: "a@b.c" });
   await h.db.pledges.add(first.id, {
     company: "Backer Co",
     amountUsd: 1000,
@@ -196,7 +196,7 @@ Deno.test("backup: restore is idempotent, only while paused, never deletes, and 
     await exit(a, adminA);
 
     const adminB = await b.mint(ADMIN, true);
-    const extra = await b.db.rfps.insert({ title: "Only in B", status: "approved" });
+    const extra = await b.db.initiatives.insert({ title: "Only in B", status: "approved" });
     const off = await restore(b, adminB, { backup });
     assertEquals(off.status, 409);
     assertEquals((await j(off)).error, "Turn maintenance mode on before restoring a backup.");
@@ -214,7 +214,7 @@ Deno.test("backup: restore is idempotent, only while paused, never deletes, and 
     assertEquals(audited.map((e) => e.outcome), ["attempt", "success"]);
     assertEquals(audited[1].detail, "merge");
     assertEquals(await b.deps.maintenance.fresh().then((s) => s.on), true, "flag untouched");
-    assertEquals((await b.db.rfps.get(extra.id))!.title, "Only in B");
+    assertEquals((await b.db.initiatives.get(extra.id))!.title, "Only in B");
     assertEquals(await b.deps.admins.isAdmin(PLAIN), true);
 
     // The held comment's claim works again on the restored site.
@@ -225,7 +225,7 @@ Deno.test("backup: restore is idempotent, only while paused, never deletes, and 
 
     // Same rows, same pages.
     await exit(b, adminB);
-    await b.db.rfps.update(extra.id, { status: "archived" });
+    await b.db.initiatives.update(extra.id, { status: "archived" });
     for (
       const path of [
         "/api/board",
@@ -244,14 +244,14 @@ Deno.test("backup: restore is idempotent, only while paused, never deletes, and 
       claimsRebuilt: 0,
     });
     const before = (await b.db.revisions.list(first.id, true)).length;
-    await b.db.rfps.revise(first.id, { ...first, title: "Changed in B" }, {
+    await b.db.initiatives.revise(first.id, { ...first, title: "Changed in B" }, {
       author: "",
       source: "admin",
     });
-    assertEquals((await b.db.rfps.get(first.id))!.title, "Changed in B");
+    assertEquals((await b.db.initiatives.get(first.id))!.title, "Changed in B");
     const replaced = await j(await restore(b, adminB, { backup, mode: "replace" }));
     assertEquals(replaced.written, backup.entries.length);
-    assertEquals(await b.db.rfps.get(first.id), await a.db.rfps.get(first.id));
+    assertEquals(await b.db.initiatives.get(first.id), await a.db.initiatives.get(first.id));
     assertEquals((await b.db.revisions.list(first.id, true)).length, before + 1);
   } finally {
     a.close();

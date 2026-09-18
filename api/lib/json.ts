@@ -2,11 +2,11 @@
  * The ONE place that turns stored records into API JSON. `contact`, `funders`
  * and comment `email` are private and only leave through the admin shapes.
  */
-import type { Comment, Donation, Pledge, Revision, Rfp } from "../db/types.ts";
+import type { Comment, Donation, Initiative, Pledge, Revision } from "../db/types.ts";
 import { LIVE_ROLES } from "../services/roles.ts";
 import type { Config } from "../config.ts";
 import { isStructured } from "../../shared/draft/mod.ts";
-import { pickText } from "../db/rfps.ts";
+import { pickText } from "../db/initiatives.ts";
 
 export function ipfsUrl(config: Config, cid: string): string {
   return cid ? `https://${config.pinataGateway}/ipfs/${cid}` : "";
@@ -16,7 +16,7 @@ export function pfpUrl(config: Config, pfp: string): string {
   return pfp.startsWith("ipfs:") ? ipfsUrl(config, pfp.slice(5)) : "";
 }
 
-export function publicRfp(r: Rfp) {
+export function publicInitiative(r: Initiative) {
   return {
     id: r.id,
     slug: r.slug,
@@ -46,7 +46,7 @@ export function publicRfp(r: Rfp) {
 /** What a board card needs: identity, the one-line pitch and the funding
  * facts. The text (details, sections, milestones, links) and the page facts
  * stay on the initiative page, which the board never renders. */
-export function cardInitiative(r: Rfp) {
+export function cardInitiative(r: Initiative) {
   return {
     id: r.id,
     slug: r.slug,
@@ -63,12 +63,12 @@ export function cardInitiative(r: Rfp) {
 }
 
 /** The admin dashboard row: the card plus the contact it shows. */
-export function adminCardInitiative(r: Rfp) {
+export function adminCardInitiative(r: Initiative) {
   return { ...cardInitiative(r), contact: r.contact };
 }
 
 /** The structured body with defaults for rows written before it existed. */
-function structuredJson(r: Pick<Rfp, "sections" | "milestones" | "links">) {
+function structuredJson(r: Pick<Initiative, "sections" | "milestones" | "links">) {
   const t = pickText({ ...r, title: "", summary: "", details: "" });
   return {
     sections: t.sections,
@@ -99,13 +99,13 @@ export function revisionJson(v: Revision) {
   };
 }
 
-export function adminRfp(r: Rfp) {
-  return { ...publicRfp(r), contact: r.contact, funders: r.funders };
+export function adminInitiative(r: Initiative) {
+  return { ...publicInitiative(r), contact: r.contact, funders: r.funders };
 }
 
 /** What the proposer sees of their own row: the public shape plus the two
  * private fields they wrote themselves. */
-export const proposerRfp = adminRfp;
+export const proposerInitiative = adminInitiative;
 
 export function pledgeJson(config: Config, p: Pledge) {
   return {
@@ -194,7 +194,7 @@ export function adminCommentJson(
 ) {
   return {
     ...commentJson(c, live),
-    rfpId: c.rfpId,
+    initiativeId: c.rfpId,
     parentId: c.parentId,
     status: c.status,
     email: c.email,

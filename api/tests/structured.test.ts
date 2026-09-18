@@ -13,7 +13,7 @@ import {
 } from "./app-helpers.ts";
 import { exampleSubmission, grantBody, minimalSubmission, revisionBody } from "./fixtures.ts";
 import { LIMITS, SECTIONS, TOO_LONG_MSG, tooLong } from "../../shared/draft/mod.ts";
-import type { Rfp } from "../db/types.ts";
+import type { Initiative } from "../db/types.ts";
 
 const OTHER = "0x2222222222222222222222222222222222222222";
 
@@ -62,7 +62,7 @@ Deno.test("submit: the guide's example lands structured, with its backers as ple
   const out = await j(res) as { slug: string; status: string; warnings: Finding[] };
   assertEquals(out.status, "pending");
   assertEquals(out.warnings, []);
-  const row = (await h.db.rfps.bySlug(out.slug))!;
+  const row = (await h.db.initiatives.bySlug(out.slug))!;
   assertEquals(row.details, "");
   assertEquals(Object.keys(row.sections), SECTIONS.rfp);
   assertEquals(row.goalUsd, 150000);
@@ -124,7 +124,10 @@ Deno.test("submit: a missing section and a bad sum come back as findings, nothin
   const sum = body.findings.errors.find((e) => e.field === "goal")!;
   assertEquals(sum.kind, "content");
   assertStringIncludes(sum.msg, "Milestone amounts total $900, the funding goal is $1,000");
-  assertEquals((await h.db.rfps.list(["pending", "approved", "rejected", "archived"])).length, 0);
+  assertEquals(
+    (await h.db.initiatives.list(["pending", "approved", "rejected", "archived"])).length,
+    0,
+  );
   // Legacy text cannot be submitted instead of structured fields.
   const legacy = await submit(h, token, {
     title: good.title,
@@ -147,11 +150,11 @@ Deno.test("initiative writes reject retired amount/duration aliases without part
     for (const retired of [{ goalUsd: 2000 }, { duration: "12" }]) {
       assertEquals((await submit(h, token, { ...good, ...retired })).status, 400);
     }
-    assertEquals(await h.db.rfps.list(["pending"]), []);
+    assertEquals(await h.db.initiatives.list(["pending"]), []);
     const response = await submit(h, token, good);
     assertEquals(response.status, 201);
     const { slug } = await j(response) as { slug: string };
-    const before = (await h.db.rfps.bySlug(slug))!;
+    const before = (await h.db.initiatives.bySlug(slug))!;
     for (
       const [path, t] of [
         [`/api/initiatives/${slug}`, token],
@@ -167,7 +170,7 @@ Deno.test("initiative writes reject retired amount/duration aliases without part
           })).status,
           400,
         );
-        assertEquals(await h.db.rfps.get(before.id), before);
+        assertEquals(await h.db.initiatives.get(before.id), before);
       }
     }
   } finally {
@@ -188,7 +191,7 @@ Deno.test("submit: an all-done top-up needs no adoption milestone and warns inst
   assertEquals(res.status, 201);
   const out = await j(res) as { slug: string; warnings: Finding[] };
   assertEquals(fields(out.warnings).sort(), ["backers", "ms_0_link"]);
-  const row = (await h.db.rfps.bySlug(out.slug))!;
+  const row = (await h.db.initiatives.bySlug(out.slug))!;
   assertEquals([row.type, row.topup, row.milestoneReviewer], ["grant", true, "The reviewer"]);
   assertEquals(row.recipientTeam, "Team X");
   assertEquals(row.milestones[0].done, true);
@@ -202,7 +205,7 @@ Deno.test("submit: rejected proposals still block the same text", async () => {
   const first = await submit(h, token, good);
   assertEquals(first.status, 201);
   const { slug } = await j(first) as { slug: string };
-  await h.db.rfps.update((await h.db.rfps.bySlug(slug))!.id, { status: "rejected" });
+  await h.db.initiatives.update((await h.db.initiatives.bySlug(slug))!.id, { status: "rejected" });
   const again = await submit(h, token, {
     ...good,
     title: "Another title for the same text",
@@ -238,7 +241,7 @@ Deno.test("submit: renaming a duplicate explains the match; revising its section
     assertStringIncludes(findings.errors[0].msg, original.title);
     assertStringIncludes(findings.errors[0].msg, "section text and milestone names and criteria");
     assertStringIncludes(findings.errors[0].msg, "changing only the title");
-    assertEquals((await h.db.rfps.list(["pending"])).length, 1);
+    assertEquals((await h.db.initiatives.list(["pending"])).length, 1);
 
     const revised = await submit(h, token, {
       ...renamed,
@@ -246,8 +249,8 @@ Deno.test("submit: renaming a duplicate explains the match; revising its section
     });
     assertEquals(revised.status, 201);
     const { slug } = await j(revised) as { slug: string };
-    assertEquals((await h.db.rfps.bySlug(slug))!.title, renamed.title);
-    assertEquals((await h.db.rfps.list(["pending"])).length, 2);
+    assertEquals((await h.db.initiatives.bySlug(slug))!.title, renamed.title);
+    assertEquals((await h.db.initiatives.list(["pending"])).length, 2);
   } finally {
     h.close();
   }
@@ -365,7 +368,7 @@ Deno.test("proposer edit: structured revisions, unchanged, legacy body on a stru
   assertEquals(out.revision.n, 2);
   assertEquals(out.warnings, []);
   assertEquals((out.initiative.sections as Record<string, string>).why, "A better reason.");
-  const rev2 = (await h.db.revisions.get((await h.db.rfps.bySlug(slug))!.id, 2))!;
+  const rev2 = (await h.db.revisions.get((await h.db.initiatives.bySlug(slug))!.id, 2))!;
   assertEquals(rev2.links, ["https://ref.example/"]);
   assertEquals(rev2.details, "");
   // the same text again, keys reordered and padded: nothing changed
@@ -394,14 +397,14 @@ Deno.test("proposer edit: structured revisions, unchanged, legacy body on a stru
     (await j(legacy)).error,
     "Unsupported field: details.",
   );
-  assertEquals((await h.db.rfps.bySlug(slug))!.revision, 2);
+  assertEquals((await h.db.initiatives.bySlug(slug))!.revision, 2);
   h.close();
 });
 
 Deno.test("proposer edit: legacy text stays readable but edits must migrate to sections", async () => {
   const h = await harness();
   const token = await proposerToken(h);
-  const row = await h.db.rfps.insert({
+  const row = await h.db.initiatives.insert({
     title: "Imported long ago",
     summary: "This summary is comfortably longer than the forty character minimum required.",
     details: "## Old\n\nLegacy text.",
@@ -413,7 +416,7 @@ Deno.test("proposer edit: legacy text stays readable but edits must migrate to s
     h.req(`/api/initiatives/${row.slug}/revisions`, { method: "POST", token, json });
   const legacy = await post({ title: row.title, summary: row.summary, details: "Newer text." });
   assertEquals(legacy.status, 400);
-  assertEquals(await h.db.rfps.get(row.id), row);
+  assertEquals(await h.db.initiatives.get(row.id), row);
   const visible = await j(await h.req(`/api/initiatives/${row.slug}`)) as Out;
   assertEquals(visible.initiative.details, row.details);
   assertEquals((await post({ title: row.title, summary: row.summary })).status, 400);
@@ -423,7 +426,7 @@ Deno.test("proposer edit: legacy text stays readable but edits must migrate to s
   const out = await j(upgraded) as Out;
   assertEquals(out.initiative.structured, true);
   assertEquals(out.initiative.details, "");
-  assertEquals((await h.db.rfps.get(row.id))!.revision, 2);
+  assertEquals((await h.db.initiatives.get(row.id))!.revision, 2);
   assertEquals((await h.db.revisions.get(row.id, 1))!.details, row.details);
   h.close();
 });
@@ -462,7 +465,7 @@ Deno.test("proposer PATCH: page facts while pending, locked after approval, admi
   assertEquals((await j(longContact)).error, "The contact is too long (200 characters at most).");
   assertEquals((await patch({ contact: "c".repeat(LIMITS.CONTACT_CHARS) })).status, 200);
   // the text is untouched: no revision for a facts change
-  const row = (await h.db.rfps.bySlug(slug))!;
+  const row = (await h.db.initiatives.bySlug(slug))!;
   assertEquals(row.revision, 1);
   await deploySafe(h, admin, row.id);
   await h.req(`/api/admin/initiatives/${row.id}/status`, {
@@ -473,9 +476,9 @@ Deno.test("proposer PATCH: page facts while pending, locked after approval, admi
   const locked = await patch({ goal: "3,000" });
   assertEquals(locked.status, 403);
   assertEquals((await j(locked)).error, "Locked after approval; email the team.");
-  assertEquals((await h.db.rfps.bySlug(slug))!.goalUsd, 2000);
+  assertEquals((await h.db.initiatives.bySlug(slug))!.goalUsd, 2000);
   assertEquals((await patch({ goal: "3,000" }, admin)).status, 200);
-  assertEquals((await h.db.rfps.bySlug(slug))!.goalUsd, 3000);
+  assertEquals((await h.db.initiatives.bySlug(slug))!.goalUsd, 3000);
   h.close();
 });
 
@@ -485,7 +488,7 @@ Deno.test("admin PATCH: structured findings, legacy migration, type switch, hard
   const admin = await h.mint(ADMIN, true);
   const good = minimalSubmission(1000, "grant");
   const { slug } = await j(await submit(h, token, good)) as { slug: string };
-  const id = (await h.db.rfps.bySlug(slug))!.id;
+  const id = (await h.db.initiatives.bySlug(slug))!.id;
   const patch = (json: unknown) =>
     h.req(`/api/admin/initiatives/${id}`, { method: "PATCH", token: admin, json });
   // a section removed: saved, reported
@@ -495,11 +498,11 @@ Deno.test("admin PATCH: structured findings, legacy migration, type switch, hard
   const out = await j(res) as Out;
   assertEquals(fields(out.findings!.errors), ["team"]);
   assertEquals("team" in (out.initiative.sections as object), false);
-  assertEquals((await h.db.rfps.get(id))!.revision, 2);
+  assertEquals((await h.db.initiatives.get(id))!.revision, 2);
   // a no-op save is fine and still lists the findings
   const again = await j(await patch({ sections })) as Out;
   assertEquals(fields(again.findings!.errors), ["team"]);
-  assertEquals((await h.db.rfps.get(id))!.revision, 2);
+  assertEquals((await h.db.initiatives.get(id))!.revision, 2);
   // Retired details cannot be mixed into structured writes.
   const both = await patch({ details: "A blob.", sections: good.sections });
   assertEquals(both.status, 400);
@@ -525,10 +528,10 @@ Deno.test("admin PATCH: structured findings, legacy migration, type switch, hard
     "why",
   ]);
   assert(fields(switched.findings!.errors).includes("hard_req"));
-  const row = (await h.db.rfps.get(id))!;
+  const row = (await h.db.initiatives.get(id))!;
   assertEquals([row.type, row.revision, row.recipientTeam], ["rfp", 3, ""]);
   // A legacy row keeps its text during facts-only edits, then migrates on a structured edit.
-  const legacy = await h.db.rfps.insert({
+  const legacy = await h.db.initiatives.insert({
     title: "Legacy initiative",
     summary: "This summary is comfortably longer than the forty character minimum required.",
     details: "Legacy body.",
@@ -543,7 +546,7 @@ Deno.test("admin PATCH: structured findings, legacy migration, type switch, hard
     }).then((res) => res.status),
     400,
   );
-  assertEquals(await h.db.rfps.get(legacy.id), legacy);
+  assertEquals(await h.db.initiatives.get(legacy.id), legacy);
   const legacyPatch = (json: unknown) =>
     h.req(`/api/admin/initiatives/${legacy.id}`, { method: "PATCH", token: admin, json });
   assertEquals((await legacyPatch({ title: "A changed title" })).status, 400);
@@ -553,7 +556,7 @@ Deno.test("admin PATCH: structured findings, legacy migration, type switch, hard
   const lp = await j(await legacyPatch(revisionBody(minimalSubmission(1000)))) as Out;
   assertEquals(lp.initiative.structured, true);
   assertEquals(lp.initiative.details, "");
-  const asRfp: Rfp = (await h.db.rfps.get(legacy.id))!;
+  const asRfp: Initiative = (await h.db.initiatives.get(legacy.id))!;
   assertEquals(asRfp.revision, 2);
   assertEquals((await h.db.revisions.get(legacy.id, 1))!.details, legacy.details);
   h.close();
@@ -562,8 +565,8 @@ Deno.test("admin PATCH: structured findings, legacy migration, type switch, hard
 Deno.test("bulk admin actions: initiatives and comments, per-id failures reported", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
-  const a = await h.db.rfps.insert({ title: "Bulk one here", status: "pending" });
-  const b = await h.db.rfps.insert({ title: "Bulk two here", status: "pending" });
+  const a = await h.db.initiatives.insert({ title: "Bulk one here", status: "pending" });
+  const b = await h.db.initiatives.insert({ title: "Bulk two here", status: "pending" });
   await deploySafe(h, admin, a.id);
   await deploySafe(h, admin, b.id);
   const res = await j(
@@ -575,8 +578,8 @@ Deno.test("bulk admin actions: initiatives and comments, per-id failures reporte
   ) as { done: number; failed: { id: string; error: string }[] };
   assertEquals(res.done, 2);
   assertEquals(res.failed, [{ id: "nope", error: "not found" }]);
-  assertEquals((await h.db.rfps.get(a.id))!.status, "approved");
-  assert((await h.db.rfps.get(b.id))!.approvedAt);
+  assertEquals((await h.db.initiatives.get(a.id))!.status, "approved");
+  assert((await h.db.initiatives.get(b.id))!.approvedAt);
   const arch = await j(
     await h.req("/api/admin/initiatives/bulk", {
       method: "POST",
@@ -585,7 +588,7 @@ Deno.test("bulk admin actions: initiatives and comments, per-id failures reporte
     }),
   ) as { done: number };
   assertEquals(arch.done, 2);
-  assertEquals((await h.db.rfps.get(b.id))!.status, "archived");
+  assertEquals((await h.db.initiatives.get(b.id))!.status, "archived");
   for (const json of [{ ids: [a.id], action: "delete" }, { ids: [], action: "approve" }]) {
     assertEquals(
       (await h.req("/api/admin/initiatives/bulk", { method: "POST", token: admin, json })).status,
@@ -647,7 +650,7 @@ Deno.test("GET /initiative/<slug>.md: the content-file shape, public rows only, 
     token: admin,
     json: { files: await loadContentFiles() },
   });
-  const first = (await h.db.rfps.list(["approved"])).find((r) => r.type === "rfp")!;
+  const first = (await h.db.initiatives.list(["approved"])).find((r) => r.type === "rfp")!;
   await h.req(`/api/admin/initiatives/${first.id}/pledges`, {
     method: "POST",
     token: admin,
@@ -671,7 +674,7 @@ Deno.test("GET /initiative/<slug>.md: the content-file shape, public rows only, 
   assertEquals(again.goalUsd, first.goalUsd);
   assertEquals(again.backers.map((b) => b.org), ["Argot Collective"]);
   // pending rows and unknown slugs are 404; the path shape is strict
-  const pending = await h.db.rfps.insert({ title: "Hidden pending one", status: "pending" });
+  const pending = await h.db.initiatives.insert({ title: "Hidden pending one", status: "pending" });
   assertEquals((await h.req(`/initiative/${pending.slug}.md`)).status, 404);
   assertEquals((await h.req(`/initiative/nope.md`)).status, 404);
   assertEquals((await h.req(`/initiative/${first.slug}`)).status, 404);
@@ -682,7 +685,7 @@ Deno.test("<slug>-PRIVATE.md: admins only, any status, carries contact and funde
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
   const plain = await h.mint(PLAIN, false);
-  const row = await h.db.rfps.insert({
+  const row = await h.db.initiatives.insert({
     title: "Pending private one",
     status: "pending",
     contact: "griff@example.com",
@@ -701,7 +704,7 @@ Deno.test("<slug>-PRIVATE.md: admins only, any status, carries contact and funde
   assertStringIncludes(md, "funders:\n  Some L2 | why | none | no | $50k\n  A wallet co |");
   // the public file never carries them, and hides the pending row anyway
   assertEquals((await h.req(`/initiative/${row.slug}.md`)).status, 404);
-  await h.db.rfps.update(row.id, { status: "approved" });
+  await h.db.initiatives.update(row.id, { status: "approved" });
   const pub = await (await h.req(`/initiative/${row.slug}.md`)).text();
   assertFalse(pub.includes("contact:"));
   assertFalse(pub.includes("funders:"));
@@ -755,7 +758,7 @@ Deno.test("content logos: pinned once by name, mapped onto the pledge by the syn
     }),
   ) as { created: number; errors: string[] };
   assertEquals(ok.errors, []);
-  const rfp = (await h.db.rfps.bySlug("logo-grant"))!;
+  const rfp = (await h.db.initiatives.bySlug("logo-grant"))!;
   const pledges = await h.db.pledges.list(rfp.id);
   assertEquals(pledges.length, 1);
   assertEquals(pledges[0].logoCid, first.cid);
@@ -784,7 +787,7 @@ Deno.test("admin pledges reject direct CIDs and amount aliases before changing d
   const h = await pinataHarness();
   try {
     const admin = await h.mint(ADMIN, true);
-    const rfp = await h.db.rfps.insert({ title: "Pledge fields", status: "approved" });
+    const rfp = await h.db.initiatives.insert({ title: "Pledge fields", status: "approved" });
     const base = `/api/admin/initiatives/${rfp.id}/pledges`;
     const created = await h.req(base, {
       method: "POST",
@@ -836,7 +839,7 @@ Deno.test("pledge edit: PATCH takes the same fields as adding, including a new l
         : new Response("not mocked", { status: 500 }),
   });
   const admin = await h.mint(ADMIN, true);
-  const rfp = await h.db.rfps.insert({ title: "Pledge edit here", status: "approved" });
+  const rfp = await h.db.initiatives.insert({ title: "Pledge edit here", status: "approved" });
   const base = `/api/admin/initiatives/${rfp.slug}/pledges`;
   const created = await j(
     await h.req(base, { method: "POST", token: admin, json: { company: "Acme", amount: "1000" } }),
@@ -954,7 +957,7 @@ Deno.test("edit: a top-up measures the adoption floor against the goal minus the
   });
   assertEquals(res.status, 201);
   const { slug } = await j(res) as { slug: string };
-  const id = (await h.db.rfps.bySlug(slug))!.id;
+  const id = (await h.db.initiatives.bySlug(slug))!.id;
   const post = (json: unknown) =>
     h.req(`/api/initiatives/${slug}/revisions`, { method: "POST", token, json });
   const patch = (json: unknown) =>
@@ -1017,7 +1020,7 @@ Deno.test("caps: a long link, an edited long title and a long pledge company are
   });
   assertEquals(patched.status, 400);
   assertStringIncludes((await j(patched)).error as string, "too long");
-  assertEquals((await h.db.rfps.bySlug(slug))!.recipientUrl, "https://x.example/");
+  assertEquals((await h.db.initiatives.bySlug(slug))!.recipientUrl, "https://x.example/");
   // edit: a long title comes back painted on the field, like submit does
   const edited = await h.req(`/api/initiatives/${slug}/revisions`, {
     method: "POST",
@@ -1029,7 +1032,7 @@ Deno.test("caps: a long link, an edited long title and a long pledge company are
   assertEquals(fields(ef), ["title"]);
   assertEquals(ef[0].msg, tooLong("The title", LIMITS.TITLE_CHARS));
   // admin pledges: company, link and note are refused past the cap, never cut
-  const id = (await h.db.rfps.bySlug(slug))!.id;
+  const id = (await h.db.initiatives.bySlug(slug))!.id;
   const base = `/api/admin/initiatives/${id}/pledges`;
   const longCompany = await h.req(base, {
     method: "POST",
@@ -1069,7 +1072,7 @@ Deno.test("admin editor: a field past its cap blocks the save, an editorial find
   const admin = await h.mint(ADMIN, true);
   const good = minimalSubmission(1000);
   const { slug } = await j(await submit(h, token, good)) as { slug: string };
-  const id = (await h.db.rfps.bySlug(slug))!.id;
+  const id = (await h.db.initiatives.bySlug(slug))!.id;
   const patch = (json: unknown) =>
     h.req(`/api/admin/initiatives/${id}`, { method: "PATCH", token: admin, json });
   // a blank milestone name is editorial: reported, saved
@@ -1084,11 +1087,11 @@ Deno.test("admin editor: a field past its cap blocks the save, an editorial find
   const lf = (await j(long) as unknown as Fail).findings.errors;
   assertEquals(fields(lf), ["ms_0_name"]);
   assertEquals(lf[0].msg, tooLong("Milestone A: the name", LIMITS.MILESTONE_NAME));
-  assertEquals((await h.db.rfps.get(id))!.milestones[0].name, "");
+  assertEquals((await h.db.initiatives.get(id))!.milestones[0].name, "");
   // so is a title past the cap, painted on the field like the proposer's edit
   const longTitle = await patch({ title: "t".repeat(LIMITS.TITLE_CHARS + 1) });
   assertEquals(longTitle.status, 400);
   assertEquals(fields((await j(longTitle) as unknown as Fail).findings.errors), ["title"]);
-  assertEquals((await h.db.rfps.get(id))!.title, good.title);
+  assertEquals((await h.db.initiatives.get(id))!.title, good.title);
   h.close();
 });

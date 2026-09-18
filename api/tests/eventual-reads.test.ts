@@ -43,7 +43,7 @@ async function record(run: () => Promise<Response>) {
 
 Deno.test("eventual reads: public pages read eventually when enabled, writes stay strong", async () => {
   const h = await harness({ env: { KV_EVENTUAL_READS: "1" } });
-  const r = await h.db.rfps.insert({
+  const r = await h.db.initiatives.insert({
     title: "Read me",
     summary: "s",
     status: "approved",
@@ -70,7 +70,7 @@ Deno.test("eventual reads: public pages read eventually when enabled, writes sta
   // A write re-reads what it checks with strong consistency.
   seen.length = 0;
   recording = true;
-  await h.db.rfps.update(r.id, { goalUsd: 20 });
+  await h.db.initiatives.update(r.id, { goalUsd: 20 });
   recording = false;
   assert(seen.length >= 1);
   assert(seen.every((s) => s.consistency === undefined), "update used an eventual read");
@@ -79,7 +79,12 @@ Deno.test("eventual reads: public pages read eventually when enabled, writes sta
 
 Deno.test("eventual reads: off by default", async () => {
   const h = await harness();
-  await h.db.rfps.insert({ title: "Read me", summary: "s", status: "approved", goalUsd: 10 });
+  await h.db.initiatives.insert({
+    title: "Read me",
+    summary: "s",
+    status: "approved",
+    goalUsd: 10,
+  });
   const board = await record(() => h.req("/api/board"));
   assert(board.length >= 1);
   assert(board.every((c) => c === undefined), `board reads: ${board.join(",")}`);

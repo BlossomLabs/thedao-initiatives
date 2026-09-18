@@ -62,7 +62,7 @@ export function commentsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions =
   }
 
   /** Published entries + replies for an initiative, oldest first. */
-  async function forRfp(rfpId: string): Promise<Comment[]> {
+  async function forInitiative(rfpId: string): Promise<Comment[]> {
     const all = await collect(kv.list<Comment>({ prefix: K.comments(rfpId) }, read));
     return all.filter((c) => c.status === "published").sort((a, b) => a.createdAt - b.createdAt);
   }
@@ -162,7 +162,7 @@ export function commentsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions =
     address: string,
   ): Promise<Record<string, number>> {
     const out: Record<string, number> = {};
-    for (const c of await forRfp(rfpId)) {
+    for (const c of await forInitiative(rfpId)) {
       const v = (await kv.get<Vote>(K.vote(c.id, address))).value;
       if (v) out[c.id] = v.value;
     }
@@ -196,7 +196,7 @@ export function commentsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions =
   return {
     create,
     get,
-    forRfp,
+    forInitiative,
     byClaimTokens,
     rotateClaimToken,
     set,

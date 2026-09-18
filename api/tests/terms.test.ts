@@ -21,7 +21,7 @@ const TX2 = "0x" + "bb".repeat(32);
 
 async function setup() {
   const h = await harness();
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Community initiative",
     status: "approved",
     goalUsd: 1000,
@@ -288,9 +288,9 @@ Deno.test("checkbox: forged origins, form posts, stale scopes and expired sessio
       body: JSON.stringify({ slug: rfp.slug, txHash: TX, attemptId: id }),
     }, testConnection());
     assertEquals(forged.status, 403);
-    await h.db.rfps.update(rfp.id, { safeAddress: ADMIN });
+    await h.db.initiatives.update(rfp.id, { safeAddress: ADMIN });
     assertEquals((await confirm(id)).status, 409);
-    await h.db.rfps.update(rfp.id, { safeAddress: SAFE_ADDR });
+    await h.db.initiatives.update(rfp.id, { safeAddress: SAFE_ADDR });
     h.clock.now += 7 * 86400 + 1;
     assertEquals((await confirm(id)).status, 403);
   } finally {
@@ -315,8 +315,8 @@ Deno.test("admin leads: only initiatives with funders, private, admin-only", asy
     const admin = await h.mint(ADMIN, true);
     const files = syntheticContentFiles();
     await h.req("/api/admin/sync-content", { method: "POST", token: admin, json: { files } });
-    const all = await h.db.rfps.list(["approved"]);
-    await h.db.rfps.update(all[0].id, {
+    const all = await h.db.initiatives.list(["approved"]);
+    await h.db.initiatives.update(all[0].id, {
       funders: "Acme | they ship it | know them well | yes | $50k",
       contact: "a@example.com",
     });

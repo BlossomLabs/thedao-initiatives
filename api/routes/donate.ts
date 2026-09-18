@@ -61,12 +61,12 @@ export function donateRoutes(deps: Deps) {
     ) {
       throw new HttpError(400, "Please agree to the donation terms first.");
     }
-    const rfp = await db.rfps.bySlug(s(body.slug, 200));
-    if (!rfp || rfp.status !== "approved" || !rfp.safeAddress) {
+    const initiative = await db.initiatives.bySlug(s(body.slug, 200));
+    if (!initiative || initiative.status !== "approved" || !initiative.safeAddress) {
       throw new HttpError(404, "not found");
     }
-    await assertInitiativeIdentity(db, rfp.slug, rfp, body.initiativeId);
-    if (typeof body.recipient !== "string" || !addrEq(body.recipient, rfp.safeAddress)) {
+    await assertInitiativeIdentity(db, initiative.slug, initiative, body.initiativeId);
+    if (typeof body.recipient !== "string" || !addrEq(body.recipient, initiative.safeAddress)) {
       throw new HttpError(409, "Donation address changed. Refresh the page before continuing.");
     }
     const published = (await publishedDonationTerms()).find((v) => v.id === body.version);
@@ -134,9 +134,9 @@ export function donateRoutes(deps: Deps) {
     }
     const row = await db.terms.record({
       sessionHash,
-      initiativeId: rfp.id,
+      initiativeId: initiative.id,
       chainId: CHAIN_ID,
-      recipient: rfp.safeAddress,
+      recipient: initiative.safeAddress,
       version: published.id,
       method: body.method as "wallet" | "exchange",
       wallet,
@@ -187,11 +187,11 @@ export function donateRoutes(deps: Deps) {
     const body = await jsonBody(c, ["slug", "initiativeId", "txHash", "attemptId"]);
     const slug = s(body.slug, 200);
     const txHash = s(body.txHash, 80).toLowerCase();
-    const rfp = await db.rfps.bySlug(slug);
-    if (!rfp) throw new HttpError(404, "not found");
-    await assertInitiativeIdentity(db, slug, rfp, body.initiativeId);
-    if (rfp.status !== "approved") throw new HttpError(404, "not found");
-    if (!rfp.safeAddress) {
+    const initiative = await db.initiatives.bySlug(slug);
+    if (!initiative) throw new HttpError(404, "not found");
+    await assertInitiativeIdentity(db, slug, initiative, body.initiativeId);
+    if (initiative.status !== "approved") throw new HttpError(404, "not found");
+    if (!initiative.safeAddress) {
       return c.json({
         status: "error",
         detail: "this initiative has no donation address yet",
@@ -206,8 +206,8 @@ export function donateRoutes(deps: Deps) {
       const row = typeof id === "string" && ATTEMPT_RE.test(id) ? await db.terms.get(id) : null;
       if (!row || row.sessionHash !== sessionHash) throw new HttpError(404, "not found");
       if (
-        row.initiativeId !== rfp.id || row.chainId !== CHAIN_ID ||
-        !addrEq(row.recipient, rfp.safeAddress)
+        row.initiativeId !== initiative.id || row.chainId !== CHAIN_ID ||
+        !addrEq(row.recipient, initiative.safeAddress)
       ) {
         throw new HttpError(
           409,
@@ -221,13 +221,13 @@ export function donateRoutes(deps: Deps) {
     if (!Object.keys(await chain.activeTokens()).length) {
       return c.json({ status: "error", detail: state.detail }, 503);
     }
-    const v = await chain.verifyDonation(txHash, rfp.safeAddress);
+    const v = await chain.verifyDonation(txHash, initiative.safeAddress);
     if (!v.found && v.detail.includes("malformed")) {
       return c.json({ status: "error", detail: v.detail }, 400);
     }
     if (association) await matchDonation(db, association, v);
-    let [, status] = await db.donations.record(rfp.id, txHash, v, "tx");
-    if (status === "confirmed") await deps.funding.invalidate(rfp.safeAddress);
+    let [, status] = await db.donations.record(initiative.id, txHash, v, "tx");
+    if (status === "confirmed") await deps.funding.invalidate(initiative.safeAddress);
     if (status === "already-confirmed") status = "confirmed";
     return c.json({
       status,
@@ -247,13 +247,13 @@ export function donateRoutes(deps: Deps) {
       row.status === "pending" && !(await deps.maintenance.on()) &&
       (await db.rateLimit("st:" + txHash, 1, 5))
     ) {
-      const rfp = await db.rfps.get(row.rfpId);
-      if (rfp?.safeAddress && Object.keys(await chain.activeTokens()).length) {
-        const v = await chain.verifyDonation(txHash, rfp.safeAddress);
+      const initiative = await db.initiatives.get(row.rfpId);
+      if (initiative?.safeAddress && Object.keys(await chain.activeTokens()).length) {
+        const v = await chain.verifyDonation(txHash, initiative.safeAddress);
         if (v.found && !v.pending) {
-          await db.donations.record(rfp.id, txHash, v, row.source);
-          if (v.ok) await deps.funding.invalidate(rfp.safeAddress);
-          row = (await db.donations.get(rfp.id, txHash)) ?? row;
+          await db.donations.record(initiative.id, txHash, v, row.source);
+          if (v.ok) await deps.funding.invalidate(initiative.safeAddress);
+          row = (await db.donations.get(initiative.id, txHash)) ?? row;
         }
       }
     }

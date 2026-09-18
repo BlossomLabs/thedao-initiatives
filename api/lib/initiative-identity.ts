@@ -1,4 +1,4 @@
-import type { Db, Rfp } from "../db/mod.ts";
+import type { Db, Initiative } from "../db/mod.ts";
 import { HttpError } from "./errors.ts";
 
 export const INITIATIVE_CHANGED =
@@ -9,11 +9,11 @@ export const INITIATIVE_CHANGED =
 export async function assertInitiativeIdentity(
   db: Db,
   slug: string,
-  rfp: Rfp,
+  rfp: Initiative,
   initiativeId: unknown,
 ): Promise<void> {
   if (
     (initiativeId !== undefined && initiativeId !== rfp.id) ||
-    (initiativeId === undefined && await db.rfps.isReusedSlug(slug))
+    (initiativeId === undefined && await db.initiatives.isReusedSlug(slug))
   ) throw new HttpError(409, INITIATIVE_CHANGED);
 }

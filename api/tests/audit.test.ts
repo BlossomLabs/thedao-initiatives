@@ -162,7 +162,7 @@ Deno.test("audit: admin changes and mixed bulk outcomes identify each item witho
         e.action === "session.admin_revoke" && e.target.id === PLAIN.toLowerCase()
       ),
     );
-    const row = await h.db.rfps.insert({
+    const row = await h.db.initiatives.insert({
       title: "Private funder title",
       funders: "Private funder",
       status: "pending",
@@ -361,7 +361,10 @@ Deno.test("audit: logger failures do not block mutations or change their respons
     const token = await h.mint(ADMIN, true);
     // Exercise failures both before mutation and after a successful commit.
     for (const failOn of ["attempt", "success"]) {
-      const row = await h.db.rfps.insert({ title: "Audit logger fixture", status: "pending" });
+      const row = await h.db.initiatives.insert({
+        title: "Audit logger fixture",
+        status: "pending",
+      });
       let failures = 0;
       h.deps.log = (line) => {
         if (JSON.parse(line).outcome === failOn) {
@@ -376,7 +379,7 @@ Deno.test("audit: logger failures do not block mutations or change their respons
         json: { action: "reject" },
       });
       assertEquals(response.status, 200);
-      assertEquals((await h.db.rfps.get(row.id))?.status, "rejected");
+      assertEquals((await h.db.initiatives.get(row.id))?.status, "rejected");
       assertEquals(failures, 1);
       assertEquals(forRequest(h, response).map((e) => e.outcome), [
         failOn === "attempt" ? "success" : "attempt",

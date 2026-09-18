@@ -42,7 +42,7 @@ export async function retryDonationMatches(db: Db, chain: Chain, initiativeId: s
       continue;
     }
     try {
-      const rfp = await db.rfps.get(initiativeId);
+      const rfp = await db.initiatives.get(initiativeId);
       if (!rfp || rfp.status !== "approved" || !addrEq(rfp.safeAddress, link.recipient)) {
         await db.terms.resolve(link.attemptId, "unmatched", "Initiative or recipient changed.");
         continue;

@@ -26,8 +26,8 @@ Deno.test("sensitive admin changes reject stale authentication before any side e
       assertEquals((await j(res)).reauthenticate, true);
     }
     assertEquals(await h.deps.admins.isAdmin(PLAIN), false);
-    assertEquals(await h.db.rfps.bySlug("synthetic-rfp"), null);
-    const initiative = await h.db.rfps.insert({
+    assertEquals(await h.db.initiatives.bySlug("synthetic-rfp"), null);
+    const initiative = await h.db.initiatives.insert({
       title: "Recent authorization check",
       status: "approved",
     });
@@ -39,7 +39,7 @@ Deno.test("sensitive admin changes reject stale authentication before any side e
       });
       assertEquals(res.status, 403);
       assertEquals((await j(res)).reauthenticate, true);
-      assertEquals(await h.db.rfps.get(initiative.id), initiative);
+      assertEquals(await h.db.initiatives.get(initiative.id), initiative);
     }
     // Read-only access remains available; fresh admin authentication can perform the change.
     assertEquals((await h.req("/api/admin/admins", { token: stale })).status, 200);
@@ -61,7 +61,7 @@ Deno.test("sensitive admin changes reject stale authentication before any side e
     });
     assertEquals(synced.status, 200);
     assertEquals((await j(synced)).created, 1);
-    assertEquals((await h.db.rfps.bySlug("synthetic-rfp"))?.status, "approved");
+    assertEquals((await h.db.initiatives.bySlug("synthetic-rfp"))?.status, "approved");
     const ordinary = await h.mint("0x3333333333333333333333333333333333333333");
     const denied = await h.req("/api/admin/admins", {
       method: "POST",

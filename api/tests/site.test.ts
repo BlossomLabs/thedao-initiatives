@@ -296,7 +296,7 @@ Deno.test("site: enforced CSP and shared headers cover static 404s and unexpecte
 Deno.test("site: Markdown downloads keep API authorization and never fall through to HTML", async () => {
   const h = await siteHarness();
   try {
-    const row = await h.db.rfps.insert({
+    const row = await h.db.initiatives.insert({
       title: "Published example",
       status: "approved",
       contact: "private@example.com",

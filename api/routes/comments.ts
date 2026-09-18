@@ -43,11 +43,11 @@ export function commentRoutes(deps: Deps) {
     if (!(await db.rateLimit("cml:" + requireClientIp(c), 60, 60))) {
       throw new HttpError(429, "slow down");
     }
-    const rfp = await db.rfps.bySlug(c.req.param("slug"));
+    const rfp = await db.initiatives.bySlug(c.req.param("slug"));
     if (!rfp || !["approved", "archived"].includes(rfp.status)) {
       throw new HttpError(404, "not found");
     }
-    const rows = await db.comments.forRfp(rfp.id);
+    const rows = await db.comments.forInitiative(rfp.id);
     const user = c.var.user;
     let myVotes: Record<string, number> = {};
     let eligible = false;
@@ -78,7 +78,7 @@ export function commentRoutes(deps: Deps) {
   });
 
   r.post("/initiatives/:slug/comments", async (c) => {
-    const rfp = await db.rfps.bySlug(c.req.param("slug"));
+    const rfp = await db.initiatives.bySlug(c.req.param("slug"));
     const body = await jsonBody(c, [
       "initiativeId",
       "body",
@@ -179,7 +179,7 @@ export function commentRoutes(deps: Deps) {
     return c.json({
       held: rows.map((x) => ({
         id: x.id,
-        rfpId: x.rfpId,
+        initiativeId: x.rfpId,
         parentId: x.parentId,
         type: x.type,
         body: x.body,
@@ -310,7 +310,7 @@ export function commentRoutes(deps: Deps) {
       reply: status === "published"
         ? commentJson(
           reply,
-          liveRoles(await deps.admins.set(), address, await db.rfps.get(parent.rfpId)),
+          liveRoles(await deps.admins.set(), address, await db.initiatives.get(parent.rfpId)),
         )
         : null,
       claimToken: status === "held" ? reply.claimToken : "",

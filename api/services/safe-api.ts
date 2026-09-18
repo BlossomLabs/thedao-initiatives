@@ -11,7 +11,7 @@ import { MIN_CONFIRMATIONS, SAFE_TX_SERVICE_BASE, TOKENS } from "../config.ts";
 import type { Config } from "../config.ts";
 import type { Db } from "../db/mod.ts";
 import type { Chain } from "../chain/mod.ts";
-import type { Rfp, SafeSyncState } from "../db/types.ts";
+import type { Initiative, SafeSyncState } from "../db/types.ts";
 import type { Verification } from "../chain/verify.ts";
 import { toChecksum } from "../chain/address.ts";
 
@@ -82,7 +82,7 @@ async function fetchPage(deps: SafeApiDeps, url: string): Promise<Page> {
 /** Credit one tx hash to an initiative: RPC verification first, indexer fallback for ETH. */
 async function creditTx(
   deps: SafeApiDeps,
-  rfp: Rfp,
+  rfp: Initiative,
   txHash: string,
   rows: SafeTransfer[],
   getBlockNumber: () => Promise<number>,
@@ -156,7 +156,7 @@ const ACCEPTED = new Set(Object.values(TOKENS).map(([a]) => a.toLowerCase()));
  */
 export async function syncSafe(
   deps: SafeApiDeps,
-  rfp: Rfp,
+  rfp: Initiative,
   budgetMs = DEFAULT_BUDGET_MS,
   getBlockNumber = lazyBlockNumber(deps),
   persist = true,
@@ -263,13 +263,13 @@ export async function syncSafe(
 export async function reverifyPending(
   deps: SafeApiDeps,
   getBlockNumber = lazyBlockNumber(deps),
-  initiative?: Rfp,
+  initiative?: Initiative,
 ): Promise<void> {
   const pending = initiative
     ? (await deps.db.donations.list(initiative.id, false)).filter((d) => d.status === "pending")
     : await deps.db.donations.pending();
   for (const d of pending) {
-    const rfp = initiative ?? await deps.db.rfps.get(d.rfpId);
+    const rfp = initiative ?? await deps.db.initiatives.get(d.rfpId);
     if (!rfp?.safeAddress) continue;
     try {
       const v = await deps.chain.verifyDonation(d.txHash, rfp.safeAddress, { getBlockNumber });

@@ -4,11 +4,11 @@ export type ReadOptions = { consistency: Deno.KvConsistencyLevel } | undefined;
 
 /** Single source of truth for every KV key shape. */
 export const K = {
-  rfp: (id: string) => ["rfp", id] as const,
-  rfpBySlug: (slug: string) => ["rfp_by_slug", slug] as const,
-  rfpBySourceSlug: (slug: string) => ["rfp_by_source_slug", slug] as const,
-  reusedRfpSlug: (slug: string) => ["reused_rfp_slug", slug] as const,
-  rfpBySafe: (addr: string) => ["rfp_by_safe", addr.toLowerCase()] as const,
+  initiative: (id: string) => ["rfp", id] as const,
+  initiativeBySlug: (slug: string) => ["rfp_by_slug", slug] as const,
+  initiativeBySourceSlug: (slug: string) => ["rfp_by_source_slug", slug] as const,
+  reusedInitiativeSlug: (slug: string) => ["reused_rfp_slug", slug] as const,
+  initiativeBySafe: (addr: string) => ["rfp_by_safe", addr.toLowerCase()] as const,
   revision: (rfpId: string, n: number) => ["revision", rfpId, n] as const,
   revisions: (rfpId: string) => ["revision", rfpId] as const,
   pledge: (rfpId: string, id: string) => ["pledge", rfpId, id] as const,

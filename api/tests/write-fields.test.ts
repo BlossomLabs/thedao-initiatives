@@ -18,7 +18,7 @@ async function setup() {
   const admin = await h.mint(ADMIN, true);
   const proposer = await proposerToken(h);
   const draft = minimalSubmission(1000);
-  const row = await h.db.rfps.insert({
+  const row = await h.db.initiatives.insert({
     ...revisionBody(draft),
     goalUsd: 1000,
     proposer: PLAIN,
@@ -117,10 +117,13 @@ Deno.test("writes: every JSON endpoint rejects unknown fields before changing do
         `${method} ${path}`,
       );
     }
-    assertEquals(await h.db.rfps.get(row.id), row);
-    assertEquals((await h.db.rfps.list(["pending", "approved", "rejected", "archived"])).length, 1);
+    assertEquals(await h.db.initiatives.get(row.id), row);
+    assertEquals(
+      (await h.db.initiatives.list(["pending", "approved", "rejected", "archived"])).length,
+      1,
+    );
     assertEquals((await h.db.revisions.list(row.id)).length, 1);
-    assertEquals(await h.db.comments.forRfp(row.id), [comment]);
+    assertEquals(await h.db.comments.forInitiative(row.id), [comment]);
     assertEquals(await h.db.pledges.list(row.id), [pledge]);
     assertEquals(await h.db.profiles.get(ADMIN), profile);
     assertEquals(await h.deps.admins.list(), admins);
@@ -225,8 +228,8 @@ Deno.test("writes: unknown nested fields reject the entire request, including bu
       }),
       "terms",
     );
-    assertEquals(await h.db.rfps.get(row.id), row);
-    assertEquals((await h.db.rfps.list(["pending", "approved"])).length, 1);
+    assertEquals(await h.db.initiatives.get(row.id), row);
+    assertEquals((await h.db.initiatives.list(["pending", "approved"])).length, 1);
     assertEquals((await h.db.revisions.list(row.id)).length, 1);
     assertEquals(h.fetchLog, []);
     assertEquals(h.script.calls, []);
@@ -256,7 +259,7 @@ Deno.test("writes: malformed JSON cannot become an empty update or logout", asyn
         field,
       );
     }
-    assertEquals(await h.db.rfps.get(row.id), row);
+    assertEquals(await h.db.initiatives.get(row.id), row);
     assert(await h.db.sessions.get(admin, false));
     // Bodyless actions still accept no body or an empty object.
     for (const json of [undefined, {}]) {
@@ -284,7 +287,7 @@ Deno.test("writes: unknown actions cannot match inherited object properties", as
         assertEquals((await h.req(path, { method: "POST", token: admin, json })).status, 400);
       }
     }
-    assertEquals(await h.db.rfps.get(row.id), row);
+    assertEquals(await h.db.initiatives.get(row.id), row);
     assertEquals(await h.db.comments.get(comment.id), comment);
   } finally {
     h.close();

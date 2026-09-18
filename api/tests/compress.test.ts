@@ -9,7 +9,7 @@ async function gunzip(res: Response): Promise<string> {
 Deno.test("api: JSON is gzipped when the client accepts it, unchanged otherwise", async () => {
   const h = await harness();
   for (let i = 0; i < 8; i++) {
-    await h.db.rfps.insert({
+    await h.db.initiatives.insert({
       title: `Initiative ${i}`,
       summary: "s".repeat(300),
       status: "approved",

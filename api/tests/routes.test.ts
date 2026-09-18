@@ -31,15 +31,15 @@ async function seedApproved(h: Awaited<ReturnType<typeof harness>>, safe = SAFE_
     json: { files },
   });
   assertEquals(await j(res), { created: 13, updated: 0, backers: 2, errors: [] });
-  const first = (await h.db.rfps.list(["approved"]))[0];
-  if (safe) await h.db.rfps.update(first.id, { safeAddress: safe });
-  return { admin, first: (await h.db.rfps.get(first.id))! };
+  const first = (await h.db.initiatives.list(["approved"]))[0];
+  if (safe) await h.db.initiatives.update(first.id, { safeAddress: safe });
+  return { admin, first: (await h.db.initiatives.get(first.id))! };
 }
 
 Deno.test("content sync publishes the repo files as structured rows; public JSON never leaks private fields", async () => {
   const h = await harness();
   const { admin, first } = await seedApproved(h);
-  await h.db.rfps.update(first.id, {
+  await h.db.initiatives.update(first.id, {
     contact: "secret@example.com",
     funders: "SECRET FUNDER LIST",
   });
@@ -59,7 +59,7 @@ Deno.test("content sync publishes the repo files as structured rows; public JSON
     }
   }
   assertEquals("community" in board, false);
-  const ethdebug = (await h.db.rfps.bySlug(
+  const ethdebug = (await h.db.initiatives.bySlug(
     "source-level-debugging-for-solidity-ethdebug-in-solc",
   ))!;
   assertEquals(ethdebug.topup, true);
@@ -90,7 +90,7 @@ Deno.test("content sync publishes the repo files as structured rows; public JSON
     "SECRET FUNDER LIST",
   );
   // re-sync updates words but never lifecycle/Safe
-  await h.db.rfps.update(first.id, { status: "archived" });
+  await h.db.initiatives.update(first.id, { status: "archived" });
   const again = await j(
     await h.req("/api/admin/sync-content", {
       method: "POST",
@@ -99,11 +99,11 @@ Deno.test("content sync publishes the repo files as structured rows; public JSON
     }),
   );
   assertEquals(again, { created: 0, updated: 13, backers: 0, errors: [] });
-  for (const r of await h.db.rfps.list(["approved", "pending", "archived"])) {
+  for (const r of await h.db.initiatives.list(["approved", "pending", "archived"])) {
     assertEquals((await h.db.revisions.list(r.id)).length, 1); // unchanged: no new revision
   }
-  assertEquals((await h.db.rfps.get(first.id))!.status, "archived");
-  assertEquals((await h.db.rfps.get(first.id))!.safeAddress, SAFE_ADDR);
+  assertEquals((await h.db.initiatives.get(first.id))!.status, "archived");
+  assertEquals((await h.db.initiatives.get(first.id))!.safeAddress, SAFE_ADDR);
   const bad = await j(
     await h.req("/api/admin/sync-content", {
       method: "POST",
@@ -129,7 +129,7 @@ Deno.test("content sync publishes the repo files as structured rows; public JSON
   ) as { created: number; errors: string[] };
   assertEquals(noScope.created, 0);
   assertEquals(noScope.errors, ["broken.md: not structured: missing: Out of scope"]);
-  assertEquals(await h.db.rfps.bySlug("broken"), null);
+  assertEquals(await h.db.initiatives.bySlug("broken"), null);
   h.close();
 });
 
@@ -137,7 +137,7 @@ Deno.test("board ordering: pins first, then money, then newest", async () => {
   const h = await harness();
   const mk = async (title: string, rank: number | null) => {
     h.clock.now += 10;
-    return await h.db.rfps.insert({
+    return await h.db.initiatives.insert({
       title,
       status: "approved",
       sortRank: rank,
@@ -180,7 +180,7 @@ Deno.test("submit: needs a signed-in wallet with a display name; records the pro
   const res = await h.req("/api/initiatives", { method: "POST", token, json: good });
   assertEquals(res.status, 201);
   const { slug } = await j(res) as { slug: string };
-  const row = (await h.db.rfps.bySlug(slug))!;
+  const row = (await h.db.initiatives.bySlug(slug))!;
   assertEquals(row.proposer, PLAIN);
   // public once approved, proposer included
   const admin = await h.mint(ADMIN, true);
@@ -250,7 +250,7 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
   });
   assertEquals(res.status, 201);
   const { slug } = await j(res) as { slug: string };
-  const row = (await h.db.rfps.bySlug(slug))!;
+  const row = (await h.db.initiatives.bySlug(slug))!;
   assertEquals(row.status, "pending");
   assertEquals(row.type, "rfp");
   assertEquals(row.goalUsd, 25000);
@@ -285,7 +285,7 @@ Deno.test("mine: a proposer lists and opens their own submissions, rejected ones
   h.clock.now += 1;
   const second = await submit(token, 26000);
   const theirs = await submit(stranger, 27000);
-  const rejected = (await h.db.rfps.bySlug(first))!;
+  const rejected = (await h.db.initiatives.bySlug(first))!;
   await h.req(`/api/admin/initiatives/${rejected.id}/status`, {
     method: "POST",
     token: admin,
@@ -662,7 +662,7 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
       json: minimalSubmission(1000),
     }),
   ) as { slug: string };
-  const id = (await h.db.rfps.bySlug(sub.slug))!.id;
+  const id = (await h.db.initiatives.bySlug(sub.slug))!.id;
   assertEquals((await h.req("/api/admin/dashboard")).status, 401);
   const dash = await j(await h.req("/api/admin/dashboard", { token: admin })) as {
     pendingCount: number;
@@ -704,7 +704,7 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     400,
   );
   // deploy the Safe (deploy first, approve second)
-  const key = (await h.db.rfps.get(id))!.safeDeploymentKey!;
+  const key = (await h.db.initiatives.get(id))!.safeDeploymentKey!;
   h.script.code[predictSafeAddress(SIGNERS, key).toLowerCase()] = "0x6080";
   const conf = await j(
     await h.req("/api/admin/initiatives/" + id + "/safe-confirm", {
@@ -790,8 +790,8 @@ Deno.test("ai-search: mocked provider, unknown ids dropped, cache, disabled", as
       });
     },
   });
-  const a = await h.db.rfps.insert({ title: "Alpha initiative", status: "approved" });
-  const b = await h.db.rfps.insert({ title: "Beta initiative", status: "approved" });
+  const a = await h.db.initiatives.insert({ title: "Alpha initiative", status: "approved" });
+  const b = await h.db.initiatives.insert({ title: "Beta initiative", status: "approved" });
   const knownIds = [b.id, a.id];
   assertEquals(
     (await h.req("/api/ai-search", { method: "POST", json: { query: "ab" } })).status,
@@ -823,7 +823,7 @@ Deno.test("submit: discussion links are stored without fetching; title is requir
   });
   assertEquals(res.status, 201);
   const { slug } = await j(res) as { slug: string };
-  const row = (await h.db.rfps.bySlug(slug))!;
+  const row = (await h.db.initiatives.bySlug(slug))!;
   assertEquals(row.title, good.title);
   assertEquals(row.discourseUrl, "https://forum.example.org/t/my-initiative/123");
   const noTitle = await h.req("/api/initiatives", {
@@ -851,7 +851,7 @@ Deno.test("content backers: file pledges are created once, kept in step, never o
   const h = await harness();
   const { admin } = await seedApproved(h);
   // the repo files: one backer each on ethdebug and formal verification
-  const fv = (await h.db.rfps.bySlug("securing-ethereum-with-formal-verification"))!;
+  const fv = (await h.db.initiatives.bySlug("securing-ethereum-with-formal-verification"))!;
   assertEquals(fv.discourseUrl, "https://t.me/+PHZekKhdjPAxOWU0");
   assertEquals(fv.recipientTeam, "Verity Labs");
   const fvPledges = await h.db.pledges.list(fv.id);
@@ -860,7 +860,8 @@ Deno.test("content backers: file pledges are created once, kept in step, never o
   assertEquals(fvPledges[0].amountUsd, 100000);
   assertEquals(fvPledges[0].url, "https://ethereum.foundation/");
   assertEquals(fvPledges[0].status, "pledged");
-  const eth = (await h.db.rfps.bySlug("source-level-debugging-for-solidity-ethdebug-in-solc"))!;
+  const eth =
+    (await h.db.initiatives.bySlug("source-level-debugging-for-solidity-ethdebug-in-solc"))!;
   const ethPledges = await h.db.pledges.list(eth.id);
   assertEquals(ethPledges.map((p) => [p.company, p.amountUsd]), [["Argot Collective", 151000]]);
   const board = await j(await h.req("/api/board"));
@@ -878,7 +879,7 @@ Deno.test("content backers: file pledges are created once, kept in step, never o
   // created with two pledges; the admin marks one received and adds a third
   const s1 = await sync([file("  Acme | $60 | https://acme.example/\n  - Beta Org | 40\n")]);
   assertEquals([s1.created, s1.backers, s1.errors], [1, 2, []]);
-  const gb = (await h.db.rfps.bySlug("grant-b"))!;
+  const gb = (await h.db.initiatives.bySlug("grant-b"))!;
   let rows = await h.db.pledges.list(gb.id);
   assertEquals(rows.map((p) => [p.company, p.amountUsd, p.url]), [
     ["Acme", 60, "https://acme.example/"],
@@ -921,7 +922,7 @@ Deno.test("content backers: file pledges are created once, kept in step, never o
     assertEquals(r.created, 0);
     assertStringIncludes((r.errors as string[])[0], "backers");
   }
-  assertEquals(await h.db.rfps.bySlug("grant-bad"), null);
+  assertEquals(await h.db.initiatives.bySlug("grant-bad"), null);
 });
 
 Deno.test("page facts: content keys sync, admin patch validates and clears per type", async () => {
@@ -971,7 +972,7 @@ Deno.test("page facts: content keys sync, admin patch validates and clears per t
   );
   assertEquals(sync.created, 1);
   assertEquals((sync.errors as string[]).length, 2);
-  const gx = (await h.db.rfps.bySlug("grant-x"))!;
+  const gx = (await h.db.initiatives.bySlug("grant-x"))!;
   assertEquals(gx.durationMonths, 3);
   assertEquals(gx.recipientTeam, "Team X");
   assertEquals(gx.recipientUrl, "https://x.example/team#top");

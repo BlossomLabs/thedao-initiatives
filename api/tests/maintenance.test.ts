@@ -120,7 +120,7 @@ Deno.test("maintenance: every write answers 503, sign-in and the admin controls 
   try {
     const admin = await h.mint(ADMIN, true);
     const proposer = await proposerToken(h);
-    const initiative = await h.db.rfps.insert({
+    const initiative = await h.db.initiatives.insert({
       title: "Frozen",
       status: "approved",
       goalUsd: 10,
@@ -152,9 +152,9 @@ Deno.test("maintenance: every write answers 503, sign-in and the admin controls 
         `${path} audited as a failure`,
       );
     }
-    assertEquals(await h.db.rfps.get(initiative.id), initiative);
+    assertEquals(await h.db.initiatives.get(initiative.id), initiative);
     assertEquals(await h.deps.admins.isAdmin(PLAIN), false);
-    assertEquals((await h.db.comments.forRfp(initiative.id)).length, 0);
+    assertEquals((await h.db.comments.forInitiative(initiative.id)).length, 0);
 
     // Sign-in, sign-out and session management stay open.
     const login = await h.req("/api/auth/verify", { method: "POST", json: await signed(h) });
@@ -223,7 +223,7 @@ Deno.test("maintenance: background refreshes reachable from reads and the cron s
   const h = await harness({ fetch: () => transfers() });
   try {
     const admin = await h.mint(ADMIN, true);
-    const initiative = await h.db.rfps.insert({
+    const initiative = await h.db.initiatives.insert({
       title: "Quiet",
       status: "approved",
       goalUsd: 10,

@@ -89,7 +89,7 @@ async function setup(aiFetch?: (url: string) => Response) {
     env: aiFetch ? { AI_SEARCH_API_KEY: "k" } : {},
     fetch: aiFetch,
   });
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Community initiative",
     status: "approved",
     goalUsd: 1000,
@@ -180,7 +180,7 @@ Deno.test("new comments are generic and cannot collect categories, topics or ema
     ) {
       assertEquals((await post(admin, retired)).status, 400);
     }
-    assertEquals(await h.db.comments.forRfp(rfp.id), []);
+    assertEquals(await h.db.comments.forInitiative(rfp.id), []);
     // Current requests and the previous browser's harmless defaults both work.
     for (const body of [{}, { type: "other", topic: "", email: "" }]) {
       const response = await post(admin, body);
@@ -440,7 +440,9 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   );
   assertEquals((await h.db.comments.get(e1.id))!.reviewed, true);
   // the front-page level is gone: the action is unknown, "feature" still works
-  const ids = (await h.db.comments.forRfp(rfp.id)).filter((c) => !c.parentId).map((c) => c.id);
+  const ids = (await h.db.comments.forInitiative(rfp.id)).filter((c) => !c.parentId).map((c) =>
+    c.id
+  );
   const front = await h.req(`/api/admin/comments/${ids[0]}/feature-front`, {
     method: "POST",
     token: admin,
@@ -482,7 +484,7 @@ Deno.test("names: .eth is only allowed as the poster's own ENS name", async () =
       return Response.json({});
     },
   });
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Named initiative",
     status: "approved",
     goalUsd: 1000,

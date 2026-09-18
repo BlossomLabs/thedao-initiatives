@@ -33,7 +33,7 @@ export function isCurator(address: string): boolean {
 
 /** The wallet the initiative was submitted from (or set by an admin). */
 async function isProposer(db: Db, address: string, rfpId: string): Promise<boolean> {
-  const rfp = await db.rfps.get(rfpId);
+  const rfp = await db.initiatives.get(rfpId);
   return Boolean(rfp?.proposer) && rfp!.proposer.toLowerCase() === address.toLowerCase();
 }
 

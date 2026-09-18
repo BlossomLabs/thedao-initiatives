@@ -1,7 +1,7 @@
 import { collect, K, type ReadOptions } from "./keys.ts";
 import type { Revision } from "./types.ts";
 
-/** Read side of the revision history; revisions are written by rfpsRepo. */
+/** Read side of the revision history; revisions are written by initiativesRepo. */
 export function revisionsRepo(kv: Deno.Kv, read: ReadOptions = undefined) {
   const get = async (rfpId: string, n: number): Promise<Revision | null> =>
     (await kv.get<Revision>(K.revision(rfpId, n), read)).value;

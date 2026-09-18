@@ -156,7 +156,7 @@ export interface Harness {
 
 /** Put the initiative's Safe on the fake chain and bind it, as the deploy panel would. */
 export async function deploySafe(h: Harness, admin: string, id: string): Promise<string> {
-  const rfp = (await h.db.rfps.get(id))!;
+  const rfp = (await h.db.initiatives.get(id))!;
   const address = predictSafeAddress(SIGNERS, rfp.safeDeploymentKey ?? rfp.slug);
   h.script.code[address.toLowerCase()] = "0x6080";
   const res = await h.req(`/api/admin/initiatives/${id}/safe-confirm`, {

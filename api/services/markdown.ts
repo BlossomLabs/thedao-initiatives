@@ -4,7 +4,7 @@
  * sync imports comes back out the same way, so a page can be exported,
  * edited and pushed again.
  */
-import type { Pledge, Rfp } from "../db/types.ts";
+import type { Initiative, Pledge } from "../db/types.ts";
 import { FIELDS, milestonesToMd, SECTIONS } from "../../shared/draft/mod.ts";
 import { isStructured } from "../../shared/draft/normalise.ts";
 
@@ -16,7 +16,11 @@ export interface MarkdownOptions {
   privateFields?: boolean;
 }
 
-export function initiativeMarkdown(r: Rfp, pledges: Pledge[], opts: MarkdownOptions = {}): string {
+export function initiativeMarkdown(
+  r: Initiative,
+  pledges: Pledge[],
+  opts: MarkdownOptions = {},
+): string {
   const fm: string[] = ["---", `title: ${value(r.title)}`, `type: ${r.type}`];
   if (opts.privateFields) {
     fm.push(`status: ${r.status}`);

@@ -47,7 +47,7 @@ Deno.test("daily cache: only the exact production timeline may access KV or upst
       db: {
         ...h.db,
         rfps: {
-          ...h.db.rfps,
+          ...h.db.initiatives,
           list: () => {
             throw new Error("non-production must not read KV");
           },
@@ -80,23 +80,23 @@ Deno.test("daily cache: production refreshes approved Safes, persists both cache
     fetch: (url) => url.includes(SECOND_SAFE) ? transfers(SECOND_SAFE, TX2) : transfers(),
   });
   try {
-    const first = await h.db.rfps.insert({
+    const first = await h.db.initiatives.insert({
       title: "Daily first",
       status: "approved",
       safeAddress: SAFE_ADDR,
     });
-    const second = await h.db.rfps.insert({
+    const second = await h.db.initiatives.insert({
       title: "Daily second",
       status: "approved",
       safeAddress: SECOND_SAFE,
     });
-    const bare = await h.db.rfps.insert({ title: "No Safe", status: "approved" });
-    const pending = await h.db.rfps.insert({
+    const bare = await h.db.initiatives.insert({ title: "No Safe", status: "approved" });
+    const pending = await h.db.initiatives.insert({
       title: "Pending",
       status: "pending",
       safeAddress: "0x" + "66".repeat(20),
     });
-    const archived = await h.db.rfps.insert({
+    const archived = await h.db.initiatives.insert({
       title: "Archived",
       status: "archived",
       safeAddress: "0x" + "77".repeat(20),
@@ -158,7 +158,7 @@ Deno.test("daily cache: visitor refreshes share the scheduled job's ledger and b
   });
   let job: Promise<void> | undefined;
   try {
-    const rfp = await h.db.rfps.insert({
+    const rfp = await h.db.initiatives.insert({
       title: "Shared daily refresh",
       status: "approved",
       safeAddress: SAFE_ADDR,

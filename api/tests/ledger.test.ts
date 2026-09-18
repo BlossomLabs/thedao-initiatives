@@ -47,7 +47,7 @@ type Page = {
 Deno.test("ledger: snapshot first, refresh saves donations to KV, fresh visits do no upstream work", async () => {
   const h = await harness({ fetch: () => result([TX1]) });
   try {
-    const rfp = await h.db.rfps.insert({
+    const rfp = await h.db.initiatives.insert({
       title: "Viewed ledger",
       status: "approved",
       safeAddress: SAFE_ADDR,
@@ -97,7 +97,7 @@ Deno.test("ledger: concurrent visitors share a KV lease and see saved donations 
   });
   let pending: Promise<Response> | undefined;
   try {
-    const rfp = await h.db.rfps.insert({
+    const rfp = await h.db.initiatives.insert({
       title: "Shared ledger",
       status: "approved",
       safeAddress: SAFE_ADDR,
@@ -145,7 +145,7 @@ Deno.test("ledger: failures preserve saved rows and share a retry cooldown", asy
     fetch: () => failed ? new Response("{}", { status: 429 }) : result([TX1]),
   });
   try {
-    const rfp = await h.db.rfps.insert({
+    const rfp = await h.db.initiatives.insert({
       title: "Retry ledger",
       status: "approved",
       safeAddress: SAFE_ADDR,
@@ -187,7 +187,7 @@ Deno.test("ledger: an expired lease recovers and its late worker cannot overwrit
   });
   let pending: ReturnType<typeof refreshLedger> | undefined;
   try {
-    const rfp = await h.db.rfps.insert({
+    const rfp = await h.db.initiatives.insert({
       title: "Recover ledger",
       status: "approved",
       safeAddress: SAFE_ADDR,
@@ -212,13 +212,13 @@ Deno.test("ledger: an expired lease recovers and its late worker cannot overwrit
 Deno.test("ledger: page refresh retries only that initiative's pending donations", async () => {
   const h = await harness({ fetch: () => result([]) });
   try {
-    const first = await h.db.rfps.insert({
+    const first = await h.db.initiatives.insert({
       title: "Visited",
       status: "approved",
       safeAddress: SAFE_ADDR,
     });
     const otherSafe = "0x" + "55".repeat(20);
-    const second = await h.db.rfps.insert({
+    const second = await h.db.initiatives.insert({
       title: "Not visited",
       status: "approved",
       safeAddress: otherSafe,
@@ -247,22 +247,22 @@ Deno.test("ledger: page refresh retries only that initiative's pending donations
 Deno.test("ledger: board refreshes visible Safes and reuses the result on initiative pages", async () => {
   const h = await harness({ fetch: () => result([]) });
   try {
-    const first = await h.db.rfps.insert({
+    const first = await h.db.initiatives.insert({
       title: "On the board",
       status: "approved",
       safeAddress: SAFE_ADDR,
     });
-    const second = await h.db.rfps.insert({
+    const second = await h.db.initiatives.insert({
       title: "Also visible",
       status: "approved",
       safeAddress: "0x" + "55".repeat(20),
     });
-    const hidden = await h.db.rfps.insert({
+    const hidden = await h.db.initiatives.insert({
       title: "Private",
       status: "pending",
       safeAddress: "0x" + "66".repeat(20),
     });
-    await h.db.rfps.insert({ title: "No Safe", status: "approved" });
+    await h.db.initiatives.insert({ title: "No Safe", status: "approved" });
     await h.req("/api/board");
     assertEquals(h.fetchLog.length, 0);
     await h.req("/api/board?refresh=1");
@@ -304,7 +304,7 @@ Deno.test("ledger: an incomplete backfill resumes after the short cooldown while
     },
   });
   try {
-    const rfp = await h.db.rfps.insert({
+    const rfp = await h.db.initiatives.insert({
       title: "Long history",
       status: "approved",
       safeAddress: SAFE_ADDR,

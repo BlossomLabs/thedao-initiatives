@@ -14,7 +14,7 @@ type Board = { flags: { tokensOk: boolean }; cards: { donationsEnabled: boolean 
 
 Deno.test("cold snapshot: donations stay enabled until the token check has run", async () => {
   const h = await harness();
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Cold",
     status: "approved",
     goalUsd: 1000,
@@ -34,7 +34,7 @@ Deno.test("cold snapshot: donations stay enabled until the token check has run",
 
 Deno.test("a token check that ran and verified nothing disables donations", async () => {
   const h = await harness();
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Broken",
     status: "approved",
     goalUsd: 1000,

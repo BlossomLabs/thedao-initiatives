@@ -2,7 +2,7 @@
  * requests claim a shared lease and await persisted results before responding. */
 import { retryDonationMatches } from "./donation-matching.ts";
 import { K } from "../db/keys.ts";
-import type { Rfp, SafeSyncState } from "../db/types.ts";
+import type { Initiative, SafeSyncState } from "../db/types.ts";
 import {
   DEFAULT_BUDGET_MS,
   lazyBlockNumber,
@@ -18,7 +18,7 @@ const refreshAfter = (deps: SafeApiDeps, state: SafeSyncState | null): number =>
   state?.refreshAfter ??
     (state ? state.at + (state.ok ? deps.config.safeSyncTtlSecs : LEDGER_RETRY_SECS) : 0);
 
-export async function ledgerStatus(deps: SafeApiDeps, rfp: Rfp) {
+export async function ledgerStatus(deps: SafeApiDeps, rfp: Initiative) {
   if (!rfp.safeAddress) return null;
   const state = await deps.db.meta.safeSync(rfp.id);
   const due = refreshAfter(deps, state) <= deps.now();
@@ -34,7 +34,7 @@ export async function ledgerStatus(deps: SafeApiDeps, rfp: Rfp) {
 /** Forced admin refreshes still respect a lease held by another request. */
 export async function refreshLedger(
   deps: SafeApiDeps,
-  rfp: Rfp,
+  rfp: Initiative,
   force = false,
   getBlockNumber = lazyBlockNumber(deps),
 ): Promise<SafeSyncState | null> {
@@ -84,7 +84,7 @@ export async function refreshLedger(
 /** Only the initiatives included in the visible page; bounded upstream concurrency. */
 export async function refreshLedgers(
   deps: SafeApiDeps,
-  rfps: Rfp[],
+  rfps: Initiative[],
   force = false,
 ): Promise<number> {
   const getBlockNumber = lazyBlockNumber(deps);

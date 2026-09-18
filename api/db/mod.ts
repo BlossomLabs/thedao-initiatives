@@ -1,4 +1,4 @@
-import { rfpsRepo } from "./rfps.ts";
+import { initiativesRepo } from "./initiatives.ts";
 import { logosRepo } from "./logos.ts";
 import { revisionsRepo } from "./revisions.ts";
 import { pledgesRepo } from "./pledges.ts";
@@ -32,7 +32,7 @@ export function createDb(
     now,
     /** The consistency for public reads outside the repos (funding snapshots). */
     read,
-    rfps: rfpsRepo(kv, now, read),
+    initiatives: initiativesRepo(kv, now, read),
     logos: logosRepo(kv, now),
     revisions: revisionsRepo(kv, read),
     pledges,

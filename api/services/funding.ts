@@ -13,7 +13,7 @@ import { abiWord, decodeHexInt, SEL_BALANCE_OF } from "../chain/abi.ts";
 import { ethCall } from "../chain/rpc.ts";
 import type { Chain } from "../chain/mod.ts";
 import type { Db } from "../db/mod.ts";
-import type { Donation, Pledge, Rfp } from "../db/types.ts";
+import type { Donation, Initiative, Pledge } from "../db/types.ts";
 import { K } from "../db/keys.ts";
 
 /** How long one Safe's balance read is reused before the chain is asked again. */
@@ -144,7 +144,7 @@ export function createFunding(deps: FundingDeps) {
    * confirmed donations, as the repos list them), so a page that shows the
    * rows too reads them once. Only the Safe balance snapshot is fetched here. */
   async function summaryFrom(
-    rfp: Rfp,
+    rfp: Initiative,
     pledges: Pledge[],
     donations: Donation[],
     revalidate = false,
@@ -168,7 +168,7 @@ export function createFunding(deps: FundingDeps) {
     };
   }
 
-  async function summary(rfp: Rfp, revalidate = false): Promise<FundingSummary> {
+  async function summary(rfp: Initiative, revalidate = false): Promise<FundingSummary> {
     const [pledges, donations] = await Promise.all([
       deps.db.pledges.list(rfp.id),
       deps.db.donations.list(rfp.id),

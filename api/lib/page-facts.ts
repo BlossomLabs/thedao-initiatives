@@ -6,7 +6,7 @@
  * (or becomes) an RFP, and the reviewer when it is not a top-up, so a type
  * switch never leaves stale facts behind.
  */
-import type { Rfp } from "../db/types.ts";
+import type { Initiative } from "../db/types.ts";
 import type { Deps } from "../middleware/context.ts";
 import { HttpError } from "./errors.ts";
 import { s } from "./body.ts";
@@ -35,10 +35,10 @@ export const PAGE_FACT_FIELDS = [
 
 export async function readPageFacts(
   body: Record<string, unknown>,
-  current: Rfp,
+  current: Initiative,
   deps: Pick<Deps, "resolve">,
-): Promise<Partial<Rfp>> {
-  const patch: Partial<Rfp> = {};
+): Promise<Partial<Initiative>> {
+  const patch: Partial<Initiative> = {};
   if (body.goal !== undefined) {
     const [goal, err] = parseGoal(body.goal);
     if (err) throw new HttpError(400, err);

@@ -6,7 +6,7 @@ import { type SafeApiDeps, syncSafe } from "../services/safe-api.ts";
 import { refreshLedgers } from "../services/ledger.ts";
 
 const syncAll = async (deps: SafeApiDeps) =>
-  await refreshLedgers(deps, await deps.db.rfps.list(["approved"]), true);
+  await refreshLedgers(deps, await deps.db.initiatives.list(["approved"]), true);
 
 const USDC = TOKENS.USDC[0];
 const DONOR = "0x4444444444444444444444444444444444444444";
@@ -45,7 +45,7 @@ Deno.test("safe sync: groups rows per tx, verifies over RPC, sends bearer, incre
       });
     },
   });
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Synced initiative",
     status: "approved",
     goalUsd: 1000,
@@ -163,7 +163,7 @@ Deno.test("safe sync: shallow transfers wait for confirmations, pending rows get
         ? Response.json({ count: 1, next: null, results: pageBody })
         : new Response("", { status: 404 }),
   });
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Shallow initiative",
     status: "approved",
     goalUsd: 1000,
@@ -225,7 +225,7 @@ Deno.test("safe refresh: 19 idle Safes use zero RPC, including unaccepted transf
   });
   try {
     for (let i = 1; i <= 19; i++) {
-      await h.db.rfps.insert({
+      await h.db.initiatives.insert({
         title: `Idle initiative ${i}`,
         status: "approved",
         safeAddress: "0x" + i.toString(16).padStart(40, "0"),
@@ -264,12 +264,12 @@ Deno.test("safe refresh: one head serves all Safes and pending receipts, with a 
       }),
   });
   try {
-    const first = await h.db.rfps.insert({
+    const first = await h.db.initiatives.insert({
       title: "First active Safe",
       status: "approved",
       safeAddress: SAFE_ADDR,
     });
-    const second = await h.db.rfps.insert({
+    const second = await h.db.initiatives.insert({
       title: "Second active Safe",
       status: "approved",
       safeAddress: secondSafe,
@@ -337,12 +337,12 @@ Deno.test("safe refresh: a failed head is shared, preserves cursors, and retries
       }),
   });
   try {
-    const first = await h.db.rfps.insert({
+    const first = await h.db.initiatives.insert({
       title: "RPC retry token Safe",
       status: "approved",
       safeAddress: SAFE_ADDR,
     });
-    const second = await h.db.rfps.insert({
+    const second = await h.db.initiatives.insert({
       title: "RPC retry ETH Safe",
       status: "approved",
       safeAddress: secondSafe,
@@ -406,7 +406,7 @@ Deno.test("safe sync: a time budget cuts a backfill short, progress persists, th
       });
     },
   });
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Big initiative",
     status: "approved",
     goalUsd: 1000,
@@ -471,7 +471,7 @@ Deno.test("safe sync: a failed manual verification does not block the indexer fa
         ? Response.json({ count: pageBody.length, next: null, results: pageBody })
         : new Response("", { status: 404 }),
   });
-  const rfp = await h.db.rfps.insert({
+  const rfp = await h.db.initiatives.insert({
     title: "Exchange ETH initiative",
     status: "approved",
     goalUsd: 1000,

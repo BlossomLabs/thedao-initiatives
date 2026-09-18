@@ -6,7 +6,7 @@
 import { MAX_SUMMARY, MAX_TITLE } from "../config.ts";
 import { parseDuration, parseGoal, validateHttpsLink } from "../lib/validate.ts";
 import type { Db } from "../db/mod.ts";
-import type { RfpStatus, RfpType } from "../db/types.ts";
+import type { InitiativeStatus, InitiativeType } from "../db/types.ts";
 import {
   criterionTooLong,
   FIELDS,
@@ -38,9 +38,9 @@ export interface ContentFields {
   links: string[];
   goalUsd: number;
   discourseUrl: string;
-  status: RfpStatus;
+  status: InitiativeStatus;
   sortRank: number | null;
-  type: RfpType;
+  type: InitiativeType;
   durationMonths: number | null;
   recipientTeam: string;
   recipientUrl: string;
@@ -98,7 +98,7 @@ export type LogoResolver = (name: string) => Promise<string | null>;
  * a criterion, amounts summing to the goal, no other-type sections, no text
  * outside a known heading. Otherwise the reasons (v1's wording) are thrown.
  */
-export function parseStructuredBody(body: string, type: RfpType, goal: number): Structured {
+export function parseStructuredBody(body: string, type: InitiativeType, goal: number): Structured {
   const res = splitDraft(body, type);
   const reasons: string[] = [];
   const missing = SECTIONS[type].filter((k) => !(res.fields[k] ?? "").trim());
@@ -308,7 +308,7 @@ export async function syncContent(
       await audit(f.name, async () => {
         if (!slug) throw new Error("filename makes an empty slug");
         const fields = parseRfpFile(f.text);
-        const r = await db.rfps.upsertContent(slug, fields);
+        const r = await db.initiatives.upsertContent(slug, fields);
         if (r.action === "created") out.created++;
         else out.updated++;
         out.backers += await syncBackers(db, r.id, fields.backers);

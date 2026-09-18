@@ -1,4 +1,5 @@
 import { type Context, Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { auditContext, auditedItem, recordAudit } from "../services/audit.ts";
@@ -32,6 +33,7 @@ import { predictSafeAddress, safeDeployCalldata, signersConfigured } from "../ch
 import { isAddress, toChecksum } from "../chain/address.ts";
 import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
 import { refreshLedger } from "../services/ledger.ts";
+import { exportBackup, restoreBackup, validateBackup } from "../services/backup.ts";
 import { liveRoles } from "../services/roles.ts";
 import type { AdminEntry } from "../services/admins.ts";
 import type { Comment, Pledge, PledgeStatus, Rfp } from "../db/types.ts";
@@ -144,6 +146,42 @@ export function adminRoutes(deps: Deps) {
     await jsonBody(c, []);
     return c.json(await deps.maintenance.exit(c.var.user!.address));
   });
+
+  // The whole database as one file, and the way back (services/backup.ts).
+  r.get("/backup", requireRecentAuth(deps.now), async (c) => {
+    const backup = await exportBackup(db, deps.now);
+    const stamp = backup.exportedAt.replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+    return c.body(JSON.stringify(backup), 200, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Disposition": `attachment; filename="thedao-kv-backup-${stamp}.json"`,
+      "Cache-Control": "no-store",
+    });
+  });
+  r.post(
+    "/restore",
+    requireRecentAuth(deps.now),
+    bodyLimit({
+      maxSize: 32 * 1024 * 1024,
+      onError: (c) => c.json({ error: "Backup file too large (32 MB max)." }, 413),
+    }),
+    async (c) => {
+      const body = await jsonBody(c, ["mode", "backup"]);
+      const mode = body.mode ?? "merge";
+      if (mode !== "merge" && mode !== "replace") {
+        throw new HttpError(400, "mode must be merge or replace");
+      }
+      if (!(await deps.maintenance.fresh()).on) {
+        throw new HttpError(409, "Turn maintenance mode on before restoring a backup.");
+      }
+      const backup = validateBackup(body.backup);
+      auditContext(c, { detail: mode });
+      const result = await restoreBackup(db, backup, mode, deps.now);
+      deps.log(
+        `backup restore (${mode}): written=${result.written} skipped=${result.skipped} claims=${result.claimsRebuilt}`,
+      );
+      return c.json(result);
+    },
+  );
 
   // The admin list. ADMIN_ADDRESSES entries are fixed; the rest live in KV.
   const adminsJson = (admins: AdminEntry[], c: Context<Vars>) =>

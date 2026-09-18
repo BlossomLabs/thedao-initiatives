@@ -16,6 +16,9 @@ Deno.test("sensitive admin changes reject stale authentication before any side e
         ["/initiatives/missing/safe-confirm", "POST", {}],
         // Content sync publishes approved initiatives, so it steps up like approval does.
         ["/sync-content", "POST", { files: [syntheticContentFiles()[0]] }],
+        ["/maintenance/enter", "POST", {}],
+        ["/maintenance/exit", "POST", {}],
+        ["/restore", "POST", { backup: {} }],
       ] as const
     ) {
       const res = await h.req(`/api/admin${path}`, { method, token: stale, json });
@@ -40,6 +43,10 @@ Deno.test("sensitive admin changes reject stale authentication before any side e
     }
     // Read-only access remains available; fresh admin authentication can perform the change.
     assertEquals((await h.req("/api/admin/admins", { token: stale })).status, 200);
+    // The backup carries every private field, so downloading it steps up too.
+    const backup = await h.req("/api/admin/backup", { token: stale });
+    assertEquals(backup.status, 403);
+    assertEquals((await j(backup)).reauthenticate, true);
     const fresh = await h.mint(ADMIN, true);
     assertEquals(
       (await h.req("/api/admin/admins", { method: "POST", token: fresh, json: { address: PLAIN } }))

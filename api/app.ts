@@ -67,7 +67,10 @@ export function createApp(
   );
   app.use("*", siteLock(lock));
   // A backup restore carries the whole database; it sets its own, larger cap.
-  const limit = bodyLimit({ maxSize: 2 * 1024 * 1024 });
+  const limit = bodyLimit({
+    maxSize: 2 * 1024 * 1024,
+    onError: (c) => c.json({ error: "Request body too large (2 MB max)." }, 413),
+  });
   useApi(
     clientIp(),
     originGuard(deps.config),

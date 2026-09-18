@@ -71,6 +71,8 @@ const DETAILS = [
   "unreport",
   "reauthenticate",
   "login",
+  "merge",
+  "replace",
 ] as const;
 type Detail = typeof DETAILS[number];
 

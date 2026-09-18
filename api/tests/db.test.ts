@@ -328,12 +328,11 @@ Deno.test("sessions + nonces: single-use nonce, expiry, revoke all", async () =>
   const { token: t2 } = await db.sessions.create(addr, true);
   assertEquals((await db.sessions.get(token))?.address, addr);
   assert((await db.sessions.get(t2))?.isAdmin);
-  // The user session is touched every 30 minutes and stays alive; the admin
-  // session is never touched and hits its inactivity limit.
-  for (let i = 0; i * 1800 <= ADMIN_SESSION_IDLE_SECS; i++) {
-    clock += 1800;
-    assert(await db.sessions.get(token));
-  }
+  // Inactivity is per session: the user session is touched just inside the
+  // limit and lives on; the admin session, last seen above, runs out.
+  clock += ADMIN_SESSION_IDLE_SECS - 1;
+  assert(await db.sessions.get(token));
+  clock += 1;
   assertEquals(await db.sessions.get(t2), null);
   assert(await db.sessions.get(token));
   assertEquals(await db.sessions.revokeAll(addr), 1);

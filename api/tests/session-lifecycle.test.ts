@@ -258,14 +258,15 @@ Deno.test("passive funding polls and preview-lock checks do not extend inactivit
   const h = await harness({ env: { SITE_USERNAME: "preview", SITE_PASSWORD: "secret" } });
   try {
     const token = await h.mint(ADMIN, true);
-    // Fifteen even steps up to the limit, whatever the limit is.
-    const step = ADMIN_SESSION_IDLE_SECS / 15;
-    for (let elapsed = step; elapsed <= ADMIN_SESSION_IDLE_SECS; elapsed += step) {
-      h.clock.now += step;
+    // Fifteen whole-second steps; the last lands exactly on the limit.
+    const start = h.clock.now;
+    const steps = 15;
+    for (let i = 1; i <= steps; i++) {
+      h.clock.now = start + Math.floor(ADMIN_SESSION_IDLE_SECS * i / steps);
       const response = await h.req("/api/auth/me", {
         headers: { Cookie: "session=" + token, "X-Session-Activity": "passive" },
       });
-      assertEquals(response.status, elapsed < ADMIN_SESSION_IDLE_SECS ? 200 : 401);
+      assertEquals(response.status, i < steps ? 200 : 401);
     }
     assertEquals(await h.db.sessions.get(token), null);
   } finally {

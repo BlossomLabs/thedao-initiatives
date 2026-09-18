@@ -7,6 +7,7 @@ import Crumbs from "~/components/layout/Crumbs";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
 import { api } from "~/lib/api";
+import { needsReauthentication } from "~/lib/reauthenticate";
 import type { FunderLead } from "~/lib/api-types";
 import { dt } from "~/lib/format";
 import { generateMeta } from "~/utils/meta";
@@ -24,12 +25,21 @@ export { leadsCsv } from "~/lib/leads-csv";
  * Never linked from a public page.
  */
 export default function Leads() {
-  const { session } = useSession();
-  const { data, isLoading, error } = useQuery({
+  const { session, signIn } = useSession();
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["admin", "leads", sessionKey(session)] as const,
     queryFn: ({ signal }) => api<{ rows: FunderLead[] }>("/api/admin/leads", { signal }),
     enabled: Boolean(session?.isAdmin),
+    // A stale sign-in needs the admin, not a second request.
+    retry: (count, e) => !needsReauthentication(e) && count < 1,
   });
+  // Private contacts need a recent signature. Ask on a click, never on page
+  // load: a wallet prompt nobody requested reads as phishing.
+  const stale = needsReauthentication(error);
+  const confirm = async () => {
+    await signIn();
+    await refetch();
+  };
   const rows = error ? [] : data?.rows ?? [];
   const download = () => {
     const blob = new Blob([leadsCsv(rows)], { type: "text/csv;charset=utf-8" });
@@ -65,7 +75,15 @@ export default function Leads() {
           <Skeleton className="mt-px h-12 rounded-b-2xl" />
         </div>
       )}
-      {error && (
+      {stale && (
+        <p className="mt-4 flex flex-wrap items-center gap-4">
+          <span className="small dim">
+            Funder contacts are private. Sign in again to confirm it is you.
+          </span>
+          <Button onClick={() => void confirm().catch(() => {})}>Sign in again</Button>
+        </p>
+      )}
+      {error && !stale && (
         <p className="alert">{error instanceof Error ? error.message : "Could not load leads."}</p>
       )}
       {data && !rows.length && (

@@ -624,7 +624,7 @@ export function adminRoutes(deps: Deps) {
    * Funder leads: the ONLY reader of the private funders field besides the
    * manage page. Never link from a public page; never add a public route.
    */
-  r.get("/leads", async (c) => {
+  r.get("/leads", requireRecentAuth(deps.now), async (c) => {
     const all = await db.rfps.list(["pending", "approved", "rejected", "archived"]);
     const rows = all.filter((x) => x.funders.trim()).map((x) => ({
       id: x.id,

@@ -6,6 +6,7 @@ import { SAFE_OWNER_COUNT, SAFE_THRESHOLD } from "../config.ts";
 import type { FundingSummary } from "../services/funding.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
 import { ledgerStatus, refreshLedgers } from "../services/ledger.ts";
+import { createSnapshotCache, type SnapshotCache } from "../lib/snapshot-cache.ts";
 
 export interface Card {
   initiative: ReturnType<typeof cardInitiative>;
@@ -77,9 +78,51 @@ export function quietCard<T extends Card>(card: T): T {
   };
 }
 
-export function boardRoutes(deps: Deps) {
-  const r = new Hono<Vars>();
+/** The board as built, before a maintenance pause quiets it. */
+export type BoardCache = SnapshotCache<Awaited<ReturnType<typeof buildBoard>>>;
+
+/** Each isolate serves its last built board for a few seconds: it is public, polled, and costs
+ * a KV read wave per card. app.ts clears it after every write request. */
+export const createBoardCache = (deps: Deps): BoardCache =>
+  createSnapshotCache(deps.now, deps.config.boardCacheSecs);
+
+async function buildBoard(deps: Deps, refresh: boolean) {
   const { db, config } = deps;
+  const [initiatives, state] = await Promise.all([
+    db.initiatives.list(["approved"]),
+    deps.chain.state(refresh),
+  ]);
+  if (refresh) await refreshLedgers(deps, initiatives);
+  const tokensOk = tokensUsable(state);
+  const cards = orderCards(
+    await Promise.all(initiatives.map((x) => buildCard(deps, x, tokensOk, refresh))),
+  );
+  return {
+    refreshDue: !chainStateFresh(state, deps.now()),
+    cards,
+    totals: {
+      count: cards.length,
+      goal: cards.reduce((n, x) => n + x.initiative.goalUsd, 0),
+      raised: cards.reduce((n, x) => n + x.summary.total, 0),
+      backers: cards.reduce((n, x) => n + x.backers, 0),
+      donations: cards.reduce((n, x) => n + x.donations, 0),
+    },
+    flags: {
+      aiSearch: deps.ai.enabled,
+      tokensOk,
+      chainDetail: state.detail,
+      uploads: deps.pinata.enabled,
+      support: Boolean(config.supportUrl),
+      walletConnectProjectId: config.walletConnectProjectId,
+      safeThreshold: SAFE_THRESHOLD,
+      safeOwnerCount: SAFE_OWNER_COUNT,
+    },
+  };
+}
+
+export function boardRoutes(deps: Deps, cache: BoardCache = createBoardCache(deps)) {
+  const r = new Hono<Vars>();
+  const { config } = deps;
 
   // The global profile/support UI must not load or poll the funding board.
   r.get("/settings", async (c) => {
@@ -96,39 +139,13 @@ export function boardRoutes(deps: Deps) {
     // response then says nothing is due so the client stops asking.
     const asked = c.req.query("refresh") === "1";
     const paused = asked && await deps.maintenance.on();
-    const refresh = asked && !paused;
-    const [initiatives, state] = await Promise.all([
-      db.initiatives.list(["approved"]),
-      deps.chain.state(refresh),
-    ]);
-    if (refresh) await refreshLedgers(deps, initiatives);
-    const tokensOk = tokensUsable(state);
-    const cards = orderCards(
-      await Promise.all(
-        initiatives.map((x) => buildCard(deps, x, tokensOk, refresh)),
-      ),
-    ).map((card) => paused ? quietCard(card) : card);
-    return c.json({
-      refreshDue: !paused && !chainStateFresh(state, deps.now()),
-      cards,
-      totals: {
-        count: cards.length,
-        goal: cards.reduce((n, x) => n + x.initiative.goalUsd, 0),
-        raised: cards.reduce((n, x) => n + x.summary.total, 0),
-        backers: cards.reduce((n, x) => n + x.backers, 0),
-        donations: cards.reduce((n, x) => n + x.donations, 0),
-      },
-      flags: {
-        aiSearch: deps.ai.enabled,
-        tokensOk,
-        chainDetail: state.detail,
-        uploads: deps.pinata.enabled,
-        support: Boolean(config.supportUrl),
-        walletConnectProjectId: config.walletConnectProjectId,
-        safeThreshold: SAFE_THRESHOLD,
-        safeOwnerCount: SAFE_OWNER_COUNT,
-      },
-    });
+    // A refresh is always built, and is then the newest board this isolate has.
+    const board = asked && !paused
+      ? await cache.rebuild(() => buildBoard(deps, true))
+      : await cache.get(() => buildBoard(deps, false));
+    return c.json(
+      paused ? { ...board, refreshDue: false, cards: board.cards.map(quietCard) } : board,
+    );
   });
   return r;
 }

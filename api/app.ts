@@ -9,7 +9,7 @@ import { sessionLoader } from "./middleware/auth.ts";
 import { MARKDOWN_PATHS, markdownRoutes } from "./routes/markdown.ts";
 import { apiHeaders, originGuard, securityHeaders, siteLock } from "./middleware/headers.ts";
 import { authRoutes } from "./routes/auth.ts";
-import { boardRoutes } from "./routes/board.ts";
+import { boardRoutes, createBoardCache } from "./routes/board.ts";
 import { initiativeRoutes } from "./routes/initiatives.ts";
 import { donateRoutes } from "./routes/donate.ts";
 import { profileRoutes } from "./routes/profile.ts";
@@ -87,9 +87,20 @@ export function createApp(
     maintenanceGate(deps),
   );
 
+  // Any write may change a card (pledge, donation, approval, pin), so the next
+  // board read in this isolate is rebuilt; other isolates wait out their window.
+  const boardCache = createBoardCache(deps);
+  useApi(async (c, next) => {
+    try {
+      await next();
+    } finally {
+      if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method)) boardCache.clear();
+    }
+  });
+
   app.route("/healthz", healthRoutes(deps));
   app.route("/api/auth", authRoutes(deps));
-  app.route("/api/board", boardRoutes(deps));
+  app.route("/api/board", boardRoutes(deps, boardCache));
   app.route("/api/initiatives", initiativeRoutes(deps));
   app.route("/api/donate", donateRoutes(deps));
   app.route("/api/uploads", uploadRoutes(deps));

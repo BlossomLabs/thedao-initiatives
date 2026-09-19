@@ -164,6 +164,8 @@ export interface Config {
   kvPath: string | undefined;
   /** Public pages read KV with eventual consistency (nearest replica). */
   kvEventualReads: boolean;
+  /** BOARD_CACHE_SECS: how long an isolate serves its saved board; 0 = off. */
+  boardCacheSecs: number;
   /** First key part every KV key is stored under; empty = bare keys. */
   dbPrefix: string;
 }
@@ -200,6 +202,7 @@ export function webOriginsFrom(env: Record<string, string | undefined>): string[
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const syncTtl = Number(env.SAFE_SYNC_TTL_SECS);
+  const boardCache = Number((env.BOARD_CACHE_SECS ?? "").trim() || NaN);
   const rpcOverride = (env.RPC_URL ?? "").trim();
   const alchemyApiKey = (env.ALCHEMY_API_KEY ?? "").trim();
   const webOrigins = webOriginsFrom(env);
@@ -257,6 +260,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     port: Number(env.PORT ?? "8000") || 8000,
     kvPath: (env.KV_PATH ?? "").trim() || undefined,
     kvEventualReads: flag(env.KV_EVENTUAL_READS),
+    boardCacheSecs: Number.isFinite(boardCache) && boardCache >= 0 ? boardCache : 5,
     dbPrefix: (env.DB_PREFIX ?? "").trim(),
   };
 }

@@ -319,6 +319,12 @@ Every write keeps strong reads for the entries it checks. It is an experiment: m
 `deno task bench` on a preview before keeping it on, since a page read right after a write may
 briefly show the previous state.
 
+`BOARD_CACHE_SECS` (default 5, `0` = off) is how long an isolate serves `GET /api/board` from its own
+memory instead of reading KV: the board is public, polled every 30 s by every open tab, and costs a
+read wave per card. Any write request and any `?refresh=1` board read replaces the saved board at
+once in the isolate that served it; a board read that lands on another isolate can be up to that
+many seconds behind.
+
 ## Scripts
 
 - `ADMIN_PRIVATE_KEY=0x… deno task login` — prints a bearer token (dev wallet whose address is in

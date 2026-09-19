@@ -10,6 +10,14 @@ import { parseUsd, tokenQty } from "~/lib/donate";
 import { cn } from "~/lib/utils";
 import Status from "~/components/ui/Status";
 import { Button } from "~/components/ui/Button";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/Select";
 import { errorMessage } from "~/lib/api";
 import { useDonation } from "./useDonation";
 import { WALLETCONNECT_PROJECT_ID } from "~/lib/wagmi";
@@ -113,6 +121,17 @@ export default function DonateWidget({
 
   const rate = params?.enabled ? params.rates[symbol] || 1 : 1;
   const usd = parseUsd(amount);
+  // The trigger shows the bare symbol (it is 110px wide); the list adds the balance.
+  const tokenItems = (tokens.length ? tokens : ["USDC"]).map((t) => ({
+    value: t,
+    label: typeof balances[t] === "number" && balances[t]! > 0
+      ? `${t} (${balances[t]!.toFixed(2)})`
+      : t,
+  }));
+  const currencyItems = [
+    { value: "", label: "Not specified" },
+    ...tokens.map((t) => ({ value: t, label: t })),
+  ];
   const conv = params?.enabled && params.tokens[symbol] && usd > 0 && rate !== 1
     ? `≈ ${tokenQty(usd, rate, params.tokens[symbol].decimals)} ${symbol} · ${
       rate >= 10 ? "$" + Math.round(rate).toLocaleString() : "$" + rate.toFixed(2)
@@ -169,21 +188,24 @@ export default function DonateWidget({
                 onChange={(e) => setAmount(e.target.value)}
               />
             </label>
-            <select
-              className="field w-[110px] flex-none py-2.5 pl-3 pr-2"
-              aria-label="Donation token"
+            <Select
               value={symbol}
-              onChange={(e) => setSymbol(e.target.value)}
+              onValueChange={(v) => setSymbol(v as string)}
             >
-              {(tokens.length ? tokens : ["USDC"]).map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                  {typeof balances[t] === "number" && balances[t]! > 0
-                    ? ` (${balances[t]!.toFixed(2)})`
-                    : ""}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                className="w-[110px] flex-none py-2.5 pl-3 pr-2"
+                aria-label="Donation token"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectGroup>
+                  {tokenItems.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
           {conv && <p className="-mt-0.5 ml-0.5 m-0 small dim">{conv}</p>}
         </>
@@ -301,18 +323,27 @@ export default function DonateWidget({
                     onChange={(e) => setExchangeAmount(e.target.value)}
                   />
                 </label>
-                <label className="flex flex-col gap-1 small">
-                  Currency (optional)
-                  <select
-                    className="field"
+                <div className="flex flex-col gap-1 small">
+                  <label htmlFor="exchange-currency">Currency (optional)</label>
+                  <Select
+                    id="exchange-currency"
+                    items={currencyItems}
                     value={currency}
                     disabled={recording}
-                    onChange={(e) => setCurrency(e.target.value)}
+                    onValueChange={(v) => setCurrency(v as string)}
                   >
-                    <option value="">Not specified</option>
-                    {tokens.map((token) => <option key={token} value={token}>{token}</option>)}
-                  </select>
-                </label>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {currencyItems.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <Button variant="primary" onClick={revealAddress} disabled={!accepted || recording}>
                 {recording ? "Recording agreement…" : "Show donation address"}

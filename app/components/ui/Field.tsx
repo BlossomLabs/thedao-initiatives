@@ -27,16 +27,6 @@ export function Textarea({ className, ...rest }: React.ComponentProps<"textarea"
   return <textarea className={cn("field", className)} {...rest} />;
 }
 
-export function Select(
-  { className, children, ...rest }: React.SelectHTMLAttributes<HTMLSelectElement>,
-) {
-  return (
-    <select className={cn("field", className)} {...rest}>
-      {children}
-    </select>
-  );
-}
-
 /** Label + control in one (Figma form: 12px label margin + 6px column gap). */
 export function Field({
   children,

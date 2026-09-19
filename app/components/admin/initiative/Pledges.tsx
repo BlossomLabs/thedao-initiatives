@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { PencilLine, Trash2, Upload } from "lucide-react";
 import { Button } from "~/components/ui/Button";
-import { Input, Select } from "~/components/ui/Field";
+import { Input } from "~/components/ui/Field";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/Select";
 import { api } from "~/lib/api";
 import type { AdminInitiativePage, Pledge } from "~/lib/api-types";
 import { usd } from "~/lib/format";
@@ -20,9 +28,12 @@ function PledgeForm(
   const ref = useRef<HTMLFormElement>(null);
   const [busy, setBusy] = useState(false);
   const [logoName, setLogoName] = useState("");
+  // Controlled: form.reset() does not reach the custom select.
+  const [status, setStatus] = useState(editing?.status ?? "pledged");
   useEffect(() => {
     ref.current?.reset();
     setLogoName("");
+    setStatus(editing?.status ?? "pledged");
   }, [editing?.id]);
   return (
     <form
@@ -43,6 +54,7 @@ function PledgeForm(
             if (!saved) return;
             ref.current?.reset();
             setLogoName("");
+            setStatus("pledged");
             onDone();
           })
           .finally(() => setBusy(false));
@@ -66,10 +78,17 @@ function PledgeForm(
           required
           defaultValue={editing ? String(editing.amountUsd) : ""}
         />
-        <Select name="status" defaultValue={editing?.status ?? "pledged"}>
-          <option value="pledged">pledged</option>
-          <option value="received">received</option>
-          {editing && <option value="withdrawn">withdrawn</option>}
+        <Select name="status" value={status} onValueChange={(v) => setStatus(v as typeof status)}>
+          <SelectTrigger aria-label="Status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="pledged">pledged</SelectItem>
+              <SelectItem value="received">received</SelectItem>
+              {editing && <SelectItem value="withdrawn">withdrawn</SelectItem>}
+            </SelectGroup>
+          </SelectContent>
         </Select>
       </div>
       <div className="mt-2.5 grid grid-cols-2 gap-2.5 max-[640px]:grid-cols-1">
@@ -148,19 +167,25 @@ export default function Pledges(
                   <td className="amt">{usd(p.amountUsd)}</td>
                   <td>
                     <Select
-                      className="w-auto rounded-[10px] px-2.5 py-1.5 text-[12px]"
                       value={p.status}
-                      onChange={(e) =>
+                      onValueChange={(status) =>
                         run(() =>
                           api(`${base}/pledges/${p.id}`, {
                             method: "PATCH",
-                            json: { status: e.target.value },
+                            json: { status },
                           })
                         )}
                     >
-                      {["pledged", "received", "withdrawn"].map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
+                      <SelectTrigger size="sm" aria-label={`Status of ${p.company}'s pledge`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {["pledged", "received", "withdrawn"].map((s) => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
                     </Select>
                   </td>
                   <td className="small dim">{p.note}</td>

@@ -146,10 +146,6 @@
     font: inherit;
     color: inherit;
   }
-  select option {
-    background: var(--color-panel);
-    color: #fff;
-  }
 }
 
 @layer components {
@@ -468,9 +464,6 @@
   }
   textarea.field {
     @apply resize-y;
-  }
-  select.field {
-    @apply appearance-none;
   }
   .hp {
     position: absolute;

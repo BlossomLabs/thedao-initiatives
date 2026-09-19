@@ -53,7 +53,7 @@ it("keeps the address hidden until the checked acceptance is persisted, with eve
   const button = screen.getByRole("button", { name: "Show donation address" });
   expect(button).toBeDisabled();
   expect(screen.queryByText(SAFE)).toBeNull();
-  expect(screen.getByLabelText("Currency (optional)")).toHaveValue("");
+  expect(screen.getByLabelText("Currency (optional)")).toHaveTextContent("Not specified");
   fireEvent.click(screen.getByRole("checkbox"));
   expect(screen.queryByText(SAFE)).toBeNull();
   fireEvent.click(button);

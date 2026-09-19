@@ -1,19 +1,32 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Download, FileJson, Pause, Play, Upload } from "lucide-react";
+import { Download, FileJson, Pause, Play, Upload } from "lucide-react";
 import { useAdminApi } from "~/hooks/use-admin-api";
 import { sessionKey, useSession } from "~/context/session";
 import { privateCacheGeneration } from "~/lib/browser-privacy";
 import { boardKey } from "~/hooks/use-board";
 import { siteSettingsKey } from "~/hooks/use-site-settings";
 import { Button } from "~/components/ui/Button";
-import { Input, Label, Select } from "~/components/ui/Field";
+import { Input, Label } from "~/components/ui/Field";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/Select";
 import Status, { type StatusKind } from "~/components/ui/Status";
 import { api, errorMessage } from "~/lib/api";
 import type { BackupFile, MaintenanceState, RestoreResult } from "~/lib/api-types";
 import { dt } from "~/lib/format";
 import { shortAddr } from "~/lib/format";
 import { cn } from "~/lib/utils";
+
+const RESTORE_MODES = [
+  { value: "merge", label: "Merge (keep existing rows)" },
+  { value: "replace", label: "Replace (overwrite existing rows)" },
+] as const;
 
 export const maintenanceKey = ["admin", "maintenance"] as const;
 
@@ -216,21 +229,23 @@ export default function Maintenance() {
           </div>
           <div className="flex min-w-0 flex-col gap-1.5">
             <Label label="Mode" htmlFor="restore-mode" />
-            <div className="relative">
-              <Select
-                id="restore-mode"
-                className="pr-10"
-                value={mode}
-                onChange={(e) => setMode(e.target.value as "merge" | "replace")}
-              >
-                <option value="merge">Merge (keep existing rows)</option>
-                <option value="replace">Replace (overwrite existing rows)</option>
-              </Select>
-              <ChevronDown
-                className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-white/50"
-                aria-hidden="true"
-              />
-            </div>
+            <Select
+              id="restore-mode"
+              items={RESTORE_MODES}
+              value={mode}
+              onValueChange={(v) => setMode(v as "merge" | "replace")}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {RESTORE_MODES.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
           <Button
             className={cn(

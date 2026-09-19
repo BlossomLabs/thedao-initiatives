@@ -117,7 +117,7 @@ export default function Admins() {
       >
         <Input
           aria-label="Wallet address"
-          className="mono min-w-[200px] flex-1 text-[12.5px]"
+          className="mono h-[38px] min-w-[200px] flex-1 py-0 text-[12.5px]"
           placeholder="0x… wallet to make admin"
           value={address}
           onChange={(e) => setAddress(e.target.value)}

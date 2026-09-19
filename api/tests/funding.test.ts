@@ -201,6 +201,15 @@ Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, 
     logoCid: "",
     status: "pledged",
   });
+  // A received pledge was paid into the Safe: the balance already holds its money.
+  await h.db.pledges.add(initiative.id, {
+    company: "Paid Co",
+    amountUsd: 300,
+    url: "",
+    note: "",
+    logoCid: "",
+    status: "received",
+  });
 
   const page = await j(await h.req("/api/initiatives/" + initiative.slug + "?refresh=1")) as {
     summary: Record<string, number | boolean>;
@@ -210,6 +219,7 @@ Deno.test("funding: raised comes from the Safe's balances, priced by the feeds, 
   };
   assertEquals(page.summary, {
     pledged: 500,
+    received: 300,
     donated: 2002.5,
     total: 2502.5,
     live: true,
@@ -313,6 +323,7 @@ Deno.test("funding: shared snapshot, explicit refresh, failure cooldown, ledger 
   };
   assertEquals(b.summary, {
     pledged: 0,
+    received: 0,
     donated: 0,
     total: 0,
     live: false,

@@ -733,6 +733,9 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
   });
   assertEquals(p1.status, 201);
   assertEquals(((await j(p1)).pledge as { url: string }).url, "https://acme.example/");
+  // No pledger has a logo yet: the strip gets the pledgers themselves, to draw as silhouettes.
+  const bare = ((await j(await h.req("/api/board"))).cards as { logos: unknown[] }[])[0];
+  assertEquals(bare.logos, [{ company: "Acme", logoUrl: "", url: "https://acme.example/" }]);
   const form = new FormData();
   form.append("company", "Logo Co");
   form.append("url", "https://logo.example");
@@ -752,13 +755,16 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     backers: number;
     summary: { pledged: number };
   }[])[0];
-  assertEquals(card.backers, 2);
+  // Logo Co's pledge is received: it keeps its logo, but its money and its
+  // head are counted through the donation, not the pledge.
+  assertEquals(card.backers, 1);
+  // Once a pledger has a logo, the strip is the logos alone.
   assertEquals(card.logos, [{
     company: "Logo Co",
     logoUrl: p2.pledge.logoUrl,
     url: "https://logo.example/",
   }]);
-  assertEquals(card.summary.pledged, 750);
+  assertEquals(card.summary.pledged, 500);
   await h.req("/api/admin/initiatives/" + id + "/pledges/" + p2.pledge.id, {
     method: "PATCH",
     token: admin,

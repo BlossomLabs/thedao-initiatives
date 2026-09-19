@@ -4,12 +4,13 @@ import type { Pledge } from "~/lib/api-types";
 import { usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
 
-/** Pledge chips under the funding panel; nothing at all until someone has pledged. */
+/** Pledge chips under the funding panel; nothing at all until someone has pledged.
+ * Headed "Pledges": the card's backer count also includes the on-chain donors. */
 export default function Backers({ pledges }: { pledges: Pledge[] }) {
   if (!pledges.length) return null;
   return (
     <>
-      <SectionHeading count={pledges.length}>Backers</SectionHeading>
+      <SectionHeading count={pledges.length}>Pledges</SectionHeading>
       <div className="flex flex-wrap gap-2.5">
         {pledges.map((p) => (
           <div

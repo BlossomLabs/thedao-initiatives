@@ -43,3 +43,8 @@ describe("TopBar hamburger", () => {
     expect(document.getElementById("site-menu")).toBeNull();
   });
 });
+
+it("keeps a space between TheDAO and Security Fund in the site name", () => {
+  mount();
+  expect(screen.getByRole("link", { name: /TheDAO/ }).textContent).toBe("TheDAO Security Fund");
+});

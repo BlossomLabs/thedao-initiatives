@@ -2,7 +2,7 @@ import { cn } from "~/lib/utils";
 
 /**
  * A backer's round logo, or the same-sized silhouette when none was uploaded.
- * Shared by the board card's "Backed by" strip and the initiative's Backers list.
+ * Shared by the board card's "Pledged by" strip and the initiative's Pledges list.
  */
 export default function BackerLogo(
   { logoUrl, company, url, className }: {

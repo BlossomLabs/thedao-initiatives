@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { cardInitiative, ipfsUrl } from "../lib/json.ts";
-import type { Initiative } from "../db/types.ts";
+import type { Donation, Initiative, Pledge } from "../db/types.ts";
 import { SAFE_OWNER_COUNT, SAFE_THRESHOLD } from "../config.ts";
 import type { FundingSummary } from "../services/funding.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
@@ -12,9 +12,12 @@ export interface Card {
   initiative: ReturnType<typeof cardInitiative>;
   summary: FundingSummary;
   pct: number;
+  /** Pledgers and donors together (backerCount). */
   backers: number;
   donations: number;
   ledger: Awaited<ReturnType<typeof ledgerStatus>>;
+  /** The "Pledged by" strip, at most four: the pledgers with a logo, or, while none
+   * has one, the pledgers themselves with an empty `logoUrl` (drawn as silhouettes). */
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
@@ -22,6 +25,14 @@ export interface Card {
 
 export const pctOf = (total: number, goal: number): number =>
   goal ? Math.min(100, Math.round((1000 * total) / goal) / 10) : 0;
+
+/** Everyone behind an initiative: open pledges, plus each distinct address with a
+ * confirmed donation. A received pledge was paid, so its backer is already among
+ * the donors and is not counted a second time. */
+export function backerCount(pledges: Pledge[], donations: Donation[]): number {
+  const donors = new Set(donations.map((d) => d.donor.toLowerCase()).filter(Boolean));
+  return pledges.filter((p) => p.status === "pledged").length + donors.size;
+}
 
 /** Board order: admin pins first (1 = top), then total raised, newest on ties. */
 export function orderCards<
@@ -55,14 +66,15 @@ export async function buildCard(
     ledgerStatus(deps, r),
   ]);
   const summary = await deps.funding.summaryFrom(r, pledges, donations, refresh);
+  const withLogo = pledges.filter((p) => p.logoCid);
   return {
     initiative: cardInitiative(r),
     summary,
     pct: pctOf(summary.total, r.goalUsd),
-    backers: pledges.length,
+    backers: backerCount(pledges, donations),
     donations: donations.length,
     ledger,
-    logos: pledges.filter((p) => p.logoCid).slice(0, 4)
+    logos: (withLogo.length ? withLogo : pledges).slice(0, 4)
       .map((p) => ({ company: p.company, logoUrl: ipfsUrl(deps.config, p.logoCid), url: p.url })),
     funded: Boolean(r.goalUsd && summary.total >= r.goalUsd),
     donationsEnabled: Boolean(tokensOk && r.safeAddress && r.status === "approved"),

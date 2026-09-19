@@ -90,7 +90,10 @@ export interface AdminInitiative extends Initiative {
 }
 
 export interface Summary {
+  /** Open pledges only: not withdrawn, not received. */
   pledged: number;
+  /** Pledges marked received; their money is already inside `donated`, not in `total`. */
+  received: number;
   /** Safe balance value + paid out when `live`; the ledger's confirmed total otherwise. */
   donated: number;
   total: number;
@@ -134,9 +137,11 @@ export interface Card {
   initiative: CardInitiative;
   summary: Summary;
   pct: number;
+  /** Open pledges plus the distinct addresses that donated. */
   backers: number;
   donations: number;
   ledger?: LedgerStatus | null;
+  /** The "Pledged by" strip: up to four pledgers, `logoUrl` empty for one with no logo. */
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;

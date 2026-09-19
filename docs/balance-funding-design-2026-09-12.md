@@ -16,6 +16,11 @@ Funding now uses a request-driven shared snapshot with stale-while-revalidate.
 
 **raised = pledged + donated**, where **donated = balance value + paid out**.
 
+- Pledged: open pledges only. A withdrawn pledge never counts, and one the admin
+  marks `received` stops counting, because its money arrived as a donation and is
+  in the balance already (`summary.received` reports it, outside the total).
+  The card's backer count follows the same rule: open pledges plus the distinct
+  addresses with a confirmed donation.
 - Balance value: every accepted token's `balanceOf(safe)` plus the ETH balance,
   each priced with the same Chainlink feeds the verifier uses. Read by the API,
   saved in KV for two minutes per Safe, with an atomic refresh lease shared by

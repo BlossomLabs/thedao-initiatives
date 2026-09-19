@@ -46,7 +46,7 @@ vi.mock("~/components/initiative-form/InitiativeForm", () => ({ default: () => n
 const page = (over: Partial<AdminInitiativePage["initiative"]>): AdminInitiativePage => ({
   initiative: { ...structuredRow(), contact: "me@example.org", funders: "", ...over },
   revisions: [],
-  summary: { pledged: 0, donated: 0, total: 0, live: false, ledger: 0, paidOut: 0 },
+  summary: { pledged: 0, received: 0, donated: 0, total: 0, live: false, ledger: 0, paidOut: 0 },
   pledges: [],
   donations: [],
   safeSync: null,

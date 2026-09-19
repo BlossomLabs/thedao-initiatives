@@ -85,6 +85,7 @@ export default function PreviewPane({ draft, onBack }: { draft: Draft; onBack: (
   const pledged = pledges.reduce((a, p) => a + p.amountUsd, 0);
   const summary: Summary = {
     pledged,
+    received: 0,
     donated: 0,
     total: pledged,
     live: false,

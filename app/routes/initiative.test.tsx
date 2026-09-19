@@ -28,6 +28,7 @@ const page = (): InitiativePage => ({
   donations: [],
   summary: {
     pledged: 0,
+    received: 0,
     donated: 0,
     total: 0,
     live: false,

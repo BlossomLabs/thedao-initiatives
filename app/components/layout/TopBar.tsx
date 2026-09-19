@@ -75,7 +75,7 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
             className="size-[22px] flex-none"
           />
           <span className="whitespace-nowrap">
-            <b className="font-bold">TheDAO</b>
+            <b className="font-bold">TheDAO</b>{" "}
             <span className="max-[640px]:hidden">Security Fund</span>
           </span>
         </Link>

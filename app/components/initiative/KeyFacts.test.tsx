@@ -32,6 +32,7 @@ const base: Initiative = {
 };
 const summary: Summary = {
   pledged: 150_000,
+  received: 0,
   donated: 0,
   total: 150_000,
   live: false,
@@ -62,6 +63,17 @@ describe("KeyFacts", () => {
     expect(screen.getByText("$150,000")).toBeInTheDocument();
     expect(screen.getByText("$450,000")).toBeInTheDocument();
     expect(screen.getByText("N. D'Andrea")).toBeInTheDocument();
+  });
+
+  it("keeps a top-up's committed amount once the funder has paid", () => {
+    render(
+      <KeyFacts
+        r={{ ...base, topup: true }}
+        summary={{ ...summary, pledged: 50_000, received: 100_000, donated: 100_000 }}
+      />,
+    );
+    expect(screen.getByText("$150,000")).toBeInTheDocument();
+    expect(screen.getByText("$450,000")).toBeInTheDocument();
   });
 
   it("hides grant-only rows on an RFP even if stale values are present", () => {

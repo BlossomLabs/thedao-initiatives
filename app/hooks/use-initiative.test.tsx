@@ -34,6 +34,7 @@ const page = (refreshDue: boolean, count = 1, updating = false): InitiativePage 
   donations: Array.from({ length: count }, (_, i) => donation(i + 1)),
   summary: {
     pledged: 0,
+    received: 0,
     donated: 1,
     total: 1,
     live: true,

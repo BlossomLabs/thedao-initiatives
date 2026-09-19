@@ -41,7 +41,11 @@ interface CachedBalances {
 }
 
 export interface FundingSummary {
+  /** Open pledges only: not withdrawn, and not received. */
   pledged: number;
+  /** Pledges the admin marked received. Their money arrived as a donation, so
+   * it is inside `donated` and stays out of `total`. */
+  received: number;
   /** Balance value + paid out when live; the ledger's confirmed total otherwise. */
   donated: number;
   total: number;
@@ -149,8 +153,9 @@ export function createFunding(deps: FundingDeps) {
     donations: Donation[],
     revalidate = false,
   ): Promise<FundingSummary> {
-    const pledged = pledges.filter((p) => p.status !== "withdrawn")
-      .reduce((s, p) => s + p.amountUsd, 0);
+    const sumOf = (status: Pledge["status"]) =>
+      pledges.filter((p) => p.status === status).reduce((s, p) => s + p.amountUsd, 0);
+    const pledged = sumOf("pledged");
     const ledger = donations.filter((d) => d.status === "confirmed")
       .reduce((s, d) => s + d.amountUsd, 0);
     const paidOut = initiative.paidOutUsd ?? 0;
@@ -161,6 +166,7 @@ export function createFunding(deps: FundingDeps) {
     const donated = cents(b ? b.usd + paidOut : ledger);
     return {
       pledged: cents(pledged),
+      received: cents(sumOf("received")),
       donated,
       total: cents(pledged + donated),
       live: Boolean(b),

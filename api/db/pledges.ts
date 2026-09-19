@@ -41,8 +41,10 @@ export function pledgesRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = 
     return next;
   }
   const remove = (rfpId: string, id: string) => kv.delete(K.pledge(rfpId, id));
+  /** Still owed: a received pledge has been paid, and counts as a donation instead. */
   async function totalActive(rfpId: string): Promise<number> {
-    return (await list(rfpId)).reduce((s, p) => s + p.amountUsd, 0);
+    return (await list(rfpId)).filter((p) => p.status === "pledged")
+      .reduce((s, p) => s + p.amountUsd, 0);
   }
   return { add, get, list, setStatus, update, remove, totalActive };
 }

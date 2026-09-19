@@ -26,13 +26,15 @@ export default function KeyFacts({ r, summary }: { r: Initiative; summary: Summa
         : r.recipientTeam,
     });
   }
-  if (topup && summary.pledged > 0) {
+  // What the other funder committed, whether it is still owed or already paid in.
+  const committed = summary.pledged + summary.received;
+  if (topup && committed > 0) {
     rows.push({
       label: "Already committed",
       value: (
         <>
-          <b className="text-white">{usd(summary.pledged)}</b>; this grant raises the remaining{" "}
-          <b className="text-white">{usd(Math.max(0, r.goalUsd - summary.pledged))}</b>
+          <b className="text-white">{usd(committed)}</b>; this grant raises the remaining{" "}
+          <b className="text-white">{usd(Math.max(0, r.goalUsd - committed))}</b>
         </>
       ),
     });

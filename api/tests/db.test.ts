@@ -223,7 +223,7 @@ Deno.test("donations: one tx credits two initiatives, idempotent, pending->confi
   kv.close();
 });
 
-Deno.test("pledges: totals exclude withdrawn", async () => {
+Deno.test("pledges: totals count open pledges only, not received or withdrawn", async () => {
   const { kv, db } = await fresh();
   const r = await db.initiatives.insert({ title: "First one here" });
   const p = await db.pledges.add(r.id, {
@@ -242,9 +242,10 @@ Deno.test("pledges: totals exclude withdrawn", async () => {
     url: "",
     logoCid: "",
   });
-  assertEquals((await db.fundingSummary(r.id)).pledged, 150);
+  // B has paid: its money is a donation now, not pledged money.
+  assertEquals((await db.fundingSummary(r.id)).pledged, 100);
   await db.pledges.setStatus(r.id, p.id, "withdrawn");
-  assertEquals((await db.fundingSummary(r.id)).pledged, 50);
+  assertEquals((await db.fundingSummary(r.id)).pledged, 0);
   assertEquals((await db.pledges.list(r.id, true)).length, 2);
   await db.pledges.remove(r.id, p.id);
   assertEquals((await db.pledges.list(r.id, true)).length, 1);

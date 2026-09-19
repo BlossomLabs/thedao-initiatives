@@ -39,8 +39,9 @@ the process rules and the donation terms are files under `content/`; the propose
 
     deno i                      # install deps
     cp .env.example .env        # web + api variables in one file
-    deno task dev:api           # API on http://localhost:8000
-    deno task dev               # http://localhost:5173, proxies /api to the API
+    deno task dev               # web on http://localhost:5173 + API on :8000, together
+    deno task dev:web           # just the web app, proxies /api to the API
+    deno task dev:api           # just the API on http://localhost:8000
 
     deno task typecheck         # react-router typegen + tsc
     deno task test              # vitest (jsdom)

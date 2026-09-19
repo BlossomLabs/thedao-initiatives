@@ -2,7 +2,8 @@
   "nodeModulesDir": "auto",
   "unstable": ["kv", "cron"],
   "tasks": {
-    "dev": "deno run -A npm:@react-router/dev dev",
+    "dev": { "dependencies": ["dev:api", "dev:web"] },
+    "dev:web": "deno run -A npm:@react-router/dev dev",
     "dev:api": "deno run --env-file=.env -A --watch api/main.ts",
     "build": "deno run -A npm:@react-router/dev build",
     "start": "deno run --env-file=.env --allow-net --allow-read --allow-env --allow-write server.ts",

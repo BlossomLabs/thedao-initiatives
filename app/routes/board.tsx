@@ -35,7 +35,7 @@ export default function Board() {
 
   return (
     <>
-      <Hero raised={data?.totals.raised ?? 0} loading={isLoading} />
+      <Hero raised={data?.totals.raised} />
       <PageMain>
         <SectionHeading id="rfps" className="max-[640px]:text-center">
           Security initiatives looking for funding

@@ -119,7 +119,7 @@ describe("SupportPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() =>
       expect(screen.getByRole("dialog")).toHaveTextContent(
-        "too many messages, try again in an hour",
+        "Too many messages, try again in an hour.",
       )
     );
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));

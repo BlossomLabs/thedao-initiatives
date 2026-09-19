@@ -53,5 +53,9 @@ export function walletErrorMessage(e: unknown): string {
   if (/user rejected|denied|rejected the request/i.test(raw)) {
     return "you rejected the request in the wallet.";
   }
+  // wagmi's injected connector when the browser has no wallet extension.
+  if (/provider not found|connector not found/i.test(raw)) {
+    return "no wallet was found in this browser. Install one, or choose another way to connect.";
+  }
   return raw ? raw.slice(0, 200) : "unknown error";
 }

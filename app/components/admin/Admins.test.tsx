@@ -71,7 +71,7 @@ test("adding an address posts it and shows the new row; errors show inline", asy
 
   fireEvent.change(input, { target: { value: "0xbad" } });
   fireEvent.click(screen.getByRole("button", { name: /Add admin/ }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("that is not an Ethereum address");
+  expect(await screen.findByRole("alert")).toHaveTextContent("That is not an Ethereum address.");
 });
 
 test("removing another admin deletes it and drops the row", async () => {

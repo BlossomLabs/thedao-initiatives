@@ -106,12 +106,12 @@ export default function CommentsSection({ initiativeId, slug, open }: {
     if (
       action === "discard" && !confirm("Discard this comment? It will be removed from the forum.")
     ) return;
+    // A failure is thrown to the entry, which says it under its own buttons.
     try {
       await adminAction(id, action);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Action failed.");
+    } finally {
+      refetch();
     }
-    refetch();
   };
   const onPost = async (
     body: string,
@@ -159,7 +159,19 @@ export default function CommentsSection({ initiativeId, slug, open }: {
           ))}
         </div>
       )}
-      {q.isError && <p className="text-muted">Comments could not be loaded.</p>}
+      {q.isError && (
+        <p className="alert flex flex-wrap items-center justify-between gap-3" role="alert">
+          Comments could not be loaded.
+          <button
+            type="button"
+            className="cursor-pointer border-0 bg-transparent p-0 text-inherit underline"
+            onClick={() =>
+              void q.refetch()}
+          >
+            Try again
+          </button>
+        </p>
+      )}
       {!entries.length && !held.length && q.isSuccess && (
         <p className="text-muted">Be the first to ask about this initiative.</p>
       )}

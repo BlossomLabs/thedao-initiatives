@@ -79,5 +79,5 @@ it("keeps the address hidden after a recording failure and sends optional detail
   );
   expect(mock.recordAcceptance).toHaveBeenCalledWith("exchange", { name: "Donor" });
   expect(screen.queryByText(SAFE)).toBeNull();
-  expect(mock.setStatus).toHaveBeenCalledWith({ kind: "err", text: "offline" });
+  expect(mock.setStatus).toHaveBeenCalledWith({ kind: "err", text: "Offline." });
 });

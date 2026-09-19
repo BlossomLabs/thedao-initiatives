@@ -68,6 +68,8 @@ export default function EditInitiative() {
         <p className="m-0 small dim">
           {gone && !session
             ? "Use the Connect wallet button in the top right. A submission under review is only visible to its proposer."
+            : gone
+            ? "There is no initiative at this address that this wallet can edit."
             : errorMessage(error)}
         </p>
         <Link className="btn self-start" to="/">All initiatives</Link>

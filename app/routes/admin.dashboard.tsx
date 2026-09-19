@@ -1,5 +1,5 @@
 import { useAdminApi } from "~/hooks/use-admin-api";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { Bell } from "lucide-react";
@@ -15,7 +15,7 @@ import { useSiteSettings } from "~/hooks/use-site-settings";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { sessionKey, useSession } from "~/context/session";
-import { api } from "~/lib/api";
+import { api, errorMessage } from "~/lib/api";
 import type { AdminComment, AdminDashboard } from "~/lib/api-types";
 import { dt, shortAddr, truncate, usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
@@ -46,15 +46,22 @@ export default function Dashboard() {
     queryFn: ({ signal }) => api<AdminDashboard>("/api/admin/dashboard", { signal }),
     enabled: Boolean(session?.isAdmin),
   });
+  // A failed row action says so in that row, under the button that ran it.
+  const [rowError, setRowError] = useState<{ id: string; text: string } | null>(null);
   const act = async (id: string, action: string) => {
     if (action === "discard" && !confirm("Discard this comment?")) return;
+    setRowError(null);
     try {
       await api(`/api/admin/comments/${id}/${action}`, { method: "POST" });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed");
+      setRowError({ id, text: errorMessage(e, "That did not work.") });
     }
     void qc.invalidateQueries({ queryKey: dashKey });
   };
+  const rowSaid = (id: string) =>
+    rowError?.id === id && (
+      <p className="fld-msg fld-err whitespace-normal" role="alert">{rowError.text}</p>
+    );
   // Bulk actions: one request per table, then refetch. Selections live on ids so
   // a row that leaves a list (published, archived) drops out on its own.
   const heldIds = useMemo(() => (data?.held ?? []).map((c) => c.id), [data?.held]);
@@ -74,8 +81,8 @@ export default function Dashboard() {
   if (error || !data) {
     return (
       <PageMain detail>
-        <p className="alert">
-          {error instanceof Error ? error.message : "Could not load the dashboard."}
+        <p className="alert" role="alert">
+          The dashboard could not be loaded. {errorMessage(error, "")}
         </p>
       </PageMain>
     );
@@ -263,6 +270,7 @@ export default function Dashboard() {
                       >
                         Discard
                       </Button>
+                      {rowSaid(c.id)}
                     </td>
                   </tr>
                 ))}
@@ -387,6 +395,7 @@ export default function Dashboard() {
                       <Button sm variant="ghost" onClick={() => act(c.id, "discard")}>
                         Discard
                       </Button>
+                      {rowSaid(c.id)}
                     </td>
                   </tr>
                 ))}

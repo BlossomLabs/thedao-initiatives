@@ -3,6 +3,8 @@
  * The session travels as an HttpOnly cookie set by `POST /api/auth/verify`
  * (see context/session.tsx), so nothing here ever holds a token: every call
  * just sends credentials. */
+import { walletErrorMessage } from "./donate";
+
 /** Same origin by default (the site server hosts the API under /api; the dev
  * server proxies it). Set VITE_API_URL only to point at a remote API. */
 export const API_URL = ((import.meta.env?.VITE_API_URL as string | undefined) ?? "").replace(
@@ -69,8 +71,29 @@ export const isMaintenance = (e: unknown): boolean =>
   e instanceof ApiError && e.status === 503 && Boolean(e.body) && typeof e.body === "object" &&
   (e.body as { maintenance?: unknown }).maintenance === true;
 
-export const errorMessage = (e: unknown): string =>
-  e instanceof Error ? e.message : typeof e === "string" ? e : "Something went wrong.";
+/** Server errors and wallet fragments are written lowercase with no full stop
+ * ("slow down"); on screen they read as a sentence. */
+export const sentence = (s: string): string => {
+  const t = s.trim();
+  if (!t) return t;
+  return t[0].toUpperCase() + t.slice(1) + (/[.!?…:]$/.test(t) ? "" : ".");
+};
+
+/** A wallet or viem failure rather than one of ours: those carry an EIP-1193
+ * code or viem's shortMessage, and their message is a developer dump. */
+const isWalletError = (e: unknown): boolean =>
+  !(e instanceof ApiError) && typeof e === "object" && e !== null &&
+  (typeof (e as { code?: unknown }).code === "number" ||
+    typeof (e as { shortMessage?: unknown }).shortMessage === "string");
+
+/** The line to show a person for any thrown value. */
+export const errorMessage = (e: unknown, fallback = "Something went wrong."): string => {
+  if (e instanceof ApiError && e.status >= 500 && e.message === "internal error") {
+    return "Something went wrong on our side. Please try again in a moment.";
+  }
+  if (isWalletError(e)) return sentence(walletErrorMessage(e));
+  return e instanceof Error ? sentence(e.message) : typeof e === "string" ? sentence(e) : fallback;
+};
 
 /** A non-JSON GET with the session (markdown exports). Throws ApiError on failure. */
 export async function apiText(path: string): Promise<string> {

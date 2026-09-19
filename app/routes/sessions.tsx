@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { cn } from "~/lib/utils";
 import PageMain from "~/components/layout/PageMain";
 import { Button } from "~/components/ui/Button";
 import { Field, Input } from "~/components/ui/Field";
@@ -26,8 +27,8 @@ const date = (time: number) => new Date(time * 1000).toLocaleString();
 export default function Sessions() {
   const { session, signIn, signOut } = useSession();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  // The answer to a button shows next to it (`at`), not at the top of a long page.
+  const [said, setSaid] = useState<{ at: string; error?: string; notice?: string } | null>(null);
   const [target, setTarget] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const inventory = useQuery({
@@ -39,10 +40,9 @@ export default function Sessions() {
     gcTime: 0,
   });
 
-  async function manage(path: string, json?: unknown, signOutAfter = false) {
+  async function manage(at: string, path: string, json?: unknown, signOutAfter = false) {
     setBusy(true);
-    setError("");
-    setNotice("");
+    setSaid(null);
     try {
       // Always request a new wallet signature for remote/global termination.
       // Reauthentication rotates the current token without ending other devices.
@@ -56,13 +56,19 @@ export default function Sessions() {
         await revoke();
         await inventory.refetch();
       }
-      setNotice("Sessions revoked.");
+      setSaid({ at, notice: "Sessions revoked." });
     } catch (e) {
-      setError(errorMessage(e));
+      setSaid({ at, error: errorMessage(e) });
     } finally {
       setBusy(false);
     }
   }
+
+  const answer = (at: string, className = "mt-3 mb-0") =>
+    said?.at === at &&
+    (said.error
+      ? <p className={cn("alert", className)} role="alert">{said.error}</p>
+      : <p className={cn("small", className)} role="status">{said.notice}</p>);
 
   return (
     <PageMain narrow detail className="min-h-[60vh]">
@@ -79,8 +85,6 @@ export default function Sessions() {
           <ConnectInline />
         </p>
       )}
-      {error && <p className="alert" role="alert">{error}</p>}
-      {notice && <p className="small" role="status">{notice}</p>}
       {session && (
         <>
           <p className="small dim">
@@ -112,10 +116,13 @@ export default function Sessions() {
                   variant="danger"
                   disabled={busy}
                   onClick={() =>
-                    row.current ? void signOut() : void manage(`/api/auth/sessions/${row.id}`)}
+                    row.current
+                      ? void signOut()
+                      : void manage(row.id, `/api/auth/sessions/${row.id}`)}
                 >
                   {row.current ? "Sign out" : "End session"}
                 </Button>
+                {answer(row.id, "my-0 basis-full")}
               </li>
             ))}
           </ul>
@@ -123,10 +130,11 @@ export default function Sessions() {
             className="mt-5"
             variant="danger"
             disabled={busy}
-            onClick={() => void manage("/api/auth/logout-all", {}, true)}
+            onClick={() => void manage("everywhere", "/api/auth/logout-all", {}, true)}
           >
             Sign out everywhere
           </Button>
+          {answer("everywhere")}
           {session.isAdmin && (
             <section className="panel mt-8" aria-labelledby="admin-session-heading">
               <h2
@@ -155,6 +163,7 @@ export default function Sessions() {
                 disabled={busy || !/^0x[a-fA-F0-9]{40}$/.test(target.trim())}
                 onClick={() =>
                   void manage(
+                    "wallet",
                     "/api/admin/sessions/revoke",
                     { address: target.trim() },
                     target.trim().toLowerCase() === session.address.toLowerCase(),
@@ -162,6 +171,7 @@ export default function Sessions() {
               >
                 Revoke this wallet’s sessions
               </Button>
+              {answer("wallet")}
               <Field
                 label="Revoke every session on the site"
                 htmlFor="revoke-confirmation"
@@ -181,10 +191,11 @@ export default function Sessions() {
                 className="mt-3"
                 disabled={busy || confirmation !== "revoke all sessions"}
                 onClick={() =>
-                  void manage("/api/admin/sessions/revoke-all", { confirmation }, true)}
+                  void manage("global", "/api/admin/sessions/revoke-all", { confirmation }, true)}
               >
                 Revoke all sessions
               </Button>
+              {answer("global")}
             </section>
           )}
         </>

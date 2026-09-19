@@ -7,6 +7,7 @@ import { Avatar } from "~/components/wallet/Avatar";
 import { QaChip, RoleTags } from "~/components/ui/Badge";
 import WalletMenu from "~/components/wallet/WalletMenu";
 import type { CommentEntry } from "~/lib/api-types";
+import { errorMessage } from "~/lib/api";
 import { useIdentity } from "~/hooks/use-identity";
 import { avatarSrc } from "~/lib/avatar";
 import { cn } from "~/lib/utils";
@@ -90,6 +91,8 @@ export default function EntryCard({
   const [posted, setPosted] = useState(0);
   const [reported, setReported] = useState(false);
   const [flash, setFlash] = useState<Note>(null);
+  const admin = (action: string) =>
+    void onAdmin(c.id, action).catch((e) => say(errorMessage(e, "Action failed.")));
   const say = (text: string, ok = false) => {
     setFlash({ text, ok });
     setTimeout(() => setFlash(null), 6000);
@@ -125,7 +128,7 @@ export default function EntryCard({
       // Let the button show its "Posted" state before the box folds away.
       setTimeout(() => setReplying(false), SENT_MS - 200);
     } catch (e) {
-      setNote({ text: e instanceof Error ? e.message : "Reply failed." });
+      setNote({ text: errorMessage(e, "Reply failed.") });
     } finally {
       setBusy(false);
     }
@@ -146,8 +149,7 @@ export default function EntryCard({
           myvote={c.myvote ?? 0}
           canVote={canVote}
           connected={connected}
-          onVote={(d) =>
-            onVote(c.id, d).catch((e) => say(e instanceof Error ? e.message : "Vote failed."))}
+          onVote={(d) => onVote(c.id, d).catch((e) => say(errorMessage(e, "Vote failed.")))}
         />
         <div className="min-w-0 flex-1">
           {c.featured > 0 && (
@@ -192,7 +194,7 @@ export default function EntryCard({
               disabled={reported}
               onClick={() =>
                 onReport(c.id).then(() => setReported(true)).catch((e) =>
-                  say(e instanceof Error ? e.message : "Report failed.")
+                  say(errorMessage(e, "Report failed."))
                 )}
             >
               <Flag className="size-3.5" />
@@ -210,7 +212,7 @@ export default function EntryCard({
                       linkBtn,
                       "border-[rgba(92,183,90,.35)] bg-[rgba(92,183,90,.1)] text-dao-green hover:border-dao-green hover:bg-dao-green hover:text-[#0d1f14]",
                     )}
-                    onClick={() => onAdmin(c.id, "review")}
+                    onClick={() => admin("review")}
                   >
                     <Check className="size-3.5" />Mark reviewed
                   </button>
@@ -239,7 +241,7 @@ export default function EntryCard({
                         label: f.label,
                         active: c.featured === level,
                         onClick: () => {
-                          if (c.featured !== level) void onAdmin(c.id, f.action);
+                          if (c.featured !== level) admin(f.action);
                         },
                       }))}
                     />
@@ -251,7 +253,7 @@ export default function EntryCard({
                     linkBtn,
                     "border-[rgba(255,59,56,.35)] bg-[rgba(255,59,56,.1)] text-[#ffd2d1] hover:border-[rgba(255,59,56,.6)] hover:bg-[rgba(255,59,56,.2)]",
                   )}
-                  onClick={() => onAdmin(c.id, "discard")}
+                  onClick={() => admin("discard")}
                 >
                   <Trash2 className="size-3.5" />Discard
                 </button>

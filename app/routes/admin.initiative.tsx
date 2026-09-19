@@ -32,7 +32,7 @@ import InitiativeForm from "~/components/initiative-form/InitiativeForm";
 import type { SubmitPayload } from "~/components/initiative-form/types";
 import { fromInitiative } from "~/components/initiative-form/useDraft";
 import Identity from "~/components/wallet/Identity";
-import { api, apiText, errorMessage } from "~/lib/api";
+import { api, ApiError, apiText, errorMessage } from "~/lib/api";
 import type {
   AdminInitiative,
   AdminInitiativePage,
@@ -47,7 +47,8 @@ import { dt, shortAddr, usd } from "~/lib/format";
 import { discussionKind } from "~/lib/discussion";
 
 type Msg = { kind: StatusKind; text: string } | null;
-type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<void>;
+/** Resolves to whether `fn` succeeded; a failure is already on screen. */
+type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
 
 const STATUS_HELP: Record<string, string> = {
   pending: "Submitted and waiting for review. It is not on the board yet.",
@@ -77,19 +78,31 @@ export default function AdminInitiativeEditor() {
     }
   }, [initiativeId, slug, navigate]);
   const refresh = () => void qc.invalidateQueries({ queryKey: ["admin"] });
-  const [msg, setMsg] = useState<Msg>(null);
+  // Each section gets its own `run`, and the answer renders in that section
+  // (`said`): the page is long, and a box under the title is off screen for
+  // someone pressing "Add pledge" or "Recheck" far below it.
+  const [msg, setMsg] = useState<(NonNullable<Msg> & { at: string }) | null>(null);
   const { isConnected } = useAccount();
   const safe = useSafeDeploy(data?.initiative.id ?? "", refresh);
-  const run: Run = async (fn, ok) => {
+  const runAt = (at: string): Run => async (fn, ok) => {
     setMsg(null);
     try {
       await fn();
-      if (ok) setMsg({ kind: "ok", text: ok });
+      if (ok) setMsg({ at, kind: "ok", text: ok });
       refresh();
+      return true;
     } catch (e) {
-      setMsg({ kind: "err", text: errorMessage(e) });
+      setMsg({ at, kind: "err", text: errorMessage(e) });
+      return false;
     }
   };
+  const said = (at: string, className = "mt-3") =>
+    msg?.at === at && (
+      // Brought into view when it lands below the fold ("nearest" is a no-op otherwise).
+      <div ref={(el) => el?.scrollIntoView?.({ block: "nearest", behavior: "smooth" })}>
+        <Status kind={msg.kind} className={className}>{msg.text}</Status>
+      </div>
+    );
 
   if (isLoading) return <PageSkeleton />;
   if (error || !data) {
@@ -98,7 +111,11 @@ export default function AdminInitiativeEditor() {
         <Crumbs
           items={[{ label: "Initiatives", to: "/" }, { label: "Admin", to: "/admin" }]}
         />
-        <p className="alert">{error instanceof Error ? error.message : "Not found."}</p>
+        <p className="alert">
+          {error instanceof ApiError && error.status === 404
+            ? "There is no initiative at this address. It may have been deleted, or the link is wrong."
+            : errorMessage(error)}
+        </p>
       </PageMain>
     );
   }
@@ -107,9 +124,15 @@ export default function AdminInitiativeEditor() {
   const pct = r.goalUsd > 0 ? (data.summary.total / r.goalUsd) * 100 : 0;
   // Deploy first, approve second: the wallet prompt is the admin's sign-off on the Safe.
   const canApprove = Boolean(r.safeAddress) || isConnected;
+  const run = runAt("status");
   const approve = (action: "approve" | "unarchive", ok: string) =>
     run(async () => {
-      if (!r.safeAddress) await safe.ensureDeployed();
+      // The Safe card reports the deploy itself; here it is why nothing was approved.
+      if (!r.safeAddress) {
+        await safe.ensureDeployed().catch((e) => {
+          throw new Error("Not approved: " + walletErrorMessage(e));
+        });
+      }
       await adminApi(`${base}/status`, { json: { action } });
     }, ok);
 
@@ -126,7 +149,6 @@ export default function AdminInitiativeEditor() {
           created {dt(r.createdAt)} · <span className="mono">{r.slug}</span>
         </span>
       </p>
-      {msg && <Status kind={msg.kind} className="mt-4">{msg.text}</Status>}
 
       <div className="mt-4 grid grid-cols-[1fr_340px] items-start gap-9 max-[960px]:grid-cols-1">
         <div className="min-w-0">
@@ -143,19 +165,23 @@ export default function AdminInitiativeEditor() {
             r={r}
             pledges={data.pledges}
             onSaved={(text) => {
-              setMsg({ kind: "ok", text });
+              setMsg({ at: "edit", kind: "ok", text });
               refresh();
             }}
           />
+          {said("edit", "mt-4")}
 
           <SectionHeading count={data.revisions.length}>Revisions</SectionHeading>
-          <Revisions page={data} base={base} run={run} />
+          <Revisions page={data} base={base} run={runAt("revisions")} />
+          {said("revisions")}
 
           <SectionHeading count={data.pledges.length}>Backer pledges</SectionHeading>
-          <Pledges page={data} base={base} run={run} />
+          <Pledges page={data} base={base} run={runAt("pledges")} />
+          {said("pledges")}
 
           <SectionHeading count={data.donations.length}>Donations</SectionHeading>
-          <Donations page={data} base={base} run={run} />
+          <Donations page={data} base={base} run={runAt("donations")} />
+          {said("donations")}
         </div>
 
         <StickyAside className="flex flex-col gap-3.5 max-[960px]:static">
@@ -216,6 +242,7 @@ export default function AdminInitiativeEditor() {
                 </Button>
               )}
             </div>
+            {said("status")}
           </div>
 
           <SafeCard page={data} safe={safe} onChange={refresh} />
@@ -245,7 +272,7 @@ export default function AdminInitiativeEditor() {
                   className="cursor-pointer border-0 bg-transparent p-0 text-dao-green hover:underline"
                   title="With status, proposer, contact and funders. Never share it."
                   onClick={() =>
-                    run(async () => {
+                    runAt("links")(async () => {
                       const md = await apiText(`/initiative/${r.slug}-PRIVATE.md`);
                       const url = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
                       const a = document.createElement("a");
@@ -293,6 +320,7 @@ export default function AdminInitiativeEditor() {
                 </li>
               )}
             </ul>
+            {said("links")}
           </div>
         </StickyAside>
       </div>
@@ -351,7 +379,7 @@ function useSafeDeploy(id: string, onChange: () => void) {
         await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     } catch (e) {
-      setStatus({ kind: "err", text: walletErrorMessage(e) });
+      setStatus({ kind: "err", text: "Safe not deployed: " + walletErrorMessage(e) });
       throw e;
     } finally {
       setBusy(false);
@@ -738,6 +766,8 @@ function PledgeForm(
     <form
       ref={ref}
       className="panel"
+      // The server's answer renders under the form; the browser's own bubble would not match the site.
+      noValidate
       onSubmit={(e) => {
         e.preventDefault();
         const form = new FormData(e.currentTarget);
@@ -746,7 +776,9 @@ function PledgeForm(
           ? api(`${base}/pledges/${editing.id}`, { method: "PATCH", form })
           : api(`${base}/pledges`, { form });
         run(() => req, editing ? "Pledge updated." : "Pledge added.")
-          .then(() => {
+          .then((saved) => {
+            // A refused pledge keeps what was typed.
+            if (!saved) return;
             ref.current?.reset();
             setLogoName("");
             onDone();

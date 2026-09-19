@@ -22,7 +22,7 @@ import CommentsSection from "~/components/comments/CommentsSection";
 import Identity from "~/components/wallet/Identity";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { useRevision } from "~/hooks/use-revision";
-import { ApiError } from "~/lib/api";
+import { ApiError, errorMessage } from "~/lib/api";
 import { diffRevisions } from "~/lib/revision-diff";
 import type { RevisionText } from "~/lib/api-types";
 import { SITE_NAME } from "~/data/site";
@@ -37,7 +37,8 @@ export function meta() {
 
 export default function Initiative() {
   const { slug = "" } = useParams();
-  const { data: page, isLoading, error, isPlaceholderData, isUpdatingLedger } = useInitiative(slug);
+  const { data: page, isLoading, error, refetch, isPlaceholderData, isUpdatingLedger } =
+    useInitiative(slug);
   const qc = useQueryClient();
 
   // ?rev=N opens an older revision in place of the current text. The history
@@ -63,6 +64,21 @@ export default function Initiative() {
         <h1 className="font-inter-tight text-[40px] font-medium tracking-[-.02em]">404</h1>
         <p className="text-muted">That initiative does not exist or is not published.</p>
         <Link className="btn mt-4" to="/">All initiatives</Link>
+      </PageMain>
+    );
+  }
+  // Any other failure (the API is down, a 500): say so instead of a skeleton forever.
+  if (error && !page) {
+    return (
+      <PageMain detail center className="min-h-[50vh]">
+        <h1 className="font-inter-tight text-[28px] font-medium tracking-[-.02em]">
+          This initiative could not be loaded
+        </h1>
+        <p className="text-muted" role="alert">{errorMessage(error)}</p>
+        <div className="mt-4 flex justify-center gap-2.5">
+          <button type="button" className="btn" onClick={() => void refetch()}>Try again</button>
+          <Link className="btn" to="/">All initiatives</Link>
+        </div>
       </PageMain>
     );
   }

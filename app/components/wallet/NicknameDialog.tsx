@@ -203,7 +203,7 @@ export default function NicknameDialog({
         alt=""
         className="mt-2 block size-14 rounded-full border-2 border-dao-green object-cover"
       />
-      {error && <p className="m-0 text-[12.5px] text-[#ff9a9a]">{error}</p>}
+      {error && <p className="m-0 text-[12.5px] text-[#ffd7d6]" role="alert">{error}</p>}
       <div className="mt-0.5 flex gap-2.5">
         <Button className="flex-1" variant="ghost" sm onClick={() => onOpenChange(false)}>
           {allLocked ? "Close" : firstTime ? "Skip for now" : "Cancel"}

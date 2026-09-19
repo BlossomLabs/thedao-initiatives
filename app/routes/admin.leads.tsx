@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { sessionKey, useSession } from "~/context/session";
 import { useQuery } from "@tanstack/react-query";
 import Skeleton from "~/components/ui/Skeleton";
@@ -6,7 +7,8 @@ import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { Button } from "~/components/ui/Button";
-import { api } from "~/lib/api";
+import { api, errorMessage } from "~/lib/api";
+import { walletErrorMessage } from "~/lib/donate";
 import { needsReauthentication } from "~/lib/reauthenticate";
 import type { FunderLead } from "~/lib/api-types";
 import { dt } from "~/lib/format";
@@ -36,9 +38,15 @@ export default function Leads() {
   // Private contacts need a recent signature. Ask on a click, never on page
   // load: a wallet prompt nobody requested reads as phishing.
   const stale = needsReauthentication(error);
+  const [refused, setRefused] = useState("");
   const confirm = async () => {
-    await signIn();
-    await refetch();
+    setRefused("");
+    try {
+      await signIn();
+      await refetch();
+    } catch (e) {
+      setRefused("Not signed in: " + walletErrorMessage(e));
+    }
   };
   const rows = error ? [] : data?.rows ?? [];
   const download = () => {
@@ -80,12 +88,13 @@ export default function Leads() {
           <span className="small dim">
             Funder contacts are private. Sign in again to confirm it is you.
           </span>
-          <Button onClick={() => void confirm().catch(() => {})}>Sign in again</Button>
+          <Button onClick={() => void confirm()}>Sign in again</Button>
+          {refused && (
+            <span className="basis-full small text-[#ffd7d6]" role="alert">{refused}</span>
+          )}
         </p>
       )}
-      {error && !stale && (
-        <p className="alert">{error instanceof Error ? error.message : "Could not load leads."}</p>
-      )}
+      {error && !stale && <p className="alert" role="alert">{errorMessage(error)}</p>}
       {data && !rows.length && (
         <p className="text-muted">No initiative has named likely funders yet.</p>
       )}

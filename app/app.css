@@ -485,6 +485,29 @@
       text-[#ffd7d6] text-[13.5px];
   }
 
+  /* Errors and notices never pop in: every box, field message and role="alert"
+     line fades down into place, the same motion as the comment form's notes. */
+  @keyframes notice-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+  .alert,
+  .status,
+  .fld-msg,
+  [role="alert"] {
+    animation: notice-in 0.2s ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .alert,
+    .status,
+    .fld-msg,
+    [role="alert"] {
+      animation: none;
+    }
+  }
+
   /* revision diff: insertions green, deletions red, wrapped like the source text */
   .diff {
     @apply whitespace-pre-wrap [overflow-wrap:anywhere];

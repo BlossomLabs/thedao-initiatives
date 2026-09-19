@@ -3,7 +3,7 @@ import { useAccount } from "wagmi";
 import PageMain from "~/components/layout/PageMain";
 import { Button } from "~/components/ui/Button";
 import { useSession } from "~/context/session";
-import { errorMessage } from "~/lib/api";
+import { walletErrorMessage } from "~/lib/donate";
 import { useState } from "react";
 import { generateMeta } from "~/utils/meta";
 
@@ -35,18 +35,19 @@ export default function AdminLayout() {
           <Button
             variant="primary"
             loading={signingIn}
-            onClick={() => signIn().catch((e) => setError(errorMessage(e)))}
+            onClick={() =>
+              signIn().catch((e) => setError("Not signed in: " + walletErrorMessage(e)))}
           >
             Sign in with {address?.slice(0, 6)}…
           </Button>
         )}
         {session && !session.isAdmin && (
-          <p className="m-0 small text-[#ffd7d6]">
+          <p className="m-0 small text-[#ffd7d6]" role="alert">
             This session has no administrator access. If this wallet was recently added as an
             administrator, sign in again to activate that access.
           </p>
         )}
-        {error && <p className="m-0 small text-[#ffd7d6]">{error}</p>}
+        {error && <p className="m-0 small text-[#ffd7d6]" role="alert">{error}</p>}
       </div>
     </PageMain>
   );

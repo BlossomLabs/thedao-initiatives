@@ -233,19 +233,26 @@ export function useDonation(
   useEffect(() => () => stopPolling(), []);
 
   const donate = useCallback(
-    async (symbol: string, usdRaw: string, balances: Record<string, number | null>) => {
-      if (busy || sending.current) return;
+    /** Resolves to whether the agreement was used up: a refusal before it is
+     * recorded (bad amount, empty wallet) leaves the terms tick in place. */
+    async (
+      symbol: string,
+      usdRaw: string,
+      balances: Record<string, number | null>,
+    ): Promise<boolean> => {
+      let agreementUsed = false;
+      if (busy || sending.current) return false;
       if (!acceptedRef.current) {
         setStatus({ kind: "err", text: "Please agree to the donation terms first." });
-        return;
+        return false;
       }
       if (!/^0x[0-9a-fA-F]{40}$/.test(safeAddress)) {
         setStatus({ kind: "err", text: "This initiative's donation address is not set up yet." });
-        return;
+        return false;
       }
       if (!params?.enabled) {
         setStatus({ kind: "err", text: "Donations are unavailable right now." });
-        return;
+        return false;
       }
       const tok = params.tokens[symbol];
       if (!tok) {
@@ -253,19 +260,19 @@ export function useDonation(
           kind: "err",
           text: "That token isn't available to donate right now. Pick another from the list.",
         });
-        return;
+        return false;
       }
       const rate = params.rates[symbol] || 1;
       const usd = parseUsd(usdRaw);
       if (!(usd > 0)) {
         setStatus({ kind: "err", text: "Enter the amount in dollars, like 100 or 49.50." });
-        return;
+        return false;
       }
       const qtyStr = tokenQty(usd, rate, tok.decimals);
       const base = toBaseUnits(qtyStr, tok.decimals);
       if (base === null) {
         setStatus({ kind: "err", text: `That amount is too small for ${symbol}.` });
-        return;
+        return false;
       }
       const isNative = tok.address === "native";
       const qtyNum = parseFloat(qtyStr);
@@ -277,7 +284,7 @@ export function useDonation(
               (params.minEth * rate).toFixed(2)
             }). Enter a larger amount.`,
           });
-          return;
+          return false;
         }
       } else if (qtyNum < (params.minTokenUnits || 1)) {
         setStatus({
@@ -286,7 +293,7 @@ export function useDonation(
             rate.toFixed(2)
           }). Enter a larger amount.`,
         });
-        return;
+        return false;
       }
       sending.current = true;
       try {
@@ -298,7 +305,7 @@ export function useDonation(
               kind: "err",
               text: "No wallet detected in this browser. Use the exchange option instead.",
             });
-            return;
+            return false;
           }
           setStatus({ kind: "wait", text: "Connecting wallet…" });
           const r = await connectAsync({ connector: usable[0], chainId: 1 });
@@ -315,7 +322,7 @@ export function useDonation(
                 Object.keys(params.tokens).join(", ")
               }). Top it up, switch wallets (button top right), or use the exchange option.`,
           });
-          return;
+          return false;
         }
         if (typeof bal === "number" && bal < qtyNum) {
           setStatus({
@@ -324,7 +331,7 @@ export function useDonation(
               bal.toFixed(4)
             }, this donation needs ${qtyStr}.`,
           });
-          return;
+          return false;
         }
         setStatus({
           kind: "wait",
@@ -338,6 +345,7 @@ export function useDonation(
           ),
         });
         setBusy("Recording agreement…");
+        agreementUsed = true;
         const acceptance = await recordAcceptance("wallet", undefined, {
           address: account!,
           token: tok.address,
@@ -378,10 +386,17 @@ export function useDonation(
         await confirmTx(txHash.toLowerCase(), acceptance.attemptId);
       } catch (e) {
         setBusy(null);
-        setStatus({ kind: "err", text: "Not sent: " + walletErrorMessage(e) });
+        const noWallet = /provider not found/i.test(String((e as Error)?.message));
+        setStatus({
+          kind: "err",
+          text: noWallet
+            ? "No wallet detected in this browser. Use the exchange option instead."
+            : "Not sent: " + walletErrorMessage(e),
+        });
       } finally {
         sending.current = false;
       }
+      return agreementUsed;
     },
     [
       busy,

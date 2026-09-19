@@ -18,16 +18,21 @@ const ID_RE = /^[0-9a-f]{64}$/;
 export default function TermsVersionPage() {
   const { id } = useParams();
   const v = id && ID_RE.test(id) ? termsById(id) : undefined;
+  // Same shape as the other not-found pages, not a stray heading in the terms column.
+  if (!v) {
+    return (
+      <PageMain detail center className="min-h-[50vh]">
+        <h1 className="font-inter-tight text-[40px] font-medium tracking-[-.02em]">
+          No such version
+        </h1>
+        <p className="text-muted">There is no version of the donation terms at this address.</p>
+        <Link className="btn mt-4" to="/donation-terms">Read the current donation terms</Link>
+      </PageMain>
+    );
+  }
   return (
     <PageMain narrow detail className="terms-page min-h-[50vh]">
-      {v ? <TermsDocument terms={v} versions={TERMS_VERSIONS} current={v.id === TERMS.id} /> : (
-        <>
-          <h1 className="h2">No such version</h1>
-          <p className="small dim">
-            <Link to="/donation-terms" className="underline">Read the current donation terms</Link>
-          </p>
-        </>
-      )}
+      <TermsDocument terms={v} versions={TERMS_VERSIONS} current={v.id === TERMS.id} />
     </PageMain>
   );
 }

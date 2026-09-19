@@ -19,7 +19,7 @@ import { useSiteSettings } from "~/hooks/use-site-settings";
 import { GUIDE_TEXT } from "~/data/guide";
 import { rulesKindFor } from "~/data/rules";
 import { WHAT_NEXT } from "~/data/what-next";
-import { errorMessage } from "~/lib/api";
+import { walletErrorMessage } from "~/lib/donate";
 import { submitInitiative } from "~/lib/submit-initiative";
 import { cn } from "~/lib/utils";
 import { generateMeta } from "~/utils/meta";
@@ -138,7 +138,8 @@ function Gate({ children, aside }: { children: React.ReactNode; aside: React.Rea
               variant="primary"
               className="self-start"
               loading={signingIn}
-              onClick={() => signIn().catch((e) => setError(errorMessage(e)))}
+              onClick={() =>
+                signIn().catch((e) => setError("Not signed in: " + walletErrorMessage(e)))}
             >
               Sign in with {identity.name}
             </Button>
@@ -152,7 +153,7 @@ function Gate({ children, aside }: { children: React.ReactNode; aside: React.Rea
               {identity.hasName ? "Pick a picture" : "Set your name and picture"}
             </Button>
           )}
-          {error && <p className="m-0 small text-[#ffd7d6]">{error}</p>}
+          {error && <p className="m-0 small text-[#ffd7d6]" role="alert">{error}</p>}
         </div>
       }
     />

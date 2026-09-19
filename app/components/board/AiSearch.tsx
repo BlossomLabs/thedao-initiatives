@@ -3,22 +3,26 @@ import { ArrowRight, Search } from "lucide-react";
 import { api, errorMessage } from "~/lib/api";
 import { Button } from "~/components/ui/Button";
 import { usePhone } from "~/hooks/use-media";
+import { cn } from "~/lib/utils";
 
 /** "Show top matches": the LLM ranks initiatives; only the order changes, client-side. */
 export default function AiSearch({ onMatches }: { onMatches: (ids: string[] | null) => void }) {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<React.ReactNode>(null);
+  const [failed, setFailed] = useState(false);
   const phone = usePhone();
 
   async function run(e: React.FormEvent) {
     e.preventDefault();
     const query = q.trim();
     if (query.length < 3) {
+      setFailed(true);
       setNote("Describe what you want to fund in a few words.");
       return;
     }
     setBusy(true);
+    setFailed(false);
     setNote(null);
     try {
       const { matches } = await api<{ matches: string[] }>("/api/ai-search", {
@@ -45,6 +49,7 @@ export default function AiSearch({ onMatches }: { onMatches: (ids: string[] | nu
           : "No clear matches; showing everything.",
       );
     } catch (err) {
+      setFailed(true);
       setNote(errorMessage(err));
     } finally {
       setBusy(false);
@@ -81,7 +86,16 @@ export default function AiSearch({ onMatches }: { onMatches: (ids: string[] | nu
           <ArrowRight className="size-4" />
         </Button>
       </form>
-      {note && <p className="-mt-2 mb-[18px] small dim">{note}</p>}
+      {note && (
+        <p
+          // Keyed so a repeated refusal animates in again.
+          key={failed ? String(note) : "result"}
+          role={failed ? "alert" : "status"}
+          className={cn("-mt-2 mb-[18px] small", failed ? "text-[#ffd7d6]" : "dim")}
+        >
+          {note}
+        </p>
+      )}
     </>
   );
 }

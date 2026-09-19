@@ -20,7 +20,7 @@ import {
   type SupportCategory,
 } from "@shared/support";
 import { inputMax, tooLong } from "@shared/draft/mod";
-import { api } from "~/lib/api";
+import { api, ApiError, errorMessage } from "~/lib/api";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { Button } from "~/components/ui/Button";
 import { Input, Textarea } from "~/components/ui/Field";
@@ -36,6 +36,9 @@ const CATEGORY_UI: Record<
   idea: { placeholder: "What if...", Icon: Lightbulb, color: "text-dao-sky" },
   other: { placeholder: "I'd like to share...", Icon: MessageSquare, color: "text-soft" },
 };
+
+/** The same loose shape the server checks; a typo is caught before sending. */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const ICON_BTN =
   "inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white";
@@ -68,6 +71,7 @@ export function SupportPanel() {
   const [capturing, setCapturing] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -168,8 +172,14 @@ export function SupportPanel() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSend || !category) return;
-    setSending(true);
     setError(null);
+    // Checked here, under the field, rather than by the browser's own bubble.
+    if (email.trim() && !EMAIL_RE.test(email.trim())) {
+      setEmailError("That email does not look right. Fix it, or leave it blank.");
+      return;
+    }
+    setEmailError(null);
+    setSending(true);
     try {
       await api("/api/support", {
         json: {
@@ -182,8 +192,9 @@ export function SupportPanel() {
       });
       setView("success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "We couldn't send your message.");
-      setView("error");
+      setError(err instanceof Error ? errorMessage(err) : "We couldn't send your message.");
+      // Something the sender can fix stays in the form, with what they typed.
+      if (!(err instanceof ApiError && err.status === 400)) setView("error");
     } finally {
       setSending(false);
     }
@@ -266,18 +277,27 @@ export function SupportPanel() {
           )}
 
           {view === "form" && category && (
-            <form onSubmit={submit} className="flex flex-col gap-2.5 p-3">
+            <form onSubmit={submit} noValidate className="flex flex-col gap-2.5 p-3">
               <Input
                 id={emailId}
                 type="email"
                 aria-label="Email (optional)"
                 placeholder="your@email.com (optional)"
                 value={email}
-                onChange={(e) =>
-                  setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setEmailError(null);
+                }}
                 autoComplete="email"
-                className="py-2.5 text-[13.5px]"
+                aria-invalid={Boolean(emailError)}
+                aria-describedby={emailError ? emailId + "-msg" : undefined}
+                className={cn("py-2.5 text-[13.5px]", emailError && "has-error")}
               />
+              {emailError && (
+                <p id={emailId + "-msg"} className="fld-msg fld-err -mt-1" role="alert">
+                  {emailError}
+                </p>
+              )}
               <Textarea
                 id={messageId}
                 ref={textareaRef}
@@ -302,7 +322,8 @@ export function SupportPanel() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setScreenshot(null)}
+                    onClick={() =>
+                      setScreenshot(null)}
                     disabled={sending}
                     aria-label="Remove screenshot"
                     className="absolute right-2.5 top-2.5 inline-flex size-7 items-center justify-center rounded-full bg-panel-deep/90 text-white/60 shadow-menu transition-colors hover:text-dao-red disabled:opacity-50"

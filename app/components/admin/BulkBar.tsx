@@ -3,6 +3,7 @@ import { Button } from "~/components/ui/Button";
 import Status, { type StatusKind } from "~/components/ui/Status";
 import type { Selection } from "~/hooks/use-selection";
 import { cn } from "~/lib/utils";
+import { errorMessage } from "~/lib/api";
 
 export interface BulkAction {
   key: string;
@@ -59,7 +60,7 @@ export default function BulkBar(
       });
       selection.clear();
     } catch (e) {
-      setMsg({ kind: "err", text: e instanceof Error ? e.message : "Failed" });
+      setMsg({ kind: "err", text: errorMessage(e, "That did not work.") });
     } finally {
       setBusy(false);
     }

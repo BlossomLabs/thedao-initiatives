@@ -124,16 +124,20 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     details = error.message;
     stack = error.stack;
   }
+  // The static shell needs no providers, so it is safe here even when the
+  // error came from one of them: the page keeps its top bar and footer.
   return (
-    <main className="mx-auto flex min-h-[60vh] max-w-[672px] flex-col items-center justify-center px-6 text-center">
-      <h1 className="font-inter-tight text-[40px] font-medium tracking-[-.02em]">{message}</h1>
-      <p className="mt-2 text-muted">{details}</p>
-      <a href="/" className="btn mt-6">Back to the board</a>
-      {stack && (
-        <pre className="mt-6 w-full overflow-x-auto rounded-xl bg-black/25 p-4 text-left text-[12px]">
-          <code>{stack}</code>
-        </pre>
-      )}
-    </main>
+    <Shell staticShell>
+      <main className="mx-auto flex min-h-[60vh] max-w-[672px] flex-col items-center justify-center px-6 text-center animate-in fade-in duration-300">
+        <h1 className="font-inter-tight text-[40px] font-medium tracking-[-.02em]">{message}</h1>
+        <p className="mt-2 text-muted">{details}</p>
+        <a href="/" className="btn mt-6">Back to the board</a>
+        {stack && (
+          <pre className="mt-6 w-full overflow-x-auto rounded-xl bg-black/25 p-4 text-left text-[12px]">
+            <code>{stack}</code>
+          </pre>
+        )}
+      </main>
+    </Shell>
   );
 }

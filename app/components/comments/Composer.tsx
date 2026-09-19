@@ -9,6 +9,7 @@ import { nameInput, signedInAs } from "./styles";
 import { FormNote, type Note, SubmitButton } from "./FormFeedback";
 import { COMMENT_BODY_MAX, COMMENT_NAME_MAX } from "@shared/comments";
 import { inputMax, tooLong } from "@shared/draft/mod";
+import { errorMessage } from "~/lib/api";
 
 /** One generic comment box (the MVP dropped type/topic pickers). */
 export default function Composer(
@@ -72,7 +73,7 @@ export default function Composer(
       setPosted((n) => n + 1);
       if (msg) setNote({ text: msg, ok: true });
     } catch (e) {
-      setNote({ text: e instanceof Error ? e.message : "Could not post.", ok: false });
+      setNote({ text: errorMessage(e, "Could not post."), ok: false });
     } finally {
       setBusy(false);
     }

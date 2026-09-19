@@ -79,6 +79,11 @@ export default function DonateWidget({
     return false;
   };
 
+  // The answer to a button shows under that button: before the address is
+  // revealed that is the "Show donation address" button, not the widget's foot.
+  const statusBox = d.status && <Status kind={d.status.kind}>{d.status.text}</Status>;
+  const underReveal = method === "exchange" && !exchangeAttempt;
+
   const tokens = useMemo(() => (params?.enabled ? Object.keys(params.tokens) : []), [params]);
   useEffect(() => {
     if (tokens.length && !tokens.includes(symbol)) {
@@ -234,8 +239,7 @@ export default function DonateWidget({
           variant="primary"
           onClick={async () => {
             if (gated()) {
-              await d.donate(symbol, amount, balances);
-              setAccepted(false);
+              if (await d.donate(symbol, amount, balances)) setAccepted(false);
             }
           }}
           disabled={Boolean(d.busy) || !accepted}
@@ -313,6 +317,7 @@ export default function DonateWidget({
               <Button variant="primary" onClick={revealAddress} disabled={!accepted || recording}>
                 {recording ? "Recording agreement…" : "Show donation address"}
               </Button>
+              {statusBox}
             </>
           )}
           <span className="k">Ethereum Mainnet (ERC-20) address</span>
@@ -361,7 +366,7 @@ export default function DonateWidget({
         </div>
       )}
 
-      {d.status && <Status kind={d.status.kind}>{d.status.text}</Status>}
+      {!underReveal && statusBox}
     </div>
   );
 }

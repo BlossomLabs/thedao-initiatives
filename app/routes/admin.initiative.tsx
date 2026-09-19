@@ -6,15 +6,16 @@ import StickyAside from "~/components/layout/StickyAside";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
 import { useAccount } from "wagmi";
-import { Download, ExternalLink, FileText, MessageSquare, PencilLine } from "lucide-react";
+import { Download, ExternalLink, FileText, MessageSquare } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
-import { Button, LinkButton } from "~/components/ui/Button";
+import { Button } from "~/components/ui/Button";
 import Status from "~/components/ui/Status";
 import FundingHead from "~/components/initiative/FundingHead";
 import Donations from "~/components/admin/initiative/Donations";
+import InitiativeText from "~/components/admin/initiative/InitiativeText";
 import OpenPoints from "~/components/admin/initiative/OpenPoints";
 import Pledges from "~/components/admin/initiative/Pledges";
 import Revisions from "~/components/admin/initiative/Revisions";
@@ -35,9 +36,9 @@ const STATUS_HELP: Record<string, string> = {
 };
 
 /**
- * The team's page for one initiative: status, Safe, settings, pledges,
- * donations and revisions. Its text and facts are edited on the edit page
- * the proposer uses.
+ * The team's page for one initiative: its text to read, status, Safe,
+ * settings, pledges, donations and revisions. Its text and facts are edited
+ * on the edit page the proposer uses.
  */
 export default function ManageInitiative() {
   const adminApi = useAdminApi();
@@ -106,8 +107,6 @@ export default function ManageInitiative() {
   // Deploy first, approve second: the wallet prompt is the admin's sign-off on the Safe.
   const canApprove = Boolean(r.safeAddress) || isConnected;
   const run = runAt("status");
-  // The edit page takes pending and approved initiatives, from anyone.
-  const editable = r.status === "pending" || r.status === "approved";
   const approve = (action: "approve" | "unarchive", ok: string) =>
     run(async () => {
       // The Safe card reports the deploy itself; here it is why nothing was approved.
@@ -141,6 +140,8 @@ export default function ManageInitiative() {
             pct={pct}
             funded={r.goalUsd > 0 && data.summary.total >= r.goalUsd}
           />
+
+          <InitiativeText r={r} />
 
           <SectionHeading>Settings</SectionHeading>
           <SettingsForm r={r} run={runAt("settings")} />
@@ -218,22 +219,6 @@ export default function ManageInitiative() {
               )}
             </div>
             {said("status")}
-            {editable
-              ? (
-                <LinkButton
-                  variant="ghost"
-                  sm
-                  className="mt-3.5 w-full"
-                  to={`/initiative/${r.slug}/edit`}
-                >
-                  <PencilLine className="size-[15px]" />Edit initiative
-                </LinkButton>
-              )
-              : (
-                <p className="m-0 mt-3.5 small dim">
-                  Its text is closed for edits while it is {r.status}.
-                </p>
-              )}
           </div>
 
           <SafeCard page={data} safe={safe} onChange={refresh} />

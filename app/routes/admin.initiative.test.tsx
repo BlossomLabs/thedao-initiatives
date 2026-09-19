@@ -11,7 +11,7 @@ vi.mock("~/context/session", () => ({
 }));
 import { MemoryRouter, Route, Routes } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { sendTransaction, waitForTransactionReceipt } from "wagmi/actions";
 import { structuredRow } from "../../test/fixtures";
@@ -186,6 +186,24 @@ it("has no editor: the text is edited on the edit page, while it is open for edi
   const edit = await screen.findByRole("link", { name: "Edit initiative" });
   expect(edit).toHaveAttribute("href", `/initiative/${current.initiative.slug}/edit`);
   expect(document.getElementById("f-title")).toBeNull();
+});
+
+it("shows the formatted text in a box: open for a pending review, folded after", async () => {
+  renderPage();
+  const box = (await screen.findByText("Initiative text")).closest("details")!;
+  expect(box.open).toBe(true);
+  expect(within(box).getByText("why grant")).toBeVisible();
+  expect(within(box).getByText("Only milestone")).toBeVisible();
+  fireEvent.click(screen.getByText("Initiative text"));
+  expect(box.open).toBe(false);
+});
+
+it("the text box starts folded once the initiative is approved", async () => {
+  current = page({ status: "approved", safeAddress: SAFE });
+  renderPage();
+  const box = (await screen.findByText("Initiative text")).closest("details")!;
+  expect(box.open).toBe(false);
+  expect(screen.getByRole("link", { name: "Edit initiative" })).toBeInTheDocument();
 });
 
 it("an archived initiative offers no edit link", async () => {

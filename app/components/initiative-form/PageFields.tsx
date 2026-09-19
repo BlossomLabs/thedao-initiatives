@@ -9,6 +9,13 @@ import FormField from "./FormField";
 import type { Draft } from "./types";
 import type { DraftActions } from "./useDraft";
 
+/**
+ * Two fields side by side. Each one lays its label, control and message on
+ * the row's own grid lines, so the controls line up when one hint wraps.
+ */
+const PAIR = "grid grid-cols-[1fr_1fr] gap-x-4 max-[640px]:grid-cols-1";
+const PAIRED = "row-span-3 grid grid-rows-subgrid first:mt-[18px]";
+
 export default function PageFields(
   { draft, actions, locked }: { draft: Draft; actions: DraftActions; locked?: boolean },
 ) {
@@ -41,8 +48,14 @@ export default function PageFields(
           onChange={set("summary")}
         />
       </FormField>
-      <div className="grid grid-cols-[1fr_1fr] gap-x-4 max-[640px]:grid-cols-1">
-        <FormField field="goal" label="Funding goal (USD)" required hint="One flat number.">
+      <div className={PAIR}>
+        <FormField
+          field="goal"
+          label="Funding goal (USD)"
+          required
+          hint="One flat number."
+          className={PAIRED}
+        >
           {(props) => (
             <AmountInput
               {...props}
@@ -58,6 +71,7 @@ export default function PageFields(
           label="Expected duration (months)"
           required
           hint="Months from funding until the last milestone is complete."
+          className={PAIRED}
         >
           <Input
             className="mono text-[14px]"
@@ -71,14 +85,16 @@ export default function PageFields(
         </FormField>
       </div>
       {draft.type === "grant" && (
-        <div className="grid grid-cols-[1fr_1fr] gap-x-4 max-[640px]:grid-cols-1">
+        <div className={PAIR}>
           <FormField
             field="recipient_team"
             label="Recipient team"
             required
-            hint='Short name for the header and the board card, as in "Grant to the OPSEC ratings coalition".'
+            hint="Short name for the header and the board card."
+            className={PAIRED}
           >
             <Input
+              placeholder="OPSEC ratings coalition"
               maxLength={inputMax(LIMITS.RECIPIENT_CHARS)}
               value={p.recipientTeam}
               disabled={locked}
@@ -89,6 +105,7 @@ export default function PageFields(
             field="recipient_url"
             label="Recipient link"
             hint="Optional https link to the team's site or repository."
+            className={PAIRED}
           >
             <Input
               type="url"

@@ -13,6 +13,7 @@ import {
 import type { Connector } from "wagmi";
 import { PRIVY_CONNECTOR_ID } from "~/lib/privy";
 import { cn } from "~/lib/utils";
+import Pop from "~/components/ui/Pop";
 
 export interface WalletMenuItem {
   key: string;
@@ -45,7 +46,8 @@ const ICONS = {
 
 /** The MVP's wallet picker / account menu, anchored under the top-bar button. */
 export default function WalletMenu(
-  { items, onClose, className }: {
+  { open, items, onClose, className }: {
+    open: boolean;
     items: WalletMenuItem[];
     onClose: () => void;
     className?: string;
@@ -53,6 +55,7 @@ export default function WalletMenu(
 ) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (!open) return;
     const onDoc = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
@@ -65,9 +68,10 @@ export default function WalletMenu(
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
-  }, [onClose]);
+  }, [open, onClose]);
   return (
-    <div
+    <Pop
+      show={open}
       ref={ref}
       className={cn(
         "absolute right-0 top-[46px] z-[60] flex min-w-[236px] flex-col overflow-hidden rounded-[14px] border border-edge2 bg-panel p-1.5 shadow-menu",
@@ -106,7 +110,7 @@ export default function WalletMenu(
           </button>
         );
       })}
-    </div>
+    </Pop>
   );
 }
 

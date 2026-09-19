@@ -174,7 +174,11 @@ export default function ConnectButton() {
           ? "Sign in"
           : "Connect wallet"}
       </button>
-      {menu === "account" && <WalletMenu items={accountItems} onClose={() => setMenu("none")} />}
+      <WalletMenu
+        open={menu === "account"}
+        items={accountItems}
+        onClose={() => setMenu("none")}
+      />
       {error && (
         <div
           className="absolute right-0 top-[46px] z-[60] w-max max-w-[300px] rounded-xl border border-[rgba(255,59,56,.55)] bg-panel px-3 py-2 text-[12.5px] text-[#ffd7d6] shadow-menu"

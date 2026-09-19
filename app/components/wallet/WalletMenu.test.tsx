@@ -8,6 +8,7 @@ test("a keepOpen item runs its action without closing the menu; others close it"
   const out = vi.fn();
   render(
     <WalletMenu
+      open
       onClose={onClose}
       items={[
         {

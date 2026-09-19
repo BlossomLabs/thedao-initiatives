@@ -20,6 +20,7 @@ import {
 } from "~/components/ui/Select";
 import { errorMessage } from "~/lib/api";
 import { useDonation } from "./useDonation";
+import Reveal from "~/components/ui/Reveal";
 import { WALLETCONNECT_PROJECT_ID } from "~/lib/wagmi";
 
 const CHIPS = ["50", "500", "5000", "50000"];
@@ -155,8 +156,9 @@ export default function DonateWidget({
 
   return (
     <div className="flex flex-col gap-2.5">
-      {method === "wallet" && (
-        <>
+      {/* Each Reveal carries its own gap as padding and cancels the column's, so a closed one takes no room. */}
+      <Reveal show={method === "wallet"} className="-mb-2.5">
+        <div className="flex flex-col gap-2.5 pb-2.5">
           <div className="flex flex-wrap gap-2">
             {CHIPS.map((c) => (
               <button
@@ -208,8 +210,8 @@ export default function DonateWidget({
             </Select>
           </div>
           {conv && <p className="-mt-0.5 ml-0.5 m-0 small dim">{conv}</p>}
-        </>
-      )}
+        </div>
+      </Reveal>
 
       <label className="my-0.5 flex cursor-pointer items-center gap-2 small text-soft">
         <input
@@ -256,21 +258,23 @@ export default function DonateWidget({
         ))}
       </div>
 
-      {method === "wallet" && (
-        <Button
-          variant="primary"
-          onClick={async () => {
-            if (gated()) {
-              if (await d.donate(symbol, amount, balances)) setAccepted(false);
-            }
-          }}
-          disabled={Boolean(d.busy) || !accepted}
-        >
-          {d.busy ?? "Donate"}
-        </Button>
-      )}
-      {method === "exchange" && (
-        <div className="flex flex-col gap-2">
+      <Reveal show={method === "wallet"} className="-mt-2.5">
+        <div className="flex flex-col pt-2.5">
+          <Button
+            variant="primary"
+            onClick={async () => {
+              if (gated()) {
+                if (await d.donate(symbol, amount, balances)) setAccepted(false);
+              }
+            }}
+            disabled={Boolean(d.busy) || !accepted}
+          >
+            {d.busy ?? "Donate"}
+          </Button>
+        </div>
+      </Reveal>
+      <Reveal show={method === "exchange"} className="-mt-2.5">
+        <div className="flex flex-col gap-2 pt-2.5">
           <p className="m-0 small dim">
             Send from an exchange or another wallet to the address below. It shows up on this page
             on its own, usually within a few minutes.
@@ -295,8 +299,8 @@ export default function DonateWidget({
               the rest.
             </li>
           </ul>
-          {!exchangeAttempt && (
-            <>
+          <Reveal show={!exchangeAttempt} className="-mb-2">
+            <div className="flex flex-col gap-2 pb-2">
               <p className="m-0 small dim">
                 Optional details to help us match your deposit. You can leave all fields blank.
               </p>
@@ -349,8 +353,8 @@ export default function DonateWidget({
                 {recording ? "Recording agreement…" : "Show donation address"}
               </Button>
               {statusBox}
-            </>
-          )}
+            </div>
+          </Reveal>
           <span className="k">Ethereum Mainnet (ERC-20) address</span>
           <div className="flex items-center gap-2 rounded-[14px] border border-edge bg-black/15 px-3 py-2">
             <span
@@ -369,8 +373,8 @@ export default function DonateWidget({
               {copied ? "Copied ✓" : "Copy"}
             </Button>
           </div>
-          {exchangeAttempt && (
-            <>
+          <Reveal show={Boolean(exchangeAttempt)} className="-mt-2">
+            <div className="flex flex-col gap-2 pt-2">
               <label className="flex flex-col gap-1 small">
                 Transaction hash after withdrawal (optional)
                 <input
@@ -384,18 +388,19 @@ export default function DonateWidget({
               <Button
                 variant="ghost"
                 disabled={Boolean(d.busy) || !/^0x[0-9a-fA-F]{64}$/.test(txHash.trim())}
-                onClick={() => d.confirmTx(txHash.trim().toLowerCase(), exchangeAttempt)}
+                onClick={() =>
+                  d.confirmTx(txHash.trim().toLowerCase(), exchangeAttempt ?? undefined)}
               >
                 {d.busy ?? "Match my deposit"}
               </Button>
               <p className="m-0 small dim">
                 These details stay private. A transaction hash helps us identify the deposit.
               </p>
-            </>
-          )}
+            </div>
+          </Reveal>
           <GovernedBy />
         </div>
-      )}
+      </Reveal>
 
       {!underReveal && statusBox}
     </div>

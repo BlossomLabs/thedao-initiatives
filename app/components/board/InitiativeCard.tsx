@@ -7,6 +7,7 @@ import Bar from "~/components/ui/Bar";
 import Money from "~/components/ui/Money";
 import { Button, LinkButton } from "~/components/ui/Button";
 import DonateWidget from "~/components/donate/DonateWidget";
+import Reveal from "~/components/ui/Reveal";
 import type { Card } from "~/lib/api-types";
 import { pctText, plural, usd } from "~/lib/format";
 import { usePrefetchInitiative } from "~/hooks/use-initiative";
@@ -122,7 +123,7 @@ export default function InitiativeCard({
           </div>
         )}
       </div>
-      {canDonate && open && (
+      <Reveal show={canDonate && open}>
         <div className="mt-3.5 border-t border-edge pt-3.5">
           <DonateWidget
             initiativeId={r.id}
@@ -131,7 +132,7 @@ export default function InitiativeCard({
             onConfirmed={onDonated}
           />
         </div>
-      )}
+      </Reveal>
     </div>
   );
 }

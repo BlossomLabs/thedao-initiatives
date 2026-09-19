@@ -2,6 +2,7 @@ import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "~/lib/utils";
+import Pop, { PopBox } from "./Pop";
 
 /**
  * Modal in the MVP's nickname-dialog look (solid navy panel over a blurred
@@ -51,22 +52,25 @@ export function Dialog({
     };
   }, [open]);
 
-  if (!open || typeof document === "undefined") return null;
+  if (typeof document === "undefined") return null;
   return createPortal(
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-[rgba(15,30,44,.62)] p-5 backdrop-blur-[4px] animate-in fade-in-0 duration-150"
+    <Pop
+      show={open}
+      from="fade"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-[rgba(15,30,44,.62)] p-5 backdrop-blur-[4px]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onOpenChange(false);
       }}
     >
-      <div
+      <PopBox
+        from="zoom"
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descId : undefined}
         className={cn(
-          "flex w-[min(420px,100%)] flex-col gap-3 rounded-[18px] border border-edge2 bg-panel-modal p-[22px] shadow-modal outline-none animate-in fade-in-0 zoom-in-95 duration-200",
+          "flex w-[min(420px,100%)] flex-col gap-3 rounded-[18px] border border-edge2 bg-panel-modal p-[22px] shadow-modal outline-none",
           className,
         )}
       >
@@ -87,8 +91,8 @@ export function Dialog({
           <p id={descId} className="m-0 text-[12.5px] leading-[1.5] text-muted">{description}</p>
         )}
         {children}
-      </div>
-    </div>,
+      </PopBox>
+    </Pop>,
     document.body,
   );
 }

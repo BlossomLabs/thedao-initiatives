@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type DraftType, FIELDS, splitDraft } from "@shared/draft/mod";
 import { Button } from "~/components/ui/Button";
 import { Textarea } from "~/components/ui/Field";
+import Reveal from "~/components/ui/Reveal";
 import { renderDraft, textMatchesDraft } from "./draft-text";
 import type { Draft } from "./types";
 import { splitReport } from "./useDraft";
@@ -207,11 +208,13 @@ export default function PasteBox(
         What you write here fills the fields below, and what you type in a field shows up here. Both
         are the same draft; the fields are what gets submitted.
       </p>
-      {report && (
-        <p role="status" className="small m-0 mt-2.5">
-          <b className="text-dao-green">Sorted:</b> {reportLine(report).slice("Sorted: ".length)}
-        </p>
-      )}
+      <Reveal show={Boolean(report)}>
+        {report && (
+          <p role="status" className="small m-0 mt-2.5">
+            <b className="text-dao-green">Sorted:</b> {reportLine(report).slice("Sorted: ".length)}
+          </p>
+        )}
+      </Reveal>
       {hints.length > 0 && (
         <ul className="hint m-0 mt-1.5 list-none p-0 text-[#ffe9b8]" data-field="paste-hints">
           {hints.map((h) => <li key={h.key}>{h.text}</li>)}

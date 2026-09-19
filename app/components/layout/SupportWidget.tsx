@@ -24,6 +24,7 @@ import { api, ApiError, errorMessage } from "~/lib/api";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { Button } from "~/components/ui/Button";
 import { Input, Textarea } from "~/components/ui/Field";
+import Pop from "~/components/ui/Pop";
 import { cn } from "~/lib/utils";
 
 type View = "picker" | "form" | "success" | "error";
@@ -227,174 +228,174 @@ export function SupportPanel() {
         <span className="max-[760px]:hidden">Support</span>
       </button>
 
-      {open && (
-        <div
-          ref={panelRef}
-          id={panelId}
-          role="dialog"
-          aria-modal="false"
-          aria-labelledby={headingId}
-          className="fixed bottom-[66px] right-4 z-[100] w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[18px] border border-edge2 bg-panel-modal shadow-modal animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
-        >
-          <div className="flex items-center gap-1.5 border-b border-white/[.08] px-3 py-2.5">
-            {view === "form"
-              ? (
-                <button type="button" onClick={back} aria-label="Back" className={ICON_BTN}>
-                  <ChevronLeft className="size-4" />
+      <Pop
+        show={open}
+        from="rise"
+        ref={panelRef}
+        id={panelId}
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby={headingId}
+        className="fixed bottom-[66px] right-4 z-[100] w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-[18px] border border-edge2 bg-panel-modal shadow-modal"
+      >
+        <div className="flex items-center gap-1.5 border-b border-white/[.08] px-3 py-2.5">
+          {view === "form"
+            ? (
+              <button type="button" onClick={back} aria-label="Back" className={ICON_BTN}>
+                <ChevronLeft className="size-4" />
+              </button>
+            )
+            : <span className="size-7 shrink-0" aria-hidden />}
+          <h2
+            id={headingId}
+            className="m-0 flex-1 truncate text-center font-inter-tight text-[15px] font-medium text-white"
+          >
+            {title}
+          </h2>
+          <button type="button" onClick={close} aria-label="Close" className={ICON_BTN}>
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {view === "picker" && (
+          <div className="flex flex-col gap-2 p-3">
+            {SUPPORT_CATEGORY_KEYS.map((c) => {
+              const { Icon, color } = CATEGORY_UI[c];
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => pick(c)}
+                  className="flex w-full items-center gap-3 rounded-[14px] border border-white/10 bg-white/5 px-3.5 py-2.5 text-left font-inter-tight text-[13.5px] text-white transition-[border-color,box-shadow] duration-150 hover:border-[rgba(92,183,90,.6)] hover:shadow-glow"
+                >
+                  <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-white/[.06]">
+                    <Icon className={cn("size-4", color)} />
+                  </span>
+                  {SUPPORT_CATEGORIES[c]}
                 </button>
-              )
-              : <span className="size-7 shrink-0" aria-hidden />}
-            <h2
-              id={headingId}
-              className="m-0 flex-1 truncate text-center font-inter-tight text-[15px] font-medium text-white"
-            >
-              {title}
-            </h2>
-            <button type="button" onClick={close} aria-label="Close" className={ICON_BTN}>
-              <X className="size-4" />
-            </button>
+              );
+            })}
           </div>
+        )}
 
-          {view === "picker" && (
-            <div className="flex flex-col gap-2 p-3">
-              {SUPPORT_CATEGORY_KEYS.map((c) => {
-                const { Icon, color } = CATEGORY_UI[c];
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => pick(c)}
-                    className="flex w-full items-center gap-3 rounded-[14px] border border-white/10 bg-white/5 px-3.5 py-2.5 text-left font-inter-tight text-[13.5px] text-white transition-[border-color,box-shadow] duration-150 hover:border-[rgba(92,183,90,.6)] hover:shadow-glow"
-                  >
-                    <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-white/[.06]">
-                      <Icon className={cn("size-4", color)} />
-                    </span>
-                    {SUPPORT_CATEGORIES[c]}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {view === "form" && category && (
-            <form onSubmit={submit} noValidate className="flex flex-col gap-2.5 p-3">
-              <Input
-                id={emailId}
-                type="email"
-                aria-label="Email (optional)"
-                placeholder="your@email.com (optional)"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setEmailError(null);
-                }}
-                autoComplete="email"
-                aria-invalid={Boolean(emailError)}
-                aria-describedby={emailError ? emailId + "-msg" : undefined}
-                className={cn("py-2.5 text-[13.5px]", emailError && "has-error")}
-              />
-              {emailError && (
-                <p id={emailId + "-msg"} className="fld-msg fld-err -mt-1" role="alert">
-                  {emailError}
-                </p>
-              )}
-              <Textarea
-                id={messageId}
-                ref={textareaRef}
-                aria-label="Message"
-                value={text}
-                onChange={(e) =>
-                  setText(e.target.value)}
-                placeholder={CATEGORY_UI[category].placeholder}
-                rows={4}
-                maxLength={inputMax(SUPPORT_MESSAGE_MAX)}
-                required
-                className="resize-none py-2.5 text-[13.5px]"
-              />
-              {screenshot && (
-                <div className="relative rounded-[14px] border border-white/10 bg-white/5 p-1.5">
-                  <div className="max-h-40 overflow-y-auto rounded-[10px]">
-                    <img
-                      src={screenshot}
-                      alt="Screenshot preview"
-                      className="block w-full rounded-[10px]"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setScreenshot(null)}
-                    disabled={sending}
-                    aria-label="Remove screenshot"
-                    className="absolute right-2.5 top-2.5 inline-flex size-7 items-center justify-center rounded-full bg-panel-deep/90 text-white/60 shadow-menu transition-colors hover:text-dao-red disabled:opacity-50"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+        {view === "form" && category && (
+          <form onSubmit={submit} noValidate className="flex flex-col gap-2.5 p-3">
+            <Input
+              id={emailId}
+              type="email"
+              aria-label="Email (optional)"
+              placeholder="your@email.com (optional)"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setEmailError(null);
+              }}
+              autoComplete="email"
+              aria-invalid={Boolean(emailError)}
+              aria-describedby={emailError ? emailId + "-msg" : undefined}
+              className={cn("py-2.5 text-[13.5px]", emailError && "has-error")}
+            />
+            {emailError && (
+              <p id={emailId + "-msg"} className="fld-msg fld-err -mt-1" role="alert">
+                {emailError}
+              </p>
+            )}
+            <Textarea
+              id={messageId}
+              ref={textareaRef}
+              aria-label="Message"
+              value={text}
+              onChange={(e) =>
+                setText(e.target.value)}
+              placeholder={CATEGORY_UI[category].placeholder}
+              rows={4}
+              maxLength={inputMax(SUPPORT_MESSAGE_MAX)}
+              required
+              className="resize-none py-2.5 text-[13.5px]"
+            />
+            {screenshot && (
+              <div className="relative rounded-[14px] border border-white/10 bg-white/5 p-1.5">
+                <div className="max-h-40 overflow-y-auto rounded-[10px]">
+                  <img
+                    src={screenshot}
+                    alt="Screenshot preview"
+                    className="block w-full rounded-[10px]"
+                  />
                 </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Button
-                  sm
-                  onClick={capture}
-                  disabled={capturing || sending}
-                  aria-label={screenshot ? "Recapture screenshot" : "Attach a screenshot"}
-                  title={screenshot ? "Recapture screenshot" : "Attach a screenshot"}
-                  className="w-[38px] shrink-0 px-0"
+                <button
+                  type="button"
+                  onClick={() =>
+                    setScreenshot(null)}
+                  disabled={sending}
+                  aria-label="Remove screenshot"
+                  className="absolute right-2.5 top-2.5 inline-flex size-7 items-center justify-center rounded-full bg-panel-deep/90 text-white/60 shadow-menu transition-colors hover:text-dao-red disabled:opacity-50"
                 >
-                  {capturing
-                    ? <Loader2 className="size-4 animate-spin" />
-                    : <Camera className="size-4" />}
-                </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  sm
-                  loading={sending}
-                  disabled={!canSend}
-                  className="flex-1"
-                >
-                  Send
-                </Button>
+                  <Trash2 className="size-3.5" />
+                </button>
               </div>
-              {overCap && (
-                <p className="m-0 text-[12.5px] text-[#ffb3b1]" role="alert">
-                  {tooLong("The message", SUPPORT_MESSAGE_MAX)}
-                </p>
-              )}
-              {error && <p className="m-0 text-[12.5px] text-[#ffb3b1]" role="alert">{error}</p>}
-            </form>
-          )}
-
-          {view === "success" && (
-            <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
-              <CheckCircle2 className="size-10 text-dao-green" />
-              <p className="m-0 text-[13px] text-muted">
-                Thanks for writing. We read every message.
-              </p>
-              <Button sm onClick={close} className="w-full">Done</Button>
-            </div>
-          )}
-
-          {view === "error" && (
-            <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
-              <CircleAlert className="size-10 text-dao-red" />
-              <p className="m-0 text-[13px] text-muted" role="alert">
-                {error ?? "We couldn't send your message."}
-              </p>
+            )}
+            <div className="flex items-center gap-2">
               <Button
                 sm
-                onClick={() => {
-                  setView("form");
-                  setError(null);
-                }}
-                className="w-full"
+                onClick={capture}
+                disabled={capturing || sending}
+                aria-label={screenshot ? "Recapture screenshot" : "Attach a screenshot"}
+                title={screenshot ? "Recapture screenshot" : "Attach a screenshot"}
+                className="w-[38px] shrink-0 px-0"
               >
-                Try again
+                {capturing
+                  ? <Loader2 className="size-4 animate-spin" />
+                  : <Camera className="size-4" />}
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                sm
+                loading={sending}
+                disabled={!canSend}
+                className="flex-1"
+              >
+                Send
               </Button>
             </div>
-          )}
-        </div>
-      )}
+            {overCap && (
+              <p className="m-0 text-[12.5px] text-[#ffb3b1]" role="alert">
+                {tooLong("The message", SUPPORT_MESSAGE_MAX)}
+              </p>
+            )}
+            {error && <p className="m-0 text-[12.5px] text-[#ffb3b1]" role="alert">{error}</p>}
+          </form>
+        )}
+
+        {view === "success" && (
+          <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
+            <CheckCircle2 className="size-10 text-dao-green" />
+            <p className="m-0 text-[13px] text-muted">
+              Thanks for writing. We read every message.
+            </p>
+            <Button sm onClick={close} className="w-full">Done</Button>
+          </div>
+        )}
+
+        {view === "error" && (
+          <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
+            <CircleAlert className="size-10 text-dao-red" />
+            <p className="m-0 text-[13px] text-muted" role="alert">
+              {error ?? "We couldn't send your message."}
+            </p>
+            <Button
+              sm
+              onClick={() => {
+                setView("form");
+                setError(null);
+              }}
+              className="w-full"
+            >
+              Try again
+            </Button>
+          </div>
+        )}
+      </Pop>
     </div>,
     document.body,
   );

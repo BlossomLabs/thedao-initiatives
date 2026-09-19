@@ -190,19 +190,23 @@ it("has no editor: the text is edited on the edit page, while it is open for edi
 
 it("shows the formatted text in a box: open for a pending review, folded after", async () => {
   renderPage();
-  const box = (await screen.findByText("Initiative text")).closest("details")!;
-  expect(box.open).toBe(true);
+  const toggle = await screen.findByRole("button", { name: "Initiative text" });
+  const box = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
   expect(within(box).getByText("why grant")).toBeVisible();
   expect(within(box).getByText("Only milestone")).toBeVisible();
-  fireEvent.click(screen.getByText("Initiative text"));
-  expect(box.open).toBe(false);
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  // Folded, the start of the text still shows, out of reach of the keyboard.
+  expect(within(box).getByText("why grant")).toBeInTheDocument();
+  expect(box).toHaveAttribute("inert");
 });
 
 it("the text box starts folded once the initiative is approved", async () => {
   current = page({ status: "approved", safeAddress: SAFE });
   renderPage();
-  const box = (await screen.findByText("Initiative text")).closest("details")!;
-  expect(box.open).toBe(false);
+  const toggle = await screen.findByRole("button", { name: "Initiative text" });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
   expect(screen.getByRole("link", { name: "Edit initiative" })).toBeInTheDocument();
 });
 

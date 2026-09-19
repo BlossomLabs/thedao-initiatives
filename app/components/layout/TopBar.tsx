@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
 import { Menu, X } from "lucide-react";
 import { cn } from "~/lib/utils";
+import Pop from "~/components/ui/Pop";
 
 const ConnectButton = lazy(() => import("~/components/wallet/ConnectButton"));
 
@@ -105,20 +106,20 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
           </button>
         </div>
       </div>
-      {open && (
-        <nav
-          ref={menuRef}
-          id="site-menu"
-          aria-label="Site"
-          className="absolute inset-x-3.5 top-full mt-2 hidden flex-col rounded-[14px] border border-edge2 bg-panel p-1.5 shadow-menu max-[760px]:flex"
-        >
-          {LINKS.map((l) => (
-            <NavLink key={l.to} to={l.to} end={l.end} className={cls(menuLink)}>
-              {l.label}
-            </NavLink>
-          ))}
-        </nav>
-      )}
+      <Pop
+        show={open}
+        as="nav"
+        ref={menuRef}
+        id="site-menu"
+        aria-label="Site"
+        className="absolute inset-x-3.5 top-full mt-2 hidden flex-col rounded-[14px] border border-edge2 bg-panel p-1.5 shadow-menu max-[760px]:flex"
+      >
+        {LINKS.map((l) => (
+          <NavLink key={l.to} to={l.to} end={l.end} className={cls(menuLink)}>
+            {l.label}
+          </NavLink>
+        ))}
+      </Pop>
     </header>
   );
 }

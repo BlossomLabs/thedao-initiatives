@@ -5,11 +5,12 @@
  * live checks. Errors never disable the button: pressing it paints them.
  */
 import StickyAside from "~/components/layout/StickyAside";
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { Lock, Send } from "lucide-react";
 import { type CheckScope, type Findings, SECTIONS } from "@shared/draft/mod";
 import RulesPanel from "~/components/initiative/RulesPanel";
 import { Button } from "~/components/ui/Button";
+import Reveal from "~/components/ui/Reveal";
 import Status from "~/components/ui/Status";
 import { WHAT_NEXT } from "~/data/what-next";
 import { errorMessage } from "~/lib/api";
@@ -111,6 +112,8 @@ export default function InitiativeForm({
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(true);
+  const rulesId = useId();
   const [website, setWebsite] = useState("");
 
   // Findings and alerts describe only the submitted draft, including when
@@ -300,17 +303,25 @@ export default function InitiativeForm({
         )}
 
         {showRules && (
-          <details open className="mt-10 group">
-            <summary className="cursor-pointer list-none font-inter-tight text-[13.5px] text-muted marker:content-none">
+          <div className="mt-10">
+            <button
+              type="button"
+              className="block w-full cursor-pointer border-0 bg-transparent p-0 text-left font-inter-tight text-[13.5px] text-muted"
+              aria-expanded={rulesOpen}
+              aria-controls={rulesOpen ? rulesId : undefined}
+              onClick={() => setRulesOpen((o) => !o)}
+            >
               <span className="k mb-0 inline text-dao-green">The panel the site adds</span>
               <span className="mt-1 block">
                 The site adds this panel under your text, it swaps with the type
               </span>
-            </summary>
-            <RulesPanel
-              r={{ type: draft.type, topup: draft.type === "grant" && draft.topup }}
-            />
-          </details>
+            </button>
+            <Reveal show={rulesOpen} id={rulesId}>
+              <RulesPanel
+                r={{ type: draft.type, topup: draft.type === "grant" && draft.topup }}
+              />
+            </Reveal>
+          </div>
         )}
 
         <Button

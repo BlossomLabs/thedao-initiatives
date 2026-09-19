@@ -5,6 +5,7 @@ import { useSession } from "~/context/session";
 import Identity from "~/components/wallet/Identity";
 import { Avatar } from "~/components/wallet/Avatar";
 import { QaChip, RoleTags } from "~/components/ui/Badge";
+import Reveal from "~/components/ui/Reveal";
 import WalletMenu from "~/components/wallet/WalletMenu";
 import type { CommentEntry } from "~/lib/api-types";
 import { errorMessage } from "~/lib/api";
@@ -232,20 +233,19 @@ export default function EntryCard({
                     {FEATURE_LEVELS[c.featured]?.label ?? "Feature"}
                     <ChevronDown className="size-3.5 opacity-70" />
                   </button>
-                  {featureMenu && (
-                    <WalletMenu
-                      className="left-0 right-auto top-[36px] min-w-[170px]"
-                      onClose={() => setFeatureMenu(false)}
-                      items={FEATURE_LEVELS.map((f, level) => ({
-                        key: f.action,
-                        label: f.label,
-                        active: c.featured === level,
-                        onClick: () => {
-                          if (c.featured !== level) admin(f.action);
-                        },
-                      }))}
-                    />
-                  )}
+                  <WalletMenu
+                    open={featureMenu}
+                    className="left-0 right-auto top-[36px] min-w-[170px]"
+                    onClose={() => setFeatureMenu(false)}
+                    items={FEATURE_LEVELS.map((f, level) => ({
+                      key: f.action,
+                      label: f.label,
+                      active: c.featured === level,
+                      onClick: () => {
+                        if (c.featured !== level) admin(f.action);
+                      },
+                    }))}
+                  />
                 </span>
                 <button
                   type="button"
@@ -261,7 +261,7 @@ export default function EntryCard({
             )}
           </div>
           <FormNote note={flash} className="mt-1.5" />
-          {replying && (
+          <Reveal show={replying}>
             <div className="mt-3 flex flex-col gap-2">
               <textarea
                 className="min-h-[70px] w-full rounded-xl border border-white/10 bg-[rgba(9,18,30,.5)] px-3 py-2.5 font-inter-tight text-[14px] text-white outline-none placeholder:text-muted focus:border-[rgba(92,183,90,.55)] disabled:cursor-default disabled:opacity-60"
@@ -299,7 +299,7 @@ export default function EntryCard({
               </div>
               <FormNote note={note} />
             </div>
-          )}
+          </Reveal>
         </div>
       </div>
     </div>

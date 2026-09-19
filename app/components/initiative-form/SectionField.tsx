@@ -7,6 +7,7 @@ import { useId, useState } from "react";
 import { FIELDS, inputMax, LIMITS, type SectionKey } from "@shared/draft/mod";
 import Markdown from "~/components/Markdown";
 import { Textarea } from "~/components/ui/Field";
+import Reveal from "~/components/ui/Reveal";
 import { exampleFor } from "~/data/guide";
 import { cn } from "~/lib/utils";
 import { domId, FieldMsg, useFinding } from "./findings";
@@ -56,29 +57,30 @@ export default function SectionField(
           type="button"
           className="cursor-pointer border-0 bg-transparent p-0 font-inter-tight text-[12.5px] text-dao-green underline-offset-2 hover:underline"
           aria-expanded={open}
-          aria-controls={exId}
+          aria-controls={open ? exId : undefined}
           onClick={() => setOpen((o) => !o)}
         >
           {open ? "Hide example" : "Show example"}
         </button>
         <span className="small dim tnum">{wordCount(value)} words</span>
       </div>
-      <div
-        id={exId}
-        hidden={!open}
-        className="mt-2 rounded-xl border border-dashed border-white/15 bg-white/[.03] px-4 py-3"
-      >
-        <span className="eyebrow mb-1.5">
-          Example{!ex.fallback && (
-            <i className="ml-1.5 font-normal normal-case tracking-normal text-muted">
-              from the gold-standard initiative
-            </i>
-          )}
-        </span>
-        {ex.fallback
-          ? <p className="m-0 small dim">{ex.text}</p>
-          : <Markdown text={ex.text} className="text-[13.5px] text-soft" />}
-      </div>
+      <Reveal show={open}>
+        <div
+          id={exId}
+          className="mt-2 rounded-xl border border-dashed border-white/15 bg-white/[.03] px-4 py-3"
+        >
+          <span className="eyebrow mb-1.5">
+            Example{!ex.fallback && (
+              <i className="ml-1.5 font-normal normal-case tracking-normal text-muted">
+                from the gold-standard initiative
+              </i>
+            )}
+          </span>
+          {ex.fallback
+            ? <p className="m-0 small dim">{ex.text}</p>
+            : <Markdown text={ex.text} className="text-[13.5px] text-soft" />}
+        </div>
+      </Reveal>
     </div>
   );
 }

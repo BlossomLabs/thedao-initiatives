@@ -8,7 +8,7 @@ export const BOARD_POLL_MS = 30_000;
 
 export function useBoard() {
   const qc = useQueryClient();
-  const query = useQuery({
+  return useQuery({
     queryKey: boardKey,
     queryFn: ({ signal }) =>
       cachedFunding<Board>(
@@ -23,12 +23,4 @@ export function useBoard() {
     refetchInterval: (q) =>
       q.state.data?.cards.some((c) => c.ledger?.updating) ? 2_000 : BOARD_POLL_MS,
   });
-  return {
-    ...query,
-    isUpdatingLedger: Boolean(
-      query.data?.cards.some((c) =>
-        c.ledger?.updating || (query.isFetching && c.ledger?.refreshDue)
-      ),
-    ),
-  };
 }

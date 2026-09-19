@@ -11,7 +11,6 @@ import PledgeBand from "~/components/board/PledgeBand";
 import Skeleton from "~/components/ui/Skeleton";
 import { boardKey, useBoard } from "~/hooks/use-board";
 import { generateMeta } from "~/utils/meta";
-import { LoaderCircle } from "lucide-react";
 
 export function meta() {
   return generateMeta({ url: "/" });
@@ -20,7 +19,7 @@ export function meta() {
 const SUGGEST_LAST_FROM = 69;
 
 export default function Board() {
-  const { data, isLoading, isError, isUpdatingLedger } = useBoard();
+  const { data, isLoading, isError } = useBoard();
   const qc = useQueryClient();
   const [matches, setMatches] = useState<string[] | null>(null);
 
@@ -40,12 +39,6 @@ export default function Board() {
         <SectionHeading id="rfps" className="max-[640px]:text-center">
           Security initiatives looking for funding
         </SectionHeading>
-        {isUpdatingLedger && (
-          <p className="m-0 mb-3 flex items-center gap-2 small dim" role="status">
-            <LoaderCircle className="size-3.5 motion-safe:animate-spin" aria-hidden="true" />
-            Updating donations…
-          </p>
-        )}
         {data?.flags.aiSearch && cards.length > 0 && <AiSearch onMatches={setMatches} />}
         {isError && (
           <p className="alert">The board could not be loaded. Please try again in a moment.</p>

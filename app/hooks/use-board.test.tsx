@@ -22,11 +22,10 @@ function deferred<T>() {
   return { promise, resolve };
 }
 function View() {
-  const { data, isLoading, isUpdatingLedger } = useBoard();
+  const { data, isLoading } = useBoard();
   return isLoading ? <p>Loading</p> : (
     <>
       <Money value={data!.totals.raised} />
-      {isUpdatingLedger && <p role="status">Updating donations…</p>}
       <span>{data!.totals.donations} donations</span>
     </>
   );
@@ -111,7 +110,7 @@ it("a cancelled snapshot cannot repopulate a cleared query", async () => {
   expect(qc.getQueryData(["private"])).toBeUndefined();
 });
 
-it("refreshes stale donation counts even when balances are fresh, with an updating indicator", async () => {
+it("refreshes stale donation counts even when balances are fresh", async () => {
   const fresh = deferred<Response>();
   const snapshot = {
     cards: [{
@@ -130,7 +129,6 @@ it("refreshes stale donation counts even when balances are fresh, with an updati
     </QueryClientProvider>,
   );
   await screen.findByText("1 donations");
-  expect(screen.getByRole("status")).toHaveTextContent("Updating donations…");
   act(() =>
     fresh.resolve(Response.json({
       ...snapshot,
@@ -139,6 +137,5 @@ it("refreshes stale donation counts even when balances are fresh, with an updati
     }))
   );
   await screen.findByText("2 donations");
-  expect(screen.queryByRole("status")).not.toBeInTheDocument();
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });

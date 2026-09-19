@@ -73,10 +73,9 @@ and pull request. Deno Deploy builds and deploys `main` itself; there is no depl
   time by `app/data/terms.ts`, with every earlier version listed; the donate widget's gate and the
   footer link here), `/donation-terms/v/:id` (one earlier version by its content hash)
 - `/admin` (SIWE-gated dashboard, incl. "Sync content files": pick the repo's `content`
-  folder in the browser, no private key needed; "Maintenance and backups": pause every write on
-  the site, download the whole database as one JSON file, restore one while paused, see
-  `api/README.md`), `/admin/initiatives/:id`, `/admin/leads` (private
-  funder leads + CSV)
+  folder in the browser, no private key needed), `/admin/initiatives/:id`, `/admin/leads` (private
+  funder leads + CSV), `/admin/maintenance` (pause every write on the site, download the whole
+  database as one JSON file, restore one while paused, see `api/README.md`)
 
 `/`, `/submit`, `/submit/thanks`, `/donation-terms` and `/admin` are prerendered; everything else is
 served from the SPA fallback by the same Hono app. API, health and Markdown routes are registered

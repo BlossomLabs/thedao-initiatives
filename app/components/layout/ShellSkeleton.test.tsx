@@ -18,6 +18,7 @@ describe("ShellSkeleton", () => {
     expect(run("/admin/")).toBe("dashboard");
     expect(run("/admin/initiatives/some-slug")).toBeUndefined();
     expect(run("/admin/leads")).toBeUndefined();
+    expect(run("/admin/maintenance")).toBeUndefined();
     expect(run("/initiative/some-slug")).toBeUndefined();
     expect(run("/administrator")).toBeUndefined();
   });

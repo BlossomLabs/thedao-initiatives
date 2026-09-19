@@ -222,7 +222,7 @@ records are deleted by this API cleanup.
 ## Maintenance mode, backup and restore
 
 **Maintenance mode** is a flag under `["meta","maintenance"]` (`{on, by, at, note}`) that an admin
-toggles from the dashboard: `POST /api/admin/maintenance/enter` `{note?}` and
+toggles from `/admin/maintenance`: `POST /api/admin/maintenance/enter` `{note?}` and
 `POST
 /api/admin/maintenance/exit` (both need recent authentication and are audited as
 `maintenance.enter` / `maintenance.exit`; `GET /api/admin/maintenance` reads it). While it is on,
@@ -263,7 +263,8 @@ maintenance flag inside a file is ignored. The whole file is validated first and
 (`400` naming the first bad entry) before any write; a `200 {written, skipped, claimsRebuilt}` means
 every entry was either written or skipped, so re-running a restore is safe. Held comments that were
 written get their claim index back with the remaining lifetime, so their authors can still find
-them. The dashboard card wraps all of this: enter maintenance, download, restore a file, exit.
+them. The `/admin/maintenance` page wraps all of this: enter maintenance, download, restore a
+file, exit.
 
 ## SIWE from the frontend
 

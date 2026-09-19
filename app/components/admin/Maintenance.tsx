@@ -1,20 +1,24 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Pause, Play, Upload } from "lucide-react";
+import { ChevronDown, Download, FileJson, Pause, Play, Upload } from "lucide-react";
 import { useAdminApi } from "~/hooks/use-admin-api";
 import { sessionKey, useSession } from "~/context/session";
 import { privateCacheGeneration } from "~/lib/browser-privacy";
 import { boardKey } from "~/hooks/use-board";
 import { siteSettingsKey } from "~/hooks/use-site-settings";
 import { Button } from "~/components/ui/Button";
-import { Input, Select } from "~/components/ui/Field";
+import { Input, Label, Select } from "~/components/ui/Field";
 import Status, { type StatusKind } from "~/components/ui/Status";
 import { api, errorMessage } from "~/lib/api";
 import type { BackupFile, MaintenanceState, RestoreResult } from "~/lib/api-types";
 import { dt } from "~/lib/format";
 import { shortAddr } from "~/lib/format";
+import { cn } from "~/lib/utils";
 
 export const maintenanceKey = ["admin", "maintenance"] as const;
+
+// One width for every action, so the buttons form a column down the page.
+const ACTION = "w-[220px] max-[640px]:w-full";
 
 /**
  * Pause every write on the site, take the database home as one file, and
@@ -33,8 +37,10 @@ export default function Maintenance() {
   const [note, setNote] = useState("");
   const [mode, setMode] = useState<"merge" | "replace">("merge");
   const [busy, setBusy] = useState("");
-  const [msg, setMsg] = useState<{ kind: StatusKind; text: string } | null>(null);
+  // `at` is the action that spoke, so the message shows in that action's panel.
+  const [msg, setMsg] = useState<{ kind: StatusKind; text: string; at: string } | null>(null);
   const file = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState("");
 
   const run = async (key: string, work: () => Promise<string>) => {
     setBusy(key);
@@ -43,9 +49,9 @@ export default function Maintenance() {
     try {
       const done = await work();
       if (generation !== privateCacheGeneration()) return;
-      setMsg({ kind: "ok", text: done });
+      setMsg({ kind: "ok", text: done, at: key });
     } catch (e) {
-      setMsg({ kind: "err", text: errorMessage(e) });
+      setMsg({ kind: "err", text: errorMessage(e), at: key });
     } finally {
       setBusy("");
     }
@@ -98,93 +104,149 @@ export default function Maintenance() {
     });
 
   const on = data?.on ?? false;
+  const said = (...keys: string[]) =>
+    msg && keys.includes(msg.at) && <Status kind={msg.kind} className="mt-4">{msg.text}</Status>;
   return (
-    <div className="mt-3 rounded-2xl border border-edge bg-card px-[18px] py-3.5">
-      <b className="block font-inter-tight text-[14px] font-semibold">Maintenance and backups</b>
-      {error && <p className="alert mt-2">{errorMessage(error)}</p>}
-      {data && (
-        <p className="m-0 mt-1 small">
-          <span
-            className={"mr-2 inline-block size-2 rounded-full align-middle " +
-              (on ? "bg-amber-400" : "bg-dao-green")}
-            aria-hidden="true"
-          />
-          {on
-            ? `Maintenance is on since ${dt(data.at)} (${shortAddr(data.by)})` +
-              (data.note ? `: ${data.note}` : "") +
-              ". Visitors can browse; every change answers 503."
-            : "Maintenance is off. Turn it on before restoring a backup or moving the data."}
-        </p>
-      )}
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        {!on && (
-          <label className="flex min-w-[240px] flex-1 flex-col gap-1 small">
-            Note for visitors
-            <Input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              maxLength={200}
-              placeholder="Moving the database, back in a few minutes"
+    <>
+      <section className="panel mt-5">
+        <h2 className="k">Maintenance mode</h2>
+        {error && <p className="alert mt-0">{errorMessage(error)}</p>}
+        {data && (
+          <p className="m-0 flex items-baseline gap-2.5 font-inter-tight text-[14px] leading-[1.6]">
+            <span
+              className={cn(
+                "size-[9px] flex-none translate-y-[-1px] rounded-full",
+                on
+                  ? "bg-dao-red shadow-[0_0_10px_rgba(255,59,56,.6)]"
+                  : "bg-dao-green shadow-[0_0_10px_rgba(92,183,90,.6)]",
+              )}
+              aria-hidden="true"
             />
-          </label>
+            <span>
+              {on
+                ? `Maintenance is on since ${dt(data.at)} (${shortAddr(data.by)})` +
+                  (data.note ? `: ${data.note}` : "") +
+                  ". Visitors can browse; every change answers 503."
+                : "Maintenance is off. Turn it on before restoring a backup or moving the data."}
+            </span>
+          </p>
         )}
-        <Button
-          variant={on ? "primary" : "danger"}
-          sm
-          loading={busy === "enter" || busy === "exit"}
-          disabled={Boolean(busy) || !data}
-          onClick={() => void toggle(!on)}
-        >
-          {on
-            ? (
-              <>
-                <Play className="size-3.5" /> Exit maintenance mode
-              </>
-            )
-            : (
-              <>
-                <Pause className="size-3.5" /> Enter maintenance mode
-              </>
-            )}
-        </Button>
-      </div>
-      <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-white/[.08] pt-3">
-        <Button
-          variant="ghost"
-          sm
-          loading={busy === "backup"}
-          disabled={Boolean(busy)}
-          onClick={() => void download()}
-        >
-          <Download className="size-3.5" /> Download backup
-        </Button>
-        <label className="flex flex-col gap-1 small">
-          Backup file
-          <input ref={file} type="file" accept=".json,application/json" className="text-[13px]" />
-        </label>
-        <label className="flex flex-col gap-1 small">
-          Mode
-          <Select value={mode} onChange={(e) => setMode(e.target.value as "merge" | "replace")}>
-            <option value="merge">merge (keep existing rows)</option>
-            <option value="replace">replace (overwrite existing rows)</option>
-          </Select>
-        </label>
-        <Button
-          variant="ghost"
-          sm
-          loading={busy === "restore"}
-          disabled={Boolean(busy) || !on}
-          title={on ? undefined : "Enter maintenance mode first"}
-          onClick={() => void restore()}
-        >
-          <Upload className="size-3.5" /> Restore
-        </Button>
-        <p className="m-0 basis-full small dim">
-          The file holds every record, including private contacts and emails: keep it safe. A
-          restore never deletes anything.
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          {!on && (
+            <div className="flex min-w-[240px] flex-1 flex-col gap-1.5">
+              <Label label="Note for visitors" htmlFor="maintenance-note" />
+              <Input
+                id="maintenance-note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                maxLength={200}
+                placeholder="Moving the database, back in a few minutes"
+              />
+            </div>
+          )}
+          <Button
+            variant={on ? "primary" : "danger"}
+            className={ACTION}
+            loading={busy === "enter" || busy === "exit"}
+            disabled={Boolean(busy) || !data}
+            onClick={() => void toggle(!on)}
+          >
+            {on
+              ? (
+                <>
+                  <Play className="size-4" /> Exit maintenance mode
+                </>
+              )
+              : (
+                <>
+                  <Pause className="size-4" /> Enter maintenance mode
+                </>
+              )}
+          </Button>
+        </div>
+        {said("enter", "exit")}
+      </section>
+
+      <section className="panel mt-4">
+        <h2 className="k">Backup</h2>
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <p className="m-0 min-w-[240px] flex-1 small dim">
+            The whole database as one JSON file. It holds every record, including private contacts
+            and emails: keep it safe.
+          </p>
+          <Button
+            className={ACTION}
+            loading={busy === "backup"}
+            disabled={Boolean(busy)}
+            onClick={() => void download()}
+          >
+            <Download className="size-4" /> Download backup
+          </Button>
+        </div>
+        {said("backup")}
+      </section>
+
+      <section className="panel mt-4">
+        <h2 className="k">Restore</h2>
+        <p className="m-0 small dim">
+          Puts a backup file back. A restore never deletes anything
+          {on ? "." : ", and it needs maintenance mode on, so nothing changes underneath."}
         </p>
-        {msg && <Status kind={msg.kind} className="basis-full">{msg.text}</Status>}
-      </div>
-    </div>
+        <div className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-3 max-[860px]:grid-cols-2 max-[640px]:grid-cols-1">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label label="Backup file" htmlFor="restore-file" />
+            <input
+              ref={file}
+              id="restore-file"
+              type="file"
+              accept=".json,application/json"
+              className="peer sr-only"
+              onChange={(e) => setFileName(e.target.files?.[0]?.name ?? "")}
+            />
+            <label
+              htmlFor="restore-file"
+              className={cn(
+                "field flex cursor-pointer items-center gap-2.5 hover:border-white/30 peer-focus-visible:border-[rgba(92,183,90,.6)]",
+                !fileName && "text-white/30",
+              )}
+            >
+              <FileJson className="size-4 flex-none" aria-hidden="true" />
+              <span className="min-w-0 truncate">{fileName || "Choose a .json backup"}</span>
+            </label>
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label label="Mode" htmlFor="restore-mode" />
+            <div className="relative">
+              <Select
+                id="restore-mode"
+                className="pr-10"
+                value={mode}
+                onChange={(e) => setMode(e.target.value as "merge" | "replace")}
+              >
+                <option value="merge">Merge (keep existing rows)</option>
+                <option value="replace">Replace (overwrite existing rows)</option>
+              </Select>
+              <ChevronDown
+                className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-white/50"
+                aria-hidden="true"
+              />
+            </div>
+          </div>
+          <Button
+            className={cn(
+              ACTION,
+              "max-[860px]:col-span-2 max-[860px]:justify-self-end max-[640px]:col-span-1",
+            )}
+            loading={busy === "restore"}
+            disabled={Boolean(busy) || !on}
+            title={on ? undefined : "Enter maintenance mode first"}
+            onClick={() => void restore()}
+          >
+            <Upload className="size-4" /> Restore
+          </Button>
+        </div>
+        {said("restore")}
+      </section>
+    </>
   );
 }

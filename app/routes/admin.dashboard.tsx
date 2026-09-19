@@ -9,9 +9,9 @@ import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import SyncContent from "~/components/admin/SyncContent";
 import Admins from "~/components/admin/Admins";
-import Maintenance from "~/components/admin/Maintenance";
 import BulkBar, { type BulkResult, HeadCheck, RowCheck } from "~/components/admin/BulkBar";
 import { useSelection } from "~/hooks/use-selection";
+import { useSiteSettings } from "~/hooks/use-site-settings";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { sessionKey, useSession } from "~/context/session";
@@ -39,6 +39,8 @@ export default function Dashboard() {
   const adminApi = useAdminApi();
   const { signOut, session } = useSession();
   const qc = useQueryClient();
+  // The banner's query, so the button costs no request of its own.
+  const maintenance = useSiteSettings().data?.maintenance;
   const { data, isLoading, error } = useQuery({
     queryKey: [...dashKey, sessionKey(session)],
     queryFn: ({ signal }) => api<AdminDashboard>("/api/admin/dashboard", { signal }),
@@ -107,6 +109,25 @@ export default function Dashboard() {
           >
             Funder leads
           </LinkButton>
+          <LinkButton
+            variant="ghost"
+            sm
+            to="/admin/maintenance"
+            title="Pause writes, download or restore the database"
+          >
+            {maintenance && (
+              <span
+                className={cn(
+                  "size-[9px] flex-none rounded-full",
+                  maintenance.on
+                    ? "bg-dao-red shadow-[0_0_10px_rgba(255,59,56,.6)]"
+                    : "bg-dao-green shadow-[0_0_10px_rgba(92,183,90,.6)]",
+                )}
+                aria-hidden="true"
+              />
+            )}
+            Maintenance{maintenance ? (maintenance.on ? " on" : " off") : ""}
+          </LinkButton>
           <Button variant="ghost" sm onClick={() => void signOut()}>Log out</Button>
         </div>
       </div>
@@ -169,7 +190,6 @@ export default function Dashboard() {
 
       <SyncContent />
       <Admins />
-      <Maintenance />
 
       <SectionHeading id="moderation">Community moderation</SectionHeading>
       <h3 className="h3">

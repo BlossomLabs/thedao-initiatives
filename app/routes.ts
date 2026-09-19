@@ -15,5 +15,6 @@ export default [
     index("routes/admin.dashboard.tsx"),
     route("initiatives/:slug", "routes/admin.initiative.tsx"),
     route("leads", "routes/admin.leads.tsx"),
+    route("maintenance", "routes/admin.maintenance.tsx"),
   ]),
 ] satisfies RouteConfig;

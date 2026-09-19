@@ -75,8 +75,11 @@ function jsonSafe(v: unknown): boolean {
   if (Array.isArray(v)) return v.every(jsonSafe);
   if (typeof v === "object") {
     const proto = Object.getPrototypeOf(v);
+    // An `undefined` property survives KV's structured clone (a spread of an
+    // optional field writes it) and JSON simply drops the key; readers treat a
+    // missing optional the same way, so the round trip loses nothing.
     return (proto === Object.prototype || proto === null) &&
-      Object.values(v as Record<string, unknown>).every(jsonSafe);
+      Object.values(v as Record<string, unknown>).every((x) => x === undefined || jsonSafe(x));
   }
   return false;
 }

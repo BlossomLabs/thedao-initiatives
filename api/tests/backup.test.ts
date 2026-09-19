@@ -104,6 +104,8 @@ async function seed(h: H) {
     recipient: SAFE_ADDR,
     version: "v1",
     method: "wallet",
+    // The accept route spreads both optional fields; the unused one is stored as `undefined`.
+    details: undefined,
   });
   await h.db.terms.attach(acceptance, TX1);
   await h.db.meta.setSafeSync(first.id, {
@@ -171,6 +173,9 @@ Deno.test("backup: an admin downloads every record; secrets, TTL rows and the ma
     }
     const row = backup.entries.find((e) => e.key[0] === "rfp" && e.key[1] === first.id)!;
     assertEquals((row.value as { contact: string }).contact, "a@b.c");
+    const attempt = backup.entries.find((e) => e.key[0] === "checkbox_acceptance")!;
+    assert(attempt, "the donation attempt is exported");
+    assert(!("details" in (attempt.value as object)), "an undefined field is dropped, not fatal");
     assertEquals(
       forRequest(h, res).filter((e) => e.action === "backup.export").map((e) => e.outcome),
       ["success"],

@@ -13,7 +13,6 @@ import {
 } from "./app-helpers.ts";
 import { exampleSubmission, grantBody, minimalSubmission, revisionBody } from "./fixtures.ts";
 import { LIMITS, SECTIONS, TOO_LONG_MSG, tooLong } from "../../shared/draft/mod.ts";
-import type { Initiative } from "../db/types.ts";
 
 const OTHER = "0x2222222222222222222222222222222222222222";
 
@@ -155,15 +154,10 @@ Deno.test("initiative writes reject retired amount/duration aliases without part
     assertEquals(response.status, 201);
     const { slug } = await j(response) as { slug: string };
     const before = (await h.db.initiatives.bySlug(slug))!;
-    for (
-      const [path, t] of [
-        [`/api/initiatives/${slug}`, token],
-        [`/api/admin/initiatives/${before.id}`, admin],
-      ]
-    ) {
+    for (const t of [token, admin]) {
       for (const retired of [{ goalUsd: 2000 }, { duration: "12" }]) {
         assertEquals(
-          (await h.req(path, {
+          (await h.req(`/api/initiatives/${slug}`, {
             method: "PATCH",
             token: t,
             json: { goal: "3000", ...retired },
@@ -390,6 +384,21 @@ Deno.test("proposer edit: structured revisions, unchanged, legacy body on a stru
     milestones: [{ ...good.milestones[0], amount: 500 }],
   });
   assertEquals(fields((await j(sum) as unknown as Fail).findings.errors), ["goal"]);
+  // shape rules: a non-https milestone link, a bad month, too many milestones
+  const link = await post({
+    ...revisionBody(good),
+    milestones: [{ ...good.milestones[0], link: "http://x.example/", month: "11/2026" }],
+  });
+  assertEquals(link.status, 400);
+  assertEquals(fields((await j(link) as unknown as Fail).findings.errors), [
+    "ms_0_link",
+    "ms_0_month",
+  ]);
+  const many = await post({
+    ...revisionBody(good),
+    milestones: Array.from({ length: LIMITS.MILESTONES + 1 }, () => good.milestones[0]),
+  });
+  assert(fields((await j(many) as unknown as Fail).findings.errors).includes("milestones"));
   // a legacy body cannot downgrade a structured row
   const legacy = await post({ title: good.title, summary: good.summary, details: "One blob." });
   assertEquals(legacy.status, 400);
@@ -482,55 +491,9 @@ Deno.test("proposer PATCH: page facts while pending, locked after approval, admi
   h.close();
 });
 
-Deno.test("admin PATCH: structured findings, legacy migration, type switch, hard rules", async () => {
+Deno.test("admin settings: a legacy row keeps its text, and text cannot ride along", async () => {
   const h = await harness();
-  const token = await proposerToken(h);
   const admin = await h.mint(ADMIN, true);
-  const good = minimalSubmission(1000, "grant");
-  const { slug } = await j(await submit(h, token, good)) as { slug: string };
-  const id = (await h.db.initiatives.bySlug(slug))!.id;
-  const patch = (json: unknown) =>
-    h.req(`/api/admin/initiatives/${id}`, { method: "PATCH", token: admin, json });
-  // a section removed: saved, reported
-  const { team: _t, ...sections } = good.sections;
-  const res = await patch({ sections });
-  assertEquals(res.status, 200);
-  const out = await j(res) as Out;
-  assertEquals(fields(out.findings!.errors), ["team"]);
-  assertEquals("team" in (out.initiative.sections as object), false);
-  assertEquals((await h.db.initiatives.get(id))!.revision, 2);
-  // a no-op save is fine and still lists the findings
-  const again = await j(await patch({ sections })) as Out;
-  assertEquals(fields(again.findings!.errors), ["team"]);
-  assertEquals((await h.db.initiatives.get(id))!.revision, 2);
-  // Retired details cannot be mixed into structured writes.
-  const both = await patch({ details: "A blob.", sections: good.sections });
-  assertEquals(both.status, 400);
-  assertEquals((await j(both)).error, "Unsupported field: details.");
-  // shape rules block: a non-https milestone link, a bad month, too many milestones
-  const link = await patch({
-    milestones: [{ ...good.milestones[0], link: "http://x.example/", month: "11/2026" }],
-  });
-  assertEquals(link.status, 400);
-  assertEquals(fields((await j(link) as unknown as Fail).findings.errors), [
-    "ms_0_link",
-    "ms_0_month",
-  ]);
-  const many = await patch({
-    milestones: Array.from({ length: LIMITS.MILESTONES + 1 }, () => good.milestones[0]),
-  });
-  assertEquals(fields((await j(many) as unknown as Fail).findings.errors), ["milestones"]);
-  // a type switch re-cuts the body for the new type and revisions it
-  const switched = await j(await patch({ type: "rfp" })) as Out;
-  assertEquals(Object.keys(switched.initiative.sections as object).sort(), [
-    "in_scope",
-    "out_scope",
-    "why",
-  ]);
-  assert(fields(switched.findings!.errors).includes("hard_req"));
-  const row = (await h.db.initiatives.get(id))!;
-  assertEquals([row.type, row.revision, row.recipientTeam], ["rfp", 3, ""]);
-  // A legacy row keeps its text during facts-only edits, then migrates on a structured edit.
   const legacy = await h.db.initiatives.insert({
     title: "Legacy initiative",
     summary: "This summary is comfortably longer than the forty character minimum required.",
@@ -538,27 +501,17 @@ Deno.test("admin PATCH: structured findings, legacy migration, type switch, hard
     status: "approved",
     goalUsd: 1000,
   });
-  assertEquals(
-    await h.req(`/api/admin/initiatives/${legacy.id}`, {
-      method: "PATCH",
-      token: admin,
-      json: { details: "Legacy body, edited.", paidOutUsd: 99 },
-    }).then((res) => res.status),
-    400,
-  );
-  assertEquals(await h.db.initiatives.get(legacy.id), legacy);
-  const legacyPatch = (json: unknown) =>
+  const patch = (json: unknown) =>
     h.req(`/api/admin/initiatives/${legacy.id}`, { method: "PATCH", token: admin, json });
-  assertEquals((await legacyPatch({ title: "A changed title" })).status, 400);
-  const facts = await j(await legacyPatch({ paidOutUsd: 50 })) as Out;
-  assertEquals(facts.initiative.details, legacy.details);
-  assertEquals(facts.initiative.paidOutUsd, 50);
-  const lp = await j(await legacyPatch(revisionBody(minimalSubmission(1000)))) as Out;
-  assertEquals(lp.initiative.structured, true);
-  assertEquals(lp.initiative.details, "");
-  const asInitiative: Initiative = (await h.db.initiatives.get(legacy.id))!;
-  assertEquals(asInitiative.revision, 2);
-  assertEquals((await h.db.revisions.get(legacy.id, 1))!.details, legacy.details);
+  const mixed = await patch({ details: "Legacy body, edited.", paidOutUsd: 99 });
+  assertEquals(mixed.status, 400);
+  assertEquals((await j(mixed)).error, "Unsupported field: details.");
+  assertEquals(await h.db.initiatives.get(legacy.id), legacy);
+  const out = await j(await patch({ paidOutUsd: 50 })) as Out;
+  assertEquals(out.initiative.details, legacy.details);
+  assertEquals(out.initiative.paidOutUsd, 50);
+  assertEquals("findings" in out, false);
+  assertEquals((await h.db.initiatives.get(legacy.id))!.revision, legacy.revision);
   h.close();
 });
 
@@ -966,8 +919,6 @@ Deno.test("edit: a top-up measures the adoption floor against the goal minus the
   const id = (await h.db.initiatives.bySlug(slug))!.id;
   const post = (json: unknown) =>
     h.req(`/api/initiatives/${slug}/revisions`, { method: "POST", token, json });
-  const patch = (json: unknown) =>
-    h.req(`/api/admin/initiatives/${id}`, { method: "PATCH", token: admin, json });
   const TOO_LOW = "of the $131,000 this grant raises. Raise them to at least $43,667";
   // 45,000 is 34% of the 131,000 left to raise: an edit keeps passing
   const edited = await post({
@@ -982,12 +933,15 @@ Deno.test("edit: a top-up measures the adoption floor against the goal minus the
   assertEquals(low.status, 400);
   const lowErr = (await j(low) as Fail).findings.errors.find((e) => e.field === "milestones")!;
   assertStringIncludes(lowErr.msg, TOO_LOW);
-  // the admin editor reports the same rule without blocking
-  const ok = await j(await patch({ milestones: ms(236_000, 45_000) })) as Out;
-  assertEquals(fields(ok.findings!.errors), []);
-  const warned = await j(await patch({ milestones: ms(241_000, 40_000) })) as Out;
+  // the team's edit is held to the same floor
+  const team = await h.req(`/api/initiatives/${slug}/revisions`, {
+    method: "POST",
+    token: admin,
+    json: { ...revisionBody(good), milestones: ms(241_000, 40_000) },
+  });
+  assertEquals(team.status, 400);
   assertStringIncludes(
-    warned.findings!.errors.find((e) => e.field === "milestones")!.msg,
+    (await j(team) as Fail).findings.errors.find((e) => e.field === "milestones")!.msg,
     TOO_LOW,
   );
   // a withdrawn pledge no longer counts: the whole goal is the base again
@@ -1072,32 +1026,40 @@ Deno.test("caps: a long link, an edited long title and a long pledge company are
   h.close();
 });
 
-Deno.test("admin editor: a field past its cap blocks the save, an editorial finding does not", async () => {
+Deno.test("team edit: an editorial finding and a field past its cap both block the save", async () => {
   const h = await harness();
   const token = await proposerToken(h);
   const admin = await h.mint(ADMIN, true);
   const good = minimalSubmission(1000);
   const { slug } = await j(await submit(h, token, good)) as { slug: string };
   const id = (await h.db.initiatives.bySlug(slug))!.id;
-  const patch = (json: unknown) =>
-    h.req(`/api/admin/initiatives/${id}`, { method: "PATCH", token: admin, json });
-  // a blank milestone name is editorial: reported, saved
-  const blank = await patch({ milestones: [{ ...good.milestones[0], name: "" }] });
-  assertEquals(blank.status, 200);
-  assertEquals(fields((await j(blank) as Out).findings!.errors), ["ms_0_name"]);
+  const post = (json: Record<string, unknown>) =>
+    h.req(`/api/initiatives/${slug}/revisions`, {
+      method: "POST",
+      token: admin,
+      json: { ...revisionBody(good), ...json },
+    });
+  // a blank milestone name is editorial: the team is refused like the proposer
+  const blank = await post({ milestones: [{ ...good.milestones[0], name: "" }] });
+  assertEquals(blank.status, 400);
+  assertEquals(fields((await j(blank) as unknown as Fail).findings.errors), ["ms_0_name"]);
   // a name past the cap is refused with the finding on its field
-  const long = await patch({
+  const long = await post({
     milestones: [{ ...good.milestones[0], name: "n".repeat(LIMITS.MILESTONE_NAME + 1) }],
   });
   assertEquals(long.status, 400);
   const lf = (await j(long) as unknown as Fail).findings.errors;
   assertEquals(fields(lf), ["ms_0_name"]);
   assertEquals(lf[0].msg, tooLong("Milestone A: the name", LIMITS.MILESTONE_NAME));
-  assertEquals((await h.db.initiatives.get(id))!.milestones[0].name, "");
-  // so is a title past the cap, painted on the field like the proposer's edit
-  const longTitle = await patch({ title: "t".repeat(LIMITS.TITLE_CHARS + 1) });
+  // so is a title past the cap
+  const longTitle = await post({ title: "t".repeat(LIMITS.TITLE_CHARS + 1) });
   assertEquals(longTitle.status, 400);
   assertEquals(fields((await j(longTitle) as unknown as Fail).findings.errors), ["title"]);
-  assertEquals((await h.db.initiatives.get(id))!.title, good.title);
+  const row = (await h.db.initiatives.get(id))!;
+  assertEquals([row.title, row.milestones[0].name, row.revision], [
+    good.title,
+    good.milestones[0].name,
+    1,
+  ]);
   h.close();
 });

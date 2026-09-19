@@ -15,9 +15,11 @@ vi.mock("~/hooks/use-initiative", () => ({
   useInitiative: vi.fn(),
   initiativeKey: (slug: string) => ["initiative", slug],
 }));
+const ME = "0x1111111111111111111111111111111111111111";
+const who = vi.hoisted(() => ({ isAdmin: true }));
 vi.mock("~/context/session", () => ({
   useSession: () => ({
-    session: { isAdmin: true, address: "0x1111111111111111111111111111111111111111" },
+    session: { isAdmin: who.isAdmin, address: ME },
     requireSession: () => Promise.resolve({}),
   }),
 }));
@@ -27,10 +29,18 @@ vi.mock("~/lib/api", async (original) => ({
 }));
 vi.mock("~/components/wallet/Identity", () => ({ default: () => null }));
 vi.mock("~/components/initiative-form/InitiativeForm", () => ({
-  default: function TestForm({ initial, onSubmit }: InitiativeFormProps) {
+  default: function TestForm(
+    { initial, onSubmit, locked, showPrivate, showTypePicker, asideTop }: InitiativeFormProps,
+  ) {
     const [title, setTitle] = useState(initial!.page.title);
     return (
       <>
+        {typeof asideTop === "function" ? asideTop({ empty: false }) : asideTop}
+        <output aria-label="Facts">
+          {locked ? "locked" : "open"}
+          {showPrivate && " private"}
+          {showTypePicker && " type"}
+        </output>
         <input aria-label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
         <button
           type="button"
@@ -52,6 +62,70 @@ vi.mock("~/components/initiative-form/InitiativeForm", () => ({
 
 beforeEach(() => {
   vi.mocked(api).mockReset().mockResolvedValue({});
+  who.isAdmin = true;
+});
+
+const feed = (row: ReturnType<typeof structuredRow>) =>
+  vi.mocked(useInitiative).mockReturnValue({
+    data: { initiative: row } as InitiativePage,
+    isLoading: false,
+    isPlaceholderData: false,
+    error: null,
+  } as ReturnType<typeof useInitiative>);
+
+function page(qc: QueryClient) {
+  return (
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={["/initiative/same-url/edit"]}>
+        <Routes>
+          <Route path="/initiative/:slug/edit" element={<EditInitiative />} />
+          <Route path="/initiative/:slug" element={<div>The public page</div>} />
+          <Route path="/admin/initiatives/:slug" element={<div>The admin page</div>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
+it("an admin edits an approved initiative with the facts open, and lands back on the admin page", async () => {
+  feed({
+    ...structuredRow(),
+    slug: "same-url",
+    status: "approved" as const,
+    proposer: "0x2222222222222222222222222222222222222222",
+  });
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.getByLabelText("Facts")).toHaveTextContent("open private type");
+  // the rest (status, Safe, settings, pledges) is one click away
+  expect(screen.getByRole("link", { name: "Manage initiative" })).toHaveAttribute(
+    "href",
+    "/admin/initiatives/same-url",
+  );
+  fireEvent.click(screen.getByText("Save"));
+  expect(await screen.findByText("The admin page")).toBeInTheDocument();
+  expect(api).toHaveBeenCalledWith("/api/initiatives/same-url", {
+    method: "PATCH",
+    json: expect.objectContaining({ durationMonths: "7" }),
+  });
+  unmount();
+  qc.clear();
+});
+
+it("the proposer of an approved initiative keeps the facts locked and lands on the public page", async () => {
+  who.isAdmin = false;
+  feed({ ...structuredRow(), slug: "same-url", status: "approved" as const, proposer: ME });
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.getByLabelText("Facts")).toHaveTextContent(/^locked$/);
+  expect(screen.queryByRole("link", { name: "Manage initiative" })).toBeNull();
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "A proposer's new title" } });
+  fireEvent.click(screen.getByText("Save"));
+  expect(await screen.findByText("The public page")).toBeInTheDocument();
+  expect(api).toHaveBeenCalledTimes(1);
+  expect(api).toHaveBeenCalledWith("/api/initiatives/same-url/revisions", expect.anything());
+  unmount();
+  qc.clear();
 });
 
 it("resets the draft for a replacement and binds both edit requests to its ID", async () => {

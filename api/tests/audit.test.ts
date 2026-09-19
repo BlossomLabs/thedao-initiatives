@@ -12,7 +12,7 @@ import {
 import { wallet } from "./helpers.ts";
 import type { AuditEvent } from "../services/audit.ts";
 import { sha256Hex } from "../lib/ids.ts";
-import { syntheticContentFiles } from "./fixtures.ts";
+import { minimalSubmission, revisionBody, syntheticContentFiles } from "./fixtures.ts";
 import { SESSION_REAUTH_SECS } from "../config.ts";
 
 const w = wallet("0x" + "11".repeat(32));
@@ -211,6 +211,45 @@ Deno.test("audit: admin changes and mixed bulk outcomes identify each item witho
     ) {
       assertFalse(serialized.includes(secret));
     }
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("audit: an admin's edit through the proposer's routes is recorded, a proposer's is not", async () => {
+  const h = await harness();
+  try {
+    const admin = await h.mint(ADMIN, true);
+    const good = minimalSubmission(1000);
+    const row = await h.db.initiatives.insert({
+      title: good.title,
+      summary: good.summary,
+      sections: good.sections,
+      milestones: good.milestones,
+      goalUsd: 1000,
+      proposer: PLAIN,
+      status: "pending",
+    });
+    const write = (token: string, goal: string, why: string) =>
+      Promise.all([
+        h.req(`/api/initiatives/${row.slug}`, { method: "PATCH", token, json: { goal } }),
+        h.req(`/api/initiatives/${row.slug}/revisions`, {
+          method: "POST",
+          token,
+          json: { ...revisionBody(good), sections: { ...good.sections, why } },
+        }),
+      ]);
+    const [facts, text] = await write(admin, "1000", "The team's reason.");
+    assertEquals([facts.status, text.status], [200, 201]);
+    assert(
+      forRequest(h, facts).some((e) => e.action === "initiative.edit" && e.outcome === "success"),
+    );
+    assert(
+      forRequest(h, text).some((e) => e.action === "initiative.revise" && e.outcome === "success"),
+    );
+    const [mine, mineText] = await write(await h.mint(PLAIN), "1000", "The proposer's reason.");
+    assertEquals([mine.status, mineText.status], [200, 201]);
+    assertEquals([...forRequest(h, mine), ...forRequest(h, mineText)], []);
   } finally {
     h.close();
   }

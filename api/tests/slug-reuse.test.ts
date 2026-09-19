@@ -378,7 +378,7 @@ Deno.test("reused URLs reject stale writes and admin slug actions; matching IDs 
       503,
     );
     const unsafeAdminActions = [
-      { path: `/api/admin/initiatives/${slug}`, method: "PATCH", json: { goal: "500" } },
+      { path: `/api/admin/initiatives/${slug}`, method: "PATCH", json: { sortRank: "1" } },
       {
         path: `/api/admin/initiatives/${slug}/status`,
         method: "POST",

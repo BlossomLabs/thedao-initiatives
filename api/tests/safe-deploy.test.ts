@@ -113,21 +113,15 @@ Deno.test("a Safe held by another initiative cannot be reassigned or detached th
   const dup = await confirm(h, admin, initiative.id);
   assertEquals(dup.status, 409);
   assertStringIncludes((await j(dup) as { detail: string }).detail, holder.slug);
-  // The editor cannot change the Safe binding, including by clearing it.
-  assertEquals(
-    (await h.req(url(holder.id), {
-      method: "PATCH",
-      token: admin,
-      json: { safeAddress: SAFE_ADDR },
-    }))
-      .status,
-    400,
-  );
-  assertEquals(
-    (await h.req(url(holder.id), { method: "PATCH", token: admin, json: { safeAddress: "" } }))
-      .status,
-    400,
-  );
+  // Neither the admin settings nor the edit page can change the Safe binding, or clear it.
+  for (const path of [url(holder.id), `/api/initiatives/${holder.slug}`]) {
+    for (const safeAddress of [SAFE_ADDR, ""]) {
+      assertEquals(
+        (await h.req(path, { method: "PATCH", token: admin, json: { safeAddress } })).status,
+        400,
+      );
+    }
+  }
   assertEquals((await h.db.initiatives.get(holder.id))!.safeAddress, predicted(initiative));
   assertEquals((await confirm(h, admin, initiative.id)).status, 409);
   assertEquals((await h.db.initiatives.get(initiative.id))!.safeAddress, "");

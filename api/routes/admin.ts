@@ -16,20 +16,9 @@ import {
   pledgeJson,
   revisionMeta,
 } from "../lib/json.ts";
-import {
-  capped,
-  cleanText,
-  DOMAIN_RE,
-  parseGoal,
-  TX_HASH_RE,
-  validateHttpsLink,
-  validateText,
-} from "../lib/validate.ts";
-import { decimalsOf, editChecks, pledgeBackers } from "./initiatives.ts";
-import { PAGE_FACT_FIELDS, readPageFacts } from "../lib/page-facts.ts";
-import { assertNoErrors, mergeFindings, readStructured, TEXT_FIELDS } from "../lib/structured.ts";
-import { type InitiativeText, pickText } from "../db/initiatives.ts";
-import { type Findings, isStructured, LIMITS } from "../../shared/draft/mod.ts";
+import { capped, DOMAIN_RE, parseGoal, TX_HASH_RE, validateHttpsLink } from "../lib/validate.ts";
+import { decimalsOf } from "./initiatives.ts";
+import { LIMITS } from "../../shared/draft/mod.ts";
 import { predictSafeAddress, safeDeployCalldata, signersConfigured } from "../chain/safe.ts";
 import { isAddress, toChecksum } from "../chain/address.ts";
 import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
@@ -39,11 +28,6 @@ import { liveRoles } from "../services/roles.ts";
 import type { AdminEntry } from "../services/admins.ts";
 import type { Comment, Initiative, Pledge, PledgeStatus } from "../db/types.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
-
-/** Findings that block an admin save: shape rules, not editorial ones. Every
- * cap finding blocks too (the limits are the same for everyone). */
-const HARD_FIELD_RE = /^(links(_\d+)?|ms_\d+_(link|month))$/;
-const blocks = (f: Findings["errors"][number]) => f.kind === "cap" || HARD_FIELD_RE.test(f.field);
 
 export function adminRoutes(deps: Deps) {
   const r = new Hono<Vars>();
@@ -236,24 +220,15 @@ export function adminRoutes(deps: Deps) {
   });
 
   /**
-   * The admin editor. Page facts go through `readPageFacts`; the text
-   * (title, summary, and the structured body) is
-   * revisioned together, fields not sent carrying over from the row. Shape
-   * rules block (caps, https links, month format, byte cap);
-   * the editorial rules (required sections, sums, adoption) come
-   * back as `findings` for the form to show without blocking.
+   * The admin settings of an initiative: board pin, owner and paid out. The
+   * text and the page facts are edited on the initiative's edit page, through
+   * the routes a proposer uses.
    */
   r.patch("/initiatives/:id", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"), true);
-    const body = await jsonBody(c, [
-      ...TEXT_FIELDS,
-      ...PAGE_FACT_FIELDS,
-      "sortRank",
-      "paidOutUsd",
-      "proposer",
-    ]);
+    const body = await jsonBody(c, ["sortRank", "paidOutUsd", "proposer"]);
     if (body.paidOutUsd !== undefined || body.proposer !== undefined) assertRecentAuth(c, deps.now);
-    const patch = await readPageFacts(body, initiative, deps);
+    const patch: Partial<Initiative> = {};
     if (body.sortRank !== undefined) {
       const raw = s(body.sortRank, 10);
       if (!raw) patch.sortRank = null;
@@ -286,57 +261,10 @@ export function adminRoutes(deps: Deps) {
         patch.proposer = resolved;
       } else throw new HttpError(400, "Owner must be a wallet address or an ENS name.");
     }
-    const nextType = patch.type ?? initiative.type;
-    const cur = pickText(initiative);
-    const textGiven = TEXT_FIELDS.some((k) => body[k] !== undefined);
-    // A type switch re-normalises a structured body: other-type sections go.
-    const reshape = nextType !== initiative.type && isStructured(cur);
-    let text: InitiativeText | null = null;
-    let findings: Findings = { errors: [], warnings: [] };
-    if (textGiven || reshape) {
-      if (
-        !isStructured(cur) &&
-        !["sections", "milestones", "links"].some((key) => body[key] !== undefined)
-      ) throw new HttpError(400, "Send sections, milestones and links to edit initiative text.");
-      // One character past each cap survives so the checks paint "too long"
-      // on the field; the length floors are validateText's, below.
-      const base = textGiven
-        ? {
-          title: cleanText(body.title === undefined ? cur.title : body.title, "title"),
-          summary: cleanText(body.summary === undefined ? cur.summary : body.summary, "summary"),
-          details: "",
-        }
-        : { title: cur.title, summary: cur.summary, details: "" };
-      const { structured, findings: caps } = readStructured({
-        sections: body.sections === undefined ? cur.sections : body.sections,
-        milestones: body.milestones === undefined ? cur.milestones : body.milestones,
-        links: body.links === undefined ? cur.links : body.links,
-      }, nextType);
-      const checks = editChecks(
-        {
-          type: nextType,
-          topup: patch.topup ?? initiative.topup,
-          goalUsd: patch.goalUsd ?? initiative.goalUsd,
-        },
-        { ...base, ...structured },
-        pledgeBackers(await db.pledges.list(initiative.id)),
-      );
-      const hard = checks.errors.filter(blocks);
-      assertNoErrors(mergeFindings(caps, { errors: hard, warnings: [] }));
-      findings = mergeFindings(caps, checks);
-      if (textGiven) validateText(base);
-      text = { ...base, ...structured };
-    }
-    let next = Object.keys(patch).length
+    const next = Object.keys(patch).length
       ? await db.initiatives.update(initiative.id, patch)
       : initiative;
-    if (text) {
-      next = (await db.initiatives.revise(initiative.id, text, {
-        author: c.var.user!.address,
-        source: "admin",
-      })).initiative;
-    }
-    return c.json({ initiative: adminInitiative(next), findings });
+    return c.json({ initiative: adminInitiative(next) });
   });
 
   /** Hide a superseded revision from the public history, or show it again. */

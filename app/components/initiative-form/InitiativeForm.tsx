@@ -1,5 +1,5 @@
 /**
- * The initiative editor: submit page, proposer edit and admin edit share it.
+ * The initiative editor: the submit page and the edit page share it.
  * The draft lives in useDraft, the rules run in useChecks on every change,
  * findings paint through the FindingsProvider, and the sidebar carries the
  * live checks. Errors never disable the button: pressing it paints them.
@@ -40,19 +40,11 @@ export interface InitiativeFormProps {
   /** Which rules run; defaults to "submit" on the submit page, "edit" elsewhere. */
   scope?: CheckScope;
   /** Throw (a FindingsError, or an ApiError with a findings body) to paint
-   * server findings; anything else shows as the alert. Findings returned
-   * from a success (the admin's non-blocking ones) are painted the same way,
-   * without an alert. */
-  onSubmit: (payload: SubmitPayload, draft: Draft) => Promise<void | Findings | null>;
+   * server findings; anything else shows as the alert. */
+  onSubmit: (payload: SubmitPayload, draft: Draft) => Promise<void>;
   submitLabel: string;
-  /** Client errors block the button (default). Off, the admin saves past them:
-   * the server's findings come back as open points instead. */
-  enforce?: boolean;
   /** Shown above the locked fields; defaults to the "Locked after approval" line. */
   lockNote?: React.ReactNode;
-  /** "grid": the sidebar carries the checks (submit and edit pages).
-   * "inline": the checks card sits above the button, inside the column. */
-  layout?: "grid" | "inline";
   showBackers?: boolean;
   showPrivate?: boolean;
   showRules?: boolean;
@@ -68,8 +60,6 @@ export interface InitiativeFormProps {
   asideBottom?: React.ReactNode;
   /** Under the submit button ("Submitting as …"). */
   footer?: React.ReactNode;
-  /** Sits before the type picker, for extras an edit page needs. */
-  before?: React.ReactNode;
 }
 
 /** The two-column grid of the submit and edit pages. */
@@ -90,9 +80,6 @@ const fixingLine = (n: number) =>
 export const LOCK_NOTE =
   "Locked after approval: type, goal, duration, recipient and the private fields. Email the team to change them.";
 
-const hasFindings = (f: Findings | null | undefined | void): f is Findings =>
-  Boolean(f && (f.errors.length || f.warnings.length));
-
 export default function InitiativeForm({
   mode,
   initial,
@@ -110,10 +97,7 @@ export default function InitiativeForm({
   asideTop,
   asideBottom,
   footer,
-  before,
-  enforce = true,
   lockNote = LOCK_NOTE,
-  layout = "grid",
 }: InitiativeFormProps) {
   const { draft, actions, reset } = useDraft(initial);
   const [submitted, setSubmitted] = useState(false);
@@ -147,7 +131,7 @@ export default function InitiativeForm({
     setSubmitted(true);
     setServerFeedback(null);
     const res = runChecks(draft, scope);
-    if (res.errors.length && enforce) {
+    if (res.errors.length) {
       setFailed(true);
       const first = firstOnPage(res.errors.map((x) => paintField(x.field)).filter(Boolean));
       setTimeout(() => {
@@ -159,13 +143,9 @@ export default function InitiativeForm({
     }
     setBusy(true);
     try {
-      const open = await onSubmit(toPayload(draft, {}), draft);
+      await onSubmit(toPayload(draft, {}), draft);
       autosave.clear();
       setFailed(false);
-      if (hasFindings(open)) {
-        // saved, with open points: painted like the server's, no alert
-        setServerFeedback({ draft, findings: open, alert: "" });
-      }
     } catch (err) {
       const findings = findingsOf(err);
       setFailed(true);
@@ -188,10 +168,9 @@ export default function InitiativeForm({
   const empty = isEmptyDraft(draft);
   const top = typeof asideTop === "function" ? asideTop({ empty }) : asideTop;
   const errorsNow = checks.errors.length;
-  const inline = layout === "inline";
 
   const checksCard = (
-    <div data-checks="" className={cn(inline && "mt-8")}>
+    <div data-checks="">
       <ChecksCard
         checks={checks}
         submitted={submitted}
@@ -214,7 +193,6 @@ export default function InitiativeForm({
 
   const main = (
     <>
-      {inline && top}
       {autosave.restored && (
         <Status
           kind="wait"
@@ -257,7 +235,6 @@ export default function InitiativeForm({
           autoComplete="off"
           aria-hidden="true"
         />
-        {before}
         {locked && lockNote && (
           <Status kind="wait" className="mt-3">
             <Lock className="mr-1.5 inline size-3.5 align-[-2px]" />
@@ -336,7 +313,6 @@ export default function InitiativeForm({
           </details>
         )}
 
-        {inline && checksCard}
         <Button
           type="submit"
           variant="primary"
@@ -346,14 +322,13 @@ export default function InitiativeForm({
           <Send className="size-4" />
           {submitLabel}
         </Button>
-        {submitted && errorsNow > 0 && enforce && (
+        {submitted && errorsNow > 0 && (
           <p className="m-0 mt-2.5 text-center small text-[#ffd7d6]" role="status">
             {fixingLine(errorsNow)}
           </p>
         )}
         {footer}
       </form>
-      {inline && bottom}
     </>
   );
 
@@ -361,20 +336,18 @@ export default function InitiativeForm({
     <FindingsProvider value={checks.byField}>
       {previewing && <PreviewPane draft={draft} onBack={() => setPreviewing(false)} />}
       <div hidden={previewing}>
-        {inline ? main : (
-          <FormGrid
-            main={main}
-            aside={
-              <>
-                {top && (
-                  <div className="contents max-[960px]:order-first max-[960px]:block">{top}</div>
-                )}
-                {checksCard}
-                {bottom}
-              </>
-            }
-          />
-        )}
+        <FormGrid
+          main={main}
+          aside={
+            <>
+              {top && (
+                <div className="contents max-[960px]:order-first max-[960px]:block">{top}</div>
+              )}
+              {checksCard}
+              {bottom}
+            </>
+          }
+        />
       </div>
     </FindingsProvider>
   );

@@ -66,14 +66,15 @@ and pull request. Deno Deploy builds and deploys `main` itself; there is no depl
 - `/initiative/:slug/edit` (proposer or admin, SIWE): the submit form on the stored row. Sections,
   milestones, links, title and summary are always editable and each save is a new public revision
   that goes live at once; while the initiative is pending the type, goal, duration, recipient, forum
-  link and the private fields can change too (locked after approval, admins edit them under
-  `/admin`)
+  link and the private fields can change too (locked after approval for the proposer, never for an
+  admin, who edits here under the same checks)
 - `/submit`, `/submit/thanks`
 - `/donation-terms` (the version in force of `content/donation-terms/<date>.md`, bundled at build
   time by `app/data/terms.ts`, with every earlier version listed; the donate widget's gate and the
   footer link here), `/donation-terms/v/:id` (one earlier version by its content hash)
 - `/admin` (SIWE-gated dashboard, incl. "Sync content files": pick the repo's `content`
-  folder in the browser, no private key needed), `/admin/initiatives/:id`, `/admin/leads` (private
+  folder in the browser, no private key needed), `/admin/initiatives/:id` (status, Safe, settings,
+  pledges, donations, revisions; the text is edited at `/initiative/:slug/edit`), `/admin/leads` (private
   funder leads + CSV), `/admin/maintenance` (pause every write on the site, download the whole
   database as one JSON file, restore one while paused, see `api/README.md`)
 

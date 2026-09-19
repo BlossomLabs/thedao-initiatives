@@ -13,7 +13,7 @@ import type {
   Sections,
 } from "@shared/draft/mod";
 
-export type FormMode = "submit" | "proposer" | "admin";
+export type FormMode = "submit" | "edit";
 
 export interface DraftCriterion {
   id: string;

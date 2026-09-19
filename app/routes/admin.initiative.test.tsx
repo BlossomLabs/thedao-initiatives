@@ -17,7 +17,7 @@ import { sendTransaction, waitForTransactionReceipt } from "wagmi/actions";
 import { structuredRow } from "../../test/fixtures";
 import type { AdminInitiativePage } from "~/lib/api-types";
 import { api } from "~/lib/api";
-import AdminInitiativeEditor from "./admin.initiative";
+import ManageInitiative from "./admin.initiative";
 
 const wallet = vi.hoisted(() => ({ connected: true }));
 const ADMIN = "0x1111111111111111111111111111111111111111";
@@ -41,7 +41,6 @@ vi.mock("~/lib/api", async (original) => ({
   api: vi.fn(),
 }));
 vi.mock("~/components/wallet/Identity", () => ({ default: () => null }));
-vi.mock("~/components/initiative-form/InitiativeForm", () => ({ default: () => null }));
 
 const page = (over: Partial<AdminInitiativePage["initiative"]>): AdminInitiativePage => ({
   initiative: { ...structuredRow(), contact: "me@example.org", funders: "", ...over },
@@ -106,7 +105,7 @@ function renderPage() {
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={["/admin/initiatives/1"]}>
         <Routes>
-          <Route path="/admin/initiatives/:slug" element={<AdminInitiativeEditor />} />
+          <Route path="/admin/initiatives/:slug" element={<ManageInitiative />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -180,4 +179,49 @@ it("without a wallet, an initiative with no Safe cannot be approved from here", 
   const approve = await screen.findByRole("button", { name: /Approve/ });
   expect(approve).toBeDisabled();
   expect(indexOf("/status")).toBe(-1);
+});
+
+it("has no editor: the text is edited on the edit page, while it is open for edits", async () => {
+  renderPage();
+  const edit = await screen.findByRole("link", { name: "Edit initiative" });
+  expect(edit).toHaveAttribute("href", `/initiative/${current.initiative.slug}/edit`);
+  expect(document.getElementById("f-title")).toBeNull();
+});
+
+it("an archived initiative offers no edit link", async () => {
+  current = page({ status: "archived", safeAddress: SAFE });
+  renderPage();
+  await screen.findByRole("button", { name: "Re-approve" });
+  expect(screen.queryByRole("link", { name: "Edit initiative" })).toBeNull();
+  expect(screen.getByText(/closed for edits while it is archived/)).toBeInTheDocument();
+});
+
+it("settings: only the changed field is sent", async () => {
+  current = page({ proposer: ADMIN, sortRank: 2, paidOutUsd: 0 });
+  renderPage();
+  const save = await screen.findByRole("button", { name: "Save settings" });
+  expect(save).toBeDisabled();
+  expect(screen.getByLabelText(/^Owner/)).toHaveValue(ADMIN);
+  fireEvent.change(screen.getByLabelText(/^Pin to board position/), { target: { value: "5" } });
+  fireEvent.click(save);
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/admin/initiatives/1", {
+      method: "PATCH",
+      json: { sortRank: "5" },
+    })
+  );
+  await screen.findByText("Settings saved.");
+});
+
+it("open points: the edit page's checks, read next to Approve", async () => {
+  renderPage();
+  await screen.findByRole("button", { name: "Approve" });
+  expect(screen.getByText(/passes every check of the edit page/)).toBeInTheDocument();
+});
+
+it("open points: a missing section is listed", async () => {
+  current = page({ sections: { ...structuredRow().sections, why: "" } });
+  renderPage();
+  await screen.findByRole("button", { name: "Approve" });
+  expect(screen.getByText(/Why this matters is required/)).toBeInTheDocument();
 });

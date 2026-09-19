@@ -1,10 +1,7 @@
-/** Input validation shared by the submit form, the proposer's edit page and the admin editor. */
+/** Input validation shared by the submit form, the edit page and the admin routes. */
 import { HttpError } from "./errors.ts";
 import { MAX_DETAILS, MAX_SUMMARY, MAX_TITLE } from "../config.ts";
 import { LIMITS, tooLong } from "../../shared/draft/mod.ts";
-
-export const MIN_TITLE = 8;
-export const MIN_SUMMARY = 40;
 
 /** Trim a text field, keeping one character past its limit so the checks can
  * report "too long" instead of the tail vanishing; the same everywhere the
@@ -19,28 +16,6 @@ export function capped(v: unknown, cap: number, label: string): string {
   const t = String(v ?? "").trim().slice(0, cap + 1);
   if (t.length > cap) throw new HttpError(400, tooLong(label, cap));
   return t;
-}
-
-/**
- * The three revisioned fields, validated together (title >= 8 chars, summary
- * >= 40 chars, details optional). Throws a 400 with the user-facing message.
- */
-export function validateText(
-  text: { title: string; summary: string; details: string },
-): { title: string; summary: string; details: string } {
-  const title = cleanText(text.title, "title");
-  if (title.length < MIN_TITLE) {
-    throw new HttpError(400, `Title needs at least ${MIN_TITLE} characters.`);
-  }
-  if (title.length > MAX_TITLE) throw new HttpError(400, tooLong("The title", MAX_TITLE));
-  const summary = cleanText(text.summary, "summary");
-  if (summary.length < MIN_SUMMARY) {
-    throw new HttpError(400, `Summary needs at least ${MIN_SUMMARY} characters.`);
-  }
-  if (summary.length > MAX_SUMMARY) throw new HttpError(400, tooLong("The summary", MAX_SUMMARY));
-  const details = cleanText(text.details, "details");
-  if (details.length > MAX_DETAILS) throw new HttpError(400, tooLong("The details", MAX_DETAILS));
-  return { title, summary, details };
 }
 
 export function parseGoal(raw: unknown): [number, null] | [null, string] {

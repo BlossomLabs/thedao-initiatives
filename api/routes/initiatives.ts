@@ -201,7 +201,9 @@ export function initiativeRoutes(deps: Deps) {
     if (initiative.status !== "pending" && initiative.status !== "approved") {
       throw new HttpError(403, "This initiative is no longer open for edits.");
     }
+    // The hourly cap is for proposers; the team edits without one.
     if (
+      !user.isAdmin &&
       !(await db.rateLimit(
         "revise:" + user.address.toLowerCase(),
         REVISIONS_PER_HOUR_PER_ADDRESS,

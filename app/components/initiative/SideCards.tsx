@@ -95,7 +95,7 @@ export default function SideCards(
       {session?.isAdmin && (
         <div className="panel border-[rgba(255,180,50,.32)]">
           <span className="k">Only admins</span>
-          <p className="m-0 mb-2 small dim">Edit, approve, or sync this initiative.</p>
+          <p className="m-0 mb-2 small dim">Approve, fund, sync or edit this initiative.</p>
           <LinkButton variant="ghost" className="mt-1 w-full" to={`/admin/initiatives/${r.slug}`}>
             <Settings2 className="size-[15px]" />Manage initiative
           </LinkButton>

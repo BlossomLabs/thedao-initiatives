@@ -2,6 +2,7 @@
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { ADMIN, deploySafe, harness, j, PLAIN, proposerToken } from "./app-helpers.ts";
 import type { Initiative, Revision } from "../db/types.ts";
+import { REVISIONS_PER_HOUR_PER_ADDRESS } from "../config.ts";
 import { minimalSubmission, revisionBody, syntheticContentFiles } from "./fixtures.ts";
 
 const OTHER = "0x2222222222222222222222222222222222222222";
@@ -144,40 +145,74 @@ Deno.test("pending initiative: visible and editable for its proposer and admins 
   h.close();
 });
 
-Deno.test("admin editor: text changes become admin revisions, other fields do not", async () => {
+Deno.test("team edits: an admin uses the edit routes; text is an admin revision, facts are not", async () => {
   const h = await harness();
   const { admin, slug, id } = await submitted(h);
-  const patch = (json: Record<string, unknown>) =>
-    h.req(`/api/admin/initiatives/${id}`, { method: "PATCH", token: admin, json });
-  assertEquals((await patch({ goal: "30,000" })).status, 200);
+  const facts = (json: Record<string, unknown>) =>
+    h.req(`/api/initiatives/${slug}`, { method: "PATCH", token: admin, json });
+  const revise = (json: Record<string, unknown>) =>
+    h.req(`/api/initiatives/${slug}/revisions`, { method: "POST", token: admin, json });
+  // approved: the money facts are locked for the proposer, never for the team
+  assertEquals((await facts({ goal: "30,000" })).status, 200);
   assertEquals((await h.db.revisions.list(id)).length, 1);
-  assertEquals((await patch({ title: "Renamed by the team" })).status, 200);
+  assertEquals((await h.db.initiatives.get(id))!.goalUsd, 30000);
+  // the milestones must match the goal the admin just raised
+  const body = {
+    ...revisionBody(GOOD),
+    title: "Renamed by the team",
+    milestones: [{ ...GOOD.milestones[0], amount: 30000 }],
+  };
+  const res = await revise(body);
+  assertEquals(res.status, 201);
+  assertEquals((await j(res) as { revision: Meta }).revision.source, "admin");
   const revs = await h.db.revisions.list(id);
   assertEquals(revs.map((r) => [r.n, r.source, r.author]), [[1, "submit", PLAIN], [
     2,
     "admin",
     ADMIN,
   ]]);
-  assertEquals(revs[1].summary, GOOD.summary); // untouched fields carry over
-  assertEquals((await h.db.initiatives.get(id))!.goalUsd, 30000);
-  assertEquals((await patch({ title: "short" })).status, 400);
-  assertEquals((await patch({ title: "Renamed by the team" })).status, 200); // no-op, still fine
+  // the editorial rules block the team like anyone else
+  const short = await revise({ ...body, title: "short" });
+  assertEquals(short.status, 400);
+  assertEquals(
+    ((await j(short)).findings as { errors: { field: string }[] }).errors.map((f) => f.field),
+    ["title"],
+  );
+  assertEquals((await revise(body)).status, 400); // nothing changed
   assertEquals((await h.db.revisions.list(id)).length, 2);
-  // an admin may also use the public edit endpoint; it is tagged as an admin
-  // revision (the milestones must match the goal the admin just raised)
-  const res = await h.req(`/api/initiatives/${slug}/revisions`, {
-    method: "POST",
-    token: admin,
-    json: {
-      ...revisionBody(GOOD),
-      title: "Renamed again by the team",
-      milestones: [{ ...GOOD.milestones[0], amount: 30000 }],
-    },
-  });
-  assertEquals(res.status, 201);
-  assertEquals((await j(res) as { revision: Meta }).revision.source, "admin");
-  const view = await j(await h.req(`/api/admin/initiatives/${id}`, { token: admin }));
-  assertEquals((view.revisions as Meta[]).length, 3);
+  // the text and the facts have no other door: the admin PATCH is settings only
+  for (const json of [{ title: "Renamed through the back" }, { goal: "500" }]) {
+    const refused = await h.req(`/api/admin/initiatives/${id}`, {
+      method: "PATCH",
+      token: admin,
+      json,
+    });
+    assertEquals(refused.status, 400);
+    assertStringIncludes(String((await j(refused)).error), "Unsupported field");
+  }
+  // an archived initiative is closed for the team's text edits too
+  await h.db.initiatives.update(id, { status: "archived" });
+  assertEquals((await revise({ ...body, title: "Renamed after archiving" })).status, 403);
+  assertEquals((await h.db.revisions.list(id)).length, 2);
+  h.close();
+});
+
+Deno.test("the hourly revision cap stops a proposer, not an admin", async () => {
+  const h = await harness();
+  const { token, admin, slug } = await submitted(h);
+  for (const address of [PLAIN, ADMIN]) {
+    for (let i = 0; i < REVISIONS_PER_HOUR_PER_ADDRESS; i++) {
+      await h.db.rateLimit("revise:" + address.toLowerCase(), REVISIONS_PER_HOUR_PER_ADDRESS, 3600);
+    }
+  }
+  const edit = (t: string, title: string) =>
+    h.req(`/api/initiatives/${slug}/revisions`, {
+      method: "POST",
+      token: t,
+      json: { ...revisionBody(GOOD), title },
+    });
+  assertEquals((await edit(token, "Renamed by its proposer")).status, 429);
+  assertEquals((await edit(admin, "Renamed by the team")).status, 201);
   h.close();
 });
 

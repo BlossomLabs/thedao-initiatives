@@ -95,7 +95,7 @@ Deno.test("writes: every JSON endpoint rejects unknown fields before changing do
       ["POST", "/api/admin/sessions/revoke-all", { confirmation: "revoke all sessions" }],
       ["POST", "/api/admin/admins", { address: PLAIN }],
       ["DELETE", `/api/admin/admins/${PLAIN}`, {}],
-      ["PATCH", base, { goal: "2000", title: "Changed title here" }],
+      ["PATCH", base, { sortRank: "1" }],
       ["POST", `${base}/revisions/1`, { action: "archive" }],
       ["POST", `${base}/status`, { action: "reject" }],
       ["POST", "/api/admin/initiatives/bulk", { ids: [row.id], action: "reject" }],
@@ -173,7 +173,7 @@ Deno.test("writes: unknown multipart text and file fields are rejected before up
 });
 
 Deno.test("writes: unknown nested fields reject the entire request, including bulk content sync", async () => {
-  const { h, admin, proposer, draft, row, base } = await setup();
+  const { h, admin, proposer, draft, row } = await setup();
   try {
     const nested: [Record<string, unknown>, string][] = [
       [{ sections: { ...draft.sections, typo: "An answer that would be lost" } }, "sections.typo"],
@@ -194,10 +194,6 @@ Deno.test("writes: unknown nested fields reject the entire request, including bu
           token: proposer,
           json: { ...revisionBody(draft), ...extra },
         }),
-        field,
-      );
-      await rejected(
-        await h.req(base, { method: "PATCH", token: admin, json: { goal: "2000", ...extra } }),
         field,
       );
     }
@@ -241,7 +237,7 @@ Deno.test("writes: unknown nested fields reject the entire request, including bu
 Deno.test("writes: malformed JSON cannot become an empty update or logout", async () => {
   const { h, admin, row, base } = await setup();
   try {
-    for (const body of ['{"goal":"2000",', "[]", "null", "true", '"text"']) {
+    for (const body of ['{"sortRank":"1",', "[]", "null", "true", '"text"']) {
       for (const [method, path] of [["PATCH", base], ["POST", "/api/auth/logout"]]) {
         const res = await h.req(path, {
           method,
@@ -255,7 +251,11 @@ Deno.test("writes: malformed JSON cannot become an empty update or logout", asyn
     }
     for (const field of ["goalUsd", UNKNOWN, "", "__proto__", "constructor", "toString"]) {
       await rejected(
-        await h.req(base, { method: "PATCH", token: admin, json: { goal: "2000", [field]: true } }),
+        await h.req(base, {
+          method: "PATCH",
+          token: admin,
+          json: { sortRank: "1", [field]: true },
+        }),
         field,
       );
     }

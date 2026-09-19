@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import StickyAside from "~/components/layout/StickyAside";
 import { Link, useNavigate, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { Settings2 } from "lucide-react";
 import Crumbs from "~/components/layout/Crumbs";
 import PageMain from "~/components/layout/PageMain";
 import Skeleton from "~/components/ui/Skeleton";
@@ -27,8 +28,9 @@ export function meta() {
  * milestones, links, title and summary are always editable and every save is
  * a new public revision. While the initiative is pending the page facts
  * (type, goal, duration, recipient, reviewer, forum link) and the private
- * fields can change too; after approval those belong to the team. Admins
- * may use it too (their edits are tagged as the team's).
+ * fields can change too; after approval those belong to the team. It is the
+ * team's editor as well: an admin works under the same rules, tagged as the
+ * team, and the facts are never locked for them.
  */
 export default function EditInitiative() {
   const { slug = "" } = useParams();
@@ -132,12 +134,23 @@ export default function EditInitiative() {
       </p>
 
       {body === null && r
-        ? <EditForm key={r.id} r={r} pledges={page.pledges} />
+        ? (
+          <EditForm
+            key={r.id}
+            r={r}
+            pledges={page.pledges}
+            team={Boolean(session?.isAdmin)}
+            mine={mine}
+          />
+        )
         : (
           <div className="mt-4 grid grid-cols-[1fr_340px] items-start gap-9 max-[960px]:grid-cols-1">
             <div className="min-w-0">{body}</div>
             <StickyAside className="flex flex-col gap-3.5 max-[960px]:static max-[960px]:order-first">
-              <WhatYouCanChange status={r?.status} />
+              <WhatYouCanChange
+                status={r?.status}
+                manage={session?.isAdmin && r ? `/admin/initiatives/${r.slug}` : undefined}
+              />
               <RevisionsCard />
             </StickyAside>
           </div>
@@ -146,13 +159,17 @@ export default function EditInitiative() {
   );
 }
 
-/** What can change, by status. */
-function WhatYouCanChange({ status }: { status?: Initiative["status"] }) {
+/** What can change, by status; an admin also gets the way to everything else (`manage`). */
+function WhatYouCanChange(
+  { status, manage }: { status?: Initiative["status"]; manage?: string },
+) {
   return (
     <div className="panel">
       <span className="k">What you can change</span>
       <p className="m-0 small dim">
-        {status === "pending"
+        {manage
+          ? "As an admin you can change everything here, the facts locked after approval included. The same checks apply, and your edits are tagged as the team's."
+          : status === "pending"
           ? "Everything you submitted can still be changed here. Backers are added by the team."
           : (
             <>
@@ -162,6 +179,11 @@ function WhatYouCanChange({ status }: { status?: Initiative["status"] }) {
             </>
           )}
       </p>
+      {manage && (
+        <LinkButton variant="ghost" className="mt-3 w-full" to={manage}>
+          <Settings2 className="size-[15px]" />Manage initiative
+        </LinkButton>
+      )}
     </div>
   );
 }
@@ -178,17 +200,22 @@ function RevisionsCard() {
   );
 }
 
-function EditForm({ r, pledges }: { r: Initiative; pledges: Pledge[] }) {
+function EditForm(
+  { r, pledges, team, mine }: { r: Initiative; pledges: Pledge[]; team: boolean; mine: boolean },
+) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { requireSession } = useSession();
-  const pending = r.status === "pending";
+  // The facts lock on approval for the proposer, never for the team.
+  const open = r.status === "pending" || team;
+  // The team comes from the admin page and goes back to it.
+  const back = team && !mine ? `/admin/initiatives/${r.slug}` : `/initiative/${r.slug}`;
   const initial = useMemo(() => fromInitiative(r, pledges), [r, pledges]);
   const path = `/api/initiatives/${encodeURIComponent(r.slug)}`;
 
   async function onSubmit(payload: SubmitPayload) {
     await requireSession();
-    const facts = pending ? pageFactsPatch(payload, r) : null;
+    const facts = open ? pageFactsPatch(payload, r) : null;
     const text = textChanged(payload, r);
     if (!facts && !text) throw new Error("Nothing changed.");
     let patched = false;
@@ -207,26 +234,32 @@ function EditForm({ r, pledges }: { r: Initiative; pledges: Pledge[] }) {
     }
     await qc.invalidateQueries({ queryKey: initiativeKey(r.slug) });
     void qc.invalidateQueries({ queryKey: ["board"] });
-    navigate(`/initiative/${r.slug}`);
+    void qc.invalidateQueries({ queryKey: ["admin"] });
+    navigate(back);
   }
 
   return (
     <InitiativeForm
-      mode="proposer"
+      mode="edit"
       initial={initial}
-      locked={!pending}
+      locked={!open}
       onSubmit={onSubmit}
       submitLabel="Save as a new revision"
       showBackers={false}
-      showPrivate={pending}
-      showTypePicker={pending}
+      showPrivate={open}
+      showTypePicker={open}
       showRules={false}
       autosaveKey={null}
-      asideTop={<WhatYouCanChange status={r.status} />}
+      asideTop={
+        <WhatYouCanChange
+          status={r.status}
+          manage={team ? `/admin/initiatives/${r.slug}` : undefined}
+        />
+      }
       asideBottom={<RevisionsCard />}
       footer={
         <p className="m-0 mt-3.5 text-center">
-          <Link className="btn btn-ghost btn-sm" to={`/initiative/${r.slug}`}>Cancel</Link>
+          <Link className="btn btn-ghost btn-sm" to={back}>Cancel</Link>
         </p>
       }
     />

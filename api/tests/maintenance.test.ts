@@ -135,7 +135,7 @@ Deno.test("maintenance: every write answers 503, sign-in and the admin controls 
       ["POST", "/api/initiatives", proposer, { title: "x" }],
       ["POST", `/api/initiatives/${initiative.slug}/comments`, undefined, { body: "hi" }],
       ["POST", `/api/admin/initiatives/${initiative.id}/status`, admin, { action: "archive" }],
-      ["PATCH", `/api/admin/initiatives/${initiative.id}`, admin, { goalUsd: 20 }],
+      ["PATCH", `/api/admin/initiatives/${initiative.id}`, admin, { sortRank: "1" }],
       ["POST", "/api/nickname", proposer, { nickname: "frozen" }],
       ["POST", "/api/donate/confirm", undefined, {}],
       ["POST", "/api/support", undefined, { message: "hi" }],

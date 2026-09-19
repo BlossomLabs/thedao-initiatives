@@ -644,7 +644,7 @@ Deno.test("profile: nickname rules, .eth ownership, pfp presets and upload", asy
   h.close();
 });
 
-Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm, comments actions", async () => {
+Deno.test("admin: settings, status, pledges with logo, safe deploy params + confirm, comments actions", async () => {
   const h = await harness({
     env: { PINATA_JWT: "jwt" },
     fetch: (url) =>
@@ -674,32 +674,16 @@ Deno.test("admin: edit, status, pledges with logo, safe deploy params + confirm,
     await h.req("/api/admin/initiatives/" + id, {
       method: "PATCH",
       token: admin,
-      json: {
-        title: "Renamed initiative",
-        sortRank: "3",
-        type: "grant",
-        goal: "2,000",
-        proposer: ADMIN.toLowerCase(),
-      },
+      json: { sortRank: "3", proposer: ADMIN.toLowerCase() },
     }),
   ) as { initiative: Record<string, unknown> };
-  assertEquals(patched.initiative.title, "Renamed initiative");
   assertEquals(patched.initiative.sortRank, 3);
-  assertEquals(patched.initiative.goalUsd, 2000);
   assertEquals(patched.initiative.proposer, ADMIN);
   assertEquals(
     (await h.req("/api/admin/initiatives/" + id, {
       method: "PATCH",
       token: admin,
       json: { proposer: "not an owner" },
-    })).status,
-    400,
-  );
-  assertEquals(
-    (await h.req("/api/admin/initiatives/" + id, {
-      method: "PATCH",
-      token: admin,
-      json: { title: "short" },
     })).status,
     400,
   );
@@ -931,7 +915,7 @@ Deno.test("content backers: file pledges are created once, kept in step, never o
   assertEquals(await h.db.initiatives.bySlug("grant-bad"), null);
 });
 
-Deno.test("page facts: content keys sync, admin patch validates and clears per type", async () => {
+Deno.test("page facts: content keys sync, an admin's patch validates and clears per type", async () => {
   const h = await harness();
   const { admin } = await seedApproved(h);
   const board = await j(await h.req("/api/board"));
@@ -983,8 +967,9 @@ Deno.test("page facts: content keys sync, admin patch validates and clears per t
   assertEquals(gx.recipientTeam, "Team X");
   assertEquals(gx.recipientUrl, "https://x.example/team#top");
 
+  // the team changes the facts of an approved initiative on the proposer's route
   const patch = (json: Record<string, unknown>) =>
-    h.req("/api/admin/initiatives/" + gx.id, { method: "PATCH", token: admin, json });
+    h.req("/api/initiatives/grant-x", { method: "PATCH", token: admin, json });
   const p1 = await j(
     await patch({ topup: true, milestoneReviewer: "Rev", durationMonths: "" }),
   ) as { initiative: Record<string, unknown> };
@@ -998,21 +983,10 @@ Deno.test("page facts: content keys sync, admin patch validates and clears per t
   // dropping the top-up flag clears the reviewer; switching to RFP clears the grant fields
   const p2 = await j(await patch({ topup: false })) as { initiative: Record<string, unknown> };
   assertEquals(p2.initiative.milestoneReviewer, "");
-  const p3 = await j(await patch({ type: "rfp" })) as {
-    initiative: Record<string, unknown>;
-    findings: { errors: { field: string }[] };
-  };
+  const p3 = await j(await patch({ type: "rfp" })) as { initiative: Record<string, unknown> };
   assertEquals(p3.initiative.recipientTeam, "");
   assertEquals(p3.initiative.recipientUrl, "");
   assertEquals(p3.initiative.topup, false);
-  // the structured body is re-cut for the new type: grant-only sections go,
-  // and the RFP sections it now lacks come back as non-blocking findings
-  assertEquals(Object.keys(p3.initiative.sections as object).sort(), [
-    "in_scope",
-    "out_scope",
-    "why",
-  ]);
-  assert(p3.findings.errors.some((e) => e.field === "hard_req"));
   // the public page carries the facts and nothing private
   const page = await j(await h.req("/api/initiatives/grant-x")) as {
     initiative: Record<string, unknown>;

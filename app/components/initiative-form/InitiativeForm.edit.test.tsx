@@ -10,7 +10,7 @@ const setup = (props: Partial<InitiativeFormProps> = {}) => {
   const onSubmit = props.onSubmit ?? vi.fn(async () => {});
   const utils = render(
     <InitiativeForm
-      mode="proposer"
+      mode="edit"
       initial={fromInitiative(structuredRow())}
       onSubmit={onSubmit}
       submitLabel="Save as a new revision"
@@ -138,34 +138,7 @@ describe("InitiativeForm in edit mode", () => {
     ]);
   });
 
-  it("admin mode: enforce off saves past client errors and paints the returned findings", async () => {
-    const onSubmit = vi.fn(() =>
-      Promise.resolve({
-        errors: [
-          {
-            field: "why",
-            msg: "Why this matters is required. Answer the question above.",
-            kind: "missing" as const,
-          },
-        ],
-        warnings: [{ field: "ms_0_c0", msg: "Milestone A, not checkable yet: vague." }],
-      })
-    );
-    setup({ mode: "admin", enforce: false, layout: "inline", onSubmit });
-    fireEvent.change(document.getElementById("f-why")!, { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save as a new revision" }));
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(document.getElementById("f-why")).toHaveClass("has-error"));
-    expect(document.getElementById("f-ms_0_c0")).toHaveClass("has-warn");
-    // saved, so no alert and no "needs fixing" line
-    expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.queryByText(/needs fixing, marked above/)).toBeNull();
-    // inline layout: the checks card sits inside the column, no sidebar
-    expect(document.querySelector("aside")).toBeNull();
-    expect(document.querySelector("[data-checks]")).not.toBeNull();
-  });
-
-  it("proposer mode: client errors still block the save", async () => {
+  it("client errors block the save, whoever edits", async () => {
     const { onSubmit } = setup();
     fireEvent.change(document.getElementById("f-why")!, { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Save as a new revision" }));

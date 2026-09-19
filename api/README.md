@@ -115,8 +115,8 @@ without static files for API-only development.
   the same on the form and here; failures come back as
   `{error, findings: {errors: [{field, msg, kind}], warnings: [{field, msg}]}}` with the form's
   field ids.
-- **Text is revisioned.** Every change to title, summary, sections, milestones or links (the
-  proposer's edit page, the admin editor, content sync) appends an immutable revision under
+- **Text is revisioned.** Every change to title, summary, sections, milestones or links (the edit
+  page, used by the proposer and by admins, and content sync) appends an immutable revision under
   `["revision", rfpId, n]`; the initiative row carries the current number. A revision carries the
   structured fields too. Revisions are public; admins can archive a superseded one (hidden from the
   public history, never the current one). Rows written before revisions existed get their text
@@ -158,7 +158,7 @@ internal and cannot be edited through proposal APIs. No bulk migration is requir
 Slug-addressed edits, comment posts and donation confirmations accept `initiativeId`, the ID from
 the displayed initiative. A mismatched ID returns 409 with a refresh message. Missing IDs remain
 accepted for URLs that have never been released or reused; reused URLs require the ID. Admin
-mutations and Safe deployment requests must use the permanent ID for reused URLs. The admin editor
+mutations and Safe deployment requests must use the permanent ID for reused URLs. The admin page
 switches to its ID route after loading, and the web client includes IDs in writes.
 
 ## Endpoints
@@ -182,9 +182,13 @@ from the same wallet within a day), `POST /api/initiatives/:slug/revisions` (pro
 title, summary, sections, milestones, links; legacy rows migrate to this format),
 `PATCH /api/initiatives/:slug` (proposer while pending, admin always: type, topup, goal,
 durationMonths, recipientTeam, recipientUrl, milestoneReviewer, discourseUrl, funders, contact;
-after approval a proposer gets 403).
+after approval a proposer gets 403). These two routes are the only way to edit an initiative's text
+and facts, for admins too: the editorial findings block an admin's save, and a rejected or archived
+initiative refuses text edits from everyone. An admin's revision is tagged `admin`, is audited, and
+does not count against the hourly revision cap.
 
-Admin (`/api/admin/...`): `GET dashboard`, `GET|PATCH initiatives/:id`,
+Admin (`/api/admin/...`): `GET dashboard`, `GET initiatives/:id`, `PATCH initiatives/:id` (the admin
+settings only: `sortRank`, `paidOutUsd`, `proposer`; the last two need recent authentication),
 `POST initiatives/:id/status`, `POST initiatives/:id/revisions/:n` (archive / unarchive),
 `POST|PATCH|DELETE initiatives/:id/pledges[/:pid]`, `POST initiatives/:id/donations/recheck`,
 `POST initiatives/:id/sync-donations`, `GET initiatives/:id/safe-deploy-params`,
@@ -204,8 +208,8 @@ historical comment `email`) only appear in admin responses.
 - Initiative submission and page-fact edits use `goal` and `durationMonths`. The request aliases
   `goalUsd` and `duration` are rejected; response objects still expose `goalUsd`. Text edits reject
   `details` and use sections, milestones and links.
-- Safe binding goes through on-chain verification at `safe-confirm`. The initiative editor cannot
-  set or clear `safeAddress`.
+- Safe binding goes through on-chain verification at `safe-confirm`. Neither the edit routes nor the
+  admin settings can set or clear `safeAddress`.
 - Admin pledge writes use `amount` (responses still expose `amountUsd`) and accept a multipart
   `logo` image for a logo change. Direct `logoCid` and `amountUsd` request fields are rejected. This
   does not change submission `backers[].amountUsd` or `backers[].logoCid`, whose uploaded CIDs
@@ -263,8 +267,8 @@ maintenance flag inside a file is ignored. The whole file is validated first and
 (`400` naming the first bad entry) before any write; a `200 {written, skipped, claimsRebuilt}` means
 every entry was either written or skipped, so re-running a restore is safe. Held comments that were
 written get their claim index back with the remaining lifetime, so their authors can still find
-them. The `/admin/maintenance` page wraps all of this: enter maintenance, download, restore a
-file, exit.
+them. The `/admin/maintenance` page wraps all of this: enter maintenance, download, restore a file,
+exit.
 
 ## SIWE from the frontend
 
@@ -320,11 +324,11 @@ Every write keeps strong reads for the entries it checks. It is an experiment: m
 `deno task bench` on a preview before keeping it on, since a page read right after a write may
 briefly show the previous state.
 
-`BOARD_CACHE_SECS` (default 5, `0` = off) is how long an isolate serves `GET /api/board` from its own
-memory instead of reading KV: the board is public, polled every 30 s by every open tab, and costs a
-read wave per card. Any write request and any `?refresh=1` board read replaces the saved board at
-once in the isolate that served it; a board read that lands on another isolate can be up to that
-many seconds behind.
+`BOARD_CACHE_SECS` (default 5, `0` = off) is how long an isolate serves `GET /api/board` from its
+own memory instead of reading KV: the board is public, polled every 30 s by every open tab, and
+costs a read wave per card. Any write request and any `?refresh=1` board read replaces the saved
+board at once in the isolate that served it; a board read that lands on another isolate can be up to
+that many seconds behind.
 
 ## Scripts
 

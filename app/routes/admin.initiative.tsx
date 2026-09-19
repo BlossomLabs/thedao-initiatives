@@ -1,54 +1,31 @@
 import { useAdminApi } from "~/hooks/use-admin-api";
 import { sessionKey, useSession } from "~/context/session";
-import { cn } from "~/lib/utils";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import PageSkeleton from "~/components/layout/PageSkeleton";
 import StickyAside from "~/components/layout/StickyAside";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
-import GovernedBy from "~/components/terms/GovernedBy";
-import { sendTransaction, waitForTransactionReceipt } from "wagmi/actions";
-import { useAccount, useConfig } from "wagmi";
-import {
-  Download,
-  ExternalLink,
-  FileText,
-  MessageSquare,
-  PencilLine,
-  RefreshCw,
-  Trash2,
-  Upload,
-} from "lucide-react";
-import { RevisionAuthor } from "~/components/initiative/RevisionBar";
+import { useAccount } from "wagmi";
+import { Download, ExternalLink, FileText, MessageSquare, PencilLine } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
-import { Button } from "~/components/ui/Button";
-import { Field, Input, Select } from "~/components/ui/Field";
-import Status, { type StatusKind } from "~/components/ui/Status";
+import { Button, LinkButton } from "~/components/ui/Button";
+import Status from "~/components/ui/Status";
 import FundingHead from "~/components/initiative/FundingHead";
-import InitiativeForm from "~/components/initiative-form/InitiativeForm";
-import type { SubmitPayload } from "~/components/initiative-form/types";
-import { fromInitiative } from "~/components/initiative-form/useDraft";
-import Identity from "~/components/wallet/Identity";
+import Donations from "~/components/admin/initiative/Donations";
+import OpenPoints from "~/components/admin/initiative/OpenPoints";
+import Pledges from "~/components/admin/initiative/Pledges";
+import Revisions from "~/components/admin/initiative/Revisions";
+import type { Msg, Run } from "~/components/admin/initiative/run";
+import SafeCard, { useSafeDeploy } from "~/components/admin/initiative/SafeCard";
+import SettingsForm from "~/components/admin/initiative/SettingsForm";
 import { api, ApiError, apiText, errorMessage } from "~/lib/api";
-import type {
-  AdminInitiative,
-  AdminInitiativePage,
-  Findings,
-  Pledge,
-  SafeConfirmResult,
-  SafeDeployParams,
-  SafeSyncState,
-} from "~/lib/api-types";
+import type { AdminInitiativePage } from "~/lib/api-types";
 import { walletErrorMessage } from "~/lib/donate";
-import { dt, shortAddr, usd } from "~/lib/format";
+import { dt } from "~/lib/format";
 import { discussionKind } from "~/lib/discussion";
-
-type Msg = { kind: StatusKind; text: string } | null;
-/** Resolves to whether `fn` succeeded; a failure is already on screen. */
-type Run = (fn: () => Promise<unknown>, ok?: string) => Promise<boolean>;
 
 const STATUS_HELP: Record<string, string> = {
   pending: "Submitted and waiting for review. It is not on the board yet.",
@@ -57,8 +34,12 @@ const STATUS_HELP: Record<string, string> = {
   archived: "Hidden from the board; its public page stays reachable.",
 };
 
-/** Admin editor for one initiative: same two-column layout as the public page. */
-export default function AdminInitiativeEditor() {
+/**
+ * The team's page for one initiative: status, Safe, settings, pledges,
+ * donations and revisions. Its text and facts are edited on the edit page
+ * the proposer uses.
+ */
+export default function ManageInitiative() {
   const adminApi = useAdminApi();
   const { session } = useSession();
   const { slug = "" } = useParams();
@@ -125,6 +106,8 @@ export default function AdminInitiativeEditor() {
   // Deploy first, approve second: the wallet prompt is the admin's sign-off on the Safe.
   const canApprove = Boolean(r.safeAddress) || isConnected;
   const run = runAt("status");
+  // The edit page takes pending and approved initiatives, from anyone.
+  const editable = r.status === "pending" || r.status === "approved";
   const approve = (action: "approve" | "unarchive", ok: string) =>
     run(async () => {
       // The Safe card reports the deploy itself; here it is why nothing was approved.
@@ -159,21 +142,9 @@ export default function AdminInitiativeEditor() {
             funded={r.goalUsd > 0 && data.summary.total >= r.goalUsd}
           />
 
-          <SectionHeading>Edit initiative</SectionHeading>
-          <EditForm
-            key={r.id}
-            r={r}
-            pledges={data.pledges}
-            onSaved={(text) => {
-              setMsg({ at: "edit", kind: "ok", text });
-              refresh();
-            }}
-          />
-          {said("edit", "mt-4")}
-
-          <SectionHeading count={data.revisions.length}>Revisions</SectionHeading>
-          <Revisions page={data} base={base} run={runAt("revisions")} />
-          {said("revisions")}
+          <SectionHeading>Settings</SectionHeading>
+          <SettingsForm r={r} run={runAt("settings")} />
+          {said("settings")}
 
           <SectionHeading count={data.pledges.length}>Backer pledges</SectionHeading>
           <Pledges page={data} base={base} run={runAt("pledges")} />
@@ -182,6 +153,10 @@ export default function AdminInitiativeEditor() {
           <SectionHeading count={data.donations.length}>Donations</SectionHeading>
           <Donations page={data} base={base} run={runAt("donations")} />
           {said("donations")}
+
+          <SectionHeading count={data.revisions.length}>Revisions</SectionHeading>
+          <Revisions page={data} base={base} run={runAt("revisions")} />
+          {said("revisions")}
         </div>
 
         <StickyAside className="flex flex-col gap-3.5 max-[960px]:static">
@@ -243,9 +218,27 @@ export default function AdminInitiativeEditor() {
               )}
             </div>
             {said("status")}
+            {editable
+              ? (
+                <LinkButton
+                  variant="ghost"
+                  sm
+                  className="mt-3.5 w-full"
+                  to={`/initiative/${r.slug}/edit`}
+                >
+                  <PencilLine className="size-[15px]" />Edit initiative
+                </LinkButton>
+              )
+              : (
+                <p className="m-0 mt-3.5 small dim">
+                  Its text is closed for edits while it is {r.status}.
+                </p>
+              )}
           </div>
 
           <SafeCard page={data} safe={safe} onChange={refresh} />
+
+          <OpenPoints r={r} pledges={data.pledges} />
 
           <div className="panel">
             <span className="k">Links</span>
@@ -308,729 +301,11 @@ export default function AdminInitiativeEditor() {
                   </a>
                 </li>
               )}
-              {r.proposer && (
-                <li className="dim flex items-center gap-1.5">
-                  Proposed by{" "}
-                  <Identity address={r.proposer} size={16} nameClassName="text-[13px]" />
-                </li>
-              )}
-              {r.contact && (
-                <li className="dim">
-                  Contact: <span className="text-soft">{r.contact}</span>
-                </li>
-              )}
             </ul>
             {said("links")}
           </div>
         </StickyAside>
       </div>
     </PageMain>
-  );
-}
-
-/** The deploy flow shared by the Approve button and the Safe card. */
-function useSafeDeploy(id: string, onChange: () => void) {
-  const adminApi = useAdminApi();
-  const config = useConfig();
-  const [status, setStatus] = useState<Msg>(null);
-  const [busy, setBusy] = useState(false);
-  const base = `/api/admin/initiatives/${id}`;
-
-  /**
-   * Make sure the initiative's Safe exists and is bound, deploying it from the
-   * admin's wallet if not. The server binds on code at the predicted CREATE2
-   * address (a Safe wallet or a sped-up tx mines under another hash), so the
-   * browser watches its own receipt for a revert and then asks the server
-   * until the Safe is there. Resolves to the address; throws on failure.
-   */
-  const ensureDeployed = async (): Promise<string> => {
-    setStatus(null);
-    setBusy(true);
-    try {
-      const p = await api<SafeDeployParams>(`${base}/safe-deploy-params`);
-      if (!p.enabled) throw new Error(p.reason);
-      if (!p.deployed) {
-        setStatus({
-          kind: "wait",
-          text:
-            `Confirm the Safe deploy in your wallet (${p.threshold}-of-${p.signers.length} via the canonical factory, to ${p.address}).`,
-        });
-        const hash = await sendTransaction(config, {
-          to: p.factory as `0x${string}`,
-          data: p.calldata as `0x${string}`,
-          chainId: 1,
-        });
-        setStatus({ kind: "wait", text: `Sent ${shortAddr(hash)}. Waiting for it to be mined…` });
-        const receipt = await waitForTransactionReceipt(config, { hash, chainId: 1 });
-        if (receipt.status !== "success") {
-          throw new Error("The deploy transaction reverted; nothing was deployed.");
-        }
-      }
-      for (let attempt = 0;; attempt++) {
-        const res = await adminApi<SafeConfirmResult>(`${base}/safe-confirm`, { json: {} })
-          .catch((e) => ({ status: "error", detail: errorMessage(e) } as SafeConfirmResult));
-        if (res.status === "ok") {
-          setStatus({ kind: "ok", text: `Safe ${res.address} verified: ${res.detail}` });
-          onChange();
-          return res.address!;
-        }
-        if (res.status !== "pending" || attempt >= 20) throw new Error(res.detail);
-        setStatus({ kind: "wait", text: "Waiting for the Safe to show up on-chain…" });
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-      }
-    } catch (e) {
-      setStatus({ kind: "err", text: "Safe not deployed: " + walletErrorMessage(e) });
-      throw e;
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return { ensureDeployed, status, busy };
-}
-
-function SafeCard(
-  { page, safe, onChange }: {
-    page: AdminInitiativePage;
-    safe: ReturnType<typeof useSafeDeploy>;
-    onChange: () => void;
-  },
-) {
-  const adminApi = useAdminApi();
-  const { session } = useSession();
-  const r = page.initiative;
-  const { isConnected } = useAccount();
-  const [status, setStatus] = useState<Msg>(null);
-  const [busy, setBusy] = useState(false);
-  const [syncState, setSyncState] = useState<SafeSyncState | null>(page.safeSync);
-  useEffect(() => setSyncState(page.safeSync), [page.safeSync]);
-  // Unbound: is the Safe already at its CREATE2 address (a deploy the browser
-  // lost track of, or one made from another environment)? Then it is linked,
-  // not deployed again: the factory would only revert at an occupied address.
-  const params = useQuery({
-    queryKey: ["admin", "safe-deploy-params", r.id, sessionKey(session)],
-    queryFn: ({ signal }) =>
-      api<SafeDeployParams>(`/api/admin/initiatives/${r.id}/safe-deploy-params`, { signal }),
-    enabled: !r.safeAddress && page.signers.ok,
-  });
-  const existing = !r.safeAddress && params.data?.enabled && params.data.deployed
-    ? params.data.address
-    : null;
-
-  const link = async () => {
-    setBusy(true);
-    setStatus(null);
-    try {
-      const res = await adminApi<SafeConfirmResult>(`/api/admin/initiatives/${r.id}/safe-confirm`, {
-        json: {},
-      }).catch((e) => ({ status: "error", detail: errorMessage(e) } as SafeConfirmResult));
-      if (res.status !== "ok") throw new Error(res.detail);
-      setStatus({ kind: "ok", text: `Safe ${res.address} linked: ${res.detail}` });
-      onChange();
-    } catch (e) {
-      setStatus({ kind: "err", text: errorMessage(e) });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const sync = async () => {
-    setBusy(true);
-    try {
-      const res = await api<{ safeSync: SafeSyncState }>(
-        `/api/admin/initiatives/${r.id}/sync-donations`,
-        { method: "POST" },
-      );
-      setSyncState(res.safeSync);
-      setStatus(
-        res.safeSync.ok
-          ? { kind: "ok", text: "Synced with the Safe Transaction Service." }
-          : { kind: "err", text: res.safeSync.error },
-      );
-      onChange();
-    } catch (e) {
-      setStatus({ kind: "err", text: errorMessage(e) });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  let body: React.ReactNode;
-  if (r.safeAddress) {
-    body = (
-      <>
-        <p className="m-0 flex flex-wrap items-center gap-2">
-          <span className="chip st-approved">
-            {page.signers.threshold}-of-{page.signers.list.length}
-          </span>
-          <span className="small text-dao-green">deployed and verified</span>
-        </p>
-        <a
-          className="mono mt-2.5 block rounded-[10px] border border-edge bg-black/15 px-3 py-2 text-[11.5px] [overflow-wrap:anywhere]"
-          href={`https://eth.blockscout.com/address/${r.safeAddress}`}
-          target="_blank"
-          rel="noopener"
-        >
-          {r.safeAddress}
-        </a>
-        <GovernedBy className="mt-1.5" />
-        <p className="m-0 mt-2.5 small dim">
-          Indexer sync: {syncState
-            ? (syncState.ok
-              ? `${syncState.backfilled ? "up to date" : "backfilling"}, last run ${
-                dt(syncState.at)
-              }`
-              : `error: ${syncState.error}`)
-            : "never run"}
-        </p>
-        <Button sm variant="ghost" className="mt-3 w-full" loading={busy} onClick={sync}>
-          <RefreshCw className="size-3.5" />Sync donations now
-        </Button>
-      </>
-    );
-  } else if (!page.signers.ok) {
-    body = (
-      <p className="m-0 small">
-        Safe deployment is disabled: <b>{page.signers.detail}</b>.
-      </p>
-    );
-  } else if (existing) {
-    body = (
-      <>
-        <p className="m-0 small dim">
-          A Safe already exists at this initiative's address but is not linked yet. Linking checks
-          on-chain that it is a {page.signers.threshold}-of-{page.signers.list.length}{" "}
-          Safe owned by the operational signers on the canonical singleton before binding it.
-        </p>
-        <span className="mono mt-2.5 block rounded-[10px] border border-edge bg-black/15 px-3 py-2 text-[11.5px] [overflow-wrap:anywhere]">
-          {existing}
-        </span>
-        <Button variant="ghost" sm className="mt-3 w-full" loading={busy} onClick={link}>
-          Link the Safe
-        </Button>
-      </>
-    );
-  } else {
-    body = (
-      <>
-        <p className="m-0 small dim">
-          Approving deploys a {page.signers.threshold}-of-{page.signers.list.length}{" "}
-          Safe owned by the operational signers: one transaction from your wallet via the canonical
-          factory, verified on-chain before the initiative goes live. Or deploy it ahead of time:
-        </p>
-        <Button
-          variant="ghost"
-          sm
-          className="mt-3 w-full"
-          loading={safe.busy}
-          disabled={!isConnected}
-          onClick={() => void safe.ensureDeployed().catch(() => {})}
-        >
-          {isConnected ? "Deploy Safe now" : "Connect a wallet to deploy"}
-        </Button>
-      </>
-    );
-  }
-  const shown = safe.status ?? status;
-  return (
-    <div className="panel">
-      <span className="k">Donation Safe</span>
-      {body}
-      {shown && <Status kind={shown.kind} className="mt-3">{shown.text}</Status>}
-    </div>
-  );
-}
-
-/**
- * The same form as the submit page, in admin mode: nothing blocks the
- * button, the server's editorial findings come back as open points. The
- * admin-only knobs (board pin, owner) ride the same PATCH.
- */
-function EditForm(
-  { r, pledges, onSaved }: {
-    r: AdminInitiative;
-    pledges: Pledge[];
-    onSaved: (text: string) => void;
-  },
-) {
-  const adminApi = useAdminApi();
-  const extrasOf = () => ({
-    sortRank: r.sortRank ? String(r.sortRank) : "",
-    proposer: r.proposer,
-    paidOutUsd: r.paidOutUsd ? String(r.paidOutUsd) : "",
-  });
-  const [extras, setExtras] = useState(extrasOf);
-  useEffect(() => setExtras(extrasOf()), [r.sortRank, r.proposer, r.paidOutUsd]);
-  const [open, setOpen] = useState<Findings | null>(null);
-  const [initial] = useState(() => fromInitiative(r, pledges));
-
-  async function onSubmit(payload: SubmitPayload) {
-    const { website: _hp, backers: _bk, ...fields } = payload;
-    const body = {
-      ...fields,
-      sortRank: extras.sortRank,
-      proposer: extras.proposer,
-      paidOutUsd: extras.paidOutUsd,
-    };
-    const res = await adminApi<{ initiative: AdminInitiative; findings: Findings }>(
-      `/api/admin/initiatives/${r.id}`,
-      { method: "PATCH", json: body },
-    );
-    const points = res.findings.errors.length || res.findings.warnings.length ? res.findings : null;
-    setOpen(points);
-    onSaved("Saved.");
-    return points;
-  }
-
-  return (
-    <div className="panel">
-      <InitiativeForm
-        mode="admin"
-        initial={initial}
-        locked={false}
-        enforce={false}
-        layout="inline"
-        onSubmit={onSubmit}
-        submitLabel="Save changes"
-        showBackers={false}
-        showPrivate
-        showTypePicker
-        showRules={false}
-        autosaveKey={null}
-        before={
-          <>
-            <div className="grid grid-cols-2 gap-x-4 max-[640px]:grid-cols-1 [&>*:first-child]:mt-[18px]">
-              <Field label="Pin to board position" htmlFor="e-pin">
-                <Input
-                  id="e-pin"
-                  inputMode="numeric"
-                  placeholder="1 = top; blank = sort by money raised."
-                  value={extras.sortRank}
-                  onChange={(e) => setExtras((s) => ({ ...s, sortRank: e.target.value }))}
-                />
-              </Field>
-              <Field
-                label="Owner"
-                htmlFor="e-owner"
-                hint="Wallet address or ENS name. Shown publicly as “Proposed by”; blank to hide."
-              >
-                <Input
-                  id="e-owner"
-                  maxLength={100}
-                  placeholder="0x… or name.eth"
-                  className="mono"
-                  value={extras.proposer}
-                  onChange={(e) => setExtras((s) => ({ ...s, proposer: e.target.value }))}
-                />
-              </Field>
-              <Field
-                label="Paid out to the team (USD)"
-                htmlFor="e-paid"
-                hint="“Raised” is the Safe's balance plus this, so a milestone payment does not lower it."
-              >
-                <Input
-                  id="e-paid"
-                  inputMode="decimal"
-                  placeholder="0"
-                  value={extras.paidOutUsd}
-                  onChange={(e) => setExtras((s) => ({ ...s, paidOutUsd: e.target.value }))}
-                />
-              </Field>
-            </div>
-          </>
-        }
-        footer={
-          <>
-            <p className="m-0 mt-3 text-center small dim">
-              Goes live immediately; a changed title, summary, section, milestone or link is saved
-              as a new public revision.
-            </p>
-            {open && (
-              <div
-                className="mt-4 rounded-2xl border border-[rgba(240,180,41,.5)] bg-[rgba(240,180,41,.06)] px-5 py-4"
-                role="status"
-              >
-                <p className="m-0 small text-[#ffe9b8]">
-                  The page is saved; the reviewer sees these open points:
-                </p>
-                <ul className="m-0 mt-2 flex list-disc flex-col gap-1 pl-5 small">
-                  {[...open.errors, ...open.warnings].map((f, i) => (
-                    <li key={i} className={f.kind ? "text-[#ffd7d6]" : "text-[#ffe9b8]"}>
-                      {f.msg}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
-        }
-      />
-    </div>
-  );
-}
-
-/** The public history: every version of the text, with archive as the only edit. */
-function Revisions({ page, base, run }: { page: AdminInitiativePage; base: string; run: Run }) {
-  const r = page.initiative;
-  if (!page.revisions.length) {
-    return (
-      <p className="m-0 mb-3.5 small dim">
-        No history yet: this initiative predates revisions. Its first edit will keep the text shown
-        today as revision 1.
-      </p>
-    );
-  }
-  return (
-    <div className="tblbox mb-3.5">
-      <table className="tbl">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Author</th>
-            <th>Date</th>
-            <th>Visibility</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {[...page.revisions].reverse().map((v) => {
-            const isCurrent = v.n === r.revision;
-            return (
-              <tr key={v.n} className={v.archived ? "[&>td]:opacity-60" : undefined}>
-                <td className="mono">{v.n}</td>
-                <td className="small">
-                  <RevisionAuthor rev={v} />
-                </td>
-                <td className="whitespace-nowrap">{dt(v.createdAt)}</td>
-                <td>
-                  {isCurrent
-                    ? <span className="chip st-approved">current</span>
-                    : v.archived
-                    ? <span className="chip st-archived">archived</span>
-                    : <span className="chip">public</span>}
-                </td>
-                <td className="whitespace-nowrap text-right">
-                  <Link
-                    className="btn btn-ghost btn-sm mr-1.5"
-                    to={`/initiative/${r.slug}${isCurrent ? "" : `?rev=${v.n}`}`}
-                  >
-                    View
-                  </Link>
-                  <Button
-                    sm
-                    variant="ghost"
-                    disabled={isCurrent}
-                    title={isCurrent
-                      ? "The current revision cannot be archived; save a new one to replace it."
-                      : v.archived
-                      ? "Show it in the public history again"
-                      : "Hide it from the public history (admins still see it)"}
-                    onClick={() =>
-                      run(
-                        () =>
-                          api(`${base}/revisions/${v.n}`, {
-                            json: { action: v.archived ? "unarchive" : "archive" },
-                          }),
-                        v.archived ? "Revision restored." : "Revision archived.",
-                      )}
-                  >
-                    {v.archived ? "Unarchive" : "Archive"}
-                  </Button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** Add or edit a pledge: the same fields either way; a new logo replaces the old one. */
-function PledgeForm(
-  { base, run, editing, onDone }: {
-    base: string;
-    run: Run;
-    editing: Pledge | null;
-    onDone: () => void;
-  },
-) {
-  const ref = useRef<HTMLFormElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [logoName, setLogoName] = useState("");
-  useEffect(() => {
-    ref.current?.reset();
-    setLogoName("");
-  }, [editing?.id]);
-  return (
-    <form
-      ref={ref}
-      className="panel"
-      // The server's answer renders under the form; the browser's own bubble would not match the site.
-      noValidate
-      onSubmit={(e) => {
-        e.preventDefault();
-        const form = new FormData(e.currentTarget);
-        setBusy(true);
-        const req = editing
-          ? api(`${base}/pledges/${editing.id}`, { method: "PATCH", form })
-          : api(`${base}/pledges`, { form });
-        run(() => req, editing ? "Pledge updated." : "Pledge added.")
-          .then((saved) => {
-            // A refused pledge keeps what was typed.
-            if (!saved) return;
-            ref.current?.reset();
-            setLogoName("");
-            onDone();
-          })
-          .finally(() => setBusy(false));
-      }}
-    >
-      <span className="k">
-        {editing ? `Edit the pledge from ${editing.company}` : "Add a pledge"}
-      </span>
-      <div className="grid grid-cols-[1fr_140px_130px] gap-2.5 max-[640px]:grid-cols-1">
-        <Input
-          name="company"
-          placeholder="Company *"
-          maxLength={120}
-          required
-          defaultValue={editing?.company ?? ""}
-        />
-        <Input
-          name="amount"
-          placeholder="Amount USD *"
-          inputMode="decimal"
-          required
-          defaultValue={editing ? String(editing.amountUsd) : ""}
-        />
-        <Select name="status" defaultValue={editing?.status ?? "pledged"}>
-          <option value="pledged">pledged</option>
-          <option value="received">received</option>
-          {editing && <option value="withdrawn">withdrawn</option>}
-        </Select>
-      </div>
-      <div className="mt-2.5 grid grid-cols-2 gap-2.5 max-[640px]:grid-cols-1">
-        <Input
-          name="url"
-          placeholder="Link (optional)"
-          maxLength={300}
-          defaultValue={editing?.url ?? ""}
-        />
-        <Input
-          name="note"
-          placeholder="Note (optional)"
-          maxLength={300}
-          defaultValue={editing?.note ?? ""}
-        />
-      </div>
-      <div className="mt-3.5 flex flex-wrap items-center gap-3">
-        <Button type="submit" sm loading={busy}>{editing ? "Save pledge" : "Add pledge"}</Button>
-        {editing && <Button type="button" sm variant="ghost" onClick={onDone}>Cancel</Button>}
-        <label className="btn btn-ghost btn-sm cursor-pointer">
-          <Upload className="size-3.5" />
-          {logoName || (editing?.logoUrl ? "Replace logo" : "Logo (optional)")}
-          <input
-            type="file"
-            name="logo"
-            accept=".png,.jpg,.jpeg,.webp"
-            className="sr-only"
-            onChange={(e) => setLogoName(e.target.files?.[0]?.name ?? "")}
-          />
-        </label>
-        {editing?.logoUrl && !logoName && (
-          <img src={editing.logoUrl} alt="" className="h-6 rounded bg-white p-0.5" />
-        )}
-        <span className="small dim">PNG, JPG or WEBP; shown on the public page.</span>
-      </div>
-    </form>
-  );
-}
-
-function Pledges({ page, base, run }: { page: AdminInitiativePage; base: string; run: Run }) {
-  const [editing, setEditing] = useState<Pledge | null>(null);
-  return (
-    <>
-      {page.pledges.length > 0 && (
-        <div className="tblbox mb-3.5">
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Company</th>
-                <th className="amt">Amount</th>
-                <th>Status</th>
-                <th>Note</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {page.pledges.map((p) => (
-                <tr
-                  key={p.id}
-                  className={cn(editing?.id === p.id && "[&>td]:bg-[rgba(92,183,90,.08)]")}
-                >
-                  <td>
-                    {p.logoUrl && (
-                      <img
-                        src={p.logoUrl}
-                        alt=""
-                        className="mr-2 inline h-6 rounded bg-white p-0.5 align-middle"
-                      />
-                    )}
-                    {p.url
-                      ? <a href={p.url} target="_blank" rel="noopener">{p.company}</a>
-                      : p.company}
-                  </td>
-                  <td className="amt">{usd(p.amountUsd)}</td>
-                  <td>
-                    <Select
-                      className="w-auto rounded-[10px] px-2.5 py-1.5 text-[12px]"
-                      value={p.status}
-                      onChange={(e) =>
-                        run(() =>
-                          api(`${base}/pledges/${p.id}`, {
-                            method: "PATCH",
-                            json: { status: e.target.value },
-                          })
-                        )}
-                    >
-                      {["pledged", "received", "withdrawn"].map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </Select>
-                  </td>
-                  <td className="small dim">{p.note}</td>
-                  <td className="whitespace-nowrap text-right">
-                    <button
-                      type="button"
-                      className="cursor-pointer rounded-[9px] border border-transparent bg-transparent p-1.5 text-muted hover:border-[rgba(92,183,90,.5)] hover:text-dao-green"
-                      title="Edit pledge"
-                      onClick={() => setEditing(p)}
-                    >
-                      <PencilLine className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      className="cursor-pointer rounded-[9px] border border-transparent bg-transparent p-1.5 text-[#ffb3b1] hover:border-[rgba(255,59,56,.6)]"
-                      title="Delete pledge"
-                      onClick={() =>
-                        confirm(`Delete the pledge from ${p.company}?`) &&
-                        run(
-                          () => api(`${base}/pledges/${p.id}`, { method: "DELETE" }),
-                          "Pledge deleted.",
-                        )}
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <PledgeForm base={base} run={run} editing={editing} onDone={() => setEditing(null)} />
-    </>
-  );
-}
-
-function Donations({ page, base, run }: { page: AdminInitiativePage; base: string; run: Run }) {
-  const [tx, setTx] = useState("");
-  const valid = /^0x[0-9a-fA-F]{64}$/.test(tx.trim());
-  return (
-    <>
-      {page.donations.length > 0
-        ? (
-          <div className="tblbox mb-3.5">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Donor</th>
-                  <th className="amt">USD</th>
-                  <th>Token</th>
-                  <th>Status</th>
-                  <th>Detail</th>
-                  <th>Tx</th>
-                </tr>
-              </thead>
-              <tbody>
-                {page.donations.map((d) => (
-                  <tr key={d.txHash}>
-                    <td className="whitespace-nowrap">{dt(d.confirmedAt ?? d.createdAt)}</td>
-                    <td>
-                      {d.donor
-                        ? (
-                          <Identity
-                            address={d.donor}
-                            size={18}
-                            nameClassName="text-[12.5px] font-normal text-white"
-                          />
-                        )
-                        : <span className="mono">—</span>}
-                    </td>
-                    <td className="amt">{usd(d.amountUsd)}</td>
-                    <td>
-                      {d.tokenSymbol}
-                      {d.source === "safe-api" && <span className="dim">(indexer)</span>}
-                    </td>
-                    <td>
-                      <span
-                        className={`chip st-${
-                          d.status === "confirmed"
-                            ? "approved"
-                            : d.status === "failed"
-                            ? "rejected"
-                            : "pending"
-                        }`}
-                      >
-                        {d.status}
-                      </span>
-                    </td>
-                    <td className="small dim">{d.detail}</td>
-                    <td className="mono">
-                      <a
-                        href={`https://eth.blockscout.com/tx/${d.txHash}`}
-                        target="_blank"
-                        rel="noopener"
-                      >
-                        {shortAddr(d.txHash)}
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-        : (
-          <p className="m-0 mb-3.5 small dim">
-            No donations recorded yet. Transfers to the Safe are picked up by the indexer sync;
-            paste a transaction hash below to check one right away.
-          </p>
-        )}
-      <form
-        className="panel"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!valid) return;
-          void run(
-            () => api(`${base}/donations/recheck`, { json: { txHash: tx.trim().toLowerCase() } }),
-            "Rechecked.",
-          );
-        }}
-      >
-        <span className="k">Check a transaction</span>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Input
-            className="mono min-w-[280px] flex-1"
-            placeholder="0x… transaction hash"
-            value={tx}
-            onChange={(e) => setTx(e.target.value)}
-          />
-          <Button type="submit" variant="ghost" disabled={!valid}>Recheck</Button>
-        </div>
-      </form>
-    </>
   );
 }

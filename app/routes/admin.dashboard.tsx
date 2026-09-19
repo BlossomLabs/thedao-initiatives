@@ -133,7 +133,7 @@ export default function Dashboard() {
                 aria-hidden="true"
               />
             )}
-            Maintenance{maintenance ? (maintenance.on ? " on" : " off") : ""}
+            Maintenance mode{maintenance ? (maintenance.on ? " on" : " off") : ""}
           </LinkButton>
           <Button variant="ghost" sm onClick={() => void signOut()}>Log out</Button>
         </div>
@@ -195,7 +195,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <SyncContent />
       <Admins />
 
       <SectionHeading id="moderation">Community moderation</SectionHeading>
@@ -488,15 +487,7 @@ export default function Dashboard() {
         </table>
       </div>
 
-      <SectionHeading>Content files</SectionHeading>
-      <p className="small dim">
-        Initiatives in <code className="mono">content/initiatives/*.md</code>{" "}
-        are published by pushing them to the API from the repo:{" "}
-        <code className="mono">cd api && deno task sync-content</code> (with{" "}
-        <code className="mono">ADMIN_TOKEN</code> or <code className="mono">ADMIN_PRIVATE_KEY</code>
-        {" "}
-        set). Files own the words and the goal; this panel owns status, Safes and money.
-      </p>
+      <SyncContent />
     </PageMain>
   );
 }

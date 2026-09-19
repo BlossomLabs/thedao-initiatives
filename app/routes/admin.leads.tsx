@@ -84,15 +84,13 @@ export default function Leads() {
         </div>
       )}
       {stale && (
-        <p className="mt-4 flex flex-wrap items-center gap-4">
-          <span className="small dim">
+        <div className="mt-4 flex flex-col items-start gap-3">
+          <p className="m-0 small dim">
             Funder contacts are private. Sign in again to confirm it is you.
-          </span>
-          <Button onClick={() => void confirm()}>Sign in again</Button>
-          {refused && (
-            <span className="basis-full small text-[#ffd7d6]" role="alert">{refused}</span>
-          )}
-        </p>
+          </p>
+          <Button sm onClick={() => void confirm()}>Sign in again</Button>
+          {refused && <p className="m-0 small text-[#ffd7d6]" role="alert">{refused}</p>}
+        </div>
       )}
       {error && !stale && <p className="alert" role="alert">{errorMessage(error)}</p>}
       {data && !rows.length && (

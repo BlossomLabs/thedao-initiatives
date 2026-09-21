@@ -35,33 +35,36 @@ export function sortEntries<
 export function commentRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const { db } = deps;
-  const rolesFor = (address: string, rfpId: string, isAdmin: boolean) =>
-    commentRoles(deps, address, rfpId).then((roles) =>
+  const rolesFor = (address: string, rfpId: string, isAdmin: boolean, withBadge = true) =>
+    commentRoles(deps, address, rfpId, withBadge).then((roles) =>
       isAdmin && !roles.includes("ADMIN") ? ["ADMIN", ...roles] : roles
     );
+  const listed = async (slug: string) => {
+    const initiative = await db.initiatives.bySlug(slug);
+    if (!initiative || !["approved", "archived"].includes(initiative.status)) {
+      throw new HttpError(404, "not found");
+    }
+    return initiative;
+  };
 
   r.get("/initiatives/:slug/comments", async (c) => {
     if (!(await db.rateLimit("cml:" + requireClientIp(c), 60, 60))) {
       throw new HttpError(429, "slow down");
     }
-    const initiative = await db.initiatives.bySlug(c.req.param("slug"));
-    if (!initiative || !["approved", "archived"].includes(initiative.status)) {
-      throw new HttpError(404, "not found");
-    }
+    const initiative = await listed(c.req.param("slug"));
     const rows = await db.comments.forInitiative(initiative.id);
     const user = c.var.user;
+    // No chain here: what the badge adds comes from /comments/experts.
     let myVotes: Record<string, number> = {};
     let eligible = false;
     let viewerRoles: string[] = [];
     if (user) {
       myVotes = await db.comments.votesByAddress(initiative.id, user.address);
-      eligible = user.isAdmin || await voteEligible(deps, user.address, initiative.id);
-      viewerRoles = await rolesFor(user.address, initiative.id, user.isAdmin);
+      eligible = user.isAdmin || await voteEligible(deps, user.address, initiative.id, false);
+      viewerRoles = await rolesFor(user.address, initiative.id, user.isAdmin, false);
     }
     const admins = await deps.admins.set();
-    const experts = await badgeHolders(deps.chain, rows.map((row) => row.address));
-    const live = (row: Comment) =>
-      liveRoles(admins, row.address, initiative, experts.has(row.address.toLowerCase()));
+    const live = (row: Comment) => liveRoles(admins, row.address, initiative, false);
     const replies = new Map<string, CommentJson[]>();
     const entries: Comment[] = [];
     for (const row of rows) {
@@ -78,6 +81,23 @@ export function commentRoutes(deps: Deps) {
       viewerCanVote: eligible,
       viewerRoles,
     });
+  });
+
+  /** What the ETHSecurity badge adds to a page of comments: the holders among
+   * its commenters (lowercase) and whether the viewer may vote. The only
+   * comment read that asks the chain, so the list never waits on an RPC. */
+  r.get("/initiatives/:slug/comments/experts", async (c) => {
+    if (!(await db.rateLimit("cex:" + requireClientIp(c), 60, 60))) {
+      throw new HttpError(429, "slow down");
+    }
+    const initiative = await listed(c.req.param("slug"));
+    const rows = await db.comments.forInitiative(initiative.id);
+    const user = c.var.user;
+    const [experts, viewerCanVote] = await Promise.all([
+      badgeHolders(deps.chain, rows.map((row) => row.address)),
+      user ? user.isAdmin || voteEligible(deps, user.address, initiative.id) : false,
+    ]);
+    return c.json({ experts: [...experts], viewerCanVote });
   });
 
   r.post("/initiatives/:slug/comments", async (c) => {

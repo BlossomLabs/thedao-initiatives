@@ -11,7 +11,9 @@ import { cn } from "~/lib/utils";
 import {
   adminAction,
   commentsKey,
+  expertsKey,
   fetchComments,
+  fetchExperts,
   fetchMine,
   mineKey,
   postComment,
@@ -52,10 +54,27 @@ export default function CommentsSection({ initiativeId, slug, open }: {
 
   const entries = q.data?.entries ?? [];
   const isAdmin = Boolean(session?.isAdmin);
-  const canVote = Boolean(q.data?.viewerCanVote) || isAdmin;
+  // The list never waits on the chain. Who holds the ETHSecurity badge, and
+  // whether it lets the viewer vote, arrives after it with a request of its own.
+  const wallets = entries.some((e) => e.address || e.replies?.some((r) => r.address));
+  const badge = useQuery({
+    queryKey: expertsKey(slug, sessionKey(session), initiativeId),
+    queryFn: ({ signal }) => fetchExperts(slug, signal, !session),
+    enabled: q.isSuccess && (wallets || (Boolean(session) && !isAdmin)),
+    staleTime: 5 * 60_000,
+  });
+  const canVote = Boolean(q.data?.viewerCanVote || badge.data?.viewerCanVote) || isAdmin;
 
   const list = useMemo(() => {
-    const l = [...entries];
+    const experts = new Set(badge.data?.experts ?? []);
+    const tagged = (c: CommentEntry): CommentEntry => ({
+      ...c,
+      roles: experts.has(c.address.toLowerCase()) && !c.roles.includes("EXPERT")
+        ? [...c.roles, "EXPERT"]
+        : c.roles,
+      replies: c.replies?.map(tagged),
+    });
+    const l = entries.map(tagged);
     l.sort((a, b) => {
       if (Boolean(a.featured) !== Boolean(b.featured)) return a.featured ? -1 : 1;
       if (a.featured && b.featured) return b.featuredAt - a.featuredAt;
@@ -63,7 +82,7 @@ export default function CommentsSection({ initiativeId, slug, open }: {
       return b.votes - a.votes || b.createdAt - a.createdAt;
     });
     return l;
-  }, [entries, sort]);
+  }, [entries, sort, badge.data]);
 
   const held = (mine.data?.held ?? []).filter((h) => !entries.some((e) => e.id === h.id));
   const patch = (fn: (d: CommentsResponse) => CommentsResponse) =>

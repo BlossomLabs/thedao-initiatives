@@ -457,23 +457,32 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   h.close();
 });
 
-Deno.test("EXPERT is a live role: it follows the badge, on old comments and in the admin views", async () => {
+Deno.test("EXPERT is a live role: a separate request says who holds the badge, and the comment list never asks the chain", async () => {
   const { h, initiative, post } = await setup();
   const admin = await h.mint(ADMIN, true);
-  const list = async () =>
-    (await j(await h.req(`/api/initiatives/${initiative.slug}/comments`)) as {
+  const base = `/api/initiatives/${initiative.slug}/comments`;
+  const list = async (token?: string) =>
+    await j(await h.req(base, { token })) as {
       entries: { id: string; roles: string[] }[];
-    }).entries;
-  const rolesOf = async (id: string) => (await list()).find((e) => e.id === id)!.roles;
+      viewerCanVote: boolean;
+    };
+  const experts = async (token?: string) =>
+    await j(await h.req(base + "/experts", { token })) as {
+      experts: string[];
+      viewerCanVote: boolean;
+    };
+  const rolesOf = async (id: string) => (await list()).entries.find((e) => e.id === id)!.roles;
 
-  // DONOR comments twice before holding the badge; EXPERT comments while holding it.
+  // DONOR comments before holding the badge; EXPERT comments while holding it.
   const d1 = await j(await post(await h.mint(DONOR), { body: "donor q" })) as { id: string };
-  const d2 = await j(await post(await h.mint(DONOR), { body: "donor q2" })) as { id: string };
-  const e1 = await j(await post(await h.mint(EXPERT), { body: "expert q" })) as { id: string };
+  const e1 = await j(await post(await h.mint(EXPERT), { body: "expert q" })) as {
+    id: string;
+    entry: { roles: string[] };
+  };
   await h.req(`/api/admin/comments/${d1.id}/publish`, { method: "POST", token: admin });
-  assertEquals(await rolesOf(d1.id), ["DONOR"]);
-  assertEquals(await rolesOf(e1.id), ["EXPERT"]);
+  assertEquals(e1.entry.roles, ["EXPERT"]); // the author sees the tag at once
   assertEquals((await h.db.comments.get(e1.id))!.roles, []); // never stored on the comment
+  assertEquals((await experts()).experts, [EXPERT.toLowerCase()]);
 
   // An older comment that still carries the stored tag, from a wallet with no badge.
   const p1 = await j(await post(await h.mint(PLAIN), { body: "plain q" })) as { id: string };
@@ -488,19 +497,27 @@ Deno.test("EXPERT is a live role: it follows the badge, on old comments and in t
   h.script.badgeHolders.add(DONOR.toLowerCase());
   h.clock.now += 3601;
   h.script.calls.length = 0;
-  assertEquals(await rolesOf(d1.id), ["EXPERT", "DONOR"]);
-  assertEquals(await rolesOf(e1.id), []);
-  assertEquals(await rolesOf(p1.id), []);
+  assertEquals((await experts()).experts, [DONOR.toLowerCase()]);
+  assertEquals(h.script.calls.filter((m) => m === "eth_call").length, 3); // DONOR, EXPERT, PLAIN
 
-  // The admin views agree, and one page looks each wallet up once.
-  const published = await j(
-    await h.req(`/api/admin/comments/${d2.id}/publish`, { method: "POST", token: admin }),
-  ) as { comment: { roles: string[] } };
-  assertEquals(published.comment.roles, ["EXPERT", "DONOR"]);
+  // The list carries the roles that need no chain, for visitors and signed-in viewers alike.
   h.clock.now += 3601;
   h.script.calls.length = 0;
-  await list();
-  assertEquals(h.script.calls.filter((m) => m === "eth_call").length, 3); // DONOR, EXPERT, PLAIN
+  assertEquals(await rolesOf(d1.id), ["DONOR"]);
+  assertEquals(await rolesOf(e1.id), []);
+  assertEquals(await rolesOf(p1.id), []);
+  const holder = "0x7777777777777777777777777777777777777777";
+  h.script.badgeHolders.add(holder);
+  const holderToken = await h.mint(holder);
+  assertEquals((await list(holderToken)).viewerCanVote, false);
+  assertEquals((await list(await h.mint(DONOR))).viewerCanVote, true); // $25 donated
+  assertEquals(h.script.calls.length, 0);
+  // The badge's say on voting comes with the separate request.
+  assertEquals((await experts(holderToken)).viewerCanVote, true);
+  assertEquals((await experts(await h.mint(PLAIN))).viewerCanVote, false);
+  assertEquals((await experts()).viewerCanVote, false);
+
+  assertEquals((await h.req("/api/initiatives/nope/comments/experts")).status, 404);
   h.close();
 });
 

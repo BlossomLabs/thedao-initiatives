@@ -261,8 +261,16 @@ export interface DonateResult {
 
 export interface CommentsResponse {
   entries: CommentEntry[];
+  /** From what needs no chain lookup; the badge's say comes with CommentExperts. */
   viewerCanVote: boolean;
   viewerRoles: string[];
+}
+
+/** What the ETHSecurity badge adds to a page of comments, asked apart from the list. */
+export interface CommentExperts {
+  /** Lowercase addresses of the commenters who hold the badge. */
+  experts: string[];
+  viewerCanVote: boolean;
 }
 
 export interface PostCommentResult {

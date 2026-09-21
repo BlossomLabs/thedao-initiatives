@@ -1,12 +1,26 @@
 import { api } from "~/lib/api";
-import type { CommentEntry, CommentsResponse, HeldMine, PostCommentResult } from "~/lib/api-types";
+import type {
+  CommentEntry,
+  CommentExperts,
+  CommentsResponse,
+  HeldMine,
+  PostCommentResult,
+} from "~/lib/api-types";
 
 export const commentsKey = (slug: string, who: string | null, initiativeId: string) =>
   ["comments", slug, who ?? "", initiativeId] as const;
+export const expertsKey = (slug: string, who: string | null, initiativeId: string) =>
+  ["comment-experts", slug, who ?? "", initiativeId] as const;
 export const mineKey = (scope: string) => ["comments-mine", scope] as const;
 
 export const fetchComments = (slug: string, signal?: AbortSignal, anonymous = false) =>
   api<CommentsResponse>(`/api/initiatives/${encodeURIComponent(slug)}/comments`, {
+    signal,
+    anonymous,
+  });
+/** The badge lookups go to the chain, so they travel apart from the list. */
+export const fetchExperts = (slug: string, signal?: AbortSignal, anonymous = false) =>
+  api<CommentExperts>(`/api/initiatives/${encodeURIComponent(slug)}/comments/experts`, {
     signal,
     anonymous,
   });

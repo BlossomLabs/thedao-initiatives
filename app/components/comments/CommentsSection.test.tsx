@@ -10,7 +10,19 @@ vi.mock("~/context/session", () => ({
   sessionKey: () => null,
 }));
 vi.mock("~/lib/api", () => ({ api: vi.fn() }));
-vi.mock("./EntryCard", () => ({ default: () => null }));
+vi.mock("./EntryCard", () => ({
+  default: (
+    { c, canVote }: {
+      c: { id: string; roles: string[]; replies?: { id: string; roles: string[] }[] };
+      canVote: boolean;
+    },
+  ) => (
+    <div>
+      {[c, ...(c.replies ?? [])].map((x) => `${x.id}:${x.roles.join("+")}`).join(" ")}
+      {canVote ? " votes" : ""}
+    </div>
+  ),
+}));
 vi.mock("./Composer", () => ({
   default: (
     { onPost }: { onPost: (...args: [string, string, string, boolean]) => Promise<unknown> },
@@ -55,6 +67,49 @@ it("posts the displayed proposal ID and separates comment caches for reused URLs
     )
   );
   expect(qc.getQueryCache().findAll({ queryKey: ["comments", "shared-url"] })).toHaveLength(2);
+  unmount();
+  qc.clear();
+});
+
+it("adds the Expert tag and the badge's vote from a request of their own, after the list", async () => {
+  localStorage.clear();
+  const holder = "0x3333333333333333333333333333333333333333";
+  const entry = (id: string, address: string, roles: string[], replies: unknown[] = []) => ({
+    id,
+    address,
+    roles,
+    replies,
+    votes: 0,
+    createdAt: 1,
+  });
+  let answerExperts = (_v: unknown) => {};
+  vi.mocked(api).mockImplementation((path) =>
+    path.endsWith("/comments/experts")
+      ? new Promise((resolve) => (answerExperts = resolve))
+      : Promise.resolve({
+        entries: [
+          entry("a", holder.toUpperCase().replace("0X", "0x"), ["DONOR"], [
+            entry("r", holder, []),
+          ]),
+          entry("b", "0x4444444444444444444444444444444444444444", ["CURATOR"]),
+          entry("c", "", []),
+        ],
+        viewerCanVote: false,
+        viewerRoles: [],
+      })
+  );
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const { unmount } = render(
+    <QueryClientProvider client={qc}>
+      <CommentsSection initiativeId="id" slug="s" open={false} />
+    </QueryClientProvider>,
+  );
+  // The comments are on screen while the chain is still being asked.
+  expect(await screen.findByText("a:DONOR r:")).toBeTruthy();
+  expect(api).toHaveBeenCalledWith("/api/initiatives/s/comments/experts", expect.anything());
+  answerExperts({ experts: [holder], viewerCanVote: true });
+  expect(await screen.findByText("a:DONOR+EXPERT r:EXPERT votes")).toBeTruthy();
+  expect(screen.getByText("b:CURATOR votes")).toBeTruthy();
   unmount();
   qc.clear();
 });

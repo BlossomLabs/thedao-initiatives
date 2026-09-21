@@ -28,10 +28,6 @@ export function liveRoles(
   return roles;
 }
 
-/** How long a page of comments waits for the chain before it goes out
- * without the EXPERT tags. The lookups finish on their own and fill the cache. */
-const BADGE_WAIT_MS = 1500;
-
 /** The badge holders among a page's commenters, lowercase: one lookup per
  * wallet, all at once. Anonymous comments have no address and are skipped. */
 export async function badgeHolders(
@@ -39,14 +35,7 @@ export async function badgeHolders(
   addresses: string[],
 ): Promise<Set<string>> {
   const wallets = [...new Set(addresses.filter(Boolean).map((a) => a.toLowerCase()))];
-  if (!wallets.length) return new Set();
-  const held = await new Promise<boolean[]>((resolve) => {
-    const timer = setTimeout(() => resolve([]), BADGE_WAIT_MS);
-    Promise.all(wallets.map((a) => chain.hasBadge(a))).then((all) => {
-      clearTimeout(timer);
-      resolve(all);
-    });
-  });
+  const held = await Promise.all(wallets.map((a) => chain.hasBadge(a)));
   return new Set(wallets.filter((_, i) => held[i]));
 }
 
@@ -66,31 +55,35 @@ async function isProposer(db: Db, address: string, rfpId: string): Promise<boole
 }
 
 /** Non-administrator authorization roles on THIS initiative. Callers add
- * ADMIN only from the authenticated session; live membership is display-only. */
+ * ADMIN only from the authenticated session; live membership is display-only.
+ * `withBadge: false` leaves the chain out: a page read never waits on it. */
 export async function commentRoles(
   deps: { db: Db; chain: Chain },
   address: string,
   rfpId: string,
+  withBadge = true,
 ): Promise<string[]> {
   const roles: string[] = [];
   if (!address) return roles;
   if (await isProposer(deps.db, address, rfpId)) roles.push("PROPOSER");
   if (isCurator(address)) roles.push("CURATOR");
-  if (await deps.chain.hasBadge(address)) roles.push("EXPERT");
+  if (withBadge && await deps.chain.hasBadge(address)) roles.push("EXPERT");
   if ((await deps.db.donations.totalFor(rfpId, address)) > 0) roles.push("DONOR");
   return roles;
 }
 
 /** Non-administrator eligibility, or $20+ confirmed donations to this initiative.
- * Callers separately allow administrator-authenticated sessions. */
+ * Callers separately allow administrator-authenticated sessions. The badge is
+ * asked last, and not at all with `withBadge: false`. */
 export async function voteEligible(
   deps: { db: Db; chain: Chain },
   address: string,
   rfpId: string,
+  withBadge = true,
 ): Promise<boolean> {
   if (!address) return false;
   if (isCurator(address)) return true;
   if (await isProposer(deps.db, address, rfpId)) return true;
-  if (await deps.chain.hasBadge(address)) return true;
-  return (await deps.db.donations.totalFor(rfpId, address)) >= MIN_VOTE_DONATION_USD;
+  if ((await deps.db.donations.totalFor(rfpId, address)) >= MIN_VOTE_DONATION_USD) return true;
+  return withBadge && await deps.chain.hasBadge(address);
 }

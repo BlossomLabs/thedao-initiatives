@@ -85,8 +85,10 @@ and the reason behind it.
   accepted from the wallet it resolves to.
 - **Roles are decided live where they can be.** ADMIN, PROPOSER and EXPERT tags on comments are
   computed at view time from the current state, so a change of team, owner or badge holder updates
-  old comments too; the other roles (curator, donor) stay snapshotted at post time as before. A
-  page of comments waits 1.5 s for the badge lookups and goes out without EXPERT tags past that.
+  old comments too; the other roles (curator, donor) stay snapshotted at post time as before. The
+  comment list never asks the chain: the page asks `/comments/experts` apart from it for the badge
+  holders among its commenters and for whether the badge lets the viewer vote, and adds both when
+  the answer arrives.
 
 ## Cryptography and correctness
 

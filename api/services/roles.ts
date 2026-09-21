@@ -5,14 +5,18 @@ import type { Chain } from "../chain/mod.ts";
 
 export const ROLE_FAST_LANE = new Set(["ADMIN", "PROPOSER", "CURATOR", "EXPERT"]);
 
-/** Roles shown from the current state, never stored on a comment: the team
- * and the initiative's proposer can change, and the label follows. */
-export const LIVE_ROLES = new Set(["ADMIN", "PROPOSER"]);
+/** Roles shown from the current state, never stored on a comment: the team,
+ * the initiative's proposer and the badge can change, and the label follows. */
+export const LIVE_ROLES = new Set(["ADMIN", "PROPOSER", "EXPERT"]);
+
+/** The order role tags are shown in; a comment carries the first two. */
+export const ROLE_ORDER = ["ADMIN", "PROPOSER", "CURATOR", "EXPERT", "DONOR"];
 
 export function liveRoles(
   admins: Set<string>,
   address: string,
   initiative: { proposer: string } | null | undefined,
+  holdsBadge: boolean,
 ): string[] {
   const roles: string[] = [];
   if (!address) return roles;
@@ -20,7 +24,30 @@ export function liveRoles(
   if (initiative?.proposer && initiative.proposer.toLowerCase() === address.toLowerCase()) {
     roles.push("PROPOSER");
   }
+  if (holdsBadge) roles.push("EXPERT");
   return roles;
+}
+
+/** How long a page of comments waits for the chain before it goes out
+ * without the EXPERT tags. The lookups finish on their own and fill the cache. */
+const BADGE_WAIT_MS = 1500;
+
+/** The badge holders among a page's commenters, lowercase: one lookup per
+ * wallet, all at once. Anonymous comments have no address and are skipped. */
+export async function badgeHolders(
+  chain: Pick<Chain, "hasBadge">,
+  addresses: string[],
+): Promise<Set<string>> {
+  const wallets = [...new Set(addresses.filter(Boolean).map((a) => a.toLowerCase()))];
+  if (!wallets.length) return new Set();
+  const held = await new Promise<boolean[]>((resolve) => {
+    const timer = setTimeout(() => resolve([]), BADGE_WAIT_MS);
+    Promise.all(wallets.map((a) => chain.hasBadge(a))).then((all) => {
+      clearTimeout(timer);
+      resolve(all);
+    });
+  });
+  return new Set(wallets.filter((_, i) => held[i]));
 }
 
 /** The roles worth snapshotting on a comment (everything but the live ones). */

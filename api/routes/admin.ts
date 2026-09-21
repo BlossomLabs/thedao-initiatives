@@ -24,7 +24,7 @@ import { isAddress, toChecksum } from "../chain/address.ts";
 import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
 import { refreshLedger } from "../services/ledger.ts";
 import { exportBackup, restoreBackup, validateBackup } from "../services/backup.ts";
-import { liveRoles } from "../services/roles.ts";
+import { badgeHolders, liveRoles } from "../services/roles.ts";
 import type { AdminEntry } from "../services/admins.ts";
 import type { Comment, Initiative, Pledge, PledgeStatus } from "../db/types.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
@@ -70,9 +70,11 @@ export function adminRoutes(deps: Deps) {
   const withInitiative = async (rows: Comment[]) => {
     const out = [];
     const admins = await deps.admins.set();
+    const experts = await badgeHolders(deps.chain, rows.map((cm) => cm.address));
     for (const cm of rows) {
       const initiative = await db.initiatives.get(cm.rfpId);
-      out.push(adminCommentJson(cm, liveRoles(admins, cm.address, initiative), initiative));
+      const live = liveRoles(admins, cm.address, initiative, experts.has(cm.address.toLowerCase()));
+      out.push(adminCommentJson(cm, live, initiative));
     }
     return out;
   };
@@ -592,7 +594,12 @@ export function adminRoutes(deps: Deps) {
     return c.json({
       comment: adminCommentJson(
         next!,
-        liveRoles(await deps.admins.set(), next!.address, initiative),
+        liveRoles(
+          await deps.admins.set(),
+          next!.address,
+          initiative,
+          Boolean(next!.address) && await deps.chain.hasBadge(next!.address),
+        ),
         initiative,
       ),
     });

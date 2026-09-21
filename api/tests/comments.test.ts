@@ -457,6 +457,53 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   h.close();
 });
 
+Deno.test("EXPERT is a live role: it follows the badge, on old comments and in the admin views", async () => {
+  const { h, initiative, post } = await setup();
+  const admin = await h.mint(ADMIN, true);
+  const list = async () =>
+    (await j(await h.req(`/api/initiatives/${initiative.slug}/comments`)) as {
+      entries: { id: string; roles: string[] }[];
+    }).entries;
+  const rolesOf = async (id: string) => (await list()).find((e) => e.id === id)!.roles;
+
+  // DONOR comments twice before holding the badge; EXPERT comments while holding it.
+  const d1 = await j(await post(await h.mint(DONOR), { body: "donor q" })) as { id: string };
+  const d2 = await j(await post(await h.mint(DONOR), { body: "donor q2" })) as { id: string };
+  const e1 = await j(await post(await h.mint(EXPERT), { body: "expert q" })) as { id: string };
+  await h.req(`/api/admin/comments/${d1.id}/publish`, { method: "POST", token: admin });
+  assertEquals(await rolesOf(d1.id), ["DONOR"]);
+  assertEquals(await rolesOf(e1.id), ["EXPERT"]);
+  assertEquals((await h.db.comments.get(e1.id))!.roles, []); // never stored on the comment
+
+  // An older comment that still carries the stored tag, from a wallet with no badge.
+  const p1 = await j(await post(await h.mint(PLAIN), { body: "plain q" })) as { id: string };
+  await h.req(`/api/admin/comments/${p1.id}/publish`, { method: "POST", token: admin });
+  await h.kv.set(K.comment(initiative.id, p1.id), {
+    ...(await h.db.comments.get(p1.id))!,
+    roles: ["EXPERT"],
+  });
+
+  // The badge changes hands; the hourly cache runs out.
+  h.script.badgeHolders.delete(EXPERT.toLowerCase());
+  h.script.badgeHolders.add(DONOR.toLowerCase());
+  h.clock.now += 3601;
+  h.script.calls.length = 0;
+  assertEquals(await rolesOf(d1.id), ["EXPERT", "DONOR"]);
+  assertEquals(await rolesOf(e1.id), []);
+  assertEquals(await rolesOf(p1.id), []);
+
+  // The admin views agree, and one page looks each wallet up once.
+  const published = await j(
+    await h.req(`/api/admin/comments/${d2.id}/publish`, { method: "POST", token: admin }),
+  ) as { comment: { roles: string[] } };
+  assertEquals(published.comment.roles, ["EXPERT", "DONOR"]);
+  h.clock.now += 3601;
+  h.script.calls.length = 0;
+  await list();
+  assertEquals(h.script.calls.filter((m) => m === "eth_call").length, 3); // DONOR, EXPERT, PLAIN
+  h.close();
+});
+
 Deno.test("two-tier ordering: featured (newest featured first), then votes, then newest", () => {
   const e = (
     id: string,

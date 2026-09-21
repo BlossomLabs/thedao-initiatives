@@ -83,9 +83,10 @@ and the reason behind it.
   may be held for admin review, with a private claim token so the author still sees it;
   anonymous replies are limited to three per hour per address, and a `.eth` name is only
   accepted from the wallet it resolves to.
-- **Roles are decided live where they can be.** ADMIN and PROPOSER tags on comments are computed at
-  view time from the current state, so a change of team or owner updates old comments too; the
-  other roles (curator, badge holder, donor) stay snapshotted at post time as before.
+- **Roles are decided live where they can be.** ADMIN, PROPOSER and EXPERT tags on comments are
+  computed at view time from the current state, so a change of team, owner or badge holder updates
+  old comments too; the other roles (curator, donor) stay snapshotted at post time as before. A
+  page of comments waits 1.5 s for the badge lookups and goes out without EXPERT tags past that.
 
 ## Cryptography and correctness
 

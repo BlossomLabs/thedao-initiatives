@@ -3,7 +3,7 @@
  * and comment `email` are private and only leave through the admin shapes.
  */
 import type { Comment, Donation, Initiative, Pledge, Revision } from "../db/types.ts";
-import { LIVE_ROLES } from "../services/roles.ts";
+import { LIVE_ROLES, ROLE_ORDER } from "../services/roles.ts";
 import type { Config } from "../config.ts";
 import { isStructured } from "../../shared/draft/mod.ts";
 import { pickText } from "../db/initiatives.ts";
@@ -157,8 +157,9 @@ export function donationJson(
 export type CommentJson = Record<string, unknown>;
 
 /**
- * `live` holds the roles decided at view time (team, proposer); they come
- * first and replace any such tag an older comment still carries.
+ * `live` holds the roles decided at view time (team, proposer, badge); they
+ * replace any such tag an older comment still carries. The two that rank
+ * highest in ROLE_ORDER go out.
  */
 export function commentJson(
   c: Comment,
@@ -173,7 +174,8 @@ export function commentJson(
     body: c.body,
     displayName: c.displayName,
     address: c.address,
-    roles: [...live, ...c.roles.filter((r) => !LIVE_ROLES.has(r))].slice(0, 2),
+    roles: [...live, ...c.roles.filter((r) => !LIVE_ROLES.has(r))]
+      .sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b)).slice(0, 2),
     answered: c.answered,
     reviewed: c.reviewed,
     accepted: c.accepted,

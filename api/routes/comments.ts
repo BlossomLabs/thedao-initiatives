@@ -10,6 +10,7 @@ import { type CommentJson, commentJson } from "../lib/json.ts";
 import { capped } from "../lib/validate.ts";
 import { assertEthNameOwned } from "../services/names.ts";
 import {
+  badgeHolders,
   commentRoles,
   liveRoles,
   ROLE_FAST_LANE,
@@ -58,7 +59,9 @@ export function commentRoutes(deps: Deps) {
       viewerRoles = await rolesFor(user.address, initiative.id, user.isAdmin);
     }
     const admins = await deps.admins.set();
-    const live = (row: Comment) => liveRoles(admins, row.address, initiative);
+    const experts = await badgeHolders(deps.chain, rows.map((row) => row.address));
+    const live = (row: Comment) =>
+      liveRoles(admins, row.address, initiative, experts.has(row.address.toLowerCase()));
     const replies = new Map<string, CommentJson[]>();
     const entries: Comment[] = [];
     for (const row of rows) {
@@ -156,7 +159,7 @@ export function commentRoutes(deps: Deps) {
       entry: status === "published"
         ? commentJson(
           cm,
-          liveRoles(await deps.admins.set(), address, initiative),
+          liveRoles(await deps.admins.set(), address, initiative, roles.includes("EXPERT")),
           startVote ? { [cm.id]: 1 } : {},
           [],
         )
@@ -310,7 +313,12 @@ export function commentRoutes(deps: Deps) {
       reply: status === "published"
         ? commentJson(
           reply,
-          liveRoles(await deps.admins.set(), address, await db.initiatives.get(parent.rfpId)),
+          liveRoles(
+            await deps.admins.set(),
+            address,
+            await db.initiatives.get(parent.rfpId),
+            roles.includes("EXPERT"),
+          ),
         )
         : null,
       claimToken: status === "held" ? reply.claimToken : "",

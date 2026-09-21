@@ -27,13 +27,10 @@ export function FundedChip() {
 }
 
 const ROLE_TAGS: Record<string, [string, string]> = {
-  ADMIN: ["TheDAO team", "text-dao-amber border-[rgba(255,180,50,.32)] bg-[rgba(255,180,50,.12)]"],
+  ADMIN: ["Admin", "text-dao-amber border-[rgba(255,180,50,.32)] bg-[rgba(255,180,50,.12)]"],
   PROPOSER: ["Proposer", "text-dao-sky border-[rgba(90,200,250,.4)] bg-[rgba(90,200,250,.12)]"],
   CURATOR: ["Curator", "text-dao-green border-[rgba(92,183,90,.35)] bg-[rgba(92,183,90,.12)]"],
-  EXPERT: [
-    "ETHSecurity Badgeholder",
-    "text-dao-rfp border-[rgba(126,179,255,.3)] bg-[rgba(44,94,134,.22)]",
-  ],
+  EXPERT: ["Expert", "text-dao-red border-[rgba(255,59,56,.4)] bg-[rgba(255,59,56,.12)]"],
   DONOR: ["Donor", "text-[#c4a6ff] border-[rgba(160,108,255,.4)] bg-[rgba(160,108,255,.14)]"],
 };
 

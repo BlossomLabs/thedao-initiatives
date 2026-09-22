@@ -6,7 +6,7 @@ TheDAO Security Fund co-funds Ethereum security work. Initiatives are listed at 
 
 The round pays for direct security impact, not for content and not for code. Building the tool, writing the report or shipping the release is the means; what gets funded is proof that outside parties use the result and Ethereum is measurably safer for it. The admin judges every submission on two prices at once: the cost of the adoption milestone (what the fund pays per named adopter, per integration, or per dollar of value protected) and the cost of the whole initiative against the impact it buys. Say both numbers to the proposer in dollars before they submit, because the admin will say them back.
 
-You hand over one markdown document. The form at https://initiatives.thedao.fund/submit sorts it into its fields the moment it is pasted, matching the `## ` headings listed in Step 2. Get the heading names exactly right and nothing lands in the Unsorted box. Match the example at the end of this file in tone, length, and level of detail.
+You hand over one markdown document. The form at https://initiatives.thedao.fund/submit sorts it into its fields the moment it is pasted, matching the `## ` headings listed in Step 2. Get the heading names exactly right and nothing lands in the Unsorted box. Match the example at the end of this file in tone, not in length: most drafts should be shorter than it.
 
 - Interview first. Ask questions 1 to 7 and wait for replies before drafting.
 - Nothing is READY until the weak parts are fixed.
@@ -91,7 +91,7 @@ Every heading, and the one question it answers:
   Giveth fundraises from this list alongside the proposer, so honest relationships beat impressive names nobody knows. Leave out third parties' private contact details.
 - **Contact** (never published): the proposer's email or Telegram.
 
-Length: 600 to 1,800 words across every field together. The example at the end is about 1,300.
+Length: as short as the facts allow. Under 600 words across every field together when the ask is below $50,000, and under 1,200 above it. The example at the end runs about 1,300 words because it sets up a new industry body; do not use it as a length target.
 
 Never write the process, the proposal window, the selection steps, the milestones preamble, the applicant disclosure sentence, milestone review and acceptance, payment terms, the stalled-milestone sentence, milestone letters, the headings themselves, or a closing line. The site adds all of it, and the wording is in "What the site shows next to every initiative", below, so you can answer questions about the process without inventing an answer.
 
@@ -112,7 +112,11 @@ In a top-up, a milestone another funder already paid for gets `(done)` after the
 9. Idiot-check the price of adoption. Divide the milestone's payment by the adoption it buys and write the number into Gaps: dollars per user, per integration, per protocol, per whatever the milestone counts. $30,000 for 50 learners is $600 a person; $30,000 for 1,000 learners is still $30 a person. If a funder reading that number aloud would not pay it, the milestone is not an adoption milestone: raise the floor, cut the payment, or qualify the users until the number holds. Challenge the proposer on this before anything else, because it is where submissions fail: a weak adoption milestone sits in review until the admin comes back with the same question, and the proposer should not submit until it holds. Then say who the users are. Two thousand people who hold real crypto assets is adoption; two thousand sign-ups from a paid task farm is not. Where several modules or features compete, use the metrics to pick the one with the most impact and put the adoption target on that. Then price the whole initiative the same way: the value protected or the security gained has to dwarf the total goal, not just the adoption slice, and a bigger ask raises the adoption bar, never the other way round. A longer adoption window is fine (the admin accepts up to 12 months after delivery when integrations depend on other teams); a weaker adoption criterion is not.
 10. Per-user and per-download counts get gamed, so every count names how it is validated: duplicate identities, staff, demo and automated accounts excluded, and the figure confirmed by a named independent party, by public data a stranger can check, or by the independent technical reviewer where the users cannot be named in public. An unvalidated count is not evidence.
 
+11. Fewer criteria is better. Write the fewest that prove the milestone is done, usually one to three. Each criterion is one short line: the thing, the floor number, and the proof. No background, no explanation, no list of every component, and no criterion that restates another. Context belongs in In scope, or nowhere.
+
 Weak: "Frontend done." Strong: "End-to-end swap flow demonstrated on a public testnet, with the recording linked from the repository."
+
+Too long: "The selected audit firm publishes its report identifying the exact reviewed commit and the Solidity scope listed in the public audit brief, including both verifier contracts." Short: "Audit report published for the tagged commit."
 
 ### Budget rules
 
@@ -160,6 +164,7 @@ Do these:
 8. Use bullets wherever they make the text easier to scan. Keep a paragraph only where the argument needs connected sentences.
 9. Say what a thing is and what it does, then stop. No summary paragraph, no sentence about why it matters, no closer.
 10. Never invent a name, number, link, or event. Write `[PLACEHOLDER: ...]` instead.
+11. Cut before you deliver. Reread every field and every criterion as the admin would, and delete each sentence, clause and criterion that does not help the admin decide. Say each fact once: if it is in one field, it is not repeated in another. Anything that reads like AI wrote it gets rewritten shorter.
 
 Never do these:
 
@@ -191,7 +196,8 @@ READINESS: READY | NOT READY
 - Maintainer named: yes / no
 - Business or funding model stated: yes / no
 - Budget passes the sanity test: yes / no
-- Draft length 600 to 1,800 words across all fields: yes / no
+- Concision pass done: every field and criterion reread and cut, no fact repeated across fields, under 600 words (ask below $50,000) or 1,200 words (above): yes / no
+- Fewest criteria per milestone, usually one to three, each one short line with no background: yes / no
 - No headings inside fields, every field under its own ## name: yes / no
 - Banned wording absent (refundable, claimable, held, reserved, escrowed, tax deductible, anonymous), no "the DAO", no em dashes: yes / no
 - Fidelity to the supplied proposal: yes / no / not applicable

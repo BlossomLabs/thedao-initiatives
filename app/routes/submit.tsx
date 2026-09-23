@@ -13,6 +13,7 @@ import Identity from "~/components/wallet/Identity";
 import InitiativeForm, { FormGrid } from "~/components/initiative-form/InitiativeForm";
 import type { Draft } from "~/components/initiative-form/types";
 import { useSession } from "~/context/session";
+import { useWalletPicker } from "~/context/wallet-picker";
 import { useProfileDialog } from "~/context/profile-dialog";
 import { useIdentity } from "~/hooks/use-identity";
 import { useSiteSettings } from "~/hooks/use-site-settings";
@@ -55,6 +56,7 @@ function useSubmitter() {
 function Gate({ children, aside }: { children: React.ReactNode; aside: React.ReactNode }) {
   const { isConnected, status, signIn, signingIn, identity, signedIn, complete } = useSubmitter();
   const { openProfile } = useProfileDialog();
+  const { openWalletPicker } = useWalletPicker();
   const [error, setError] = useState("");
 
   // wagmi starts a reload as "reconnecting" (and stays there while an injected
@@ -134,15 +136,19 @@ function Gate({ children, aside }: { children: React.ReactNode; aside: React.Rea
             ))}
           </ol>
           {step === 0 && isConnected && (
-            <Button
-              variant="primary"
-              className="self-start"
-              loading={signingIn}
-              onClick={() =>
-                signIn().catch((e) => setError("Not signed in: " + walletErrorMessage(e)))}
-            >
-              Sign in with {identity.name}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="primary"
+                loading={signingIn}
+                onClick={() =>
+                  signIn().catch((e) => setError("Not signed in: " + walletErrorMessage(e)))}
+              >
+                Sign in with {identity.name}
+              </Button>
+              <Button variant="ghost" disabled={signingIn} onClick={openWalletPicker}>
+                Use a different wallet
+              </Button>
+            </div>
           )}
           {step === 1 && (
             <Button

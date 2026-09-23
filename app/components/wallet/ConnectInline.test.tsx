@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import ConnectInline from "./ConnectInline";
 
@@ -26,28 +26,14 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("signs in with the connected wallet without opening another wallet picker", async () => {
+it("opens the chooser for a connected wallet without a session, so another wallet or email stays reachable", () => {
   state.isConnected = true;
   render(<ConnectInline />);
   const button = screen.getByRole("button", { name: "Sign in" });
-  expect(button).not.toHaveAttribute("aria-haspopup");
+  expect(button).toHaveAttribute("aria-haspopup", "dialog");
   fireEvent.click(button);
-  await waitFor(() => expect(state.signIn).toHaveBeenCalledOnce());
-  expect(state.openWalletPicker).not.toHaveBeenCalled();
-});
-
-it("shows a refused signature and allows a retry on the same connection", async () => {
-  state.isConnected = true;
-  state.signIn.mockRejectedValueOnce(Object.assign(new Error("User rejected request"), {
-    code: 4001,
-  }));
-  render(<ConnectInline />);
-  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("Sign-in failed:");
-  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-  await waitFor(() => expect(state.signIn).toHaveBeenCalledTimes(2));
-  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  expect(state.openWalletPicker).not.toHaveBeenCalled();
+  expect(state.openWalletPicker).toHaveBeenCalledOnce();
+  expect(state.signIn).not.toHaveBeenCalled();
 });
 
 it.each(["connecting", "signingIn"] as const)("disables sign-in while %s", (busy) => {

@@ -1,9 +1,7 @@
-import { useEffect, useState } from "react";
 import { Wallet } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useSession } from "~/context/session";
 import { useWalletPicker } from "~/context/wallet-picker";
-import { walletErrorMessage } from "~/lib/donate";
 import { cn } from "~/lib/utils";
 
 /** Blue outline button used for wallet actions inside forms. */
@@ -14,18 +12,13 @@ export const walletBtn =
  * "Connect wallet" for use next to a form's submit button. Disconnected: the
  * same wallet chooser and SIWE flow as the header (reopening it while a
  * pairing is in flight shows that request). Connected without a session, after
- * a restore or a dismissed signature: retries the signature in place.
+ * a restore or a dismissed signature: the chooser too, so another wallet or
+ * email stays reachable; picking the connected wallet retries the signature.
  */
 export default function ConnectInline({ className }: { className?: string }) {
-  const { connecting, signIn, signingIn } = useSession();
+  const { connecting, signingIn } = useSession();
   const { openWalletPicker, walletPickerOpen } = useWalletPicker();
   const { isConnected } = useAccount();
-  // Shown under the button until dismissed, a retry, or a successful
-  // connection made anywhere on the page.
-  const [error, setError] = useState("");
-  useEffect(() => {
-    if (isConnected) setError("");
-  }, [isConnected]);
 
   return (
     <span className={cn("relative", className)}>
@@ -33,14 +26,9 @@ export default function ConnectInline({ className }: { className?: string }) {
         type="button"
         className={walletBtn}
         disabled={isConnected && (connecting || signingIn)}
-        aria-haspopup={isConnected ? undefined : "dialog"}
-        aria-expanded={isConnected ? undefined : walletPickerOpen}
-        onClick={() => {
-          setError("");
-          if (isConnected) {
-            void signIn().catch((e) => setError("Sign-in failed: " + walletErrorMessage(e)));
-          } else openWalletPicker();
-        }}
+        aria-haspopup="dialog"
+        aria-expanded={walletPickerOpen}
+        onClick={openWalletPicker}
       >
         <Wallet className="size-3.5" />
         {connecting || signingIn
@@ -49,15 +37,6 @@ export default function ConnectInline({ className }: { className?: string }) {
           ? "Sign in"
           : "Connect wallet"}
       </button>
-      {error && (
-        <span
-          className="absolute left-0 top-[44px] z-[60] w-max max-w-[280px] rounded-xl border border-[rgba(255,59,56,.55)] bg-panel px-3 py-2 text-[12.5px] text-[#ffd7d6] shadow-menu"
-          role="alert"
-          onClick={() => setError("")}
-        >
-          {error}
-        </span>
-      )}
     </span>
   );
 }

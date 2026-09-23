@@ -3,6 +3,7 @@ import { useAccount } from "wagmi";
 import PageMain from "~/components/layout/PageMain";
 import { Button } from "~/components/ui/Button";
 import { useSession } from "~/context/session";
+import { useWalletPicker } from "~/context/wallet-picker";
 import { walletErrorMessage } from "~/lib/donate";
 import { useState } from "react";
 import { generateMeta } from "~/utils/meta";
@@ -14,6 +15,7 @@ export function meta() {
 /** Gate: everything under /admin needs a SIWE session from an admin wallet. */
 export default function AdminLayout() {
   const { session, signIn, signingIn } = useSession();
+  const { openWalletPicker } = useWalletPicker();
   const { isConnected, address } = useAccount();
   const [error, setError] = useState("");
   if (session?.isAdmin) return <Outlet />;
@@ -32,14 +34,19 @@ export default function AdminLayout() {
           </p>
         )}
         {isConnected && !session?.isAdmin && (
-          <Button
-            variant="primary"
-            loading={signingIn}
-            onClick={() =>
-              signIn().catch((e) => setError("Not signed in: " + walletErrorMessage(e)))}
-          >
-            Sign in with {address?.slice(0, 6)}…
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="primary"
+              loading={signingIn}
+              onClick={() =>
+                signIn().catch((e) => setError("Not signed in: " + walletErrorMessage(e)))}
+            >
+              Sign in with {address?.slice(0, 6)}…
+            </Button>
+            <Button variant="ghost" disabled={signingIn} onClick={openWalletPicker}>
+              Use a different wallet
+            </Button>
+          </div>
         )}
         {session && !session.isAdmin && (
           <p className="m-0 small text-[#ffd7d6]" role="alert">

@@ -8,7 +8,6 @@ import { useWalletPicker } from "~/context/wallet-picker";
 import { useIdentity } from "~/hooks/use-identity";
 import { Avatar } from "./Avatar";
 import WalletMenu, { type WalletMenuItem } from "./WalletMenu";
-import { walletErrorMessage } from "~/lib/donate";
 import { shortAddr } from "~/lib/format";
 import { cn } from "~/lib/utils";
 
@@ -20,7 +19,7 @@ import { cn } from "~/lib/utils";
  */
 export default function ConnectButton() {
   const { address, isConnected } = useAccount();
-  const { session, connecting, signingIn, signIn, signOut, switchWallet } = useSession();
+  const { session, connecting, signingIn, signOut, switchWallet } = useSession();
   // Wallet access alone does not grant a signed-in session.
   const signedIn = Boolean(
     isConnected && address && session && session.address.toLowerCase() === address.toLowerCase(),
@@ -30,7 +29,6 @@ export default function ConnectButton() {
   const { openWalletPicker, walletPickerOpen } = useWalletPicker();
   const navigate = useNavigate();
   const [menu, setMenu] = useState<"none" | "account">("none");
-  const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const copyAddress = () => {
     if (!address) return;
@@ -39,9 +37,6 @@ export default function ConnectButton() {
       setTimeout(() => setCopied(false), 1500);
     }).catch(() => {});
   };
-  useEffect(() => {
-    if (isConnected) setError("");
-  }, [isConnected]);
   // Set on a fresh sign-in; consumed once the identity lookups have settled.
   const [promptPending, setPromptPending] = useState(false);
   const who = sessionKey(session);
@@ -73,7 +68,6 @@ export default function ConnectButton() {
   ]);
 
   function onClick() {
-    setError("");
     if (connecting || signingIn) {
       openWalletPicker();
       return;
@@ -82,11 +76,10 @@ export default function ConnectButton() {
       setMenu(menu === "account" ? "none" : "account");
       return;
     }
-    if (isConnected && address) {
-      // Restored connection, expired session, or refused signature: retry SIWE.
-      signIn(address).catch((e) => setError("Not signed in: " + walletErrorMessage(e)));
-      return;
-    }
+    // Also when a wallet is connected without a session (restored connection,
+    // expired session, refused signature): the chooser lists that wallet, and
+    // picking it retries SIWE without a new permission request, but any other
+    // wallet or email stays reachable.
     openWalletPicker();
   }
 
@@ -179,15 +172,6 @@ export default function ConnectButton() {
         items={accountItems}
         onClose={() => setMenu("none")}
       />
-      {error && (
-        <div
-          className="absolute right-0 top-[46px] z-[60] w-max max-w-[300px] rounded-xl border border-[rgba(255,59,56,.55)] bg-panel px-3 py-2 text-[12.5px] text-[#ffd7d6] shadow-menu"
-          role="alert"
-          onClick={() => setError("")}
-        >
-          {error}
-        </div>
-      )}
     </div>
   );
 }

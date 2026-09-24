@@ -56,6 +56,19 @@ const isStaleMessage = (e: unknown) =>
 /** Dev-only fake wallet: it cannot sign, so it connects without a session. */
 const skipsSignIn = (c: Connector | undefined) => c?.id === "mock";
 
+/** WalletConnect's disconnect() throws before it deletes its stored session
+ * when the relay is unreachable, so the next connect() and every reload would
+ * restore that session. Delete it locally. */
+async function dropWalletConnectSession(c: Connector) {
+  if (c.id !== "walletConnect") return;
+  try {
+    const provider = await c.getProvider() as
+      | { signer?: { cleanup?(): Promise<void> } }
+      | undefined;
+    await provider?.signer?.cleanup?.();
+  } catch { /* nothing stored */ }
+}
+
 function load(): SessionInfo | null {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "null") as SessionInfo | null;
@@ -305,7 +318,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       stray.emitter.off("change", events.change);
       stray.emitter.off("disconnect", events.disconnect);
       stray.emitter.on("connect", events.connect);
-      void stray.disconnect().catch(() => {});
+      void stray.disconnect().catch(() => dropWalletConnectSession(stray));
     }), [config]);
 
   const signIn = useCallback(
@@ -392,6 +405,28 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     [address, connector, config, signMessageAsync, refreshMe, qc],
   );
 
+  /** Ends a wallet connection. wagmi keeps a connection whose disconnect()
+   * throws (WalletConnect while its relay is unreachable), so drop it here. */
+  const endConnection = useCallback(async (c: Connector) => {
+    try {
+      await disconnectAsync({ connector: c });
+      return;
+    } catch { /* dropped below */ }
+    await dropWalletConnectSession(c);
+    const { events } = config._internal;
+    c.emitter.off("change", events.change);
+    c.emitter.off("disconnect", events.disconnect);
+    c.emitter.on("connect", events.connect);
+    config.setState((x) => {
+      if (!x.connections.has(c.uid)) return x;
+      const connections = new Map(x.connections);
+      connections.delete(c.uid);
+      if (x.current !== c.uid) return { ...x, connections };
+      const current = connections.keys().next().value ?? null;
+      return { ...x, connections, current, status: current ? "connected" : "disconnected" };
+    });
+  }, [config, disconnectAsync]);
+
   const endSession = useCallback(async () => {
     const s = sessionRef.current;
     clear(); // Clear locally immediately, even if logout is slow or offline.
@@ -404,11 +439,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // restored one without a session) leaves both in wagmi, which falls back
     // to the older one when the current one disconnects. End every connection.
     for (const { connector } of [...config.state.connections.values()]) {
-      try {
-        await disconnectAsync({ connector });
-      } catch { /* already gone */ }
+      await endConnection(connector);
     }
-  }, [clear, config, disconnectAsync]);
+  }, [clear, config, endConnection]);
 
   const chooseLogout = useCallback((choice: DraftLogoutChoice) => {
     logoutPrompt?.resolve(choice);
@@ -473,9 +506,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       // wallet, which may have dropped it. SIWE over it can hang unseen on a
       // phone, and only a new pairing gives the QR code and the deep links.
       if (c.id === "walletConnect" && config.state.connections.has(c.uid)) {
-        try {
-          await disconnectAsync({ connector: c });
-        } catch { /* already gone */ }
+        await endConnection(c);
       }
       // A restored wallet or a refused signature may already be connected.
       // Retry SIWE without issuing another permission request to that wallet.
@@ -504,7 +535,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setConnecting(false);
     });
     return entry.promise;
-  }, [config, connectAsync, disconnectAsync, signIn]);
+  }, [config, connectAsync, endConnection, signIn]);
 
   const cancelPairing = useCallback(() => {
     const active = connectingRef.current;

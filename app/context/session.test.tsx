@@ -292,6 +292,70 @@ it("starts a new pairing for a restored WalletConnect connection instead of sign
   expect(config.state.current).toBe(wc.uid);
 });
 
+/** A stand-in for wagmi's WalletConnect connector whose disconnect() fails the
+ * way WalletConnect's does while the relay is unreachable: it throws before
+ * deleting its stored session. */
+function unreachableWalletConnect(config: ReturnType<typeof setup>["config"], request: unknown) {
+  const cleanup = vi.fn(async () => {});
+  const provider = { request, on: vi.fn(), removeListener: vi.fn(), signer: { cleanup } };
+  const wc = config._internal.connectors.setup(
+    injected({
+      target: {
+        id: "walletConnect",
+        name: "WalletConnect",
+        provider: provider as unknown as EIP1193Provider,
+      },
+    }),
+  );
+  wc.disconnect = () => Promise.reject(new Error("Failed to publish payload"));
+  config._internal.connectors.setState((x) => [...x, wc]);
+  return { wc, cleanup };
+}
+
+it("starts a new pairing even when the restored WalletConnect session cannot be ended", async () => {
+  const { result, config, request, signature } = setup();
+  const { wc, cleanup } = unreachableWalletConnect(config, request);
+  await act(() => connectWallet(config, { connector: wc }));
+  request.mockClear();
+
+  let pending!: Promise<void>;
+  act(() => {
+    pending = result.current.connect(wc);
+  });
+  await waitFor(() =>
+    expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(true)
+  );
+  expect(cleanup).toHaveBeenCalled();
+  expect(request.mock.calls.some(([args]) => args.method === "wallet_requestPermissions"))
+    .toBe(true);
+  await act(async () => {
+    signature.resolve("0x1234");
+    await pending;
+  });
+  expect(result.current.session).toEqual(SESSION);
+});
+
+it("signs out of a WalletConnect session that cannot be ended, so a reload does not restore it", async () => {
+  const { result, config, request, signature } = setup();
+  const { wc, cleanup } = unreachableWalletConnect(config, request);
+  let pending!: Promise<void>;
+  act(() => {
+    pending = result.current.connect(wc);
+  });
+  await waitFor(() =>
+    expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(true)
+  );
+  await act(async () => {
+    signature.resolve("0x1234");
+    await pending;
+  });
+  cleanup.mockClear();
+  await act(() => result.current.signOut());
+  expect(cleanup).toHaveBeenCalled();
+  expect(config.state.connections.size).toBe(0);
+  expect(config.state.status).toBe("disconnected");
+});
+
 it.each([false, true])(
   "does not let another tab cancel SIWE (second tab opens during sign-in: %s)",
   async (opensDuringSignIn) => {

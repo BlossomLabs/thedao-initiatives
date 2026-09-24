@@ -60,17 +60,34 @@ const skipsSignIn = (c: Connector | undefined) => c?.id === "mock";
  * lives 15 minutes, and a wallet that dropped the session never answers it. */
 const WALLET_CONNECT_ANSWER_MS = 90_000;
 
-/** WalletConnect's disconnect() throws before it deletes its stored session
- * when the relay is unreachable, so the next connect() and every reload would
- * restore that session. Delete it locally. */
-async function dropWalletConnectSession(c: Connector) {
-  if (c.id !== "walletConnect") return;
-  try {
-    const provider = await c.getProvider() as
-      | { signer?: { cleanup?(): Promise<void> } }
-      | undefined;
-    await provider?.signer?.cleanup?.();
-  } catch { /* nothing stored */ }
+type WalletConnectProvider = {
+  session?: { topic: string };
+  reset?(): void;
+  signer?: {
+    cleanup?(): Promise<void>;
+    client?: {
+      disconnect(p: { topic: string; reason: { code: number; message: string } }): Promise<void>;
+      session: { delete(topic: string, reason: { code: number; message: string }): void };
+    };
+  };
+};
+
+/** Ends a WalletConnect session here at once, and tells the wallet in the
+ * background. WalletConnect's own disconnect() first waits for the relay,
+ * about 10 s on a phone that just loaded the page, and throws without
+ * forgetting the session when the relay is unreachable, so a reload would
+ * restore it. A late disconnect() would also wipe a pairing started since. */
+async function endWalletConnectSession(c: Connector) {
+  const provider = await c.getProvider() as WalletConnectProvider | undefined;
+  const topic = provider?.session?.topic;
+  const client = provider?.signer?.client;
+  await provider?.signer?.cleanup?.();
+  provider?.reset?.();
+  if (!topic || !client) return;
+  const reason = { code: 6000, message: "User disconnected." };
+  void client.disconnect({ topic, reason })
+    .catch(() => client.session.delete(topic, reason))
+    .catch(() => {});
 }
 
 function load(): SessionInfo | null {
@@ -327,7 +344,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       stray.emitter.off("change", events.change);
       stray.emitter.off("disconnect", events.disconnect);
       stray.emitter.on("connect", events.connect);
-      void stray.disconnect().catch(() => dropWalletConnectSession(stray));
+      void (stray.id === "walletConnect" ? endWalletConnectSession(stray) : stray.disconnect())
+        .catch(() => {});
     }), [config]);
 
   const signIn = useCallback(
@@ -450,13 +468,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   );
 
   /** Ends a wallet connection. wagmi keeps a connection whose disconnect()
-   * throws (WalletConnect while its relay is unreachable), so drop it here. */
+   * throws, and WalletConnect's waits for the relay, so drop those here. */
   const endConnection = useCallback(async (c: Connector) => {
-    try {
-      await disconnectAsync({ connector: c });
-      return;
-    } catch { /* dropped below */ }
-    await dropWalletConnectSession(c);
+    if (c.id === "walletConnect") {
+      try {
+        await endWalletConnectSession(c);
+      } catch { /* nothing stored */ }
+    } else {
+      try {
+        await disconnectAsync({ connector: c });
+        return;
+      } catch { /* dropped below */ }
+    }
     const { events } = config._internal;
     c.emitter.off("change", events.change);
     c.emitter.off("disconnect", events.disconnect);

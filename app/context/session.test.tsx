@@ -254,21 +254,47 @@ it.each([false, true])("handles a restored wallet (stored session: %s)", async (
     .toBe(false);
 });
 
-it("starts a new pairing for a restored WalletConnect connection instead of signing over it", async () => {
-  // wagmi restores a WalletConnect session from storage without asking the
-  // wallet, which may have dropped it: SIWE over it can hang unseen, and only
-  // a new pairing gives the QR code and the mobile deep links.
-  const { result, config, request, signature } = setup();
+/** A stand-in for wagmi's WalletConnect connector: an injected wallet with
+ * the parts of WalletConnect's provider that ending a session touches. Its
+ * relay request to end the session never completes by default, like one sent
+ * right after a phone loads the page. */
+function walletConnect(
+  config: ReturnType<typeof setup>["config"],
+  request: unknown,
+  relay: () => Promise<void> = () => new Promise(() => {}),
+) {
+  const cleanup = vi.fn(async () => {});
+  const disconnect = vi.fn(relay);
+  const forget = vi.fn();
+  const provider = {
+    request,
+    on: vi.fn(),
+    removeListener: vi.fn(),
+    session: { topic: "old" },
+    reset: vi.fn(),
+    signer: { cleanup, client: { disconnect, session: { delete: forget } } },
+  };
   const wc = config._internal.connectors.setup(
     injected({
       target: {
         id: "walletConnect",
         name: "WalletConnect",
-        provider: { request, on: vi.fn(), removeListener: vi.fn() } as unknown as EIP1193Provider,
+        provider: provider as unknown as EIP1193Provider,
       },
     }),
   );
+  // WalletConnect's own disconnect() waits for the relay.
+  wc.disconnect = () => new Promise(() => {});
   config._internal.connectors.setState((x) => [...x, wc]);
+  return { wc, cleanup, disconnect, forget };
+}
+
+it("starts a new pairing for a restored WalletConnect connection without waiting for the relay", async () => {
+  // wagmi restores a WalletConnect session from storage without asking the
+  // wallet, which may have dropped it: SIWE over it can hang unseen, and only
+  // a new pairing gives the QR code and the mobile deep links.
+  const { result, config, request, signature } = setup();
+  const { wc, cleanup, disconnect } = walletConnect(config, request);
   await act(() => connectWallet(config, { connector: wc }));
   expect(result.current.session).toBeNull();
   request.mockClear();
@@ -280,10 +306,10 @@ it("starts a new pairing for a restored WalletConnect connection instead of sign
   await waitFor(() =>
     expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(true)
   );
-  const methods = request.mock.calls.map(([args]) => args.method);
-  expect(methods.indexOf("wallet_revokePermissions")).toBeGreaterThanOrEqual(0);
-  expect(methods.indexOf("wallet_requestPermissions"))
-    .toBeGreaterThan(methods.indexOf("wallet_revokePermissions"));
+  expect(cleanup).toHaveBeenCalled();
+  expect(disconnect).toHaveBeenCalledWith(expect.objectContaining({ topic: "old" }));
+  expect(request.mock.calls.some(([args]) => args.method === "wallet_requestPermissions"))
+    .toBe(true);
   await act(async () => {
     signature.resolve("0x1234");
     await pending;
@@ -292,52 +318,13 @@ it("starts a new pairing for a restored WalletConnect connection instead of sign
   expect(config.state.current).toBe(wc.uid);
 });
 
-/** A stand-in for wagmi's WalletConnect connector whose disconnect() fails the
- * way WalletConnect's does while the relay is unreachable: it throws before
- * deleting its stored session. */
-function unreachableWalletConnect(config: ReturnType<typeof setup>["config"], request: unknown) {
-  const cleanup = vi.fn(async () => {});
-  const provider = { request, on: vi.fn(), removeListener: vi.fn(), signer: { cleanup } };
-  const wc = config._internal.connectors.setup(
-    injected({
-      target: {
-        id: "walletConnect",
-        name: "WalletConnect",
-        provider: provider as unknown as EIP1193Provider,
-      },
-    }),
-  );
-  wc.disconnect = () => Promise.reject(new Error("Failed to publish payload"));
-  config._internal.connectors.setState((x) => [...x, wc]);
-  return { wc, cleanup };
-}
-
-it("starts a new pairing even when the restored WalletConnect session cannot be ended", async () => {
+it("forgets a WalletConnect session the relay could not end, so a reload does not restore it", async () => {
   const { result, config, request, signature } = setup();
-  const { wc, cleanup } = unreachableWalletConnect(config, request);
-  await act(() => connectWallet(config, { connector: wc }));
-  request.mockClear();
-
-  let pending!: Promise<void>;
-  act(() => {
-    pending = result.current.connect(wc);
-  });
-  await waitFor(() =>
-    expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(true)
+  const { wc, cleanup, forget } = walletConnect(
+    config,
+    request,
+    () => Promise.reject(new Error("Failed to publish payload")),
   );
-  expect(cleanup).toHaveBeenCalled();
-  expect(request.mock.calls.some(([args]) => args.method === "wallet_requestPermissions"))
-    .toBe(true);
-  await act(async () => {
-    signature.resolve("0x1234");
-    await pending;
-  });
-  expect(result.current.session).toEqual(SESSION);
-});
-
-it("signs out of a WalletConnect session that cannot be ended, so a reload does not restore it", async () => {
-  const { result, config, request, signature } = setup();
-  const { wc, cleanup } = unreachableWalletConnect(config, request);
   let pending!: Promise<void>;
   act(() => {
     pending = result.current.connect(wc);
@@ -349,16 +336,16 @@ it("signs out of a WalletConnect session that cannot be ended, so a reload does 
     signature.resolve("0x1234");
     await pending;
   });
-  cleanup.mockClear();
   await act(() => result.current.signOut());
   expect(cleanup).toHaveBeenCalled();
+  await waitFor(() => expect(forget).toHaveBeenCalledWith("old", expect.anything()));
   expect(config.state.connections.size).toBe(0);
   expect(config.state.status).toBe("disconnected");
 });
 
 it("cancels a WalletConnect sign-in the wallet does not answer, so another method can start", async () => {
   const { result, config, request } = setup();
-  const { wc } = unreachableWalletConnect(config, request);
+  const { wc } = walletConnect(config, request);
   let pending!: Promise<void>;
   act(() => {
     pending = result.current.connect(wc);
@@ -381,7 +368,7 @@ it("gives up on a WalletConnect sign-in the wallet does not answer", async () =>
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   try {
     const { result, config, request } = setup();
-    const { wc } = unreachableWalletConnect(config, request);
+    const { wc } = walletConnect(config, request);
     let pending!: Promise<void>;
     act(() => {
       pending = result.current.connect(wc);

@@ -668,6 +668,60 @@ it("drops an unanswered connection for another method, and disconnects it if app
   expect(result.current.session).toEqual(SESSION);
 });
 
+it("signs in with the connected wallet after dropping a pairing for it", async () => {
+  // wagmi stays "connecting" while a dropped WalletConnect pairing is pending,
+  // with the restored wallet still current: picking that wallet must sign in,
+  // not ask wagmi to connect it again.
+  const approval = deferred<void>();
+  const late = vi.fn(async ({ method }: { method: string }): Promise<unknown> => {
+    if (method === "wallet_requestPermissions") {
+      await approval.promise;
+      return [];
+    }
+    if (method === "eth_accounts" || method === "eth_requestAccounts") return [];
+    if (method === "eth_chainId") return "0x1";
+    throw new Error("Unexpected wallet request: " + method);
+  });
+  const { result, config, request, signature } = setup();
+  await act(() => connectWallet(config, { connector: config.connectors[0] }));
+  const qr = config._internal.connectors.setup(injected({
+    target: {
+      id: "qr",
+      name: "QR",
+      provider: {
+        request: late,
+        on: vi.fn(),
+        removeListener: vi.fn(),
+      } as unknown as EIP1193Provider,
+    },
+  }));
+  config._internal.connectors.setState((x) => [...x, qr]);
+  act(() => {
+    void result.current.connect(qr).catch(() => {});
+  });
+  await waitFor(() => expect(late).toHaveBeenCalled());
+  expect(config.state.status).toBe("connecting");
+  act(() => {
+    expect(result.current.cancelPairing()).toBe(true);
+  });
+  let pending!: Promise<void>;
+  let failure: unknown;
+  act(() => {
+    pending = result.current.connect(config.connectors[0]);
+    void pending.catch((error) => failure = error);
+  });
+  await waitFor(() =>
+    expect(
+      failure ?? request.mock.calls.some(([args]) => args.method === "personal_sign"),
+    ).toBe(true)
+  );
+  await act(async () => {
+    signature.resolve("0x1234");
+    await pending;
+  });
+  expect(result.current.session).toEqual(SESSION);
+});
+
 /** A wallet whose site chain is not Ethereum (Ambire keeps one per site and
  * refuses personal_sign when it is not an enabled network; MetaMask signs
  * anyway, but a smart account's signature only verifies on the chain it was

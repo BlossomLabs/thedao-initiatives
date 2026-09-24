@@ -551,11 +551,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
       // A restored wallet or a refused signature may already be connected.
       // Retry SIWE without issuing another permission request to that wallet.
-      const current = getConnection(config);
-      const { accounts } =
-        current.isConnected && current.address && current.connector?.uid === c.uid
-          ? { accounts: [current.address] }
-          : await connectAsync({ connector: c, chainId: 1 });
+      // Read the connection itself: wagmi reports isConnected false while a
+      // dropped WalletConnect pairing keeps its status at "connecting".
+      const current = config.state.current === c.uid
+        ? config.state.connections.get(c.uid)
+        : undefined;
+      const { accounts } = current?.accounts.length
+        ? current
+        : await connectAsync({ connector: c, chainId: 1 });
       // Dropped while pairing: the effect above has already undone it.
       if (connectingRef.current !== entry) throw new Error("Connection cancelled.");
       entry.pairing = false;

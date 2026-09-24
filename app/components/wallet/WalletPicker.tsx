@@ -21,7 +21,7 @@ export default function WalletPicker({ open, onOpenChange }: {
   onOpenChange: (open: boolean) => void;
 }) {
   const connectors = useConnectors();
-  const { connect, connecting, signingIn } = useSession();
+  const { connect, cancelPairing, connecting, signingIn } = useSession();
   const { openEmailSignIn } = useEmailSignIn();
   const [view, setView] = useState<"choose" | "mobile">("choose");
   const [tab, setTab] = useState<"wallets" | "qr">("wallets");
@@ -39,6 +39,7 @@ export default function WalletPicker({ open, onOpenChange }: {
   const running = useRef(false);
   const alive = useRef(true);
   const detach = useRef<(() => void) | null>(null);
+  const attempt = useRef(0);
   const wc = connectors.find((c) => c.id === "walletConnect");
 
   useEffect(() => {
@@ -86,8 +87,9 @@ export default function WalletPicker({ open, onOpenChange }: {
     return () => controller.abort();
   }, [view, wallets, reload]);
 
-  async function start(connector: Connector) {
-    if (running.current || connecting || signingIn) return;
+  async function start(connector: Connector, switching = false) {
+    if (running.current || (!switching && (connecting || signingIn))) return;
+    const id = ++attempt.current;
     running.current = true;
     setPending(true);
     setPairing(connector.id === "walletConnect");
@@ -108,22 +110,37 @@ export default function WalletPicker({ open, onOpenChange }: {
     try {
       // Includes SIWE. Keep the chooser available until the signature completes.
       await connect(connector);
-      if (alive.current) {
+      if (alive.current && id === attempt.current) {
         onOpenChange(false);
         setView("choose");
       }
     } catch (e) {
-      if (alive.current) setError("Not connected: " + walletErrorMessage(e));
-    } finally {
-      detach.current?.();
-      detach.current = null;
-      running.current = false;
-      if (alive.current) {
-        setPending(false);
-        setUri(null);
-        setSelected(null);
+      if (alive.current && id === attempt.current) {
+        setError("Not connected: " + walletErrorMessage(e));
       }
+    } finally {
+      if (id === attempt.current) end();
     }
+  }
+
+  function end() {
+    detach.current?.();
+    detach.current = null;
+    running.current = false;
+    if (alive.current) {
+      setPending(false);
+      setUri(null);
+      setSelected(null);
+    }
+  }
+
+  /** Drops a WalletConnect pairing nobody scanned, so another method can start. */
+  function leavePairing() {
+    if (!switchable) return true;
+    if (!cancelPairing()) return false;
+    attempt.current++;
+    end();
+    return true;
   }
 
   function mobile() {
@@ -143,6 +160,8 @@ export default function WalletPicker({ open, onOpenChange }: {
   }
 
   const busy = pending || connecting || signingIn;
+  // An unscanned QR pairing must not lock out the other connection methods.
+  const switchable = pending && pairing && !signingIn;
   const visible = (wallets ?? []).filter((w) =>
     w.name.toLowerCase().includes(query.trim().toLowerCase())
   );
@@ -170,12 +189,14 @@ export default function WalletPicker({ open, onOpenChange }: {
                 key={c.uid}
                 type="button"
                 className={row}
-                disabled={busy}
+                disabled={busy && !switchable}
                 onClick={() => {
+                  const switching = switchable;
+                  if (!leavePairing()) return;
                   if (c.id === PRIVY_CONNECTOR_ID) {
                     onOpenChange(false);
                     openEmailSignIn();
-                  } else void start(c);
+                  } else void start(c, switching);
                 }}
               >
                 {c.icon
@@ -402,8 +423,12 @@ export default function WalletPicker({ open, onOpenChange }: {
       {error && <p role="alert" className="m-0 text-[12.5px] text-[#ffd7d6]">{error}</p>}
       {busy && (
         <p className="m-0 text-xs text-muted">
-          {view === "choose" ? "Check your wallet to finish the pending request. " : ""}Closing this
-          window keeps the request open. Use Connect wallet to return.
+          {view !== "choose"
+            ? ""
+            : switchable
+            ? "Your QR connection is still waiting. Continue it above, or pick another method to drop it. "
+            : "Check your wallet to finish the pending request. "}Closing this window keeps the
+          request open. Use Connect wallet to return.
         </p>
       )}
     </Dialog>

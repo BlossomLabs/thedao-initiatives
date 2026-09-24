@@ -456,6 +456,73 @@ it("signs out of every connected wallet, so an earlier one does not take over", 
   expect(result.current.address).toBeUndefined();
 });
 
+it("drops an unanswered connection for another method, and disconnects it if approved later", async () => {
+  // WalletConnect cannot abort a pairing: a QR scanned after the user moved on
+  // to another wallet must not take over.
+  const OTHER = "0x0000000000000000000000000000000000000abc";
+  const approval = deferred<void>();
+  const late = vi.fn(async ({ method }: { method: string }): Promise<unknown> => {
+    if (method === "wallet_requestPermissions") {
+      await approval.promise;
+      return [{ parentCapability: "eth_accounts", caveats: [{ value: [OTHER] }] }];
+    }
+    if (method === "eth_accounts" || method === "eth_requestAccounts") return [OTHER];
+    if (method === "eth_chainId") return "0x1";
+    if (method === "wallet_revokePermissions") return null;
+    throw new Error("Unexpected wallet request: " + method);
+  });
+  const { result, config, signature } = setup();
+  const qr = injected({
+    target: {
+      id: "qr",
+      name: "QR",
+      provider: {
+        request: late,
+        on: vi.fn(),
+        removeListener: vi.fn(),
+      } as unknown as EIP1193Provider,
+    },
+  });
+  const pairingConnector = config._internal.connectors.setup(qr);
+  config._internal.connectors.setState((x) => [...x, pairingConnector]);
+  let pairing!: Promise<void>;
+  act(() => {
+    pairing = result.current.connect(pairingConnector);
+  });
+  await waitFor(() => expect(late).toHaveBeenCalled());
+  const dropped = pairing.catch((error) => error);
+  act(() => {
+    expect(result.current.cancelPairing()).toBe(true);
+  });
+  expect(await dropped).toHaveProperty("message", "Connection cancelled.");
+  expect(result.current.connecting).toBe(false);
+
+  let pending!: Promise<void>;
+  act(() => {
+    pending = result.current.connect(config.connectors[0]);
+  });
+  await waitFor(() => expect(result.current.signingIn).toBe(true));
+  expect(result.current.cancelPairing()).toBe(false);
+  await act(async () => {
+    signature.resolve("0x1234");
+    await pending;
+  });
+  expect(result.current.session).toEqual(SESSION);
+
+  await act(async () => {
+    approval.resolve();
+    await waitFor(() =>
+      expect(late.mock.calls.some(([args]) => args.method === "wallet_revokePermissions")).toBe(
+        true,
+      )
+    );
+  });
+  expect([...config.state.connections.values()].map((c) => c.connector.uid)).toEqual([
+    config.connectors[0].uid,
+  ]);
+  expect(result.current.session).toEqual(SESSION);
+});
+
 /** A wallet whose site chain is not Ethereum (Ambire keeps one per site and
  * refuses personal_sign when it is not an enabled network; MetaMask signs
  * anyway, but a smart account's signature only verifies on the chain it was

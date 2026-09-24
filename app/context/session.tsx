@@ -97,6 +97,10 @@ interface SessionCtx {
   /** Connect the wallet and sign in with it in one go. A failed sign-in keeps
    * the wallet connected for a retry, without granting a session. */
   connect(connector: Connector): Promise<void>;
+  /** Drop a connection the wallet has not answered yet (an unscanned
+   * WalletConnect pairing), so another method can start. False once the
+   * wallet has connected: its sign-in has to settle first. */
+  cancelPairing(): boolean;
   signIn(account?: `0x${string}`): Promise<SessionInfo>;
   /** Ask about an unfinished draft before logout; false means the user cancelled. */
   signOut(beforeLogout?: () => Promise<void>): Promise<boolean>;
@@ -133,7 +137,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [connecting, setConnecting] = useState(false);
   // React state is for rendering. These synchronous guards own the wallet
   // requests, including the gap before React commits a busy-state update.
-  const connectingRef = useRef<{ connector: Connector; promise: Promise<void> } | null>(null);
+  const connectingRef = useRef<
+    {
+      connector: Connector;
+      promise: Promise<void>;
+      /** Still waiting for the wallet to connect, before any SIWE request. */
+      pairing: boolean;
+      cancel(): void;
+    } | null
+  >(null);
   const signingInRef = useRef<
     {
       account: string;
@@ -270,6 +282,31 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       drop();
     }
   }, [address, status, drop]);
+
+  // Pairings dropped for another method (cancelPairing). WalletConnect cannot
+  // abort one, so its wallet can still approve it later, and wagmi then makes
+  // it the current connection. Undo that before React renders, so the chosen
+  // wallet and its session stay in place, then end the stray session.
+  const dropped = useRef(new Set<string>());
+  useEffect(() =>
+    config.subscribe((state) => state.current, (current, previous) => {
+      if (!current || !dropped.current.delete(current)) return;
+      const stray = config.state.connections.get(current)?.connector;
+      config.setState((x) => {
+        const connections = new Map(x.connections);
+        connections.delete(current);
+        const back = previous && connections.has(previous)
+          ? previous
+          : connections.keys().next().value ?? null;
+        return { ...x, connections, current: back, status: back ? "connected" : "disconnected" };
+      });
+      if (!stray) return;
+      const { events } = config._internal;
+      stray.emitter.off("change", events.change);
+      stray.emitter.off("disconnect", events.disconnect);
+      stray.emitter.on("connect", events.connect);
+      void stray.disconnect().catch(() => {});
+    }), [config]);
 
   const signIn = useCallback(
     (
@@ -417,7 +454,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return Promise.reject(new Error("Finish the pending wallet sign-in first."));
     }
     setConnecting(true);
-    const promise = Promise.resolve().then(async () => {
+    let rejectCancelled: (e: Error) => void = () => {};
+    const cancelledPromise = new Promise<never>((_, reject) => rejectCancelled = reject);
+    const entry: NonNullable<typeof connectingRef.current> = {
+      connector: c,
+      promise: cancelledPromise,
+      pairing: true,
+      cancel() {
+        entry.pairing = false;
+        dropped.current.add(c.uid);
+        rejectCancelled(new Error("Connection cancelled."));
+        connectingRef.current = null;
+        setConnecting(false);
+      },
+    };
+    const run = async () => {
       // A restored wallet or a refused signature may already be connected.
       // Retry SIWE without issuing another permission request to that wallet.
       const current = getConnection(config);
@@ -425,15 +476,35 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         current.isConnected && current.address && current.connector?.uid === c.uid
           ? { accounts: [current.address] }
           : await connectAsync({ connector: c, chainId: 1 });
+      // Dropped while pairing: the effect above has already undone it.
+      if (connectingRef.current !== entry) throw new Error("Connection cancelled.");
+      entry.pairing = false;
       if (skipsSignIn(c)) return;
       await signIn(accounts[0], c);
-    }).finally(() => {
+    };
+    connectingRef.current = entry;
+    dropped.current.delete(c.uid);
+    entry.promise = Promise.race([
+      run().catch((e) => {
+        if (connectingRef.current !== entry) dropped.current.delete(c.uid);
+        throw e;
+      }),
+      cancelledPromise,
+    ]).finally(() => {
+      if (connectingRef.current !== entry) return;
       connectingRef.current = null;
       setConnecting(false);
     });
-    connectingRef.current = { connector: c, promise };
-    return promise;
+    return entry.promise;
   }, [config, connectAsync, signIn]);
+
+  const cancelPairing = useCallback(() => {
+    const active = connectingRef.current;
+    if (!active) return true;
+    if (!active.pairing || signingInRef.current) return false;
+    active.cancel();
+    return true;
+  }, []);
 
   // Wallet events are broadcast to every tab on this origin. An idle tab must
   // neither prompt for SIWE nor revoke account permissions on those events.
@@ -454,6 +525,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       connecting,
       address,
       connect,
+      cancelPairing,
       signIn,
       signOut,
       switchWallet: endSession,
@@ -467,6 +539,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       connecting,
       address,
       connect,
+      cancelPairing,
       signIn,
       signOut,
       endSession,

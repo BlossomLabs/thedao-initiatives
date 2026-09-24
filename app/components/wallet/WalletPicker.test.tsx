@@ -5,6 +5,7 @@ import WalletPicker from "./WalletPicker";
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
+  cancelPairing: vi.fn(() => true),
   email: vi.fn(),
   connectors: [] as Connector[],
   connecting: false,
@@ -190,4 +191,36 @@ test("does not create overlapping requests from repeated clicks", () => {
   fireEvent.click(button);
   expect(mocks.connect).toHaveBeenCalledExactlyOnceWith(injected);
   expect(screen.getByRole("button", { name: /Mobile wallets/ })).toBeDisabled();
+});
+
+test("a pending QR pairing leaves the other methods available, and picking one drops it", async () => {
+  await pairing();
+  ready();
+  mocks.connecting = true;
+  fireEvent.click(screen.getByRole("button", { name: /All connection methods/ }));
+  expect(screen.getByRole("button", { name: /Continue wallet connection/ })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Email" })).toBeEnabled();
+  expect(screen.getByText(/pick another method to drop it/)).toBeInTheDocument();
+  mocks.connect.mockImplementation(() => new Promise(() => {}));
+  fireEvent.click(screen.getByRole("button", { name: "Rabby" }));
+  expect(mocks.cancelPairing).toHaveBeenCalledTimes(1);
+  expect(mocks.connect).toHaveBeenLastCalledWith(injected);
+  expect(listeners.size).toBe(0);
+  // The dropped pairing settling later neither closes the chooser nor shows an error.
+  await act(async () => {
+    reject(new Error("Connection cancelled."));
+    await pending.catch(() => {});
+  });
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByRole("button", { name: "Email" })).toBeDisabled();
+});
+
+test("the other methods stay disabled once the QR wallet is signing in", async () => {
+  const { rerender, onOpenChange } = await pairing();
+  ready();
+  mocks.signingIn = true;
+  rerender(<WalletPicker open onOpenChange={onOpenChange} />);
+  fireEvent.click(screen.getByRole("button", { name: /All connection methods/ }));
+  expect(screen.getByRole("button", { name: "Rabby" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Email" })).toBeDisabled();
 });

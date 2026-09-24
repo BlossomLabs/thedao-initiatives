@@ -363,10 +363,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         await api("/api/auth/logout", { method: "POST" });
       } catch { /* already gone */ }
     }
-    try {
-      await disconnectAsync();
-    } catch { /* not connected */ }
-  }, [clear, disconnectAsync]);
+    // A wallet picked in the chooser while another was still connected (a
+    // restored one without a session) leaves both in wagmi, which falls back
+    // to the older one when the current one disconnects. End every connection.
+    for (const { connector } of [...config.state.connections.values()]) {
+      try {
+        await disconnectAsync({ connector });
+      } catch { /* already gone */ }
+    }
+  }, [clear, config, disconnectAsync]);
 
   const chooseLogout = useCallback((choice: DraftLogoutChoice) => {
     logoutPrompt?.resolve(choice);

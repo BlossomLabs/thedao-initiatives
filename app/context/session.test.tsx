@@ -5,6 +5,7 @@ import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createConfig, http, WagmiProvider } from "wagmi";
 import { injected } from "wagmi/connectors";
+import { connect as connectWallet } from "wagmi/actions";
 import { mainnet } from "viem/chains";
 import type { EIP1193Provider } from "viem";
 import { api, ApiError } from "~/lib/api";
@@ -390,6 +391,69 @@ it("still revokes wallet permissions and the API session on explicit sign-out", 
     method: "wallet_revokePermissions",
     params: [{ eth_accounts: {} }],
   });
+});
+
+it("signs out of every connected wallet, so an earlier one does not take over", async () => {
+  // Rabby restored without a session, then MetaMask picked in the chooser:
+  // wagmi keeps both, and disconnecting only MetaMask would make Rabby current.
+  const OTHER = "0x0000000000000000000000000000000000000abc";
+  const wallet = (account: string) => {
+    const signature = deferred<`0x${string}`>();
+    const request = vi.fn(async ({ method }: { method: string }): Promise<unknown> => {
+      if (method === "wallet_requestPermissions") {
+        return [{ parentCapability: "eth_accounts", caveats: [{ value: [account] }] }];
+      }
+      if (method === "eth_accounts" || method === "eth_requestAccounts") return [account];
+      if (method === "eth_chainId") return "0x1";
+      if (method === "personal_sign") return await signature.promise;
+      if (method === "wallet_revokePermissions") return null;
+      throw new Error("Unexpected wallet request: " + method);
+    });
+    const provider = { request, on: vi.fn(), removeListener: vi.fn() };
+    return { request, signature, provider: provider as unknown as EIP1193Provider };
+  };
+  const rabby = wallet(OTHER);
+  const metamask = wallet(ADDRESS);
+  const config = createConfig({
+    chains: [mainnet],
+    connectors: [
+      injected({ target: { id: "io.rabby", name: "Rabby", provider: rabby.provider } }),
+      injected({ target: { id: "io.metamask", name: "MetaMask", provider: metamask.provider } }),
+    ],
+    transports: { [mainnet.id]: http() },
+    storage: null,
+    multiInjectedProviderDiscovery: false,
+  });
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const { result } = renderHook(() => useSession(), {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <WagmiProvider config={config} reconnectOnMount={false}>
+        <QueryClientProvider client={queryClient}>
+          <SessionProvider>{children}</SessionProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
+    ),
+  });
+  await act(() => connectWallet(config, { connector: config.connectors[0] }));
+  let pending!: Promise<void>;
+  act(() => {
+    pending = result.current.connect(config.connectors[1]);
+  });
+  await waitFor(() =>
+    expect(metamask.request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(
+      true,
+    )
+  );
+  await act(async () => {
+    metamask.signature.resolve("0x1234");
+    await pending;
+  });
+  expect(result.current.session).toEqual(SESSION);
+  expect(config.state.connections.size).toBe(2);
+  await act(() => result.current.signOut());
+  expect(config.state.status).toBe("disconnected");
+  expect(config.state.connections.size).toBe(0);
+  expect(result.current.address).toBeUndefined();
 });
 
 /** A wallet whose site chain is not Ethereum (Ambire keeps one per site and

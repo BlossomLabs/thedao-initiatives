@@ -722,6 +722,16 @@ it("signs in with the connected wallet after dropping a pairing for it", async (
   expect(result.current.session).toEqual(SESSION);
 });
 
+it("does not start a connection while wagmi is still restoring one", async () => {
+  const { result, config, request } = setup();
+  act(() => config.setState((x) => ({ ...x, status: "reconnecting" })));
+  expect(result.current.restoring).toBe(true);
+  await expect(result.current.connect(config.connectors[0])).rejects.toThrow(/restor/i);
+  expect(request).not.toHaveBeenCalled();
+  act(() => config.setState((x) => ({ ...x, status: "disconnected" })));
+  expect(result.current.restoring).toBe(false);
+});
+
 /** A wallet whose site chain is not Ethereum (Ambire keeps one per site and
  * refuses personal_sign when it is not an enabled network; MetaMask signs
  * anyway, but a smart account's signature only verifies on the chain it was

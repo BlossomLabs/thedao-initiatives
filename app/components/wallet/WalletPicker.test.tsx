@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   connectors: [] as Connector[],
   connecting: false,
   signingIn: false,
+  restoring: false,
 }));
 vi.mock("~/context/session", () => ({ useSession: () => mocks }));
 vi.mock(
@@ -45,6 +46,7 @@ beforeEach(() => {
   mocks.connectors = [injected, email, wc];
   mocks.connecting = false;
   mocks.signingIn = false;
+  mocks.restoring = false;
   pending = new Promise<void>((yes, no) => {
     resolve = yes;
     reject = no;
@@ -240,4 +242,14 @@ test("a QR wallet's pending sign-in can be dropped for a new pairing", async () 
   expect(mocks.connect).toHaveBeenCalledTimes(2);
   expect(mocks.connect).toHaveBeenLastCalledWith(wc);
   expect(listeners.size).toBe(1);
+});
+
+test("waits for a wallet connection being restored before offering any method", () => {
+  // A restore finishing after another wallet connected would replace that wallet.
+  mocks.restoring = true;
+  render(<WalletPicker open onOpenChange={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Rabby" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Email" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /Mobile wallets/ })).toBeDisabled();
+  expect(screen.getByText(/Restoring your wallet connection/)).toBeInTheDocument();
 });

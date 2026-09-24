@@ -109,6 +109,9 @@ interface SessionCtx {
   signingIn: boolean;
   /** True from the wallet prompt until sign-in has settled (connect()). */
   connecting: boolean;
+  /** wagmi is still restoring the connections of a previous visit. A wallet
+   * connected meanwhile would be replaced once the restore finishes. */
+  restoring: boolean;
   /** Connected wallet address (may differ from session.address until sign-in). */
   address: string | undefined;
   /** Connect the wallet and sign in with it in one go. A failed sign-in keeps
@@ -519,6 +522,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [endSession]);
 
   const connect = useCallback((c: Connector): Promise<void> => {
+    if (config.state.status === "reconnecting") {
+      return Promise.reject(new Error("Wait until your wallet connection is restored."));
+    }
     const active = connectingRef.current;
     if (active) {
       if (active.connector.uid === c.uid) return active.promise;
@@ -619,6 +625,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       me,
       signingIn,
       connecting,
+      restoring: status === "reconnecting",
       address,
       connect,
       cancelPairing,
@@ -633,6 +640,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       me,
       signingIn,
       connecting,
+      status,
       address,
       connect,
       cancelPairing,

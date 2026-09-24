@@ -21,7 +21,7 @@ export default function WalletPicker({ open, onOpenChange }: {
   onOpenChange: (open: boolean) => void;
 }) {
   const connectors = useConnectors();
-  const { connect, cancelPairing, connecting, signingIn } = useSession();
+  const { connect, cancelPairing, connecting, signingIn, restoring } = useSession();
   const { openEmailSignIn } = useEmailSignIn();
   const [view, setView] = useState<"choose" | "mobile">("choose");
   const [tab, setTab] = useState<"wallets" | "qr">("wallets");
@@ -159,7 +159,7 @@ export default function WalletPicker({ open, onOpenChange }: {
     }
   }
 
-  const busy = pending || connecting || signingIn;
+  const busy = pending || connecting || signingIn || restoring;
   // An unscanned QR pairing, or a sign-in its wallet may never answer, must
   // not lock out the other connection methods.
   const switchable = pending && pairing;
@@ -433,7 +433,12 @@ export default function WalletPicker({ open, onOpenChange }: {
           </>
         )}
       {error && <p role="alert" className="m-0 text-[12.5px] text-[#ffd7d6]">{error}</p>}
-      {busy && (
+      {restoring && !pending && (
+        <p className="m-0 text-xs text-muted" role="status">
+          Restoring your wallet connection from your last visit…
+        </p>
+      )}
+      {busy && !restoring && (
         <p className="m-0 text-xs text-muted">
           {view !== "choose"
             ? ""

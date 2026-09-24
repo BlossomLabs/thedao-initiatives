@@ -356,6 +356,49 @@ it("signs out of a WalletConnect session that cannot be ended, so a reload does 
   expect(config.state.status).toBe("disconnected");
 });
 
+it("cancels a WalletConnect sign-in the wallet does not answer, so another method can start", async () => {
+  const { result, config, request } = setup();
+  const { wc } = unreachableWalletConnect(config, request);
+  let pending!: Promise<void>;
+  act(() => {
+    pending = result.current.connect(wc);
+  });
+  await waitFor(() => expect(result.current.signingIn).toBe(true));
+  const cancelled = pending.catch((error) => error);
+  act(() => {
+    expect(result.current.cancelPairing()).toBe(true);
+  });
+  expect(await cancelled).toHaveProperty("message", "Sign-in was cancelled.");
+  expect(result.current.signingIn).toBe(false);
+  expect(result.current.connecting).toBe(false);
+  act(() => {
+    void result.current.connect(config.connectors[0]).catch(() => {});
+  });
+  await waitFor(() => expect(result.current.signingIn).toBe(true));
+});
+
+it("gives up on a WalletConnect sign-in the wallet does not answer", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    const { result, config, request } = setup();
+    const { wc } = unreachableWalletConnect(config, request);
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.connect(wc);
+    });
+    let failure: Error | undefined;
+    void pending.catch((error) => failure = error);
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    expect(result.current.signingIn).toBe(true);
+    await act(() => vi.advanceTimersByTimeAsync(90_000));
+    expect(failure?.message).toMatch(/did not answer/);
+    expect(result.current.signingIn).toBe(false);
+    expect(result.current.connecting).toBe(false);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it.each([false, true])(
   "does not let another tab cancel SIWE (second tab opens during sign-in: %s)",
   async (opensDuringSignIn) => {

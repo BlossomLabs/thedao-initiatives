@@ -215,12 +215,29 @@ test("a pending QR pairing leaves the other methods available, and picking one d
   expect(screen.getByRole("button", { name: "Email" })).toBeDisabled();
 });
 
-test("the other methods stay disabled once the QR wallet is signing in", async () => {
+test("a QR wallet's pending sign-in leaves the other methods available, and picking one cancels it", async () => {
+  // A WalletConnect sign-in can wait unanswered for a wallet that dropped the session.
   const { rerender, onOpenChange } = await pairing();
   ready();
   mocks.signingIn = true;
   rerender(<WalletPicker open onOpenChange={onOpenChange} />);
   fireEvent.click(screen.getByRole("button", { name: /All connection methods/ }));
-  expect(screen.getByRole("button", { name: "Rabby" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Email" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Email" })).toBeEnabled();
+  mocks.connect.mockImplementation(() => new Promise(() => {}));
+  fireEvent.click(screen.getByRole("button", { name: "Rabby" }));
+  expect(mocks.cancelPairing).toHaveBeenCalledTimes(1);
+  expect(mocks.connect).toHaveBeenLastCalledWith(injected);
+});
+
+test("a QR wallet's pending sign-in can be dropped for a new pairing", async () => {
+  const { rerender, onOpenChange } = await pairing();
+  ready();
+  mocks.signingIn = true;
+  rerender(<WalletPicker open onOpenChange={onOpenChange} />);
+  mocks.connect.mockImplementation(() => new Promise(() => {}));
+  fireEvent.click(screen.getByRole("button", { name: "Start a new connection" }));
+  expect(mocks.cancelPairing).toHaveBeenCalledTimes(1);
+  expect(mocks.connect).toHaveBeenCalledTimes(2);
+  expect(mocks.connect).toHaveBeenLastCalledWith(wc);
+  expect(listeners.size).toBe(1);
 });

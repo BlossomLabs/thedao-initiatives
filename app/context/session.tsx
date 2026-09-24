@@ -56,6 +56,10 @@ const isStaleMessage = (e: unknown) =>
 /** Dev-only fake wallet: it cannot sign, so it connects without a session. */
 const skipsSignIn = (c: Connector | undefined) => c?.id === "mock";
 
+/** How long a sign-in over WalletConnect waits for the wallet. The request
+ * lives 15 minutes, and a wallet that dropped the session never answers it. */
+const WALLET_CONNECT_ANSWER_MS = 90_000;
+
 /** WalletConnect's disconnect() throws before it deletes its stored session
  * when the relay is unreachable, so the next connect() and every reload would
  * restore that session. Delete it locally. */
@@ -164,6 +168,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       account: string;
       connector: Connector | undefined;
       promise: Promise<SessionInfo>;
+      /** Set for WalletConnect, whose wallet may never answer. */
+      cancel?: () => void;
     } | null
   >(null);
   const authGeneration = useRef(0);
@@ -337,8 +343,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
       setSigningIn(true);
       const generation = authGeneration.current;
+      let stopped = false;
       const stillActive = () => {
-        if (generation !== authGeneration.current) throw new Error("Sign-in was cancelled.");
+        if (stopped || generation !== authGeneration.current) {
+          throw new Error("Sign-in was cancelled.");
+        }
+      };
+      let stop: (e: Error) => void = () => {};
+      const stopping = new Promise<never>((_, reject) => stop = reject);
+      const halt = (e: Error) => {
+        stopped = true;
+        stop(e);
       };
       const attempt = async (): Promise<SessionInfo> => {
         const { nonce } = await api<{ nonce: string }>("/api/auth/nonce");
@@ -368,7 +383,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           json: { message, signature, cookie: true },
         });
       };
-      const promise = Promise.resolve().then(async () => {
+      const work = Promise.resolve().then(async () => {
         let s: SessionInfo;
         try {
           s = await attempt();
@@ -391,15 +406,41 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         sessionRef.current = s;
         await refreshMe();
         return s;
-      }).finally(() => {
+      });
+      const walletConnect = signingConnector?.id === "walletConnect";
+      const timer = walletConnect
+        ? setTimeout(
+          () =>
+            halt(
+              new Error(
+                "Your wallet did not answer. Start a new connection, or use another method.",
+              ),
+            ),
+          WALLET_CONNECT_ANSWER_MS,
+        )
+        : undefined;
+      const release = () => {
+        if (signingInRef.current !== entry) return;
         signingInRef.current = null;
         setSigningIn(false);
+      };
+      const promise = Promise.race([work, stopping]).finally(() => {
+        clearTimeout(timer);
+        release();
       });
-      signingInRef.current = {
+      void work.catch(() => {});
+      const entry: NonNullable<typeof signingInRef.current> = {
         account: account.toLowerCase(),
         connector: signingConnector,
         promise,
+        cancel: walletConnect
+          ? () => {
+            halt(new Error("Sign-in was cancelled."));
+            release();
+          }
+          : undefined,
       };
+      signingInRef.current = entry;
       return promise;
     },
     [address, connector, config, signMessageAsync, refreshMe, qc],
@@ -539,8 +580,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const cancelPairing = useCallback(() => {
     const active = connectingRef.current;
+    const signing = signingInRef.current;
+    if (signing) {
+      // A WalletConnect sign-in may wait on a wallet that dropped the session.
+      if (!signing.cancel) return false;
+      signing.cancel();
+      // connect() then rejects with the sign-in; free its slot now so another
+      // method can start before that settles.
+      if (active) {
+        connectingRef.current = null;
+        setConnecting(false);
+      }
+      return true;
+    }
     if (!active) return true;
-    if (!active.pairing || signingInRef.current) return false;
+    if (!active.pairing) return false;
     active.cancel();
     return true;
   }, []);

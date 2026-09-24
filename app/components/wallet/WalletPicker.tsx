@@ -160,8 +160,9 @@ export default function WalletPicker({ open, onOpenChange }: {
   }
 
   const busy = pending || connecting || signingIn;
-  // An unscanned QR pairing must not lock out the other connection methods.
-  const switchable = pending && pairing && !signingIn;
+  // An unscanned QR pairing, or a sign-in its wallet may never answer, must
+  // not lock out the other connection methods.
+  const switchable = pending && pairing;
   const visible = (wallets ?? []).filter((w) =>
     w.name.toLowerCase().includes(query.trim().toLowerCase())
   );
@@ -271,6 +272,17 @@ export default function WalletPicker({ open, onOpenChange }: {
                       onClick={() => void start(wc)}
                     >
                       Try again
+                    </button>
+                  )}
+                  {signingIn && switchable && (
+                    <button
+                      type="button"
+                      className={cn(smallButton, "mt-2")}
+                      onClick={() => {
+                        if (leavePairing()) void start(wc, true);
+                      }}
+                    >
+                      Start a new connection
                     </button>
                   )}
                 </div>

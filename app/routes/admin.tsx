@@ -14,7 +14,7 @@ export function meta() {
 
 /** Gate: everything under /admin needs a SIWE session from an admin wallet. */
 export default function AdminLayout() {
-  const { session, signIn, signingIn } = useSession();
+  const { session, signIn, signingIn, connecting } = useSession();
   const { openWalletPicker } = useWalletPicker();
   const { isConnected, address } = useAccount();
   const [error, setError] = useState("");
@@ -43,7 +43,7 @@ export default function AdminLayout() {
             >
               Sign in with {address?.slice(0, 6)}…
             </Button>
-            <Button variant="ghost" disabled={signingIn} onClick={openWalletPicker}>
+            <Button variant="ghost" disabled={signingIn || connecting} onClick={openWalletPicker}>
               Use a different wallet
             </Button>
           </div>

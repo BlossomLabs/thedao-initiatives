@@ -254,6 +254,44 @@ it.each([false, true])("handles a restored wallet (stored session: %s)", async (
     .toBe(false);
 });
 
+it("starts a new pairing for a restored WalletConnect connection instead of signing over it", async () => {
+  // wagmi restores a WalletConnect session from storage without asking the
+  // wallet, which may have dropped it: SIWE over it can hang unseen, and only
+  // a new pairing gives the QR code and the mobile deep links.
+  const { result, config, request, signature } = setup();
+  const wc = config._internal.connectors.setup(
+    injected({
+      target: {
+        id: "walletConnect",
+        name: "WalletConnect",
+        provider: { request, on: vi.fn(), removeListener: vi.fn() } as unknown as EIP1193Provider,
+      },
+    }),
+  );
+  config._internal.connectors.setState((x) => [...x, wc]);
+  await act(() => connectWallet(config, { connector: wc }));
+  expect(result.current.session).toBeNull();
+  request.mockClear();
+
+  let pending!: Promise<void>;
+  act(() => {
+    pending = result.current.connect(wc);
+  });
+  await waitFor(() =>
+    expect(request.mock.calls.some(([args]) => args.method === "personal_sign")).toBe(true)
+  );
+  const methods = request.mock.calls.map(([args]) => args.method);
+  expect(methods.indexOf("wallet_revokePermissions")).toBeGreaterThanOrEqual(0);
+  expect(methods.indexOf("wallet_requestPermissions"))
+    .toBeGreaterThan(methods.indexOf("wallet_revokePermissions"));
+  await act(async () => {
+    signature.resolve("0x1234");
+    await pending;
+  });
+  expect(result.current.session).toEqual(SESSION);
+  expect(config.state.current).toBe(wc.uid);
+});
+
 it.each([false, true])(
   "does not let another tab cancel SIWE (second tab opens during sign-in: %s)",
   async (opensDuringSignIn) => {

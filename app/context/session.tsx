@@ -469,6 +469,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       },
     };
     const run = async () => {
+      // wagmi restores a WalletConnect session from storage without asking the
+      // wallet, which may have dropped it. SIWE over it can hang unseen on a
+      // phone, and only a new pairing gives the QR code and the deep links.
+      if (c.id === "walletConnect" && config.state.connections.has(c.uid)) {
+        try {
+          await disconnectAsync({ connector: c });
+        } catch { /* already gone */ }
+      }
       // A restored wallet or a refused signature may already be connected.
       // Retry SIWE without issuing another permission request to that wallet.
       const current = getConnection(config);
@@ -496,7 +504,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setConnecting(false);
     });
     return entry.promise;
-  }, [config, connectAsync, signIn]);
+  }, [config, connectAsync, disconnectAsync, signIn]);
 
   const cancelPairing = useCallback(() => {
     const active = connectingRef.current;

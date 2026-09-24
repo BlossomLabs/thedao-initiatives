@@ -44,17 +44,28 @@ export function meta() {
 /** The connected wallet, whether it is signed in, and whether its identity is complete. */
 function useSubmitter() {
   const { isConnected, address, status } = useAccount();
-  const { session, signIn, signingIn } = useSession();
+  const { session, signIn, signingIn, connecting } = useSession();
   const identity = useIdentity(address);
   const signedIn = Boolean(
     session && address && session.address.toLowerCase() === address.toLowerCase(),
   );
   const complete = identity.hasName && identity.hasAvatar;
-  return { isConnected, address, status, signIn, signingIn, identity, signedIn, complete };
+  return {
+    isConnected,
+    address,
+    status,
+    signIn,
+    signingIn,
+    connecting,
+    identity,
+    signedIn,
+    complete,
+  };
 }
 
 function Gate({ children, aside }: { children: React.ReactNode; aside: React.ReactNode }) {
-  const { isConnected, status, signIn, signingIn, identity, signedIn, complete } = useSubmitter();
+  const { isConnected, status, signIn, signingIn, connecting, identity, signedIn, complete } =
+    useSubmitter();
   const { openProfile } = useProfileDialog();
   const { openWalletPicker } = useWalletPicker();
   const [error, setError] = useState("");
@@ -145,7 +156,7 @@ function Gate({ children, aside }: { children: React.ReactNode; aside: React.Rea
               >
                 Sign in with {identity.name}
               </Button>
-              <Button variant="ghost" disabled={signingIn} onClick={openWalletPicker}>
+              <Button variant="ghost" disabled={signingIn || connecting} onClick={openWalletPicker}>
                 Use a different wallet
               </Button>
             </div>

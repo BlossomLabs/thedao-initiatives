@@ -148,6 +148,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
         recipientUrl: fields.recipientUrl ?? "",
         topup: fields.topup ?? false,
         milestoneReviewer: fields.milestoneReviewer ?? "",
+        categories: fields.categories ?? [],
         revision: 1,
         createdAt: t,
         approvedAt: fields.approvedAt ?? (status === "approved" ? t : null),
@@ -276,6 +277,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     "recipientUrl",
     "topup",
     "milestoneReviewer",
+    "categories",
   ]);
 
   /** Patch allowed fields; keeps the Safe index in step. */

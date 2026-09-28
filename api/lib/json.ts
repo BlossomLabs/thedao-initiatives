@@ -7,6 +7,7 @@ import { LIVE_ROLES, ROLE_ORDER } from "../services/roles.ts";
 import type { Config } from "../config.ts";
 import { isStructured } from "../../shared/draft/mod.ts";
 import { pickText } from "../db/initiatives.ts";
+import { categoriesOf } from "../../shared/categories.ts";
 
 export function ipfsUrl(config: Config, cid: string): string {
   return cid ? `https://${config.pinataGateway}/ipfs/${cid}` : "";
@@ -36,6 +37,7 @@ export function publicInitiative(r: Initiative) {
     recipientUrl: r.recipientUrl ?? "",
     topup: Boolean(r.topup),
     milestoneReviewer: r.milestoneReviewer ?? "",
+    categories: categoriesOf(r),
     ...structuredJson(r),
     revision: r.revision ?? 0,
     createdAt: r.createdAt,
@@ -57,6 +59,7 @@ export function cardInitiative(r: Initiative) {
     type: r.type,
     sortRank: r.sortRank,
     safeAddress: r.safeAddress,
+    categories: categoriesOf(r),
     createdAt: r.createdAt,
     approvedAt: r.approvedAt,
   };

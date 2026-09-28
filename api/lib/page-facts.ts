@@ -19,6 +19,7 @@ import {
 } from "./validate.ts";
 import { MAX_FUNDERS } from "../config.ts";
 import { LIMITS } from "../../shared/draft/mod.ts";
+import { readCategories } from "../../shared/categories.ts";
 
 export const PAGE_FACT_FIELDS = [
   "type",
@@ -31,6 +32,7 @@ export const PAGE_FACT_FIELDS = [
   "discourseUrl",
   "funders",
   "contact",
+  "categories",
 ] as const;
 
 export async function readPageFacts(
@@ -94,5 +96,13 @@ export async function readPageFacts(
   if (body.funders !== undefined) {
     patch.funders = capped(body.funders, MAX_FUNDERS, "The funder list");
   }
+  if (body.categories !== undefined) patch.categories = categoriesOr400(body.categories);
   return patch;
+}
+
+/** A category list from a request body, or a 400 with the reason. */
+export function categoriesOr400(raw: unknown): string[] {
+  const [list, err] = readCategories(raw);
+  if (err) throw new HttpError(400, err);
+  return list!;
 }

@@ -1,4 +1,6 @@
 import { type Context, Hono } from "hono";
+import { categoriesOr400 } from "../lib/page-facts.ts";
+import { categoriesOf } from "../../shared/categories.ts";
 import { bodyLimit } from "hono/body-limit";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
@@ -227,9 +229,11 @@ export function adminRoutes(deps: Deps) {
    */
   r.patch("/initiatives/:id", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"), true);
-    const body = await jsonBody(c, ["sortRank", "paidOutUsd", "proposer"]);
+    const body = await jsonBody(c, ["sortRank", "paidOutUsd", "proposer", "categories"]);
     if (body.paidOutUsd !== undefined || body.proposer !== undefined) assertRecentAuth(c, deps.now);
     const patch: Partial<Initiative> = {};
+    // Categories sit outside the text: editable in every status, never a revision.
+    if (body.categories !== undefined) patch.categories = categoriesOr400(body.categories);
     if (body.sortRank !== undefined) {
       const raw = s(body.sortRank, 10);
       if (!raw) patch.sortRank = null;
@@ -315,6 +319,9 @@ export function adminRoutes(deps: Deps) {
     // Deploy first, approve second: a live initiative always has its Safe.
     if (!initiative.safeAddress) {
       throw new HttpError(400, "Deploy the Safe first; approval needs a deployed, verified Safe.");
+    }
+    if (!categoriesOf(initiative).length) {
+      throw new HttpError(400, "Add at least one category to approve.");
     }
     return await db.initiatives.unarchive(initiative.id);
   }

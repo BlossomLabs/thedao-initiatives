@@ -304,7 +304,7 @@ Deno.test("site: Markdown downloads keep API authorization and never fall throug
     const publicFile = await h.req(`/initiative/${row.slug}.md`);
     assertEquals(publicFile.status, 200);
     assertStringIncludes(publicFile.headers.get("Content-Type")!, "text/markdown");
-    assertEquals(publicFile.headers.get("Cache-Control"), "public, max-age=60");
+    assertEquals(publicFile.headers.get("Cache-Control"), "public, max-age=300");
     assertEquals(publicFile.headers.get("Content-Security-Policy"), API_CSP);
     assert(!(await publicFile.text()).includes("private@example.com"));
     const privatePath = `/initiative/${row.slug}-PRIVATE.md`;

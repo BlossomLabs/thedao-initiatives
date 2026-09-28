@@ -14,6 +14,8 @@ const value = (v: string) => v.replace(/\r?\n/g, " ").trim();
 export interface MarkdownOptions {
   /** Admin export: status, proposer, and the private contact and funders. */
   privateFields?: boolean;
+  /** Public facts for agents, as front-matter lines the content sync ignores. */
+  extraFrontMatter?: string[];
 }
 
 export function initiativeMarkdown(
@@ -53,6 +55,7 @@ export function initiativeMarkdown(
       for (const line of r.funders.split(/\r?\n/)) if (line.trim()) fm.push(`  ${line.trim()}`);
     }
   }
+  fm.push(...(opts.extraFrontMatter ?? []));
   fm.push("---");
 
   const body: string[] = [];

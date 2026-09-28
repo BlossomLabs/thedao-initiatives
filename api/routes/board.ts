@@ -132,6 +132,10 @@ async function buildBoard(deps: Deps, refresh: boolean) {
   };
 }
 
+/** The board as the public GET serves it (no refresh), for the feeds. */
+export const readBoard = (deps: Deps, cache: BoardCache) =>
+  cache.get(() => buildBoard(deps, false));
+
 export function boardRoutes(deps: Deps, cache: BoardCache = createBoardCache(deps)) {
   const r = new Hono<Vars>();
   const { config } = deps;

@@ -1,11 +1,11 @@
 /**
- * The proposer's guide (public/llms.txt, served as-is at /llms.txt), bundled
+ * The proposer's guide (public/submit.md, served as-is at /submit.md), bundled
  * so the copy button needs no fetch, and its two ```markdown blocks sorted
  * with the real splitter: the gold-standard RFP gives every RFP section, the
  * funding goal and the milestones their example; the second block gives the
  * three grant-only sections theirs.
  */
-import raw from "../../public/llms.txt?raw";
+import raw from "../../public/submit.md?raw";
 import {
   type Milestone,
   type PageKey,

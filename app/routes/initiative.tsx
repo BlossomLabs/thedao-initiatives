@@ -5,6 +5,7 @@ import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import { TypeBadge } from "~/components/ui/Badge";
+import { CategoryLink } from "~/components/ui/CategoryTag";
 import Skeleton from "~/components/ui/Skeleton";
 import PageSkeleton from "~/components/layout/PageSkeleton";
 import Markdown from "~/components/Markdown";
@@ -104,6 +105,11 @@ export default function Initiative() {
       <h1 className="m-0 mb-3 mt-1.5 font-inter-tight text-[clamp(28px,4vw,44px)] font-bold leading-[1.1] tracking-[-.02em]">
         {diff ? <DiffBlock chunks={diff.title} /> : text.title}
       </h1>
+      {r.categories.length > 0 && (
+        <p className="m-0 mb-3 flex flex-wrap gap-1.5">
+          {r.categories.map((slug) => <CategoryLink key={slug} slug={slug} />)}
+        </p>
+      )}
       <p className="m-0 flex flex-wrap items-center gap-3">
         <TypeBadge type={r.type} inline />
         {r.status === "archived" && <span className="chip chip-badge st-archived">archived</span>}

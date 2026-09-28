@@ -125,6 +125,7 @@ describe("useDraft reducer", () => {
       recipientUrl: "https://team.example",
       topup: true,
       milestoneReviewer: "N.",
+      categories: [],
       sections: { why: "w", team: "t" },
       milestones: [{
         name: "A",

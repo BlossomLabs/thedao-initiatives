@@ -1,6 +1,6 @@
 /** Initiative categories: validation, every writer, the approval gate, the public shapes, AI pre-fill. */
 import { assert, assertEquals } from "@std/assert";
-import { ADMIN, deploySafe, harness, type Harness, j, proposerToken } from "./app-helpers.ts";
+import { ADMIN, deploySafe, type Harness, harness, j, proposerToken } from "./app-helpers.ts";
 import { minimalSubmission } from "./fixtures.ts";
 import { CATEGORIES, readCategories } from "../../shared/categories.ts";
 import { aiFilterCategories } from "../services/ai.ts";
@@ -13,7 +13,16 @@ const submit = (h: Harness, token: string, json: unknown) =>
 Deno.test("readCategories: 1 to 3 unique registry slugs, first is primary", () => {
   assertEquals(readCategories(["opsec"]), [["opsec"], null]);
   assertEquals(readCategories(["defi", "opsec", "compilers"])[0], ["defi", "opsec", "compilers"]);
-  for (const bad of [[], ["opsec", "defi", "compilers", "infrastructure"], ["nope"], ["opsec", "opsec"], "opsec", null]) {
+  for (
+    const bad of [
+      [],
+      ["opsec", "defi", "compilers", "infrastructure"],
+      ["nope"],
+      ["opsec", "opsec"],
+      "opsec",
+      null,
+    ]
+  ) {
     const [list, err] = readCategories(bad);
     assertEquals(list, null);
     assert(err);
@@ -23,18 +32,23 @@ Deno.test("readCategories: 1 to 3 unique registry slugs, first is primary", () =
 });
 
 Deno.test("aiFilterCategories: registry slugs only, no repeats, at most 3", () => {
-  assertEquals(aiFilterCategories(["bogus", "opsec", "opsec", "defi", "compilers", "infrastructure"]), [
-    "opsec",
-    "defi",
-    "compilers",
-  ]);
+  assertEquals(
+    aiFilterCategories(["bogus", "opsec", "opsec", "defi", "compilers", "infrastructure"]),
+    [
+      "opsec",
+      "defi",
+      "compilers",
+    ],
+  );
   assertEquals(aiFilterCategories("opsec"), []);
 });
 
 Deno.test("submit: categories are required and validated, then stored and shown", async () => {
   const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
   const token = await proposerToken(h);
-  for (const categories of [[], ["nope"], ["opsec", "defi", "compilers", "infrastructure"], undefined]) {
+  for (
+    const categories of [[], ["nope"], ["opsec", "defi", "compilers", "infrastructure"], undefined]
+  ) {
     const res = await submit(h, token, { ...minimalSubmission(1000), categories });
     assertEquals(res.status, 400);
     const body = await j(res) as { findings: { errors: { field: string }[] } };
@@ -71,7 +85,9 @@ Deno.test("admin: categories editable in every status without a revision; approv
   assertEquals((await approve()).status, 200);
   // archived rows stay taggable, and no edit makes a text revision
   await h.db.initiatives.update(row.id, { status: "archived" });
-  assertEquals((await j(await patch({ categories: ["defi"] })) as Row).initiative.categories, ["defi"]);
+  assertEquals((await j(await patch({ categories: ["defi"] })) as Row).initiative.categories, [
+    "defi",
+  ]);
   assertEquals((await h.db.initiatives.get(row.id))!.revision, 1);
   h.close();
 });
@@ -102,7 +118,10 @@ Deno.test("board and page: categories on cards and the public initiative; legacy
     status: "approved",
     categories: ["defi", "audits-analysis"],
   });
-  const legacy = await h.db.initiatives.insert({ title: "Legacy approved row", status: "approved" });
+  const legacy = await h.db.initiatives.insert({
+    title: "Legacy approved row",
+    status: "approved",
+  });
   // a row written before categories existed has no key at all
   const { categories: _, ...bare } = (await h.db.initiatives.get(legacy.id))!;
   await h.kv.set(["rfp", legacy.id], bare);
@@ -119,7 +138,10 @@ Deno.test("board and page: categories on cards and the public initiative; legacy
 
 Deno.test("ai-categories: mocked provider, bogus slugs dropped, needs text, disabled", async () => {
   const off = await harness();
-  const body = { title: "Formal verification of the compiler", summary: "Prove the Vyper compiler correct end to end." };
+  const body = {
+    title: "Formal verification of the compiler",
+    summary: "Prove the Vyper compiler correct end to end.",
+  };
   assertEquals((await off.req("/api/ai-categories", { method: "POST", json: body })).status, 503);
   off.close();
   const h = await harness({

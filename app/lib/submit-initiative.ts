@@ -56,7 +56,11 @@ export async function uploadLogo(file: File): Promise<UploadedLogo> {
  */
 export async function submitInitiative(
   draft: Draft,
-  { onLogoCid }: { onLogoCid?: (backerId: string, cid: string) => void } = {},
+  { onLogoCid, categories = [] }: {
+    onLogoCid?: (backerId: string, cid: string) => void;
+    /** Kept outside the draft: the pasted text never carries them. */
+    categories?: string[];
+  } = {},
 ): Promise<SubmitResult> {
   const cids: Record<string, string> = {};
   const live = liveBackers(draft);
@@ -80,7 +84,9 @@ export async function submitInitiative(
     }
   }
   try {
-    return await api<SubmitResult>("/api/initiatives", { json: toPayload(draft, cids) });
+    return await api<SubmitResult>("/api/initiatives", {
+      json: { ...toPayload(draft, cids), categories },
+    });
   } catch (err) {
     const findings = findingsOf(err);
     if (findings && err instanceof ApiError) throw new FindingsError(err.message, findings);

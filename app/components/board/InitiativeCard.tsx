@@ -3,6 +3,7 @@ import BackerLogo from "~/components/ui/BackerLogo";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router";
 import { FundedChip, TypeBadge } from "~/components/ui/Badge";
+import { CategoryLink } from "~/components/ui/CategoryTag";
 import Bar from "~/components/ui/Bar";
 import Money from "~/components/ui/Money";
 import { Button, LinkButton } from "~/components/ui/Button";
@@ -64,6 +65,11 @@ export default function InitiativeCard({
       >
         {r.title}
       </Link>
+      {r.categories.length > 0 && (
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {r.categories.slice(0, 3).map((slug) => <CategoryLink key={slug} slug={slug} />)}
+        </div>
+      )}
       <p className="mb-5 mt-2.5 line-clamp-3 min-h-[42px] text-[13px] leading-[1.6] text-white/55">
         {r.summary}
       </p>

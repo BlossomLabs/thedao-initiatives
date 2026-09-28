@@ -40,6 +40,8 @@ export interface Initiative {
   topup: boolean;
   /** Top-ups only: who decides whether the remaining milestones pass. */
   milestoneReviewer: string;
+  /** 1 to 3 category slugs (app/lib/categories.ts), primary first; [] on untagged rows. */
+  categories: string[];
   /** Structured body (sections per type, milestones, links). A structured
    * row has `details === ""`; a legacy row has empty sections. */
   sections: Sections;
@@ -129,6 +131,7 @@ export type CardInitiative = Pick<
   | "type"
   | "sortRank"
   | "safeAddress"
+  | "categories"
   | "createdAt"
   | "approvedAt"
 >;

@@ -22,6 +22,7 @@ const base: Initiative = {
   recipientUrl: "https://vyperlang.org/",
   topup: false,
   milestoneReviewer: "",
+  categories: [],
   sections: {},
   milestones: [],
   links: [],

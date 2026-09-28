@@ -4,12 +4,7 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { requireClientIp } from "../middleware/ip.ts";
 import { jsonBody, s } from "../lib/body.ts";
-import {
-  AI_QUERY_MAX_CHARS,
-  aiFilterCategories,
-  aiFilterRanked,
-  aiTopK,
-} from "../services/ai.ts";
+import { AI_QUERY_MAX_CHARS, aiFilterCategories, aiFilterRanked, aiTopK } from "../services/ai.ts";
 
 const CACHE_TTL = 600;
 const CACHE_MAX = 500;

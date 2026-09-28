@@ -260,7 +260,9 @@ export function initiativeRoutes(deps: Deps) {
     const body = await jsonBody(c, ["initiativeId", ...PAGE_FACT_FIELDS]);
     const { initiative } = await editableBy(c.req.param("slug"), user, body);
     // Categories follow the text: the proposer may change them while the text is editable.
-    const onlyCategories = Object.keys(body).every((k) => k === "initiativeId" || k === "categories");
+    const onlyCategories = Object.keys(body).every((k) =>
+      k === "initiativeId" || k === "categories"
+    );
     const open = initiative.status === "pending" ||
       (onlyCategories && initiative.status === "approved");
     if (!user.isAdmin && !open) {

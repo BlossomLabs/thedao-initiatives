@@ -404,6 +404,78 @@
     @apply inline-block rounded-full border border-edge2 text-soft px-2.5 py-0.5 font-inter-tight
       text-[11px] uppercase tracking-[0.08em];
   }
+  /* category tags: sentence case + icon (sets them apart from the uppercase type badges);
+     --tag is the category base colour, --tag-text its dark-theme text colour */
+  .cat-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px 0 8px;
+    border-radius: 9999px;
+    border: 1px solid color-mix(in srgb, var(--tag) 50%, transparent);
+    background-color: rgb(9 18 30 / 0.6);
+    background-image: linear-gradient(
+      color-mix(in srgb, var(--tag) 14%, transparent),
+      color-mix(in srgb, var(--tag) 14%, transparent)
+    );
+    color: var(--tag-text);
+    font-family: var(--font-inter-tight);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .cat-tag svg {
+    width: 13px;
+    height: 13px;
+    flex: none;
+    color: var(--tag);
+    stroke-width: 2.2;
+  }
+  .cat-tag.cat-sm {
+    height: 20px;
+  }
+  .cat-tag.cat-icon {
+    width: 20px;
+    padding: 0;
+    justify-content: center;
+  }
+  button.cat-tag,
+  a.cat-tag {
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  }
+  button.cat-tag:hover,
+  a.cat-tag:hover {
+    border-color: color-mix(in srgb, var(--tag) 80%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--tag) 35%, transparent);
+    color: var(--tag-text);
+    text-decoration: none;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    button.cat-tag:hover,
+    a.cat-tag:hover {
+      transform: translateY(-1px);
+    }
+  }
+  .cat-tag:focus-visible {
+    outline: 2px solid var(--color-dao-bright);
+    outline-offset: 2px;
+  }
+  .cat-tag.cat-on {
+    background: var(--tag);
+    border-color: var(--tag);
+    color: #0b1b2b;
+  }
+  .cat-tag.cat-on svg {
+    color: #0b1b2b;
+  }
+  .cat-tag.cat-dim {
+    opacity: 0.4;
+  }
+
   /* a chip sitting next to a type badge: same height and vertical rhythm */
   .chip-badge {
     @apply inline-flex items-center py-1 leading-[1.5] font-semibold tracking-[0.05em];

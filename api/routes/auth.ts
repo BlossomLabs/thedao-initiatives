@@ -85,9 +85,12 @@ export function authRoutes(deps: Deps) {
   r.get("/me", requireAuth, async (c) => {
     const u = c.var.user!;
     const p = await db.profiles.get(u.address);
+    // The same check that tags comments EXPERT; a chain hiccup reads as "no badge".
+    const isBadgeHolder = await deps.chain.hasBadge(u.address).catch(() => false);
     return c.json({
       address: u.address,
       isAdmin: u.isAdmin,
+      isBadgeHolder,
       expiresAt: u.expiresAt,
       nickname: p.nickname || null,
       pfp: p.pfp,

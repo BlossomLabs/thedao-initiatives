@@ -46,11 +46,13 @@ const ICONS = {
 
 /** The MVP's wallet picker / account menu, anchored under the top-bar button. */
 export default function WalletMenu(
-  { open, items, onClose, className }: {
+  { open, items, onClose, className, header }: {
     open: boolean;
     items: WalletMenuItem[];
     onClose: () => void;
     className?: string;
+    /** Shown above the items (the badge tag on phones). */
+    header?: React.ReactNode;
   },
 ) {
   const ref = useRef<HTMLDivElement>(null);
@@ -79,6 +81,7 @@ export default function WalletMenu(
       )}
       role="menu"
     >
+      {header}
       {items.map((it) => {
         const Icon = it.lucide ? ICONS[it.lucide] : null;
         return (

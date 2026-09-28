@@ -7,6 +7,13 @@ import type { FundingSummary } from "../services/funding.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
 import { ledgerStatus, refreshLedgers } from "../services/ledger.ts";
 import { createSnapshotCache, type SnapshotCache } from "../lib/snapshot-cache.ts";
+import { DEFAULT_VOTE, type VoteSettings } from "../../shared/vote.ts";
+
+/** The vote-eligibility settings, defaults until an admin saves them. */
+export const voteSettings = async (deps: Pick<Deps, "db">): Promise<VoteSettings> => ({
+  ...DEFAULT_VOTE,
+  ...(await deps.db.meta.getPublic<VoteSettings>("vote_settings")),
+});
 
 export interface Card {
   initiative: ReturnType<typeof cardInitiative>;
@@ -100,9 +107,10 @@ export const createBoardCache = (deps: Deps): BoardCache =>
 
 async function buildBoard(deps: Deps, refresh: boolean) {
   const { db, config } = deps;
-  const [initiatives, state] = await Promise.all([
+  const [initiatives, state, vote] = await Promise.all([
     db.initiatives.list(["approved"]),
     deps.chain.state(refresh),
+    voteSettings(deps),
   ]);
   if (refresh) await refreshLedgers(deps, initiatives);
   const tokensOk = tokensUsable(state);
@@ -128,6 +136,7 @@ async function buildBoard(deps: Deps, refresh: boolean) {
       walletConnectProjectId: config.walletConnectProjectId,
       safeThreshold: SAFE_THRESHOLD,
       safeOwnerCount: SAFE_OWNER_COUNT,
+      vote,
     },
   };
 }

@@ -7,6 +7,9 @@ export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = und
   const get = async <T = unknown>(key: string): Promise<T | null> =>
     (await kv.get<T>(K.meta(key))).value;
   const set = (key: string, value: unknown) => kv.set(K.meta(key), value);
+  /** A public read (display settings): eventual when the deployment allows it. */
+  const getPublic = async <T = unknown>(key: string): Promise<T | null> =>
+    (await kv.get<T>(K.meta(key), read)).value;
 
   /** Short-lived lock; true if acquired. Expires on its own. */
   async function lock(name: string, ttlSecs: number): Promise<boolean> {
@@ -32,5 +35,5 @@ export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = und
     (await kv.get<SafeSyncState>(K.safeSync(rfpId), read)).value;
   const setSafeSync = (rfpId: string, s: SafeSyncState) => kv.set(K.safeSync(rfpId), s);
 
-  return { get, set, lock, unlock, aiBudgetOk, safeSync, setSafeSync };
+  return { get, getPublic, set, lock, unlock, aiBudgetOk, safeSync, setSafeSync };
 }

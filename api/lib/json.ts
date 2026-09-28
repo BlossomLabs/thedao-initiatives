@@ -60,6 +60,8 @@ export function cardInitiative(r: Initiative) {
     sortRank: r.sortRank,
     safeAddress: r.safeAddress,
     categories: categoriesOf(r),
+    /** Grants only; the board's keyword filter searches it. */
+    recipientTeam: r.type === "grant" ? r.recipientTeam ?? "" : "",
     createdAt: r.createdAt,
     approvedAt: r.approvedAt,
   };

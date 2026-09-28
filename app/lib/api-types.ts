@@ -132,6 +132,7 @@ export type CardInitiative = Pick<
   | "sortRank"
   | "safeAddress"
   | "categories"
+  | "recipientTeam"
   | "createdAt"
   | "approvedAt"
 >;
@@ -179,6 +180,8 @@ export interface BoardFlags {
   walletConnectProjectId: string;
   safeThreshold: number;
   safeOwnerCount: number;
+  /** Vote-eligibility display (flag + numbers, editable without a deploy). */
+  vote?: import("@shared/vote").VoteSettings;
 }
 
 export interface Board {
@@ -302,6 +305,8 @@ export interface SessionInfo {
 export interface Me {
   address: string;
   isAdmin: boolean;
+  /** Holds the ETHSecurity Badge (the check behind the EXPERT role). */
+  isBadgeHolder?: boolean;
   expiresAt: number;
   nickname: string | null;
   pfp: string;

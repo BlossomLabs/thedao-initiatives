@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BadgeHolderTag } from "~/components/ui/Badge";
 import { Wallet } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAccount } from "wagmi";
@@ -19,7 +20,7 @@ import { cn } from "~/lib/utils";
  */
 export default function ConnectButton() {
   const { address, isConnected } = useAccount();
-  const { session, connecting, signingIn, signOut, switchWallet } = useSession();
+  const { session, me, connecting, signingIn, signOut, switchWallet } = useSession();
   // Wallet access alone does not grant a signed-in session.
   const signedIn = Boolean(
     isConnected && address && session && session.address.toLowerCase() === address.toLowerCase(),
@@ -147,8 +148,10 @@ export default function ConnectButton() {
     },
   ];
 
+  const badge = signedIn && me?.isBadgeHolder;
   return (
-    <div className="relative">
+    <div className="relative flex items-center gap-2.5">
+      {badge && <BadgeHolderTag className="max-[640px]:hidden" />}
       <button
         type="button"
         className={cn("btn btn-wallet", signedIn && "connected")}
@@ -171,6 +174,11 @@ export default function ConnectButton() {
         open={menu === "account"}
         items={accountItems}
         onClose={() => setMenu("none")}
+        header={badge && (
+          <div className="px-3 pb-1.5 pt-2 min-[641px]:hidden">
+            <BadgeHolderTag />
+          </div>
+        )}
       />
     </div>
   );

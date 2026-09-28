@@ -9,6 +9,8 @@ import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import SyncContent from "~/components/admin/SyncContent";
 import Admins from "~/components/admin/Admins";
+import VoteSettings from "~/components/admin/VoteSettings";
+import { Search } from "lucide-react";
 import BulkBar, { type BulkResult, HeadCheck, RowCheck } from "~/components/admin/BulkBar";
 import { useSelection } from "~/hooks/use-selection";
 import { useSiteSettings } from "~/hooks/use-site-settings";
@@ -83,14 +85,19 @@ export default function Dashboard() {
   const reportedIds = useMemo(() => (data?.reported ?? []).map((c) => c.id), [data?.reported]);
   // "all", "untagged" or a category slug.
   const [catFilter, setCatFilter] = useState("all");
-  const rows = useMemo(
-    () =>
-      (data?.rows ?? []).filter(({ initiative: r }) =>
-        catFilter === "all" ||
-        (catFilter === "untagged" ? !r.categories.length : r.categories.includes(catFilter))
-      ),
-    [data?.rows, catFilter],
-  );
+  // One box over the project name and the contact (name, email or handle), as you type.
+  const [search, setSearch] = useState("");
+  const rows = useMemo(() => {
+    const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+    return (data?.rows ?? []).filter(({ initiative: r }) =>
+      (catFilter === "all" ||
+        (catFilter === "untagged" ? !r.categories.length : r.categories.includes(catFilter))) &&
+      words.every((w) => `${r.title} ${r.contact ?? ""}`.toLowerCase().includes(w))
+    );
+  }, [data?.rows, catFilter, search]);
+  // The same approved rows the board shows, so the numbers match it.
+  const approved = (data?.rows ?? []).filter((x) => x.initiative.status === "approved");
+  const approvedGrants = approved.filter((x) => x.initiative.type === "grant").length;
   const rowIds = useMemo(() => rows.map((r) => r.initiative.id), [rows]);
   const heldSel = useSelection(heldIds);
   const reportedSel = useSelection(reportedIds);
@@ -164,6 +171,11 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <p className="mb-0 mt-3.5 font-inter-tight text-[15px] text-soft" aria-live="polite">
+        <b className="text-white">{approved.length} approved</b>: {approvedGrants} grant
+        {approvedGrants === 1 ? "" : "s"}, {approved.length - approvedGrants} RFP
+        {approved.length - approvedGrants === 1 ? "" : "s"}
+      </p>
       <div className="mt-3.5 grid grid-cols-3 gap-3 max-[860px]:grid-cols-1">
         <div className="flex items-center gap-3 rounded-2xl border border-edge bg-card px-[18px] py-3.5">
           <span
@@ -221,6 +233,7 @@ export default function Dashboard() {
       </div>
 
       <Admins />
+      <VoteSettings />
 
       <SectionHeading id="moderation">Community moderation</SectionHeading>
       <h3 className="h3">
@@ -431,6 +444,20 @@ export default function Dashboard() {
 
       <SectionHeading>All initiatives</SectionHeading>
       <div className="mb-3 flex flex-wrap items-center gap-2.5">
+        <label className="relative min-w-[240px] flex-1">
+          <span className="sr-only">Search by project or contact</span>
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/40"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            className="field min-h-[38px] py-1.5 pl-9 text-[13px]"
+            placeholder="Search by project or contact"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </label>
         <Select
           value={catFilter}
           items={CAT_FILTER_ITEMS}

@@ -20,6 +20,7 @@ const card = (over: Partial<Card>): Card => ({
     sortRank: null,
     safeAddress: "",
     categories: [],
+    recipientTeam: "",
     createdAt: 0,
     approvedAt: null,
   },

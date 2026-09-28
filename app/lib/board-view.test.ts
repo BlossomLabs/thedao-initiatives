@@ -37,6 +37,7 @@ const card = (
       sortRank: null,
       safeAddress: "",
       categories: o.cats ?? [],
+      recipientTeam: "",
       createdAt: o.at ?? n,
       approvedAt: o.at ?? n,
     },
@@ -192,5 +193,14 @@ describe("board view", () => {
       ["opsec", 1],
       [null, 1],
     ]);
+  });
+});
+
+describe("vote-eligible filter", () => {
+  it("keeps initiatives at or above the floor, only while the flag is on", () => {
+    const vote = { show: true, floorPct: 25, capUsd: 200_000 };
+    const v = { ...DEFAULT_VIEW, status: "vote" as const };
+    expect(titles(applyView(board, v, vote))).toEqual(["Safe lockdown", "Echidna"]);
+    expect(applyView(board, v, { ...vote, show: false }).length).toBe(board.length);
   });
 });

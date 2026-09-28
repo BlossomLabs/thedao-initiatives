@@ -1,6 +1,14 @@
 /** Initiative categories: validation, every writer, the approval gate, the public shapes, AI pre-fill. */
 import { assert, assertEquals } from "@std/assert";
-import { ADMIN, deploySafe, type Harness, harness, j, proposerToken } from "./app-helpers.ts";
+import {
+  ADMIN,
+  deploySafe,
+  type Harness,
+  harness,
+  j,
+  PLAIN,
+  proposerToken,
+} from "./app-helpers.ts";
 import { minimalSubmission } from "./fixtures.ts";
 import { CATEGORIES, readCategories } from "../../shared/categories.ts";
 import { aiFilterCategories } from "../services/ai.ts";
@@ -165,4 +173,49 @@ Deno.test("ai-categories: mocked provider, bogus slugs dropped, needs text, disa
   const res = await j(await h.req("/api/ai-categories", { method: "POST", json: body }));
   assertEquals(res.categories, ["formal-verification", "compilers"]);
   h.close();
+});
+
+Deno.test("auth/me: isBadgeHolder follows the badge check behind the EXPERT role", async () => {
+  const h = await harness();
+  const holder = "0x2222222222222222222222222222222222222222";
+  h.script.badgeHolders.add(holder);
+  const plain = await h.mint(PLAIN);
+  assertEquals((await j(await h.req("/api/auth/me", { token: plain }))).isBadgeHolder, false);
+  const badge = await h.mint(holder);
+  assertEquals((await j(await h.req("/api/auth/me", { token: badge }))).isBadgeHolder, true);
+  h.close();
+});
+
+Deno.test("vote settings: off by default, admins change them without a deploy, the board carries them", async () => {
+  const h = await harness();
+  const admin = await h.mint(ADMIN, true);
+  const flags = async () =>
+    ((await j(await h.req("/api/board"))) as { flags: { vote: unknown } }).flags.vote;
+  assertEquals(await flags(), { show: false, floorPct: 25, capUsd: 200_000 });
+  const save = (json: unknown, token = admin) =>
+    h.req("/api/admin/vote-settings", { method: "POST", token, json });
+  assertEquals(
+    (await save({ show: true, floorPct: 30, capUsd: 150_000 }, await h.mint(PLAIN))).status,
+    403,
+  );
+  for (
+    const bad of [{ show: "yes", floorPct: 25, capUsd: 1 }, {
+      show: true,
+      floorPct: 120,
+      capUsd: 1,
+    }, { show: true, floorPct: 25, capUsd: -1 }]
+  ) {
+    assertEquals((await save(bad)).status, 400);
+  }
+  assertEquals((await save({ show: true, floorPct: 30, capUsd: 150_000 })).status, 200);
+  assertEquals(await flags(), { show: true, floorPct: 30, capUsd: 150_000 });
+  h.close();
+});
+
+Deno.test("voteState: below the floor, eligible, eligible with a gap above the cap", async () => {
+  const { voteState, DEFAULT_VOTE } = await import("../../shared/vote.ts");
+  const s = { ...DEFAULT_VOTE, show: true };
+  assertEquals(voteState(100_000, 600_000, s), { kind: "below", toFloorUsd: 50_000 });
+  assertEquals(voteState(151_008, 279_000, s), { kind: "eligible" });
+  assertEquals(voteState(150_000, 600_000, s), { kind: "gap", gapUsd: 450_000, capUsd: 200_000 });
 });

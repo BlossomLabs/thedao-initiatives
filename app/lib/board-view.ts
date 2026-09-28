@@ -5,9 +5,11 @@
  */
 import type { Card } from "~/lib/api-types";
 import { CATEGORIES, CATEGORY_INDEX, categoryOf } from "~/lib/categories";
+import { type VoteSettings, voteState } from "@shared/vote";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
-export const STATUSES = ["all", "open", "funded"] as const;
+/** "vote" (Vote-eligible) is offered only while the vote display is flagged on. */
+export const STATUSES = ["all", "open", "funded", "vote"] as const;
 export const SORTS = [
   ["recommended", "Recommended"],
   ["closest", "Closest to funded"],
@@ -82,7 +84,7 @@ const haystack = (c: Card) =>
   [
     c.initiative.title,
     c.initiative.summary,
-    (c.initiative as { recipientTeam?: string }).recipientTeam ?? "",
+    c.initiative.recipientTeam ?? "",
     ...c.initiative.categories.map((s) => categoryOf(s)?.label ?? ""),
   ].join(" ").toLowerCase();
 
@@ -90,10 +92,14 @@ type Facet = "type" | "status" | "cats" | "q";
 
 /** One card against the view; `skip` leaves one facet out (for that facet's counts).
  * Categories are OR among themselves and AND with everything else. */
-export function matches(c: Card, v: BoardView, skip?: Facet): boolean {
+export function matches(c: Card, v: BoardView, skip?: Facet, vote?: VoteSettings): boolean {
   if (skip !== "type" && v.type !== "all" && c.initiative.type !== v.type) return false;
   if (skip !== "status" && v.status === "open" && c.funded) return false;
   if (skip !== "status" && v.status === "funded" && !c.funded) return false;
+  if (
+    skip !== "status" && v.status === "vote" && vote?.show &&
+    voteState(c.summary.total, c.initiative.goalUsd, vote).kind === "below"
+  ) return false;
   if (
     skip !== "cats" && v.cats.length && !c.initiative.categories.some((s) => v.cats.includes(s))
   ) {
@@ -131,20 +137,20 @@ export function sortCards(cards: Card[], sort: BoardSort): Card[] {
 }
 
 /** The cards the view shows, in its order. */
-export const applyView = (cards: Card[], v: BoardView): Card[] =>
-  sortCards(cards.filter((c) => matches(c, v)), v.sort);
+export const applyView = (cards: Card[], v: BoardView, vote?: VoteSettings): Card[] =>
+  sortCards(cards.filter((c) => matches(c, v, undefined, vote)), v.sort);
 
 /** Live counts for the controls: each facet counted with the other filters applied. */
-export function facetCounts(cards: Card[], v: BoardView) {
+export function facetCounts(cards: Card[], v: BoardView, vote?: VoteSettings) {
   const type = { all: 0, rfp: 0, grant: 0 };
   for (const c of cards) {
-    if (!matches(c, v, "type")) continue;
+    if (!matches(c, v, "type", vote)) continue;
     type.all++;
     type[c.initiative.type]++;
   }
   const cats: Record<string, number> = Object.fromEntries(CATEGORIES.map((c) => [c.slug, 0]));
   for (const c of cards) {
-    if (!matches(c, v, "cats")) continue;
+    if (!matches(c, v, "cats", vote)) continue;
     for (const s of c.initiative.categories) if (s in cats) cats[s]++;
   }
   return { type, cats };

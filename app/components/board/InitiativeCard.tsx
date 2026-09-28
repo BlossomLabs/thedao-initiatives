@@ -4,6 +4,8 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "react-router";
 import { FundedChip, TypeBadge } from "~/components/ui/Badge";
 import { CategoryLink } from "~/components/ui/CategoryTag";
+import VoteChip from "~/components/board/VoteChip";
+import type { VoteSettings } from "@shared/vote";
 import Bar from "~/components/ui/Bar";
 import Money from "~/components/ui/Money";
 import { Button, LinkButton } from "~/components/ui/Button";
@@ -28,10 +30,13 @@ export default function InitiativeCard({
   aiTop,
   onDonated,
   style,
+  vote,
 }: {
   card: Card;
   tokensOk: boolean;
   aiTop?: boolean;
+  /** Vote-eligibility display, when flagged on. */
+  vote?: VoteSettings;
   onDonated?: () => void;
   style?: React.CSSProperties;
 }) {
@@ -73,7 +78,7 @@ export default function InitiativeCard({
       <p className="mb-5 mt-2.5 line-clamp-3 min-h-[42px] text-[13px] leading-[1.6] text-white/55">
         {r.summary}
       </p>
-      <Bar pct={pct} className="mt-auto" />
+      <Bar pct={pct} className="mt-auto" tick={vote?.show ? vote.floorPct : undefined} />
       <div
         className={cn(
           "mt-2 flex justify-between gap-2.5 text-[13px]",
@@ -102,6 +107,9 @@ export default function InitiativeCard({
             </span>
           )}
       </div>
+      {vote?.show && (
+        <VoteChip raised={summary.total} goal={r.goalUsd} vote={vote} className="mt-2 self-start" />
+      )}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {canDonate && (
           <Button variant="primary" sm onClick={() => setOpen((o) => !o)}>

@@ -6,6 +6,11 @@ OPSEC Ratings Coalition to Build & Maintain an "L2Beat for OPSEC"
 
 One OPSEC rating the whole industry recognizes, issued by the firms that already run OPSEC audits. This RFP funds the coordinator who gets at least 6 auditing firms to agree on one scoring template and the A / AA / AAA tiers, stands up a public board of rated teams, and hands the standard to a membership body the firms own. Rated teams pay a fixed fee for their assessment, so the system pays for itself once enough teams are on the board.
 
+## Categories
+
+OpSec
+Audits & Analysis
+
 ## Funding goal (USD)
 
 $150,000

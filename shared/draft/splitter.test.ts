@@ -94,3 +94,10 @@ test("backer lines, with an optional logo file as the 4th field", () => {
     { org: "Org2", amountUsd: 5000, url: "", logo: "" },
   ]);
 });
+
+test("a Categories section is a page field", () => {
+  const r = splitDraft("## Title\nT\n\n## Categories\n- OpSec\n- DeFi Safety\n", "rfp");
+  expect(r.page.categories).toBe("- OpSec\n- DeFi Safety");
+  expect(r.unsorted).toBe("");
+  expect(splitDraft("## Tags\nOpSec", "rfp").page.categories).toBe("OpSec");
+});

@@ -144,3 +144,31 @@ describe("replaceFromText", () => {
     expect(textMatchesDraft(first, "## Title\n\nOther")).toBe(false);
   });
 });
+
+describe("categories in the text", () => {
+  it("renders a Categories section right after the summary, primary first", () => {
+    const d = emptyDraft();
+    d.page.title = "T";
+    d.page.summary = "S";
+    d.page.goal = "1,000";
+    d.categories = ["defi", "opsec"];
+    expect(renderDraft(d)).toContain(
+      "## Short summary\n\nS\n\n## Categories\n\nDeFi Safety\nOpSec\n\n## Funding goal",
+    );
+  });
+
+  it("round-trips through the text in order", () => {
+    const d = emptyDraft();
+    d.page.title = "T";
+    d.categories = ["research-education", "compilers"];
+    expect(replaceFromText(emptyDraft(), renderDraft(d)).categories)
+      .toEqual(["research-education", "compilers"]);
+    expect(textMatchesDraft(d, renderDraft(d))).toBe(true);
+  });
+
+  it("no categories, no heading", () => {
+    const d = emptyDraft();
+    d.page.title = "T";
+    expect(renderDraft(d)).not.toContain("Categories");
+  });
+});

@@ -1,8 +1,8 @@
 /**
  * The paste box and the fields mirror each other. This file is the two
  * conversions: a draft rendered as the guide's paste format, and a draft
- * with its text half replaced from that format. Everything the text cannot
- * carry (type, top-up, reviewer, recipient URL, forum link, logos, the other
+ * with its text half replaced from that format (categories included).
+ * Everything the text cannot carry (type, top-up, reviewer, recipient URL, forum link, logos, the other
  * type's sections) is kept from the draft as it was.
  */
 import {
@@ -15,6 +15,7 @@ import {
   splitDraft,
   usd,
 } from "@shared/draft/mod";
+import { categoriesText, readCategoryText } from "@shared/categories";
 import type { Draft, DraftBacker, DraftMilestone } from "./types";
 import { draftMilestone, emptyBacker, emptyMilestone, money } from "./useDraft";
 
@@ -40,6 +41,7 @@ export function renderDraft(d: Draft): string {
   };
   put("Title", d.page.title);
   put("Short summary", d.page.summary);
+  put("Categories", categoriesText(d.categories));
   const goal = parseAmount(d.page.goal);
   put("Funding goal (USD)", goal ? usd(goal) : "");
   put("Expected duration (months)", d.page.duration);
@@ -122,7 +124,8 @@ export function replaceFromText(d: Draft, text: string): Draft {
   const rows = res.milestones.map(draftMilestone);
   const milestones = rows.length ? mergeMilestones(d.milestones, rows) : [emptyMilestone()];
   const backers = mergeBackers(d.backers, p.backers ?? "");
-  return { ...d, page, priv, sections, milestones, backers, unsorted: res.unsorted };
+  const categories = readCategoryText(p.categories ?? "").slugs;
+  return { ...d, page, priv, categories, sections, milestones, backers, unsorted: res.unsorted };
 }
 
 /** Whether the box text already says what the draft says, so a draft change

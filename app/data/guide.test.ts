@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseAmount, SECTIONS } from "@shared/draft/mod";
+import { CATEGORIES, readCategoryText } from "@shared/categories";
 import {
   EXAMPLE_MILESTONES,
   EXAMPLE_PAGE,
@@ -34,5 +35,13 @@ describe("guide", () => {
     expect(EXAMPLE_MILESTONES.filter((m) => m.adoption)).toHaveLength(1);
     expect(EXAMPLE_MILESTONES.every((m) => m.criteria.length > 0)).toBe(true);
     expect(EXAMPLE_PAGE.title).toContain("OPSEC");
+  });
+
+  it("the example names 1 to 3 categories the site reads, and the guide lists all ten", () => {
+    const r = readCategoryText(EXAMPLE_PAGE.categories ?? "");
+    expect(r.unknown).toEqual([]);
+    expect(r.slugs.length).toBeGreaterThanOrEqual(1);
+    expect(r.slugs.length).toBeLessThanOrEqual(3);
+    for (const c of CATEGORIES) expect(GUIDE_TEXT).toContain(c.label);
   });
 });

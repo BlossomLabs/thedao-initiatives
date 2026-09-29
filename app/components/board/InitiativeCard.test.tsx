@@ -83,3 +83,25 @@ it("shows a pledger's logo as a link to its site", () => {
     "https://logo.example/",
   );
 });
+
+it("shows dots, not category pills, on a tagged card", () => {
+  const base = card({});
+  mount(card({ initiative: { ...base.initiative, categories: ["opsec"] } }));
+  expect(screen.getByRole("button", { name: "Categories: OpSec" })).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /OpSec/ })).toBeNull();
+});
+
+it("labels a featured card as Featured", () => {
+  render(
+    <MemoryRouter>
+      <InitiativeCard card={card({})} tokensOk={false} featured />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText("Featured")).toBeInTheDocument();
+});
+
+it("no Featured label from a rank alone: the board decides what is featured", () => {
+  const base = card({});
+  mount(card({ initiative: { ...base.initiative, sortRank: 4 } }));
+  expect(screen.queryByText("Featured")).toBeNull();
+});

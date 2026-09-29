@@ -28,7 +28,6 @@ import PrivateFields from "./PrivateFields";
 import SectionField from "./SectionField";
 import type { Draft, FormMode, SubmitPayload } from "./types";
 import TypePicker from "./TypePicker";
-import CategoriesPicker from "./CategoriesPicker";
 import { AUTOSAVE_KEY, useAutosave } from "./useAutosave";
 import { paintField, runChecks, useChecks } from "./useChecks";
 import { emptyDraft, isEmptyDraft, toPayload, useDraft } from "./useDraft";
@@ -62,10 +61,9 @@ export interface InitiativeFormProps {
   asideBottom?: React.ReactNode;
   /** Under the submit button ("Submitting as …"). */
   footer?: React.ReactNode;
-  /** The categories question, right under the type. Outside the draft (the
-   * pasted text never carries it); required when shown. `suggest` turns on the
-   * AI pre-fill from the title and summary. */
-  categories?: { value: string[]; onChange: (next: string[]) => void; suggest?: boolean };
+  /** Show and require the categories question, a page field right after the
+   * summary. `suggest` offers an AI suggestion from the title and summary. */
+  categories?: { suggest?: boolean };
 }
 
 /** The two-column grid of the submit and edit pages. */
@@ -82,8 +80,6 @@ export function FormGrid({ main, aside }: { main: React.ReactNode; aside: React.
 
 const fixingLine = (n: number) =>
   n === 1 ? "One thing needs fixing, marked above." : `${n} things need fixing, marked above.`;
-
-const CATEGORY_MISSING = "Pick at least one category.";
 
 export const LOCK_NOTE =
   "Locked after approval: type, goal, duration, recipient and the private fields. Email the team to change them.";
@@ -128,7 +124,13 @@ export default function InitiativeForm({
   // a response arrives after the user has already edited it.
   const feedback = serverFeedback?.draft === draft ? serverFeedback : null;
   const alert = feedback?.alert;
-  const checks = useChecks(draft, { submitted, serverFindings: feedback?.findings, scope });
+  const withCats = Boolean(categories);
+  const checks = useChecks(draft, {
+    submitted,
+    serverFindings: feedback?.findings,
+    scope,
+    categories: withCats,
+  });
   const autosave = useAutosave(draft, { key: autosaveKey, onRestore: actions.replace });
 
   const jump = useCallback((field: string) => {
@@ -141,10 +143,7 @@ export default function InitiativeForm({
     if (busy) return;
     setSubmitted(true);
     setServerFeedback(null);
-    const res = runChecks(draft, scope);
-    if (categories && !categories.value.length) {
-      res.errors.unshift({ field: "categories", msg: CATEGORY_MISSING, kind: "missing" });
-    }
+    const res = runChecks(draft, scope, { categories: withCats });
     if (res.errors.length) {
       setFailed(true);
       const first = firstOnPage(res.errors.map((x) => paintField(x.field)).filter(Boolean));
@@ -178,12 +177,6 @@ export default function InitiativeForm({
       setBusy(false);
     }
   }
-
-  // Shown once a submit was tried, like the other required questions.
-  const categoryError = !categories
-    ? undefined
-    : feedback?.findings?.errors.find((f) => f.field === "categories")?.msg ??
-      (submitted && !categories.value.length ? CATEGORY_MISSING : undefined);
 
   const empty = isEmptyDraft(draft);
   const top = typeof asideTop === "function" ? asideTop({ empty }) : asideTop;
@@ -262,14 +255,6 @@ export default function InitiativeForm({
           </Status>
         )}
         {showTypePicker && <TypePicker draft={draft} actions={actions} locked={locked} />}
-        {categories && (
-          <CategoriesPicker
-            value={categories.value}
-            onChange={categories.onChange}
-            suggestFrom={categories.suggest ? draft.page : undefined}
-            error={categoryError}
-          />
-        )}
         {showPaste && (
           <PasteBox
             draft={draft}
@@ -282,7 +267,7 @@ export default function InitiativeForm({
           These render in the header of your initiative page, next to the type badge. They are never
           part of a body section.
         </FormGroup>
-        <PageFields draft={draft} actions={actions} locked={locked} />
+        <PageFields draft={draft} actions={actions} locked={locked} categories={categories} />
 
         {showBackers && (
           <>

@@ -37,7 +37,7 @@ export function previewInitiative(d: Draft): Initiative {
     details: "",
     discourseUrl: d.page.discourseUrl.trim(),
     goalUsd: parseAmount(d.page.goal),
-    categories: [],
+    categories: d.categories,
     status: "pending",
     type: d.type,
     sortRank: null,

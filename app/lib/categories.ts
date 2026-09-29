@@ -11,15 +11,20 @@ import {
   Sigma,
   Siren,
 } from "lucide-react";
-import { CATEGORIES } from "@shared/categories";
+import { CATEGORIES, isCategorySlug, MAX_CATEGORIES } from "@shared/categories";
 
 export {
   CATEGORIES,
   categoriesOf,
   type Category,
   categoryOf,
+  isCategorySlug,
   MAX_CATEGORIES,
 } from "@shared/categories";
+
+/** A list from the client or storage: known slugs, first occurrence wins, at most three. */
+export const normaliseCategories = (raw: readonly unknown[]): string[] =>
+  [...new Set(raw.filter(isCategorySlug))].slice(0, MAX_CATEGORIES);
 
 /** The registry names lucide icons; these are the components. */
 const ICONS: Record<string, LucideIcon> = {

@@ -55,6 +55,16 @@ vi.mock("~/components/initiative-form/InitiativeForm", () => ({
         >
           Save
         </button>
+        <button
+          type="button"
+          onClick={() =>
+            void onSubmit(
+              toPayload({ ...initial!, categories: [...initial!.categories, "defi"] }),
+              initial!,
+            )}
+        >
+          Add DeFi
+        </button>
       </>
     );
   },
@@ -175,6 +185,30 @@ it("resets the draft for a replacement and binds both edit requests to its ID", 
       title: "An updated replacement title",
     }),
   });
+  unmount();
+  qc.clear();
+});
+
+it("a category-only change PATCHes the categories and posts no revision", async () => {
+  who.isAdmin = false;
+  const row = {
+    ...structuredRow(),
+    slug: "same-url",
+    status: "approved" as const,
+    proposer: ME,
+    categories: ["opsec"],
+  };
+  feed(row);
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  fireEvent.click(screen.getByText("Add DeFi"));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/initiatives/same-url", {
+      method: "PATCH",
+      json: { categories: ["opsec", "defi"], initiativeId: row.id },
+    })
+  );
+  expect(api).toHaveBeenCalledTimes(1);
   unmount();
   qc.clear();
 });

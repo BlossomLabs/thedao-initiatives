@@ -247,11 +247,10 @@ export default function Submit() {
   const submitter = useSubmitter();
   const settings = useSiteSettings();
   const uploads = settings.data?.uploads ?? true;
-  const [categories, setCategories] = useState<string[]>([]);
 
   async function onSubmit(_payload: unknown, draft: Draft) {
     await requireSession();
-    const res = await submitInitiative(draft, { categories });
+    const res = await submitInitiative(draft);
     const state: SubmittedState = {
       title: draft.page.title.trim(),
       slug: res.slug,
@@ -291,7 +290,7 @@ export default function Submit() {
           mode="submit"
           autosaveKey={session ? `thedao:submit-draft:${session.address.toLowerCase()}` : null}
           onSubmit={onSubmit}
-          categories={{ value: categories, onChange: setCategories, suggest: true }}
+          categories={{ suggest: true }}
           submitLabel="Submit for review"
           uploads={uploads}
           asideTop={({ empty }) => <GuideCard glow={empty} />}

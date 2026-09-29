@@ -146,3 +146,26 @@ it("restores only the selected wallet's draft", () => {
     "Wallet A private draft",
   );
 });
+
+describe("categories in the autosave", () => {
+  it("round-trips the categories", () => {
+    const d = { ...emptyDraft(), categories: ["opsec", "defi"] };
+    d.page.title = "T";
+    expect(reviveDraft(JSON.parse(JSON.stringify(snapshot(d))))?.categories)
+      .toEqual(["opsec", "defi"]);
+  });
+
+  it("an older saved draft without categories restores with none", () => {
+    const old = { type: "rfp", page: { title: "Old draft" } };
+    expect(reviveDraft(old)?.categories).toEqual([]);
+  });
+
+  it("a tampered list keeps the valid, unique first three", () => {
+    const bad = {
+      page: { title: "T" },
+      categories: ["x", "opsec", 4, "opsec", "defi", "compilers", "sigma"],
+    };
+    expect(reviveDraft(bad)?.categories).toEqual(["opsec", "defi", "compilers"]);
+    expect(reviveDraft({ page: { title: "T" }, categories: "opsec" })?.categories).toEqual([]);
+  });
+});

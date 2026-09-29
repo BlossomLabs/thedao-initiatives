@@ -138,3 +138,34 @@ export function readCategories(raw: unknown): [string[], null] | [null, string] 
   if (new Set(raw).size !== raw.length) return [null, "Each category can be picked once."];
   return [raw as string[], null];
 }
+
+const norm = (s: string) =>
+  s.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim();
+
+const BY_NAME = new Map<string, string>(
+  CATEGORIES.flatMap((c) => [[norm(c.label), c.slug], [norm(c.slug), c.slug]]),
+);
+
+/**
+ * A draft's Categories section: names or slugs, one per line or separated by
+ * commas or semicolons, bullets, numbers, case, bold and "(primary)" notes
+ * ignored, "and" for "&". Known ones in order, first occurrence wins, at most
+ * three; `unknown` is what could not be read, as written.
+ */
+export function readCategoryText(text: string): { slugs: string[]; unknown: string[] } {
+  const slugs: string[] = [];
+  const unknown: string[] = [];
+  for (const raw of String(text ?? "").split(/[\n,;]/)) {
+    const token = raw.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, "").replace(/[*_`]/g, "")
+      .replace(/\((?:primary|main)\)/i, "").trim();
+    if (!token) continue;
+    const slug = BY_NAME.get(norm(token));
+    if (!slug) unknown.push(token);
+    else if (!slugs.includes(slug)) slugs.push(slug);
+  }
+  return { slugs: slugs.slice(0, MAX_CATEGORIES), unknown };
+}
+
+/** A draft's categories as its Categories section: the labels, one per line. */
+export const categoriesText = (slugs: readonly string[]): string =>
+  slugs.map((s) => BY_SLUG.get(s)?.label).filter(Boolean).join("\n");

@@ -17,7 +17,7 @@ export default function CategoriesPanel({ r, run }: { r: AdminInitiative; run: R
   return (
     <div className="panel">
       <span className="k">Categories</span>
-      <CategoriesPicker label="Tags" value={value} onChange={setValue} />
+      <CategoriesPicker label="Tags" id="admin-categories" value={value} onChange={setValue} />
       <div className="mt-3 flex items-center gap-2.5">
         <Button
           sm

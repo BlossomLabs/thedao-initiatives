@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import StickyAside from "~/components/layout/StickyAside";
 import { Link, useNavigate, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -212,14 +212,15 @@ function EditForm(
   const back = team && !mine ? `/admin/initiatives/${r.slug}` : `/initiative/${r.slug}`;
   const initial = useMemo(() => fromInitiative(r, pledges), [r, pledges]);
   const path = `/api/initiatives/${encodeURIComponent(r.slug)}`;
-  // Categories follow the text: editable while it is, outside the revision.
-  const [categories, setCategories] = useState(r.categories);
 
   async function onSubmit(payload: SubmitPayload) {
     await requireSession();
     const facts = open ? pageFactsPatch(payload, r) : null;
     const text = textChanged(payload, r);
-    const cats = categories.join() !== r.categories.join() ? { categories } : null;
+    // Categories follow the text: editable while it is, outside the revision.
+    const cats = payload.categories.join() !== r.categories.join()
+      ? { categories: payload.categories }
+      : null;
     if (!facts && !text && !cats) throw new Error("Nothing changed.");
     let patched = false;
     try {
@@ -247,7 +248,7 @@ function EditForm(
       initial={initial}
       locked={!open}
       onSubmit={onSubmit}
-      categories={{ value: categories, onChange: setCategories }}
+      categories={{}}
       submitLabel="Save as a new revision"
       showBackers={false}
       showPrivate={open}

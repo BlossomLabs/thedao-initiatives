@@ -87,6 +87,7 @@ export const SECTION_KEYS = Object.keys(FIELDS) as SectionKey[];
 export const PAGE_KEYS: PageKey[] = [
   "title",
   "summary",
+  "categories",
   "goal",
   "duration",
   "recipient",
@@ -104,6 +105,9 @@ export const ALIASES: Record<string, AliasTarget> = {
   "title": "title",
   "short summary": "summary",
   "summary": "summary",
+  "categories": "categories",
+  "category": "categories",
+  "tags": "categories",
   "funding goal": "goal",
   "funding goal (usd)": "goal",
   "budget": "goal",

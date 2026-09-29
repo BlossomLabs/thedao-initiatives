@@ -9,7 +9,9 @@ export function TypeBadge(
       className={cn(
         "type-badge",
         type === "grant" ? "t-grant" : "t-rfp",
-        !inline && "absolute top-4 right-[18px]",
+        // On a card: centred on the title's first line of text (24px padding + half the 20px
+        // text box), its right edge on the card padding like the progress bar.
+        !inline && "absolute top-[34px] right-6 -translate-y-1/2",
         className,
       )}
     >

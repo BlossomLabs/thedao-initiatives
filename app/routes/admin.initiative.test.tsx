@@ -247,3 +247,14 @@ it("open points: a missing section is listed", async () => {
   await screen.findByRole("button", { name: "Approve" });
   expect(screen.getByText(/Why this matters is required/)).toBeInTheDocument();
 });
+it("the header row shows the type and the categories as one tight group, not the status", async () => {
+  current = page({ categories: ["opsec", "defi"] });
+  renderPage();
+  const h1 = await screen.findByRole("heading", { level: 1 });
+  const row = h1.nextElementSibling as HTMLElement;
+  expect(row.querySelector(".st-pending, [class*='st-']")).toBeNull();
+  const group = row.querySelector("[data-categories]") as HTMLElement;
+  expect(group).not.toBeNull();
+  expect(group.children).toHaveLength(2);
+  expect(group.className).toContain("gap-1.5");
+});

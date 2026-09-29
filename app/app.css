@@ -64,6 +64,28 @@
   html {
     color-scheme: dark;
   }
+  /* Scrollbars inside the page (menus, the filter sheet, text boxes, lists):
+     thin translucent thumbs with no track or arrows. The page's own scrollbar
+     stays native. */
+  body * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  }
+  body *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  body *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  body *::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.22) padding-box;
+  }
+  body *::-webkit-scrollbar-button {
+    display: none;
+  }
   /* The OS focus highlight is blue and vanishes on the blue background. */
   ::selection {
     background: #0b1a28;
@@ -404,8 +426,8 @@
     @apply inline-block rounded-full border border-edge2 text-soft px-2.5 py-0.5 font-inter-tight
       text-[11px] uppercase tracking-[0.08em];
   }
-  /* category tags: sentence case + icon (sets them apart from the uppercase type badges);
-     --tag is the category base colour, --tag-text its dark-theme text colour */
+  /* category tags: normal chips (card fill, white border and text, sentence
+     case) whose category colour is only the icon; --tag is the base colour */
   .cat-tag {
     display: inline-flex;
     align-items: center;
@@ -413,16 +435,13 @@
     height: 24px;
     padding: 0 10px 0 8px;
     border-radius: 9999px;
-    border: 1px solid color-mix(in srgb, var(--tag) 50%, transparent);
-    background-color: rgb(9 18 30 / 0.6);
-    background-image: linear-gradient(
-      color-mix(in srgb, var(--tag) 14%, transparent),
-      color-mix(in srgb, var(--tag) 14%, transparent)
-    );
-    color: var(--tag-text);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    /* the board card's fill (.card: bg-white/5) */
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--color-soft);
     font-family: var(--font-inter-tight);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1;
     white-space: nowrap;
     text-decoration: none;
@@ -437,25 +456,17 @@
   .cat-tag.cat-sm {
     height: 20px;
   }
-  .cat-tag.cat-icon {
-    width: 20px;
-    padding: 0;
-    justify-content: center;
-  }
-  button.cat-tag,
   a.cat-tag {
     cursor: pointer;
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
   }
-  button.cat-tag:hover,
   a.cat-tag:hover {
-    border-color: color-mix(in srgb, var(--tag) 80%, transparent);
+    border-color: rgba(255, 255, 255, 0.55);
     box-shadow: 0 0 14px color-mix(in srgb, var(--tag) 35%, transparent);
-    color: var(--tag-text);
+    color: #fff;
     text-decoration: none;
   }
   @media (prefers-reduced-motion: no-preference) {
-    button.cat-tag:hover,
     a.cat-tag:hover {
       transform: translateY(-1px);
     }
@@ -463,17 +474,6 @@
   .cat-tag:focus-visible {
     outline: 2px solid var(--color-dao-bright);
     outline-offset: 2px;
-  }
-  .cat-tag.cat-on {
-    background: var(--tag);
-    border-color: var(--tag);
-    color: #0b1b2b;
-  }
-  .cat-tag.cat-on svg {
-    color: #0b1b2b;
-  }
-  .cat-tag.cat-dim {
-    opacity: 0.4;
   }
 
   /* a chip sitting next to a type badge: same height and vertical rhythm */

@@ -129,8 +129,12 @@ export default function ManageInitiative() {
       </h1>
       <p className="m-0 flex flex-wrap items-center gap-3">
         <TypeBadge type={r.type} inline />
-        <StatusChip status={r.status} />
-        {r.categories.map((slug) => <CategoryTag key={slug} slug={slug} />)}
+        {/* The status has its own panel below; the categories sit together. */}
+        {r.categories.length > 0 && (
+          <span className="flex flex-wrap items-center gap-1.5" data-categories="">
+            {r.categories.map((slug) => <CategoryTag key={slug} slug={slug} />)}
+          </span>
+        )}
         <span className="small dim">
           created {dt(r.createdAt)} · <span className="mono">{r.slug}</span>
         </span>

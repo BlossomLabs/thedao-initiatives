@@ -5,11 +5,12 @@
  */
 import type { Card } from "~/lib/api-types";
 import { CATEGORIES, CATEGORY_INDEX, categoryOf } from "~/lib/categories";
+import { plural } from "~/lib/format";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
 export const STATUSES = ["all", "open", "funded"] as const;
 export const SORTS = [
-  ["recommended", "Recommended"],
+  ["recommended", "Featured"],
   ["closest", "Closest to funded"],
   ["least-left", "Least left to raise"],
   ["newest", "Newest"],
@@ -161,3 +162,36 @@ export function groupByPrimary(cards: Card[]): { slug: string | null; cards: Car
     .filter((s) => groups.has(s))
     .map((slug) => ({ slug, cards: groups.get(slug)! }));
 }
+
+export const STATUS_LABELS = { open: "Open for funding", funded: "Fully funded" } as const;
+
+/** What Clear filters resets: every applied filter (type, categories, funding
+ * status, keyword). Sort, view and the AI order stay as they are. */
+export const CLEARED: Pick<BoardView, "type" | "cats" | "status" | "q"> = {
+  type: "all",
+  cats: [],
+  status: "all",
+  q: "",
+};
+
+export const TYPE_LABELS = { rfp: "RFPs", grant: "Grants" } as const;
+
+/** The number the Filters (N) button shows: categories plus a funding restriction. */
+export const activeFilterCount = (v: BoardView): number =>
+  v.cats.length + (v.status !== "all" ? 1 : 0);
+
+/** "12 initiatives", or "3 of 12 initiatives" while filters narrow the board. */
+export const resultLabel = (shown: number, total: number, filtered: boolean): string =>
+  filtered ? `${shown} of ${plural(total, "initiative")}` : plural(total, "initiative");
+
+/** The featured initiatives: those the team pinned (an admin sort rank, 1 = top). */
+export const featuredIds = (cards: Card[]): Set<string> =>
+  new Set(cards.filter((c) => (c.initiative.sortRank ?? 0) > 0).map((c) => c.initiative.id));
+
+/** Whether anything is featured (see featuredIds). */
+export const hasFeatured = (cards: Card[]): boolean => featuredIds(cards).size > 0;
+
+/** The sort the board uses: Featured (the server's order, pins first) only
+ * while something is featured; otherwise the default is closest to funded. */
+export const sortFor = (sort: BoardSort, featured: boolean): BoardSort =>
+  sort === "recommended" && !featured ? "closest" : sort;

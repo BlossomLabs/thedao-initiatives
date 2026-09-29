@@ -1,12 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { Card } from "./api-types";
 import {
+  activeFilterCount,
   applyView,
+  type BoardView,
+  CLEARED,
   DEFAULT_VIEW,
   facetCounts,
+  featuredIds,
   groupByPrimary,
+  hasFeatured,
   readView,
+  resultLabel,
   sortCards,
+  sortFor,
+  SORTS,
   writeView,
 } from "./board-view";
 
@@ -87,6 +95,55 @@ const board = [
 const titles = (cs: Card[]) => cs.map((c) => c.initiative.title);
 
 describe("board view", () => {
+  it("featured are all the initiatives the team pinned, whatever their rank", () => {
+    const at = (title: string, sortRank: number | null) => {
+      const c = card(title);
+      return { ...c, initiative: { ...c.initiative, sortRank } };
+    };
+    const one = at("One", 1), four = at("Four", 4), last = at("Last", 999), none = at("None", null);
+    expect([...featuredIds([one, four, last, none])].sort()).toEqual(
+      [one.initiative.id, four.initiative.id, last.initiative.id].sort(),
+    );
+    expect(hasFeatured([four, none])).toBe(true);
+    expect(hasFeatured([none])).toBe(false);
+  });
+
+  it("without featured initiatives, the default order is closest to funded", () => {
+    expect(sortFor("recommended", false)).toBe("closest");
+    expect(sortFor("recommended", true)).toBe("recommended");
+    expect(sortFor("newest", false)).toBe("newest");
+  });
+
+  it("the default sort is labelled Featured", () => {
+    expect(SORTS.find(([v]) => v === "recommended")?.[1]).toBe("Featured");
+  });
+
+  it("Clear filters empties type, categories, funding status and the keyword, keeping sort and view", () => {
+    const v: BoardView = {
+      ...DEFAULT_VIEW,
+      type: "rfp",
+      cats: ["opsec"],
+      status: "open",
+      sort: "newest",
+      view: "list",
+      q: "x",
+    };
+    expect({ ...v, ...CLEARED }).toEqual({ ...v, type: "all", cats: [], status: "all", q: "" });
+  });
+
+  it("counts the active filters the Filters button shows", () => {
+    expect(activeFilterCount(DEFAULT_VIEW)).toBe(0);
+    expect(activeFilterCount({ ...DEFAULT_VIEW, cats: ["a", "b"], status: "funded" })).toBe(3);
+    expect(activeFilterCount({ ...DEFAULT_VIEW, type: "rfp", sort: "newest" })).toBe(0);
+  });
+
+  it("labels the results", () => {
+    expect(resultLabel(12, 12, false)).toBe("12 initiatives");
+    expect(resultLabel(1, 1, false)).toBe("1 initiative");
+    expect(resultLabel(3, 12, true)).toBe("3 of 12 initiatives");
+    expect(resultLabel(1, 1, true)).toBe("1 of 1 initiative");
+  });
+
   it("URL round trip, defaults omitted, junk ignored", () => {
     const v = readView(
       new URLSearchParams(

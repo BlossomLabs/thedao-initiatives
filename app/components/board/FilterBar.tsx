@@ -1,34 +1,54 @@
-import { CategoryChip } from "~/components/ui/CategoryTag";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/Select";
 import {
   type BoardSort,
-  type BoardStatus,
   type BoardType,
   type BoardView,
+  CLEARED,
   isFiltered,
-  SORTS,
+  resultLabel,
 } from "~/lib/board-view";
-import { CATEGORIES } from "~/lib/categories";
+import { Suspense } from "react";
+import { lazyPart } from "~/lib/lazy-part";
+import { standInFocus } from "~/lib/focus-handover";
 import { cn } from "~/lib/utils";
+import {
+  FILTER_FOCUS_KEY,
+  FILTER_PILL_ON,
+  TRIGGER,
+  TriggerFace,
+  triggerLabel,
+} from "./filters/CategoryTrigger";
+import SortSelect from "./filters/SortSelect";
+import StatusSelect from "./filters/StatusSelect";
+import TypeSelect from "./filters/TypeSelect";
 
-const TYPE_LABELS: [BoardType, string][] = [["all", "All"], ["rfp", "RFPs"], ["grant", "Grants"]];
-const STATUS_ITEMS = [
-  { value: "all", label: "All statuses" },
-  { value: "open", label: "Open for funding" },
-  { value: "funded", label: "Fully funded" },
-];
-const SORT_ITEMS = SORTS.map(([value, label]) => ({ value, label }));
+/** A plain button with the Category dropdown's face, until (or if never) its code arrives. */
+function CategoryFilterStandIn({ value }: { value: string[] }) {
+  return (
+    <button
+      type="button"
+      className={cn(TRIGGER, value.length > 0 && FILTER_PILL_ON)}
+      aria-label={triggerLabel(value.length)}
+      onPointerEnter={preloadFilters}
+      {...standInFocus(FILTER_FOCUS_KEY)}
+      onFocusCapture={preloadFilters}
+      onClick={preloadFilters}
+    >
+      <TriggerFace value={value} />
+    </button>
+  );
+}
+
+// The combobox loads after the board (preloadFilters, called once it has mounted).
+const filter = lazyPart(() => import("./filters/CategoryFilter"), CategoryFilterStandIn);
+export const preloadFilters = filter.preload;
+const CategoryFilter = filter.Component;
 
 /**
- * Between the AI search and the grid. Row 1: type, status, sort, the count and
- * Clear. Row 2: the categories with live counts (OR among themselves, AND with
- * the rest); on phones they scroll sideways in one row.
+ * Between the AI search and the grid. One row of pills: Type, Category and
+ * Funding, with the count and Sort on the right (Sort orders, it does not
+ * narrow). The active filters follow on their own row as removable tokens.
+ * Phones (<=640px): Type, Filters (N) (the sheet with Category and Funding) and
+ * Sort, then the count.
  */
 export default function FilterBar({
   view,
@@ -36,100 +56,73 @@ export default function FilterBar({
   counts,
   shown,
   total,
+  ai,
+  featured = true,
+  onSort,
+  sheet,
 }: {
   view: BoardView;
   onChange: (next: Partial<BoardView>) => void;
   counts: { type: Record<BoardType, number>; cats: Record<string, number> };
   shown: number;
   total: number;
+  ai: boolean;
+  /** Whether anything is featured (the Featured sort is offered only then). */
+  featured?: boolean;
+  onSort: (s: BoardSort) => void;
+  /** The phone Filters (N) button with its sheet. */
+  sheet: React.ReactNode;
 }) {
-  const toggleCat = (slug: string) =>
-    onChange({
-      cats: view.cats.includes(slug) ? view.cats.filter((s) => s !== slug) : [...view.cats, slug],
-    });
+  const label = resultLabel(shown, total, isFiltered(view));
+  const filtered = isFiltered(view);
+  const clear = filtered && (
+    <button
+      type="button"
+      className="cursor-pointer border-0 bg-transparent px-1 py-0 font-inter-tight text-[12px] text-white/55 underline decoration-white/25 underline-offset-2 hover:text-white"
+      onClick={() => onChange({ ...CLEARED })}
+    >
+      Clear filters
+    </button>
+  );
   return (
-    <div className="mb-5 flex flex-col gap-3" role="group" aria-label="Filter and sort initiatives">
-      <div className="flex flex-wrap items-center gap-2.5">
-        <div
-          className="inline-flex rounded-[12px] border border-white/10 bg-white/5 p-1"
-          role="group"
-          aria-label="Type"
-        >
-          {TYPE_LABELS.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={view.type === value}
-              onClick={() => onChange({ type: value })}
-              className={cn(
-                "min-h-[34px] cursor-pointer rounded-[9px] border-0 px-3 font-inter-tight text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-dao-bright",
-                view.type === value
-                  ? "bg-white/[.12] text-dao-green"
-                  : "bg-transparent text-white/70 hover:text-white",
-              )}
-            >
-              {label} <span className="text-white/40">{counts.type[value]}</span>
-            </button>
-          ))}
+    <div className="mb-6 flex flex-col" role="group" aria-label="Filter and sort initiatives">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="mr-1 small dim max-[641px]:hidden">Filters:</span>
+        <TypeSelect
+          value={view.type}
+          counts={counts.type}
+          onChange={(type) => onChange({ type })}
+        />
+        <div className="contents max-[641px]:hidden">
+          <Suspense fallback={<CategoryFilterStandIn value={view.cats} />}>
+            <CategoryFilter
+              value={view.cats}
+              counts={counts.cats}
+              onChange={(cats) => onChange({ cats })}
+            />
+          </Suspense>
+          <StatusSelect value={view.status} onChange={(status) => onChange({ status })} />
         </div>
-        <Select
-          value={view.status}
-          items={STATUS_ITEMS}
-          onValueChange={(v) =>
-            onChange({ status: v as BoardStatus })}
-        >
-          <SelectTrigger size="sm" aria-label="Status" className="min-h-[42px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_ITEMS.map((s) => (
-              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={view.sort}
-          items={SORT_ITEMS}
-          onValueChange={(v) =>
-            onChange({ sort: v as BoardSort })}
-        >
-          <SelectTrigger size="sm" aria-label="Sort" className="min-h-[42px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SORT_ITEMS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}
-            </SelectItem>)}
-          </SelectContent>
-        </Select>
-        <span className="ml-auto flex items-center gap-3 small dim" aria-live="polite">
-          Showing {shown} of {total}
-          {isFiltered(view) && (
-            <button
-              type="button"
-              className="cursor-pointer border-0 bg-transparent p-0 text-dao-green underline"
-              onClick={() => onChange({ type: "all", status: "all", cats: [], q: "" })}
-            >
-              Clear
-            </button>
-          )}
+        <div className="hidden max-[641px]:contents">{sheet}</div>
+        <span className="max-[641px]:hidden">{clear}</span>
+        <span className="ml-auto flex items-center gap-3">
+          <span className="small dim tnum max-[641px]:hidden" aria-live="polite">{label}</span>
+          <SortSelect
+            sort={view.sort}
+            ai={ai}
+            featured={featured}
+            onSort={onSort}
+            className="min-h-[32px] border-transparent bg-transparent px-1.5 hover:border-white/15"
+          />
         </span>
       </div>
-      <div
-        className="flex flex-wrap gap-2 max-[640px]:-mx-4 max-[640px]:flex-nowrap max-[640px]:overflow-x-auto max-[640px]:px-4 max-[640px]:pb-1"
-        role="group"
-        aria-label="Categories"
+      <p
+        className="m-0 mt-3 hidden items-center gap-2 small dim tnum max-[641px]:flex"
+        aria-live="polite"
       >
-        {CATEGORIES.map((c) => (
-          <CategoryChip
-            key={c.slug}
-            slug={c.slug}
-            selected={view.cats.includes(c.slug)}
-            dim={!counts.cats[c.slug]}
-            onToggle={() => toggleCat(c.slug)}
-            after={<span className="opacity-60">{counts.cats[c.slug]}</span>}
-          />
-        ))}
-      </div>
+        {label}
+        {clear}
+      </p>
     </div>
   );
 }

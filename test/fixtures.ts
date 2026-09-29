@@ -21,6 +21,7 @@ export const structuredRow = (): Initiative => ({
   recipientUrl: "https://rollup.example",
   topup: false,
   milestoneReviewer: "",
+  categories: ["audits-analysis"],
   sections: {
     why: "why",
     team: "team",

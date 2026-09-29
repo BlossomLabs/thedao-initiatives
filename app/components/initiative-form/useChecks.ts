@@ -22,6 +22,11 @@ import { liveBackers, payloadMilestones, toCheckInput } from "./useDraft";
 
 export const LOGO_MAX_BYTES = 1024 * 1024;
 
+export const CATEGORY_MISSING = "Pick at least one category.";
+
+/** `categories`: the form shows (and so requires) the categories question. */
+type CheckOpts = { categories?: boolean };
+
 export interface FieldFindings {
   errors: string[];
   warnings: string[];
@@ -67,8 +72,8 @@ export function paintField(field: string): string {
 }
 
 /** The required questions of the scope, for "n of m answered". */
-export function requiredFields(d: Draft, scope: CheckScope): string[] {
-  const out: string[] = ["title", "summary"];
+export function requiredFields(d: Draft, scope: CheckScope, opts: CheckOpts = {}): string[] {
+  const out: string[] = opts.categories ? ["title", "summary", "categories"] : ["title", "summary"];
   if (scope === "submit") {
     out.push("goal", "duration_months");
     if (d.type === "grant") out.push("recipient_team");
@@ -94,21 +99,28 @@ function clientOnly(d: Draft): Finding[] {
   return out;
 }
 
-export function runChecks(d: Draft, scope: CheckScope): Findings {
+export function runChecks(d: Draft, scope: CheckScope, opts: CheckOpts = {}): Findings {
   const r = checkSubmission(toCheckInput(d), scope);
-  return { errors: [...r.errors, ...clientOnly(d)], warnings: r.warnings };
+  const cats: Finding[] = opts.categories && !d.categories.length
+    ? [{ field: "categories", msg: CATEGORY_MISSING, kind: "missing" }]
+    : [];
+  // In form order: right after the title and summary findings.
+  const at = r.errors.filter((e) => e.field === "title" || e.field === "summary").length;
+  const errors = [...r.errors.slice(0, at), ...cats, ...r.errors.slice(at)];
+  return { errors: [...errors, ...clientOnly(d)], warnings: r.warnings };
 }
 
 export function useChecks(
   draft: Draft,
-  { submitted, serverFindings, scope = "submit" }: {
+  { submitted, serverFindings, scope = "submit", categories = false }: {
     submitted: boolean;
     serverFindings?: Findings | null;
     scope?: CheckScope;
+    categories?: boolean;
   },
 ): Checks {
   return useMemo(() => {
-    const all = runChecks(draft, scope);
+    const all = runChecks(draft, scope, { categories });
     const errors = [
       ...all.errors.filter((e) => submitted || e.kind !== "missing"),
       ...(serverFindings?.errors ?? []),
@@ -124,7 +136,7 @@ export function useChecks(
     for (const e of errors) at(e.field).errors.push(e.msg);
     for (const w of warnings) at(w.field).warnings.push(w.msg);
 
-    const req = requiredFields(draft, scope);
+    const req = requiredFields(draft, scope, { categories });
     const missing = new Set(all.errors.filter((e) => e.kind === "missing").map((e) => e.field));
     // a milestone row with an empty name, amount or criteria is not an answer
     const msMissing = [...missing].some((f) => f.startsWith("ms_"));
@@ -161,5 +173,5 @@ export function useChecks(
         exempt,
       },
     };
-  }, [draft, submitted, serverFindings, scope]);
+  }, [draft, submitted, serverFindings, scope, categories]);
 }

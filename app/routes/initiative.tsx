@@ -5,6 +5,7 @@ import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import { TypeBadge } from "~/components/ui/Badge";
+import { CategoryLink } from "~/components/ui/CategoryTag";
 import Skeleton from "~/components/ui/Skeleton";
 import PageSkeleton from "~/components/layout/PageSkeleton";
 import Markdown from "~/components/Markdown";
@@ -106,6 +107,11 @@ export default function Initiative() {
       </h1>
       <p className="m-0 flex flex-wrap items-center gap-3">
         <TypeBadge type={r.type} inline />
+        {r.categories.length > 0 && (
+          <span className="flex flex-wrap items-center gap-1.5" data-categories="">
+            {r.categories.map((slug) => <CategoryLink key={slug} slug={slug} />)}
+          </span>
+        )}
         {r.status === "archived" && <span className="chip chip-badge st-archived">archived</span>}
         {r.status === "pending" && (
           <span

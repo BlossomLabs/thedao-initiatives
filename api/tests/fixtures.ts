@@ -33,6 +33,7 @@ export function minimalSubmission(goal: number, type: FixtureType = "rfp") {
     backers: [] as Record<string, unknown>[],
     funders: "Some L2 and a wallet company",
     contact: "me@example.com",
+    categories: ["audits-analysis"],
   };
 }
 
@@ -61,6 +62,7 @@ export async function exampleSubmission() {
     backers: [] as Record<string, unknown>[],
     funders: r.page.funders ?? "",
     contact: r.page.contact ?? "",
+    categories: ["opsec", "audits-analysis"],
   };
 }
 

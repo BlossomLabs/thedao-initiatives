@@ -42,6 +42,10 @@ export interface Initiative {
   topup: boolean;
   /** Top-ups only: who decides whether the remaining milestones pass. */
   milestoneReviewer: string;
+  /** 1 to 3 registry slugs (shared/categories.ts), first is primary. Outside the
+   * revisioned text: editable in every status. Rows written before it lack the
+   * key; readers treat it as none. */
+  categories?: string[];
   /** Structured body (submission redesign, Sep 2026): one answer per section
    * of the type, milestone rows, links. A structured row stores `details: ""`
    * (structured XOR details, enforced by `revise`). Rows written before it

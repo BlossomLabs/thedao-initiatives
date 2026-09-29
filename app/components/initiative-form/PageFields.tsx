@@ -5,6 +5,7 @@
 import { inputMax, LIMITS } from "@shared/draft/mod";
 import { Input, Textarea } from "~/components/ui/Field";
 import AmountInput from "./AmountInput";
+import CategoryField from "./CategoryField";
 import FormField from "./FormField";
 import type { Draft } from "./types";
 import type { DraftActions } from "./useDraft";
@@ -17,7 +18,13 @@ const PAIR = "grid grid-cols-[1fr_1fr] gap-x-4 max-[640px]:grid-cols-1";
 const PAIRED = "row-span-3 grid grid-rows-subgrid first:mt-[18px]";
 
 export default function PageFields(
-  { draft, actions, locked }: { draft: Draft; actions: DraftActions; locked?: boolean },
+  { draft, actions, locked, categories }: {
+    draft: Draft;
+    actions: DraftActions;
+    locked?: boolean;
+    /** Show the categories question after the summary. */
+    categories?: { suggest?: boolean };
+  },
 ) {
   const p = draft.page;
   const set = (key: keyof Draft["page"]) =>
@@ -48,6 +55,7 @@ export default function PageFields(
           onChange={set("summary")}
         />
       </FormField>
+      {categories && <CategoryField draft={draft} actions={actions} suggest={categories.suggest} />}
       <div className={PAIR}>
         <FormField
           field="goal"

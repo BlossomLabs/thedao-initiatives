@@ -290,6 +290,7 @@ export default function Submit() {
           mode="submit"
           autosaveKey={session ? `thedao:submit-draft:${session.address.toLowerCase()}` : null}
           onSubmit={onSubmit}
+          categories={{ suggest: true }}
           submitLabel="Submit for review"
           uploads={uploads}
           asideTop={({ empty }) => <GuideCard glow={empty} />}

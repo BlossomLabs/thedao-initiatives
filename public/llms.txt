@@ -50,6 +50,7 @@ An RFP, in this order:
 ```
 ## Title
 ## Short summary
+## Categories
 ## Funding goal (USD)
 ## Expected duration (months)
 ## Backers already committed
@@ -71,6 +72,7 @@ Every heading, and the one question it answers:
 
 - **Title**: up to 140 characters, no "RFP:" or "Grant:" prefix. Tell the proposer which radio button to pick, and for a top-up to tick "Work is already under way with another funder".
 - **Short summary**: what gets built and why it matters, 2 to 4 sentences. This is the board card text.
+- **Categories**: 1 to 3 of these names, one per line, the main topic first, written exactly as here: Compilers & Languages, Formal Verification, Fuzzing & Testing, Audits & Analysis, Wallets & Signing, OpSec, Detection & Response, DeFi Safety, Infrastructure & Clients, Research & Education. Pick by what the work is, not by who pays for it; one is often right.
 - **Funding goal (USD)**: one flat number, written `$150,000`, never "up to $150,000". The form reads `150,000` and `150.000` alike and echoes back what it read, so check the echo.
 - **Expected duration (months)**: one integer, months from funding until the last milestone is complete.
 - **Recipient team** (grant): the short team name, for the header and the board card.
@@ -185,7 +187,7 @@ Never do these:
 
 ## Step 3: Deliver the document plus the scorecard
 
-Hand over the whole document in one markdown block the proposer can copy in one go, then tell them what to do with it: pick the type at https://initiatives.thedao.fund/submit, paste the document into "Your whole draft as one text", and the fields fill themselves; that text and the fields mirror each other from then on, so either can be edited. Anything landing in the Unsorted box means a heading name is wrong. Then this scorecard, filled honestly:
+Hand over the whole document in one markdown block the proposer can copy in one go, then tell them what to do with it: pick the type at https://initiatives.thedao.fund/submit, paste the document into "Your whole draft as one text", and the fields fill themselves; that text and the fields mirror each other from then on, so either can be edited. Anything landing in the Unsorted box means a heading name is wrong, and a category the site does not know is named under the box. The Categories field shows what was read; the proposer can change it there. Then this scorecard, filled honestly:
 
 ```
 READINESS: READY | NOT READY
@@ -294,6 +296,11 @@ OPSEC Ratings Coalition to Build & Maintain an "L2Beat for OPSEC"
 ## Short summary
 
 One OPSEC rating the whole industry recognizes, issued by the firms that already run OPSEC audits. This RFP funds the coordinator who gets at least 6 auditing firms to agree on one scoring template and the A / AA / AAA tiers, stands up a public board of rated teams, and hands the standard to a membership body the firms own. Rated teams pay a fixed fee for their assessment, so the system pays for itself once enough teams are on the board.
+
+## Categories
+
+OpSec
+Audits & Analysis
 
 ## Funding goal (USD)
 

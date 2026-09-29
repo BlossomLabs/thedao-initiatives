@@ -22,6 +22,8 @@ import Revisions from "~/components/admin/initiative/Revisions";
 import type { Msg, Run } from "~/components/admin/initiative/run";
 import SafeCard, { useSafeDeploy } from "~/components/admin/initiative/SafeCard";
 import SettingsForm from "~/components/admin/initiative/SettingsForm";
+import CategoriesPanel from "~/components/admin/initiative/CategoriesPanel";
+import { CategoryTag } from "~/components/ui/CategoryTag";
 import { api, ApiError, apiText, errorMessage } from "~/lib/api";
 import type { AdminInitiativePage } from "~/lib/api-types";
 import { walletErrorMessage } from "~/lib/donate";
@@ -106,6 +108,7 @@ export default function ManageInitiative() {
   const pct = r.goalUsd > 0 ? (data.summary.total / r.goalUsd) * 100 : 0;
   // Deploy first, approve second: the wallet prompt is the admin's sign-off on the Safe.
   const canApprove = Boolean(r.safeAddress) || isConnected;
+  const tagged = r.categories.length > 0;
   const run = runAt("status");
   const approve = (action: "approve" | "unarchive", ok: string) =>
     run(async () => {
@@ -126,7 +129,12 @@ export default function ManageInitiative() {
       </h1>
       <p className="m-0 flex flex-wrap items-center gap-3">
         <TypeBadge type={r.type} inline />
-        <StatusChip status={r.status} />
+        {/* The status has its own panel below; the categories sit together. */}
+        {r.categories.length > 0 && (
+          <span className="flex flex-wrap items-center gap-1.5" data-categories="">
+            {r.categories.map((slug) => <CategoryTag key={slug} slug={slug} />)}
+          </span>
+        )}
         <span className="small dim">
           created {dt(r.createdAt)} · <span className="mono">{r.slug}</span>
         </span>
@@ -172,9 +180,13 @@ export default function ManageInitiative() {
                 <Button
                   variant="primary"
                   sm
-                  disabled={!canApprove}
+                  disabled={!canApprove || !tagged}
                   loading={safe.busy}
-                  title={canApprove ? undefined : "Connect a wallet: approving deploys the Safe"}
+                  title={!tagged
+                    ? "Add at least one category to approve."
+                    : canApprove
+                    ? undefined
+                    : "Connect a wallet: approving deploys the Safe"}
                   onClick={() => approve("approve", "Safe deployed and initiative approved.")}
                 >
                   Approve
@@ -209,17 +221,29 @@ export default function ManageInitiative() {
               {r.status === "archived" && (
                 <Button
                   sm
-                  disabled={!canApprove}
+                  disabled={!canApprove || !tagged}
                   loading={safe.busy}
-                  title={canApprove ? undefined : "Connect a wallet: approving deploys the Safe"}
+                  title={!tagged
+                    ? "Add at least one category to approve."
+                    : canApprove
+                    ? undefined
+                    : "Connect a wallet: approving deploys the Safe"}
                   onClick={() => approve("unarchive", "Re-approved.")}
                 >
                   Re-approve
                 </Button>
               )}
             </div>
+            {!tagged && r.status !== "approved" && (
+              <p className="m-0 mt-2.5 small text-dao-amber">
+                Add at least one category to approve.
+              </p>
+            )}
             {said("status")}
           </div>
+
+          <CategoriesPanel r={r} run={runAt("categories")} />
+          {said("categories")}
 
           <SafeCard page={data} safe={safe} onChange={refresh} />
 

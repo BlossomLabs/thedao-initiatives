@@ -214,3 +214,59 @@ describe("InitiativeForm checks", () => {
     expect(screen.getByRole("button", { name: "Submit for review" })).toBeEnabled();
   });
 });
+
+describe("categories in the checks", () => {
+  const form = (d: Draft, onSubmit = vi.fn(async () => {}), withCats = true) =>
+    render(
+      <InitiativeForm
+        mode="submit"
+        initial={d}
+        onSubmit={onSubmit}
+        submitLabel="Submit for review"
+        autosaveKey={null}
+        categories={withCats ? {} : undefined}
+      />,
+    );
+  const total = () =>
+    Number(/of (\d+) required/.exec(screen.getByText(/required answered/).textContent ?? "")?.[1]);
+
+  it("counts categories as a required question", () => {
+    const { unmount } = form(validDraft(), undefined, false);
+    const without = total();
+    unmount();
+    form(validDraft());
+    expect(total()).toBe(without + 1);
+  });
+
+  it("an empty category list blocks the submit, is listed, painted and focused", async () => {
+    const onSubmit = vi.fn(async () => {});
+    form(validDraft(), onSubmit);
+    fireEvent.click(screen.getByRole("button", { name: /Submit for review/ }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Nothing blocks this submission/)).toBeNull();
+    expect(screen.getAllByText("Pick at least one category.").length).toBeGreaterThanOrEqual(2);
+    await waitFor(() => expect(document.activeElement?.id).toBe("f-categories"));
+  });
+
+  it("says nothing blocks only when every required question is answered", async () => {
+    form({ ...validDraft(), categories: ["opsec"] });
+    fireEvent.click(screen.getByRole("button", { name: /Submit for review/ }));
+    expect(await screen.findByText(/Nothing blocks this submission/)).toBeInTheDocument();
+  });
+
+  it("a legacy untagged row on the edit page cannot save until one is picked", async () => {
+    const onSubmit = vi.fn(async () => {});
+    render(
+      <InitiativeForm
+        mode="edit"
+        initial={validDraft()}
+        onSubmit={onSubmit}
+        submitLabel="Save"
+        categories={{}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Save/ }));
+    await waitFor(() => expect(document.activeElement?.id).toBe("f-categories"));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});

@@ -518,8 +518,16 @@ Deno.test("admin settings: a legacy row keeps its text, and text cannot ride alo
 Deno.test("bulk admin actions: initiatives and comments, per-id failures reported", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
-  const a = await h.db.initiatives.insert({ title: "Bulk one here", status: "pending" });
-  const b = await h.db.initiatives.insert({ title: "Bulk two here", status: "pending" });
+  const a = await h.db.initiatives.insert({
+    title: "Bulk one here",
+    status: "pending",
+    categories: ["opsec"],
+  });
+  const b = await h.db.initiatives.insert({
+    title: "Bulk two here",
+    status: "pending",
+    categories: ["defi", "opsec"],
+  });
   await deploySafe(h, admin, a.id);
   await deploySafe(h, admin, b.id);
   const res = await j(

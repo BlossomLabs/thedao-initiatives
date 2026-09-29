@@ -102,7 +102,7 @@ export default function ChecksCard(
       <div className="mt-3.5 flex flex-col gap-2">
         {errors.length === 0 && (
           <Status kind="ok">
-            {submitted
+            {submitted && required.answered === required.total
               ? "Nothing blocks this submission"
               : "Nothing is wrong with what is filled in so far"}
             {warnings.length ? ". You can submit past warnings, the reviewer sees them too." : "."}

@@ -64,6 +64,28 @@
   html {
     color-scheme: dark;
   }
+  /* Scrollbars inside the page (menus, the filter sheet, text boxes, lists):
+     thin translucent thumbs with no track or arrows. The page's own scrollbar
+     stays native. */
+  body * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  }
+  body *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  body *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  body *::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.22) padding-box;
+  }
+  body *::-webkit-scrollbar-button {
+    display: none;
+  }
   /* The OS focus highlight is blue and vanishes on the blue background. */
   ::selection {
     background: #0b1a28;
@@ -404,6 +426,56 @@
     @apply inline-block rounded-full border border-edge2 text-soft px-2.5 py-0.5 font-inter-tight
       text-[11px] uppercase tracking-[0.08em];
   }
+  /* category tags: normal chips (card fill, white border and text, sentence
+     case) whose category colour is only the icon; --tag is the base colour */
+  .cat-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px 0 8px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    /* the board card's fill (.card: bg-white/5) */
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--color-soft);
+    font-family: var(--font-inter-tight);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .cat-tag svg {
+    width: 13px;
+    height: 13px;
+    flex: none;
+    color: var(--tag);
+    stroke-width: 2.2;
+  }
+  .cat-tag.cat-sm {
+    height: 20px;
+  }
+  a.cat-tag {
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  }
+  a.cat-tag:hover {
+    border-color: rgba(255, 255, 255, 0.55);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--tag) 35%, transparent);
+    color: #fff;
+    text-decoration: none;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    a.cat-tag:hover {
+      transform: translateY(-1px);
+    }
+  }
+  .cat-tag:focus-visible {
+    outline: 2px solid var(--color-dao-bright);
+    outline-offset: 2px;
+  }
+
   /* a chip sitting next to a type badge: same height and vertical rhythm */
   .chip-badge {
     @apply inline-flex items-center py-1 leading-[1.5] font-semibold tracking-[0.05em];

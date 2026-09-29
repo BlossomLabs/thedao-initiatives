@@ -13,6 +13,15 @@ import BulkBar, { type BulkResult, HeadCheck, RowCheck } from "~/components/admi
 import { useSelection } from "~/hooks/use-selection";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
+import { CategoryTag } from "~/components/ui/CategoryTag";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/Select";
+import { CATEGORIES } from "~/lib/categories";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { sessionKey, useSession } from "~/context/session";
 import { api, errorMessage } from "~/lib/api";
@@ -21,6 +30,12 @@ import { dt, shortAddr, truncate, usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
 
 const dashKey = ["admin", "dashboard"] as const;
+
+const CAT_FILTER_ITEMS = [
+  { value: "all", label: "All categories" },
+  { value: "untagged", label: "Untagged" },
+  ...CATEGORIES.map((c) => ({ value: c.slug as string, label: c.label as string })),
+];
 
 function CommentCell({ c }: { c: AdminComment }) {
   return (
@@ -66,7 +81,17 @@ export default function Dashboard() {
   // a row that leaves a list (published, archived) drops out on its own.
   const heldIds = useMemo(() => (data?.held ?? []).map((c) => c.id), [data?.held]);
   const reportedIds = useMemo(() => (data?.reported ?? []).map((c) => c.id), [data?.reported]);
-  const rowIds = useMemo(() => (data?.rows ?? []).map((r) => r.initiative.id), [data?.rows]);
+  // "all", "untagged" or a category slug.
+  const [catFilter, setCatFilter] = useState("all");
+  const rows = useMemo(
+    () =>
+      (data?.rows ?? []).filter(({ initiative: r }) =>
+        catFilter === "all" ||
+        (catFilter === "untagged" ? !r.categories.length : r.categories.includes(catFilter))
+      ),
+    [data?.rows, catFilter],
+  );
+  const rowIds = useMemo(() => rows.map((r) => r.initiative.id), [rows]);
   const heldSel = useSelection(heldIds);
   const reportedSel = useSelection(reportedIds);
   const rowSel = useSelection(rowIds);
@@ -405,6 +430,27 @@ export default function Dashboard() {
       )}
 
       <SectionHeading>All initiatives</SectionHeading>
+      <div className="mb-3 flex flex-wrap items-center gap-2.5">
+        <Select
+          value={catFilter}
+          items={CAT_FILTER_ITEMS}
+          onValueChange={(v) => setCatFilter(String(v))}
+        >
+          <SelectTrigger size="sm" aria-label="Category" className="min-h-[38px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CAT_FILTER_ITEMS.map((c) => (
+              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="small dim">
+          {rows.length} of {data.rows.length}
+          {" · "}
+          {data.rows.filter((x) => !x.initiative.categories.length).length} untagged
+        </span>
+      </div>
       <div className="tblbox">
         <BulkBar
           selection={rowSel}
@@ -438,7 +484,7 @@ export default function Dashboard() {
             </tr>
           </thead>
           <tbody>
-            {data.rows.map(({ initiative: r, summary, safeSync }) => (
+            {rows.map(({ initiative: r, summary, safeSync }) => (
               <tr key={r.id}>
                 <td>
                   <RowCheck selection={rowSel} id={r.id} label={`Select ${r.title}`} />
@@ -449,7 +495,14 @@ export default function Dashboard() {
                     ? <span title={`Pinned to board position ${r.sortRank}`}>📌{r.sortRank}</span>
                     : null}
                 </td>
-                <td>{r.title}</td>
+                <td>
+                  {r.title}
+                  {r.categories.length > 0 && (
+                    <span className="mt-1.5 flex flex-wrap gap-1">
+                      {r.categories.map((slug) => <CategoryTag key={slug} slug={slug} sm />)}
+                    </span>
+                  )}
+                </td>
                 <td className="amt">{usd(r.goalUsd)}</td>
                 <td
                   className="amt"

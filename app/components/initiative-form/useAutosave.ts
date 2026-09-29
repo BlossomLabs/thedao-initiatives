@@ -7,6 +7,7 @@ import { cancelDraftWrites, draftVersion, registerDraftFlusher } from "~/lib/bro
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Draft } from "./types";
 import { emptyDraft, isEmptyDraft, newId } from "./useDraft";
+import { normaliseCategories } from "~/lib/categories";
 
 export const AUTOSAVE_KEY = "thedao:submit-draft";
 export const AUTOSAVE_DELAY = 400;
@@ -25,6 +26,7 @@ export function reviveDraft(raw: unknown): Draft | null {
     ...base,
     type: s.type === "grant" ? "grant" : "rfp",
     topup: s.type === "grant" && Boolean(s.topup),
+    categories: Array.isArray(s.categories) ? normaliseCategories(s.categories) : [],
     milestoneReviewer: String(s.milestoneReviewer ?? ""),
     page: { ...base.page, ...(s.page && typeof s.page === "object" ? s.page : {}) },
     sections: s.sections && typeof s.sections === "object" ? { ...s.sections } : {},

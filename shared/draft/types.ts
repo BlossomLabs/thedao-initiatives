@@ -19,6 +19,7 @@ export type SectionKey =
 export type PageKey =
   | "title"
   | "summary"
+  | "categories"
   | "goal"
   | "duration"
   | "recipient"

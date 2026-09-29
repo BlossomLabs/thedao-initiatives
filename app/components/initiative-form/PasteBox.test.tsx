@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { readFileSync } from "node:fs";
-import PasteBox, { MIRROR_DELAY } from "./PasteBox";
+import PasteBox, { formatHints, MIRROR_DELAY } from "./PasteBox";
+import { splitDraft } from "@shared/draft/mod";
+import { splitReport } from "./useDraft";
 import { useDraft } from "./useDraft";
 
 const EXAMPLE = readFileSync("docs/llms-v3-example-output.md", "utf8");
@@ -161,5 +163,23 @@ describe("PasteBox hints", () => {
     const hints = document.querySelector('[data-field="paste-hints"]')!.textContent!;
     expect(hints).toContain("No milestones found");
     expect(hints).toContain("Unsorted box");
+  });
+});
+
+describe("category hints after a paste", () => {
+  const hints = (text: string) =>
+    formatHints(splitReport(splitDraft(text, "rfp"), "rfp")).map((h) => h.key);
+
+  it("asks for categories when the paste has none", () => {
+    expect(hints("## Title\nT\n")).toContain("no-categories");
+    expect(hints("## Categories\nOpSec\n")).not.toContain("no-categories");
+  });
+
+  it("names categories it could not read", () => {
+    const r = splitReport(splitDraft("## Categories\nOpSec\nZK stuff\n", "rfp"), "rfp");
+    const h = formatHints(r).find((x) => x.key === "unknown-categories");
+    expect(h).toBeTruthy();
+    render(<p>{h!.text}</p>);
+    expect(screen.getByText(/ZK stuff/)).toBeInTheDocument();
   });
 });

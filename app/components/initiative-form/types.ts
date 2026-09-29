@@ -60,6 +60,8 @@ export interface DraftPage {
 export interface Draft {
   type: DraftType;
   topup: boolean;
+  /** 1 to 3 category slugs, the first is primary. Outside the pasted text and the revisions. */
+  categories: string[];
   milestoneReviewer: string;
   page: DraftPage;
   sections: Sections;
@@ -75,6 +77,7 @@ export interface SubmitPayload {
   website: "";
   type: DraftType;
   topup: boolean;
+  categories: string[];
   title: string;
   summary: string;
   discourseUrl: string;

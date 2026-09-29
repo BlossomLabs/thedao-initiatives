@@ -217,11 +217,15 @@ function EditForm(
     await requireSession();
     const facts = open ? pageFactsPatch(payload, r) : null;
     const text = textChanged(payload, r);
-    if (!facts && !text) throw new Error("Nothing changed.");
+    // Categories follow the text: editable while it is, outside the revision.
+    const cats = payload.categories.join() !== r.categories.join()
+      ? { categories: payload.categories }
+      : null;
+    if (!facts && !text && !cats) throw new Error("Nothing changed.");
     let patched = false;
     try {
-      if (facts) {
-        await api(path, { method: "PATCH", json: { ...facts, initiativeId: r.id } });
+      if (facts || cats) {
+        await api(path, { method: "PATCH", json: { ...facts, ...cats, initiativeId: r.id } });
         patched = true;
       }
       if (text) {
@@ -244,6 +248,7 @@ function EditForm(
       initial={initial}
       locked={!open}
       onSubmit={onSubmit}
+      categories={{}}
       submitLabel="Save as a new revision"
       showBackers={false}
       showPrivate={open}

@@ -14,6 +14,9 @@ import Reveal from "~/components/ui/Reveal";
 import { renderDraft, textMatchesDraft } from "./draft-text";
 import type { Draft } from "./types";
 import { splitReport } from "./useDraft";
+import { CATEGORIES } from "@shared/categories";
+
+const CATEGORY_NAMES = CATEGORIES.map((c) => c.label).join(", ");
 
 type Report = ReturnType<typeof splitReport>;
 
@@ -47,6 +50,28 @@ export function formatHints(r: Report): { key: string; text: React.ReactNode }[]
         <>
           Text under a heading the site does not know went to the Unsorted box below. Headings
           inside a section become bold text; the site owns the section headings.
+        </>
+      ),
+    });
+  }
+  if (r.categories === 0 && !r.unknownCategories.length) {
+    out.push({
+      key: "no-categories",
+      text: (
+        <>
+          No categories found. Put 1 to 3 under{" "}
+          <code>## Categories</code>, one per line, the main one first, or pick them in the
+          Categories field above.
+        </>
+      ),
+    });
+  }
+  if (r.unknownCategories.length) {
+    out.push({
+      key: "unknown-categories",
+      text: (
+        <>
+          Not a category: {r.unknownCategories.join(", ")}. Use these names: {CATEGORY_NAMES}.
         </>
       ),
     });
@@ -104,6 +129,10 @@ export const PASTE_PLACEHOLDER = [
   "",
   "## Title",
   'One line, no "RFP:" prefix',
+  "",
+  "## Categories",
+  "OpSec",
+  "Research & Education",
   "",
   "## Why this matters",
   "One heading per section, in the guide's order; headings inside a section become bold.",

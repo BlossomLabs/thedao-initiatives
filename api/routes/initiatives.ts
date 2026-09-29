@@ -33,6 +33,7 @@ import {
   TEXT_FIELDS,
 } from "../lib/structured.ts";
 import { PAGE_FACT_FIELDS, readPageFacts } from "../lib/page-facts.ts";
+import { readCategories } from "../../shared/categories.ts";
 import { ownsUpload } from "./uploads.ts";
 import {
   bodyKey,
@@ -258,7 +259,13 @@ export function initiativeRoutes(deps: Deps) {
     const user = c.var.user!;
     const body = await jsonBody(c, ["initiativeId", ...PAGE_FACT_FIELDS]);
     const { initiative } = await editableBy(c.req.param("slug"), user, body);
-    if (!user.isAdmin && initiative.status !== "pending") {
+    // Categories follow the text: the proposer may change them while the text is editable.
+    const onlyCategories = Object.keys(body).every((k) =>
+      k === "initiativeId" || k === "categories"
+    );
+    const open = initiative.status === "pending" ||
+      (onlyCategories && initiative.status === "approved");
+    if (!user.isAdmin && !open) {
       throw new HttpError(403, "Locked after approval; email the team.");
     }
     const patch = await readPageFacts(body, initiative, deps);
@@ -336,6 +343,8 @@ export function initiativeRoutes(deps: Deps) {
       backers,
     }, "submit");
     const extra: Finding[] = [];
+    const [categories, categoryErr] = readCategories(body.categories ?? []);
+    if (categoryErr) extra.push({ field: "categories", msg: categoryErr, kind: "content" });
     // Logo receipts: a CID rides the form only if this wallet pinned it.
     for (const [i, b] of backers.entries()) {
       if (b.logoCid && !(await ownsUpload(db, b.logoCid, proposer))) {
@@ -379,6 +388,7 @@ export function initiativeRoutes(deps: Deps) {
         recipientUrl,
         topup,
         milestoneReviewer,
+        categories: categories!,
       },
       undefined,
       undefined,

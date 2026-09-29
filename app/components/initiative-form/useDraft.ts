@@ -18,6 +18,8 @@ import {
   type SplitResult,
 } from "@shared/draft/mod";
 import type { Initiative, Pledge } from "~/lib/api-types";
+import { normaliseCategories } from "~/lib/categories";
+import { readCategoryText } from "@shared/categories";
 import type { Draft, DraftBacker, DraftCriterion, DraftMilestone, SubmitPayload } from "./types";
 import { replaceFromText } from "./draft-text";
 
@@ -49,6 +51,7 @@ export const emptyBacker = (): DraftBacker => ({
 export const emptyDraft = (): Draft => ({
   type: "rfp",
   topup: false,
+  categories: [],
   milestoneReviewer: "",
   page: {
     title: "",
@@ -94,7 +97,7 @@ export function isEmptyDraft(d: Draft): boolean {
   );
   const bk = d.backers.some((b) => b.org.trim() || b.amount.trim());
   const priv = Boolean(d.priv.funders.trim() || d.priv.contact.trim());
-  return !(page || sections || ms || bk || priv || d.unsorted.trim());
+  return !(d.categories.length || page || sections || ms || bk || priv || d.unsorted.trim());
 }
 
 /** An initiative from the API as a draft (edit pages). Backers are pledges
@@ -108,6 +111,7 @@ export function fromInitiative(
   const d = emptyDraft();
   d.type = r.type;
   d.topup = r.type === "grant" && r.topup;
+  d.categories = normaliseCategories(r.categories ?? []);
   d.milestoneReviewer = r.milestoneReviewer ?? "";
   d.page = {
     title: r.title ?? "",
@@ -193,6 +197,7 @@ export function toPayload(d: Draft, logoCids: Record<string, string> = {}): Subm
     website: "",
     type: d.type,
     topup: d.type === "grant" && d.topup,
+    categories: [...d.categories],
     title: d.page.title.trim(),
     summary: d.page.summary.trim(),
     discourseUrl: d.page.discourseUrl.trim(),
@@ -220,6 +225,7 @@ export function toPayload(d: Draft, logoCids: Record<string, string> = {}): Subm
 export type DraftAction =
   | { t: "setType"; type: DraftType }
   | { t: "setTopup"; topup: boolean }
+  | { t: "setCategories"; value: string[] }
   | { t: "setReviewer"; value: string }
   | { t: "setPage"; key: keyof Draft["page"]; value: string }
   | { t: "setSection"; key: SectionKey; value: string }
@@ -265,7 +271,11 @@ export function splitReport(res: SplitResult, type: DraftType) {
   const backerRows = p.backers ? parseBackers(p.backers).length : 0;
   if (backerRows) fields++;
   const letter = (i: number) => String.fromCharCode(65 + (i % 26));
+  const cats = readCategoryText(p.categories ?? "");
   return {
+    /** Categories read from the Categories section, and names it could not read. */
+    categories: cats.slugs.length,
+    unknownCategories: cats.unknown,
     sections,
     milestones: res.milestones.length,
     fields,
@@ -292,6 +302,8 @@ export function draftReducer(s: DraftState, a: DraftAction): DraftState {
       };
     case "setTopup":
       return { ...s, draft: { ...d, topup: d.type === "grant" && a.topup } };
+    case "setCategories":
+      return { ...s, draft: { ...d, categories: normaliseCategories(a.value) } };
     case "setReviewer":
       return { ...s, draft: { ...d, milestoneReviewer: a.value } };
     case "setPage":
@@ -360,6 +372,7 @@ export function useDraft(initial?: Draft) {
     () => ({
       setType: (type: DraftType) => dispatch({ t: "setType", type }),
       setTopup: (topup: boolean) => dispatch({ t: "setTopup", topup }),
+      setCategories: (value: string[]) => dispatch({ t: "setCategories", value }),
       setReviewer: (value: string) => dispatch({ t: "setReviewer", value }),
       setPage: (key: keyof Draft["page"], value: string) => dispatch({ t: "setPage", key, value }),
       setSection: (key: SectionKey, value: string) => dispatch({ t: "setSection", key, value }),

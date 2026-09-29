@@ -1,8 +1,8 @@
 import { useState } from "react";
 import BackerLogo from "~/components/ui/BackerLogo";
 import { ArrowRight } from "lucide-react";
-import { Link } from "react-router";
 import { FundedChip, TypeBadge } from "~/components/ui/Badge";
+import CardTitle from "./CardTitle";
 import Bar from "~/components/ui/Bar";
 import Money from "~/components/ui/Money";
 import { Button, LinkButton } from "~/components/ui/Button";
@@ -25,12 +25,15 @@ export default function InitiativeCard({
   card,
   tokensOk,
   aiTop,
+  featured,
   onDonated,
   style,
 }: {
   card: Card;
   tokensOk: boolean;
   aiTop?: boolean;
+  /** Pinned by the team at the top (see featuredIds): shows the Featured label. */
+  featured?: boolean;
   onDonated?: () => void;
   style?: React.CSSProperties;
 }) {
@@ -49,21 +52,30 @@ export default function InitiativeCard({
       )}
       data-initiative-id={r.id}
     >
-      {aiTop && (
-        <span className="absolute -top-2.5 left-3.5 rounded-full bg-dao-green px-2.5 py-[3px] font-inter-tight text-[11px] font-bold uppercase tracking-[.4px] text-[#08321c]">
-          AI pick
+      {(aiTop || featured) && (
+        <span className="absolute -top-2.5 left-3.5 flex gap-1.5">
+          {featured && (
+            <span
+              className="rounded-full border border-white/25 bg-[#24506f] px-2.5 py-[3px] font-inter-tight text-[11px] font-bold uppercase tracking-[.4px] text-white"
+              title="Pinned to the top by the team"
+            >
+              Featured
+            </span>
+          )}
+          {aiTop && (
+            <span className="rounded-full bg-dao-green px-2.5 py-[3px] font-inter-tight text-[11px] font-bold uppercase tracking-[.4px] text-[#08321c]">
+              AI pick
+            </span>
+          )}
         </span>
       )}
       <TypeBadge type={r.type} />
-      <Link
-        to={`/initiative/${r.slug}`}
-        prefetch="intent"
-        onMouseEnter={prefetch}
-        onFocus={prefetch}
-        className="block pr-[72px] font-inter-tight text-[16px] font-medium leading-[1.35] text-white no-underline hover:text-dao-green hover:no-underline"
-      >
-        {r.title}
-      </Link>
+      <CardTitle
+        title={r.title}
+        href={`/initiative/${r.slug}`}
+        categories={r.categories}
+        onPrefetch={prefetch}
+      />
       <p className="mb-5 mt-2.5 line-clamp-3 min-h-[42px] text-[13px] leading-[1.6] text-white/55">
         {r.summary}
       </p>

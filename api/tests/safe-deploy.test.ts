@@ -28,6 +28,7 @@ Deno.test("approval needs a deployed Safe: the panel targets the predicted addre
     title: "Deploy first",
     status: "pending",
     goalUsd: 1000,
+    categories: ["opsec"],
   });
   const refused = await setStatus(h, admin, initiative.id, "approve");
   assertEquals(refused.status, 400);
@@ -153,6 +154,7 @@ Deno.test("bulk approve: rows without a Safe fail one by one, the rest land", as
     title: "Ready",
     status: "pending",
     safeAddress: SAFE_ADDR,
+    categories: ["opsec"],
   });
   const bare = await h.db.initiatives.insert({ title: "Bare", status: "pending" });
   const res = await j(

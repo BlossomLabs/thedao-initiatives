@@ -19,6 +19,46 @@ import { structuredRow } from "../../../test/fixtures";
 const state = (): DraftState => ({ draft: emptyDraft() });
 
 describe("useDraft reducer", () => {
+  it("keeps categories in the draft, ordered, unique, known and at most three", () => {
+    const s = draftReducer(state(), {
+      t: "setCategories",
+      value: ["opsec", "defi", "opsec", "nope", "audits-analysis", "compilers"],
+    });
+    expect(s.draft.categories).toEqual(["opsec", "defi", "audits-analysis"]);
+    expect(toPayload(s.draft).categories).toEqual(["opsec", "defi", "audits-analysis"]);
+  });
+
+  it("a paste sets the categories from its Categories section, like any other field", () => {
+    let s = draftReducer(state(), { t: "setCategories", value: ["defi"] });
+    s = draftReducer(s, {
+      t: "replaceText",
+      text: "## Title\nNew title\n\n## Categories\nOpSec\nResearch & Education\n",
+    });
+    expect(s.draft.page.title).toBe("New title");
+    expect(s.draft.categories).toEqual(["opsec", "research-education"]);
+    // a text without the section empties the field, as with every other heading
+    s = draftReducer(s, { t: "replaceText", text: "## Title\nNew title\n" });
+    expect(s.draft.categories).toEqual([]);
+  });
+
+  it("the paste report counts categories and names the unknown ones", () => {
+    const r = splitReport(splitDraft("## Categories\nOpSec\nZK stuff\n", "rfp"), "rfp");
+    expect(r.categories).toBe(1);
+    expect(r.unknownCategories).toEqual(["ZK stuff"]);
+    expect(splitReport(splitDraft("## Title\nT\n", "rfp"), "rfp").categories).toBe(0);
+  });
+
+  it("a draft with only categories is not empty", () => {
+    const d = emptyDraft();
+    expect(d.categories).toEqual([]);
+    expect(isEmptyDraft({ ...d, categories: ["defi"] })).toBe(false);
+  });
+
+  it("an initiative's categories seed the edit draft", () => {
+    const d = fromInitiative({ ...structuredRow(), categories: ["opsec", "defi"] });
+    expect(d.categories).toEqual(["opsec", "defi"]);
+  });
+
   it("setType to rfp clears the top-up; a grant keeps it", () => {
     let s = draftReducer(state(), { t: "setType", type: "grant" });
     s = draftReducer(s, { t: "setTopup", topup: true });
@@ -125,6 +165,7 @@ describe("useDraft reducer", () => {
       recipientUrl: "https://team.example",
       topup: true,
       milestoneReviewer: "N.",
+      categories: [],
       sections: { why: "w", team: "t" },
       milestones: [{
         name: "A",

@@ -1,14 +1,20 @@
 /**
  * Pins the number of sequential KV round trips behind the public reads. Every
  * KV operation is delayed by a fixed LATENCY, so the elapsed time of one
- * request divided by LATENCY is the depth of its critical path; the count of
- * operations bounds the total KV work. Production pays ~120-180 ms per trip.
+ * request divided by LATENCY, rounded down, is the depth of its critical path;
+ * the count of operations bounds the total KV work. Production pays ~120-180 ms
+ * per trip.
+ *
+ * The request's own CPU time (building and serializing 25 cards: ~40 ms cold,
+ * ~15 ms warm) adds to the elapsed time. LATENCY is set well above it and the
+ * depth is rounded down, so that time never reads as an extra trip; a real
+ * extra trip still adds a whole LATENCY.
  */
 import { assert, assertEquals } from "@std/assert";
 import { harness } from "./app-helpers.ts";
 import { K } from "../db/keys.ts";
 
-const LATENCY = 30;
+const LATENCY = 100;
 const delay = () => new Promise((r) => setTimeout(r, LATENCY));
 
 const counter = { ops: 0, on: false };
@@ -81,7 +87,7 @@ async function timed(run: () => Promise<Response>) {
   assertEquals(res.status, 200);
   return {
     ops: counter.ops,
-    trips: Math.round(elapsed / LATENCY),
+    trips: Math.floor(elapsed / LATENCY),
     elapsed,
     body: await res.json(),
   };

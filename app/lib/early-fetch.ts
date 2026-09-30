@@ -7,7 +7,6 @@
 import { API_URL } from "./api-url";
 
 declare global {
-  // deno-lint-ignore no-var
   var __early: Record<string, Promise<Response>> | undefined;
 }
 

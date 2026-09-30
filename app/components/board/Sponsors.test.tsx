@@ -1,53 +1,39 @@
-import { MemoryRouter } from "react-router";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
 import Sponsors from "./Sponsors";
 import type { Sponsor } from "~/lib/api-types";
 
-const sponsor = (company: string, slugs: string[]): Sponsor => ({
+const sponsor = (company: string, totalUsd: number, url = ""): Sponsor => ({
   company,
   logoUrl: "",
-  url: "",
-  totalUsd: 1000 * slugs.length,
-  initiatives: slugs.map((slug) => ({ slug, title: `Title ${slug}`, amountUsd: 1000 })),
+  url,
+  totalUsd,
+  initiatives: [{ slug: "x", title: "X", amountUsd: totalUsd }],
 });
-
-const view = (sponsors?: Sponsor[]) =>
-  render(
-    <MemoryRouter>
-      <Sponsors sponsors={sponsors} />
-    </MemoryRouter>,
-  );
 
 it("renders nothing until someone has pledged", () => {
-  const { container } = view([]);
-  expect(container.innerHTML).toBe("");
-  expect(view(undefined).container.innerHTML).toBe("");
+  expect(render(<Sponsors sponsors={[]} />).container.innerHTML).toBe("");
+  expect(render(<Sponsors sponsors={undefined} />).container.innerHTML).toBe("");
 });
 
-it("lists each sponsor with its total and links its one initiative", () => {
-  view([sponsor("Ethereum Foundation", ["vyper"])]);
-  expect(screen.getByText("Top sponsors of security for Ethereum")).toBeTruthy();
-  expect(screen.getByText("Ethereum Foundation")).toBeTruthy();
-  expect(screen.getByText("$1,000")).toBeTruthy();
-  expect(screen.getByRole("link", { name: "Title vyper" }).getAttribute("href")).toBe(
-    "/initiative/vyper",
+it("numbers the sponsors in order with whole-dollar totals, the leader inverted", () => {
+  render(
+    <Sponsors
+      sponsors={[
+        sponsor("Argot Collective", 151000.4, "https://argot.org"),
+        sponsor("Acme", 800.5),
+      ]}
+    />,
   );
-  expect(screen.queryByRole("button")).toBeNull();
-});
-
-it("shows the first initiative and expands to all of them", () => {
-  view([sponsor("Acme", ["a", "b", "c"])]);
-  expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Title a"]);
-  const more = screen.getByRole("button", { name: "+2 more" });
-  expect(more.getAttribute("aria-expanded")).toBe("false");
-  fireEvent.click(more);
-  expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual([
-    "Title a",
-    "Title b",
-    "Title c",
+  expect(screen.getByText("Top sponsors of security for Ethereum")).toBeTruthy();
+  const items = screen.getAllByRole("listitem");
+  expect(items.map((li) => li.textContent)).toEqual([
+    "Argot Collective$151,000 pledged#01",
+    "Acme$801 pledged#02",
   ]);
-  expect(screen.getByRole("button", { name: "Show less" }).getAttribute("aria-expanded")).toBe(
-    "true",
+  expect(items[0].className).toContain("bg-white ");
+  expect(items[1].className).not.toContain("bg-white ");
+  expect(screen.getByRole("link", { name: "Argot Collective" }).getAttribute("href")).toBe(
+    "https://argot.org",
   );
 });

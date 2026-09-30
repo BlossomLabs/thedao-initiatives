@@ -1,3 +1,4 @@
+import { Bookmark } from "lucide-react";
 import {
   type BoardSort,
   type BoardType,
@@ -12,6 +13,7 @@ import { standInFocus } from "~/lib/focus-handover";
 import { cn } from "~/lib/utils";
 import {
   FILTER_FOCUS_KEY,
+  FILTER_PILL,
   FILTER_PILL_ON,
   TRIGGER,
   TriggerFace,
@@ -38,17 +40,46 @@ function CategoryFilterStandIn({ value }: { value: string[] }) {
   );
 }
 
+/** "My watchlist": only what this browser added to it; offered once something is. */
+function WatchlistPill(
+  { on, count, onChange, compact }: {
+    on: boolean;
+    count: number;
+    onChange: (on: boolean) => void;
+    /** Phones: the bookmark and the count only. */
+    compact?: boolean;
+  },
+) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      title="Initiatives on your watchlist in this browser"
+      onClick={() => onChange(!on)}
+      className={cn(FILTER_PILL, "pr-3", on && FILTER_PILL_ON)}
+    >
+      <Bookmark
+        className={cn("size-3.5", on ? "text-dao-amber" : "text-white/50")}
+        fill={on ? "currentColor" : "none"}
+        aria-hidden="true"
+      />
+      {compact ? <span className="sr-only">My watchlist</span> : "My watchlist"}{" "}
+      <span className="tnum text-white/45">{count}</span>
+    </button>
+  );
+}
+
 // The combobox loads after the board (preloadFilters, called once it has mounted).
 const filter = lazyPart(() => import("./filters/CategoryFilter"), CategoryFilterStandIn);
 export const preloadFilters = filter.preload;
 const CategoryFilter = filter.Component;
 
 /**
- * Between the AI search and the grid. One row of pills: Type, Category and
- * Funding, with the count and Sort on the right (Sort orders, it does not
- * narrow). The active filters follow on their own row as removable tokens.
- * Phones (<=640px): Type, Filters (N) (the sheet with Category and Funding) and
- * Sort, then the count.
+ * Between the AI search and the grid. One row of pills: Type, Category,
+ * Funding and Watchlist (once this browser has one), with the count
+ * and Sort on the right (Sort orders, it does not narrow).
+ * Phones (<=640px): Filters (N) (the sheet with Type, Category and Funding),
+ * Watchlist and Sort, then the count.
  */
 export default function FilterBar({
   view,
@@ -60,6 +91,7 @@ export default function FilterBar({
   featured = true,
   onSort,
   sheet,
+  watchlistCount = 0,
 }: {
   view: BoardView;
   onChange: (next: Partial<BoardView>) => void;
@@ -72,9 +104,20 @@ export default function FilterBar({
   onSort: (s: BoardSort) => void;
   /** The phone Filters (N) button with its sheet. */
   sheet: React.ReactNode;
+  /** How many initiatives are on this browser's watchlist. */
+  watchlistCount?: number;
 }) {
   const label = resultLabel(shown, total, isFiltered(view));
   const filtered = isFiltered(view);
+  const watchlist = (compact?: boolean) =>
+    (watchlistCount > 0 || view.watchlist) && (
+      <WatchlistPill
+        on={view.watchlist}
+        count={watchlistCount}
+        compact={compact}
+        onChange={(on) => onChange({ watchlist: on })}
+      />
+    );
   const clear = filtered && (
     <button
       type="button"
@@ -88,12 +131,12 @@ export default function FilterBar({
     <div className="mb-6 flex flex-col" role="group" aria-label="Filter and sort initiatives">
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-1 small dim max-[641px]:hidden">Filters:</span>
-        <TypeSelect
-          value={view.type}
-          counts={counts.type}
-          onChange={(type) => onChange({ type })}
-        />
         <div className="contents max-[641px]:hidden">
+          <TypeSelect
+            value={view.type}
+            counts={counts.type}
+            onChange={(type) => onChange({ type })}
+          />
           <Suspense fallback={<CategoryFilterStandIn value={view.cats} />}>
             <CategoryFilter
               value={view.cats}
@@ -102,8 +145,12 @@ export default function FilterBar({
             />
           </Suspense>
           <StatusSelect value={view.status} onChange={(status) => onChange({ status })} />
+          {watchlist()}
         </div>
-        <div className="hidden max-[641px]:contents">{sheet}</div>
+        <div className="hidden max-[641px]:contents">
+          {sheet}
+          {watchlist(true)}
+        </div>
         <span className="max-[641px]:hidden">{clear}</span>
         <span className="ml-auto flex items-center gap-3">
           <span className="small dim tnum max-[641px]:hidden" aria-live="polite">{label}</span>

@@ -10,6 +10,7 @@ import {
   featuredIds,
   groupByPrimary,
   hasFeatured,
+  isFiltered,
   readView,
   resultLabel,
   sortCards,
@@ -134,7 +135,7 @@ describe("board view", () => {
   it("counts the active filters the Filters button shows", () => {
     expect(activeFilterCount(DEFAULT_VIEW)).toBe(0);
     expect(activeFilterCount({ ...DEFAULT_VIEW, cats: ["a", "b"], status: "funded" })).toBe(3);
-    expect(activeFilterCount({ ...DEFAULT_VIEW, type: "rfp", sort: "newest" })).toBe(0);
+    expect(activeFilterCount({ ...DEFAULT_VIEW, type: "rfp", sort: "newest" })).toBe(1);
   });
 
   it("labels the results", () => {
@@ -157,6 +158,7 @@ describe("board view", () => {
       sort: "closest",
       view: "list",
       q: "safe",
+      watchlist: false,
     });
     expect(writeView(v).toString()).toBe("type=rfp&cat=opsec%2Cdefi&sort=closest&view=list&q=safe");
     expect(writeView(DEFAULT_VIEW).toString()).toBe("");
@@ -249,5 +251,19 @@ describe("board view", () => {
       ["opsec", 1],
       [null, 1],
     ]);
+  });
+});
+
+describe("watchlist", () => {
+  it("keeps only watchlisted initiatives and round-trips in the URL", () => {
+    const v = { ...DEFAULT_VIEW, watchlist: true };
+    expect(
+      titles(applyView(board, v, [
+        board.find((c) => c.initiative.title === "Echidna")!.initiative.id,
+      ])),
+    ).toEqual(["Echidna"]);
+    expect(writeView(v).toString()).toBe("watchlist=1");
+    expect(readView(new URLSearchParams("watchlist=1")).watchlist).toBe(true);
+    expect(isFiltered(v)).toBe(true);
   });
 });

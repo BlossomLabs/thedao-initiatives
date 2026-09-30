@@ -6,6 +6,7 @@ import SectionHeading from "~/components/layout/SectionHeading";
 import Hero from "~/components/board/Hero";
 import AiSearch from "~/components/board/AiSearch";
 import InitiativeCard from "~/components/board/InitiativeCard";
+import { useWatchlist } from "~/hooks/use-watchlist";
 import SuggestCard from "~/components/board/SuggestCard";
 import PledgeBand from "~/components/board/PledgeBand";
 import FilterBar, { preloadFilters } from "~/components/board/FilterBar";
@@ -66,6 +67,7 @@ export default function Board() {
     setView({ sort });
   };
 
+  const watchlist = useWatchlist();
   const all = data?.cards ?? [];
   // Featured (pins first) exists only while the team pinned something;
   // otherwise the default order is closest to funded.
@@ -75,16 +77,20 @@ export default function Board() {
     () => ({ ...view, sort: sortFor(view.sort, featured) }),
     [view, featured],
   );
-  const counts = useMemo(() => facetCounts(all, view), [all, view]);
+  const counts = useMemo(() => facetCounts(all, view, watchlist.ids), [
+    all,
+    view,
+    watchlist.ids,
+  ]);
   // Filters and sort first; the AI picks then move to the front of what is left.
   const cards = useMemo(() => {
-    const list = applyView(all, shownView);
+    const list = applyView(all, shownView, watchlist.ids);
     if (!matches?.length) return list;
     const top = matches.map((id) => list.find((c) => c.initiative.id === id)).filter((
       c,
     ): c is NonNullable<typeof c> => Boolean(c));
     return [...top, ...list.filter((c) => !matches.includes(c.initiative.id))];
-  }, [all, shownView, matches]);
+  }, [all, shownView, watchlist.ids, matches]);
   const filtered = isFiltered(view);
   // "By category" draws sections; the AI order wins over them while it is on.
   const groups = view.sort === "category" && !matches?.length
@@ -103,6 +109,7 @@ export default function Board() {
           <FilterBar
             view={shownView}
             featured={featured}
+            watchlistCount={watchlist.ids.length}
             onChange={setView}
             counts={counts}
             shown={cards.length}
@@ -111,9 +118,21 @@ export default function Board() {
             onSort={onSort}
             sheet={
               <Suspense
-                fallback={<FilterSheetStandIn cards={all} view={view} onApply={setView} />}
+                fallback={
+                  <FilterSheetStandIn
+                    cards={all}
+                    view={view}
+                    watched={watchlist.ids}
+                    onApply={setView}
+                  />
+                }
               >
-                <FilterSheet cards={all} view={view} onApply={setView} />
+                <FilterSheet
+                  cards={all}
+                  view={view}
+                  watched={watchlist.ids}
+                  onApply={setView}
+                />
               </Suspense>
             }
           />
@@ -176,6 +195,10 @@ export default function Board() {
                     featured={featuredSet.has(c.initiative.id)}
                     onDonated={() => void qc.invalidateQueries({ queryKey: boardKey })}
                     style={{ animationDelay: `${i * 60}ms` }}
+                    watch={{
+                      on: watchlist.has(c.initiative.id),
+                      toggle: () => watchlist.toggle(c.initiative.id),
+                    }}
                   />
                 ))}
                 {gi === groups.length - 1 &&

@@ -136,3 +136,63 @@ it("the Donate look-alike links the terms and is not marked busy", () => {
   expect(screen.getByRole("button", { name: "Wallet" })).toBeDisabled();
   expect(document.querySelector("[aria-busy]")).toBeNull();
 });
+
+it("marks an initiative approved in the last 7 days as New, and not older ones", () => {
+  const now = Date.now() / 1000;
+  const base = card({}).initiative;
+  const { unmount } = mount(card({ initiative: { ...base, approvedAt: now - 2 * 86400 } }));
+  expect(screen.getByText("New")).toBeInTheDocument();
+  unmount();
+  mount(card({ initiative: { ...base, approvedAt: now - 8 * 86400 } }));
+  expect(screen.queryByText("New")).toBeNull();
+});
+
+it("the watchlist bookmark is a pressed-state button named for the initiative", () => {
+  const toggle = vi.fn();
+  render(
+    <MemoryRouter>
+      <InitiativeCard card={card({})} tokensOk={false} watch={{ on: true, toggle }} />
+    </MemoryRouter>,
+  );
+  const bookmark = screen.getByRole("button", {
+    name: "Remove Audit tooling for rollups from watchlist",
+  });
+  expect(bookmark).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(bookmark);
+  expect(toggle).toHaveBeenCalled();
+});
+
+it("a featured card shows Featured, not New", () => {
+  const base = card({}).initiative;
+  render(
+    <MemoryRouter>
+      <InitiativeCard
+        card={card({ initiative: { ...base, approvedAt: Date.now() / 1000 - 86400 } })}
+        tokensOk={false}
+        featured
+      />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText("Featured")).toBeInTheDocument();
+  expect(screen.queryByText("New")).toBeNull();
+});
+
+it("shows one label on the top edge: AI pick over Featured over New", () => {
+  const base = card({}).initiative;
+  const fresh = card({ initiative: { ...base, approvedAt: Date.now() / 1000 - 86400 } });
+  const labels = () => ["AI pick", "Featured", "New"].filter((t) => screen.queryByText(t));
+  const view = (props: { aiTop?: boolean; featured?: boolean }) =>
+    render(
+      <MemoryRouter>
+        <InitiativeCard card={fresh} tokensOk={false} {...props} />
+      </MemoryRouter>,
+    );
+  let v = view({ aiTop: true, featured: true });
+  expect(labels()).toEqual(["AI pick"]);
+  v.unmount();
+  v = view({ featured: true });
+  expect(labels()).toEqual(["Featured"]);
+  v.unmount();
+  view({});
+  expect(labels()).toEqual(["New"]);
+});

@@ -309,7 +309,7 @@ Deno.test("checkbox: direct confirmations credit transfers without inventing acc
   }
 });
 
-Deno.test("admin leads: only initiatives with funders, private, admin-only", async () => {
+Deno.test("admin leads: a row for every approved and pending initiative (blank leads allowed), rejected and archived only with leads, private, admin-only", async () => {
   const h: Harness = await harness();
   try {
     const admin = await h.mint(ADMIN, true);
@@ -322,12 +322,26 @@ Deno.test("admin leads: only initiatives with funders, private, admin-only", asy
     });
     assertEquals((await h.req("/api/admin/leads")).status, 401);
     assertEquals((await h.req("/api/admin/leads", { token: await h.mint(PLAIN) })).status, 403);
+    const pending = await h.db.initiatives.insert({ title: "A pending one", status: "pending" });
+    const rejectedBare = await h.db.initiatives.insert({
+      title: "Rejected bare",
+      status: "rejected",
+    });
+    const rejectedLead = await h.db.initiatives.insert({
+      title: "Rejected with a lead",
+      status: "rejected",
+      funders: "Beta | maybe | met once | no | $10k",
+    });
     const leads = await j(await h.req("/api/admin/leads", { token: admin }));
     const rows = leads.rows as { id: string; funders: string; contact: string }[];
-    assertEquals(rows.length, 1);
-    assertEquals(rows[0].id, all[0].id);
-    assertStringIncludes(rows[0].funders, "Acme");
-    assertEquals(rows[0].contact, "a@example.com");
+    const ids = new Set(rows.map((r) => r.id));
+    assertEquals(rows.length, all.length + 2);
+    for (const x of all) assert(ids.has(x.id));
+    assert(ids.has(pending.id) && ids.has(rejectedLead.id) && !ids.has(rejectedBare.id));
+    const acme = rows.find((r) => r.id === all[0].id)!;
+    assertStringIncludes(acme.funders, "Acme");
+    assertEquals(acme.contact, "a@example.com");
+    assertEquals(rows.find((r) => r.id === pending.id)!.funders, "");
     // Private contacts need a recent signature, not just a live cookie.
     h.clock.now += SESSION_REAUTH_SECS;
     const stale = await h.req("/api/admin/leads", { token: admin });

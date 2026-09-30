@@ -2,7 +2,7 @@ import { useAdminApi } from "~/hooks/use-admin-api";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { Bell } from "lucide-react";
+import { Bell, Search } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
 import DashboardSkeleton from "~/components/layout/DashboardSkeleton";
 import Crumbs from "~/components/layout/Crumbs";
@@ -26,7 +26,9 @@ import { Button, LinkButton } from "~/components/ui/Button";
 import { sessionKey, useSession } from "~/context/session";
 import { api, errorMessage } from "~/lib/api";
 import type { AdminComment, AdminDashboard } from "~/lib/api-types";
-import { dt, shortAddr, truncate, usd } from "~/lib/format";
+import { approvedCounts, filterAdminRows } from "~/lib/admin-rows";
+import TypeGlyph from "~/components/board/filters/TypeGlyph";
+import { dt, plural, shortAddr, truncate, usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
 
 const dashKey = ["admin", "dashboard"] as const;
@@ -83,14 +85,12 @@ export default function Dashboard() {
   const reportedIds = useMemo(() => (data?.reported ?? []).map((c) => c.id), [data?.reported]);
   // "all", "untagged" or a category slug.
   const [catFilter, setCatFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const rows = useMemo(
-    () =>
-      (data?.rows ?? []).filter(({ initiative: r }) =>
-        catFilter === "all" ||
-        (catFilter === "untagged" ? !r.categories.length : r.categories.includes(catFilter))
-      ),
-    [data?.rows, catFilter],
+    () => filterAdminRows(data?.rows ?? [], catFilter, search),
+    [data?.rows, catFilter, search],
   );
+  const counts = approvedCounts(data?.rows ?? []);
   const rowIds = useMemo(() => rows.map((r) => r.initiative.id), [rows]);
   const heldSel = useSelection(heldIds);
   const reportedSel = useSelection(reportedIds);
@@ -164,7 +164,29 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-3.5 grid grid-cols-3 gap-3 max-[860px]:grid-cols-1">
+      <div className="mt-3.5 grid grid-cols-4 gap-3 max-[1100px]:grid-cols-2 max-[640px]:grid-cols-1">
+        {/* The same approved rows the board shows, so the numbers match it. */}
+        <div className="flex items-center gap-3 rounded-2xl border border-edge bg-card px-[18px] py-3.5">
+          <span
+            className="size-[9px] flex-none rounded-full bg-dao-green shadow-[0_0_10px_rgba(92,183,90,.6)]"
+            aria-hidden="true"
+          />
+          <div>
+            <b className="block font-inter-tight text-[14px] font-semibold">
+              {counts.total} approved
+            </b>
+            <small className="flex items-center gap-3 text-[12px] text-muted">
+              <span className="inline-flex items-center gap-1.5">
+                <TypeGlyph type="grant" />
+                {plural(counts.grants, "grant")}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <TypeGlyph type="rfp" />
+                {plural(counts.rfps, "RFP")}
+              </span>
+            </small>
+          </div>
+        </div>
         <div className="flex items-center gap-3 rounded-2xl border border-edge bg-card px-[18px] py-3.5">
           <span
             className={cn(
@@ -431,6 +453,20 @@ export default function Dashboard() {
 
       <SectionHeading>All initiatives</SectionHeading>
       <div className="mb-3 flex flex-wrap items-center gap-2.5">
+        <label className="relative min-w-[240px] flex-1">
+          <span className="sr-only">Search by project or contact</span>
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/40"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            className="field min-h-[38px] py-1.5 pl-9 text-[13px]"
+            placeholder="Search project or contact"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </label>
         <Select
           value={catFilter}
           items={CAT_FILTER_ITEMS}
@@ -484,6 +520,23 @@ export default function Dashboard() {
             </tr>
           </thead>
           <tbody>
+            {!rows.length && (
+              <tr>
+                <td colSpan={8} className="py-6 text-center text-muted">
+                  No initiatives match.{" "}
+                  <button
+                    type="button"
+                    className="cursor-pointer border-0 bg-transparent p-0 text-dao-green underline"
+                    onClick={() => {
+                      setSearch("");
+                      setCatFilter("all");
+                    }}
+                  >
+                    Clear search and category
+                  </button>
+                </td>
+              </tr>
+            )}
             {rows.map(({ initiative: r, summary, safeSync }) => (
               <tr key={r.id}>
                 <td>

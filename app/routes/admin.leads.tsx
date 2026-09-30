@@ -94,7 +94,9 @@ export default function Leads() {
       )}
       {error && !stale && <p className="alert" role="alert">{errorMessage(error)}</p>}
       {data && !rows.length && (
-        <p className="text-muted">No initiative has named likely funders yet.</p>
+        <p className="text-muted">
+          No approved or pending initiatives yet.
+        </p>
       )}
       {rows.length > 0 && (
         <div className="tblbox mt-4">

@@ -612,7 +612,11 @@ export function adminRoutes(deps: Deps) {
    */
   r.get("/leads", requireRecentAuth(deps.now), async (c) => {
     const all = await db.initiatives.list(["pending", "approved", "rejected", "archived"]);
-    const rows = all.filter((x) => x.funders.trim()).map((x) => ({
+    // Every approved and pending initiative gets a row, with blank lead columns when it
+    // has no leads yet; rejected and archived ones only while they carry leads.
+    const rows = all.filter((x) =>
+      x.funders.trim() || x.status === "approved" || x.status === "pending"
+    ).map((x) => ({
       id: x.id,
       title: x.title,
       slug: x.slug,

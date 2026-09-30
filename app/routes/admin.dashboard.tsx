@@ -21,6 +21,7 @@ import type { AdminComment, AdminDashboard } from "~/lib/api-types";
 import { adminFacetCounts, approvedCounts, filterAdminRows } from "~/lib/admin-rows";
 import { parseAdminQuery, setQualifier, UNTAGGED } from "~/lib/admin-query";
 import AdminFilters from "~/components/admin/AdminFilters";
+import SafeSyncIcon from "~/components/admin/SafeSyncIcon";
 import TypeGlyph from "~/components/board/filters/TypeGlyph";
 import { dt, plural, shortAddr, truncate, usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
@@ -495,25 +496,26 @@ export default function Dashboard() {
           ]}
           onAct={bulkInitiatives}
         />
-        <table className="tbl">
+        <table className="tbl [&_td]:align-middle">
           <thead>
             <tr>
               <th className="w-8">
                 <HeadCheck selection={rowSel} label="Select every initiative" />
               </th>
               <th>Status</th>
+              <th>Type</th>
               <th>Title</th>
               <th className="amt">Goal</th>
               <th className="amt">Raised</th>
               <th>Contact</th>
-              <th>Safe sync</th>
+              <th className="whitespace-nowrap text-center">Safe sync</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {!rows.length && (
               <tr>
-                <td colSpan={8} className="py-6 text-center text-muted">
+                <td colSpan={9} className="py-6 text-center text-muted">
                   No initiatives match.{" "}
                   <button
                     type="button"
@@ -531,10 +533,17 @@ export default function Dashboard() {
                   <RowCheck selection={rowSel} id={r.id} label={`Select ${r.title}`} />
                 </td>
                 <td className="whitespace-nowrap">
-                  <StatusChip status={r.status} /> <TypeBadge type={r.type} inline />
+                  <StatusChip status={r.status} />
                   {r.sortRank
-                    ? <span title={`Pinned to board position ${r.sortRank}`}>📌{r.sortRank}</span>
+                    ? (
+                      <span className="ml-1" title={`Pinned to board position ${r.sortRank}`}>
+                        📌{r.sortRank}
+                      </span>
+                    )
                     : null}
+                </td>
+                <td className="whitespace-nowrap">
+                  <TypeBadge type={r.type} inline />
                 </td>
                 <td>
                   {r.title}
@@ -557,18 +566,8 @@ export default function Dashboard() {
                     : null}
                 </td>
                 <td className="small [overflow-wrap:anywhere]">{r.contact || "–"}</td>
-                <td className="small">
-                  {!r.safeAddress
-                    ? <span className="dim">no Safe</span>
-                    : !safeSync
-                    ? <span className="dim">never</span>
-                    : safeSync.ok
-                    ? (
-                      <span className="text-dao-green">
-                        {safeSync.backfilled ? "ok" : "backfilling"} · {dt(safeSync.at)}
-                      </span>
-                    )
-                    : <span className="text-[#ffb3b1]" title={safeSync.error}>error</span>}
+                <td className="text-center">
+                  <SafeSyncIcon safeAddress={r.safeAddress} sync={safeSync} />
                 </td>
                 <td>
                   <Link className="btn btn-ghost btn-sm" to={`/admin/initiatives/${r.slug}`}>

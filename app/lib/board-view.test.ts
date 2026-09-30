@@ -29,6 +29,7 @@ const card = (
     raised?: number;
     backers?: number;
     at?: number;
+    team?: string;
   } = {},
 ): Card => {
   const goal = o.goal ?? 100_000;
@@ -46,6 +47,7 @@ const card = (
       sortRank: null,
       safeAddress: "",
       categories: o.cats ?? [],
+      recipientTeam: o.team ?? "",
       createdAt: o.at ?? n,
       approvedAt: o.at ?? n,
     },
@@ -265,5 +267,13 @@ describe("watchlist", () => {
     expect(writeView(v).toString()).toBe("watchlist=1");
     expect(readView(new URLSearchParams("watchlist=1")).watchlist).toBe(true);
     expect(isFiltered(v)).toBe(true);
+  });
+});
+
+describe("keyword filter", () => {
+  it("matches a grant's recipient team too", () => {
+    const cards = [card("Fuzzing grant", { team: "Trail of Bits" }), card("Other grant")];
+    const v = { ...DEFAULT_VIEW, q: "trail bits" };
+    expect(applyView(cards, v).map((c) => c.initiative.title)).toEqual(["Fuzzing grant"]);
   });
 });

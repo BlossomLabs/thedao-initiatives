@@ -55,6 +55,7 @@ export const CARD_FIELDS = [
   "safeAddress",
   "paidOutUsd",
   "categories",
+  "recipientTeam",
   "createdAt",
   "approvedAt",
 ] as const;
@@ -68,7 +69,7 @@ export function cardRow(r: Initiative): CardRow {
 /** Under meta: the status index (#47) is complete at this shape. Missing (a database from
  * before it, or one restored from a backup) means the next cards() read rebuilds it. */
 export const STATUS_INDEX_MARK = "rfp_by_status";
-const STATUS_INDEX_VERSION = 1;
+const STATUS_INDEX_VERSION = 2; // 2: cards carry recipientTeam
 
 export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
   /** Every row write also writes its card under its status, off the old status when it moved. */

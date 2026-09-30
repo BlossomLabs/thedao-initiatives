@@ -132,6 +132,7 @@ export type CardInitiative = Pick<
   | "sortRank"
   | "safeAddress"
   | "categories"
+  | "recipientTeam"
   | "createdAt"
   | "approvedAt"
 >;

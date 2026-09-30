@@ -106,3 +106,38 @@ Deno.test("status index: a restore drops the built mark so the index is rebuilt 
   assertEquals(await indexed(h, "archived"), []);
   h.close();
 });
+
+Deno.test("status index: cards carry the grant's recipient team; an index from before it is rebuilt", async () => {
+  const h = await harness({ env: { BOARD_CACHE_SECS: "0" } });
+  const grant = await h.db.initiatives.insert({
+    title: "A grant",
+    summary: "g",
+    status: "approved",
+    goalUsd: 10,
+    type: "grant",
+    recipientTeam: "Trail of Bits",
+  });
+  await h.db.initiatives.insert({
+    title: "An RFP",
+    summary: "r",
+    status: "approved",
+    goalUsd: 10,
+    type: "rfp",
+    recipientTeam: "ignored for an rfp",
+  });
+  // An index built before the team was a card field: its entries lack it, its mark is 1.
+  await h.db.initiatives.cards("approved");
+  const { recipientTeam: _, ...old } = (await h.kv.get<Record<string, unknown>>(
+    K.initiativeByStatus("approved", grant.id),
+  )).value!;
+  await h.kv.set(K.initiativeByStatus("approved", grant.id), old);
+  await h.kv.set(K.meta("rfp_by_status"), 1);
+
+  const board = await (await h.req("/api/board")).json() as {
+    cards: { initiative: { title: string; recipientTeam: string } }[];
+  };
+  const team = (t: string) => board.cards.find((c) => c.initiative.title === t)!.initiative;
+  assertEquals(team("A grant").recipientTeam, "Trail of Bits");
+  assertEquals(team("An RFP").recipientTeam, "");
+  h.close();
+});

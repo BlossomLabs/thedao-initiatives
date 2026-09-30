@@ -89,7 +89,7 @@ const haystack = (c: Card) =>
   [
     c.initiative.title,
     c.initiative.summary,
-    (c.initiative as { recipientTeam?: string }).recipientTeam ?? "",
+    c.initiative.recipientTeam ?? "",
     ...c.initiative.categories.map((s) => categoryOf(s)?.label ?? ""),
   ].join(" ").toLowerCase();
 

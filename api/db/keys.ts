@@ -25,6 +25,8 @@ export const K = {
   votes: (commentId: string) => ["vote", commentId] as const,
   profile: (addr: string) => ["profile", addr.toLowerCase()] as const,
   nick: (nick: string) => ["nick", nick.toLowerCase()] as const,
+  /** One account's watchlist (db/watchlists.ts): { ids, updatedAt }. */
+  watchlist: (addr: string) => ["watchlist", addr.toLowerCase()] as const,
   nonce: (nonce: string) => ["nonce", nonce] as const,
   session: (tokenHash: string) => ["session", tokenHash] as const,
   sessionsByAddr: (addr: string, tokenHash: string) =>

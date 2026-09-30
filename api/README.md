@@ -174,18 +174,23 @@ always pending: the form as JSON, backers become `pledged` rows), `GET /api/dona
 message, email?, page?, screenshot?}`, tagged and forwarded to `SUPPORT_URL`; 503 until
 it is set, 5 per hour per IP).
 
-Signed in: `GET /api/auth/me`, `POST /api/auth/logout`, `POST /api/auth/logout-all`,
-`POST /api/nickname`, `POST /api/pfp`, `POST /api/pfp/upload`, `POST /api/comments/:id/vote`,
-`POST /api/comments/:id/reply` (role-gated), `POST /api/uploads/logo` (multipart `image`, a backer
-logo pinned before submitting; returns `{cid, logoUrl}`, the CID is only accepted on a submission
-from the same wallet within a day), `POST /api/initiatives/:slug/revisions` (proposer or admin:
-title, summary, sections, milestones, links; legacy rows migrate to this format),
-`PATCH /api/initiatives/:slug` (proposer while pending, admin always: type, topup, goal,
-durationMonths, recipientTeam, recipientUrl, milestoneReviewer, discourseUrl, funders, contact;
-after approval a proposer gets 403). These two routes are the only way to edit an initiative's text
-and facts, for admins too: the editorial findings block an admin's save, and a rejected or archived
-initiative refuses text edits from everyone. An admin's revision is tagged `admin`, is audited, and
-does not count against the hourly revision cap.
+Signed in: `GET /api/auth/me` (includes `hasWatchlist`), `POST /api/auth/logout`,
+`POST /api/auth/logout-all`, `POST /api/nickname`, `POST /api/pfp`, `POST /api/pfp/upload`,
+`POST /api/comments/:id/vote`, `POST /api/comments/:id/reply` (role-gated), `POST /api/uploads/logo`
+(multipart `image`, a backer logo pinned before submitting; returns `{cid, logoUrl}`, the CID is
+only accepted on a submission from the same wallet within a day),
+`POST /api/initiatives/:slug/revisions` (proposer or admin: title, summary, sections, milestones,
+links; legacy rows migrate to this format), `PATCH /api/initiatives/:slug` (proposer while pending,
+admin always: type, topup, goal, durationMonths, recipientTeam, recipientUrl, milestoneReviewer,
+discourseUrl, funders, contact; after approval a proposer gets 403). These two routes are the only
+way to edit an initiative's text and facts, for admins too: the editorial findings block an admin's
+save, and a rejected or archived initiative refuses text edits from everyone. An admin's revision is
+tagged `admin`, is audited, and does not count against the hourly revision cap.
+
+The account watchlist: `GET /api/watchlist` (the account's `{ids}`, 404 when it has none),
+`POST /api/watchlist/import` (`{ids}`; adds the approved ones, creates the list, 200 at most),
+`PUT /api/watchlist/:id` and `DELETE /api/watchlist/:id` (add or remove one; 404 when the account
+has no list). The writes share a limit of 60 per minute per account.
 
 Admin (`/api/admin/...`): `GET dashboard`, `GET initiatives/:id`, `PATCH initiatives/:id` (the admin
 settings only: `sortRank`, `paidOutUsd`, `proposer`; the last two need recent authentication),

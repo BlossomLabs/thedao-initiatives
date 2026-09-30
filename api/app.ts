@@ -18,6 +18,7 @@ import { aiRoutes } from "./routes/ai.ts";
 import { supportRoutes } from "./routes/support.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { cspRoutes } from "./routes/csp.ts";
+import { watchlistRoutes } from "./routes/watchlist.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
 import { createFeedCache, FEED_PATHS, feedRoutes } from "./routes/feeds.ts";
@@ -79,7 +80,7 @@ export function createApp(
   const apiCors = cors({
     origin: deps.config.webOrigins,
     allowHeaders: ["Authorization", "Content-Type", "X-Session-Activity"],
-    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
     maxAge: 600,
   });
@@ -129,6 +130,7 @@ export function createApp(
   app.route("/api/initiatives", initiativeRoutes(deps));
   app.route("/api/donate", donateRoutes(deps));
   app.route("/api/uploads", uploadRoutes(deps));
+  app.route("/api/watchlist", watchlistRoutes(deps));
   app.route("/api", profileRoutes(deps));
   app.route("/api", commentRoutes(deps));
   app.route("/api", aiRoutes(deps));

@@ -39,6 +39,7 @@ export const BACKUP_PREFIXES = [
   "safe_balances",
   "safe_sync",
   "vote",
+  "watchlist",
 ] as const;
 
 export type BackupKey = (string | number)[];

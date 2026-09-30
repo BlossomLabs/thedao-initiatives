@@ -20,11 +20,15 @@ import { adminRoutes } from "./routes/admin.ts";
 import { cspRoutes } from "./routes/csp.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
+import { createFeedCache, FEED_PATHS, feedRoutes } from "./routes/feeds.ts";
 import { createSiteLock, type SiteLock } from "./lib/sitelock.ts";
 import { auditIntent, securityAudit } from "./services/audit.ts";
 import { maintenanceGate } from "./services/maintenance.ts";
 import { auditRoutes } from "./routes/audit.ts";
 import type { StaticSite } from "./site.ts";
+
+/** The public initiative Markdown file (not the admin -PRIVATE one): open CORS like the feeds. */
+const PUBLIC_MD = /^\/initiative\/[a-z0-9-]+\.md$/;
 
 /** One preview gate covers pages, assets and API routes. */
 export function siteLockFor(deps: Deps): SiteLock {
@@ -40,8 +44,14 @@ export function createApp(
   // These namespaces must never fall through to the SPA, even for unknown API routes.
   // /api/* also matches /api itself in Hono.
   const apiPaths = site
-    ? ["/api/*", "/healthz", ...Object.values(MARKDOWN_PATHS).map((p) => `/initiative${p}`)]
+    ? [
+      "/api/*",
+      "/healthz",
+      ...Object.values(MARKDOWN_PATHS).map((p) => `/initiative${p}`),
+      ...FEED_PATHS.filter((p) => !p.startsWith("/api/")),
+    ]
     : ["*"];
+  const feedPaths = new Set<string>(FEED_PATHS);
   const useApi = (...handlers: MiddlewareHandler<Vars>[]) => {
     for (const path of apiPaths) app.use(path, ...handlers);
   };
@@ -64,14 +74,18 @@ export function createApp(
   useApi(
     apiHeaders,
     securityAudit(deps),
-    cors({
-      origin: deps.config.webOrigins,
-      allowHeaders: ["Authorization", "Content-Type", "X-Session-Activity"],
-      allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-      credentials: true,
-      maxAge: 600,
-    }),
   );
+  // The feeds are open to any origin without credentials; everything else is not.
+  const apiCors = cors({
+    origin: deps.config.webOrigins,
+    allowHeaders: ["Authorization", "Content-Type", "X-Session-Activity"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    credentials: true,
+    maxAge: 600,
+  });
+  const feedCors = cors({ origin: "*", allowMethods: ["GET", "HEAD", "OPTIONS"], maxAge: 600 });
+  const isFeed = (path: string) => feedPaths.has(path) || PUBLIC_MD.test(path);
+  useApi((c, next) => (isFeed(c.req.path) ? feedCors : apiCors)(c, next));
   app.use("*", siteLock(lock));
   // A backup restore carries the whole database; it sets its own, larger cap.
   const limit = bodyLimit({
@@ -94,15 +108,21 @@ export function createApp(
   // Any write may change a card (pledge, donation, approval, pin), so the next
   // board read in this isolate is rebuilt; other isolates wait out their window.
   const boardCache = createBoardCache(deps);
+  const feedCache = createFeedCache(deps, boardCache);
   useApi(async (c, next) => {
     try {
       await next();
     } finally {
-      if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method)) boardCache.clear();
+      if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method)) {
+        boardCache.clear();
+        feedCache.clear();
+      }
     }
   });
 
   app.route("/healthz", healthRoutes(deps));
+  // Before /api/initiatives, so /api/initiatives.json is never read as a slug.
+  app.route("/", feedRoutes(feedCache));
   app.route("/api/auth", authRoutes(deps));
   app.route("/api/board", boardRoutes(deps, boardCache));
   app.route("/api/initiatives", initiativeRoutes(deps));
@@ -114,7 +134,7 @@ export function createApp(
   app.route("/api", supportRoutes(deps));
   app.route("/api/admin/audit", auditRoutes(deps));
   app.route("/api/admin", adminRoutes(deps));
-  app.route("/initiative", markdownRoutes(deps));
+  app.route("/initiative", markdownRoutes(deps, feedCache));
 
   if (site) {
     for (const path of apiPaths) app.all(path, (c) => c.notFound());

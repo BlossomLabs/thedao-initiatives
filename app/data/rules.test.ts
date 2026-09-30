@@ -35,7 +35,7 @@ test("panel choice: top-up beats grant, everything else is an RFP", () => {
 test.each(["rfp", "grant", "topup"] as const)(
   "the AI guide's %s process rules match the website",
   (kind) => {
-    const guide = readFileSync("public/llms.txt", "utf8").replace(/\r\n/g, "\n");
+    const guide = readFileSync("public/submit.md", "utf8").replace(/\r\n/g, "\n");
     const panel = RULES[kind];
     const section = guide.split(/^#{1,3} /m).find((block) => block.startsWith(`${panel.title}\n`));
     expect(section?.slice(panel.title.length).trim()).toBe(panel.body);

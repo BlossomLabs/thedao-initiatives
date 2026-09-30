@@ -228,7 +228,7 @@ function GuideCard({ glow }: { glow: boolean }) {
                 </>
               )
               : copied === "fail"
-              ? "Copy failed, open /llms.txt"
+              ? "Copy failed, open /submit.md"
               : (
                 <>
                   <Copy className="size-4" />Copy the guide

@@ -36,7 +36,11 @@ import { boardKey, useBoard } from "~/hooks/use-board";
 import { generateMeta } from "~/utils/meta";
 
 export function meta() {
-  return generateMeta({ url: "/" });
+  // Agents find the index from the page head; relative so a preview host serves its own.
+  return [
+    ...generateMeta({ url: "/" }),
+    { tagName: "link", rel: "alternate", type: "text/plain", title: "llms.txt", href: "/llms.txt" },
+  ];
 }
 
 const SUGGEST_LAST_FROM = 69;

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { headingKey, SECTIONS } from "./sections.ts";
 import { rowFromHeading } from "./milestones.ts";
 
-const guide = readFileSync("public/llms.txt", "utf8");
+const guide = readFileSync("public/submit.md", "utf8");
 
 test("every heading in the guide's RFP field list maps through the alias map, in form order", () => {
   const block = /An RFP, in this order[\s\S]*?```([\s\S]*?)```/.exec(guide) ??

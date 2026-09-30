@@ -99,7 +99,7 @@ export const PAGE_KEYS: PageKey[] = [
 
 export type AliasTarget = SectionKey | PageKey | "milestones";
 
-/** Heading aliases: the contract with the guide (llms.txt). Change the guide
+/** Heading aliases: the contract with the guide (public/submit.md). Change the guide
  * when you change this. */
 export const ALIASES: Record<string, AliasTarget> = {
   "title": "title",

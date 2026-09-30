@@ -101,6 +101,16 @@ it("restores an authorised wallet and reports when that settled", async () => {
   });
 });
 
+it("a restore the page asked for ends settled when wagmi stored nothing to reconnect", async () => {
+  // A signed-in visit asks for a restore before the island knows whether wagmi
+  // stored a connection; when it did not, the island must still settle it.
+  const { config, store } = setup();
+  store.setSnapshot({ status: "reconnecting", restoring: true });
+  const api = attach(store, config, { reconnect: false });
+  await api.restored;
+  expect(store.getSnapshot()).toMatchObject({ status: "disconnected", restoring: false });
+});
+
 it("builds the sign-in message and answers the connection", () => {
   const { config, store } = setup();
   const api = attach(store, config, { reconnect: false });

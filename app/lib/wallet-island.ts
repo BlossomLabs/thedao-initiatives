@@ -42,12 +42,14 @@ export function attach(
   watchConnection(config, { onChange: push });
   watchConnectors(config, { onChange: push });
   if (opts.reconnect) store.setSnapshot({ status: "reconnecting", restoring: true });
-  const restored = opts.reconnect
-    ? reconnect(config).then(() => {}, () => {}).then(() => {
+  // Settled either way: the page may have asked for a restore (a stored
+  // session) that wagmi's stored state then had nothing for, and the status
+  // it set must not outlive it.
+  const restored = (opts.reconnect ? reconnect(config).then(() => {}, () => {}) : Promise.resolve())
+    .then(() => {
       store.setSnapshot({ restoring: false });
       push();
-    })
-    : Promise.resolve();
+    });
   const api: WalletApi = {
     config,
     connect: (p) => connect(config, p),

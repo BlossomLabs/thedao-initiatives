@@ -1,11 +1,42 @@
 # Wallet connection and sign-in
 
-Wallet connection and SIWE authentication are separate states. Restoring a wallet, receiving an account event from another tab, or failing a signature does not grant a session and does not revoke wallet permissions. Signing in requires an explicit user action; protected actions still require a verified API session. Explicit sign-out ends the API session and disconnects the wallet. This prevents an idle tab from revoking the origin's MetaMask permissions while another tab is signing in.
+Wallet connection and SIWE authentication are separate states. Restoring a wallet, receiving an
+account event from another tab, or failing a signature does not grant a session and does not revoke
+wallet permissions. Signing in requires an explicit user action; protected actions still require a
+verified API session. Explicit sign-out ends the API session and disconnects the wallet. This
+prevents an idle tab from revoking the origin's MetaMask permissions while another tab is signing
+in.
 
-The SIWE message names chain 1 and the API verifies it there (EIP-1271 for smart accounts), so `signIn()` first asks a wallet that reports another chain to switch to Ethereum. Ambire keeps a chain per site and answers `personal_sign` with EIP-1193 code 4901 ("The Provider is not connected to the requested chain") while that chain is not one of its enabled networks; the switch request is what resets it. A refused switch ends the sign-in like a refused signature.
+The SIWE message names chain 1 and the API verifies it there (EIP-1271 for smart accounts), so
+`signIn()` first asks a wallet that reports another chain to switch to Ethereum. Ambire keeps a
+chain per site and answers `personal_sign` with EIP-1193 code 4901 ("The Provider is not connected
+to the requested chain") while that chain is not one of its enabled networks; the switch request is
+what resets it. A refused switch ends the sign-in like a refused signature.
 
 ## The wallet stack loads on demand
 
-wagmi, viem and the connectors are not part of a page's first load. They live in one lazily loaded module, the wallet island (`app/lib/wallet-island.ts`), and the page reads the wallet through a small store (`app/lib/wallet-store.ts`, `useWallet()` in `app/context/wallet.tsx`). There is no `WagmiProvider` in the tree; the island creates the wagmi config after hydration, mirrors its connection into the store and hands over the actions, which wait for the initial reconnect to settle so a click never races a restore.
+wagmi, viem and the connectors are not part of a page's first load. They live in one lazily loaded
+module, the wallet island (`app/lib/wallet-island.ts`), and the page reads the wallet through a
+small store (`app/lib/wallet-store.ts`, `useWallet()` in `app/context/wallet.tsx`). There is no
+`WagmiProvider` in the tree; the island creates the wagmi config after hydration, mirrors its
+connection into the store and hands over the actions, which wait for the initial reconnect to settle
+so a click never races a restore.
 
-The island is fetched right away only for a returning wallet user: a stored session record, or a current connection in wagmi's own `wagmi.store` entry (the session provider checks both on mount and shows `restoring` meanwhile). Everyone else gets it on their first wallet action: opening the wallet chooser, revealing a card's Donate panel (itself a lazy part behind a look-alike), signing in, or an admin Safe deploy. A sign-out while the island never loaded clears the API session and forgets wagmi's stored connection, so the next visit neither fetches the island nor restores a dead connection. A failed island download leaves the page disconnected, keeps a stored session, and is retried by the next wallet action.
+The island is fetched right away only for a returning wallet user: a stored session record, or a
+current connection in wagmi's own `wagmi.store` entry (the session provider checks both on mount and
+shows `restoring` meanwhile). Everyone else gets it on their first wallet action: opening the wallet
+chooser, revealing a card's Donate panel (itself a lazy part behind a look-alike), signing in, or an
+admin Safe deploy. A sign-out while the island never loaded clears the API session and forgets
+wagmi's stored connection, so the next visit neither fetches the island nor restores a dead
+connection. A failed island download leaves the page disconnected, keeps a stored session, and is
+retried by the next wallet action.
+
+To check that a build keeps the wallet stack off the first load, look for wallet code (not chunk
+names, which every chunk's preload list mentions) in the chunks `build/client/index.html` preloads:
+
+```sh
+cd build/client && grep -o 'href="/assets/[^"]*\.js"' index.html | sed 's/href="//;s/"$//' | sort -u |
+  while read f; do grep -lE 'eth_requestAccounts|watchConnection|createConfig\(' ".$f"; done
+```
+
+It should print nothing.

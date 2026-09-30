@@ -151,3 +151,19 @@ it("the app's island restores a wallet only when wagmi stored a connection", asy
     restoring: false,
   });
 });
+
+it("the app's island lets wagmi's stored state land before it attaches", async () => {
+  const { wagmiConfig } = await import("./wagmi");
+  const order: string[] = [];
+  const rehydrate = vi.fn(() => {
+    order.push("rehydrate");
+    return Promise.resolve();
+  });
+  (wagmiConfig._internal.store as unknown as { persist: unknown }).persist = { rehydrate };
+  const store = createWalletStore(() => Promise.reject(new Error("unused")));
+  store.subscribe(() => {
+    if (store.getSnapshot().attached && !order.includes("attached")) order.push("attached");
+  });
+  await install(store);
+  expect(order).toEqual(["rehydrate", "attached"]);
+});

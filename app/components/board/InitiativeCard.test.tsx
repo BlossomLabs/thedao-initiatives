@@ -1,7 +1,7 @@
 import { MemoryRouter } from "react-router";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import InitiativeCard from "./InitiativeCard";
+import InitiativeCard, { DonateStandIn } from "./InitiativeCard";
 import type { Card } from "~/lib/api-types";
 
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
@@ -119,4 +119,20 @@ it("fetches the Donate panel only when asked, showing a look-alike until it is i
   expect(screen.getByRole("button", { name: "Donate" })).toBeDisabled();
   expect(await screen.findByText("donate widget")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Donate" })).toBeNull();
+});
+
+it("the Donate look-alike links the terms and is not marked busy", () => {
+  // Rendered on its own: once a test has loaded the panel's chunk, React no
+  // longer shows the stand-in for the lazy part.
+  render(
+    <MemoryRouter>
+      <DonateStandIn />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("link", { name: "Donation Terms" })).toHaveAttribute(
+    "href",
+    "/donation-terms",
+  );
+  expect(screen.getByRole("button", { name: "Wallet" })).toBeDisabled();
+  expect(document.querySelector("[aria-busy]")).toBeNull();
 });

@@ -22,7 +22,7 @@ export default function WalletPicker({ open, onOpenChange }: {
   onOpenChange: (open: boolean) => void;
 }) {
   const connectors = useConnectors();
-  const { attached } = useWallet();
+  const { attached, failed } = useWallet();
   const { connect, cancelPairing, connecting, signingIn, restoring } = useSession();
   const { openEmailSignIn } = useEmailSignIn();
   const [view, setView] = useState<"choose" | "mobile">("choose");
@@ -185,7 +185,13 @@ export default function WalletPicker({ open, onOpenChange }: {
       {view === "choose"
         ? (
           <div className="flex flex-col gap-2">
-            {!attached && <p className="text-[14px] text-white/60">Loading wallets…</p>}
+            {!attached && (
+              <p className="text-[14px] text-white/60">
+                {failed
+                  ? "The wallet tools could not load. Check your connection and try again."
+                  : "Loading wallets…"}
+              </p>
+            )}
             {connectors.filter((c) =>
               c.id !== "walletConnect" && (c.id !== "injected" || injectedAvailable)
             ).map((c) => (

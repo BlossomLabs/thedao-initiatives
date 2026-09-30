@@ -69,5 +69,11 @@ export function attach(
  * and the wallet chooser. */
 export async function install(store: WalletStore): Promise<WalletApi> {
   const { wagmiConfig } = await import("./wagmi");
+  // Without wagmi's SSR mode the stored state lands asynchronously; let it,
+  // so the reconnect sees the stored connection rather than an empty one.
+  const persisted = wagmiConfig._internal.store as unknown as {
+    persist?: { rehydrate?: () => Promise<void> | void };
+  };
+  await persisted.persist?.rehydrate?.();
   return attach(store, wagmiConfig, { reconnect: hasStoredWagmiConnection() });
 }

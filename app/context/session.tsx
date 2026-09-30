@@ -260,9 +260,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refreshMe]);
 
-  // Validate the stored session once; drop it when the wallet moves. wagmi
-  // (ssr mode) mounts as "disconnected" and only then reconnects, so a
-  // disconnect counts as settled once a reconnect attempt has been seen.
+  // Validate the stored session once; drop it when the wallet moves. The
+  // wallet island starts "disconnected" and only then restores a connection,
+  // so a disconnect counts as settled once a wallet has been seen attached.
   // A record from before the cookie (it still carries the bearer) is first
   // exchanged for the cookie, so nobody signed in at the switch is signed out;
   // queries that already ran without the cookie are then refetched.
@@ -285,7 +285,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [refreshMe, clear, qc]);
 
   // A returning wallet user: fetch the wallet stack now so the connection is
-  // restored. Anyone else gets it on their first wallet action.
+  // restored. Anyone else gets it on their first wallet action, including a
+  // session that migrateLegacySession (above) produces after this mount.
   useEffect(() => {
     if (sessionRef.current || hasStoredWagmiConnection()) {
       void wallet.load({ restoring: true }).catch(() => {});

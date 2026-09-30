@@ -16,7 +16,7 @@ import { cn } from "~/lib/utils";
  * Top-bar wallet button. Disconnected: opens the shared wallet chooser;
  * connecting signs in with Ethereum in the same step. A connected wallet
  * without a session can retry signing in. Signed in: account menu with
- * name/picture, switch wallet, sign out.
+ * name/picture, sessions, sign out (to switch wallets: sign out, then connect).
  */
 export default function ConnectButton() {
   const { address, isConnected } = useWallet();

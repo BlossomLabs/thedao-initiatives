@@ -43,6 +43,7 @@ export function clearPrivateQueries(qc: QueryClient) {
     "sessions",
     "comments",
     "comments-mine",
+    "watchlist",
   ]);
   const filters = {
     predicate: (q: { queryKey: readonly unknown[] }) => roots.has(String(q.queryKey[0])),

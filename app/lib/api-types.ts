@@ -306,6 +306,8 @@ export interface Me {
   nickname: string | null;
   pfp: string;
   pfpUrl: string;
+  /** The account keeps a watchlist (the browser list can be moved to it). */
+  hasWatchlist?: boolean;
 }
 
 export interface Profile {

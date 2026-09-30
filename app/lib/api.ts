@@ -16,7 +16,7 @@ export class ApiError extends Error {
 }
 
 export interface ApiOptions {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   json?: unknown;
   form?: FormData;
   signal?: AbortSignal;

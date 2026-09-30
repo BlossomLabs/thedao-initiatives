@@ -44,6 +44,7 @@ vi.mock("~/hooks/use-board", () => ({
     isError: false,
   }),
 }));
+vi.mock("~/context/session", () => ({ useSession: () => ({ session: null, me: null }) }));
 vi.mock("~/components/board/Hero", () => ({ default: () => null }));
 vi.mock("~/components/board/PledgeBand", () => ({ default: () => null }));
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));

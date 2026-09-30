@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { environmentManager } from "@tanstack/react-query";
+import { environmentManager, notifyManager } from "@tanstack/react-query";
 import { MotionGlobalConfig } from "motion/react";
 
 // vitest runs under Deno here, and TanStack Query treats any runtime with a
@@ -11,3 +11,6 @@ environmentManager.setIsServer(() => false);
 // With animations skipped they mount and unmount in the same tick, so tests
 // can assert on a closed panel without waiting.
 MotionGlobalConfig.skipAnimations = true;
+
+// Deliver query updates synchronously so `act()` sees them without a timer tick.
+notifyManager.setScheduler((cb) => cb());

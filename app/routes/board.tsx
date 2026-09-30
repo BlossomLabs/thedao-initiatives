@@ -106,36 +106,45 @@ export default function Board() {
         </SectionHeading>
         {data?.flags.aiSearch && all.length > 0 && <AiSearch active={ai} onMatches={setMatches} />}
         {data && all.length > 0 && (
-          <FilterBar
-            view={shownView}
-            featured={featured}
-            watchlistCount={watchlist.ids.length}
-            onChange={setView}
-            counts={counts}
-            shown={cards.length}
-            total={all.length}
-            ai={ai}
-            onSort={onSort}
-            sheet={
-              <Suspense
-                fallback={
-                  <FilterSheetStandIn
+          <>
+            <FilterBar
+              view={shownView}
+              featured={featured}
+              watchlistCount={watchlist.ids.length}
+              onChange={setView}
+              counts={counts}
+              shown={cards.length}
+              total={all.length}
+              ai={ai}
+              onSort={onSort}
+              sheet={
+                <Suspense
+                  fallback={
+                    <FilterSheetStandIn
+                      cards={all}
+                      view={view}
+                      watched={watchlist.ids}
+                      onApply={setView}
+                    />
+                  }
+                >
+                  <FilterSheet
                     cards={all}
                     view={view}
                     watched={watchlist.ids}
                     onApply={setView}
                   />
-                }
-              >
-                <FilterSheet
-                  cards={all}
-                  view={view}
-                  watched={watchlist.ids}
-                  onApply={setView}
-                />
-              </Suspense>
-            }
-          />
+                </Suspense>
+              }
+            />
+            <p
+              className="m-0 mb-3 small text-dao-red empty:hidden"
+              role="status"
+              aria-live="polite"
+            >
+              {watchlist.error}
+            </p>
+          </>
         )}
         {isError && (
           <p className="alert">The board could not be loaded. Please try again in a moment.</p>

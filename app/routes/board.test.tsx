@@ -184,6 +184,9 @@ it("while the AI thinks, an empty keyword result says it is asking, not that not
   findMatches("tools that keep keys safe");
   expect(await screen.findByText("Asking AI for the best matches…")).toBeInTheDocument();
   expect(screen.queryByText(/No Initiatives match/)).toBeNull();
-  await act(async () => answer({ matches: ["b"] }));
+  await act(async () => {
+    answer({ matches: ["b"] });
+    await Promise.resolve();
+  });
   expect(await screen.findByText("AI pick")).toBeInTheDocument();
 });

@@ -8,12 +8,18 @@ const sponsor = (company: string, totalUsd: number, url = ""): Sponsor => ({
   logoUrl: "",
   url,
   totalUsd,
-  initiatives: [{ slug: "x", title: "X", amountUsd: totalUsd }],
 });
 
 it("renders nothing until someone has pledged", () => {
   expect(render(<Sponsors sponsors={[]} />).container.innerHTML).toBe("");
   expect(render(<Sponsors sponsors={undefined} />).container.innerHTML).toBe("");
+});
+
+it("holds the place with skeletons while the board loads", () => {
+  const { container } = render(<Sponsors loading />);
+  expect(screen.getByText("Top sponsors of security for Ethereum")).toBeTruthy();
+  expect(container.querySelector("[aria-busy]")?.childElementCount).toBe(5);
+  expect(screen.queryByRole("list")).toBeNull();
 });
 
 it("numbers the sponsors in order with whole-dollar totals, the leader inverted", () => {

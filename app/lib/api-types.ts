@@ -186,8 +186,6 @@ export interface Sponsor {
   logoUrl: string;
   url: string;
   totalUsd: number;
-  /** Biggest pledge first. */
-  initiatives: { slug: string; title: string; amountUsd: number }[];
 }
 
 export interface Board {

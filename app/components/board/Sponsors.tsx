@@ -1,20 +1,43 @@
 import SectionHeading from "~/components/layout/SectionHeading";
 import BackerLogo from "~/components/ui/BackerLogo";
+import Skeleton from "~/components/ui/Skeleton";
 import type { Sponsor } from "~/lib/api-types";
 import { cn } from "~/lib/utils";
 
+const GRID = "m-0 grid list-none grid-cols-2 gap-4 p-0 max-[640px]:grid-cols-1";
+
 /** "Top sponsors of security for Ethereum": the five biggest pledgers as a numbered
- * board, two to a row. The leader takes the first row alone, inverted to white. */
-export default function Sponsors({ sponsors }: { sponsors?: Sponsor[] }) {
-  if (!sponsors?.length) return null;
+ * board, two to a row. The leader takes the first row alone, inverted to white.
+ * While the board loads, five card-shaped skeletons hold the place so the rest of
+ * the page does not jump once the sponsors arrive. */
+export default function Sponsors(
+  { sponsors, loading }: { sponsors?: Sponsor[]; loading?: boolean },
+) {
+  if (!loading && !sponsors?.length) return null;
   return (
     <section className="mx-auto max-w-[1100px] px-6" aria-labelledby="sponsors">
       <SectionHeading id="sponsors" className="max-[640px]:text-center">
         Top sponsors of security for Ethereum
       </SectionHeading>
-      <ol className="m-0 grid list-none grid-cols-2 gap-4 p-0 max-[640px]:grid-cols-1">
-        {sponsors.map((s, i) => <Entry key={s.company} s={s} rank={i + 1} lead={i === 0} />)}
-      </ol>
+      {sponsors?.length
+        ? (
+          <ol className={GRID}>
+            {sponsors.map((s, i) => <Entry key={s.company} s={s} rank={i + 1} lead={i === 0} />)}
+          </ol>
+        )
+        : (
+          <div className={GRID} aria-busy="true">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <Skeleton
+                key={i}
+                className={cn(
+                  "h-[78px] rounded-2xl",
+                  i === 0 && "col-span-2 max-[640px]:col-span-1",
+                )}
+              />
+            ))}
+          </div>
+        )}
     </section>
   );
 }

@@ -39,8 +39,6 @@ export interface Sponsor {
   logoUrl: string;
   url: string;
   totalUsd: number;
-  /** Biggest pledge first. */
-  initiatives: { slug: string; title: string; amountUsd: number }[];
 }
 
 /** The leaderboard of pledgers across the published initiatives: withdrawn pledges
@@ -48,20 +46,17 @@ export interface Sponsor {
  * name. Biggest total first, then by name. */
 export function topSponsors(
   config: Deps["config"],
-  rows: { initiative: Initiative; pledges: Pledge[] }[],
+  rows: { pledges: Pledge[] }[],
   limit = 5,
 ): Sponsor[] {
-  const by = new Map<string, { pledges: Pledge[]; per: Map<string, number>; total: number }>();
-  const titles = new Map(rows.map((r) => [r.initiative.slug, r.initiative.title]));
-  for (const { initiative, pledges } of rows) {
+  const by = new Map<string, { pledges: Pledge[]; total: number }>();
+  for (const { pledges } of rows) {
     for (const p of pledges) {
       if (p.status === "withdrawn" || !(p.amountUsd > 0)) continue;
       const key = p.company.trim().replace(/\s+/g, " ").toLowerCase();
       if (!key) continue;
-      const s = by.get(key) ??
-        { pledges: [] as Pledge[], per: new Map<string, number>(), total: 0 };
+      const s = by.get(key) ?? { pledges: [] as Pledge[], total: 0 };
       s.pledges.push(p);
-      s.per.set(initiative.slug, (s.per.get(initiative.slug) ?? 0) + p.amountUsd);
       s.total += p.amountUsd;
       by.set(key, s);
     }
@@ -74,9 +69,6 @@ export function topSponsors(
         logoUrl: ipfsUrl(config, s.pledges.find((p) => p.logoCid)?.logoCid ?? ""),
         url: s.pledges.find((p) => p.url)?.url ?? "",
         totalUsd: s.total,
-        initiatives: [...s.per.entries()]
-          .sort((a, b) => b[1] - a[1])
-          .map(([slug, amountUsd]) => ({ slug, title: titles.get(slug) ?? slug, amountUsd })),
       };
     })
     .sort((a, b) => b.totalUsd - a.totalUsd || a.company.localeCompare(b.company))
@@ -167,10 +159,7 @@ async function buildBoard(deps: Deps, refresh: boolean) {
   return {
     refreshDue: !chainStateFresh(state, deps.now()),
     cards,
-    sponsors: topSponsors(
-      config,
-      initiatives.map((initiative, i) => ({ initiative, pledges: pledges[i] })),
-    ),
+    sponsors: topSponsors(config, pledges.map((p) => ({ pledges: p }))),
     totals: {
       count: cards.length,
       goal: cards.reduce((n, x) => n + x.initiative.goalUsd, 0),

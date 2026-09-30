@@ -91,7 +91,7 @@ export default function Board() {
   return (
     <>
       <Hero raised={data?.totals.raised} />
-      <Sponsors sponsors={data?.sponsors} />
+      <Sponsors sponsors={data?.sponsors} loading={isLoading} />
       <PageMain>
         <SectionHeading id="rfps" className="max-[640px]:text-center">
           Security initiatives looking for funding

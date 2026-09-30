@@ -21,17 +21,9 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import {
-  type Connector,
-  useAccount,
-  useConfig,
-  useConnect,
-  useDisconnect,
-  useSignMessage,
-} from "wagmi";
-import { getConnection, switchChain } from "wagmi/actions";
-import { createSiweMessage } from "viem/siwe";
+import type { Connector } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
+import { useWallet, useWalletStore } from "./wallet";
 import {
   clearPrivateQueries,
   deletePrivateDraft,
@@ -156,11 +148,10 @@ const useHydrated = () => useSyncExternalStore(noop, () => true, () => false);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const qc = useQueryClient();
-  const config = useConfig();
-  const { address, status, connector } = useAccount();
-  const { connectAsync } = useConnect();
-  const { disconnectAsync } = useDisconnect();
-  const { signMessageAsync } = useSignMessage();
+  // The wallet stack is an island loaded on demand (lib/wallet-store.ts);
+  // `config` is the wagmi config once it is attached.
+  const wallet = useWalletStore();
+  const { address, status, connector, config, attached, restoring } = useWallet();
   const [stored, setSession] = useState<SessionInfo | null>(
     () => (typeof localStorage === "undefined" ? null : load()),
   );
@@ -311,7 +302,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [qc, refreshMe]);
   const walletLive = useRef(false);
   useEffect(() => {
-    if (status !== "disconnected") walletLive.current = true;
+    // Only a wallet that was really there counts: an island whose download
+    // failed goes "reconnecting" → "disconnected" without one.
+    if (attached && status !== "disconnected") walletLive.current = true;
     const s = sessionRef.current;
     if (!s) return;
     if (
@@ -320,15 +313,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     ) {
       drop();
     }
-  }, [address, status, drop]);
+  }, [address, status, attached, drop]);
 
   // Pairings dropped for another method (cancelPairing). WalletConnect cannot
   // abort one, so its wallet can still approve it later, and wagmi then makes
   // it the current connection. Undo that before React renders, so the chosen
   // wallet and its session stay in place, then end the stray session.
   const dropped = useRef(new Set<string>());
-  useEffect(() =>
-    config.subscribe((state) => state.current, (current, previous) => {
+  useEffect(() => {
+    if (!config) return;
+    return config.subscribe((state) => state.current, (current, previous) => {
       if (!current || !dropped.current.delete(current)) return;
       const stray = config.state.connections.get(current)?.connector;
       config.setState((x) => {
@@ -346,7 +340,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       stray.emitter.on("connect", events.connect);
       void (stray.id === "walletConnect" ? endWalletConnectSession(stray) : stray.disconnect())
         .catch(() => {});
-    }), [config]);
+    });
+  }, [config]);
 
   const signIn = useCallback(
     (
@@ -377,8 +372,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         stop(e);
       };
       const attempt = async (): Promise<SessionInfo> => {
+        const island = await wallet.load();
         const { nonce } = await api<{ nonce: string }>("/api/auth/nonce");
-        const message = createSiweMessage({
+        const message = island.createSiweMessage({
           domain: globalThis.location.host,
           address: account,
           uri: globalThis.location.origin,
@@ -395,9 +391,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         // request is what resets it.
         const onChain = signingConnector
           ? await signingConnector.getChainId()
-          : getConnection(config).chainId;
-        if (onChain !== 1) await switchChain(config, { chainId: 1, connector: signingConnector });
-        const signature = await signMessageAsync({ message, account, connector: signingConnector });
+          : island.getConnection().chainId;
+        if (onChain !== 1) await island.switchChain({ chainId: 1, connector: signingConnector });
+        const signature = await island.signMessage({
+          message,
+          account,
+          connector: signingConnector,
+        });
         stillActive();
         // cookie: true -> the token comes back as an HttpOnly cookie, not in the body.
         return await api<SessionInfo>("/api/auth/verify", {
@@ -464,7 +464,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       signingInRef.current = entry;
       return promise;
     },
-    [address, connector, config, signMessageAsync, refreshMe, qc],
+    [address, connector, wallet, refreshMe, qc],
   );
 
   /** Ends a wallet connection. wagmi keeps a connection whose disconnect()
@@ -476,10 +476,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       } catch { /* nothing stored */ }
     } else {
       try {
-        await disconnectAsync({ connector: c });
+        await wallet.disconnect({ connector: c });
         return;
       } catch { /* dropped below */ }
     }
+    const config = wallet.getSnapshot().config;
+    if (!config) return;
     const { events } = config._internal;
     c.emitter.off("change", events.change);
     c.emitter.off("disconnect", events.disconnect);
@@ -492,7 +494,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const current = connections.keys().next().value ?? null;
       return { ...x, connections, current, status: current ? "connected" : "disconnected" };
     });
-  }, [config, disconnectAsync]);
+  }, [wallet]);
 
   const endSession = useCallback(async () => {
     const s = sessionRef.current;
@@ -505,10 +507,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // A wallet picked in the chooser while another was still connected (a
     // restored one without a session) leaves both in wagmi, which falls back
     // to the older one when the current one disconnects. End every connection.
-    for (const { connector } of [...config.state.connections.values()]) {
-      await endConnection(connector);
+    const config = wallet.getSnapshot().config;
+    if (config) {
+      for (const { connector } of [...config.state.connections.values()]) {
+        await endConnection(connector);
+      }
+    } else {
+      // No wallet was connected in this tab; only wagmi's stored connection
+      // could bring one back on the next visit.
+      wallet.forgetStoredConnection();
     }
-  }, [clear, config, endConnection]);
+  }, [clear, wallet, endConnection]);
 
   const chooseLogout = useCallback((choice: DraftLogoutChoice) => {
     logoutPrompt?.resolve(choice);
@@ -545,7 +554,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [endSession]);
 
   const connect = useCallback((c: Connector): Promise<void> => {
-    if (config.state.status === "reconnecting") {
+    if (wallet.getSnapshot().status === "reconnecting") {
       return Promise.reject(new Error("Wait until your wallet connection is restored."));
     }
     const active = connectingRef.current;
@@ -572,6 +581,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       },
     };
     const run = async () => {
+      const { config } = await wallet.load();
       // wagmi restores a WalletConnect session from storage without asking the
       // wallet, which may have dropped it. SIWE over it can hang unseen on a
       // phone, and only a new pairing gives the QR code and the deep links.
@@ -587,7 +597,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         : undefined;
       const { accounts } = current?.accounts.length
         ? current
-        : await connectAsync({ connector: c, chainId: 1 });
+        : await wallet.connect({ connector: c, chainId: 1 });
       // Dropped while pairing: the effect above has already undone it.
       if (connectingRef.current !== entry) throw new Error("Connection cancelled.");
       entry.pairing = false;
@@ -608,7 +618,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setConnecting(false);
     });
     return entry.promise;
-  }, [config, connectAsync, endConnection, signIn]);
+  }, [wallet, endConnection, signIn]);
 
   const cancelPairing = useCallback(() => {
     const active = connectingRef.current;
@@ -648,7 +658,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       me,
       signingIn,
       connecting,
-      restoring: status === "reconnecting",
+      restoring: restoring || status === "reconnecting",
       address,
       connect,
       cancelPairing,
@@ -664,6 +674,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       signingIn,
       connecting,
       status,
+      restoring,
       address,
       connect,
       cancelPairing,

@@ -3,14 +3,24 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, startTransition } from "react";
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { createConfig, http, WagmiProvider } from "wagmi";
+import { createConfig, http } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { connect as connectWallet } from "wagmi/actions";
 import { mainnet } from "viem/chains";
 import type { EIP1193Provider } from "viem";
 import { api, ApiError } from "~/lib/api";
 import { SESSION_KEY } from "~/lib/session-migration";
+import { attach } from "~/lib/wallet-island";
+import { createWalletStore } from "~/lib/wallet-store";
 import { SessionProvider, useSession } from "./session";
+import { WalletStoreProvider } from "./wallet";
+
+/** The island attached to a test config in place of its download. */
+const islandFor = (config: ReturnType<typeof createConfig>, reconnect: boolean) => {
+  const store = createWalletStore(() => Promise.reject(new Error("attached directly")));
+  attach(store, config, { reconnect });
+  return store;
+};
 
 vi.mock("~/lib/api", async (original) => ({
   ...await original<typeof import("~/lib/api")>(),
@@ -57,15 +67,16 @@ function setup(sharedProvider?: EIP1193Provider, reconnectOnMount = false) {
     multiInjectedProviderDiscovery: false,
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const store = islandFor(config, reconnectOnMount);
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <WagmiProvider config={config} reconnectOnMount={reconnectOnMount}>
+    <WalletStoreProvider store={store}>
       <QueryClientProvider client={queryClient}>
         <SessionProvider>{children}</SessionProvider>
       </QueryClientProvider>
-    </WagmiProvider>
+    </WalletStoreProvider>
   );
   const hook = renderHook(() => useSession(), { wrapper });
-  return { ...hook, config, request, signature, queryClient };
+  return { ...hook, config, request, signature, queryClient, store };
 }
 
 beforeEach(() => {
@@ -557,13 +568,14 @@ it("signs out of every connected wallet, so an earlier one does not take over", 
     multiInjectedProviderDiscovery: false,
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const store = islandFor(config, false);
   const { result } = renderHook(() => useSession(), {
     wrapper: ({ children }: { children: ReactNode }) => (
-      <WagmiProvider config={config} reconnectOnMount={false}>
+      <WalletStoreProvider store={store}>
         <QueryClientProvider client={queryClient}>
           <SessionProvider>{children}</SessionProvider>
         </QueryClientProvider>
-      </WagmiProvider>
+      </WalletStoreProvider>
     ),
   });
   await act(() => connectWallet(config, { connector: config.connectors[0] }));

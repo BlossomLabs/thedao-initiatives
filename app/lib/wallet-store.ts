@@ -150,6 +150,7 @@ export function createWalletStore(
     load,
     whenReady: () => ready,
     attach(next) {
+      pending = Promise.resolve(next);
       setSnapshot({ attached: true, config: next.config, failed: null });
       next.restored.catch(() => {}).then(() => setSnapshot({ restoring: false }));
       resolveReady(next);

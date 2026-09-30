@@ -164,3 +164,11 @@ it("forgetting the stored connection removes only wagmi's record", () => {
   expect(localStorage.getItem("wagmi.store")).toBeNull();
   expect(localStorage.getItem("wagmi.recentConnectorId")).toBe('"injected"');
 });
+
+it("a directly attached island satisfies later loads without the loader", async () => {
+  const island = fakeIsland();
+  const store = createWalletStore(island.loader);
+  store.attach(island.api);
+  await expect(store.load()).resolves.toBe(island.api);
+  expect(island.loader).not.toHaveBeenCalled();
+});

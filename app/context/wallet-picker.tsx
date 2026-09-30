@@ -23,8 +23,8 @@ export function WalletPickerProvider({ children }: { children: React.ReactNode }
     <Ctx.Provider value={value}>
       {children}
       {loaded && (
-        // Keep an in-flight pairing alive when the dialog is hidden. Reopening
-        // shows that same request instead of creating competing sessions.
+        // Stays mounted once opened: closing drops a WalletConnect request, but a
+        // browser wallet's stays open in its popup, and reopening shows it.
         <WalletPicker open={open} onOpenChange={setOpen} />
       )}
     </Ctx.Provider>

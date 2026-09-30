@@ -207,6 +207,13 @@ export default function WalletPicker({ open, onOpenChange }: {
   const visible = (wallets ?? []).filter((w) =>
     w.name.toLowerCase().includes(query.trim().toLowerCase())
   );
+  // The QR code and the app links live only in this modal, so closing it
+  // drops an unanswered WalletConnect request. A browser wallet's request
+  // stays: its own popup is still open and cannot be withdrawn from here.
+  const close = (next: boolean) => {
+    if (!next && switchable) leavePairing();
+    onOpenChange(next);
+  };
   const selectedLink = selected
     ? walletDeepLink(selected, signingIn ? undefined : uri ?? undefined)
     : null;
@@ -214,7 +221,7 @@ export default function WalletPicker({ open, onOpenChange }: {
   return (
     <Dialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={close}
       title={view === "choose" ? "Connect wallet" : "Connect your mobile wallet"}
       description={view === "choose"
         ? "Use a wallet in this browser, or connect from a wallet app."
@@ -484,14 +491,10 @@ export default function WalletPicker({ open, onOpenChange }: {
           Restoring your wallet connection from your last visit…
         </p>
       )}
-      {busy && !restoring && (
-        <p className="m-0 text-xs text-muted">
-          {view !== "choose"
-            ? ""
-            : switchable
-            ? "Your QR connection is still waiting. Continue it above, or pick another method to drop it. "
-            : "Check your wallet to finish the pending request. "}Closing this window keeps the
-          request open. Use Connect wallet to return.
+      {/* Every row is disabled while a browser wallet's request is open. */}
+      {busy && !restoring && !switchable && view === "choose" && (
+        <p className="m-0 text-center text-xs text-muted">
+          Check your wallet to finish the pending request.
         </p>
       )}
     </Dialog>

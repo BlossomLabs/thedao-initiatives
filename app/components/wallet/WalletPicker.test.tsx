@@ -113,20 +113,39 @@ test("offers different app links from one pairing, search, and an unrestricted Q
   expect(fetched).toHaveBeenCalledExactlyOnceWith("/wallets.json", expect.anything());
 });
 
-test("closing and reopening retains the pairing, and cleanup removes its listener", async () => {
-  const { rerender, onOpenChange, unmount } = await pairing();
+test("closing cancels an unscanned pairing, and reopening offers the methods again", async () => {
+  const { rerender, onOpenChange } = await pairing();
   ready();
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  expect(mocks.cancelPairing).toHaveBeenCalledTimes(1);
   expect(onOpenChange).toHaveBeenCalledWith(false);
+  expect(listeners.size).toBe(0);
   rerender(<WalletPicker open={false} onOpenChange={onOpenChange} />);
   rerender(<WalletPicker open onOpenChange={onOpenChange} />);
-  expect(screen.getByRole("link", { name: "Rainbow" })).toHaveAttribute(
-    "href",
-    expect.stringContaining("rainbow://wc"),
-  );
-  expect(mocks.connect).toHaveBeenCalledTimes(1);
-  unmount();
-  expect(listeners.size).toBe(0);
+  expect(screen.getByRole("button", { name: /Mobile wallets \/ QR code/ })).toBeEnabled();
+  // The dropped pairing settling later shows no error.
+  await act(async () => {
+    reject(new Error("Connection request reset"));
+    await pending.catch(() => {});
+  });
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+test("closing keeps a browser wallet's request, which its own popup still shows", async () => {
+  const onOpenChange = vi.fn();
+  render(<WalletPicker open onOpenChange={onOpenChange} />);
+  fireEvent.click(screen.getByRole("button", { name: "Rabby" }));
+  expect(mocks.connect).toHaveBeenCalledWith(injected);
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  expect(mocks.cancelPairing).not.toHaveBeenCalled();
+  expect(onOpenChange).toHaveBeenCalledWith(false);
+});
+
+it("asks to check the wallet only while a browser wallet's request disables every row", () => {
+  mocks.connecting = true;
+  render(<WalletPicker open onOpenChange={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Email" })).toBeDisabled();
+  expect(screen.getByText("Check your wallet to finish the pending request.")).toBeInTheDocument();
 });
 
 test("keeps the wallet accessible during SIWE and closes only after sign-in finishes", async () => {
@@ -205,7 +224,7 @@ test("a pending QR pairing leaves the other methods available, and picking one d
   fireEvent.click(screen.getByRole("button", { name: /All connection methods/ }));
   expect(screen.getByRole("button", { name: /Continue wallet connection/ })).toBeEnabled();
   expect(screen.getByRole("button", { name: "Email" })).toBeEnabled();
-  expect(screen.getByText(/pick another method to drop it/)).toBeInTheDocument();
+  expect(screen.queryByText(/Check your wallet/)).toBeNull();
   mocks.connect.mockImplementation(() => new Promise(() => {}));
   fireEvent.click(screen.getByRole("button", { name: "Rabby" }));
   expect(mocks.cancelPairing).toHaveBeenCalledTimes(1);

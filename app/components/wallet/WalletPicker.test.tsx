@@ -18,7 +18,7 @@ vi.mock(
   () => ({ useEmailSignIn: () => ({ openEmailSignIn: mocks.email }) }),
 );
 vi.mock("~/hooks/use-connectors", () => ({ useConnectors: () => mocks.connectors }));
-vi.mock("~/lib/privy", () => ({ PRIVY_CONNECTOR_ID: "privy" }));
+vi.mock("~/lib/privy-store", () => ({ PRIVY_CONNECTOR_ID: "privy" }));
 
 const uri = "wc:test-topic@2?relay-protocol=irn&symKey=abc123";
 type Message = { type: string; data?: unknown };

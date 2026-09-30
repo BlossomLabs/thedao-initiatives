@@ -9,7 +9,7 @@ import { PrivyProvider, usePrivy, useWallets } from "@privy-io/react-auth";
 import type { EIP1193Provider } from "viem";
 import { mainnet } from "viem/chains";
 import EmailSignInDialog from "~/components/wallet/EmailSignInDialog";
-import { PRIVY_APP_ID, privyStore } from "~/lib/privy";
+import { PRIVY_APP_ID, privyStore } from "~/lib/privy-store";
 import { SITE_LOGO, SITE_URL } from "~/data/site";
 
 /** Mirrors Privy's session and embedded wallet into `privyStore`. */

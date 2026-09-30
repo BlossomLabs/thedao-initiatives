@@ -6,7 +6,7 @@ import { Button } from "~/components/ui/Button";
 import { Field, Input, Label } from "~/components/ui/Field";
 import { InputOTP } from "~/components/ui/InputOTP";
 import { useSession } from "~/context/session";
-import { PRIVY_CONNECTOR_ID, privyStore } from "~/lib/privy";
+import { PRIVY_CONNECTOR_ID, privyStore } from "~/lib/privy-store";
 import { walletErrorMessage } from "~/lib/donate";
 
 type Step = "email" | "code" | "finishing";

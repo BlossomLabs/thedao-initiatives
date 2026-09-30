@@ -21,7 +21,7 @@ import {
 import { errorMessage } from "~/lib/api";
 import { useDonation } from "./useDonation";
 import Reveal from "~/components/ui/Reveal";
-import { WALLETCONNECT_PROJECT_ID } from "~/lib/wagmi";
+import { WALLETCONNECT_PROJECT_ID } from "~/lib/wallet-env";
 
 const CHIPS = ["50", "500", "5000", "50000"];
 type Method = "wallet" | "exchange";

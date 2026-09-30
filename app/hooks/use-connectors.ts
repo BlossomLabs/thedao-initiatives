@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { type Connector, useConnect } from "wagmi";
-import { MOCK_WALLET } from "~/lib/wagmi";
+import { MOCK_WALLET } from "~/lib/wallet-env";
 
 /**
  * Connectors worth offering: the dev mock only when configured, and the

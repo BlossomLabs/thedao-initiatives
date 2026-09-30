@@ -7,7 +7,7 @@ import { useSession } from "~/context/session";
 import { useEmailSignIn } from "~/context/email-sign-in";
 import { useConnectors } from "~/hooks/use-connectors";
 import { walletErrorMessage } from "~/lib/donate";
-import { PRIVY_CONNECTOR_ID } from "~/lib/privy";
+import { PRIVY_CONNECTOR_ID } from "~/lib/privy-store";
 import { type MobileWallet, normalizeWallets, walletDeepLink } from "~/lib/mobile-wallets";
 import { cn } from "~/lib/utils";
 

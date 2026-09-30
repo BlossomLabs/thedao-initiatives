@@ -9,7 +9,7 @@ const mock = vi.hoisted(() => ({
   setStatus: vi.fn(),
 }));
 vi.mock("wagmi", () => ({ useAccount: () => ({}) }));
-vi.mock("~/lib/wagmi", () => ({ WALLETCONNECT_PROJECT_ID: "" }));
+vi.mock("~/lib/wallet-env", () => ({ WALLETCONNECT_PROJECT_ID: "" }));
 const params = vi.hoisted(() => ({
   enabled: true,
   tokens: { USDC: { address: "token", decimals: 6 } },

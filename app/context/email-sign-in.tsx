@@ -16,7 +16,7 @@ import {
   useState,
 } from "react";
 import { Dialog } from "~/components/ui/Dialog";
-import { PRIVY_APP_ID, privyStore, recentConnectorIsPrivy } from "~/lib/privy";
+import { PRIVY_APP_ID, privyStore, recentConnectorIsPrivy } from "~/lib/privy-store";
 
 const PrivyIsland = lazy(() => import("./privy"));
 

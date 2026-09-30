@@ -11,6 +11,7 @@ import type { ReadOptions } from "./keys.ts";
 import { metaRepo } from "./meta.ts";
 import { termsRepo } from "./terms.ts";
 import { cardsRepo } from "./cards.ts";
+import { snapshotsRepo } from "./snapshots.ts";
 
 export type * from "./types.ts";
 
@@ -43,6 +44,7 @@ export function createDb(
     profiles: profilesRepo(kv, now),
     sessions: sessionsRepo(kv, now),
     meta: metaRepo(kv, now, read),
+    snapshots: snapshotsRepo(kv, now, read),
     terms: termsRepo(kv, now),
     rateLimit: rateLimiter(kv, now, opts),
     /** Ledger-only totals (pledges + confirmed donation rows). The pages use

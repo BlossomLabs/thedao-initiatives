@@ -349,6 +349,15 @@ and left out of backups:
 `deno task bench` measures the board with both in place; `api/tests/kv-depth.test.ts` pins the round
 trips.
 
+The agent feeds (`/llms.txt`, `/llms-full.txt`, `/api/initiatives.json`, the facts in each
+`/initiative/<slug>.md`) are built from that board plus every approved row's text, so a build is the
+board's read wave again. They are served for 5 minutes (`FEED_TTL_SECS` in `api/routes/feeds.ts`,
+also their `max-age`) from the isolate's memory, else from a gzipped copy in KV under
+`["snapshot", "feed", origin]` that any isolate may have stored (`api/db/snapshots.ts`, chunked
+under the 64 KiB value cap, not in backups), and built only when neither exists. Any write request
+drops the memory in its isolate and the KV copy for everyone; another isolate's memory can be up to
+5 minutes behind.
+
 ## Scripts
 
 - `ADMIN_PRIVATE_KEY=0x… deno task login` — prints a bearer token (dev wallet whose address is in

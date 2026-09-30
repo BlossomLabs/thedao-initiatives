@@ -1,13 +1,14 @@
 # Contributing
 
-## The submission form and llms.txt stay in sync
+## The submission form and submit.md stay in sync
 
 Any change to the initiative submission form (fields added, removed, renamed,
-or requirements changed) MUST update `public/llms.txt` in the same pull request, so
+or requirements changed) MUST update `public/submit.md` in the same pull request, so
 the AI drafting guide always matches the real form. The form is the source of
 truth.
 
-`public/llms.txt` is served as-is at `GET /llms.txt` and bundled into the
+`public/submit.md` is served as-is at `GET /submit.md` (`/llms.txt` is the generated
+index of approved initiatives) and bundled into the
 submit form. Its "Step 3: Deliver the form fields plus the scorecard"
 section lists every form field in the form's top-to-bottom order with the same
 required flags. When you touch the form in `app/components/initiative-form/`,

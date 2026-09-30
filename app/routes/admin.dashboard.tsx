@@ -1,8 +1,8 @@
 import { useAdminApi } from "~/hooks/use-admin-api";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router";
-import { Bell, Search } from "lucide-react";
+import { Link, useSearchParams } from "react-router";
+import { Bell } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
 import DashboardSkeleton from "~/components/layout/DashboardSkeleton";
 import Crumbs from "~/components/layout/Crumbs";
@@ -14,30 +14,18 @@ import { useSelection } from "~/hooks/use-selection";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { CategoryTag } from "~/components/ui/CategoryTag";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/Select";
-import { CATEGORIES } from "~/lib/categories";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { sessionKey, useSession } from "~/context/session";
 import { api, errorMessage } from "~/lib/api";
 import type { AdminComment, AdminDashboard } from "~/lib/api-types";
-import { approvedCounts, filterAdminRows } from "~/lib/admin-rows";
+import { adminFacetCounts, approvedCounts, filterAdminRows } from "~/lib/admin-rows";
+import { parseAdminQuery, setQualifier, UNTAGGED } from "~/lib/admin-query";
+import AdminFilters from "~/components/admin/AdminFilters";
 import TypeGlyph from "~/components/board/filters/TypeGlyph";
 import { dt, plural, shortAddr, truncate, usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
 
 const dashKey = ["admin", "dashboard"] as const;
-
-const CAT_FILTER_ITEMS = [
-  { value: "all", label: "All categories" },
-  { value: "untagged", label: "Untagged" },
-  ...CATEGORIES.map((c) => ({ value: c.slug as string, label: c.label as string })),
-];
 
 function CommentCell({ c }: { c: AdminComment }) {
   return (
@@ -84,11 +72,19 @@ export default function Dashboard() {
   const heldIds = useMemo(() => (data?.held ?? []).map((c) => c.id), [data?.held]);
   const reportedIds = useMemo(() => (data?.reported ?? []).map((c) => c.id), [data?.reported]);
   // "all", "untagged" or a category slug.
-  const [catFilter, setCatFilter] = useState("all");
-  const [search, setSearch] = useState("");
+  // One query for the list (`type:grant status:pending First QA`), kept in the URL.
+  const [params, setParams] = useSearchParams();
+  const q = params.get("q") ?? "";
+  const setQ = (next: string) =>
+    setParams(next.trim() ? { q: next } : {}, { replace: true, preventScrollReset: true });
+  const parsed = useMemo(() => parseAdminQuery(q), [q]);
   const rows = useMemo(
-    () => filterAdminRows(data?.rows ?? [], catFilter, search),
-    [data?.rows, catFilter, search],
+    () => filterAdminRows(data?.rows ?? [], parsed.query),
+    [data?.rows, parsed],
+  );
+  const facetCounts = useMemo(
+    () => adminFacetCounts(data?.rows ?? [], parsed.query),
+    [data?.rows, parsed],
   );
   const counts = approvedCounts(data?.rows ?? []);
   const rowIds = useMemo(() => rows.map((r) => r.initiative.id), [rows]);
@@ -462,41 +458,26 @@ export default function Dashboard() {
       </div>
 
       <SectionHeading>All initiatives</SectionHeading>
-      <div className="mb-3 flex flex-wrap items-center gap-2.5">
-        <label className="relative min-w-[240px] flex-1">
-          <span className="sr-only">Search by project or contact</span>
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/40"
-            aria-hidden="true"
-          />
-          <input
-            type="search"
-            className="field min-h-[38px] py-1.5 pl-9 text-[13px]"
-            placeholder="Search project or contact"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </label>
-        <Select
-          value={catFilter}
-          items={CAT_FILTER_ITEMS}
-          onValueChange={(v) => setCatFilter(String(v))}
-        >
-          <SelectTrigger size="sm" aria-label="Category" className="min-h-[38px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CAT_FILTER_ITEMS.map((c) => (
-              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="small dim">
-          {rows.length} of {data.rows.length}
-          {" · "}
-          {data.rows.filter((x) => !x.initiative.categories.length).length} untagged
-        </span>
-      </div>
+      <AdminFilters
+        q={q}
+        query={parsed.query}
+        problems={parsed.problems}
+        counts={facetCounts}
+        onChange={setQ}
+        aside={
+          <span className="small dim tnum">
+            {rows.length} of {data.rows.length}
+            {" · "}
+            <button
+              type="button"
+              className="cursor-pointer border-0 bg-transparent p-0 text-inherit underline decoration-white/25 underline-offset-2 hover:text-white"
+              onClick={() => setQ(setQualifier(q, "cat", [UNTAGGED]))}
+            >
+              {data.rows.filter((x) => !x.initiative.categories.length).length} untagged
+            </button>
+          </span>
+        }
+      />
       <div className="tblbox">
         <BulkBar
           selection={rowSel}
@@ -537,12 +518,9 @@ export default function Dashboard() {
                   <button
                     type="button"
                     className="cursor-pointer border-0 bg-transparent p-0 text-dao-green underline"
-                    onClick={() => {
-                      setSearch("");
-                      setCatFilter("all");
-                    }}
+                    onClick={() => setQ("")}
                   >
-                    Clear search and category
+                    Clear the search
                   </button>
                 </td>
               </tr>

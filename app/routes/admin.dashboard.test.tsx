@@ -16,9 +16,9 @@ vi.mock("~/lib/api", async (original) => ({
 vi.mock("~/hooks/use-site-settings", () => ({ useSiteSettings: () => ({ data: undefined }) }));
 vi.mock("~/components/admin/SyncContent", () => ({ default: () => null }));
 vi.mock("~/components/admin/Admins", () => ({ default: () => null }));
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { structuredRow } from "../../test/fixtures";
 import type { AdminDashboard, AdminInitiative } from "~/lib/api-types";
@@ -83,14 +83,21 @@ beforeEach(() => {
   );
 });
 
-const mount = () =>
+const where = { search: "" };
+function Location() {
+  where.search = useLocation().search;
+  return null;
+}
+const mount = (url = "/admin") =>
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <Dashboard />
+        <Location />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+const box = () => screen.findByRole("searchbox", { name: "Search by project or contact" });
 
 it("the first status card counts the approved initiatives by type, as on the board", async () => {
   mount();
@@ -116,8 +123,61 @@ it("when nothing matches, the table says so and one click clears the search", as
   const box = await screen.findByRole("searchbox", { name: "Search by project or contact" });
   fireEvent.change(box, { target: { value: "nothing like this" } });
   expect(screen.getByText(/No initiatives match\./)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Clear search and category" }));
+  fireEvent.click(screen.getByRole("button", { name: "Clear the search" }));
   expect(box).toHaveValue("");
   expect(screen.getByText("Echidna fuzzing")).toBeInTheDocument();
   expect(screen.getByText(/4 of 4/)).toBeInTheDocument();
+});
+
+it("the user's example: type:grant status:pending First QA", async () => {
+  mount();
+  fireEvent.change(await box(), { target: { value: "type:grant status:pending grant" } });
+  expect(screen.getByText("Pending grant")).toBeInTheDocument();
+  expect(screen.queryByText("Echidna fuzzing")).toBeNull();
+  expect(screen.getByText(/1 of 4/)).toBeInTheDocument();
+});
+
+it("typing a qualifier moves its pill; the query lives in the URL", async () => {
+  mount();
+  fireEvent.change(await box(), { target: { value: "status:pending" } });
+  expect(screen.getByRole("combobox", { name: "Status" })).toHaveTextContent("Pending");
+  await waitFor(() => expect(where.search).toBe("?q=status%3Apending"));
+});
+
+it("picking a pill writes its qualifier into the query, keeping the words", async () => {
+  mount();
+  const input = await box();
+  fireEvent.change(input, { target: { value: "lockdown" } });
+  const status = screen.getByRole("combobox", { name: "Status" });
+  status.focus();
+  fireEvent.keyDown(status, { key: "ArrowDown" });
+  const approved = await screen.findByRole("option", { name: /Approved/ });
+  for (let i = 0; i < 6 && !approved.hasAttribute("data-highlighted"); i++) {
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "ArrowDown" });
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  fireEvent.keyDown(approved, { key: "Enter" });
+  expect(input).toHaveValue("lockdown status:approved");
+  expect(screen.getByText("Safe Lockdown Guard")).toBeInTheDocument();
+});
+
+it("a shared URL restores the view", async () => {
+  mount("/admin?q=type%3Arfp");
+  expect(await box()).toHaveValue("type:rfp");
+  expect(screen.getByText(/2 of 4/)).toBeInTheDocument();
+  expect(screen.queryByText("Echidna fuzzing")).toBeNull();
+});
+
+it("an unknown value is named and ignored", async () => {
+  mount();
+  fireEvent.change(await box(), { target: { value: "status:pendng" } });
+  expect(screen.getByText(/Unknown status: pendng\./)).toBeInTheDocument();
+  expect(screen.getByText(/4 of 4/)).toBeInTheDocument();
+});
+
+it("the untagged count fills in cat:untagged", async () => {
+  mount();
+  await box();
+  fireEvent.click(screen.getByRole("button", { name: /4 untagged/ }));
+  expect(await box()).toHaveValue("cat:untagged");
 });

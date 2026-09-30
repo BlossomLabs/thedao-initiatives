@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from "react-router";
 import { Menu, X } from "lucide-react";
 import { cn } from "~/lib/utils";
 import Pop from "~/components/ui/Pop";
+import WatchlistOfferSlot from "~/components/wallet/WatchlistOfferSlot";
 
 const ConnectButton = lazy(() => import("~/components/wallet/ConnectButton"));
 
@@ -89,9 +90,12 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
             ))}
           </nav>
           {staticShell ? <Fallback /> : (
-            <Suspense fallback={<Fallback />}>
-              <ConnectButton />
-            </Suspense>
+            <div className="relative">
+              <Suspense fallback={<Fallback />}>
+                <ConnectButton />
+              </Suspense>
+              <WatchlistOfferSlot />
+            </div>
           )}
           <button
             ref={toggleRef}

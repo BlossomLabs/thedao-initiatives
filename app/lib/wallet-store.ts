@@ -120,7 +120,9 @@ export function createWalletStore(
     if (opts.restoring && !snapshot.attached && !snapshot.restoring) {
       setSnapshot({ status: "reconnecting", restoring: true });
     }
-    return pending ??= loader().then((island) => island.install(store), (e: unknown) => {
+    // Either download (the island, then the wagmi config it imports) can fail:
+    // report it, and let the next load try again.
+    return pending ??= loader().then((island) => island.install(store)).catch((e: unknown) => {
       pending = null;
       setSnapshot({
         status: "disconnected",

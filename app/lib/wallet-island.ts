@@ -17,7 +17,7 @@ import {
   watchConnectors,
 } from "wagmi/actions";
 import { createSiweMessage } from "viem/siwe";
-import type { WalletApi, WalletStore } from "./wallet-store";
+import { hasStoredWagmiConnection, type WalletApi, type WalletStore } from "./wallet-store";
 
 export function attach(
   store: WalletStore,
@@ -63,8 +63,11 @@ export function attach(
   return api;
 }
 
-/** The store's loader entry: the app's config, restoring any stored connection. */
+/** The store's loader entry: the app's config, restoring a stored connection.
+ * A first visit has nothing to restore, and asking every connector would put
+ * WalletConnect's provider download and relay handshake between the person
+ * and the wallet chooser. */
 export async function install(store: WalletStore): Promise<WalletApi> {
   const { wagmiConfig } = await import("./wagmi");
-  return attach(store, wagmiConfig, { reconnect: true });
+  return attach(store, wagmiConfig, { reconnect: hasStoredWagmiConnection() });
 }

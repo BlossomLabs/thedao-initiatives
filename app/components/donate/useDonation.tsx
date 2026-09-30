@@ -51,7 +51,7 @@ export function useDonation(
   { initiativeId, slug, safeAddress, params, onConfirmed, accepted }: UseDonationArgs,
 ) {
   const wallet = useWalletStore();
-  const { address, isConnected, connectors, connect } = useWallet();
+  const { address, isConnected, connect } = useWallet();
   // Read at confirm time through refs so confirmTx keeps a stable identity.
   const acceptedRef = useRef(false);
   acceptedRef.current = accepted ?? false;
@@ -298,7 +298,9 @@ export function useDonation(
       try {
         let account = address;
         if (!isConnected || !account) {
-          const usable = connectors.filter((c) => c.id !== "mock");
+          // The island's own list: the page's snapshot is empty until it is attached.
+          const { config } = await wallet.load();
+          const usable = config.connectors.filter((c) => c.id !== "mock");
           if (!usable.length) {
             setStatus({
               kind: "err",
@@ -404,7 +406,6 @@ export function useDonation(
       params,
       address,
       isConnected,
-      connectors,
       connect,
       wallet,
       confirmTx,

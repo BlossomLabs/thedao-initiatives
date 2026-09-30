@@ -172,3 +172,22 @@ it("a directly attached island satisfies later loads without the loader", async 
   await expect(store.load()).resolves.toBe(island.api);
   expect(island.loader).not.toHaveBeenCalled();
 });
+
+it("a failing island setup is reported like a failed download and retried by the next load", async () => {
+  const island = fakeIsland();
+  const broken: WalletIsland = {
+    install: vi.fn(() => Promise.reject(new Error("wagmi chunk failed"))),
+  };
+  const loader = vi.fn().mockResolvedValueOnce(broken).mockImplementation(island.loader);
+  const store = createWalletStore(loader);
+  await expect(store.load({ restoring: true })).rejects.toThrow("wagmi chunk failed");
+  expect(store.getSnapshot()).toMatchObject({
+    status: "disconnected",
+    restoring: false,
+    attached: false,
+    failed: expect.any(Error),
+  });
+  await store.load();
+  expect(loader).toHaveBeenCalledTimes(2);
+  expect(store.getSnapshot()).toMatchObject({ attached: true, failed: null });
+});

@@ -1,7 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { WagmiProvider } from "wagmi";
-import { wagmiConfig } from "~/lib/wagmi";
 import { SessionProvider } from "./session";
 import { EmailSignInProvider } from "./email-sign-in";
 import { ProfileDialogProvider } from "./profile-dialog";
@@ -15,16 +13,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }),
   );
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <SessionProvider>
-          <EmailSignInProvider>
-            <WalletPickerProvider>
-              <ProfileDialogProvider>{children}</ProfileDialogProvider>
-            </WalletPickerProvider>
-          </EmailSignInProvider>
-        </SessionProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <QueryClientProvider client={queryClient}>
+      <SessionProvider>
+        <EmailSignInProvider>
+          <WalletPickerProvider>
+            <ProfileDialogProvider>{children}</ProfileDialogProvider>
+          </WalletPickerProvider>
+        </EmailSignInProvider>
+      </SessionProvider>
+    </QueryClientProvider>
   );
 }

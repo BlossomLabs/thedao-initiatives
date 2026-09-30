@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { vi } from "vitest";
 import type { Connector } from "wagmi";
 import WalletPicker from "./WalletPicker";
+import { walletStore } from "~/lib/wallet-store";
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -18,7 +19,7 @@ vi.mock(
   () => ({ useEmailSignIn: () => ({ openEmailSignIn: mocks.email }) }),
 );
 vi.mock("~/hooks/use-connectors", () => ({ useConnectors: () => mocks.connectors }));
-vi.mock("~/lib/privy", () => ({ PRIVY_CONNECTOR_ID: "privy" }));
+vi.mock("~/lib/privy-store", () => ({ PRIVY_CONNECTOR_ID: "privy" }));
 
 const uri = "wc:test-topic@2?relay-protocol=irn&symKey=abc123";
 type Message = { type: string; data?: unknown };
@@ -252,4 +253,15 @@ test("waits for a wallet connection being restored before offering any method", 
   expect(screen.getByRole("button", { name: "Email" })).toBeDisabled();
   expect(screen.getByRole("button", { name: /Mobile wallets/ })).toBeDisabled();
   expect(screen.getByText(/Restoring your wallet connection/)).toBeInTheDocument();
+});
+
+it("says so when the wallet tools could not load, instead of loading forever", () => {
+  walletStore.setSnapshot({ attached: false, failed: new Error("chunk failed") });
+  try {
+    render(<WalletPicker open onOpenChange={vi.fn()} />);
+    expect(screen.getByText(/could not load/)).toBeInTheDocument();
+    expect(screen.queryByText("Loading wallets…")).toBeNull();
+  } finally {
+    walletStore.setSnapshot({ failed: null });
+  }
 });

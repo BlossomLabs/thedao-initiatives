@@ -1,11 +1,11 @@
 import { MemoryRouter } from "react-router";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
-import InitiativeCard from "./InitiativeCard";
+import InitiativeCard, { DonateStandIn } from "./InitiativeCard";
 import type { Card } from "~/lib/api-types";
 
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
-vi.mock("~/components/donate/DonateWidget", () => ({ default: () => null }));
+vi.mock("~/components/donate/DonateWidget", () => ({ default: () => <p>donate widget</p> }));
 vi.mock("~/components/ui/Money", () => ({ default: ({ value }: { value: number }) => value }));
 
 const card = (over: Partial<Card>): Card => ({
@@ -104,4 +104,35 @@ it("no Featured label from a rank alone: the board decides what is featured", ()
   const base = card({});
   mount(card({ initiative: { ...base.initiative, sortRank: 4 } }));
   expect(screen.queryByText("Featured")).toBeNull();
+});
+
+it("fetches the Donate panel only when asked, showing a look-alike until it is in", async () => {
+  render(
+    <MemoryRouter>
+      <InitiativeCard card={card({ donationsEnabled: true })} tokensOk />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByText("donate widget")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Donate" }));
+  // The toggle now reads Close; the panel's own Donate button is the stand-in's, disabled.
+  expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Donate" })).toBeDisabled();
+  expect(await screen.findByText("donate widget")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Donate" })).toBeNull();
+});
+
+it("the Donate look-alike links the terms and is not marked busy", () => {
+  // Rendered on its own: once a test has loaded the panel's chunk, React no
+  // longer shows the stand-in for the lazy part.
+  render(
+    <MemoryRouter>
+      <DonateStandIn />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("link", { name: "Donation Terms" })).toHaveAttribute(
+    "href",
+    "/donation-terms",
+  );
+  expect(screen.getByRole("button", { name: "Wallet" })).toBeDisabled();
+  expect(document.querySelector("[aria-busy]")).toBeNull();
 });

@@ -1,5 +1,5 @@
 import { Outlet } from "react-router";
-import { useAccount } from "wagmi";
+import { useWallet } from "~/context/wallet";
 import PageMain from "~/components/layout/PageMain";
 import { Button } from "~/components/ui/Button";
 import { useSession } from "~/context/session";
@@ -16,7 +16,7 @@ export function meta() {
 export default function AdminLayout() {
   const { session, signIn, signingIn, connecting } = useSession();
   const { openWalletPicker } = useWalletPicker();
-  const { isConnected, address } = useAccount();
+  const { isConnected, address } = useWallet();
   const [error, setError] = useState("");
   if (session?.isAdmin) return <Outlet />;
   return (

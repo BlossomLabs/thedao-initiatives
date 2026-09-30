@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Landmark, Wallet } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useWallet, useWalletStore } from "~/context/wallet";
 import { useDonateParams } from "~/hooks/use-donate-params";
 import { TERMS } from "~/data/terms";
 import GovernedBy from "~/components/terms/GovernedBy";
@@ -21,7 +21,7 @@ import {
 import { errorMessage } from "~/lib/api";
 import { useDonation } from "./useDonation";
 import Reveal from "~/components/ui/Reveal";
-import { WALLETCONNECT_PROJECT_ID } from "~/lib/wagmi";
+import { WALLETCONNECT_PROJECT_ID } from "~/lib/wallet-env";
 
 const CHIPS = ["50", "500", "5000", "50000"];
 type Method = "wallet" | "exchange";
@@ -39,7 +39,12 @@ export default function DonateWidget({
   onConfirmed?: (r: DonateResult) => void;
 }) {
   const { data: params } = useDonateParams();
-  const { address, connector } = useAccount();
+  const { address, connector } = useWallet();
+  const wallet = useWalletStore();
+  // The Donate panel is where a wallet gets used: fetch the wallet stack now.
+  useEffect(() => {
+    void wallet.load().catch(() => {});
+  }, [wallet]);
   const [accepted, setAccepted] = useState(false);
   const [exchangeAttempt, setExchangeAttempt] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);

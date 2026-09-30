@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, ChevronDown, CornerDownLeft, Flag, Star, Trash2, Wallet } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useWallet } from "~/context/wallet";
 import { useSession } from "~/context/session";
 import Identity from "~/components/wallet/Identity";
 import { Avatar } from "~/components/wallet/Avatar";
@@ -80,7 +80,7 @@ export default function EntryCard({
   const [replying, setReplying] = useState(false);
   const [name, setName] = useState("");
   const [featureMenu, setFeatureMenu] = useState(false);
-  const { address } = useAccount();
+  const { address } = useWallet();
   const { connecting } = useSession();
   const me = useIdentity(replying ? address : undefined);
   // The wallet is briefly connected before the sign-in signature; keep the

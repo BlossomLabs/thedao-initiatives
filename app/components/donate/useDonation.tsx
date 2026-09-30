@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBalance, readContract, sendTransaction, switchChain } from "wagmi/actions";
 import { erc20Abi } from "viem";
-import { useAccount, useConfig, useConnect } from "wagmi";
+import { useWallet, useWalletStore } from "~/context/wallet";
 import { api, ApiError, errorMessage, isMaintenance } from "~/lib/api";
 import type { AcceptanceReceipt, ExchangeDetails, WalletIntent } from "../../../shared/terms.ts";
 import { TERMS } from "~/data/terms";
@@ -50,13 +50,12 @@ const PENDING: DonateResult = { status: "pending", detail: "", amount: 0, token:
 export function useDonation(
   { initiativeId, slug, safeAddress, params, onConfirmed, accepted }: UseDonationArgs,
 ) {
-  const config = useConfig();
-  const { address, isConnected } = useAccount();
+  const wallet = useWalletStore();
+  const { address, isConnected, connect } = useWallet();
   // Read at confirm time through refs so confirmTx keeps a stable identity.
   const acceptedRef = useRef(false);
   acceptedRef.current = accepted ?? false;
   const sending = useRef(false);
-  const { connectors, connectAsync } = useConnect();
   const [status, setStatus] = useState<DonationStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   // Keep the attempt through retries until the server has persisted the transaction hash.
@@ -299,7 +298,9 @@ export function useDonation(
       try {
         let account = address;
         if (!isConnected || !account) {
-          const usable = connectors.filter((c) => c.id !== "mock");
+          // The island's own list: the page's snapshot is empty until it is attached.
+          const { config } = await wallet.load();
+          const usable = config.connectors.filter((c) => c.id !== "mock");
           if (!usable.length) {
             setStatus({
               kind: "err",
@@ -308,7 +309,7 @@ export function useDonation(
             return false;
           }
           setStatus({ kind: "wait", text: "Connecting wallet…" });
-          const r = await connectAsync({ connector: usable[0], chainId: 1 });
+          const r = await connect({ connector: usable[0], chainId: 1 });
           account = r.accounts[0];
         }
         const bal = balances[symbol];
@@ -352,6 +353,7 @@ export function useDonation(
           amountRaw: base.toString(),
         });
         setBusy("Confirm in wallet…");
+        const { config } = await wallet.load();
         await switchChain(config, { chainId: 1 }).catch(() => {});
         const txHash = isNative
           ? await sendTransaction(config, {
@@ -404,9 +406,8 @@ export function useDonation(
       params,
       address,
       isConnected,
-      connectors,
-      connectAsync,
-      config,
+      connect,
+      wallet,
       confirmTx,
       recordAcceptance,
     ],
@@ -416,6 +417,7 @@ export function useDonation(
   const loadBalances = useCallback(async (): Promise<Record<string, number | null>> => {
     const out: Record<string, number | null> = {};
     if (!address || !params?.enabled) return out;
+    const { config } = await wallet.load();
     await Promise.all(
       Object.entries(params.tokens).map(async ([sym, t]) => {
         try {
@@ -435,7 +437,7 @@ export function useDonation(
       }),
     );
     return out;
-  }, [address, params, config]);
+  }, [address, params, wallet]);
 
   return {
     status,

@@ -12,7 +12,7 @@ const state = vi.hoisted(() => ({
   walletPickerOpen: false,
 }));
 
-vi.mock("wagmi", () => ({ useAccount: () => state }));
+vi.mock("~/context/wallet", () => ({ useWallet: () => state }));
 vi.mock("~/context/session", () => ({ useSession: () => state }));
 vi.mock("~/context/wallet-picker", () => ({ useWalletPicker: () => state }));
 

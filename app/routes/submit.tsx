@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { useAccount } from "wagmi";
+import { useWallet } from "~/context/wallet";
 import { Check, Copy } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Crumbs from "~/components/layout/Crumbs";
@@ -43,7 +43,7 @@ export function meta() {
  */
 /** The connected wallet, whether it is signed in, and whether its identity is complete. */
 function useSubmitter() {
-  const { isConnected, address, status } = useAccount();
+  const { isConnected, address, status } = useWallet();
   const { session, signIn, signingIn, connecting } = useSession();
   const identity = useIdentity(address);
   const signedIn = Boolean(

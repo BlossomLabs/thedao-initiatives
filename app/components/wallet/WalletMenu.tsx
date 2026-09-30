@@ -11,7 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { Connector } from "wagmi";
-import { PRIVY_CONNECTOR_ID } from "~/lib/privy";
+import { PRIVY_CONNECTOR_ID } from "~/lib/privy-store";
 import { cn } from "~/lib/utils";
 import Pop from "~/components/ui/Pop";
 

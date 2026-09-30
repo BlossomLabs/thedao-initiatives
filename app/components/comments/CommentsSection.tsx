@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MessageSquare } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useWallet } from "~/context/wallet";
 import SectionHeading from "~/components/layout/SectionHeading";
 import { QaChip } from "~/components/ui/Badge";
 import { sessionKey, useSession } from "~/context/session";
@@ -32,7 +32,7 @@ export default function CommentsSection({ initiativeId, slug, open }: {
   open: boolean;
 }) {
   const { session, requireSession } = useSession();
-  const { isConnected } = useAccount();
+  const { isConnected } = useWallet();
   const qc = useQueryClient();
   const key = commentsKey(slug, sessionKey(session), initiativeId);
   const q = useQuery({

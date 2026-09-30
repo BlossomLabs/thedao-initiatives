@@ -1,5 +1,6 @@
 import { createContext, lazy, Suspense, useCallback, useContext, useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/Dialog";
+import { useWalletStore } from "./wallet";
 
 const WalletPicker = lazy(() => import("~/components/wallet/WalletPicker"));
 const Ctx = createContext<{ openWalletPicker(): void; walletPickerOpen: boolean } | null>(null);
@@ -7,10 +8,12 @@ const Ctx = createContext<{ openWalletPicker(): void; walletPickerOpen: boolean 
 export function WalletPickerProvider({ children }: { children: React.ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
+  const wallet = useWalletStore();
   const openWalletPicker = useCallback(() => {
+    void wallet.load().catch(() => {});
     setLoaded(true);
     setOpen(true);
-  }, []);
+  }, [wallet]);
   const value = useMemo(() => ({ openWalletPicker, walletPickerOpen: open }), [
     openWalletPicker,
     open,

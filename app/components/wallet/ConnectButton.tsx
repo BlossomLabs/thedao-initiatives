@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Wallet } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useAccount } from "wagmi";
+import { useWallet } from "~/context/wallet";
 import { sessionKey, useSession } from "~/context/session";
 import { useProfileDialog } from "~/context/profile-dialog";
 import { useWalletPicker } from "~/context/wallet-picker";
@@ -18,7 +18,7 @@ import { cn } from "~/lib/utils";
  * name/picture, switch wallet, sign out.
  */
 export default function ConnectButton() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWallet();
   const { session, connecting, signingIn, signOut, switchWallet } = useSession();
   // Wallet access alone does not grant a signed-in session.
   const signedIn = Boolean(

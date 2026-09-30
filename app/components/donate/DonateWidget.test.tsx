@@ -8,8 +8,11 @@ const mock = vi.hoisted(() => ({
   confirmTx: vi.fn(),
   setStatus: vi.fn(),
 }));
-vi.mock("wagmi", () => ({ useAccount: () => ({}) }));
-vi.mock("~/lib/wagmi", () => ({ WALLETCONNECT_PROJECT_ID: "" }));
+vi.mock("~/context/wallet", () => ({
+  useWallet: () => ({}),
+  useWalletStore: () => ({ load: () => Promise.resolve({ config: {} }) }),
+}));
+vi.mock("~/lib/wallet-env", () => ({ WALLETCONNECT_PROJECT_ID: "" }));
 const params = vi.hoisted(() => ({
   enabled: true,
   tokens: { USDC: { address: "token", decimals: 6 } },

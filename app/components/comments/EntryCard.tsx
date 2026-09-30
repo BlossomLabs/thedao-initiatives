@@ -4,7 +4,7 @@ import { useWallet } from "~/context/wallet";
 import { useSession } from "~/context/session";
 import Identity from "~/components/wallet/Identity";
 import { Avatar } from "~/components/wallet/Avatar";
-import { BadgeHolderMark, QaChip, RoleTags } from "~/components/ui/Badge";
+import { QaChip, RoleTags } from "~/components/ui/Badge";
 import Reveal from "~/components/ui/Reveal";
 import WalletMenu from "~/components/wallet/WalletMenu";
 import type { CommentEntry } from "~/lib/api-types";
@@ -23,17 +23,14 @@ export function IdentityRow({ c }: { c: CommentEntry }) {
   const label = c.roles.includes("ADMIN") ? "TheDAO team" : c.displayName || "Anonymous";
   return (
     <span className="flex flex-wrap items-center gap-2.5">
-      <span className="inline-flex items-center gap-1">
-        {c.address
-          ? <Identity address={c.address} size={24} />
-          : (
-            <span className="inline-flex items-center gap-1.5">
-              <Avatar src={avatarSrc(label)} size={24} />
-              <span className="font-inter-tight text-[14.5px] font-normal text-muted">{label}</span>
-            </span>
-          )}
-        {c.roles.includes("EXPERT") && <BadgeHolderMark />}
-      </span>
+      {c.address
+        ? <Identity address={c.address} size={24} />
+        : (
+          <span className="inline-flex items-center gap-1.5">
+            <Avatar src={avatarSrc(label)} size={24} />
+            <span className="font-inter-tight text-[14.5px] font-normal text-muted">{label}</span>
+          </span>
+        )}
       <RoleTags roles={c.roles} />
     </span>
   );

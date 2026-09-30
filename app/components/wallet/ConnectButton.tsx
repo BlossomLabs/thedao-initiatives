@@ -45,8 +45,14 @@ export default function ConnectButton() {
 
   // Detect a sign-in made in this page (a stored session on reload is not one).
   // Skipped while the dialog itself triggered the sign-in on save.
+  // The Badge holder mark's entrance, played once: a pop after a sign-in in
+  // this page, a glow when the page loads signed in.
+  const [entrance, setEntrance] = useState<"pop" | "glow" | null>("glow");
   useEffect(() => {
-    if (who && who !== lastKey.current && !profileOpen) setPromptPending(true);
+    if (who && who !== lastKey.current) {
+      if (!profileOpen) setPromptPending(true);
+      setEntrance("pop");
+    }
     lastKey.current = who;
   }, [who, profileOpen]);
 
@@ -147,21 +153,33 @@ export default function ConnectButton() {
     <div className="relative">
       <button
         type="button"
-        className={cn("btn btn-wallet", signedIn && "connected")}
+        className={cn("btn btn-wallet group", signedIn && "connected")}
         onClick={onClick}
         aria-haspopup={signedIn ? "menu" : "dialog"}
         aria-expanded={signedIn ? menu !== "none" : walletPickerOpen}
       >
         {signedIn
-          ? <Avatar src={identity.avatar} size={20} />
-          : <Wallet className="size-4 opacity-80" />}
-        {connecting || signingIn ? "Check your wallet…" : signedIn
           ? (
-            <>
-              {identity.name}
-              {badge && <BadgeHolderMark className="-ml-0.5 text-current" />}
-            </>
+            // A badge holder's mark sits on the avatar's corner, as on a profile picture.
+            <span className={cn("relative flex-none", badge && "mr-1.5")}>
+              <Avatar src={identity.avatar} size={20} />
+              {badge && (
+                <BadgeHolderMark
+                  onAnimationEnd={() => setEntrance(null)}
+                  className={cn(
+                    "absolute -bottom-1.5 -right-2 size-4 drop-shadow-[0_0_1px_rgba(0,0,0,.6)] motion-safe:transition-[scale,filter] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(.34,1.56,.64,1)] group-hover:drop-shadow-[0_0_5px_rgba(242,193,78,.85)] motion-safe:group-hover:scale-125",
+                    entrance === "pop" && "motion-safe:animate-badge-pop",
+                    entrance === "glow" && "motion-safe:animate-badge-glow",
+                  )}
+                />
+              )}
+            </span>
           )
+          : <Wallet className="size-4 opacity-80" />}
+        {connecting || signingIn
+          ? "Check your wallet…"
+          : signedIn
+          ? identity.name
           : isConnected
           ? "Sign in"
           : "Connect wallet"}

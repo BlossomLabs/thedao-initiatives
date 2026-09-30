@@ -1,4 +1,3 @@
-import { BadgeCheck } from "lucide-react";
 import { cn } from "~/lib/utils";
 import type { InitiativeType } from "~/lib/api-types";
 
@@ -30,14 +29,14 @@ export function FundedChip() {
 }
 
 const ROLE_TAGS: Record<string, [string, string]> = {
-  ADMIN: ["Admin", "text-dao-amber border-[rgba(255,180,50,.32)] bg-[rgba(255,180,50,.12)]"],
+  ADMIN: ["Admin", "text-white border-white/40 bg-white/10"],
   PROPOSER: ["Proposer", "text-dao-sky border-[rgba(90,200,250,.4)] bg-[rgba(90,200,250,.12)]"],
   CURATOR: ["Curator", "text-dao-green border-[rgba(92,183,90,.35)] bg-[rgba(92,183,90,.12)]"],
   DONOR: ["Donor", "text-[#c4a6ff] border-[rgba(160,108,255,.4)] bg-[rgba(160,108,255,.14)]"],
 };
 
-/** Role chips, priority order, at most two shown. Badge holders (EXPERT) get
- * BadgeHolderMark by their name instead. */
+/** Role chips, priority order, at most two shown, after the Badge holder chip
+ * (EXPERT), which is always shown. */
 export function RoleTags({ roles }: { roles: string[] }) {
   const shown = ["ADMIN", "PROPOSER", "CURATOR", "DONOR"].filter((r) => roles.includes(r))
     .slice(
@@ -46,6 +45,7 @@ export function RoleTags({ roles }: { roles: string[] }) {
     );
   return (
     <>
+      {roles.includes("EXPERT") && <BadgeHolderTag />}
       {shown.map((r) => (
         <span
           key={r}
@@ -82,20 +82,50 @@ export function QaChip(
 export const BADGE_HOLDER = "ETHSecurity Badge holder";
 
 /**
- * The ETHSecurity Badge holder mark: a verified check right after the name, the
- * way X, GitHub or Farcaster mark an account. It takes no width a name row
- * doesn't already have; the words are its tooltip and accessible name.
+ * The ETHSecurity Badge holder mark: the badge itself, a gold shield with the
+ * Ethereum diamond (thedao.fund/ethsecurity-badges), flat so it reads at 14-16px
+ * and stands out beside a name in any colour (the signed-in wallet button is
+ * green). Labelled by default; `decorative` when words sit beside it.
  */
-export function BadgeHolderMark({ className }: { className?: string }) {
+export function BadgeHolderMark(
+  { className, decorative, onAnimationEnd }: {
+    className?: string;
+    decorative?: boolean;
+    onAnimationEnd?: () => void;
+  },
+) {
   return (
-    <BadgeCheck
-      role="img"
-      aria-label={BADGE_HOLDER}
-      className={cn("size-4 flex-none text-white", className)}
-      strokeWidth={2.2}
+    <svg
+      viewBox="0 0 24 24"
+      className={cn("size-4 flex-none", className)}
+      onAnimationEnd={onAnimationEnd}
+      {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": BADGE_HOLDER })}
     >
-      <title>{BADGE_HOLDER}</title>
-    </BadgeCheck>
+      {!decorative && <title>{BADGE_HOLDER}</title>}
+      <path
+        d="M12 1.6 20.6 4.8v6.6c0 5.3-3.6 9.4-8.6 11-5-1.6-8.6-5.7-8.6-11V4.8Z"
+        fill="var(--color-panel-deep)"
+        stroke="#f2c14e"
+        strokeWidth={1.8}
+        strokeLinejoin="round"
+      />
+      <path d="M12 5.6 8 12.2 12 14.6Z" fill="#ffd978" />
+      <path d="M12 5.6 16 12.2 12 14.6Z" fill="#e0a932" />
+      <path d="M8 13.1 12 15.5 16 13.1 12 18.6Z" fill="#f2c14e" />
+    </svg>
+  );
+}
+
+/** The mark with its name, in a comment's role chips. */
+export function BadgeHolderTag() {
+  return (
+    <span
+      title={BADGE_HOLDER}
+      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[rgba(255,180,50,.32)] bg-[rgba(255,180,50,.12)] py-1 pl-1.5 pr-2.5 font-inter-tight text-[10.5px] font-bold uppercase tracking-[.06em] text-dao-amber"
+    >
+      <BadgeHolderMark decorative className="size-3.5" />
+      Badge holder
+    </span>
   );
 }
 
@@ -108,7 +138,7 @@ export function BadgeHolderNote({ className }: { className?: string }) {
         className,
       )}
     >
-      <BadgeCheck className="size-4 flex-none text-white" strokeWidth={2.2} aria-hidden="true" />
+      <BadgeHolderMark decorative />
       {BADGE_HOLDER}
     </span>
   );

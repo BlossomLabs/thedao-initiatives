@@ -20,21 +20,20 @@ const entry = (roles: string[]): CommentEntry => ({
   createdAt: 0,
 });
 
-it("a Badge holder gets the check after the name, not a role chip", () => {
+it("a Badge holder gets a Badge holder chip, named in full in its tooltip", () => {
   render(<IdentityRow c={entry(["EXPERT"])} />);
-  expect(screen.getByRole("img", { name: "ETHSecurity Badge holder" })).toBeInTheDocument();
-  expect(screen.queryByText("Badge holder")).toBeNull();
+  expect(screen.getByText("Badge holder")).toHaveAttribute("title", "ETHSecurity Badge holder");
   expect(screen.queryByText("Expert")).toBeNull();
 });
 
-it("the check shows beside two other role chips (the chip cap no longer hides it)", () => {
+it("the Badge holder chip shows beside two other role chips (outside their cap)", () => {
   render(<IdentityRow c={entry(["PROPOSER", "CURATOR", "EXPERT"])} />);
-  expect(screen.getByRole("img", { name: "ETHSecurity Badge holder" })).toBeInTheDocument();
+  expect(screen.getByText("Badge holder")).toBeInTheDocument();
   expect(screen.getByText("Proposer")).toBeInTheDocument();
   expect(screen.getByText("Curator")).toBeInTheDocument();
 });
 
-it("no check without the badge", () => {
+it("no Badge holder chip without the badge", () => {
   render(<IdentityRow c={entry(["DONOR"])} />);
-  expect(screen.queryByRole("img", { name: "ETHSecurity Badge holder" })).toBeNull();
+  expect(screen.queryByText("Badge holder")).toBeNull();
 });

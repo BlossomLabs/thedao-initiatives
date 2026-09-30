@@ -88,8 +88,9 @@ export const BADGE_HOLDER = "ETHSecurity Badge holder";
  * green). Labelled by default; `decorative` when words sit beside it.
  */
 export function BadgeHolderMark(
-  { className, decorative, onAnimationEnd }: {
+  { className, style, decorative, onAnimationEnd }: {
     className?: string;
+    style?: React.CSSProperties;
     decorative?: boolean;
     onAnimationEnd?: () => void;
   },
@@ -98,6 +99,7 @@ export function BadgeHolderMark(
     <svg
       viewBox="0 0 24 24"
       className={cn("size-4 flex-none", className)}
+      style={style}
       onAnimationEnd={onAnimationEnd}
       {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": BADGE_HOLDER })}
     >
@@ -116,14 +118,14 @@ export function BadgeHolderMark(
   );
 }
 
-/** The mark with its name, in a comment's role chips. */
+/** A comment's Badge holder chip: a gold dot like the other role chips (the
+ * mark itself is on the avatar), its full name as the tooltip. */
 export function BadgeHolderTag() {
   return (
     <span
       title={BADGE_HOLDER}
-      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[rgba(255,180,50,.32)] bg-[rgba(255,180,50,.12)] py-1 pl-1.5 pr-2.5 font-inter-tight text-[10.5px] font-bold uppercase tracking-[.06em] text-dao-amber"
+      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[rgba(255,180,50,.32)] bg-[rgba(255,180,50,.12)] px-2.5 py-1 font-inter-tight text-[10.5px] font-bold uppercase tracking-[.06em] text-dao-amber before:size-1.5 before:rounded-full before:bg-current before:content-['']"
     >
-      <BadgeHolderMark decorative className="size-3.5" />
       Badge holder
     </span>
   );

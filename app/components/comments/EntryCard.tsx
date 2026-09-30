@@ -24,7 +24,7 @@ export function IdentityRow({ c }: { c: CommentEntry }) {
   return (
     <span className="flex flex-wrap items-center gap-2.5">
       {c.address
-        ? <Identity address={c.address} size={24} />
+        ? <Identity address={c.address} size={24} badge={c.roles.includes("EXPERT")} />
         : (
           <span className="inline-flex items-center gap-1.5">
             <Avatar src={avatarSrc(label)} size={24} />

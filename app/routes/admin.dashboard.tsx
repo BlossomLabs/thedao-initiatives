@@ -242,214 +242,224 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <Admins />
-
       <SectionHeading id="moderation">Community moderation</SectionHeading>
-      <h3 className="h3">
-        Waiting for review <span className="ml-2 text-[12px] text-muted">({data.held.length})</span>
-      </h3>
-      {data.held.length
-        ? (
-          <div className="tblbox">
-            <BulkBar
-              selection={heldSel}
-              noun="entry"
-              actions={[
-                { key: "publish", label: "Publish", variant: "primary" },
-                {
-                  key: "discard",
-                  label: "Discard",
-                  variant: "ghost",
-                  confirm: "Discard {n} {noun}?",
-                },
-              ]}
-              onAct={bulkComments}
-            />
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th className="w-8">
-                    <HeadCheck selection={heldSel} label="Select every held entry" />
-                  </th>
-                  <th>Entry</th>
-                  <th>AI summary</th>
-                  <th>Identity</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.held.map((c) => (
-                  <tr key={c.id} className={cn(c.reports > 0 && "[&>td]:bg-[rgba(255,59,56,.06)]")}>
-                    <td>
-                      <RowCheck
-                        selection={heldSel}
-                        id={c.id}
-                        label={`Select ${c.type} on ${c.initiative?.title ?? "?"}`}
-                      />
-                    </td>
-                    <CommentCell c={c} />
-                    <td className="small dim">{c.aiSummary}</td>
-                    <td className="small">
-                      {c.displayName || "(no name)"}
-                      {c.email && ` · ${c.email}`}
-                      {c.address && (
-                        <>
-                          <br />
-                          {shortAddr(c.address)}
-                        </>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap">
-                      <Button
-                        sm
-                        className="mr-1.5"
-                        onClick={() =>
-                          act(c.id, "publish")}
-                      >
-                        Publish
-                      </Button>
-                      <Button
-                        sm
-                        variant="ghost"
-                        onClick={() =>
-                          act(c.id, "discard")}
-                      >
-                        Discard
-                      </Button>
-                      {rowSaid(c.id)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-        : <p className="text-muted">Nothing waiting for review.</p>}
-
-      <h3 className="h3">
-        Unanswered questions{" "}
-        <span className="ml-2 text-[12px] text-muted">({data.unanswered.length})</span>
-      </h3>
-      {data.unanswered.length
-        ? (
-          <div className="tblbox">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Question</th>
-                  <th>Asked</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.unanswered.map((c) => (
-                  <tr
-                    key={c.id}
-                    className={cn(c.createdAt < data.weekAgo && "[&>td]:bg-[rgba(255,59,56,.06)]")}
-                  >
-                    <CommentCell c={c} />
-                    <td>
-                      {dt(c.createdAt)}
-                      {c.createdAt < data.weekAgo && (
-                        <>
-                          · <b>7+ days</b>
-                        </>
-                      )}
-                    </td>
-                    <td>
-                      {c.initiative && (
-                        <LinkButton
-                          sm
-                          variant="ghost"
-                          to={`/initiative/${c.initiative.slug}#qa-${c.parentId ?? c.id}`}
-                        >
-                          Open
-                        </LinkButton>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-        : <p className="text-muted">Every question has a reply.</p>}
-
-      {data.reported.length > 0 && (
-        <>
+      {/* Admins sit beside the queues on wide screens, under them on narrow ones. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5 max-[1100px]:grid-cols-1">
+        <div className="min-w-0">
           <h3 className="h3">
-            Reported entries{" "}
-            <span className="ml-2 text-[12px] text-muted">({data.reported.length})</span>
+            Waiting for review{" "}
+            <span className="ml-2 text-[12px] text-muted">({data.held.length})</span>
           </h3>
-          <div className="tblbox">
-            <BulkBar
-              selection={reportedSel}
-              noun="entry"
-              actions={[
-                { key: "unreport", label: "Dismiss reports" },
-                {
-                  key: "discard",
-                  label: "Discard",
-                  variant: "ghost",
-                  confirm: "Discard {n} {noun}?",
-                },
-              ]}
-              onAct={bulkComments}
-            />
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th className="w-8">
-                    <HeadCheck selection={reportedSel} label="Select every reported entry" />
-                  </th>
-                  <th>Entry</th>
-                  <th>Reports</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.reported.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <RowCheck
-                        selection={reportedSel}
-                        id={c.id}
-                        label={`Select ${c.type} on ${c.initiative?.title ?? "?"}`}
-                      />
-                    </td>
-                    <CommentCell c={c} />
-                    <td>{c.reports}</td>
-                    <td className="whitespace-nowrap">
-                      {c.initiative && (
-                        <LinkButton
-                          sm
-                          variant="ghost"
-                          className="mr-1.5"
-                          to={`/initiative/${c.initiative.slug}#qa-${c.parentId ?? c.id}`}
-                        >
-                          Open
-                        </LinkButton>
-                      )}
-                      <Button
-                        sm
-                        variant="ghost"
-                        className="mr-1.5"
-                        onClick={() => act(c.id, "unreport")}
+          {data.held.length
+            ? (
+              <div className="tblbox">
+                <BulkBar
+                  selection={heldSel}
+                  noun="entry"
+                  actions={[
+                    { key: "publish", label: "Publish", variant: "primary" },
+                    {
+                      key: "discard",
+                      label: "Discard",
+                      variant: "ghost",
+                      confirm: "Discard {n} {noun}?",
+                    },
+                  ]}
+                  onAct={bulkComments}
+                />
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th className="w-8">
+                        <HeadCheck selection={heldSel} label="Select every held entry" />
+                      </th>
+                      <th>Entry</th>
+                      <th>AI summary</th>
+                      <th>Identity</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.held.map((c) => (
+                      <tr
+                        key={c.id}
+                        className={cn(c.reports > 0 && "[&>td]:bg-[rgba(255,59,56,.06)]")}
                       >
-                        Dismiss reports
-                      </Button>
-                      <Button sm variant="ghost" onClick={() => act(c.id, "discard")}>
-                        Discard
-                      </Button>
-                      {rowSaid(c.id)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+                        <td>
+                          <RowCheck
+                            selection={heldSel}
+                            id={c.id}
+                            label={`Select ${c.type} on ${c.initiative?.title ?? "?"}`}
+                          />
+                        </td>
+                        <CommentCell c={c} />
+                        <td className="small dim">{c.aiSummary}</td>
+                        <td className="small">
+                          {c.displayName || "(no name)"}
+                          {c.email && ` · ${c.email}`}
+                          {c.address && (
+                            <>
+                              <br />
+                              {shortAddr(c.address)}
+                            </>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap">
+                          <Button
+                            sm
+                            className="mr-1.5"
+                            onClick={() => act(c.id, "publish")}
+                          >
+                            Publish
+                          </Button>
+                          <Button
+                            sm
+                            variant="ghost"
+                            onClick={() => act(c.id, "discard")}
+                          >
+                            Discard
+                          </Button>
+                          {rowSaid(c.id)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+            : <p className="text-muted">Nothing waiting for review.</p>}
+
+          <h3 className="h3">
+            Unanswered questions{" "}
+            <span className="ml-2 text-[12px] text-muted">({data.unanswered.length})</span>
+          </h3>
+          {data.unanswered.length
+            ? (
+              <div className="tblbox">
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>Question</th>
+                      <th>Asked</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.unanswered.map((c) => (
+                      <tr
+                        key={c.id}
+                        className={cn(
+                          c.createdAt < data.weekAgo && "[&>td]:bg-[rgba(255,59,56,.06)]",
+                        )}
+                      >
+                        <CommentCell c={c} />
+                        <td>
+                          {dt(c.createdAt)}
+                          {c.createdAt < data.weekAgo && (
+                            <>
+                              · <b>7+ days</b>
+                            </>
+                          )}
+                        </td>
+                        <td>
+                          {c.initiative && (
+                            <LinkButton
+                              sm
+                              variant="ghost"
+                              to={`/initiative/${c.initiative.slug}#qa-${c.parentId ?? c.id}`}
+                            >
+                              Open
+                            </LinkButton>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+            : <p className="text-muted">Every question has a reply.</p>}
+
+          {data.reported.length > 0 && (
+            <>
+              <h3 className="h3">
+                Reported entries{" "}
+                <span className="ml-2 text-[12px] text-muted">({data.reported.length})</span>
+              </h3>
+              <div className="tblbox">
+                <BulkBar
+                  selection={reportedSel}
+                  noun="entry"
+                  actions={[
+                    { key: "unreport", label: "Dismiss reports" },
+                    {
+                      key: "discard",
+                      label: "Discard",
+                      variant: "ghost",
+                      confirm: "Discard {n} {noun}?",
+                    },
+                  ]}
+                  onAct={bulkComments}
+                />
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th className="w-8">
+                        <HeadCheck selection={reportedSel} label="Select every reported entry" />
+                      </th>
+                      <th>Entry</th>
+                      <th>Reports</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.reported.map((c) => (
+                      <tr key={c.id}>
+                        <td>
+                          <RowCheck
+                            selection={reportedSel}
+                            id={c.id}
+                            label={`Select ${c.type} on ${c.initiative?.title ?? "?"}`}
+                          />
+                        </td>
+                        <CommentCell c={c} />
+                        <td>{c.reports}</td>
+                        <td className="whitespace-nowrap">
+                          {c.initiative && (
+                            <LinkButton
+                              sm
+                              variant="ghost"
+                              className="mr-1.5"
+                              to={`/initiative/${c.initiative.slug}#qa-${c.parentId ?? c.id}`}
+                            >
+                              Open
+                            </LinkButton>
+                          )}
+                          <Button
+                            sm
+                            variant="ghost"
+                            className="mr-1.5"
+                            onClick={() => act(c.id, "unreport")}
+                          >
+                            Dismiss reports
+                          </Button>
+                          <Button sm variant="ghost" onClick={() => act(c.id, "discard")}>
+                            Discard
+                          </Button>
+                          {rowSaid(c.id)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+        <aside className="mt-5 max-[1100px]:mt-0">
+          <Admins />
+        </aside>
+      </div>
 
       <SectionHeading>All initiatives</SectionHeading>
       <div className="mb-3 flex flex-wrap items-center gap-2.5">

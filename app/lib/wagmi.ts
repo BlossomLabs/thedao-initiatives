@@ -33,9 +33,9 @@ export const wagmiConfig = createConfig({
       : []),
   ],
   transports: { [mainnet.id]: http(RPC_URL) },
-  // Restore the stored connection in an effect, not during the hydration
-  // render: prerendered pages were built disconnected and must hydrate as such.
-  ssr: true,
+  // Created by the wallet island after hydration (lib/wallet-island.ts), never
+  // during a prerender or the hydration render, so no SSR mode is needed.
+  ssr: false,
 });
 
 declare module "wagmi" {

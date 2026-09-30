@@ -1046,3 +1046,60 @@ it("gives up after one retry when the message is still out of the server window"
   expect(result.current.session).toBeNull();
   expect(result.current.signingIn).toBe(false);
 });
+
+/** A session provider over a store whose island has not loaded; `loader` is its download. */
+function setupUnloaded(loader = vi.fn(() => new Promise<never>(() => {}))) {
+  const store = createWalletStore(loader);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <WalletStoreProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <SessionProvider>{children}</SessionProvider>
+      </QueryClientProvider>
+    </WalletStoreProvider>
+  );
+  const hook = renderHook(() => useSession(), { wrapper });
+  return { ...hook, store, loader };
+}
+
+const WAGMI_STORED = JSON.stringify({ state: { current: "uid" }, version: 3 });
+
+it("fetches the wallet island right away for a stored session", () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const { result, loader } = setupUnloaded();
+  expect(loader).toHaveBeenCalledTimes(1);
+  expect(result.current.restoring).toBe(true);
+});
+
+it("fetches the wallet island right away for wagmi's stored connection", () => {
+  localStorage.setItem("wagmi.store", WAGMI_STORED);
+  const { result, loader } = setupUnloaded();
+  expect(loader).toHaveBeenCalledTimes(1);
+  expect(result.current.restoring).toBe(true);
+});
+
+it("leaves the wallet island alone on a first visit", () => {
+  const { result, loader } = setupUnloaded();
+  expect(loader).not.toHaveBeenCalled();
+  expect(result.current.restoring).toBe(false);
+  expect(result.current.address).toBeUndefined();
+});
+
+it("signing out before the island loaded forgets wagmi's stored connection", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  localStorage.setItem("wagmi.store", WAGMI_STORED);
+  const { result } = setupUnloaded();
+  await act(async () => {
+    await result.current.signOut();
+  });
+  expect(localStorage.getItem("wagmi.store")).toBeNull();
+  expect(localStorage.getItem(SESSION_KEY)).toBeNull();
+});
+
+it("a failed island download keeps the stored session", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const { result } = setupUnloaded(vi.fn(() => Promise.reject(new Error("chunk failed"))));
+  await waitFor(() => expect(result.current.restoring).toBe(false));
+  expect(result.current.session).toEqual(SESSION);
+  expect(localStorage.getItem(SESSION_KEY)).not.toBeNull();
+});

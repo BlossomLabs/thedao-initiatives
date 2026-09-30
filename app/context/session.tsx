@@ -24,6 +24,7 @@ import {
 import type { Connector } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWallet, useWalletStore } from "./wallet";
+import { hasStoredWagmiConnection } from "~/lib/wallet-store";
 import {
   clearPrivateQueries,
   deletePrivateDraft,
@@ -282,6 +283,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       active = false;
     };
   }, [refreshMe, clear, qc]);
+
+  // A returning wallet user: fetch the wallet stack now so the connection is
+  // restored. Anyone else gets it on their first wallet action.
+  useEffect(() => {
+    if (sessionRef.current || hasStoredWagmiConnection()) {
+      void wallet.load({ restoring: true }).catch(() => {});
+    }
+  }, [wallet]);
 
   useEffect(() => {
     const changed = (e: StorageEvent) => {

@@ -13,6 +13,7 @@ import Footer from "~/components/layout/Footer";
 import SupportWidget from "~/components/layout/SupportWidget";
 import MaintenanceBanner from "~/components/layout/MaintenanceBanner";
 import ShellSkeleton, { SHELL_SCRIPT } from "~/components/layout/ShellSkeleton";
+import { EARLY_FETCH_SCRIPT } from "~/lib/early-fetch";
 import "./app.css";
 
 // Fonts as a <link> rather than an @import inside app.css: the browser fetches
@@ -51,7 +52,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <script
           dangerouslySetInnerHTML={{
             __html: "setTimeout(function(){document.body.style.visibility='visible'},4000);" +
-              SHELL_SCRIPT,
+              SHELL_SCRIPT + ";" + EARLY_FETCH_SCRIPT,
           }}
         />
         <Meta />

@@ -55,10 +55,12 @@ export function createApp(
   app.notFound((c) => c.json({ error: "not found" }, 404));
 
   app.use("*", securityHeaders(site?.policy));
+  // JSON bodies gzip to about a fifth (the board is the one that matters) and
+  // the built site's scripts and styles to a third; serveDir sends them raw.
+  // Hono leaves HEAD, 304, 206 and small or already encoded bodies alone.
+  app.use("*", compress());
   useApi(
     apiHeaders,
-    // JSON bodies gzip to about a fifth; the board is the one that matters.
-    compress(),
     securityAudit(deps),
     cors({
       origin: deps.config.webOrigins,

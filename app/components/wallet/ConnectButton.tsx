@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BadgeHolderMark, BadgeHolderNote } from "~/components/ui/Badge";
 import { Wallet } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useWallet } from "~/context/wallet";
@@ -19,7 +20,7 @@ import { cn } from "~/lib/utils";
  */
 export default function ConnectButton() {
   const { address, isConnected } = useWallet();
-  const { session, connecting, signingIn, signOut, switchWallet } = useSession();
+  const { session, me, connecting, signingIn, signOut, switchWallet } = useSession();
   // Wallet access alone does not grant a signed-in session.
   const signedIn = Boolean(
     isConnected && address && session && session.address.toLowerCase() === address.toLowerCase(),
@@ -147,6 +148,7 @@ export default function ConnectButton() {
     },
   ];
 
+  const badge = signedIn && me?.isBadgeHolder;
   return (
     <div className="relative">
       <button
@@ -159,10 +161,13 @@ export default function ConnectButton() {
         {signedIn
           ? <Avatar src={identity.avatar} size={20} />
           : <Wallet className="size-4 opacity-80" />}
-        {connecting || signingIn
-          ? "Check your wallet…"
-          : signedIn
-          ? identity.name
+        {connecting || signingIn ? "Check your wallet…" : signedIn
+          ? (
+            <>
+              {identity.name}
+              {badge && <BadgeHolderMark className="-ml-0.5 text-current" />}
+            </>
+          )
           : isConnected
           ? "Sign in"
           : "Connect wallet"}
@@ -171,6 +176,9 @@ export default function ConnectButton() {
         open={menu === "account"}
         items={accountItems}
         onClose={() => setMenu("none")}
+        header={badge && (
+          <BadgeHolderNote className="mb-1 border-b border-white/10 px-3 pb-2.5 pt-2" />
+        )}
       />
     </div>
   );

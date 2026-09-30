@@ -1,3 +1,4 @@
+import { BadgeCheck } from "lucide-react";
 import { cn } from "~/lib/utils";
 import type { InitiativeType } from "~/lib/api-types";
 
@@ -32,13 +33,13 @@ const ROLE_TAGS: Record<string, [string, string]> = {
   ADMIN: ["Admin", "text-dao-amber border-[rgba(255,180,50,.32)] bg-[rgba(255,180,50,.12)]"],
   PROPOSER: ["Proposer", "text-dao-sky border-[rgba(90,200,250,.4)] bg-[rgba(90,200,250,.12)]"],
   CURATOR: ["Curator", "text-dao-green border-[rgba(92,183,90,.35)] bg-[rgba(92,183,90,.12)]"],
-  EXPERT: ["Expert", "text-dao-red border-[rgba(255,59,56,.4)] bg-[rgba(255,59,56,.12)]"],
   DONOR: ["Donor", "text-[#c4a6ff] border-[rgba(160,108,255,.4)] bg-[rgba(160,108,255,.14)]"],
 };
 
-/** Role chips, priority order, at most two shown. */
+/** Role chips, priority order, at most two shown. Badge holders (EXPERT) get
+ * BadgeHolderMark by their name instead. */
 export function RoleTags({ roles }: { roles: string[] }) {
-  const shown = ["ADMIN", "PROPOSER", "CURATOR", "EXPERT", "DONOR"].filter((r) => roles.includes(r))
+  const shown = ["ADMIN", "PROPOSER", "CURATOR", "DONOR"].filter((r) => roles.includes(r))
     .slice(
       0,
       2,
@@ -74,6 +75,41 @@ export function QaChip(
       )}
     >
       {children}
+    </span>
+  );
+}
+
+export const BADGE_HOLDER = "ETHSecurity Badge holder";
+
+/**
+ * The ETHSecurity Badge holder mark: a verified check right after the name, the
+ * way X, GitHub or Farcaster mark an account. It takes no width a name row
+ * doesn't already have; the words are its tooltip and accessible name.
+ */
+export function BadgeHolderMark({ className }: { className?: string }) {
+  return (
+    <BadgeCheck
+      role="img"
+      aria-label={BADGE_HOLDER}
+      className={cn("size-4 flex-none text-white", className)}
+      strokeWidth={2.2}
+    >
+      <title>{BADGE_HOLDER}</title>
+    </BadgeCheck>
+  );
+}
+
+/** The mark spelled out, where there is room to say what it means (the wallet menu). */
+export function BadgeHolderNote({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "flex items-center gap-2 font-inter-tight text-[12.5px] text-white/70",
+        className,
+      )}
+    >
+      <BadgeCheck className="size-4 flex-none text-white" strokeWidth={2.2} aria-hidden="true" />
+      {BADGE_HOLDER}
     </span>
   );
 }

@@ -302,6 +302,8 @@ export interface SessionInfo {
 export interface Me {
   address: string;
   isAdmin: boolean;
+  /** Holds the ETHSecurity Badge (the check behind the EXPERT role in comments). */
+  isBadgeHolder?: boolean;
   expiresAt: number;
   nickname: string | null;
   pfp: string;

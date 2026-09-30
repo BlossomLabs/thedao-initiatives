@@ -84,13 +84,16 @@ export function authRoutes(deps: Deps) {
 
   r.get("/me", requireAuth, async (c) => {
     const u = c.var.user!;
-    const [p, hasWatchlist] = await Promise.all([
+    const [p, hasWatchlist, isBadgeHolder] = await Promise.all([
       db.profiles.get(u.address),
       db.watchlists.has(u.address),
+      // The same check that tags comments EXPERT (cached an hour); a chain error reads as "no badge".
+      deps.chain.hasBadge(u.address).catch(() => false),
     ]);
     return c.json({
       address: u.address,
       isAdmin: u.isAdmin,
+      isBadgeHolder,
       expiresAt: u.expiresAt,
       nickname: p.nickname || null,
       pfp: p.pfp,

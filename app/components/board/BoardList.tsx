@@ -8,6 +8,14 @@ import { pctText, plural, usd, usdShort } from "~/lib/format";
 import { usePrefetchInitiative } from "~/hooks/use-initiative";
 import { usePhone } from "~/hooks/use-media";
 import { cn } from "~/lib/utils";
+import type { VoteSettings } from "@shared/vote";
+import {
+  calloutText,
+  useVoteReveal,
+  VoteCallout,
+  voteStanding,
+  VoteTick,
+} from "~/components/board/VoteMark";
 
 type Watch = { has: (id: string) => boolean; toggle: (id: string) => void };
 
@@ -54,39 +62,53 @@ function Backers({ count, children }: { count: number; children: React.ReactElem
 }
 
 /** The row's own funding bar: 3px, rounded, a faint track and the funded part in green. */
-function FundingBar({ pct, className }: { pct: number; className?: string }) {
+function FundingBar(
+  { pct, tick, className, children }: {
+    pct: number;
+    tick?: number;
+    className?: string;
+    /** The vote callout, over the mark. */
+    children?: React.ReactNode;
+  },
+) {
   return (
-    <span
-      className={cn(
-        "relative block h-[3px] overflow-hidden rounded-full bg-white/[.08]",
-        className,
-      )}
-      aria-hidden="true"
-    >
-      {pct > 0 && (
-        <i
-          data-funding-fill
-          className="absolute inset-y-0 left-0 min-w-[3px] rounded-full bg-gradient-to-r from-dao-green to-dao-bright shadow-bar"
-          style={{ width: `${Math.min(100, pct)}%` }}
-        />
-      )}
+    <span className={cn("relative block", className)} aria-hidden="true">
+      <span className="relative block h-[3px] overflow-hidden rounded-full bg-white/[.08]">
+        {pct > 0 && (
+          <i
+            data-funding-fill
+            className="absolute inset-y-0 left-0 min-w-[3px] rounded-full bg-gradient-to-r from-dao-green to-dao-bright shadow-bar"
+            style={{ width: `${Math.min(100, pct)}%` }}
+          />
+        )}
+      </span>
+      {tick !== undefined && <VoteTick at={tick} reached={pct >= tick} />}
+      {children}
     </span>
   );
 }
 
 function Row(
-  { card, label, watch }: {
+  { card, label, watch, vote }: {
     card: Card;
     label: ReturnType<typeof cardLabel>;
     watch?: Watch;
+    vote?: VoteSettings;
   },
 ) {
   const { initiative: r, summary, pct, backers } = card;
+  // With the vote display on, the % turns green at the vote floor, where the tick is.
+  const pctOn = vote?.show ? pct >= vote.floorPct : pct >= 1;
+  const standing = vote?.show ? voteStanding(summary.total, r.goalUsd, vote) : null;
+  // Hovering or tapping the row shows its vote callout under the bar.
+  const reveal = useVoteReveal(Boolean(standing));
   const prefetch = usePrefetchInitiative(r.slug);
   return (
     <li
       className={cn(
         ROW,
+        // Open, the row stacks above the rows after it, so the callout is never under them.
+        reveal.open && "relative z-10",
         "gap-y-1.5 border-b border-white/[.07] pb-2.5 pt-2 last:border-b-0 max-[640px]:gap-y-1 max-[640px]:py-2.5",
       )}
     >
@@ -115,11 +137,11 @@ function Row(
         className={cn(
           NUM,
           "text-[12.5px] font-medium max-[640px]:hidden",
-          pct >= 1 ? "text-dao-green" : "text-white/40",
+          pctOn ? "text-dao-green" : "text-white/40",
         )}
       >
         {pctText(pct)}
-        <span className="sr-only">funded</span>
+        <span className="sr-only">funded{standing && `. ${calloutText(standing)}`}</span>
       </span>
       {/* Desktop: the Backers column. */}
       <span className={cn(NUM, "text-[12.5px] text-white/60 max-[640px]:hidden")}>
@@ -174,12 +196,18 @@ function Row(
       </div>
       {/* The row's own bar: under the title on desktop, the last line on phones (with its %). */}
       <div className="col-start-3 flex items-center gap-2.5 max-[640px]:col-span-2 max-[640px]:col-start-2 max-[640px]:row-start-3">
-        <FundingBar pct={pct} className="flex-1" />
+        {vote?.show && standing
+          ? (
+            <FundingBar pct={pct} tick={vote.floorPct} className="flex-1">
+              {reveal.open && <VoteCallout state={standing} at={vote.floorPct} side="bottom" />}
+            </FundingBar>
+          )
+          : <FundingBar pct={pct} className="flex-1" />}
         <span
           className={cn(
             NUM,
             "hidden w-12 text-[12.5px] font-semibold max-[640px]:inline-block",
-            pct >= 1 ? "text-dao-green" : "text-white/40",
+            pctOn ? "text-dao-green" : "text-white/40",
           )}
           aria-hidden="true"
         >
@@ -192,13 +220,15 @@ function Row(
 
 /** Compact rows: every initiative at a glance, the numbers in aligned columns. */
 export default function BoardList(
-  { cards, aiTop = [], featured, watch }: {
+  { cards, aiTop = [], featured, watch, vote }: {
     cards: Card[];
     /** Initiatives the AI search put first. */
     aiTop?: string[];
     /** Pinned by the team. */
     featured?: Set<string>;
     watch?: Watch;
+    /** The vote floor on each bar, while the display is on. */
+    vote?: VoteSettings;
   },
 ) {
   return (
@@ -229,6 +259,7 @@ export default function BoardList(
                 approvedAt: c.initiative.approvedAt,
               })}
               watch={watch}
+              vote={vote}
             />
           ))}
         </ul>

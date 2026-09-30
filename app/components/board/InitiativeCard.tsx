@@ -7,6 +7,14 @@ import CardTitle from "./CardTitle";
 import WatchlistButton from "~/components/board/WatchlistButton";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import Bar from "~/components/ui/Bar";
+import {
+  calloutText,
+  useVoteReveal,
+  VoteCallout,
+  voteCallout,
+  voteStanding,
+} from "~/components/board/VoteMark";
+import type { VoteSettings } from "@shared/vote";
 import Money from "~/components/ui/Money";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { lazyPart } from "~/lib/lazy-part";
@@ -103,8 +111,11 @@ export default function InitiativeCard({
   onDonated,
   style,
   watch,
+  vote,
 }: {
   card: Card;
+  /** The vote floor on the bar, while the display is on. */
+  vote?: VoteSettings;
   /** Watchlist state in this browser; omitted = no button. */
   watch?: { on: boolean; toggle: () => void };
   tokensOk: boolean;
@@ -118,11 +129,19 @@ export default function InitiativeCard({
   const [open, setOpen] = useState(false);
   const prefetch = usePrefetchInitiative(r.slug);
   const zero = !summary.total;
+  // With the vote display on, the % turns green at the vote floor, where the tick is.
+  const pctOn = vote?.show ? pct >= vote.floorPct : !zero;
+  // Near the floor or past it: always shown. Otherwise the card shows it on hover or tap.
+  const callout = voteCallout(summary.total, r.goalUsd, vote);
+  const reveal = useVoteReveal(Boolean(vote?.show) && !callout);
+  const shown = callout ??
+    (reveal.open && vote ? voteStanding(summary.total, r.goalUsd, vote) : null);
   // One label on the top edge, by priority: AI pick, then Featured, then New.
   const label = cardLabel({ aiTop, featured, approvedAt: r.approvedAt });
   const canDonate = tokensOk && donationsEnabled;
   return (
     <div
+      {...reveal.handlers}
       style={style}
       className={cn(
         "card card-hover flex flex-col motion-safe:animate-fade-in-up",
@@ -146,7 +165,22 @@ export default function InitiativeCard({
       <p className="mb-5 mt-2.5 line-clamp-3 min-h-[42px] text-[13px] leading-[1.6] text-white/55">
         {r.summary}
       </p>
-      <Bar pct={pct} className="mt-auto" />
+      {vote?.show
+        ? (
+          // Room above the bar for the callout.
+          <div className={cn("mt-auto", callout && "pt-9")}>
+            <Bar
+              pct={pct}
+              tick={vote.floorPct}
+              label={`${pctText(pct)} funded. ${
+                calloutText(voteStanding(summary.total, r.goalUsd, vote))
+              }`}
+            >
+              {shown && <VoteCallout state={shown} at={vote.floorPct} side="top" />}
+            </Bar>
+          </div>
+        )
+        : <Bar pct={pct} className="mt-auto" />}
       <div
         className={cn(
           "mt-2 flex justify-between gap-2.5 text-[13px]",
@@ -167,13 +201,18 @@ export default function InitiativeCard({
             <span className="text-[12px] text-white/30">· {plural(backers, "backer")}</span>
           )}
         </span>
-        {funded
-          ? <FundedChip />
-          : (
-            <span className={cn("text-[12px]", zero ? "text-white/25" : "text-dao-green")}>
+        {funded ? <FundedChip /> : (
+          <span className="flex items-center gap-2">
+            <span
+              className={cn(
+                "text-[12px]",
+                pctOn ? "text-dao-green" : zero ? "text-white/25" : "text-white/45",
+              )}
+            >
               {pctText(pct)}
             </span>
-          )}
+          </span>
+        )}
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {canDonate && (

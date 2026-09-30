@@ -1,8 +1,10 @@
+import { PartyPopper } from "lucide-react";
 import type { BoardStatus } from "~/lib/board-view";
 
 /**
- * Funding status as a 14px ring, in the funding bar's colours: dashed for any
- * status, part-filled for open for funding, full with a check once funded.
+ * Funding status as a 14px glyph, in the funding bar's colours: a dashed ring for
+ * any status, part-filled for open for funding, a check once the first goal is
+ * reached, and a party popper once fully funded.
  */
 export default function FundingGlyph({ status }: { status: BoardStatus }) {
   return (
@@ -39,7 +41,7 @@ export default function FundingGlyph({ status }: { status: BoardStatus }) {
           />
         </>
       )}
-      {status === "funded" && (
+      {status === "first-goal" && (
         <>
           <circle cx="8" cy="8" r="7" fill="#5cb75a" />
           <path
@@ -51,6 +53,10 @@ export default function FundingGlyph({ status }: { status: BoardStatus }) {
             strokeLinejoin="round"
           />
         </>
+      )}
+      {status === "funded" && (
+        // Fully funded: a party popper.
+        <PartyPopper x="1" y="1" width="14" height="14" stroke="#5cb75a" strokeWidth={2.2} />
       )}
     </svg>
   );

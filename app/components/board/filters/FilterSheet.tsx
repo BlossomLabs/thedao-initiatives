@@ -28,6 +28,7 @@ const TYPES: [BoardType, string][] = [["all", "All"], ["rfp", "RFPs"], ["grant",
 const STATUSES: [BoardStatus, string][] = [
   ["all", "Any funding status"],
   ["open", "Open for funding"],
+  ["first-goal", "First goal reached"],
   ["funded", "Fully funded"],
 ];
 
@@ -56,6 +57,8 @@ export default function FilterSheet(
   });
   const [q, setQ] = useState("");
   const ids = useId();
+  // The cards carry their vote state only while the vote display is on.
+  const voteOn = cards.some((c) => c.vote !== undefined);
   const next = useMemo(() => ({ ...view, ...picks }), [view, picks]);
   const shown = useMemo(() => applyView(cards, next, watched).length, [
     cards,
@@ -174,7 +177,7 @@ export default function FilterSheet(
                   aria-labelledby={`${ids}-status`}
                   className="flex flex-col"
                 >
-                  {STATUSES.map(([v, label]) => (
+                  {STATUSES.filter(([v]) => voteOn || v !== "first-goal").map(([v, label]) => (
                     <label
                       key={v}
                       className="flex min-h-[44px] cursor-pointer items-center gap-3 font-inter-tight text-[14px] text-soft"

@@ -8,7 +8,7 @@ import { CATEGORIES, CATEGORY_INDEX, categoryOf } from "~/lib/categories";
 import { plural } from "~/lib/format";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
-export const STATUSES = ["all", "open", "funded"] as const;
+export const STATUSES = ["all", "open", "first-goal", "funded"] as const;
 export const SORTS = [
   ["recommended", "Featured"],
   ["closest", "Closest to funded"],
@@ -102,6 +102,8 @@ export function matches(c: Card, v: BoardView, skip?: Facet, watched?: string[])
   if (skip !== "type" && v.type !== "all" && c.initiative.type !== v.type) return false;
   if (skip !== "status" && v.status === "open" && c.funded) return false;
   if (skip !== "status" && v.status === "funded" && !c.funded) return false;
+  // First goal reached: past the vote floor. The cards carry it only while the display is on.
+  if (skip !== "status" && v.status === "first-goal" && c.vote === "below") return false;
   if (
     skip !== "cats" && v.cats.length && !c.initiative.categories.some((s) => v.cats.includes(s))
   ) {
@@ -170,7 +172,11 @@ export function groupByPrimary(cards: Card[]): { slug: string | null; cards: Car
     .map((slug) => ({ slug, cards: groups.get(slug)! }));
 }
 
-export const STATUS_LABELS = { open: "Open for funding", funded: "Fully funded" } as const;
+export const STATUS_LABELS = {
+  open: "Open for funding",
+  funded: "Fully funded",
+  "first-goal": "First goal reached",
+} as const;
 
 /** What Clear filters resets: every applied filter (type, categories, funding
  * status, keyword, watchlist). Sort, view and the AI order stay as they are. */

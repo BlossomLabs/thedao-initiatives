@@ -9,6 +9,13 @@ import type { FundingSummary } from "../services/funding.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
 import { ledgerStatus, refreshLedgers } from "../services/ledger.ts";
 import { createSnapshotCache, type SnapshotCache } from "../lib/snapshot-cache.ts";
+import { DEFAULT_VOTE, type VoteSettings, voteState } from "../../shared/vote.ts";
+
+/** The vote-eligibility settings, the defaults until an admin saves them. */
+export const voteSettings = async (deps: Pick<Deps, "db">): Promise<VoteSettings> => ({
+  ...DEFAULT_VOTE,
+  ...(await deps.db.meta.getPublic<VoteSettings>("vote_settings")),
+});
 
 export interface Card {
   initiative: ReturnType<typeof cardInitiative>;
@@ -23,6 +30,8 @@ export interface Card {
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
+  /** Where it stands for TheDAO's vote; only while the vote display is on. */
+  vote?: ReturnType<typeof voteState>["kind"];
 }
 
 export const pctOf = (total: number, goal: number): number =>
@@ -109,9 +118,10 @@ export const createBoardCache = (deps: Deps): BoardCache =>
 
 async function buildBoard(deps: Deps, refresh: boolean) {
   const { db, config } = deps;
-  const [initiatives, state] = await Promise.all([
+  const [initiatives, state, vote] = await Promise.all([
     db.initiatives.cards("approved"),
     deps.chain.state(refresh),
+    voteSettings(deps),
   ]);
   if (refresh) await refreshLedgers(deps, initiatives);
   const tokensOk = tokensUsable(state);
@@ -120,6 +130,8 @@ async function buildBoard(deps: Deps, refresh: boolean) {
     await Promise.all(
       initiatives.map((x, i) => buildCard(deps, x, summaries[i], tokensOk, refresh)),
     ),
+  ).map((c): Card =>
+    vote.show ? { ...c, vote: voteState(c.summary.total, c.initiative.goalUsd, vote).kind } : c
   );
   return {
     refreshDue: !chainStateFresh(state, deps.now()),
@@ -140,6 +152,7 @@ async function buildBoard(deps: Deps, refresh: boolean) {
       walletConnectProjectId: config.walletConnectProjectId,
       safeThreshold: SAFE_THRESHOLD,
       safeOwnerCount: SAFE_OWNER_COUNT,
+      vote,
     },
   };
 }
@@ -154,11 +167,15 @@ export function boardRoutes(deps: Deps, cache: BoardCache = createBoardCache(dep
 
   // The global profile/support UI must not load or poll the funding board.
   r.get("/settings", async (c) => {
-    const { on, at, note } = await deps.maintenance.state();
+    const [{ on, at, note }, vote] = await Promise.all([
+      deps.maintenance.state(),
+      voteSettings(deps),
+    ]);
     return c.json({
       uploads: deps.pinata.enabled,
       support: Boolean(config.supportUrl),
       maintenance: { on, at, note },
+      vote,
     });
   });
 

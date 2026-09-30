@@ -125,6 +125,7 @@ export default function FilterBar({
   onSort,
   sheet,
   watchlistCount = 0,
+  voteFilter = false,
 }: {
   view: BoardView;
   onChange: (next: Partial<BoardView>) => void;
@@ -139,6 +140,8 @@ export default function FilterBar({
   sheet: React.ReactNode;
   /** How many initiatives are on this browser's watchlist. */
   watchlistCount?: number;
+  /** The vote display is on: Funding offers First goal reached. */
+  voteFilter?: boolean;
 }) {
   const label = resultLabel(shown, total, isFiltered(view));
   const filtered = isFiltered(view);
@@ -177,7 +180,11 @@ export default function FilterBar({
               onChange={(cats) => onChange({ cats })}
             />
           </Suspense>
-          <StatusSelect value={view.status} onChange={(status) => onChange({ status })} />
+          <StatusSelect
+            value={view.status}
+            vote={voteFilter}
+            onChange={(status) => onChange({ status })}
+          />
           {watchlist()}
         </div>
         <div className="hidden max-[641px]:contents">

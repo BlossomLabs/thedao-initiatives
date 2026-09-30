@@ -21,6 +21,7 @@ import type { AdminComment, AdminDashboard } from "~/lib/api-types";
 import { adminFacetCounts, approvedCounts, filterAdminRows } from "~/lib/admin-rows";
 import { parseAdminQuery, setQualifier, UNTAGGED } from "~/lib/admin-query";
 import AdminFilters from "~/components/admin/AdminFilters";
+import VoteSettings from "~/components/admin/VoteSettings";
 import SafeSyncIcon from "~/components/admin/SafeSyncIcon";
 import TypeGlyph from "~/components/board/filters/TypeGlyph";
 import { dt, plural, shortAddr, truncate, usd } from "~/lib/format";
@@ -580,6 +581,7 @@ export default function Dashboard() {
         </table>
       </div>
 
+      <VoteSettings />
       <SyncContent />
     </PageMain>
   );

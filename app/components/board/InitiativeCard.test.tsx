@@ -1,6 +1,6 @@
 import { MemoryRouter } from "react-router";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import InitiativeCard, { DonateStandIn } from "./InitiativeCard";
 import type { Card } from "~/lib/api-types";
 
@@ -196,4 +196,33 @@ it("shows one label on the top edge: AI pick over Featured over New", () => {
   v.unmount();
   view({});
   expect(labels()).toEqual(["New"]);
+});
+
+describe("vote eligibility", () => {
+  const vote = { show: true, floorPct: 25, capUsd: 200_000 };
+  const raised = (total: number) =>
+    card({ summary: { ...card({}).summary, total }, pct: total / 10 });
+
+  it("off: no mark on the bar, the plain bar", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <InitiativeCard card={raised(100)} tokensOk vote={{ ...vote, show: false }} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector("[data-vote-tick]")).toBeNull();
+  });
+
+  it("on: a mark at the floor, and the bar tells screen readers how far it is", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <InitiativeCard card={raised(100)} tokensOk vote={vote} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector<HTMLElement>("[data-vote-tick]")!.style.left).toBe("25%");
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuetext",
+      "10.0% funded. $150 to the first goal",
+    );
+    expect(screen.queryByText(/First goal|to first goal/)).toBeNull();
+  });
 });

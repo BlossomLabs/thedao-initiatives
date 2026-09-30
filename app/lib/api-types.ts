@@ -1,5 +1,6 @@
 /** Hand-mirrored shapes of the API's JSON (api/lib/json.ts + routes). */
 import type { Finding, Findings, Milestone, SectionKey, Sections } from "@shared/draft/types";
+import type { VoteSettings, VoteState } from "@shared/vote";
 
 export type { Finding, Findings, Milestone, SectionKey, Sections };
 export type InitiativeType = "rfp" | "grant";
@@ -149,6 +150,8 @@ export interface Card {
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
+  /** Where it stands for TheDAO's vote; only while the vote display is on. */
+  vote?: VoteState["kind"];
 }
 
 export interface CommentEntry {
@@ -180,6 +183,8 @@ export interface BoardFlags {
   walletConnectProjectId: string;
   safeThreshold: number;
   safeOwnerCount: number;
+  /** Vote eligibility: the floor tick and its line show only while `show` is on. */
+  vote: VoteSettings;
 }
 
 export interface Board {
@@ -415,6 +420,7 @@ export interface SiteSettings {
   uploads: boolean;
   support: boolean;
   maintenance?: Pick<MaintenanceState, "on" | "at" | "note">;
+  vote?: VoteSettings;
 }
 
 /** GET /api/admin/backup: every stored record, keys and values verbatim. */

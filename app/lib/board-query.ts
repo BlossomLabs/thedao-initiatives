@@ -17,7 +17,7 @@ export interface BoardQuery {
 type Name = "type" | "cat" | "funding";
 export const BOARD_QUALIFIERS: readonly Name[] = ["type", "cat", "funding"];
 const TYPES = ["grant", "rfp"] as const;
-const FUNDING = ["open", "funded"] as const;
+const FUNDING = ["open", "funded", "first-goal"] as const;
 
 export function parseBoardQuery(q: string): { query: BoardQuery; problems: string[] } {
   const query: BoardQuery = { type: "all", cats: [], status: "all", words: [] };

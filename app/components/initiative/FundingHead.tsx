@@ -1,12 +1,23 @@
 import { Trophy } from "lucide-react";
 import Bar from "~/components/ui/Bar";
+import { Check } from "lucide-react";
+import { calloutLabel, calloutText, voteStanding } from "~/components/board/VoteMark";
+import type { VoteSettings } from "@shared/vote";
 import Money from "~/components/ui/Money";
 import type { Summary } from "~/lib/api-types";
 import { pctText, usd } from "~/lib/format";
 
 export default function FundingHead(
-  { summary, goal, pct, funded }: { summary: Summary; goal: number; pct: number; funded: boolean },
+  { summary, goal, pct, funded, vote }: {
+    summary: Summary;
+    goal: number;
+    pct: number;
+    funded: boolean;
+    /** Where it stands for TheDAO's vote, while the display is on (approved initiatives). */
+    vote?: VoteSettings;
+  },
 ) {
+  const standing = vote?.show ? voteStanding(summary.total, goal, vote) : null;
   const split = (
     <div className="mt-2.5 flex flex-wrap gap-[26px] text-[13px] text-muted">
       {funded && (
@@ -38,8 +49,20 @@ export default function FundingHead(
         </span>
       )}
       {!funded && (
-        <span>
-          <b className="text-white">{pctText(pct)}</b> of goal
+        <span className="inline-flex flex-wrap items-center gap-x-2.5">
+          <span>
+            <b className="text-white">{pctText(pct)}</b> of goal
+          </span>
+          {standing && (
+            // The board's callout words, beside the % they are about.
+            <span className="inline-flex items-center gap-1 font-semibold text-white">
+              {standing.kind === "eligible" && (
+                <Check className="size-3.5 text-dao-green" strokeWidth={3} aria-hidden="true" />
+              )}
+              <span aria-hidden="true">{calloutLabel(standing)}</span>
+              <span className="sr-only">{calloutText(standing)}</span>
+            </span>
+          )}
         </span>
       )}
     </div>
@@ -63,8 +86,15 @@ export default function FundingHead(
         </b>{" "}
         <span className="text-muted">of {usd(goal)}</span>
       </div>
-      <Bar pct={pct} big />
+      <Bar pct={pct} big tick={standing ? vote!.floorPct : undefined} />
       {split}
+      {standing && (
+        // Once, where people read: what the first goal is and what it unlocks.
+        <p className="m-0 mt-2.5 text-[12.5px] text-muted">
+          The first goal is{" "}
+          {vote!.floorPct}% of the goal: reaching it puts the initiative to TheDAO's vote.
+        </p>
+      )}
     </div>
   );
 }

@@ -149,6 +149,7 @@ export default function Board() {
               shown={cards.length}
               total={all.length}
               ai={ai}
+              voteFilter={Boolean(data.flags.vote?.show)}
               onSort={onSort}
               sheet={
                 <Suspense
@@ -238,6 +239,7 @@ export default function Board() {
                       aiTop={matches ?? []}
                       featured={featuredSet}
                       watch={watchlist}
+                      vote={data.flags.vote}
                     />
                   </Suspense>
                 )
@@ -255,6 +257,7 @@ export default function Board() {
                         key={c.initiative.id}
                         card={c}
                         tokensOk={data.flags.tokensOk}
+                        vote={data.flags.vote}
                         aiTop={Boolean(matches?.includes(c.initiative.id))}
                         featured={featuredSet.has(c.initiative.id)}
                         onDonated={() => void qc.invalidateQueries({ queryKey: boardKey })}

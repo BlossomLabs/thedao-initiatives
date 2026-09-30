@@ -277,3 +277,17 @@ describe("keyword filter", () => {
     expect(applyView(cards, v).map((c) => c.initiative.title)).toEqual(["Fuzzing grant"]);
   });
 });
+
+describe("First goal reached filter", () => {
+  it("keeps the cards past the vote floor; without the display on it narrows nothing", () => {
+    const below = { ...card("Below"), vote: "below" as const };
+    const past = { ...card("Past"), vote: "eligible" as const };
+    const gap = { ...card("Gap"), vote: "gap" as const };
+    const v = { ...DEFAULT_VIEW, status: "first-goal" as const };
+    expect(applyView([below, past, gap], v).map((c) => c.initiative.title)).toEqual([
+      "Past",
+      "Gap",
+    ]);
+    expect(applyView([card("Off")], v)).toHaveLength(1);
+  });
+});

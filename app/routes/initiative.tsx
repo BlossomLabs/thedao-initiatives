@@ -23,6 +23,7 @@ import CommentsSection from "~/components/comments/CommentsSection";
 import Identity from "~/components/wallet/Identity";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { useRevision } from "~/hooks/use-revision";
+import { useSiteSettings } from "~/hooks/use-site-settings";
 import { ApiError, errorMessage } from "~/lib/api";
 import { diffRevisions } from "~/lib/revision-diff";
 import type { RevisionText } from "~/lib/api-types";
@@ -49,6 +50,7 @@ export default function Initiative() {
   const asked = Number(params.get("rev"));
   const viewing = Number.isInteger(asked) && asked > 0 && asked !== current ? asked : current;
   const older = useRevision(slug, viewing !== current ? viewing : null);
+  const { data: site } = useSiteSettings();
   const revisions = page?.revisions ?? [];
   const idx = revisions.findIndex((v) => v.n === viewing);
   const [mode, setMode] = useState<ViewMode>("rendered");
@@ -151,6 +153,7 @@ export default function Initiative() {
             goal={r.goalUsd}
             pct={page.pct}
             funded={page.funded}
+            vote={r.status === "approved" ? site?.vote : undefined}
           />
           {!isPlaceholderData && <Backers pledges={page.pledges} />}
           <SectionHeading>Summary</SectionHeading>

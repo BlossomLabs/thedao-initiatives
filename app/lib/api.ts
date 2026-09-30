@@ -46,8 +46,9 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
       signal: opts.signal,
     });
   // A read the page started before the app loaded (early-fetch.ts) is used as
-  // is; if that request failed, this one is sent like any other.
-  const early = method === "GET" ? takeEarly(path) : undefined;
+  // is; if that request failed, this one is sent like any other. It carried
+  // the cookie, so an anonymous read (after a local logout) never takes it.
+  const early = method === "GET" && !opts.anonymous ? takeEarly(path) : undefined;
   const res = early ? await early.catch(() => request()) : await request();
   const text = await res.text();
   let data: unknown = null;

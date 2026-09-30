@@ -3,7 +3,11 @@
  * first read of the same path and the cards paint as soon as the app hydrates.
  * Only the prerendered board page ("/") starts one. The request is the app's
  * own board read: credentials included, marked passive so it does not extend
- * the session's inactivity deadline. */
+ * the session's inactivity deadline. A failure is held quietly (no unhandled
+ * rejection in the console) until the app takes it and sends its own request.
+ * In `deno task dev` StrictMode's double mount discards the early response and
+ * sends a second request; production has no StrictMode, so verify the single
+ * request on a built site. */
 import { API_URL } from "./api-url";
 
 declare global {
@@ -12,9 +16,10 @@ declare global {
 
 const BOARD_PATH = "/api/board";
 
-export const EARLY_FETCH_SCRIPT = "if(location.pathname==='/')window.__early={" +
-  JSON.stringify(BOARD_PATH) + ":fetch(" + JSON.stringify(API_URL + BOARD_PATH) +
-  ",{credentials:'include',headers:{'X-Session-Activity':'passive'}})};";
+export const EARLY_FETCH_SCRIPT = "if(location.pathname==='/'){var p=fetch(" +
+  JSON.stringify(API_URL + BOARD_PATH) +
+  ",{credentials:'include',headers:{'X-Session-Activity':'passive'}});" +
+  "p.catch(function(){});window.__early={" + JSON.stringify(BOARD_PATH) + ":p}}";
 
 /** The started request for `path`, handed over once; nothing after the first taker. */
 export function takeEarly(path: string): Promise<Response> | undefined {

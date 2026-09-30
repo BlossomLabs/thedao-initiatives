@@ -34,3 +34,23 @@ it("hands the started request over exactly once", async () => {
   expect(takeEarly("/api/board")).toBeUndefined();
   await early;
 });
+
+it("a request that fails before the app loads is held quietly until the app takes it", async () => {
+  vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new TypeError("offline"))));
+  runScript("/");
+  // Give the browser its chance to report an unhandled rejection (it must not).
+  await new Promise((r) => setTimeout(r, 0));
+  await expect(takeEarly("/api/board")).rejects.toThrow("offline");
+});
+
+it("an anonymous read never takes the early request, which carried the cookie", async () => {
+  const { api } = await import("./api");
+  const fetchMock = vi.fn(() => Promise.resolve(Response.json({ own: true })));
+  vi.stubGlobal("fetch", fetchMock);
+  globalThis.__early = { "/api/board": Promise.resolve(Response.json({ early: true })) };
+  await expect(api("/api/board", { anonymous: true })).resolves.toEqual({ own: true });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(globalThis.__early["/api/board"]).toBeDefined();
+  await expect(api("/api/board")).resolves.toEqual({ early: true });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});

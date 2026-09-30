@@ -34,6 +34,7 @@ afterEach(() => {
   cleanup();
   clients.splice(0).forEach((qc) => qc.clear());
   vi.unstubAllGlobals();
+  delete globalThis.__early;
 });
 
 it("shows saved values before a slow refresh, then animates the mounted number", async () => {
@@ -167,4 +168,5 @@ it("sends its own request when the early one failed", async () => {
   );
   await screen.findByText("$100.00");
   expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(globalThis.__early?.["/api/board"]).toBeUndefined();
 });

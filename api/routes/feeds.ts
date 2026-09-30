@@ -1,7 +1,7 @@
 /**
  * Agent-readable feeds, no JavaScript, wallet or login needed: /llms.txt,
  * /llms-full.txt, /api/initiatives.json and its schema. Open to
- * any origin (no credentials), cached 5 minutes, with an ETag.
+ * any origin (no credentials), cached FEED_TTL_SECS, with an ETag.
  */
 import { type Context, Hono } from "hono";
 import { encodeHex } from "@std/encoding/hex";
@@ -9,7 +9,7 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { type BoardCache, readBoard } from "./board.ts";
 import { buildFeed, type Feed, filterFeed, llmsFull, llmsIndex } from "../services/feed.ts";
 import { FEED_JSON_SCHEMA } from "../services/feed-schema.ts";
-import { createSnapshotCache, type SnapshotCache } from "../lib/snapshot-cache.ts";
+import { gunzip, gzip } from "../lib/gzip.ts";
 
 export const FEED_PATHS = [
   "/llms.txt",
@@ -18,25 +18,64 @@ export const FEED_PATHS = [
   "/api/initiatives.schema.json",
 ] as const;
 
-/** One feed per origin (prod and preview hosts write their own URLs). Cleared with the board. */
+/** How long a built feed serves: in an isolate's memory and as the KV copy every
+ * isolate shares. Also the HTTP max-age: agents need no finer freshness. */
+export const FEED_TTL_SECS = 300;
+
+/**
+ * One feed per origin (prod and preview hosts write their own URLs). A read is
+ * served from this isolate's memory inside the window, else from the gzipped
+ * copy in KV that another isolate stored (db/snapshots.ts), and only then
+ * built from the board, which costs a KV read wave per card (#46, #47). Every
+ * write request drops the memory here and the KV copy for everyone; another
+ * isolate's memory can be up to FEED_TTL_SECS behind.
+ */
 export function createFeedCache(deps: Deps, board: BoardCache) {
-  const byOrigin = new Map<string, SnapshotCache<Feed>>();
-  const cacheFor = (origin: string) => {
-    let c = byOrigin.get(origin);
-    if (!c) {
-      // ponytail: a handful of hosts at most; drop the oldest past 8.
-      if (byOrigin.size >= 8) byOrigin.delete(byOrigin.keys().next().value!);
-      c = createSnapshotCache<Feed>(deps.now, deps.config.boardCacheSecs);
-      byOrigin.set(origin, c);
+  const { db, now, log } = deps;
+  const saved = new Map<string, { feed: Feed; until: number }>();
+  const inflight = new Map<string, Promise<Feed>>();
+  const load = async (origin: string): Promise<Feed> => {
+    const stored = await db.snapshots.get("feed", origin).catch((e) => {
+      log(`feed snapshot read failed: ${String(e)}`);
+      return null;
+    });
+    if (stored) {
+      const feed = JSON.parse(new TextDecoder().decode(await gunzip(stored.bytes))) as Feed;
+      saved.set(origin, { feed, until: stored.until });
+      return feed;
     }
-    return c;
+    const feed = await buildFeed(deps, origin, (await readBoard(deps, board)).cards);
+    saved.set(origin, { feed, until: now() + FEED_TTL_SECS });
+    try {
+      const bytes = await gzip(new TextEncoder().encode(JSON.stringify(feed)));
+      if (!await db.snapshots.set("feed", origin, bytes, FEED_TTL_SECS)) {
+        log(`feed snapshot not stored: ${bytes.length} bytes gzipped is over the cap`);
+      }
+    } catch (e) {
+      log(`feed snapshot write failed: ${String(e)}`);
+    }
+    return feed;
   };
-  const get = (origin: string): Promise<Feed> =>
-    cacheFor(origin).get(async () => buildFeed(deps, origin, (await readBoard(deps, board)).cards));
   return {
-    get,
-    clear() {
-      for (const c of byOrigin.values()) c.clear();
+    get(origin: string): Promise<Feed> {
+      const s = saved.get(origin);
+      if (s && now() < s.until) return Promise.resolve(s.feed);
+      let p = inflight.get(origin);
+      if (!p) {
+        p = load(origin).finally(() => {
+          if (inflight.get(origin) === p) inflight.delete(origin);
+        });
+        inflight.set(origin, p);
+      }
+      return p;
+    },
+    /** After a write: this isolate's copies and the shared KV copy. */
+    async clear(): Promise<void> {
+      saved.clear();
+      inflight.clear();
+      await db.snapshots.clear("feed").catch((e) =>
+        log(`feed snapshot clear failed: ${String(e)}`)
+      );
     },
     /** The origin to write into URLs: the request's own when it is a configured web
      * origin, the primary one otherwise (a spoofed Host never reaches a cached body). */
@@ -65,7 +104,7 @@ export async function feedResponse(c: Context, body: string, type: string): Prom
   const etag = await etagOf(body);
   const headers: Record<string, string> = {
     "Content-Type": type,
-    "Cache-Control": "public, max-age=300",
+    "Cache-Control": `public, max-age=${FEED_TTL_SECS}`,
     ETag: etag,
   };
   if (matchesEtag(c.req.header("If-None-Match"), etag)) return c.body(null, 304, headers);

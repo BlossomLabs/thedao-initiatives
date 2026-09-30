@@ -107,6 +107,7 @@ export function createApp(
 
   // Any write may change a card (pledge, donation, approval, pin), so the next
   // board read in this isolate is rebuilt; other isolates wait out their window.
+  // The feed's shared KV copy goes too, so every isolate rebuilds it once.
   const boardCache = createBoardCache(deps);
   const feedCache = createFeedCache(deps, boardCache);
   useApi(async (c, next) => {
@@ -115,7 +116,7 @@ export function createApp(
     } finally {
       if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method)) {
         boardCache.clear();
-        feedCache.clear();
+        await feedCache.clear();
       }
     }
   });

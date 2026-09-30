@@ -47,6 +47,11 @@ export const K = {
   /** Bumped by every pledge or donation write; a card summary carries the one it was built from. */
   cardVersion: (rfpId: string) => ["card_version", rfpId] as const,
   cardSummary: (rfpId: string) => ["card_summary", rfpId] as const,
+  /** A built public value shared across isolates (db/snapshots.ts), per origin, in chunks. */
+  snapshots: (name: string) => ["snapshot", name] as const,
+  snapshotHead: (name: string, origin: string) => ["snapshot", name, origin, "head"] as const,
+  snapshotChunk: (name: string, origin: string, i: number) =>
+    ["snapshot", name, origin, "chunk", i] as const,
   meta: (key: string) => ["meta", key] as const,
   checkboxSession: (hash: string) => ["checkbox_session", hash] as const,
   checkboxAcceptance: (id: string) => ["checkbox_acceptance", id] as const,

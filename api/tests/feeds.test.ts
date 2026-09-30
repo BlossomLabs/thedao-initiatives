@@ -2,7 +2,7 @@
 import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
 import { createApp } from "../app.ts";
 import { createStaticSite } from "../site.ts";
-import { harness, PLAIN, SAFE_ADDR, testConnection } from "./app-helpers.ts";
+import { ADMIN, harness, PLAIN, SAFE_ADDR, testConnection } from "./app-helpers.ts";
 import { minimalSubmission, revisionBody } from "./fixtures.ts";
 import { FEED_JSON_SCHEMA } from "../services/feed-schema.ts";
 import { parseInitiativeFile } from "../services/content.ts";
@@ -179,6 +179,48 @@ Deno.test("markdown file: feed facts in front matter, still syncs back, approved
     assertEquals(parseInitiativeFile(md).goalUsd, 100_000);
     assertEquals((await t.req(`/initiative/${t.pending.slug}.md`)).status, 404);
     assertEquals((await t.req(`/api/initiatives/${t.pending.slug}`)).status, 404);
+  } finally {
+    await t.close();
+  }
+});
+
+Deno.test("feed cache: built once and shared through KV, dropped by a write, aged out elsewhere", async () => {
+  const t = await setup();
+  try {
+    const count = async (app = t.app) =>
+      ((await (await app.request(HOST + "/api/initiatives.json", undefined, testConnection()))
+        .json()) as { count: number }).count;
+    const stored = async () => {
+      let n = 0;
+      for await (const _ of t.h.kv.list({ prefix: ["snapshot", "feed"] })) n++;
+      return n;
+    };
+    assertEquals(await count(), 2);
+    assertEquals(await stored(), 2, "a head and one gzipped chunk");
+    // Another isolate (same KV, empty memory) serves the stored copy, not a build.
+    const other = createApp(t.h.deps);
+    await t.h.db.initiatives.insert({
+      ...revisionBody(minimalSubmission(10_000)),
+      title: "Added behind the cache",
+      goalUsd: 10_000,
+      status: "approved",
+      categories: ["opsec"],
+    });
+    assertEquals(await count(other), 2);
+    // A write through the API drops this isolate's memory and the shared copy.
+    const admin = await t.h.mint(ADMIN, true);
+    const res = await t.req(`/api/admin/initiatives/${t.live.id}/pledges`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${admin}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ company: "Acme", amount: 5 }),
+    });
+    assertEquals(res.status, 201);
+    assertEquals(await stored(), 0);
+    assertEquals(await count(), 3);
+    // The other isolate keeps its memory until its window ends.
+    assertEquals(await count(other), 2);
+    t.h.clock.now += 301;
+    assertEquals(await count(other), 3);
   } finally {
     await t.close();
   }

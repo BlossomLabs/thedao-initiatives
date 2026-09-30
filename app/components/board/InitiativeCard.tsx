@@ -4,8 +4,8 @@ import { ArrowRight, Landmark, Wallet } from "lucide-react";
 import { Link } from "react-router";
 import { FundedChip, TypeBadge } from "~/components/ui/Badge";
 import CardTitle from "./CardTitle";
-import WatchlistButton, { NewMarker } from "~/components/board/WatchlistButton";
-import { isNew } from "~/hooks/use-watchlist";
+import WatchlistButton from "~/components/board/WatchlistButton";
+import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import Bar from "~/components/ui/Bar";
 import Money from "~/components/ui/Money";
 import { Button, LinkButton } from "~/components/ui/Button";
@@ -119,7 +119,7 @@ export default function InitiativeCard({
   const prefetch = usePrefetchInitiative(r.slug);
   const zero = !summary.total;
   // One label on the top edge, by priority: AI pick, then Featured, then New.
-  const label = aiTop ? "ai" : featured ? "featured" : isNew(r.approvedAt) ? "new" : null;
+  const label = cardLabel({ aiTop, featured, approvedAt: r.approvedAt });
   const canDonate = tokensOk && donationsEnabled;
   return (
     <div
@@ -133,20 +133,7 @@ export default function InitiativeCard({
     >
       {label && (
         <span className="absolute -top-2.5 left-3.5 flex">
-          {label === "new" && <NewMarker />}
-          {label === "featured" && (
-            <span
-              className="rounded-full border border-white/25 bg-[#24506f] px-2.5 py-[3px] font-inter-tight text-[11px] font-bold uppercase tracking-[.4px] text-white"
-              title="Pinned to the top by the team"
-            >
-              Featured
-            </span>
-          )}
-          {label === "ai" && (
-            <span className="rounded-full bg-dao-green px-2.5 py-[3px] font-inter-tight text-[11px] font-bold uppercase tracking-[.4px] text-[#08321c]">
-              AI pick
-            </span>
-          )}
+          <CardLabel kind={label} />
         </span>
       )}
       <TypeBadge type={r.type} />

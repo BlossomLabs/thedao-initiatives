@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Card } from "~/lib/api-types";
 import Board from "./board";
 
@@ -151,4 +151,28 @@ it("with nothing featured, the board orders by closest to funded and Sort has no
     "Closest to funded",
   );
   expect(screen.queryByText("Featured")).toBeNull();
+});
+
+describe("list view", () => {
+  afterEach(() => localStorage.clear());
+
+  it("?view=list shows the rows, and the Cards button goes back to cards", async () => {
+    const router = at("/?view=list");
+    expect(await screen.findByText("Raised")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem").length).toBe(3);
+    const cards = screen.getByRole("button", { name: "Cards" });
+    expect(screen.getByRole("button", { name: "List" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(cards);
+    await waitFor(() => expect(router.state.location.search).toBe(""));
+    expect(screen.queryByText("Raised")).toBeNull();
+  });
+
+  it("a plain URL opens in the layout this device used last", async () => {
+    at("/");
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(localStorage.getItem("thedao:board-layout")).toBe("list");
+    cleanup();
+    const router = at("/");
+    await waitFor(() => expect(router.state.location.search).toBe("?view=list"));
+  });
 });

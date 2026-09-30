@@ -8,6 +8,16 @@ export function usd(v: unknown): string {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** Money in a few characters, for tight spots: $274, $1.1k, $100k, $1.3M. */
+export function usdShort(v: unknown): string {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return "$0";
+  const trim = (x: number, digits: number) => String(Number(x.toFixed(digits)));
+  if (n < 999.5) return `$${Math.round(n)}`;
+  if (n < 999_500) return `$${trim(n / 1000, n < 9_950 ? 1 : 0)}k`;
+  return `$${trim(n / 1_000_000, 1)}M`;
+}
+
 export function shortAddr(a: string | null | undefined): string {
   return a && a.length > 12 ? a.slice(0, 6) + "…" + a.slice(-4) : a ?? "";
 }

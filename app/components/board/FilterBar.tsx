@@ -1,8 +1,9 @@
-import { Bookmark } from "lucide-react";
+import { Bookmark, LayoutGrid, List } from "lucide-react";
 import {
   type BoardSort,
   type BoardType,
   type BoardView,
+  type BoardViewMode,
   CLEARED,
   isFiltered,
   resultLabel,
@@ -66,6 +67,38 @@ function WatchlistPill(
       {compact ? <span className="sr-only">My watchlist</span> : "My watchlist"}{" "}
       <span className="tnum text-white/45">{count}</span>
     </button>
+  );
+}
+
+const LAYOUTS = [["cards", "Cards", LayoutGrid], ["list", "List", List]] as const;
+
+/** Cards or list: two icon buttons in one pill, the current one lit. */
+function LayoutToggle(
+  { value, onChange }: { value: BoardViewMode; onChange: (v: BoardViewMode) => void },
+) {
+  return (
+    <div
+      className="inline-flex h-8 flex-none items-center rounded-full border border-white/12 bg-white/[.03] p-0.5 max-[641px]:h-10"
+      role="group"
+      aria-label="Layout"
+    >
+      {LAYOUTS.map(([v, label, Icon]) => (
+        <button
+          key={v}
+          type="button"
+          aria-pressed={value === v}
+          aria-label={label}
+          title={label}
+          onClick={() => onChange(v)}
+          className={cn(
+            "grid h-full w-8 cursor-pointer place-items-center rounded-full border-0 bg-transparent p-0 text-white/50 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-dao-bright max-[641px]:w-9",
+            value === v && "bg-white/[.12] text-white",
+          )}
+        >
+          <Icon className="size-3.5" aria-hidden="true" />
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -161,6 +194,7 @@ export default function FilterBar({
             onSort={onSort}
             className="min-h-[32px] border-transparent bg-transparent px-1.5 hover:border-white/15"
           />
+          <LayoutToggle value={view.view} onChange={(v) => onChange({ view: v })} />
         </span>
       </div>
       <p

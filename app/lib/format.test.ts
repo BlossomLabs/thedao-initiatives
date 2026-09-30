@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dt, pct, shortAddr, usd } from "./format";
+import { dt, pct, shortAddr, usd, usdShort } from "./format";
 import { parseUsd, toBaseUnits, tokenQty, transferCalldata } from "./donate";
 import { avatarSrc, pfpDefaultIndex, presetUri } from "./avatar";
 
@@ -54,5 +54,25 @@ describe("avatars", () => {
     expect(avatarSrc(a, "preset:3")).toBe(presetUri(3));
     expect(avatarSrc(a, "ipfs:x", "https://gw/ipfs/x")).toBe("https://gw/ipfs/x");
     expect(decodeURIComponent(presetUri(0))).toContain("<svg");
+  });
+});
+
+describe("usdShort (list rows on phones)", () => {
+  it("under a thousand: whole dollars", () => {
+    expect(usdShort(0)).toBe("$0");
+    expect(usdShort(9.97)).toBe("$10");
+    expect(usdShort(274.04)).toBe("$274");
+  });
+  it("thousands as k: one decimal under 10k, none above", () => {
+    expect(usdShort(1_108)).toBe("$1.1k");
+    expect(usdShort(2_000)).toBe("$2k");
+    expect(usdShort(37_500)).toBe("$38k");
+    expect(usdShort(100_050)).toBe("$100k");
+    expect(usdShort(999_400)).toBe("$999k");
+  });
+  it("millions as M, one decimal", () => {
+    expect(usdShort(999_600)).toBe("$1M");
+    expect(usdShort(1_250_000)).toBe("$1.3M");
+    expect(usdShort(-5)).toBe("$0");
   });
 });

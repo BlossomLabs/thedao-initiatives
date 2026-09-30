@@ -1,4 +1,4 @@
-import { Fragment, Suspense, useEffect, useMemo, useState } from "react";
+import { Fragment, lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 import PageMain from "~/components/layout/PageMain";
@@ -45,6 +45,10 @@ export function meta() {
 }
 
 const SUGGEST_LAST_FROM = 69;
+// The list layout (and its tooltip code) loads only when someone switches to it.
+const BoardList = lazy(() => import("~/components/board/BoardList"));
+/** The device's last layout (cards or list), used when the URL does not say. */
+const LAYOUT_KEY = "thedao:board-layout";
 
 export default function Board() {
   const { data, isLoading, isError } = useBoard();
@@ -57,8 +61,24 @@ export default function Board() {
     void preloadDots();
     void preloadSheet();
   }, []);
-  const setView = (next: Partial<BoardView>) =>
+  const setView = (next: Partial<BoardView>) => {
+    // The layout is also remembered on this device; everything else lives in the URL only.
+    if (next.view) {
+      try {
+        localStorage.setItem(LAYOUT_KEY, next.view);
+      } catch { /* storage off: the URL still carries it */ }
+    }
     setParams(writeView({ ...view, ...next }), { replace: true, preventScrollReset: true });
+  };
+  // A plain board URL opens in the layout this device used last.
+  useEffect(() => {
+    if (params.has("view")) return;
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(LAYOUT_KEY);
+    } catch { /* storage off */ }
+    if (saved === "list") setView({ view: "list" });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, on arrival
 
   const ai = Boolean(matches?.length);
   // A manual sort hands the order back from the AI.
@@ -187,34 +207,47 @@ export default function Board() {
                   <span className="small dim tnum">{g.cards.length}</span>
                 </h3>
               )}
-              <div className="grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
-                {
-                  /* Under 69 approved initiatives the suggest card leads the grid (Griff, 20 -> 69 on
+              {view.view === "list"
+                ? (
+                  <Suspense fallback={<Skeleton className="h-[480px] rounded-2xl" />}>
+                    <BoardList
+                      cards={g.cards}
+                      aiTop={matches ?? []}
+                      featured={featuredSet}
+                      watch={watchlist}
+                    />
+                  </Suspense>
+                )
+                : (
+                  <div className="grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
+                    {
+                      /* Under 69 approved initiatives the suggest card leads the grid (Griff, 20 -> 69 on
                   2026-09-16); while filters narrow the board it goes last. */
-                }
-                {gi === 0 && all.length < SUGGEST_LAST_FROM && !filtered && "flat" in g && (
-                  <SuggestCard />
+                    }
+                    {gi === 0 && all.length < SUGGEST_LAST_FROM && !filtered && "flat" in g && (
+                      <SuggestCard />
+                    )}
+                    {g.cards.map((c, i) => (
+                      <InitiativeCard
+                        key={c.initiative.id}
+                        card={c}
+                        tokensOk={data.flags.tokensOk}
+                        aiTop={Boolean(matches?.includes(c.initiative.id))}
+                        featured={featuredSet.has(c.initiative.id)}
+                        onDonated={() => void qc.invalidateQueries({ queryKey: boardKey })}
+                        style={{ animationDelay: `${i * 60}ms` }}
+                        watch={{
+                          on: watchlist.has(c.initiative.id),
+                          toggle: () => watchlist.toggle(c.initiative.id),
+                        }}
+                      />
+                    ))}
+                    {gi === groups.length - 1 &&
+                      (all.length >= SUGGEST_LAST_FROM || filtered || !("flat" in g)) && (
+                      <SuggestCard style={{ animationDelay: `${g.cards.length * 60}ms` }} />
+                    )}
+                  </div>
                 )}
-                {g.cards.map((c, i) => (
-                  <InitiativeCard
-                    key={c.initiative.id}
-                    card={c}
-                    tokensOk={data.flags.tokensOk}
-                    aiTop={Boolean(matches?.includes(c.initiative.id))}
-                    featured={featuredSet.has(c.initiative.id)}
-                    onDonated={() => void qc.invalidateQueries({ queryKey: boardKey })}
-                    style={{ animationDelay: `${i * 60}ms` }}
-                    watch={{
-                      on: watchlist.has(c.initiative.id),
-                      toggle: () => watchlist.toggle(c.initiative.id),
-                    }}
-                  />
-                ))}
-                {gi === groups.length - 1 &&
-                  (all.length >= SUGGEST_LAST_FROM || filtered || !("flat" in g)) && (
-                  <SuggestCard style={{ animationDelay: `${g.cards.length * 60}ms` }} />
-                )}
-              </div>
             </Fragment>
           ))}
         <PledgeBand />

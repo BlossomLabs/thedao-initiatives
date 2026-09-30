@@ -134,8 +134,6 @@ interface SessionCtx {
   signIn(account?: `0x${string}`): Promise<SessionInfo>;
   /** Ask about an unfinished draft before logout; false means the user cancelled. */
   signOut(beforeLogout?: () => Promise<void>): Promise<boolean>;
-  /** End this session for a wallet switch, retaining every wallet's draft. */
-  switchWallet(): Promise<void>;
   /** Session for the connected wallet, signing in first if needed. */
   requireSession(): Promise<SessionInfo>;
   refreshMe(): Promise<void>;
@@ -674,7 +672,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       cancelPairing,
       signIn,
       signOut,
-      switchWallet: endSession,
       requireSession,
       refreshMe,
     }),

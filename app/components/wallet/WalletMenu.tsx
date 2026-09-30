@@ -6,7 +6,6 @@ import {
   LogOut,
   Mail,
   Pencil,
-  RefreshCw,
   ShieldCheck,
   Wallet,
 } from "lucide-react";
@@ -19,7 +18,7 @@ export interface WalletMenuItem {
   key: string;
   label: string;
   icon?: string;
-  lucide?: "wallet" | "mail" | "switch" | "edit" | "power" | "sign" | "admin" | "copy" | "list";
+  lucide?: "wallet" | "mail" | "edit" | "power" | "sign" | "admin" | "copy" | "list";
   active?: boolean;
   danger?: boolean;
   separator?: boolean;
@@ -36,7 +35,6 @@ const ICONS = {
   copy: Copy,
   wallet: Wallet,
   mail: Mail,
-  switch: RefreshCw,
   edit: Pencil,
   power: LogOut,
   sign: ShieldCheck,

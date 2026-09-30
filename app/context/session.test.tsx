@@ -980,22 +980,6 @@ it("cancelling the draft popup leaves the session, draft and revocation action u
   expect(api).not.toHaveBeenCalledWith("/api/auth/logout", expect.anything());
 });
 
-it("switching wallets retains every draft without showing a deletion popup", async () => {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
-  const key = `thedao:submit-draft:${ADDRESS.toLowerCase()}`;
-  localStorage.setItem(key, "wallet A draft");
-  localStorage.setItem("thedao:submit-draft:wallet-b", "wallet B draft");
-  const { result, queryClient } = setup();
-  await waitFor(() => expect(result.current.me).not.toBeNull());
-  queryClient.setQueryData(["admin", "leads"], "private server data");
-  await act(() => result.current.switchWallet());
-  expect(screen.queryByRole("dialog")).toBeNull();
-  expect(result.current.session).toBeNull();
-  expect(queryClient.getQueryData(["admin", "leads"])).toBeUndefined();
-  expect(localStorage.getItem(key)).toBe("wallet A draft");
-  expect(localStorage.getItem("thedao:submit-draft:wallet-b")).toBe("wallet B draft");
-});
-
 /** A wallet prompt left open for a while: the signed message is older than the
  * server's window. The client fetches a fresh nonce and asks for one more signature. */
 it("retries once with a fresh nonce when the signed message aged out of the server window", async () => {

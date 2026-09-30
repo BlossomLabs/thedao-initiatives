@@ -20,7 +20,7 @@ import { cn } from "~/lib/utils";
  */
 export default function ConnectButton() {
   const { address, isConnected } = useWallet();
-  const { session, me, connecting, signingIn, signOut, switchWallet } = useSession();
+  const { session, me, connecting, signingIn, signOut } = useSession();
   // Wallet access alone does not grant a signed-in session.
   const signedIn = Boolean(
     isConnected && address && session && session.address.toLowerCase() === address.toLowerCase(),
@@ -125,12 +125,6 @@ export default function ConnectButton() {
         : "Set a display name",
       lucide: "edit",
       onClick: () => openProfile(false),
-    },
-    {
-      key: "switch",
-      label: "Switch wallet",
-      lucide: "switch",
-      onClick: () => void switchWallet().then(openWalletPicker),
     },
     {
       key: "sessions",

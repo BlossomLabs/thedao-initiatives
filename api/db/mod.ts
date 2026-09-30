@@ -10,6 +10,7 @@ import { rateLimiter, type RateLimiterOptions } from "./ratelimit.ts";
 import type { ReadOptions } from "./keys.ts";
 import { metaRepo } from "./meta.ts";
 import { termsRepo } from "./terms.ts";
+import { cardsRepo } from "./cards.ts";
 
 export type * from "./types.ts";
 
@@ -37,6 +38,7 @@ export function createDb(
     revisions: revisionsRepo(kv, read),
     pledges,
     donations,
+    cards: cardsRepo(kv, read, pledges, donations),
     comments: commentsRepo(kv, now, read),
     profiles: profilesRepo(kv, now),
     sessions: sessionsRepo(kv, now),

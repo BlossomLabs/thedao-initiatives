@@ -19,7 +19,7 @@ export function aiRoutes(deps: Deps) {
     const body = await jsonBody(c, ["query"]);
     const query = s(body.query, AI_QUERY_MAX_CHARS);
     if (query.length < 3) throw new HttpError(400, "describe what you want to fund");
-    const initiatives = await db.initiatives.list(["approved"]);
+    const initiatives = await db.initiatives.cards("approved");
     if (!initiatives.length) return c.json({ matches: [] });
     const items = initiatives.map((x) => ({
       id: x.id,

@@ -40,6 +40,13 @@ export const K = {
   safeSync: (rfpId: string) => ["safe_sync", rfpId] as const,
   safeBalances: (safe: string) => ["safe_balances", safe.toLowerCase()] as const,
   lock: (name: string) => ["lock", name] as const,
+  /** The card fields of every row under its status (db/initiatives.ts cards()): what the
+   * board lists instead of every full row. Derived; rebuilt when the mark under meta is gone. */
+  initiativesByStatus: (status: string) => ["rfp_by_status", status] as const,
+  initiativeByStatus: (status: string, id: string) => ["rfp_by_status", status, id] as const,
+  /** Bumped by every pledge or donation write; a card summary carries the one it was built from. */
+  cardVersion: (rfpId: string) => ["card_version", rfpId] as const,
+  cardSummary: (rfpId: string) => ["card_summary", rfpId] as const,
   meta: (key: string) => ["meta", key] as const,
   checkboxSession: (hash: string) => ["checkbox_session", hash] as const,
   checkboxAcceptance: (id: string) => ["checkbox_acceptance", id] as const,

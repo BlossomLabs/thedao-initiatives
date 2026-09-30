@@ -15,6 +15,9 @@ import type { Initiative, SafeSyncState } from "../db/types.ts";
 import type { Verification } from "../chain/verify.ts";
 import { toChecksum } from "../chain/address.ts";
 
+/** What a Safe sync reads from an initiative: a board card row carries these. */
+export type SafeRow = Pick<Initiative, "id" | "safeAddress" | "slug">;
+
 export interface SafeTransfer {
   type: "ERC20_TRANSFER" | "ETHER_TRANSFER" | "ERC721_TRANSFER" | string;
   executionDate: string;
@@ -82,7 +85,7 @@ async function fetchPage(deps: SafeApiDeps, url: string): Promise<Page> {
 /** Credit one tx hash to an initiative: RPC verification first, indexer fallback for ETH. */
 async function creditTx(
   deps: SafeApiDeps,
-  initiative: Initiative,
+  initiative: SafeRow,
   txHash: string,
   rows: SafeTransfer[],
   getBlockNumber: () => Promise<number>,
@@ -156,7 +159,7 @@ const ACCEPTED = new Set(Object.values(TOKENS).map(([a]) => a.toLowerCase()));
  */
 export async function syncSafe(
   deps: SafeApiDeps,
-  initiative: Initiative,
+  initiative: SafeRow,
   budgetMs = DEFAULT_BUDGET_MS,
   getBlockNumber = lazyBlockNumber(deps),
   persist = true,
@@ -263,7 +266,7 @@ export async function syncSafe(
 export async function reverifyPending(
   deps: SafeApiDeps,
   getBlockNumber = lazyBlockNumber(deps),
-  only?: Initiative,
+  only?: SafeRow,
 ): Promise<void> {
   const pending = only
     ? (await deps.db.donations.list(only.id, false)).filter((d) => d.status === "pending")

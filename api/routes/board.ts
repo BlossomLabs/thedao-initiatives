@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { cardInitiative, ipfsUrl } from "../lib/json.ts";
-import type { Donation, Initiative, Pledge } from "../db/types.ts";
+import type { Donation, Pledge } from "../db/types.ts";
+import type { CardRow } from "../db/initiatives.ts";
+import type { CardSummary } from "../db/cards.ts";
 import { SAFE_OWNER_COUNT, SAFE_THRESHOLD } from "../config.ts";
 import type { FundingSummary } from "../services/funding.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
@@ -53,28 +55,35 @@ export function orderCards<
   });
 }
 
+/** From the card row and its summary (#46, #47): one wave for the ledger status
+ * and the Safe balance snapshot, no pledge or donation rows. */
 export async function buildCard(
   deps: Deps,
-  r: Initiative,
+  r: CardRow,
+  s: CardSummary,
   tokensOk: boolean,
   refresh = false,
 ): Promise<Card> {
-  // One wave of reads, then only the Safe balance snapshot for the summary.
-  const [pledges, donations, ledger] = await Promise.all([
-    deps.db.pledges.list(r.id),
-    deps.db.donations.list(r.id),
+  const sumOf = (status: Pledge["status"]) =>
+    s.pledges.filter((p) => p.status === status).reduce((n, p) => n + p.amountUsd, 0);
+  const [summary, ledger] = await Promise.all([
+    deps.funding.summaryOf(
+      r,
+      { pledged: sumOf("pledged"), received: sumOf("received"), ledger: s.donatedUsd },
+      refresh,
+    ),
     ledgerStatus(deps, r),
   ]);
-  const summary = await deps.funding.summaryFrom(r, pledges, donations, refresh);
-  const withLogo = pledges.filter((p) => p.logoCid);
+  const withLogo = s.pledges.filter((p) => p.logoCid);
   return {
     initiative: cardInitiative(r),
     summary,
     pct: pctOf(summary.total, r.goalUsd),
-    backers: backerCount(pledges, donations),
-    donations: donations.length,
+    // The same rule as backerCount, from the summary's counts.
+    backers: s.pledges.filter((p) => p.status === "pledged").length + s.donors,
+    donations: s.donations,
     ledger,
-    logos: (withLogo.length ? withLogo : pledges).slice(0, 4)
+    logos: (withLogo.length ? withLogo : s.pledges).slice(0, 4)
       .map((p) => ({ company: p.company, logoUrl: ipfsUrl(deps.config, p.logoCid), url: p.url })),
     funded: Boolean(r.goalUsd && summary.total >= r.goalUsd),
     donationsEnabled: Boolean(tokensOk && r.safeAddress && r.status === "approved"),
@@ -101,13 +110,16 @@ export const createBoardCache = (deps: Deps): BoardCache =>
 async function buildBoard(deps: Deps, refresh: boolean) {
   const { db, config } = deps;
   const [initiatives, state] = await Promise.all([
-    db.initiatives.list(["approved"]),
+    db.initiatives.cards("approved"),
     deps.chain.state(refresh),
   ]);
   if (refresh) await refreshLedgers(deps, initiatives);
   const tokensOk = tokensUsable(state);
+  const summaries = await db.cards.summaries(initiatives.map((x) => x.id));
   const cards = orderCards(
-    await Promise.all(initiatives.map((x) => buildCard(deps, x, tokensOk, refresh))),
+    await Promise.all(
+      initiatives.map((x, i) => buildCard(deps, x, summaries[i], tokensOk, refresh)),
+    ),
   );
   return {
     refreshDue: !chainStateFresh(state, deps.now()),

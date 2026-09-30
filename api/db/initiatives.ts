@@ -42,7 +42,42 @@ export const sameText = (a: Partial<InitiativeText>, b: Partial<InitiativeText>)
     sameStructured(x, y);
 };
 
+/** The fields a board card, the funding summary and the ledger status read from a row. */
+export const CARD_FIELDS = [
+  "id",
+  "slug",
+  "title",
+  "summary",
+  "goalUsd",
+  "status",
+  "type",
+  "sortRank",
+  "safeAddress",
+  "paidOutUsd",
+  "categories",
+  "createdAt",
+  "approvedAt",
+] as const;
+export type CardRow = Pick<Initiative, typeof CARD_FIELDS[number]>;
+export function cardRow(r: Initiative): CardRow {
+  const out: Partial<CardRow> = {};
+  for (const k of CARD_FIELDS) if (r[k] !== undefined) (out as Record<string, unknown>)[k] = r[k];
+  return out as CardRow;
+}
+
+/** Under meta: the status index (#47) is complete at this shape. Missing (a database from
+ * before it, or one restored from a backup) means the next cards() read rebuilds it. */
+export const STATUS_INDEX_MARK = "rfp_by_status";
+const STATUS_INDEX_VERSION = 1;
+
 export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
+  /** Every row write also writes its card under its status, off the old status when it moved. */
+  const indexRow = (op: Deno.AtomicOperation, before: Initiative | null, next: Initiative) => {
+    if (before && before.status !== next.status) {
+      op.delete(K.initiativeByStatus(before.status, before.id));
+    }
+    return op.set(K.initiativeByStatus(next.status, next.id), cardRow(next));
+  };
   // Public reads; every writer re-reads what it checks with strong consistency.
   const get = async (id: string): Promise<Initiative | null> =>
     (await kv.get<Initiative>(K.initiative(id), read)).value;
@@ -167,6 +202,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
           .set(K.initiativeBySlug(s), id)
           .set(K.initiative(id), initiative)
           .set(K.revision(id, 1), revisionOf(initiative, 1, initiative, origin, t));
+        indexRow(op, null, initiative);
         if (reclaim && owner?.value) {
           const old = owner.value;
           const archiveBase = `${s}-archived-${old.id.toLowerCase()}`;
@@ -177,16 +213,18 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
             archiveSlug = `${archiveBase}-${suffix++}`;
             archiveIndex = await kv.get<string>(K.initiativeBySlug(archiveSlug));
           }
+          const moved: Initiative = {
+            ...old,
+            slug: archiveSlug,
+            archiveSlug,
+            safeDeploymentKey: old.safeDeploymentKey ?? old.slug,
+          };
           op.check(owner)
             .check(archiveIndex)
             .set(K.initiativeBySlug(archiveSlug), old.id)
-            .set(K.initiative(old.id), {
-              ...old,
-              slug: archiveSlug,
-              archiveSlug,
-              safeDeploymentKey: old.safeDeploymentKey ?? old.slug,
-            })
+            .set(K.initiative(old.id), moved)
             .set(K.reusedInitiativeSlug(s), true);
+          indexRow(op, old, moved);
           // Pin even legacy filenames before handing their public URL away.
           const source = await kv.get<string>(K.initiativeBySourceSlug(s));
           op.check(source);
@@ -217,6 +255,53 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       .sort((a, b) => b.createdAt - a.createdAt);
   };
 
+  /**
+   * The cards of every row in one status, newest first, from the index: one
+   * list of small values instead of every full row of every status (#47). The
+   * mark under meta says the index is complete; without it (a database from
+   * before the index, or just restored) the index is rebuilt from a full scan
+   * first, keeping any entry a concurrent writer put there meanwhile.
+   */
+  async function cards(status: InitiativeStatus): Promise<CardRow[]> {
+    const [mark, rows] = await Promise.all([
+      kv.get<number>(K.meta(STATUS_INDEX_MARK), read),
+      collect(kv.list<CardRow>({ prefix: K.initiativesByStatus(status) }, read)),
+    ]);
+    const found = mark.value === STATUS_INDEX_VERSION
+      ? rows
+      : (await rebuildIndex()).filter((r) => r.status === status);
+    return found.sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  async function rebuildIndex(): Promise<CardRow[]> {
+    // Out with entries a restore may have left under a status the row no longer has.
+    let op = kv.atomic();
+    let n = 0;
+    for await (const e of kv.list({ prefix: ["rfp_by_status"] })) {
+      op.delete(e.key);
+      if (++n % 500 === 0) {
+        await op.commit();
+        op = kv.atomic();
+      }
+    }
+    if (n % 500) await op.commit();
+    const all = (await collect(kv.list<Initiative>({ prefix: ["rfp"] }))).map(cardRow);
+    for (let i = 0; i < all.length; i += 100) {
+      const batch = all.slice(i, i + 100);
+      const entry = (r: CardRow, o: Deno.AtomicOperation) =>
+        o.check({ key: K.initiativeByStatus(r.status, r.id), versionstamp: null })
+          .set(K.initiativeByStatus(r.status, r.id), r);
+      const o = kv.atomic();
+      for (const r of batch) entry(r, o);
+      if (!(await o.commit()).ok) {
+        // A writer got there first for some row: its entry is newer, keep it.
+        for (const r of batch) await entry(r, kv.atomic()).commit();
+      }
+    }
+    await kv.set(K.meta(STATUS_INDEX_MARK), STATUS_INDEX_VERSION);
+    return all;
+  }
+
   /** Restore with a freshly allocated title slug; archive URLs remain aliases.
    * Unlike submission, restoring never displaces another archived proposal. */
   async function unarchive(id: string): Promise<Initiative> {
@@ -243,6 +328,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       };
       const op = kv.atomic().check(cur, index).set(K.initiative(id), next)
         .set(K.initiativeBySlug(slug), id);
+      indexRow(op, old, next);
       if (slug !== old.slug) {
         const source = await kv.get<string>(K.initiativeBySourceSlug(old.slug));
         op.check(source);
@@ -290,6 +376,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       if (!cur.value) throw new Error("rfp not found");
       const next: Initiative = { ...cur.value, ...patch };
       const op = kv.atomic().check(cur).set(K.initiative(id), next);
+      indexRow(op, cur.value, next);
       if (
         patch.safeAddress !== undefined && patch.safeAddress !== cur.value.safeAddress
       ) {
@@ -337,6 +424,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
         .check({ key: K.revision(id, n), versionstamp: null })
         .set(K.initiative(id), next)
         .set(K.revision(id, n), revision);
+      indexRow(op, initiative, next);
       if (legacy) {
         op.check({ key: K.revision(id, 1), versionstamp: null }).set(
           K.revision(id, 1),
@@ -411,6 +499,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     bySafe,
     insert,
     list,
+    cards,
     update,
     unarchive,
     revise,

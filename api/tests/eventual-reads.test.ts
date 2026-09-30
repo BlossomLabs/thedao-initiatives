@@ -59,6 +59,9 @@ Deno.test("eventual reads: public pages read eventually when enabled, writes sta
     logoCid: "",
   });
 
+  // The index and the card summary are built (write paths, read strongly), as on a running site.
+  await h.db.initiatives.cards("approved");
+  await h.db.cards.summary(r.id);
   const board = await record(() => h.req("/api/board"));
   assert(board.length >= 4, `board did ${board.length} reads`);
   assert(board.every((c) => c === "eventual"), `board reads: ${board.join(",")}`);
@@ -88,5 +91,36 @@ Deno.test("eventual reads: off by default", async () => {
   const board = await record(() => h.req("/api/board"));
   assert(board.length >= 1);
   assert(board.every((c) => c === undefined), `board reads: ${board.join(",")}`);
+  h.close();
+});
+
+Deno.test("eventual reads: a card summary is built from strong reads and served from eventual ones", async () => {
+  const h = await harness({ env: { KV_EVENTUAL_READS: "1" } });
+  const r = await h.db.initiatives.insert({ title: "Summed", summary: "s", status: "approved" });
+  await h.db.pledges.add(r.id, {
+    company: "c",
+    amountUsd: 5,
+    status: "pledged",
+    note: "",
+    url: "",
+    logoCid: "",
+  });
+  // Cold: the version and summary lookup may be eventual; the rows it is built
+  // from may not, or a replica behind the write would be frozen into the copy.
+  seen.length = 0;
+  recording = true;
+  await h.db.cards.summary(r.id);
+  recording = false;
+  assertEquals(seen.map((s) => `${s.op}:${s.consistency}`), [
+    "getMany:eventual",
+    "list:undefined",
+    "list:undefined",
+  ]);
+  // Warm: one eventual lookup.
+  seen.length = 0;
+  recording = true;
+  await h.db.cards.summary(r.id);
+  recording = false;
+  assertEquals(seen.map((s) => `${s.op}:${s.consistency}`), ["getMany:eventual"]);
   h.close();
 });

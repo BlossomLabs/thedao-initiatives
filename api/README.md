@@ -330,6 +330,25 @@ costs a read wave per card. Any write request and any `?refresh=1` board read re
 board at once in the isolate that served it; a board read that lands on another isolate can be up to
 that many seconds behind.
 
+A board build reads two derived copies instead of the rows themselves (#46, #47), both kept in KV
+and left out of backups:
+
+- `["rfp_by_status", status, id]` holds the card fields of every initiative under its status
+  (`cards()` in `api/db/initiatives.ts`), written in the same atomic operation as the row and moved
+  when the status changes. The board, the daily refresh and the AI search list one status from it
+  instead of scanning every full row. A mark under `meta` says it is complete; a database from
+  before the index, or one just restored, has no mark, and the next read rebuilds it from a scan.
+- `["card_summary", id]` holds what a card needs from an initiative's pledge and donation rows
+  (`api/db/cards.ts`): the active pledges, and the confirmed donations' count, total and distinct
+  donors. It is a rebuildable copy, never the truth: every pledge or donation write bumps
+  `["card_version", id]` in the same atomic operation, the summary carries the version it was built
+  from, and a reader that finds them different rebuilds from the rows. A restore drops every copy.
+  The lookup may be an eventual read; the rows a copy is built from are always read strongly, so a
+  replica behind a write can never be frozen into a copy.
+
+`deno task bench` measures the board with both in place; `api/tests/kv-depth.test.ts` pins the round
+trips.
+
 ## Scripts
 
 - `ADMIN_PRIVATE_KEY=0x… deno task login` — prints a bearer token (dev wallet whose address is in

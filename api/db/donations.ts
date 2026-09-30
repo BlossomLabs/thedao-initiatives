@@ -45,14 +45,19 @@ export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions 
       const res = await kv.atomic().check(cur)
         .set(K.donation(rfpId, tx), row)
         .set(K.donationByTx(tx, rfpId), true)
+        // The card summary (db/cards.ts) is rebuilt after this write.
+        .set(K.cardVersion(rfpId), crypto.randomUUID())
         .commit();
       if (res.ok) return [row, status];
     }
     throw new Error("donation write conflict");
   }
 
-  async function list(rfpId: string, onlyConfirmed = true): Promise<Donation[]> {
-    const all = await collect(kv.list<Donation>({ prefix: K.donations(rfpId) }, read));
+  /** `strong` for a copy built from the rows (db/cards.ts): never from a replica behind a write. */
+  async function list(rfpId: string, onlyConfirmed = true, strong = false): Promise<Donation[]> {
+    const all = await collect(
+      kv.list<Donation>({ prefix: K.donations(rfpId) }, strong ? undefined : read),
+    );
     const rows = onlyConfirmed ? all.filter((d) => d.status === "confirmed") : all;
     return rows.sort((a, b) => (b.confirmedAt ?? b.createdAt) - (a.confirmedAt ?? a.createdAt));
   }

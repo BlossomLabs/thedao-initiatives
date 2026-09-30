@@ -10,11 +10,20 @@ import { SHEET_FOCUS_KEY, sheetTriggerClass, SheetTriggerFace } from "./SheetTri
 import { Button } from "~/components/ui/Button";
 import CategoryDot from "~/components/ui/CategoryDot";
 import type { Card } from "~/lib/api-types";
-import { applyView, type BoardStatus, type BoardView, facetCounts } from "~/lib/board-view";
+import {
+  applyView,
+  type BoardStatus,
+  type BoardType,
+  type BoardView,
+  facetCounts,
+} from "~/lib/board-view";
+import TypeGlyph from "./TypeGlyph";
 import { CATEGORIES } from "~/lib/categories";
 import { plural } from "~/lib/format";
 
-type Picks = Pick<BoardView, "cats" | "status">;
+type Picks = Pick<BoardView, "type" | "cats" | "status">;
+
+const TYPES: [BoardType, string][] = [["all", "All"], ["rfp", "RFPs"], ["grant", "Grants"]];
 
 const STATUSES: [BoardStatus, string][] = [
   ["all", "Any funding status"],
@@ -23,23 +32,42 @@ const STATUSES: [BoardStatus, string][] = [
 ];
 
 /**
- * Phones: Filters (N) opens a bottom sheet with an inline category search and
- * list, and the funding status. Picks are provisional until Show N initiatives;
+ * Phones: Filters (N) opens a bottom sheet with the type, an inline category
+ * search and list, and the funding status. Picks are provisional until Show N initiatives;
  * closing discards them and Reset clears them. The footer sits above the safe
  * area, and the list scrolls between the fixed header and footer.
  */
 export default function FilterSheet(
-  { cards, view, onApply }: { cards: Card[]; view: BoardView; onApply: (p: Picks) => void },
+  { cards, view, watched, onApply }: {
+    cards: Card[];
+    view: BoardView;
+    /** This browser's watchlist, for the count while the Watchlist filter is on. */
+    watched?: string[];
+    onApply: (p: Picks) => void;
+  },
 ) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   useTakeFocus(SHEET_FOCUS_KEY, trigger);
-  const [picks, setPicks] = useState<Picks>({ cats: view.cats, status: view.status });
+  const [picks, setPicks] = useState<Picks>({
+    type: view.type,
+    cats: view.cats,
+    status: view.status,
+  });
   const [q, setQ] = useState("");
   const ids = useId();
   const next = useMemo(() => ({ ...view, ...picks }), [view, picks]);
-  const shown = useMemo(() => applyView(cards, next).length, [cards, next]);
-  const counts = useMemo(() => facetCounts(cards, next).cats, [cards, next]);
+  const shown = useMemo(() => applyView(cards, next, watched).length, [
+    cards,
+    next,
+    watched,
+  ]);
+  const facets = useMemo(() => facetCounts(cards, next, watched), [
+    cards,
+    next,
+    watched,
+  ]);
+  const counts = facets.cats;
   const query = q.trim().toLowerCase();
   const list = CATEGORIES.filter((c) => c.label.toLowerCase().includes(query));
 
@@ -49,7 +77,7 @@ export default function FilterSheet(
       onOpenChange={(o) => {
         // Each opening starts from what the board shows; closing drops the rest.
         if (o) {
-          setPicks({ cats: view.cats, status: view.status });
+          setPicks({ type: view.type, cats: view.cats, status: view.status });
           setQ("");
         }
         setOpen(o);
@@ -75,6 +103,26 @@ export default function FilterSheet(
                 </Drawer.Close>
               </div>
               <Drawer.Content className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
+                <span className="k mb-2 block" id={`${ids}-type`}>Type</span>
+                {/* Three short choices: one segmented row, not three list rows. */}
+                <RadioGroup
+                  value={picks.type}
+                  onValueChange={(type) => setPicks((p) => ({ ...p, type: type as BoardType }))}
+                  aria-labelledby={`${ids}-type`}
+                  className="mb-5 grid grid-cols-3 gap-1 rounded-[12px] border border-white/10 bg-white/[.03] p-1"
+                >
+                  {TYPES.map(([v, label]) => (
+                    <Radio.Root
+                      key={v}
+                      value={v}
+                      className="flex min-h-[44px] cursor-pointer items-center justify-center gap-1.5 rounded-[9px] border-0 bg-transparent px-2 font-inter-tight text-[14px] text-white/70 outline-none focus-visible:outline-2 focus-visible:outline-dao-bright data-[checked]:bg-white/[.12] data-[checked]:text-white"
+                    >
+                      <TypeGlyph type={v} />
+                      {label}
+                      <span className="tnum text-white/40">{facets.type[v]}</span>
+                    </Radio.Root>
+                  ))}
+                </RadioGroup>
                 <label htmlFor={`${ids}-q`} className="k mb-2 block">Category</label>
                 <div className="relative mb-1">
                   <Search
@@ -143,7 +191,10 @@ export default function FilterSheet(
                 </RadioGroup>
               </Drawer.Content>
               <div className="flex shrink-0 items-center gap-3 border-t border-white/10 px-4 pt-3 pb-[max(16px,env(safe-area-inset-bottom))]">
-                <Button variant="ghost" onClick={() => setPicks({ cats: [], status: "all" })}>
+                <Button
+                  variant="ghost"
+                  onClick={() => setPicks({ type: "all", cats: [], status: "all" })}
+                >
                   Reset
                 </Button>
                 <Button

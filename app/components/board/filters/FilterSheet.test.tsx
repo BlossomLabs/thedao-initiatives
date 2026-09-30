@@ -25,6 +25,26 @@ it("the button counts the active filters", () => {
   expect(screen.getByRole("button", { name: "Filters (2)" })).toBeInTheDocument();
 });
 
+it("the type is in the sheet: counts per type, provisional, counted on the button", () => {
+  const grant = {
+    ...mk("g", ["defi"]),
+    initiative: { ...mk("g", ["defi"]).initiative, type: "grant" },
+  } as Card;
+  const { onApply } = sheet(DEFAULT_VIEW, vi.fn(), [...cards, grant]);
+  openSheet();
+  const rfps = within(dialog()).getByRole("radio", { name: /RFPs\s*3/ });
+  expect(within(dialog()).getByRole("radio", { name: /Grants\s*1/ })).toBeInTheDocument();
+  fireEvent.click(rfps);
+  expect(onApply).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog()).getByRole("button", { name: "Show 3 initiatives" }));
+  expect(onApply).toHaveBeenCalledWith({ type: "rfp", cats: [], status: "all" });
+});
+
+it("the button counts a type", () => {
+  sheet({ ...DEFAULT_VIEW, type: "grant" });
+  expect(screen.getByRole("button", { name: "Filters (1)" })).toBeInTheDocument();
+});
+
 it("changes are provisional: the count previews, Show applies", () => {
   const { onApply } = sheet();
   openSheet();
@@ -34,7 +54,7 @@ it("changes are provisional: the count previews, Show applies", () => {
   expect(within(dialog()).getByRole("button", { name: "Show 2 initiatives" })).toBeInTheDocument();
   fireEvent.click(within(dialog()).getByRole("radio", { name: "Open for funding" }));
   fireEvent.click(within(dialog()).getByRole("button", { name: "Show 1 initiative" }));
-  expect(onApply).toHaveBeenCalledWith({ cats: ["opsec"], status: "open" });
+  expect(onApply).toHaveBeenCalledWith({ type: "all", cats: ["opsec"], status: "open" });
 });
 
 it("closing discards, and reopening shows the applied state", async () => {
@@ -50,11 +70,12 @@ it("closing discards, and reopening shows the applied state", async () => {
 });
 
 it("Reset clears the provisional state only", () => {
-  const { onApply } = sheet({ ...DEFAULT_VIEW, cats: ["defi"], status: "funded" });
+  const { onApply } = sheet({ ...DEFAULT_VIEW, type: "rfp", cats: ["defi"], status: "funded" });
   openSheet();
   fireEvent.click(within(dialog()).getByRole("button", { name: "Reset" }));
   expect(box(/DeFi/)).not.toBeChecked();
   expect(within(dialog()).getByRole("radio", { name: "Any funding status" })).toBeChecked();
+  expect(within(dialog()).getByRole("radio", { name: /^All/ })).toBeChecked();
   expect(onApply).not.toHaveBeenCalled();
 });
 

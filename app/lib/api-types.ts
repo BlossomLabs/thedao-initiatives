@@ -181,10 +181,21 @@ export interface BoardFlags {
   safeOwnerCount: number;
 }
 
+export interface Sponsor {
+  company: string;
+  logoUrl: string;
+  url: string;
+  totalUsd: number;
+  /** Biggest pledge first. */
+  initiatives: { slug: string; title: string; amountUsd: number }[];
+}
+
 export interface Board {
   /** The server's token verification needs a background refresh. */
   refreshDue?: boolean;
   cards: Card[];
+  /** Top pledgers across the published initiatives (at most five). */
+  sponsors?: Sponsor[];
   totals: { count: number; goal: number; raised: number; backers: number; donations: number };
   flags: BoardFlags;
 }

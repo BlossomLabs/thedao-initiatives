@@ -34,6 +34,55 @@ export function backerCount(pledges: Pledge[], donations: Donation[]): number {
   return pledges.filter((p) => p.status === "pledged").length + donors.size;
 }
 
+export interface Sponsor {
+  company: string;
+  logoUrl: string;
+  url: string;
+  totalUsd: number;
+  /** Biggest pledge first. */
+  initiatives: { slug: string; title: string; amountUsd: number }[];
+}
+
+/** The leaderboard of pledgers across the published initiatives: withdrawn pledges
+ * do not count, and one company is one row whatever the casing or spacing of its
+ * name. Biggest total first, then by name. */
+export function topSponsors(
+  config: Deps["config"],
+  rows: { initiative: Initiative; pledges: Pledge[] }[],
+  limit = 5,
+): Sponsor[] {
+  const by = new Map<string, { pledges: Pledge[]; per: Map<string, number>; total: number }>();
+  const titles = new Map(rows.map((r) => [r.initiative.slug, r.initiative.title]));
+  for (const { initiative, pledges } of rows) {
+    for (const p of pledges) {
+      if (p.status === "withdrawn" || !(p.amountUsd > 0)) continue;
+      const key = p.company.trim().replace(/\s+/g, " ").toLowerCase();
+      if (!key) continue;
+      const s = by.get(key) ??
+        { pledges: [] as Pledge[], per: new Map<string, number>(), total: 0 };
+      s.pledges.push(p);
+      s.per.set(initiative.slug, (s.per.get(initiative.slug) ?? 0) + p.amountUsd);
+      s.total += p.amountUsd;
+      by.set(key, s);
+    }
+  }
+  return [...by.values()]
+    .map((s) => {
+      const lead = [...s.pledges].sort((a, b) => b.amountUsd - a.amountUsd)[0];
+      return {
+        company: lead.company.trim(),
+        logoUrl: ipfsUrl(config, s.pledges.find((p) => p.logoCid)?.logoCid ?? ""),
+        url: s.pledges.find((p) => p.url)?.url ?? "",
+        totalUsd: s.total,
+        initiatives: [...s.per.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([slug, amountUsd]) => ({ slug, title: titles.get(slug) ?? slug, amountUsd })),
+      };
+    })
+    .sort((a, b) => b.totalUsd - a.totalUsd || a.company.localeCompare(b.company))
+    .slice(0, limit);
+}
+
 /** Board order: admin pins first (1 = top), then total raised, newest on ties. */
 export function orderCards<
   T extends {
@@ -58,6 +107,8 @@ export async function buildCard(
   r: Initiative,
   tokensOk: boolean,
   refresh = false,
+  /** Hands the pledges read here to the caller (the board's sponsors reuse them). */
+  seen?: (pledges: Pledge[]) => void,
 ): Promise<Card> {
   // One wave of reads, then only the Safe balance snapshot for the summary.
   const [pledges, donations, ledger] = await Promise.all([
@@ -65,6 +116,7 @@ export async function buildCard(
     deps.db.donations.list(r.id),
     ledgerStatus(deps, r),
   ]);
+  seen?.(pledges);
   const summary = await deps.funding.summaryFrom(r, pledges, donations, refresh);
   const withLogo = pledges.filter((p) => p.logoCid);
   return {
@@ -106,12 +158,19 @@ async function buildBoard(deps: Deps, refresh: boolean) {
   ]);
   if (refresh) await refreshLedgers(deps, initiatives);
   const tokensOk = tokensUsable(state);
+  const pledges: Pledge[][] = initiatives.map(() => []);
   const cards = orderCards(
-    await Promise.all(initiatives.map((x) => buildCard(deps, x, tokensOk, refresh))),
+    await Promise.all(
+      initiatives.map((x, i) => buildCard(deps, x, tokensOk, refresh, (p) => (pledges[i] = p))),
+    ),
   );
   return {
     refreshDue: !chainStateFresh(state, deps.now()),
     cards,
+    sponsors: topSponsors(
+      config,
+      initiatives.map((initiative, i) => ({ initiative, pledges: pledges[i] })),
+    ),
     totals: {
       count: cards.length,
       goal: cards.reduce((n, x) => n + x.initiative.goalUsd, 0),

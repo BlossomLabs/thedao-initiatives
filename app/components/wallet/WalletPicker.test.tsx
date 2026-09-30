@@ -19,7 +19,8 @@ vi.mock(
   () => ({ useEmailSignIn: () => ({ openEmailSignIn: mocks.email }) }),
 );
 vi.mock("~/hooks/use-connectors", () => ({ useConnectors: () => mocks.connectors }));
-vi.mock("~/lib/privy-store", () => ({ PRIVY_CONNECTOR_ID: "privy" }));
+vi.mock("~/lib/privy-store", () => ({ PRIVY_APP_ID: "app", PRIVY_CONNECTOR_ID: "privy" }));
+vi.mock("~/lib/wallet-env", () => ({ MOCK_WALLET: undefined, WALLETCONNECT_PROJECT_ID: "wc" }));
 
 const uri = "wc:test-topic@2?relay-protocol=irn&symKey=abc123";
 type Message = { type: string; data?: unknown };
@@ -43,6 +44,7 @@ const copied = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
+  walletStore.setSnapshot({ attached: true, failed: null });
   listeners.clear();
   mocks.connectors = [injected, email, wc];
   mocks.connecting = false;
@@ -104,7 +106,7 @@ test("offers different app links from one pairing, search, and an unrestricted Q
   expect(screen.queryByRole("link", { name: "MetaMask" })).toBeNull();
   expect(screen.getByRole("link", { name: "Rainbow" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "QR code / copy" }));
-  expect(screen.getByTitle("WalletConnect pairing QR code")).toBeInTheDocument();
+  expect(await screen.findByTitle("WalletConnect pairing QR code")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Copy connection URI" }));
   await screen.findByRole("button", { name: "Copied" });
   expect(copied).toHaveBeenCalledWith(uri);
@@ -264,4 +266,27 @@ it("says so when the wallet tools could not load, instead of loading forever", (
   } finally {
     walletStore.setSnapshot({ failed: null });
   }
+});
+
+it("shows the same rows, disabled, while the wallet island loads", () => {
+  walletStore.setSnapshot({ attached: false });
+  mocks.connectors = [];
+  render(<WalletPicker open onOpenChange={vi.fn()} />);
+  act(() => {
+    globalThis.dispatchEvent(
+      new CustomEvent("eip6963:announceProvider", {
+        detail: { info: { uuid: "1", rdns: "io.rabby", name: "Rabby", icon: "" }, provider: {} },
+      }),
+    );
+  });
+  const rows = screen.getAllByRole("button").filter((b) => b.textContent);
+  expect(rows.map((b) => b.textContent)).toEqual([
+    "Email",
+    "Rabby",
+    expect.stringMatching(/^Mobile wallets/),
+  ]);
+  for (const b of rows) expect(b).toBeDisabled();
+  expect(screen.queryByText("Loading wallets…")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Rabby" }));
+  expect(mocks.connect).not.toHaveBeenCalled();
 });

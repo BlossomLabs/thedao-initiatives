@@ -114,11 +114,31 @@ it("each row carries its own funding bar, filled as far as it is funded", () => 
   expect(none.querySelector("[data-funding-fill]")).toBeNull(); // nothing raised: the bare track
 });
 
-it("tapping (or hovering) the amount shows its backers, in the tooltip style", async () => {
+const phoneScreen = (on: boolean) => {
+  globalThis.matchMedia = ((query: string) => ({
+    matches: on && query === "(max-width: 640px)",
+    addEventListener() {},
+    removeEventListener() {},
+  })) as unknown as typeof matchMedia;
+};
+
+it("phones: tapping the amount shows its backers, in the tooltip style", async () => {
+  phoneScreen(true);
   mount();
   const amount = [...screen.getAllByRole("listitem")[0].querySelectorAll("[tabindex='0']")]
     .find((e) => e.textContent?.includes(" of $")) as HTMLElement;
   expect(amount).toHaveTextContent("$100,000 of $200,000");
   fireEvent.click(amount); // a tap on phones and touch screens
   expect(await screen.findByText("3 backers", { selector: "div" })).toBeInTheDocument();
+  phoneScreen(false);
+});
+
+it("desktop: the amount is plain text, the Backers column says it", () => {
+  phoneScreen(false);
+  mount();
+  const row = screen.getAllByRole("listitem")[0];
+  const amount = [...row.querySelectorAll("span")].find((e) =>
+    e.textContent?.startsWith("$100,000 of $200,000")
+  )!;
+  expect(amount).not.toHaveAttribute("tabindex");
 });

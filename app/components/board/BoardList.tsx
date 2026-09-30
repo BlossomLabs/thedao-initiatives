@@ -6,6 +6,7 @@ import WatchlistButton from "~/components/board/WatchlistButton";
 import type { Card } from "~/lib/api-types";
 import { pctText, plural, usd, usdShort } from "~/lib/format";
 import { usePrefetchInitiative } from "~/hooks/use-initiative";
+import { usePhone } from "~/hooks/use-media";
 import { cn } from "~/lib/utils";
 
 type Watch = { has: (id: string) => boolean; toggle: (id: string) => void };
@@ -13,7 +14,7 @@ type Watch = { has: (id: string) => boolean; toggle: (id: string) => void };
 /**
  * The list's columns, shared by the header and every row (subgrid), so each
  * column lines up down the list: bookmark · type · title · funded · backers ·
- * raised of goal (phones: the backers on hover or tap of the amount). Each row carries its own funding bar, inset under the title
+ * raised of goal (phones: the backers on a tap of the amount). Each row carries its own funding bar, inset under the title
  * (not a divider: rounded, inside the content column, the real divider below
  * it). Phones: bookmark | title, type and label, raised, then the
  * bar with its % at the end.
@@ -25,12 +26,13 @@ const ROW =
 const NUM = "text-right tnum whitespace-nowrap";
 
 /**
- * "4 backers" over the amount, in the site's tooltip style (as on the category
- * icon). A popover, not a tooltip, so a tap opens it on phones and touch
- * screens too; the mouse still opens it on hover.
+ * Phones: "4 backers" over the amount, in the site's tooltip style (as on the
+ * category icon). A popover, not a tooltip, so a tap opens it. Desktop has the
+ * Backers column instead, so the amount stays plain there.
  */
 function Backers({ count, children }: { count: number; children: React.ReactElement }) {
-  if (!count) return children;
+  const phone = usePhone();
+  if (!count || !phone) return children;
   return (
     <Popover.Root>
       <Popover.Trigger

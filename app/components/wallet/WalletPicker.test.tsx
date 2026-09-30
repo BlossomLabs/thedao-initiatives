@@ -131,7 +131,7 @@ test("closing cancels an unscanned pairing, and reopening offers the methods aga
   expect(screen.queryByRole("alert")).toBeNull();
 });
 
-test("closing keeps a browser wallet's request, which its own popup still shows", async () => {
+test("closing keeps a browser wallet's request, which its own popup still shows", () => {
   const onOpenChange = vi.fn();
   render(<WalletPicker open onOpenChange={onOpenChange} />);
   fireEvent.click(screen.getByRole("button", { name: "Rabby" }));

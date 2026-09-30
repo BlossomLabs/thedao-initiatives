@@ -55,10 +55,14 @@ export function createApp(
   app.notFound((c) => c.json({ error: "not found" }, 404));
 
   app.use("*", securityHeaders(site?.policy));
+  // JSON bodies gzip to about a fifth (the board is the one that matters) and
+  // the built site's scripts and styles to a third; serveDir sends them raw.
+  // Hono skips HEAD, 206, bodiless answers (304), already encoded and
+  // non-compressible types, and file bodies under 1 KB (a c.json() body has
+  // no Content-Length, so small JSON is compressed as it always was).
+  app.use("*", compress());
   useApi(
     apiHeaders,
-    // JSON bodies gzip to about a fifth; the board is the one that matters.
-    compress(),
     securityAudit(deps),
     cors({
       origin: deps.config.webOrigins,

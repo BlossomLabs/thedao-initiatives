@@ -4,13 +4,10 @@
  * (see context/session.tsx), so nothing here ever holds a token: every call
  * just sends credentials. */
 import { walletErrorMessage } from "./donate";
+import { API_URL } from "./api-url";
+import { takeEarly } from "./early-fetch";
 
-/** Same origin by default (the site server hosts the API under /api; the dev
- * server proxies it). Set VITE_API_URL only to point at a remote API. */
-export const API_URL = ((import.meta.env?.VITE_API_URL as string | undefined) ?? "").replace(
-  /\/+$/,
-  "",
-);
+export { API_URL };
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body?: unknown) {
@@ -37,15 +34,21 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     headers.set("Content-Type", "application/json");
     body = JSON.stringify(opts.json);
   } else if (opts.form) body = opts.form;
-  const res = await fetch(API_URL + path, {
-    method: opts.method ?? (body ? "POST" : "GET"),
-    headers,
-    body,
-    // "include" rather than the default "same-origin" so a build pointed at a
-    // remote VITE_API_URL still sends the session cookie.
-    credentials: opts.anonymous ? "omit" : "include",
-    signal: opts.signal,
-  });
+  const method = opts.method ?? (body ? "POST" : "GET");
+  const request = () =>
+    fetch(API_URL + path, {
+      method,
+      headers,
+      body,
+      // "include" rather than the default "same-origin" so a build pointed at a
+      // remote VITE_API_URL still sends the session cookie.
+      credentials: opts.anonymous ? "omit" : "include",
+      signal: opts.signal,
+    });
+  // A read the page started before the app loaded (early-fetch.ts) is used as
+  // is; if that request failed, this one is sent like any other.
+  const early = method === "GET" ? takeEarly(path) : undefined;
+  const res = early ? await early.catch(() => request()) : await request();
   const text = await res.text();
   let data: unknown = null;
   try {

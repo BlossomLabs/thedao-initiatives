@@ -139,3 +139,32 @@ it("refreshes stale donation counts even when balances are fresh", async () => {
   await screen.findByText("2 donations");
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
+
+it("paints from the request the page started before the app loaded, without a second one", async () => {
+  const fetchMock = vi.fn(() => Promise.resolve(Response.json(board(100, false))));
+  vi.stubGlobal("fetch", fetchMock);
+  globalThis.__early = { "/api/board": Promise.resolve(Response.json(board(300, false))) };
+  render(
+    <QueryClientProvider client={client()}>
+      <View />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("$300.00");
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(globalThis.__early["/api/board"]).toBeUndefined();
+});
+
+it("sends its own request when the early one failed", async () => {
+  const fetchMock = vi.fn(() => Promise.resolve(Response.json(board(100, false))));
+  vi.stubGlobal("fetch", fetchMock);
+  const failed = Promise.reject(new TypeError("offline"));
+  failed.catch(() => {});
+  globalThis.__early = { "/api/board": failed };
+  render(
+    <QueryClientProvider client={client()}>
+      <View />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("$100.00");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});

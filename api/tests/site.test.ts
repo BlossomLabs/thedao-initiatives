@@ -376,41 +376,54 @@ async function gunzip(res: Response): Promise<string> {
 
 Deno.test("site: built assets and pages are gzipped when the client accepts it", async () => {
   const h = await siteHarness();
-  const big = `export const pad = "${"x".repeat(20_000)}";`;
-  await Deno.writeTextFile(`${h.root}/assets/big-abc123.js`, big);
-  const page = `<html><script>${SCRIPT}</script>${"<p>HOME</p>".repeat(400)}</html>`;
-  await Deno.writeTextFile(`${h.root}/index.html`, page);
-  const gz = { headers: { "accept-encoding": "gzip, br" } };
+  try {
+    const big = `export const pad = "${"x".repeat(20_000)}";`;
+    await Deno.writeTextFile(`${h.root}/assets/big-abc123.js`, big);
+    const page = `<html><script>${SCRIPT}</script>${"<p>HOME</p>".repeat(400)}</html>`;
+    await Deno.writeTextFile(`${h.root}/index.html`, page);
+    const gz = { headers: { "accept-encoding": "gzip, br" } };
 
-  const zipped = await h.req("/assets/big-abc123.js", gz);
-  assertEquals(zipped.status, 200);
-  assertEquals(zipped.headers.get("content-encoding"), "gzip");
-  assert(/accept-encoding/i.test(zipped.headers.get("vary") ?? ""), "Vary: Accept-Encoding");
-  assertEquals(zipped.headers.get("cache-control"), "public, max-age=31536000, immutable");
-  assertEquals(await gunzip(zipped), big);
+    const zipped = await h.req("/assets/big-abc123.js", gz);
+    assertEquals(zipped.status, 200);
+    assertEquals(zipped.headers.get("content-encoding"), "gzip");
+    assert(/accept-encoding/i.test(zipped.headers.get("vary") ?? ""), "Vary: Accept-Encoding");
+    assertEquals(zipped.headers.get("cache-control"), "public, max-age=31536000, immutable");
+    assert(zipped.headers.get("etag")?.startsWith("W/"), "a compressed body carries a weak ETag");
+    assertEquals(await gunzip(zipped), big);
 
-  const plain = await h.req("/assets/big-abc123.js");
-  assertEquals(plain.headers.get("content-encoding"), null);
-  assertEquals(await plain.text(), big);
+    const plain = await h.req("/assets/big-abc123.js");
+    assertEquals(plain.headers.get("content-encoding"), null);
+    assertEquals(await plain.text(), big);
 
-  // The page is rewritten per request (origin, CSP hashes) and still compresses.
-  const html = await h.req("/", gz);
-  assertEquals(html.headers.get("content-encoding"), "gzip");
-  assertEquals(html.headers.get("cache-control"), "no-cache");
-  assertStringIncludes(
-    html.headers.get("Content-Security-Policy-Report-Only") ?? "",
-    await scriptHash(SCRIPT),
-  );
-  assertStringIncludes(await gunzip(html), "<p>HOME</p>");
+    // The page is rewritten per request on a preview origin (origin, CSP
+    // hashes) and streamed from disk on the canonical one; both compress.
+    const html = await h.req("/", gz);
+    assertEquals(html.headers.get("content-encoding"), "gzip");
+    assertEquals(html.headers.get("cache-control"), "no-cache");
+    assertStringIncludes(
+      html.headers.get("Content-Security-Policy-Report-Only") ?? "",
+      await scriptHash(SCRIPT),
+    );
+    assertStringIncludes(await gunzip(html), "<p>HOME</p>");
+    const streamed = await h.app.request(SITE_URL + "/", gz, testConnection("203.0.113.42"));
+    assertEquals(streamed.status, 200);
+    assertEquals(streamed.headers.get("content-encoding"), "gzip");
+    assert(streamed.headers.get("etag")?.startsWith("W/"), "weak ETag on the streamed page");
+    assertStringIncludes(await gunzip(streamed), "<p>HOME</p>");
 
-  // Metadata-only answers stay unencoded.
-  const head = await h.req("/assets/big-abc123.js", { method: "HEAD", ...gz });
-  assertEquals(head.status, 200);
-  assertEquals(head.headers.get("content-encoding"), null);
-  const cached = await h.req("/assets/big-abc123.js", {
-    headers: { "accept-encoding": "gzip", "if-none-match": plain.headers.get("etag")! },
-  });
-  assertEquals(cached.status, 304);
-  assertEquals(cached.headers.get("content-encoding"), null);
-  await h.close();
+    // Metadata-only answers stay unencoded, including a revalidation with the
+    // weak ETag a browser holds after a gzipped answer.
+    const head = await h.req("/assets/big-abc123.js", { method: "HEAD", ...gz });
+    assertEquals(head.status, 200);
+    assertEquals(head.headers.get("content-encoding"), null);
+    for (const etag of [plain.headers.get("etag")!, zipped.headers.get("etag")!]) {
+      const cached = await h.req("/assets/big-abc123.js", {
+        headers: { "accept-encoding": "gzip", "if-none-match": etag },
+      });
+      assertEquals(cached.status, 304, etag);
+      assertEquals(cached.headers.get("content-encoding"), null);
+    }
+  } finally {
+    await h.close();
+  }
 });

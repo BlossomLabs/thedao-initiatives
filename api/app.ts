@@ -57,7 +57,9 @@ export function createApp(
   app.use("*", securityHeaders(site?.policy));
   // JSON bodies gzip to about a fifth (the board is the one that matters) and
   // the built site's scripts and styles to a third; serveDir sends them raw.
-  // Hono leaves HEAD, 304, 206 and small or already encoded bodies alone.
+  // Hono skips HEAD, 206, bodiless answers (304), already encoded and
+  // non-compressible types, and file bodies under 1 KB (a c.json() body has
+  // no Content-Length, so small JSON is compressed as it always was).
   app.use("*", compress());
   useApi(
     apiHeaders,

@@ -1,5 +1,5 @@
 import { Wallet } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useWallet } from "~/context/wallet";
 import { useSession } from "~/context/session";
 import { useWalletPicker } from "~/context/wallet-picker";
 import { cn } from "~/lib/utils";
@@ -18,7 +18,7 @@ export const walletBtn =
 export default function ConnectInline({ className }: { className?: string }) {
   const { connecting, signingIn } = useSession();
   const { openWalletPicker, walletPickerOpen } = useWalletPicker();
-  const { isConnected } = useAccount();
+  const { isConnected } = useWallet();
 
   return (
     <span className={cn("relative", className)}>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLoginWithEmail, usePrivy } from "@privy-io/react-auth";
-import { useConfig } from "wagmi";
+import { useWalletStore } from "~/context/wallet";
 import { Dialog } from "~/components/ui/Dialog";
 import { Button } from "~/components/ui/Button";
 import { Field, Input, Label } from "~/components/ui/Field";
@@ -28,7 +28,7 @@ export default function EmailSignInDialog({
   const { sendCode, loginWithCode } = useLoginWithEmail();
   const { authenticated, createWallet } = usePrivy();
   const { connect } = useSession();
-  const config = useConfig();
+  const wallet = useWalletStore();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -57,6 +57,7 @@ export default function EmailSignInDialog({
         }
       }
       await privyStore.waitForWallet();
+      const { config } = await wallet.load();
       const c = config.connectors.find((x) => x.id === PRIVY_CONNECTOR_ID);
       if (!c) throw new Error("Email sign-in is not available.");
       await connect(c);

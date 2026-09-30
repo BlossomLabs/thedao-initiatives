@@ -6,6 +6,7 @@ import { Dialog } from "~/components/ui/Dialog";
 import { useSession } from "~/context/session";
 import { useEmailSignIn } from "~/context/email-sign-in";
 import { useConnectors } from "~/hooks/use-connectors";
+import { useWallet } from "~/context/wallet";
 import { walletErrorMessage } from "~/lib/donate";
 import { PRIVY_CONNECTOR_ID } from "~/lib/privy-store";
 import { type MobileWallet, normalizeWallets, walletDeepLink } from "~/lib/mobile-wallets";
@@ -21,6 +22,7 @@ export default function WalletPicker({ open, onOpenChange }: {
   onOpenChange: (open: boolean) => void;
 }) {
   const connectors = useConnectors();
+  const { attached } = useWallet();
   const { connect, cancelPairing, connecting, signingIn, restoring } = useSession();
   const { openEmailSignIn } = useEmailSignIn();
   const [view, setView] = useState<"choose" | "mobile">("choose");
@@ -183,6 +185,7 @@ export default function WalletPicker({ open, onOpenChange }: {
       {view === "choose"
         ? (
           <div className="flex flex-col gap-2">
+            {!attached && <p className="text-[14px] text-white/60">Loading wallets…</p>}
             {connectors.filter((c) =>
               c.id !== "walletConnect" && (c.id !== "injected" || injectedAvailable)
             ).map((c) => (

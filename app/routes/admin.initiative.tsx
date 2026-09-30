@@ -5,7 +5,7 @@ import PageSkeleton from "~/components/layout/PageSkeleton";
 import StickyAside from "~/components/layout/StickyAside";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
-import { useAccount } from "wagmi";
+import { useWallet } from "~/context/wallet";
 import { Download, ExternalLink, FileText, MessageSquare } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
@@ -66,7 +66,7 @@ export default function ManageInitiative() {
   // (`said`): the page is long, and a box under the title is off screen for
   // someone pressing "Add pledge" or "Recheck" far below it.
   const [msg, setMsg] = useState<(NonNullable<Msg> & { at: string }) | null>(null);
-  const { isConnected } = useAccount();
+  const { isConnected } = useWallet();
   const safe = useSafeDeploy(data?.initiative.id ?? "", refresh);
   const runAt = (at: string): Run => async (fn, ok) => {
     setMsg(null);

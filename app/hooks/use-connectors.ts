@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { type Connector, useConnect } from "wagmi";
+import type { Connector } from "wagmi";
+import { useWallet } from "~/context/wallet";
 import { MOCK_WALLET } from "~/lib/wallet-env";
 
 /**
@@ -7,7 +8,7 @@ import { MOCK_WALLET } from "~/lib/wallet-env";
  * generic "Injected" entry only until EIP-6963 announced a named wallet.
  */
 export function useConnectors(): Connector[] {
-  const { connectors } = useConnect();
+  const { connectors } = useWallet();
   return useMemo(() => {
     const named = connectors.some((c) => c.type === "injected" && c.id !== "injected");
     return connectors.filter((c) =>

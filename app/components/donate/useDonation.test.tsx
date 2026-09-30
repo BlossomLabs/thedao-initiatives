@@ -16,10 +16,9 @@ vi.mock("wagmi/actions", () => ({
   getBalance: vi.fn(),
   readContract: vi.fn(),
 }));
-vi.mock("wagmi", () => ({
-  useAccount: () => walletState,
-  useConfig: () => ({}),
-  useConnect: () => ({ connectors: [], connectAsync: vi.fn() }),
+vi.mock("~/context/wallet", () => ({
+  useWallet: () => ({ ...walletState, connectors: [], connect: vi.fn() }),
+  useWalletStore: () => ({ load: () => Promise.resolve({ config: {} }) }),
 }));
 vi.mock("./Celebration", () => ({ confettiBurst: vi.fn() }));
 vi.mock("~/lib/api", async (original) => ({

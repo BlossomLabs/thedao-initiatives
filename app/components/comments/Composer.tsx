@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Wallet } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useWallet } from "~/context/wallet";
 import { useSession } from "~/context/session";
 import { useIdentity } from "~/hooks/use-identity";
 import ConnectInline from "~/components/wallet/ConnectInline";
@@ -22,7 +22,7 @@ export default function Composer(
     ) => Promise<string | null>;
   },
 ) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useWallet();
   const { session, requireSession, connecting } = useSession();
   const identity = useIdentity(address);
   const [text, setText] = useState("");

@@ -4,7 +4,7 @@ import { expect, it, vi } from "vitest";
 import { api } from "~/lib/api";
 import CommentsSection from "./CommentsSection";
 
-vi.mock("wagmi", () => ({ useAccount: () => ({ isConnected: false }) }));
+vi.mock("~/context/wallet", () => ({ useWallet: () => ({ isConnected: false }) }));
 vi.mock("~/context/session", () => ({
   useSession: () => ({ session: null, requireSession: vi.fn() }),
   sessionKey: () => null,

@@ -1,4 +1,11 @@
 import { categoryOf } from "~/lib/categories";
+import {
+  orList,
+  qualifierOf,
+  setQualifier as setQualifierIn,
+  tokens,
+  wordOf,
+} from "~/lib/query-text";
 
 /**
  * The admin list's one query: `type:grant status:pending cat:opsec,defi
@@ -26,40 +33,30 @@ const FUNDING = ["open", "funded"] as const;
 export const UNTAGGED = "untagged";
 
 type Name = "type" | "status" | "cat" | "funding";
-const QUALIFIER = /^(type|status|cat|funding):(.*)$/i;
-
-/** Raw tokens: "quoted phrases" or runs of non-space, in order. */
-const tokens = (q: string): string[] => q.match(/"[^"]*"?|\S+/g) ?? [];
-
-const list = (xs: readonly string[]) =>
-  xs.length > 1 ? `${xs.slice(0, -1).join(", ")} or ${xs[xs.length - 1]}` : xs[0];
+const NAMES: readonly Name[] = ["type", "status", "cat", "funding"];
 
 export function parseAdminQuery(q: string): { query: AdminQuery; problems: string[] } {
   const query: AdminQuery = { type: "all", status: "all", cats: [], funding: "all", words: [] };
   const problems: string[] = [];
   for (const raw of tokens(q)) {
-    if (raw.startsWith('"')) {
-      const phrase = raw.replace(/^"|"$/g, "").trim().toLowerCase();
-      if (phrase) query.words.push(phrase);
-      continue;
-    }
-    const m = QUALIFIER.exec(raw);
+    const m = qualifierOf(raw, NAMES);
     if (!m) {
-      query.words.push(raw.toLowerCase());
+      const word = wordOf(raw);
+      if (word) query.words.push(word);
       continue;
     }
-    const name = m[1].toLowerCase() as Name;
-    const value = m[2].toLowerCase();
+    const name = m.name as Name;
+    const value = m.value;
     if (name === "type") {
       if ((TYPES as readonly string[]).includes(value)) query.type = value as AdminType;
-      else problems.push(`Unknown type: ${m[2]}. Try ${list(TYPES)}.`);
+      else problems.push(`Unknown type: ${m.rawValue}. Try ${orList(TYPES)}.`);
     } else if (name === "status") {
       if ((ADMIN_STATUSES as readonly string[]).includes(value)) {
         query.status = value as AdminStatus;
-      } else problems.push(`Unknown status: ${m[2]}. Try ${list(ADMIN_STATUSES)}.`);
+      } else problems.push(`Unknown status: ${m.rawValue}. Try ${orList(ADMIN_STATUSES)}.`);
     } else if (name === "funding") {
       if ((FUNDING as readonly string[]).includes(value)) query.funding = value as AdminFunding;
-      else problems.push(`Unknown funding: ${m[2]}. Try ${list(FUNDING)}.`);
+      else problems.push(`Unknown funding: ${m.rawValue}. Try ${orList(FUNDING)}.`);
     } else {
       for (const slug of value.split(",").filter(Boolean)) {
         if (slug === UNTAGGED || categoryOf(slug)) {
@@ -71,25 +68,6 @@ export function parseAdminQuery(q: string): { query: AdminQuery; problems: strin
   return { query, problems };
 }
 
-/**
- * The query with one qualifier set (a pill picked): it replaces that qualifier
- * where it first stood, or is appended; "all" or no categories removes it.
- * Words, phrases and other qualifiers keep their text and order.
- */
-export function setQualifier(q: string, name: Name, value: string | string[]): string {
-  const text = Array.isArray(value) ? value.join(",") : value;
-  const next = text && text !== "all" ? `${name}:${text}` : null;
-  const out: string[] = [];
-  let placed = false;
-  for (const raw of tokens(q)) {
-    const m = QUALIFIER.exec(raw);
-    if (m && m[1].toLowerCase() === name) {
-      if (next && !placed) out.push(next);
-      placed = true;
-      continue;
-    }
-    out.push(raw);
-  }
-  if (next && !placed) out.push(next);
-  return out.join(" ");
-}
+/** The query with one qualifier set (a pill picked); see query-text's setQualifier. */
+export const setQualifier = (q: string, name: Name, value: string | string[]): string =>
+  setQualifierIn(q, name, value, NAMES);

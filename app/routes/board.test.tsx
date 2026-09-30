@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -69,10 +69,10 @@ const at = (url: string) => {
 };
 
 const findMatches = (q: string) => {
-  fireEvent.change(screen.getByRole("textbox", { name: /security work/ }), {
+  fireEvent.change(screen.getByRole("searchbox", { name: /Search initiatives/ }), {
     target: { value: q },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Find matches" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
 };
 
 it("the phone Filters button is there from the first render, before the sheet code loads", () => {
@@ -119,7 +119,7 @@ it("AI order: Sort shows AI matches, filters still narrow, a manual sort clears 
 it("filters still narrow the AI order", async () => {
   api.mockResolvedValue({ matches: ["a", "c"] });
   at("/?cat=opsec");
-  findMatches("anything");
+  findMatches("anything cat:opsec");
   await waitFor(() => expect(screen.getAllByText("AI pick")).toHaveLength(1));
   expect(screen.queryByText("Alpha fuzzing")).toBeNull();
 });
@@ -127,7 +127,7 @@ it("filters still narrow the AI order", async () => {
 it("Clear filters keeps the sort and the AI order", async () => {
   api.mockResolvedValue({ matches: ["b"] });
   const router = at("/?cat=opsec&status=open&sort=newest");
-  findMatches("wallets");
+  findMatches("wallets cat:opsec funding:open");
   await screen.findByText("AI pick");
   fireEvent.click(
     screen.getAllByRole("button", { name: "Clear filters" })[0],
@@ -175,4 +175,15 @@ describe("list view", () => {
     const router = at("/");
     await waitFor(() => expect(router.state.location.search).toBe("?view=list"));
   });
+});
+
+it("while the AI thinks, an empty keyword result says it is asking, not that nothing matches", async () => {
+  let answer!: (v: { matches: string[] }) => void;
+  api.mockReturnValue(new Promise((r) => (answer = r)));
+  at("/");
+  findMatches("tools that keep keys safe");
+  expect(await screen.findByText("Asking AI for the best matches…")).toBeInTheDocument();
+  expect(screen.queryByText(/No Initiatives match/)).toBeNull();
+  await act(async () => answer({ matches: ["b"] }));
+  expect(await screen.findByText("AI pick")).toBeInTheDocument();
 });

@@ -1,10 +1,11 @@
 import { Fragment, lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Sparkles } from "lucide-react";
 import { Link, useSearchParams } from "react-router";
 import PageMain from "~/components/layout/PageMain";
 import SectionHeading from "~/components/layout/SectionHeading";
 import Hero from "~/components/board/Hero";
-import AiSearch from "~/components/board/AiSearch";
+import BoardSearch from "~/components/board/BoardSearch";
 import InitiativeCard from "~/components/board/InitiativeCard";
 import { useWatchlist } from "~/hooks/use-watchlist";
 import SuggestCard from "~/components/board/SuggestCard";
@@ -54,6 +55,7 @@ export default function Board() {
   const { data, isLoading, isError } = useBoard();
   const qc = useQueryClient();
   const [matches, setMatches] = useState<string[] | null>(null);
+  const [asking, setAsking] = useState(false);
   const [params, setParams] = useSearchParams();
   const view = useMemo(() => readView(params), [params]);
   useEffect(() => {
@@ -93,13 +95,15 @@ export default function Board() {
   // otherwise the default order is closest to funded.
   const featuredSet = useMemo(() => featuredIds(all), [all]);
   const featured = featuredSet.size > 0;
+  // While the AI order is on, the model ranked every initiative: the typed words
+  // stop filtering (the qualifiers still do), and Esc brings them back.
   const shownView = useMemo(
-    () => ({ ...view, sort: sortFor(view.sort, featured) }),
-    [view, featured],
+    () => ({ ...view, sort: sortFor(view.sort, featured), ...(ai ? { q: "" } : {}) }),
+    [view, featured, ai],
   );
-  const counts = useMemo(() => facetCounts(all, view, watchlist.ids), [
+  const counts = useMemo(() => facetCounts(all, shownView, watchlist.ids), [
     all,
-    view,
+    shownView,
     watchlist.ids,
   ]);
   // Filters and sort first; the AI picks then move to the front of what is left.
@@ -124,7 +128,16 @@ export default function Board() {
         <SectionHeading id="rfps" className="max-[640px]:text-center">
           Security initiatives looking for funding
         </SectionHeading>
-        {data?.flags.aiSearch && all.length > 0 && <AiSearch active={ai} onMatches={setMatches} />}
+        {data && all.length > 0 && (
+          <BoardSearch
+            view={view}
+            onFilter={setView}
+            aiEnabled={Boolean(data.flags.aiSearch)}
+            active={ai}
+            onMatches={setMatches}
+            onAsking={setAsking}
+          />
+        )}
         {data && all.length > 0 && (
           <>
             <FilterBar
@@ -179,9 +192,19 @@ export default function Board() {
             No initiatives published yet. <Link to="/submit">Suggest the first one.</Link>
           </p>
         )}
-        {data && all.length > 0 && !cards.length && (
+        {data && all.length > 0 && !cards.length && asking && (
+          // A sentence for the AI rarely matches as keywords: not "nothing matches" while it thinks.
+          <p className="mb-[46px] flex items-center gap-2.5 text-muted" role="status">
+            <Sparkles className="size-4 animate-pulse text-dao-green" aria-hidden="true" />
+            Asking AI for the best matches…
+          </p>
+        )}
+        {data && all.length > 0 && !cards.length && !asking && (
           <div className="mb-[46px] flex flex-wrap items-center gap-3 text-muted">
             No Initiatives match these filters.
+            {view.q.trim() && data.flags.aiSearch && (
+              <span>Press Enter in the search box to ask AI instead.</span>
+            )}
             <Button
               sm
               variant="ghost"

@@ -225,3 +225,44 @@ Deno.test("feed cache: built once and shared through KV, dropped by a write, age
     await t.close();
   }
 });
+
+Deno.test("feed build: pledges come from the card summaries, not a read per initiative", async () => {
+  const t = await setup();
+  try {
+    await t.h.db.pledges.add(t.live.id, {
+      company: "Received Labs",
+      amountUsd: 40_000,
+      status: "received",
+      note: "",
+      url: "",
+      logoCid: "",
+    });
+    await t.h.db.pledges.add(t.live.id, {
+      company: "",
+      amountUsd: 1_000,
+      status: "pledged",
+      note: "",
+      url: "",
+      logoCid: "",
+    });
+    // The board builds the card summaries after the new pledges; the feed then reads them.
+    await t.req("/api/board");
+    let direct = 0;
+    const list = t.h.db.pledges.list;
+    t.h.db.pledges.list = (...a: Parameters<typeof list>) => {
+      direct++;
+      return list(...a);
+    };
+    const all = await (await t.req("/api/initiatives.json")).json() as {
+      initiatives: { slug: string; pledges: unknown }[];
+    };
+    assertEquals(direct, 0);
+    // named, pledged or received, largest first; no withdrawn or unnamed ones
+    assertEquals(all.initiatives.find((x) => x.slug === t.live.slug)!.pledges, [
+      { company: "Received Labs", amountUsd: 40_000, status: "received" },
+      { company: "Example Foundation", amountUsd: 25_000, status: "pledged" },
+    ]);
+  } finally {
+    await t.close();
+  }
+});

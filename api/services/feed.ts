@@ -76,7 +76,7 @@ export function feedInitiative(
   origin: string,
   r: Initiative,
   card: Card,
-  pledges: Pledge[],
+  pledges: Pick<Pledge, "company" | "amountUsd" | "status">[],
 ): FeedInitiative {
   const t = pickText(r);
   const structured = isStructured(t);
@@ -140,14 +140,17 @@ export async function buildFeed(
   origin: string,
   cards: Card[],
 ): Promise<Feed> {
-  const approved = await deps.db.initiatives.list(["approved"]);
+  // The full rows for the text; the pledges from the card summaries (#63), which
+  // keep every pledge not withdrawn, largest first, in a few batched reads.
+  const [approved, summaries] = await Promise.all([
+    deps.db.initiatives.list(["approved"]),
+    deps.db.cards.summaries(cards.map((c) => c.initiative.id)),
+  ]);
   const byId = new Map(approved.map((r) => [r.id, r]));
-  const initiatives = await Promise.all(
-    cards.flatMap((card) => {
-      const r = byId.get(card.initiative.id);
-      return r ? [deps.db.pledges.list(r.id).then((p) => feedInitiative(origin, r, card, p))] : [];
-    }),
-  );
+  const initiatives = cards.flatMap((card, i) => {
+    const r = byId.get(card.initiative.id);
+    return r ? [feedInitiative(origin, r, card, summaries[i].pledges)] : [];
+  });
   return {
     schemaVersion: FEED_SCHEMA_VERSION,
     generatedAt: new Date(deps.now() * 1000).toISOString(),

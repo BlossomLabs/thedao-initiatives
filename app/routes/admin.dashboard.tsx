@@ -21,7 +21,6 @@ import type { AdminComment, AdminDashboard } from "~/lib/api-types";
 import { adminFacetCounts, approvedCounts, filterAdminRows } from "~/lib/admin-rows";
 import { parseAdminQuery, setQualifier, UNTAGGED } from "~/lib/admin-query";
 import AdminFilters from "~/components/admin/AdminFilters";
-import VoteSettings from "~/components/admin/VoteSettings";
 import SafeSyncIcon from "~/components/admin/SafeSyncIcon";
 import TypeGlyph from "~/components/board/filters/TypeGlyph";
 import { dt, plural, shortAddr, truncate, usd } from "~/lib/format";
@@ -47,7 +46,9 @@ export default function Dashboard() {
   const { signOut, session } = useSession();
   const qc = useQueryClient();
   // The banner's query, so the button costs no request of its own.
-  const maintenance = useSiteSettings().data?.maintenance;
+  const site = useSiteSettings().data;
+  const maintenance = site?.maintenance;
+  const vote = site?.vote;
   const { data, isLoading, error } = useQuery({
     queryKey: [...dashKey, sessionKey(session)],
     queryFn: ({ signal }) => api<AdminDashboard>("/api/admin/dashboard", { signal }),
@@ -138,6 +139,24 @@ export default function Dashboard() {
             title="Who is likely to fund each initiative (private)"
           >
             Funder leads
+          </LinkButton>
+          <LinkButton
+            variant="ghost"
+            sm
+            to="/admin/vote"
+            title="The first goal, and whether the site shows it"
+          >
+            {vote && (
+              <span
+                className={cn(
+                  "size-[9px] flex-none rounded-full",
+                  vote.show ? "bg-dao-green shadow-[0_0_10px_rgba(92,183,90,.6)]" : "bg-white/30",
+                )}
+                aria-hidden="true"
+              />
+            )}
+            Vote
+            {vote && <span className="sr-only">{vote.show ? ", on the site" : ", hidden"}</span>}
           </LinkButton>
           <LinkButton
             variant="ghost"
@@ -581,7 +600,6 @@ export default function Dashboard() {
         </table>
       </div>
 
-      <VoteSettings />
       <SyncContent />
     </PageMain>
   );

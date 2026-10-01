@@ -190,3 +190,14 @@ it("while the AI thinks, an empty keyword result says it is asking, not that not
   });
   expect(await screen.findByText("AI pick")).toBeInTheDocument();
 });
+
+it("nothing matches: no button of its own, the bar's Clear filters lights up and clears", async () => {
+  const router = at("/?q=zzzz-nothing");
+  expect(await screen.findByText(/No Initiatives match/)).toBeInTheDocument();
+  const clears = screen.getAllByRole("button", { name: "Clear filters" });
+  expect(clears).toHaveLength(2); // the bar's link: desktop row and phone line, no third
+  for (const c of clears) expect(c.className).toContain("animate-shine");
+  fireEvent.click(clears[0]);
+  await waitFor(() => expect(router.state.location.search).toBe(""));
+  expect(screen.queryByText(/No Initiatives match/)).toBeNull();
+});

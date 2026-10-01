@@ -39,11 +39,11 @@ import { cn } from "~/lib/utils";
  */
 export function DonateStandIn() {
   const chip =
-    "rounded-full border border-edge2 bg-white/5 px-4 py-2 font-inter-tight text-[13px] text-soft max-[760px]:px-4 max-[760px]:py-[11px]";
+    "whitespace-nowrap rounded-full border border-edge2 bg-white/5 px-1 py-2 text-center font-inter-tight text-[13px] text-soft max-[760px]:py-[11px]";
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex flex-col gap-2.5 pb-2.5">
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-4 gap-1.5">
           {["50", "500", "5000", "50000"].map((c) => (
             <button key={c} type="button" className={chip} disabled>
               ${Number(c).toLocaleString("en-US")}
@@ -55,7 +55,7 @@ export function DonateStandIn() {
             <span className="flex-none font-inter-tight text-[14px] font-light text-muted">$</span>
             <input
               className="min-w-0 flex-1 bg-transparent py-2.5 pl-1 pr-3.5 font-inter-tight text-[14px] font-light text-white outline-none placeholder:text-white/35"
-              placeholder="Custom amount ($1 minimum)"
+              placeholder="Custom amount"
               aria-label="Amount in US dollars"
               disabled
             />
@@ -136,7 +136,7 @@ export default function InitiativeCard({
   const reveal = useVoteReveal(Boolean(vote?.show) && !callout);
   const shown = callout ??
     (reveal.open && vote ? voteStanding(summary.total, r.goalUsd, vote) : null);
-  // One label on the top edge, by priority: AI pick, then Featured, then New.
+  // The top edge: AI pick or New, then the Featured pin.
   const label = cardLabel({ aiTop, featured, approvedAt: r.approvedAt });
   const canDonate = tokensOk && donationsEnabled;
   return (
@@ -144,15 +144,15 @@ export default function InitiativeCard({
       {...reveal.handlers}
       style={style}
       className={cn(
-        "card card-hover flex flex-col motion-safe:animate-fade-in-up",
+        "card card-hover flex flex-col",
         aiTop &&
           "border-[rgba(92,183,90,.5)] shadow-[0_0_0_1px_rgba(92,183,90,.25),0_14px_30px_rgba(0,0,0,.35)]",
       )}
       data-initiative-id={r.id}
     >
-      {label && (
-        <span className="absolute -top-2.5 left-3.5 flex">
-          <CardLabel kind={label} />
+      {label.length > 0 && (
+        <span className="absolute -top-2.5 left-3.5 flex items-center gap-1.5">
+          {label.map((k) => <CardLabel key={k} kind={k} />)}
         </span>
       )}
       <TypeBadge type={r.type} />

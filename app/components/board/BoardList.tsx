@@ -1,4 +1,6 @@
 import { Popover } from "@base-ui/react/popover";
+import { AnimatePresence, motion } from "motion/react";
+import { useRowMotion } from "~/components/board/Shuffle";
 import { TypeBadge } from "~/components/ui/Badge";
 import CardTitle from "~/components/board/CardTitle";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
@@ -102,9 +104,13 @@ function Row(
   const standing = vote?.show ? voteStanding(summary.total, r.goalUsd, vote) : null;
   // Hovering or tapping the row shows its vote callout under the bar.
   const reveal = useVoteReveal(Boolean(standing));
+  // Rows come and go with the filters: a fade, and a glide when others move.
+  const rowMotion = useRowMotion();
   const prefetch = usePrefetchInitiative(r.slug);
   return (
-    <li
+    <motion.li
+      {...rowMotion}
+      {...reveal.handlers}
       className={cn(
         ROW,
         // Open, the row stacks above the rows after it, so the callout is never under them.
@@ -131,7 +137,7 @@ function Row(
           onPrefetch={prefetch}
           className="min-w-0 pr-0 text-[14px] leading-[1.3]"
         />
-        {label && <CardLabel kind={label} className="flex-none max-[640px]:hidden" />}
+        {label.map((k) => <CardLabel key={k} kind={k} className="flex-none max-[640px]:hidden" />)}
       </div>
       <span
         className={cn(
@@ -169,12 +175,13 @@ function Row(
           inline
           className="hidden flex-none px-2 py-[2px] text-[10px] max-[640px]:inline-flex"
         />
-        {label && (
+        {label.map((k) => (
           <CardLabel
-            kind={label}
+            key={k}
+            kind={k}
             className="hidden flex-none px-2 py-[2px] text-[10px] max-[640px]:inline-flex"
           />
-        )}
+        ))}
         <Backers count={backers}>
           <span
             className={cn(
@@ -214,7 +221,7 @@ function Row(
           {pctText(pct)}
         </span>
       </div>
-    </li>
+    </motion.li>
   );
 }
 
@@ -249,19 +256,21 @@ export default function BoardList(
           <span className="text-right">Raised</span>
         </div>
         <ul className="col-span-full m-0 grid list-none grid-cols-subgrid p-0">
-          {cards.map((c) => (
-            <Row
-              key={c.initiative.id}
-              card={c}
-              label={cardLabel({
-                aiTop: aiTop.includes(c.initiative.id),
-                featured: featured?.has(c.initiative.id),
-                approvedAt: c.initiative.approvedAt,
-              })}
-              watch={watch}
-              vote={vote}
-            />
-          ))}
+          <AnimatePresence>
+            {cards.map((c) => (
+              <Row
+                key={c.initiative.id}
+                card={c}
+                label={cardLabel({
+                  aiTop: aiTop.includes(c.initiative.id),
+                  featured: featured?.has(c.initiative.id),
+                  approvedAt: c.initiative.approvedAt,
+                })}
+                watch={watch}
+                vote={vote}
+              />
+            ))}
+          </AnimatePresence>
         </ul>
       </div>
     </div>

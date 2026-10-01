@@ -154,10 +154,17 @@ export default function FilterBar({
         onChange={(on) => onChange({ watchlist: on })}
       />
     );
+  // Nothing matches: a light sweeps across the link, the one way out.
+  const empty = filtered && shown === 0;
   const clear = filtered && (
     <button
       type="button"
-      className="cursor-pointer border-0 bg-transparent px-1 py-0 font-inter-tight text-[12px] text-white/55 underline decoration-white/25 underline-offset-2 hover:text-white"
+      className={cn(
+        "inline-block cursor-pointer border-0 bg-transparent px-1 py-0 font-inter-tight text-[12px] underline underline-offset-2 hover:text-white",
+        empty
+          ? "font-medium text-white decoration-white/25 motion-safe:shine-text motion-safe:animate-shine"
+          : "text-white/55 decoration-white/25",
+      )}
       onClick={() => onChange({ ...CLEARED })}
     >
       Clear filters

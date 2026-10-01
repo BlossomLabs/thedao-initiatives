@@ -164,13 +164,14 @@ export default function DonateWidget({
       {/* Each Reveal carries its own gap as padding and cancels the column's, so a closed one takes no room. */}
       <Reveal show={method === "wallet"} className="-mb-2.5">
         <div className="flex flex-col gap-2.5 pb-2.5">
-          <div className="flex flex-wrap gap-2">
+          {/* The four amounts share one row, in equal columns. */}
+          <div className="grid grid-cols-4 gap-1.5">
             {CHIPS.map((c) => (
               <button
                 key={c}
                 type="button"
                 className={cn(
-                  "cursor-pointer rounded-full border px-4 py-2 font-inter-tight text-[13px] transition-all duration-150 max-[760px]:px-4 max-[760px]:py-[11px]",
+                  "cursor-pointer whitespace-nowrap rounded-full border px-1 py-2 text-center font-inter-tight text-[13px] transition-all duration-150 max-[760px]:py-[11px]",
                   amount === c
                     ? "border-dao-green bg-dao-green font-medium text-white"
                     : "border-edge2 bg-white/5 text-soft hover:border-[rgba(92,183,90,.6)] hover:text-dao-green",
@@ -189,7 +190,7 @@ export default function DonateWidget({
               <input
                 className="min-w-0 flex-1 bg-transparent py-2.5 pl-1 pr-3.5 font-inter-tight text-[14px] font-light text-white outline-none placeholder:text-white/35"
                 inputMode="decimal"
-                placeholder="Custom amount ($1 minimum)"
+                placeholder="Custom amount"
                 aria-label="Amount in US dollars"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}

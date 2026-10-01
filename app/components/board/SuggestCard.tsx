@@ -6,7 +6,7 @@ export default function SuggestCard({ style }: { style?: React.CSSProperties }) 
     <Link
       to="/submit"
       style={style}
-      className="card group flex min-h-[220px] cursor-pointer flex-col items-center justify-center gap-1.5 border-dashed border-white/15 bg-white/[.03] text-center text-soft no-underline hover:border-[rgba(92,183,90,.55)] hover:no-underline hover:shadow-[0_0_30px_rgba(92,183,90,.1)] motion-safe:animate-fade-in-up"
+      className="card group flex min-h-[220px] cursor-pointer flex-col items-center justify-center gap-1.5 border-dashed border-white/15 bg-white/[.03] text-center text-soft no-underline hover:border-[rgba(92,183,90,.55)] hover:no-underline hover:shadow-[0_0_30px_rgba(92,183,90,.1)]"
     >
       <span
         className="flex size-12 items-center justify-center rounded-full border border-[rgba(0,255,136,.3)] bg-[rgba(0,255,136,.12)] font-inter-tight text-[30px] font-light leading-none text-dao-green transition-[transform,background] duration-150 group-hover:scale-[1.08] group-hover:bg-[rgba(92,183,90,.16)]"

@@ -1,4 +1,5 @@
-import { Fragment, lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import { Link, useSearchParams } from "react-router";
@@ -9,6 +10,7 @@ import BoardSearch from "~/components/board/BoardSearch";
 import InitiativeCard from "~/components/board/InitiativeCard";
 import { useWatchlist } from "~/hooks/use-watchlist";
 import SuggestCard from "~/components/board/SuggestCard";
+import { ShuffleItem } from "~/components/board/Shuffle";
 import PledgeBand from "~/components/board/PledgeBand";
 import FilterBar, { preloadFilters } from "~/components/board/FilterBar";
 import { preloadDots } from "~/components/board/CardTitle";
@@ -18,12 +20,10 @@ import {
   preloadSheet,
 } from "~/components/board/filters/SheetTrigger";
 import CategoryDot from "~/components/ui/CategoryDot";
-import { Button } from "~/components/ui/Button";
 import {
   applyView,
   type BoardSort,
   type BoardView,
-  CLEARED,
   facetCounts,
   featuredIds,
   groupByPrimary,
@@ -83,6 +83,13 @@ export default function Board() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, on arrival
 
   const ai = Boolean(matches?.length);
+  // The cards come in one after another only the first time they show; after that
+  // a filter's arrivals come in at once.
+  const shownOnce = useRef(false);
+  const firstShow = !shownOnce.current;
+  useEffect(() => {
+    if (data?.cards.length) shownOnce.current = true;
+  }, [data]);
   // A manual sort hands the order back from the AI.
   const onSort = (sort: BoardSort) => {
     setMatches(null);
@@ -206,13 +213,6 @@ export default function Board() {
             {view.q.trim() && data.flags.aiSearch && (
               <span>Press Enter in the search box to ask AI instead.</span>
             )}
-            <Button
-              sm
-              variant="ghost"
-              onClick={() => setView({ ...CLEARED })}
-            >
-              Clear filters
-            </Button>
           </div>
         )}
         {data && (all.length === 0 || cards.length > 0) &&
@@ -244,34 +244,47 @@ export default function Board() {
                   </Suspense>
                 )
                 : (
-                  <div className="grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
-                    {
-                      /* Under 69 approved initiatives the suggest card leads the grid (Griff, 20 -> 69 on
+                  // `relative`: cards leaving are taken out of the flow while they fade.
+                  <div className="relative grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
+                    <AnimatePresence mode="popLayout">
+                      {
+                        /* Under 69 approved initiatives the suggest card leads the grid (Griff, 20 -> 69 on
                   2026-09-16); while filters narrow the board it goes last. */
-                    }
-                    {gi === 0 && all.length < SUGGEST_LAST_FROM && !filtered && "flat" in g && (
-                      <SuggestCard />
-                    )}
-                    {g.cards.map((c, i) => (
-                      <InitiativeCard
-                        key={c.initiative.id}
-                        card={c}
-                        tokensOk={data.flags.tokensOk}
-                        vote={data.flags.vote}
-                        aiTop={Boolean(matches?.includes(c.initiative.id))}
-                        featured={featuredSet.has(c.initiative.id)}
-                        onDonated={() => void qc.invalidateQueries({ queryKey: boardKey })}
-                        style={{ animationDelay: `${i * 60}ms` }}
-                        watch={{
-                          on: watchlist.has(c.initiative.id),
-                          toggle: () => watchlist.toggle(c.initiative.id),
-                        }}
-                      />
-                    ))}
-                    {gi === groups.length - 1 &&
-                      (all.length >= SUGGEST_LAST_FROM || filtered || !("flat" in g)) && (
-                      <SuggestCard style={{ animationDelay: `${g.cards.length * 60}ms` }} />
-                    )}
+                      }
+                      {gi === 0 && all.length < SUGGEST_LAST_FROM && !filtered && "flat" in g && (
+                        <ShuffleItem key="suggest-first" stagger={firstShow}>
+                          <SuggestCard />
+                        </ShuffleItem>
+                      )}
+                      {g.cards.map((c, i) => (
+                        <ShuffleItem key={c.initiative.id} index={i + 1} stagger={firstShow}>
+                          <InitiativeCard
+                            card={c}
+                            tokensOk={data.flags.tokensOk}
+                            vote={data.flags.vote}
+                            aiTop={Boolean(matches?.includes(c.initiative.id))}
+                            featured={featuredSet.has(c.initiative.id)}
+                            onDonated={() =>
+                              void qc.invalidateQueries({ queryKey: boardKey })}
+                            watch={{
+                              on: watchlist.has(c.initiative.id),
+                              toggle: () =>
+                                watchlist.toggle(c.initiative.id),
+                            }}
+                          />
+                        </ShuffleItem>
+                      ))}
+                      {gi === groups.length - 1 &&
+                        (all.length >= SUGGEST_LAST_FROM || filtered || !("flat" in g)) && (
+                        <ShuffleItem
+                          key="suggest-last"
+                          index={g.cards.length + 1}
+                          stagger={firstShow}
+                        >
+                          <SuggestCard />
+                        </ShuffleItem>
+                      )}
+                    </AnimatePresence>
                   </div>
                 )}
             </Fragment>

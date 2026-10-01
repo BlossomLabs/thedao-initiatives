@@ -87,7 +87,7 @@ it("every row sits on the list's shared columns", () => {
   }
 });
 
-it("rows carry the card's one label (AI pick, Featured or New)", () => {
+it("rows carry the card's labels (the Featured pin, then AI pick or New)", () => {
   mount({ aiTop: ["a"] });
   const rows = screen.getAllByRole("listitem");
   // beside the title on desktop, beside the type on phones

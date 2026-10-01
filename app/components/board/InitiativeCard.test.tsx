@@ -163,7 +163,7 @@ it("the watchlist bookmark is a pressed-state button named for the initiative", 
   expect(toggle).toHaveBeenCalled();
 });
 
-it("a featured card shows Featured, not New", () => {
+it("a featured new card shows the pin and New", () => {
   const base = card({}).initiative;
   render(
     <MemoryRouter>
@@ -175,13 +175,21 @@ it("a featured card shows Featured, not New", () => {
     </MemoryRouter>,
   );
   expect(screen.getByText("Featured")).toBeInTheDocument();
-  expect(screen.queryByText("New")).toBeNull();
+  expect(screen.getByText("New")).toBeInTheDocument();
 });
 
-it("shows one label on the top edge: AI pick over Featured over New", () => {
+it("the top edge: AI pick or New, then the Featured pin; AI pick over New", () => {
   const base = card({}).initiative;
   const fresh = card({ initiative: { ...base, approvedAt: Date.now() / 1000 - 86400 } });
-  const labels = () => ["AI pick", "Featured", "New"].filter((t) => screen.queryByText(t));
+  // In the order they appear on the top edge.
+  const labels = () =>
+    ["AI pick", "Featured", "New"]
+      .map((t) => [t, screen.queryByText(t)] as const)
+      .filter(([, el]) => el)
+      .sort(([, a], [, b]) =>
+        a!.compareDocumentPosition(b!) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+      )
+      .map(([t]) => t);
   const view = (props: { aiTop?: boolean; featured?: boolean }) =>
     render(
       <MemoryRouter>
@@ -189,10 +197,13 @@ it("shows one label on the top edge: AI pick over Featured over New", () => {
       </MemoryRouter>,
     );
   let v = view({ aiTop: true, featured: true });
-  expect(labels()).toEqual(["AI pick"]);
+  expect(labels()).toEqual(["AI pick", "Featured"]);
+  v.unmount();
+  v = view({ aiTop: true });
+  expect(labels()).toEqual(["AI pick"]); // never with New
   v.unmount();
   v = view({ featured: true });
-  expect(labels()).toEqual(["Featured"]);
+  expect(labels()).toEqual(["New", "Featured"]);
   v.unmount();
   view({});
   expect(labels()).toEqual(["New"]);

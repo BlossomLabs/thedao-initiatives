@@ -26,7 +26,7 @@ export function aiRoutes(deps: Deps) {
     const items = initiatives.map((x) => ({
       id: x.id,
       title: x.title.slice(0, 120),
-      summary: x.summary.slice(0, 300),
+      summary: x.summary.slice(0, 1000),
     }));
     const key = JSON.stringify([
       query,

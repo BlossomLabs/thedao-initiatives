@@ -777,20 +777,44 @@ Deno.test("ai-search: Jev scores every proposal, caches content, and has its own
       assertEquals(Object.keys(request.questions).length, 5);
       const answers = Object.fromEntries(
         Object.entries(request.questions).map(([key, value]) => {
-          const question = value as { type: string; instructions: { proposal: { title: string } } };
-          assertEquals(question.type, "noul");
+          const question = value as {
+            type: string;
+            criteria: string[];
+            instructions: { context: string; proposal: { title: string; summary: string } };
+          };
+          assertEquals(question.type, "score");
+          assertEquals(question.criteria.length, 5);
+          assertEquals(
+            question.instructions.context.includes("solc is the Solidity compiler"),
+            true,
+          );
+          assertEquals(question.instructions.context.includes("ERC-8255"), true);
+          assertEquals(question.instructions.context.includes("Echidna"), true);
+          assertEquals(question.instructions.context.includes("ordinary adjective safe"), true);
           const index = Number(question.instructions.proposal.title.at(-1));
-          return [key, { type: "noul", noul: index / 4 }];
+          if (index === 0) {
+            assertEquals(
+              question.instructions.proposal.summary.length,
+              calls === 1 ? 700 : "Changed proposal text".length,
+            );
+          }
+          return [key, { type: "score", score: index === 2 ? 2.45 : index }];
         }),
       );
-      return Response.json({ answers: { ...answers, bogus: { type: "noul", noul: 1 } } });
+      return Response.json({ answers: { ...answers, bogus: { type: "score", score: 4 } } });
     },
   });
   const jevBoard = await j(await h.req("/api/board"));
   assertEquals((jevBoard.flags as { aiSearchAuto: boolean }).aiSearchAuto, true);
   const rows = [];
   for (let i = 0; i < 5; i++) {
-    rows.push(await h.db.initiatives.insert({ title: `Proposal ${i}`, status: "approved" }));
+    rows.push(
+      await h.db.initiatives.insert({
+        title: `Proposal ${i}`,
+        summary: i === 0 ? "s".repeat(700) : "",
+        status: "approved",
+      }),
+    );
   }
   await h.db.initiatives.insert({ title: "Pending 5", status: "pending" });
   const search = () =>
@@ -802,7 +826,7 @@ Deno.test("ai-search: Jev scores every proposal, caches content, and has its own
     (await h.req("/api/ai-search", { method: "POST", json: { query: "ab" } })).status,
     400,
   );
-  const expected = rows.map((r, i) => ({ id: r.id, score: i / 4 })).reverse();
+  const expected = rows.map((r, i) => ({ id: r.id, score: (i === 2 ? 2.45 : i) / 4 })).reverse();
   assertEquals(await j(await search()), { scores: expected, pickThreshold: 0.75 });
   await search();
   assertEquals(calls, 1);
@@ -832,6 +856,10 @@ Deno.test("ai-search: disabling TypeSafe uses the configured LLM and scores the 
       calls++;
       const request = JSON.parse(String(init?.body));
       assertEquals(request.model, "existing-model");
+      assertEquals(request.messages[0].content.includes("ERC-8255"), true);
+      assertEquals(request.messages[0].content.includes("Echidna"), true);
+      assertEquals(request.messages[0].content.includes("ordinary adjective safe"), true);
+      assertEquals(request.messages[0].content.includes("passing mention"), true);
       const input = JSON.parse(request.messages[1].content);
       assertEquals(input.query, "wallet security");
       assertEquals(input.proposals.length, 4);
@@ -911,8 +939,8 @@ Deno.test("ai-search: LLM mode requires its key and rejects missing or malformed
 
 Deno.test("ai-search: invalid or missing Jev scores fail without caching partial rankings", async () => {
   for (
-    const answer of [undefined, { type: "noul", noul: "0.9" }, { type: "noul", noul: 1.1 }, {
-      type: "score",
+    const answer of [undefined, { type: "score", score: "3.6" }, { type: "score", score: 4.1 }, {
+      type: "noul",
       noul: 0.9,
     }]
   ) {

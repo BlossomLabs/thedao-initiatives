@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Card } from "~/lib/api-types";
 import Board from "./board";
 
+const searchMode = vi.hoisted(() => ({ automatic: false }));
+
 const cards = vi.hoisted(() =>
   [
     { id: "a", title: "Alpha fuzzing", type: "rfp", categories: ["fuzzing-testing"] },
@@ -40,7 +42,11 @@ const cards = vi.hoisted(() =>
 vi.mock("~/hooks/use-board", () => ({
   boardKey: ["board"],
   useBoard: () => ({
-    data: { cards, totals: { raised: 0 }, flags: { aiSearch: true, tokensOk: false } },
+    data: {
+      cards,
+      totals: { raised: 0 },
+      flags: { aiSearch: true, aiSearchAuto: searchMode.automatic, tokensOk: false },
+    },
     isLoading: false,
     isError: false,
   }),
@@ -55,7 +61,10 @@ vi.mock("~/lib/api", async (o) => ({
   ...(await o<typeof import("~/lib/api")>()),
   api: (...a: unknown[]) => api(...a),
 }));
-beforeEach(() => api.mockReset());
+beforeEach(() => {
+  api.mockReset();
+  searchMode.automatic = false;
+});
 
 const at = (url: string) => {
   const router = createMemoryRouter([{ path: "/", element: <Board /> }], {
@@ -253,4 +262,26 @@ it("list view uses score order and the same AI pick threshold", async () => {
   expect(within(rows[0]).getAllByText("AI pick").length).toBeGreaterThan(0);
   expect(within(rows[1]).queryByText("AI pick")).toBeNull();
   localStorage.clear();
+});
+
+it("Jev searches as you type and sets keyword filtering aside during the debounce", async () => {
+  searchMode.automatic = true;
+  api.mockResolvedValue({
+    scores: [{ id: "b", score: 0.9 }, { id: "a", score: 0.4 }, { id: "c", score: 0.1 }],
+    pickThreshold: 0.8,
+  });
+  at("/");
+  fireEvent.change(screen.getByRole("searchbox", { name: /Search initiatives/ }), {
+    target: { value: "tools that protect keys" },
+  });
+  expect(document.querySelectorAll("[data-initiative-id]")).toHaveLength(3);
+  expect(api).not.toHaveBeenCalled();
+  await screen.findByText("AI pick");
+  expect(screen.queryByText(/Initiatives ordered by relevance/)).toBeNull();
+  expect(api).toHaveBeenCalledTimes(1);
+  expect(
+    [...document.querySelectorAll("[data-initiative-id]")].map((el) =>
+      el.getAttribute("data-initiative-id")
+    ),
+  ).toEqual(["b", "a", "c"]);
 });

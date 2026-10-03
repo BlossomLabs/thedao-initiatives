@@ -1,7 +1,7 @@
 import type { AiSearchResult } from "../../../shared/ai-search";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import BoardSearch from "./BoardSearch";
 import { type BoardView, DEFAULT_VIEW } from "~/lib/board-view";
 
@@ -11,11 +11,16 @@ vi.mock("~/lib/api", async (original) => ({
   api: (...a: unknown[]) => api(...a),
 }));
 beforeEach(() => api.mockReset());
+afterEach(() => vi.useRealTimers());
 
 // The board around the box: its filters and the AI order.
 const board = { view: DEFAULT_VIEW as BoardView, matches: null as string[] | null };
 function Host(
-  { aiEnabled = true, start = {} }: { aiEnabled?: boolean; start?: Partial<BoardView> },
+  { aiEnabled = true, aiAuto = false, start = {} }: {
+    aiEnabled?: boolean;
+    aiAuto?: boolean;
+    start?: Partial<BoardView>;
+  },
 ) {
   const [view, setView] = useState<BoardView>({ ...DEFAULT_VIEW, ...start });
   const [result, setResult] = useState<AiSearchResult | null>(null);
@@ -27,6 +32,7 @@ function Host(
         view={view}
         onFilter={(next) => setView((v) => ({ ...v, ...next }))}
         aiEnabled={aiEnabled}
+        aiAuto={aiAuto}
         active={Boolean(result?.scores.length)}
         onResults={setResult}
       />
@@ -35,6 +41,9 @@ function Host(
         RFPs pill
       </button>
       <button type="button" onClick={() => setResult(null)}>Manual sort</button>
+      <button type="button" onClick={() => setView((v) => ({ ...v, sort: "newest" }))}>
+        Newest sort
+      </button>
     </>
   );
 }
@@ -151,4 +160,113 @@ it("without AI: just the keyword box, no Ask AI", () => {
   enter();
   expect(api).not.toHaveBeenCalled();
   expect(board.view.q).toBe("wallet");
+});
+
+const result = { scores: [{ id: "a", score: 0.9 }], pickThreshold: 0.8 };
+const tick = async (ms: number) => {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+};
+
+it("Jev debounces typing and sends only the latest words", async () => {
+  vi.useFakeTimers();
+  api.mockResolvedValue(result);
+  render(<Host aiAuto />);
+  type("sol");
+  await tick(300);
+  type("solidity cat:opsec");
+  await tick(499);
+  expect(api).not.toHaveBeenCalled();
+  await tick(1);
+  expect(api).toHaveBeenCalledTimes(1);
+  expect(api).toHaveBeenCalledWith("/api/ai-search", { json: { query: "solidity" } });
+  expect(board.matches).toEqual(["a"]);
+  expect(screen.queryByText(/Initiatives ordered by relevance/)).toBeNull();
+  expect(screen.queryByText("Back to keywords")).toBeNull();
+  expect(board.view.cats).toEqual(["opsec"]);
+  fireEvent.click(screen.getByRole("button", { name: "RFPs pill" }));
+  await tick(600);
+  expect(api).toHaveBeenCalledTimes(1);
+  expect(board.matches).toEqual(["a"]);
+});
+
+it("Jev automatically searches a query restored from the URL", async () => {
+  vi.useFakeTimers();
+  api.mockResolvedValue(result);
+  render(<Host aiAuto start={{ q: "solidity" }} />);
+  await tick(500);
+  expect(api).toHaveBeenCalledWith("/api/ai-search", { json: { query: "solidity" } });
+});
+
+it("editing or clearing rejects an in-flight response before the next debounce fires", async () => {
+  vi.useFakeTimers();
+  let finish!: (value: AiSearchResult) => void;
+  api.mockReturnValueOnce(
+    new Promise<AiSearchResult>((resolve) => {
+      finish = resolve;
+    }),
+  )
+    .mockResolvedValue(result);
+  render(<Host aiAuto />);
+  type("solidity");
+  await tick(500);
+  type("wallets");
+  await act(async () => {
+    finish(result);
+    await Promise.resolve();
+  });
+  expect(board.matches).toBeNull();
+  type("");
+  await tick(600);
+  expect(api).toHaveBeenCalledTimes(1);
+  expect(board.matches).toBeNull();
+  type("ab");
+  await tick(600);
+  expect(api).toHaveBeenCalledTimes(1);
+});
+
+it("Enter flushes the Jev debounce without a duplicate request", async () => {
+  vi.useFakeTimers();
+  api.mockResolvedValue(result);
+  render(<Host aiAuto />);
+  type("solidity");
+  enter();
+  await tick(600);
+  expect(api).toHaveBeenCalledTimes(1);
+});
+
+it("Esc and manual sorting do not immediately restart automatic search", async () => {
+  vi.useFakeTimers();
+  api.mockResolvedValue(result);
+  render(<Host aiAuto />);
+  type("solidity");
+  fireEvent.keyDown(box(), { key: "Escape" });
+  await tick(600);
+  expect(api).not.toHaveBeenCalled();
+  type("wallets");
+  await tick(500);
+  expect(board.matches).toEqual(["a"]);
+  fireEvent.click(screen.getByRole("button", { name: "Manual sort" }));
+  await tick(600);
+  expect(board.matches).toBeNull();
+  expect(api).toHaveBeenCalledTimes(1);
+});
+
+it("unmounting cancels a scheduled automatic search", async () => {
+  vi.useFakeTimers();
+  const { unmount } = render(<Host aiAuto />);
+  type("solidity");
+  unmount();
+  await tick(600);
+  expect(api).not.toHaveBeenCalled();
+});
+
+it("a manual sort cancels the pending Jev debounce", async () => {
+  vi.useFakeTimers();
+  render(<Host aiAuto />);
+  type("solidity");
+  fireEvent.click(screen.getByRole("button", { name: "Newest sort" }));
+  await tick(600);
+  expect(api).not.toHaveBeenCalled();
 });

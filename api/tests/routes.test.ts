@@ -786,6 +786,8 @@ Deno.test("ai-search: Jev scores every proposal, caches content, and has its own
       return Response.json({ answers: { ...answers, bogus: { type: "noul", noul: 1 } } });
     },
   });
+  const jevBoard = await j(await h.req("/api/board"));
+  assertEquals((jevBoard.flags as { aiSearchAuto: boolean }).aiSearchAuto, true);
   const rows = [];
   for (let i = 0; i < 5; i++) {
     rows.push(await h.db.initiatives.insert({ title: `Proposal ${i}`, status: "approved" }));
@@ -853,6 +855,7 @@ Deno.test("ai-search: disabling TypeSafe uses the configured LLM and scores the 
   }
   const board = await j(await h.req("/api/board"));
   assertEquals((board.flags as { aiSearch: boolean }).aiSearch, true);
+  assertEquals((board.flags as { aiSearchAuto: boolean }).aiSearchAuto, false);
   const search = () =>
     h.req("/api/ai-search", {
       method: "POST",

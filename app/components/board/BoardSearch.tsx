@@ -13,24 +13,29 @@ import {
 } from "~/lib/board-query";
 import { cn } from "~/lib/utils";
 
-type Filters = Pick<BoardView, "q" | "type" | "cats" | "status">;
+type Filters =
+  & Pick<BoardView, "q" | "type" | "cats" | "status">
+  & Partial<Pick<BoardView, "sort">>;
 
 /**
  * The board's one search box, in two modes.
  * - Keywords (as you type): every word must match an initiative's title,
  *   summary, team or category; `type:grant cat:opsec funding:open` move the
  *   pills, and the pills write them back.
- * - AI (Enter, or Ask AI): the words go to the model, which ranks every
+ * - Jev searches after a 500 ms typing pause; the LLM uses Enter or Ask AI.
+ * - AI: the words go to the model, which ranks every
  *   initiative; scores order the whole board and the board sets the keyword filter
  *   aside while that order is on (the qualifiers still filter). Esc, editing
  *   the text, or a manual sort go back.
  * The icon, a tag in the box and the note under it say which mode is on.
  */
 export default function BoardSearch(
-  { view, onFilter, aiEnabled, active, onResults, onAsking }: {
+  { view, onFilter, aiEnabled, aiAuto = false, active, onResults, onAsking }: {
     view: Filters;
     onFilter: (next: Partial<BoardView>) => void;
     aiEnabled: boolean;
+    /** Jev searches automatically after a 500 ms pause in typing. */
+    aiAuto?: boolean;
     /** Whether the board still shows the AI order (a manual sort clears it). */
     active: boolean;
     onResults: (result: AiSearchResult | null) => void;
@@ -43,6 +48,9 @@ export default function BoardSearch(
   const noteId = useId();
   // The latest search wins: an answer to an earlier one is dropped.
   const seq = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const automatic = aiEnabled && aiAuto;
+  const previousSort = useRef(view.sort);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<React.ReactNode>(null);
   const [failed, setFailed] = useState(false);
@@ -66,7 +74,15 @@ export default function BoardSearch(
   }, [view.type, view.cats.join(), view.status, view.q]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Back to keywords: the AI order goes, so the words filter again.
+  const cancel = () => {
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = null;
+    ++seq.current;
+  };
+
   const leaveAi = () => {
+    cancel();
+    setBusy(false);
     setAiMode(false);
     setNote(null);
     onResults(null);
@@ -74,33 +90,31 @@ export default function BoardSearch(
 
   // The board cleared the AI order (a manual sort): back to keywords.
   useEffect(() => {
-    if (!active && aiMode) {
-      setAiMode(false);
-      setNote(null);
+    if ((!active && aiMode) || previousSort.current !== view.sort) {
+      leaveAi();
     }
-  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
+    previousSort.current = view.sort;
+  }, [active, view.sort]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function edit(next: string) {
     setText(next);
     setFailed(false);
     const p = parseBoardQuery(next).query;
-    if (aiMode) {
-      setAiMode(false);
-      setNote(null);
-      onResults(null);
-    } else if (note) setNote(null);
+    if (p.words.join(" ") !== words) {
+      leaveAi();
+    } else if (note && !aiMode) setNote(null);
     onFilter({ type: p.type, cats: p.cats, status: p.status, q: p.words.join(" ") });
   }
 
-  async function run(e: React.FormEvent) {
-    e.preventDefault();
+  async function search() {
     if (!aiEnabled) return;
     if (words.length < 3) {
       setFailed(true);
       setNote("Describe what you want to fund in a few words, then press Enter.");
       return;
     }
-    const mine = ++seq.current;
+    cancel();
+    const mine = seq.current;
     setBusy(true);
     setFailed(false);
     setNote(null);
@@ -110,23 +124,27 @@ export default function BoardSearch(
       });
       if (mine !== seq.current) return;
       if (!result.scores.length) {
+        setAiMode(false);
+        onResults(null);
         setNote("No initiatives to rank; filtering by your keywords.");
         return;
       }
       setAiMode(true);
       onResults(result); // the board sets the words aside while this order is on
       setNote(
-        <>
-          Initiatives ordered by relevance; type:, cat: and funding: still filter.{" "}
-          <button
-            type="button"
-            className="cursor-pointer border-0 bg-transparent p-0 text-dao-green underline"
-            onClick={() => leaveAi()}
-          >
-            Back to keywords
-          </button>{" "}
-          <span className="max-[640px]:hidden">(Esc)</span>
-        </>,
+        automatic ? null : (
+          <>
+            Initiatives ordered by relevance; type:, cat: and funding: still filter.{" "}
+            <button
+              type="button"
+              className="cursor-pointer border-0 bg-transparent p-0 text-dao-green underline"
+              onClick={() => leaveAi()}
+            >
+              Back to keywords
+            </button>{" "}
+            <span className="max-[640px]:hidden">(Esc)</span>
+          </>
+        ),
       );
     } catch (err) {
       if (mine !== seq.current) return;
@@ -137,12 +155,34 @@ export default function BoardSearch(
     }
   }
 
+  function run(e: React.FormEvent) {
+    e.preventDefault();
+    void search();
+  }
+
+  useEffect(() => {
+    if (!automatic || words.length < 3) {
+      setBusy(false);
+      return;
+    }
+    // Qualifier changes do not send another request: only the words are scored.
+    setBusy(true);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      void search();
+    }, 500);
+    return cancel;
+  }, [words, automatic]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Invalidate any pending response when the box unmounts.
+  useEffect(() => cancel, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const hint = problems.length ? problems.join(" ") : null;
   return (
     <>
       <form className="mb-5 mt-1 flex" autoComplete="off" onSubmit={run}>
         <div className="relative min-w-0 flex-1">
-          {aiMode
+          {aiMode || automatic
             ? (
               <Sparkles
                 className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-dao-green"
@@ -158,32 +198,37 @@ export default function BoardSearch(
           <input
             type="search"
             className={cn(
-              "field pl-11 placeholder:text-white/25 min-[641px]:pr-[8.5rem]",
+              "field pl-11 placeholder:text-white/25 [&::-webkit-search-cancel-button]:opacity-30 [&::-webkit-search-cancel-button:hover]:opacity-60",
+              aiEnabled && !automatic ? "min-[641px]:pr-[8.5rem]" : "pr-4",
               aiEnabled && "rounded-r-none border-r-0",
               aiMode ? "border-[rgba(92,183,90,.55)]" : "border-white/10",
             )}
             maxLength={300}
             spellCheck={false}
-            placeholder={aiEnabled
+            placeholder={automatic
+              ? "Describe the work you want to fund"
+              : aiEnabled
               ? phone
                 ? "Search, or ask AI"
                 : "Search by keyword, or describe the work you want to fund and press Enter to ask AI"
               : "Search by keyword, type:grant, cat:opsec, funding:open"}
-            aria-label={aiEnabled
+            aria-label={automatic
+              ? "Search initiatives by AI"
+              : aiEnabled
               ? "Search initiatives by keyword, or describe the work you want to fund and press Enter to ask AI"
               : "Search initiatives by keyword"}
             aria-describedby={note || hint ? noteId : undefined}
             value={text}
             onChange={(e) => edit(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Escape" && aiMode) {
+              if (e.key === "Escape" && (aiMode || busy)) {
                 e.preventDefault();
                 leaveAi();
               }
             }}
           />
           {/* Which mode the box is in, at its end (desktop). */}
-          {aiEnabled && (aiMode || words) && (
+          {aiEnabled && !automatic && (aiMode || words) && (
             <span
               className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5 font-inter-tight text-[12px] max-[640px]:hidden"
               aria-hidden="true"
@@ -211,10 +256,10 @@ export default function BoardSearch(
             variant="primary"
             type="submit"
             loading={busy}
-            aria-label="Ask AI"
+            aria-label={automatic ? "Search" : "Ask AI"}
             className="flex-none rounded-l-none max-[640px]:w-[51px] max-[640px]:px-0"
           >
-            <span className="max-[640px]:hidden">Ask AI</span>
+            <span className="max-[640px]:hidden">{automatic ? "Search" : "Ask AI"}</span>
             <Sparkles className="size-4" aria-hidden="true" />
           </Button>
         )}

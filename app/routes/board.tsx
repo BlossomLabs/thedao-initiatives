@@ -106,8 +106,12 @@ export default function Board() {
   // While the AI order is on, the model ranked every initiative: the typed words
   // stop filtering (the qualifiers still do), and Esc brings them back.
   const shownView = useMemo(
-    () => ({ ...view, sort: sortFor(view.sort, featured), ...(ai ? { q: "" } : {}) }),
-    [view, featured, ai],
+    () => ({
+      ...view,
+      sort: sortFor(view.sort, featured),
+      ...(ai || (data?.flags.aiSearchAuto && asking) ? { q: "" } : {}),
+    }),
+    [view, featured, ai, data?.flags.aiSearchAuto, asking],
   );
   const counts = useMemo(() => facetCounts(all, shownView, watchlist.ids), [
     all,
@@ -150,6 +154,7 @@ export default function Board() {
             view={view}
             onFilter={setView}
             aiEnabled={Boolean(data.flags.aiSearch)}
+            aiAuto={Boolean(data.flags.aiSearchAuto)}
             active={ai}
             onResults={setAiResult}
             onAsking={setAsking}

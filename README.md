@@ -14,7 +14,8 @@ the process rules and the donation terms are files under `content/`; the propose
 `public/submit.md` (the drafting guide; `/llms.txt` is now the generated index of approved initiatives). The Flask MVP this replaced is described in `docs/v1-to-v2.md`.
 
 AI search uses TypeSafe Jev to score every approved initiative against the donor's query.
-The board orders all initiatives by descending score; an **AI pick** label appears only when
+With Jev enabled, search runs after a 500 ms pause in typing (at least three characters);
+the LLM mode searches on Enter or Ask AI. The board orders all initiatives by descending score; an **AI pick** label appears only when
 its score is strictly above `AI_PICK_THRESHOLD` (default `0.8`). Filters still apply, and a
 manual sort clears the AI order. Set `TYPESAFE_API_KEY` to enable search; `TYPESAFE_MODEL`
 defaults to the pinned `jev-1.13.0`. Set `TYPESAFE_ENABLED=false` to use the existing

@@ -175,6 +175,8 @@ export interface CommentEntry {
 
 export interface BoardFlags {
   aiSearch: boolean;
+  /** Jev can search automatically after typing pauses. */
+  aiSearchAuto?: boolean;
   tokensOk: boolean;
   chainDetail: string;
   uploads: boolean;

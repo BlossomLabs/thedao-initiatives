@@ -215,7 +215,7 @@ it("nothing matches: no button of its own, the bar's Clear filters lights up and
   expect(screen.queryByText(/No Initiatives match/)).toBeNull();
 });
 
-it("orders every proposal by score even when none earns an AI pick", async () => {
+it("orders every proposal and labels the first three even with low scores", async () => {
   api.mockResolvedValue({
     scores: [{ id: "b", score: 0.7 }, { id: "a", score: 0.5 }, { id: "c", score: 0.1 }],
     pickThreshold: 0.8,
@@ -228,23 +228,26 @@ it("orders every proposal by score even when none earns an AI pick", async () =>
       el.getAttribute("data-initiative-id")
     ),
   ).toEqual(["b", "a", "c"]);
-  expect(screen.queryByText("AI pick")).toBeNull();
+  expect(screen.getAllByText("AI pick")).toHaveLength(3);
+  expect(screen.getByText("70%")).toBeInTheDocument();
+  expect(screen.getByText("50%")).toBeInTheDocument();
+  expect(screen.getByText("10%")).toBeInTheDocument();
   expect(screen.getAllByRole("combobox", { name: "Sort" })[0]).toHaveTextContent("AI matches");
 });
 
-it("labels any number of proposals strictly above the threshold", async () => {
+it("labels the first three and displays each score as a percentage", async () => {
   api.mockResolvedValue({
     scores: [{ id: "a", score: 0.9 }, { id: "b", score: 0.81 }, { id: "c", score: 0.8 }],
     pickThreshold: 0.8,
   });
   at("/");
   findMatches("security");
-  await waitFor(() => expect(screen.getAllByText("AI pick")).toHaveLength(2));
+  await waitFor(() => expect(screen.getAllByText("AI pick")).toHaveLength(3));
   const boundary = document.querySelector('[data-initiative-id="c"]')!;
-  expect(within(boundary as HTMLElement).queryByText("AI pick")).toBeNull();
+  expect(within(boundary as HTMLElement).getByText("80%")).toBeInTheDocument();
 });
 
-it("list view uses score order and the same AI pick threshold", async () => {
+it("list view uses score order and displays top-three percentages", async () => {
   api.mockResolvedValue({
     scores: [{ id: "b", score: 0.9 }, { id: "a", score: 0.8 }, { id: "c", score: 0.1 }],
     pickThreshold: 0.8,
@@ -260,7 +263,8 @@ it("list view uses score order and the same AI pick threshold", async () => {
     "Gamma opsec",
   ]);
   expect(within(rows[0]).getAllByText("AI pick").length).toBeGreaterThan(0);
-  expect(within(rows[1]).queryByText("AI pick")).toBeNull();
+  expect(within(rows[1]).getAllByText("80%").length).toBeGreaterThan(0);
+  expect(within(rows[2]).getAllByText("10%").length).toBeGreaterThan(0);
   localStorage.clear();
 });
 
@@ -276,7 +280,7 @@ it("Jev searches as you type and sets keyword filtering aside during the debounc
   });
   expect(document.querySelectorAll("[data-initiative-id]")).toHaveLength(3);
   expect(api).not.toHaveBeenCalled();
-  await screen.findByText("AI pick");
+  await screen.findAllByText("AI pick");
   expect(screen.queryByText(/Initiatives ordered by relevance/)).toBeNull();
   expect(api).toHaveBeenCalledTimes(1);
   expect(
@@ -284,4 +288,29 @@ it("Jev searches as you type and sets keyword filtering aside during the debounc
       el.getAttribute("data-initiative-id")
     ),
   ).toEqual(["b", "a", "c"]);
+});
+
+it("only the first three scored results get labels when there are more proposals", async () => {
+  cards.push({
+    ...cards[0],
+    initiative: { ...cards[0].initiative, id: "d", slug: "d", title: "Delta" },
+  });
+  try {
+    api.mockResolvedValue({
+      scores: [{ id: "b", score: 0.95 }, { id: "d", score: 0.9 }, { id: "a", score: 0.85 }, {
+        id: "c",
+        score: 0.8,
+      }],
+      pickThreshold: 0.8,
+    });
+    at("/");
+    findMatches("security work");
+    await screen.findByText(/Initiatives ordered by relevance/);
+    expect(screen.getAllByText("AI pick")).toHaveLength(3);
+    const fourth = document.querySelector('[data-initiative-id="c"]')!;
+    expect(within(fourth as HTMLElement).queryByText("AI pick")).toBeNull();
+    expect(within(fourth as HTMLElement).queryByText("80%")).toBeNull();
+  } finally {
+    cards.pop();
+  }
 });

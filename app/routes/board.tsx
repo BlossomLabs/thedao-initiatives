@@ -122,12 +122,6 @@ export default function Board() {
     () => new Map(aiResult?.scores.map(({ id, score }) => [id, score])),
     [aiResult],
   );
-  const picks = useMemo(
-    () =>
-      aiResult?.scores.filter(({ score }) => score > aiResult.pickThreshold).map(({ id }) => id) ??
-        [],
-    [aiResult],
-  );
   // Equal scores retain the ordinary order; new proposals follow scored ones.
   const cards = useMemo(() => {
     const list = applyView(all, shownView, watchlist.ids);
@@ -136,6 +130,15 @@ export default function Board() {
       (scores.get(b.initiative.id) ?? -1) - (scores.get(a.initiative.id) ?? -1)
     );
   }, [all, shownView, watchlist.ids, ai, scores]);
+  const picks = useMemo(
+    () =>
+      ai
+        ? cards.filter((card) => scores.has(card.initiative.id)).slice(0, 3).map((card) =>
+          card.initiative.id
+        )
+        : [],
+    [ai, cards, scores],
+  );
   const filtered = isFiltered(view);
   // "By category" draws sections; the AI order wins over them while it is on.
   const groups = view.sort === "category" && !ai
@@ -252,6 +255,7 @@ export default function Board() {
                     <BoardList
                       cards={g.cards}
                       aiTop={picks}
+                      aiScores={scores}
                       featured={featuredSet}
                       watch={watchlist}
                       vote={data.flags.vote}
@@ -278,6 +282,7 @@ export default function Board() {
                             tokensOk={data.flags.tokensOk}
                             vote={data.flags.vote}
                             aiTop={picks.includes(c.initiative.id)}
+                            aiScore={scores.get(c.initiative.id)}
                             featured={featuredSet.has(c.initiative.id)}
                             onDonated={() =>
                               void qc.invalidateQueries({ queryKey: boardKey })}

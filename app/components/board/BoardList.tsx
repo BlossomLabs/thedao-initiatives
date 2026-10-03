@@ -91,9 +91,10 @@ function FundingBar(
 }
 
 function Row(
-  { card, label, watch, vote }: {
+  { card, label, watch, vote, aiScore }: {
     card: Card;
     label: ReturnType<typeof cardLabel>;
+    aiScore?: number;
     watch?: Watch;
     vote?: VoteSettings;
   },
@@ -137,7 +138,9 @@ function Row(
           onPrefetch={prefetch}
           className="min-w-0 pr-0 text-[14px] leading-[1.3]"
         />
-        {label.map((k) => <CardLabel key={k} kind={k} className="flex-none max-[640px]:hidden" />)}
+        {label.map((k) => (
+          <CardLabel key={k} kind={k} aiScore={aiScore} className="flex-none max-[640px]:hidden" />
+        ))}
       </div>
       <span
         className={cn(
@@ -179,6 +182,7 @@ function Row(
           <CardLabel
             key={k}
             kind={k}
+            aiScore={aiScore}
             className="hidden flex-none px-2 py-[2px] text-[10px] max-[640px]:inline-flex"
           />
         ))}
@@ -227,10 +231,11 @@ function Row(
 
 /** Compact rows: every initiative at a glance, the numbers in aligned columns. */
 export default function BoardList(
-  { cards, aiTop = [], featured, watch, vote }: {
+  { cards, aiTop = [], aiScores, featured, watch, vote }: {
     cards: Card[];
     /** Initiatives the AI search put first. */
     aiTop?: string[];
+    aiScores?: ReadonlyMap<string, number>;
     /** Pinned by the team. */
     featured?: Set<string>;
     watch?: Watch;
@@ -261,6 +266,7 @@ export default function BoardList(
               <Row
                 key={c.initiative.id}
                 card={c}
+                aiScore={aiScores?.get(c.initiative.id)}
                 label={cardLabel({
                   aiTop: aiTop.includes(c.initiative.id),
                   featured: featured?.has(c.initiative.id),

@@ -107,6 +107,7 @@ export default function InitiativeCard({
   card,
   tokensOk,
   aiTop,
+  aiScore,
   featured,
   onDonated,
   style,
@@ -120,6 +121,7 @@ export default function InitiativeCard({
   watch?: { on: boolean; toggle: () => void };
   tokensOk: boolean;
   aiTop?: boolean;
+  aiScore?: number;
   /** Pinned by the team at the top (see featuredIds): shows the Featured label. */
   featured?: boolean;
   onDonated?: () => void;
@@ -152,7 +154,7 @@ export default function InitiativeCard({
     >
       {label.length > 0 && (
         <span className="absolute -top-2.5 left-3.5 flex items-center gap-1.5">
-          {label.map((k) => <CardLabel key={k} kind={k} />)}
+          {label.map((k) => <CardLabel key={k} kind={k} aiScore={aiScore} />)}
         </span>
       )}
       <TypeBadge type={r.type} />

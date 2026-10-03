@@ -26,7 +26,7 @@ const PILL =
 
 /** One label, the same on a card's top edge and in a list row. */
 export default function CardLabel(
-  { kind, className }: { kind: CardLabelKind; className?: string },
+  { kind, className, aiScore }: { kind: CardLabelKind; className?: string; aiScore?: number },
 ) {
   if (kind === "new") return <NewMarker className={className} />;
   if (kind === "featured") {
@@ -46,5 +46,14 @@ export default function CardLabel(
       </span>
     );
   }
-  return <span className={cn(PILL, "bg-dao-green text-[#08321c]", className)}>AI pick</span>;
+  return (
+    <span className={cn(PILL, "bg-dao-green text-[#08321c]", className)}>
+      <span>AI pick</span>
+      {aiScore !== undefined && (
+        <span className="ml-1.5 tabular-nums opacity-75" title="AI relevance score">
+          {Math.round(aiScore * 100)}%
+        </span>
+      )}
+    </span>
+  );
 }

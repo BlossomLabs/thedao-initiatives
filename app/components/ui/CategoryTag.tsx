@@ -1,4 +1,5 @@
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
+import { categoryBoardUrl } from "~/lib/board-links";
 import { categoryOf, iconOf } from "~/lib/categories";
 import { cn } from "~/lib/utils";
 
@@ -39,11 +40,13 @@ export function CategoryTag(p: Common) {
 
 /** A category that links to the board filtered by it (initiative pages). */
 export function CategoryLink(p: Common & { onClick?: (e: React.MouseEvent) => void }) {
+  const location = useLocation();
   if (!categoryOf(p.slug)) return null;
   const label = categoryOf(p.slug)!.label;
   return (
     <Link
-      to={`/?cat=${p.slug}`}
+      to={categoryBoardUrl(location.pathname === "/" ? location.search : "", p.slug)}
+      preventScrollReset
       className={cls(p)}
       style={vars(p.slug)}
       title={`Show ${label} initiatives`}

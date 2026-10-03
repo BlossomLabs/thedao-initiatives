@@ -1,4 +1,5 @@
 import type { AiSearchResult } from "../../../shared/ai-search";
+import { isAiSearchQuery } from "../../../shared/ai-search";
 import { useEffect, useId, useRef, useState } from "react";
 import { CornerDownLeft, Search, Sparkles } from "lucide-react";
 import { api, errorMessage } from "~/lib/api";
@@ -108,7 +109,7 @@ export default function BoardSearch(
 
   async function search() {
     if (!aiEnabled) return;
-    if (words.length < 3) {
+    if (!isAiSearchQuery(words)) {
       setFailed(true);
       setNote("Describe what you want to fund in a few words, then press Enter.");
       return;
@@ -161,7 +162,7 @@ export default function BoardSearch(
   }
 
   useEffect(() => {
-    if (!automatic || words.length < 3) {
+    if (!automatic || !isAiSearchQuery(words)) {
       setBusy(false);
       return;
     }

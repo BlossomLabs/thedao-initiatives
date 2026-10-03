@@ -17,7 +17,7 @@ AI search uses TypeSafe Jev to rate every approved initiative against the donor'
 a five-level relevance rubric. Percentages are normalized relevance scores, not probabilities
 of correctness. The prompt recognizes domain relationships such as solc being Solidity's compiler
 and distinguishes direct work from supporting tools and incidental mentions.
-With Jev enabled, search runs after a 500 ms pause in typing (at least three characters);
+With Jev enabled, search runs after a 500 ms pause in typing (at least three characters, or `zk`);
 the LLM mode searches on Enter or Ask AI. The board orders all initiatives by descending score; the first three visible scored results receive an **AI pick** label with their score as a percentage. Filters still apply, and a
 manual sort clears the AI order. Set `TYPESAFE_API_KEY` to enable search; `TYPESAFE_MODEL`
 defaults to the pinned `jev-1.13.0`. Set `TYPESAFE_ENABLED=false` to use the existing

@@ -758,6 +758,33 @@ Deno.test("admin: settings, status, pledges with logo, safe deploy params + conf
   h.close();
 });
 
+Deno.test("ai-search: accepts zk in either provider mode but rejects other short queries", async () => {
+  for (const typesafeEnabled of ["true", "false"]) {
+    const h = await harness({
+      env: {
+        TYPESAFE_ENABLED: typesafeEnabled,
+        TYPESAFE_API_KEY: "jev-key",
+        AI_SEARCH_API_KEY: "llm-key",
+      },
+    });
+    try {
+      for (const query of ["zk", "ZK"]) {
+        const response = await h.req("/api/ai-search", { method: "POST", json: { query } });
+        assertEquals(response.status, 200);
+        assertEquals((await j(response)).scores, []);
+      }
+      for (const query of ["", "z", "ab"]) {
+        assertEquals(
+          (await h.req("/api/ai-search", { method: "POST", json: { query } })).status,
+          400,
+        );
+      }
+    } finally {
+      h.close();
+    }
+  }
+});
+
 Deno.test("ai-search: Jev scores every proposal, caches content, and has its own key", async () => {
   const off = await harness({ env: { AI_SEARCH_API_KEY: "chat-only" } });
   assertEquals(
@@ -789,8 +816,27 @@ Deno.test("ai-search: Jev scores every proposal, caches content, and has its own
             true,
           );
           assertEquals(question.instructions.context.includes("ERC-8255"), true);
-          assertEquals(question.instructions.context.includes("Echidna"), true);
-          assertEquals(question.instructions.context.includes("ordinary adjective safe"), true);
+          for (
+            const name of [
+              "Echidna",
+              "Wake",
+              "EEZ",
+              "Colibri",
+              "LUCID",
+              "ForensIQ",
+              "NanoJS",
+              "EquiVM",
+              "Etherform",
+              "Hookscope",
+            ]
+          ) {
+            assertEquals(question.instructions.context.includes(name), false);
+          }
+          assertEquals(question.instructions.context.includes("glossary is non-exhaustive"), true);
+          assertEquals(
+            question.instructions.context.includes("Relevance is not a judgment of quality"),
+            true,
+          );
           const index = Number(question.instructions.proposal.title.at(-1));
           if (index === 0) {
             assertEquals(
@@ -857,8 +903,27 @@ Deno.test("ai-search: disabling TypeSafe uses the configured LLM and scores the 
       const request = JSON.parse(String(init?.body));
       assertEquals(request.model, "existing-model");
       assertEquals(request.messages[0].content.includes("ERC-8255"), true);
-      assertEquals(request.messages[0].content.includes("Echidna"), true);
-      assertEquals(request.messages[0].content.includes("ordinary adjective safe"), true);
+      for (
+        const name of [
+          "Echidna",
+          "Wake",
+          "EEZ",
+          "Colibri",
+          "LUCID",
+          "ForensIQ",
+          "NanoJS",
+          "EquiVM",
+          "Etherform",
+          "Hookscope",
+        ]
+      ) {
+        assertEquals(request.messages[0].content.includes(name), false);
+      }
+      assertEquals(request.messages[0].content.includes("glossary is non-exhaustive"), true);
+      assertEquals(
+        request.messages[0].content.includes("Relevance is not a judgment of quality"),
+        true,
+      );
       assertEquals(request.messages[0].content.includes("passing mention"), true);
       const input = JSON.parse(request.messages[1].content);
       assertEquals(input.query, "wallet security");

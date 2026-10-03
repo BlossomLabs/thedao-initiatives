@@ -1,5 +1,6 @@
 /** AI board search: advisory and client-side only; the stored order never changes. */
 import type { AiSearchResult } from "../../shared/ai-search.ts";
+import { isAiSearchQuery } from "../../shared/ai-search.ts";
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
@@ -20,7 +21,7 @@ export function aiRoutes(deps: Deps) {
     const pickThreshold = deps.config.aiPickThreshold;
     const body = await jsonBody(c, ["query"]);
     const query = s(body.query, AI_QUERY_MAX_CHARS);
-    if (query.length < 3) throw new HttpError(400, "describe what you want to fund");
+    if (!isAiSearchQuery(query)) throw new HttpError(400, "describe what you want to fund");
     const initiatives = await db.initiatives.cards("approved");
     if (!initiatives.length) return c.json({ scores: [], pickThreshold });
     const items = initiatives.map((x) => ({

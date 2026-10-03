@@ -199,6 +199,26 @@ it("Jev automatically searches a query restored from the URL", async () => {
   expect(api).toHaveBeenCalledWith("/api/ai-search", { json: { query: "solidity" } });
 });
 
+it.each(["zk", "ZK"])("Jev accepts the short zero-knowledge query %s", async (query) => {
+  vi.useFakeTimers();
+  api.mockResolvedValue(result);
+  render(<Host aiAuto />);
+  type(query);
+  await tick(500);
+  expect(api).toHaveBeenCalledWith("/api/ai-search", { json: { query: "zk" } });
+  expect(board.matches).toEqual(["a"]);
+});
+
+it("LLM search also accepts zk on Enter", async () => {
+  api.mockResolvedValue(result);
+  render(<Host />);
+  type("zk");
+  enter();
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/ai-search", { json: { query: "zk" } })
+  );
+});
+
 it("editing or clearing rejects an in-flight response before the next debounce fires", async () => {
   vi.useFakeTimers();
   let finish!: (value: AiSearchResult) => void;

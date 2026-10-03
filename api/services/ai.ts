@@ -28,42 +28,45 @@ export const AI_RELEVANCE_LEVELS = [
   "Central focus: the principal deliverable directly improves, secures, or establishes correctness of the queried subject itself, or directly delivers the specific outcome requested in the query.",
 ];
 
-// Relationships expand query meaning; they do not imply identical scope or capabilities.
+// A non-exhaustive technical glossary, without recommendations for individual initiatives.
 const SEARCH_RELATIONSHIPS = [
-  "solc is the Solidity compiler: verifying solc's compilation correctness is direct work on Solidity itself.",
-  "ethdebug and soldb relate to Solidity debugging, execution tracing, variable inspection, and compiler debug information.",
-  "Echidna relates to smart-contract fuzzing, property testing, and invariant testing.",
-  "Wake relates to Solidity testing, fuzzing, static analysis, and developer tooling.",
-  "Foundry and Forge relate to smart-contract development and testing; Etherform specifically relates to Foundry CI/CD and upgrade safety.",
-  "EquiVM relates to formal verification of deployed EVM bytecode and contract specifications.",
-  "Verity and Lean relate to machine-checked proofs and formal verification; use their role in the proposal to determine scope.",
+  "solc is the Solidity compiler. Compiler correctness, compiler security, and source-level debugging are related but distinct kinds of language tooling.",
+  "Fuzzing includes property-based testing and invariant testing; static analysis examines code without executing it.",
+  "Smart-contract development and testing includes developer tooling, CI/CD, and upgrade safety when these are part of the proposed work.",
+  "Formal verification includes machine-checked proofs, contract specifications, and verification of source code, compilers, or deployed bytecode, according to the stated target.",
   "Decompilers and bytecode analysis relate to understanding deployed contracts without relying on source code.",
-  "Safe and Zodiac relate to multisig security, scoped permissions, signing controls, and transaction safeguards.",
-  "ERC-8255 relates to expiring token approvals, allowances, and approval exposure.",
-  "ERC-7540 relates to asynchronous tokenized vault deposit and redemption requests and claims.",
-  "Uniswap v4 hooks and Hookscope relate to hook behavior and security of pools using hooks.",
-  "LUCID and encrypted mempools relate to confidentiality before transaction ordering and protection against frontrunning.",
-  "Account abstraction relates to smart-account security, including signing, delegation, and transaction handling.",
-  "Rollup exits relate to L2 withdrawal guarantees, sequencer failure, and recovery of DeFi or multisig funds.",
-  "Colibri relates to trustless Ethereum access, client verification, and stateless clients.",
-  "ENS and .eth resolution relate to name resolution verification and protection against malicious providers or gateways.",
-  "EDR (endpoint detection and response) and OpSec (operational security) relate to endpoint protection, compromised devices, and malware.",
-  "TEE (trusted execution environment) and attestation relate to trusted execution and verification of trusted deployed code.",
-  "ForensIQ and NanoJS relate to exploit investigation, fund tracing, evidence reconstruction, and incident response.",
-  "Post-quantum and quantum-resistant relate to signer and verifier security against quantum threats.",
+  "Multisig security includes scoped permissions, signing controls, and transaction safeguards when supported by the proposal.",
+  "ERC-8255 concerns expiring token approvals and allowances. ERC-7540 concerns asynchronous tokenized vault deposit and redemption requests and claims.",
+  "Smart-contract hooks can customize protocol behavior; hook security concerns the effects of those customizations.",
+  "Encrypted mempools relate to confidentiality before transaction ordering and protection against frontrunning.",
+  "Account abstraction relates to smart accounts, including signing, delegation, and transaction handling.",
+  "Rollup exits relate to L2 withdrawal guarantees, sequencer failure, and fund recovery.",
+  "Trustless blockchain access relates to client verification, stateless clients, and locally verified blockchain data.",
+  "ENS and .eth resolution refer to Ethereum name resolution; resolution verification can protect against malicious providers or gateways.",
+  "EDR means endpoint detection and response. OpSec means operational security. These can concern endpoint protection, compromised devices, and malware.",
+  "TEE means trusted execution environment. Attestation can establish evidence about execution environments or deployed code under stated trust assumptions.",
+  "Incident response and forensics include exploit investigation, fund tracing, and evidence reconstruction.",
+  "Post-quantum and quantum-resistant refer to security against quantum threats.",
+  "ZK, zero knowledge, and zero-knowledge refer to zero-knowledge proof technology. zkSNARK, zk-SNARK, and zk SNARK are equivalent spellings. SNARKs and STARKs are relevant proof-system families in this context; zkVMs, provers, proving circuits, verification keys, and validity proofs can be related when the proposal establishes their zero-knowledge role.",
 ];
 
 const SEARCH_BOUNDARIES = [
-  "Vyper is a different smart-contract language; a comparison with Solidity or shared EVM targeting does not make Vyper compiler work Solidity work.",
+  "Different smart-contract languages are distinct query subjects; comparison with another language or shared execution targets does not make work on one language work on the other.",
   "Formal verification, fuzzing, and auditing are related but distinct deliverables; do not treat them as interchangeable.",
   "Wallet recovery vaults are distinct from DeFi investment vaults.",
-  "Safe as a wallet brand is distinct from the ordinary adjective safe.",
+  "Distinguish named products and protocols from ordinary words with the same spelling using the query and proposal context.",
   "AI-assisted security tooling is distinct from security of AI agents.",
+  "For ZK queries, distinguish direct work on zero-knowledge proving systems and circuits from integrations or applications that use them; apply the same relevance rubric as for every other topic.",
+  "Encryption, privacy, Merkle proofs, name-resolution proofs, mathematical proofs, and formal verification do not by themselves establish zero-knowledge work. A network's branding or a team's affiliation does not establish a funded ZK deliverable. Require evidence of a ZK component rather than inferring it from privacy, proof, verification, or rollup terminology alone.",
 ];
 
 const SEARCH_CONTEXT =
   "Interpret a short topic query as an interest in that subject, not a requirement for an exact word match. " +
   "Use the proposed deliverable, not repeated keywords, to judge relevance. " +
+  "Apply the same criteria to every proposal. Relevance is not a judgment of quality, impact, credibility, or funding priority. " +
+  "Do not reward or penalize project names, team identity, reputation, or inclusion in this glossary. The glossary is non-exhaustive; unlisted terminology can be equally relevant. " +
+  "If the query explicitly names a project, assess that requested subject using the supplied proposal text, without inferring additional capabilities from its name. " +
+  "Base proposal capabilities on the supplied text. Missing detail limits the available evidence; it does not prove that a capability is absent. " +
   "For a language-name query, distinguish work on the language/compiler itself from tools or applications using it. " +
   "For a specific task query (such as debugging), prioritize that task rather than language/compiler work in general. " +
   "Recognize established abbreviations and ecosystem relationships, but do not invent unsupported proposal capabilities. " +

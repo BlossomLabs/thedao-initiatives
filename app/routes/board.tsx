@@ -1,3 +1,4 @@
+import type { AiSearchResult } from "../../shared/ai-search";
 import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -54,7 +55,7 @@ const LAYOUT_KEY = "thedao:board-layout";
 export default function Board() {
   const { data, isLoading, isError } = useBoard();
   const qc = useQueryClient();
-  const [matches, setMatches] = useState<string[] | null>(null);
+  const [aiResult, setAiResult] = useState<AiSearchResult | null>(null);
   const [asking, setAsking] = useState(false);
   const [params, setParams] = useSearchParams();
   const view = useMemo(() => readView(params), [params]);
@@ -82,7 +83,7 @@ export default function Board() {
     if (saved === "list") setView({ view: "list" });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, on arrival
 
-  const ai = Boolean(matches?.length);
+  const ai = Boolean(aiResult?.scores.length);
   // The cards come in one after another only the first time they show; after that
   // a filter's arrivals come in at once.
   const shownOnce = useRef(false);
@@ -92,7 +93,7 @@ export default function Board() {
   }, [data]);
   // A manual sort hands the order back from the AI.
   const onSort = (sort: BoardSort) => {
-    setMatches(null);
+    setAiResult(null);
     setView({ sort });
   };
 
@@ -113,18 +114,27 @@ export default function Board() {
     shownView,
     watchlist.ids,
   ]);
-  // Filters and sort first; the AI picks then move to the front of what is left.
+  const scores = useMemo(
+    () => new Map(aiResult?.scores.map(({ id, score }) => [id, score])),
+    [aiResult],
+  );
+  const picks = useMemo(
+    () =>
+      aiResult?.scores.filter(({ score }) => score > aiResult.pickThreshold).map(({ id }) => id) ??
+        [],
+    [aiResult],
+  );
+  // Equal scores retain the ordinary order; new proposals follow scored ones.
   const cards = useMemo(() => {
     const list = applyView(all, shownView, watchlist.ids);
-    if (!matches?.length) return list;
-    const top = matches.map((id) => list.find((c) => c.initiative.id === id)).filter((
-      c,
-    ): c is NonNullable<typeof c> => Boolean(c));
-    return [...top, ...list.filter((c) => !matches.includes(c.initiative.id))];
-  }, [all, shownView, watchlist.ids, matches]);
+    if (!ai) return list;
+    return list.sort((a, b) =>
+      (scores.get(b.initiative.id) ?? -1) - (scores.get(a.initiative.id) ?? -1)
+    );
+  }, [all, shownView, watchlist.ids, ai, scores]);
   const filtered = isFiltered(view);
   // "By category" draws sections; the AI order wins over them while it is on.
-  const groups = view.sort === "category" && !matches?.length
+  const groups = view.sort === "category" && !ai
     ? groupByPrimary(cards)
     : [{ slug: null, cards, flat: true }];
 
@@ -141,7 +151,7 @@ export default function Board() {
             onFilter={setView}
             aiEnabled={Boolean(data.flags.aiSearch)}
             active={ai}
-            onMatches={setMatches}
+            onResults={setAiResult}
             onAsking={setAsking}
           />
         )}
@@ -236,7 +246,7 @@ export default function Board() {
                   <Suspense fallback={<Skeleton className="h-[480px] rounded-2xl" />}>
                     <BoardList
                       cards={g.cards}
-                      aiTop={matches ?? []}
+                      aiTop={picks}
                       featured={featuredSet}
                       watch={watchlist}
                       vote={data.flags.vote}
@@ -262,7 +272,7 @@ export default function Board() {
                             card={c}
                             tokensOk={data.flags.tokensOk}
                             vote={data.flags.vote}
-                            aiTop={Boolean(matches?.includes(c.initiative.id))}
+                            aiTop={picks.includes(c.initiative.id)}
                             featured={featuredSet.has(c.initiative.id)}
                             onDonated={() =>
                               void qc.invalidateQueries({ queryKey: boardKey })}

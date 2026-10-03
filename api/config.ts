@@ -148,6 +148,10 @@ export interface Config {
   pinataGateway: string;
   /** Where the support widget's messages are forwarded; empty = widget disabled (503). */
   supportUrl: string;
+  typesafeEnabled: boolean;
+  typesafeApiKey: string;
+  typesafeModel: string;
+  aiPickThreshold: number;
   aiSearchApiKey: string;
   aiSearchBaseUrl: string;
   aiSearchModel: string;
@@ -201,6 +205,10 @@ export function webOriginsFrom(env: Record<string, string | undefined>): string[
 }
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
+  const aiPickThreshold = Number((env.AI_PICK_THRESHOLD ?? "").trim() || "0.8");
+  if (!Number.isFinite(aiPickThreshold) || aiPickThreshold < 0 || aiPickThreshold > 1) {
+    throw new Error("AI_PICK_THRESHOLD must be between 0 and 1");
+  }
   const syncTtl = Number(env.SAFE_SYNC_TTL_SECS);
   const boardCache = Number((env.BOARD_CACHE_SECS ?? "").trim() || NaN);
   const rpcOverride = (env.RPC_URL ?? "").trim();
@@ -240,6 +248,10 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     pinataJwt: (env.PINATA_JWT ?? "").trim(),
     pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "ipfs.blossom.software",
     supportUrl: (env.SUPPORT_URL ?? "").trim(),
+    typesafeEnabled: !(env.TYPESAFE_ENABLED ?? "").trim() || flag(env.TYPESAFE_ENABLED),
+    typesafeApiKey: (env.TYPESAFE_API_KEY ?? "").trim(),
+    typesafeModel: (env.TYPESAFE_MODEL ?? "").trim() || "jev-1.13.0",
+    aiPickThreshold,
     aiSearchApiKey: (env.AI_SEARCH_API_KEY ?? "").trim(),
     aiSearchBaseUrl: ((env.AI_SEARCH_BASE_URL ?? "").trim() || "https://api.deepseek.com")
       .replace(/\/+$/, ""),

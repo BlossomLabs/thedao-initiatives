@@ -144,7 +144,7 @@ async function buildBoard(deps: Deps, refresh: boolean) {
       donations: cards.reduce((n, x) => n + x.donations, 0),
     },
     flags: {
-      aiSearch: deps.ai.enabled,
+      aiSearch: deps.ai.searchEnabled,
       tokensOk,
       chainDetail: state.detail,
       uploads: deps.pinata.enabled,

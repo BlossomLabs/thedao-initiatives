@@ -758,48 +758,182 @@ Deno.test("admin: settings, status, pledges with logo, safe deploy params + conf
   h.close();
 });
 
-Deno.test("ai-search: mocked provider, unknown ids dropped, cache, disabled", async () => {
-  const off = await harness();
+Deno.test("ai-search: Jev scores every proposal, caches content, and has its own key", async () => {
+  const off = await harness({ env: { AI_SEARCH_API_KEY: "chat-only" } });
   assertEquals(
-    (await off.req("/api/ai-search", { method: "POST", json: { query: "compilers" } }))
-      .status,
+    (await off.req("/api/ai-search", { method: "POST", json: { query: "compilers" } })).status,
     503,
   );
   off.close();
   let calls = 0;
   const h = await harness({
-    env: { AI_SEARCH_API_KEY: "k" },
+    env: { TYPESAFE_API_KEY: "k", AI_PICK_THRESHOLD: "0.75" },
     fetch: (url, init) => {
-      if (!url.includes("/chat/completions")) return new Response("", { status: 404 });
+      assertEquals(url, "https://api.typesafe.ai/v1/systemone");
       calls++;
-      // The reasoning model must not think out loud: it blew the 25 s budget.
-      assertEquals(JSON.parse(String(init?.body)).reasoning_effort, "none");
-      const ids = ["bogus", ...knownIds];
-      return Response.json({
-        choices: [{ message: { content: JSON.stringify({ ranked_ids: ids }) } }],
-      });
+      const request = JSON.parse(String(init?.body));
+      assertEquals(request.model, "jev-1.13.0");
+      assertEquals(request.state, { query: "verified compilers" });
+      assertEquals(Object.keys(request.questions).length, 5);
+      const answers = Object.fromEntries(
+        Object.entries(request.questions).map(([key, value]) => {
+          const question = value as { type: string; instructions: { proposal: { title: string } } };
+          assertEquals(question.type, "noul");
+          const index = Number(question.instructions.proposal.title.at(-1));
+          return [key, { type: "noul", noul: index / 4 }];
+        }),
+      );
+      return Response.json({ answers: { ...answers, bogus: { type: "noul", noul: 1 } } });
     },
   });
-  const a = await h.db.initiatives.insert({ title: "Alpha initiative", status: "approved" });
-  const b = await h.db.initiatives.insert({ title: "Beta initiative", status: "approved" });
-  const knownIds = [b.id, a.id];
+  const rows = [];
+  for (let i = 0; i < 5; i++) {
+    rows.push(await h.db.initiatives.insert({ title: `Proposal ${i}`, status: "approved" }));
+  }
+  await h.db.initiatives.insert({ title: "Pending 5", status: "pending" });
+  const search = () =>
+    h.req("/api/ai-search", {
+      method: "POST",
+      json: { query: "verified compilers" },
+    });
   assertEquals(
     (await h.req("/api/ai-search", { method: "POST", json: { query: "ab" } })).status,
     400,
   );
-  const res = await j(
-    await h.req("/api/ai-search", {
-      method: "POST",
-      json: { query: "verified compilers" },
-    }),
-  );
-  assertEquals(res.matches, [b.id, a.id]);
-  await h.req("/api/ai-search", {
-    method: "POST",
-    json: { query: "Verified Compilers" },
+  const expected = rows.map((r, i) => ({ id: r.id, score: i / 4 })).reverse();
+  assertEquals(await j(await search()), { scores: expected, pickThreshold: 0.75 });
+  await search();
+  assertEquals(calls, 1);
+  await h.db.initiatives.revise(rows[0].id, { ...rows[0], summary: "Changed proposal text" }, {
+    source: "admin",
+    author: ADMIN,
   });
-  assertEquals(calls, 1); // cached
+  await search();
+  assertEquals(calls, 2);
   h.close();
+});
+
+Deno.test("ai-search: disabling TypeSafe uses the configured LLM and scores the whole board", async () => {
+  let calls = 0;
+  const h = await harness({
+    env: {
+      TYPESAFE_ENABLED: "false",
+      TYPESAFE_API_KEY: "unused-jev-key",
+      AI_SEARCH_API_KEY: "llm-key",
+      AI_SEARCH_BASE_URL: "https://llm.example/v1",
+      AI_SEARCH_MODEL: "existing-model",
+      AI_PICK_THRESHOLD: "0.6",
+    },
+    fetch: (url, init) => {
+      assertEquals(url, "https://llm.example/v1/chat/completions");
+      assertEquals(new Headers(init?.headers).get("Authorization"), "Bearer llm-key");
+      calls++;
+      const request = JSON.parse(String(init?.body));
+      assertEquals(request.model, "existing-model");
+      const input = JSON.parse(request.messages[1].content);
+      assertEquals(input.query, "wallet security");
+      assertEquals(input.proposals.length, 4);
+      const scores = Object.fromEntries(
+        input.proposals.map((
+          item: { id: string; title: string },
+        ) => [item.id, Number(item.title.at(-1)) / 4]),
+      );
+      return Response.json({
+        choices: [{
+          message: {
+            content: JSON.stringify({ scores: { ...scores, unknown: 1 } }),
+          },
+        }],
+      });
+    },
+  });
+  const rows = [];
+  for (let i = 0; i < 4; i++) {
+    rows.push(await h.db.initiatives.insert({ title: `Proposal ${i}`, status: "approved" }));
+  }
+  const board = await j(await h.req("/api/board"));
+  assertEquals((board.flags as { aiSearch: boolean }).aiSearch, true);
+  const search = () =>
+    h.req("/api/ai-search", {
+      method: "POST",
+      json: { query: "wallet security" },
+    });
+  assertEquals(await j(await search()), {
+    scores: rows.map((r, i) => ({ id: r.id, score: i / 4 })).reverse(),
+    pickThreshold: 0.6,
+  });
+  await search();
+  assertEquals(calls, 1);
+  h.close();
+});
+
+Deno.test("ai-search: LLM mode requires its key and rejects missing or malformed scores", async () => {
+  const off = await harness({ env: { TYPESAFE_ENABLED: "false", TYPESAFE_API_KEY: "jev-only" } });
+  const board = await j(await off.req("/api/board")) as { flags: { aiSearch: boolean } };
+  assertEquals(board.flags.aiSearch, false);
+  assertEquals(
+    (await off.req("/api/ai-search", {
+      method: "POST",
+      json: { query: "wallet security" },
+    })).status,
+    503,
+  );
+  off.close();
+  for (const value of [undefined, "0.9", -0.1, 1.1]) {
+    const h = await harness({
+      env: { TYPESAFE_ENABLED: "false", AI_SEARCH_API_KEY: "llm-key" },
+      fetch: (_url, init) => {
+        const request = JSON.parse(String(init?.body));
+        const { proposals } = JSON.parse(request.messages[1].content);
+        return Response.json({
+          choices: [{
+            message: {
+              content: JSON.stringify({ scores: { [proposals[0].id]: value } }),
+            },
+          }],
+        });
+      },
+    });
+    await h.db.initiatives.insert({ title: "Approved proposal", status: "approved" });
+    assertEquals(
+      (await h.req("/api/ai-search", {
+        method: "POST",
+        json: { query: "wallet security" },
+      })).status,
+      502,
+    );
+    h.close();
+  }
+});
+
+Deno.test("ai-search: invalid or missing Jev scores fail without caching partial rankings", async () => {
+  for (
+    const answer of [undefined, { type: "noul", noul: "0.9" }, { type: "noul", noul: 1.1 }, {
+      type: "score",
+      noul: 0.9,
+    }]
+  ) {
+    let calls = 0;
+    const h = await harness({
+      env: { TYPESAFE_API_KEY: "k" },
+      fetch: () => {
+        calls++;
+        return Response.json({ answers: { proposal_0: answer } });
+      },
+    });
+    await h.db.initiatives.insert({ title: "Approved proposal", status: "approved" });
+    for (let i = 0; i < 2; i++) {
+      assertEquals(
+        (await h.req("/api/ai-search", {
+          method: "POST",
+          json: { query: "compilers" },
+        })).status,
+        502,
+      );
+    }
+    assertEquals(calls, 2);
+    h.close();
+  }
 });
 
 Deno.test("submit: discussion links are stored without fetching; title is required", async () => {

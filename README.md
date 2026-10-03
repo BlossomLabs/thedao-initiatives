@@ -13,6 +13,16 @@ Hono app serving the API under `/api` and the built SPA, from one Deno Deploy ap
 the process rules and the donation terms are files under `content/`; the proposer's AI guide is
 `public/submit.md` (the drafting guide; `/llms.txt` is now the generated index of approved initiatives). The Flask MVP this replaced is described in `docs/v1-to-v2.md`.
 
+AI search uses TypeSafe Jev to score every approved initiative against the donor's query.
+The board orders all initiatives by descending score; an **AI pick** label appears only when
+its score is strictly above `AI_PICK_THRESHOLD` (default `0.8`). Filters still apply, and a
+manual sort clears the AI order. Set `TYPESAFE_API_KEY` to enable search; `TYPESAFE_MODEL`
+defaults to the pinned `jev-1.13.0`. Set `TYPESAFE_ENABLED=false` to use the existing
+`AI_SEARCH_*` LLM for search instead, with the same full ordering and pick threshold;
+the LLM must supply a valid score for every proposal. Category suggestions and comment moderation continue
+using the separate OpenAI-compatible `AI_SEARCH_*` settings. Search scores are cached for ten
+minutes, keyed by the query, model, and scored proposal text.
+
 ## How money flows
 
 - Every approved initiative has its **own 3-of-5 Gnosis Safe**, deployed before approval: the

@@ -1,3 +1,4 @@
+import type { AiSearchResult } from "../../../shared/ai-search";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -17,23 +18,23 @@ function Host(
   { aiEnabled = true, start = {} }: { aiEnabled?: boolean; start?: Partial<BoardView> },
 ) {
   const [view, setView] = useState<BoardView>({ ...DEFAULT_VIEW, ...start });
-  const [matches, setMatches] = useState<string[] | null>(null);
+  const [result, setResult] = useState<AiSearchResult | null>(null);
   board.view = view;
-  board.matches = matches;
+  board.matches = result?.scores.map(({ id }) => id) ?? null;
   return (
     <>
       <BoardSearch
         view={view}
         onFilter={(next) => setView((v) => ({ ...v, ...next }))}
         aiEnabled={aiEnabled}
-        active={Boolean(matches?.length)}
-        onMatches={setMatches}
+        active={Boolean(result?.scores.length)}
+        onResults={setResult}
       />
       {/* stand-ins for a pill and for a manual sort */}
       <button type="button" onClick={() => setView((v) => ({ ...v, type: "rfp" }))}>
         RFPs pill
       </button>
-      <button type="button" onClick={() => setMatches(null)}>Manual sort</button>
+      <button type="button" onClick={() => setResult(null)}>Manual sort</button>
     </>
   );
 }
@@ -68,7 +69,10 @@ it("the box starts from the URL's filters", () => {
 });
 
 it("Enter asks the AI with the words only; its picks lead and the keywords stop filtering", async () => {
-  api.mockResolvedValue({ matches: ["a", "b"] });
+  api.mockResolvedValue({
+    scores: [{ "id": "a", "score": 0.9 }, { "id": "b", "score": 0.9 }],
+    pickThreshold: 0.8,
+  });
   render(<Host />);
   type("hardware wallets for newcomers type:grant");
   enter();
@@ -79,11 +83,11 @@ it("Enter asks the AI with the words only; its picks lead and the keywords stop 
   expect(board.view.q).toBe("hardware wallets for newcomers"); // kept; the board sets it aside
   expect(board.view.type).toBe("grant"); // qualifiers still filter
   expect(screen.getByText("AI matches", { selector: "span" })).toBeInTheDocument();
-  expect(screen.getByRole("status")).toHaveTextContent(/AI matches first/);
+  expect(screen.getByRole("status")).toHaveTextContent(/ordered by relevance/);
 });
 
 it("Esc, editing the text, or a manual sort go back to keywords", async () => {
-  api.mockResolvedValue({ matches: ["a"] });
+  api.mockResolvedValue({ scores: [{ "id": "a", "score": 0.9 }], pickThreshold: 0.8 });
   render(<Host />);
   type("fuzzing tools");
   enter();
@@ -106,18 +110,21 @@ it("Esc, editing the text, or a manual sort go back to keywords", async () => {
 });
 
 it("no clear AI matches: says so and keeps filtering by the keywords", async () => {
-  api.mockResolvedValue({ matches: [] });
+  api.mockResolvedValue({ scores: [], pickThreshold: 0.8 });
   render(<Host />);
   type("nothing like this");
   enter();
-  expect(await screen.findByText(/No clear AI matches/)).toBeInTheDocument();
+  expect(await screen.findByText(/No initiatives to rank/)).toBeInTheDocument();
   expect(board.view.q).toBe("nothing like this");
 });
 
 it("the later of two AI searches wins even when the first answers last", async () => {
-  let first!: (v: { matches: string[] }) => void;
-  const pending = new Promise<{ matches: string[] }>((r) => (first = r));
-  api.mockReturnValueOnce(pending).mockResolvedValueOnce({ matches: ["b"] });
+  let first!: (v: AiSearchResult) => void;
+  const pending = new Promise<AiSearchResult>((r) => (first = r));
+  api.mockReturnValueOnce(pending).mockResolvedValueOnce({
+    scores: [{ "id": "b", "score": 0.9 }],
+    pickThreshold: 0.8,
+  });
   render(<Host />);
   type("fuzzing tools");
   enter();
@@ -125,7 +132,7 @@ it("the later of two AI searches wins even when the first answers last", async (
   enter();
   await waitFor(() => expect(board.matches).toEqual(["b"]));
   await act(async () => {
-    first({ matches: ["a"] });
+    first({ scores: [{ "id": "a", "score": 0.9 }], pickThreshold: 0.8 });
     await pending;
   });
   expect(board.matches).toEqual(["b"]);

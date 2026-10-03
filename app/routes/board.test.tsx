@@ -1,3 +1,4 @@
+import type { AiSearchResult } from "../../shared/ai-search";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -96,7 +97,7 @@ it("By category draws plain headings with a dot and a count", () => {
 });
 
 it("AI order: Sort shows AI matches, filters still narrow, a manual sort clears it", async () => {
-  api.mockResolvedValue({ matches: ["c"] });
+  api.mockResolvedValue({ scores: [{ "id": "c", "score": 0.9 }], pickThreshold: 0.8 });
   const router = at("/?sort=newest");
   findMatches("opsec things");
   await waitFor(() =>
@@ -117,7 +118,10 @@ it("AI order: Sort shows AI matches, filters still narrow, a manual sort clears 
 });
 
 it("filters still narrow the AI order", async () => {
-  api.mockResolvedValue({ matches: ["a", "c"] });
+  api.mockResolvedValue({
+    scores: [{ "id": "a", "score": 0.9 }, { "id": "c", "score": 0.9 }],
+    pickThreshold: 0.8,
+  });
   at("/?cat=opsec");
   findMatches("anything cat:opsec");
   await waitFor(() => expect(screen.getAllByText("AI pick")).toHaveLength(1));
@@ -125,7 +129,7 @@ it("filters still narrow the AI order", async () => {
 });
 
 it("Clear filters keeps the sort and the AI order", async () => {
-  api.mockResolvedValue({ matches: ["b"] });
+  api.mockResolvedValue({ scores: [{ "id": "b", "score": 0.9 }], pickThreshold: 0.8 });
   const router = at("/?cat=opsec&status=open&sort=newest");
   findMatches("wallets cat:opsec funding:open");
   await screen.findByText("AI pick");
@@ -178,14 +182,14 @@ describe("list view", () => {
 });
 
 it("while the AI thinks, an empty keyword result says it is asking, not that nothing matches", async () => {
-  let answer!: (v: { matches: string[] }) => void;
+  let answer!: (v: AiSearchResult) => void;
   api.mockReturnValue(new Promise((r) => (answer = r)));
   at("/");
   findMatches("tools that keep keys safe");
   expect(await screen.findByText("Asking AI for the best matches…")).toBeInTheDocument();
   expect(screen.queryByText(/No Initiatives match/)).toBeNull();
   await act(async () => {
-    answer({ matches: ["b"] });
+    answer({ scores: [{ "id": "b", "score": 0.9 }], pickThreshold: 0.8 });
     await Promise.resolve();
   });
   expect(await screen.findByText("AI pick")).toBeInTheDocument();
@@ -200,4 +204,53 @@ it("nothing matches: no button of its own, the bar's Clear filters lights up and
   fireEvent.click(clears[0]);
   await waitFor(() => expect(router.state.location.search).toBe(""));
   expect(screen.queryByText(/No Initiatives match/)).toBeNull();
+});
+
+it("orders every proposal by score even when none earns an AI pick", async () => {
+  api.mockResolvedValue({
+    scores: [{ id: "b", score: 0.7 }, { id: "a", score: 0.5 }, { id: "c", score: 0.1 }],
+    pickThreshold: 0.8,
+  });
+  at("/?sort=newest");
+  findMatches("a weak match");
+  await screen.findByText(/Initiatives ordered by relevance/);
+  expect(
+    [...document.querySelectorAll("[data-initiative-id]")].map((el) =>
+      el.getAttribute("data-initiative-id")
+    ),
+  ).toEqual(["b", "a", "c"]);
+  expect(screen.queryByText("AI pick")).toBeNull();
+  expect(screen.getAllByRole("combobox", { name: "Sort" })[0]).toHaveTextContent("AI matches");
+});
+
+it("labels any number of proposals strictly above the threshold", async () => {
+  api.mockResolvedValue({
+    scores: [{ id: "a", score: 0.9 }, { id: "b", score: 0.81 }, { id: "c", score: 0.8 }],
+    pickThreshold: 0.8,
+  });
+  at("/");
+  findMatches("security");
+  await waitFor(() => expect(screen.getAllByText("AI pick")).toHaveLength(2));
+  const boundary = document.querySelector('[data-initiative-id="c"]')!;
+  expect(within(boundary as HTMLElement).queryByText("AI pick")).toBeNull();
+});
+
+it("list view uses score order and the same AI pick threshold", async () => {
+  api.mockResolvedValue({
+    scores: [{ id: "b", score: 0.9 }, { id: "a", score: 0.8 }, { id: "c", score: 0.1 }],
+    pickThreshold: 0.8,
+  });
+  at("/?view=list");
+  findMatches("security work");
+  await screen.findByText(/Initiatives ordered by relevance/);
+  await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(3));
+  const rows = screen.getAllByRole("listitem");
+  expect(rows.map((row) => within(row).getByRole("link").textContent)).toEqual([
+    "Beta wallets",
+    "Alpha fuzzing",
+    "Gamma opsec",
+  ]);
+  expect(within(rows[0]).getAllByText("AI pick").length).toBeGreaterThan(0);
+  expect(within(rows[1]).queryByText("AI pick")).toBeNull();
+  localStorage.clear();
 });

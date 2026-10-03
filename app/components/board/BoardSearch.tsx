@@ -1,3 +1,4 @@
+import type { AiSearchResult } from "../../../shared/ai-search";
 import { useEffect, useId, useRef, useState } from "react";
 import { CornerDownLeft, Search, Sparkles } from "lucide-react";
 import { api, errorMessage } from "~/lib/api";
@@ -20,19 +21,19 @@ type Filters = Pick<BoardView, "q" | "type" | "cats" | "status">;
  *   summary, team or category; `type:grant cat:opsec funding:open` move the
  *   pills, and the pills write them back.
  * - AI (Enter, or Ask AI): the words go to the model, which ranks every
- *   initiative; its picks move first and the board sets the keyword filter
+ *   initiative; scores order the whole board and the board sets the keyword filter
  *   aside while that order is on (the qualifiers still filter). Esc, editing
  *   the text, or a manual sort go back.
  * The icon, a tag in the box and the note under it say which mode is on.
  */
 export default function BoardSearch(
-  { view, onFilter, aiEnabled, active, onMatches, onAsking }: {
+  { view, onFilter, aiEnabled, active, onResults, onAsking }: {
     view: Filters;
     onFilter: (next: Partial<BoardView>) => void;
     aiEnabled: boolean;
     /** Whether the board still shows the AI order (a manual sort clears it). */
     active: boolean;
-    onMatches: (ids: string[] | null) => void;
+    onResults: (result: AiSearchResult | null) => void;
     /** While the model is thinking: the board says so instead of an empty result. */
     onAsking?: (asking: boolean) => void;
   },
@@ -68,7 +69,7 @@ export default function BoardSearch(
   const leaveAi = () => {
     setAiMode(false);
     setNote(null);
-    onMatches(null);
+    onResults(null);
   };
 
   // The board cleared the AI order (a manual sort): back to keywords.
@@ -86,7 +87,7 @@ export default function BoardSearch(
     if (aiMode) {
       setAiMode(false);
       setNote(null);
-      onMatches(null);
+      onResults(null);
     } else if (note) setNote(null);
     onFilter({ type: p.type, cats: p.cats, status: p.status, q: p.words.join(" ") });
   }
@@ -104,19 +105,19 @@ export default function BoardSearch(
     setFailed(false);
     setNote(null);
     try {
-      const { matches } = await api<{ matches: string[] }>("/api/ai-search", {
+      const result = await api<AiSearchResult>("/api/ai-search", {
         json: { query: words },
       });
       if (mine !== seq.current) return;
-      if (!matches.length) {
-        setNote("No clear AI matches; filtering by your keywords.");
+      if (!result.scores.length) {
+        setNote("No initiatives to rank; filtering by your keywords.");
         return;
       }
       setAiMode(true);
-      onMatches(matches); // the board sets the words aside while this order is on
+      onResults(result); // the board sets the words aside while this order is on
       setNote(
         <>
-          AI matches first; type:, cat: and funding: still filter.{" "}
+          Initiatives ordered by relevance; type:, cat: and funding: still filter.{" "}
           <button
             type="button"
             className="cursor-pointer border-0 bg-transparent p-0 text-dao-green underline"

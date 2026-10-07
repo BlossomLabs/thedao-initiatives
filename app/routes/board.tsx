@@ -13,6 +13,7 @@ import { useWatchlist } from "~/hooks/use-watchlist";
 import SuggestCard from "~/components/board/SuggestCard";
 import { ShuffleItem } from "~/components/board/Shuffle";
 import PledgeBand from "~/components/board/PledgeBand";
+import Sponsors from "~/components/board/Sponsors";
 import FilterBar, { preloadFilters } from "~/components/board/FilterBar";
 import { preloadDots } from "~/components/board/CardTitle";
 import {
@@ -149,6 +150,7 @@ export default function Board() {
   return (
     <>
       <Hero raised={data?.totals.raised} />
+      <Sponsors sponsors={data?.sponsors} loading={isLoading} />
       <PageMain>
         <SectionHeading id="rfps" className="max-[640px]:text-center">
           Security initiatives looking for funding

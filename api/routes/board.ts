@@ -45,6 +45,47 @@ export function backerCount(pledges: Pledge[], donations: Donation[]): number {
   return pledges.filter((p) => p.status === "pledged").length + donors.size;
 }
 
+export interface Sponsor {
+  company: string;
+  logoUrl: string;
+  url: string;
+  totalUsd: number;
+}
+
+/** The leaderboard of pledgers across the published initiatives: withdrawn pledges
+ * do not count, and one company is one row whatever the casing or spacing of its
+ * name. Biggest total first, then by name. */
+export function topSponsors(
+  config: Deps["config"],
+  rows: Pick<CardSummary, "pledges">[],
+  limit = 8,
+): Sponsor[] {
+  const by = new Map<string, { pledges: CardSummary["pledges"]; total: number }>();
+  for (const { pledges } of rows) {
+    for (const p of pledges) {
+      if (p.status === "withdrawn" || !(p.amountUsd > 0)) continue;
+      const key = p.company.trim().replace(/\s+/g, " ").toLowerCase();
+      if (!key) continue;
+      const s = by.get(key) ?? { pledges: [] as CardSummary["pledges"], total: 0 };
+      s.pledges.push(p);
+      s.total += p.amountUsd;
+      by.set(key, s);
+    }
+  }
+  return [...by.values()]
+    .map((s) => {
+      const lead = [...s.pledges].sort((a, b) => b.amountUsd - a.amountUsd)[0];
+      return {
+        company: lead.company.trim(),
+        logoUrl: ipfsUrl(config, s.pledges.find((p) => p.logoCid)?.logoCid ?? ""),
+        url: s.pledges.find((p) => p.url)?.url ?? "",
+        totalUsd: s.total,
+      };
+    })
+    .sort((a, b) => b.totalUsd - a.totalUsd || a.company.localeCompare(b.company))
+    .slice(0, limit);
+}
+
 /** Board order: admin pins first (1 = top), then total raised, newest on ties. */
 export function orderCards<
   T extends {
@@ -136,6 +177,7 @@ async function buildBoard(deps: Deps, refresh: boolean) {
   return {
     refreshDue: !chainStateFresh(state, deps.now()),
     cards,
+    sponsors: topSponsors(config, summaries),
     totals: {
       count: cards.length,
       goal: cards.reduce((n, x) => n + x.initiative.goalUsd, 0),

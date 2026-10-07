@@ -37,6 +37,7 @@ import {
 } from "~/lib/board-view";
 import BoardSkeleton, { ListSkeleton, markBoardLayout } from "~/components/board/BoardSkeleton";
 import { categoryOf } from "~/lib/categories";
+import { cn } from "~/lib/utils";
 import { boardKey, useBoard } from "~/hooks/use-board";
 import { generateMeta } from "~/utils/meta";
 
@@ -236,11 +237,17 @@ export default function Board() {
           groups.map((g, gi) => (
             <Fragment key={g.slug ?? "all"}>
               {!("flat" in g) && (
-                <h3 className="mb-3 mt-6 flex items-center gap-2 font-inter-tight text-[14px] font-medium text-white first:mt-0">
+                <h3
+                  className={cn(
+                    "mb-4 flex items-center gap-2.5 font-inter-tight text-[20px] font-semibold leading-[26px] text-white",
+                    // The first sits under the filter row's own margin.
+                    gi > 0 && "mt-9",
+                  )}
+                >
                   {g.slug
                     ? (
                       <>
-                        <CategoryDot slug={g.slug} />
+                        <CategoryDot slug={g.slug} className="size-2.5" />
                         {categoryOf(g.slug)?.label}
                       </>
                     )

@@ -20,13 +20,13 @@ export function markBoardLayout(view: "cards" | "list") {
 const SECTIONS = [4, 3];
 
 /** The list's shape: a category heading over a panel of rows, as BoardList
- * draws them (heading 21px, column header 28.8px, a one-line row 59px). */
+ * draws them (heading 26px, column header 28.8px, a one-line row 59px). */
 export function ListSkeleton() {
   return (
     <>
       {SECTIONS.map((rows, i) => (
-        <div key={i} className="mt-6 first:mt-0">
-          <Skeleton className="mb-3 h-[21px] w-44" />
+        <div key={i} className="mt-9 first:mt-0">
+          <Skeleton className="mb-4 h-[26px] w-56" />
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.04]">
             <div className="h-[28.8px] border-b border-white/10 max-[640px]:hidden" />
             {Array.from({ length: rows }, (_, r) => (
@@ -50,13 +50,13 @@ export function ListSkeleton() {
 const CARD_SECTIONS = [2, 4];
 
 /** The cards' shape: a category heading over a grid of cards, as the board
- * draws them by category (heading 21px, a card with a one-line title 273px). */
+ * draws them by category (heading 26px, a card with a one-line title 273px). */
 function CardsSkeleton() {
   return (
     <>
       {CARD_SECTIONS.map((cards, i) => (
-        <div key={i} className="mt-6 first:mt-0">
-          <Skeleton className="mb-3 h-[21px] w-44" />
+        <div key={i} className="mt-9 first:mt-0">
+          <Skeleton className="mb-4 h-[26px] w-56" />
           <div className="grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
             {Array.from(
               { length: cards },

@@ -102,6 +102,8 @@ it("By category draws plain headings with a dot and a count", () => {
   at("/?sort=category");
   const h = screen.getByRole("heading", { name: /Fuzzing & Testing\s*1/ });
   expect(h.querySelector("span[aria-hidden]")).not.toBeNull();
+  // 26px tall, the height BoardSkeleton holds for it
+  expect(h).toHaveClass("text-[20px]", "leading-[26px]");
   expect(screen.getByRole("heading", { name: /Wallets & Signing\s*1/ })).toBeInTheDocument();
 });
 

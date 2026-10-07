@@ -379,14 +379,21 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     "milestoneReviewer",
   ]);
 
-  /** Patch allowed fields; keeps the Safe index in step. */
-  async function update(id: string, patch: Partial<Initiative>): Promise<Initiative> {
+  /** Patch allowed fields; keeps the Safe index in step. `allow` sees the row
+   * the commit is checked against and throws to refuse the write, so a
+   * caller's permission check cannot go stale between its read and this one. */
+  async function update(
+    id: string,
+    patch: Partial<Initiative>,
+    allow?: (current: Initiative) => void,
+  ): Promise<Initiative> {
     for (const k of Object.keys(patch)) {
       if (!ALLOWED.has(k as keyof Initiative)) throw new Error(`field not allowed: ${k}`);
     }
     for (let i = 0; i < 5; i++) {
       const cur = await kv.get<Initiative>(K.initiative(id));
       if (!cur.value) throw new Error("rfp not found");
+      allow?.(cur.value);
       const next: Initiative = { ...cur.value, ...patch };
       const op = kv.atomic().check(cur).set(K.initiative(id), next);
       indexRow(op, cur.value, next);

@@ -350,3 +350,60 @@ Deno.test("whether an edit is held is decided on the row as written, not as the 
   assertEquals([tags.revision!.state, tags.initiative.categories], ["pending", []]);
   h.close();
 });
+
+Deno.test("a change landing between the request's check and its write is seen by the write", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  const { token, id, edit, row } = await approved(h, false);
+  // Run `change` after the route has authorised the request, right before it writes.
+  const racing = async (change: () => Promise<unknown>, json: unknown) => {
+    const revise = h.db.initiatives.revise;
+    h.db.initiatives.revise = async (...args) => {
+      h.db.initiatives.revise = revise;
+      await change();
+      return await revise(...args);
+    };
+    try {
+      return await edit(token, json);
+    } finally {
+      h.db.initiatives.revise = revise;
+    }
+  };
+  // approved meanwhile: the edit is held, not published
+  const held = await racing(
+    () => h.db.initiatives.update(id, { status: "approved" }),
+    retitled("Written while it was approved"),
+  );
+  assertEquals(held.status, 201);
+  assertEquals((await j(held) as unknown as Out).pending, true);
+  assertEquals([(await row()).title, (await row()).pendingRevision], [GOOD.title, 2]);
+  // handed to another proposer meanwhile: the write is refused
+  const lost = await racing(
+    () => h.db.initiatives.update(id, { proposer: OTHER }),
+    retitled("Written after losing the initiative"),
+  );
+  assertEquals(lost.status, 403);
+  assertEquals([(await row()).title, (await row()).pendingRevision], [GOOD.title, 2]);
+  assertEquals((await h.db.revisions.get(id, 2))!.state, "pending");
+  assertEquals(await h.db.revisions.get(id, 3), null);
+  h.close();
+});
+
+Deno.test("the page facts lock with the approval, even one that lands mid-request", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  const { token, slug, id, row } = await approved(h, false);
+  const update = h.db.initiatives.update;
+  h.db.initiatives.update = async (...args) => {
+    h.db.initiatives.update = update;
+    await update(id, { status: "approved" });
+    return await update(...args);
+  };
+  const res = await h.req(`/api/initiatives/${slug}`, {
+    method: "PATCH",
+    token,
+    json: { goal: "99,000" },
+  });
+  h.db.initiatives.update = update;
+  assertEquals(res.status, 403);
+  assertEquals((await row()).goalUsd, 25000);
+  h.close();
+});

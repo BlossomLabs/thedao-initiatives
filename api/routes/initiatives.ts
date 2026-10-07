@@ -121,13 +121,16 @@ export function initiativeRoutes(deps: Deps) {
   };
 
   /** The proposer (or an admin) may act on this row; everyone else is refused. */
-  const editableBy = async (slug: string, user: Session, body: Record<string, unknown>) => {
-    const initiative = await visibleOr404(slug, user, body);
-    const proposer = isProposer(initiative, user);
-    if (!proposer && !user.isAdmin) {
+  /** Throws unless `user` may edit the row: its proposer, or an admin. */
+  const assertEditor = (initiative: Initiative, user: Session) => {
+    if (!isProposer(initiative, user) && !user.isAdmin) {
       throw new HttpError(403, "Only the proposer can edit this initiative.");
     }
-    return { initiative, proposer };
+  };
+  const editableBy = async (slug: string, user: Session, body: Record<string, unknown>) => {
+    const initiative = await visibleOr404(slug, user, body);
+    assertEditor(initiative, user);
+    return { initiative, proposer: isProposer(initiative, user) };
   };
 
   /** The admin's note when the proposer's latest edit was turned down and
@@ -244,10 +247,12 @@ export function initiativeRoutes(deps: Deps) {
       throw new HttpError(429, "Too many edits; try again in an hour.");
     }
     const origin = { author: user.address, source: proposer ? "proposer" : "admin" } as const;
-    // Asked again inside the write, on the row it commits against: a status
-    // change racing this request can neither publish an unreviewed edit to
-    // an approved initiative nor reopen a closed one.
+    // Asked again inside the write, on the row it commits against: a change
+    // racing this request can neither publish an unreviewed edit to an
+    // approved initiative, nor reopen a closed one, nor let a wallet that is
+    // no longer the proposer write.
     const holdWhen = (row: Initiative) => {
+      assertEditor(row, user);
       assertOpen(row);
       return !user.isAdmin && row.status === "approved";
     };
@@ -327,12 +332,18 @@ export function initiativeRoutes(deps: Deps) {
     const user = c.var.user!;
     const body = await jsonBody(c, ["initiativeId", ...PAGE_FACT_FIELDS]);
     const { initiative } = await editableBy(c.req.param("slug"), user, body);
-    if (!user.isAdmin && initiative.status !== "pending") {
-      throw new HttpError(403, "Locked after approval; email the team.");
-    }
+    // Checked here for the answer, and again inside the write on the row it
+    // commits against: an approval or a new proposer landing mid-request locks it.
+    const assertUnlocked = (row: Initiative) => {
+      assertEditor(row, user);
+      if (!user.isAdmin && row.status !== "pending") {
+        throw new HttpError(403, "Locked after approval; email the team.");
+      }
+    };
+    assertUnlocked(initiative);
     const patch = await readPageFacts(body, initiative, deps);
     const next = Object.keys(patch).length
-      ? await db.initiatives.update(initiative.id, patch)
+      ? await db.initiatives.update(initiative.id, patch, assertUnlocked)
       : initiative;
     return c.json({ initiative: proposerInitiative(next) });
   });

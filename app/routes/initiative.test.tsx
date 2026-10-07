@@ -186,3 +186,25 @@ it("an edit in review opens as such, and its changes are against the live text",
   expect(h1.querySelector("ins")).toHaveTextContent("proposed");
   revs.byN = {};
 });
+
+it("says when comments open on an unpublished page instead of loading them", () => {
+  const show = (status: "pending" | "rejected" | "approved") => {
+    vi.mocked(useInitiative).mockReturnValue({
+      data: { ...page(), initiative: { ...page().initiative, status } },
+      isLoading: false,
+      isPlaceholderData: false,
+      error: null,
+      isUpdatingLedger: false,
+    } as unknown as ReturnType<typeof useInitiative>);
+    return render(tree(new QueryClient()));
+  };
+  const pending = show("pending");
+  expect(screen.getByRole("heading", { name: "Comments" })).toBeInTheDocument();
+  expect(screen.getByText(/Comments open once this initiative is approved/)).toBeInTheDocument();
+  pending.unmount();
+  const rejected = show("rejected");
+  expect(screen.getByText(/was not published, so it has no comments/)).toBeInTheDocument();
+  rejected.unmount();
+  show("approved");
+  expect(screen.queryByText(/Comments open once/)).toBeNull();
+});

@@ -19,6 +19,7 @@ import Sections from "~/components/initiative/Sections";
 import Milestones from "~/components/initiative/Milestones";
 import Links from "~/components/initiative/Links";
 import { DiffBlock, type ViewMode } from "~/components/initiative/RevisionBar";
+import CommentsClosed from "~/components/comments/CommentsClosed";
 import CommentsSection from "~/components/comments/CommentsSection";
 import Identity from "~/components/wallet/Identity";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
@@ -252,12 +253,16 @@ export default function Initiative() {
               </>
             )}
           {!isPlaceholderData && <RulesPanel r={r} />}
-          <CommentsSection
-            key={r.id}
-            initiativeId={r.id}
-            slug={r.slug}
-            open={r.status === "approved"}
-          />
+          {r.status === "approved" || r.status === "archived"
+            ? (
+              <CommentsSection
+                key={r.id}
+                initiativeId={r.id}
+                slug={r.slug}
+                open={r.status === "approved"}
+              />
+            )
+            : <CommentsClosed status={r.status} />}
           {isPlaceholderData
             ? (
               <>

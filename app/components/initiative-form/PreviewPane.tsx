@@ -6,6 +6,7 @@
 import { useEffect, useMemo } from "react";
 import { ArrowLeft, Send } from "lucide-react";
 import { parseAmount } from "@shared/draft/mod";
+import CommentsClosed from "~/components/comments/CommentsClosed";
 import SectionHeading from "~/components/layout/SectionHeading";
 import Backers from "~/components/initiative/Backers";
 import FundingHead from "~/components/initiative/FundingHead";
@@ -181,6 +182,9 @@ export default function PreviewPane(
           <Sections type={r.type} sections={r.sections} />
           <Milestones type={r.type} topup={r.topup} milestones={r.milestones} />
           <RulesPanel r={r} />
+          {r.status !== "approved" && r.status !== "archived" && (
+            <CommentsClosed status={r.status} />
+          )}
           {r.proposer && (
             <p className="mt-7 flex flex-wrap items-center gap-2 border-t border-white/[.08] pt-4 text-[13.5px] text-muted">
               Proposed by <Identity address={r.proposer} size={20} />

@@ -10,7 +10,12 @@ vi.mock("~/lib/api", async (original) => ({
   ...(await original<typeof import("~/lib/api")>()),
   api: (...a: unknown[]) => api(...a),
 }));
-beforeEach(() => api.mockReset());
+const upgradeNow = vi.fn(() => false);
+vi.mock("~/lib/app-upgrade", () => ({ upgradeNow: () => upgradeNow() }));
+beforeEach(() => {
+  api.mockReset();
+  upgradeNow.mockReset().mockReturnValue(false);
+});
 afterEach(() => vi.useRealTimers());
 
 // The board around the box: its filters and the AI order.
@@ -289,4 +294,31 @@ it("a manual sort cancels the pending Jev debounce", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Newest sort" }));
   await tick(600);
   expect(api).not.toHaveBeenCalled();
+});
+
+it.each([null, {}, { scores: undefined }, { matches: ["a"] }])(
+  "an answer without scores (%j) reads as plain words and the keywords keep filtering",
+  async (answer) => {
+    api.mockResolvedValue(answer);
+    render(<Host />);
+    type("monad would like these");
+    enter();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Search is unavailable right now. Refresh the page and try again.",
+    );
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/undefined|properties/);
+    expect(board.matches).toBeNull();
+    expect(board.view.q).toBe("monad would like these");
+  },
+);
+
+it("an answer this build cannot read reloads onto the new build instead of failing", async () => {
+  upgradeNow.mockReturnValue(true);
+  api.mockResolvedValue({ ranking: [] });
+  render(<Host />);
+  type("monad would like these");
+  enter();
+  await waitFor(() => expect(upgradeNow).toHaveBeenCalledTimes(1));
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(board.view.q).toBe("monad would like these"); // in the URL, so the reload keeps it
 });

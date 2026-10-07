@@ -76,6 +76,15 @@ export function createApp(
     apiHeaders,
     securityAudit(deps),
   );
+  // A tab left open keeps running the build it loaded; every API answer names
+  // the build now being served so the app can reload itself (app/lib/app-upgrade.ts).
+  const version = site?.version ?? null;
+  if (version) {
+    useApi(async (c, next) => {
+      await next();
+      c.header("X-App-Version", version);
+    });
+  }
   // The feeds are open to any origin without credentials; everything else is not.
   const apiCors = cors({
     origin: deps.config.webOrigins,
@@ -100,6 +109,8 @@ export function createApp(
   );
   // Reports never load or refresh an authenticated session.
   app.route("/api/csp-report", cspRoutes(deps));
+  // The app's version check: before the session loader, so it never reads or extends a session.
+  app.get("/api/version", (c) => c.json({ version }));
   useApi(
     sessionLoader(deps.db, deps.admins),
     auditIntent(deps),

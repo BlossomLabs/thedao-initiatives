@@ -6,6 +6,7 @@
 import { walletErrorMessage } from "./donate";
 import { API_URL } from "./api-url";
 import { takeEarly } from "./early-fetch";
+import { noteServerVersion } from "./app-upgrade";
 
 export { API_URL };
 
@@ -50,6 +51,7 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   // the cookie, so an anonymous read (after a local logout) never takes it.
   const early = method === "GET" && !opts.anonymous ? takeEarly(path) : undefined;
   const res = early ? await early.catch(() => request()) : await request();
+  noteServerVersion(res);
   const text = await res.text();
   let data: unknown = null;
   try {
@@ -96,12 +98,22 @@ export const errorMessage = (e: unknown, fallback = "Something went wrong."): st
     return "Something went wrong on our side. Please try again in a moment.";
   }
   if (isWalletError(e)) return sentence(walletErrorMessage(e));
+  // A bug's own message ("Cannot read properties of undefined") means nothing
+  // to a visitor: it goes to the console, and the page says something plain.
+  if (e instanceof TypeError || e instanceof ReferenceError || e instanceof RangeError) {
+    if (/fetch|network|load failed/i.test(e.message)) {
+      return "Could not reach the server. Check your connection and try again.";
+    }
+    console.error(e);
+    return fallback;
+  }
   return e instanceof Error ? sentence(e.message) : typeof e === "string" ? sentence(e) : fallback;
 };
 
 /** A non-JSON GET with the session (markdown exports). Throws ApiError on failure. */
 export async function apiText(path: string): Promise<string> {
   const res = await fetch(API_URL + path, { credentials: "include" });
+  noteServerVersion(res);
   if (!res.ok) {
     let msg = res.statusText || "Request failed";
     try {

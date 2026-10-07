@@ -13,14 +13,14 @@ const SCRIPT = "window.ready = true;";
 const BASIC = "Basic " + btoa("preview:secret");
 const API_CSP = "default-src 'none'; frame-ancestors 'none'";
 
-async function siteHarness(env: Record<string, string> = {}) {
+async function siteHarness(env: Record<string, string> = {}, head = "") {
   const h = await harness({ env: { CSP_ENFORCE: "false", ...env } });
   const root = await Deno.makeTempDir();
   await Deno.mkdir(`${root}/assets`);
   await Deno.mkdir(`${root}/admin`);
   await Deno.writeTextFile(
     `${root}/index.html`,
-    `<html><link rel="canonical" href="${SITE_URL}/"><script>${SCRIPT}</script>HOME</html>`,
+    `<html>${head}<link rel="canonical" href="${SITE_URL}/"><script>${SCRIPT}</script>HOME</html>`,
   );
   await Deno.writeTextFile(`${root}/__spa-fallback.html`, "<html>SPA FALLBACK</html>");
   await Deno.writeTextFile(`${root}/admin/index.html`, "<html>ADMIN PAGE</html>");
@@ -425,5 +425,33 @@ Deno.test("site: built assets and pages are gzipped when the client accepts it",
     }
   } finally {
     await h.close();
+  }
+});
+
+Deno.test("site: API answers carry the served build's version, so an open tab can tell it is behind", async () => {
+  const h = await siteHarness();
+  try {
+    assertEquals(h.site.version, null);
+    assertEquals((await h.req("/api/board")).headers.get("X-App-Version"), null);
+  } finally {
+    await h.close();
+  }
+  const built = await siteHarness(
+    {},
+    '<link rel="modulepreload" href="/assets/manifest-4c624852.js"/>',
+  );
+  try {
+    assertEquals(built.site.version, "4c624852");
+    const check = await built.req("/api/version");
+    assertEquals(check.status, 200);
+    assertEquals(check.headers.get("X-App-Version"), "4c624852");
+    assertEquals(check.headers.get("Cache-Control"), "no-store");
+    assertEquals(await check.json(), { version: "4c624852" });
+    // Every API answer says it, errors included; pages and assets do not need to.
+    assertEquals((await built.req("/api/board")).headers.get("X-App-Version"), "4c624852");
+    assertEquals((await built.req("/api/nope")).headers.get("X-App-Version"), "4c624852");
+    assertEquals((await built.req("/")).headers.get("X-App-Version"), null);
+  } finally {
+    await built.close();
   }
 });

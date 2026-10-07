@@ -18,6 +18,8 @@ export interface SiteOptions {
 
 export interface StaticSite {
   policy: SitePolicy;
+  /** The served build's id (React Router's manifest version); null without a build. */
+  version: string | null;
   serve(req: Request): Promise<Response>;
 }
 
@@ -35,6 +37,9 @@ export async function createStaticSite(
     `site headers: CSP ${cspEnforce ? "enforced" : "report-only"}, ` +
       `${scriptHashes.length} inline script hash(es)`,
   );
+
+  const version = await buildVersion(root);
+  if (version) log(`site build version: ${version}`);
 
   /** Prerendered pages bake the site URL into their meta; rewrite for staging origins. */
   async function rewriteOrigin(res: Response, origin: string): Promise<Response> {
@@ -75,7 +80,26 @@ export async function createStaticSite(
     return res;
   }
 
-  return { policy, serve };
+  return { policy, version, serve };
+}
+
+/**
+ * Every page loads `/assets/manifest-<version>.js`, and the app reads the same
+ * version from that file (`__reactRouterManifest.version`), so the two sides
+ * agree without a build step of their own. It changes whenever any script or
+ * stylesheet of the build does.
+ */
+async function buildVersion(root: string): Promise<string | null> {
+  for (const page of ["index.html", "__spa-fallback.html"]) {
+    try {
+      const html = await Deno.readTextFile(`${root}/${page}`);
+      const version = html.match(/\/assets\/manifest-([A-Za-z0-9_-]+)\.js/)?.[1];
+      if (version) return version;
+    } catch (e) {
+      if (!(e instanceof Deno.errors.NotFound)) throw e;
+    }
+  }
+  return null;
 }
 
 /** Vite's hashed assets are immutable; HTML must be revalidated after each deploy. */

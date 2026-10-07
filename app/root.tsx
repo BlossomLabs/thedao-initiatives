@@ -12,6 +12,7 @@ import TopBar from "~/components/layout/TopBar";
 import Footer from "~/components/layout/Footer";
 import SupportWidget from "~/components/layout/SupportWidget";
 import MaintenanceBanner from "~/components/layout/MaintenanceBanner";
+import AppUpgrade from "~/components/layout/AppUpgrade";
 import ShellSkeleton, { SHELL_SCRIPT } from "~/components/layout/ShellSkeleton";
 import { EARLY_FETCH_SCRIPT } from "~/lib/early-fetch";
 import "./app.css";
@@ -93,6 +94,7 @@ export default function App() {
         <Outlet />
       </Shell>
       <SupportWidget />
+      <AppUpgrade />
     </Providers>
   );
 }

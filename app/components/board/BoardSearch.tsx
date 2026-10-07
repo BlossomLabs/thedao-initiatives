@@ -3,6 +3,7 @@ import { isAiSearchQuery } from "../../../shared/ai-search";
 import { useEffect, useId, useRef, useState } from "react";
 import { CornerDownLeft, Search, Sparkles } from "lucide-react";
 import { api, errorMessage } from "~/lib/api";
+import { upgradeNow } from "~/lib/app-upgrade";
 import { Button } from "~/components/ui/Button";
 import { usePhone } from "~/hooks/use-media";
 import type { BoardView } from "~/lib/board-view";
@@ -124,6 +125,12 @@ export default function BoardSearch(
         json: { query: words },
       });
       if (mine !== seq.current) return;
+      if (!Array.isArray(result?.scores)) {
+        // An answer this page cannot read: most likely the tab is older than
+        // the last deploy. The words are in the URL, so a reload keeps them.
+        if (upgradeNow()) return;
+        throw new Error("Search is unavailable right now. Refresh the page and try again.");
+      }
       if (!result.scores.length) {
         setAiMode(false);
         onResults(null);
@@ -181,7 +188,8 @@ export default function BoardSearch(
   const hint = problems.length ? problems.join(" ") : null;
   return (
     <>
-      <form className="mb-5 mt-1 flex" autoComplete="off" onSubmit={run}>
+      {/* The text is in the URL, so it never holds back a reload onto a new build. */}
+      <form className="mb-5 mt-1 flex" autoComplete="off" onSubmit={run} data-upgrade-safe>
         <div className="relative min-w-0 flex-1">
           {aiMode || automatic
             ? (

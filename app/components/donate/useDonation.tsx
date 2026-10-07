@@ -18,6 +18,7 @@ import {
   walletErrorMessage,
 } from "~/lib/donate";
 import { shortAddr } from "~/lib/format";
+import { holdUpgrade } from "~/lib/app-upgrade";
 import { confettiBurst } from "./Celebration";
 
 export interface DonationStatus {
@@ -58,6 +59,8 @@ export function useDonation(
   const sending = useRef(false);
   const [status, setStatus] = useState<DonationStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // A donation in flight (the visitor may be away in their wallet) is never reloaded away.
+  useEffect(() => busy ? holdUpgrade() : undefined, [busy]);
   // Keep the attempt through retries until the server has persisted the transaction hash.
   const confirmations = useRef(
     new Map<string, {

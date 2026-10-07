@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { expect, it } from "vitest";
 import Sponsors from "./Sponsors";
 import type { Sponsor } from "~/lib/api-types";
@@ -19,11 +19,19 @@ it("holds the place with a skeleton while the board loads", () => {
   const { container } = render(<Sponsors loading />);
   expect(screen.getByText("Top sponsors of security for Ethereum")).toBeTruthy();
   expect(container.querySelector("[aria-busy]")?.childElementCount).toBe(1);
-  // as tall as the panel this device last drew, else as four sponsors take
+  // as tall as the panel this device last drew, else as three sponsors take
   expect(container.querySelector("[aria-busy] > *")?.className).toContain(
-    "h-[var(--sponsors-h,353px)]",
+    "h-[var(--sponsors-h,268px)]",
   );
   expect(screen.queryByRole("list")).toBeNull();
+});
+
+it('six to eight: "pledged by" only where the amount sits over the logo and name', () => {
+  render(<Sponsors sponsors={["A", "B", "C", "D", "E", "F"].map((c) => sponsor(c, 5000))} />);
+  const first = screen.getAllByRole("listitem")[0];
+  // side by side under the full width, the amount follows the name: "$5,000 pledged"
+  expect(within(first).getByText("pledged")).toHaveClass("min-[1100px]:hidden");
+  expect(within(first).getByText("pledged by")).toHaveClass("hidden", "min-[1100px]:block");
 });
 
 it("lists the sponsors in order in one row with whole-dollar totals", () => {

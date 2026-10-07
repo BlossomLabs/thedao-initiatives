@@ -16,7 +16,7 @@ const fitOf = (n: number): Fit => n > 5 ? "stack" : n > 4 ? "tight" : "wide";
  * page width: under 1100px the panel holds them two to a line, and on phones one
  * to a line. While the board loads, a skeleton holds the place so the rest of the
  * page does not jump once the sponsors arrive: as tall as the panel this device
- * last drew (sponsors-height.ts), else as four sponsors take at each width. */
+ * last drew (sponsors-height.ts), else as three sponsors take at each width. */
 export default function Sponsors(
   { sponsors, loading }: { sponsors?: Sponsor[]; loading?: boolean },
 ) {
@@ -57,7 +57,7 @@ export default function Sponsors(
         )
         : (
           <div aria-busy="true">
-            <Skeleton className="h-[var(--sponsors-h,353px)] rounded-2xl min-[641px]:h-[var(--sponsors-h,182px)] min-[1100px]:h-[var(--sponsors-h,120px)]" />
+            <Skeleton className="h-[var(--sponsors-h,268px)] rounded-2xl min-[641px]:h-[var(--sponsors-h,182px)] min-[1100px]:h-[var(--sponsors-h,114px)]" />
           </div>
         )}
     </section>
@@ -139,14 +139,12 @@ function Entry({ s, fit }: { s: Sponsor; fit: Fit }) {
             /* Stacked, the figure is the headline and "pledged by" its caption, read
             down into the logo and the name. */
           }
-          <span
-            className={cn(
-              fit === "stack" &&
-                "min-[1100px]:mt-2 min-[1100px]:block min-[1100px]:font-inter-tight min-[1100px]:text-[10px] min-[1100px]:uppercase min-[1100px]:tracking-[.18em] min-[1100px]:text-white/45",
-            )}
-          >
-            {fit === "stack" ? "pledged by" : "pledged"}
-          </span>
+          <span className={cn(fit === "stack" && "min-[1100px]:hidden")}>pledged</span>
+          {fit === "stack" && (
+            <span className="mt-2 hidden font-inter-tight text-[10px] uppercase tracking-[.18em] text-white/45 min-[1100px]:block">
+              pledged by
+            </span>
+          )}
         </span>
       </div>
     </li>

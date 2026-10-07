@@ -52,9 +52,12 @@ export interface Sponsor {
   totalUsd: number;
 }
 
+/** What a company has to pledge in total for a slot among the top sponsors. */
+export const SPONSOR_MIN_USD = 5000;
+
 /** The leaderboard of pledgers across the published initiatives: withdrawn pledges
  * do not count, and one company is one row whatever the casing or spacing of its
- * name. Biggest total first, then by name. */
+ * name. Only those at SPONSOR_MIN_USD or more, biggest total first, then by name. */
 export function topSponsors(
   config: Deps["config"],
   rows: Pick<CardSummary, "pledges">[],
@@ -73,6 +76,7 @@ export function topSponsors(
     }
   }
   return [...by.values()]
+    .filter((s) => s.total >= SPONSOR_MIN_USD)
     .map((s) => {
       const lead = [...s.pledges].sort((a, b) => b.amountUsd - a.amountUsd)[0];
       return {

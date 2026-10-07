@@ -107,7 +107,7 @@ it("By category draws plain headings with a dot and a count", () => {
 
 it("AI order: Sort shows AI matches, filters still narrow, a manual sort clears it", async () => {
   api.mockResolvedValue({ scores: [{ "id": "c", "score": 0.9 }], pickThreshold: 0.8 });
-  const router = at("/?sort=newest");
+  const router = at("/?sort=newest&view=cards");
   findMatches("opsec things");
   await waitFor(() =>
     expect(screen.getAllByRole("combobox", { name: "Sort" })[0]).toHaveTextContent("AI matches")
@@ -131,7 +131,7 @@ it("filters still narrow the AI order", async () => {
     scores: [{ "id": "a", "score": 0.9 }, { "id": "c", "score": 0.9 }],
     pickThreshold: 0.8,
   });
-  at("/?cat=opsec");
+  at("/?cat=opsec&view=cards");
   findMatches("anything cat:opsec");
   await waitFor(() => expect(screen.getAllByText("AI pick")).toHaveLength(1));
   expect(screen.queryByText("Alpha fuzzing")).toBeNull();
@@ -139,13 +139,13 @@ it("filters still narrow the AI order", async () => {
 
 it("Clear filters keeps the sort and the AI order", async () => {
   api.mockResolvedValue({ scores: [{ "id": "b", "score": 0.9 }], pickThreshold: 0.8 });
-  const router = at("/?cat=opsec&status=open&sort=newest");
+  const router = at("/?cat=opsec&status=open&sort=newest&view=cards");
   findMatches("wallets cat:opsec funding:open");
   await screen.findByText("AI pick");
   fireEvent.click(
     screen.getAllByRole("button", { name: "Clear filters" })[0],
   );
-  await waitFor(() => expect(router.state.location.search).toBe("?sort=newest"));
+  await waitFor(() => expect(router.state.location.search).toBe("?sort=newest&view=cards"));
   expect(screen.getByText("AI pick")).toBeInTheDocument();
 });
 
@@ -158,42 +158,52 @@ it("the phone Filters sheet applies its picks to the URL", async () => {
   await waitFor(() => expect(router.state.location.search).toBe("?cat=opsec&sort=newest"));
 });
 
-it("with nothing featured, the board orders by closest to funded and Sort has no Featured", () => {
+it("a plain board is the list in sections by category", async () => {
   at("/");
+  expect(screen.getAllByRole("combobox", { name: "Sort" })[0]).toHaveTextContent("By category");
+  expect(screen.getByRole("button", { name: "List" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("heading", { name: /Fuzzing & Testing\s*1/ })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(3));
+});
+
+it("with nothing featured, Featured orders by closest to funded and Sort does not offer it", () => {
+  at("/?sort=recommended");
   expect(screen.getAllByRole("combobox", { name: "Sort" })[0]).toHaveTextContent(
     "Closest to funded",
   );
   expect(screen.queryByText("Featured")).toBeNull();
 });
 
-describe("list view", () => {
+describe("layout", () => {
   afterEach(() => localStorage.clear());
 
-  it("?view=list shows the rows, and the Cards button goes back to cards", async () => {
-    const router = at("/?view=list");
+  it("the list is the plain URL, and the Cards button writes ?view=cards", async () => {
+    const router = at("/?sort=newest");
     expect(await screen.findByText("Raised")).toBeInTheDocument();
     expect(screen.getAllByRole("listitem").length).toBe(3);
     const cards = screen.getByRole("button", { name: "Cards" });
     expect(screen.getByRole("button", { name: "List" })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(cards);
-    await waitFor(() => expect(router.state.location.search).toBe(""));
+    await waitFor(() => expect(router.state.location.search).toBe("?sort=newest&view=cards"));
     expect(screen.queryByText("Raised")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    await waitFor(() => expect(router.state.location.search).toBe("?sort=newest"));
   });
 
   it("a plain URL opens in the layout this device used last", async () => {
     at("/");
-    fireEvent.click(screen.getByRole("button", { name: "List" }));
-    expect(localStorage.getItem("thedao:board-layout")).toBe("list");
+    fireEvent.click(screen.getByRole("button", { name: "Cards" }));
+    expect(localStorage.getItem("thedao:board-layout")).toBe("cards");
     cleanup();
     const router = at("/");
-    await waitFor(() => expect(router.state.location.search).toBe("?view=list"));
+    await waitFor(() => expect(router.state.location.search).toBe("?view=cards"));
   });
 });
 
 it("while the AI thinks, an empty keyword result says it is asking, not that nothing matches", async () => {
   let answer!: (v: AiSearchResult) => void;
   api.mockReturnValue(new Promise((r) => (answer = r)));
-  at("/");
+  at("/?view=cards");
   findMatches("tools that keep keys safe");
   expect(await screen.findByText("Asking AI for the best matches…")).toBeInTheDocument();
   expect(screen.queryByText(/No Initiatives match/)).toBeNull();
@@ -220,7 +230,7 @@ it("orders every proposal and labels the first three even with low scores", asyn
     scores: [{ id: "b", score: 0.7 }, { id: "a", score: 0.5 }, { id: "c", score: 0.1 }],
     pickThreshold: 0.8,
   });
-  at("/?sort=newest");
+  at("/?sort=newest&view=cards");
   findMatches("a weak match");
   await screen.findByText(/Initiatives ordered by relevance/);
   expect(
@@ -240,7 +250,7 @@ it("labels the first three and displays each score as a percentage", async () =>
     scores: [{ id: "a", score: 0.9 }, { id: "b", score: 0.81 }, { id: "c", score: 0.8 }],
     pickThreshold: 0.8,
   });
-  at("/");
+  at("/?view=cards");
   findMatches("security");
   await waitFor(() => expect(screen.getAllByText("AI pick")).toHaveLength(3));
   const boundary = document.querySelector('[data-initiative-id="c"]')!;
@@ -274,7 +284,7 @@ it("Jev searches as you type and sets keyword filtering aside during the debounc
     scores: [{ id: "b", score: 0.9 }, { id: "a", score: 0.4 }, { id: "c", score: 0.1 }],
     pickThreshold: 0.8,
   });
-  at("/");
+  at("/?view=cards");
   fireEvent.change(screen.getByRole("searchbox", { name: /Search initiatives/ }), {
     target: { value: "tools that protect keys" },
   });
@@ -303,7 +313,7 @@ it("only the first three scored results get labels when there are more proposals
       }],
       pickThreshold: 0.8,
     });
-    at("/");
+    at("/?view=cards");
     findMatches("security work");
     await screen.findByText(/Initiatives ordered by relevance/);
     expect(screen.getAllByText("AI pick")).toHaveLength(3);

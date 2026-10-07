@@ -29,11 +29,12 @@ import {
   featuredIds,
   groupByPrimary,
   isFiltered,
+  LAYOUT_KEY,
   readView,
   sortFor,
   writeView,
 } from "~/lib/board-view";
-import Skeleton from "~/components/ui/Skeleton";
+import BoardSkeleton, { ListSkeleton, markBoardLayout } from "~/components/board/BoardSkeleton";
 import { categoryOf } from "~/lib/categories";
 import { boardKey, useBoard } from "~/hooks/use-board";
 import { generateMeta } from "~/utils/meta";
@@ -50,7 +51,6 @@ const SUGGEST_LAST_FROM = 69;
 // The list layout (and its tooltip code) loads only when someone switches to it.
 const BoardList = lazy(() => import("~/components/board/BoardList"));
 /** The device's last layout (cards or list), used when the URL does not say. */
-const LAYOUT_KEY = "thedao:board-layout";
 
 export default function Board() {
   const { data, isLoading, isError } = useBoard();
@@ -67,6 +67,7 @@ export default function Board() {
   const setView = (next: Partial<BoardView>) => {
     // The layout is also remembered on this device; everything else lives in the URL only.
     if (next.view) {
+      markBoardLayout(next.view);
       try {
         localStorage.setItem(LAYOUT_KEY, next.view);
       } catch { /* storage off: the URL still carries it */ }
@@ -75,12 +76,12 @@ export default function Board() {
   };
   // A plain board URL opens in the layout this device used last.
   useEffect(() => {
-    if (params.has("view")) return;
+    if (params.has("view")) return markBoardLayout(view.view);
     let saved: string | null = null;
     try {
       saved = localStorage.getItem(LAYOUT_KEY);
     } catch { /* storage off */ }
-    if (saved === "list") setView({ view: "list" });
+    if (saved === "cards") setView({ view: "cards" });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, on arrival
 
   const ai = Boolean(aiResult?.scores.length);
@@ -142,7 +143,7 @@ export default function Board() {
   const filtered = isFiltered(view);
   // "By category" draws sections; the AI order wins over them while it is on.
   const groups = view.sort === "category" && !ai
-    ? groupByPrimary(cards)
+    ? groupByPrimary(cards, all)
     : [{ slug: null, cards, flat: true }];
 
   return (
@@ -208,11 +209,7 @@ export default function Board() {
         {isError && (
           <p className="alert">The board could not be loaded. Please try again in a moment.</p>
         )}
-        {isLoading && (
-          <div className="grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
-            {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[230px] rounded-2xl" />)}
-          </div>
-        )}
+        {isLoading && <BoardSkeleton />}
         {data && !all.length && (
           <p className="mb-[46px] text-muted">
             No initiatives published yet. <Link to="/submit">Suggest the first one.</Link>
@@ -251,7 +248,7 @@ export default function Board() {
               )}
               {view.view === "list"
                 ? (
-                  <Suspense fallback={<Skeleton className="h-[480px] rounded-2xl" />}>
+                  <Suspense fallback={<ListSkeleton />}>
                     <BoardList
                       cards={g.cards}
                       aiTop={picks}

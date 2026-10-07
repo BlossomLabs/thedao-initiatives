@@ -1,0 +1,487 @@
+Task test:api deno test -A api/
+Download https://registry.npmjs.org/viem
+Check api/tests/admin-reauth.test.ts
+Check api/tests/admins-concurrency.test.ts
+Check api/tests/admins.test.ts
+Check api/tests/audit.test.ts
+Check api/tests/backup.test.ts
+Check api/tests/badge-holder.test.ts
+Check api/tests/bench.test.ts
+Check api/tests/board-cache.test.ts
+Check api/tests/board.test.ts
+Check api/tests/card-summary.test.ts
+Check api/tests/categories.test.ts
+Check api/tests/chain.test.ts
+Check api/tests/cold-snapshot.test.ts
+Check api/tests/comments.test.ts
+Check api/tests/compress.test.ts
+Check api/tests/content-caps.test.ts
+Check api/tests/csp.test.ts
+Check api/tests/daily-cache.test.ts
+Check api/tests/db.test.ts
+Check api/tests/ens-ccip.test.ts
+Check api/tests/ens.test.ts
+Check api/tests/eventual-reads.test.ts
+Check api/tests/feeds.test.ts
+Check api/tests/forum.test.ts
+Check api/tests/funding.test.ts
+Check api/tests/images.test.ts
+Check api/tests/ip.test.ts
+Check api/tests/kv-depth.test.ts
+Check api/tests/ledger.test.ts
+Check api/tests/maintenance.test.ts
+Check api/tests/origin.test.ts
+Check api/tests/pending-revisions.test.ts
+Check api/tests/prefix.test.ts
+Check api/tests/private-fields.test.ts
+Check api/tests/ratelimit.test.ts
+Check api/tests/revisions.test.ts
+Check api/tests/routes.test.ts
+Check api/tests/safe-api.test.ts
+Check api/tests/safe-deploy.test.ts
+Check api/tests/session-cookie.test.ts
+Check api/tests/session-lifecycle.test.ts
+Check api/tests/session-upgrade.test.ts
+Check api/tests/site-headers.test.ts
+Check api/tests/site.test.ts
+Check api/tests/sitelock.test.ts
+Check api/tests/slug-reuse.test.ts
+Check api/tests/smoke.test.ts
+Check api/tests/status-index.test.ts
+Check api/tests/structured.test.ts
+Check api/tests/support.test.ts
+Check api/tests/terms.test.ts
+Check api/tests/vote.test.ts
+Check api/tests/watchlist.test.ts
+Check api/tests/write-fields.test.ts
+running 1 test from ./api/tests/admin-reauth.test.ts
+sensitive admin changes reject stale authentication before any side effect ... ok (40ms)
+running 4 tests from ./api/tests/admins-concurrency.test.ts
+admins: an overlapping addition cannot restore a successfully removed wallet ... ok (22ms)
+admins: overlapping additions preserve both wallets ... ok (3ms)
+admins: overlapping removals preserve both revocations ... ok (4ms)
+admins: overlapping additions of the same wallet have one winner ... ok (2ms)
+running 2 tests from ./api/tests/admins.test.ts
+admins: env addresses are fixed, dashboard changes invalidate existing sessions ... ok (27ms)
+admins: a dashboard admin gets the ADMIN role tag and an admin session at sign-in ... ok (5ms)
+running 10 tests from ./api/tests/audit.test.ts
+audit: verified login, reauthentication and revocation emit structured safe metadata ... ok (26ms)
+audit: auth failures, early Origin denials, validation and throttling exclude raw input ... ok (17ms)
+audit: admin changes and mixed bulk outcomes identify each item without private content ... ok (8ms)
+audit: an admin's edit through the proposer's routes is recorded, a proposer's is not ... ok (6ms)
+audit: controlled test requires a recently authenticated admin and history is unavailable ... ok (4ms)
+audit: each session revocation mode records actor, target and success ... ok (4ms)
+audit: events are logged without touching KV ... ok (2ms)
+audit: unexpected failures emit metadata without raw errors and request data ... ok (1ms)
+audit: logger failures do not block mutations or change their responses ... ok (4ms)
+audit: logo replacement and reuse identify the target without logging its name ...Download https://registry.npmjs.org/@imagemagick%2fmagick-wasm
+Check api/lib/image-worker.ts
+ ok (466ms)
+running 3 tests from ./api/tests/backup.test.ts
+backup: an admin downloads every record; secrets, TTL rows and the maintenance flag stay out ... ok (43ms)
+backup: restore is idempotent, only while paused, never deletes, and reproduces the pages ... ok (60ms)
+backup: a bad file is refused whole, and a big valid one fits ... ok (25ms)
+running 2 tests from ./api/tests/badge-holder.test.ts
+auth/me: isBadgeHolder follows the badge check behind the EXPERT role ... ok (18ms)
+badges: which of the addresses hold the badge, lowercase ... ok (4ms)
+running 2 tests from ./api/tests/bench.test.ts
+bench: percentile interpolates over sorted samples ... ok (531µs)
+bench: runBench samples each path and reports wire bytes ... ok (6ms)
+running 12 tests from ./api/tests/board-cache.test.ts
+snapshot cache: builds once inside the window, again after it ... ok (5ms)
+snapshot cache: concurrent readers share one build ... ok (133µs)
+snapshot cache: a build already running when the cache is cleared is not kept ... ok (75µs)
+snapshot cache: rebuild always builds, replaces the value and restarts the window ... ok (46µs)
+snapshot cache: a rebuild running when the cache is cleared is not kept ... ok (50µs)
+snapshot cache: a failed build is not kept ... ok (426µs)
+snapshot cache: zero seconds builds on every read ... ok (44µs)
+board cache: a repeat read inside the window is the saved board, then it is rebuilt ... ok (13ms)
+board cache: a write through the API drops the saved board ... ok (6ms)
+board cache: ?refresh=1 rebuilds and replaces the saved board ... ok (5ms)
+board cache: BOARD_CACHE_SECS=0 turns it off ... ok (2ms)
+board cache: on for 5 seconds unless configured ... ok (162µs)
+running 7 tests from ./api/tests/board.test.ts
+backers: open pledges plus the distinct addresses that donated ... ok (404µs)
+backers: a donor who gave twice is one backer, whatever the address casing ... ok (29µs)
+backers: a received pledge is counted through its donation, not twice ... ok (28µs)
+backers: a donation with no sender on record adds nobody ... ok (18µs)
+sponsors: one row per company across initiatives, biggest total first ... ok (294µs)
+sponsors: withdrawn and empty pledges do not count, top 8 only ... ok (96µs)
+sponsors: the name shown is the biggest pledge's spelling ... ok (50µs)
+running 4 tests from ./api/tests/card-summary.test.ts
+card summary: built from the rows once, reused until a pledge or donation write ... ok (12ms)
+card summary: a copy built from rows older than the last write is not reused ... ok (1ms)
+card summary: many at once, in the order asked, misses built alongside hits ... ok (3ms)
+card summary: a restore drops every copy, since it writes the rows without a version ... ok (2ms)
+running 8 tests from ./api/tests/categories.test.ts
+readCategories: 1 to 3 unique registry slugs, first is primary ... ok (5ms)
+aiFilterCategories: registry slugs only, no repeats, at most 3 ... ok (103µs)
+submit: categories are required and validated, then stored and shown ... ok (20ms)
+db: categories are written with a revision and snapshotted in it, never patched ... ok (2ms)
+admin: categories change through a revision in every status; approve needs one ... ok (12ms)
+proposer: categories change only with a revision, while the text is editable ... ok (10ms)
+board and page: categories on cards and the public initiative; legacy rows show none ... ok (3ms)
+ai-categories: mocked provider, bogus slugs dropped, needs text, disabled ... ok (4ms)
+running 21 tests from ./api/tests/chain.test.ts
+keccak constants match published values ... ok (445µs)
+EIP-55 reference vectors and config addresses ... ok (798µs)
+verifyDonationTx: valid USDC transfer ... ok (463µs)
+verifyDonationTx: 18-decimal DAI ... ok (133µs)
+verifyDonationTx: rejects wrong recipient, unknown token, revert, zero ... ok (143µs)
+verifyDonationTx: pending / not found / malformed ... ok (45µs)
+verifyDonationTx: sums same-token transfers, notes extra tokens, dust floor ... ok (87µs)
+verifyDonationTx: confirmation depth ... ok (52µs)
+verifyDonationTx: shared head failure stays pending without a separate RPC lookup ... ok (961µs)
+verifyDonationTx: native ETH ... ok (567µs)
+usdRate: stables are 1, feeds via Chainlink, guards ... ok (619µs)
+Safe setup / createProxy encoding layout ... ok (365µs)
+verifySafe checks owner set, threshold, singleton, handler ... ok (459µs)
+signersConfigured validation ... ok (99µs)
+recoverPersonalSign: known-good vectors, wrong sig, malformed, local wallet ... ok (12ms)
+SIWE parser: spec example, no-statement form, rejects junk ... ok (1ms)
+verifySiwe: happy path and each rejection ... ok (3ms)
+encodeIsValidSignature matches viem's ABI encoding ... ok (1ms)
+verifySiwe: EIP-1271 fallback for contract accounts ... ok (865µs)
+verifySiwe: a valid EOA signature never touches the rpc ... ok (1ms)
+predictSafeAddress matches a Safe deployed from the panel on mainnet ... ok (764µs)
+running 2 tests from ./api/tests/cold-snapshot.test.ts
+cold snapshot: donations stay enabled until the token check has run ... ok (21ms)
+a token check that ran and verified nothing disables donations ... ok (4ms)
+running 10 tests from ./api/tests/comments.test.ts
+comment claim rotation cannot be overwritten by a concurrent review ... ok (23ms)
+comment claims: POST only, bounded input, rotation, expiry and moderation revocation ... ok (11ms)
+comments: anonymous needs a name; without AI, anon posts are held with a private claim token ... ok (11ms)
+new comments are generic and cannot collect categories, topics or email ... ok (6ms)
+AI screen: constructive publishes, unclear holds, spam discards but looks held, failure holds ... ok (5ms)
+roles: fast lane, starting vote, eligibility, replies, ordering, featured cap ... ok (34ms)
+EXPERT is a live role: a separate request says who holds the badge, and the comment list never asks the chain ... ok (11ms)
+two-tier ordering: featured (newest featured first), then votes, then newest ... ok (85µs)
+names: .eth is only allowed as the poster's own ENS name ... ok (7ms)
+comments: a name past its cap is refused as too long, never cut ... ok (3ms)
+running 1 test from ./api/tests/compress.test.ts
+api: JSON is gzipped when the client accepts it, unchanged otherwise ... ok (21ms)
+running 4 tests from ./api/tests/content-caps.test.ts
+content: a section past its cap is a sync error, not a cut ... ok (2ms)
+content: a milestone link or a page link past the cap is a sync error ... ok (592µs)
+content: the recipient link has the same cap as the form ... ok (690µs)
+content: a backer organisation past the cap uses the shared wording ... ok (179µs)
+running 1 test from ./api/tests/csp.test.ts
+CSP reports are bounded and redacted, and do not refresh sessions ... ok (25ms)
+running 3 tests from ./api/tests/daily-cache.test.ts
+daily cache: only the exact production timeline may access KV or upstream services ... ok (10ms)
+daily cache: production refreshes approved Safes, persists both caches, and skips fresh data ... ok (15ms)
+daily cache: visitor refreshes share the scheduled job's ledger and balance leases ... ok (4ms)
+running 10 tests from ./api/tests/db.test.ts
+rfps: slug uniqueness, lookup, list order, update guard ... ok (6ms)
+rfps: a Safe address belongs to exactly one initiative ... ok (1ms)
+rfps: content upsert never touches lifecycle or money ... ok (1ms)
+rfps: revise ignores reordered or trimmed structured text, refuses details+sections ... ok (1ms)
+donations: one tx credits two initiatives, idempotent, pending->confirmed ... ok (1ms)
+pledges: totals count open pledges only, not received or withdrawn ... ok (1ms)
+comments: author starting vote, toggle, switch, ordering data, claim tokens ... ok (2ms)
+profiles: nickname uniqueness is case-insensitive, pfp independent ... ok (1ms)
+sessions + nonces: single-use nonce, expiry, revoke all ... ok (3ms)
+rate limit windows, locks, ai budget ... ok (35ms)
+running 2 tests from ./api/tests/ens-ccip.test.ts
+ENS: direct and nested CCIP gateways never become server HTTP requests ...
+  direct: http://127.0.0.1:8888/internal/{data} ... ok (111ms)
+  direct: http://[::1]/internal/{data} ... ok (6ms)
+  direct: http://169.254.169.254/metadata ... ok (4ms)
+  direct: https://attacker.example/gateway ... ok (4ms)
+  local batch: http://127.0.0.1:8888/internal/{data} ... ok (3ms)
+  local batch: http://[::1]/internal/{data} ... ok (3ms)
+  local batch: http://169.254.169.254/metadata ... ok (3ms)
+  local batch: https://attacker.example/gateway ... ok (3ms)
+ENS: direct and nested CCIP gateways never become server HTTP requests ... ok (145ms)
+ENS: disabling CCIP still resolves an ordinary on-chain address ... ok (990µs)
+running 6 tests from ./api/tests/ens.test.ts
+ens: on-chain name + avatar, forward-verified, ensdata never asked ... ok (7ms)
+ens: a name whose forward record points elsewhere is not shown ... ok (95µs)
+ens: non-https avatars are dropped and a broken avatar record keeps the name ... ok (228µs)
+ens: an authoritative on-chain 'no name' does not fall back to ensdata ... ok (78µs)
+ens: when the chain cannot be asked, ensdata answers and the failure is logged ... ok (3ms)
+ens: both sources down fails closed and is cached ... ok (367µs)
+running 3 tests from ./api/tests/eventual-reads.test.ts
+eventual reads: public pages read eventually when enabled, writes stay strong ... ok (18ms)
+eventual reads: off by default ... ok (2ms)
+eventual reads: a card summary is built from strong reads and served from eventual ones ... ok (1ms)
+running 5 tests from ./api/tests/feeds.test.ts
+feeds: approved only, allowlisted fields, open CORS, cache and ETag ... ok (27ms)
+initiatives.json: shape, totals, filters by type, category and status ... ok (5ms)
+markdown file: feed facts in front matter, still syncs back, approved rows only ... ok (6ms)
+feed cache: built once and shared through KV, dropped by a write, aged out elsewhere ... ok (10ms)
+feed build: pledges come from the card summaries, not a read per initiative ... ok (4ms)
+running 11 tests from ./api/tests/forum.test.ts
+submit never fetches a discussion URL: https://forum.example.com//127.0.0.1:8443/admin ... ok (22ms)
+submit never fetches a discussion URL: https://forum.example.com///169.254.169.254/latest/meta-data ... ok (4ms)
+submit never fetches a discussion URL: https://forum.example.com//[::1]:8443/admin ... ok (4ms)
+submit never fetches a discussion URL: https://forum.example.com/\127.0.0.1:8443/admin ... ok (3ms)
+submit never fetches a discussion URL: https://127.0.0.1:8443/admin ... ok (3ms)
+submit never fetches a discussion URL: https://10.0.0.1/admin ... ok (3ms)
+submit never fetches a discussion URL: https://[::1]/admin ... ok (2ms)
+submit never fetches a discussion URL: https://[::ffff:127.0.0.1]/admin ... ok (2ms)
+submit never fetches a discussion URL: https://forum.example.com/redirect-to-private ... ok (3ms)
+submit never fetches a discussion URL: https://rebind.example.com/t/topic/123 ... ok (3ms)
+submit: a private DNS result rejects a discussion link without fetching it ... ok (12ms)
+running 9 tests from ./api/tests/funding.test.ts
+funding: settings and cold snapshots do not read balances; the ledger is the first fallback ... ok (19ms)
+funding: old values return during a slow refresh, with one lease across instances ... ok (4ms)
+funding: expired lease recovers and its late worker cannot overwrite the new snapshot ... ok (1ms)
+funding: 30-second board polls share one two-minute refresh across 19 Safes ... ok (28ms)
+funding: a newly confirmed donation invalidates only its Safe, repeated confirms do not ... ok (6ms)
+funding: raised comes from the Safe's balances, priced by the feeds, plus paid out ... ok (24ms)
+funding: shared snapshot, explicit refresh, failure cooldown, ledger without a Safe ... ok (8ms)
+funding: the page says when the ledger was last checked and whether it needs refreshing ... ok (3ms)
+config: ALCHEMY_API_KEY adds an Alchemy RPC ahead of the public endpoints, after RPC_URL ... ok (122µs)
+running 3 tests from ./api/tests/images.test.ts
+uploads decode and re-encode all supported formats and strip metadata/appended bytes ...Download https://registry.npmjs.org/@imagemagick%2fmagick-wasm
+ ok (167ms)
+the decoder is initialised once per process and reused, so a deadline only covers decoding ...Download https://registry.npmjs.org/@imagemagick%2fmagick-wasm
+ ok (132ms)
+invalid, truncated, unsupported and oversized-dimension images never reach the upload provider ...Download https://registry.npmjs.org/@imagemagick%2fmagick-wasm
+ ok (134ms)
+running 6 tests from ./api/tests/ip.test.ts
+client IP: canonical forms cannot create distinct quota identities ... ok (6ms)
+client IP: real server dispatch preserves distinct socket peers and ignores spoofed forwarding ... ok (2ms)
+client IP: missing identity fails IP-limited routes closed without consuming a shared quota ... ok (12ms)
+client IP: socket peers have independent quotas; IPv4-mapped aliases share one ... ok (10ms)
+client IP: global quotas remain effective when clients change addresses ... ok (3ms)
+client IP: IPv6 peers share one quota per /64 and get a fresh one per prefix ... ok (8ms)
+running 1 test from ./api/tests/kv-depth.test.ts
+kv depth: the board and the initiative page stay within a few round trips ... ok (1s)
+running 8 tests from ./api/tests/ledger.test.ts
+ledger: snapshot first, refresh saves donations to KV, fresh visits do no upstream work ... ok (24ms)
+ledger: concurrent visitors share a KV lease and see saved donations while updating ... ok (6ms)
+ledger: failures preserve saved rows and share a retry cooldown ... ok (2ms)
+ledger: an expired lease recovers and its late worker cannot overwrite the new cursor ... ok (2ms)
+ledger: page refresh retries only that initiative's pending donations ... ok (2ms)
+ledger: board refreshes visible Safes and reuses the result on initiative pages ... ok (7ms)
+ledger: cache lifetime replaces the old schedule configuration ... ok (202µs)
+ledger: an incomplete backfill resumes after the short cooldown while viewed ... ok (2ms)
+running 4 tests from ./api/tests/maintenance.test.ts
+maintenance: admins toggle it with recent authentication; the change is audited ... ok (56ms)
+maintenance: every write answers 503, sign-in and the admin controls keep working, reads are untouched ... ok (69ms)
+maintenance: background refreshes reachable from reads and the cron stay quiet ... ok (38ms)
+maintenance: another isolate sees the change within the cache window ... ok (3ms)
+running 3 tests from ./api/tests/origin.test.ts
+selfOrigin: platform hosts only; forwarding headers cannot change the scheme ... ok (20ms)
+config: WEB_ORIGIN entries are normalized to bare origins (trailing slash, path, case) ... ok (645µs)
+config: WEB_ORIGIN falls back to VITE_SITE_URL's origin, then localhost ... ok (411µs)
+running 12 tests from ./api/tests/pending-revisions.test.ts
+a proposer's edit to an approved initiative is held: the approved version stays live ... ok (45ms)
+a held or rejected edit is for its proposer and the admins only ... ok (21ms)
+accept makes the held edit live; reject leaves the live text alone; both clear the wait ... ok (17ms)
+a second edit while one waits supersedes the first ... ok (27ms)
+admin edits, and proposer edits to a pending initiative, still go live at once ... ok (33ms)
+revisions written before states existed read as live ... ok (6ms)
+held edits count against the proposer's hourly cap ... ok (19ms)
+my initiatives: an edit in review, then the note when it was turned down ... ok (11ms)
+a row older than revisions: the held edit still snapshots the live text as revision 1 ... ok (2ms)
+whether an edit is held is decided on the row as written, not as the request read it ... ok (3ms)
+a change landing between the request's check and its write is seen by the write ... ok (3ms)
+the page facts lock with the approval, even one that lands mid-request ... ok (3ms)
+running 3 tests from ./api/tests/prefix.test.ts
+prefixedKv: empty prefix returns the bare handle ... ok (3ms)
+prefixedKv: two prefixes on one database never collide ... ok (2ms)
+prefixedKv: repos on separate prefixes see separate data ... ok (1ms)
+running 3 tests from ./api/tests/private-fields.test.ts
+private fields: stale admin reads and harmless edits cannot bypass the leads gate ... ok (70ms)
+private fields: older proposer can edit their own pending row; other users cannot read it ... ok (6ms)
+private fields: freshness and proposer ownership are checked again inside the write ... ok (10ms)
+running 13 tests from ./api/tests/ratelimit.test.ts
+rate limit mode: enforce by default, RATE_LIMIT_MODE selects observe or off ... ok (6ms)
+rate limit mode: the retired DISABLE_RATE_LIMITS variable is ignored ... ok (132µs)
+rate limit mode: a misspelt mode stops the app instead of silently enforcing ... ok (532µs)
+rate limiter: observe mode counts, allows past the cap and logs the breach once per window ... ok (15ms)
+rate limiter: enforce mode refuses past the cap and logs the breach as enforced ... ok (4ms)
+rate limiter: off mode neither counts nor logs ... ok (1ms)
+rate limiter: observe mode still refuses buckets listed as always enforced ... ok (3ms)
+rate limiter: the default mode is enforce and a missing logger is fine ... ok (4ms)
+rate limiter: the breach line is one JSON object with a stable shape ... ok (2ms)
+RATE_LIMIT_MODE=observe: a public quota past its cap is reported through the app logger, not refused ... ok (46ms)
+RATE_LIMIT_MODE=observe: submissions, support and uploads keep their caps ... ok (30ms)
+RATE_LIMIT_MODE=off: nothing is counted or reported ... ok (17ms)
+bootstrap log: structured JSON lines reach the console unprefixed, plain text is timestamped ... ok (120µs)
+running 7 tests from ./api/tests/revisions.test.ts
+submit writes revision 1; the proposer's edit, once accepted, is revision 2 ... ok (56ms)
+pending initiative: visible and editable for its proposer and admins only ... ok (9ms)
+team edits: an admin uses the edit routes; text is an admin revision, facts are not ... ok (25ms)
+the hourly revision cap stops a proposer, not an admin ... ok (25ms)
+content sync: an unchanged file adds no revision, a changed one does ... ok (45ms)
+archive: hides a superseded revision publicly, never the current one, reversible ... ok (30ms)
+legacy rows: the first edit snapshots the old text as revision 1 ... ok (5ms)
+running 20 tests from ./api/tests/routes.test.ts
+content sync publishes the repo files as structured rows; public JSON never leaks private fields ... ok (136ms)
+board ordering: pins first, then money, then newest ... ok (22ms)
+submit: needs a signed-in wallet with a display name; records the proposer ... ok (32ms)
+submit: validation, honeypot, rate limit, pending never on board ... ok (79ms)
+mine: a proposer lists and opens their own submissions, rejected ones only for them and admins ... ok (23ms)
+SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, logout ... ok (58ms)
+origin guard and CORS ... ok (8ms)
+donate: params, confirm, status, totals ... ok (59ms)
+profile: nickname rules, .eth ownership, pfp presets and upload ...Download https://registry.npmjs.org/@imagemagick%2fmagick-wasm
+ ok (235ms)
+admin: settings, status, pledges with logo, safe deploy params + confirm, comments actions ... ok (44ms)
+ai-search: accepts zk in either provider mode but rejects other short queries ... ok (14ms)
+ai-search: Jev scores every proposal, caches content, and has its own key ... ok (19ms)
+ai-search: disabling TypeSafe uses the configured LLM and scores the whole board ... ok (15ms)
+ai-search: LLM mode requires its key and rejects missing or malformed scores ... ok (43ms)
+ai-search: invalid or missing Jev scores fail without caching partial rankings ... ok (39ms)
+submit: discussion links are stored without fetching; title is required ... ok (17ms)
+content backers: file pledges are created once, kept in step, never own the status ... ok (73ms)
+page facts: content keys sync, an admin's patch validates and clears per type ... ok (60ms)
+RATE_LIMIT_MODE=off: the submit limit stops counting ... ok (38ms)
+submit: a discussion link past the form's cap is too long, not silently accepted ... ok (18ms)
+running 7 tests from ./api/tests/safe-api.test.ts
+safe sync: groups rows per tx, verifies over RPC, sends bearer, incremental stop, ETH fallback, 429 ... ok (67ms)
+safe sync: shallow transfers wait for confirmations, pending rows get re-verified ... ok (20ms)
+safe refresh: 19 idle Safes use zero RPC, including unaccepted transfers and API errors ... ok (61ms)
+safe refresh: one head serves all Safes and pending receipts, with a fresh head next run ... ok (15ms)
+safe refresh: a failed head is shared, preserves cursors, and retries next run ... ok (15ms)
+safe sync: a time budget cuts a backfill short, progress persists, the next run completes ... ok (27ms)
+safe sync: a failed manual verification does not block the indexer fallback ... ok (10ms)
+running 6 tests from ./api/tests/safe-deploy.test.ts
+approval needs a deployed Safe: the panel targets the predicted address, safe-confirm binds it once it exists ... ok (53ms)
+a contract at the predicted address that is not our Safe is rejected, never bound ... ok (10ms)
+a Safe held by another initiative cannot be reassigned or detached through the editor ... ok (21ms)
+page refresh only syncs initiatives with a Safe; it never assigns one ... ok (6ms)
+bulk approve: rows without a Safe fail one by one, the rest land ... ok (14ms)
+a Safe already on-chain but not yet bound: the panel reports it deployed, so no second (reverting) factory tx ... ok (7ms)
+running 7 tests from ./api/tests/session-cookie.test.ts
+verify with cookie: true sets an HttpOnly cookie and omits the token ... ok (73ms)
+verify without cookie: true still returns the token and sets no cookie ... ok (52ms)
+a bad signature gets 401 and no cookie, even with cookie: true ... ok (11ms)
+logout-all clears the cookie and revokes every session of the address ... ok (17ms)
+site lock: a valid session cookie passes, a stale one does not ... ok (9ms)
+cookie name: __Host- + Secure over https, plain over http, forwarding headers ignored ... ok (11ms)
+POST /api/auth/cookie: a pre-cookie bearer session gets its cookie, same expiry ... ok (14ms)
+running 10 tests from ./api/tests/session-lifecycle.test.ts
+reauthentication invalidates the presented bearer or cookie, and leaves other devices intact ... ok (74ms)
+idle deadlines slide with activity, absolute deadlines never do ... ok (22ms)
+administrator access is bounded by authentication privilege and its absolute limit ... ok (40ms)
+session inventory is private; remote termination needs fresh auth and checks ownership ... ok (16ms)
+administrator per-user and global revocation require recent privileged authentication ... ok (34ms)
+revocation wins a concurrent session activity write ... ok (6ms)
+partially upgraded session rows cannot acquire a fresh inactivity window ... ok (3ms)
+passive funding polls and preview-lock checks do not extend inactivity ... ok (29ms)
+promotion does not grant comment fast-lane or voting privileges to an ordinary session ... ok (39ms)
+administrator authorization ignores another instance's stale display snapshot after removal ... ok (12ms)
+running 8 tests from ./api/tests/session-upgrade.test.ts
+legacy localStorage bearer upgrades through the cookie exchange without signing in ... ok (36ms)
+existing legacy cookies retain only their original and currently authorized privilege ... ok (9ms)
+legacy upgrade initializes idle time once, even through passive site-lock reads ... ok (11ms)
+upgraded sessions slide idle time but keep the original or stricter absolute deadline ... ok (10ms)
+expired, malformed, and partially upgraded legacy rows cannot migrate or receive a cookie ... ok (30ms)
+any persisted wallet or global revocation marker prevents legacy migration ... ok (10ms)
+concurrent legacy upgrades converge on one session and repair its inventory entry ... ok (2ms)
+logout and wallet/global revocation win races against legacy upgrade writes ... ok (13ms)
+running 7 tests from ./api/tests/site-headers.test.ts
+site headers: every header is present and Cache-Control survives ... ok (12ms)
+site headers: report-only by default, full policy enforced with CSP_ENFORCE ... ok (944µs)
+config: CSP_ENFORCE flag ... ok (568µs)
+inline scripts: extracted without src, ignored with src ... ok (329µs)
+script hashes: 'sha256-<base64>' tokens, deduplicated across documents ... ok (1ms)
+collectScriptHashes: walks a directory of HTML; missing directory yields none ... ok (2ms)
+CSP connections only accept explicit secure deployment origins ... ok (844µs)
+running 10 tests from ./api/tests/site.test.ts
+site: only approved origins rewrite HTML, including hydration hashes ... ok (97ms)
+site: Hono serves pages, assets and SPA fallbacks without swallowing API routes ... ok (44ms)
+site: static requests skip API sessions, auditing and CORS; API guards still run ... ok (24ms)
+site: the shared preview gate covers all routes and preserves session cookies ... ok (27ms)
+site: enforced CSP and shared headers cover static 404s and unexpected errors ... ok (15ms)
+site: Markdown downloads keep API authorization and never fall through to HTML ... ok (28ms)
+site: HEAD, conditional requests and ranges retain static-file semantics ... ok (76ms)
+site: the combined app uses runtime IPs and rejects missing identity ... ok (9ms)
+site: built assets and pages are gzipped when the client accepts it ... ok (25ms)
+site: API answers carry the served build's version, so an open tab can tell it is behind ... ok (25ms)
+running 3 tests from ./api/tests/sitelock.test.ts
+site lock: off by default ... ok (29ms)
+site lock: basic -> cookie -> bearer session; healthz stays open ... ok (23ms)
+admin promotion requires fresh authentication; demotion removes access immediately ... ok (44ms)
+running 9 tests from ./api/tests/slug-reuse.test.ts
+slug transfer preserves legacy deployment, source identity, and all attached records ... ok (10ms)
+only an opted-in desired slug is reclaimable; archive URLs stay reserved ... ok (4ms)
+simultaneous claims have one clean URL; a competing unarchive cannot be overwritten ... ok (3ms)
+failed transfer transactions leave no partial archive, source binding, or replacement ... ok (4ms)
+unarchive recalculates from title, skips occupied slugs, and preserves archive aliases ... ok (4ms)
+unarchive retries a competing claim and freezes legacy salt before releasing a URL ... ok (2ms)
+content and backer resync keep the original ID across multiple replacements ... ok (18ms)
+submission reuses archived text and URL; approval and unarchive preserve both pages ... ok (57ms)
+reused URLs reject stale writes and admin slug actions; matching IDs and archive reads work ... ok (52ms)
+running 1 test from ./api/tests/smoke.test.ts
+healthz verifies tokens through the scripted rpc ... ok (23ms)
+running 4 tests from ./api/tests/status-index.test.ts
+status index: cards(status) equals a full scan after every kind of write ... ok (18ms)
+status index: rows from before the index are indexed on the first read, then the index is the source ... ok (1ms)
+status index: a restore drops the built mark so the index is rebuilt from the restored rows ... ok (2ms)
+status index: cards carry the grant's recipient team; an index from before it is rebuilt ... ok (8ms)
+running 21 tests from ./api/tests/structured.test.ts
+submit: the guide's example lands structured, with its backers as pledges ...Download https://registry.npmjs.org/@imagemagick%2fmagick-wasm
+ ok (171ms)
+submit: a missing section and a bad sum come back as findings, nothing is written ... ok (4ms)
+initiative writes reject retired amount/duration aliases without partial updates ... ok (6ms)
+submit: an all-done top-up needs no adoption milestone and warns instead ... ok (2ms)
+submit: rejected proposals still block the same text ... ok (3ms)
+submit: renaming a duplicate explains the match; revising its section text permits submission ... ok (3ms)
+submit: links must be https; the body has a byte cap ... ok (5ms)
+uploads: auth, disabled, junk, ok, rate limit; a CID someone else pinned is refused ... ok (43ms)
+proposer edit: structured revisions, unchanged, legacy body on a structured row ... ok (8ms)
+proposer edit: legacy text stays readable but edits must migrate to sections ... ok (3ms)
+proposer PATCH: page facts while pending, locked after approval, admin always ... ok (9ms)
+admin settings: a legacy row keeps its text, and text cannot ride along ... ok (2ms)
+bulk admin actions: initiatives and comments, per-id failures reported ... ok (9ms)
+GET /initiative/<slug>.md: the content-file shape, public rows only, round-trips ... ok (20ms)
+<slug>-PRIVATE.md: admins only, any status, carries contact and funders; admin API by slug ... ok (4ms)
+content logos: pinned once by name, mapped onto the pledge by the sync ... ok (9ms)
+admin pledges reject direct CIDs and amount aliases before changing data or uploading ... ok (11ms)
+pledge edit: PATCH takes the same fields as adding, including a new logo ... ok (12ms)
+edit: a top-up measures the adoption floor against the goal minus the stored pledges ... ok (7ms)
+caps: a long link, an edited long title and a long pledge company are refused with the message ... ok (9ms)
+team edit: an editorial finding and a field past its cap both block the save ... ok (6ms)
+running 8 tests from ./api/tests/support.test.ts
+support: 503 until SUPPORT_URL is set ... ok (16ms)
+support: rejects an unknown category, an empty message and a bad email ... ok (4ms)
+support: forwards the tagged message, page URL and screenshot upstream ... ok (2ms)
+support: email and screenshot are optional; an off-site page is dropped ... ok (1ms)
+support: 502 when the upstream fails ... ok (1ms)
+support: 5 messages per hour per IP ... ok (4ms)
+support: the board's flags.support says whether the widget can show ... ok (3ms)
+support: a message past its cap is refused as too long, never cut ... ok (1ms)
+running 12 tests from ./api/tests/terms.test.ts
+checkbox: records server time before transfer and correlates without authentication or signature ... ok (27ms)
+checkbox: rejects unknown/future versions, client timestamps, unchecked consent and malformed intents ... ok (9ms)
+checkbox: exchange fields are independently optional and private; hash is only visitor-reported ... ok (11ms)
+checkbox: other sessions cannot attach or read; a forged first claim cannot block another attempt ... ok (7ms)
+checkbox: pending/RPC failures queue matching and server retries survive browser closure and prior accounting ... ok (16ms)
+checkbox: mismatched sender, amount, token, older transfers and ambiguous receipts remain unmatched ... ok (14ms)
+checkbox: missing, reverted, shallow and wrong-recipient transfers never match ... ok (10ms)
+checkbox: forged origins, form posts, stale scopes and expired sessions are rejected ... ok (4ms)
+checkbox: direct confirmations credit transfers without inventing acceptance ... ok (2ms)
+admin leads: a row for every approved and pending initiative (blank leads allowed), rejected and archived only with leads, private, admin-only ... ok (9ms)
+checkbox: secure cookie is separate from login and oversized requests are refused ... ok (2ms)
+checkbox: native ETH matches and expired pending associations stop retrying ... ok (4ms)
+running 3 tests from ./api/tests/vote.test.ts
+vote settings: off by default, admins change them, the board and site settings carry them ... ok (24ms)
+voteState: below the floor, eligible, eligible with a gap above the cap ... ok (109µs)
+the board marks each card's vote state only while the display is on ... ok (5ms)
+running 11 tests from ./api/tests/watchlist.test.ts
+watchlist: signed out is 401 on every route ... ok (19ms)
+watchlist: none until imported; import creates, merges, dedupes, drops non-approved ... ok (7ms)
+watchlist: import rejects a bad body and a merge over the limit ... ok (27ms)
+watchlist: PUT and DELETE are idempotent; PUT of a non-approved id is 404 ... ok (5ms)
+watchlist: PUT and DELETE before any import are 404 and create nothing ... ok (3ms)
+watchlist: one account never reads or writes another's list ... ok (16ms)
+watchlist: concurrent imports keep every id ... ok (1ms)
+watchlist: writes are rate limited per account ... ok (27ms)
+watchlist: the record is backed up ... ok (55µs)
+watchlist: the CORS preflight for PUT is allowed from the web origin ... ok (2ms)
+watchlist: PUT into a full list (200 ids) is 400 ... ok (27ms)
+running 5 tests from ./api/tests/write-fields.test.ts
+writes: every JSON endpoint rejects unknown fields before changing domain data ... ok (43ms)
+writes: unknown multipart text and file fields are rejected before uploads ... ok (13ms)
+writes: unknown nested fields reject the entire request, including bulk content sync ... ok (7ms)
+writes: malformed JSON cannot become an empty update or logout ... ok (20ms)
+writes: unknown actions cannot match inherited object properties ... ok (7ms)
+
+ok | 358 passed (8 steps) | 0 failed (22s)
+

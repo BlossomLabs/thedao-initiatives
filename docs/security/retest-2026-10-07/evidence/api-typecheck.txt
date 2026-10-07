@@ -1,0 +1,10 @@
+Task check:api deno check api/main.ts server.ts api/scripts/*.ts shared/draft/mod.ts
+Download https://registry.npmjs.org/viem
+Check api/main.ts
+Check server.ts
+Check api/scripts/bench.ts
+Check api/scripts/lib.ts
+Check api/scripts/login.ts
+Check api/scripts/seed-categories.ts
+Check api/scripts/sync-content.ts
+Check shared/draft/mod.ts

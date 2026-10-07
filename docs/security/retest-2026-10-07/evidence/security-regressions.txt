@@ -1,0 +1,41 @@
+Check api/tests/ens-ccip.test.ts
+Check api/tests/private-fields.test.ts
+Check api/tests/admins-concurrency.test.ts
+Check api/tests/pending-revisions.test.ts
+running 2 tests from ./api/tests/ens-ccip.test.ts
+ENS: direct and nested CCIP gateways never become server HTTP requests ...
+  direct: http://127.0.0.1:8888/internal/{data} ... ok (110ms)
+  direct: http://[::1]/internal/{data} ... ok (7ms)
+  direct: http://169.254.169.254/metadata ... ok (4ms)
+  direct: https://attacker.example/gateway ... ok (3ms)
+  local batch: http://127.0.0.1:8888/internal/{data} ... ok (4ms)
+  local batch: http://[::1]/internal/{data} ... ok (3ms)
+  local batch: http://169.254.169.254/metadata ... ok (3ms)
+  local batch: https://attacker.example/gateway ... ok (3ms)
+ENS: direct and nested CCIP gateways never become server HTTP requests ... ok (143ms)
+ENS: disabling CCIP still resolves an ordinary on-chain address ... ok (1ms)
+running 3 tests from ./api/tests/private-fields.test.ts
+private fields: stale admin reads and harmless edits cannot bypass the leads gate ... ok (33ms)
+private fields: older proposer can edit their own pending row; other users cannot read it ... ok (3ms)
+private fields: freshness and proposer ownership are checked again inside the write ... ok (4ms)
+running 4 tests from ./api/tests/admins-concurrency.test.ts
+admins: an overlapping addition cannot restore a successfully removed wallet ... ok (22ms)
+admins: overlapping additions preserve both wallets ... ok (3ms)
+admins: overlapping removals preserve both revocations ... ok (5ms)
+admins: overlapping additions of the same wallet have one winner ... ok (2ms)
+running 12 tests from ./api/tests/pending-revisions.test.ts
+a proposer's edit to an approved initiative is held: the approved version stays live ... ok (31ms)
+a held or rejected edit is for its proposer and the admins only ... ok (15ms)
+accept makes the held edit live; reject leaves the live text alone; both clear the wait ... ok (11ms)
+a second edit while one waits supersedes the first ... ok (10ms)
+admin edits, and proposer edits to a pending initiative, still go live at once ... ok (15ms)
+revisions written before states existed read as live ... ok (4ms)
+held edits count against the proposer's hourly cap ... ok (18ms)
+my initiatives: an edit in review, then the note when it was turned down ... ok (6ms)
+a row older than revisions: the held edit still snapshots the live text as revision 1 ... ok (2ms)
+whether an edit is held is decided on the row as written, not as the request read it ... ok (2ms)
+a change landing between the request's check and its write is seen by the write ... ok (6ms)
+the page facts lock with the approval, even one that lands mid-request ... ok (4ms)
+
+ok | 21 passed (8 steps) | 0 failed (1s)
+

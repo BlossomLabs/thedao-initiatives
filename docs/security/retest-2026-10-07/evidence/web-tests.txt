@@ -1,0 +1,18 @@
+Task test deno run -A npm:vitest run
+
+ RUN  v5.0.3 /home/sem/thedao-initiatives
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+
+ Test Files  111 passed (111)
+      Tests  686 passed (686)
+   Start at  04:56:08
+   Duration  10.15s (environment 35%, tests 30%, transform 16%, setup 10%, import 10%)
+
+Environment  jsdom was created 111 times · 45.90s total, 35% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+

@@ -1,0 +1,35 @@
+{
+  "note": "GitHub Git Data publication recreated commit metadata; each published source tree is byte-for-byte identical to the locally tested commit. Main is updated only after the closure report is added.",
+  "local_tested_source": "12baf1930d8c32ebb01964363a1eba7990baf9c4",
+  "published_source": "5914155d28798ffd09f777e017342d08169db254",
+  "commits": [
+    {
+      "local": "b746fd404d9b8758e94dd52bf93facd35ba290c7",
+      "remote": "7dcd0ca46edb8ff2a57b26af682f2f39b7bb1a33",
+      "tree": "7d682e3a0f426a4d50825e05f67c41576245b8c6"
+    },
+    {
+      "local": "7e4739b71744755161c87bf2136420602683fb12",
+      "remote": "32b40bb5a0476aedfa012fe931387613b6f74097",
+      "tree": "483ce469942e790c9c61e01dcce921a015a5090b"
+    },
+    {
+      "local": "33ecfbe259cd092eb4a1aaea82c7283c9b404d60",
+      "remote": "7314f74b48054986b950128139c1e7bcc52f4a28",
+      "tree": "0ee415b54d51983532e5c6492e7ac2f06a5cdc96"
+    },
+    {
+      "local": "12baf1930d8c32ebb01964363a1eba7990baf9c4",
+      "remote": "5914155d28798ffd09f777e017342d08169db254",
+      "tree": "635a3ab230f70e5cf7390d3b0f647e0acdf9336f"
+    }
+  ],
+  "verification": {
+    "command": "git diff --exit-code 12baf1930d8c32ebb01964363a1eba7990baf9c4 5914155d28798ffd09f777e017342d08169db254",
+    "exit": 0,
+    "scope": "All tracked files; exact same Git tree",
+    "security_recheck_command": "deno test --cached-only -A --deny-net api/tests/ens-ccip.test.ts api/tests/private-fields.test.ts api/tests/admins-concurrency.test.ts api/tests/pending-revisions.test.ts",
+    "security_recheck_exit": 0,
+    "security_recheck_result": "21 passed (8 steps), 0 failed"
+  }
+}

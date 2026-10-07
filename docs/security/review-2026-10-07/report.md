@@ -1,5 +1,7 @@
 # Security assessment — 7 October 2026
 
+**Historical assessment:** all four October findings were subsequently closed in the [source retest](../retest-2026-10-07/report.md). The findings and evidence below describe the original reviewed revision.
+
 **Repository:** [blossomlabs/thedao-initiatives](https://github.com/blossomlabs/thedao-initiatives)  
 **Source revision:** `a70726c0f776ffcc2f50cb9f0c3774d44834d134` (`main`)  
 **Public target:** [initiatives.thedao.fund](https://initiatives.thedao.fund/)  

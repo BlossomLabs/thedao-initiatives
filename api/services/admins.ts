@@ -52,10 +52,14 @@ export function createAdmins(db: Db, config: Config, now: () => number) {
   async function add(raw: string): Promise<AdminEntry[]> {
     if (!isAddress(raw)) throw new HttpError(400, "that is not an Ethereum address");
     const address = toChecksum(raw);
-    if (await isAdmin(address)) throw new HttpError(409, "already an admin");
-    await db.sessions.revokeAll(address);
-    await db.meta.set(ADMINS_META_KEY, [...(await added()), address]);
+    if (isFixed(address)) throw new HttpError(409, "already an admin");
+    await db.meta.update<string[]>(ADMINS_META_KEY, (current) => {
+      const cur = current ?? [];
+      if (cur.some((a) => addrEq(a, address))) throw new HttpError(409, "already an admin");
+      return [...cur, address];
+    });
     snapshot = null;
+    await db.sessions.revokeAll(address);
     return list();
   }
 
@@ -65,12 +69,14 @@ export function createAdmins(db: Db, config: Config, now: () => number) {
       throw new HttpError(400, "set in ADMIN_ADDRESSES; change the env var to remove it");
     }
     if (addrEq(raw, by)) throw new HttpError(400, "you cannot remove yourself");
-    const cur = await added();
-    const next = cur.filter((a) => !addrEq(a, raw));
-    if (next.length === cur.length) throw new HttpError(404, "not an admin");
-    await db.sessions.revokeAll(raw);
-    await db.meta.set(ADMINS_META_KEY, next);
+    await db.meta.update<string[]>(ADMINS_META_KEY, (current) => {
+      const cur = current ?? [];
+      const next = cur.filter((a) => !addrEq(a, raw));
+      if (next.length === cur.length) throw new HttpError(404, "not an admin");
+      return next;
+    });
     snapshot = null;
+    await db.sessions.revokeAll(raw);
     return list();
   }
 

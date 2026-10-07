@@ -11,6 +11,16 @@ export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = und
     (await kv.get<T>(K.meta(key), read)).value;
   const set = (key: string, value: unknown) => kv.set(K.meta(key), value);
 
+  /** Strong read + CAS; the pure callback can run again after a conflict. */
+  async function update<T>(key: string, change: (current: T | null) => T): Promise<T> {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const cur = await kv.get<T>(K.meta(key));
+      const next = change(cur.value);
+      if ((await kv.atomic().check(cur).set(cur.key, next).commit()).ok) return next;
+    }
+    throw new Error("metadata: too much contention");
+  }
+
   /** Short-lived lock; true if acquired. Expires on its own. */
   async function lock(name: string, ttlSecs: number): Promise<boolean> {
     const res = await kv.atomic()
@@ -35,5 +45,5 @@ export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = und
     (await kv.get<SafeSyncState>(K.safeSync(rfpId), read)).value;
   const setSafeSync = (rfpId: string, s: SafeSyncState) => kv.set(K.safeSync(rfpId), s);
 
-  return { get, getPublic, set, lock, unlock, aiBudgetOk, safeSync, setSafeSync };
+  return { get, getPublic, set, update, lock, unlock, aiBudgetOk, safeSync, setSafeSync };
 }

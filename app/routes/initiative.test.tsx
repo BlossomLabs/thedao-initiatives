@@ -175,6 +175,12 @@ it("an edit in review opens as such, and its changes are against the live text",
   const h1 = screen.getByRole("heading", { level: 1 });
   expect(h1).toHaveTextContent("The proposed title");
   expect(screen.getByText("edit in review")).toBeInTheDocument();
+  // the side panel does not number it among the published revisions
+  expect(screen.getByText("Not in the public history")).toBeInTheDocument();
+  expect(screen.queryByText(/Revision \?/)).toBeNull();
+  expect(screen.queryByText("superseded")).toBeNull();
+  // not the first revision of anything: its changes are against the live text
+  expect(screen.getByRole("button", { name: "changes" })).not.toHaveAttribute("title");
   fireEvent.click(screen.getByRole("button", { name: "changes" }));
   expect(h1.querySelector("del")).toHaveTextContent("approved");
   expect(h1.querySelector("ins")).toHaveTextContent("proposed");

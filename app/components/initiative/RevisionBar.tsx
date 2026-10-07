@@ -66,10 +66,11 @@ export default function RevisionPanel({
       <span className="k">Revisions</span>
       <p className="m-0 flex flex-wrap items-center gap-2 font-inter-tight text-[13.5px] font-semibold">
         <History className="size-4 text-dao-green" />
-        Revision {idx >= 0 ? idx + 1 : "?"} of {revisions.length}
+        {/* An edit in review or a rejected one is open: it has no place in this list. */}
+        {idx >= 0 ? `Revision ${idx + 1} of ${revisions.length}` : "Not in the public history"}
         {isCurrent
           ? <span className="chip st-approved">current</span>
-          : <span className="chip st-pending">superseded</span>}
+          : idx >= 0 && <span className="chip st-pending">superseded</span>}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <NavLink to={prev ? href(prev.n) : null} label="Previous revision">
@@ -86,7 +87,7 @@ export default function RevisionPanel({
             <button
               key={m}
               type="button"
-              title={m === "changes" && !prev
+              title={m === "changes" && idx === 0
                 ? "First revision: everything shows as added"
                 : undefined}
               className={cn(

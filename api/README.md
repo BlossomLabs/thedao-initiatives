@@ -11,8 +11,8 @@ without static files for API-only development.
 
 ENS resolution disables server-side CCIP-Read. Resolver-supplied gateway URLs are never fetched;
 ordinary on-chain records use the configured RPC endpoints, with the fixed `api.ensdata.net`
-fallback for failed/unsupported lookups. Adding offchain gateway support requires a separate
-vetted egress policy and request/resource limits.
+fallback for failed/unsupported lookups. Adding offchain gateway support requires a separate vetted
+egress policy and request/resource limits.
 
     cp .env.example .env      # fill in what you have
     deno task dev:api         # http://localhost:8000 on its own, local KV in ../.kv

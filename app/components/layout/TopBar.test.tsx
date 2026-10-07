@@ -48,3 +48,14 @@ it("keeps a space between TheDAO and Security Fund in the site name", () => {
   mount();
   expect(screen.getByRole("link", { name: /TheDAO/ }).textContent).toBe("TheDAO Security Fund");
 });
+
+it("the static shell marks no link as the current page: one prerendered copy serves every URL", () => {
+  mount("/");
+  fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+  const links = document.querySelectorAll('nav[aria-label="Site"] a');
+  expect(links).toHaveLength(4);
+  for (const a of links) {
+    expect(a).not.toHaveAttribute("aria-current");
+    expect(a.className).not.toMatch(/\bactive\b/);
+  }
+});

@@ -60,7 +60,13 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
     };
   }, [open]);
 
-  const cls = (active: typeof link) => (staticShell ? active({ isActive: false }) : active);
+  // The static shell is prerendered once (at "/") and served for every URL
+  // without a page of its own, so it marks no link as current: plain links,
+  // which also keeps its HTML identical to what the client hydrates there.
+  const item = (l: typeof LINKS[number], style: typeof link) =>
+    staticShell
+      ? <Link key={l.to} to={l.to} className={style({ isActive: false })}>{l.label}</Link>
+      : <NavLink key={l.to} to={l.to} end={l.end} className={style}>{l.label}</NavLink>;
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/[.07] bg-[rgba(44,94,134,.5)] px-8 py-3 backdrop-blur-[20px] max-[760px]:px-3.5 max-[760px]:py-2.5">
@@ -83,11 +89,7 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
         </Link>
         <div className="flex items-center gap-[22px] max-[760px]:gap-2.5">
           <nav className="flex items-center gap-[22px] max-[760px]:hidden" aria-label="Site">
-            {LINKS.map((l) => (
-              <NavLink key={l.to} to={l.to} end={l.end} className={cls(link)}>
-                {l.label}
-              </NavLink>
-            ))}
+            {LINKS.map((l) => item(l, link))}
           </nav>
           {staticShell ? <Fallback /> : (
             <div className="relative">
@@ -118,11 +120,7 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
         aria-label="Site"
         className="absolute inset-x-3.5 top-full mt-2 hidden flex-col rounded-[14px] border border-edge2 bg-panel p-1.5 shadow-menu max-[760px]:flex"
       >
-        {LINKS.map((l) => (
-          <NavLink key={l.to} to={l.to} end={l.end} className={cls(menuLink)}>
-            {l.label}
-          </NavLink>
-        ))}
+        {LINKS.map((l) => item(l, menuLink))}
       </Pop>
     </header>
   );

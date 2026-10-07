@@ -4,9 +4,13 @@ import { DiffBlock } from "~/components/initiative/RevisionBar";
 import type { TextDiff } from "~/lib/revision-diff";
 import { httpsHref } from "~/lib/utils";
 
-/** The initiative's links: https ones as anchors, anything else as plain text. */
+/**
+ * The initiative's links in full: https ones as anchors, anything else as
+ * plain text. The team's view lists them this way; the public page shows them
+ * by domain in Key facts and renders this only for the diff of its changes view.
+ */
 export default function Links(
-  { links, diff }: { links: string[]; diff?: Pick<TextDiff, "links"> | null },
+  { links = [], diff }: { links?: string[]; diff?: Pick<TextDiff, "links"> | null },
 ) {
   if (diff) {
     if (!diff.links.length) return null;

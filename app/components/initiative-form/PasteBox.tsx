@@ -161,6 +161,7 @@ export default function PasteBox(
   const [report, setReport] = useState<Report | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const focused = useRef(false);
+  const clicked = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<string | null>(null);
 
@@ -211,11 +212,23 @@ export default function PasteBox(
         placeholder={PASTE_PLACEHOLDER}
         value={text}
         disabled={disabled}
-        onFocus={() => {
+        onFocus={(e) => {
           focused.current = true;
+          // The whole draft is selected on focus: the next paste replaces it.
+          e.currentTarget.select();
+          clicked.current = true;
+        }}
+        onMouseUp={(e) => {
+          // The click that gave the focus would drop the selection on release.
+          if (clicked.current) e.preventDefault();
+          clicked.current = false;
+        }}
+        onKeyDown={() => {
+          clicked.current = false;
         }}
         onBlur={() => {
           focused.current = false;
+          clicked.current = false;
           flush();
         }}
         onChange={(e) => {

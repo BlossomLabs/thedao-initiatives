@@ -2,11 +2,24 @@ import type { Initiative, Summary } from "~/lib/api-types";
 import { plural, usd } from "~/lib/format";
 import { httpsHref } from "~/lib/utils";
 
+/** The domain a link is shown as: the host without a leading "www.". */
+export function linkDomain(href: string): string {
+  try {
+    return new URL(href).hostname.replace(/^www\./, "");
+  } catch {
+    return href;
+  }
+}
+
 /**
  * Side card with the page facts the funding panel does not already show:
- * duration, recipient, what a top-up still needs, and who reviews it.
+ * duration, recipient, what a top-up still needs, who reviews it, and the
+ * initiative's links by domain. `links` are those of the text on screen when
+ * it is not the current one (an older revision).
  */
-export default function KeyFacts({ r, summary }: { r: Initiative; summary: Summary }) {
+export default function KeyFacts(
+  { r, summary, links = r.links ?? [] }: { r: Initiative; summary: Summary; links?: string[] },
+) {
   const grant = r.type === "grant";
   const topup = grant && r.topup;
   const href = httpsHref(r.recipientUrl);
@@ -41,6 +54,31 @@ export default function KeyFacts({ r, summary }: { r: Initiative; summary: Summa
   }
   if (topup && r.milestoneReviewer) {
     rows.push({ label: "Milestone reviewer", value: r.milestoneReviewer });
+  }
+  // https links as anchors named by their domain, anything else as plain text
+  const linkRows = links.map((l) => l.trim()).filter(Boolean);
+  if (linkRows.length) {
+    rows.push({
+      label: "Links",
+      value: (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+          {linkRows.map((l, i) => {
+            const to = httpsHref(l);
+            return (
+              <li key={i} className="[overflow-wrap:anywhere]">
+                {to
+                  ? (
+                    <a href={to} title={l} target="_blank" rel="noopener noreferrer">
+                      {linkDomain(to)}
+                    </a>
+                  )
+                  : l}
+              </li>
+            );
+          })}
+        </ul>
+      ),
+    });
   }
   return (
     <div className="panel">

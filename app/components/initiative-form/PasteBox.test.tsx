@@ -156,6 +156,18 @@ describe("PasteBox hints", () => {
     expect(hints).not.toContain("Unsorted box");
   });
 
+  it("selects the whole draft when the box takes focus", async () => {
+    render(<Harness />);
+    const ta = paste("## Title\nA title\n");
+    await settle();
+    fireEvent.blur(ta);
+    ta.setSelectionRange(3, 3);
+    fireEvent.focus(ta);
+    expect(ta.selectionStart).toBe(0);
+    expect(ta.selectionEnd).toBe(ta.value.length);
+    expect(ta.value.length).toBeGreaterThan(0);
+  });
+
   it("points at the milestones heading when none were found", async () => {
     render(<Harness />);
     paste("## Why this matters\n\nBecause.\n\n## Random\n\nlost\n");

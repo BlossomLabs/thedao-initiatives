@@ -216,7 +216,7 @@ export default function Initiative() {
                   milestones={text.milestones ?? []}
                   diff={diff}
                 />
-                <Links links={text.links ?? []} diff={diff} />
+                {diff && <Links diff={diff} />}
                 {diff && diff.details.length > 0 && (
                   <>
                     <SectionHeading>Full initiative details</SectionHeading>
@@ -286,6 +286,7 @@ export default function Initiative() {
           page={page}
           placeholder={isPlaceholderData}
           onDonated={refresh}
+          links={structured ? text.links ?? [] : []}
           revisions={showBar ? { viewing, current, mode, onMode: setMode } : undefined}
         />
       </div>

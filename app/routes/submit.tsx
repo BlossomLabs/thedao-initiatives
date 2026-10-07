@@ -293,6 +293,7 @@ export default function Submit() {
           categories={{ suggest: true }}
           submitLabel="Submit for review"
           uploads={uploads}
+          previewAs={submitter.address ? { proposer: submitter.address } : undefined}
           asideTop={({ empty }) => <GuideCard glow={empty} />}
           footer={submitter.address && (
             <p className="m-0 mt-3.5 flex flex-wrap items-center justify-center gap-2 text-[13.5px] text-muted">

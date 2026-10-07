@@ -2,10 +2,11 @@
  * The initiative editor: the submit page and the edit page share it.
  * The draft lives in useDraft, the rules run in useChecks on every change,
  * findings paint through the FindingsProvider, and the sidebar carries the
- * live checks. Errors never disable the button: pressing it paints them.
+ * live checks. Errors never disable the form's button: pressing it paints
+ * them. The preview's copy of it is disabled instead, the fields being hidden.
  */
 import StickyAside from "~/components/layout/StickyAside";
-import { useCallback, useId, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { Lock, Send } from "lucide-react";
 import { type CheckScope, type Findings, SECTIONS } from "@shared/draft/mod";
 import RulesPanel from "~/components/initiative/RulesPanel";
@@ -23,7 +24,7 @@ import FormGroup from "./FormGroup";
 import MilestonesEditor from "./MilestonesEditor";
 import PageFields from "./PageFields";
 import PasteBox from "./PasteBox";
-import PreviewPane from "./PreviewPane";
+import PreviewPane, { type PreviewAs } from "./PreviewPane";
 import PrivateFields from "./PrivateFields";
 import SectionField from "./SectionField";
 import type { Draft, FormMode, SubmitPayload } from "./types";
@@ -64,6 +65,9 @@ export interface InitiativeFormProps {
   /** Show and require the categories question, a page field right after the
    * summary. `suggest` offers an AI suggestion from the title and summary. */
   categories?: { suggest?: boolean };
+  /** Who proposed it, when, and its status, for the preview; a new submission
+   * needs only the proposer. */
+  previewAs?: PreviewAs;
 }
 
 /** The two-column grid of the submit and edit pages. */
@@ -103,6 +107,7 @@ export default function InitiativeForm({
   footer,
   lockNote = LOCK_NOTE,
   categories,
+  previewAs,
 }: InitiativeFormProps) {
   const { draft, actions, reset } = useDraft(initial);
   const [submitted, setSubmitted] = useState(false);
@@ -138,14 +143,14 @@ export default function InitiativeForm({
     setTimeout(() => focusField(paintField(field)), 0);
   }, []);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit() {
     if (busy) return;
     setSubmitted(true);
     setServerFeedback(null);
     const res = runChecks(draft, scope, { categories: withCats });
     if (res.errors.length) {
       setFailed(true);
+      setPreviewing(false);
       const first = firstOnPage(res.errors.map((x) => paintField(x.field)).filter(Boolean));
       setTimeout(() => {
         if (!first || !focusField(first)) {
@@ -162,6 +167,7 @@ export default function InitiativeForm({
     } catch (err) {
       const findings = findingsOf(err);
       setFailed(true);
+      setPreviewing(false);
       setServerFeedback({ draft, findings, alert: errorMessage(err) });
       if (findings) {
         const first = firstOnPage(
@@ -181,6 +187,14 @@ export default function InitiativeForm({
   const empty = isEmptyDraft(draft);
   const top = typeof asideTop === "function" ? asideTop({ empty }) : asideTop;
   const errorsNow = checks.errors.length;
+  // Everything a submit would be refused for, the still-hidden "missing" ones
+  // included: the preview has no fields to paint them on.
+  const blocked = useMemo(
+    () =>
+      runChecks(draft, scope, { categories: withCats }).errors.length +
+      (feedback?.findings?.errors.length ?? 0),
+    [draft, scope, withCats, feedback],
+  );
 
   const checksCard = (
     <div data-checks="">
@@ -188,8 +202,7 @@ export default function InitiativeForm({
         checks={checks}
         submitted={submitted}
         failed={failed}
-        previewing={previewing}
-        onTogglePreview={() => setPreviewing((p) => !p)}
+        onPreview={() => setPreviewing(true)}
         onJump={jump}
         scope={scope}
       />
@@ -228,7 +241,10 @@ export default function InitiativeForm({
       {alert && <div className="alert" role="alert">{alert}</div>}
       <form
         className="flex flex-col"
-        onSubmit={submit}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
         noValidate
         onKeyDown={(e) => {
           const t = e.target as HTMLElement;
@@ -355,7 +371,14 @@ export default function InitiativeForm({
 
   return (
     <FindingsProvider value={checks.byField}>
-      {previewing && <PreviewPane draft={draft} onBack={() => setPreviewing(false)} />}
+      {previewing && (
+        <PreviewPane
+          draft={draft}
+          as={previewAs}
+          onBack={() => setPreviewing(false)}
+          submit={{ label: submitLabel, blocked, busy, onSubmit: () => void submit() }}
+        />
+      )}
       <div hidden={previewing}>
         <FormGrid
           main={main}

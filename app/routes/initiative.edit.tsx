@@ -333,6 +333,7 @@ function EditForm(
       showTypePicker={open}
       showRules={false}
       autosaveKey={null}
+      previewAs={r}
       asideTop={
         <WhatYouCanChange
           status={r.status}

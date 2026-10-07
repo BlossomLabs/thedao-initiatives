@@ -2,7 +2,7 @@
  * The live checks in the sidebar: how many required questions are answered,
  * the two money lines, and every finding as a jump link to its field.
  */
-import { AlertTriangle, ArrowLeft, Eye, XCircle } from "lucide-react";
+import { AlertTriangle, Eye, XCircle } from "lucide-react";
 import { type Finding, usd } from "@shared/draft/mod";
 import Bar from "~/components/ui/Bar";
 import { Button } from "~/components/ui/Button";
@@ -53,13 +53,13 @@ export function checkRows(errors: Finding[], warnings: Finding[]): { rows: Row[]
 }
 
 export default function ChecksCard(
-  { checks, submitted, failed, previewing, onTogglePreview, onJump, scope = "submit" }: {
+  { checks, submitted, failed, onPreview, onJump, scope = "submit" }: {
     checks: Checks;
     submitted: boolean;
     /** The last submit attempt was refused (paints the border red). */
     failed: boolean;
-    previewing: boolean;
-    onTogglePreview: () => void;
+    /** Opens the draft as the page the site would publish. */
+    onPreview: () => void;
     onJump: (field: string) => void;
     scope?: "submit" | "edit";
   },
@@ -136,18 +136,8 @@ export default function ChecksCard(
       <p className="m-0 mt-3.5 small dim">{CHECKS_INTRO}</p>
       {!submitted && scope === "submit" && <p className="m-0 mt-2 small dim">{CHECKS_NOTE}</p>}
 
-      <Button variant="ghost" className="mt-4 w-full" onClick={onTogglePreview}>
-        {previewing
-          ? (
-            <>
-              <ArrowLeft className="size-[15px]" />Back to editing
-            </>
-          )
-          : (
-            <>
-              <Eye className="size-[15px]" />See it as a page
-            </>
-          )}
+      <Button variant="ghost" className="mt-4 w-full" onClick={onPreview}>
+        <Eye className="size-[15px]" />Preview
       </Button>
     </div>
   );

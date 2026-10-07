@@ -77,6 +77,46 @@ describe("KeyFacts", () => {
     expect(screen.getByText("$450,000")).toBeInTheDocument();
   });
 
+  it("lists the links by domain, https ones as anchors to the full URL", () => {
+    render(
+      <KeyFacts
+        r={{
+          ...base,
+          type: "rfp",
+          links: [
+            "https://www.example.org/spec?x=1",
+            "http://plain.example",
+            "javascript:alert(1)",
+          ],
+        }}
+        summary={summary}
+      />,
+    );
+    expect(screen.getByText("Links")).toBeInTheDocument();
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveTextContent(/^example\.org$/);
+    expect(links[0]).toHaveAttribute("href", "https://www.example.org/spec?x=1");
+    expect(links[0]).toHaveAttribute("title", "https://www.example.org/spec?x=1");
+    expect(links[0]).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.getByText("http://plain.example")).toBeInTheDocument();
+    expect(screen.getByText("javascript:alert(1)")).toBeInTheDocument();
+  });
+
+  it("shows the links it is handed in place of the initiative's, and no row without any", () => {
+    const { rerender } = render(
+      <KeyFacts
+        r={{ ...base, type: "rfp", links: ["https://now.example"] }}
+        summary={summary}
+        links={["https://then.example/a"]}
+      />,
+    );
+    expect(screen.getByRole("link", { name: "then.example" })).toBeInTheDocument();
+    expect(screen.queryByText("now.example")).not.toBeInTheDocument();
+    rerender(<KeyFacts r={{ ...base, type: "rfp" }} summary={summary} links={[" "]} />);
+    expect(screen.queryByText("Links")).not.toBeInTheDocument();
+  });
+
   it("hides grant-only rows on an RFP even if stale values are present", () => {
     render(<KeyFacts r={{ ...base, type: "rfp", durationMonths: 1 }} summary={summary} />);
     expect(screen.getByText("About 1 month")).toBeInTheDocument();

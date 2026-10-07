@@ -6,50 +6,38 @@ import RevisionPanel, { type ViewMode } from "~/components/initiative/RevisionBa
 import KeyFacts from "~/components/initiative/KeyFacts";
 import Skeleton from "~/components/ui/Skeleton";
 import { useSession } from "~/context/session";
-import type { InitiativePage } from "~/lib/api-types";
+import type { Initiative, InitiativePage, Summary } from "~/lib/api-types";
 import { openDiscussion } from "~/lib/discussion";
 import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
 import { WHAT_NEXT } from "~/data/what-next";
 
-export default function SideCards(
-  { page, placeholder = false, onDonated, revisions }: {
-    /** The page is still the board card's placeholder: the facts are unknown. */
+/** What the donate card says while an initiative has no donation address yet. */
+export const DONATE_SETUP = "This initiative's donation address is being set up. Check back soon.";
+
+/**
+ * The cards every visitor sees, in the page's order. The initiative page
+ * renders them from the API, the submit preview from the draft.
+ */
+export function PublicCards(
+  { r, summary, links, donate = DONATE_SETUP, placeholder = false }: {
+    r: Initiative;
+    summary: Summary;
+    /** The links of the text on screen; defaults to the initiative's. */
+    links?: string[];
+    /** The donate card's body: the widget, or a line saying why there is none. */
+    donate?: React.ReactNode;
     placeholder?: boolean;
-    page: InitiativePage;
-    onDonated?: () => void;
-    /** History navigation state owned by the page; omitted when there is nothing to browse. */
-    revisions?: { viewing: number; current: number; mode: ViewMode; onMode: (m: ViewMode) => void };
   },
 ) {
-  const r = page.initiative;
-  const { session } = useSession();
-  const mine = Boolean(
-    session && r.proposer && session.address.toLowerCase() === r.proposer.toLowerCase(),
-  );
-  const editable = r.status === "pending" || r.status === "approved";
   return (
-    <StickyAside className="flex flex-col gap-3.5 max-[960px]:static">
+    <>
       <div className="panel border-[rgba(92,183,90,.35)] shadow-[0_0_34px_rgba(92,183,90,.07)]">
         <span className="k">Donate to this initiative</span>
-        {page.donationsEnabled
-          ? (
-            <DonateWidget
-              key={r.id}
-              initiativeId={r.id}
-              slug={r.slug}
-              safeAddress={r.safeAddress}
-              onConfirmed={onDonated}
-            />
-          )
-          : (
-            <p className="m-0 small">
-              {!r.safeAddress
-                ? "This initiative's donation address is being set up. Check back soon."
-                : "Donations are temporarily unavailable."}
-            </p>
-          )}
+        {typeof donate === "string" ? <p className="m-0 small">{donate}</p> : donate}
       </div>
-      {placeholder ? <Skeleton className="h-28" /> : <KeyFacts r={r} summary={page.summary} />}
+      {placeholder
+        ? <Skeleton className="h-28" />
+        : <KeyFacts r={r} summary={summary} links={links} />}
       {r.discourseUrl && (
         <div className="panel border-[rgba(90,200,250,.35)]">
           <span className="k">Join the discussion</span>
@@ -78,6 +66,49 @@ export default function SideCards(
         <span className="k">What happens next</span>
         <p className="m-0 small dim">{WHAT_NEXT[r.type]}</p>
       </div>
+    </>
+  );
+}
+
+export default function SideCards(
+  { page, placeholder = false, onDonated, revisions, links }: {
+    /** The page is still the board card's placeholder: the facts are unknown. */
+    placeholder?: boolean;
+    page: InitiativePage;
+    onDonated?: () => void;
+    /** History navigation state owned by the page; omitted when there is nothing to browse. */
+    revisions?: { viewing: number; current: number; mode: ViewMode; onMode: (m: ViewMode) => void };
+    /** The links of the text on screen, when it is not the current one. */
+    links?: string[];
+  },
+) {
+  const r = page.initiative;
+  const { session } = useSession();
+  const mine = Boolean(
+    session && r.proposer && session.address.toLowerCase() === r.proposer.toLowerCase(),
+  );
+  const editable = r.status === "pending" || r.status === "approved";
+  return (
+    <StickyAside className="flex flex-col gap-3.5 max-[960px]:static">
+      <PublicCards
+        r={r}
+        summary={page.summary}
+        links={links}
+        placeholder={placeholder}
+        donate={page.donationsEnabled
+          ? (
+            <DonateWidget
+              key={r.id}
+              initiativeId={r.id}
+              slug={r.slug}
+              safeAddress={r.safeAddress}
+              onConfirmed={onDonated}
+            />
+          )
+          : !r.safeAddress
+          ? DONATE_SETUP
+          : "Donations are temporarily unavailable."}
+      />
       {revisions && <RevisionPanel slug={r.slug} revisions={page.revisions} {...revisions} />}
       {mine && editable && (
         <div className="panel border-[rgba(90,200,250,.35)]">

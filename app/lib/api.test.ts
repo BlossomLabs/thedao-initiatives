@@ -28,3 +28,16 @@ test("a value that is not an error gets the caller's fallback", () => {
   expect(errorMessage(undefined, "Vote failed.")).toBe("Vote failed.");
   expect(errorMessage(undefined)).toBe("Something went wrong.");
 });
+
+it("a bug's own message never reaches the page", () => {
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  const bug = new TypeError("Cannot read properties of undefined (reading 'length')");
+  expect(errorMessage(bug)).toBe("Something went wrong.");
+  expect(errorMessage(bug, "Search failed.")).toBe("Search failed.");
+  expect(log).toHaveBeenCalledWith(bug);
+  log.mockRestore();
+  expect(errorMessage(new TypeError("Failed to fetch"))).toBe(
+    "Could not reach the server. Check your connection and try again.",
+  );
+  expect(errorMessage(new Error("slow down"))).toBe("Slow down.");
+});

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { sendTransaction, waitForTransactionReceipt } from "wagmi/actions";
-import { useAccount, useConfig } from "wagmi";
+import { useWallet, useWalletStore } from "~/context/wallet";
 import { RefreshCw } from "lucide-react";
 import GovernedBy from "~/components/terms/GovernedBy";
 import { Button } from "~/components/ui/Button";
@@ -22,7 +22,7 @@ import type { Msg } from "./run";
 /** The deploy flow shared by the Approve button and the Safe card. */
 export function useSafeDeploy(id: string, onChange: () => void) {
   const adminApi = useAdminApi();
-  const config = useConfig();
+  const wallet = useWalletStore();
   const [status, setStatus] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
   const base = `/api/admin/initiatives/${id}`;
@@ -46,6 +46,7 @@ export function useSafeDeploy(id: string, onChange: () => void) {
           text:
             `Confirm the Safe deploy in your wallet (${p.threshold}-of-${p.signers.length} via the canonical factory, to ${p.address}).`,
         });
+        const { config } = await wallet.load();
         const hash = await sendTransaction(config, {
           to: p.factory as `0x${string}`,
           data: p.calldata as `0x${string}`,
@@ -90,7 +91,7 @@ export default function SafeCard(
   const adminApi = useAdminApi();
   const { session } = useSession();
   const r = page.initiative;
-  const { isConnected } = useAccount();
+  const { isConnected } = useWallet();
   const [status, setStatus] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
   const [syncState, setSyncState] = useState<SafeSyncState | null>(page.safeSync);

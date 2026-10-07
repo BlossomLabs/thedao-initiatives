@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import FilterBar from "./FilterBar";
 import { type BoardView, DEFAULT_VIEW } from "~/lib/board-view";
@@ -9,7 +9,12 @@ const counts = {
   cats: Object.fromEntries(CATEGORIES.map((c, i) => [c.slug, i + 1])),
 };
 
-const bar = (view: Partial<BoardView> = {}, onChange = vi.fn(), onSort = vi.fn()) => {
+const bar = (
+  view: Partial<BoardView> = {},
+  onChange = vi.fn(),
+  onSort = vi.fn(),
+  watchlistCount = 0,
+) => {
   render(
     <FilterBar
       view={{ ...DEFAULT_VIEW, ...view }}
@@ -20,6 +25,7 @@ const bar = (view: Partial<BoardView> = {}, onChange = vi.fn(), onSort = vi.fn()
       ai={false}
       onSort={onSort}
       sheet={null}
+      watchlistCount={watchlistCount}
     />,
   );
   return { onChange, onSort };
@@ -98,7 +104,13 @@ it("no row of applied filters: the pills carry the state", () => {
 it("Clear filters shows only while something is filtered, and resets it all but sort", () => {
   const { onChange } = bar({ cats: ["opsec"], status: "open", sort: "newest" });
   fireEvent.click(screen.getAllByRole("button", { name: "Clear filters" })[0]);
-  expect(onChange).toHaveBeenLastCalledWith({ type: "all", cats: [], status: "all", q: "" });
+  expect(onChange).toHaveBeenLastCalledWith({
+    type: "all",
+    cats: [],
+    status: "all",
+    q: "",
+    watchlist: false,
+  });
 });
 
 it("no Clear filters with nothing filtered, and the count reads N initiatives", () => {
@@ -126,4 +138,15 @@ it("the empty Category pill shows three plain dots, without the rings", async ()
   const dots = pill.querySelectorAll(".rounded-full");
   expect(dots).toHaveLength(3);
   for (const d of dots) expect(d.className).not.toMatch(/shadow-/);
+});
+
+it("My watchlist appears once this browser has one, and toggles the filter", () => {
+  bar();
+  expect(screen.queryByRole("button", { name: /My watchlist/ })).toBeNull();
+  cleanup();
+  const { onChange } = bar({}, vi.fn(), vi.fn(), 2);
+  const pill = screen.getAllByRole("button", { name: /My watchlist 2/ })[0];
+  expect(pill).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(pill);
+  expect(onChange).toHaveBeenLastCalledWith({ watchlist: true });
 });

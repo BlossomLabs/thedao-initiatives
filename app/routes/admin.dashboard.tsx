@@ -1,7 +1,7 @@
 import { useAdminApi } from "~/hooks/use-admin-api";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { Bell } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
 import DashboardSkeleton from "~/components/layout/DashboardSkeleton";
@@ -14,28 +14,19 @@ import { useSelection } from "~/hooks/use-selection";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { StatusChip, TypeBadge } from "~/components/ui/Badge";
 import { CategoryTag } from "~/components/ui/CategoryTag";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/Select";
-import { CATEGORIES } from "~/lib/categories";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { sessionKey, useSession } from "~/context/session";
 import { api, errorMessage } from "~/lib/api";
 import type { AdminComment, AdminDashboard } from "~/lib/api-types";
-import { dt, shortAddr, truncate, usd } from "~/lib/format";
+import { adminFacetCounts, approvedCounts, filterAdminRows } from "~/lib/admin-rows";
+import { parseAdminQuery, setQualifier, UNTAGGED } from "~/lib/admin-query";
+import AdminFilters from "~/components/admin/AdminFilters";
+import SafeSyncIcon from "~/components/admin/SafeSyncIcon";
+import TypeGlyph from "~/components/board/filters/TypeGlyph";
+import { dt, plural, shortAddr, truncate, usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
 
 const dashKey = ["admin", "dashboard"] as const;
-
-const CAT_FILTER_ITEMS = [
-  { value: "all", label: "All categories" },
-  { value: "untagged", label: "Untagged" },
-  ...CATEGORIES.map((c) => ({ value: c.slug as string, label: c.label as string })),
-];
 
 function CommentCell({ c }: { c: AdminComment }) {
   return (
@@ -55,7 +46,9 @@ export default function Dashboard() {
   const { signOut, session } = useSession();
   const qc = useQueryClient();
   // The banner's query, so the button costs no request of its own.
-  const maintenance = useSiteSettings().data?.maintenance;
+  const site = useSiteSettings().data;
+  const maintenance = site?.maintenance;
+  const vote = site?.vote;
   const { data, isLoading, error } = useQuery({
     queryKey: [...dashKey, sessionKey(session)],
     queryFn: ({ signal }) => api<AdminDashboard>("/api/admin/dashboard", { signal }),
@@ -82,15 +75,21 @@ export default function Dashboard() {
   const heldIds = useMemo(() => (data?.held ?? []).map((c) => c.id), [data?.held]);
   const reportedIds = useMemo(() => (data?.reported ?? []).map((c) => c.id), [data?.reported]);
   // "all", "untagged" or a category slug.
-  const [catFilter, setCatFilter] = useState("all");
+  // One query for the list (`type:grant status:pending First QA`), kept in the URL.
+  const [params, setParams] = useSearchParams();
+  const q = params.get("q") ?? "";
+  const setQ = (next: string) =>
+    setParams(next.trim() ? { q: next } : {}, { replace: true, preventScrollReset: true });
+  const parsed = useMemo(() => parseAdminQuery(q), [q]);
   const rows = useMemo(
-    () =>
-      (data?.rows ?? []).filter(({ initiative: r }) =>
-        catFilter === "all" ||
-        (catFilter === "untagged" ? !r.categories.length : r.categories.includes(catFilter))
-      ),
-    [data?.rows, catFilter],
+    () => filterAdminRows(data?.rows ?? [], parsed.query),
+    [data?.rows, parsed],
   );
+  const facetCounts = useMemo(
+    () => adminFacetCounts(data?.rows ?? [], parsed.query),
+    [data?.rows, parsed],
+  );
+  const counts = approvedCounts(data?.rows ?? []);
   const rowIds = useMemo(() => rows.map((r) => r.initiative.id), [rows]);
   const heldSel = useSelection(heldIds);
   const reportedSel = useSelection(reportedIds);
@@ -144,6 +143,24 @@ export default function Dashboard() {
           <LinkButton
             variant="ghost"
             sm
+            to="/admin/vote"
+            title="The first goal, and whether the site shows it"
+          >
+            {vote && (
+              <span
+                className={cn(
+                  "size-[9px] flex-none rounded-full",
+                  vote.show ? "bg-dao-green shadow-[0_0_10px_rgba(92,183,90,.6)]" : "bg-white/30",
+                )}
+                aria-hidden="true"
+              />
+            )}
+            Vote
+            {vote && <span className="sr-only">{vote.show ? ", on the site" : ", hidden"}</span>}
+          </LinkButton>
+          <LinkButton
+            variant="ghost"
+            sm
             to="/admin/maintenance"
             title="Pause writes, download or restore the database"
           >
@@ -164,7 +181,29 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-3.5 grid grid-cols-3 gap-3 max-[860px]:grid-cols-1">
+      <div className="mt-3.5 grid grid-cols-4 gap-3 max-[1100px]:grid-cols-2 max-[640px]:grid-cols-1">
+        {/* The same approved rows the board shows, so the numbers match it. */}
+        <div className="flex items-center gap-3 rounded-2xl border border-edge bg-card px-[18px] py-3.5">
+          <span
+            className="size-[9px] flex-none rounded-full bg-dao-green shadow-[0_0_10px_rgba(92,183,90,.6)]"
+            aria-hidden="true"
+          />
+          <div>
+            <b className="block font-inter-tight text-[14px] font-semibold">
+              {counts.total} approved
+            </b>
+            <small className="flex items-center gap-3 text-[12px] text-muted">
+              <span className="inline-flex items-center gap-1.5">
+                <TypeGlyph type="grant" />
+                {plural(counts.grants, "grant")}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <TypeGlyph type="rfp" />
+                {plural(counts.rfps, "RFP")}
+              </span>
+            </small>
+          </div>
+        </div>
         <div className="flex items-center gap-3 rounded-2xl border border-edge bg-card px-[18px] py-3.5">
           <span
             className={cn(
@@ -220,237 +259,246 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <Admins />
-
       <SectionHeading id="moderation">Community moderation</SectionHeading>
-      <h3 className="h3">
-        Waiting for review <span className="ml-2 text-[12px] text-muted">({data.held.length})</span>
-      </h3>
-      {data.held.length
-        ? (
-          <div className="tblbox">
-            <BulkBar
-              selection={heldSel}
-              noun="entry"
-              actions={[
-                { key: "publish", label: "Publish", variant: "primary" },
-                {
-                  key: "discard",
-                  label: "Discard",
-                  variant: "ghost",
-                  confirm: "Discard {n} {noun}?",
-                },
-              ]}
-              onAct={bulkComments}
-            />
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th className="w-8">
-                    <HeadCheck selection={heldSel} label="Select every held entry" />
-                  </th>
-                  <th>Entry</th>
-                  <th>AI summary</th>
-                  <th>Identity</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.held.map((c) => (
-                  <tr key={c.id} className={cn(c.reports > 0 && "[&>td]:bg-[rgba(255,59,56,.06)]")}>
-                    <td>
-                      <RowCheck
-                        selection={heldSel}
-                        id={c.id}
-                        label={`Select ${c.type} on ${c.initiative?.title ?? "?"}`}
-                      />
-                    </td>
-                    <CommentCell c={c} />
-                    <td className="small dim">{c.aiSummary}</td>
-                    <td className="small">
-                      {c.displayName || "(no name)"}
-                      {c.email && ` · ${c.email}`}
-                      {c.address && (
-                        <>
-                          <br />
-                          {shortAddr(c.address)}
-                        </>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap">
-                      <Button
-                        sm
-                        className="mr-1.5"
-                        onClick={() =>
-                          act(c.id, "publish")}
-                      >
-                        Publish
-                      </Button>
-                      <Button
-                        sm
-                        variant="ghost"
-                        onClick={() =>
-                          act(c.id, "discard")}
-                      >
-                        Discard
-                      </Button>
-                      {rowSaid(c.id)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-        : <p className="text-muted">Nothing waiting for review.</p>}
-
-      <h3 className="h3">
-        Unanswered questions{" "}
-        <span className="ml-2 text-[12px] text-muted">({data.unanswered.length})</span>
-      </h3>
-      {data.unanswered.length
-        ? (
-          <div className="tblbox">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Question</th>
-                  <th>Asked</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.unanswered.map((c) => (
-                  <tr
-                    key={c.id}
-                    className={cn(c.createdAt < data.weekAgo && "[&>td]:bg-[rgba(255,59,56,.06)]")}
-                  >
-                    <CommentCell c={c} />
-                    <td>
-                      {dt(c.createdAt)}
-                      {c.createdAt < data.weekAgo && (
-                        <>
-                          · <b>7+ days</b>
-                        </>
-                      )}
-                    </td>
-                    <td>
-                      {c.initiative && (
-                        <LinkButton
-                          sm
-                          variant="ghost"
-                          to={`/initiative/${c.initiative.slug}#qa-${c.parentId ?? c.id}`}
-                        >
-                          Open
-                        </LinkButton>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-        : <p className="text-muted">Every question has a reply.</p>}
-
-      {data.reported.length > 0 && (
-        <>
+      {/* Admins sit beside the queues on wide screens, under them on narrow ones. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-5 max-[1100px]:grid-cols-1">
+        <div className="min-w-0">
           <h3 className="h3">
-            Reported entries{" "}
-            <span className="ml-2 text-[12px] text-muted">({data.reported.length})</span>
+            Waiting for review{" "}
+            <span className="ml-2 text-[12px] text-muted">({data.held.length})</span>
           </h3>
-          <div className="tblbox">
-            <BulkBar
-              selection={reportedSel}
-              noun="entry"
-              actions={[
-                { key: "unreport", label: "Dismiss reports" },
-                {
-                  key: "discard",
-                  label: "Discard",
-                  variant: "ghost",
-                  confirm: "Discard {n} {noun}?",
-                },
-              ]}
-              onAct={bulkComments}
-            />
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th className="w-8">
-                    <HeadCheck selection={reportedSel} label="Select every reported entry" />
-                  </th>
-                  <th>Entry</th>
-                  <th>Reports</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.reported.map((c) => (
-                  <tr key={c.id}>
-                    <td>
-                      <RowCheck
-                        selection={reportedSel}
-                        id={c.id}
-                        label={`Select ${c.type} on ${c.initiative?.title ?? "?"}`}
-                      />
-                    </td>
-                    <CommentCell c={c} />
-                    <td>{c.reports}</td>
-                    <td className="whitespace-nowrap">
-                      {c.initiative && (
-                        <LinkButton
-                          sm
-                          variant="ghost"
-                          className="mr-1.5"
-                          to={`/initiative/${c.initiative.slug}#qa-${c.parentId ?? c.id}`}
-                        >
-                          Open
-                        </LinkButton>
-                      )}
-                      <Button
-                        sm
-                        variant="ghost"
-                        className="mr-1.5"
-                        onClick={() => act(c.id, "unreport")}
+          {data.held.length
+            ? (
+              <div className="tblbox">
+                <BulkBar
+                  selection={heldSel}
+                  noun="entry"
+                  actions={[
+                    { key: "publish", label: "Publish", variant: "primary" },
+                    {
+                      key: "discard",
+                      label: "Discard",
+                      variant: "ghost",
+                      confirm: "Discard {n} {noun}?",
+                    },
+                  ]}
+                  onAct={bulkComments}
+                />
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th className="w-8">
+                        <HeadCheck selection={heldSel} label="Select every held entry" />
+                      </th>
+                      <th>Entry</th>
+                      <th>AI summary</th>
+                      <th>Identity</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.held.map((c) => (
+                      <tr
+                        key={c.id}
+                        className={cn(c.reports > 0 && "[&>td]:bg-[rgba(255,59,56,.06)]")}
                       >
-                        Dismiss reports
-                      </Button>
-                      <Button sm variant="ghost" onClick={() => act(c.id, "discard")}>
-                        Discard
-                      </Button>
-                      {rowSaid(c.id)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+                        <td>
+                          <RowCheck
+                            selection={heldSel}
+                            id={c.id}
+                            label={`Select ${c.type} on ${c.initiative?.title ?? "?"}`}
+                          />
+                        </td>
+                        <CommentCell c={c} />
+                        <td className="small dim">{c.aiSummary}</td>
+                        <td className="small">
+                          {c.displayName || "(no name)"}
+                          {c.email && ` · ${c.email}`}
+                          {c.address && (
+                            <>
+                              <br />
+                              {shortAddr(c.address)}
+                            </>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap">
+                          <Button
+                            sm
+                            className="mr-1.5"
+                            onClick={() => act(c.id, "publish")}
+                          >
+                            Publish
+                          </Button>
+                          <Button
+                            sm
+                            variant="ghost"
+                            onClick={() => act(c.id, "discard")}
+                          >
+                            Discard
+                          </Button>
+                          {rowSaid(c.id)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+            : <p className="text-muted">Nothing waiting for review.</p>}
+
+          <h3 className="h3">
+            Unanswered questions{" "}
+            <span className="ml-2 text-[12px] text-muted">({data.unanswered.length})</span>
+          </h3>
+          {data.unanswered.length
+            ? (
+              <div className="tblbox">
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>Question</th>
+                      <th>Asked</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.unanswered.map((c) => (
+                      <tr
+                        key={c.id}
+                        className={cn(
+                          c.createdAt < data.weekAgo && "[&>td]:bg-[rgba(255,59,56,.06)]",
+                        )}
+                      >
+                        <CommentCell c={c} />
+                        <td>
+                          {dt(c.createdAt)}
+                          {c.createdAt < data.weekAgo && (
+                            <>
+                              · <b>7+ days</b>
+                            </>
+                          )}
+                        </td>
+                        <td>
+                          {c.initiative && (
+                            <LinkButton
+                              sm
+                              variant="ghost"
+                              to={`/initiative/${c.initiative.slug}#qa-${c.parentId ?? c.id}`}
+                            >
+                              Open
+                            </LinkButton>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+            : <p className="text-muted">Every question has a reply.</p>}
+
+          {data.reported.length > 0 && (
+            <>
+              <h3 className="h3">
+                Reported entries{" "}
+                <span className="ml-2 text-[12px] text-muted">({data.reported.length})</span>
+              </h3>
+              <div className="tblbox">
+                <BulkBar
+                  selection={reportedSel}
+                  noun="entry"
+                  actions={[
+                    { key: "unreport", label: "Dismiss reports" },
+                    {
+                      key: "discard",
+                      label: "Discard",
+                      variant: "ghost",
+                      confirm: "Discard {n} {noun}?",
+                    },
+                  ]}
+                  onAct={bulkComments}
+                />
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th className="w-8">
+                        <HeadCheck selection={reportedSel} label="Select every reported entry" />
+                      </th>
+                      <th>Entry</th>
+                      <th>Reports</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.reported.map((c) => (
+                      <tr key={c.id}>
+                        <td>
+                          <RowCheck
+                            selection={reportedSel}
+                            id={c.id}
+                            label={`Select ${c.type} on ${c.initiative?.title ?? "?"}`}
+                          />
+                        </td>
+                        <CommentCell c={c} />
+                        <td>{c.reports}</td>
+                        <td className="whitespace-nowrap">
+                          {c.initiative && (
+                            <LinkButton
+                              sm
+                              variant="ghost"
+                              className="mr-1.5"
+                              to={`/initiative/${c.initiative.slug}#qa-${c.parentId ?? c.id}`}
+                            >
+                              Open
+                            </LinkButton>
+                          )}
+                          <Button
+                            sm
+                            variant="ghost"
+                            className="mr-1.5"
+                            onClick={() => act(c.id, "unreport")}
+                          >
+                            Dismiss reports
+                          </Button>
+                          <Button sm variant="ghost" onClick={() => act(c.id, "discard")}>
+                            Discard
+                          </Button>
+                          {rowSaid(c.id)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+        <aside className="mt-5 max-[1100px]:mt-0">
+          <Admins />
+        </aside>
+      </div>
 
       <SectionHeading>All initiatives</SectionHeading>
-      <div className="mb-3 flex flex-wrap items-center gap-2.5">
-        <Select
-          value={catFilter}
-          items={CAT_FILTER_ITEMS}
-          onValueChange={(v) => setCatFilter(String(v))}
-        >
-          <SelectTrigger size="sm" aria-label="Category" className="min-h-[38px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CAT_FILTER_ITEMS.map((c) => (
-              <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="small dim">
-          {rows.length} of {data.rows.length}
-          {" · "}
-          {data.rows.filter((x) => !x.initiative.categories.length).length} untagged
-        </span>
-      </div>
+      <AdminFilters
+        q={q}
+        query={parsed.query}
+        problems={parsed.problems}
+        counts={facetCounts}
+        onChange={setQ}
+        aside={
+          <span className="small dim tnum">
+            {rows.length} of {data.rows.length}
+            {" · "}
+            <button
+              type="button"
+              className="cursor-pointer border-0 bg-transparent p-0 text-inherit underline decoration-white/25 underline-offset-2 hover:text-white"
+              onClick={() => setQ(setQualifier(q, "cat", [UNTAGGED]))}
+            >
+              {data.rows.filter((x) => !x.initiative.categories.length).length} untagged
+            </button>
+          </span>
+        }
+      />
       <div className="tblbox">
         <BulkBar
           selection={rowSel}
@@ -468,32 +516,54 @@ export default function Dashboard() {
           ]}
           onAct={bulkInitiatives}
         />
-        <table className="tbl">
+        <table className="tbl [&_td]:align-middle">
           <thead>
             <tr>
               <th className="w-8">
                 <HeadCheck selection={rowSel} label="Select every initiative" />
               </th>
               <th>Status</th>
+              <th>Type</th>
               <th>Title</th>
               <th className="amt">Goal</th>
               <th className="amt">Raised</th>
               <th>Contact</th>
-              <th>Safe sync</th>
+              <th className="whitespace-nowrap text-center">Safe sync</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
+            {!rows.length && (
+              <tr>
+                <td colSpan={9} className="py-6 text-center text-muted">
+                  No initiatives match.{" "}
+                  <button
+                    type="button"
+                    className="cursor-pointer border-0 bg-transparent p-0 text-dao-green underline"
+                    onClick={() => setQ("")}
+                  >
+                    Clear the search
+                  </button>
+                </td>
+              </tr>
+            )}
             {rows.map(({ initiative: r, summary, safeSync }) => (
               <tr key={r.id}>
                 <td>
                   <RowCheck selection={rowSel} id={r.id} label={`Select ${r.title}`} />
                 </td>
                 <td className="whitespace-nowrap">
-                  <StatusChip status={r.status} /> <TypeBadge type={r.type} inline />
+                  <StatusChip status={r.status} />
                   {r.sortRank
-                    ? <span title={`Pinned to board position ${r.sortRank}`}>📌{r.sortRank}</span>
+                    ? (
+                      <span className="ml-1" title={`Pinned to board position ${r.sortRank}`}>
+                        📌{r.sortRank}
+                      </span>
+                    )
                     : null}
+                </td>
+                <td className="whitespace-nowrap">
+                  <TypeBadge type={r.type} inline />
                 </td>
                 <td>
                   {r.title}
@@ -516,18 +586,8 @@ export default function Dashboard() {
                     : null}
                 </td>
                 <td className="small [overflow-wrap:anywhere]">{r.contact || "–"}</td>
-                <td className="small">
-                  {!r.safeAddress
-                    ? <span className="dim">no Safe</span>
-                    : !safeSync
-                    ? <span className="dim">never</span>
-                    : safeSync.ok
-                    ? (
-                      <span className="text-dao-green">
-                        {safeSync.backfilled ? "ok" : "backfilling"} · {dt(safeSync.at)}
-                      </span>
-                    )
-                    : <span className="text-[#ffb3b1]" title={safeSync.error}>error</span>}
+                <td className="text-center">
+                  <SafeSyncIcon safeAddress={r.safeAddress} sync={safeSync} />
                 </td>
                 <td>
                   <Link className="btn btn-ghost btn-sm" to={`/admin/initiatives/${r.slug}`}>

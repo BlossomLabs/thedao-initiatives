@@ -6,7 +6,7 @@ import type { Comment, Donation, Initiative, Pledge, Revision } from "../db/type
 import { LIVE_ROLES, ROLE_ORDER } from "../services/roles.ts";
 import type { Config } from "../config.ts";
 import { isStructured } from "../../shared/draft/mod.ts";
-import { pickText } from "../db/initiatives.ts";
+import { type CardRow, pickText } from "../db/initiatives.ts";
 import { categoriesOf } from "../../shared/categories.ts";
 
 export function ipfsUrl(config: Config, cid: string): string {
@@ -48,7 +48,7 @@ export function publicInitiative(r: Initiative) {
 /** What a board card needs: identity, the one-line pitch and the funding
  * facts. The text (details, sections, milestones, links) and the page facts
  * stay on the initiative page, which the board never renders. */
-export function cardInitiative(r: Initiative) {
+export function cardInitiative(r: CardRow) {
   return {
     id: r.id,
     slug: r.slug,
@@ -60,6 +60,8 @@ export function cardInitiative(r: Initiative) {
     sortRank: r.sortRank,
     safeAddress: r.safeAddress,
     categories: categoriesOf(r),
+    /** Grants only; the board's keyword filter searches it. */
+    recipientTeam: r.type === "grant" ? r.recipientTeam ?? "" : "",
     createdAt: r.createdAt,
     approvedAt: r.approvedAt,
   };

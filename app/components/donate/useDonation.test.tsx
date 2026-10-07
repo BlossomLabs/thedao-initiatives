@@ -16,10 +16,13 @@ vi.mock("wagmi/actions", () => ({
   getBalance: vi.fn(),
   readContract: vi.fn(),
 }));
-vi.mock("wagmi", () => ({
-  useAccount: () => walletState,
-  useConfig: () => ({}),
-  useConnect: () => ({ connectors: [], connectAsync: vi.fn() }),
+const island = vi.hoisted(() => ({ connectors: [] as unknown[], connect: vi.fn() }));
+vi.mock("~/context/wallet", () => ({
+  // The page's snapshot lists no connectors until the island is attached.
+  useWallet: () => ({ ...walletState, connectors: [], connect: island.connect }),
+  useWalletStore: () => ({
+    load: () => Promise.resolve({ config: { connectors: island.connectors } }),
+  }),
 }));
 vi.mock("./Celebration", () => ({ confettiBurst: vi.fn() }));
 vi.mock("~/lib/api", async (original) => ({
@@ -35,6 +38,8 @@ beforeEach(() => {
   sessionStorage.clear();
   walletState.address = undefined;
   walletState.isConnected = false;
+  island.connectors = [];
+  island.connect.mockReset();
 });
 
 afterEach(() => vi.useRealTimers());
@@ -219,4 +224,19 @@ it("manually confirms a public hash without creating an acceptance", async () =>
   expect(api).toHaveBeenCalledWith("/api/donate/confirm", {
     json: { initiativeId: args.initiativeId, slug: args.slug, txHash: TX },
   });
+});
+
+it("connects through the island's wallets when the wallet stack is still on its way", async () => {
+  const connector = { id: "io.metamask", uid: "1" };
+  island.connectors = [connector];
+  island.connect.mockResolvedValue({ accounts: [ADDRESS], chainId: 1 });
+  vi.mocked(api).mockResolvedValueOnce({ attemptId: ID, recordedAt: 1 }).mockResolvedValueOnce(
+    confirmed,
+  );
+  vi.mocked(sendTransaction).mockResolvedValue(TX as `0x${string}`);
+  const { result } = renderHook(() => useDonation(args));
+  await act(() => result.current.donate("USDC", "5", {}));
+  expect(island.connect).toHaveBeenCalledWith({ connector, chainId: 1 });
+  expect(result.current.status?.kind).toBe("ok");
+  expect(sendTransaction).toHaveBeenCalledTimes(1);
 });

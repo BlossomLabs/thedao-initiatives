@@ -1,18 +1,37 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, ArrowUpRight, Check, Copy, Mail, QrCode, Search, Wallet } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
 import type { Connector } from "wagmi";
 import { Dialog } from "~/components/ui/Dialog";
 import { useSession } from "~/context/session";
 import { useEmailSignIn } from "~/context/email-sign-in";
 import { useConnectors } from "~/hooks/use-connectors";
+import { useWallet } from "~/context/wallet";
 import { walletErrorMessage } from "~/lib/donate";
-import { PRIVY_CONNECTOR_ID } from "~/lib/privy";
+import { PRIVY_APP_ID, PRIVY_CONNECTOR_ID } from "~/lib/privy-store";
+import { MOCK_WALLET, WALLETCONNECT_PROJECT_ID } from "~/lib/wallet-env";
+import {
+  getAnnouncedWallets,
+  getServerAnnouncedWallets,
+  hasInjectedProvider,
+  subscribeAnnouncedWallets,
+} from "~/lib/announced-wallets";
 import { type MobileWallet, normalizeWallets, walletDeepLink } from "~/lib/mobile-wallets";
 import { cn } from "~/lib/utils";
 
 const row =
   "flex w-full items-center gap-3 rounded-xl border border-edge2 bg-white/[.025] px-3.5 py-3 text-left text-sm text-soft transition-colors hover:border-dao-green/50 hover:bg-white/[.06] hover:text-white focus-visible:outline-2 focus-visible:outline-dao-green disabled:cursor-default disabled:opacity-50";
+// Only the QR tab needs it.
+const QRCodeSVG = lazy(() => import("qrcode.react").then((m) => ({ default: m.QRCodeSVG })));
+
+/** A connection method row; `connector` is unset until the wallet island is up. */
+interface Choice {
+  key: string;
+  id: string;
+  name: string;
+  icon?: string;
+  connector?: Connector;
+}
+
 const smallButton =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-edge2 px-3 py-2 text-[13px] text-soft hover:bg-white/5 disabled:opacity-50";
 
@@ -21,6 +40,7 @@ export default function WalletPicker({ open, onOpenChange }: {
   onOpenChange: (open: boolean) => void;
 }) {
   const connectors = useConnectors();
+  const { attached, failed } = useWallet();
   const { connect, cancelPairing, connecting, signingIn, restoring } = useSession();
   const { openEmailSignIn } = useEmailSignIn();
   const [view, setView] = useState<"choose" | "mobile">("choose");
@@ -35,12 +55,32 @@ export default function WalletPicker({ open, onOpenChange }: {
   const [copied, setCopied] = useState(false);
   const [pending, setPending] = useState(false);
   const [pairing, setPairing] = useState(false);
-  const [injectedAvailable, setInjectedAvailable] = useState(false);
+  const [injectedAvailable, setInjectedAvailable] = useState(hasInjectedProvider);
   const running = useRef(false);
   const alive = useRef(true);
   const detach = useRef<(() => void) | null>(null);
   const attempt = useRef(0);
   const wc = connectors.find((c) => c.id === "walletConnect");
+  const announced = useSyncExternalStore(
+    subscribeAnnouncedWallets,
+    getAnnouncedWallets,
+    getServerAnnouncedWallets,
+  );
+  // Until the island is up, the rows its connectors will make, in wagmi's
+  // order (configured connectors, then the announced wallets), disabled.
+  const choices: Choice[] = attached
+    ? connectors.filter((c) =>
+      c.id !== "walletConnect" && (c.id !== "injected" || injectedAvailable)
+    ).map((c) => ({ key: c.uid, id: c.id, name: c.name, icon: c.icon, connector: c }))
+    : [
+      ...(MOCK_WALLET ? [{ key: "mock", id: "mock", name: "Mock Connector" }] : []),
+      ...(PRIVY_APP_ID ? [{ key: PRIVY_CONNECTOR_ID, id: PRIVY_CONNECTOR_ID, name: "Email" }] : []),
+      ...(!announced.length && hasInjectedProvider()
+        ? [{ key: "injected", id: "injected", name: "Injected" }]
+        : []),
+      ...announced.map((w) => ({ key: w.rdns, id: w.rdns, name: w.name, icon: w.icon })),
+    ];
+  const mobileRow = attached ? Boolean(wc) : Boolean(WALLETCONNECT_PROJECT_ID);
 
   useEffect(() => {
     alive.current = true;
@@ -54,7 +94,8 @@ export default function WalletPicker({ open, onOpenChange }: {
     if (!open) return;
     let live = true;
     const injected = connectors.find((c) => c.id === "injected");
-    setInjectedAvailable(false);
+    // The stand-in row's own guess, so the row does not blink while this settles.
+    setInjectedAvailable(hasInjectedProvider());
     void injected?.getProvider().then((provider) => {
       if (live) setInjectedAvailable(Boolean(provider));
     }).catch(() => {});
@@ -166,6 +207,13 @@ export default function WalletPicker({ open, onOpenChange }: {
   const visible = (wallets ?? []).filter((w) =>
     w.name.toLowerCase().includes(query.trim().toLowerCase())
   );
+  // The QR code and the app links live only in this modal, so closing it
+  // drops an unanswered WalletConnect request. A browser wallet's request
+  // stays: its own popup is still open and cannot be withdrawn from here.
+  const close = (next: boolean) => {
+    if (!next && switchable) leavePairing();
+    onOpenChange(next);
+  };
   const selectedLink = selected
     ? walletDeepLink(selected, signingIn ? undefined : uri ?? undefined)
     : null;
@@ -173,7 +221,7 @@ export default function WalletPicker({ open, onOpenChange }: {
   return (
     <Dialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={close}
       title={view === "choose" ? "Connect wallet" : "Connect your mobile wallet"}
       description={view === "choose"
         ? "Use a wallet in this browser, or connect from a wallet app."
@@ -183,21 +231,24 @@ export default function WalletPicker({ open, onOpenChange }: {
       {view === "choose"
         ? (
           <div className="flex flex-col gap-2">
-            {connectors.filter((c) =>
-              c.id !== "walletConnect" && (c.id !== "injected" || injectedAvailable)
-            ).map((c) => (
+            {failed && (
+              <p className="text-[14px] text-white/60">
+                The wallet tools could not load. Check your connection and try again.
+              </p>
+            )}
+            {choices.map((c) => (
               <button
-                key={c.uid}
+                key={c.key}
                 type="button"
                 className={row}
-                disabled={busy && !switchable}
+                disabled={!c.connector || (busy && !switchable)}
                 onClick={() => {
                   const switching = switchable;
-                  if (!leavePairing()) return;
+                  if (!c.connector || !leavePairing()) return;
                   if (c.id === PRIVY_CONNECTOR_ID) {
                     onOpenChange(false);
                     openEmailSignIn();
-                  } else void start(c, switching);
+                  } else void start(c.connector, switching);
                 }}
               >
                 {c.icon
@@ -209,12 +260,12 @@ export default function WalletPicker({ open, onOpenChange }: {
                 <ArrowUpRight className="size-4 text-muted" />
               </button>
             ))}
-            {wc && (
+            {mobileRow && (
               <button
                 type="button"
                 className={row}
                 onClick={mobile}
-                disabled={busy && !(pending && pairing)}
+                disabled={!wc || (busy && !(pending && pairing))}
               >
                 <QrCode className="size-5 text-dao-green" />
                 <span className="flex-1">
@@ -394,11 +445,13 @@ export default function WalletPicker({ open, onOpenChange }: {
                       {uri && !signingIn
                         ? (
                           <div className="rounded-xl bg-white p-4">
-                            <QRCodeSVG
-                              value={uri}
-                              size={200}
-                              title="WalletConnect pairing QR code"
-                            />
+                            <Suspense fallback={<div className="size-[200px]" />}>
+                              <QRCodeSVG
+                                value={uri}
+                                size={200}
+                                title="WalletConnect pairing QR code"
+                              />
+                            </Suspense>
                           </div>
                         )
                         : (
@@ -438,14 +491,10 @@ export default function WalletPicker({ open, onOpenChange }: {
           Restoring your wallet connection from your last visit…
         </p>
       )}
-      {busy && !restoring && (
-        <p className="m-0 text-xs text-muted">
-          {view !== "choose"
-            ? ""
-            : switchable
-            ? "Your QR connection is still waiting. Continue it above, or pick another method to drop it. "
-            : "Check your wallet to finish the pending request. "}Closing this window keeps the
-          request open. Use Connect wallet to return.
+      {/* Every row is disabled while a browser wallet's request is open. */}
+      {busy && !restoring && !switchable && view === "choose" && (
+        <p className="m-0 text-center text-xs text-muted">
+          Check your wallet to finish the pending request.
         </p>
       )}
     </Dialog>

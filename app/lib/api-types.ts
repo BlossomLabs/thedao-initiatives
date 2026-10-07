@@ -1,5 +1,6 @@
 /** Hand-mirrored shapes of the API's JSON (api/lib/json.ts + routes). */
 import type { Finding, Findings, Milestone, SectionKey, Sections } from "@shared/draft/types";
+import type { VoteSettings, VoteState } from "@shared/vote";
 
 export type { Finding, Findings, Milestone, SectionKey, Sections };
 export type InitiativeType = "rfp" | "grant";
@@ -132,6 +133,7 @@ export type CardInitiative = Pick<
   | "sortRank"
   | "safeAddress"
   | "categories"
+  | "recipientTeam"
   | "createdAt"
   | "approvedAt"
 >;
@@ -148,6 +150,8 @@ export interface Card {
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
+  /** Where it stands for TheDAO's vote; only while the vote display is on. */
+  vote?: VoteState["kind"];
 }
 
 export interface CommentEntry {
@@ -171,6 +175,8 @@ export interface CommentEntry {
 
 export interface BoardFlags {
   aiSearch: boolean;
+  /** Jev can search automatically after typing pauses. */
+  aiSearchAuto?: boolean;
   tokensOk: boolean;
   chainDetail: string;
   uploads: boolean;
@@ -179,6 +185,8 @@ export interface BoardFlags {
   walletConnectProjectId: string;
   safeThreshold: number;
   safeOwnerCount: number;
+  /** Vote eligibility: the floor tick and its line show only while `show` is on. */
+  vote: VoteSettings;
 }
 
 export interface Sponsor {
@@ -311,10 +319,14 @@ export interface SessionInfo {
 export interface Me {
   address: string;
   isAdmin: boolean;
+  /** Holds the ETHSecurity Badge (the check behind the EXPERT role in comments). */
+  isBadgeHolder?: boolean;
   expiresAt: number;
   nickname: string | null;
   pfp: string;
   pfpUrl: string;
+  /** The account keeps a watchlist (the browser list can be moved to it). */
+  hasWatchlist?: boolean;
 }
 
 export interface Profile {
@@ -419,6 +431,7 @@ export interface SiteSettings {
   uploads: boolean;
   support: boolean;
   maintenance?: Pick<MaintenanceState, "on" | "at" | "note">;
+  vote?: VoteSettings;
 }
 
 /** GET /api/admin/backup: every stored record, keys and values verbatim. */

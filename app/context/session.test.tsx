@@ -3,14 +3,24 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, startTransition } from "react";
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { createConfig, http, WagmiProvider } from "wagmi";
+import { createConfig, http } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { connect as connectWallet } from "wagmi/actions";
 import { mainnet } from "viem/chains";
 import type { EIP1193Provider } from "viem";
 import { api, ApiError } from "~/lib/api";
 import { SESSION_KEY } from "~/lib/session-migration";
+import { attach } from "~/lib/wallet-island";
+import { createWalletStore } from "~/lib/wallet-store";
 import { SessionProvider, useSession } from "./session";
+import { WalletStoreProvider } from "./wallet";
+
+/** The island attached to a test config in place of its download. */
+const islandFor = (config: ReturnType<typeof createConfig>, reconnect: boolean) => {
+  const store = createWalletStore(() => Promise.reject(new Error("attached directly")));
+  attach(store, config, { reconnect });
+  return store;
+};
 
 vi.mock("~/lib/api", async (original) => ({
   ...await original<typeof import("~/lib/api")>(),
@@ -57,15 +67,16 @@ function setup(sharedProvider?: EIP1193Provider, reconnectOnMount = false) {
     multiInjectedProviderDiscovery: false,
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const store = islandFor(config, reconnectOnMount);
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <WagmiProvider config={config} reconnectOnMount={reconnectOnMount}>
+    <WalletStoreProvider store={store}>
       <QueryClientProvider client={queryClient}>
         <SessionProvider>{children}</SessionProvider>
       </QueryClientProvider>
-    </WagmiProvider>
+    </WalletStoreProvider>
   );
   const hook = renderHook(() => useSession(), { wrapper });
-  return { ...hook, config, request, signature, queryClient };
+  return { ...hook, config, request, signature, queryClient, store };
 }
 
 beforeEach(() => {
@@ -557,13 +568,14 @@ it("signs out of every connected wallet, so an earlier one does not take over", 
     multiInjectedProviderDiscovery: false,
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const store = islandFor(config, false);
   const { result } = renderHook(() => useSession(), {
     wrapper: ({ children }: { children: ReactNode }) => (
-      <WagmiProvider config={config} reconnectOnMount={false}>
+      <WalletStoreProvider store={store}>
         <QueryClientProvider client={queryClient}>
           <SessionProvider>{children}</SessionProvider>
         </QueryClientProvider>
-      </WagmiProvider>
+      </WalletStoreProvider>
     ),
   });
   await act(() => connectWallet(config, { connector: config.connectors[0] }));
@@ -968,22 +980,6 @@ it("cancelling the draft popup leaves the session, draft and revocation action u
   expect(api).not.toHaveBeenCalledWith("/api/auth/logout", expect.anything());
 });
 
-it("switching wallets retains every draft without showing a deletion popup", async () => {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
-  const key = `thedao:submit-draft:${ADDRESS.toLowerCase()}`;
-  localStorage.setItem(key, "wallet A draft");
-  localStorage.setItem("thedao:submit-draft:wallet-b", "wallet B draft");
-  const { result, queryClient } = setup();
-  await waitFor(() => expect(result.current.me).not.toBeNull());
-  queryClient.setQueryData(["admin", "leads"], "private server data");
-  await act(() => result.current.switchWallet());
-  expect(screen.queryByRole("dialog")).toBeNull();
-  expect(result.current.session).toBeNull();
-  expect(queryClient.getQueryData(["admin", "leads"])).toBeUndefined();
-  expect(localStorage.getItem(key)).toBe("wallet A draft");
-  expect(localStorage.getItem("thedao:submit-draft:wallet-b")).toBe("wallet B draft");
-});
-
 /** A wallet prompt left open for a while: the signed message is older than the
  * server's window. The client fetches a fresh nonce and asks for one more signature. */
 it("retries once with a fresh nonce when the signed message aged out of the server window", async () => {
@@ -1033,4 +1029,61 @@ it("gives up after one retry when the message is still out of the server window"
   expect(request.mock.calls.filter(([args]) => args.method === "personal_sign")).toHaveLength(2);
   expect(result.current.session).toBeNull();
   expect(result.current.signingIn).toBe(false);
+});
+
+/** A session provider over a store whose island has not loaded; `loader` is its download. */
+function setupUnloaded(loader = vi.fn(() => new Promise<never>(() => {}))) {
+  const store = createWalletStore(loader);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <WalletStoreProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <SessionProvider>{children}</SessionProvider>
+      </QueryClientProvider>
+    </WalletStoreProvider>
+  );
+  const hook = renderHook(() => useSession(), { wrapper });
+  return { ...hook, store, loader };
+}
+
+const WAGMI_STORED = JSON.stringify({ state: { current: "uid" }, version: 3 });
+
+it("fetches the wallet island right away for a stored session", () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const { result, loader } = setupUnloaded();
+  expect(loader).toHaveBeenCalledTimes(1);
+  expect(result.current.restoring).toBe(true);
+});
+
+it("fetches the wallet island right away for wagmi's stored connection", () => {
+  localStorage.setItem("wagmi.store", WAGMI_STORED);
+  const { result, loader } = setupUnloaded();
+  expect(loader).toHaveBeenCalledTimes(1);
+  expect(result.current.restoring).toBe(true);
+});
+
+it("leaves the wallet island alone on a first visit", () => {
+  const { result, loader } = setupUnloaded();
+  expect(loader).not.toHaveBeenCalled();
+  expect(result.current.restoring).toBe(false);
+  expect(result.current.address).toBeUndefined();
+});
+
+it("signing out before the island loaded forgets wagmi's stored connection", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  localStorage.setItem("wagmi.store", WAGMI_STORED);
+  const { result } = setupUnloaded();
+  await act(async () => {
+    await result.current.signOut();
+  });
+  expect(localStorage.getItem("wagmi.store")).toBeNull();
+  expect(localStorage.getItem(SESSION_KEY)).toBeNull();
+});
+
+it("a failed island download keeps the stored session", async () => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(SESSION));
+  const { result } = setupUnloaded(vi.fn(() => Promise.reject(new Error("chunk failed"))));
+  await waitFor(() => expect(result.current.restoring).toBe(false));
+  expect(result.current.session).toEqual(SESSION);
+  expect(localStorage.getItem(SESSION_KEY)).not.toBeNull();
 });

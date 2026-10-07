@@ -9,15 +9,22 @@ import FundingGlyph from "./FundingGlyph";
 const ITEMS: { value: BoardStatus; label: string }[] = [
   { value: "all", label: "Any funding status" },
   { value: "open", label: STATUS_LABELS.open },
+  { value: "first-goal", label: STATUS_LABELS["first-goal"] },
   { value: "funded", label: STATUS_LABELS.funded },
 ];
 
 /** The Funding pill: its ring shows the status it filters by, like the funding bar. */
 export default function StatusSelect(
-  { value, onChange }: { value: BoardStatus; onChange: (s: BoardStatus) => void },
+  { value, vote, onChange }: {
+    value: BoardStatus;
+    /** Offer First goal reached (the vote display is on). */
+    vote?: boolean;
+    onChange: (s: BoardStatus) => void;
+  },
 ) {
+  const items = vote ? ITEMS : ITEMS.filter((s) => s.value !== "first-goal");
   return (
-    <Select value={value} items={ITEMS} onValueChange={(v) => v && onChange(v as BoardStatus)}>
+    <Select value={value} items={items} onValueChange={(v) => v && onChange(v as BoardStatus)}>
       <SelectPrimitive.Trigger
         aria-label="Funding status"
         className={cn(FILTER_PILL, value !== "all" && FILTER_PILL_ON)}
@@ -27,7 +34,7 @@ export default function StatusSelect(
         <ChevronDown className="size-3.5 text-white/45" aria-hidden="true" />
       </SelectPrimitive.Trigger>
       <SelectContent>
-        {ITEMS.map((s) => (
+        {items.map((s) => (
           <SelectItem key={s.value} value={s.value}>
             <span className="flex items-center gap-2.5">
               <FundingGlyph status={s.value} />

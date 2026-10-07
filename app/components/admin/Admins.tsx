@@ -66,7 +66,7 @@ export default function Admins() {
     );
 
   return (
-    <div className="mt-3 rounded-2xl border border-edge bg-card px-[18px] py-3.5">
+    <div className="rounded-2xl border border-edge bg-card px-[18px] py-3.5">
       <b className="block font-inter-tight text-[14px] font-semibold">Admins</b>
       <small className="block text-[12px] text-muted">
         Wallets that can open this dashboard. Locked ones come from{" "}

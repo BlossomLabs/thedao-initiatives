@@ -10,6 +10,7 @@ import {
   featuredIds,
   groupByPrimary,
   hasFeatured,
+  isFiltered,
   readView,
   resultLabel,
   sortCards,
@@ -28,6 +29,7 @@ const card = (
     raised?: number;
     backers?: number;
     at?: number;
+    team?: string;
   } = {},
 ): Card => {
   const goal = o.goal ?? 100_000;
@@ -45,6 +47,7 @@ const card = (
       sortRank: null,
       safeAddress: "",
       categories: o.cats ?? [],
+      recipientTeam: o.team ?? "",
       createdAt: o.at ?? n,
       approvedAt: o.at ?? n,
     },
@@ -134,7 +137,7 @@ describe("board view", () => {
   it("counts the active filters the Filters button shows", () => {
     expect(activeFilterCount(DEFAULT_VIEW)).toBe(0);
     expect(activeFilterCount({ ...DEFAULT_VIEW, cats: ["a", "b"], status: "funded" })).toBe(3);
-    expect(activeFilterCount({ ...DEFAULT_VIEW, type: "rfp", sort: "newest" })).toBe(0);
+    expect(activeFilterCount({ ...DEFAULT_VIEW, type: "rfp", sort: "newest" })).toBe(1);
   });
 
   it("labels the results", () => {
@@ -157,6 +160,7 @@ describe("board view", () => {
       sort: "closest",
       view: "list",
       q: "safe",
+      watchlist: false,
     });
     expect(writeView(v).toString()).toBe("type=rfp&cat=opsec%2Cdefi&sort=closest&view=list&q=safe");
     expect(writeView(DEFAULT_VIEW).toString()).toBe("");
@@ -249,5 +253,41 @@ describe("board view", () => {
       ["opsec", 1],
       [null, 1],
     ]);
+  });
+});
+
+describe("watchlist", () => {
+  it("keeps only watchlisted initiatives and round-trips in the URL", () => {
+    const v = { ...DEFAULT_VIEW, watchlist: true };
+    expect(
+      titles(applyView(board, v, [
+        board.find((c) => c.initiative.title === "Echidna")!.initiative.id,
+      ])),
+    ).toEqual(["Echidna"]);
+    expect(writeView(v).toString()).toBe("watchlist=1");
+    expect(readView(new URLSearchParams("watchlist=1")).watchlist).toBe(true);
+    expect(isFiltered(v)).toBe(true);
+  });
+});
+
+describe("keyword filter", () => {
+  it("matches a grant's recipient team too", () => {
+    const cards = [card("Fuzzing grant", { team: "Trail of Bits" }), card("Other grant")];
+    const v = { ...DEFAULT_VIEW, q: "trail bits" };
+    expect(applyView(cards, v).map((c) => c.initiative.title)).toEqual(["Fuzzing grant"]);
+  });
+});
+
+describe("First goal reached filter", () => {
+  it("keeps the cards past the vote floor; without the display on it narrows nothing", () => {
+    const below = { ...card("Below"), vote: "below" as const };
+    const past = { ...card("Past"), vote: "eligible" as const };
+    const gap = { ...card("Gap"), vote: "gap" as const };
+    const v = { ...DEFAULT_VIEW, status: "first-goal" as const };
+    expect(applyView([below, past, gap], v).map((c) => c.initiative.title)).toEqual([
+      "Past",
+      "Gap",
+    ]);
+    expect(applyView([card("Off")], v)).toHaveLength(1);
   });
 });

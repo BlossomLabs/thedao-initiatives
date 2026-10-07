@@ -12,8 +12,8 @@ import {
 } from "./guide";
 
 describe("guide", () => {
-  it("bundles public/llms.txt", () => {
-    expect(GUIDE_TEXT).toBe(readFileSync("public/llms.txt", "utf8"));
+  it("bundles public/submit.md", () => {
+    expect(GUIDE_TEXT).toBe(readFileSync("public/submit.md", "utf8"));
     expect(markdownBlocks(GUIDE_TEXT)).toHaveLength(2);
   });
 

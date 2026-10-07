@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { BadgeHolderMark, BadgeHolderNote } from "~/components/ui/Badge";
 import { Wallet } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useAccount } from "wagmi";
+import { useWallet } from "~/context/wallet";
 import { sessionKey, useSession } from "~/context/session";
 import { useProfileDialog } from "~/context/profile-dialog";
 import { useWalletPicker } from "~/context/wallet-picker";
@@ -15,11 +16,11 @@ import { cn } from "~/lib/utils";
  * Top-bar wallet button. Disconnected: opens the shared wallet chooser;
  * connecting signs in with Ethereum in the same step. A connected wallet
  * without a session can retry signing in. Signed in: account menu with
- * name/picture, switch wallet, sign out.
+ * name/picture, sessions, sign out (to switch wallets: sign out, then connect).
  */
 export default function ConnectButton() {
-  const { address, isConnected } = useAccount();
-  const { session, connecting, signingIn, signOut, switchWallet } = useSession();
+  const { address, isConnected } = useWallet();
+  const { session, me, connecting, signingIn, signOut } = useSession();
   // Wallet access alone does not grant a signed-in session.
   const signedIn = Boolean(
     isConnected && address && session && session.address.toLowerCase() === address.toLowerCase(),
@@ -44,8 +45,14 @@ export default function ConnectButton() {
 
   // Detect a sign-in made in this page (a stored session on reload is not one).
   // Skipped while the dialog itself triggered the sign-in on save.
+  // The Badge holder mark's entrance, played once: a pop after a sign-in in
+  // this page, a glow when the page loads signed in.
+  const [entrance, setEntrance] = useState<"pop" | "glow" | null>("glow");
   useEffect(() => {
-    if (who && who !== lastKey.current && !profileOpen) setPromptPending(true);
+    if (who && who !== lastKey.current) {
+      if (!profileOpen) setPromptPending(true);
+      setEntrance("pop");
+    }
     lastKey.current = who;
   }, [who, profileOpen]);
 
@@ -126,12 +133,6 @@ export default function ConnectButton() {
       onClick: () => openProfile(false),
     },
     {
-      key: "switch",
-      label: "Switch wallet",
-      lucide: "switch",
-      onClick: () => void switchWallet().then(openWalletPicker),
-    },
-    {
       key: "sessions",
       label: "Manage sessions",
       lucide: "list",
@@ -147,17 +148,33 @@ export default function ConnectButton() {
     },
   ];
 
+  const badge = signedIn && me?.isBadgeHolder;
   return (
     <div className="relative">
       <button
         type="button"
-        className={cn("btn btn-wallet", signedIn && "connected")}
+        className={cn("btn btn-wallet group", signedIn && "connected")}
         onClick={onClick}
         aria-haspopup={signedIn ? "menu" : "dialog"}
         aria-expanded={signedIn ? menu !== "none" : walletPickerOpen}
       >
         {signedIn
-          ? <Avatar src={identity.avatar} size={20} />
+          ? (
+            // A badge holder's mark sits on the avatar's corner, as on a profile picture.
+            <span className={cn("relative flex-none", badge && "mr-1.5")}>
+              <Avatar src={identity.avatar} size={20} />
+              {badge && (
+                <BadgeHolderMark
+                  onAnimationEnd={() => setEntrance(null)}
+                  className={cn(
+                    "absolute -bottom-1.5 -right-2 size-4 drop-shadow-[0_0_1px_rgba(0,0,0,.6)] motion-safe:transition-[scale,filter] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(.34,1.56,.64,1)] group-hover:drop-shadow-[0_0_5px_rgba(242,193,78,.85)] motion-safe:group-hover:scale-125",
+                    entrance === "pop" && "motion-safe:animate-badge-pop",
+                    entrance === "glow" && "motion-safe:animate-badge-glow",
+                  )}
+                />
+              )}
+            </span>
+          )
           : <Wallet className="size-4 opacity-80" />}
         {connecting || signingIn
           ? "Check your wallet…"
@@ -171,6 +188,9 @@ export default function ConnectButton() {
         open={menu === "account"}
         items={accountItems}
         onClose={() => setMenu("none")}
+        header={badge && (
+          <BadgeHolderNote className="mb-1 border-b border-white/10 px-3 pb-2.5 pt-2" />
+        )}
       />
     </div>
   );

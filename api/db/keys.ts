@@ -25,6 +25,8 @@ export const K = {
   votes: (commentId: string) => ["vote", commentId] as const,
   profile: (addr: string) => ["profile", addr.toLowerCase()] as const,
   nick: (nick: string) => ["nick", nick.toLowerCase()] as const,
+  /** One account's watchlist (db/watchlists.ts): { ids, updatedAt }. */
+  watchlist: (addr: string) => ["watchlist", addr.toLowerCase()] as const,
   nonce: (nonce: string) => ["nonce", nonce] as const,
   session: (tokenHash: string) => ["session", tokenHash] as const,
   sessionsByAddr: (addr: string, tokenHash: string) =>
@@ -40,6 +42,18 @@ export const K = {
   safeSync: (rfpId: string) => ["safe_sync", rfpId] as const,
   safeBalances: (safe: string) => ["safe_balances", safe.toLowerCase()] as const,
   lock: (name: string) => ["lock", name] as const,
+  /** The card fields of every row under its status (db/initiatives.ts cards()): what the
+   * board lists instead of every full row. Derived; rebuilt when the mark under meta is gone. */
+  initiativesByStatus: (status: string) => ["rfp_by_status", status] as const,
+  initiativeByStatus: (status: string, id: string) => ["rfp_by_status", status, id] as const,
+  /** Bumped by every pledge or donation write; a card summary carries the one it was built from. */
+  cardVersion: (rfpId: string) => ["card_version", rfpId] as const,
+  cardSummary: (rfpId: string) => ["card_summary", rfpId] as const,
+  /** A built public value shared across isolates (db/snapshots.ts), per origin, in chunks. */
+  snapshots: (name: string) => ["snapshot", name] as const,
+  snapshotHead: (name: string, origin: string) => ["snapshot", name, origin, "head"] as const,
+  snapshotChunk: (name: string, origin: string, i: number) =>
+    ["snapshot", name, origin, "chunk", i] as const,
   meta: (key: string) => ["meta", key] as const,
   checkboxSession: (hash: string) => ["checkbox_session", hash] as const,
   checkboxAcceptance: (id: string) => ["checkbox_acceptance", id] as const,

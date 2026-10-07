@@ -3,7 +3,9 @@ import { afterEach, expect, it, vi } from "vitest";
 import { COMMENT_BODY_MAX, COMMENT_NAME_MAX } from "@shared/comments";
 import Composer from "./Composer";
 
-vi.mock("wagmi", () => ({ useAccount: () => ({ address: undefined, isConnected: false }) }));
+vi.mock("~/context/wallet", () => ({
+  useWallet: () => ({ address: undefined, isConnected: false }),
+}));
 vi.mock("~/context/session", () => ({
   useSession: () => ({ session: null, requireSession: vi.fn(), connecting: false }),
 }));

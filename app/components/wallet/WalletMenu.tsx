@@ -6,12 +6,11 @@ import {
   LogOut,
   Mail,
   Pencil,
-  RefreshCw,
   ShieldCheck,
   Wallet,
 } from "lucide-react";
 import type { Connector } from "wagmi";
-import { PRIVY_CONNECTOR_ID } from "~/lib/privy";
+import { PRIVY_CONNECTOR_ID } from "~/lib/privy-store";
 import { cn } from "~/lib/utils";
 import Pop from "~/components/ui/Pop";
 
@@ -19,7 +18,7 @@ export interface WalletMenuItem {
   key: string;
   label: string;
   icon?: string;
-  lucide?: "wallet" | "mail" | "switch" | "edit" | "power" | "sign" | "admin" | "copy" | "list";
+  lucide?: "wallet" | "mail" | "edit" | "power" | "sign" | "admin" | "copy" | "list";
   active?: boolean;
   danger?: boolean;
   separator?: boolean;
@@ -36,7 +35,6 @@ const ICONS = {
   copy: Copy,
   wallet: Wallet,
   mail: Mail,
-  switch: RefreshCw,
   edit: Pencil,
   power: LogOut,
   sign: ShieldCheck,
@@ -46,11 +44,13 @@ const ICONS = {
 
 /** The MVP's wallet picker / account menu, anchored under the top-bar button. */
 export default function WalletMenu(
-  { open, items, onClose, className }: {
+  { open, items, onClose, className, header }: {
     open: boolean;
     items: WalletMenuItem[];
     onClose: () => void;
     className?: string;
+    /** Shown above the items (the ETHSecurity Badge holder note). */
+    header?: React.ReactNode;
   },
 ) {
   const ref = useRef<HTMLDivElement>(null);
@@ -79,6 +79,7 @@ export default function WalletMenu(
       )}
       role="menu"
     >
+      {header}
       {items.map((it) => {
         const Icon = it.lucide ? ICONS[it.lucide] : null;
         return (

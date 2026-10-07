@@ -1,11 +1,11 @@
 import { MemoryRouter } from "react-router";
-import { render, screen } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
-import InitiativeCard from "./InitiativeCard";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import InitiativeCard, { DonateStandIn } from "./InitiativeCard";
 import type { Card } from "~/lib/api-types";
 
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
-vi.mock("~/components/donate/DonateWidget", () => ({ default: () => null }));
+vi.mock("~/components/donate/DonateWidget", () => ({ default: () => <p>donate widget</p> }));
 vi.mock("~/components/ui/Money", () => ({ default: ({ value }: { value: number }) => value }));
 
 const card = (over: Partial<Card>): Card => ({
@@ -20,6 +20,7 @@ const card = (over: Partial<Card>): Card => ({
     sortRank: null,
     safeAddress: "",
     categories: [],
+    recipientTeam: "",
     createdAt: 0,
     approvedAt: null,
   },
@@ -104,4 +105,135 @@ it("no Featured label from a rank alone: the board decides what is featured", ()
   const base = card({});
   mount(card({ initiative: { ...base.initiative, sortRank: 4 } }));
   expect(screen.queryByText("Featured")).toBeNull();
+});
+
+it("fetches the Donate panel only when asked, showing a look-alike until it is in", async () => {
+  render(
+    <MemoryRouter>
+      <InitiativeCard card={card({ donationsEnabled: true })} tokensOk />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByText("donate widget")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Donate" }));
+  // The toggle now reads Close; the panel's own Donate button is the stand-in's, disabled.
+  expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Donate" })).toBeDisabled();
+  expect(await screen.findByText("donate widget")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Donate" })).toBeNull();
+});
+
+it("the Donate look-alike links the terms and is not marked busy", () => {
+  // Rendered on its own: once a test has loaded the panel's chunk, React no
+  // longer shows the stand-in for the lazy part.
+  render(
+    <MemoryRouter>
+      <DonateStandIn />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("link", { name: "Donation Terms" })).toHaveAttribute(
+    "href",
+    "/donation-terms",
+  );
+  expect(screen.getByRole("button", { name: "Wallet" })).toBeDisabled();
+  expect(document.querySelector("[aria-busy]")).toBeNull();
+});
+
+it("marks an initiative approved in the last 7 days as New, and not older ones", () => {
+  const now = Date.now() / 1000;
+  const base = card({}).initiative;
+  const { unmount } = mount(card({ initiative: { ...base, approvedAt: now - 2 * 86400 } }));
+  expect(screen.getByText("New")).toBeInTheDocument();
+  unmount();
+  mount(card({ initiative: { ...base, approvedAt: now - 8 * 86400 } }));
+  expect(screen.queryByText("New")).toBeNull();
+});
+
+it("the watchlist bookmark is a pressed-state button named for the initiative", () => {
+  const toggle = vi.fn();
+  render(
+    <MemoryRouter>
+      <InitiativeCard card={card({})} tokensOk={false} watch={{ on: true, toggle }} />
+    </MemoryRouter>,
+  );
+  const bookmark = screen.getByRole("button", {
+    name: "Remove Audit tooling for rollups from watchlist",
+  });
+  expect(bookmark).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(bookmark);
+  expect(toggle).toHaveBeenCalled();
+});
+
+it("a featured new card shows the pin and New", () => {
+  const base = card({}).initiative;
+  render(
+    <MemoryRouter>
+      <InitiativeCard
+        card={card({ initiative: { ...base, approvedAt: Date.now() / 1000 - 86400 } })}
+        tokensOk={false}
+        featured
+      />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText("Featured")).toBeInTheDocument();
+  expect(screen.getByText("New")).toBeInTheDocument();
+});
+
+it("the top edge: AI pick or New, then the Featured pin; AI pick over New", () => {
+  const base = card({}).initiative;
+  const fresh = card({ initiative: { ...base, approvedAt: Date.now() / 1000 - 86400 } });
+  // In the order they appear on the top edge.
+  const labels = () =>
+    ["AI pick", "Featured", "New"]
+      .map((t) => [t, screen.queryByText(t)] as const)
+      .filter(([, el]) => el)
+      .sort(([, a], [, b]) =>
+        a!.compareDocumentPosition(b!) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+      )
+      .map(([t]) => t);
+  const view = (props: { aiTop?: boolean; featured?: boolean }) =>
+    render(
+      <MemoryRouter>
+        <InitiativeCard card={fresh} tokensOk={false} {...props} />
+      </MemoryRouter>,
+    );
+  let v = view({ aiTop: true, featured: true });
+  expect(labels()).toEqual(["AI pick", "Featured"]);
+  v.unmount();
+  v = view({ aiTop: true });
+  expect(labels()).toEqual(["AI pick"]); // never with New
+  v.unmount();
+  v = view({ featured: true });
+  expect(labels()).toEqual(["New", "Featured"]);
+  v.unmount();
+  view({});
+  expect(labels()).toEqual(["New"]);
+});
+
+describe("vote eligibility", () => {
+  const vote = { show: true, floorPct: 25, capUsd: 200_000 };
+  const raised = (total: number) =>
+    card({ summary: { ...card({}).summary, total }, pct: total / 10 });
+
+  it("off: no mark on the bar, the plain bar", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <InitiativeCard card={raised(100)} tokensOk vote={{ ...vote, show: false }} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector("[data-vote-tick]")).toBeNull();
+  });
+
+  it("on: a mark at the floor, and the bar tells screen readers how far it is", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <InitiativeCard card={raised(100)} tokensOk vote={vote} />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector<HTMLElement>("[data-vote-tick]")!.style.left).toBe("25%");
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuetext",
+      "10.0% funded. $150 to the first goal",
+    );
+    expect(screen.queryByText(/First goal|to first goal/)).toBeNull();
+  });
 });

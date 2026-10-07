@@ -8,7 +8,7 @@ import { CATEGORIES, CATEGORY_INDEX, categoryOf } from "~/lib/categories";
 import { plural } from "~/lib/format";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
-export const STATUSES = ["all", "open", "funded"] as const;
+export const STATUSES = ["all", "open", "first-goal", "funded"] as const;
 export const SORTS = [
   ["recommended", "Featured"],
   ["closest", "Closest to funded"],
@@ -33,6 +33,8 @@ export interface BoardView {
   sort: BoardSort;
   view: BoardViewMode;
   q: string;
+  /** Only the initiatives on this browser's watchlist. */
+  watchlist: boolean;
 }
 
 export const DEFAULT_VIEW: BoardView = {
@@ -42,6 +44,7 @@ export const DEFAULT_VIEW: BoardView = {
   sort: "recommended",
   view: "cards",
   q: "",
+  watchlist: false,
 };
 
 const pick = <T extends string>(v: string | null, allowed: readonly T[], fallback: T): T =>
@@ -57,6 +60,7 @@ export function readView(params: URLSearchParams): BoardView {
     sort: pick(params.get("sort"), SORTS.map((s) => s[0]), "recommended"),
     view: pick(params.get("view"), VIEWS, "cards"),
     q: (params.get("q") ?? "").slice(0, 100),
+    watchlist: params.get("watchlist") === "1",
   };
 }
 
@@ -69,12 +73,14 @@ export function writeView(v: BoardView): URLSearchParams {
   if (v.sort !== "recommended") p.set("sort", v.sort);
   if (v.view !== "cards") p.set("view", v.view);
   if (v.q.trim()) p.set("q", v.q.trim());
+  if (v.watchlist) p.set("watchlist", "1");
   return p;
 }
 
 /** Whether any filter narrows the board (sort and view do not). */
 export const isFiltered = (v: BoardView) =>
-  v.type !== "all" || v.status !== "all" || v.cats.length > 0 || v.q.trim() !== "";
+  v.type !== "all" || v.status !== "all" || v.cats.length > 0 || v.q.trim() !== "" ||
+  v.watchlist;
 
 const words = (q: string) => q.toLowerCase().split(/\s+/).filter(Boolean);
 
@@ -83,7 +89,7 @@ const haystack = (c: Card) =>
   [
     c.initiative.title,
     c.initiative.summary,
-    (c.initiative as { recipientTeam?: string }).recipientTeam ?? "",
+    c.initiative.recipientTeam ?? "",
     ...c.initiative.categories.map((s) => categoryOf(s)?.label ?? ""),
   ].join(" ").toLowerCase();
 
@@ -91,10 +97,13 @@ type Facet = "type" | "status" | "cats" | "q";
 
 /** One card against the view; `skip` leaves one facet out (for that facet's counts).
  * Categories are OR among themselves and AND with everything else. */
-export function matches(c: Card, v: BoardView, skip?: Facet): boolean {
+export function matches(c: Card, v: BoardView, skip?: Facet, watched?: string[]): boolean {
+  if (v.watchlist && watched && !watched.includes(c.initiative.id)) return false;
   if (skip !== "type" && v.type !== "all" && c.initiative.type !== v.type) return false;
   if (skip !== "status" && v.status === "open" && c.funded) return false;
   if (skip !== "status" && v.status === "funded" && !c.funded) return false;
+  // First goal reached: past the vote floor. The cards carry it only while the display is on.
+  if (skip !== "status" && v.status === "first-goal" && c.vote === "below") return false;
   if (
     skip !== "cats" && v.cats.length && !c.initiative.categories.some((s) => v.cats.includes(s))
   ) {
@@ -132,20 +141,20 @@ export function sortCards(cards: Card[], sort: BoardSort): Card[] {
 }
 
 /** The cards the view shows, in its order. */
-export const applyView = (cards: Card[], v: BoardView): Card[] =>
-  sortCards(cards.filter((c) => matches(c, v)), v.sort);
+export const applyView = (cards: Card[], v: BoardView, watched?: string[]): Card[] =>
+  sortCards(cards.filter((c) => matches(c, v, undefined, watched)), v.sort);
 
 /** Live counts for the controls: each facet counted with the other filters applied. */
-export function facetCounts(cards: Card[], v: BoardView) {
+export function facetCounts(cards: Card[], v: BoardView, watched?: string[]) {
   const type = { all: 0, rfp: 0, grant: 0 };
   for (const c of cards) {
-    if (!matches(c, v, "type")) continue;
+    if (!matches(c, v, "type", watched)) continue;
     type.all++;
     type[c.initiative.type]++;
   }
   const cats: Record<string, number> = Object.fromEntries(CATEGORIES.map((c) => [c.slug, 0]));
   for (const c of cards) {
-    if (!matches(c, v, "cats")) continue;
+    if (!matches(c, v, "cats", watched)) continue;
     for (const s of c.initiative.categories) if (s in cats) cats[s]++;
   }
   return { type, cats };
@@ -163,22 +172,27 @@ export function groupByPrimary(cards: Card[]): { slug: string | null; cards: Car
     .map((slug) => ({ slug, cards: groups.get(slug)! }));
 }
 
-export const STATUS_LABELS = { open: "Open for funding", funded: "Fully funded" } as const;
+export const STATUS_LABELS = {
+  open: "Open for funding",
+  funded: "Fully funded",
+  "first-goal": "First goal reached",
+} as const;
 
 /** What Clear filters resets: every applied filter (type, categories, funding
- * status, keyword). Sort, view and the AI order stay as they are. */
-export const CLEARED: Pick<BoardView, "type" | "cats" | "status" | "q"> = {
+ * status, keyword, watchlist). Sort, view and the AI order stay as they are. */
+export const CLEARED: Pick<BoardView, "type" | "cats" | "status" | "q" | "watchlist"> = {
   type: "all",
   cats: [],
   status: "all",
   q: "",
+  watchlist: false,
 };
 
 export const TYPE_LABELS = { rfp: "RFPs", grant: "Grants" } as const;
 
-/** The number the Filters (N) button shows: categories plus a funding restriction. */
+/** The number the Filters (N) button shows: a type, the categories and a funding restriction. */
 export const activeFilterCount = (v: BoardView): number =>
-  v.cats.length + (v.status !== "all" ? 1 : 0);
+  (v.type !== "all" ? 1 : 0) + v.cats.length + (v.status !== "all" ? 1 : 0);
 
 /** "12 initiatives", or "3 of 12 initiatives" while filters narrow the board. */
 export const resultLabel = (shown: number, total: number, filtered: boolean): string =>

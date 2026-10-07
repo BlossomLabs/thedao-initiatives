@@ -174,18 +174,23 @@ always pending: the form as JSON, backers become `pledged` rows), `GET /api/dona
 message, email?, page?, screenshot?}`, tagged and forwarded to `SUPPORT_URL`; 503 until
 it is set, 5 per hour per IP).
 
-Signed in: `GET /api/auth/me`, `POST /api/auth/logout`, `POST /api/auth/logout-all`,
-`POST /api/nickname`, `POST /api/pfp`, `POST /api/pfp/upload`, `POST /api/comments/:id/vote`,
-`POST /api/comments/:id/reply` (role-gated), `POST /api/uploads/logo` (multipart `image`, a backer
-logo pinned before submitting; returns `{cid, logoUrl}`, the CID is only accepted on a submission
-from the same wallet within a day), `POST /api/initiatives/:slug/revisions` (proposer or admin:
-title, summary, sections, milestones, links; legacy rows migrate to this format),
-`PATCH /api/initiatives/:slug` (proposer while pending, admin always: type, topup, goal,
-durationMonths, recipientTeam, recipientUrl, milestoneReviewer, discourseUrl, funders, contact;
-after approval a proposer gets 403). These two routes are the only way to edit an initiative's text
-and facts, for admins too: the editorial findings block an admin's save, and a rejected or archived
-initiative refuses text edits from everyone. An admin's revision is tagged `admin`, is audited, and
-does not count against the hourly revision cap.
+Signed in: `GET /api/auth/me` (includes `hasWatchlist`), `POST /api/auth/logout`,
+`POST /api/auth/logout-all`, `POST /api/nickname`, `POST /api/pfp`, `POST /api/pfp/upload`,
+`POST /api/comments/:id/vote`, `POST /api/comments/:id/reply` (role-gated), `POST /api/uploads/logo`
+(multipart `image`, a backer logo pinned before submitting; returns `{cid, logoUrl}`, the CID is
+only accepted on a submission from the same wallet within a day),
+`POST /api/initiatives/:slug/revisions` (proposer or admin: title, summary, sections, milestones,
+links; legacy rows migrate to this format), `PATCH /api/initiatives/:slug` (proposer while pending,
+admin always: type, topup, goal, durationMonths, recipientTeam, recipientUrl, milestoneReviewer,
+discourseUrl, funders, contact; after approval a proposer gets 403). These two routes are the only
+way to edit an initiative's text and facts, for admins too: the editorial findings block an admin's
+save, and a rejected or archived initiative refuses text edits from everyone. An admin's revision is
+tagged `admin`, is audited, and does not count against the hourly revision cap.
+
+The account watchlist: `GET /api/watchlist` (the account's `{ids}`, 404 when it has none),
+`POST /api/watchlist/import` (`{ids}`; adds the approved ones, creates the list, 200 at most),
+`PUT /api/watchlist/:id` and `DELETE /api/watchlist/:id` (add or remove one; 404 when the account
+has no list). The writes share a limit of 60 per minute per account.
 
 Admin (`/api/admin/...`): `GET dashboard`, `GET initiatives/:id`, `PATCH initiatives/:id` (the admin
 settings only: `sortRank`, `paidOutUsd`, `proposer`; the last two need recent authentication),
@@ -329,6 +334,34 @@ own memory instead of reading KV: the board is public, polled every 30 s by ever
 costs a read wave per card. Any write request and any `?refresh=1` board read replaces the saved
 board at once in the isolate that served it; a board read that lands on another isolate can be up to
 that many seconds behind.
+
+A board build reads two derived copies instead of the rows themselves (#46, #47), both kept in KV
+and left out of backups:
+
+- `["rfp_by_status", status, id]` holds the card fields of every initiative under its status
+  (`cards()` in `api/db/initiatives.ts`), written in the same atomic operation as the row and moved
+  when the status changes. The board, the daily refresh and the AI search list one status from it
+  instead of scanning every full row. A mark under `meta` says it is complete; a database from
+  before the index, or one just restored, has no mark, and the next read rebuilds it from a scan.
+- `["card_summary", id]` holds what a card needs from an initiative's pledge and donation rows
+  (`api/db/cards.ts`): the active pledges, and the confirmed donations' count, total and distinct
+  donors. It is a rebuildable copy, never the truth: every pledge or donation write bumps
+  `["card_version", id]` in the same atomic operation, the summary carries the version it was built
+  from, and a reader that finds them different rebuilds from the rows. A restore drops every copy.
+  The lookup may be an eventual read; the rows a copy is built from are always read strongly, so a
+  replica behind a write can never be frozen into a copy.
+
+`deno task bench` measures the board with both in place; `api/tests/kv-depth.test.ts` pins the round
+trips.
+
+The agent feeds (`/llms.txt`, `/llms-full.txt`, `/api/initiatives.json`, the facts in each
+`/initiative/<slug>.md`) are built from that board plus every approved row's text, so a build is the
+board's read wave again. They are served for 5 minutes (`FEED_TTL_SECS` in `api/routes/feeds.ts`,
+also their `max-age`) from the isolate's memory, else from a gzipped copy in KV under
+`["snapshot", "feed", origin]` that any isolate may have stored (`api/db/snapshots.ts`, chunked
+under the 64 KiB value cap, not in backups), and built only when neither exists. Any write request
+drops the memory in its isolate and the KV copy for everyone; another isolate's memory can be up to
+5 minutes behind.
 
 ## Scripts
 

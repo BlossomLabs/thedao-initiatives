@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { vi } from "vitest";
 import type { Connector } from "wagmi";
 import WalletPicker from "./WalletPicker";
+import { walletStore } from "~/lib/wallet-store";
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -18,7 +19,8 @@ vi.mock(
   () => ({ useEmailSignIn: () => ({ openEmailSignIn: mocks.email }) }),
 );
 vi.mock("~/hooks/use-connectors", () => ({ useConnectors: () => mocks.connectors }));
-vi.mock("~/lib/privy", () => ({ PRIVY_CONNECTOR_ID: "privy" }));
+vi.mock("~/lib/privy-store", () => ({ PRIVY_APP_ID: "app", PRIVY_CONNECTOR_ID: "privy" }));
+vi.mock("~/lib/wallet-env", () => ({ MOCK_WALLET: undefined, WALLETCONNECT_PROJECT_ID: "wc" }));
 
 const uri = "wc:test-topic@2?relay-protocol=irn&symKey=abc123";
 type Message = { type: string; data?: unknown };
@@ -42,6 +44,7 @@ const copied = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
+  walletStore.setSnapshot({ attached: true, failed: null });
   listeners.clear();
   mocks.connectors = [injected, email, wc];
   mocks.connecting = false;
@@ -103,27 +106,46 @@ test("offers different app links from one pairing, search, and an unrestricted Q
   expect(screen.queryByRole("link", { name: "MetaMask" })).toBeNull();
   expect(screen.getByRole("link", { name: "Rainbow" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "QR code / copy" }));
-  expect(screen.getByTitle("WalletConnect pairing QR code")).toBeInTheDocument();
+  expect(await screen.findByTitle("WalletConnect pairing QR code")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Copy connection URI" }));
   await screen.findByRole("button", { name: "Copied" });
   expect(copied).toHaveBeenCalledWith(uri);
   expect(fetched).toHaveBeenCalledExactlyOnceWith("/wallets.json", expect.anything());
 });
 
-test("closing and reopening retains the pairing, and cleanup removes its listener", async () => {
-  const { rerender, onOpenChange, unmount } = await pairing();
+test("closing cancels an unscanned pairing, and reopening offers the methods again", async () => {
+  const { rerender, onOpenChange } = await pairing();
   ready();
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  expect(mocks.cancelPairing).toHaveBeenCalledTimes(1);
   expect(onOpenChange).toHaveBeenCalledWith(false);
+  expect(listeners.size).toBe(0);
   rerender(<WalletPicker open={false} onOpenChange={onOpenChange} />);
   rerender(<WalletPicker open onOpenChange={onOpenChange} />);
-  expect(screen.getByRole("link", { name: "Rainbow" })).toHaveAttribute(
-    "href",
-    expect.stringContaining("rainbow://wc"),
-  );
-  expect(mocks.connect).toHaveBeenCalledTimes(1);
-  unmount();
-  expect(listeners.size).toBe(0);
+  expect(screen.getByRole("button", { name: /Mobile wallets \/ QR code/ })).toBeEnabled();
+  // The dropped pairing settling later shows no error.
+  await act(async () => {
+    reject(new Error("Connection request reset"));
+    await pending.catch(() => {});
+  });
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+test("closing keeps a browser wallet's request, which its own popup still shows", () => {
+  const onOpenChange = vi.fn();
+  render(<WalletPicker open onOpenChange={onOpenChange} />);
+  fireEvent.click(screen.getByRole("button", { name: "Rabby" }));
+  expect(mocks.connect).toHaveBeenCalledWith(injected);
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  expect(mocks.cancelPairing).not.toHaveBeenCalled();
+  expect(onOpenChange).toHaveBeenCalledWith(false);
+});
+
+it("asks to check the wallet only while a browser wallet's request disables every row", () => {
+  mocks.connecting = true;
+  render(<WalletPicker open onOpenChange={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "Email" })).toBeDisabled();
+  expect(screen.getByText("Check your wallet to finish the pending request.")).toBeInTheDocument();
 });
 
 test("keeps the wallet accessible during SIWE and closes only after sign-in finishes", async () => {
@@ -202,7 +224,7 @@ test("a pending QR pairing leaves the other methods available, and picking one d
   fireEvent.click(screen.getByRole("button", { name: /All connection methods/ }));
   expect(screen.getByRole("button", { name: /Continue wallet connection/ })).toBeEnabled();
   expect(screen.getByRole("button", { name: "Email" })).toBeEnabled();
-  expect(screen.getByText(/pick another method to drop it/)).toBeInTheDocument();
+  expect(screen.queryByText(/Check your wallet/)).toBeNull();
   mocks.connect.mockImplementation(() => new Promise(() => {}));
   fireEvent.click(screen.getByRole("button", { name: "Rabby" }));
   expect(mocks.cancelPairing).toHaveBeenCalledTimes(1);
@@ -252,4 +274,38 @@ test("waits for a wallet connection being restored before offering any method", 
   expect(screen.getByRole("button", { name: "Email" })).toBeDisabled();
   expect(screen.getByRole("button", { name: /Mobile wallets/ })).toBeDisabled();
   expect(screen.getByText(/Restoring your wallet connection/)).toBeInTheDocument();
+});
+
+it("says so when the wallet tools could not load, instead of loading forever", () => {
+  walletStore.setSnapshot({ attached: false, failed: new Error("chunk failed") });
+  try {
+    render(<WalletPicker open onOpenChange={vi.fn()} />);
+    expect(screen.getByText(/could not load/)).toBeInTheDocument();
+    expect(screen.queryByText("Loading wallets…")).toBeNull();
+  } finally {
+    walletStore.setSnapshot({ failed: null });
+  }
+});
+
+it("shows the same rows, disabled, while the wallet island loads", () => {
+  walletStore.setSnapshot({ attached: false });
+  mocks.connectors = [];
+  render(<WalletPicker open onOpenChange={vi.fn()} />);
+  act(() => {
+    globalThis.dispatchEvent(
+      new CustomEvent("eip6963:announceProvider", {
+        detail: { info: { uuid: "1", rdns: "io.rabby", name: "Rabby", icon: "" }, provider: {} },
+      }),
+    );
+  });
+  const rows = screen.getAllByRole("button").filter((b) => b.textContent);
+  expect(rows.map((b) => b.textContent)).toEqual([
+    "Email",
+    "Rabby",
+    expect.stringMatching(/^Mobile wallets/),
+  ]);
+  for (const b of rows) expect(b).toBeDisabled();
+  expect(screen.queryByText("Loading wallets…")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Rabby" }));
+  expect(mocks.connect).not.toHaveBeenCalled();
 });

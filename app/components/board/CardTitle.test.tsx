@@ -3,9 +3,9 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import CardTitle from "./CardTitle";
 
-const view = (title: string, categories: string[]) =>
+const view = (title: string, categories: string[], url = "/") =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[url]}>
       <CardTitle title={title} href="/initiative/x" categories={categories} />
     </MemoryRouter>,
   );
@@ -71,4 +71,37 @@ describe("CardTitle", () => {
     await waitFor(() => expect(screen.queryByRole("link", { name: /Browse category/ })).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(btn));
   });
+});
+
+it("category links preserve other board filters, the query, sorting and layout", async () => {
+  view(
+    "Wallet security",
+    ["opsec"],
+    "/?view=list&q=node&type=grant&status=open&sort=newest&watchlist=1&cat=defi",
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: /Categories:/ })).toHaveAttribute("data-ready")
+  );
+  fireEvent.click(screen.getByRole("button", { name: /Categories:/ }));
+  const link = await screen.findByRole("link", { name: "Browse category: OpSec" });
+  const url = new URL(link.getAttribute("href")!, "http://localhost");
+  expect(Object.fromEntries(url.searchParams)).toEqual({
+    view: "list",
+    q: "node",
+    type: "grant",
+    status: "open",
+    sort: "newest",
+    watchlist: "1",
+    cat: "opsec",
+  });
+});
+
+it("category links from an initiative page go to the board without copying unrelated parameters", async () => {
+  view("Wallet security", ["opsec"], "/initiative/wallet-security?tab=discussion");
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: /Categories:/ })).toHaveAttribute("data-ready")
+  );
+  fireEvent.click(screen.getByRole("button", { name: /Categories:/ }));
+  const link = await screen.findByRole("link", { name: "Browse category: OpSec" });
+  expect(link).toHaveAttribute("href", "/?cat=opsec");
 });

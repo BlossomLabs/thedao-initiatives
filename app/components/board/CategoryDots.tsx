@@ -3,7 +3,8 @@ import { Tooltip } from "@base-ui/react/tooltip";
 import { ChevronRight } from "lucide-react";
 import { useRef, useState } from "react";
 import { useTakeFocus } from "~/lib/focus-handover";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
+import { categoryBoardUrl } from "~/lib/board-links";
 import { CategoryIcon, Dots, DOTS_BUTTON, dotsLabel, dotsOf } from "./DotsFace";
 
 const PANEL = "rounded-[14px] border border-edge2 bg-panel shadow-menu outline-none";
@@ -17,6 +18,8 @@ const PANEL = "rounded-[14px] border border-edge2 bg-panel shadow-menu outline-n
 export default function CategoryDots(
   { slugs, focusKey }: { slugs: string[]; focusKey?: string },
 ) {
+  const location = useLocation();
+  const boardSearch = location.pathname === "/" ? location.search : "";
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   useTakeFocus(focusKey ?? "", trigger);
@@ -57,7 +60,8 @@ export default function CategoryDots(
                 <li key={c.slug}>
                   {/* The row is the link to the board filtered by it; the chevron says so. */}
                   <Link
-                    to={`/?cat=${c.slug}`}
+                    to={categoryBoardUrl(boardSearch, c.slug)}
+                    preventScrollReset
                     aria-label={`Browse category: ${c.label}`}
                     className="flex min-h-[40px] items-center gap-2.5 rounded-[9px] px-2.5 font-inter-tight text-[13.5px] text-white no-underline outline-none hover:bg-white/[.06] hover:text-white hover:no-underline focus-visible:bg-white/[.06]"
                     onClick={() => setOpen(false)}

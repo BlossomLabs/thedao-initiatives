@@ -4,13 +4,11 @@
  * (see context/session.tsx), so nothing here ever holds a token: every call
  * just sends credentials. */
 import { walletErrorMessage } from "./donate";
+import { API_URL } from "./api-url";
+import { takeEarly } from "./early-fetch";
+import { noteServerVersion } from "./app-upgrade";
 
-/** Same origin by default (the site server hosts the API under /api; the dev
- * server proxies it). Set VITE_API_URL only to point at a remote API. */
-export const API_URL = ((import.meta.env?.VITE_API_URL as string | undefined) ?? "").replace(
-  /\/+$/,
-  "",
-);
+export { API_URL };
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public body?: unknown) {
@@ -19,7 +17,7 @@ export class ApiError extends Error {
 }
 
 export interface ApiOptions {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   json?: unknown;
   form?: FormData;
   signal?: AbortSignal;
@@ -37,15 +35,23 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     headers.set("Content-Type", "application/json");
     body = JSON.stringify(opts.json);
   } else if (opts.form) body = opts.form;
-  const res = await fetch(API_URL + path, {
-    method: opts.method ?? (body ? "POST" : "GET"),
-    headers,
-    body,
-    // "include" rather than the default "same-origin" so a build pointed at a
-    // remote VITE_API_URL still sends the session cookie.
-    credentials: opts.anonymous ? "omit" : "include",
-    signal: opts.signal,
-  });
+  const method = opts.method ?? (body ? "POST" : "GET");
+  const request = () =>
+    fetch(API_URL + path, {
+      method,
+      headers,
+      body,
+      // "include" rather than the default "same-origin" so a build pointed at a
+      // remote VITE_API_URL still sends the session cookie.
+      credentials: opts.anonymous ? "omit" : "include",
+      signal: opts.signal,
+    });
+  // A read the page started before the app loaded (early-fetch.ts) is used as
+  // is; if that request failed, this one is sent like any other. It carried
+  // the cookie, so an anonymous read (after a local logout) never takes it.
+  const early = method === "GET" && !opts.anonymous ? takeEarly(path) : undefined;
+  const res = early ? await early.catch(() => request()) : await request();
+  noteServerVersion(res);
   const text = await res.text();
   let data: unknown = null;
   try {
@@ -92,12 +98,22 @@ export const errorMessage = (e: unknown, fallback = "Something went wrong."): st
     return "Something went wrong on our side. Please try again in a moment.";
   }
   if (isWalletError(e)) return sentence(walletErrorMessage(e));
+  // A bug's own message ("Cannot read properties of undefined") means nothing
+  // to a visitor: it goes to the console, and the page says something plain.
+  if (e instanceof TypeError || e instanceof ReferenceError || e instanceof RangeError) {
+    if (/fetch|network|load failed/i.test(e.message)) {
+      return "Could not reach the server. Check your connection and try again.";
+    }
+    console.error(e);
+    return fallback;
+  }
   return e instanceof Error ? sentence(e.message) : typeof e === "string" ? sentence(e) : fallback;
 };
 
 /** A non-JSON GET with the session (markdown exports). Throws ApiError on failure. */
 export async function apiText(path: string): Promise<string> {
   const res = await fetch(API_URL + path, { credentials: "include" });
+  noteServerVersion(res);
   if (!res.ok) {
     let msg = res.statusText || "Request failed";
     try {

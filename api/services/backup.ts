@@ -8,6 +8,7 @@
 import type { Db } from "../db/mod.ts";
 import type { Comment } from "../db/types.ts";
 import { K } from "../db/keys.ts";
+import { STATUS_INDEX_MARK } from "../db/initiatives.ts";
 import { CLAIM_TTL_SECS } from "../db/comments.ts";
 import { HttpError } from "../lib/errors.ts";
 import { MAINTENANCE_META_KEY } from "./maintenance.ts";
@@ -38,6 +39,7 @@ export const BACKUP_PREFIXES = [
   "safe_balances",
   "safe_sync",
   "vote",
+  "watchlist",
 ] as const;
 
 export type BackupKey = (string | number)[];
@@ -240,5 +242,22 @@ export async function restoreBackup(
     await kv.set(K.claim(c.claimToken), c.id, { expireIn: ttlMs });
     result.claimsRebuilt++;
   }
+  // The rows came in without their derived copies' bookkeeping: the status
+  // index is rebuilt on the next board read, and every card summary from its rows.
+  await kv.delete(K.meta(STATUS_INDEX_MARK));
+  await deleteAll(kv, ["card_summary"]);
   return result;
+}
+
+async function deleteAll(kv: Deno.Kv, prefix: Deno.KvKey): Promise<void> {
+  let op = kv.atomic();
+  let n = 0;
+  for await (const e of kv.list({ prefix })) {
+    op.delete(e.key);
+    if (++n % 500 === 0) {
+      await op.commit();
+      op = kv.atomic();
+    }
+  }
+  if (n % 500) await op.commit();
 }

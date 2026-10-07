@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, ChevronDown, CornerDownLeft, Flag, Star, Trash2, Wallet } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useWallet } from "~/context/wallet";
 import { useSession } from "~/context/session";
 import Identity from "~/components/wallet/Identity";
 import { Avatar } from "~/components/wallet/Avatar";
@@ -24,7 +24,7 @@ export function IdentityRow({ c }: { c: CommentEntry }) {
   return (
     <span className="flex flex-wrap items-center gap-2.5">
       {c.address
-        ? <Identity address={c.address} size={24} />
+        ? <Identity address={c.address} size={24} badge={c.roles.includes("EXPERT")} />
         : (
           <span className="inline-flex items-center gap-1.5">
             <Avatar src={avatarSrc(label)} size={24} />
@@ -80,7 +80,7 @@ export default function EntryCard({
   const [replying, setReplying] = useState(false);
   const [name, setName] = useState("");
   const [featureMenu, setFeatureMenu] = useState(false);
-  const { address } = useAccount();
+  const { address } = useWallet();
   const { connecting } = useSession();
   const me = useIdentity(replying ? address : undefined);
   // The wallet is briefly connected before the sign-in signature; keep the

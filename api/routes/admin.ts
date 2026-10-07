@@ -1,4 +1,6 @@
 import { type Context, Hono } from "hono";
+import { voteSettings } from "./board.ts";
+import { readVoteSettings } from "../../shared/vote.ts";
 import { categoriesOr400 } from "../lib/page-facts.ts";
 import { categoriesOf } from "../../shared/categories.ts";
 import { bodyLimit } from "hono/body-limit";
@@ -79,6 +81,15 @@ export function adminRoutes(deps: Deps) {
     }
     return out;
   };
+
+  /** Vote-eligibility display settings (flag, floor, cap): no deploy needed to change them. */
+  r.get("/vote-settings", async (c) => c.json(await voteSettings(deps)));
+  r.post("/vote-settings", async (c) => {
+    const [v, err] = readVoteSettings(await jsonBody(c, ["show", "floorPct", "capUsd"]));
+    if (err) throw new HttpError(400, err);
+    await db.meta.set("vote_settings", v);
+    return c.json(v);
+  });
 
   r.get("/dashboard", async (c) => {
     const [pending, approved, other] = await Promise.all([
@@ -612,7 +623,11 @@ export function adminRoutes(deps: Deps) {
    */
   r.get("/leads", requireRecentAuth(deps.now), async (c) => {
     const all = await db.initiatives.list(["pending", "approved", "rejected", "archived"]);
-    const rows = all.filter((x) => x.funders.trim()).map((x) => ({
+    // Every approved and pending initiative gets a row, with blank lead columns when it
+    // has no leads yet; rejected and archived ones only while they carry leads.
+    const rows = all.filter((x) =>
+      x.funders.trim() || x.status === "approved" || x.status === "pending"
+    ).map((x) => ({
       id: x.id,
       title: x.title,
       slug: x.slug,

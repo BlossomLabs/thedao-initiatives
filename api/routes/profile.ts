@@ -9,6 +9,7 @@ import { isAddress } from "../chain/address.ts";
 import { DOMAIN_RE, NICK_RE, PRESET_RE } from "../lib/validate.ts";
 import { assertEthNameOwned } from "../services/names.ts";
 import { pfpUrl } from "../lib/json.ts";
+import { badgeHolders } from "../services/roles.ts";
 
 export const PFP_MAX_BYTES = 512 * 1024;
 
@@ -26,6 +27,24 @@ export function profileRoutes(deps: Deps) {
     }
     const id = await ens.reverse(address);
     return c.json({ name: id.name || null, avatar: id.avatar || null });
+  });
+
+  /** Which of these addresses hold the ETHSecurity badge (lowercase), for the
+   * mark on their avatars. At most 50 a call; each check is cached an hour,
+   * and a chain error reads as "no badge". */
+  r.get("/badges", async (c) => {
+    const list = (c.req.query("addresses") ?? "").split(",").map((a) => a.trim()).filter(Boolean);
+    if (!list.length || list.length > 50 || !list.every((a) => isAddress(a))) {
+      throw new HttpError(400, "bad addresses");
+    }
+    if (!(await db.rateLimit("badges:" + requireClientIp(c), 60, 60))) {
+      throw new HttpError(429, "slow down");
+    }
+    const held = await badgeHolders(
+      { hasBadge: (a) => deps.chain.hasBadge(a).catch(() => false) },
+      list,
+    );
+    return c.json({ holders: [...held] });
   });
 
   r.get("/nickname/:address", async (c) => {

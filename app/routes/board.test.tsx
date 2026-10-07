@@ -1,9 +1,12 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { AiSearchResult } from "../../shared/ai-search";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Card } from "~/lib/api-types";
 import Board from "./board";
+
+const searchMode = vi.hoisted(() => ({ automatic: false }));
 
 const cards = vi.hoisted(() =>
   [
@@ -39,11 +42,16 @@ const cards = vi.hoisted(() =>
 vi.mock("~/hooks/use-board", () => ({
   boardKey: ["board"],
   useBoard: () => ({
-    data: { cards, totals: { raised: 0 }, flags: { aiSearch: true, tokensOk: false } },
+    data: {
+      cards,
+      totals: { raised: 0 },
+      flags: { aiSearch: true, aiSearchAuto: searchMode.automatic, tokensOk: false },
+    },
     isLoading: false,
     isError: false,
   }),
 }));
+vi.mock("~/context/session", () => ({ useSession: () => ({ session: null, me: null }) }));
 vi.mock("~/components/board/Hero", () => ({ default: () => null }));
 vi.mock("~/components/board/PledgeBand", () => ({ default: () => null }));
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
@@ -53,7 +61,10 @@ vi.mock("~/lib/api", async (o) => ({
   ...(await o<typeof import("~/lib/api")>()),
   api: (...a: unknown[]) => api(...a),
 }));
-beforeEach(() => api.mockReset());
+beforeEach(() => {
+  api.mockReset();
+  searchMode.automatic = false;
+});
 
 const at = (url: string) => {
   const router = createMemoryRouter([{ path: "/", element: <Board /> }], {
@@ -68,10 +79,10 @@ const at = (url: string) => {
 };
 
 const findMatches = (q: string) => {
-  fireEvent.change(screen.getByRole("textbox", { name: /security work/ }), {
+  fireEvent.change(screen.getByRole("searchbox", { name: /Search initiatives/ }), {
     target: { value: q },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Find matches" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
 };
 
 it("the phone Filters button is there from the first render, before the sheet code loads", () => {
@@ -95,7 +106,7 @@ it("By category draws plain headings with a dot and a count", () => {
 });
 
 it("AI order: Sort shows AI matches, filters still narrow, a manual sort clears it", async () => {
-  api.mockResolvedValue({ matches: ["c"] });
+  api.mockResolvedValue({ scores: [{ "id": "c", "score": 0.9 }], pickThreshold: 0.8 });
   const router = at("/?sort=newest");
   findMatches("opsec things");
   await waitFor(() =>
@@ -116,17 +127,20 @@ it("AI order: Sort shows AI matches, filters still narrow, a manual sort clears 
 });
 
 it("filters still narrow the AI order", async () => {
-  api.mockResolvedValue({ matches: ["a", "c"] });
+  api.mockResolvedValue({
+    scores: [{ "id": "a", "score": 0.9 }, { "id": "c", "score": 0.9 }],
+    pickThreshold: 0.8,
+  });
   at("/?cat=opsec");
-  findMatches("anything");
+  findMatches("anything cat:opsec");
   await waitFor(() => expect(screen.getAllByText("AI pick")).toHaveLength(1));
   expect(screen.queryByText("Alpha fuzzing")).toBeNull();
 });
 
 it("Clear filters keeps the sort and the AI order", async () => {
-  api.mockResolvedValue({ matches: ["b"] });
+  api.mockResolvedValue({ scores: [{ "id": "b", "score": 0.9 }], pickThreshold: 0.8 });
   const router = at("/?cat=opsec&status=open&sort=newest");
-  findMatches("wallets");
+  findMatches("wallets cat:opsec funding:open");
   await screen.findByText("AI pick");
   fireEvent.click(
     screen.getAllByRole("button", { name: "Clear filters" })[0],
@@ -150,4 +164,153 @@ it("with nothing featured, the board orders by closest to funded and Sort has no
     "Closest to funded",
   );
   expect(screen.queryByText("Featured")).toBeNull();
+});
+
+describe("list view", () => {
+  afterEach(() => localStorage.clear());
+
+  it("?view=list shows the rows, and the Cards button goes back to cards", async () => {
+    const router = at("/?view=list");
+    expect(await screen.findByText("Raised")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem").length).toBe(3);
+    const cards = screen.getByRole("button", { name: "Cards" });
+    expect(screen.getByRole("button", { name: "List" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(cards);
+    await waitFor(() => expect(router.state.location.search).toBe(""));
+    expect(screen.queryByText("Raised")).toBeNull();
+  });
+
+  it("a plain URL opens in the layout this device used last", async () => {
+    at("/");
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(localStorage.getItem("thedao:board-layout")).toBe("list");
+    cleanup();
+    const router = at("/");
+    await waitFor(() => expect(router.state.location.search).toBe("?view=list"));
+  });
+});
+
+it("while the AI thinks, an empty keyword result says it is asking, not that nothing matches", async () => {
+  let answer!: (v: AiSearchResult) => void;
+  api.mockReturnValue(new Promise((r) => (answer = r)));
+  at("/");
+  findMatches("tools that keep keys safe");
+  expect(await screen.findByText("Asking AI for the best matches…")).toBeInTheDocument();
+  expect(screen.queryByText(/No Initiatives match/)).toBeNull();
+  await act(async () => {
+    answer({ scores: [{ "id": "b", "score": 0.9 }], pickThreshold: 0.8 });
+    await Promise.resolve();
+  });
+  expect(await screen.findByText("AI pick")).toBeInTheDocument();
+});
+
+it("nothing matches: no button of its own, the bar's Clear filters lights up and clears", async () => {
+  const router = at("/?q=zzzz-nothing");
+  expect(await screen.findByText(/No Initiatives match/)).toBeInTheDocument();
+  const clears = screen.getAllByRole("button", { name: "Clear filters" });
+  expect(clears).toHaveLength(2); // the bar's link: desktop row and phone line, no third
+  for (const c of clears) expect(c.className).toContain("animate-shine");
+  fireEvent.click(clears[0]);
+  await waitFor(() => expect(router.state.location.search).toBe(""));
+  expect(screen.queryByText(/No Initiatives match/)).toBeNull();
+});
+
+it("orders every proposal and labels the first three even with low scores", async () => {
+  api.mockResolvedValue({
+    scores: [{ id: "b", score: 0.7 }, { id: "a", score: 0.5 }, { id: "c", score: 0.1 }],
+    pickThreshold: 0.8,
+  });
+  at("/?sort=newest");
+  findMatches("a weak match");
+  await screen.findByText(/Initiatives ordered by relevance/);
+  expect(
+    [...document.querySelectorAll("[data-initiative-id]")].map((el) =>
+      el.getAttribute("data-initiative-id")
+    ),
+  ).toEqual(["b", "a", "c"]);
+  expect(screen.getAllByText("AI pick")).toHaveLength(3);
+  expect(screen.getByText("70%")).toBeInTheDocument();
+  expect(screen.getByText("50%")).toBeInTheDocument();
+  expect(screen.getByText("10%")).toBeInTheDocument();
+  expect(screen.getAllByRole("combobox", { name: "Sort" })[0]).toHaveTextContent("AI matches");
+});
+
+it("labels the first three and displays each score as a percentage", async () => {
+  api.mockResolvedValue({
+    scores: [{ id: "a", score: 0.9 }, { id: "b", score: 0.81 }, { id: "c", score: 0.8 }],
+    pickThreshold: 0.8,
+  });
+  at("/");
+  findMatches("security");
+  await waitFor(() => expect(screen.getAllByText("AI pick")).toHaveLength(3));
+  const boundary = document.querySelector('[data-initiative-id="c"]')!;
+  expect(within(boundary as HTMLElement).getByText("80%")).toBeInTheDocument();
+});
+
+it("list view uses score order and displays top-three percentages", async () => {
+  api.mockResolvedValue({
+    scores: [{ id: "b", score: 0.9 }, { id: "a", score: 0.8 }, { id: "c", score: 0.1 }],
+    pickThreshold: 0.8,
+  });
+  at("/?view=list");
+  findMatches("security work");
+  await screen.findByText(/Initiatives ordered by relevance/);
+  await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(3));
+  const rows = screen.getAllByRole("listitem");
+  expect(rows.map((row) => within(row).getByRole("link").textContent)).toEqual([
+    "Beta wallets",
+    "Alpha fuzzing",
+    "Gamma opsec",
+  ]);
+  expect(within(rows[0]).getAllByText("AI pick").length).toBeGreaterThan(0);
+  expect(within(rows[1]).getAllByText("80%").length).toBeGreaterThan(0);
+  expect(within(rows[2]).getAllByText("10%").length).toBeGreaterThan(0);
+  localStorage.clear();
+});
+
+it("Jev searches as you type and sets keyword filtering aside during the debounce", async () => {
+  searchMode.automatic = true;
+  api.mockResolvedValue({
+    scores: [{ id: "b", score: 0.9 }, { id: "a", score: 0.4 }, { id: "c", score: 0.1 }],
+    pickThreshold: 0.8,
+  });
+  at("/");
+  fireEvent.change(screen.getByRole("searchbox", { name: /Search initiatives/ }), {
+    target: { value: "tools that protect keys" },
+  });
+  expect(document.querySelectorAll("[data-initiative-id]")).toHaveLength(3);
+  expect(api).not.toHaveBeenCalled();
+  await screen.findAllByText("AI pick");
+  expect(screen.queryByText(/Initiatives ordered by relevance/)).toBeNull();
+  expect(api).toHaveBeenCalledTimes(1);
+  expect(
+    [...document.querySelectorAll("[data-initiative-id]")].map((el) =>
+      el.getAttribute("data-initiative-id")
+    ),
+  ).toEqual(["b", "a", "c"]);
+});
+
+it("only the first three scored results get labels when there are more proposals", async () => {
+  cards.push({
+    ...cards[0],
+    initiative: { ...cards[0].initiative, id: "d", slug: "d", title: "Delta" },
+  });
+  try {
+    api.mockResolvedValue({
+      scores: [{ id: "b", score: 0.95 }, { id: "d", score: 0.9 }, { id: "a", score: 0.85 }, {
+        id: "c",
+        score: 0.8,
+      }],
+      pickThreshold: 0.8,
+    });
+    at("/");
+    findMatches("security work");
+    await screen.findByText(/Initiatives ordered by relevance/);
+    expect(screen.getAllByText("AI pick")).toHaveLength(3);
+    const fourth = document.querySelector('[data-initiative-id="c"]')!;
+    expect(within(fourth as HTMLElement).queryByText("AI pick")).toBeNull();
+    expect(within(fourth as HTMLElement).queryByText("80%")).toBeNull();
+  } finally {
+    cards.pop();
+  }
 });

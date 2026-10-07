@@ -13,14 +13,14 @@ const SCRIPT = "window.ready = true;";
 const BASIC = "Basic " + btoa("preview:secret");
 const API_CSP = "default-src 'none'; frame-ancestors 'none'";
 
-async function siteHarness(env: Record<string, string> = {}) {
+async function siteHarness(env: Record<string, string> = {}, head = "") {
   const h = await harness({ env: { CSP_ENFORCE: "false", ...env } });
   const root = await Deno.makeTempDir();
   await Deno.mkdir(`${root}/assets`);
   await Deno.mkdir(`${root}/admin`);
   await Deno.writeTextFile(
     `${root}/index.html`,
-    `<html><link rel="canonical" href="${SITE_URL}/"><script>${SCRIPT}</script>HOME</html>`,
+    `<html>${head}<link rel="canonical" href="${SITE_URL}/"><script>${SCRIPT}</script>HOME</html>`,
   );
   await Deno.writeTextFile(`${root}/__spa-fallback.html`, "<html>SPA FALLBACK</html>");
   await Deno.writeTextFile(`${root}/admin/index.html`, "<html>ADMIN PAGE</html>");
@@ -304,7 +304,7 @@ Deno.test("site: Markdown downloads keep API authorization and never fall throug
     const publicFile = await h.req(`/initiative/${row.slug}.md`);
     assertEquals(publicFile.status, 200);
     assertStringIncludes(publicFile.headers.get("Content-Type")!, "text/markdown");
-    assertEquals(publicFile.headers.get("Cache-Control"), "public, max-age=60");
+    assertEquals(publicFile.headers.get("Cache-Control"), "public, max-age=300");
     assertEquals(publicFile.headers.get("Content-Security-Policy"), API_CSP);
     assert(!(await publicFile.text()).includes("private@example.com"));
     const privatePath = `/initiative/${row.slug}-PRIVATE.md`;
@@ -367,5 +367,91 @@ Deno.test("site: the combined app uses runtime IPs and rejects missing identity"
     assertEquals((await h.app.request(PREVIEW + "/api/auth/nonce")).status, 503);
   } finally {
     await h.close();
+  }
+});
+
+async function gunzip(res: Response): Promise<string> {
+  return await new Response(res.body!.pipeThrough(new DecompressionStream("gzip"))).text();
+}
+
+Deno.test("site: built assets and pages are gzipped when the client accepts it", async () => {
+  const h = await siteHarness();
+  try {
+    const big = `export const pad = "${"x".repeat(20_000)}";`;
+    await Deno.writeTextFile(`${h.root}/assets/big-abc123.js`, big);
+    const page = `<html><script>${SCRIPT}</script>${"<p>HOME</p>".repeat(400)}</html>`;
+    await Deno.writeTextFile(`${h.root}/index.html`, page);
+    const gz = { headers: { "accept-encoding": "gzip, br" } };
+
+    const zipped = await h.req("/assets/big-abc123.js", gz);
+    assertEquals(zipped.status, 200);
+    assertEquals(zipped.headers.get("content-encoding"), "gzip");
+    assert(/accept-encoding/i.test(zipped.headers.get("vary") ?? ""), "Vary: Accept-Encoding");
+    assertEquals(zipped.headers.get("cache-control"), "public, max-age=31536000, immutable");
+    assert(zipped.headers.get("etag")?.startsWith("W/"), "a compressed body carries a weak ETag");
+    assertEquals(await gunzip(zipped), big);
+
+    const plain = await h.req("/assets/big-abc123.js");
+    assertEquals(plain.headers.get("content-encoding"), null);
+    assertEquals(await plain.text(), big);
+
+    // The page is rewritten per request on a preview origin (origin, CSP
+    // hashes) and streamed from disk on the canonical one; both compress.
+    const html = await h.req("/", gz);
+    assertEquals(html.headers.get("content-encoding"), "gzip");
+    assertEquals(html.headers.get("cache-control"), "no-cache");
+    assertStringIncludes(
+      html.headers.get("Content-Security-Policy-Report-Only") ?? "",
+      await scriptHash(SCRIPT),
+    );
+    assertStringIncludes(await gunzip(html), "<p>HOME</p>");
+    const streamed = await h.app.request(SITE_URL + "/", gz, testConnection("203.0.113.42"));
+    assertEquals(streamed.status, 200);
+    assertEquals(streamed.headers.get("content-encoding"), "gzip");
+    assert(streamed.headers.get("etag")?.startsWith("W/"), "weak ETag on the streamed page");
+    assertStringIncludes(await gunzip(streamed), "<p>HOME</p>");
+
+    // Metadata-only answers stay unencoded, including a revalidation with the
+    // weak ETag a browser holds after a gzipped answer.
+    const head = await h.req("/assets/big-abc123.js", { method: "HEAD", ...gz });
+    assertEquals(head.status, 200);
+    assertEquals(head.headers.get("content-encoding"), null);
+    for (const etag of [plain.headers.get("etag")!, zipped.headers.get("etag")!]) {
+      const cached = await h.req("/assets/big-abc123.js", {
+        headers: { "accept-encoding": "gzip", "if-none-match": etag },
+      });
+      assertEquals(cached.status, 304, etag);
+      assertEquals(cached.headers.get("content-encoding"), null);
+    }
+  } finally {
+    await h.close();
+  }
+});
+
+Deno.test("site: API answers carry the served build's version, so an open tab can tell it is behind", async () => {
+  const h = await siteHarness();
+  try {
+    assertEquals(h.site.version, null);
+    assertEquals((await h.req("/api/board")).headers.get("X-App-Version"), null);
+  } finally {
+    await h.close();
+  }
+  const built = await siteHarness(
+    {},
+    '<link rel="modulepreload" href="/assets/manifest-4c624852.js"/>',
+  );
+  try {
+    assertEquals(built.site.version, "4c624852");
+    const check = await built.req("/api/version");
+    assertEquals(check.status, 200);
+    assertEquals(check.headers.get("X-App-Version"), "4c624852");
+    assertEquals(check.headers.get("Cache-Control"), "no-store");
+    assertEquals(await check.json(), { version: "4c624852" });
+    // Every API answer says it, errors included; pages and assets do not need to.
+    assertEquals((await built.req("/api/board")).headers.get("X-App-Version"), "4c624852");
+    assertEquals((await built.req("/api/nope")).headers.get("X-App-Version"), "4c624852");
+    assertEquals((await built.req("/")).headers.get("X-App-Version"), null);
+  } finally {
+    await built.close();
   }
 });

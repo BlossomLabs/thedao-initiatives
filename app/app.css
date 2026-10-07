@@ -4,6 +4,40 @@
 /* Tokens: Figma "TheDAO Sites" via the MVP's style.css :root. */
 @theme {
   --animate-caret-blink: caret-blink 1.25s ease-out infinite;
+  /* The Badge holder mark on the avatar: it pops in after a sign-in, glows on a page load. */
+  --animate-badge-pop: badge-pop 0.9s ease-out backwards;
+  --animate-badge-glow: badge-glow 1.4s ease-in-out;
+  /* Clear filters, when nothing matches: a light sweeping across the letters, as a
+     chat app's "Thinking…" (React Bits' Shiny Text), for as long as nothing matches. */
+  --animate-shine: shine 2.2s linear infinite;
+  @keyframes shine {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+  @keyframes badge-glow {
+    40% {
+      filter: drop-shadow(0 0 3px rgb(242, 193, 78)) drop-shadow(0 0 9px rgba(242, 193, 78, 0.85));
+    }
+  }
+  @keyframes badge-pop {
+    0% {
+      scale: 0;
+      opacity: 0;
+    }
+    40% {
+      scale: 1.4;
+      opacity: 1;
+      filter: drop-shadow(0 0 6px rgba(242, 193, 78, 0.95));
+    }
+    100% {
+      scale: 1;
+      filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+    }
+  }
   @keyframes caret-blink {
     0%,
     70%,
@@ -795,4 +829,18 @@ body {
 html[data-shell="dashboard"] .shell-detail,
 html:not([data-shell="dashboard"]) .shell-dashboard {
   display: none;
+}
+
+/* The shiny text itself: the letters show a gradient, a bright band in dimmer white. */
+@utility shine-text {
+  color: transparent;
+  background-image: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.55) 35%,
+    #fff 50%,
+    rgba(255, 255, 255, 0.55) 65%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
 }

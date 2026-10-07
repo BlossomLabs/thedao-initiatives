@@ -20,7 +20,7 @@ export async function refreshDailyCache(
   // A paused site is being backed up or moved: no background writes.
   if (await deps.maintenance.on()) return;
 
-  const initiatives = (await deps.db.initiatives.list(["approved"])).filter((initiative) =>
+  const initiatives = (await deps.db.initiatives.cards("approved")).filter((initiative) =>
     initiative.safeAddress
   );
   await refreshLedgers(deps, initiatives);

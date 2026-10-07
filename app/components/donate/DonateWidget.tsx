@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Landmark, Wallet } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useWallet, useWalletStore } from "~/context/wallet";
 import { useDonateParams } from "~/hooks/use-donate-params";
 import { TERMS } from "~/data/terms";
 import GovernedBy from "~/components/terms/GovernedBy";
@@ -21,7 +21,7 @@ import {
 import { errorMessage } from "~/lib/api";
 import { useDonation } from "./useDonation";
 import Reveal from "~/components/ui/Reveal";
-import { WALLETCONNECT_PROJECT_ID } from "~/lib/wagmi";
+import { WALLETCONNECT_PROJECT_ID } from "~/lib/wallet-env";
 
 const CHIPS = ["50", "500", "5000", "50000"];
 type Method = "wallet" | "exchange";
@@ -39,7 +39,12 @@ export default function DonateWidget({
   onConfirmed?: (r: DonateResult) => void;
 }) {
   const { data: params } = useDonateParams();
-  const { address, connector } = useAccount();
+  const { address, connector } = useWallet();
+  const wallet = useWalletStore();
+  // The Donate panel is where a wallet gets used: fetch the wallet stack now.
+  useEffect(() => {
+    void wallet.load().catch(() => {});
+  }, [wallet]);
   const [accepted, setAccepted] = useState(false);
   const [exchangeAttempt, setExchangeAttempt] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
@@ -159,13 +164,14 @@ export default function DonateWidget({
       {/* Each Reveal carries its own gap as padding and cancels the column's, so a closed one takes no room. */}
       <Reveal show={method === "wallet"} className="-mb-2.5">
         <div className="flex flex-col gap-2.5 pb-2.5">
-          <div className="flex flex-wrap gap-2">
+          {/* The four amounts share one row, in equal columns. */}
+          <div className="grid grid-cols-4 gap-1.5">
             {CHIPS.map((c) => (
               <button
                 key={c}
                 type="button"
                 className={cn(
-                  "cursor-pointer rounded-full border px-4 py-2 font-inter-tight text-[13px] transition-all duration-150 max-[760px]:px-4 max-[760px]:py-[11px]",
+                  "cursor-pointer whitespace-nowrap rounded-full border px-1 py-2 text-center font-inter-tight text-[13px] transition-all duration-150 max-[760px]:py-[11px]",
                   amount === c
                     ? "border-dao-green bg-dao-green font-medium text-white"
                     : "border-edge2 bg-white/5 text-soft hover:border-[rgba(92,183,90,.6)] hover:text-dao-green",
@@ -184,7 +190,7 @@ export default function DonateWidget({
               <input
                 className="min-w-0 flex-1 bg-transparent py-2.5 pl-1 pr-3.5 font-inter-tight text-[14px] font-light text-white outline-none placeholder:text-white/35"
                 inputMode="decimal"
-                placeholder="Custom amount ($1 minimum)"
+                placeholder="Custom amount"
                 aria-label="Amount in US dollars"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}

@@ -1,12 +1,21 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { cardInitiative, ipfsUrl } from "../lib/json.ts";
-import type { Donation, Initiative, Pledge } from "../db/types.ts";
+import type { Donation, Pledge } from "../db/types.ts";
+import type { CardRow } from "../db/initiatives.ts";
+import type { CardSummary } from "../db/cards.ts";
 import { SAFE_OWNER_COUNT, SAFE_THRESHOLD } from "../config.ts";
 import type { FundingSummary } from "../services/funding.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
 import { ledgerStatus, refreshLedgers } from "../services/ledger.ts";
 import { createSnapshotCache, type SnapshotCache } from "../lib/snapshot-cache.ts";
+import { DEFAULT_VOTE, type VoteSettings, voteState } from "../../shared/vote.ts";
+
+/** The vote-eligibility settings, the defaults until an admin saves them. */
+export const voteSettings = async (deps: Pick<Deps, "db">): Promise<VoteSettings> => ({
+  ...DEFAULT_VOTE,
+  ...(await deps.db.meta.getPublic<VoteSettings>("vote_settings")),
+});
 
 export interface Card {
   initiative: ReturnType<typeof cardInitiative>;
@@ -21,6 +30,8 @@ export interface Card {
   logos: { company: string; logoUrl: string; url: string }[];
   funded: boolean;
   donationsEnabled: boolean;
+  /** Where it stands for TheDAO's vote; only while the vote display is on. */
+  vote?: ReturnType<typeof voteState>["kind"];
 }
 
 export const pctOf = (total: number, goal: number): number =>
@@ -46,16 +57,16 @@ export interface Sponsor {
  * name. Biggest total first, then by name. */
 export function topSponsors(
   config: Deps["config"],
-  rows: { pledges: Pledge[] }[],
+  rows: Pick<CardSummary, "pledges">[],
   limit = 5,
 ): Sponsor[] {
-  const by = new Map<string, { pledges: Pledge[]; total: number }>();
+  const by = new Map<string, { pledges: CardSummary["pledges"]; total: number }>();
   for (const { pledges } of rows) {
     for (const p of pledges) {
       if (p.status === "withdrawn" || !(p.amountUsd > 0)) continue;
       const key = p.company.trim().replace(/\s+/g, " ").toLowerCase();
       if (!key) continue;
-      const s = by.get(key) ?? { pledges: [] as Pledge[], total: 0 };
+      const s = by.get(key) ?? { pledges: [] as CardSummary["pledges"], total: 0 };
       s.pledges.push(p);
       s.total += p.amountUsd;
       by.set(key, s);
@@ -94,31 +105,35 @@ export function orderCards<
   });
 }
 
+/** From the card row and its summary (#46, #47): one wave for the ledger status
+ * and the Safe balance snapshot, no pledge or donation rows. */
 export async function buildCard(
   deps: Deps,
-  r: Initiative,
+  r: CardRow,
+  s: CardSummary,
   tokensOk: boolean,
   refresh = false,
-  /** Hands the pledges read here to the caller (the board's sponsors reuse them). */
-  seen?: (pledges: Pledge[]) => void,
 ): Promise<Card> {
-  // One wave of reads, then only the Safe balance snapshot for the summary.
-  const [pledges, donations, ledger] = await Promise.all([
-    deps.db.pledges.list(r.id),
-    deps.db.donations.list(r.id),
+  const sumOf = (status: Pledge["status"]) =>
+    s.pledges.filter((p) => p.status === status).reduce((n, p) => n + p.amountUsd, 0);
+  const [summary, ledger] = await Promise.all([
+    deps.funding.summaryOf(
+      r,
+      { pledged: sumOf("pledged"), received: sumOf("received"), ledger: s.donatedUsd },
+      refresh,
+    ),
     ledgerStatus(deps, r),
   ]);
-  seen?.(pledges);
-  const summary = await deps.funding.summaryFrom(r, pledges, donations, refresh);
-  const withLogo = pledges.filter((p) => p.logoCid);
+  const withLogo = s.pledges.filter((p) => p.logoCid);
   return {
     initiative: cardInitiative(r),
     summary,
     pct: pctOf(summary.total, r.goalUsd),
-    backers: backerCount(pledges, donations),
-    donations: donations.length,
+    // The same rule as backerCount, from the summary's counts.
+    backers: s.pledges.filter((p) => p.status === "pledged").length + s.donors,
+    donations: s.donations,
     ledger,
-    logos: (withLogo.length ? withLogo : pledges).slice(0, 4)
+    logos: (withLogo.length ? withLogo : s.pledges).slice(0, 4)
       .map((p) => ({ company: p.company, logoUrl: ipfsUrl(deps.config, p.logoCid), url: p.url })),
     funded: Boolean(r.goalUsd && summary.total >= r.goalUsd),
     donationsEnabled: Boolean(tokensOk && r.safeAddress && r.status === "approved"),
@@ -144,22 +159,25 @@ export const createBoardCache = (deps: Deps): BoardCache =>
 
 async function buildBoard(deps: Deps, refresh: boolean) {
   const { db, config } = deps;
-  const [initiatives, state] = await Promise.all([
-    db.initiatives.list(["approved"]),
+  const [initiatives, state, vote] = await Promise.all([
+    db.initiatives.cards("approved"),
     deps.chain.state(refresh),
+    voteSettings(deps),
   ]);
   if (refresh) await refreshLedgers(deps, initiatives);
   const tokensOk = tokensUsable(state);
-  const pledges: Pledge[][] = initiatives.map(() => []);
+  const summaries = await db.cards.summaries(initiatives.map((x) => x.id));
   const cards = orderCards(
     await Promise.all(
-      initiatives.map((x, i) => buildCard(deps, x, tokensOk, refresh, (p) => (pledges[i] = p))),
+      initiatives.map((x, i) => buildCard(deps, x, summaries[i], tokensOk, refresh)),
     ),
+  ).map((c): Card =>
+    vote.show ? { ...c, vote: voteState(c.summary.total, c.initiative.goalUsd, vote).kind } : c
   );
   return {
     refreshDue: !chainStateFresh(state, deps.now()),
     cards,
-    sponsors: topSponsors(config, pledges.map((p) => ({ pledges: p }))),
+    sponsors: topSponsors(config, summaries),
     totals: {
       count: cards.length,
       goal: cards.reduce((n, x) => n + x.initiative.goalUsd, 0),
@@ -168,7 +186,8 @@ async function buildBoard(deps: Deps, refresh: boolean) {
       donations: cards.reduce((n, x) => n + x.donations, 0),
     },
     flags: {
-      aiSearch: deps.ai.enabled,
+      aiSearch: deps.ai.searchEnabled,
+      aiSearchAuto: deps.ai.searchEnabled && config.typesafeEnabled,
       tokensOk,
       chainDetail: state.detail,
       uploads: deps.pinata.enabled,
@@ -176,9 +195,14 @@ async function buildBoard(deps: Deps, refresh: boolean) {
       walletConnectProjectId: config.walletConnectProjectId,
       safeThreshold: SAFE_THRESHOLD,
       safeOwnerCount: SAFE_OWNER_COUNT,
+      vote,
     },
   };
 }
+
+/** The board as the public GET serves it (no refresh), for the feeds. */
+export const readBoard = (deps: Deps, cache: BoardCache) =>
+  cache.get(() => buildBoard(deps, false));
 
 export function boardRoutes(deps: Deps, cache: BoardCache = createBoardCache(deps)) {
   const r = new Hono<Vars>();
@@ -186,11 +210,15 @@ export function boardRoutes(deps: Deps, cache: BoardCache = createBoardCache(dep
 
   // The global profile/support UI must not load or poll the funding board.
   r.get("/settings", async (c) => {
-    const { on, at, note } = await deps.maintenance.state();
+    const [{ on, at, note }, vote] = await Promise.all([
+      deps.maintenance.state(),
+      voteSettings(deps),
+    ]);
     return c.json({
       uploads: deps.pinata.enabled,
       support: Boolean(config.supportUrl),
       maintenance: { on, at, note },
+      vote,
     });
   });
 

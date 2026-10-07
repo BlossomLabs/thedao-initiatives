@@ -1,14 +1,20 @@
 /**
  * Pins the number of sequential KV round trips behind the public reads. Every
  * KV operation is delayed by a fixed LATENCY, so the elapsed time of one
- * request divided by LATENCY is the depth of its critical path; the count of
- * operations bounds the total KV work. Production pays ~120-180 ms per trip.
+ * request divided by LATENCY, rounded down, is the depth of its critical path;
+ * the count of operations bounds the total KV work. Production pays ~120-180 ms
+ * per trip.
+ *
+ * The request's own CPU time (building and serializing 25 cards: ~40 ms cold,
+ * ~15 ms warm) adds to the elapsed time. LATENCY is set well above it and the
+ * depth is rounded down, so that time never reads as an extra trip; a real
+ * extra trip still adds a whole LATENCY.
  */
 import { assert, assertEquals } from "@std/assert";
 import { harness } from "./app-helpers.ts";
 import { K } from "../db/keys.ts";
 
-const LATENCY = 30;
+const LATENCY = 100;
 const delay = () => new Promise((r) => setTimeout(r, LATENCY));
 
 const counter = { ops: 0, on: false };
@@ -81,14 +87,14 @@ async function timed(run: () => Promise<Response>) {
   assertEquals(res.status, 200);
   return {
     ops: counter.ops,
-    trips: Math.round(elapsed / LATENCY),
+    trips: Math.floor(elapsed / LATENCY),
     elapsed,
     body: await res.json(),
   };
 }
 
 Deno.test("kv depth: the board and the initiative page stay within a few round trips", async () => {
-  const h = await harness();
+  const h = await harness({ env: { BOARD_CACHE_SECS: "0" } });
   const text = "lorem ipsum ".repeat(700);
   for (let i = 0; i < 25; i++) {
     const r = await h.db.initiatives.insert({
@@ -130,10 +136,21 @@ Deno.test("kv depth: the board and the initiative page stay within a few round t
     await h.db.initiatives.insert({ title: `Pending ${i}`, summary: "", details: text });
   }
 
+  await h.db.initiatives.cards("approved"); // the index is built, as on a running site
+  // The first read after the writes builds every card summary from its rows (#46);
+  // that is a one-off per write, not per build.
+  const cold = await timed(() => h.req("/api/board"));
+  assertEquals(cold.body.cards.length, 25);
+  assert(
+    cold.trips <= 6 && cold.ops <= 140,
+    `cold board took ${cold.trips} sequential KV trips and ${cold.ops} operations`,
+  );
+  // Then a build is the status index (#47), one getMany per five cards, and the
+  // ledger and balance snapshots per card, all but one wave in parallel.
   const board = await timed(() => h.req("/api/board"));
   assertEquals(board.body.cards.length, 25);
   assert(
-    board.trips <= 4 && board.ops <= 110,
+    board.trips <= 3 && board.ops <= 60,
     `board took ${board.trips} sequential KV trips and ${board.ops} operations`,
   );
 

@@ -11,7 +11,20 @@ Suggest an initiative), expressed as Tailwind v4 tokens in `app/app.css`. Data c
 `api/` (Deno + Hono + KV, see `api/README.md`), hosted by the same package: `server.ts` starts one
 Hono app serving the API under `/api` and the built SPA, from one Deno Deploy app. The initiative texts,
 the process rules and the donation terms are files under `content/`; the proposer's AI guide is
-`public/llms.txt`. The Flask MVP this replaced is described in `docs/v1-to-v2.md`.
+`public/submit.md` (the drafting guide; `/llms.txt` is now the generated index of approved initiatives). The Flask MVP this replaced is described in `docs/v1-to-v2.md`.
+
+AI search uses TypeSafe Jev to rate every approved initiative against the donor's query on
+a five-level relevance rubric. Percentages are normalized relevance scores, not probabilities
+of correctness. The prompt recognizes domain relationships such as solc being Solidity's compiler
+and distinguishes direct work from supporting tools and incidental mentions.
+With Jev enabled, search runs after a 500 ms pause in typing (at least three characters, or `zk`);
+the LLM mode searches on Enter or Ask AI. The board orders all initiatives by descending score; the first three visible scored results receive an **AI pick** label with their score as a percentage. Filters still apply, and a
+manual sort clears the AI order. Set `TYPESAFE_API_KEY` to enable search; `TYPESAFE_MODEL`
+defaults to the pinned `jev-1.13.0`. Set `TYPESAFE_ENABLED=false` to use the existing
+`AI_SEARCH_*` LLM for search instead, with the same full ordering and top-three labels;
+the LLM must supply a valid score for every proposal. Category suggestions and comment moderation continue
+using the separate OpenAI-compatible `AI_SEARCH_*` settings. Search scores are cached for ten
+minutes, keyed by the query, model, and scored proposal text.
 
 ## How money flows
 

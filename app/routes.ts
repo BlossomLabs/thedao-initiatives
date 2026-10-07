@@ -16,5 +16,6 @@ export default [
     route("initiatives/:slug", "routes/admin.initiative.tsx"),
     route("leads", "routes/admin.leads.tsx"),
     route("maintenance", "routes/admin.maintenance.tsx"),
+    route("vote", "routes/admin.vote.tsx"),
   ]),
 ] satisfies RouteConfig;

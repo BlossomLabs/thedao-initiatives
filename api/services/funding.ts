@@ -147,7 +147,7 @@ export function createFunding(deps: FundingDeps) {
   /** The summary from rows the caller already holds (active pledges and
    * confirmed donations, as the repos list them), so a page that shows the
    * rows too reads them once. Only the Safe balance snapshot is fetched here. */
-  async function summaryFrom(
+  function summaryFrom(
     initiative: Initiative,
     pledges: Pledge[],
     donations: Donation[],
@@ -155,9 +155,23 @@ export function createFunding(deps: FundingDeps) {
   ): Promise<FundingSummary> {
     const sumOf = (status: Pledge["status"]) =>
       pledges.filter((p) => p.status === status).reduce((s, p) => s + p.amountUsd, 0);
-    const pledged = sumOf("pledged");
     const ledger = donations.filter((d) => d.status === "confirmed")
       .reduce((s, d) => s + d.amountUsd, 0);
+    return summaryOf(initiative, {
+      pledged: sumOf("pledged"),
+      received: sumOf("received"),
+      ledger,
+    }, revalidate);
+  }
+
+  /** The summary from totals already summed (the board's card summary, db/cards.ts):
+   * open pledges, received pledges and confirmed donation rows in USD. */
+  async function summaryOf(
+    initiative: Pick<Initiative, "safeAddress" | "paidOutUsd">,
+    rows: { pledged: number; received: number; ledger: number },
+    revalidate = false,
+  ): Promise<FundingSummary> {
+    const { pledged, received, ledger } = rows;
     const paidOut = initiative.paidOutUsd ?? 0;
     const snapshot = initiative.safeAddress
       ? await cached(initiative.safeAddress, revalidate)
@@ -166,7 +180,7 @@ export function createFunding(deps: FundingDeps) {
     const donated = cents(b ? b.usd + paidOut : ledger);
     return {
       pledged: cents(pledged),
-      received: cents(sumOf("received")),
+      received: cents(received),
       donated,
       total: cents(pledged + donated),
       live: Boolean(b),
@@ -186,7 +200,7 @@ export function createFunding(deps: FundingDeps) {
     return summaryFrom(initiative, pledges, donations, revalidate);
   }
 
-  return { balances, summary, summaryFrom, invalidate };
+  return { balances, summary, summaryFrom, summaryOf, invalidate };
 }
 
 export type Funding = ReturnType<typeof createFunding>;

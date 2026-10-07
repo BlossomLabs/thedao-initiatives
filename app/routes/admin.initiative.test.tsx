@@ -25,12 +25,12 @@ const SAFE = "0x4534fA9FaEdE981FF7b9c9bFe112067ECA216609";
 const FACTORY = "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67";
 const SIGNERS = [1, 2, 3, 4, 5].map((n) => `0x${String(n).repeat(40)}`);
 
-vi.mock("wagmi", () => ({
-  useAccount: () => ({
+vi.mock("~/context/wallet", () => ({
+  useWallet: () => ({
     address: wallet.connected ? ADMIN : undefined,
     isConnected: wallet.connected,
   }),
-  useConfig: () => ({}),
+  useWalletStore: () => ({ load: () => Promise.resolve({ config: {} }) }),
 }));
 vi.mock("wagmi/actions", () => ({
   sendTransaction: vi.fn(),

@@ -29,7 +29,9 @@ export function SheetTriggerFace({ view }: { view: BoardView }) {
 type SheetProps = {
   cards: Card[];
   view: BoardView;
-  onApply: (p: Pick<BoardView, "cats" | "status">) => void;
+  /** This browser's watchlist, for the sheet's counts while the Watchlist filter is on. */
+  watched?: string[];
+  onApply: (p: Pick<BoardView, "type" | "cats" | "status">) => void;
 };
 
 /** The Filters (N) button on its own, until (or if never) the sheet code arrives. */

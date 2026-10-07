@@ -70,12 +70,17 @@ export async function createStaticSite(
     const { origin, pathname } = new URL(req.url);
     const res = await serveDir(req, { fsRoot: root, quiet: true });
     if (res.status !== 404) return withCaching(await rewriteOrigin(res, origin), pathname);
+    // The app's shell for every URL without a file of its own; the board page
+    // stands in only when the build has no shell. The request keeps its
+    // validators, so a repeat visit is answered 304 for the shell: any answer
+    // but "no such file" is the shell's, never a reason to try the next one
+    // (which sent the board page to revalidating browsers on other URLs).
     for (const fallback of ["/__spa-fallback.html", "/index.html"]) {
       const fb = await serveDir(new Request(new URL(fallback, req.url), req), {
         fsRoot: root,
         quiet: true,
       });
-      if (fb.status === 200) return withCaching(await rewriteOrigin(fb, origin), pathname);
+      if (fb.status !== 404) return withCaching(await rewriteOrigin(fb, origin), pathname);
     }
     return res;
   }

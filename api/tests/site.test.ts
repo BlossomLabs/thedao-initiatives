@@ -352,6 +352,39 @@ Deno.test("site: HEAD, conditional requests and ranges retain static-file semant
   }
 });
 
+Deno.test("site: a revalidated SPA URL answers for the shell, never with the board page", async () => {
+  const h = await siteHarness();
+  try {
+    // HTML is `no-cache`, so a repeat visit revalidates what the browser holds for the URL.
+    const get = (headers: Record<string, string> = {}) =>
+      h.app.request(
+        SITE_URL + "/initiative/some-slug",
+        { headers },
+        testConnection("203.0.113.42"),
+      );
+    const first = await get();
+    assertEquals(first.status, 200);
+    assertEquals(await first.text(), "<html>SPA FALLBACK</html>");
+    const etag = first.headers.get("ETag")!;
+    const modified = first.headers.get("Last-Modified")!;
+    assert(etag && modified);
+    for (const [name, value] of [["If-None-Match", etag], ["If-Modified-Since", modified]]) {
+      const again = await get({ [name]: value });
+      assertEquals(again.status, 304);
+      assertEquals(await again.text(), "");
+    }
+    // a validator from an older build gets the shell again
+    const stale = await get({ "If-None-Match": 'W/"an-older-build"' });
+    assertEquals(stale.status, 200);
+    assertEquals(await stale.text(), "<html>SPA FALLBACK</html>");
+    // the board page stands in only when the build has no shell at all
+    await Deno.remove(`${h.root}/__spa-fallback.html`);
+    assertStringIncludes(await (await get()).text(), "HOME");
+  } finally {
+    await h.close();
+  }
+});
+
 Deno.test("site: the combined app uses runtime IPs and rejects missing identity", async () => {
   const h = await siteHarness();
   try {

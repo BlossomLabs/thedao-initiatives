@@ -42,11 +42,11 @@ Deno.test("sponsors: one row per company across initiatives, biggest total first
   assertEquals(s[0].url, "https://ef");
 });
 
-Deno.test("sponsors: withdrawn and empty pledges do not count, top 5 only", () => {
-  const pledges = ["A", "B", "C", "D", "E", "F"].map((c, i) => pl(c, 10 + i));
+Deno.test("sponsors: withdrawn and empty pledges do not count, top 8 only", () => {
+  const pledges = ["A", "B", "C", "D", "E", "F", "G", "H", "I"].map((c, i) => pl(c, 10 + i));
   pledges.push(pl("Z", 999, { status: "withdrawn" }), pl("Y", 0), pl("  ", 500));
   const s = topSponsors(cfg, [{ pledges }]);
-  assertEquals(s.map((x) => x.company), ["F", "E", "D", "C", "B"]);
+  assertEquals(s.map((x) => x.company), ["I", "H", "G", "F", "E", "D", "C", "B"]);
 });
 
 Deno.test("sponsors: the name shown is the biggest pledge's spelling", () => {

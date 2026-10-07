@@ -15,14 +15,14 @@ it("renders nothing until someone has pledged", () => {
   expect(render(<Sponsors sponsors={undefined} />).container.innerHTML).toBe("");
 });
 
-it("holds the place with skeletons while the board loads", () => {
+it("holds the place with a skeleton while the board loads", () => {
   const { container } = render(<Sponsors loading />);
   expect(screen.getByText("Top sponsors of security for Ethereum")).toBeTruthy();
-  expect(container.querySelector("[aria-busy]")?.childElementCount).toBe(5);
+  expect(container.querySelector("[aria-busy]")?.childElementCount).toBe(1);
   expect(screen.queryByRole("list")).toBeNull();
 });
 
-it("numbers the sponsors in order with whole-dollar totals, the leader inverted", () => {
+it("lists the sponsors in order in one row with whole-dollar totals", () => {
   render(
     <Sponsors
       sponsors={[
@@ -34,11 +34,10 @@ it("numbers the sponsors in order with whole-dollar totals, the leader inverted"
   expect(screen.getByText("Top sponsors of security for Ethereum")).toBeTruthy();
   const items = screen.getAllByRole("listitem");
   expect(items.map((li) => li.textContent)).toEqual([
-    "Argot Collective$151,000 pledged#01",
-    "Acme$801 pledged#02",
+    "Argot Collective$151,000 pledged",
+    "Acme$801 pledged",
   ]);
-  expect(items[0].className).toContain("bg-white ");
-  expect(items[1].className).not.toContain("bg-white ");
+  expect(items[0].parentElement).toBe(screen.getByRole("list"));
   expect(screen.getByRole("link", { name: "Argot Collective" }).getAttribute("href")).toBe(
     "https://argot.org",
   );

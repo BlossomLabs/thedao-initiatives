@@ -58,7 +58,7 @@ export interface Sponsor {
 export function topSponsors(
   config: Deps["config"],
   rows: Pick<CardSummary, "pledges">[],
-  limit = 5,
+  limit = 8,
 ): Sponsor[] {
   const by = new Map<string, { pledges: CardSummary["pledges"]; total: number }>();
   for (const { pledges } of rows) {

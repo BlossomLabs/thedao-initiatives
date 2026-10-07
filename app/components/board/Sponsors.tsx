@@ -4,16 +4,21 @@ import Skeleton from "~/components/ui/Skeleton";
 import type { Sponsor } from "~/lib/api-types";
 import { cn } from "~/lib/utils";
 
-const GRID = "m-0 grid list-none grid-cols-2 gap-4 p-0 max-[640px]:grid-cols-1";
+/** How the full-width row is drawn: up to four at full size, five at a smaller one,
+ * and six to eight stacked (logo over name over amount), the only way they fit. */
+type Fit = "wide" | "tight" | "stack";
+const fitOf = (n: number): Fit => n > 5 ? "stack" : n > 4 ? "tight" : "wide";
 
-/** "Top sponsors of security for Ethereum": the five biggest pledgers as a numbered
- * board, two to a row. The leader takes the first row alone, inverted to white.
- * While the board loads, five card-shaped skeletons hold the place so the rest of
- * the page does not jump once the sponsors arrive. */
+/** "Top sponsors of security for Ethereum": the biggest pledgers (eight at most) side by side
+ * in one panel, biggest first, each the same width, a hairline between each. The row needs the full
+ * page width: under 1100px the panel holds them two to a line, and on phones one
+ * to a line. While the board loads, a panel-shaped skeleton holds the place so the
+ * rest of the page does not jump once the sponsors arrive. */
 export default function Sponsors(
   { sponsors, loading }: { sponsors?: Sponsor[]; loading?: boolean },
 ) {
   if (!loading && !sponsors?.length) return null;
+  const fit = fitOf(sponsors?.length ?? 0);
   return (
     <section className="mx-auto max-w-[1100px] px-6" aria-labelledby="sponsors">
       <SectionHeading id="sponsors" className="max-[640px]:text-center">
@@ -21,21 +26,22 @@ export default function Sponsors(
       </SectionHeading>
       {sponsors?.length
         ? (
-          <ol className={GRID}>
-            {sponsors.map((s, i) => <Entry key={s.company} s={s} rank={i + 1} lead={i === 0} />)}
+          <ol
+            className={cn(
+              "m-0 grid list-none rounded-2xl border border-white/[.09] bg-white/5 px-5 py-1.5 min-[641px]:grid-cols-2 min-[641px]:gap-x-6 min-[1100px]:auto-cols-[minmax(0,1fr)] min-[1100px]:grid-flow-col min-[1100px]:grid-cols-none min-[1100px]:gap-0",
+              {
+                wide: "min-[1100px]:px-1 min-[1100px]:py-6",
+                tight: "min-[1100px]:px-2 min-[1100px]:py-5",
+                stack: "min-[1100px]:px-3 min-[1100px]:py-6",
+              }[fit],
+            )}
+          >
+            {sponsors.map((s) => <Entry key={s.company} s={s} fit={fit} />)}
           </ol>
         )
         : (
-          <div className={GRID} aria-busy="true">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <Skeleton
-                key={i}
-                className={cn(
-                  "h-[78px] rounded-2xl",
-                  i === 0 && "col-span-2 max-[640px]:col-span-1",
-                )}
-              />
-            ))}
+          <div aria-busy="true">
+            <Skeleton className="h-[114px] rounded-2xl" />
           </div>
         )}
     </section>
@@ -45,39 +51,60 @@ export default function Sponsors(
 /** Whole dollars: a leaderboard ranks, it does not account. */
 const dollars = (n: number) => "$" + Math.round(n).toLocaleString("en-US");
 
-function Entry({ s, rank, lead }: { s: Sponsor; rank: number; lead: boolean }) {
+function Entry({ s, fit }: { s: Sponsor; fit: Fit }) {
   return (
     <li
       className={cn(
-        "flex items-center gap-4 rounded-2xl border px-5 py-4 font-inter-tight max-[640px]:gap-3.5 max-[640px]:px-4",
-        lead
-          ? "col-span-2 border-white bg-white text-dao-blue-dark max-[640px]:col-span-1"
-          : "border-white/[.09] bg-white/5 text-white",
+        "flex min-w-0 items-center gap-4 border-t border-white/10 py-3.5 font-inter-tight text-white first:border-t-0 min-[641px]:border-t-0 min-[1100px]:border-l min-[1100px]:py-0 min-[1100px]:first:border-l-0",
+        {
+          wide: "min-[1100px]:px-5",
+          tight: "min-[1100px]:gap-2 min-[1100px]:px-3",
+          stack:
+            "min-[1100px]:flex-col min-[1100px]:items-center min-[1100px]:justify-start min-[1100px]:gap-3.5 min-[1100px]:px-2 min-[1100px]:text-center",
+        }[fit],
       )}
     >
-      {
-        /* The same round mark as the cards' "Pledged by" strip; a silhouette when none
-          was uploaded, drawn in blue on the white leader card. */
-      }
+      {/* The cards' "Pledged by" mark, larger; a silhouette when none was uploaded. */}
       <BackerLogo
         logoUrl={s.logoUrl}
         company={s.company}
         className={cn(
-          "size-11 flex-none",
-          lead && (s.logoUrl
-            ? "border-dao-blue-dark/15"
-            : "border-dao-blue-dark/20 bg-dao-blue-dark/[.07] text-dao-blue-dark/50"),
+          "size-14 flex-none p-2 [&>svg]:size-5",
+          {
+            wide: "min-[1100px]:size-16 min-[1100px]:p-2.5 min-[1100px]:[&>svg]:size-6",
+            tight: "min-[1100px]:size-12 min-[1100px]:p-1.5",
+            stack: "min-[1100px]:size-[52px] min-[1100px]:p-2",
+          }[fit],
         )}
       />
-      <div className="min-w-0 flex-1">
-        <b className="block text-[17px] font-bold leading-tight">
+      <div
+        className={cn(
+          "min-w-0 break-words",
+          // Stacked, the amount leads, above the logo, so the amounts share one line
+          // however many lines the names take.
+          fit === "stack" &&
+            "min-[1100px]:contents",
+        )}
+      >
+        <b
+          title={s.company}
+          className={cn(
+            "line-clamp-3 text-balance text-[17px] font-bold leading-[1.2]",
+            {
+              wide: "min-[1100px]:text-[19px]",
+              tight: "min-[1100px]:text-[16px]",
+              stack:
+                "min-[1100px]:w-full min-[1100px]:text-[14px] min-[1100px]:font-semibold min-[1100px]:leading-[1.3]",
+            }[fit],
+          )}
+        >
           {s.url
             ? (
               <a
                 href={s.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={cn("hover:underline", lead ? "text-dao-blue-dark" : "text-white")}
+                className="text-white hover:underline"
               >
                 {s.company}
               </a>
@@ -85,26 +112,27 @@ function Entry({ s, rank, lead }: { s: Sponsor; rank: number; lead: boolean }) {
             : s.company}
         </b>
         <span
-          className={cn("mono mt-0.5 block text-[13px]", lead ? "text-dao-blue" : "text-dao-green")}
-        >
-          {dollars(s.totalUsd)} pledged
-        </span>
-      </div>
-      {/* The list numbers the entries; the numeral is the picture of it. */}
-      <span
-        className="tnum flex-none text-right text-[44px] font-bold leading-none tracking-[-.05em]"
-        aria-hidden="true"
-      >
-        <span
           className={cn(
-            "mr-0.5 align-baseline text-[28px] font-semibold tracking-normal",
-            lead ? "text-dao-blue" : "text-white/45",
+            "mono mt-1 block text-[13px] text-dao-green",
+            fit === "wide" && "min-[1100px]:text-[14px]",
+            fit === "stack" &&
+              "min-[1100px]:order-first min-[1100px]:mt-0 min-[1100px]:text-[16px] min-[1100px]:leading-none",
           )}
         >
-          #
+          <span className="whitespace-nowrap">{dollars(s.totalUsd)}</span> {
+            /* Stacked, the figure is the headline and "pledged by" its caption, read
+            down into the logo and the name. */
+          }
+          <span
+            className={cn(
+              fit === "stack" &&
+                "min-[1100px]:mt-2 min-[1100px]:block min-[1100px]:font-inter-tight min-[1100px]:text-[10px] min-[1100px]:uppercase min-[1100px]:tracking-[.18em] min-[1100px]:text-white/45",
+            )}
+          >
+            {fit === "stack" ? "pledged by" : "pledged"}
+          </span>
         </span>
-        {String(rank).padStart(2, "0")}
-      </span>
+      </div>
     </li>
   );
 }

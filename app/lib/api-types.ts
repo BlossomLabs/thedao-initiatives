@@ -200,7 +200,7 @@ export interface Board {
   /** The server's token verification needs a background refresh. */
   refreshDue?: boolean;
   cards: Card[];
-  /** Top pledgers across the published initiatives (at most five). */
+  /** Top pledgers across the published initiatives (at most eight). */
   sponsors?: Sponsor[];
   totals: { count: number; goal: number; raised: number; backers: number; donations: number };
   flags: BoardFlags;

@@ -5,7 +5,7 @@ import {
   MagickImage,
   MagickReadSettings,
   ResourceLimits,
-} from "npm:@imagemagick/magick-wasm@0.0.43";
+} from "npm:@imagemagick/magick-wasm@0.0.44";
 import { imageExt } from "./validate.ts";
 
 const initialized = (async () => {
@@ -17,7 +17,7 @@ const initialized = (async () => {
 </policymap>`;
   await initializeImageMagick(
     await Deno.readFile(
-      new URL(import.meta.resolve("npm:@imagemagick/magick-wasm@0.0.43/magick.wasm")),
+      new URL(import.meta.resolve("npm:@imagemagick/magick-wasm@0.0.44/magick.wasm")),
     ),
     files,
   );

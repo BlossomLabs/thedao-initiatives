@@ -17,8 +17,8 @@
     "jsr:@std/streams@^1.2.0": "1.2.0",
     "jsr:@std/ulid@1": "1.0.0",
     "npm:@base-ui/react@^1.8.0": "1.8.0_@types+react@19.3.0_react@19.3.0_react-dom@19.3.0",
-    "npm:@imagemagick/magick-wasm@0.0.43": "0.0.43",
-    "npm:@imagemagick/magick-wasm@^0.0.43": "0.0.43",
+    "npm:@imagemagick/magick-wasm@0.0.44": "0.0.44",
+    "npm:@imagemagick/magick-wasm@^0.0.44": "0.0.44",
     "npm:@privy-io/react-auth@^3.47.0": "3.47.0_@solana+kit@5.5.1_react@19.3.0_react-dom@19.3.0_@solana+sysvars@5.5.1_@stripe+stripe-js@1.54.2_@tanstack+react-query@5.104.1_@types+react@19.3.0_typescript@7.0.2",
     "npm:@react-router/dev@*": "8.4.0_react-router@8.4.0_typescript@7.0.2_vite@8.3.2_@types+node@26.6.4",
     "npm:@react-router/dev@^8.4.0": "8.4.0_react-router@8.4.0_typescript@7.0.2_vite@8.3.2_@types+node@26.6.4",
@@ -37,7 +37,7 @@
     "npm:isbot@^5.2.2": "5.2.2",
     "npm:jsdom@^30.1.2": "30.1.2",
     "npm:lucide-react@^1.52.0": "1.52.0_@types+react@19.3.0_react@19.3.0",
-    "npm:motion@^13.5.1": "13.5.1_react@19.3.0_react-dom@19.3.0",
+    "npm:motion@14": "14.0.0_react@19.3.0_react-dom@19.3.0",
     "npm:ogl@^1.0.11": "1.0.11",
     "npm:qrcode.react@4.2.0": "4.2.0_react@19.3.0",
     "npm:react-dom@^19.3.0": "19.3.0_react@19.3.0",
@@ -471,8 +471,8 @@
         "react"
       ]
     },
-    "@imagemagick/magick-wasm@0.0.43": {
-      "integrity": "sha512-+Wlr3eEl4JlqLwrhAHBlf4VDzOWiFa8L2hYl7mOMXCgq896KghEnh3Go35nuZJMfmE6lX2waBZdr+u9FVluJLA=="
+    "@imagemagick/magick-wasm@0.0.44": {
+      "integrity": "sha512-J6oieSjlJzamANwtrNAlO+DKnRm49ILtSIWDhtkGn35f/5zS99AXta2gPsZuG9m2JvQbsu3h3CHe14ViXrFD/Q=="
     },
     "@internationalized/date@3.12.4": {
       "integrity": "sha512-M1dEn4c1U1HsSlaVR8upZtSqvXrTkHDfv18H01uCSJyjVLDxnBR38v/fMxecmlwXKR4i9HeZcmgQAPE6A+aGJQ==",
@@ -2799,8 +2799,8 @@
         "mime-types"
       ]
     },
-    "framer-motion@13.5.1_react@19.3.0_react-dom@19.3.0": {
-      "integrity": "sha512-HeWOaeHD3kyTSIEMT6+nw7fBn4saIfxxabZyAITbycAl4xr1kzGJKIvGt/OWghSlvIA9qTnZ1zTGelHAe6S8DA==",
+    "framer-motion@14.0.0_react@19.3.0_react-dom@19.3.0": {
+      "integrity": "sha512-QAtHmybrDFSliyW1sexMtSQTQd+1jw2ajibEmzpuI4XdPVzQkn+dAzJMm2sW3pl9MJuSS4xN51djQ7huhlP/VA==",
       "dependencies": [
         "motion-dom",
         "motion-utils",
@@ -3734,17 +3734,17 @@
         "typescript"
       ]
     },
-    "motion-dom@13.5.1": {
-      "integrity": "sha512-/7CVCD20Mz1KobktorpdgvowV0V41J7UxqE+qWS3GkSJqrRr5ft+2RloOYtEKv+wvBp3JaSFBclhxt4ja8ovHg==",
+    "motion-dom@14.0.0": {
+      "integrity": "sha512-aU3ApXo1yTpeUi3JU+jbDk2TELjxPE3MbBMUP7nZHlARb6RweJK+ojmLjpuB0YsY6zhbBl1YWGo8LMsI1/Llqw==",
       "dependencies": [
         "motion-utils"
       ]
     },
-    "motion-utils@13.5.0": {
-      "integrity": "sha512-Hqe/sqjIKliPZg8sVjWAkdySDPJNIeKH+euVkDOG8ri3DUUU7ZjndmHsGqEPz2iHpiyVaV5I22iguCMHU2he+Q=="
+    "motion-utils@14.0.0": {
+      "integrity": "sha512-jBsyjVxTTRZNeuvd/v+btVXr90LQkYl4HhRu9T2ARc+PMnvkmjsjRVeAg4Qm10b6TlTw+kykWI8gu/6LuvpLSQ=="
     },
-    "motion@13.5.1_react@19.3.0_react-dom@19.3.0": {
-      "integrity": "sha512-eV9SUem6KnzEa9+eT+dVBeDlhy5TTdn09YWR1WhUsKoZCJPw/n4TcYhjbxq2Gy5PTwDr//4H3r5vxkcZnNnO1w==",
+    "motion@14.0.0_react@19.3.0_react-dom@19.3.0": {
+      "integrity": "sha512-oGc2lkge2lkRZCP+J8/JsnYu4NFjqP1MtXirNdetn3QbvK2JqwM9A200EdT4C598KfzDhjLT12zF21xDM4Oilw==",
       "dependencies": [
         "framer-motion",
         "react",
@@ -4854,7 +4854,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@base-ui/react@^1.8.0",
-        "npm:@imagemagick/magick-wasm@^0.0.43",
+        "npm:@imagemagick/magick-wasm@^0.0.44",
         "npm:@privy-io/react-auth@^3.47.0",
         "npm:@react-router/dev@^8.4.0",
         "npm:@tailwindcss/vite@^4.3.3",
@@ -4872,7 +4872,7 @@
         "npm:isbot@^5.2.2",
         "npm:jsdom@^30.1.2",
         "npm:lucide-react@^1.52.0",
-        "npm:motion@^13.5.1",
+        "npm:motion@14",
         "npm:ogl@^1.0.11",
         "npm:qrcode.react@4.2.0",
         "npm:react-dom@^19.3.0",

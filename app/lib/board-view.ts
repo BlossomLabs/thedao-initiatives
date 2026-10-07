@@ -1,7 +1,8 @@
 /**
  * The board's filters and sorts as pure functions over the cards /api/board
  * returns (already in Recommended order). The URL is the state:
- * ?type=rfp&cat=opsec,defi&status=open&sort=closest&view=list&q=safe
+ * ?type=rfp&cat=opsec,defi&status=open&sort=closest&view=cards&q=safe
+ * A plain URL is the list, in sections by category.
  */
 import type { Card } from "~/lib/api-types";
 import { CATEGORIES, CATEGORY_INDEX, categoryOf } from "~/lib/categories";
@@ -20,6 +21,8 @@ export const SORTS = [
   ["category", "By category"],
 ] as const;
 export const VIEWS = ["cards", "list"] as const;
+/** Where this device remembers the layout it used last. */
+export const LAYOUT_KEY = "thedao:board-layout";
 
 export type BoardType = typeof TYPES[number];
 export type BoardStatus = typeof STATUSES[number];
@@ -41,8 +44,8 @@ export const DEFAULT_VIEW: BoardView = {
   type: "all",
   status: "all",
   cats: [],
-  sort: "recommended",
-  view: "cards",
+  sort: "category",
+  view: "list",
   q: "",
   watchlist: false,
 };
@@ -57,8 +60,8 @@ export function readView(params: URLSearchParams): BoardView {
     type: pick(params.get("type"), TYPES, "all"),
     status: pick(params.get("status"), STATUSES, "all"),
     cats: [...new Set(cats)],
-    sort: pick(params.get("sort"), SORTS.map((s) => s[0]), "recommended"),
-    view: pick(params.get("view"), VIEWS, "cards"),
+    sort: pick(params.get("sort"), SORTS.map((s) => s[0]), DEFAULT_VIEW.sort),
+    view: pick(params.get("view"), VIEWS, DEFAULT_VIEW.view),
     q: (params.get("q") ?? "").slice(0, 100),
     watchlist: params.get("watchlist") === "1",
   };
@@ -70,8 +73,8 @@ export function writeView(v: BoardView): URLSearchParams {
   if (v.type !== "all") p.set("type", v.type);
   if (v.cats.length) p.set("cat", v.cats.join(","));
   if (v.status !== "all") p.set("status", v.status);
-  if (v.sort !== "recommended") p.set("sort", v.sort);
-  if (v.view !== "cards") p.set("view", v.view);
+  if (v.sort !== DEFAULT_VIEW.sort) p.set("sort", v.sort);
+  if (v.view !== DEFAULT_VIEW.view) p.set("view", v.view);
   if (v.q.trim()) p.set("q", v.q.trim());
   if (v.watchlist) p.set("watchlist", "1");
   return p;
@@ -118,9 +121,29 @@ export function matches(c: Card, v: BoardView, skip?: Facet, watched?: string[])
 
 const left = (c: Card) => Math.max(0, c.initiative.goalUsd - c.summary.total);
 const when = (c: Card) => c.initiative.approvedAt ?? c.initiative.createdAt;
-const primary = (c: Card) => CATEGORY_INDEX[c.initiative.categories[0]] ?? CATEGORIES.length;
+/** The category an initiative is filed under: its first, when the registry knows it. */
+const primary = (c: Card): string | null =>
+  categoryOf(c.initiative.categories[0] ?? "") ? c.initiative.categories[0] : null;
 
-const KEYS: Record<BoardSort, ((c: Card) => number) | null> = {
+/**
+ * "By category" order: the categories whose initiatives have raised the most
+ * money come first, each initiative counted under its primary category. Equal
+ * sums keep the registry order, and untagged is always last. `cards` is the
+ * whole board, so the sections do not move around as filters narrow it.
+ */
+export function categoryOrder(cards: Card[]): (string | null)[] {
+  const raised = new Map<string | null, number>();
+  for (const c of cards) raised.set(primary(c), (raised.get(primary(c)) ?? 0) + c.summary.total);
+  const slugs = CATEGORIES.map((c) => c.slug as string);
+  return [
+    ...slugs.sort((a, b) =>
+      (raised.get(b) ?? 0) - (raised.get(a) ?? 0) || CATEGORY_INDEX[a] - CATEGORY_INDEX[b]
+    ),
+    null,
+  ];
+}
+
+const KEYS: Record<Exclude<BoardSort, "category">, ((c: Card) => number) | null> = {
   recommended: null,
   closest: (c) => -c.pct,
   "least-left": left,
@@ -128,12 +151,16 @@ const KEYS: Record<BoardSort, ((c: Card) => number) | null> = {
   backers: (c) => -c.backers,
   "goal-asc": (c) => c.initiative.goalUsd,
   "goal-desc": (c) => -c.initiative.goalUsd,
-  category: primary,
 };
 
-/** Sorted copy; ties keep the Recommended order the cards arrived in. */
-export function sortCards(cards: Card[], sort: BoardSort): Card[] {
-  const key = KEYS[sort];
+/** Sorted copy; ties keep the Recommended order the cards arrived in. `all` is
+ * the whole board, which By category ranks its categories from. */
+export function sortCards(cards: Card[], sort: BoardSort, all: Card[] = cards): Card[] {
+  let key: ((c: Card) => number) | null;
+  if (sort === "category") {
+    const order = categoryOrder(all);
+    key = (c) => order.indexOf(primary(c));
+  } else key = KEYS[sort];
   if (!key) return [...cards];
   return cards.map((c, i) => [c, key(c), i] as const)
     .sort((a, b) => a[1] - b[1] || a[2] - b[2])
@@ -142,7 +169,7 @@ export function sortCards(cards: Card[], sort: BoardSort): Card[] {
 
 /** The cards the view shows, in its order. */
 export const applyView = (cards: Card[], v: BoardView, watched?: string[]): Card[] =>
-  sortCards(cards.filter((c) => matches(c, v, undefined, watched)), v.sort);
+  sortCards(cards.filter((c) => matches(c, v, undefined, watched)), v.sort, cards);
 
 /** Live counts for the controls: each facet counted with the other filters applied. */
 export function facetCounts(cards: Card[], v: BoardView, watched?: string[]) {
@@ -160,14 +187,15 @@ export function facetCounts(cards: Card[], v: BoardView, watched?: string[]) {
   return { type, cats };
 }
 
-/** "By category": sections by primary category, registry order, untagged last. */
-export function groupByPrimary(cards: Card[]): { slug: string | null; cards: Card[] }[] {
+/** "By category": sections by primary category in categoryOrder (ranked from
+ * `all`, the whole board), untagged last. */
+export function groupByPrimary(
+  cards: Card[],
+  all: Card[] = cards,
+): { slug: string | null; cards: Card[] }[] {
   const groups = new Map<string | null, Card[]>();
-  for (const c of cards) {
-    const slug = categoryOf(c.initiative.categories[0] ?? "") ? c.initiative.categories[0] : null;
-    groups.set(slug, [...(groups.get(slug) ?? []), c]);
-  }
-  return [...CATEGORIES.map((c) => c.slug as string | null), null]
+  for (const c of cards) groups.set(primary(c), [...(groups.get(primary(c)) ?? []), c]);
+  return categoryOrder(all)
     .filter((s) => groups.has(s))
     .map((slug) => ({ slug, cards: groups.get(slug)! }));
 }
@@ -206,6 +234,7 @@ export const featuredIds = (cards: Card[]): Set<string> =>
 export const hasFeatured = (cards: Card[]): boolean => featuredIds(cards).size > 0;
 
 /** The sort the board uses: Featured (the server's order, pins first) only
- * while something is featured; otherwise the default is closest to funded. */
+ * while something is featured; a URL that still asks for it otherwise gets
+ * closest to funded. */
 export const sortFor = (sort: BoardSort, featured: boolean): BoardSort =>
   sort === "recommended" && !featured ? "closest" : sort;

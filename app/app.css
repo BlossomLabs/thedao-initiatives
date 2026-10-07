@@ -831,6 +831,13 @@ html:not([data-shell="dashboard"]) .shell-dashboard {
   display: none;
 }
 
+/* The board's loading skeleton (BoardSkeleton) carries both layouts; the head
+   script in root.tsx marks a visitor who gets the cards. */
+html[data-board="cards"] .board-skeleton-list,
+html:not([data-board="cards"]) .board-skeleton-cards {
+  display: none;
+}
+
 /* The shiny text itself: the letters show a gradient, a bright band in dimmer white. */
 @utility shine-text {
   color: transparent;

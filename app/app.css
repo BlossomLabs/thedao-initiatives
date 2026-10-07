@@ -626,6 +626,20 @@
     @apply rounded-[3px] bg-[rgba(255,59,56,.2)] text-[#ffc9c7] px-0.5 line-through
       decoration-[rgba(255,201,199,.6)];
   }
+  /* a category the revision on screen added or dropped (changes view) */
+  .tag-added,
+  .tag-removed {
+    @apply inline-flex rounded-full no-underline;
+  }
+  .tag-added {
+    box-shadow: 0 0 0 2px rgba(92, 183, 90, 0.6);
+  }
+  .tag-removed {
+    box-shadow: 0 0 0 2px rgba(255, 59, 56, 0.5);
+  }
+  .tag-removed .cat-tag {
+    @apply line-through opacity-70 decoration-[rgba(255,201,199,.6)];
+  }
 
   /* status box (donate + forms) */
   .status {

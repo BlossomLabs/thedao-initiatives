@@ -191,17 +191,22 @@ export function initiativeRoutes(deps: Deps) {
   });
 
   /**
-   * The proposer (or an admin) replaces the text. Goes live at once; the
-   * previous text stays in the history. Edits use structured sections,
-   * milestones and links, migrating legacy rows when necessary.
+   * The proposer (or an admin) replaces the text, the categories or both: the
+   * only way either changes. Goes live at once; the previous version stays in
+   * the history. Text edits use structured sections, milestones and links,
+   * migrating legacy rows when necessary; a body with only `categories` keeps
+   * the text as it is.
    */
   r.post("/:slug/revisions", requireAuth, async (c) => {
     const user = c.var.user!;
-    const body = await jsonBody(c, ["initiativeId", ...TEXT_FIELDS]);
+    const body = await jsonBody(c, ["initiativeId", ...TEXT_FIELDS, "categories"]);
     const { initiative, proposer } = await editableBy(c.req.param("slug"), user, body);
-    if (initiative.status !== "pending" && initiative.status !== "approved") {
-      throw new HttpError(403, "This initiative is no longer open for edits.");
-    }
+    const tagsOnly = body.categories !== undefined &&
+      TEXT_FIELDS.every((k) => body[k] === undefined);
+    // The team may still retag a closed row: unarchiving needs a category.
+    const open = initiative.status === "pending" || initiative.status === "approved" ||
+      (tagsOnly && user.isAdmin);
+    if (!open) throw new HttpError(403, "This initiative is no longer open for edits.");
     // The hourly cap is for proposers; the team edits without one.
     if (
       !user.isAdmin &&
@@ -213,6 +218,29 @@ export function initiativeRoutes(deps: Deps) {
     ) {
       throw new HttpError(429, "Too many edits; try again in an hour.");
     }
+    const origin = { author: user.address, source: proposer ? "proposer" : "admin" } as const;
+    const [categories, categoryErr] = body.categories === undefined
+      ? [undefined, null]
+      : readCategories(body.categories);
+    const tags = {
+      errors: categoryErr
+        ? [{ field: "categories", msg: categoryErr, kind: "content" } satisfies Finding]
+        : [],
+      warnings: [],
+    };
+    if (tagsOnly) {
+      assertNoErrors(tags);
+      const { initiative: next, revision } = await db.initiatives.retag(
+        initiative.id,
+        categories!,
+        origin,
+      );
+      if (!revision) throw new HttpError(400, "Nothing changed.");
+      return c.json(
+        { initiative: publicInitiative(next), revision: revisionMeta(revision), warnings: [] },
+        201,
+      );
+    }
     const cur = pickText(initiative);
     const structuredBody = ["sections", "milestones", "links"].some((k) => body[k] !== undefined);
     if (!structuredBody) {
@@ -221,7 +249,6 @@ export function initiativeRoutes(deps: Deps) {
         "Send sections, milestones and links to edit initiative text.",
       );
     }
-    const origin = { author: user.address, source: proposer ? "proposer" : "admin" } as const;
     // The text rules (length floors and caps included) come back as
     // findings painted on the fields, the same as on submit.
     const base = {
@@ -238,11 +265,15 @@ export function initiativeRoutes(deps: Deps) {
     const findings = mergeFindings(
       caps,
       editChecks(initiative, { ...base, ...structured }, backers),
+      tags,
     );
     assertNoErrors(findings);
     const { warnings } = findings;
-    const text = { ...base, ...structured };
-    const { initiative: next, revision } = await db.initiatives.revise(initiative.id, text, origin);
+    const { initiative: next, revision } = await db.initiatives.revise(
+      initiative.id,
+      { ...base, ...structured, categories: categories ?? undefined },
+      origin,
+    );
     if (!revision) throw new HttpError(400, "Nothing changed.");
     return c.json(
       { initiative: publicInitiative(next), revision: revisionMeta(revision), warnings },
@@ -259,13 +290,7 @@ export function initiativeRoutes(deps: Deps) {
     const user = c.var.user!;
     const body = await jsonBody(c, ["initiativeId", ...PAGE_FACT_FIELDS]);
     const { initiative } = await editableBy(c.req.param("slug"), user, body);
-    // Categories follow the text: the proposer may change them while the text is editable.
-    const onlyCategories = Object.keys(body).every((k) =>
-      k === "initiativeId" || k === "categories"
-    );
-    const open = initiative.status === "pending" ||
-      (onlyCategories && initiative.status === "approved");
-    if (!user.isAdmin && !open) {
+    if (!user.isAdmin && initiative.status !== "pending") {
       throw new HttpError(403, "Locked after approval; email the team.");
     }
     const patch = await readPageFacts(body, initiative, deps);
@@ -284,7 +309,13 @@ export function initiativeRoutes(deps: Deps) {
    */
   r.post("/", requireAuth, async (c) => {
     const proposer = c.var.user!.address;
-    const body = await jsonBody(c, [...TEXT_FIELDS, ...PAGE_FACT_FIELDS, "backers", "website"]);
+    const body = await jsonBody(c, [
+      ...TEXT_FIELDS,
+      ...PAGE_FACT_FIELDS,
+      "categories",
+      "backers",
+      "website",
+    ]);
     if (s(body.website)) throw new HttpError(400, "bad request"); // honeypot
     if (!(await hasDisplayName(proposer))) {
       throw new HttpError(403, "Set a display name (or an ENS primary name) before submitting.");

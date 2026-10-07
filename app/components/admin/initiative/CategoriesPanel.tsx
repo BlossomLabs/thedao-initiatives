@@ -6,7 +6,8 @@ import type { AdminInitiative } from "~/lib/api-types";
 import type { Run } from "./run";
 
 /** Beside the status controls: 1 to 3 categories, first is primary. Editable
- * in every status and never a text revision; approval needs at least one. */
+ * in every status; a save is a revision of the proposal with the text as it
+ * stands. Approval needs at least one. */
 export default function CategoriesPanel({ r, run }: { r: AdminInitiative; run: Run }) {
   const adminApi = useAdminApi();
   const [value, setValue] = useState(r.categories);
@@ -27,9 +28,8 @@ export default function CategoriesPanel({ r, run }: { r: AdminInitiative; run: R
             setBusy(true);
             void run(
               () =>
-                adminApi(`/api/admin/initiatives/${r.id}`, {
-                  method: "PATCH",
-                  json: { categories: value },
+                adminApi(`/api/initiatives/${encodeURIComponent(r.slug)}/revisions`, {
+                  json: { categories: value, initiativeId: r.id },
                 }),
               "Categories saved.",
             ).finally(() => setBusy(false));

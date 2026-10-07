@@ -5,7 +5,7 @@ import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import { TypeBadge } from "~/components/ui/Badge";
-import { CategoryLink } from "~/components/ui/CategoryTag";
+import { CategoryLink, CategoryTag } from "~/components/ui/CategoryTag";
 import Skeleton from "~/components/ui/Skeleton";
 import PageSkeleton from "~/components/layout/PageSkeleton";
 import Markdown from "~/components/Markdown";
@@ -25,7 +25,7 @@ import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { useRevision } from "~/hooks/use-revision";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { ApiError, errorMessage } from "~/lib/api";
-import { diffRevisions } from "~/lib/revision-diff";
+import { diffCategories, diffRevisions } from "~/lib/revision-diff";
 import type { RevisionText } from "~/lib/api-types";
 import { SITE_NAME } from "~/data/site";
 import { dt } from "~/lib/format";
@@ -97,6 +97,11 @@ export default function Initiative() {
   const diff = mode === "changes" && !older.error && !prev.error && (prev.data || !prevMeta)
     ? diffRevisions(prev.data ?? null, text, r.type)
     : null;
+  // The categories of the version on screen; one written before revisions
+  // recorded them shows the current ones, and its changes view marks none.
+  const categories = showingOld ? older.data!.categories : r.categories;
+  const tags = (diff && diffCategories(prevMeta ? prev.data!.categories : [], categories)) ||
+    (categories ?? r.categories).map((slug) => ({ slug, added: false, removed: false }));
   // Structured rows render their sections, milestones and links; a legacy
   // revision (or one side of a diff) still shows the details blob.
   const structured = isStructured(text) || Boolean(diff?.structured);
@@ -109,9 +114,23 @@ export default function Initiative() {
       </h1>
       <p className="m-0 flex flex-wrap items-center gap-3">
         <TypeBadge type={r.type} inline />
-        {r.categories.length > 0 && (
+        {tags.length > 0 && (
           <span className="flex flex-wrap items-center gap-1.5" data-categories="">
-            {r.categories.map((slug) => <CategoryLink key={slug} slug={slug} />)}
+            {tags.map(({ slug, added, removed }) =>
+              added
+                ? (
+                  <ins key={slug} className="tag-added">
+                    <CategoryTag slug={slug} />
+                  </ins>
+                )
+                : removed
+                ? (
+                  <del key={slug} className="tag-removed">
+                    <CategoryTag slug={slug} />
+                  </del>
+                )
+                : <CategoryLink key={slug} slug={slug} />
+            )}
           </span>
         )}
         {r.status === "archived" && <span className="chip chip-badge st-archived">archived</span>}

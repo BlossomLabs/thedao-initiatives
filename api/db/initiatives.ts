@@ -42,6 +42,12 @@ export const sameText = (a: Partial<InitiativeText>, b: Partial<InitiativeText>)
     sameStructured(x, y);
 };
 
+/** What `revise` accepts: the text, and the categories when they change with it. */
+export type RevisionInput = InitiativeTextInput & { categories?: string[] };
+
+const sameList = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((x, i) => x === b[i]);
+
 /** The fields a board card, the funding summary and the ledger status read from a row. */
 export const CARD_FIELDS = [
   "id",
@@ -131,12 +137,14 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     initiative: Initiative,
     n: number,
     text: InitiativeText,
+    categories: string[],
     origin: RevisionOrigin,
     createdAt: number,
   ): Revision => ({
     rfpId: initiative.id,
     n,
     ...pickText(text),
+    categories,
     author: origin.author,
     source: origin.source,
     archived: false,
@@ -202,7 +210,10 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
           .check({ key: K.revision(id, 1), versionstamp: null })
           .set(K.initiativeBySlug(s), id)
           .set(K.initiative(id), initiative)
-          .set(K.revision(id, 1), revisionOf(initiative, 1, initiative, origin, t));
+          .set(
+            K.revision(id, 1),
+            revisionOf(initiative, 1, initiative, initiative.categories ?? [], origin, t),
+          );
         indexRow(op, null, initiative);
         if (reclaim && owner?.value) {
           const old = owner.value;
@@ -346,7 +357,8 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     throw new Error("unarchive conflict");
   }
 
-  /** Everything but the text fields, which only change through revise(). */
+  /** Everything but the text fields and the categories, which only change
+   * through revise() and retag(). */
   const ALLOWED = new Set<keyof Initiative>([
     "discourseUrl",
     "goalUsd",
@@ -364,7 +376,6 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     "recipientUrl",
     "topup",
     "milestoneReviewer",
-    "categories",
   ]);
 
   /** Patch allowed fields; keeps the Safe index in step. */
@@ -397,29 +408,30 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
   }
 
   /**
-   * Replace the public text with a new revision. A no-op when nothing changed
-   * (`revision: null`). A row written before revisions existed first gets its
-   * current text snapshotted as revision 1, so the history is never missing
-   * the version people saw.
+   * Write a new revision: the text and the categories `pick` returns for the
+   * row as it stands. A no-op when neither changed (`revision: null`). A row
+   * written before revisions existed first gets its current text snapshotted
+   * as revision 1, so the history is never missing the version people saw.
    */
-  async function revise(
+  async function writeRevision(
     id: string,
-    input: InitiativeTextInput,
+    pick: (current: Initiative) => { text: InitiativeText; categories: string[] },
     origin: RevisionOrigin,
   ): Promise<{ initiative: Initiative; revision: Revision | null }> {
-    // Only the text fields, whatever else the caller's record carries.
-    const text = pickText(input);
-    if (text.details && isStructured(text)) throw new Error("structured rows carry no details");
     for (let i = 0; i < 5; i++) {
       const cur = await kv.get<Initiative>(K.initiative(id));
       if (!cur.value) throw new Error("rfp not found");
       const initiative = cur.value;
-      if (sameText(initiative, text)) return { initiative, revision: null };
+      const before = initiative.categories ?? [];
+      const { text, categories } = pick(initiative);
+      if (sameText(initiative, text) && sameList(before, categories)) {
+        return { initiative, revision: null };
+      }
       const legacy = !(initiative.revision > 0);
       const n = (legacy ? 1 : initiative.revision) + 1;
       const t = now();
-      const revision = revisionOf(initiative, n, text, origin, t);
-      const next: Initiative = { ...initiative, ...text, revision: n };
+      const revision = revisionOf(initiative, n, text, categories, origin, t);
+      const next: Initiative = { ...initiative, ...text, categories, revision: n };
       const op = kv.atomic()
         .check(cur)
         .check({ key: K.revision(id, n), versionstamp: null })
@@ -433,6 +445,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
             initiative,
             1,
             initiative,
+            before,
             { author: "", source: "import" },
             initiative.createdAt,
           ),
@@ -442,6 +455,23 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       if (res.ok) return { initiative: next, revision };
     }
     throw new Error("update conflict");
+  }
+
+  /** Replace the public text, and the categories when the input names them. */
+  async function revise(id: string, input: RevisionInput, origin: RevisionOrigin) {
+    // Only the text fields, whatever else the caller's record carries.
+    const text = pickText(input);
+    if (text.details && isStructured(text)) throw new Error("structured rows carry no details");
+    return await writeRevision(
+      id,
+      (current) => ({ text, categories: input.categories ?? current.categories ?? [] }),
+      origin,
+    );
+  }
+
+  /** Replace the categories alone: a revision whose text is the row's own. */
+  function retag(id: string, categories: string[], origin: RevisionOrigin) {
+    return writeRevision(id, (current) => ({ text: pickText(current), categories }), origin);
   }
 
   /**
@@ -504,6 +534,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     update,
     unarchive,
     revise,
+    retag,
     upsertContent,
   };
 }

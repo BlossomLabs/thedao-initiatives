@@ -25,8 +25,8 @@ export function meta() {
 
 /**
  * The proposer's edit page, on the same form as the submit page. Sections,
- * milestones, links, title and summary are always editable and every save is
- * a new public revision. While the initiative is pending the page facts
+ * milestones, links, title, summary and categories are always editable and
+ * every save is a new public revision. While the initiative is pending the page facts
  * (type, goal, duration, recipient, reviewer, forum link) and the private
  * fields can change too; after approval those belong to the team. It is the
  * team's editor as well: an admin works under the same rules, tagged as the
@@ -217,19 +217,21 @@ function EditForm(
     await requireSession();
     const facts = open ? pageFactsPatch(payload, r) : null;
     const text = textChanged(payload, r);
-    // Categories follow the text: editable while it is, outside the revision.
+    // Categories are part of the proposal: they change with the text, in the revision.
     const cats = payload.categories.join() !== r.categories.join()
       ? { categories: payload.categories }
       : null;
     if (!facts && !text && !cats) throw new Error("Nothing changed.");
     let patched = false;
     try {
-      if (facts || cats) {
-        await api(path, { method: "PATCH", json: { ...facts, ...cats, initiativeId: r.id } });
+      if (facts) {
+        await api(path, { method: "PATCH", json: { ...facts, initiativeId: r.id } });
         patched = true;
       }
-      if (text) {
-        await api(`${path}/revisions`, { json: { ...textBody(payload), initiativeId: r.id } });
+      if (text || cats) {
+        await api(`${path}/revisions`, {
+          json: { ...(text ? textBody(payload) : null), ...cats, initiativeId: r.id },
+        });
       }
     } catch (err) {
       // the facts are saved even when the text was refused: show the row as it is now

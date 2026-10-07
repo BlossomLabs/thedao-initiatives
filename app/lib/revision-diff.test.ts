@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changed, diffRevisions, diffText } from "./revision-diff";
+import { changed, diffCategories, diffRevisions, diffText } from "./revision-diff";
 import type { Milestone, RevisionText } from "./api-types";
 
 const join = (chunks: ReturnType<typeof diffText>, keep: "before" | "after") =>
@@ -99,5 +99,21 @@ describe("revision diff", () => {
     const d = diffRevisions({ ...legacy, details: "old blob" }, { ...legacy, milestones: [ms()] });
     expect(d.structured).toBe(true);
     expect(join(d.details, "before")).toBe("old blob");
+  });
+});
+
+describe("category diff", () => {
+  it("lists the new categories in order, flags the added ones, then the removed ones", () => {
+    expect(diffCategories(["opsec", "defi"], ["defi", "wallets-signing"])).toEqual([
+      { slug: "defi", added: false, removed: false },
+      { slug: "wallets-signing", added: true, removed: false },
+      { slug: "opsec", added: false, removed: true },
+    ]);
+    expect(diffCategories([], ["defi"])).toEqual([{ slug: "defi", added: true, removed: false }]);
+  });
+
+  it("is null when either side was written before categories were recorded", () => {
+    expect(diffCategories(null, ["defi"])).toBeNull();
+    expect(diffCategories(["defi"], null)).toBeNull();
   });
 });

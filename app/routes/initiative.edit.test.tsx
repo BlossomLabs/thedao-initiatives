@@ -65,6 +65,20 @@ vi.mock("~/components/initiative-form/InitiativeForm", () => ({
         >
           Add DeFi
         </button>
+        <button
+          type="button"
+          onClick={() =>
+            void onSubmit(
+              toPayload({
+                ...initial!,
+                page: { ...initial!.page, title },
+                categories: ["defi"],
+              }),
+              initial!,
+            )}
+        >
+          Save as DeFi
+        </button>
       </>
     );
   },
@@ -189,7 +203,7 @@ it("resets the draft for a replacement and binds both edit requests to its ID", 
   qc.clear();
 });
 
-it("a category-only change PATCHes the categories and posts no revision", async () => {
+it("a category-only change posts a revision with the categories alone, and no PATCH", async () => {
   who.isAdmin = false;
   const row = {
     ...structuredRow(),
@@ -203,9 +217,36 @@ it("a category-only change PATCHes the categories and posts no revision", async 
   const { unmount } = render(page(qc));
   fireEvent.click(screen.getByText("Add DeFi"));
   await waitFor(() =>
-    expect(api).toHaveBeenCalledWith("/api/initiatives/same-url", {
-      method: "PATCH",
+    expect(api).toHaveBeenCalledWith("/api/initiatives/same-url/revisions", {
       json: { categories: ["opsec", "defi"], initiativeId: row.id },
+    })
+  );
+  expect(api).toHaveBeenCalledTimes(1);
+  unmount();
+  qc.clear();
+});
+
+it("changed text and categories travel in one revision", async () => {
+  who.isAdmin = false;
+  const row = {
+    ...structuredRow(),
+    slug: "same-url",
+    status: "approved" as const,
+    proposer: ME,
+    categories: ["opsec"],
+  };
+  feed(row);
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "A proposer's new title" } });
+  fireEvent.click(screen.getByText("Save as DeFi"));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/initiatives/same-url/revisions", {
+      json: expect.objectContaining({
+        title: "A proposer's new title",
+        categories: ["defi"],
+        initiativeId: row.id,
+      }),
     })
   );
   expect(api).toHaveBeenCalledTimes(1);

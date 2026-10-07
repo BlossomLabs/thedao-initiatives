@@ -30,8 +30,10 @@ Deno.test("status index: cards(status) equals a full scan after every kind of wr
     goalUsd: 20,
   });
   await sameAsScan(h, "insert");
-  await h.db.initiatives.update(a.id, { goalUsd: 15, sortRank: 1, categories: ["opsec"] });
+  await h.db.initiatives.update(a.id, { goalUsd: 15, sortRank: 1 });
   await sameAsScan(h, "field patch");
+  await h.db.initiatives.retag(a.id, ["opsec"], { author: "", source: "admin" });
+  await sameAsScan(h, "retag");
   await h.db.initiatives.update(b.id, { status: "approved", approvedAt: h.clock.now });
   await sameAsScan(h, "status move");
   await h.db.initiatives.revise(a.id, { title: "A renamed", summary: "a2", details: "" }, {

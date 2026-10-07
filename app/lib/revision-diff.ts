@@ -84,3 +84,26 @@ export function diffRevisions(
     structured: isStructured(b) || isStructured(a),
   };
 }
+
+export interface CategoryChange {
+  slug: string;
+  added: boolean;
+  removed: boolean;
+}
+
+/** The categories after a revision, in its order, then the ones it dropped.
+ * Null when either side was written before revisions recorded categories. */
+export function diffCategories(
+  before: readonly string[] | null,
+  after: readonly string[] | null,
+): CategoryChange[] | null {
+  if (!before || !after) return null;
+  return [
+    ...after.map((slug) => ({ slug, added: !before.includes(slug), removed: false })),
+    ...before.filter((slug) => !after.includes(slug)).map((slug) => ({
+      slug,
+      added: false,
+      removed: true,
+    })),
+  ];
+}

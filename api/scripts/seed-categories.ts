@@ -1,6 +1,6 @@
 /**
  * Tag initiatives from api/scripts/categories-seed.json (slug -> 1 to 3
- * categories, primary first) through the admin PATCH. Idempotent: a row that
+ * categories, primary first), each as a revision by the admin. Idempotent: a row that
  * already has exactly those categories is left alone, so a rerun changes
  * nothing. Logs seed slugs missing from the site, and every approved, pending
  * or archived row that is still untagged afterwards.
@@ -59,10 +59,10 @@ for (const [slug, cats] of Object.entries(seed)) {
   }
   console.error(`${dry ? "would tag" : "tag"} ${slug}: ${cats.join(", ")}`);
   if (!dry) {
-    const res = await fetch(apiUrl + `/api/admin/initiatives/${row.id}`, {
-      method: "PATCH",
+    const res = await fetch(apiUrl + `/api/initiatives/${encodeURIComponent(slug)}/revisions`, {
+      method: "POST",
       headers,
-      body: JSON.stringify({ categories: cats }),
+      body: JSON.stringify({ categories: cats, initiativeId: row.id }),
     });
     if (!res.ok) throw new Error(`${slug}: ${res.status} ${await res.text()}`);
     row.categories = cats;

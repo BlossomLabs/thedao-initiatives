@@ -258,3 +258,18 @@ it("the header row shows the type and the categories as one tight group, not the
   expect(group.children).toHaveLength(2);
   expect(group.className).toContain("gap-1.5");
 });
+
+it("saving the categories posts a revision with them alone, through the proposer's route", async () => {
+  current = page({ categories: ["opsec", "defi"] });
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: "Remove DeFi Safety" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save categories" }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/initiatives/audit-tooling/revisions", {
+      json: { categories: ["opsec"], initiativeId: "1" },
+    })
+  );
+  expect(
+    vi.mocked(api).mock.calls.some(([, o]) => (o as { method?: string })?.method === "PATCH"),
+  ).toBe(false);
+});

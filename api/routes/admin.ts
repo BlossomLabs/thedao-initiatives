@@ -1,7 +1,6 @@
 import { type Context, Hono } from "hono";
 import { voteSettings } from "./board.ts";
 import { readVoteSettings } from "../../shared/vote.ts";
-import { categoriesOr400 } from "../lib/page-facts.ts";
 import { categoriesOf } from "../../shared/categories.ts";
 import { bodyLimit } from "hono/body-limit";
 import type { Deps, Vars } from "../middleware/context.ts";
@@ -235,16 +234,14 @@ export function adminRoutes(deps: Deps) {
 
   /**
    * The admin settings of an initiative: board pin, owner and paid out. The
-   * text and the page facts are edited on the initiative's edit page, through
-   * the routes a proposer uses.
+   * text, the categories and the page facts are edited through the routes a
+   * proposer uses.
    */
   r.patch("/initiatives/:id", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"), true);
-    const body = await jsonBody(c, ["sortRank", "paidOutUsd", "proposer", "categories"]);
+    const body = await jsonBody(c, ["sortRank", "paidOutUsd", "proposer"]);
     if (body.paidOutUsd !== undefined || body.proposer !== undefined) assertRecentAuth(c, deps.now);
     const patch: Partial<Initiative> = {};
-    // Categories sit outside the text: editable in every status, never a revision.
-    if (body.categories !== undefined) patch.categories = categoriesOr400(body.categories);
     if (body.sortRank !== undefined) {
       const raw = s(body.sortRank, 10);
       if (!raw) patch.sortRank = null;

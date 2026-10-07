@@ -79,9 +79,11 @@ export interface Revision extends RevisionMeta {
   milestones: Milestone[];
   links: string[];
   structured: boolean;
+  /** This version's categories; null on one written before they were recorded. */
+  categories: string[] | null;
 }
 
-/** The fields a revision may change. */
+/** The text fields a revision may change. */
 export type RevisionText = Pick<
   Revision,
   "title" | "summary" | "details" | "sections" | "milestones" | "links"

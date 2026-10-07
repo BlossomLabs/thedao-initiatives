@@ -42,9 +42,9 @@ export interface Initiative {
   topup: boolean;
   /** Top-ups only: who decides whether the remaining milestones pass. */
   milestoneReviewer: string;
-  /** 1 to 3 registry slugs (shared/categories.ts), first is primary. Outside the
-   * revisioned text: editable in every status. Rows written before it lack the
-   * key; readers treat it as none. */
+  /** 1 to 3 registry slugs (shared/categories.ts), first is primary. Part of
+   * the proposal: they change only through a revision, which snapshots them.
+   * Rows written before it lack the key; readers treat it as none. */
   categories?: string[];
   /** Structured body (submission redesign, Sep 2026): one answer per section
    * of the type, milestone rows, links. A structured row stores `details: ""`
@@ -75,6 +75,9 @@ export interface Revision {
   sections: Sections;
   milestones: Milestone[];
   links: string[];
+  /** The categories of this version. Revisions written before they were
+   * recorded lack the key. */
+  categories?: string[];
   /** Wallet address; "" for content files and imports. */
   author: string;
   source: RevisionSource;

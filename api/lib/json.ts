@@ -101,6 +101,8 @@ export function revisionJson(v: Revision) {
     summary: v.summary,
     details: v.details,
     ...structuredJson(v),
+    /** null on a revision written before categories were recorded. */
+    categories: v.categories ? categoriesOf(v) : null,
   };
 }
 

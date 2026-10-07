@@ -19,6 +19,10 @@ it("holds the place with a skeleton while the board loads", () => {
   const { container } = render(<Sponsors loading />);
   expect(screen.getByText("Top sponsors of security for Ethereum")).toBeTruthy();
   expect(container.querySelector("[aria-busy]")?.childElementCount).toBe(1);
+  // as tall as the panel this device last drew, else as four sponsors take
+  expect(container.querySelector("[aria-busy] > *")?.className).toContain(
+    "h-[var(--sponsors-h,353px)]",
+  );
   expect(screen.queryByRole("list")).toBeNull();
 });
 

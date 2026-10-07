@@ -1,7 +1,9 @@
+import { useEffect, useRef } from "react";
 import SectionHeading from "~/components/layout/SectionHeading";
 import BackerLogo from "~/components/ui/BackerLogo";
 import Skeleton from "~/components/ui/Skeleton";
 import type { Sponsor } from "~/lib/api-types";
+import { rememberSponsorsHeight } from "~/lib/sponsors-height";
 import { cn } from "~/lib/utils";
 
 /** How the full-width row is drawn: up to four at full size, five at a smaller one,
@@ -12,13 +14,26 @@ const fitOf = (n: number): Fit => n > 5 ? "stack" : n > 4 ? "tight" : "wide";
 /** "Top sponsors of security for Ethereum": the biggest pledgers (eight at most) side by side
  * in one panel, biggest first, each the same width, a hairline between each. The row needs the full
  * page width: under 1100px the panel holds them two to a line, and on phones one
- * to a line. While the board loads, a panel-shaped skeleton holds the place so the
- * rest of the page does not jump once the sponsors arrive. */
+ * to a line. While the board loads, a skeleton holds the place so the rest of the
+ * page does not jump once the sponsors arrive: as tall as the panel this device
+ * last drew (sponsors-height.ts), else as four sponsors take at each width. */
 export default function Sponsors(
   { sponsors, loading }: { sponsors?: Sponsor[]; loading?: boolean },
 ) {
   if (!loading && !sponsors?.length) return null;
   const fit = fitOf(sponsors?.length ?? 0);
+  const panel = useRef<HTMLOListElement>(null);
+  const shown = Boolean(sponsors?.length);
+  useEffect(() => {
+    const el = panel.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    // Also after the fonts arrive and when the window changes width.
+    const ro = new ResizeObserver(() =>
+      rememberSponsorsHeight(innerWidth, el.getBoundingClientRect().height)
+    );
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [shown]);
   return (
     <section className="mx-auto max-w-[1100px] px-6" aria-labelledby="sponsors">
       <SectionHeading id="sponsors" className="max-[640px]:text-center">
@@ -27,6 +42,7 @@ export default function Sponsors(
       {sponsors?.length
         ? (
           <ol
+            ref={panel}
             className={cn(
               "m-0 grid list-none rounded-2xl border border-white/[.09] bg-white/5 px-5 py-1.5 min-[641px]:grid-cols-2 min-[641px]:gap-x-6 min-[1100px]:auto-cols-[minmax(0,1fr)] min-[1100px]:grid-flow-col min-[1100px]:grid-cols-none min-[1100px]:gap-0",
               {
@@ -41,7 +57,7 @@ export default function Sponsors(
         )
         : (
           <div aria-busy="true">
-            <Skeleton className="h-[114px] rounded-2xl" />
+            <Skeleton className="h-[var(--sponsors-h,353px)] rounded-2xl min-[641px]:h-[var(--sponsors-h,182px)] min-[1100px]:h-[var(--sponsors-h,120px)]" />
           </div>
         )}
     </section>

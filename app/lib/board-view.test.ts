@@ -164,14 +164,16 @@ describe("board view", () => {
       q: "safe",
       watchlist: false,
     });
-    expect(writeView(v).toString()).toBe("type=rfp&cat=opsec%2Cdefi&sort=closest&q=safe");
-    // The plain board is the list by category; the other layout and sorts are spelled out.
-    expect(DEFAULT_VIEW).toMatchObject({ view: "list", sort: "category" });
-    expect(writeView({ ...DEFAULT_VIEW, view: "cards", sort: "recommended" }).toString()).toBe(
-      "sort=recommended&view=cards",
+    expect(writeView(v).toString()).toBe(
+      "type=rfp&cat=opsec%2Cdefi&sort=closest&view=list&q=safe",
     );
-    expect(readView(new URLSearchParams("view=cards&sort=bogus"))).toMatchObject({
-      view: "cards",
+    // The plain board is the cards by category; the other layout and sorts are spelled out.
+    expect(DEFAULT_VIEW).toMatchObject({ view: "cards", sort: "category" });
+    expect(writeView({ ...DEFAULT_VIEW, view: "list", sort: "recommended" }).toString()).toBe(
+      "sort=recommended&view=list",
+    );
+    expect(readView(new URLSearchParams("view=list&sort=bogus"))).toMatchObject({
+      view: "list",
       sort: "category",
     });
     expect(writeView(DEFAULT_VIEW).toString()).toBe("");

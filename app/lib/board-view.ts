@@ -1,8 +1,8 @@
 /**
  * The board's filters and sorts as pure functions over the cards /api/board
  * returns (already in Recommended order). The URL is the state:
- * ?type=rfp&cat=opsec,defi&status=open&sort=closest&view=cards&q=safe
- * A plain URL is the list, in sections by category.
+ * ?type=rfp&cat=opsec,defi&status=open&sort=closest&view=list&q=safe
+ * A plain URL is the cards, in sections by category.
  */
 import type { Card } from "~/lib/api-types";
 import { CATEGORIES, CATEGORY_INDEX, categoryOf } from "~/lib/categories";
@@ -45,7 +45,7 @@ export const DEFAULT_VIEW: BoardView = {
   status: "all",
   cats: [],
   sort: "category",
-  view: "list",
+  view: "cards",
   q: "",
   watchlist: false,
 };

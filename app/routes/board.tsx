@@ -82,7 +82,7 @@ export default function Board() {
     try {
       saved = localStorage.getItem(LAYOUT_KEY);
     } catch { /* storage off */ }
-    if (saved === "cards") setView({ view: "cards" });
+    if (saved === "list") setView({ view: "list" });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, on arrival
 
   const ai = Boolean(aiResult?.scores.length);

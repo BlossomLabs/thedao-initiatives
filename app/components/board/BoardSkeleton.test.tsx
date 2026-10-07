@@ -10,10 +10,13 @@ afterEach(() => {
 it("carries both layouts' shapes for the head script to pick from", () => {
   const { container } = render(<BoardSkeleton />);
   expect(container.querySelector(".board-skeleton-list")).toBeInTheDocument();
-  expect(container.querySelectorAll(".board-skeleton-cards > *")).toHaveLength(4);
+  // the cards come in sections by category: a heading over each grid
+  const sections = [...container.querySelectorAll(".board-skeleton-cards > *")];
+  expect(sections.map((s) => s.querySelectorAll(".grid > *").length)).toEqual([2, 4]);
+  for (const s of sections) expect(s.firstElementChild).toHaveClass("h-[21px]");
 });
 
-it("the head script marks cards from the URL, else from this device's last choice", () => {
+it("the head script marks the list from the URL, else from this device's last choice", () => {
   const run = (url: string, saved?: string) => {
     delete document.documentElement.dataset.board;
     localStorage.clear();
@@ -22,18 +25,18 @@ it("the head script marks cards from the URL, else from this device's last choic
     new Function("location", BOARD_SCRIPT)({ pathname, search });
     return document.documentElement.dataset.board;
   };
-  expect(run("/")).toBeUndefined(); // the list is the default
-  expect(run("/?view=cards")).toBe("cards");
-  expect(run("/", "cards")).toBe("cards");
-  expect(run("/", "list")).toBeUndefined();
-  expect(run("/?view=list", "cards")).toBeUndefined(); // the URL wins
-  expect(run("/?sort=newest", "cards")).toBe("cards");
-  expect(run("/submit?view=cards", "cards")).toBeUndefined(); // the board only
+  expect(run("/")).toBeUndefined(); // cards are the default
+  expect(run("/?view=list")).toBe("list");
+  expect(run("/", "list")).toBe("list");
+  expect(run("/", "cards")).toBeUndefined();
+  expect(run("/?view=cards", "list")).toBeUndefined(); // the URL wins
+  expect(run("/?sort=newest", "list")).toBe("list");
+  expect(run("/submit?view=list", "list")).toBeUndefined(); // the board only
 });
 
 it("the board keeps the mark in step with the layout in use", () => {
-  markBoardLayout("cards");
-  expect(document.documentElement.dataset.board).toBe("cards");
   markBoardLayout("list");
+  expect(document.documentElement.dataset.board).toBe("list");
+  markBoardLayout("cards");
   expect(document.documentElement.dataset.board).toBeUndefined();
 });

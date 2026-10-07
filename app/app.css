@@ -865,9 +865,9 @@ html:not([data-shell="dashboard"]) .shell-dashboard {
 }
 
 /* The board's loading skeleton (BoardSkeleton) carries both layouts; the head
-   script in root.tsx marks a visitor who gets the cards. */
-html[data-board="cards"] .board-skeleton-list,
-html:not([data-board="cards"]) .board-skeleton-cards {
+   script in root.tsx marks a visitor who gets the list. */
+html[data-board="list"] .board-skeleton-cards,
+html:not([data-board="list"]) .board-skeleton-list {
   display: none;
 }
 

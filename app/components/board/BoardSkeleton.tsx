@@ -3,17 +3,17 @@ import { LAYOUT_KEY } from "~/lib/board-view";
 
 /**
  * Inline head script (root.tsx) that picks the board's loading shape before
- * the first paint: the list unless the URL, or else this device's last
- * choice, says cards. The board keeps the mark in step afterwards.
+ * the first paint: the cards unless the URL, or else this device's last
+ * choice, says the list. The board keeps the mark in step afterwards.
  */
 export const BOARD_SCRIPT =
   "if(location.pathname==='/')try{if((new URLSearchParams(location.search).get('view')||localStorage.getItem(" +
   JSON.stringify(LAYOUT_KEY) +
-  "))==='cards')document.documentElement.dataset.board='cards'}catch(e){}";
+  "))==='list')document.documentElement.dataset.board='list'}catch(e){}";
 
 /** Record the layout in use, for the next time the board shows its skeleton. */
 export function markBoardLayout(view: "cards" | "list") {
-  if (view === "cards") document.documentElement.dataset.board = "cards";
+  if (view === "list") document.documentElement.dataset.board = "list";
   else delete document.documentElement.dataset.board;
 }
 
@@ -47,6 +47,28 @@ export function ListSkeleton() {
   );
 }
 
+const CARD_SECTIONS = [2, 4];
+
+/** The cards' shape: a category heading over a grid of cards, as the board
+ * draws them by category (heading 21px, a card with a one-line title 273px). */
+function CardsSkeleton() {
+  return (
+    <>
+      {CARD_SECTIONS.map((cards, i) => (
+        <div key={i} className="mt-6 first:mt-0">
+          <Skeleton className="mb-3 h-[21px] w-44" />
+          <div className="grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
+            {Array.from(
+              { length: cards },
+              (_, c) => <Skeleton key={c} className="h-[273px] rounded-2xl" />,
+            )}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 const PILL = "h-8 flex-none rounded-full";
 
 /**
@@ -62,15 +84,17 @@ function ControlsSkeleton() {
         <div className="flex flex-wrap items-center gap-2">
           {/* Desktop: "Filters:", Type, Category, Funding. */}
           <Skeleton className="mr-1 h-5 w-[35px] max-[641px]:hidden" />
-          <Skeleton className={PILL + " w-[127px] max-[641px]:hidden"} />
+          <Skeleton className={PILL + " w-[127.5px] max-[641px]:hidden"} />
           <Skeleton className={PILL + " w-[132px] max-[641px]:hidden"} />
           <Skeleton className={PILL + " w-[107px] max-[641px]:hidden"} />
           {/* Phones: Filters (N). */}
           <Skeleton className="hidden h-11 w-[110px] rounded-full max-[641px]:block" />
+          {/* Where Clear filters goes: empty, but one more gap, so the row wraps where the real one does. */}
+          <span className="max-[641px]:hidden" />
           {/* The count, Sort and the layout toggle. */}
           <span className="ml-auto flex items-center gap-3">
-            <Skeleton className="h-5 w-[67px] max-[641px]:hidden" />
-            <Skeleton className={PILL + " w-[146px] max-[641px]:h-11 max-[641px]:w-[98px]"} />
+            <Skeleton className="h-5 w-[67.5px] max-[641px]:hidden" />
+            <Skeleton className={PILL + " w-[146.5px] max-[641px]:h-11 max-[641px]:w-[98px]"} />
             <Skeleton className={PILL + " w-[70px] max-[641px]:h-10 max-[641px]:w-[78px]"} />
           </span>
         </div>
@@ -82,7 +106,7 @@ function ControlsSkeleton() {
 
 /**
  * The board while its data loads. The page is prerendered, so it carries both
- * layouts' shapes and `html[data-board="cards"]` (app.css) shows the one the
+ * layouts' shapes and `html[data-board="list"]` (app.css) shows the one the
  * visitor is about to get: no jump from one shape to the other.
  */
 export default function BoardSkeleton() {
@@ -92,8 +116,8 @@ export default function BoardSkeleton() {
       <div className="board-skeleton-list">
         <ListSkeleton />
       </div>
-      <div className="board-skeleton-cards grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
-        {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[230px] rounded-2xl" />)}
+      <div className="board-skeleton-cards">
+        <CardsSkeleton />
       </div>
     </>
   );

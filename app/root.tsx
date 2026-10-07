@@ -16,6 +16,7 @@ import AppUpgrade from "~/components/layout/AppUpgrade";
 import ShellSkeleton, { SHELL_SCRIPT } from "~/components/layout/ShellSkeleton";
 import { EARLY_FETCH_SCRIPT } from "~/lib/early-fetch";
 import { BOARD_SCRIPT } from "~/components/board/BoardSkeleton";
+import { SPONSORS_SCRIPT } from "~/lib/sponsors-height";
 import "./app.css";
 
 // Fonts as a <link> rather than an @import inside app.css: the browser fetches
@@ -54,7 +55,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <script
           dangerouslySetInnerHTML={{
             __html: "setTimeout(function(){document.body.style.visibility='visible'},4000);" +
-              SHELL_SCRIPT + ";" + BOARD_SCRIPT + ";" + EARLY_FETCH_SCRIPT,
+              SHELL_SCRIPT + ";" + BOARD_SCRIPT + ";" + SPONSORS_SCRIPT + ";" + EARLY_FETCH_SCRIPT,
           }}
         />
         <Meta />

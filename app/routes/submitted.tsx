@@ -1,7 +1,9 @@
+import { useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router";
+import { confettiBurst } from "~/components/donate/Celebration";
 import PageMain from "~/components/layout/PageMain";
 import { LinkButton } from "~/components/ui/Button";
-import { RULES, type RulesKind } from "~/data/rules";
+import Status from "~/components/ui/Status";
 import { generateMeta } from "~/utils/meta";
 
 export function meta() {
@@ -11,46 +13,62 @@ export function meta() {
 export interface SubmittedState {
   title?: string;
   slug?: string;
-  kind?: RulesKind;
   warnings?: { field: string; msg: string }[];
 }
 
-/** One sentence on what the kind's process looks like once it is funded. */
-export const KIND_NEXT: Record<RulesKind, string> = {
-  rfp:
-    "Once it is approved and funded, a 30-day proposal window opens and any qualified team can bid to do the work.",
-  grant:
-    "Once it is approved and funded, your team has 15 days to finalize the milestone terms and deadlines, and is paid out as the milestones complete.",
-  topup:
-    "A top-up has no proposal window: once it is approved and funded, the remaining milestones are paid out as the reviewer passes them.",
-};
+const rise = (i: number) => ({ "--i": i }) as React.CSSProperties;
 
 export default function Submitted() {
   const state = (useLocation().state as SubmittedState | null) ?? {};
-  const { title, slug, kind, warnings } = state;
+  const { title, slug, warnings } = state;
   const n = warnings?.length ?? 0;
+  // Confetti for a submission that just went through, once: not for a visit
+  // to the bare URL, and not for a visitor who asked for reduced motion.
+  const fired = useRef(false);
+  useEffect(() => {
+    if (!slug || fired.current) return;
+    fired.current = true;
+    if (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    confettiBurst();
+  }, [slug]);
   return (
-    <PageMain narrow detail center className="min-h-[50vh]">
-      <h1 className="m-0 font-inter-tight text-[clamp(26px,4vw,40px)] font-medium tracking-[-.02em]">
-        Thank you
+    <PageMain detail center className="min-h-[50vh] max-w-[760px] pt-[64px] max-[640px]:pt-[72px]">
+      <p className="kicker rise m-0" style={rise(0)}>Thank you</p>
+      {/* The board hero's scale: this page is the other end of the same trip. */}
+      <h1
+        className="rise m-0 mt-3.5 font-inter-tight text-[clamp(36px,9.6vw,80px)] font-bold leading-none tracking-[-.04em]"
+        style={rise(1)}
+      >
+        Congratulations
       </h1>
-      <p className="mt-3.5 font-inter-tight text-[15px] font-light leading-[1.65] text-muted">
-        {title ? <b className="text-white">{title}</b> : "Your initiative"}{" "}
-        is in the review queue. Once an admin approves it, it will appear on the initiatives board
-        and can start collecting pledges and donations.
+      {title && (
+        <p
+          className="rise mx-auto mb-0 mt-7 max-w-[620px] text-balance font-inter-tight text-[clamp(19px,3vw,26px)] font-medium leading-[1.25] tracking-[-.01em] text-white [overflow-wrap:anywhere]"
+          style={rise(2)}
+        >
+          {title}
+        </p>
+      )}
+      <p
+        className="rise mx-auto mb-0 mt-3.5 max-w-[560px] text-balance font-inter-tight text-[clamp(15px,2.2vw,17px)] font-light leading-[1.65] text-muted"
+        style={rise(3)}
+      >
+        Your initiative is in the review queue. Once an admin approves it, it will appear on the
+        initiatives board and can start collecting pledges and donations.
       </p>
-      {kind && (
-        <p className="small dim">
-          The site adds the "{RULES[kind].title}" panel under your text, so the process, the
-          reviewer and the payment terms never need to be part of what you wrote. {KIND_NEXT[kind]}
-        </p>
-      )}
+
       {n > 0 && (
-        <p className="small dim">
-          You submitted past {n} warning{n === 1 ? "" : "s"}. The reviewer sees the same list.
-        </p>
+        <div className="rise mx-auto mt-8 max-w-[560px]" style={rise(4)}>
+          <Status kind="wait">
+            You submitted past {n} warning{n === 1 ? "" : "s"}. The reviewer sees the same list.
+          </Status>
+        </div>
       )}
-      <p className="flex flex-wrap items-center justify-center gap-2.5">
+
+      <p
+        className="rise mb-0 mt-8 flex flex-wrap items-center justify-center gap-2.5 max-[640px]:flex-col max-[640px]:items-stretch"
+        style={rise(5)}
+      >
         {slug && (
           <LinkButton variant="primary" to={`/initiative/${slug}`}>
             See your initiative (pending review)

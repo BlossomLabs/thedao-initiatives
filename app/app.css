@@ -829,6 +829,25 @@
     @apply block font-inter-tight text-[11px] font-normal tracking-[0.18em] uppercase
       text-dao-green;
   }
+
+  /* Page entrance (submit/thanks): each block rises into place, one after the
+     other; --i is the block's place in the order. */
+  .rise {
+    animation: rise-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 90ms);
+  }
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rise {
+      animation: none;
+    }
+  }
 }
 
 /* Reveal: root.tsx hides <body> inline until this stylesheet is applied, so a

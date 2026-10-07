@@ -18,7 +18,6 @@ import { useProfileDialog } from "~/context/profile-dialog";
 import { useIdentity } from "~/hooks/use-identity";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { GUIDE_TEXT } from "~/data/guide";
-import { rulesKindFor } from "~/data/rules";
 import { WHAT_NEXT } from "~/data/what-next";
 import { walletErrorMessage } from "~/lib/donate";
 import { submitInitiative } from "~/lib/submit-initiative";
@@ -254,7 +253,6 @@ export default function Submit() {
     const state: SubmittedState = {
       title: draft.page.title.trim(),
       slug: res.slug,
-      kind: rulesKindFor({ type: draft.type, topup: draft.type === "grant" && draft.topup }),
       warnings: res.warnings,
     };
     navigate("/submit/thanks", { state });

@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
+import { confettiBurst } from "~/components/donate/Celebration";
 import Submitted, { type SubmittedState } from "./submitted";
+
+vi.mock("~/components/donate/Celebration", () => ({ confettiBurst: vi.fn() }));
 
 const show = (state: SubmittedState | null) =>
   render(
@@ -11,18 +14,18 @@ const show = (state: SubmittedState | null) =>
   );
 
 describe("Submitted", () => {
-  it("names the initiative, the panel and the kind's process, and links to the pending page", () => {
+  beforeEach(() => vi.mocked(confettiBurst).mockClear());
+
+  it("celebrates, names the initiative and links to the pending page", () => {
     show({
       title: "My initiative",
       slug: "my-initiative",
-      kind: "rfp",
       warnings: [{ field: "ms_0_c0", msg: "x" }, { field: "backers", msg: "y" }],
     });
-    expect(screen.getByRole("heading", { name: "Thank you" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Congratulations" })).toBeInTheDocument();
+    expect(screen.getByText("Thank you")).toBeInTheDocument();
+    expect(confettiBurst).toHaveBeenCalledTimes(1);
     expect(screen.getByText("My initiative")).toBeInTheDocument();
-    expect(screen.getByText(/The site adds the "How RFPs work" panel under your text/))
-      .toBeInTheDocument();
-    expect(screen.getByText(/30-day proposal window/)).toBeInTheDocument();
     expect(screen.getByText("You submitted past 2 warnings. The reviewer sees the same list."))
       .toBeInTheDocument();
     expect(screen.getByRole("link", { name: "See your initiative (pending review)" }))
@@ -30,18 +33,16 @@ describe("Submitted", () => {
     expect(screen.getByRole("link", { name: "Back to the board" })).toHaveAttribute("href", "/");
   });
 
-  it("uses the top-up copy and the singular warning", () => {
-    show({ title: "T", slug: "t", kind: "topup", warnings: [{ field: "", msg: "x" }] });
-    expect(screen.getByText(/How top-up grants work/)).toBeInTheDocument();
-    expect(screen.getByText(/no proposal window/)).toBeInTheDocument();
+  it("uses the singular warning", () => {
+    show({ title: "T", slug: "t", warnings: [{ field: "", msg: "x" }] });
     expect(screen.getByText(/past 1 warning\./)).toBeInTheDocument();
   });
 
   it("falls back to generic copy without state", () => {
     show(null);
     expect(screen.getByText(/Your initiative/)).toBeInTheDocument();
-    expect(screen.queryByText(/The site adds the/)).toBeNull();
     expect(screen.queryByRole("link", { name: /See your initiative/ })).toBeNull();
     expect(screen.getByRole("link", { name: "Back to the board" })).toBeInTheDocument();
+    expect(confettiBurst).not.toHaveBeenCalled();
   });
 });

@@ -408,6 +408,9 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     throw new Error("update conflict");
   }
 
+  /** Whether an edit to this row waits for an admin; see writeRevision. */
+  type HoldWhen = (current: Initiative) => boolean;
+
   /** What an edit starts from: the row, or the held edit it replaces. */
   type Base = Partial<InitiativeText> & { categories?: string[] };
 
@@ -417,20 +420,24 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
    * written before revisions existed first gets its current text snapshotted
    * as revision 1, so the history is never missing the version people saw.
    *
-   * With `hold` the revision is stored as pending and the row keeps its live
-   * text: an admin accepts or rejects it (`review`). It builds on the edit
-   * already waiting, if any, and supersedes it.
+   * When `holdWhen` says so the revision is stored as pending and the row
+   * keeps its live text: an admin accepts or rejects it (`review`). It builds
+   * on the edit already waiting, if any, and supersedes it. `holdWhen` sees
+   * the row this commit is checked against, never the one a request read
+   * earlier, so an approval racing the edit cannot let it through unreviewed;
+   * it may throw to refuse the write.
    */
   async function writeRevision(
     id: string,
     pick: (base: Base) => { text: InitiativeText; categories: string[] },
     origin: RevisionOrigin,
-    hold = false,
+    holdWhen: HoldWhen = () => false,
   ): Promise<{ initiative: Initiative; revision: Revision | null }> {
     for (let i = 0; i < 5; i++) {
       const cur = await kv.get<Initiative>(K.initiative(id));
       if (!cur.value) throw new Error("rfp not found");
       const initiative = cur.value;
+      const hold = holdWhen(initiative);
       const before = initiative.categories ?? [];
       const waiting = hold && initiative.pendingRevision
         ? await kv.get<Revision>(K.revision(id, initiative.pendingRevision))
@@ -484,8 +491,13 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
   }
 
   /** Replace the public text, and the categories when the input names them.
-   * `hold` stores the edit for an admin to review; the live text stays. */
-  async function revise(id: string, input: RevisionInput, origin: RevisionOrigin, hold = false) {
+   * `holdWhen` stores the edit for an admin to review; the live text stays. */
+  async function revise(
+    id: string,
+    input: RevisionInput,
+    origin: RevisionOrigin,
+    holdWhen?: HoldWhen,
+  ) {
     // Only the text fields, whatever else the caller's record carries.
     const text = pickText(input);
     if (text.details && isStructured(text)) throw new Error("structured rows carry no details");
@@ -493,13 +505,18 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       id,
       (base) => ({ text, categories: input.categories ?? base.categories ?? [] }),
       origin,
-      hold,
+      holdWhen,
     );
   }
 
   /** Replace the categories alone: a revision whose text is the row's own. */
-  function retag(id: string, categories: string[], origin: RevisionOrigin, hold = false) {
-    return writeRevision(id, (base) => ({ text: pickText(base), categories }), origin, hold);
+  function retag(
+    id: string,
+    categories: string[],
+    origin: RevisionOrigin,
+    holdWhen?: HoldWhen,
+  ) {
+    return writeRevision(id, (base) => ({ text: pickText(base), categories }), origin, holdWhen);
   }
 
   /**

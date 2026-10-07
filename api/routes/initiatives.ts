@@ -226,9 +226,12 @@ export function initiativeRoutes(deps: Deps) {
     const tagsOnly = body.categories !== undefined &&
       TEXT_FIELDS.every((k) => body[k] === undefined);
     // The team may still retag a closed row: unarchiving needs a category.
-    const open = initiative.status === "pending" || initiative.status === "approved" ||
-      (tagsOnly && user.isAdmin);
-    if (!open) throw new HttpError(403, "This initiative is no longer open for edits.");
+    const assertOpen = (row: Initiative) => {
+      const open = row.status === "pending" || row.status === "approved" ||
+        (tagsOnly && user.isAdmin);
+      if (!open) throw new HttpError(403, "This initiative is no longer open for edits.");
+    };
+    assertOpen(initiative);
     // The hourly cap is for proposers; the team edits without one.
     if (
       !user.isAdmin &&
@@ -241,14 +244,22 @@ export function initiativeRoutes(deps: Deps) {
       throw new HttpError(429, "Too many edits; try again in an hour.");
     }
     const origin = { author: user.address, source: proposer ? "proposer" : "admin" } as const;
-    const hold = !user.isAdmin && initiative.status === "approved";
-    const saved = (next: Initiative, revision: Revision, warnings: Finding[]) =>
-      c.json({
-        initiative: hold ? proposerInitiative(next) : publicInitiative(next),
+    // Asked again inside the write, on the row it commits against: a status
+    // change racing this request can neither publish an unreviewed edit to
+    // an approved initiative nor reopen a closed one.
+    const holdWhen = (row: Initiative) => {
+      assertOpen(row);
+      return !user.isAdmin && row.status === "approved";
+    };
+    const saved = (next: Initiative, revision: Revision, warnings: Finding[]) => {
+      const held = !isLive(revision);
+      return c.json({
+        initiative: held ? proposerInitiative(next) : publicInitiative(next),
         revision: revisionMeta(revision),
         warnings,
-        ...(hold ? { pending: true } : {}),
+        ...(held ? { pending: true } : {}),
       }, 201);
+    };
     const [categories, categoryErr] = body.categories === undefined
       ? [undefined, null]
       : readCategories(body.categories);
@@ -264,7 +275,7 @@ export function initiativeRoutes(deps: Deps) {
         initiative.id,
         categories!,
         origin,
-        hold,
+        holdWhen,
       );
       if (!revision) throw new HttpError(400, "Nothing changed.");
       return saved(next, revision, []);
@@ -301,7 +312,7 @@ export function initiativeRoutes(deps: Deps) {
       initiative.id,
       { ...base, ...structured, categories: categories ?? undefined },
       origin,
-      hold,
+      holdWhen,
     );
     if (!revision) throw new HttpError(400, "Nothing changed.");
     return saved(next, revision, warnings);

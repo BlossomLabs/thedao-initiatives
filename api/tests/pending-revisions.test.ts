@@ -318,3 +318,35 @@ Deno.test("a row older than revisions: the held edit still snapshots the live te
   assertEquals((await h.db.revisions.get(row.id, 2))!.state, "pending");
   h.close();
 });
+
+Deno.test("whether an edit is held is decided on the row as written, not as the request read it", async () => {
+  const h = await harness();
+  const origin = { author: PLAIN, source: "proposer" as const };
+  const text = { title: "Racing an approval", summary: "s", details: "d" };
+  const row = await h.db.initiatives.insert({ ...text, proposer: PLAIN, status: "pending" });
+  const whenApproved = (current: { status: string }) => current.status === "approved";
+  // still pending when the write happens: live at once
+  const early = await h.db.initiatives.revise(
+    row.id,
+    { ...text, details: "d2" },
+    origin,
+    whenApproved,
+  );
+  assertEquals([early.revision!.state, early.initiative.details], ["live", "d2"]);
+  // approved between the request's read and its write: the edit is held
+  await h.db.initiatives.update(row.id, { status: "approved" });
+  const late = await h.db.initiatives.revise(
+    row.id,
+    { ...text, details: "d3" },
+    origin,
+    whenApproved,
+  );
+  assertEquals([late.revision!.state, late.initiative.details, late.initiative.pendingRevision], [
+    "pending",
+    "d2",
+    3,
+  ]);
+  const tags = await h.db.initiatives.retag(row.id, ["defi"], origin, whenApproved);
+  assertEquals([tags.revision!.state, tags.initiative.categories], ["pending", []]);
+  h.close();
+});

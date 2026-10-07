@@ -1,0 +1,20 @@
+Check docs/security/review-2026-10-07/evidence/api-reproductions.test.ts
+running 3 tests from ./docs/security/review-2026-10-07/evidence/api-reproductions.test.ts
+OCT-01: real ENS/viem path follows resolver gateways to private HTTP destinations ...
+------- output -------
+{"finding":"OCT-01","publicStatus":200,"gatewayRequests":[{"url":"http://127.0.0.1:8888/internal/0x1234","method":"GET","hasDeadline":false,"redirect":"default (follow)"},{"url":"http://169.254.169.254/metadata","method":"POST","hasDeadline":false,"redirect":"default (follow)"}]}
+----- output end -----
+OCT-01: real ENS/viem path follows resolver gateways to private HTTP destinations ... ok (116ms)
+OCT-02: stale administrator reads private leads through alternative endpoints ...
+------- output -------
+{"finding":"OCT-02","authAge":301,"leadsStatus":403,"alternativeStatuses":[{"path":"/api/admin/initiatives/01M4A3QFZGRCH1PCS264EBCXN4","status":200},{"path":"/api/initiatives/synthetic-private-fields-fixture","status":200},{"path":"/initiative/synthetic-private-fields-fixture-PRIVATE.md","status":200}]}
+----- output end -----
+OCT-02: stale administrator reads private leads through alternative endpoints ... ok (12ms)
+OCT-03: concurrent admin addition overwrites a successful administrator removal ...
+------- output -------
+{"finding":"OCT-03","removeStatus":200,"addStatus":200,"removedWalletIsAdminAgain":true,"oldSessionStatus":401,"newSessionAdminAccess":200}
+----- output end -----
+OCT-03: concurrent admin addition overwrites a successful administrator removal ... ok (6ms)
+
+ok | 3 passed | 0 failed (141ms)
+

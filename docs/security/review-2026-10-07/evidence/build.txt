@@ -1,0 +1,541 @@
+Task build deno run -A npm:@react-router/dev build
+Using Vite Environment API
+vite v8.3.0 building client environment for production...
+transforming...
+✓ 9648 modules transformed.
+rendering chunks...
+computing gzip size...
+build/client/.vite/manifest.json                                                    214.92 kB │ gzip:  24.61 kB
+build/client/assets/root-DiBMoO2H.css                                               115.99 kB │ gzip:  20.23 kB
+build/client/assets/analytics-mkkvFRju-BRBcadka.js                                    0.06 kB │ gzip:   0.08 kB
+build/client/assets/sha256-DdQ8Vw_l.js                                                0.06 kB │ gzip:   0.07 kB
+build/client/assets/capitalizeFirstLetter-DmLYqXsO-DtOXx-2n.js                        0.07 kB │ gzip:   0.09 kB
+build/client/assets/clamp-D0kAXd-u.js                                                 0.08 kB │ gzip:   0.09 kB
+build/client/assets/parseEther-Bp9yV4NR.js                                            0.08 kB │ gzip:   0.10 kB
+build/client/assets/rfp-redirect-main--Tp1U1V_.js                                     0.09 kB │ gzip:   0.11 kB
+build/client/assets/resolveAriaLabelledBy-B2ZzrlGb.js                                 0.09 kB │ gzip:   0.10 kB
+build/client/assets/stringifyLocale-CkHjdQTJ.js                                       0.09 kB │ gzip:   0.10 kB
+build/client/assets/board-links-BYpABvN9.js                                           0.10 kB │ gzip:   0.11 kB
+build/client/assets/isElementDisabled-KSuuBj8D.js                                     0.11 kB │ gzip:   0.11 kB
+build/client/assets/rfp-redirect-client-loader-BEZFxeJs.js                            0.12 kB │ gzip:   0.13 kB
+build/client/assets/check-CDNa9_h8.js                                                 0.12 kB │ gzip:   0.14 kB
+build/client/assets/chevron-down-DSRLWkT0.js                                          0.12 kB │ gzip:   0.13 kB
+build/client/assets/serializeValue-B_EucO5O.js                                        0.13 kB │ gzip:   0.12 kB
+build/client/assets/safe-url-D7SRPu33-CkMedGro.js                                     0.14 kB │ gzip:   0.13 kB
+build/client/assets/shouldProceedtoEmbeddedWalletCreationFlow-BxvaW_Vy-Mrj_Jtn-.js    0.14 kB │ gzip:   0.13 kB
+build/client/assets/react-auth-sHnipzbS.js                                            0.14 kB │ gzip:   0.14 kB
+build/client/assets/formatErc20TokenAmount-BuPk9xcy-BVqOKQif.js                       0.14 kB │ gzip:   0.14 kB
+build/client/assets/getChainName-DjpPdUSc-DUyKDrnp.js                                 0.14 kB │ gzip:   0.11 kB
+build/client/assets/x-B3x4qXRc.js                                                     0.15 kB │ gzip:   0.15 kB
+build/client/assets/Shimmer-BuQWrKn8.js                                               0.16 kB │ gzip:   0.15 kB
+build/client/assets/check-CkO58bKC.js                                                 0.16 kB │ gzip:   0.16 kB
+build/client/assets/chevron-down-Czr35iZb.js                                          0.16 kB │ gzip:   0.16 kB
+build/client/assets/chevron-left-Bg0b0zoX.js                                          0.17 kB │ gzip:   0.17 kB
+build/client/assets/chevron-right-DQEGehqC.js                                         0.17 kB │ gzip:   0.16 kB
+build/client/assets/getUsdcMintAddress-BVgm9GRo-r2UnDeEy.js                           0.17 kB │ gzip:   0.17 kB
+build/client/assets/circle-check-big-DCYUpA4r.js                                      0.19 kB │ gzip:   0.18 kB
+build/client/assets/x-DaIYEGxl.js                                                     0.19 kB │ gzip:   0.17 kB
+build/client/assets/LabelXs-oqZNqbm_-B36aZY7t.js                                      0.19 kB │ gzip:   0.18 kB
+build/client/assets/smartphone-CuqmbzCM.js                                            0.19 kB │ gzip:   0.18 kB
+build/client/assets/use-admin-api-BSGYC9NN.js                                         0.20 kB │ gzip:   0.16 kB
+build/client/assets/arrow-left-ByKcrhtT.js                                            0.20 kB │ gzip:   0.18 kB
+build/client/assets/lock-B-qZGGw4.js                                                  0.20 kB │ gzip:   0.19 kB
+build/client/assets/circle-x-DP00Dova.js                                              0.20 kB │ gzip:   0.17 kB
+build/client/assets/CSPContext-Bb42Q0I2.js                                            0.20 kB │ gzip:   0.18 kB
+build/client/assets/ErrorMessage-D8VaAP5m-D8O0-kKO.js                                 0.21 kB │ gzip:   0.18 kB
+build/client/assets/mail-CpBx7d2_.js                                                  0.21 kB │ gzip:   0.20 kB
+build/client/assets/Skeleton-DFsiGvZY.js                                              0.21 kB │ gzip:   0.18 kB
+build/client/assets/search-BAxK2FQz.js                                                0.21 kB │ gzip:   0.19 kB
+build/client/assets/Title-BnzYV3Is-COnI1U09.js                                        0.22 kB │ gzip:   0.20 kB
+build/client/assets/lazy-part-B80BxL1Z.js                                             0.23 kB │ gzip:   0.20 kB
+build/client/assets/use-site-settings-DF0v98xI.js                                     0.23 kB │ gzip:   0.20 kB
+build/client/assets/copy-BSBTF7xO.js                                                  0.23 kB │ gzip:   0.20 kB
+build/client/assets/lock-BqPBrbhT.js                                                  0.24 kB │ gzip:   0.22 kB
+build/client/assets/circle-alert-ssvRleaO.js                                          0.25 kB │ gzip:   0.18 kB
+build/client/assets/external-link-DUQx5lY3.js                                         0.25 kB │ gzip:   0.19 kB
+build/client/assets/vote-fDxE1eNH.js                                                  0.25 kB │ gzip:   0.19 kB
+build/client/assets/mail-BSYyIuvk.js                                                  0.25 kB │ gzip:   0.22 kB
+build/client/assets/Status-CXfY_9qP.js                                                0.25 kB │ gzip:   0.20 kB
+build/client/assets/triangle-alert-bbmPqmt5.js                                        0.26 kB │ gzip:   0.21 kB
+build/client/assets/circle-x-CIPHPHe5.js                                              0.26 kB │ gzip:   0.21 kB
+build/client/assets/custom-CUy5DoVQ.js                                                0.27 kB │ gzip:   0.20 kB
+build/client/assets/upload-DGy_N1Ul.js                                                0.27 kB │ gzip:   0.22 kB
+build/client/assets/download-Dlt9trYt.js                                              0.27 kB │ gzip:   0.22 kB
+build/client/assets/ToolbarRootContext-CdzstAwT.js                                    0.27 kB │ gzip:   0.21 kB
+build/client/assets/reauthenticate-Dx51s2PK.js                                        0.28 kB │ gzip:   0.21 kB
+build/client/assets/wallet-DvGUs8li.js                                                0.28 kB │ gzip:   0.20 kB
+build/client/assets/settings-2-DQsWVCsR.js                                            0.29 kB │ gzip:   0.22 kB
+build/client/assets/Subtitle-CV-2yKE4-D-MSV54e.js                                     0.29 kB │ gzip:   0.23 kB
+build/client/assets/SectionHeading-CVnMwdb4.js                                        0.29 kB │ gzip:   0.22 kB
+build/client/assets/WalletOverflowButton-BQB3rBwe-DDhQQuR1.js                         0.31 kB │ gzip:   0.22 kB
+build/client/assets/PageMain-B0mrmTOD.js                                              0.31 kB │ gzip:   0.25 kB
+build/client/assets/esm-C3DslVJx.js                                                   0.32 kB │ gzip:   0.24 kB
+build/client/assets/wallet-B94lhlBG.js                                                0.32 kB │ gzip:   0.23 kB
+build/client/assets/triangle-alert-CnYxpHWK.js                                        0.33 kB │ gzip:   0.25 kB
+build/client/assets/list-Cg65anUL.js                                                  0.34 kB │ gzip:   0.22 kB
+build/client/assets/InjectedWalletIcon-DLcYOGDj-DmXCBz2y.js                           0.34 kB │ gzip:   0.24 kB
+build/client/assets/focus-handover-BethtXfo.js                                        0.35 kB │ gzip:   0.27 kB
+build/client/assets/hourglass-B4pL9qKo.js                                             0.36 kB │ gzip:   0.24 kB
+build/client/assets/refresh-cw-8dgb5loB.js                                            0.36 kB │ gzip:   0.25 kB
+build/client/assets/transfer-6YztDh-t-BVQkTvG-.js                                     0.38 kB │ gzip:   0.16 kB
+build/client/assets/id-UqEwL2BI-DBaJPjJB.js                                           0.38 kB │ gzip:   0.28 kB
+build/client/assets/trash-CN2P23TB.js                                                 0.38 kB │ gzip:   0.25 kB
+build/client/assets/Avatar-BrolJ9pJ.js                                                0.40 kB │ gzip:   0.27 kB
+build/client/assets/StackedContainer-B2vaEl56-DlGQCsN5.js                             0.40 kB │ gzip:   0.25 kB
+build/client/assets/CategoryDot-CJh9et0l.js                                           0.41 kB │ gzip:   0.30 kB
+build/client/assets/landmark-DhH7_jGP.js                                              0.42 kB │ gzip:   0.27 kB
+build/client/assets/jsx-runtime-YCuVGQjc.js                                           0.43 kB │ gzip:   0.30 kB
+build/client/assets/flag-Bi0EFUN8.js                                                  0.45 kB │ gzip:   0.30 kB
+build/client/assets/dist-Cm7pNAtL.js                                                  0.45 kB │ gzip:   0.28 kB
+build/client/assets/switchChain-C7yHsB29.js                                           0.45 kB │ gzip:   0.27 kB
+build/client/assets/connector-B7cuzK-C.js                                             0.46 kB │ gzip:   0.26 kB
+build/client/assets/LoadingSkeleton-BMsgO5PV-DVQWaGEh.js                              0.47 kB │ gzip:   0.25 kB
+build/client/assets/signMessage-176Wa4iS.js                                           0.47 kB │ gzip:   0.32 kB
+build/client/assets/getErc20Balance-jXNpFf0N-JYqfmxhk.js                              0.49 kB │ gzip:   0.33 kB
+build/client/assets/isPaymentRequestAvailable-Bq1cemEn-B6WHzfAz.js                    0.50 kB │ gzip:   0.36 kB
+build/client/assets/shared-FM0rljBt-BIb_xbwD.js                                       0.51 kB │ gzip:   0.32 kB
+build/client/assets/mainnet-CN1mf8XB.js                                               0.51 kB │ gzip:   0.35 kB
+build/client/assets/WalletCards-DH1rqayz-W_TyRNyh.js                                  0.52 kB │ gzip:   0.35 kB
+build/client/assets/ChevronDownIcon-CNFUJZwZ.js                                       0.53 kB │ gzip:   0.38 kB
+build/client/assets/PrivyPluginContext-DA-yS5vO-CbhpmlVw.js                           0.54 kB │ gzip:   0.34 kB
+build/client/assets/useGetSolPrice-x7gfUIHJ-BsBylKMm.js                               0.54 kB │ gzip:   0.37 kB
+build/client/assets/landmark-DpvxsgvS.js                                              0.55 kB │ gzip:   0.35 kB
+build/client/assets/telegram-B-JqnkqZ-CSYiiprl.js                                     0.55 kB │ gzip:   0.37 kB
+build/client/assets/site-BAms1TUP.js                                                  0.55 kB │ gzip:   0.32 kB
+build/client/assets/transaction-BNTP-bFm-M5tJx8vY.js                                  0.57 kB │ gzip:   0.37 kB
+build/client/assets/CheckCircleIcon-DQG7UYUB.js                                       0.57 kB │ gzip:   0.40 kB
+build/client/assets/useAriaLabelledBy-BcKImVMk.js                                     0.58 kB │ gzip:   0.39 kB
+build/client/assets/use-sign-with-user-signer-OxgKiUdW-D4X5wH51.js                    0.58 kB │ gzip:   0.37 kB
+build/client/assets/ExclamationCircleIcon-B_G6Vflo.js                                 0.58 kB │ gzip:   0.41 kB
+build/client/assets/terms-D9MIU8ZB.js                                                 0.60 kB │ gzip:   0.39 kB
+build/client/assets/FundWalletMethodHeader-CBdY084Z-GBWgUPLh.js                       0.61 kB │ gzip:   0.37 kB
+build/client/assets/fingerprint-pattern-DWiNnpNR.js                                   0.61 kB │ gzip:   0.35 kB
+build/client/assets/esm-CG_aiq74.js                                                   0.63 kB │ gzip:   0.29 kB
+build/client/assets/ConnectOrCreateScreen-DRvyMrwl-DH_k2f4L.js                        0.63 kB │ gzip:   0.40 kB
+build/client/assets/scrollable-BvpXZ0wG.js                                            0.64 kB │ gzip:   0.34 kB
+build/client/assets/use-watchlist-offer-9VSXjbcf.js                                   0.64 kB │ gzip:   0.43 kB
+build/client/assets/getErc20TokenInfo-CgPHS-3o-_6W0OPWK.js                            0.67 kB │ gzip:   0.37 kB
+build/client/assets/LandingScreen-DRUbwL_z-Dsj_nmdN.js                                0.67 kB │ gzip:   0.42 kB
+build/client/assets/react-BKMsnLTP.js                                                 0.68 kB │ gzip:   0.42 kB
+build/client/assets/LockClosedIcon-DJnxGHCI.js                                        0.68 kB │ gzip:   0.44 kB
+build/client/assets/use-board-9qUZhz82.js                                             0.68 kB │ gzip:   0.43 kB
+build/client/assets/ExclamationTriangleIcon-Dqi3XKmr.js                               0.68 kB │ gzip:   0.48 kB
+build/client/assets/CheckCircleIcon-Ul3UnmfU.js                                       0.70 kB │ gzip:   0.46 kB
+build/client/assets/Value-DTgR824E-CoJGzWqb.js                                        0.70 kB │ gzip:   0.37 kB
+build/client/assets/TypeGlyph-B_-ojSdz.js                                             0.70 kB │ gzip:   0.39 kB
+build/client/assets/InAppBrowserLoginNotPossible-92qfsBpt-Cz-HrIqG.js                 0.71 kB │ gzip:   0.45 kB
+build/client/assets/ShieldCheckIcon-DMwGUfmb.js                                       0.72 kB │ gzip:   0.50 kB
+build/client/assets/store-BlXVHZKu.js                                                 0.72 kB │ gzip:   0.41 kB
+build/client/assets/useWalletBalance-CZnP5f_f-DQ46uAhK.js                             0.73 kB │ gzip:   0.47 kB
+build/client/assets/DotsFace-BBjfDySH.js                                              0.73 kB │ gzip:   0.49 kB
+build/client/assets/simulateTransaction-CP42l5SJ-CtJbEpR6.js                          0.74 kB │ gzip:   0.42 kB
+build/client/assets/Field-BYmTvBKC.js                                                 0.75 kB │ gzip:   0.37 kB
+build/client/assets/EnvelopeIcon-CX_2lMGT.js                                          0.76 kB │ gzip:   0.46 kB
+build/client/assets/ethers-DNxEwCFm-CtL7ETni.js                                       0.77 kB │ gzip:   0.49 kB
+build/client/assets/WalletIcon-jqo04BO8.js                                            0.77 kB │ gzip:   0.45 kB
+build/client/assets/ArrowsRightLeftIcon-C-FWFVW5.js                                   0.79 kB │ gzip:   0.45 kB
+build/client/assets/FingerPrintIcon-CpeQfZRR.js                                       0.81 kB │ gzip:   0.54 kB
+build/client/assets/BackerLogo-CsQSYrpC.js                                            0.84 kB │ gzip:   0.51 kB
+build/client/assets/PhoneIcon-BckYj1fw.js                                             0.86 kB │ gzip:   0.56 kB
+build/client/assets/LinkEmailScreen-DBYu47Ce-KNpjWREZ.js                              0.88 kB │ gzip:   0.50 kB
+build/client/assets/privy-store-BPUNLKmJ.js                                           0.89 kB │ gzip:   0.51 kB
+build/client/assets/LoginFailedScreen-BogLDpQD-B26mKVAL.js                            0.91 kB │ gzip:   0.54 kB
+build/client/assets/ErrorBanner-BcpGRt0h-CEeUnpY5.js                                  0.92 kB │ gzip:   0.53 kB
+build/client/assets/ScreenLayout-XFsWudNK-DHtxGJK8.js                                 0.92 kB │ gzip:   0.46 kB
+build/client/assets/WarningBanner-ZZqCEtZK-me7HxvQj.js                                0.93 kB │ gzip:   0.53 kB
+build/client/assets/dist-CoS6E-3x.js                                                  0.93 kB │ gzip:   0.45 kB
+build/client/assets/CategoryTag-Dehtheo8.js                                           0.93 kB │ gzip:   0.54 kB
+build/client/assets/rolldown-runtime-C_s2cVnS.js                                      0.95 kB │ gzip:   0.52 kB
+build/client/assets/discussion-DI5CKbOF.js                                            0.97 kB │ gzip:   0.55 kB
+build/client/assets/sendTransaction-BmdL3zIs.js                                       0.97 kB │ gzip:   0.56 kB
+build/client/assets/GlobeAltIcon-DKWCKM7b.js                                          0.98 kB │ gzip:   0.59 kB
+build/client/assets/Button-Bu-PVRDi.js                                                1.02 kB │ gzip:   0.58 kB
+build/client/assets/useGetTokenPrice-Ufl46eND-CY23R8lZ.js                             1.05 kB │ gzip:   0.54 kB
+build/client/assets/ConnectInline-BQfwJXQL.js                                         1.05 kB │ gzip:   0.62 kB
+build/client/assets/ScreenHeader-CHmc4-Lu-BPrgf-xN.js                                 1.06 kB │ gzip:   0.54 kB
+build/client/assets/Chip-CZKIKt9K-BVmzZZbE.js                                         1.08 kB │ gzip:   0.54 kB
+build/client/assets/AllowlistRejectionScreen-Dxn2QBch-CXeHVGWQ.js                     1.17 kB │ gzip:   0.62 kB
+build/client/assets/OpenLink-CUpJ1mOr-ACMPDpUf.js                                     1.17 kB │ gzip:   0.61 kB
+build/client/assets/dist-Dl07uGq1.js                                                  1.18 kB │ gzip:   0.60 kB
+build/client/assets/format-D2vjl7zB.js                                                1.18 kB │ gzip:   0.62 kB
+build/client/assets/terms.version-Bl7wBFru.js                                         1.18 kB │ gzip:   0.63 kB
+build/client/assets/EmbeddedWalletPasswordUpdateSplashScreen-B9SS2EuP-Mjn_xCNB.js     1.18 kB │ gzip:   0.68 kB
+build/client/assets/AccountNotFoundScreen-dpvlPdBk-B49g07IG.js                        1.19 kB │ gzip:   0.73 kB
+build/client/assets/DashboardSkeleton-D-36rzjG.js                                     1.19 kB │ gzip:   0.54 kB
+build/client/assets/JsonTree-BHzNC-ic--7EBc8qI.js                                     1.19 kB │ gzip:   0.65 kB
+build/client/assets/preload-helper-BZ1Pz5am.js                                        1.21 kB │ gzip:   0.69 kB
+build/client/assets/createLucideIcon-emCOuhfR.js                                      1.21 kB │ gzip:   0.70 kB
+build/client/assets/modal-context-C9-YL9cl-97Xq3xkf.js                                1.22 kB │ gzip:   0.60 kB
+build/client/assets/UserLimitReachedScreen-cTdLG4Aq-BIhBn5ym.js                       1.25 kB │ gzip:   0.74 kB
+build/client/assets/EmbeddedWalletCreatedScreen-njjn_fWc-C0rm839e.js                  1.27 kB │ gzip:   0.76 kB
+build/client/assets/getConnectorClient-CpRiAh-z.js                                    1.30 kB │ gzip:   0.64 kB
+build/client/assets/CategoryTrigger-DXd1YX7a.js                                       1.35 kB │ gzip:   0.70 kB
+build/client/assets/Crumbs-C5w_jmn4.js                                                1.37 kB │ gzip:   0.60 kB
+build/client/assets/getFormattedUsdFromLamports-De3U9GlO-Gx4_wxON.js                  1.41 kB │ gzip:   0.72 kB
+build/client/assets/use-initiative-D41bqdnV.js                                        1.47 kB │ gzip:   0.78 kB
+build/client/assets/LinkPhoneScreen-CxzCokXL-Buck5pZc.js                              1.49 kB │ gzip:   0.83 kB
+build/client/assets/farcaster-DPlSjvF5-CEUAbeLX.js                                    1.50 kB │ gzip:   0.71 kB
+build/client/assets/index-CWARkn2w-CZglUavD.js                                        1.50 kB │ gzip:   0.62 kB
+build/client/assets/PageSkeleton-CUz4RVTV.js                                          1.51 kB │ gzip:   0.60 kB
+build/client/assets/InfoBanner-Cb3p1z12-BQkO3GAZ.js                                   1.51 kB │ gzip:   0.86 kB
+build/client/assets/TermsDocument-DzA_dDtr.js                                         1.55 kB │ gzip:   0.68 kB
+build/client/assets/Address-DMC9FYV2-BPueaJLF.js                                      1.56 kB │ gzip:   0.78 kB
+build/client/assets/ComboboxEmpty-DMwAN-EK.js                                         1.56 kB │ gzip:   0.87 kB
+build/client/assets/floating-ui.utils-Ca2a-QsZ.js                                     1.57 kB │ gzip:   0.73 kB
+build/client/assets/Money-DLLh-dFK.js                                                 1.58 kB │ gzip:   0.84 kB
+build/client/assets/UpdatePhoneScreen-XtZryXw--1ANV3Q0p.js                            1.59 kB │ gzip:   0.89 kB
+build/client/assets/CopyableText-CQapvaMr-DZkAnuoE.js                                 1.59 kB │ gzip:   0.77 kB
+build/client/assets/InstallWalletScreen-Be7abwcn-CF65-YlT.js                          1.61 kB │ gzip:   0.84 kB
+build/client/assets/Layouts-BMRfo5hw-Cbzv6pf6.js                                      1.67 kB │ gzip:   0.56 kB
+build/client/assets/WalletInterstitialScreen-Bb1Dv0ks-_rZ0Orh_.js                     1.69 kB │ gzip:   0.92 kB
+build/client/assets/WalletLink-wyEl6U-t-Db2yFepu.js                                   1.71 kB │ gzip:   0.83 kB
+build/client/assets/WalletInfoCard-zmo6O2YN-D4W7_h3G.js                               1.77 kB │ gzip:   0.95 kB
+build/client/assets/ConnectOnlyLandingScreen-DRjLarbZ-rdUU6pGC.js                     1.77 kB │ gzip:   0.86 kB
+build/client/assets/Link-BdDilT2T-BtxtckQX.js                                         1.77 kB │ gzip:   0.65 kB
+build/client/assets/meta-CdgrQZg2.js                                                  1.78 kB │ gzip:   0.66 kB
+build/client/assets/DelegatedActionsRevokeScreen-Ddfj8i91-9G3ebpYQ.js                 1.80 kB │ gzip:   1.02 kB
+build/client/assets/PasskeySelectSignupOrLogin-Bz4eA1kT-RngYlams.js                   1.80 kB │ gzip:   0.76 kB
+build/client/assets/AuthenticateWithWalletScreen-XZW4H6Rp-DGIYkS5r.js                 1.82 kB │ gzip:   0.90 kB
+build/client/assets/MfaVerifyFlowScreen-CH_lq1t9-BlXGAhqd.js                          1.83 kB │ gzip:   0.94 kB
+build/client/assets/usePopupHandleStore-CvvB4yOA.js                                   1.83 kB │ gzip:   0.73 kB
+build/client/assets/TodoList-DnyULl18-xm5uTdUa.js                                     1.85 kB │ gzip:   0.83 kB
+build/client/assets/PhCaretLeft-CI460R-A.js                                           1.85 kB │ gzip:   0.90 kB
+build/client/assets/styles-C4IROdYt-BCutvq6C.js                                       1.87 kB │ gzip:   0.75 kB
+build/client/assets/Identity-Dw8SDxQa.js                                              1.90 kB │ gzip:   1.06 kB
+build/client/assets/PhCaretDown-BDNabFuL.js                                           1.91 kB │ gzip:   0.93 kB
+build/client/assets/PhCaretRight-D7ZS3Ls8.js                                          1.93 kB │ gzip:   0.92 kB
+build/client/assets/FundingEditAmountScreen-Sl84OThy-DyEx7D5G.js                      1.95 kB │ gzip:   1.06 kB
+build/client/assets/styles-DVyDvTdj-RA7oVToJ.js                                       1.95 kB │ gzip:   0.74 kB
+build/client/assets/index-D8ngJizK-BJg2brB3.js                                        1.96 kB │ gzip:   0.94 kB
+build/client/assets/get-entropy-details-for-user-CWaM1Zij-DH3q9BCT.js                 1.96 kB │ gzip:   0.98 kB
+build/client/assets/admin-DKMrMUYt.js                                                 1.97 kB │ gzip:   1.00 kB
+build/client/assets/PhCaretUp-C-iIfyvO.js                                             1.99 kB │ gzip:   0.91 kB
+build/client/assets/wallet-store-tS2JC03c.js                                          2.02 kB │ gzip:   1.02 kB
+build/client/assets/DelegatedActionsConsentScreen-CgjAuH1X-BvJ5VFHz.js                2.02 kB │ gzip:   1.14 kB
+build/client/assets/PhArrowUpRight-BNghD2zq.js                                        2.03 kB │ gzip:   0.99 kB
+build/client/assets/PhArrowDown-87b1BizM.js                                           2.07 kB │ gzip:   0.99 kB
+build/client/assets/PhPlus-C4UoW-2n.js                                                2.08 kB │ gzip:   0.94 kB
+build/client/assets/PhCheck-DxQXn57r.js                                               2.08 kB │ gzip:   0.96 kB
+build/client/assets/PhArrowRight-AdrIL4DW.js                                          2.08 kB │ gzip:   0.99 kB
+build/client/assets/PhArrowLeft-Da0MfnbK.js                                           2.09 kB │ gzip:   0.98 kB
+build/client/assets/ConnectLedgerScreen-Cbl7rv9--BesPeA7N.js                          2.12 kB │ gzip:   1.06 kB
+build/client/assets/PhArrowUp-4sgyKPGx.js                                             2.14 kB │ gzip:   0.98 kB
+build/client/assets/composite-CY6TMZr3.js                                             2.15 kB │ gzip:   0.78 kB
+build/client/assets/submitted-D2BafnDT.js                                             2.15 kB │ gzip:   1.06 kB
+build/client/assets/PhBrowser-2-9m-AkM.js                                             2.18 kB │ gzip:   0.95 kB
+build/client/assets/PhMagnifyingGlass-C9u8jSCJ.js                                     2.18 kB │ gzip:   1.05 kB
+build/client/assets/PhDotsThree-D-k1BiYg.js                                           2.22 kB │ gzip:   0.92 kB
+build/client/assets/MfaAuthVerifyFlowScreen-Caf1mG_p-KUYSA1E7.js                      2.23 kB │ gzip:   1.13 kB
+build/client/assets/reservoir-x-nGuZkT-CExIjKiE.js                                    2.27 kB │ gzip:   1.14 kB
+build/client/assets/WatchlistOffer-NcPYcWff.js                                        2.28 kB │ gzip:   1.14 kB
+build/client/assets/floating-ui.utils.dom-Bga_OvHD.js                                 2.30 kB │ gzip:   1.05 kB
+build/client/assets/PhCopy-CWNYcABI.js                                                2.33 kB │ gzip:   0.99 kB
+build/client/assets/PhFunnelSimple-CfQs5DAW.js                                        2.33 kB │ gzip:   0.98 kB
+build/client/assets/PhClock-x3MS3Mwi.js                                               2.34 kB │ gzip:   1.01 kB
+build/client/assets/PhWarningCircle-BXHw1fCt.js                                       2.40 kB │ gzip:   1.03 kB
+build/client/assets/mine-C4FJcTNo.js                                                  2.45 kB │ gzip:   1.13 kB
+build/client/assets/PhX-DX0SFIqC.js                                                   2.47 kB │ gzip:   1.04 kB
+build/client/assets/getPseudoElementBounds-DI4cs9nM.js                                2.48 kB │ gzip:   1.21 kB
+build/client/assets/Checkbox-D1EDeo41-Co3lARaG.js                                     2.51 kB │ gzip:   1.31 kB
+build/client/assets/RecoveryPasswordCreateScreen-BLH8kpZr-Cor-vKEL.js                 2.52 kB │ gzip:   1.26 kB
+build/client/assets/PhDeviceMobile-CsyA5Goi.js                                        2.54 kB │ gzip:   1.05 kB
+build/client/assets/ConnectEmailForm-DZRoHv1b-BdutgeO9.js                             2.55 kB │ gzip:   1.40 kB
+build/client/assets/PhArrowClockwise-DVgyFuez.js                                      2.56 kB │ gzip:   1.17 kB
+build/client/assets/BoardSkeleton-CSuFonRA.js                                         2.58 kB │ gzip:   0.90 kB
+build/client/assets/AffirmativeConsentScreen-CNKhHlgd-G0kKSfi6.js                     2.61 kB │ gzip:   1.36 kB
+build/client/assets/SheetTrigger-BmhhvBmd.js                                          2.65 kB │ gzip:   1.29 kB
+build/client/assets/PhUser-0sWNXQeZ.js                                                2.65 kB │ gzip:   1.25 kB
+build/client/assets/PhEnvelope-D8kzeNox.js                                            2.66 kB │ gzip:   1.16 kB
+build/client/assets/PhCircleHalf-MJZeRBGF.js                                          2.69 kB │ gzip:   1.20 kB
+build/client/assets/styles-BsotlekN-B9EB7Smy.js                                       2.71 kB │ gzip:   1.30 kB
+build/client/assets/UpdateEmailScreen-D_Zhi8bE-CWT3PrpX.js                            2.72 kB │ gzip:   1.40 kB
+build/client/assets/PhSignOut-CxELV-i0.js                                             2.73 kB │ gzip:   1.14 kB
+build/client/assets/PhInfo-Bwi51-2X.js                                                2.74 kB │ gzip:   1.19 kB
+build/client/assets/PhPower-CFyWDmgD.js                                               2.75 kB │ gzip:   1.26 kB
+build/client/assets/PhDesktop-CxrzCSv5.js                                             2.75 kB │ gzip:   1.09 kB
+build/client/assets/CaptchaScreen-CjA52GUM-CRt77OvZ.js                                2.76 kB │ gzip:   1.35 kB
+build/client/assets/PhArrowsLeftRight-MuKBLUoF.js                                     2.77 kB │ gzip:   1.16 kB
+build/client/assets/PhArrowCircleDown-D97G-BOA.js                                     2.78 kB │ gzip:   1.16 kB
+build/client/assets/PhWallet-DzNiREN9.js                                              2.80 kB │ gzip:   1.15 kB
+build/client/assets/use-identity-BgDiPxik.js                                          2.81 kB │ gzip:   1.22 kB
+build/client/assets/PhQuestionMark-CV0k9C0Y.js                                        2.81 kB │ gzip:   1.28 kB
+build/client/assets/eventemitter3-BB9OE-nf.js                                         2.83 kB │ gzip:   1.09 kB
+build/client/assets/sha3-Dlq0T7vU.js                                                  2.85 kB │ gzip:   1.33 kB
+build/client/assets/use-watchlist-BfI5VM7n.js                                         2.85 kB │ gzip:   1.39 kB
+build/client/assets/PhArrowSquareOut-Bk2CMG3I.js                                      2.89 kB │ gzip:   1.23 kB
+build/client/assets/PhArrowsDownUp-DM09Jo_3.js                                        2.90 kB │ gzip:   1.15 kB
+build/client/assets/PhCreditCard-Fy4pzwtt.js                                          2.90 kB │ gzip:   1.13 kB
+build/client/assets/PhBank-fHbgCqqZ.js                                                2.91 kB │ gzip:   1.23 kB
+build/client/assets/PhVault-6JTskUcC.js                                               2.93 kB │ gzip:   1.18 kB
+build/client/assets/PhCompass-hYn3HhGN.js                                             2.95 kB │ gzip:   1.25 kB
+build/client/assets/EmbeddedWalletConnectingScreen-DTxYtwkh-DdaD_v9E.js               3.00 kB │ gzip:   1.44 kB
+build/client/assets/VoteMark-F0AyDMpk.js                                              3.02 kB │ gzip:   1.39 kB
+build/client/assets/EmbeddedWalletOnAccountCreateScreen-DVnOfOJg-TwJYQI1n.js          3.02 kB │ gzip:   1.47 kB
+build/client/assets/SetAutomaticRecoveryScreen-GtEwf97v-p4_BhjbU.js                   3.02 kB │ gzip:   1.45 kB
+build/client/assets/pkce-9IlxxmsH-Gg00fjIl.js                                         3.04 kB │ gzip:   1.09 kB
+build/client/assets/QrCode-cA9rnMIN-DxeAX9nY.js                                       3.05 kB │ gzip:   1.45 kB
+build/client/assets/src--yAJZle9.js                                                   3.06 kB │ gzip:   1.16 kB
+build/client/assets/WalletMenu-0y_NRk8r.js                                            3.06 kB │ gzip:   1.54 kB
+build/client/assets/PhPaperPlaneRight-zxQVvPLX.js                                     3.06 kB │ gzip:   1.40 kB
+build/client/assets/PhTrash-C9PD0SAt.js                                               3.09 kB │ gzip:   1.17 kB
+build/client/assets/GooglePay-B53WnudL-CuCVcQgc.js                                    3.10 kB │ gzip:   1.45 kB
+build/client/assets/EmailInputForm-Cqo1mda8-CBJKHfBn.js                               3.11 kB │ gzip:   1.00 kB
+build/client/assets/sendTransaction-CTXMHEXJ.js                                       3.11 kB │ gzip:   1.31 kB
+build/client/assets/EmbeddedWalletPasswordUpdateScreen-Ce4369UE-Bh3cyKTX.js           3.13 kB │ gzip:   1.26 kB
+build/client/assets/createLucideIcon-CK4TxBo_.js                                      3.13 kB │ gzip:   1.50 kB
+build/client/assets/Badge-br6bX9R7.js                                                 3.21 kB │ gzip:   1.28 kB
+build/client/assets/PhCurrencyDollar-BgiaenCi.js                                      3.22 kB │ gzip:   1.32 kB
+build/client/assets/CopyToClipboard-i_OQSBJr-CGFiLYpo.js                              3.23 kB │ gzip:   1.36 kB
+build/client/assets/ConnectButton-B9VPf4nG.js                                         3.26 kB │ gzip:   1.63 kB
+build/client/assets/PhQuestion-wOWJBd3G.js                                            3.28 kB │ gzip:   1.43 kB
+build/client/assets/CrossAppAuthScreen-CjEnrdrJ-BZHRxiGX.js                           3.32 kB │ gzip:   1.67 kB
+build/client/assets/ConnectOnlyStatusScreen-HQr2eWJ8-fEFrf4fp.js                      3.35 kB │ gzip:   1.63 kB
+build/client/assets/PhImage-Cf0J2ZfJ.js                                               3.40 kB │ gzip:   1.43 kB
+build/client/assets/config-C6xNDieX.js                                                3.41 kB │ gzip:   1.18 kB
+build/client/assets/PasskeyStatusScreen-CPNqvDoG-X8hY_Rol.js                          3.48 kB │ gzip:   1.68 kB
+build/client/assets/board-view-O730OQLn.js                                            3.58 kB │ gzip:   1.57 kB
+build/client/assets/PasswordRecoveryScreen-BBadAC-E-CTBsuaK_.js                       3.58 kB │ gzip:   1.79 kB
+build/client/assets/TelegramAuthScreen-BG263Fwa-DETrPo7p.js                           3.59 kB │ gzip:   1.75 kB
+build/client/assets/PhArrowsClockwise-BXRn1GEl.js                                     3.84 kB │ gzip:   1.57 kB
+build/client/assets/PhWarning-CoKs3gz6.js                                             3.88 kB │ gzip:   1.47 kB
+build/client/assets/FarcasterSignerStatusScreen-B67IDHNj-C8xKccIQ.js                  3.88 kB │ gzip:   1.69 kB
+build/client/assets/styles-BSL8-rdX-B1GDzaeD.js                                       3.89 kB │ gzip:   1.12 kB
+build/client/assets/react-dom-DnR5jFRL.js                                             3.89 kB │ gzip:   1.41 kB
+build/client/assets/utils-oVEYY1QK.js                                                 3.91 kB │ gzip:   1.57 kB
+build/client/assets/AddFundsSelectionScreen-D252cdfE-3mmdxgS1.js                      4.04 kB │ gzip:   1.67 kB
+build/client/assets/PhIdentificationCard-CfkZm-5K.js                                  4.19 kB │ gzip:   1.63 kB
+build/client/assets/SignRequestScreen-Chf6Z75H-108Sncd2.js                            4.21 kB │ gzip:   2.16 kB
+build/client/assets/RulesPanel-b0Twxffe.js                                            4.27 kB │ gzip:   1.79 kB
+build/client/assets/RecoverySelectionScreen-B4zO4H6R-CRU4kUOB.js                      4.29 kB │ gzip:   2.08 kB
+build/client/assets/utils-62W0Csdc.js                                                 4.29 kB │ gzip:   1.76 kB
+build/client/assets/CoinbaseOnrampStatusScreen-MwBZBEO8-BiEJbp-G.js                   4.38 kB │ gzip:   1.97 kB
+build/client/assets/ErrorScreen-CZXyXJwt-Bmzdkgd-.js                                  4.39 kB │ gzip:   1.85 kB
+build/client/assets/PhSpinner-CGDmbzUd.js                                             4.42 kB │ gzip:   1.63 kB
+build/client/assets/ConnectPhoneForm-CSL588et-K7v07G2T.js                             4.49 kB │ gzip:   1.79 kB
+build/client/assets/MfaAuthEnrollmentFlowScreen-aQyc42kT-BEbiRnKa.js                  4.56 kB │ gzip:   1.82 kB
+build/client/assets/admin.leads-BW838jTY.js                                           4.57 kB │ gzip:   2.05 kB
+build/client/assets/sessions-DrE_s6db.js                                              4.76 kB │ gzip:   2.00 kB
+build/client/assets/MoonpayStatusScreen-C_ioqmOe--L6sG9-X.js                          4.77 kB │ gzip:   2.33 kB
+build/client/assets/TypeSelect-BglBiTtW.js                                            4.79 kB │ gzip:   2.00 kB
+build/client/assets/PhLightbulb-C4FZV7Es.js                                           4.88 kB │ gzip:   1.84 kB
+build/client/assets/PhQrCode-CP3tFauY.js                                              4.89 kB │ gzip:   1.46 kB
+build/client/assets/errors-BQ3N-RVt-BLqjTPNR.js                                       4.90 kB │ gzip:   1.98 kB
+build/client/assets/stripe.esm-BCW9KcRF.js                                            5.08 kB │ gzip:   1.79 kB
+build/client/assets/ManualTransferScreen-D_NY_W-D-CqEFSM8x.js                         5.12 kB │ gzip:   2.38 kB
+build/client/assets/CategoryFilter-BvhZt_S0.js                                        5.26 kB │ gzip:   2.50 kB
+build/client/assets/EmbeddedWalletKeyExportScreen-CkF-zPTJ-BCO0cGn6.js                5.31 kB │ gzip:   2.28 kB
+build/client/assets/esm-DbPpv0LF.js                                                   5.34 kB │ gzip:   1.20 kB
+build/client/assets/PhPuzzlePiece-BjoNVfST.js                                         5.34 kB │ gzip:   1.94 kB
+build/client/assets/Shuffle-CKPhXCXe.js                                               5.37 kB │ gzip:   2.39 kB
+build/client/assets/SelectSourceAsset-BE6EzMW7-CqZ9Si9i.js                            5.40 kB │ gzip:   2.05 kB
+build/client/assets/useActiveWallet-DCQDqX3Q-DUd61YoQ.js                              5.44 kB │ gzip:   2.17 kB
+build/client/assets/TransactionDetails-BOeB1w20-DTttwMGy.js                           5.46 kB │ gzip:   1.79 kB
+build/client/assets/prepareAuthorization-Y9ybAN3o.js                                  5.50 kB │ gzip:   2.38 kB
+build/client/assets/OAuthStatusScreen-CippSqIJ-C-ca22cL.js                            5.64 kB │ gzip:   2.64 kB
+build/client/assets/categories-Bj3FzTt7.js                                            5.68 kB │ gzip:   2.51 kB
+build/client/assets/PhGlobe-DvmSc9_A.js                                               5.69 kB │ gzip:   1.91 kB
+build/client/assets/features-BMeqbKoo.js                                              5.71 kB │ gzip:   2.24 kB
+build/client/assets/useCompositeListItem-Dp-j4y6B.js                                  5.72 kB │ gzip:   2.41 kB
+build/client/assets/AwaitingSolToEvmBridgingScreen-m93Tmzeb-81ZlYV4B.js               5.87 kB │ gzip:   2.64 kB
+build/client/assets/rules-Cz1OOTCV.js                                                 5.95 kB │ gzip:   1.88 kB
+build/client/assets/profile-dialog-B8QoXjvi.js                                        6.08 kB │ gzip:   2.76 kB
+build/client/assets/BoardList-C7F893yd.js                                             6.10 kB │ gzip:   2.13 kB
+build/client/assets/shared-C4KM7VSO-DI-wRx5Z.js                                       6.16 kB │ gzip:   2.05 kB
+build/client/assets/to-ui-error-DriSyvzX-BR9IlfJf.js                                  6.16 kB │ gzip:   2.55 kB
+build/client/assets/LinkPasskeyScreen-BjrBgk8F-BZRPqQII.js                            6.62 kB │ gzip:   2.61 kB
+build/client/assets/storage-DWGw0C_e-DHoQdDID.js                                      6.75 kB │ gzip:   2.91 kB
+build/client/assets/Screen-Dtn4lspb-qQTAWk4v.js                                       6.96 kB │ gzip:   2.32 kB
+build/client/assets/TurnstileWrapper-20sam7uS-Db86PK69.js                             7.22 kB │ gzip:   2.84 kB
+build/client/assets/esm-DJNUAQDg.js                                                   7.57 kB │ gzip:   2.89 kB
+build/client/assets/FarcasterConnectStatusScreen-C9sUwPj2-ZHGDPaC5.js                 7.61 kB │ gzip:   3.28 kB
+build/client/assets/initiative.edit-CBqeV9lL.js                                       7.61 kB │ gzip:   3.01 kB
+build/client/assets/react-B83maXwk.js                                                 7.87 kB │ gzip:   3.00 kB
+build/client/assets/use-unlink-wallet-CzhLmtfX-BTX3eMNY.js                            8.07 kB │ gzip:   3.32 kB
+build/client/assets/AwaitingEvmToSolBridgingScreen-kxYkefvS-BAcI6N2f.js               8.21 kB │ gzip:   3.42 kB
+build/client/assets/LinkConflictScreen-BIU8ewTv-Bc7NOurO.js                           8.25 kB │ gzip:   3.09 kB
+build/client/assets/admin.maintenance-C82z1xWw.js                                     8.28 kB │ gzip:   3.43 kB
+build/client/assets/FundSolWalletWithExternalSolanaWallet-DAgCcGSZ-DAWDp18E.js        8.39 kB │ gzip:   3.50 kB
+build/client/assets/ofetch.CWycOUEr-CHp-crOQ.js                                       8.41 kB │ gzip:   3.38 kB
+build/client/assets/RecoveryOAuthStatusScreen-x9acanvl-C1k86S3f.js                    8.50 kB │ gzip:   3.27 kB
+build/client/assets/resolveValueLabel-DV-kh5C6.js                                     8.91 kB │ gzip:   3.60 kB
+build/client/assets/isAddress-DjlY5mLy.js                                             8.91 kB │ gzip:   3.35 kB
+build/client/assets/FundingMethodSelectionScreen-C7QABfvW-BcoE3tTL.js                 8.95 kB │ gzip:   3.41 kB
+build/client/assets/esm-Ci1ogKuK.js                                                   8.95 kB │ gzip:   2.91 kB
+build/client/assets/AwaitingPasswordlessCodeScreen-Y39Smn5S-Pda5zG42.js               9.11 kB │ gzip:   3.79 kB
+build/client/assets/useAnchoredPopupScrollLock-CRIG3lLt.js                            9.20 kB │ gzip:   3.98 kB
+build/client/assets/ConnectionStatusScreen-CkSP8_A8-D4GnsGsv.js                       9.57 kB │ gzip:   4.01 kB
+build/client/assets/wallet-island-Cvk56p4E.js                                        10.04 kB │ gzip:   3.65 kB
+build/client/assets/PinInput-DbZ0b1i1-Bz4p_rie.js                                    10.18 kB │ gzip:   3.71 kB
+build/client/assets/CaipNetworkUtil-CXYOcJYI.js                                      10.23 kB │ gzip:   4.70 kB
+build/client/assets/MfaEnrollmentFlowScreen-CsCKhXOZ-BIkANo3H.js                     10.23 kB │ gzip:   3.47 kB
+build/client/assets/FundWithBankDepositScreen-CPTWNJlt-DvOc9b2C.js                   10.31 kB │ gzip:   3.77 kB
+build/client/assets/lib-3425Ojji.js                                                  10.94 kB │ gzip:   4.40 kB
+build/client/assets/TransferFromWalletScreen-FPypY7tU-DZ91fNtc.js                    10.95 kB │ gzip:   3.72 kB
+build/client/assets/AwaitingExternalEthereumTransferScreen-CRXTmg6K-BpNqrPkN.js      11.09 kB │ gzip:   4.22 kB
+build/client/assets/PhSealCheck-vIKzREuN.js                                          12.07 kB │ gzip:   4.06 kB
+build/client/assets/wallet-connect-Ca-N52lE-D0L8kqc-.js                              12.27 kB │ gzip:   6.05 kB
+build/client/assets/Links-GZyVgZyq.js                                                12.49 kB │ gzip:   4.42 kB
+build/client/assets/useI18n-DJGbXMkU-BEi0VDxl.js                                     12.70 kB │ gzip:   3.33 kB
+build/client/assets/utils-BXFGdsjd.js                                                12.75 kB │ gzip:   5.30 kB
+build/client/assets/DirectionContext-E6AzmxwG.js                                     12.83 kB │ gzip:   5.20 kB
+build/client/assets/hooks.module-QanQLMCy.js                                         13.05 kB │ gzip:   5.35 kB
+build/client/assets/TransferOrBridgeLoadingScreen-BHVCJFXe-BOC2SKiS.js               13.63 kB │ gzip:   5.21 kB
+build/client/assets/session-DogbZOWl.js                                              13.67 kB │ gzip:   5.26 kB
+build/client/assets/DepositAddressScreen-DIaAeDcJ-DctWw-x0.js                        14.27 kB │ gzip:   4.92 kB
+build/client/assets/DepositAddressAddressStepView-DEuzIXen-WVxz1I8W.js               14.41 kB │ gzip:   5.16 kB
+build/client/assets/draft-D-gDAO6P.js                                                15.41 kB │ gzip:   6.01 kB
+build/client/assets/privy-CdY5JpPR.js                                                15.53 kB │ gzip:   6.12 kB
+build/client/assets/CategoryDots-SrkYQVKK.js                                         15.75 kB │ gzip:   6.01 kB
+build/client/assets/esm-BnsPIjby.js                                                  16.17 kB │ gzip:   6.00 kB
+build/client/assets/property-DuZ9DLP4.js                                             16.17 kB │ gzip:   6.08 kB
+build/client/assets/index-DjJmUJpR-DsrYnPDz.js                                       16.38 kB │ gzip:   5.60 kB
+build/client/assets/DepositAddressV3Screen-CrX8jlrq-ChdRWtma.js                      16.39 kB │ gzip:   5.40 kB
+build/client/assets/floating-ui.react-dom-k3VbD3mz.js                                16.45 kB │ gzip:   6.59 kB
+build/client/assets/wallet-picker-B5r-dy2Z.js                                        16.71 kB │ gzip:   6.50 kB
+build/client/assets/DonateWidget-DTz77bQd.js                                         18.08 kB │ gzip:   6.90 kB
+build/client/assets/StandardSignAndSendTransactionScreen-BlF4_0ms-NKgUgyrc.js        19.74 kB │ gzip:   6.47 kB
+build/client/assets/HCaptchaWrapper-CUi9LJsp-CtZPmYDh.js                             20.12 kB │ gzip:   7.48 kB
+build/client/assets/PopoverPopup-pmPjAFLu.js                                         20.49 kB │ gzip:   7.27 kB
+build/client/assets/index-DEvxmE29-C_SXa1To.js                                       21.23 kB │ gzip:   6.10 kB
+build/client/assets/CustomLandingScreenView-BKG1b2JP-BDP8rTzr.js                     21.26 kB │ gzip:   7.27 kB
+build/client/assets/useQuery-aTVvxPYp.js                                             22.49 kB │ gzip:   7.46 kB
+build/client/assets/ModalFooter-BldNwiHO-jwMMoOF1.js                                 22.69 kB │ gzip:   7.33 kB
+build/client/assets/lib-CAUiwVS5.js                                                  23.20 kB │ gzip:   9.92 kB
+build/client/assets/EnrollTotp-9U-h-h7Y-_zgUWSuR.js                                  23.89 kB │ gzip:   9.94 kB
+build/client/assets/browser-CQ2H9MfN.js                                              24.00 kB │ gzip:   9.07 kB
+build/client/assets/CategoriesPicker-DeDbZ3uw.js                                     24.25 kB │ gzip:   8.74 kB
+build/client/assets/admin.vote-6aBrTNf5.js                                           24.97 kB │ gzip:   9.93 kB
+build/client/assets/TransactionErrorView-CHChscnJ-B2WodVDw.js                        25.09 kB │ gzip:   6.80 kB
+build/client/assets/twitch-5IOe4sIQ-DT9EQZ9q.js                                      26.52 kB │ gzip:  14.33 kB
+build/client/assets/wagmi-B1humLSH.js                                                27.16 kB │ gzip:   8.74 kB
+build/client/assets/utils-Cu90ILtz.js                                                27.68 kB │ gzip:   8.78 kB
+build/client/assets/admin.initiative-ChEv9-1S.js                                     27.87 kB │ gzip:   8.78 kB
+build/client/assets/Select-DUjNLRBe.js                                               28.16 kB │ gzip:  10.04 kB
+build/client/assets/p256-CTbSG5wC.js                                                 29.51 kB │ gzip:  11.49 kB
+build/client/assets/Loader-UAZqxsnw-BQ4jjwVe.js                                      29.78 kB │ gzip:  12.01 kB
+build/client/assets/ComboboxItem-r6djpjMs.js                                         30.62 kB │ gzip:  10.99 kB
+build/client/assets/admin.dashboard-ChkyJz2A.js                                      30.85 kB │ gzip:   9.68 kB
+build/client/assets/secp256k1-CIV_lNct.js                                            31.37 kB │ gzip:  13.34 kB
+build/client/assets/root-Ceef3wQV.js                                                 31.67 kB │ gzip:  10.63 kB
+build/client/assets/errorBoundaries-DwABFYiH.js                                      32.29 kB │ gzip:  11.35 kB
+build/client/assets/floating-ui.react-Da7S7TL3.js                                    32.31 kB │ gzip:  11.44 kB
+build/client/assets/HelpersUtil-RbDkVX_i.js                                          40.24 kB │ gzip:  12.30 kB
+build/client/assets/initiative-BAs2wj0V.js                                           41.00 kB │ gzip:  13.46 kB
+build/client/assets/BridgeNetworkSelectionView-Crnt5gup-Dy4ZKkP6.js                  41.78 kB │ gzip:  14.62 kB
+build/client/assets/useScrollLock-CamePFcr.js                                        44.70 kB │ gzip:  15.75 kB
+build/client/assets/terms-D_p8HOG1.js                                                45.36 kB │ gzip:  10.37 kB
+build/client/assets/board-CBS6u3WK.js                                                46.40 kB │ gzip:  16.94 kB
+build/client/assets/ConnectWalletView-BLywHxyt-BCGK782z.js                           54.52 kB │ gzip:  17.79 kB
+build/client/assets/submit-CaZy13Z0.js                                               57.21 kB │ gzip:  18.09 kB
+build/client/assets/FilterSheet-DobVVl3v.js                                          62.45 kB │ gzip:  22.51 kB
+build/client/assets/privy-context-CHgh9ALO-CZQrP9t1.js                               63.46 kB │ gzip:  18.48 kB
+build/client/assets/components-DRa3_jUd.js                                           66.38 kB │ gzip:  21.29 kB
+build/client/assets/useWallets-Bdalx8ys-D0e81ZyW.js                                  67.17 kB │ gzip:  21.19 kB
+build/client/assets/core-B6iLdH5U.js                                                 71.27 kB │ gzip:  20.11 kB
+build/client/assets/SetWalletPasswordForm-mtF9E932-D8Doa2m9.js                       76.15 kB │ gzip:  30.91 kB
+build/client/assets/basic-CBV1rck4.js                                                81.10 kB │ gzip:  17.32 kB
+build/client/assets/FiatOnrampScreen-mHppmT9g-BtAT4Pc4.js                            90.66 kB │ gzip:  26.50 kB
+build/client/assets/InitiativeForm-DtRt7k-y.js                                       94.08 kB │ gzip:  32.83 kB
+build/client/assets/wui-list-item-DpjCpdBM.js                                        97.58 kB │ gzip:  27.19 kB
+build/client/assets/ccip-BbmWZK4Q.js                                                106.18 kB │ gzip:  29.48 kB
+build/client/assets/_esm-2eaa1Vhr.js                                                127.72 kB │ gzip:  38.64 kB
+build/client/assets/Reveal-lnuKglFb.js                                              135.33 kB │ gzip:  44.81 kB
+build/client/assets/toViemAccount-BEZt_I8V-C93m4i1a.js                              140.13 kB │ gzip:  40.73 kB
+build/client/assets/ApiController-ClcX4x3E.js                                       143.96 kB │ gzip:  43.18 kB
+build/client/assets/index.es-C22wHZ26.js                                            157.11 kB │ gzip:  52.31 kB
+build/client/assets/Markdown-Cx_Xo4b9.js                                            159.52 kB │ gzip:  48.00 kB
+build/client/assets/w3m-modal-CguUoc4K.js                                           165.02 kB │ gzip:  34.60 kB
+build/client/assets/entry.client-DaiVtek0.js                                        211.18 kB │ gzip:  66.29 kB
+build/client/assets/dist-l5XIgqAi.js                                                239.38 kB │ gzip:  63.73 kB
+build/client/assets/tempoModerato-DJ742JVR.js                                       240.27 kB │ gzip:  41.00 kB
+build/client/assets/use-deposit-address-BdO356-0-CWGKOtE8.js                        258.28 kB │ gzip:  76.23 kB
+build/client/assets/html2canvas-pro.esm-C5QLzfzX.js                                 261.60 kB │ gzip:  67.51 kB
+build/client/assets/dist-DpU6aipy.js                                                277.66 kB │ gzip: 106.15 kB
+build/client/assets/index-BStyLWM--BIUvTdcs.js                                      281.69 kB │ gzip:  79.91 kB
+build/client/assets/AlertController-CywAh7yn.js                                     288.77 kB │ gzip:  82.38 kB
+build/client/assets/esm-Chx5J9bZ.js                                                 343.27 kB │ gzip:  83.79 kB
+
+✓ built in 1m 27s
+[33m[PLUGIN_TIMINGS] [0mPlugin hooks ran for 79.4s of this 86.6s build (92%).
+The slowest hooks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - @tailwindcss/vite:generate:build transform (30%, 25.9s, 1 call)
+Additional hook time came from the hooks below and from hooks under 1s.
+20 hooks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:
+  - react-router:dot-server resolveId (34449 calls)
+  - react-router:virtual-modules resolveId (68898 calls)
+  - react-router:hmr-runtime resolveId (68898 calls)
+  … and 17 more
+See https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.
+
+vite v8.3.0 building ssr environment for production...
+transforming...
+✓ 243 modules transformed.
+rendering chunks...
+
+✓ 1 asset cleaned from React Router server build.
+build/server/assets/server-build-DiBMoO2H.css
+
+computing gzip size...
+build/server/.vite/manifest.json                       7.55 kB │ gzip:   1.18 kB
+build/server/assets/server-build-DiBMoO2H.css        115.99 kB │ gzip:  20.23 kB
+build/server/assets/board-links-CZCRzBYR.js            0.31 kB │ gzip:   0.23 kB
+build/server/assets/utils-CwXxGALA.js                  0.44 kB │ gzip:   0.30 kB
+build/server/assets/lazy-part-DeCcleCy.js              0.69 kB │ gzip:   0.42 kB
+build/server/assets/site-BPUKW1hP.js                   1.00 kB │ gzip:   0.53 kB
+build/server/assets/Field-Bpu-EzIX.js                  1.24 kB │ gzip:   0.54 kB
+build/server/assets/Button-DF8Sfb0w.js                 1.29 kB │ gzip:   0.57 kB
+build/server/assets/DotsFace-CjCOvnaZ.js               1.54 kB │ gzip:   0.90 kB
+build/server/assets/use-watchlist-offer-DdcIcz1k.js    1.77 kB │ gzip:   0.87 kB
+build/server/assets/wallet-island-OKauTsDN.js          1.92 kB │ gzip:   0.81 kB
+build/server/assets/format-v7CG06I8.js                 2.19 kB │ gzip:   1.07 kB
+build/server/assets/privy-store-C5UGMVVP.js            2.43 kB │ gzip:   1.01 kB
+build/server/assets/wallet-store-6VVKIhSF.js           2.57 kB │ gzip:   1.07 kB
+build/server/assets/CategoryTrigger-Bp3TQeXx.js        3.18 kB │ gzip:   1.45 kB
+build/server/assets/CategoryDots-C_yqyIDy.js           3.40 kB │ gzip:   1.40 kB
+build/server/assets/WatchlistOffer-CavYEO-v.js         3.52 kB │ gzip:   1.45 kB
+build/server/assets/wagmi-uW_n0YfJ.js                  4.81 kB │ gzip:   1.66 kB
+build/server/assets/Badge-BU3rwX0q.js                  4.84 kB │ gzip:   1.85 kB
+build/server/assets/ConnectButton-Bv7Tmt_R.js          5.37 kB │ gzip:   2.06 kB
+build/server/assets/focus-handover-CvFsTzWP.js         5.41 kB │ gzip:   2.38 kB
+build/server/assets/use-watchlist-BF0qJR93.js          5.86 kB │ gzip:   2.23 kB
+build/server/assets/FilterSheet-BFI_Nb9s.js            9.32 kB │ gzip:   2.89 kB
+build/server/assets/BoardList-D7ahOZAk.js              9.86 kB │ gzip:   3.10 kB
+build/server/assets/privy-BpXePHrh.js                 10.40 kB │ gzip:   3.59 kB
+build/server/assets/SheetTrigger-CW1rQDoy.js          10.54 kB │ gzip:   4.03 kB
+build/server/assets/Reveal-CNwrPtQU.js                16.14 kB │ gzip:   6.33 kB
+build/server/assets/Shuffle-BUHkFXOu.js               16.36 kB │ gzip:   6.02 kB
+build/server/assets/session-CfbEnTEb.js               28.10 kB │ gzip:   8.77 kB
+build/server/assets/WalletMenu-DBGtshZw.js            65.49 kB │ gzip:  21.02 kB
+build/server/index.js                                638.47 kB │ gzip: 162.37 kB
+
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0mapp/components/donate/DonateWidget.tsx is dynamically imported by app/components/board/InitiativeCard.tsx but also statically imported by app/components/initiative/SideCards.tsx, dynamic import will not move module into another chunk.
+
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0mapp/components/board/filters/CategoryFilter.tsx is dynamically imported by app/components/board/FilterBar.tsx but also statically imported by app/components/admin/AdminFilters.tsx, dynamic import will not move module into another chunk.
+
+✓ built in 424ms
+Download https://registry.npmjs.org/react-router
+Download https://registry.npmjs.org/isbot
+Download https://registry.npmjs.org/react
+Download https://registry.npmjs.org/@tanstack%2freact-query
+Download https://registry.npmjs.org/react-dom
+Download https://registry.npmjs.org/lucide-react
+Download https://registry.npmjs.org/motion
+Download https://registry.npmjs.org/@base-ui%2freact
+Download https://registry.npmjs.org/react-markdown
+Download https://registry.npmjs.org/remark-gfm
+Download https://registry.npmjs.org/rehype-sanitize
+Download https://registry.npmjs.org/viem
+Download https://registry.npmjs.org/wagmi
+Download https://registry.npmjs.org/diff
+Download https://registry.npmjs.org/ogl
+Download https://registry.npmjs.org/html2canvas-pro
+Download https://registry.npmjs.org/clsx
+Download https://registry.npmjs.org/tailwind-merge
+Download https://registry.npmjs.org/qrcode.react
+Download https://registry.npmjs.org/@privy-io%2freact-auth
+Download https://registry.npmjs.org/input-otp
+Prerender (html): / -> build/client/index.html
+Prerender (html): /submit -> build/client/submit/index.html
+Prerender (html): /submit/thanks -> build/client/submit/thanks/index.html
+Prerender (html): /donation-terms -> build/client/donation-terms/index.html
+Prerender (html): SPA Fallback -> build/client/__spa-fallback.html

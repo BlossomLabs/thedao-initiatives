@@ -1,0 +1,284 @@
+{
+  "method": "unauthenticated GET, no redirect or cookie",
+  "observations": [
+    {
+      "url": "https://initiatives.thedao.fund/",
+      "at": "2026-10-07T02:29:22.186202+00:00",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=UTF-8",
+        "cache-control": "no-cache",
+        "content-security-policy": "default-src 'self'; script-src 'self' 'sha256-8Ugic3NRgBWpQ1+EaBSMlK1GGGNaHSUYf+Q88uCsJzQ=' 'sha256-X+PV4o5mNco/Pvq+pI48kE+2DEZFB7C85wagfp0G5Bc=' 'sha256-87Pld+AwOO2L6dmRegVlD33TJDbuZH3pMBglXjG4Lwo=' 'sha256-duhaxWNI+6QAukUMmlYrkl97X+e0pxobkwS+TpY5/CQ=' 'sha256-RBZNiG3Ztb26Xi/69+VRecU4BPhrfxcvspLXMRrrCNE=' 'sha256-n1D9cZXw4ZNSiUR+6/8u4KC6Mx7KCFb9ScJA8U0UdhI=' 'sha256-eWa6DMZRMTkb7k2BX579qgK/VGeDqc4D+SQPSUKmNtE=' 'sha256-oxY3kJFD8nPAzLmNb5TnCAxJGeMcTN97EQx1KJtdoIA=' 'sha256-7mu4H06fwDCjmnxxr/xNHyuQC6pLTHr4M2E4jXw5WZs=' 'sha256-QAlSewaQLi/NPCznjAZSyvQ72heD0VdxmNDDkZeCxgc=' 'sha256-IN0OVa/Pemg91Qhq+lNNlB0i4+sqpY5dExbyPs4rpMc=' 'sha256-vBUjsHkMhDuVzcqba4xi8+FNYS/SDdgCNznxdFxReQY=' 'sha256-trPIXEZg6FYZP5qrJppu6PGJJSEm8iO9RohnINwX78w='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://auth.privy.io https://*.rpc.privy.systems https://rpc.walletconnect.com https://rpc.walletconnect.org https://relay.walletconnect.com https://relay.walletconnect.org wss://relay.walletconnect.com wss://relay.walletconnect.org https://pulse.walletconnect.com https://pulse.walletconnect.org https://explorer-api.walletconnect.com https://api.web3modal.com https://api.web3modal.org https://keys.walletconnect.com https://keys.walletconnect.org https://ethereum-rpc.publicnode.com https://eth.merkle.io https://cloudflare-eth.com https://lb.drpc.live; frame-src https://auth.privy.io https://verify.walletconnect.com https://verify.walletconnect.org https://secure.walletconnect.com https://secure.walletconnect.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; report-uri /api/csp-report",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "etag": "W/\"5e8c-rx9aCnYrOmd/5/muxL41QN8kHR7\""
+      },
+      "body_bytes": 24204,
+      "truncated": false,
+      "body_sha256": "6fd5a8f24c666c6678723eac6a5f8d206a455721b1dad6f917bb6b6c3a446802",
+      "inline_script_hashes": [
+        "'sha256-8Ugic3NRgBWpQ1+EaBSMlK1GGGNaHSUYf+Q88uCsJzQ='",
+        "'sha256-n1D9cZXw4ZNSiUR+6/8u4KC6Mx7KCFb9ScJA8U0UdhI='",
+        "'sha256-eWa6DMZRMTkb7k2BX579qgK/VGeDqc4D+SQPSUKmNtE='",
+        "'sha256-IN0OVa/Pemg91Qhq+lNNlB0i4+sqpY5dExbyPs4rpMc='",
+        "'sha256-duhaxWNI+6QAukUMmlYrkl97X+e0pxobkwS+TpY5/CQ='",
+        "'sha256-RBZNiG3Ztb26Xi/69+VRecU4BPhrfxcvspLXMRrrCNE='",
+        "'sha256-7mu4H06fwDCjmnxxr/xNHyuQC6pLTHr4M2E4jXw5WZs='",
+        "'sha256-QAlSewaQLi/NPCznjAZSyvQ72heD0VdxmNDDkZeCxgc='"
+      ],
+      "all_inline_hashes_in_enforced_csp": true
+    },
+    {
+      "url": "https://initiatives.thedao.fund/api/auth/me",
+      "at": "2026-10-07T02:29:22.830488+00:00",
+      "status": 401,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "access-control-allow-credentials": "true",
+        "x-app-version": "a857654e"
+      },
+      "body_bytes": 42,
+      "truncated": false,
+      "body_sha256": "44cdc1ccec979dd61511850b5ad163e74a5f9a1d70b2a6faf3f0849b86700331"
+    },
+    {
+      "url": "https://initiatives.thedao.fund/healthz",
+      "at": "2026-10-07T02:29:23.175688+00:00",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "access-control-allow-credentials": "true",
+        "x-app-version": "a857654e"
+      },
+      "body_bytes": 129,
+      "truncated": false,
+      "body_sha256": "c697111872d5089925ee87ca2348897d12a17f9ddb61b70fcf293020ab727f34"
+    },
+    {
+      "url": "https://initiatives.thedao.fund/api/version",
+      "at": "2026-10-07T02:29:23.498339+00:00",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "access-control-allow-credentials": "true",
+        "x-app-version": "a857654e"
+      },
+      "body_bytes": 22,
+      "truncated": false,
+      "body_sha256": "660ee398c7691c3ce1b8e835bfa4231e89d1cbc03f21b9cb2ee839ec568307c1",
+      "public_version": {
+        "version": "a857654e"
+      }
+    },
+    {
+      "url": "https://initiatives.thedao.fund/api/board/settings",
+      "at": "2026-10-07T02:29:23.810328+00:00",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "access-control-allow-credentials": "true",
+        "x-app-version": "a857654e"
+      },
+      "body_bytes": 127,
+      "truncated": false,
+      "body_sha256": "e8655c602ef2c86dfda3021707c69ccdbeb3376af2db179b187084a8b82e4e3e"
+    },
+    {
+      "url": "https://initiatives.thedao.fund/api/initiatives.json",
+      "at": "2026-10-07T02:29:24.143880+00:00",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "public, max-age=300",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "access-control-allow-origin": "*",
+        "x-app-version": "a857654e",
+        "etag": "W/\"15eb26cb62ccff75a7a7f676dba63ccb\""
+      },
+      "body_bytes": 571147,
+      "truncated": false,
+      "body_sha256": "15eb26cb62ccff75a7a7f676dba63ccb79c38afa3216a0e348fd2ed5839c69cd",
+      "feed_count": 49,
+      "private_field_names_present": []
+    },
+    {
+      "url": "https://initiatives.thedao.fund/llms.txt",
+      "at": "2026-10-07T02:29:25.099656+00:00",
+      "status": 200,
+      "headers": {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "public, max-age=300",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "access-control-allow-origin": "*",
+        "x-app-version": "a857654e",
+        "etag": "W/\"035d53bb390a8e0a384b7a018f708474\""
+      },
+      "body_bytes": 11990,
+      "truncated": false,
+      "body_sha256": "035d53bb390a8e0a384b7a018f7084744a6df41bfa96f3d7e6babd08f8973f55"
+    },
+    {
+      "url": "https://initiatives.thedao.fund/api/admin/leads",
+      "at": "2026-10-07T02:29:25.528329+00:00",
+      "status": 401,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "access-control-allow-credentials": "true",
+        "x-app-version": "a857654e"
+      },
+      "body_bytes": 42,
+      "truncated": false,
+      "body_sha256": "44cdc1ccec979dd61511850b5ad163e74a5f9a1d70b2a6faf3f0849b86700331"
+    },
+    {
+      "url": "https://initiatives.thedao.fund/api/admin/backup",
+      "at": "2026-10-07T02:29:25.830578+00:00",
+      "status": 401,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "access-control-allow-credentials": "true",
+        "x-app-version": "a857654e"
+      },
+      "body_bytes": 42,
+      "truncated": false,
+      "body_sha256": "44cdc1ccec979dd61511850b5ad163e74a5f9a1d70b2a6faf3f0849b86700331"
+    },
+    {
+      "url": "https://initiatives.thedao.fund/api/watchlist",
+      "at": "2026-10-07T02:29:26.142126+00:00",
+      "status": 401,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "access-control-allow-credentials": "true",
+        "x-app-version": "a857654e"
+      },
+      "body_bytes": 42,
+      "truncated": false,
+      "body_sha256": "44cdc1ccec979dd61511850b5ad163e74a5f9a1d70b2a6faf3f0849b86700331"
+    },
+    {
+      "url": "https://initiatives.thedao.fund/api/comments/mine",
+      "at": "2026-10-07T02:29:26.452427+00:00",
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "access-control-allow-credentials": "true",
+        "x-app-version": "a857654e"
+      },
+      "body_bytes": 21,
+      "truncated": false,
+      "body_sha256": "51d0a9e3bd9ffc25483790aaffe7a3597e642edd040dddb16aafc324e6e922ed"
+    },
+    {
+      "url": "https://initiatives.thedao.fund/api/security-review-nonexistent",
+      "at": "2026-10-07T02:29:26.762375+00:00",
+      "status": 404,
+      "headers": {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
+        "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "access-control-allow-credentials": "true",
+        "x-app-version": "a857654e"
+      },
+      "body_bytes": 21,
+      "truncated": false,
+      "body_sha256": "51d0a9e3bd9ffc25483790aaffe7a3597e642edd040dddb16aafc324e6e922ed"
+    },
+    {
+      "url": "http://initiatives.thedao.fund/api/auth/me",
+      "at": "2026-10-07T02:29:27.080775+00:00",
+      "status": 301,
+      "headers": {
+        "location": "https://initiatives.thedao.fund/api/auth/me"
+      },
+      "body_bytes": 0,
+      "truncated": false,
+      "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "url": "http://initiatives.thedao.fund/",
+      "at": "2026-10-07T02:29:27.153823+00:00",
+      "status": 301,
+      "headers": {
+        "location": "https://initiatives.thedao.fund/"
+      },
+      "body_bytes": 0,
+      "truncated": false,
+      "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

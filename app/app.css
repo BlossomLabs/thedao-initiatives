@@ -131,13 +131,24 @@
     color: #fff;
     font: 400 14px/1.5 var(--font-inter-tight);
     background-color: var(--color-dao-blue);
-    background-image: linear-gradient(
+    /* The gradient stays put while the page scrolls. Under it, a second one that
+       scrolls: the colours of the first one's bottom edge, carried down the page.
+       It never shows in a browser; a full-page screenshot paints the fixed one
+       over the first screen only, and this one continues it with no edge.
+       The same pair is in root.tsx for the first paint. */
+    background-image:
+      linear-gradient(
       142.716deg,
       var(--color-dao-blue) 31.46%,
       var(--color-dao-blue-dark) 90.4%
+    ),
+      linear-gradient(
+      90deg,
+      var(--color-dao-blue) calc(31.46vw - 90.02vh),
+      var(--color-dao-blue-dark) calc(90.4vw - 12.61vh)
     );
     background-repeat: no-repeat;
-    background-attachment: fixed;
+    background-attachment: fixed, scroll;
   }
   b,
   strong {

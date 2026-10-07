@@ -48,7 +48,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <style
           dangerouslySetInnerHTML={{
             __html:
-              "html{color-scheme:dark;background:#2c5e86 linear-gradient(142.716deg,#2c5e86 31.46%,#1f435f 90.4%) fixed no-repeat;color:#fff}" +
+              "html{color-scheme:dark;background:linear-gradient(142.716deg,#2c5e86 31.46%,#1f435f 90.4%) fixed no-repeat,#2c5e86 linear-gradient(90deg,#2c5e86 calc(31.46vw - 90.02vh),#1f435f calc(90.4vw - 12.61vh));color:#fff}" +
               "body{margin:0;visibility:hidden}",
           }}
         />

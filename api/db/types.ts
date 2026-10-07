@@ -53,8 +53,13 @@ export interface Initiative {
   sections: Sections;
   milestones: Milestone[];
   links: string[];
-  /** Number of the current (latest) revision; 0 = written before revisions existed. */
+  /** Number of the current (live) revision; 0 = written before revisions existed. */
   revision: number;
+  /** The proposer's edit waiting for an admin (approved rows only), if any. */
+  pendingRevision?: number | null;
+  /** The highest revision number used, held and rejected ones included.
+   * Absent on rows that never held an edit: `revision` is the highest. */
+  lastRevision?: number;
   createdAt: number;
   approvedAt: number | null;
 }
@@ -63,8 +68,14 @@ export interface Initiative {
  * editor, a content file, or the one-off import. */
 export type RevisionSource = "submit" | "proposer" | "admin" | "content" | "import";
 
+/** `live`: published (the current text or an earlier one). `pending`: a
+ * proposer's edit to an approved initiative, waiting for an admin.
+ * `rejected`: turned down. `superseded`: replaced before it was decided. */
+export type RevisionState = "live" | "pending" | "rejected" | "superseded";
+
 /** One version of the public text (title, summary, and either the legacy
- * `details` or the structured body). Immutable except `archived`. */
+ * `details` or the structured body). Immutable except `archived` and the
+ * review fields. */
 export interface Revision {
   rfpId: string;
   /** 1-based, dense, increasing. */
@@ -83,6 +94,14 @@ export interface Revision {
   source: RevisionSource;
   /** Hidden from the public history (admins still see it). */
   archived: boolean;
+  /** Revisions written before states existed lack the key and are live. Only
+   * live ones are public; the rest are for the proposer and the admins. */
+  state?: RevisionState;
+  /** The admin who accepted or rejected it, and when. */
+  reviewedBy?: string;
+  reviewedAt?: number;
+  /** The admin's reason for rejecting it. */
+  note?: string;
   createdAt: number;
 }
 

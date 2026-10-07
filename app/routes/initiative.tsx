@@ -26,12 +26,19 @@ import { useRevision } from "~/hooks/use-revision";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { ApiError, errorMessage } from "~/lib/api";
 import { diffCategories, diffRevisions } from "~/lib/revision-diff";
-import type { RevisionText } from "~/lib/api-types";
+import type { RevisionState, RevisionText } from "~/lib/api-types";
+import Status from "~/components/ui/Status";
 import { SITE_NAME } from "~/data/site";
 import { dt } from "~/lib/format";
 import { discussionKind } from "~/lib/discussion";
 import { generateMeta } from "~/utils/meta";
 import { isStructured } from "@shared/draft/mod";
+
+/** What the chip says when the version on screen is an edit that is not public. */
+const UNPUBLISHED: Partial<Record<RevisionState, string>> = {
+  pending: "edit in review",
+  rejected: "edit not accepted",
+};
 
 export function meta() {
   return generateMeta({ title: "Initiative" });
@@ -94,13 +101,18 @@ export default function Initiative() {
   // The text on screen: the current one, or the older revision once loaded.
   const showingOld = viewing !== current && !older.error && Boolean(older.data);
   const text: RevisionText = showingOld ? older.data! : r;
-  const diff = mode === "changes" && !older.error && !prev.error && (prev.data || !prevMeta)
-    ? diffRevisions(prev.data ?? null, text, r.type)
+  // An edit that was never published (in review, rejected) is not in the
+  // history: its changes are against the live text, not a revision before it.
+  const unpublished = showingOld && older.data!.state !== "live";
+  const diff = mode === "changes" && !older.error && !prev.error &&
+      (unpublished || prev.data || !prevMeta)
+    ? diffRevisions(unpublished ? r : prev.data ?? null, text, r.type)
     : null;
   // The categories of the version on screen; one written before revisions
   // recorded them shows the current ones, and its changes view marks none.
   const categories = showingOld ? older.data!.categories : r.categories;
-  const tags = (diff && diffCategories(prevMeta ? prev.data!.categories : [], categories)) ||
+  const before = unpublished ? r.categories : prevMeta ? prev.data?.categories ?? null : [];
+  const tags = (diff && diffCategories(before, categories)) ||
     (categories ?? r.categories).map((slug) => ({ slug, added: false, removed: false }));
   // Structured rows render their sections, milestones and links; a legacy
   // revision (or one side of a diff) still shows the details blob.
@@ -153,12 +165,20 @@ export default function Initiative() {
         {showingOld && (
           <span
             className="chip chip-badge st-pending"
-            title="An older revision of the text is open"
+            title={older.data!.state === "live"
+              ? "An older revision of the text is open"
+              : "This edit was never published; only you and the team can see it"}
           >
-            superseded
+            {UNPUBLISHED[older.data!.state] ?? "superseded"}
           </span>
         )}
       </p>
+      {r.pendingRevision && viewing !== r.pendingRevision && (
+        <Status kind="wait" className="mt-4">
+          An edit to this initiative is waiting for the team's review. This page shows the approved
+          version. <Link to={`/initiative/${r.slug}?rev=${r.pendingRevision}`}>See the edit</Link>
+        </Status>
+      )}
       {viewing !== current && older.error && (
         <p className="alert" role="alert">
           That revision is not available. Showing the current text instead.

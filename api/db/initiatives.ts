@@ -145,6 +145,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     n,
     ...pickText(text),
     categories,
+    state: "live",
     author: origin.author,
     source: origin.source,
     archived: false,
@@ -407,36 +408,61 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     throw new Error("update conflict");
   }
 
+  /** What an edit starts from: the row, or the held edit it replaces. */
+  type Base = Partial<InitiativeText> & { categories?: string[] };
+
   /**
    * Write a new revision: the text and the categories `pick` returns for the
    * row as it stands. A no-op when neither changed (`revision: null`). A row
    * written before revisions existed first gets its current text snapshotted
    * as revision 1, so the history is never missing the version people saw.
+   *
+   * With `hold` the revision is stored as pending and the row keeps its live
+   * text: an admin accepts or rejects it (`review`). It builds on the edit
+   * already waiting, if any, and supersedes it.
    */
   async function writeRevision(
     id: string,
-    pick: (current: Initiative) => { text: InitiativeText; categories: string[] },
+    pick: (base: Base) => { text: InitiativeText; categories: string[] },
     origin: RevisionOrigin,
+    hold = false,
   ): Promise<{ initiative: Initiative; revision: Revision | null }> {
     for (let i = 0; i < 5; i++) {
       const cur = await kv.get<Initiative>(K.initiative(id));
       if (!cur.value) throw new Error("rfp not found");
       const initiative = cur.value;
       const before = initiative.categories ?? [];
-      const { text, categories } = pick(initiative);
-      if (sameText(initiative, text) && sameList(before, categories)) {
+      const waiting = hold && initiative.pendingRevision
+        ? await kv.get<Revision>(K.revision(id, initiative.pendingRevision))
+        : null;
+      const { text, categories } = pick(waiting?.value ?? initiative);
+      const same = (r: Base) => sameText(r, text) && sameList(r.categories ?? [], categories);
+      if (same(initiative) || (waiting?.value && same(waiting.value))) {
         return { initiative, revision: null };
       }
       const legacy = !(initiative.revision > 0);
-      const n = (legacy ? 1 : initiative.revision) + 1;
+      const n = Math.max(legacy ? 1 : initiative.revision, initiative.lastRevision ?? 0) + 1;
       const t = now();
-      const revision = revisionOf(initiative, n, text, categories, origin, t);
-      const next: Initiative = { ...initiative, ...text, categories, revision: n };
+      const revision: Revision = {
+        ...revisionOf(initiative, n, text, categories, origin, t),
+        state: hold ? "pending" : "live",
+      };
+      const next: Initiative = hold
+        ? {
+          ...initiative,
+          revision: legacy ? 1 : initiative.revision,
+          pendingRevision: n,
+          lastRevision: n,
+        }
+        : { ...initiative, ...text, categories, revision: n, lastRevision: n };
       const op = kv.atomic()
         .check(cur)
         .check({ key: K.revision(id, n), versionstamp: null })
         .set(K.initiative(id), next)
         .set(K.revision(id, n), revision);
+      if (waiting?.value) {
+        op.check(waiting).set(waiting.key, { ...waiting.value, state: "superseded" });
+      }
       indexRow(op, initiative, next);
       if (legacy) {
         op.check({ key: K.revision(id, 1), versionstamp: null }).set(
@@ -457,21 +483,84 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     throw new Error("update conflict");
   }
 
-  /** Replace the public text, and the categories when the input names them. */
-  async function revise(id: string, input: RevisionInput, origin: RevisionOrigin) {
+  /** Replace the public text, and the categories when the input names them.
+   * `hold` stores the edit for an admin to review; the live text stays. */
+  async function revise(id: string, input: RevisionInput, origin: RevisionOrigin, hold = false) {
     // Only the text fields, whatever else the caller's record carries.
     const text = pickText(input);
     if (text.details && isStructured(text)) throw new Error("structured rows carry no details");
     return await writeRevision(
       id,
-      (current) => ({ text, categories: input.categories ?? current.categories ?? [] }),
+      (base) => ({ text, categories: input.categories ?? base.categories ?? [] }),
       origin,
+      hold,
     );
   }
 
   /** Replace the categories alone: a revision whose text is the row's own. */
-  function retag(id: string, categories: string[], origin: RevisionOrigin) {
-    return writeRevision(id, (current) => ({ text: pickText(current), categories }), origin);
+  function retag(id: string, categories: string[], origin: RevisionOrigin, hold = false) {
+    return writeRevision(id, (base) => ({ text: pickText(base), categories }), origin, hold);
+  }
+
+  /**
+   * Decide the held edit `n`: accept makes its text and categories live in
+   * one commit, reject leaves the row's text alone; both end the wait and
+   * record the admin. Null when `n` is not the edit waiting. An edit accepted
+   * after the live text moved on is written as a new, newest revision (the
+   * held one is superseded), so the live revision is always the last live one.
+   */
+  async function review(
+    id: string,
+    n: number,
+    verdict: "accept" | "reject",
+    by: string,
+    note = "",
+  ): Promise<{ initiative: Initiative; revision: Revision } | null> {
+    for (let i = 0; i < 5; i++) {
+      const cur = await kv.get<Initiative>(K.initiative(id));
+      if (!cur.value) throw new Error("rfp not found");
+      const initiative = cur.value;
+      if (initiative.pendingRevision !== n) return null;
+      const held = await kv.get<Revision>(K.revision(id, n));
+      if (held.value?.state !== "pending") return null;
+      const t = now();
+      const op = kv.atomic().check(cur, held);
+      let next: Initiative;
+      let revision: Revision;
+      if (verdict === "reject") {
+        revision = { ...held.value, state: "rejected", reviewedBy: by, reviewedAt: t, note };
+        next = { ...initiative, pendingRevision: null };
+        op.set(held.key, revision);
+      } else {
+        const moved = initiative.revision > n;
+        const m = moved ? Math.max(initiative.revision, initiative.lastRevision ?? 0) + 1 : n;
+        revision = {
+          ...held.value,
+          n: m,
+          state: "live",
+          reviewedBy: by,
+          reviewedAt: t,
+          createdAt: moved ? t : held.value.createdAt,
+        };
+        next = {
+          ...initiative,
+          ...pickText(held.value),
+          categories: held.value.categories ?? initiative.categories ?? [],
+          revision: m,
+          pendingRevision: null,
+          lastRevision: Math.max(m, initiative.lastRevision ?? 0),
+        };
+        if (moved) {
+          op.check({ key: K.revision(id, m), versionstamp: null })
+            .set(held.key, { ...held.value, state: "superseded" });
+        }
+        op.set(K.revision(id, m), revision);
+        indexRow(op, initiative, next);
+      }
+      const res = await op.set(K.initiative(id), next).commit();
+      if (res.ok) return { initiative: next, revision };
+    }
+    throw new Error("update conflict");
   }
 
   /**
@@ -535,6 +624,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     unarchive,
     revise,
     retag,
+    review,
     upsertContent,
   };
 }

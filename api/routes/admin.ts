@@ -216,7 +216,7 @@ export function adminRoutes(deps: Deps) {
     const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
     return c.json({
       initiative: adminInitiative(initiative),
-      revisions: (await db.revisions.list(initiative.id, true)).map(revisionMeta),
+      revisions: (await db.revisions.list(initiative.id, true, true)).map(revisionMeta),
       summary: await deps.funding.summary(initiative, !(await deps.maintenance.on())),
       pledges: (await db.pledges.list(initiative.id, true)).map((p) => pledgeJson(config, p)),
       donations: (await db.donations.list(initiative.id, false)).map((d) =>
@@ -299,6 +299,28 @@ export function adminRoutes(deps: Deps) {
     if (!rev) throw new HttpError(404, "not found");
     return c.json({ revision: revisionMeta(rev) });
   });
+
+  /**
+   * Decide the proposer's edit waiting on an approved initiative: accept
+   * publishes it, reject (with an optional note for the proposer) leaves the
+   * live text alone. 409 when `n` is not the edit waiting.
+   */
+  for (const verdict of ["accept", "reject"] as const) {
+    r.post(`/initiatives/:id/revisions/:n/${verdict}`, requireRecentAuth(deps.now), async (c) => {
+      const initiative = await initiativeOr404(c.req.param("id"), true);
+      const n = Number(c.req.param("n"));
+      const note = s((await jsonBody(c, ["note"])).note, 500);
+      auditContext(c, { target: `${initiative.id}:${n}`, detail: verdict });
+      const done = Number.isInteger(n) && n > 0
+        ? await db.initiatives.review(initiative.id, n, verdict, c.var.user!.address, note)
+        : null;
+      if (!done) throw new HttpError(409, "That edit is no longer waiting for review.");
+      return c.json({
+        initiative: adminInitiative(done.initiative),
+        revision: revisionMeta(done.revision),
+      });
+    });
+  }
 
   /** `{ ids: string[], action }` for a bulk route: 1 to 100 distinct ids, a known action. */
   function readBulk(

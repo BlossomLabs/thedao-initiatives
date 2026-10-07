@@ -181,3 +181,28 @@ it("the untagged count fills in cat:untagged", async () => {
   fireEvent.click(screen.getByRole("button", { name: /4 untagged/ }));
   expect(await box()).toHaveValue("cat:untagged");
 });
+
+it("edits in review: a count that fills in edit:review, and a mark on the row", async () => {
+  vi.mocked(api).mockImplementation((path) =>
+    String(path) === "/api/admin/dashboard"
+      ? Promise.resolve({
+        ...dashboard,
+        rows: dashboard.rows.map((r, i) =>
+          i === 1 ? { ...r, initiative: { ...r.initiative, pendingRevision: 3 } } : r
+        ),
+      })
+      : Promise.resolve({})
+  );
+  mount();
+  await box();
+  fireEvent.click(screen.getByRole("button", { name: /1 edit in review/ }));
+  expect(await box()).toHaveValue("edit:review");
+  await waitFor(() => expect(screen.getByText(/1 of 4/)).toBeInTheDocument());
+  expect(screen.getByText("edit in review")).toBeInTheDocument();
+});
+
+it("no edits in review: no count to click", async () => {
+  mount();
+  await box();
+  expect(screen.queryByRole("button", { name: /in review/ })).toBeNull();
+});

@@ -10,6 +10,7 @@ describe("parseAdminQuery", () => {
       status: "pending",
       cats: [],
       funding: "all",
+      edit: "all",
       words: ["first", "qa"],
     });
   });
@@ -20,6 +21,7 @@ describe("parseAdminQuery", () => {
       status: "all",
       cats: [],
       funding: "all",
+      edit: "all",
       words: [],
     });
   });
@@ -38,6 +40,13 @@ describe("parseAdminQuery", () => {
   it("categories: slugs, comma lists, repeats, and untagged", () => {
     expect(parsed("cat:opsec,defi cat:compilers").cats).toEqual(["opsec", "defi", "compilers"]);
     expect(parsed("cat:untagged").cats).toEqual(["untagged"]);
+  });
+
+  it("edit: review, for initiatives with a proposer's edit waiting", () => {
+    expect(parsed("edit:review").edit).toBe("review");
+    const bad = parseAdminQuery("edit:done");
+    expect(bad.query.edit).toBe("all");
+    expect(bad.problems).toEqual(["Unknown edit: done. Try review."]);
   });
 
   it("funding: open or funded", () => {

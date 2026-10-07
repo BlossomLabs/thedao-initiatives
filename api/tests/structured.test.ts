@@ -418,7 +418,7 @@ Deno.test("proposer edit: legacy text stays readable but edits must migrate to s
     summary: "This summary is comfortably longer than the forty character minimum required.",
     details: "## Old\n\nLegacy text.",
     proposer: PLAIN,
-    status: "approved",
+    status: "pending",
     goalUsd: 1000,
   });
   const post = (json: unknown) =>
@@ -426,7 +426,7 @@ Deno.test("proposer edit: legacy text stays readable but edits must migrate to s
   const legacy = await post({ title: row.title, summary: row.summary, details: "Newer text." });
   assertEquals(legacy.status, 400);
   assertEquals(await h.db.initiatives.get(row.id), row);
-  const visible = await j(await h.req(`/api/initiatives/${row.slug}`)) as Out;
+  const visible = await j(await h.req(`/api/initiatives/${row.slug}`, { token })) as Out;
   assertEquals(visible.initiative.details, row.details);
   assertEquals((await post({ title: row.title, summary: row.summary })).status, 400);
   const good = minimalSubmission(1000);

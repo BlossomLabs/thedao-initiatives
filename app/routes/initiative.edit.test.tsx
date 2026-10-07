@@ -15,6 +15,13 @@ vi.mock("~/hooks/use-initiative", () => ({
   useInitiative: vi.fn(),
   initiativeKey: (slug: string) => ["initiative", slug],
 }));
+const revs = vi.hoisted(() => ({ byN: {} as Record<number, unknown> }));
+vi.mock("~/hooks/use-revision", () => ({
+  useRevision: (_slug: string, n: number | null) => ({
+    data: n ? revs.byN[n] : undefined,
+    error: null,
+  }),
+}));
 const ME = "0x1111111111111111111111111111111111111111";
 const who = vi.hoisted(() => ({ isAdmin: true }));
 vi.mock("~/context/session", () => ({
@@ -87,6 +94,7 @@ vi.mock("~/components/initiative-form/InitiativeForm", () => ({
 beforeEach(() => {
   vi.mocked(api).mockReset().mockResolvedValue({});
   who.isAdmin = true;
+  revs.byN = {};
 });
 
 const feed = (row: ReturnType<typeof structuredRow>) =>
@@ -250,6 +258,54 @@ it("changed text and categories travel in one revision", async () => {
     })
   );
   expect(api).toHaveBeenCalledTimes(1);
+  unmount();
+  qc.clear();
+});
+
+it("the proposer of an approved initiative is told the edit waits for review; the team is not", () => {
+  who.isAdmin = false;
+  feed({ ...structuredRow(), slug: "same-url", status: "approved" as const, proposer: ME });
+  const qc = new QueryClient();
+  const mine = render(page(qc));
+  expect(screen.getByText(/keeps the approved version until the team accepts/)).toBeInTheDocument();
+  mine.unmount();
+  who.isAdmin = true;
+  const team = render(page(qc));
+  expect(screen.queryByText(/until the team accepts/)).toBeNull();
+  expect(screen.getByText(/Changes go live as soon as you save/)).toBeInTheDocument();
+  team.unmount();
+  qc.clear();
+});
+
+it("with an edit in review the form starts from it, and a new save is compared against it", async () => {
+  who.isAdmin = false;
+  const row = {
+    ...structuredRow(),
+    slug: "same-url",
+    status: "approved" as const,
+    proposer: ME,
+    categories: ["opsec"],
+    pendingRevision: 3,
+  };
+  revs.byN = {
+    3: { ...row, title: "A title already in review", categories: ["defi"], state: "pending" },
+  };
+  feed(row);
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.getByText(/Your last edit is waiting for review/)).toBeInTheDocument();
+  expect(screen.getByLabelText("Title")).toHaveValue("A title already in review");
+  fireEvent.change(screen.getByLabelText("Title"), {
+    target: { value: "A second title in review" },
+  });
+  fireEvent.click(screen.getByText("Save"));
+  await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+  const [path, options] = vi.mocked(api).mock.calls[0];
+  expect(path).toBe("/api/initiatives/same-url/revisions");
+  const json = (options as { json: Record<string, unknown> }).json;
+  expect(json.title).toBe("A second title in review");
+  // the categories of the edit in review were kept, so they are not sent again
+  expect("categories" in json).toBe(false);
   unmount();
   qc.clear();
 });

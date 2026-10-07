@@ -6,6 +6,7 @@ import { Settings2 } from "lucide-react";
 import Crumbs from "~/components/layout/Crumbs";
 import PageMain from "~/components/layout/PageMain";
 import Skeleton from "~/components/ui/Skeleton";
+import Status from "~/components/ui/Status";
 import { LinkButton } from "~/components/ui/Button";
 import Identity from "~/components/wallet/Identity";
 import InitiativeForm from "~/components/initiative-form/InitiativeForm";
@@ -13,6 +14,7 @@ import type { SubmitPayload } from "~/components/initiative-form/types";
 import { fromInitiative } from "~/components/initiative-form/useDraft";
 import { useSession } from "~/context/session";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
+import { useRevision } from "~/hooks/use-revision";
 import { api, ApiError, errorMessage } from "~/lib/api";
 import type { Initiative, Pledge } from "~/lib/api-types";
 import { pageFactsPatch, textBody, textChanged } from "~/lib/edit-initiative";
@@ -30,7 +32,9 @@ export function meta() {
  * (type, goal, duration, recipient, reviewer, forum link) and the private
  * fields can change too; after approval those belong to the team. It is the
  * team's editor as well: an admin works under the same rules, tagged as the
- * team, and the facts are never locked for them.
+ * team, and the facts are never locked for them. The proposer's edit to an
+ * approved initiative does not go live: it waits for the team, the form then
+ * starts from that edit, and saving again replaces it.
  */
 export default function EditInitiative() {
   const { slug = "" } = useParams();
@@ -45,12 +49,35 @@ export default function EditInitiative() {
   const mine = Boolean(
     session && r?.proposer && session.address.toLowerCase() === r.proposer.toLowerCase(),
   );
-  const allowed = mine || Boolean(session?.isAdmin);
+  const team = Boolean(session?.isAdmin);
+  const allowed = mine || team;
   const open = r?.status === "pending" || r?.status === "approved";
+  // Approval is a review of the text: the proposer's edit to it waits for the team.
+  const hold = !team && r?.status === "approved";
+  const waitingN = hold && r?.pendingRevision ? r.pendingRevision : null;
+  const waiting = useRevision(slug, waitingN);
+  const edit = waitingN ? waiting.data : undefined;
+  // The row the form starts from: the edit in review when there is one.
+  const base = useMemo(
+    () =>
+      r && edit
+        ? {
+          ...r,
+          title: edit.title,
+          summary: edit.summary,
+          details: edit.details,
+          sections: edit.sections,
+          milestones: edit.milestones,
+          links: edit.links,
+          categories: edit.categories ?? r.categories,
+        }
+        : r,
+    [r, edit],
+  );
 
   let body: React.ReactNode;
   // the board placeholder has no pledges, and the form reads its draft once
-  if (isLoading || isPlaceholderData) {
+  if (isLoading || isPlaceholderData || (waitingN && !edit && !waiting.error)) {
     body = (
       <div className="panel mt-2 flex flex-col gap-3">
         <Skeleton className="h-10 w-full" />
@@ -129,18 +156,26 @@ export default function EditInitiative() {
         Edit initiative
       </h1>
       <p className="mt-3.5 max-w-[760px] font-inter-tight text-[15px] font-light leading-[1.65] text-muted">
-        Changes go live as soon as you save. Every version is kept and anyone can browse the history
-        on the initiative page.
+        {hold
+          ? "This initiative is approved, so your edit goes to the team first: the public page keeps the approved version until the team accepts it. Every published version is kept in the history on the initiative page."
+          : "Changes go live as soon as you save. Every version is kept and anyone can browse the history on the initiative page."}
       </p>
+      {edit && body === null && (
+        <Status kind="wait" className="mt-4 max-w-[760px]">
+          Your last edit is waiting for review. The form starts from it, and saving again replaces
+          it.
+        </Status>
+      )}
 
-      {body === null && r
+      {body === null && r && base
         ? (
           <EditForm
             key={r.id}
-            r={r}
+            r={base}
             pledges={page.pledges}
-            team={Boolean(session?.isAdmin)}
+            team={team}
             mine={mine}
+            hold={hold}
           />
         )
         : (
@@ -151,7 +186,7 @@ export default function EditInitiative() {
                 status={r?.status}
                 manage={session?.isAdmin && r ? `/admin/initiatives/${r.slug}` : undefined}
               />
-              <RevisionsCard />
+              <RevisionsCard hold={hold} />
             </StickyAside>
           </div>
         )}
@@ -188,20 +223,30 @@ function WhatYouCanChange(
   );
 }
 
-function RevisionsCard() {
+function RevisionsCard({ hold }: { hold: boolean }) {
   return (
     <div className="panel">
       <span className="k">Revisions</span>
       <p className="m-0 small dim">
-        Each save is a new revision with your wallet as its author. Older revisions stay readable,
-        with a word-by-word view of what changed.
+        {hold
+          ? "Once the team accepts it, your edit is a new revision with your wallet as its author."
+          : "Each save is a new revision with your wallet as its author."}{" "}
+        Older revisions stay readable, with a word-by-word view of what changed.
       </p>
     </div>
   );
 }
 
 function EditForm(
-  { r, pledges, team, mine }: { r: Initiative; pledges: Pledge[]; team: boolean; mine: boolean },
+  { r, pledges, team, mine, hold }: {
+    /** The row with the text the form starts from (the edit in review, if any). */
+    r: Initiative;
+    pledges: Pledge[];
+    team: boolean;
+    mine: boolean;
+    /** Saving sends the edit for review instead of publishing it. */
+    hold: boolean;
+  },
 ) {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -241,6 +286,8 @@ function EditForm(
     await qc.invalidateQueries({ queryKey: initiativeKey(r.slug) });
     void qc.invalidateQueries({ queryKey: ["board"] });
     void qc.invalidateQueries({ queryKey: ["admin"] });
+    void qc.invalidateQueries({ queryKey: ["mine"] });
+    void qc.invalidateQueries({ queryKey: ["revision", r.slug] });
     navigate(back);
   }
 
@@ -251,7 +298,7 @@ function EditForm(
       locked={!open}
       onSubmit={onSubmit}
       categories={{}}
-      submitLabel="Save as a new revision"
+      submitLabel={hold ? "Send edit for review" : "Save as a new revision"}
       showBackers={false}
       showPrivate={open}
       showTypePicker={open}
@@ -263,7 +310,7 @@ function EditForm(
           manage={team ? `/admin/initiatives/${r.slug}` : undefined}
         />
       }
-      asideBottom={<RevisionsCard />}
+      asideBottom={<RevisionsCard hold={hold} />}
       footer={
         <p className="m-0 mt-3.5 text-center">
           <Link className="btn btn-ghost btn-sm" to={back}>Cancel</Link>

@@ -78,10 +78,12 @@ and pull request. Deno Deploy builds and deploys `main` itself; there is no depl
   donate/discuss/back/next side cards); `?rev=N` shows an older revision of the text, rendered or as
   word-level changes against the one before; `/rfp/:slug` redirects
 - `/initiative/:slug/edit` (proposer or admin, SIWE): the submit form on the stored row. Sections,
-  milestones, links, title and summary are always editable and each save is a new public revision
-  that goes live at once; while the initiative is pending the type, goal, duration, recipient, forum
-  link and the private fields can change too (locked after approval for the proposer, never for an
-  admin, who edits here under the same checks)
+  milestones, links, title, summary and categories are always editable and each save is a new
+  revision. It goes live at once, except the proposer's edit to an approved initiative: that one is
+  held (the approved version stays live) until an admin accepts or rejects it on the admin page.
+  While the initiative is pending the type, goal, duration, recipient, forum link and the private
+  fields can change too (locked after approval for the proposer, never for an admin, who edits here
+  under the same checks)
 - `/submit`, `/submit/thanks`
 - `/donation-terms` (the version in force of `content/donation-terms/<date>.md`, bundled at build
   time by `app/data/terms.ts`, with every earlier version listed; the donate widget's gate and the

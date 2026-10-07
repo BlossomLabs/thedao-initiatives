@@ -300,6 +300,8 @@ Deno.test("mine: a proposer lists and opens their own submissions, rejected ones
   assertEquals(mine.map((x) => [x.slug, x.status]), [[second, "pending"], [first, "rejected"]]);
   assertEquals(Object.keys(mine[0]).sort(), [
     "createdAt",
+    "editInReview",
+    "editRejected",
     "goalUsd",
     "slug",
     "status",

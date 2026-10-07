@@ -21,7 +21,8 @@ import {
   SUBMISSIONS_PER_HOUR_PER_IP,
   TOKENS,
 } from "../config.ts";
-import type { Initiative, Pledge, Session } from "../db/types.ts";
+import type { Initiative, Pledge, Revision, Session } from "../db/types.ts";
+import { isLive } from "../db/revisions.ts";
 import { pickText } from "../db/initiatives.ts";
 import { ledgerStatus, refreshLedger } from "../services/ledger.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
@@ -129,21 +130,35 @@ export function initiativeRoutes(deps: Deps) {
     return { initiative, proposer };
   };
 
+  /** The admin's note when the proposer's latest edit was turned down and
+   * nothing was saved since; null otherwise. */
+  const lastRejection = async (x: Initiative) => {
+    if (x.pendingRevision || !x.lastRevision || x.lastRevision <= x.revision) return null;
+    const last = await db.revisions.get(x.id, x.lastRevision);
+    return last?.state === "rejected"
+      ? { n: last.n, note: last.note ?? "", at: last.reviewedAt ?? last.createdAt }
+      : null;
+  };
+
   /** What the signed-in wallet proposed, any status, newest first. Before "/:slug". */
   r.get("/mine", requireAuth, async (c) => {
     const user = c.var.user!;
     const rows = await db.initiatives.list(["pending", "approved", "rejected", "archived"]);
-    const initiatives = rows
-      .filter((x) => isProposer(x, user))
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .map((x) => ({
-        slug: x.slug,
-        title: x.title,
-        type: x.type,
-        status: x.status,
-        goalUsd: x.goalUsd,
-        createdAt: x.createdAt,
-      }));
+    const initiatives = await Promise.all(
+      rows
+        .filter((x) => isProposer(x, user))
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(async (x) => ({
+          slug: x.slug,
+          title: x.title,
+          type: x.type,
+          status: x.status,
+          goalUsd: x.goalUsd,
+          createdAt: x.createdAt,
+          editInReview: Boolean(x.pendingRevision),
+          editRejected: await lastRejection(x),
+        })),
+    );
     return c.json({ initiatives });
   });
 
@@ -180,22 +195,29 @@ export function initiativeRoutes(deps: Deps) {
     });
   });
 
-  /** One version of the text as it was published; archived ones are for admins only. */
+  /** One version of the text as it was published; archived ones are for
+   * admins only, and an edit that is held or was never published (rejected,
+   * superseded) is for its proposer and the admins. */
   r.get("/:slug/revisions/:n", async (c) => {
     const user = c.var.user;
     const initiative = await visibleOr404(c.req.param("slug"), user);
     const n = Number(c.req.param("n"));
     const rev = Number.isInteger(n) && n > 0 ? await db.revisions.get(initiative.id, n) : null;
-    if (!rev || (rev.archived && !user?.isAdmin)) throw new HttpError(404, "not found");
+    const mine = Boolean(user?.isAdmin) || isProposer(initiative, user);
+    if (!rev || (rev.archived && !user?.isAdmin) || (!isLive(rev) && !mine)) {
+      throw new HttpError(404, "not found");
+    }
     return c.json({ revision: revisionJson(rev) });
   });
 
   /**
    * The proposer (or an admin) replaces the text, the categories or both: the
-   * only way either changes. Goes live at once; the previous version stays in
-   * the history. Text edits use structured sections, milestones and links,
-   * migrating legacy rows when necessary; a body with only `categories` keeps
-   * the text as it is.
+   * only way either changes. Goes live at once, with the previous version
+   * kept in the history, except a proposer's edit to an approved initiative:
+   * approval is a review of the text, so that edit is held (`pending: true`)
+   * and the approved version stays live until an admin accepts it. Text edits
+   * use structured sections, milestones and links, migrating legacy rows when
+   * necessary; a body with only `categories` keeps the text as it is.
    */
   r.post("/:slug/revisions", requireAuth, async (c) => {
     const user = c.var.user!;
@@ -219,6 +241,14 @@ export function initiativeRoutes(deps: Deps) {
       throw new HttpError(429, "Too many edits; try again in an hour.");
     }
     const origin = { author: user.address, source: proposer ? "proposer" : "admin" } as const;
+    const hold = !user.isAdmin && initiative.status === "approved";
+    const saved = (next: Initiative, revision: Revision, warnings: Finding[]) =>
+      c.json({
+        initiative: hold ? proposerInitiative(next) : publicInitiative(next),
+        revision: revisionMeta(revision),
+        warnings,
+        ...(hold ? { pending: true } : {}),
+      }, 201);
     const [categories, categoryErr] = body.categories === undefined
       ? [undefined, null]
       : readCategories(body.categories);
@@ -234,12 +264,10 @@ export function initiativeRoutes(deps: Deps) {
         initiative.id,
         categories!,
         origin,
+        hold,
       );
       if (!revision) throw new HttpError(400, "Nothing changed.");
-      return c.json(
-        { initiative: publicInitiative(next), revision: revisionMeta(revision), warnings: [] },
-        201,
-      );
+      return saved(next, revision, []);
     }
     const cur = pickText(initiative);
     const structuredBody = ["sections", "milestones", "links"].some((k) => body[k] !== undefined);
@@ -273,12 +301,10 @@ export function initiativeRoutes(deps: Deps) {
       initiative.id,
       { ...base, ...structured, categories: categories ?? undefined },
       origin,
+      hold,
     );
     if (!revision) throw new HttpError(400, "Nothing changed.");
-    return c.json(
-      { initiative: publicInitiative(next), revision: revisionMeta(revision), warnings },
-      201,
-    );
+    return saved(next, revision, warnings);
   });
 
   /**

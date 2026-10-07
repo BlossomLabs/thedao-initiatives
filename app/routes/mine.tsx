@@ -66,9 +66,25 @@ export default function Mine() {
               <span className="flex flex-wrap items-center gap-2.5 small dim">
                 <TypeBadge type={r.type} inline />
                 <span className={`chip chip-badge st-${r.status}`}>{STATUS[r.status]}</span>
+                {r.editInReview && (
+                  <span
+                    className="chip chip-badge st-pending"
+                    title="Your edit is waiting for the team; the public page shows the approved version"
+                  >
+                    edit in review
+                  </span>
+                )}
+                {r.editRejected && (
+                  <span className="chip chip-badge st-rejected">edit not accepted</span>
+                )}
                 {r.goalUsd > 0 && <span>{usd(r.goalUsd)}</span>}
                 <span>{dt(r.createdAt)}</span>
               </span>
+              {r.editRejected?.note && (
+                <p className="m-0 basis-full small dim">
+                  The team's note on your last edit: {r.editRejected.note}
+                </p>
+              )}
             </li>
           ))}
         </ul>

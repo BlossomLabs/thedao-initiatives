@@ -29,9 +29,9 @@ async function submitted(h: Awaited<ReturnType<typeof harness>>, approve = true)
   return { token, admin, slug, id: row.id };
 }
 
-Deno.test("submit writes revision 1; the proposer's edit goes live as revision 2", async () => {
+Deno.test("submit writes revision 1; the proposer's edit, once accepted, is revision 2", async () => {
   const h = await harness();
-  const { token, slug } = await submitted(h);
+  const { token, admin, slug, id } = await submitted(h);
   const page = await j(await h.req("/api/initiatives/" + slug)) as unknown as Page;
   assertEquals(page.initiative.revision, 1);
   assertEquals(page.revisions.map((r) => [r.n, r.author, r.source, r.archived]), [
@@ -66,10 +66,18 @@ Deno.test("submit writes revision 1; the proposer's edit goes live as revision 2
   });
   assertEquals(res.status, 201);
   const out = await j(res) as { initiative: { title: string; revision: number }; revision: Meta };
-  assertEquals(out.initiative.title, edit.title);
-  assertEquals(out.initiative.revision, 2);
+  // the initiative is approved, so the edit waits for an admin (#65)
+  assertEquals(out.initiative.title, GOOD.title);
+  assertEquals(out.initiative.revision, 1);
   assertEquals(out.revision.source, "proposer");
   assertEquals(out.revision.author, PLAIN);
+  assertEquals(
+    (await h.req(`/api/admin/initiatives/${id}/revisions/2/accept`, {
+      method: "POST",
+      token: admin,
+    })).status,
+    200,
+  );
 
   const after = await j(await h.req("/api/initiatives/" + slug)) as unknown as Page;
   assertEquals(after.initiative.title, edit.title);
@@ -245,7 +253,7 @@ Deno.test("archive: hides a superseded revision publicly, never the current one,
   const { token, admin, slug, id } = await submitted(h);
   await h.req(`/api/initiatives/${slug}/revisions`, {
     method: "POST",
-    token,
+    token: admin,
     json: { ...revisionBody(GOOD), title: "A second title for this one" },
   });
   const act = (n: number | string, action: string) =>

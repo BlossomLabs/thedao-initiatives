@@ -17,6 +17,7 @@ import FundingHead from "~/components/initiative/FundingHead";
 import Donations from "~/components/admin/initiative/Donations";
 import InitiativeText from "~/components/admin/initiative/InitiativeText";
 import OpenPoints from "~/components/admin/initiative/OpenPoints";
+import PendingEdit from "~/components/admin/initiative/PendingEdit";
 import Pledges from "~/components/admin/initiative/Pledges";
 import Revisions from "~/components/admin/initiative/Revisions";
 import type { Msg, Run } from "~/components/admin/initiative/run";
@@ -148,6 +149,9 @@ export default function ManageInitiative() {
             pct={pct}
             funded={r.goalUsd > 0 && data.summary.total >= r.goalUsd}
           />
+
+          <PendingEdit r={r} run={runAt("edit")} />
+          {said("edit")}
 
           <InitiativeText r={r} />
 

@@ -167,7 +167,6 @@ Deno.test("proposer: categories change only with a revision, while the text is e
   assertEquals(alone.status, 201);
   assertEquals((await j(alone) as Row).initiative.categories, ["compilers"]);
   // text and categories in one revision
-  await h.db.initiatives.update(id, { status: "approved" });
   const both = await revise(h, slug, token, {
     ...revisionBody(draft),
     title: "A retitled initiative here",
@@ -190,7 +189,7 @@ Deno.test("proposer: categories change only with a revision, while the text is e
   assertEquals((await h.db.initiatives.get(id))!.title, "A retitled initiative here");
   // the history shows each version's categories; one written before they were recorded has none
   const shown = async (n: number) =>
-    (await j(await h.req(`/api/initiatives/${slug}/revisions/${n}`)) as {
+    (await j(await h.req(`/api/initiatives/${slug}/revisions/${n}`, { token })) as {
       revision: { categories: string[] | null };
     }).revision.categories;
   assertEquals(await shown(1), ["audits-analysis"]);

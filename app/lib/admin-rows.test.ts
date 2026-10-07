@@ -30,6 +30,8 @@ const rows = [
   row({ title: "First QA grant", contact: "", status: "pending" }),
   row({ title: "First QA rfp", type: "rfp", status: "rejected", categories: ["opsec", "defi"] }),
 ];
+// the second row has a proposer's edit waiting
+rows[1].initiative.pendingRevision = 3;
 const titles = (q: string) =>
   filterAdminRows(rows, parseAdminQuery(q).query).map((x) => x.initiative.title);
 
@@ -53,6 +55,8 @@ it("each qualifier narrows, and they combine", () => {
   expect(titles("cat:opsec")).toEqual(["Safe Lockdown Guard", "First QA rfp"]);
   expect(titles("cat:defi,fuzzing-testing")).toEqual(["Echidna fuzzing", "First QA rfp"]);
   expect(titles("cat:untagged")).toEqual(["First QA grant"]);
+  expect(titles("edit:review")).toEqual(["Safe Lockdown Guard"]);
+  expect(titles("edit:review type:grant")).toEqual([]);
   expect(titles("funding:funded")).toEqual(["Echidna fuzzing"]);
   expect(titles("funding:open type:rfp status:approved")).toEqual(["Safe Lockdown Guard"]);
 });

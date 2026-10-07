@@ -14,6 +14,10 @@ export interface MineItem {
   status: InitiativeStatus;
   goalUsd: number;
   createdAt: number;
+  /** An edit to the approved text is waiting for the team. */
+  editInReview: boolean;
+  /** The team's note when the latest edit was turned down; null otherwise. */
+  editRejected: { n: number; note: string; at: number } | null;
 }
 
 export interface Initiative {
@@ -56,9 +60,13 @@ export interface Initiative {
   /** The private fields: only in answers to the proposer or an admin. */
   contact?: string;
   funders?: string;
+  /** The proposer's edit waiting for the team, if any: same answers only. */
+  pendingRevision?: number | null;
 }
 
 export type RevisionSource = "submit" | "proposer" | "admin" | "content" | "import";
+/** Only `live` revisions are public; the rest are for the proposer and the admins. */
+export type RevisionState = "live" | "pending" | "rejected" | "superseded";
 
 /** One entry of an initiative's history, without the text. */
 export interface RevisionMeta {
@@ -68,6 +76,12 @@ export interface RevisionMeta {
   source: RevisionSource;
   /** Only ever true in admin responses. */
   archived: boolean;
+  state: RevisionState;
+  /** The admin who accepted or rejected a proposer's edit, and when. */
+  reviewedBy?: string;
+  reviewedAt?: number;
+  /** The admin's reason for rejecting it. */
+  note?: string;
   createdAt: number;
 }
 
@@ -92,6 +106,8 @@ export type RevisionText = Pick<
 export interface AdminInitiative extends Initiative {
   contact: string;
   funders: string;
+  /** The proposer's edit waiting for an admin, if any (approved initiatives). */
+  pendingRevision: number | null;
 }
 
 export interface Summary {

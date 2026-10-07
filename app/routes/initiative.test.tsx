@@ -88,6 +88,7 @@ it("an older revision shows its own categories, and the changes view marks added
     author: "",
     source: "admin" as const,
     archived: false,
+    state: "live" as const,
     createdAt: n,
   });
   const row = {
@@ -117,5 +118,65 @@ it("an older revision shows its own categories, and the changes view marks added
   fireEvent.click(screen.getByRole("button", { name: "changes" }));
   expect(tags().querySelector("ins")).toHaveTextContent("DeFi");
   expect(tags().querySelector("del")).toHaveTextContent("OpSec");
+  revs.byN = {};
+});
+
+it("the proposer sees that an edit is waiting, on the approved version", () => {
+  const feedRow = (pendingRevision: number | null) =>
+    vi.mocked(useInitiative).mockReturnValue({
+      data: { ...page(), initiative: { ...page().initiative, pendingRevision } },
+      isLoading: false,
+      isPlaceholderData: false,
+      error: null,
+      isUpdatingLedger: false,
+    } as unknown as ReturnType<typeof useInitiative>);
+  feedRow(7);
+  const waiting = render(tree(new QueryClient()));
+  expect(screen.getByText(/An edit to this initiative is waiting for the team/))
+    .toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "See the edit" })).toHaveAttribute(
+    "href",
+    "/initiative/audit-tooling?rev=7",
+  );
+  waiting.unmount();
+  feedRow(null);
+  render(tree(new QueryClient()));
+  expect(screen.queryByText(/waiting for the team/)).toBeNull();
+});
+
+it("an edit in review opens as such, and its changes are against the live text", () => {
+  const meta = (n: number) => ({
+    n,
+    author: "",
+    source: "proposer" as const,
+    archived: false,
+    state: "live" as const,
+    createdAt: n,
+  });
+  const row = {
+    ...structuredRow(),
+    status: "approved" as const,
+    revision: 2,
+    pendingRevision: 3,
+    title: "The approved title",
+  };
+  revs.byN = {
+    1: { ...row, ...meta(1), structured: true, title: "The very first title" },
+    3: { ...row, ...meta(3), state: "pending", structured: true, title: "The proposed title" },
+  };
+  vi.mocked(useInitiative).mockReturnValue({
+    data: { ...page(), initiative: row, revisions: [meta(1), meta(2)] },
+    isLoading: false,
+    isPlaceholderData: false,
+    error: null,
+    isUpdatingLedger: false,
+  } as unknown as ReturnType<typeof useInitiative>);
+  render(tree(new QueryClient(), "/initiative/audit-tooling?rev=3"));
+  const h1 = screen.getByRole("heading", { level: 1 });
+  expect(h1).toHaveTextContent("The proposed title");
+  expect(screen.getByText("edit in review")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "changes" }));
+  expect(h1.querySelector("del")).toHaveTextContent("approved");
+  expect(h1.querySelector("ins")).toHaveTextContent("proposed");
   revs.byN = {};
 });

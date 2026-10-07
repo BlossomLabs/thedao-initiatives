@@ -20,13 +20,14 @@ function matches(row: Row, q: AdminQuery, skip?: Facet): boolean {
     skip !== "cats" && q.cats.length &&
     !q.cats.some((c) => c === UNTAGGED ? !r.categories.length : r.categories.includes(c))
   ) return false;
+  if (q.edit === "review" && !r.pendingRevision) return false;
   const text = `${r.title} ${r.contact ?? ""}`.toLowerCase();
   return q.words.every((w) => text.includes(w));
 }
 
 /**
  * The admin list: every qualifier (type, status, categories OR'd among
- * themselves, funding) and every word or phrase, matched against the project
+ * themselves, funding, an edit in review) and every word or phrase, matched against the project
  * name and the contact (name, email or handle).
  */
 export const filterAdminRows = <T extends Row>(rows: T[], q: AdminQuery): T[] =>

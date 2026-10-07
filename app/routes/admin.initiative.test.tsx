@@ -43,7 +43,13 @@ vi.mock("~/lib/api", async (original) => ({
 vi.mock("~/components/wallet/Identity", () => ({ default: () => null }));
 
 const page = (over: Partial<AdminInitiativePage["initiative"]>): AdminInitiativePage => ({
-  initiative: { ...structuredRow(), contact: "me@example.org", funders: "", ...over },
+  initiative: {
+    ...structuredRow(),
+    contact: "me@example.org",
+    funders: "",
+    pendingRevision: null,
+    ...over,
+  },
   revisions: [],
   summary: { pledged: 0, received: 0, donated: 0, total: 0, live: false, ledger: 0, paidOut: 0 },
   pledges: [],
@@ -272,4 +278,77 @@ it("saving the categories posts a revision with them alone, through the proposer
   expect(
     vi.mocked(api).mock.calls.some(([, o]) => (o as { method?: string })?.method === "PATCH"),
   ).toBe(false);
+});
+
+/** The page with a proposer's edit (revision 3) waiting: a new title and one category swapped. */
+function withPendingEdit() {
+  current = page({
+    status: "approved",
+    safeAddress: SAFE,
+    revision: 2,
+    pendingRevision: 3,
+    categories: ["opsec", "defi"],
+  });
+  const revision = {
+    ...structuredRow(),
+    title: "Audit tooling for sharper rollups",
+    categories: ["opsec", "wallets-signing"],
+    structured: true,
+    n: 3,
+    author: "0x2222222222222222222222222222222222222222",
+    source: "proposer",
+    state: "pending",
+    archived: false,
+    createdAt: 1_760_000_000,
+  };
+  const fallback = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, options) =>
+    String(path) === "/api/initiatives/audit-tooling/revisions/3"
+      ? Promise.resolve({ revision })
+      : fallback(path, options)
+  );
+}
+
+it("an edit awaiting approval shows what it changes against the live text, and Accept publishes it", async () => {
+  withPendingEdit();
+  renderPage();
+  const panel = (await screen.findByText("Edit awaiting approval")).closest(
+    ".panel",
+  ) as HTMLElement;
+  await waitFor(() => expect(panel.querySelector("ins")).not.toBeNull());
+  expect(within(panel).getByText("Title")).toBeInTheDocument();
+  expect(panel.querySelector(".diff ins")).toHaveTextContent("sharper");
+  const tags = panel.querySelector("[data-categories]") as HTMLElement;
+  expect(tags.querySelector("ins")).toHaveTextContent("Wallets");
+  expect(tags.querySelector("del")).toHaveTextContent("DeFi");
+  // the sections nobody touched are not listed
+  expect(within(panel).queryByText("Summary")).toBeNull();
+  fireEvent.click(within(panel).getByRole("button", { name: "Accept edit" }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/admin/initiatives/1/revisions/3/accept", { json: {} })
+  );
+});
+
+it("rejecting an edit sends the optional note for the proposer", async () => {
+  withPendingEdit();
+  renderPage();
+  const panel = (await screen.findByText("Edit awaiting approval")).closest(
+    ".panel",
+  ) as HTMLElement;
+  fireEvent.click(within(panel).getByRole("button", { name: "Reject…" }));
+  fireEvent.change(within(panel).getByLabelText("Note for the proposer (optional)"), {
+    target: { value: "Out of scope." },
+  });
+  fireEvent.click(within(panel).getByRole("button", { name: "Reject edit" }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/admin/initiatives/1/revisions/3/reject", {
+      json: { note: "Out of scope." },
+    })
+  );
+});
+
+it("no edit waiting: no approval panel", async () => {
+  renderPage();
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByText("Edit awaiting approval")).toBeNull();
 });

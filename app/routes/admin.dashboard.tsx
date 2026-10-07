@@ -85,6 +85,7 @@ export default function Dashboard() {
     () => filterAdminRows(data?.rows ?? [], parsed.query),
     [data?.rows, parsed],
   );
+  const inReview = (data?.rows ?? []).filter((x) => x.initiative.pendingRevision).length;
   const facetCounts = useMemo(
     () => adminFacetCounts(data?.rows ?? [], parsed.query),
     [data?.rows, parsed],
@@ -496,6 +497,19 @@ export default function Dashboard() {
             >
               {data.rows.filter((x) => !x.initiative.categories.length).length} untagged
             </button>
+            {inReview > 0 && (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  className="cursor-pointer border-0 bg-transparent p-0 text-dao-amber underline decoration-[rgba(240,180,41,.4)] underline-offset-2 hover:text-white"
+                  title="Proposer edits to approved initiatives, waiting for the team"
+                  onClick={() => setQ(setQualifier(q, "edit", "review"))}
+                >
+                  {inReview} edit{inReview === 1 ? "" : "s"} in review
+                </button>
+              </>
+            )}
           </span>
         }
       />
@@ -567,6 +581,9 @@ export default function Dashboard() {
                 </td>
                 <td>
                   {r.title}
+                  {r.pendingRevision
+                    ? <span className="chip st-pending ml-2 align-middle">edit in review</span>
+                    : null}
                   {r.categories.length > 0 && (
                     <span className="mt-1.5 flex flex-wrap gap-1">
                       {r.categories.map((slug) => <CategoryTag key={slug} slug={slug} sm />)}

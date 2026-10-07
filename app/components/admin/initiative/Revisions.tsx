@@ -6,7 +6,14 @@ import type { AdminInitiativePage } from "~/lib/api-types";
 import { dt } from "~/lib/format";
 import type { Run } from "./run";
 
-/** The public history: every version of the text, with archive as the only edit. */
+const UNPUBLISHED = {
+  pending: "in review",
+  rejected: "rejected",
+  superseded: "superseded",
+} as const;
+
+/** Every version of the text: the public history with archive as the only
+ * edit, and the proposer edits that never went live (the team's eyes only). */
 export default function Revisions(
   { page, base, run }: { page: AdminInitiativePage; base: string; run: Run },
 ) {
@@ -44,6 +51,15 @@ export default function Revisions(
                 <td>
                   {isCurrent
                     ? <span className="chip st-approved">current</span>
+                    : v.state !== "live"
+                    ? (
+                      <span
+                        className={`chip ${v.state === "pending" ? "st-pending" : "st-rejected"}`}
+                        title={v.note ? `Note: ${v.note}` : "Never published"}
+                      >
+                        {UNPUBLISHED[v.state]}
+                      </span>
+                    )
                     : v.archived
                     ? <span className="chip st-archived">archived</span>
                     : <span className="chip">public</span>}
@@ -58,9 +74,11 @@ export default function Revisions(
                   <Button
                     sm
                     variant="ghost"
-                    disabled={isCurrent}
+                    disabled={isCurrent || v.state !== "live"}
                     title={isCurrent
                       ? "The current revision cannot be archived; save a new one to replace it."
+                      : v.state !== "live"
+                      ? "Never published, so there is nothing to hide"
                       : v.archived
                       ? "Show it in the public history again"
                       : "Hide it from the public history (admins still see it)"}

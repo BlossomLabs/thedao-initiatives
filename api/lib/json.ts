@@ -69,8 +69,12 @@ export function cardInitiative(r: CardRow) {
 
 /** The admin dashboard row: the card plus the contact it shows and the
  * proposer's edit waiting for review, if any. */
-export function adminCardInitiative(r: Initiative) {
-  return { ...cardInitiative(r), contact: r.contact, pendingRevision: r.pendingRevision ?? null };
+export function adminCardInitiative(r: Initiative, privateFields: boolean) {
+  return {
+    ...cardInitiative(r),
+    ...(privateFields ? { contact: r.contact } : {}),
+    pendingRevision: r.pendingRevision ?? null,
+  };
 }
 
 /** The structured body with defaults for rows written before it existed. */
@@ -112,18 +116,17 @@ export function revisionJson(v: Revision) {
 
 /** For the admins and the proposer: the private fields, and the number of
  * the proposer's edit waiting for review. */
-export function adminInitiative(r: Initiative) {
+export function adminInitiative(r: Initiative, privateFields: boolean) {
   return {
     ...publicInitiative(r),
-    contact: r.contact,
-    funders: r.funders,
+    ...(privateFields ? { contact: r.contact, funders: r.funders } : {}),
     pendingRevision: r.pendingRevision ?? null,
   };
 }
 
 /** What the proposer sees of their own row: the public shape plus the two
  * private fields they wrote themselves. */
-export const proposerInitiative = adminInitiative;
+export const proposerInitiative = (r: Initiative) => adminInitiative(r, true);
 
 export function pledgeJson(config: Config, p: Pledge) {
   return {

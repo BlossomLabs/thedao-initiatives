@@ -23,6 +23,7 @@ import Revisions from "~/components/admin/initiative/Revisions";
 import type { Msg, Run } from "~/components/admin/initiative/run";
 import SafeCard, { useSafeDeploy } from "~/components/admin/initiative/SafeCard";
 import SettingsForm from "~/components/admin/initiative/SettingsForm";
+import ConfirmPrivateFields from "~/components/admin/ConfirmPrivateFields";
 import CategoriesPanel from "~/components/admin/initiative/CategoriesPanel";
 import { CategoryTag } from "~/components/ui/CategoryTag";
 import { api, ApiError, apiText, errorMessage } from "~/lib/api";
@@ -30,6 +31,7 @@ import type { AdminInitiativePage } from "~/lib/api-types";
 import { walletErrorMessage } from "~/lib/donate";
 import { dt } from "~/lib/format";
 import { discussionKind } from "~/lib/discussion";
+import { withReauthentication } from "~/lib/reauthenticate";
 
 const STATUS_HELP: Record<string, string> = {
   pending: "Submitted and waiting for review. It is not on the board yet.",
@@ -45,7 +47,7 @@ const STATUS_HELP: Record<string, string> = {
  */
 export default function ManageInitiative() {
   const adminApi = useAdminApi();
-  const { session } = useSession();
+  const { session, signIn } = useSession();
   const { slug = "" } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -156,6 +158,9 @@ export default function ManageInitiative() {
           <InitiativeText r={r} />
 
           <SectionHeading>Settings</SectionHeading>
+          {r.contact === undefined && (
+            <ConfirmPrivateFields onConfirm={() => qc.invalidateQueries({ queryKey: key })} />
+          )}
           <SettingsForm r={r} run={runAt("settings")} />
           {said("settings")}
 
@@ -279,7 +284,10 @@ export default function ManageInitiative() {
                   title="With status, proposer, contact and funders. Never share it."
                   onClick={() =>
                     runAt("links")(async () => {
-                      const md = await apiText(`/initiative/${r.slug}-PRIVATE.md`);
+                      const md = await withReauthentication(
+                        () => apiText(`/initiative/${r.slug}-PRIVATE.md`),
+                        signIn,
+                      );
                       const url = URL.createObjectURL(new Blob([md], { type: "text/markdown" }));
                       const a = document.createElement("a");
                       a.href = url;

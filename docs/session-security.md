@@ -29,6 +29,14 @@ remains a separate policy/provider-evidence item.
 
 ## Browser privacy and draft preservation
 
+Initiative contacts and funder leads are omitted from JSON/dashboard responses to an administrator
+whose signature is at least five minutes old, unless that wallet is the initiative's proposer.
+The owning proposer retains access to their own private fields. Private Markdown and leads/backup
+exports always require fresh administrator authentication. Changing another proposer's private
+fields also challenges before mutation. The browser offers an explicit confirmation button for
+withheld contacts and editors, and private downloads retry once after an explicit server challenge.
+Ordinary administrator reads and edits remain available without exposing the withheld fields.
+
 Private queries are scoped by wallet and privilege, cancelled and removed on logout, wallet changes
 and privilege changes. Restricted revisions revalidate on mount/focus, and a revalidation the API
 denies (401, 403 or 404, for instance after an administrator archives that revision) erases the

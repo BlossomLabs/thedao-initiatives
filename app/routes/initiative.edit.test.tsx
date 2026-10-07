@@ -24,10 +24,12 @@ vi.mock("~/hooks/use-revision", () => ({
 }));
 const ME = "0x1111111111111111111111111111111111111111";
 const who = vi.hoisted(() => ({ isAdmin: true }));
+const auth = vi.hoisted(() => ({ signIn: vi.fn() }));
 vi.mock("~/context/session", () => ({
   useSession: () => ({
     session: { isAdmin: who.isAdmin, address: ME },
     requireSession: () => Promise.resolve({}),
+    signIn: auth.signIn,
   }),
 }));
 vi.mock("~/lib/api", async (original) => ({
@@ -95,6 +97,7 @@ beforeEach(() => {
   vi.mocked(api).mockReset().mockResolvedValue({});
   who.isAdmin = true;
   revs.byN = {};
+  auth.signIn.mockReset().mockResolvedValue({});
 });
 
 const feed = (row: ReturnType<typeof structuredRow>) =>
@@ -118,6 +121,47 @@ function page(qc: QueryClient) {
     </QueryClientProvider>
   );
 }
+
+it("an older admin explicitly confirms before an editor loads withheld private fields", async () => {
+  const full = {
+    ...structuredRow(),
+    slug: "same-url",
+    status: "approved" as const,
+    proposer: "0x2222222222222222222222222222222222222222",
+  };
+  feed({ ...full, contact: undefined, funders: undefined });
+  vi.mocked(api).mockResolvedValue({ initiative: full });
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.queryByLabelText("Facts")).not.toBeInTheDocument();
+  expect(auth.signIn).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm wallet to view contacts" }));
+  await screen.findByLabelText("Facts");
+  expect(auth.signIn).toHaveBeenCalledTimes(1);
+  expect(screen.getByLabelText("Facts")).toHaveTextContent("open private type");
+  unmount();
+  qc.clear();
+});
+
+it("a private-read timeout during editing preserves the draft and its initial fields", () => {
+  const full = {
+    ...structuredRow(),
+    slug: "same-url",
+    status: "approved" as const,
+    proposer: "0x2222222222222222222222222222222222222222",
+  };
+  feed(full);
+  const qc = new QueryClient();
+  const { rerender, unmount } = render(page(qc));
+  fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Unsaved work" } });
+  feed({ ...full, contact: undefined, funders: undefined });
+  rerender(page(qc));
+  expect(screen.getByLabelText("Title")).toHaveValue("Unsaved work");
+  expect(screen.getByLabelText("Facts")).toHaveTextContent("open private type");
+  expect(auth.signIn).not.toHaveBeenCalled();
+  unmount();
+  qc.clear();
+});
 
 it("an admin edits an approved initiative with the facts open, and lands back on the admin page", async () => {
   feed({

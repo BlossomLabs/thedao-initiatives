@@ -57,7 +57,7 @@ export interface Initiative {
   revision: number;
   createdAt: number;
   approvedAt: number | null;
-  /** The private fields: only in answers to the proposer or an admin. */
+  /** Omitted unless the proposer or a recently authenticated administrator. */
   contact?: string;
   funders?: string;
   /** The proposer's edit waiting for the team, if any: same answers only. */
@@ -104,8 +104,6 @@ export type RevisionText = Pick<
 >;
 
 export interface AdminInitiative extends Initiative {
-  contact: string;
-  funders: string;
   /** The proposer's edit waiting for an admin, if any (approved initiatives). */
   pendingRevision: number | null;
 }

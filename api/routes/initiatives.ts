@@ -4,11 +4,12 @@ import { HttpError } from "../lib/errors.ts";
 import { requireClientIp } from "../middleware/ip.ts";
 import { assertInitiativeIdentity } from "../lib/initiative-identity.ts";
 import { jsonBody, s } from "../lib/body.ts";
-import { requireAuth } from "../middleware/auth.ts";
+import { assertRecentAuth, requireAuth } from "../middleware/auth.ts";
+import { canReadPrivateFields } from "../lib/private-fields.ts";
 import {
+  adminInitiative,
   donationJson,
   pledgeJson,
-  proposerInitiative,
   publicInitiative,
   revisionJson,
   revisionMeta,
@@ -181,10 +182,12 @@ export function initiativeRoutes(deps: Deps) {
     ]);
     const summary = await deps.funding.summaryFrom(initiative, pledges, donations, refresh);
     if (paused) summary.refreshDue = false;
-    const mine = Boolean(user?.isAdmin) || isProposer(initiative, user);
+    const privateFields = canReadPrivateFields(initiative, user, deps.now());
     return c.json({
       refreshDue: !paused && !chainStateFresh(chainState, deps.now()),
-      initiative: mine ? proposerInitiative(initiative) : publicInitiative(initiative),
+      initiative: user?.isAdmin || privateFields
+        ? adminInitiative(initiative, privateFields)
+        : publicInitiative(initiative),
       revisions: revisions.map(revisionMeta),
       summary,
       pct: pctOf(summary.total, initiative.goalUsd),
@@ -259,7 +262,9 @@ export function initiativeRoutes(deps: Deps) {
     const saved = (next: Initiative, revision: Revision, warnings: Finding[]) => {
       const held = !isLive(revision);
       return c.json({
-        initiative: held ? proposerInitiative(next) : publicInitiative(next),
+        initiative: held
+          ? adminInitiative(next, canReadPrivateFields(next, user, deps.now()))
+          : publicInitiative(next),
         revision: revisionMeta(revision),
         warnings,
         ...(held ? { pending: true } : {}),
@@ -336,6 +341,10 @@ export function initiativeRoutes(deps: Deps) {
     // commits against: an approval or a new proposer landing mid-request locks it.
     const assertUnlocked = (row: Initiative) => {
       assertEditor(row, user);
+      if (
+        user.isAdmin && !isProposer(row, user) &&
+        (body.contact !== undefined || body.funders !== undefined)
+      ) assertRecentAuth(c, deps.now);
       if (!user.isAdmin && row.status !== "pending") {
         throw new HttpError(403, "Locked after approval; email the team.");
       }
@@ -345,7 +354,9 @@ export function initiativeRoutes(deps: Deps) {
     const next = Object.keys(patch).length
       ? await db.initiatives.update(initiative.id, patch, assertUnlocked)
       : initiative;
-    return c.json({ initiative: proposerInitiative(next) });
+    return c.json({
+      initiative: adminInitiative(next, canReadPrivateFields(next, user, deps.now())),
+    });
   });
 
   /**

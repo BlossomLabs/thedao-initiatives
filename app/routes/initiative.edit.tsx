@@ -1,4 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import ConfirmPrivateFields from "~/components/admin/ConfirmPrivateFields";
+import { useAdminApi } from "~/hooks/use-admin-api";
 import StickyAside from "~/components/layout/StickyAside";
 import { Link, useNavigate, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,7 +18,7 @@ import { useSession } from "~/context/session";
 import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { useRevision } from "~/hooks/use-revision";
 import { api, ApiError, errorMessage } from "~/lib/api";
-import type { Initiative, Pledge } from "~/lib/api-types";
+import type { Initiative, InitiativePage, Pledge } from "~/lib/api-types";
 import { pageFactsPatch, textBody, textChanged } from "~/lib/edit-initiative";
 import { CONTACT_EMAIL, CONTACT_MAILTO, SITE_NAME } from "~/data/site";
 import { generateMeta } from "~/utils/meta";
@@ -169,7 +171,7 @@ export default function EditInitiative() {
 
       {body === null && r && base
         ? (
-          <EditForm
+          <PrivateEditor
             key={r.id}
             r={base}
             pledges={page.pledges}
@@ -237,6 +239,31 @@ function RevisionsCard({ hold }: { hold: boolean }) {
   );
 }
 
+/** The form snapshots its initial fields. Background polls must not replace
+ * an in-progress draft when the five-minute private-read window ends. */
+function PrivateEditor(
+  props: { r: Initiative; pledges: Pledge[]; team: boolean; mine: boolean; hold: boolean },
+) {
+  const [initial, setInitial] = useState<Initiative | null>(() =>
+    props.r.contact !== undefined && props.r.funders !== undefined ? props.r : null
+  );
+  if (initial) return <EditForm {...props} r={initial} />;
+  return (
+    <ConfirmPrivateFields
+      onConfirm={async () => {
+        const fresh = await api<InitiativePage>(
+          `/api/initiatives/${encodeURIComponent(props.r.slug)}`,
+        );
+        if (
+          fresh.initiative.id !== props.r.id || fresh.initiative.contact === undefined ||
+          fresh.initiative.funders === undefined
+        ) throw new Error("Private contacts are unavailable for this wallet.");
+        setInitial(fresh.initiative);
+      }}
+    />
+  );
+}
+
 function EditForm(
   { r, pledges, team, mine, hold }: {
     /** The row with the text the form starts from (the edit in review, if any). */
@@ -251,6 +278,7 @@ function EditForm(
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { requireSession } = useSession();
+  const adminApi = useAdminApi();
   // The facts lock on approval for the proposer, never for the team.
   const open = r.status === "pending" || team;
   // The team comes from the admin page and goes back to it.
@@ -270,7 +298,8 @@ function EditForm(
     let patched = false;
     try {
       if (facts) {
-        await api(path, { method: "PATCH", json: { ...facts, initiativeId: r.id } });
+        const request = team ? adminApi : api;
+        await request(path, { method: "PATCH", json: { ...facts, initiativeId: r.id } });
         patched = true;
       }
       if (text || cats) {

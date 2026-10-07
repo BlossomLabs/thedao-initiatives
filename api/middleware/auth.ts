@@ -4,7 +4,7 @@ import type { Db } from "../db/mod.ts";
 import type { Admins } from "../services/admins.ts";
 import { HttpError } from "../lib/errors.ts";
 import { readSessionCookie } from "../lib/session-cookie.ts";
-import { SESSION_REAUTH_SECS } from "../config.ts";
+import { hasRecentAuth } from "../lib/private-fields.ts";
 
 /** Reads the session token into c.var.user (null when absent/invalid): from
  * `Authorization: Bearer <token>` (scripts), else from the HttpOnly session
@@ -50,7 +50,7 @@ export const requireAdmin: MiddlewareHandler<Vars> = async (c, next) => {
 
 export function assertRecentAuth(c: Context<Vars>, now: () => number) {
   if (!c.var.user) throw new HttpError(401, "sign in with your wallet first");
-  if (c.var.user.createdAt + SESSION_REAUTH_SECS <= now()) {
+  if (!hasRecentAuth(c.var.user, now())) {
     throw new HttpError(403, "Sign in again to confirm this sensitive change.", {
       reauthenticate: true,
     });

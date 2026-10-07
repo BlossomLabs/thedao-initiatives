@@ -9,6 +9,7 @@ import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
 import SyncContent from "~/components/admin/SyncContent";
 import Admins from "~/components/admin/Admins";
+import ConfirmPrivateFields from "~/components/admin/ConfirmPrivateFields";
 import BulkBar, { type BulkResult, HeadCheck, RowCheck } from "~/components/admin/BulkBar";
 import { useSelection } from "~/hooks/use-selection";
 import { useSiteSettings } from "~/hooks/use-site-settings";
@@ -480,6 +481,9 @@ export default function Dashboard() {
       </div>
 
       <SectionHeading>All initiatives</SectionHeading>
+      {data.rows.some(({ initiative }) => initiative.contact === undefined) && (
+        <ConfirmPrivateFields onConfirm={() => qc.invalidateQueries({ queryKey: dashKey })} />
+      )}
       <AdminFilters
         q={q}
         query={parsed.query}
@@ -602,7 +606,9 @@ export default function Dashboard() {
                     ? <span className="dim ml-1">(ledger)</span>
                     : null}
                 </td>
-                <td className="small [overflow-wrap:anywhere]">{r.contact || "–"}</td>
+                <td className="small [overflow-wrap:anywhere]">
+                  {r.contact === undefined ? "Confirm wallet" : r.contact || "–"}
+                </td>
                 <td className="text-center">
                   <SafeSyncIcon safeAddress={r.safeAddress} sync={safeSync} />
                 </td>

@@ -7,7 +7,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
-import { requireAdmin } from "../middleware/auth.ts";
+import { requireAdmin, requireRecentAuth } from "../middleware/auth.ts";
 import { initiativeMarkdown } from "../services/markdown.ts";
 import { feedFrontMatter } from "../services/feed.ts";
 import { type FeedCache, feedResponse } from "./feeds.ts";
@@ -17,10 +17,10 @@ export const MARKDOWN_PATHS = {
   private: "/:file{[a-z0-9-]+-PRIVATE\\.md}",
 } as const;
 
-export function markdownRoutes({ db }: Deps, feeds?: FeedCache) {
+export function markdownRoutes({ db, now }: Deps, feeds?: FeedCache) {
   const r = new Hono<Vars>();
   /** <slug>-PRIVATE.md: admins only; any status, plus contact and funders. */
-  r.get(MARKDOWN_PATHS.private, requireAdmin, async (c) => {
+  r.get(MARKDOWN_PATHS.private, requireAdmin, requireRecentAuth(now), async (c) => {
     const slug = c.req.param("file").slice(0, -"-PRIVATE.md".length);
     const initiative = await db.initiatives.bySlug(slug);
     if (!initiative) throw new HttpError(404, "not found");

@@ -10,6 +10,7 @@ import { INITIATIVE_CHANGED } from "../lib/initiative-identity.ts";
 import { assertFields, formBody, jsonBody, s } from "../lib/body.ts";
 import { assertRecentAuth, requireAdmin, requireRecentAuth } from "../middleware/auth.ts";
 import { clearSessionCookie } from "../lib/session-cookie.ts";
+import { canReadPrivateFields } from "../lib/private-fields.ts";
 import {
   adminCardInitiative,
   adminCommentJson,
@@ -101,7 +102,10 @@ export function adminRoutes(deps: Deps) {
     const revalidate = !(await deps.maintenance.on());
     for (const initiative of [...pending, ...approved, ...other]) {
       rows.push({
-        initiative: adminCardInitiative(initiative),
+        initiative: adminCardInitiative(
+          initiative,
+          canReadPrivateFields(initiative, c.var.user, deps.now()),
+        ),
         summary: await deps.funding.summary(initiative, revalidate),
         safeSync: initiative.safeAddress ? await db.meta.safeSync(initiative.id) : null,
       });
@@ -215,7 +219,10 @@ export function adminRoutes(deps: Deps) {
     const initiative = await initiativeOr404(c.req.param("id"));
     const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
     return c.json({
-      initiative: adminInitiative(initiative),
+      initiative: adminInitiative(
+        initiative,
+        canReadPrivateFields(initiative, c.var.user, deps.now()),
+      ),
       revisions: (await db.revisions.list(initiative.id, true, true)).map(revisionMeta),
       summary: await deps.funding.summary(initiative, !(await deps.maintenance.on())),
       pledges: (await db.pledges.list(initiative.id, true)).map((p) => pledgeJson(config, p)),
@@ -277,7 +284,9 @@ export function adminRoutes(deps: Deps) {
     const next = Object.keys(patch).length
       ? await db.initiatives.update(initiative.id, patch)
       : initiative;
-    return c.json({ initiative: adminInitiative(next) });
+    return c.json({
+      initiative: adminInitiative(next, canReadPrivateFields(next, c.var.user, deps.now())),
+    });
   });
 
   /** Hide a superseded revision from the public history, or show it again. */
@@ -316,7 +325,10 @@ export function adminRoutes(deps: Deps) {
         : null;
       if (!done) throw new HttpError(409, "That edit is no longer waiting for review.");
       return c.json({
-        initiative: adminInitiative(done.initiative),
+        initiative: adminInitiative(
+          done.initiative,
+          canReadPrivateFields(done.initiative, c.var.user, deps.now()),
+        ),
         revision: revisionMeta(done.revision),
       });
     });
@@ -360,7 +372,10 @@ export function adminRoutes(deps: Deps) {
     const initiative = await initiativeOr404(c.req.param("id"), true);
     const action = s((await jsonBody(c, ["action"])).action, 20);
     auditContext(c, { target: initiative.id, detail: action });
-    return c.json({ initiative: adminInitiative(await applyStatus(initiative, action)) });
+    const next = await applyStatus(initiative, action);
+    return c.json({
+      initiative: adminInitiative(next, canReadPrivateFields(next, c.var.user, deps.now())),
+    });
   });
 
   /** The same status change on many initiatives at once. Each id is applied
@@ -637,8 +652,8 @@ export function adminRoutes(deps: Deps) {
   });
 
   /**
-   * Funder leads: the ONLY reader of the private funders field besides the
-   * manage page. Never link from a public page; never add a public route.
+   * Dedicated funder-leads export. Other serializers apply the same fresh
+   * administrator proof (or proposer ownership) at their field boundary.
    */
   r.get("/leads", requireRecentAuth(deps.now), async (c) => {
     const all = await db.initiatives.list(["pending", "approved", "rejected", "archived"]);

@@ -36,6 +36,10 @@ export interface EnsResolver {
 export function onchainEns(endpoints: string[], f: typeof fetch = fetch): EnsResolver {
   const client = createPublicClient({
     chain: mainnet,
+    // Resolver-supplied CCIP gateways are untrusted outbound destinations.
+    // Keep all three ENS actions on the configured RPC transport; the fixed
+    // ensdata fallback handles unsupported/offline records without gateway fetches.
+    ccipRead: false,
     transport: fallback(
       endpoints.map((url) =>
         http(url, {

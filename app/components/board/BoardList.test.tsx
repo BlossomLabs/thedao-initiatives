@@ -165,3 +165,14 @@ it("desktop: the Backers column shows the pledgers' logos, and +N for the backer
   expect(row.getAllByRole("img")).toHaveLength(4);
   expect(row.queryByText(/^\+/)).toBeNull();
 });
+
+it("the last row's vote callout hangs below the list, so nothing around it clips", () => {
+  const { container } = mount({ vote: { show: true, floorPct: 25, capUsd: 200_000 } });
+  const last = [...container.querySelectorAll("li")].at(-1)!;
+  fireEvent.click(last);
+  const callout = last.querySelector("[data-vote-callout]")!;
+  expect(callout).toHaveTextContent("$50k to qualify");
+  for (let el = callout.parentElement; el && el !== container; el = el.parentElement) {
+    expect(el.className).not.toMatch(/\boverflow-(hidden|clip|auto|scroll)\b/);
+  }
+});

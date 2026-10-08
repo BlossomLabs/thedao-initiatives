@@ -268,7 +268,8 @@ export default function BoardList(
   },
 ) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.04]">
+    // No overflow clip: the last row's vote callout hangs below the panel.
+    <div className="rounded-2xl border border-white/10 bg-white/[.04]">
       <div className={COLUMNS}>
         <div
           className={cn(

@@ -1,11 +1,11 @@
 /**
  * The board's filters and sorts as pure functions over the cards /api/board
  * returns (already in Recommended order). The URL is the state:
- * ?type=rfp&cat=opsec,defi&status=open&sort=closest&view=list&q=safe
- * A plain URL is the cards, in sections by category.
+ * ?type=rfp&cat=opsec,defi&status=open&sort=closest&view=cards&q=safe
+ * A plain URL is the list, in sections by category.
  */
 import type { Card } from "~/lib/api-types";
-import { CATEGORIES, CATEGORY_INDEX, categoryOf } from "~/lib/categories";
+import { CATEGORIES, categoryOf } from "~/lib/categories";
 import { plural } from "~/lib/format";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
@@ -45,7 +45,7 @@ export const DEFAULT_VIEW: BoardView = {
   status: "all",
   cats: [],
   sort: "category",
-  view: "cards",
+  view: "list",
   q: "",
   watchlist: false,
 };
@@ -130,22 +130,28 @@ const when = (c: Card) => c.initiative.approvedAt ?? c.initiative.createdAt;
 const primary = (c: Card): string | null =>
   categoryOf(c.initiative.categories[0] ?? "") ? c.initiative.categories[0] : null;
 
-/**
- * "By category" order: the categories whose initiatives have raised the most
- * money come first, each initiative counted under its primary category. Equal
- * sums keep the registry order, and untagged is always last. `cards` is the
- * whole board, so the sections do not move around as filters narrow it.
- */
-export function categoryOrder(cards: Card[]): (string | null)[] {
-  const raised = new Map<string | null, number>();
-  for (const c of cards) raised.set(primary(c), (raised.get(primary(c)) ?? 0) + c.summary.total);
+/** The categories shuffled (Fisher-Yates), untagged always last. */
+export function shuffleCategories(random: () => number = Math.random): (string | null)[] {
   const slugs = CATEGORIES.map((c) => c.slug as string);
-  return [
-    ...slugs.sort((a, b) =>
-      (raised.get(b) ?? 0) - (raised.get(a) ?? 0) || CATEGORY_INDEX[a] - CATEGORY_INDEX[b]
-    ),
-    null,
-  ];
+  for (let i = slugs.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [slugs[i], slugs[j]] = [slugs[j], slugs[i]];
+  }
+  return [...slugs, null];
+}
+
+let order: (string | null)[] | null = null;
+
+/**
+ * "By category" order: random, so no category always leads the board. Drawn
+ * once per page load, so the sections do not move around as filters narrow
+ * the board or its data refreshes.
+ */
+export const categoryOrder = (): (string | null)[] => order ??= shuffleCategories();
+
+/** Draw the order again (tests: with their own `random`). */
+export function redrawCategoryOrder(random?: () => number) {
+  order = shuffleCategories(random);
 }
 
 const KEYS: Record<Exclude<BoardSort, "category">, ((c: Card) => number) | null> = {
@@ -158,12 +164,11 @@ const KEYS: Record<Exclude<BoardSort, "category">, ((c: Card) => number) | null>
   "goal-desc": (c) => -c.initiative.goalUsd,
 };
 
-/** Sorted copy; ties keep the Recommended order the cards arrived in. `all` is
- * the whole board, which By category ranks its categories from. */
-export function sortCards(cards: Card[], sort: BoardSort, all: Card[] = cards): Card[] {
+/** Sorted copy; ties keep the Recommended order the cards arrived in. */
+export function sortCards(cards: Card[], sort: BoardSort): Card[] {
   let key: ((c: Card) => number) | null;
   if (sort === "category") {
-    const order = categoryOrder(all);
+    const order = categoryOrder();
     key = (c) => order.indexOf(primary(c));
   } else key = KEYS[sort];
   if (!key) return [...cards];
@@ -174,7 +179,7 @@ export function sortCards(cards: Card[], sort: BoardSort, all: Card[] = cards): 
 
 /** The cards the view shows, in its order. */
 export const applyView = (cards: Card[], v: BoardView, watched?: string[]): Card[] =>
-  sortCards(cards.filter((c) => matches(c, v, undefined, watched)), v.sort, cards);
+  sortCards(cards.filter((c) => matches(c, v, undefined, watched)), v.sort);
 
 /** Live counts for the controls: each facet counted with the other filters applied. */
 export function facetCounts(cards: Card[], v: BoardView, watched?: string[]) {
@@ -192,17 +197,20 @@ export function facetCounts(cards: Card[], v: BoardView, watched?: string[]) {
   return { type, cats };
 }
 
-/** "By category": sections by primary category in categoryOrder (ranked from
- * `all`, the whole board), untagged last. */
+/** "By category": sections by primary category in categoryOrder, untagged last,
+ * each with what its cards raised in total. */
 export function groupByPrimary(
   cards: Card[],
-  all: Card[] = cards,
-): { slug: string | null; cards: Card[] }[] {
+): { slug: string | null; cards: Card[]; raised: number }[] {
   const groups = new Map<string | null, Card[]>();
   for (const c of cards) groups.set(primary(c), [...(groups.get(primary(c)) ?? []), c]);
-  return categoryOrder(all)
+  return categoryOrder()
     .filter((s) => groups.has(s))
-    .map((slug) => ({ slug, cards: groups.get(slug)! }));
+    .map((slug) => ({
+      slug,
+      cards: groups.get(slug)!,
+      raised: groups.get(slug)!.reduce((sum, c) => sum + c.summary.total, 0),
+    }));
 }
 
 export const STATUS_LABELS = {

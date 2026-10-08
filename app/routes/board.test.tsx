@@ -98,13 +98,14 @@ it("restores filters from the URL: count, pills and cards", async () => {
   expect(screen.queryByText("Alpha fuzzing")).toBeNull();
 });
 
-it("By category draws plain headings with a dot and a count", () => {
+it("By category draws plain headings with a dot and what the category raised", () => {
   at("/?sort=category");
-  const h = screen.getByRole("heading", { name: /Fuzzing & Testing\s*1/ });
+  const h = screen.getByRole("heading", { name: /Fuzzing & Testing\s*\$0 raised/ });
   expect(h.querySelector("span[aria-hidden]")).not.toBeNull();
   // 26px tall, the height BoardSkeleton holds for it
   expect(h).toHaveClass("text-[20px]", "leading-[26px]");
-  expect(screen.getByRole("heading", { name: /Wallets & Signing\s*1/ })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /Wallets & Signing\s*\$0 raised/ }))
+    .toBeInTheDocument();
 });
 
 it("AI order: Sort shows AI matches, filters still narrow, a manual sort clears it", async () => {
@@ -147,7 +148,7 @@ it("Clear filters keeps the sort and the AI order", async () => {
   fireEvent.click(
     screen.getAllByRole("button", { name: "Clear filters" })[0],
   );
-  await waitFor(() => expect(router.state.location.search).toBe("?sort=newest"));
+  await waitFor(() => expect(router.state.location.search).toBe("?sort=newest&view=cards"));
   expect(screen.getByText("AI pick")).toBeInTheDocument();
 });
 
@@ -160,15 +161,14 @@ it("the phone Filters sheet applies its picks to the URL", async () => {
   await waitFor(() => expect(router.state.location.search).toBe("?cat=opsec&sort=newest"));
 });
 
-it("a plain board is the cards in sections by category", () => {
+it("a plain board is the list in sections by category", async () => {
   at("/");
   expect(screen.getAllByRole("combobox", { name: "Sort" })[0]).toHaveTextContent("By category");
-  expect(screen.getByRole("button", { name: "Cards" })).toHaveAttribute("aria-pressed", "true");
-  expect(screen.getByRole("heading", { name: /Fuzzing & Testing\s*1/ })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: /OpSec\s*1/ })).toBeInTheDocument();
-  // the cards, not the list's rows under its column header
-  expect(screen.getByText("Alpha fuzzing")).toBeInTheDocument();
-  expect(screen.queryByText("Raised")).toBeNull();
+  expect(screen.getByRole("button", { name: "List" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("heading", { name: /Fuzzing & Testing\s*\$0 raised/ }))
+    .toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /OpSec\s*\$0 raised/ })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(3));
 });
 
 it("with nothing featured, Featured orders by closest to funded and Sort does not offer it", () => {
@@ -182,25 +182,25 @@ it("with nothing featured, Featured orders by closest to funded and Sort does no
 describe("layout", () => {
   afterEach(() => localStorage.clear());
 
-  it("the cards are the plain URL, and the List button writes ?view=list", async () => {
+  it("the list is the plain URL, and the Cards button writes ?view=cards", async () => {
     const router = at("/?sort=newest");
-    expect(screen.queryByText("Raised")).toBeNull();
-    expect(screen.getByRole("button", { name: "Cards" })).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(screen.getByRole("button", { name: "List" }));
-    await waitFor(() => expect(router.state.location.search).toBe("?sort=newest&view=list"));
     expect(await screen.findByText("Raised")).toBeInTheDocument();
     expect(screen.getAllByRole("listitem").length).toBe(3);
+    expect(screen.getByRole("button", { name: "List" })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "Cards" }));
+    await waitFor(() => expect(router.state.location.search).toBe("?sort=newest&view=cards"));
+    expect(screen.queryByText("Raised")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
     await waitFor(() => expect(router.state.location.search).toBe("?sort=newest"));
   });
 
   it("a plain URL opens in the layout this device used last", async () => {
     at("/");
-    fireEvent.click(screen.getByRole("button", { name: "List" }));
-    expect(localStorage.getItem("thedao:board-layout")).toBe("list");
+    fireEvent.click(screen.getByRole("button", { name: "Cards" }));
+    expect(localStorage.getItem("thedao:board-layout")).toBe("cards");
     cleanup();
     const router = at("/");
-    await waitFor(() => expect(router.state.location.search).toBe("?view=list"));
+    await waitFor(() => expect(router.state.location.search).toBe("?view=cards"));
   });
 });
 

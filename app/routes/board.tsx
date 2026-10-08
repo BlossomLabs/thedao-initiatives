@@ -10,6 +10,7 @@ import Hero from "~/components/board/Hero";
 import BoardSearch from "~/components/board/BoardSearch";
 import InitiativeCard from "~/components/board/InitiativeCard";
 import { useWatchlist } from "~/hooks/use-watchlist";
+import { usd } from "~/lib/format";
 import SuggestCard from "~/components/board/SuggestCard";
 import { ShuffleItem } from "~/components/board/Shuffle";
 import PledgeBand from "~/components/board/PledgeBand";
@@ -83,7 +84,7 @@ export default function Board() {
     try {
       saved = localStorage.getItem(LAYOUT_KEY);
     } catch { /* storage off */ }
-    if (saved === "list") setView({ view: "list" });
+    if (saved === "cards") setView({ view: "cards" });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once, on arrival
 
   const ai = Boolean(aiResult?.scores.length);
@@ -145,8 +146,8 @@ export default function Board() {
   const filtered = isFiltered(view);
   // "By category" draws sections; the AI order wins over them while it is on.
   const groups = view.sort === "category" && !ai
-    ? groupByPrimary(cards, all)
-    : [{ slug: null, cards, flat: true }];
+    ? groupByPrimary(cards)
+    : [{ slug: null, cards, raised: 0, flat: true }];
 
   return (
     <>
@@ -252,7 +253,7 @@ export default function Board() {
                       </>
                     )
                     : "Untagged"}
-                  <span className="small dim tnum">{g.cards.length}</span>
+                  <span className="small dim tnum">{usd(g.raised)} raised</span>
                 </h3>
               )}
               {view.view === "list"

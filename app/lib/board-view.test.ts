@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { Card } from "./api-types";
 import { CATEGORIES } from "./categories";
 import {
@@ -14,7 +14,9 @@ import {
   hasFeatured,
   isFiltered,
   readView,
+  redrawCategoryOrder,
   resultLabel,
+  shuffleCategories,
   sortCards,
   sortFor,
   SORTS,
@@ -100,6 +102,9 @@ const board = [
 const titles = (cs: Card[]) => cs.map((c) => c.initiative.title);
 
 describe("board view", () => {
+  // By category is random per page load; here every swap is with itself: the registry order.
+  beforeEach(() => redrawCategoryOrder(() => 0.999));
+
   it("featured are all the initiatives the team pinned, whatever their rank", () => {
     const at = (title: string, sortRank: number | null) => {
       const c = card(title);
@@ -164,16 +169,14 @@ describe("board view", () => {
       q: "safe",
       watchlist: false,
     });
-    expect(writeView(v).toString()).toBe(
-      "type=rfp&cat=opsec%2Cdefi&sort=closest&view=list&q=safe",
+    expect(writeView(v).toString()).toBe("type=rfp&cat=opsec%2Cdefi&sort=closest&q=safe");
+    // The plain board is the list by category; the other layout and sorts are spelled out.
+    expect(DEFAULT_VIEW).toMatchObject({ view: "list", sort: "category" });
+    expect(writeView({ ...DEFAULT_VIEW, view: "cards", sort: "recommended" }).toString()).toBe(
+      "sort=recommended&view=cards",
     );
-    // The plain board is the cards by category; the other layout and sorts are spelled out.
-    expect(DEFAULT_VIEW).toMatchObject({ view: "cards", sort: "category" });
-    expect(writeView({ ...DEFAULT_VIEW, view: "list", sort: "recommended" }).toString()).toBe(
-      "sort=recommended&view=list",
-    );
-    expect(readView(new URLSearchParams("view=list&sort=bogus"))).toMatchObject({
-      view: "list",
+    expect(readView(new URLSearchParams("view=cards&sort=bogus"))).toMatchObject({
+      view: "cards",
       sort: "category",
     });
     expect(writeView(DEFAULT_VIEW).toString()).toBe("");
@@ -182,7 +185,7 @@ describe("board view", () => {
 
   it("filters: categories OR, AND with type, status and keywords", () => {
     const v = { ...DEFAULT_VIEW, cats: ["opsec", "defi"] };
-    expect(titles(applyView(board, v))).toEqual(["Safe lockdown", "Directory of value"]);
+    expect(titles(applyView(board, v))).toEqual(["Directory of value", "Safe lockdown"]);
     expect(titles(applyView(board, { ...v, type: "rfp" }))).toEqual(["Directory of value"]);
     expect(titles(applyView(board, { ...v, status: "funded" }))).toEqual(["Safe lockdown"]);
     expect(titles(applyView(board, { ...v, status: "open" }))).toEqual(["Directory of value"]);
@@ -240,15 +243,12 @@ describe("board view", () => {
       "Safe lockdown",
       "Untagged legacy",
     ]);
-    // most raised first: formal-verification 100k, fuzzing-testing 40k, opsec 14k,
-    // audits-analysis 5k; untagged last
-    expect(titles(sortCards(board, "category"))).toEqual([
-      "Vyper compiler",
-      "Echidna",
-      "Safe lockdown",
-      "Directory of value",
-      "Untagged legacy",
-    ]);
+    // the sections' order: here the registry's, untagged last
+    const slugs: (string | null)[] = sortCards(board, "category").map((c) =>
+      c.initiative.categories[0] ?? null
+    );
+    expect(slugs).toEqual(categoryOrder().filter((s) => slugs.includes(s)));
+    expect(slugs.at(-1)).toBeNull();
   });
 
   it("facet counts apply the other filters", () => {
@@ -259,46 +259,36 @@ describe("board view", () => {
     expect(f.cats["audits-analysis"]).toBe(1);
   });
 
-  it("groups by primary category, the categories that raised most first, untagged last", () => {
-    expect(groupByPrimary(board).map((g) => [g.slug, g.cards.length])).toEqual([
-      ["formal-verification", 1],
-      ["fuzzing-testing", 1],
-      ["opsec", 1],
-      ["audits-analysis", 1],
-      [null, 1],
-    ]);
-  });
-
-  it("a category's rank is the sum its initiatives raised, whatever the filters show", () => {
-    const more = [
+  it("groups by primary category with what each raised, untagged last", () => {
+    const groups = groupByPrimary([
       ...board,
       card("Second audit", { cats: ["audits-analysis"], raised: 30_000 }),
       card("Third audit", { cats: ["audits-analysis", "opsec"], raised: 80_000 }),
-      card("Rich but untagged", { raised: 900_000 }),
-    ];
-    // audits-analysis 5k + 30k + 80k = 115k now leads; a second category does not count.
-    expect(categoryOrder(more).slice(0, 4)).toEqual([
-      "audits-analysis",
-      "formal-verification",
-      "fuzzing-testing",
-      "opsec",
     ]);
-    expect(categoryOrder(more).at(-1)).toBeNull();
-    // Nothing raised anywhere: the registry order.
-    expect(categoryOrder([])).toEqual([...CATEGORIES.map((c) => c.slug), null]);
-    // Filtered down to the two smallest raisers, the sections keep the whole board's order.
-    const shown = more.filter((c) =>
-      ["Directory of value", "Echidna", "Rich but untagged"].includes(c.initiative.title)
+    expect(groups.map((g) => g.slug)).toEqual(
+      categoryOrder().filter((s) => groups.some((g) => g.slug === s)),
     );
-    expect(groupByPrimary(shown, more).map((g) => g.slug)).toEqual([
-      "audits-analysis",
-      "fuzzing-testing",
-      null,
+    expect(groups.at(-1)!.slug).toBeNull();
+    // audits-analysis 5k + 30k + 80k; a second category does not count
+    const of = (slug: string) => groups.find((g) => g.slug === slug)!;
+    expect([of("audits-analysis").cards.length, of("audits-analysis").raised]).toEqual([
+      3,
+      115_000,
     ]);
-    expect(titles(applyView(more, { ...DEFAULT_VIEW, type: "rfp" }))).toEqual([
-      "Directory of value",
-      "Untagged legacy",
-    ]);
+    expect(of("opsec").raised).toBe(14_000);
+  });
+
+  it("the category order is random, drawn once per page load, untagged last", () => {
+    const registry = [...CATEGORIES.map((c) => c.slug), null];
+    expect(shuffleCategories(() => 0.999)).toEqual(registry);
+    const other = shuffleCategories(() => 0);
+    expect(other).not.toEqual(registry);
+    expect([...other].sort()).toEqual([...registry].sort());
+    expect(other.at(-1)).toBeNull();
+    // the same order every time it is asked for, until it is drawn again
+    redrawCategoryOrder(() => 0);
+    expect(categoryOrder()).toEqual(other);
+    expect(categoryOrder()).toBe(categoryOrder());
   });
 });
 

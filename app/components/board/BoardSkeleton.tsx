@@ -3,17 +3,17 @@ import { LAYOUT_KEY } from "~/lib/board-view";
 
 /**
  * Inline head script (root.tsx) that picks the board's loading shape before
- * the first paint: the cards unless the URL, or else this device's last
- * choice, says the list. The board keeps the mark in step afterwards.
+ * the first paint: the list unless the URL, or else this device's last
+ * choice, says cards. The board keeps the mark in step afterwards.
  */
 export const BOARD_SCRIPT =
   "if(location.pathname==='/')try{if((new URLSearchParams(location.search).get('view')||localStorage.getItem(" +
   JSON.stringify(LAYOUT_KEY) +
-  "))==='list')document.documentElement.dataset.board='list'}catch(e){}";
+  "))==='cards')document.documentElement.dataset.board='cards'}catch(e){}";
 
 /** Record the layout in use, for the next time the board shows its skeleton. */
 export function markBoardLayout(view: "cards" | "list") {
-  if (view === "list") document.documentElement.dataset.board = "list";
+  if (view === "cards") document.documentElement.dataset.board = "cards";
   else delete document.documentElement.dataset.board;
 }
 
@@ -106,7 +106,7 @@ function ControlsSkeleton() {
 
 /**
  * The board while its data loads. The page is prerendered, so it carries both
- * layouts' shapes and `html[data-board="list"]` (app.css) shows the one the
+ * layouts' shapes and `html[data-board="cards"]` (app.css) shows the one the
  * visitor is about to get: no jump from one shape to the other.
  */
 export default function BoardSkeleton() {

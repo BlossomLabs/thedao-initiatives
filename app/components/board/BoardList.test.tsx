@@ -142,3 +142,26 @@ it("desktop: the amount is plain text, the Backers column says it", () => {
   )!;
   expect(amount).not.toHaveAttribute("tabindex");
 });
+
+it("desktop: the Backers column shows the pledgers' logos, and +N for the backers beyond them", () => {
+  const logo = (company: string) => ({ company, logoUrl: `https://x/${company}.png`, url: "" });
+  const withLogos = (n: number, backers: number) =>
+    ({ ...cards[0], backers, logos: ["A", "B", "C", "D"].slice(0, n).map(logo) }) as Card;
+  const { unmount } = mount({ cards: [withLogos(1, 4)] });
+  let row = within(screen.getByRole("listitem"));
+  expect(row.getAllByRole("img").map((i) => i.getAttribute("alt"))).toEqual(["A"]);
+  expect(row.getByText("+3")).toBeInTheDocument();
+  expect(row.getByText("4 backers")).toHaveClass("sr-only");
+  unmount();
+  // four logos fill the column: with more backers than that, three and the rest as +N
+  const second = mount({ cards: [withLogos(4, 6)] });
+  row = within(screen.getByRole("listitem"));
+  expect(row.getAllByRole("img")).toHaveLength(3);
+  expect(row.getByText("+3")).toBeInTheDocument();
+  second.unmount();
+  // the logos are all the backers: no +N
+  mount({ cards: [withLogos(4, 4)] });
+  row = within(screen.getByRole("listitem"));
+  expect(row.getAllByRole("img")).toHaveLength(4);
+  expect(row.queryByText(/^\+/)).toBeNull();
+});

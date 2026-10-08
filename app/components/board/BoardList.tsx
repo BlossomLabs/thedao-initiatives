@@ -2,6 +2,7 @@ import { Popover } from "@base-ui/react/popover";
 import { AnimatePresence, motion } from "motion/react";
 import { useRowMotion } from "~/components/board/Shuffle";
 import { TypeBadge } from "~/components/ui/Badge";
+import BackerLogo from "~/components/ui/BackerLogo";
 import CardTitle from "~/components/board/CardTitle";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import WatchlistButton from "~/components/board/WatchlistButton";
@@ -23,14 +24,15 @@ type Watch = { has: (id: string) => boolean; toggle: (id: string) => void };
 
 /**
  * The list's columns, shared by the header and every row (subgrid), so each
- * column lines up down the list: bookmark · type · title · funded · backers ·
+ * column lines up down the list: bookmark · type · title · funded · backers
+ * (the pledgers' logos, or the count when nobody pledged) ·
  * raised of goal (phones: the backers on a tap of the amount). Each row carries its own funding bar, inset under the title
  * (not a divider: rounded, inside the content column, the real divider below
  * it). Phones: bookmark | title, type and label, raised, then the
  * bar with its % at the end.
  */
 const COLUMNS =
-  "grid grid-cols-[2rem_4.25rem_minmax(0,1fr)_4rem_4.5rem_11rem] gap-x-4 max-[640px]:grid-cols-1";
+  "grid grid-cols-[2rem_4.25rem_minmax(0,1fr)_4rem_5.5rem_11rem] gap-x-4 max-[640px]:grid-cols-1";
 const ROW =
   "col-span-full grid grid-cols-subgrid items-center px-4 max-[640px]:grid-cols-[auto_minmax(0,1fr)_auto] max-[640px]:gap-x-3";
 const NUM = "text-right tnum whitespace-nowrap";
@@ -99,9 +101,12 @@ function Row(
     vote?: VoteSettings;
   },
 ) {
-  const { initiative: r, summary, pct, backers } = card;
+  const { initiative: r, summary, pct, backers, logos } = card;
   // With the vote display on, the % turns green at the vote floor, where the tick is.
   const standing = vote?.show ? voteStanding(summary.total, r.goalUsd, vote) : null;
+  // The Backers column: every logo when they are all the backers, else three and "+N" for the rest.
+  const shownLogos = backers > logos.length ? logos.slice(0, 3) : logos;
+  const more = backers - shownLogos.length;
   const pctOn = standing ? standing.kind === "eligible" : pct >= 1;
   const tick = vote ? voteFloorPct(r.goalUsd, vote) : 0;
   // Hovering or tapping the row shows its vote callout under the bar.
@@ -153,9 +158,27 @@ function Row(
         {pctText(pct)}
         <span className="sr-only">funded{standing && `. ${calloutText(standing)}`}</span>
       </span>
-      {/* Desktop: the Backers column. */}
+      {/* Desktop: the Backers column, the pledgers' logos when there are any. */}
       <span className={cn(NUM, "text-[12.5px] text-white/60 max-[640px]:hidden")}>
-        {backers > 0
+        {logos.length > 0
+          ? (
+            <span className="flex items-center justify-end">
+              {/* Small and overlapping, so four fit the column. Without a logo, the silhouette. */}
+              {shownLogos.map((l, i) => (
+                <span key={i} className="-ml-1.5 flex first:ml-0">
+                  <BackerLogo
+                    logoUrl={l.logoUrl}
+                    company={l.company}
+                    url={l.url}
+                    className="size-6 p-0.5 ring-2 ring-panel [&>svg]:size-3"
+                  />
+                </span>
+              ))}
+              {more > 0 && <span className="ml-1.5 text-white/50" aria-hidden="true">+{more}</span>}
+              <span className="sr-only">{plural(backers, "backer")}</span>
+            </span>
+          )
+          : backers > 0
           ? (
             <>
               {backers}

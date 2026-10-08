@@ -9,7 +9,7 @@ import { CATEGORIES, CATEGORY_INDEX, categoryOf } from "~/lib/categories";
 import { plural } from "~/lib/format";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
-export const STATUSES = ["all", "open", "first-goal", "funded"] as const;
+export const STATUSES = ["all", "open", "qualified", "funded"] as const;
 export const SORTS = [
   ["recommended", "Featured"],
   ["closest", "Closest to funded"],
@@ -58,7 +58,12 @@ export function readView(params: URLSearchParams): BoardView {
   const cats = (params.get("cat") ?? "").split(",").filter((s) => categoryOf(s));
   return {
     type: pick(params.get("type"), TYPES, "all"),
-    status: pick(params.get("status"), STATUSES, "all"),
+    // "first-goal" is the old name for "qualified": links shared before still work.
+    status: pick(
+      params.get("status")?.replace(/^first-goal$/, "qualified") ?? null,
+      STATUSES,
+      "all",
+    ),
     cats: [...new Set(cats)],
     sort: pick(params.get("sort"), SORTS.map((s) => s[0]), DEFAULT_VIEW.sort),
     view: pick(params.get("view"), VIEWS, DEFAULT_VIEW.view),
@@ -105,8 +110,8 @@ export function matches(c: Card, v: BoardView, skip?: Facet, watched?: string[])
   if (skip !== "type" && v.type !== "all" && c.initiative.type !== v.type) return false;
   if (skip !== "status" && v.status === "open" && c.funded) return false;
   if (skip !== "status" && v.status === "funded" && !c.funded) return false;
-  // First goal reached: past the vote floor. The cards carry it only while the display is on.
-  if (skip !== "status" && v.status === "first-goal" && c.vote === "below") return false;
+  // Qualified for the vote: past the vote floor. The cards carry it only while the display is on.
+  if (skip !== "status" && v.status === "qualified" && c.vote === "below") return false;
   if (
     skip !== "cats" && v.cats.length && !c.initiative.categories.some((s) => v.cats.includes(s))
   ) {
@@ -203,7 +208,7 @@ export function groupByPrimary(
 export const STATUS_LABELS = {
   open: "Open for funding",
   funded: "Fully funded",
-  "first-goal": "First goal reached",
+  qualified: "Qualified for the vote",
 } as const;
 
 /** What Clear filters resets: every applied filter (type, categories, funding

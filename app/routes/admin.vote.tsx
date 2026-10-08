@@ -7,7 +7,7 @@ export function meta() {
   return generateMeta({ title: "Vote", url: "/admin/vote", noIndex: true });
 }
 
-/** The first goal and the vote: set once, changed rarely, so off the dashboard. */
+/** Qualifying for the vote: set once, changed rarely, so off the dashboard. */
 export default function VotePage() {
   return (
     <PageMain detail className="max-w-[860px]">

@@ -18,13 +18,15 @@ const mount = () =>
       <VoteSettings />
     </QueryClientProvider>,
   );
-const slider = () => screen.getByRole("slider", { name: /First goal, as a percentage/ });
+const slider = () => screen.getByRole("slider", { name: /To qualify, as a percentage/ });
 const max = () => screen.getByRole("textbox", { name: "Maximum distributed per initiative" });
 const saveBtn = () => screen.getByRole("button", { name: "Save changes" });
 
 it("the switch shows the state in words and saves at once", async () => {
   mount();
-  const sw = await screen.findByRole("switch", { name: "Show the first goal on the site" });
+  const sw = await screen.findByRole("switch", {
+    name: "Show what it takes to qualify on the site",
+  });
   await waitFor(() => expect(sw).not.toHaveAttribute("data-disabled"));
   expect(screen.getByText("Hidden")).toBeInTheDocument();
   fireEvent.click(sw);
@@ -36,7 +38,7 @@ it("the switch shows the state in words and saves at once", async () => {
   expect(await screen.findByText("On the site")).toBeInTheDocument();
 });
 
-it("the slider sets the first goal from 25%, and both numbers save together", async () => {
+it("the slider sets the share to qualify from 25%, and both numbers save together", async () => {
   mount();
   await waitFor(() => expect(max()).toHaveValue("200,000"));
   expect(slider()).toHaveValue("25");

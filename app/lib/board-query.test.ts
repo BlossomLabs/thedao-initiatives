@@ -16,7 +16,7 @@ it("an unknown value is named and ignored; other colons are just words", () => {
   expect(r.problems).toEqual([
     "Unknown type: loan. Try grant or rfp.",
     "Unknown category: nope.",
-    "Unknown funding: soon. Try open, funded or first-goal.",
+    "Unknown funding: soon. Try open, funded or qualified.",
   ]);
 });
 

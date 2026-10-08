@@ -324,16 +324,12 @@ describe("keyword filter", () => {
   });
 });
 
-describe("First goal reached filter", () => {
+describe("Qualified for the vote filter", () => {
   it("keeps the cards past the vote floor; without the display on it narrows nothing", () => {
     const below = { ...card("Below"), vote: "below" as const };
     const past = { ...card("Past"), vote: "eligible" as const };
-    const gap = { ...card("Gap"), vote: "gap" as const };
-    const v = { ...DEFAULT_VIEW, status: "first-goal" as const };
-    expect(applyView([below, past, gap], v).map((c) => c.initiative.title)).toEqual([
-      "Past",
-      "Gap",
-    ]);
+    const v = { ...DEFAULT_VIEW, status: "qualified" as const };
+    expect(applyView([below, past], v).map((c) => c.initiative.title)).toEqual(["Past"]);
     expect(applyView([card("Off")], v)).toHaveLength(1);
   });
 });

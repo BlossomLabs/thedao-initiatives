@@ -232,8 +232,8 @@ describe("vote eligibility", () => {
     expect(container.querySelector<HTMLElement>("[data-vote-tick]")!.style.left).toBe("25%");
     expect(screen.getByRole("progressbar")).toHaveAttribute(
       "aria-valuetext",
-      "10.0% funded. $150 to the first goal",
+      "10.0% funded. $150 to qualify for TheDAO's vote",
     );
-    expect(screen.queryByText(/First goal|to first goal/)).toBeNull();
+    expect(screen.queryByText(/Qualified for the vote|to qualify$/)).toBeNull();
   });
 });

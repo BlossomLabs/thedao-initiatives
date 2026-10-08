@@ -2,7 +2,7 @@ import { Trophy } from "lucide-react";
 import Bar from "~/components/ui/Bar";
 import { Check } from "lucide-react";
 import { calloutLabel, calloutText, voteStanding } from "~/components/board/VoteMark";
-import type { VoteSettings } from "@shared/vote";
+import { voteFloorPct, voteFloorUsd, type VoteSettings } from "@shared/vote";
 import Money from "~/components/ui/Money";
 import type { Summary } from "~/lib/api-types";
 import { pctText, usd } from "~/lib/format";
@@ -86,13 +86,17 @@ export default function FundingHead(
         </b>{" "}
         <span className="text-muted">of {usd(goal)}</span>
       </div>
-      <Bar pct={pct} big tick={standing ? vote!.floorPct : undefined} />
+      <Bar pct={pct} big tick={standing ? voteFloorPct(goal, vote!) : undefined} />
       {split}
       {standing && (
-        // Once, where people read: what the first goal is and what it unlocks.
+        // Once, where people read: what it takes to qualify and for what.
         <p className="m-0 mt-2.5 text-[12.5px] text-muted">
-          The first goal is{" "}
-          {vote!.floorPct}% of the goal: reaching it puts the initiative to TheDAO's vote.
+          {goal - vote!.capUsd > (goal * vote!.floorPct) / 100
+            // A large goal: the floor is the goal less what TheDAO distributes at most.
+            ? `This initiative qualifies for TheDAO's vote at ${
+              usd(voteFloorUsd(goal, vote!))
+            }: TheDAO distributes at most ${usd(vote!.capUsd)} to one initiative.`
+            : `An initiative qualifies for TheDAO's vote at ${vote!.floorPct}% of its goal.`}
         </p>
       )}
     </div>

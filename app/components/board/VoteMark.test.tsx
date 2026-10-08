@@ -5,20 +5,24 @@ import { useVoteReveal, VoteCallout, voteCallout } from "./VoteMark";
 const vote = { show: true, floorPct: 25, capUsd: 200_000 };
 
 it("the callout: past the floor, or what is missing within 5 points of it", () => {
-  // goal $600k, floor 25% = $150k
-  expect(voteCallout(118_000, 600_000, vote)).toBeNull(); // 5.3 points short
-  expect(voteCallout(121_000, 600_000, vote)).toEqual({ kind: "near", missing: 29_000 });
-  expect(voteCallout(150_000, 600_000, vote)).toEqual({ kind: "eligible" });
-  expect(voteCallout(150_000, 600_000, { ...vote, show: false })).toBeNull();
+  // goal $240k, floor 25% = $60k
+  expect(voteCallout(47_000, 240_000, vote)).toBeNull(); // 5.4 points short
+  expect(voteCallout(49_000, 240_000, vote)).toEqual({ kind: "near", missing: 11_000 });
+  expect(voteCallout(60_000, 240_000, vote)).toEqual({ kind: "eligible" });
+  expect(voteCallout(60_000, 240_000, { ...vote, show: false })).toBeNull();
+  // goal $600k: the floor is the goal less the $200k cap, $400k
+  expect(voteCallout(150_000, 600_000, vote)).toBeNull();
+  expect(voteCallout(380_000, 600_000, vote)).toEqual({ kind: "near", missing: 20_000 });
+  expect(voteCallout(400_000, 600_000, vote)).toEqual({ kind: "eligible" });
 });
 
-it("the callout says how much is missing, short and rounded up, or First goal reached", () => {
+it("the callout says how much is missing, short and rounded up, or Qualified for the vote", () => {
   const { rerender } = render(
     <VoteCallout state={{ kind: "near", missing: 1_950 }} at={25} side="top" />,
   );
-  expect(screen.getByText("$2k to first goal")).toBeInTheDocument();
+  expect(screen.getByText("$2k to qualify")).toBeInTheDocument();
   rerender(<VoteCallout state={{ kind: "eligible" }} at={25} side="top" />);
-  expect(screen.getByText("First goal reached")).toBeInTheDocument();
+  expect(screen.getByText("Qualified for the vote")).toBeInTheDocument();
 });
 
 function Row() {

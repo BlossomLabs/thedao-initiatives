@@ -1,9 +1,10 @@
 /**
- * Vote eligibility (behind a flag, numbers not final): an initiative whose raised
- * total (pledges plus donations) reaches the floor share of its goal can go to
- * TheDAO's vote; one whose remaining gap is still above the cap (what TheDAO would
- * top up at most) is eligible but needs more. Settings live in the database so the
- * team changes them without a deploy.
+ * Vote eligibility (behind a flag, numbers not final): an initiative qualifies
+ * for TheDAO's vote once its raised total (pledges plus donations) reaches the
+ * floor share of its goal and what is left is no more than the cap (what TheDAO
+ * would top up at most). So a large goal's floor sits further along: the goal
+ * less the cap. Settings live in the database so the team changes them without
+ * a deploy.
  */
 export interface VoteSettings {
   show: boolean;
@@ -28,14 +29,21 @@ export function readVoteSettings(raw: unknown): [VoteSettings, null] | [null, st
   return [{ show: r.show, floorPct, capUsd: Math.round(capUsd) }, null];
 }
 
+/** What an initiative raises to qualify: the floor share of its goal, or the goal less the cap when that is more. */
+export const voteFloorUsd = (goalUsd: number, s: VoteSettings): number =>
+  Math.max((goalUsd * s.floorPct) / 100, goalUsd - s.capUsd);
+
+/** The same as a percentage of the goal: where the tick sits on the funding bar. */
+export const voteFloorPct = (goalUsd: number, s: VoteSettings): number =>
+  goalUsd > 0 ? (100 * voteFloorUsd(goalUsd, s)) / goalUsd : s.floorPct;
+
 export type VoteState =
   | { kind: "eligible" }
-  | { kind: "gap"; gapUsd: number; capUsd: number }
   | { kind: "below"; toFloorUsd: number };
 
 export function voteState(raisedUsd: number, goalUsd: number, s: VoteSettings): VoteState {
-  const floor = (goalUsd * s.floorPct) / 100;
-  if (raisedUsd < floor) return { kind: "below", toFloorUsd: Math.ceil(floor - raisedUsd) };
-  const gap = Math.max(0, goalUsd - raisedUsd);
-  return gap > s.capUsd ? { kind: "gap", gapUsd: gap, capUsd: s.capUsd } : { kind: "eligible" };
+  const floor = voteFloorUsd(goalUsd, s);
+  return raisedUsd < floor
+    ? { kind: "below", toFloorUsd: Math.ceil(floor - raisedUsd) }
+    : { kind: "eligible" };
 }

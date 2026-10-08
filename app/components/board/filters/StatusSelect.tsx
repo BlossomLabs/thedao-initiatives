@@ -9,7 +9,7 @@ import FundingGlyph from "./FundingGlyph";
 const ITEMS: { value: BoardStatus; label: string }[] = [
   { value: "all", label: "Any funding status" },
   { value: "open", label: STATUS_LABELS.open },
-  { value: "first-goal", label: STATUS_LABELS["first-goal"] },
+  { value: "qualified", label: STATUS_LABELS.qualified },
   { value: "funded", label: STATUS_LABELS.funded },
 ];
 
@@ -17,12 +17,12 @@ const ITEMS: { value: BoardStatus; label: string }[] = [
 export default function StatusSelect(
   { value, vote, onChange }: {
     value: BoardStatus;
-    /** Offer First goal reached (the vote display is on). */
+    /** Offer Qualified for the vote (the vote display is on). */
     vote?: boolean;
     onChange: (s: BoardStatus) => void;
   },
 ) {
-  const items = vote ? ITEMS : ITEMS.filter((s) => s.value !== "first-goal");
+  const items = vote ? ITEMS : ITEMS.filter((s) => s.value !== "qualified");
   return (
     <Select value={value} items={items} onValueChange={(v) => v && onChange(v as BoardStatus)}>
       <SelectPrimitive.Trigger

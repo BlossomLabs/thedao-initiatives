@@ -28,7 +28,7 @@ const TYPES: [BoardType, string][] = [["all", "All"], ["rfp", "RFPs"], ["grant",
 const STATUSES: [BoardStatus, string][] = [
   ["all", "Any funding status"],
   ["open", "Open for funding"],
-  ["first-goal", "First goal reached"],
+  ["qualified", "Qualified for the vote"],
   ["funded", "Fully funded"],
 ];
 
@@ -177,7 +177,7 @@ export default function FilterSheet(
                   aria-labelledby={`${ids}-status`}
                   className="flex flex-col"
                 >
-                  {STATUSES.filter(([v]) => voteOn || v !== "first-goal").map(([v, label]) => (
+                  {STATUSES.filter(([v]) => voteOn || v !== "qualified").map(([v, label]) => (
                     <label
                       key={v}
                       className="flex min-h-[44px] cursor-pointer items-center gap-3 font-inter-tight text-[14px] text-soft"

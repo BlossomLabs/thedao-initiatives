@@ -10,7 +10,7 @@ import { pctText, plural, usd, usdShort } from "~/lib/format";
 import { usePrefetchInitiative } from "~/hooks/use-initiative";
 import { usePhone } from "~/hooks/use-media";
 import { cn } from "~/lib/utils";
-import type { VoteSettings } from "@shared/vote";
+import { voteFloorPct, type VoteSettings } from "@shared/vote";
 import {
   calloutText,
   useVoteReveal,
@@ -101,8 +101,9 @@ function Row(
 ) {
   const { initiative: r, summary, pct, backers } = card;
   // With the vote display on, the % turns green at the vote floor, where the tick is.
-  const pctOn = vote?.show ? pct >= vote.floorPct : pct >= 1;
   const standing = vote?.show ? voteStanding(summary.total, r.goalUsd, vote) : null;
+  const pctOn = standing ? standing.kind === "eligible" : pct >= 1;
+  const tick = vote ? voteFloorPct(r.goalUsd, vote) : 0;
   // Hovering or tapping the row shows its vote callout under the bar.
   const reveal = useVoteReveal(Boolean(standing));
   // Rows come and go with the filters: a fade, and a glide when others move.
@@ -209,8 +210,8 @@ function Row(
       <div className="col-start-3 flex items-center gap-2.5 max-[640px]:col-span-2 max-[640px]:col-start-2 max-[640px]:row-start-3">
         {vote?.show && standing
           ? (
-            <FundingBar pct={pct} tick={vote.floorPct} className="flex-1">
-              {reveal.open && <VoteCallout state={standing} at={vote.floorPct} side="bottom" />}
+            <FundingBar pct={pct} tick={tick} className="flex-1">
+              {reveal.open && <VoteCallout state={standing} at={tick} side="bottom" />}
             </FundingBar>
           )
           : <FundingBar pct={pct} className="flex-1" />}

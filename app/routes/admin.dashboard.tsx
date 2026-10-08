@@ -146,7 +146,7 @@ export default function Dashboard() {
             variant="ghost"
             sm
             to="/admin/vote"
-            title="The first goal, and whether the site shows it"
+            title="What it takes to qualify for the vote, and whether the site shows it"
           >
             {vote && (
               <span

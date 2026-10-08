@@ -3,8 +3,8 @@ import type { BoardStatus } from "~/lib/board-view";
 
 /**
  * Funding status as a 14px glyph, in the funding bar's colours: a dashed ring for
- * any status, part-filled for open for funding, a check once the first goal is
- * reached, and a party popper once fully funded.
+ * any status, part-filled for open for funding, a check once it qualifies for
+ * the vote, and a party popper once fully funded.
  */
 export default function FundingGlyph({ status }: { status: BoardStatus }) {
   return (
@@ -41,7 +41,7 @@ export default function FundingGlyph({ status }: { status: BoardStatus }) {
           />
         </>
       )}
-      {status === "first-goal" && (
+      {status === "qualified" && (
         <>
           <circle cx="8" cy="8" r="7" fill="#5cb75a" />
           <path

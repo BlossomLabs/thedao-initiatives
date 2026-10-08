@@ -14,7 +14,7 @@ import {
   voteCallout,
   voteStanding,
 } from "~/components/board/VoteMark";
-import type { VoteSettings } from "@shared/vote";
+import { voteFloorPct, type VoteSettings } from "@shared/vote";
 import Money from "~/components/ui/Money";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { lazyPart } from "~/lib/lazy-part";
@@ -132,7 +132,10 @@ export default function InitiativeCard({
   const prefetch = usePrefetchInitiative(r.slug);
   const zero = !summary.total;
   // With the vote display on, the % turns green at the vote floor, where the tick is.
-  const pctOn = vote?.show ? pct >= vote.floorPct : !zero;
+  const pctOn = vote?.show
+    ? voteStanding(summary.total, r.goalUsd, vote).kind === "eligible"
+    : !zero;
+  const tick = vote ? voteFloorPct(r.goalUsd, vote) : 0;
   // Near the floor or past it: always shown. Otherwise the card shows it on hover or tap.
   const callout = voteCallout(summary.total, r.goalUsd, vote);
   const reveal = useVoteReveal(Boolean(vote?.show) && !callout);
@@ -173,12 +176,12 @@ export default function InitiativeCard({
           <div className={cn("mt-auto", callout && "pt-9")}>
             <Bar
               pct={pct}
-              tick={vote.floorPct}
+              tick={tick}
               label={`${pctText(pct)} funded. ${
                 calloutText(voteStanding(summary.total, r.goalUsd, vote))
               }`}
             >
-              {shown && <VoteCallout state={shown} at={vote.floorPct} side="top" />}
+              {shown && <VoteCallout state={shown} at={tick} side="top" />}
             </Bar>
           </div>
         )

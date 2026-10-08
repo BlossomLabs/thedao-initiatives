@@ -140,7 +140,7 @@ export default function FilterBar({
   sheet: React.ReactNode;
   /** How many initiatives are on this browser's watchlist. */
   watchlistCount?: number;
-  /** The vote display is on: Funding offers First goal reached. */
+  /** The vote display is on: Funding offers Qualified for the vote. */
   voteFilter?: boolean;
 }) {
   const label = resultLabel(shown, total, isFiltered(view));

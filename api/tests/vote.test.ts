@@ -1,7 +1,7 @@
 /** Vote eligibility: the settings admins keep (no deploy) and the rule the board and pages share. */
 import { assertEquals } from "@std/assert";
 import { ADMIN, harness, j, PLAIN } from "./app-helpers.ts";
-import { DEFAULT_VOTE, voteState } from "../../shared/vote.ts";
+import { DEFAULT_VOTE, voteFloorPct, voteState } from "../../shared/vote.ts";
 
 Deno.test("vote settings: off by default, admins change them, the board and site settings carry them", async () => {
   const h = await harness({ env: { BOARD_CACHE_SECS: "0" } });
@@ -30,11 +30,15 @@ Deno.test("vote settings: off by default, admins change them, the board and site
   h.close();
 });
 
-Deno.test("voteState: below the floor, eligible, eligible with a gap above the cap", () => {
+Deno.test("voteState: below the floor, eligible, and a large goal's floor is the goal less the cap", () => {
   const s = { ...DEFAULT_VOTE, show: true };
-  assertEquals(voteState(100_000, 600_000, s), { kind: "below", toFloorUsd: 50_000 });
+  assertEquals(voteState(50_000, 240_000, s), { kind: "below", toFloorUsd: 10_000 });
   assertEquals(voteState(151_008, 279_000, s), { kind: "eligible" });
-  assertEquals(voteState(150_000, 600_000, s), { kind: "gap", gapUsd: 450_000, capUsd: 200_000 });
+  // $600k goal: 25% is $150k, but TheDAO tops up $200k at most, so the floor is $400k.
+  assertEquals(voteState(150_000, 600_000, s), { kind: "below", toFloorUsd: 250_000 });
+  assertEquals(voteState(400_000, 600_000, s), { kind: "eligible" });
+  assertEquals(voteFloorPct(240_000, s), 25);
+  assertEquals(voteFloorPct(800_000, s), 75);
 });
 
 Deno.test("the board marks each card's vote state only while the display is on", async () => {

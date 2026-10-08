@@ -37,14 +37,16 @@ export function voteStanding(raised: number, goal: number, vote: VoteSettings): 
 
 /** The callout's words, as it shows them. */
 export const calloutLabel = (state: CalloutState): string =>
-  state.kind === "eligible" ? "First goal reached" : `${upShort(state.missing)} to first goal`;
+  state.kind === "eligible" ? "Qualified for the vote" : `${upShort(state.missing)} to qualify`;
 
 /** The callout's words for screen readers. */
 export const calloutText = (state: CalloutState): string =>
-  state.kind === "eligible" ? "First goal reached" : `${upShort(state.missing)} to the first goal`;
+  state.kind === "eligible"
+    ? "Qualified for TheDAO's vote"
+    : `${upShort(state.missing)} to qualify for TheDAO's vote`;
 
 /**
- * "$2k to first goal" (or "First goal reached"): a small callout that stays open over the bar's mark, its
+ * "$2k to qualify" (or "Qualified for the vote"): a small callout that stays open over the bar's mark, its
  * arrow on the mark, for initiatives close to the floor. `side` is where it sits
  * (above on cards, below in list rows, where the title fills the space above).
  * The parent is `relative`, as for VoteTick.

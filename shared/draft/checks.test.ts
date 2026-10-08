@@ -70,7 +70,7 @@ test("a top-up is exempt only when every milestone is done", () => {
     ms("A", 500, { done: true, link: "https://x.org/a" }),
     ms("B", 500, { done: true, link: "https://x.org/b" }),
   ];
-  i.backers = [{ org: "Argot", amountUsd: 500, url: "" }];
+  i.backers = [{ org: "Argot", amountUsd: 500, url: "https://x.org" }];
   expect(checkSubmission(i).errors).toEqual([]);
   i.milestones[1].done = false;
   const f = checkSubmission(i);
@@ -86,7 +86,7 @@ test("a top-up measures the adoption share against what this grant still raises"
   expect(adoptionFloor(500_000, 100_000)).toBe(133_334);
   const i = minimal(281_000, "grant");
   i.topup = true;
-  i.backers = [{ org: "Argot", amountUsd: 150_000, url: "" }];
+  i.backers = [{ org: "Argot", amountUsd: 150_000, url: "https://x.org" }];
   i.milestones = [
     ms("Build", 236_000, { done: true, link: "https://x.org/a" }),
     ms("Adoption", 45_000, { adoption: true, month: "2027-06" }),
@@ -145,7 +145,7 @@ test("every capped field reports too long on its own id instead of losing its ta
   i.page.contact = "c".repeat(LIMITS.CONTACT_CHARS + 1);
   i.milestones[0].name = "n".repeat(LIMITS.MILESTONE_NAME + 1);
   i.milestones[0].link = "https://x.org/" + "a".repeat(LIMITS.LINK_CHARS);
-  i.backers = [{ org: "o".repeat(LIMITS.BACKER_ORG + 1), amountUsd: 1, url: "" }];
+  i.backers = [{ org: "o".repeat(LIMITS.BACKER_ORG + 1), amountUsd: 1, url: "https://x.org" }];
   const f = checkSubmission(i);
   expect([...fields(f.errors)].sort()).toEqual([
     "bk_org_0",
@@ -222,7 +222,17 @@ test("backer half rows and the edit scope", () => {
     amountUsd: 5,
     url: "http://x.org",
   }];
-  expect(fields(checkSubmission(i).errors)).toEqual(["bk_amount_0", "bk_org_1", "bk_url_2"]);
+  // a row with an organization or an amount also needs its link
+  expect(fields(checkSubmission(i).errors)).toEqual([
+    "bk_amount_0",
+    "bk_url_0",
+    "bk_org_1",
+    "bk_url_1",
+    "bk_url_2",
+  ]);
+  expect(checkSubmission(i).errors.find((e) => e.field === "bk_url_0")!.msg).toBe(
+    "Org: add a link to the organization's site.",
+  );
   i.page.contact = "";
   i.page.funders = "";
   i.page.duration = "";

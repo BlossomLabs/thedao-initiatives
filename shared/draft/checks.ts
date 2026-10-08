@@ -183,6 +183,9 @@ export function checkSubmission(input: CheckInput, scope: CheckScope = "submit")
         cap(`bk_url_${i}`, tooLong(`${who}: the link`, LIMITS.LINK_CHARS));
       } else if ((b.url ?? "").trim() && !isHttpsUrl(b.url)) {
         err(`bk_url_${i}`, `${who}: the link must be an https URL.`);
+      } else if (!(b.url ?? "").trim() && (b.org || amt > 0)) {
+        // The board links each backer's name and logo to it.
+        err(`bk_url_${i}`, `${who}: add a link to the organization's site.`);
       }
     });
     const live = backers.filter((b) => b.org || (Number(b.amountUsd) || 0) > 0);

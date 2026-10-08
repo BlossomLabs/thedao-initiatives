@@ -71,7 +71,8 @@ function Entry({ s, fit }: { s: Sponsor; fit: Fit }) {
   return (
     <li
       className={cn(
-        "flex min-w-0 items-center gap-4 border-t border-white/10 py-3.5 font-inter-tight text-white first:border-t-0 min-[641px]:border-t-0 min-[1100px]:border-l min-[1100px]:py-0 min-[1100px]:first:border-l-0",
+        // `relative`: the name's link covers the whole entry.
+        "relative flex min-w-0 items-center gap-4 border-t border-white/10 py-3.5 font-inter-tight text-white first:border-t-0 min-[641px]:border-t-0 min-[1100px]:border-l min-[1100px]:py-0 min-[1100px]:first:border-l-0",
         {
           wide: "min-[1100px]:px-5",
           tight: "min-[1100px]:gap-2 min-[1100px]:px-3",
@@ -120,7 +121,7 @@ function Entry({ s, fit }: { s: Sponsor; fit: Fit }) {
                 href={s.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-white hover:underline"
+                className="text-white hover:underline after:absolute after:inset-0 after:content-['']"
               >
                 {s.company}
               </a>

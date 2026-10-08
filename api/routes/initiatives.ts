@@ -458,6 +458,11 @@ export function initiativeRoutes(deps: Deps) {
         });
       }
     }
+    // readBackers drops a link it refused, so the "add a link" rule would name that row again.
+    const badLinks = new Set(backerCaps.errors.map((e) => e.field));
+    checks.errors = checks.errors.filter((e) =>
+      !(e.field.startsWith("bk_url_") && badLinks.has(e.field))
+    );
     const findings = mergeFindings(caps, backerCaps, checks, { errors: extra, warnings: [] });
     assertNoErrors(findings);
     const initiative = await db.initiatives.insert(

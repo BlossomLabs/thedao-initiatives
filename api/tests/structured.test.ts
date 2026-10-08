@@ -288,7 +288,7 @@ Deno.test("submit: links must be https; the body has a byte cap", async () => {
     ...good,
     title: "t".repeat(LIMITS.TITLE_CHARS + 1),
     contact: "c".repeat(LIMITS.CONTACT_CHARS + 1),
-    backers: [{ org: "o".repeat(LIMITS.BACKER_ORG + 1), amountUsd: "1", url: "" }],
+    backers: [{ org: "o".repeat(LIMITS.BACKER_ORG + 1), amountUsd: "1", url: "https://x.org" }],
   });
   assertEquals(longFields.status, 400);
   assertEquals(
@@ -336,7 +336,7 @@ Deno.test("uploads: auth, disabled, junk, ok, rate limit; a CID someone else pin
   for (const logoCid of [up.cid, "bafy" + "z".repeat(50), "not a cid"]) {
     const res = await submit(h, other, {
       ...good,
-      backers: [{ org: "Acme", amountUsd: 100, url: "", logoCid }],
+      backers: [{ org: "Acme", amountUsd: 100, url: "https://x.org", logoCid }],
     });
     assertEquals(res.status, 400);
     const errs = (await j(res) as unknown as Fail).findings.errors;
@@ -919,7 +919,7 @@ Deno.test("edit: a top-up measures the adoption floor against the goal minus the
     ...good,
     topup: true,
     milestoneReviewer: "The reviewer",
-    backers: [{ org: "Argot", amountUsd: 150_000, url: "" }],
+    backers: [{ org: "Argot", amountUsd: 150_000, url: "https://x.org" }],
     milestones: ms(236_000, 45_000),
   });
   assertEquals(res.status, 201);
@@ -979,6 +979,17 @@ Deno.test("caps: a long link, an edited long title and a long pledge company are
   const bf = (await j(longBacker) as unknown as Fail).findings.errors;
   assertEquals(fields(bf), ["bk_url_0"]);
   assertEquals(bf[0].msg, tooLong("Org: the link", LIMITS.LINK_CHARS));
+  // a backer with no link at all is refused: the board links its name and logo to it
+  const noLink = await submit(h, token, {
+    ...good,
+    backers: [{ org: "Org", amountUsd: 5, url: "" }],
+  });
+  assertEquals(noLink.status, 400);
+  const nf = (await j(noLink) as unknown as Fail).findings.errors;
+  assertEquals(nf.map((e) => [e.field, e.msg]), [[
+    "bk_url_0",
+    "Org: add a link to the organization's site.",
+  ]]);
   // PATCH: the recipient link has the same cap as submit
   const { slug } = await j(await submit(h, token, good)) as { slug: string };
   const patched = await h.req(`/api/initiatives/${slug}`, {

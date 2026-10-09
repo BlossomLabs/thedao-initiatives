@@ -30,7 +30,7 @@ import { diffCategories, diffRevisions } from "~/lib/revision-diff";
 import type { RevisionState, RevisionText } from "~/lib/api-types";
 import Status from "~/components/ui/Status";
 import { SITE_NAME } from "~/data/site";
-import { dt } from "~/lib/format";
+import { dt, usd } from "~/lib/format";
 import { discussionKind } from "~/lib/discussion";
 import { generateMeta } from "~/utils/meta";
 import { isStructured } from "@shared/draft/mod";
@@ -178,6 +178,12 @@ export default function Initiative() {
         <Status kind="wait" className="mt-4">
           An edit to this initiative is waiting for the team's review. This page shows the approved
           version. <Link to={`/initiative/${r.slug}?rev=${r.pendingRevision}`}>See the edit</Link>
+        </Status>
+      )}
+      {unpublished && older.data!.goalUsd !== null && older.data!.goalUsd !== r.goalUsd && (
+        <Status kind="wait" className="mt-4">
+          This edit also changes the funding goal, from {usd(r.goalUsd)} to{" "}
+          {usd(older.data!.goalUsd)}.
         </Status>
       )}
       {viewing !== current && older.error && (

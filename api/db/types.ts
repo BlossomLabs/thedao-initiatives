@@ -89,6 +89,9 @@ export interface Revision {
   /** The categories of this version. Revisions written before they were
    * recorded lack the key. */
   categories?: string[];
+  /** The funding goal this edit sets, changed together with the milestones.
+   * Absent when it leaves the goal alone, as every edit before #71 did. */
+  goalUsd?: number;
   /** Wallet address; "" for content files and imports. */
   author: string;
   source: RevisionSource;

@@ -70,7 +70,7 @@ export interface CheckInput {
 }
 
 /** "submit": every rule. "edit": the text rules only (title, summary,
- * sections, milestones against the stored goal, links); the page facts,
+ * sections, milestones against the goal, links); the page facts,
  * private fields and backers are checked where they are edited. */
 export type CheckScope = "submit" | "edit";
 

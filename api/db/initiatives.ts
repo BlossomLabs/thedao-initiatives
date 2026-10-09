@@ -42,8 +42,9 @@ export const sameText = (a: Partial<InitiativeText>, b: Partial<InitiativeText>)
     sameStructured(x, y);
 };
 
-/** What `revise` accepts: the text, and the categories when they change with it. */
-export type RevisionInput = InitiativeTextInput & { categories?: string[] };
+/** What `revise` accepts: the text, and the categories and the goal when
+ * they change with it. */
+export type RevisionInput = InitiativeTextInput & { categories?: string[]; goalUsd?: number };
 
 const sameList = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && a.every((x, i) => x === b[i]);
@@ -419,11 +420,14 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
   type HoldWhen = (current: Initiative) => boolean;
 
   /** What an edit starts from: the row, or the held edit it replaces. */
-  type Base = Partial<InitiativeText> & { categories?: string[] };
+  type Base = Partial<InitiativeText> & { categories?: string[]; goalUsd?: number };
 
   /**
-   * Write a new revision: the text and the categories `pick` returns for the
-   * row as it stands. A no-op when neither changed (`revision: null`). A row
+   * Write a new revision: the text, the categories and the goal `pick`
+   * returns for the row as it stands (no goal keeps the row's). A no-op when
+   * none of them changed (`revision: null`). The revision records the goal
+   * only when it differs from the row's, so accepting a held edit never puts
+   * back a goal the team changed while it waited. A row
    * written before revisions existed first gets its current text snapshotted
    * as revision 1, so the history is never missing the version people saw.
    *
@@ -436,7 +440,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
    */
   async function writeRevision(
     id: string,
-    pick: (base: Base) => { text: InitiativeText; categories: string[] },
+    pick: (base: Base) => { text: InitiativeText; categories: string[]; goalUsd?: number },
     origin: RevisionOrigin,
     holdWhen: HoldWhen = () => false,
   ): Promise<{ initiative: Initiative; revision: Revision | null }> {
@@ -449,8 +453,11 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       const waiting = hold && initiative.pendingRevision
         ? await kv.get<Revision>(K.revision(id, initiative.pendingRevision))
         : null;
-      const { text, categories } = pick(waiting?.value ?? initiative);
-      const same = (r: Base) => sameText(r, text) && sameList(r.categories ?? [], categories);
+      const { text, categories, goalUsd = initiative.goalUsd } = pick(waiting?.value ?? initiative);
+      const regoal = goalUsd !== initiative.goalUsd ? { goalUsd } : {};
+      const same = (r: Base) =>
+        sameText(r, text) && sameList(r.categories ?? [], categories) &&
+        (r.goalUsd ?? initiative.goalUsd) === goalUsd;
       if (same(initiative) || (waiting?.value && same(waiting.value))) {
         return { initiative, revision: null };
       }
@@ -459,6 +466,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       const t = now();
       const revision: Revision = {
         ...revisionOf(initiative, n, text, categories, origin, t),
+        ...regoal,
         state: hold ? "pending" : "live",
       };
       const next: Initiative = hold
@@ -468,7 +476,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
           pendingRevision: n,
           lastRevision: n,
         }
-        : { ...initiative, ...text, categories, revision: n, lastRevision: n };
+        : { ...initiative, ...text, categories, ...regoal, revision: n, lastRevision: n };
       const op = kv.atomic()
         .check(cur)
         .check({ key: K.revision(id, n), versionstamp: null })
@@ -497,8 +505,8 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     throw new Error("update conflict");
   }
 
-  /** Replace the public text, and the categories when the input names them.
-   * `holdWhen` stores the edit for an admin to review; the live text stays. */
+  /** Replace the public text, and the categories and the goal when the input
+   * names them. `holdWhen` stores the edit for an admin to review; the live text stays. */
   async function revise(
     id: string,
     input: RevisionInput,
@@ -510,25 +518,35 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     if (text.details && isStructured(text)) throw new Error("structured rows carry no details");
     return await writeRevision(
       id,
-      (base) => ({ text, categories: input.categories ?? base.categories ?? [] }),
+      (base) => ({
+        text,
+        categories: input.categories ?? base.categories ?? [],
+        goalUsd: input.goalUsd,
+      }),
       origin,
       holdWhen,
     );
   }
 
-  /** Replace the categories alone: a revision whose text is the row's own. */
+  /** Replace the categories alone: a revision whose text and goal are the
+   * row's own (or the waiting edit's). */
   function retag(
     id: string,
     categories: string[],
     origin: RevisionOrigin,
     holdWhen?: HoldWhen,
   ) {
-    return writeRevision(id, (base) => ({ text: pickText(base), categories }), origin, holdWhen);
+    return writeRevision(
+      id,
+      (base) => ({ text: pickText(base), categories, goalUsd: base.goalUsd }),
+      origin,
+      holdWhen,
+    );
   }
 
   /**
-   * Decide the held edit `n`: accept makes its text and categories live in
-   * one commit, reject leaves the row's text alone; both end the wait and
+   * Decide the held edit `n`: accept makes its text, categories and goal (if
+   * it sets one) live in one commit, reject leaves the row's text alone; both end the wait and
    * record the admin. Null when `n` is not the edit waiting. An edit accepted
    * after the live text moved on is written as a new, newest revision (the
    * held one is superseded), so the live revision is always the last live one.
@@ -570,6 +588,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
           ...initiative,
           ...pickText(held.value),
           categories: held.value.categories ?? initiative.categories ?? [],
+          ...(held.value.goalUsd !== undefined ? { goalUsd: held.value.goalUsd } : {}),
           revision: m,
           pendingRevision: null,
           lastRevision: Math.max(m, initiative.lastRevision ?? 0),

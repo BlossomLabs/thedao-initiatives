@@ -21,7 +21,7 @@ import type { Initiative, Pledge } from "~/lib/api-types";
 import { normaliseCategories } from "~/lib/categories";
 import { readCategoryText } from "@shared/categories";
 import type { Draft, DraftBacker, DraftCriterion, DraftMilestone, SubmitPayload } from "./types";
-import { replaceFromText } from "./draft-text";
+import { replaceFromText, type TextLocks } from "./draft-text";
 
 let seq = 0;
 export const newId = (): string => `d${++seq}${Math.random().toString(36).slice(2, 7)}`;
@@ -241,7 +241,7 @@ export type DraftAction =
   | { t: "removeBacker"; id: string }
   | { t: "setBacker"; id: string; patch: Partial<Omit<DraftBacker, "id" | "logo">> }
   | { t: "setLogo"; id: string; file: File | null }
-  | { t: "replaceText"; text: string }
+  | { t: "replaceText"; text: string; locks?: TextLocks }
   | { t: "replace"; draft: Draft };
 
 export interface DraftState {
@@ -358,7 +358,7 @@ export function draftReducer(s: DraftState, a: DraftAction): DraftState {
       // a new file invalidates the receipt of the old upload
       return { ...s, draft: mapBk(d, a.id, (b) => ({ ...b, logo: a.file, logoCid: "" })) };
     case "replaceText":
-      return { draft: replaceFromText(d, a.text) };
+      return { draft: replaceFromText(d, a.text, a.locks) };
     case "replace":
       return { draft: a.draft };
   }
@@ -405,7 +405,7 @@ export function useDraft(initial?: Draft) {
       setBacker: (id: string, patch: Partial<Omit<DraftBacker, "id" | "logo">>) =>
         dispatch({ t: "setBacker", id, patch }),
       setLogo: (id: string, file: File | null) => dispatch({ t: "setLogo", id, file }),
-      replaceText: (text: string) => dispatch({ t: "replaceText", text }),
+      replaceText: (text: string, locks?: TextLocks) => dispatch({ t: "replaceText", text, locks }),
       replace: (draft: Draft) => dispatch({ t: "replace", draft }),
     }),
     [],

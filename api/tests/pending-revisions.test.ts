@@ -407,3 +407,71 @@ Deno.test("the page facts lock with the approval, even one that lands mid-reques
   assertEquals((await row()).goalUsd, 25000);
   h.close();
 });
+
+/** GOOD with the goal and its one milestone both at `goal` (#71). */
+const regoaled = (goal: number) => ({
+  ...revisionBody(GOOD),
+  milestones: [{ ...GOOD.milestones[0], amount: goal }],
+  goal: String(goal),
+});
+
+Deno.test("a held edit may change the goal with the milestones; accepting it moves the goal (#71)", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  const { token, slug, id, edit, review, row } = await approved(h);
+  // The milestones alone still have to add up to the stored goal.
+  const { goal: _, ...alone } = regoaled(11500);
+  assertEquals((await edit(token, { ...alone, initiativeId: id })).status, 400);
+  const res = await edit(token, { ...regoaled(11500), initiativeId: id });
+  assertEquals(res.status, 201);
+  const out = await j(res) as Out;
+  assertEquals(out.pending, true);
+  assertEquals((await row()).goalUsd, 25000);
+  const held = await j(
+    await h.req(`/api/initiatives/${slug}/revisions/${out.revision.n}`, { token }),
+  ) as { revision: { goalUsd: number | null } };
+  assertEquals(held.revision.goalUsd, 11500);
+  assertEquals((await review(out.revision.n, "accept")).status, 200);
+  const next = await row();
+  assertEquals(next.goalUsd, 11500);
+  assertEquals(next.milestones?.[0].amount, 11500);
+  const card = (await h.db.initiatives.cards("approved")).find((c) => c.id === id);
+  assertEquals(card?.goalUsd, 11500);
+  h.close();
+});
+
+Deno.test("a rejected goal change leaves the goal alone, and an edit that keeps the goal stores none (#71)", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  const { token, id, edit, review, row } = await approved(h);
+  const first = await j(await edit(token, { ...regoaled(11500), initiativeId: id })) as Out;
+  assertEquals((await review(first.revision.n, "reject")).status, 200);
+  assertEquals((await row()).goalUsd, 25000);
+  // The stored goal sent back is not a goal change: an admin's later change survives the accept.
+  const res = await edit(token, {
+    ...retitled("Same goal, new title"),
+    goal: "25000",
+    initiativeId: id,
+  });
+  assertEquals(res.status, 201);
+  const second = await j(res) as Out;
+  const stored = await h.kv.get<Revision>(K.revision(id, second.revision.n));
+  assertEquals(stored.value?.goalUsd, undefined);
+  await h.db.initiatives.update(id, { goalUsd: 30000 });
+  assertEquals((await review(second.revision.n, "accept")).status, 200);
+  assertEquals((await row()).goalUsd, 30000);
+  h.close();
+});
+
+Deno.test("a goal change alone is an edit, and a bad goal is refused (#71)", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  const { token, id, edit, row } = await approved(h, false);
+  assertEquals(
+    (await edit(token, { ...regoaled(11500), goal: "lots", initiativeId: id })).status,
+    400,
+  );
+  // Pending rows publish at once: the goal moves with the revision.
+  const res = await edit(token, { ...regoaled(11500), initiativeId: id });
+  assertEquals(res.status, 201);
+  assertEquals((await row()).goalUsd, 11500);
+  assertEquals((await edit(token, { ...regoaled(11500), initiativeId: id })).status, 400);
+  h.close();
+});

@@ -100,21 +100,31 @@ function mergeMilestones(had: DraftMilestone[], rows: DraftMilestone[]): DraftMi
   });
 }
 
+/** What the box may not change, whatever its text says: the form shows these
+ * read-only (or not at all), and nothing would save them. */
+export interface TextLocks {
+  /** Duration, recipient team and the private fields. */
+  facts?: boolean;
+  goal?: boolean;
+  backers?: boolean;
+}
+
 /** The draft with its text half replaced by what the box holds: a heading
- * that is missing from the text empties its field. */
-export function replaceFromText(d: Draft, text: string): Draft {
+ * that is missing from the text empties its field. Locked fields keep the
+ * draft's value. */
+export function replaceFromText(d: Draft, text: string, locks: TextLocks = {}): Draft {
   const res = splitDraft(text, d.type);
   const p = res.page;
   const page = {
     ...d.page,
     title: p.title ?? "",
     summary: p.summary ?? "",
-    goal: money(parseAmount(p.goal ?? "")),
-    duration: intText(p.duration ?? ""),
+    goal: locks.goal ? d.page.goal : money(parseAmount(p.goal ?? "")),
+    duration: locks.facts ? d.page.duration : intText(p.duration ?? ""),
     links: p.links ?? "",
-    recipientTeam: d.type === "grant" ? p.recipient ?? "" : d.page.recipientTeam,
+    recipientTeam: d.type === "grant" && !locks.facts ? p.recipient ?? "" : d.page.recipientTeam,
   };
-  const priv = { funders: p.funders ?? "", contact: p.contact ?? "" };
+  const priv = locks.facts ? d.priv : { funders: p.funders ?? "", contact: p.contact ?? "" };
   const sections: Sections = { ...d.sections };
   for (const key of SECTIONS[d.type]) {
     const t = res.fields[key];
@@ -123,7 +133,7 @@ export function replaceFromText(d: Draft, text: string): Draft {
   }
   const rows = res.milestones.map(draftMilestone);
   const milestones = rows.length ? mergeMilestones(d.milestones, rows) : [emptyMilestone()];
-  const backers = mergeBackers(d.backers, p.backers ?? "");
+  const backers = locks.backers ? d.backers : mergeBackers(d.backers, p.backers ?? "");
   const categories = readCategoryText(p.categories ?? "").slugs;
   return { ...d, page, priv, categories, sections, milestones, backers, unsorted: res.unsorted };
 }

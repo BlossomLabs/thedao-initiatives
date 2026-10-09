@@ -18,10 +18,12 @@ const PAIR = "grid grid-cols-[1fr_1fr] gap-x-4 max-[640px]:grid-cols-1";
 const PAIRED = "row-span-3 grid grid-rows-subgrid first:mt-[18px]";
 
 export default function PageFields(
-  { draft, actions, locked, categories }: {
+  { draft, actions, locked, goalLocked = locked, categories }: {
     draft: Draft;
     actions: DraftActions;
     locked?: boolean;
+    /** The goal's own lock; follows `locked` unless set. */
+    goalLocked?: boolean;
     /** Show the categories question after the summary. */
     categories?: { suggest?: boolean };
   },
@@ -69,7 +71,7 @@ export default function PageFields(
               {...props}
               placeholder="250,000"
               value={p.goal}
-              disabled={locked}
+              disabled={goalLocked}
               onChange={(v) => actions.setPage("goal", v)}
             />
           )}

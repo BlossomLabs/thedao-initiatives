@@ -281,7 +281,7 @@ it("saving the categories posts a revision with them alone, through the proposer
 });
 
 /** The page with a proposer's edit (revision 3) waiting: a new title and one category swapped. */
-function withPendingEdit() {
+function withPendingEdit(edit: Record<string, unknown> = {}) {
   current = page({
     status: "approved",
     safeAddress: SAFE,
@@ -300,6 +300,8 @@ function withPendingEdit() {
     state: "pending",
     archived: false,
     createdAt: 1_760_000_000,
+    goalUsd: null,
+    ...edit,
   };
   const fallback = vi.mocked(api).getMockImplementation()!;
   vi.mocked(api).mockImplementation((path, options) =>
@@ -327,6 +329,21 @@ it("an edit awaiting approval shows what it changes against the live text, and A
   await waitFor(() =>
     expect(api).toHaveBeenCalledWith("/api/admin/initiatives/1/revisions/3/accept", { json: {} })
   );
+});
+
+it("an edit that changes the goal says so, old and new, before it is accepted (#71)", async () => {
+  withPendingEdit({ goalUsd: 100_000 });
+  renderPage();
+  const panel = (await screen.findByText("Edit awaiting approval")).closest(
+    ".panel",
+  ) as HTMLElement;
+  const goal = await waitFor(() => {
+    const el = panel.querySelector("[data-goal-change]");
+    expect(el).not.toBeNull();
+    return el as HTMLElement;
+  });
+  expect(goal.querySelector("del")).toHaveTextContent("$150,000");
+  expect(goal.querySelector("ins")).toHaveTextContent("$100,000");
 });
 
 it("rejecting an edit sends the optional note for the proposer", async () => {

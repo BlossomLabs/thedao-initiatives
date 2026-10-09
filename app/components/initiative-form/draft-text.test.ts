@@ -91,6 +91,28 @@ describe("replaceFromText", () => {
     expect(d.milestones[0].name).toBe("");
   });
 
+  it("leaves locked fields as the draft has them, whatever the text says (#71)", () => {
+    const d = emptyDraft();
+    d.type = "grant";
+    d.page = { ...d.page, goal: "34,500", duration: "6", recipientTeam: "Team" };
+    d.priv = { funders: "F", contact: "c@example.org" };
+    d.backers = [{ ...emptyBacker(), org: "Argot", amount: "1,000" }];
+    const text = "## Title\n\nNew\n\n## Funding goal (USD)\n\n$11,500\n\n" +
+      "## Expected duration (months)\n\n2\n\n## Recipient team\n\nOthers\n";
+    const all = replaceFromText(d, text, { facts: true, goal: true, backers: true });
+    expect(all.page).toMatchObject({
+      title: "New",
+      goal: "34,500",
+      duration: "6",
+      recipientTeam: "Team",
+    });
+    expect(all.priv).toEqual(d.priv);
+    expect(all.backers).toEqual(d.backers);
+    // the goal alone can be open: a proposer's edit to an approved initiative
+    const open = replaceFromText(d, text, { facts: true, backers: true });
+    expect(open.page).toMatchObject({ goal: "11,500", duration: "6", recipientTeam: "Team" });
+  });
+
   it("keeps a backer's id and logo when its organization is still in the text", () => {
     const d = emptyDraft();
     d.backers = [

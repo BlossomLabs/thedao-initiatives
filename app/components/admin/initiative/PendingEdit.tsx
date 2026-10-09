@@ -7,7 +7,7 @@ import { useAdminApi } from "~/hooks/use-admin-api";
 import { useRevision } from "~/hooks/use-revision";
 import type { AdminInitiative } from "~/lib/api-types";
 import { errorMessage } from "~/lib/api";
-import { dt } from "~/lib/format";
+import { dt, usd } from "~/lib/format";
 import { changed, type Chunk, diffCategories, diffRevisions } from "~/lib/revision-diff";
 import type { Run } from "./run";
 
@@ -48,6 +48,7 @@ export default function PendingEdit({ r, run }: { r: AdminInitiative; run: Run }
     : [];
   const tags = (edit && diffCategories(r.categories, edit.categories)) || [];
   const retagged = tags.some((t) => t.added || t.removed);
+  const goal = edit && edit.goalUsd !== null && edit.goalUsd !== r.goalUsd ? edit.goalUsd : null;
   return (
     <div className="panel mt-7 border-[rgba(240,180,41,.45)]">
       <span className="k">Edit awaiting approval</span>
@@ -63,8 +64,19 @@ export default function PendingEdit({ r, run }: { r: AdminInitiative; run: Run }
       )}
       {error && <p className="alert mt-3">{errorMessage(error)}</p>}
       {!edit && !error && <p className="m-0 mt-3 small dim">Loading the edit…</p>}
-      {edit && !fields.length && !retagged && (
+      {edit && !fields.length && !retagged && goal === null && (
         <p className="m-0 mt-3 small dim">It no longer differs from the live text.</p>
+      )}
+      {goal !== null && (
+        <div className="mt-4" data-goal-change="">
+          <span className="label">Funding goal</span>
+          <p className="m-0 diff-body">
+            <del>{usd(r.goalUsd)}</del> <ins>{usd(goal)}</ins>
+          </p>
+          <p className="m-0 mt-1 small dim">
+            Accepting the edit changes the goal on the board and the initiative page.
+          </p>
+        </div>
       )}
       {retagged && (
         <div className="mt-4">

@@ -111,6 +111,8 @@ export function revisionJson(v: Revision) {
     ...structuredJson(v),
     /** null on a revision written before categories were recorded. */
     categories: v.categories ? categoriesOf(v) : null,
+    /** The goal this edit sets; null when it leaves the goal alone. */
+    goalUsd: v.goalUsd ?? null,
   };
 }
 

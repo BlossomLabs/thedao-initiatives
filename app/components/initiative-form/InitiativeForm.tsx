@@ -39,6 +39,9 @@ export interface InitiativeFormProps {
   /** The money facts (type, top-up, goal, duration, recipient, reviewer,
    * forum link, private fields) are read-only: an approved initiative. */
   locked?: boolean;
+  /** The goal stays editable while the rest is locked: the proposer's edit
+   * to an approved initiative may change it with the milestones. */
+  goalOpen?: boolean;
   /** Which rules run; defaults to "submit" on the submit page, "edit" elsewhere. */
   scope?: CheckScope;
   /** Throw (a FindingsError, or an ApiError with a findings body) to paint
@@ -86,12 +89,13 @@ const fixingLine = (n: number) =>
   n === 1 ? "One thing needs fixing, marked above." : `${n} things need fixing, marked above.`;
 
 export const LOCK_NOTE =
-  "Locked after approval: type, goal, duration, recipient and the private fields. Email the team to change them.";
+  "Locked after approval: type, duration, recipient and the private fields. Email the team to change them.";
 
 export default function InitiativeForm({
   mode,
   initial,
   locked,
+  goalOpen,
   scope = mode === "submit" ? "submit" : "edit",
   onSubmit,
   submitLabel,
@@ -110,6 +114,12 @@ export default function InitiativeForm({
   previewAs,
 }: InitiativeFormProps) {
   const { draft, actions, reset } = useDraft(initial);
+  const goalLocked = Boolean(locked && !goalOpen);
+  // The paste box cannot change what the fields below it cannot.
+  const textLocks = useMemo(
+    () => ({ facts: Boolean(locked), goal: goalLocked, backers: !showBackers }),
+    [locked, goalLocked, showBackers],
+  );
   const [submitted, setSubmitted] = useState(false);
   const [serverFeedback, setServerFeedback] = useState<
     {
@@ -274,7 +284,7 @@ export default function InitiativeForm({
         {showPaste && (
           <PasteBox
             draft={draft}
-            onText={actions.replaceText}
+            onText={(text) => actions.replaceText(text, textLocks)}
             onUnsorted={actions.setUnsorted}
           />
         )}
@@ -283,7 +293,13 @@ export default function InitiativeForm({
           These render in the header of your initiative page, next to the type badge. They are never
           part of a body section.
         </FormGroup>
-        <PageFields draft={draft} actions={actions} locked={locked} categories={categories} />
+        <PageFields
+          draft={draft}
+          actions={actions}
+          locked={locked}
+          goalLocked={goalLocked}
+          categories={categories}
+        />
 
         {showBackers && (
           <>

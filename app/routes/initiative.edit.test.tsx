@@ -39,7 +39,8 @@ vi.mock("~/lib/api", async (original) => ({
 vi.mock("~/components/wallet/Identity", () => ({ default: () => null }));
 vi.mock("~/components/initiative-form/InitiativeForm", () => ({
   default: function TestForm(
-    { initial, onSubmit, locked, showPrivate, showTypePicker, asideTop }: InitiativeFormProps,
+    { initial, onSubmit, locked, goalOpen, showPrivate, showTypePicker, asideTop }:
+      InitiativeFormProps,
   ) {
     const [title, setTitle] = useState(initial!.page.title);
     return (
@@ -50,7 +51,18 @@ vi.mock("~/components/initiative-form/InitiativeForm", () => ({
           {showPrivate && " private"}
           {showTypePicker && " type"}
         </output>
+        <output aria-label="Goal">{locked && !goalOpen ? "locked" : "open"}</output>
         <input aria-label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <button
+          type="button"
+          onClick={() =>
+            void onSubmit(
+              toPayload({ ...initial!, page: { ...initial!.page, goal: "100,000" } }),
+              initial!,
+            )}
+        >
+          Lower the goal
+        </button>
         <button
           type="button"
           onClick={() =>
@@ -200,6 +212,38 @@ it("the proposer of an approved initiative keeps the facts locked and lands on t
   expect(await screen.findByText("The public page")).toBeInTheDocument();
   expect(api).toHaveBeenCalledTimes(1);
   expect(api).toHaveBeenCalledWith("/api/initiatives/same-url/revisions", expect.anything());
+  unmount();
+  qc.clear();
+});
+
+it("the proposer of an approved initiative changes the goal in the edit, not in a PATCH (#71)", async () => {
+  who.isAdmin = false;
+  feed({ ...structuredRow(), slug: "same-url", status: "approved" as const, proposer: ME });
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.getByLabelText("Facts")).toHaveTextContent(/^locked$/);
+  expect(screen.getByLabelText("Goal")).toHaveTextContent(/^open$/);
+  fireEvent.click(screen.getByText("Lower the goal"));
+  expect(await screen.findByText("The public page")).toBeInTheDocument();
+  expect(api).toHaveBeenCalledTimes(1);
+  expect(api).toHaveBeenCalledWith("/api/initiatives/same-url/revisions", {
+    json: expect.objectContaining({ goal: "100000", title: "Audit tooling for rollups" }),
+  });
+  unmount();
+  qc.clear();
+});
+
+it("the team's goal change still goes in the PATCH, and no edit carries it", async () => {
+  feed({ ...structuredRow(), slug: "same-url", status: "approved" as const });
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.getByLabelText("Goal")).toHaveTextContent(/^open$/);
+  fireEvent.click(screen.getByText("Lower the goal"));
+  await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+  expect(api).toHaveBeenCalledWith("/api/initiatives/same-url", {
+    method: "PATCH",
+    json: expect.objectContaining({ goal: "100000" }),
+  });
   unmount();
   qc.clear();
 });

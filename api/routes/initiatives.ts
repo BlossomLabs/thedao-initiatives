@@ -14,7 +14,7 @@ import {
   revisionJson,
   revisionMeta,
 } from "../lib/json.ts";
-import { cleanText, validateForumUrl } from "../lib/validate.ts";
+import { cleanText, parseGoal, validateForumUrl } from "../lib/validate.ts";
 import { pctOf } from "./board.ts";
 import {
   MAX_FUNDERS,
@@ -55,8 +55,8 @@ export const pledgeBackers = (pledges: Pledge[]): CheckBacker[] =>
     .map((p) => ({ org: p.company, amountUsd: p.amountUsd, url: p.url }));
 
 /** The text rules of an edit: title, summary, sections, milestones against
- * the stored goal, links. Page facts and backers are checked where they are
- * edited; the stored pledges still count as backers here, since a top-up's
+ * the goal (the stored one, or the one the edit sets), links. The other page
+ * facts and backers are checked where they are edited; the stored pledges still count as backers here, since a top-up's
  * adoption floor is measured against what this grant raises. */
 export function editChecks(initiative: Pick<Initiative, "type" | "topup" | "goalUsd">, text: {
   title: string;
@@ -223,14 +223,16 @@ export function initiativeRoutes(deps: Deps) {
    * approval is a review of the text, so that edit is held (`pending: true`)
    * and the approved version stays live until an admin accepts it. Text edits
    * use structured sections, milestones and links, migrating legacy rows when
-   * necessary; a body with only `categories` keeps the text as it is.
+   * necessary; a body with only `categories` keeps the text as it is. A text
+   * edit may carry `goal`: the milestones are checked against it and the goal
+   * changes with the revision, when it goes live (#71).
    */
   r.post("/:slug/revisions", requireAuth, async (c) => {
     const user = c.var.user!;
-    const body = await jsonBody(c, ["initiativeId", ...TEXT_FIELDS, "categories"]);
+    const body = await jsonBody(c, ["initiativeId", ...TEXT_FIELDS, "goal", "categories"]);
     const { initiative, proposer } = await editableBy(c.req.param("slug"), user, body);
     const tagsOnly = body.categories !== undefined &&
-      TEXT_FIELDS.every((k) => body[k] === undefined);
+      [...TEXT_FIELDS, "goal"].every((k) => body[k] === undefined);
     // The team may still retag a closed row: unarchiving needs a category.
     const assertOpen = (row: Initiative) => {
       const open = row.status === "pending" || row.status === "approved" ||
@@ -310,17 +312,28 @@ export function initiativeRoutes(deps: Deps) {
       milestones: body.milestones ?? cur.milestones,
       links: body.links ?? cur.links,
     }, initiative.type);
+    let goalUsd = initiative.goalUsd;
+    if (body.goal !== undefined) {
+      const [goal, err] = parseGoal(body.goal);
+      if (err) throw new HttpError(400, err);
+      goalUsd = goal!;
+    }
     const backers = pledgeBackers(await db.pledges.list(initiative.id));
     const findings = mergeFindings(
       caps,
-      editChecks(initiative, { ...base, ...structured }, backers),
+      editChecks({ ...initiative, goalUsd }, { ...base, ...structured }, backers),
       tags,
     );
     assertNoErrors(findings);
     const { warnings } = findings;
     const { initiative: next, revision } = await db.initiatives.revise(
       initiative.id,
-      { ...base, ...structured, categories: categories ?? undefined },
+      {
+        ...base,
+        ...structured,
+        categories: categories ?? undefined,
+        goalUsd: body.goal === undefined ? undefined : goalUsd,
+      },
       origin,
       holdWhen,
     );

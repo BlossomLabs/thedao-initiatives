@@ -103,6 +103,13 @@ describe("InitiativeForm in edit mode", () => {
     expect(document.getElementById("f-ms_0_name")).not.toBeDisabled();
   });
 
+  it("locked with the goal open: the goal is the one fact that can change (#71)", () => {
+    setup({ locked: true, goalOpen: true, showPrivate: false, showTypePicker: false });
+    expect(document.getElementById("f-goal")).not.toBeDisabled();
+    expect(document.getElementById("f-duration_months")).toBeDisabled();
+    expect(document.getElementById("f-recipient_team")).toBeDisabled();
+  });
+
   it("a locked type picker keeps the radios but disables them", () => {
     setup({ locked: true, showTypePicker: true });
     expect(screen.getByRole("radio", { name: /Grant/ })).toBeDisabled();

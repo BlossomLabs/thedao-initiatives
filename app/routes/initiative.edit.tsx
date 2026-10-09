@@ -19,7 +19,7 @@ import { initiativeKey, useInitiative } from "~/hooks/use-initiative";
 import { useRevision } from "~/hooks/use-revision";
 import { api, ApiError, errorMessage } from "~/lib/api";
 import type { Initiative, InitiativePage, Pledge } from "~/lib/api-types";
-import { pageFactsPatch, textBody, textChanged } from "~/lib/edit-initiative";
+import { pageFactsPatch, rowFacts, textBody, textChanged } from "~/lib/edit-initiative";
 import { CONTACT_EMAIL, CONTACT_MAILTO, SITE_NAME } from "~/data/site";
 import { generateMeta } from "~/utils/meta";
 
@@ -32,7 +32,8 @@ export function meta() {
  * milestones, links, title, summary and categories are always editable and
  * every save is a new public revision. While the initiative is pending the page facts
  * (type, goal, duration, recipient, reviewer, forum link) and the private
- * fields can change too; after approval those belong to the team. It is the
+ * fields can change too; after approval those belong to the team, except the
+ * goal, which the proposer may change with the milestones in an edit. It is the
  * team's editor as well: an admin works under the same rules, tagged as the
  * team, and the facts are never locked for them. The proposer's edit to an
  * approved initiative does not go live: it waits for the team, the form then
@@ -72,6 +73,7 @@ export default function EditInitiative() {
           milestones: edit.milestones,
           links: edit.links,
           categories: edit.categories ?? r.categories,
+          goalUsd: edit.goalUsd ?? r.goalUsd,
         }
         : r,
     [r, edit],
@@ -210,9 +212,10 @@ function WhatYouCanChange(
           ? "Everything you submitted can still be changed here. Backers are added by the team."
           : (
             <>
-              Locked after approval: type, goal, duration, recipient and the private fields. Email
-              {" "}
-              <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a> to change them.
+              Locked after approval: type, duration, recipient and the private fields. Email{" "}
+              <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>{" "}
+              to change them. The goal can change with the milestones: the team reviews it with your
+              edit.
             </>
           )}
       </p>
@@ -294,7 +297,10 @@ function EditForm(
     const cats = payload.categories.join() !== r.categories.join()
       ? { categories: payload.categories }
       : null;
-    if (!facts && !text && !cats) throw new Error("Nothing changed.");
+    // After approval the goal is the one fact the proposer can still change:
+    // it travels in the edit, with the milestones that add up to it.
+    const goal = hold && payload.goal !== rowFacts(r).goal;
+    if (!facts && !text && !cats && !goal) throw new Error("Nothing changed.");
     let patched = false;
     try {
       if (facts) {
@@ -302,10 +308,12 @@ function EditForm(
         await request(path, { method: "PATCH", json: { ...facts, initiativeId: r.id } });
         patched = true;
       }
-      if (text || cats) {
-        await api(`${path}/revisions`, {
-          json: { ...(text ? textBody(payload) : null), ...cats, initiativeId: r.id },
-        });
+      if (text || cats || goal) {
+        // Sent with any text of a held edit, so one that already set the goal keeps it.
+        const edited = text || goal
+          ? { ...textBody(payload), ...(hold ? { goal: payload.goal } : null) }
+          : null;
+        await api(`${path}/revisions`, { json: { ...edited, ...cats, initiativeId: r.id } });
       }
     } catch (err) {
       // the facts are saved even when the text was refused: show the row as it is now
@@ -325,6 +333,7 @@ function EditForm(
       mode="edit"
       initial={initial}
       locked={!open}
+      goalOpen={hold}
       onSubmit={onSubmit}
       categories={{}}
       submitLabel={hold ? "Send edit for review" : "Save as a new revision"}

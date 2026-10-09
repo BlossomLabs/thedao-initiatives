@@ -95,6 +95,8 @@ export interface Revision extends RevisionMeta {
   structured: boolean;
   /** This version's categories; null on one written before they were recorded. */
   categories: string[] | null;
+  /** The funding goal this edit sets; null when it leaves the goal alone. */
+  goalUsd: number | null;
 }
 
 /** The text fields a revision may change. */

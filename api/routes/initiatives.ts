@@ -170,7 +170,9 @@ export function initiativeRoutes(deps: Deps) {
   r.get("/:slug", async (c) => {
     const user = c.var.user;
     const initiative = await visibleOr404(c.req.param("slug"), user);
-    const asked = c.req.query("refresh") === "1";
+    // A pending row has no Safe and takes no money: its link (#73) reads, and
+    // never starts a ledger or chain refresh.
+    const asked = c.req.query("refresh") === "1" && isPublished(initiative);
     const paused = asked && await deps.maintenance.on();
     const refresh = asked && !paused;
     if (refresh) await refreshLedger(deps, initiative);

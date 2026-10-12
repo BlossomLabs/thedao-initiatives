@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { TriangleAlert } from "lucide-react";
 import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import SectionHeading from "~/components/layout/SectionHeading";
@@ -121,7 +122,24 @@ export default function Initiative() {
   const showBar = revisions.length > 1 || viewing !== current;
   return (
     <PageMain detail>
+      {/* The link works before approval (#73); search engines are told to skip it. */}
+      {r.status !== "approved" && r.status !== "archived" && (
+        <meta name="robots" content="noindex" />
+      )}
       <Crumbs items={[{ label: "Initiatives", to: "/" }]} />
+      {r.status === "pending" && (
+        <div className="review-banner" role="note" aria-label="In review">
+          <TriangleAlert aria-hidden="true" className="review-banner-icon" />
+          <div>
+            <strong>In review. Not approved yet.</strong>
+            <p>
+              The team has not checked this initiative. The text, the milestones and any backers
+              listed are the proposer's own and may change. It is not on the board and cannot
+              receive donations until it is approved.
+            </p>
+          </div>
+        </div>
+      )}
       <h1 className="m-0 mb-3 mt-1.5 font-inter-tight text-[clamp(28px,4vw,44px)] font-bold leading-[1.1] tracking-[-.02em]">
         {diff ? <DiffBlock chunks={diff.title} /> : text.title}
       </h1>
@@ -150,7 +168,7 @@ export default function Initiative() {
         {r.status === "pending" && (
           <span
             className="chip chip-badge st-pending"
-            title="Only you and the team can see it until it is approved"
+            title="Anyone with the link can read it; it is not listed until it is approved"
           >
             pending review
           </span>

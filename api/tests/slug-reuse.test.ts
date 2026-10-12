@@ -282,7 +282,10 @@ Deno.test("submission reuses archived text and URL; approval and unarchive prese
     const next = (await h.db.initiatives.bySlug(slug))!;
     const archive = (await h.db.initiatives.get(old.id))!;
     assertNotEquals(next.id, old.id);
-    assertEquals((await h.req(`/api/initiatives/${slug}`)).status, 404);
+    // the clean URL now opens the pending replacement, for anyone with the link
+    const shown = await j(await h.req(`/api/initiatives/${slug}`));
+    assertEquals((shown.initiative as Initiative).id, next.id);
+    assertEquals((shown.initiative as Initiative).status, "pending");
     assertEquals((await h.req(`/api/initiatives/${slug}`, { token })).status, 200);
     const archivedPage = await j(await h.req(`/api/initiatives/${archive.slug}`));
     assertEquals((archivedPage.initiative as Initiative).id, old.id);

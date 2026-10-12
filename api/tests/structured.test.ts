@@ -448,7 +448,7 @@ Deno.test("proposer PATCH: page facts while pending, locked after approval, admi
   const patch = (json: unknown, t = token) =>
     h.req(`/api/initiatives/${slug}`, { method: "PATCH", token: t, json });
   assertEquals((await patch({ goal: "2,000" }, "")).status, 401);
-  assertEquals((await patch({ goal: "2,000" }, await h.mint(OTHER))).status, 404);
+  assertEquals((await patch({ goal: "2,000" }, await h.mint(OTHER))).status, 403);
   const ok = await patch({
     goal: "2,000",
     type: "grant",

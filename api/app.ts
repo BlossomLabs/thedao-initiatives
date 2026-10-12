@@ -27,6 +27,7 @@ import { auditIntent, securityAudit } from "./services/audit.ts";
 import { maintenanceGate } from "./services/maintenance.ts";
 import { auditRoutes } from "./routes/audit.ts";
 import type { StaticSite } from "./site.ts";
+import { isPublished } from "./db/initiatives.ts";
 
 /** The public initiative Markdown file (not the admin -PRIVATE one): open CORS like the feeds. */
 const PUBLIC_MD = /^\/initiative\/[a-z0-9-]+\.md$/;
@@ -152,6 +153,19 @@ export function createApp(
 
   if (site) {
     for (const path of apiPaths) app.all(path, (c) => c.notFound());
+    // A pending initiative's page opens for anyone with the link (#73) but is
+    // not for search engines: the shell is the same file for every slug, so
+    // the header is the only place to say it before any script runs.
+    app.get("/initiative/:slug{[a-z0-9-]+}", async (c) => {
+      const [res, row] = await Promise.all([
+        site.serve(c.req.raw),
+        deps.db.initiatives.bySlug(c.req.param("slug")),
+      ]);
+      if (row && isPublished(row)) return res;
+      const headers = new Headers(res.headers);
+      headers.set("X-Robots-Tag", "noindex");
+      return new Response(res.body, { status: res.status, headers });
+    });
     app.all("*", (c) => site.serve(c.req.raw));
   }
 

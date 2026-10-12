@@ -255,7 +255,7 @@ Deno.test("submit: validation, honeypot, rate limit, pending never on board", as
   assertEquals(row.type, "rfp");
   assertEquals(row.goalUsd, 25000);
   assertEquals(row.funders, good.funders);
-  assertEquals((await h.req("/api/initiatives/" + slug)).status, 404);
+  assertEquals((await h.req("/api/initiatives/" + slug)).status, 200);
   assertEquals(((await j(await h.req("/api/board"))).cards as unknown[]).length, 0);
   for (let i = 0; i < 4; i++) {
     await h.req("/api/initiatives", { method: "POST", token, json: good });

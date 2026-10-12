@@ -652,6 +652,22 @@
     @apply line-through opacity-70 decoration-[rgba(255,201,199,.6)];
   }
 
+  /* a pending initiative's page, open to anyone with the link: nobody should
+     take it for an approved one, so this is louder than a status box */
+  .review-banner {
+    @apply flex items-start gap-3.5 rounded-[14px] border-2 border-dao-amber
+      bg-[rgba(240,180,41,.14)] px-5 py-4 mt-3 mb-5 text-[#ffe9b8];
+  }
+  .review-banner-icon {
+    @apply mt-0.5 size-7 shrink-0 text-dao-amber;
+  }
+  .review-banner strong {
+    @apply block font-inter-tight text-[19px] font-bold leading-[1.25] text-dao-amber;
+  }
+  .review-banner p {
+    @apply m-0 mt-1 text-[14.5px] leading-[1.55];
+  }
+
   /* status box (donate + forms) */
   .status {
     @apply rounded-[14px] border border-edge px-4 py-3 text-[12.5px] leading-[1.6];

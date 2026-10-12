@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertFalse, assertStringIncludes } from "@std/assert";
 import { SESSION_REAUTH_SECS } from "../config.ts";
 import { ADMIN, harness, j, PLAIN } from "./app-helpers.ts";
 
@@ -80,7 +80,7 @@ Deno.test("private fields: stale admin reads and harmless edits cannot bypass th
   }
 });
 
-Deno.test("private fields: older proposer can edit their own pending row; other users cannot read it", async () => {
+Deno.test("private fields: older proposer can edit their own pending row; other users read it without them", async () => {
   const h = await harness();
   try {
     const row = await h.db.initiatives.insert({
@@ -100,7 +100,14 @@ Deno.test("private fields: older proposer can edit their own pending row; other 
     });
     assertEquals(res.status, 200);
     assertEquals(((await j(res)).initiative as Record<string, unknown>).contact, "owner update");
-    assertEquals((await h.req(`/api/initiatives/${row.slug}`, { token: other })).status, 404);
+    for (const token of [other, undefined]) {
+      const read = await h.req(`/api/initiatives/${row.slug}`, { token });
+      assertEquals(read.status, 200);
+      const text = await read.text();
+      for (const secret of ["owner update", CONTACT, FUNDERS]) assertFalse(text.includes(secret));
+      const shown = JSON.parse(text).initiative as Record<string, unknown>;
+      for (const key of ["contact", "funders", "pendingRevision"]) assertFalse(key in shown);
+    }
     assertEquals((await h.req(`/initiative/${row.slug}-PRIVATE.md`, { token: owner })).status, 403);
   } finally {
     h.close();

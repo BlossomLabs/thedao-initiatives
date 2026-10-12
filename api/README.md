@@ -141,9 +141,10 @@ egress policy and request/resource limits.
 A submission can take its title-derived slug from an archived proposal. The archived row moves to
 `<slug>-archived-<lowercase-id>` (with an additional numeric suffix if needed), retaining its ID,
 history, funds and Safe. The transfer and creation commit atomically. The replacement starts
-pending, so its clean URL is private until approval. Archived text may also be resubmitted; pending,
-approved and rejected proposals still block duplicate content. Other name collisions retain the
-normal suffix allocation. Existing numbered proposals are not renamed automatically.
+pending, so its clean URL shows the pending page (unlisted, `noindex`) until approval. Archived text
+may also be resubmitted; pending, approved and rejected proposals still block duplicate content.
+Other name collisions retain the normal suffix allocation. Existing numbered proposals are not
+renamed automatically.
 
 Duplicate content means matching section text plus milestone names and criteria, ignoring case and
 whitespace. Changing only the title or other page facts does not bypass this check. A duplicate
@@ -168,16 +169,17 @@ switches to its ID route after loading, and the web client includes IDs in write
 
 ## Endpoints
 
-Public: `GET /healthz`, `GET /api/board`, `GET /api/initiatives/:slug` (a pending one only for its
-proposer and admins), `GET /api/initiatives/:slug/revisions/:n`, `POST /api/initiatives` (submit,
-always pending: the form as JSON, backers become `pledged` rows), `GET /api/donate/params`,
-`POST /api/donate/confirm`, `GET /api/donate/status/:txHash`, `GET /api/ens-name/:addr`,
-`GET /api/nickname/:addr`, `POST /api/ai-search`, `GET /api/initiatives/:slug/comments`,
-`POST /api/initiatives/:slug/comments`, `GET /api/comments/mine?tokens=`,
-`POST /api/comments/:id/report`, `POST /api/support` (the floating Support widget:
-`{category,
-message, email?, page?, screenshot?}`, tagged and forwarded to `SUPPORT_URL`; 503 until
-it is set, 5 per hour per IP).
+Public: `GET /healthz`, `GET /api/board`, `GET /api/initiatives/:slug` (a pending one too, for
+anyone with the link: the public shape, `X-Robots-Tag: noindex`, on no board or feed; a rejected one
+only for its proposer and admins), `GET /api/initiatives/:slug/revisions/:n`,
+`POST /api/initiatives` (submit, always pending: the form as JSON, backers become `pledged` rows),
+`GET /api/donate/params`, `POST /api/donate/confirm`, `GET /api/donate/status/:txHash`,
+`GET /api/ens-name/:addr`, `GET /api/nickname/:addr`, `POST /api/ai-search`,
+`GET /api/initiatives/:slug/comments`, `POST /api/initiatives/:slug/comments`,
+`GET /api/comments/mine?tokens=`, `POST /api/comments/:id/report`, `POST /api/support` (the floating
+Support widget: `{category,
+message, email?, page?, screenshot?}`, tagged and forwarded to
+`SUPPORT_URL`; 503 until it is set, 5 per hour per IP).
 
 Signed in: `GET /api/auth/me` (includes `hasWatchlist`), `POST /api/auth/logout`,
 `POST /api/auth/logout-all`, `POST /api/nickname`, `POST /api/pfp`, `POST /api/pfp/upload`,

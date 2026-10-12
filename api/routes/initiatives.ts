@@ -24,7 +24,7 @@ import {
 } from "../config.ts";
 import type { Initiative, Pledge, Revision, Session } from "../db/types.ts";
 import { isLive } from "../db/revisions.ts";
-import { pickText } from "../db/initiatives.ts";
+import { isPublished, pickText } from "../db/initiatives.ts";
 import { ledgerStatus, refreshLedger } from "../services/ledger.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
 import {
@@ -100,8 +100,10 @@ export function initiativeRoutes(deps: Deps) {
     );
 
   /**
-   * Published rows for everyone; a pending or rejected one for its proposer and
-   * admins (pending so it can be edited, rejected so it can be read again).
+   * Published rows for everyone, and a pending one too: its link works for
+   * anyone who has it (#73), though nothing lists it (board, feeds, <slug>.md)
+   * and the page is served noindex. A rejected one is for its proposer and
+   * admins, so it can be read again.
    */
   const visibleOr404 = async (
     slug: string,
@@ -113,9 +115,8 @@ export function initiativeRoutes(deps: Deps) {
       await assertInitiativeIdentity(db, slug, initiative, mutation.initiativeId);
     }
     const ok = initiative && (
-      ["approved", "archived"].includes(initiative.status) ||
-      (["pending", "rejected"].includes(initiative.status) &&
-        (user?.isAdmin || isProposer(initiative, user)))
+      ["approved", "archived", "pending"].includes(initiative.status) ||
+      (initiative.status === "rejected" && (user?.isAdmin || isProposer(initiative, user)))
     );
     if (!ok) throw new HttpError(404, "not found");
     return initiative;
@@ -183,6 +184,7 @@ export function initiativeRoutes(deps: Deps) {
     const summary = await deps.funding.summaryFrom(initiative, pledges, donations, refresh);
     if (paused) summary.refreshDue = false;
     const privateFields = canReadPrivateFields(initiative, user, deps.now());
+    if (!isPublished(initiative)) c.header("X-Robots-Tag", "noindex");
     return c.json({
       refreshDue: !paused && !chainStateFresh(chainState, deps.now()),
       initiative: user?.isAdmin || privateFields

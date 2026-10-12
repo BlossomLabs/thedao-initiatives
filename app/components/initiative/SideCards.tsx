@@ -13,13 +13,16 @@ import { WHAT_NEXT } from "~/data/what-next";
 
 /** What the donate card says while an initiative has no donation address yet. */
 export const DONATE_SETUP = "This initiative's donation address is being set up. Check back soon.";
+/** What it says while the initiative waits for review: there is nothing to set up yet. */
+export const DONATE_PENDING = "Donations open once this initiative is approved.";
+const noDonations = (r: Initiative) => r.status === "pending" ? DONATE_PENDING : DONATE_SETUP;
 
 /**
  * The cards every visitor sees, in the page's order. The initiative page
  * renders them from the API, the submit preview from the draft.
  */
 export function PublicCards(
-  { r, summary, links, donate = DONATE_SETUP, placeholder = false }: {
+  { r, summary, links, donate = noDonations(r), placeholder = false }: {
     r: Initiative;
     summary: Summary;
     /** The links of the text on screen; defaults to the initiative's. */
@@ -106,7 +109,7 @@ export default function SideCards(
             />
           )
           : !r.safeAddress
-          ? DONATE_SETUP
+          ? noDonations(r)
           : "Donations are temporarily unavailable."}
       />
       {revisions && <RevisionPanel slug={r.slug} revisions={page.revisions} {...revisions} />}

@@ -4,6 +4,10 @@ import { newId } from "../lib/ids.ts";
 import { slugify } from "../lib/slug.ts";
 import { isStructured, sameStructured } from "../../shared/draft/mod.ts";
 
+/** Reviewed and public: listed or linked from the site, and open to search engines. */
+export const isPublished = (r: Pick<Initiative, "status">) =>
+  r.status === "approved" || r.status === "archived";
+
 export type InitiativeInput = Partial<Omit<Initiative, "id" | "createdAt" | "revision">> & {
   title: string;
 };

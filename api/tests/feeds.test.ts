@@ -178,7 +178,8 @@ Deno.test("markdown file: feed facts in front matter, still syncs back, approved
     assertFalse(md.includes("secret-contact"));
     assertEquals(parseInitiativeFile(md).goalUsd, 100_000);
     assertEquals((await t.req(`/initiative/${t.pending.slug}.md`)).status, 404);
-    assertEquals((await t.req(`/api/initiatives/${t.pending.slug}`)).status, 404);
+    // the page's link works while it is pending (#73); the file does not
+    assertEquals((await t.req(`/api/initiatives/${t.pending.slug}`)).status, 200);
   } finally {
     await t.close();
   }

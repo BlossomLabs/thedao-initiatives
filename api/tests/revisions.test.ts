@@ -130,14 +130,41 @@ Deno.test("submit writes revision 1; the proposer's edit, once accepted, is revi
   h.close();
 });
 
-Deno.test("pending initiative: visible and editable for its proposer and admins only", async () => {
+Deno.test("pending initiative: anyone with the link reads it, noindex; only its proposer and admins edit", async () => {
   const h = await harness();
   const { token, admin, slug } = await submitted(h, false);
-  assertEquals((await h.req("/api/initiatives/" + slug)).status, 404);
-  assertEquals(
-    (await h.req("/api/initiatives/" + slug, { token: await h.mint(OTHER) })).status,
-    404,
-  );
+  const other = await h.mint(OTHER);
+  const row = (await h.db.initiatives.bySlug(slug))!;
+  for (const reader of [undefined, other]) {
+    const read = await h.req("/api/initiatives/" + slug, { token: reader });
+    assertEquals(read.status, 200);
+    assertEquals(read.headers.get("X-Robots-Tag"), "noindex");
+    const out = await j(read);
+    const shown = out.initiative as Record<string, unknown>;
+    assertEquals(shown.status, "pending");
+    for (const key of ["contact", "funders", "pendingRevision"]) assertEquals(key in shown, false);
+    assertEquals(JSON.stringify(out).includes(row.contact), false);
+    assertEquals(out.donationsEnabled, false);
+    assertEquals(
+      (await h.req(`/api/initiatives/${slug}/revisions/1`, { token: reader })).status,
+      200,
+    );
+  }
+  // reading is all the link gives: no edits, no comments, no file, no listing
+  const write = (method: string, path: string, t?: string) =>
+    h.req(`/api/initiatives/${slug}${path}`, {
+      method,
+      token: t,
+      json: method === "PATCH" ? { goal: "1" } : revisionBody(GOOD),
+    });
+  assertEquals((await write("PATCH", "")).status, 401);
+  assertEquals((await write("PATCH", "", other)).status, 403);
+  assertEquals((await write("POST", "/revisions")).status, 401);
+  assertEquals((await write("POST", "/revisions", other)).status, 403);
+  assertEquals((await h.req(`/api/initiatives/${slug}/comments`)).status, 404);
+  assertEquals((await h.req(`/initiative/${slug}.md`)).status, 404);
+  assertEquals(((await j(await h.req("/api/board"))).cards as unknown[]).length, 0);
+  assertEquals((await h.db.initiatives.bySlug(slug))!.goalUsd, row.goalUsd);
   assertEquals((await h.req("/api/initiatives/" + slug, { token })).status, 200);
   assertEquals((await h.req("/api/initiatives/" + slug, { token: admin })).status, 200);
   const res = await h.req(`/api/initiatives/${slug}/revisions`, {
@@ -150,6 +177,11 @@ Deno.test("pending initiative: visible and editable for its proposer and admins 
   });
   assertEquals(res.status, 201);
   assertEquals((await h.db.initiatives.bySlug(slug))!.status, "pending");
+  // turning it down takes the link away again
+  await h.db.initiatives.update(row.id, { status: "rejected" });
+  assertEquals((await h.req("/api/initiatives/" + slug)).status, 404);
+  assertEquals((await h.req("/api/initiatives/" + slug, { token: other })).status, 404);
+  assertEquals((await h.req("/api/initiatives/" + slug, { token })).status, 200);
   h.close();
 });
 

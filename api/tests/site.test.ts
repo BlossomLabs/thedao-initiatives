@@ -153,6 +153,34 @@ Deno.test("site: Hono serves pages, assets and SPA fallbacks without swallowing 
   }
 });
 
+Deno.test("site: an initiative's page is noindex until the initiative is published", async () => {
+  const h = await siteHarness();
+  try {
+    const rows = {
+      pending: await h.db.initiatives.insert({ title: "Still in review", status: "pending" }),
+      rejected: await h.db.initiatives.insert({ title: "Turned down", status: "rejected" }),
+      approved: await h.db.initiatives.insert({ title: "Published one", status: "approved" }),
+      archived: await h.db.initiatives.insert({ title: "Closed one", status: "archived" }),
+    };
+    const robots = async (path: string) => {
+      const res = await h.req(path);
+      assertEquals(res.status, 200, path);
+      assertEquals(await res.text(), "<html>SPA FALLBACK</html>");
+      assertEquals(res.headers.get("Cache-Control"), "no-cache");
+      sharedHeaders(res);
+      return res.headers.get("X-Robots-Tag");
+    };
+    assertEquals(await robots(`/initiative/${rows.pending.slug}`), "noindex");
+    assertEquals(await robots(`/initiative/${rows.rejected.slug}`), "noindex");
+    assertEquals(await robots("/initiative/no-such-initiative"), "noindex");
+    assertEquals(await robots(`/initiative/${rows.approved.slug}`), null);
+    assertEquals(await robots(`/initiative/${rows.archived.slug}`), null);
+    assertEquals(await robots(`/initiative/${rows.approved.slug}/edit`), null);
+  } finally {
+    await h.close();
+  }
+});
+
 Deno.test("site: static requests skip API sessions, auditing and CORS; API guards still run", async () => {
   const h = await siteHarness();
   try {

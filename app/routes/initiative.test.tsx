@@ -199,12 +199,23 @@ it("says when comments open on an unpublished page instead of loading them", () 
     return render(tree(new QueryClient()));
   };
   const pending = show("pending");
+  // anyone with the link lands here, so the page says what it is and stays out of search
+  expect(screen.getByRole("note", { name: "In review" })).toHaveTextContent(
+    /Not approved yet.*has not checked this initiative.*cannot receive donations/,
+  );
+  expect(document.querySelector('meta[name="robots"]')).toHaveAttribute("content", "noindex");
+  expect(screen.getByText("Donations open once this initiative is approved.")).toBeInTheDocument();
+  expect(screen.queryByText(/donation address is being set up/)).toBeNull();
   expect(screen.getByRole("heading", { name: "Comments" })).toBeInTheDocument();
   expect(screen.getByText(/Comments open once this initiative is approved/)).toBeInTheDocument();
   pending.unmount();
   const rejected = show("rejected");
   expect(screen.getByText(/was not published, so it has no comments/)).toBeInTheDocument();
+  expect(screen.queryByRole("note", { name: "In review" })).toBeNull();
+  expect(document.querySelector('meta[name="robots"]')).toHaveAttribute("content", "noindex");
   rejected.unmount();
   show("approved");
   expect(screen.queryByText(/Comments open once/)).toBeNull();
+  expect(screen.queryByRole("note", { name: "In review" })).toBeNull();
+  expect(document.querySelector('meta[name="robots"]')).toBeNull();
 });

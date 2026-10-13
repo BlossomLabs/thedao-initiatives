@@ -887,6 +887,47 @@ Deno.test("ai-search: Jev scores every proposal, caches content, and has its own
   h.close();
 });
 
+Deno.test("ai-search: Jev scores a board too large for one request in batches", async () => {
+  const sizes: number[] = [];
+  const h = await harness({
+    env: { TYPESAFE_API_KEY: "k" },
+    fetch: (_url, init) => {
+      const request = JSON.parse(String(init?.body));
+      assertEquals(request.state, { query: "verified compilers" });
+      const questions = Object.entries(request.questions) as [
+        string,
+        { instructions: { proposal: { title: string } } },
+      ][];
+      sizes.push(questions.length);
+      return Response.json({
+        answers: Object.fromEntries(questions.map(([key, question]) => [
+          key,
+          { type: "score", score: Number(question.instructions.proposal.title.split(" ")[1]) % 5 },
+        ])),
+      });
+    },
+  });
+  const rows = [];
+  for (let i = 0; i < 60; i++) {
+    rows.push(await h.db.initiatives.insert({ title: `Proposal ${i}`, status: "approved" }));
+  }
+  const response = await h.req("/api/ai-search", {
+    method: "POST",
+    json: { query: "verified compilers" },
+  });
+  assertEquals(response.status, 200);
+  const scores = (await j(response)).scores as { id: string; score: number }[];
+  assertEquals(sizes.length > 1, true);
+  assertEquals(sizes.reduce((a, b) => a + b, 0), 60);
+  assertEquals(Math.max(...sizes) <= 25, true);
+  assertEquals(
+    new Map(scores.map((x) => [x.id, x.score])),
+    new Map(rows.map((r, i) => [r.id, (i % 5) / 4])),
+  );
+  assertEquals(scores.every((x, i) => i === 0 || scores[i - 1].score >= x.score), true);
+  h.close();
+});
+
 Deno.test("ai-search: disabling TypeSafe uses the configured LLM and scores the whole board", async () => {
   let calls = 0;
   const h = await harness({

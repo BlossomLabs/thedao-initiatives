@@ -75,6 +75,10 @@ const SEARCH_CONTEXT =
   SEARCH_RELATIONSHIPS.join("\n") + "\nDisambiguation boundaries:\n" +
   SEARCH_BOUNDARIES.join("\n");
 
+// Jev rejects a request over about 64k input tokens (max_tokens_exceeded). Every question
+// repeats the search context, about 1,350 tokens with a full summary, so 25 stays near half.
+const JEV_BATCH_SIZE = 25;
+
 export type Verdict = "published" | "held" | "discarded";
 
 export function createAi(config: Config, f: typeof fetch) {
@@ -143,6 +147,18 @@ export function createAi(config: Config, f: typeof fetch) {
         return { id, score };
       }).sort((a, b) => b.score - a.score);
     }
+    const batches: (typeof items)[] = [];
+    for (let i = 0; i < items.length; i += JEV_BATCH_SIZE) {
+      batches.push(items.slice(i, i + JEV_BATCH_SIZE));
+    }
+    return (await Promise.all(batches.map((batch) => rankJevBatch(query, batch)))).flat()
+      .sort((x, y) => y.score - x.score);
+  }
+
+  async function rankJevBatch(
+    query: string,
+    items: { id: string; title: string; summary: string }[],
+  ): Promise<AiSearchResult["scores"]> {
     const questions = Object.fromEntries(items.map((item, index) => [
       `proposal_${index}`,
       {
@@ -180,7 +196,7 @@ export function createAi(config: Config, f: typeof fetch) {
         throw new Error("Jev returned an invalid relevance score");
       }
       return { id: item.id, score: score / (AI_RELEVANCE_LEVELS.length - 1) };
-    }).sort((a, b) => b.score - a.score);
+    });
   }
 
   /** 1 to 3 category slugs for a draft, primary first. Unvalidated: see aiFilterCategories. */

@@ -1,0 +1,350 @@
+{
+  "source": "https://initiatives.thedao.fund/llms.txt",
+  "retrieved": "2026-10-04",
+  "note": "asked is the amount on the page; cost is asked less 25%, capped at 200000, as used by the Quiet Ending simulations",
+  "initiatives": [
+    {
+      "title": "Source-Level Debugging for Solidity: ethdebug in solc",
+      "type": "Grant",
+      "category": "Compilers & Languages",
+      "asked": 279000,
+      "cost": 200000
+    },
+    {
+      "title": "End-to-End Formally Verified Vyper Compiler",
+      "type": "Grant",
+      "category": "Formal Verification",
+      "asked": 600000,
+      "cost": 200000
+    },
+    {
+      "title": "Community Fuzzing Tooling for Ethereum Ecosystem Projects",
+      "type": "RFP",
+      "category": "Fuzzing & Testing",
+      "asked": 150000,
+      "cost": 112500
+    },
+    {
+      "title": "Safe Lockdown Guard: An Emergency Freeze for Kidnapping and Coercion",
+      "type": "Grant",
+      "category": "OpSec",
+      "asked": 14000,
+      "cost": 10500
+    },
+    {
+      "title": "Wallet Security for Post-Quantum Ethereum",
+      "type": "RFP",
+      "category": "Wallets & Signing",
+      "asked": 250000,
+      "cost": 187500
+    },
+    {
+      "title": "Preventing Theft in Mainstream Wallets with Vaults",
+      "type": "RFP",
+      "category": "Wallets & Signing",
+      "asked": 240000,
+      "cost": 180000
+    },
+    {
+      "title": "LeekWallet: an open DIY hardware wallet with a secure element PIN gate, and build workshops in Mexico",
+      "type": "Grant",
+      "category": "Wallets & Signing",
+      "asked": 32190,
+      "cost": 24142
+    },
+    {
+      "title": "EquiVM: End-to-End Formal Verification for EVM Bytecode",
+      "type": "Grant",
+      "category": "Formal Verification",
+      "asked": 240000,
+      "cost": 180000
+    },
+    {
+      "title": "thatsRekt: EVM exploit alerts for the public good.",
+      "type": "Grant",
+      "category": "Detection & Response",
+      "asked": 45000,
+      "cost": 33750
+    },
+    {
+      "title": "HackViz — Interactive Real-World Ethereum Exploit Learning Sandbox",
+      "type": "Grant",
+      "category": "Research & Education",
+      "asked": 20000,
+      "cost": 15000
+    },
+    {
+      "title": "Decentralized, Privacy-Preserving EDR",
+      "type": "Grant",
+      "category": "OpSec",
+      "asked": 300000,
+      "cost": 200000
+    },
+    {
+      "title": "$1 OpSec Audits",
+      "type": "RFP",
+      "category": "OpSec",
+      "asked": 80000,
+      "cost": 60000
+    },
+    {
+      "title": "Actual Rollup Exit Guarantees for DeFi and Multisigs",
+      "type": "RFP",
+      "category": "Infrastructure & Clients",
+      "asked": 265000,
+      "cost": 198750
+    },
+    {
+      "title": "Preparing encrypted mempools for inclusion in the earliest EIP possible",
+      "type": "Grant",
+      "category": "Infrastructure & Clients",
+      "asked": 34500,
+      "cost": 25875
+    },
+    {
+      "title": "Audit Coverage Attestations: bind every audit report to the exact verified bytecode it covered",
+      "type": "Grant",
+      "category": "Audits & Analysis",
+      "asked": 200000,
+      "cost": 150000
+    },
+    {
+      "title": "Onay: Local signing companion",
+      "type": "Grant",
+      "category": "Wallets & Signing",
+      "asked": 45000,
+      "cost": 33750
+    },
+    {
+      "title": "Towards a Formally Verified Solc",
+      "type": "Grant",
+      "category": "Formal Verification",
+      "asked": 350000,
+      "cost": 200000
+    },
+    {
+      "title": "Shift-Left Security for Ethereum Open Source: Agent-Enforced Security ADRs",
+      "type": "Grant",
+      "category": "Audits & Analysis",
+      "asked": 120000,
+      "cost": 90000
+    },
+    {
+      "title": "Etherform: A Hardened CI/CD Standard for Foundry Smart Contracts",
+      "type": "Grant",
+      "category": "Fuzzing & Testing",
+      "asked": 12000,
+      "cost": 9000
+    },
+    {
+      "title": "State of Ethereum AI Agent Security",
+      "type": "Grant",
+      "category": "Research & Education",
+      "asked": 75000,
+      "cost": 56250
+    },
+    {
+      "title": "DPRK IT Worker Screening for the Ethereum Ecosystem",
+      "type": "Grant",
+      "category": "OpSec",
+      "asked": 50000,
+      "cost": 37500
+    },
+    {
+      "title": "NanoJS Investigations: Sustaining Independent Ethereum Forensic Casework and Open Tooling",
+      "type": "Grant",
+      "category": "Detection & Response",
+      "asked": 10000,
+      "cost": 7500
+    },
+    {
+      "title": "Self-serve scoped permissions and pre-signature checks for Safes and AI agents",
+      "type": "Grant",
+      "category": "Wallets & Signing",
+      "asked": 135000,
+      "cost": 101250
+    },
+    {
+      "title": "EEZ Extends Ethereum: Making Its Contracts Safe for Chains to Adopt",
+      "type": "Grant",
+      "category": "Audits & Analysis",
+      "asked": 120000,
+      "cost": 90000
+    },
+    {
+      "title": "Hookscope: Evidence-Backed Uniswap v4 Hook Warnings",
+      "type": "Grant",
+      "category": "DeFi Safety",
+      "asked": 25000,
+      "cost": 18750
+    },
+    {
+      "title": "Expiring Approvals (ERC-8255): Registry, Tooling, Audits and Adoption",
+      "type": "Grant",
+      "category": "Wallets & Signing",
+      "asked": 300000,
+      "cost": 200000
+    },
+    {
+      "title": "Onchain Risk Map: An Open Operational Incident Graph for Ethereum Security",
+      "type": "Grant",
+      "category": "Detection & Response",
+      "asked": 50000,
+      "cost": 37500
+    },
+    {
+      "title": "Exploit Exposure Layer: Free Data on Every Wallet Still Approved to an Exploited Contract",
+      "type": "Grant",
+      "category": "Detection & Response",
+      "asked": 100000,
+      "cost": 75000
+    },
+    {
+      "title": "TEE Security Handbook: practical verification, failure analysis and recovery for Ethereum",
+      "type": "Grant",
+      "category": "Research & Education",
+      "asked": 18000,
+      "cost": 13500
+    },
+    {
+      "title": "From Community Contracts to OpenZeppelin Contracts: ERC-7540 Asynchronous Vaults",
+      "type": "Grant",
+      "category": "DeFi Safety",
+      "asked": 90000,
+      "cost": 67500
+    },
+    {
+      "title": "Solidity (Wake) VS Code Extension Maintenance and AI Fuzzing",
+      "type": "Grant",
+      "category": "Audits & Analysis",
+      "asked": 10000,
+      "cost": 7500
+    },
+    {
+      "title": "Wake v5 Maintenance and AI-Assisted Fuzzing",
+      "type": "Grant",
+      "category": "Fuzzing & Testing",
+      "asked": 20000,
+      "cost": 15000
+    },
+    {
+      "title": "Ethereum Decompiler Benchmark & Open Bytecode Analysis Standard",
+      "type": "Grant",
+      "category": "Audits & Analysis",
+      "asked": 120000,
+      "cost": 90000
+    },
+    {
+      "title": "Spec Bank: a public, composable registry of formal specifications for DeFi",
+      "type": "RFP",
+      "category": "Formal Verification",
+      "asked": 100000,
+      "cost": 75000
+    },
+    {
+      "title": "EtherWorld Security News & Reports: EIP-7702, Encrypted Mempools and Post-Quantum Ethereum",
+      "type": "Grant",
+      "category": "Research & Education",
+      "asked": 25000,
+      "cost": 18750
+    },
+    {
+      "title": "Fund Echidna Development Through 2027",
+      "type": "Grant",
+      "category": "Fuzzing & Testing",
+      "asked": 48000,
+      "cost": 36000
+    },
+    {
+      "title": "Open EVM Compiler Differential Fuzzing Platform",
+      "type": "Grant",
+      "category": "Compilers & Languages",
+      "asked": 75000,
+      "cost": 56250
+    },
+    {
+      "title": "Account Abstraction and Mempool Security Analytics",
+      "type": "Grant",
+      "category": "Detection & Response",
+      "asked": 45000,
+      "cost": 33750
+    },
+    {
+      "title": "Colibri — Production Infrastructure and Ecosystem Adoption for Trustless Ethereum Access",
+      "type": "Grant",
+      "category": "Infrastructure & Clients",
+      "asked": 640000,
+      "cost": 200000
+    },
+    {
+      "title": "The Ethernaut: Six New Levels Built from Real-World Exploits",
+      "type": "Grant",
+      "category": "Research & Education",
+      "asked": 44000,
+      "cost": 33000
+    },
+    {
+      "title": "Open Standard and Automated Triage Tooling for Ethereum Security Issues",
+      "type": "Grant",
+      "category": "Audits & Analysis",
+      "asked": 150000,
+      "cost": 112500
+    },
+    {
+      "title": "Securing Ethereum with Formal Verification",
+      "type": "Grant",
+      "category": "Formal Verification",
+      "asked": 200000,
+      "cost": 150000
+    },
+    {
+      "title": "Provider-Independent, Client-Verified ENS Resolution",
+      "type": "RFP",
+      "category": "Infrastructure & Clients",
+      "asked": 150000,
+      "cost": 112500
+    },
+    {
+      "title": "Production-Ready Local-First Safe UI",
+      "type": "RFP",
+      "category": "Wallets & Signing",
+      "asked": 120000,
+      "cost": 90000
+    },
+    {
+      "title": "ForensIQ: Faster Ethereum Incident Response Through Evidence Reconstruction",
+      "type": "Grant",
+      "category": "Detection & Response",
+      "asked": 135000,
+      "cost": 101250
+    },
+    {
+      "title": "Directory of Value",
+      "type": "RFP",
+      "category": "Audits & Analysis",
+      "asked": 185000,
+      "cost": 138750
+    },
+    {
+      "title": "A Unified Platform for Web3 OpSec",
+      "type": "Grant",
+      "category": "OpSec",
+      "asked": 250000,
+      "cost": 187500
+    },
+    {
+      "title": "OPSEC Ratings Coalition to Build & Maintain an \"L2Beat for OPSEC\"",
+      "type": "RFP",
+      "category": "OpSec",
+      "asked": 150000,
+      "cost": 112500
+    },
+    {
+      "title": "Automated EIP Compliance Checks for Ethereum Clients",
+      "type": "Grant",
+      "category": "Infrastructure & Clients",
+      "asked": 20000,
+      "cost": 15000
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "chainId": 1,
+  "currencies": [
+    {
+      "symbol": "ETH",
+      "asset": "0x0000000000000000000000000000000000000000",
+      "usdFeed": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+      "maxPriceAge": 7200
+    },
+    {
+      "symbol": "USDC",
+      "asset": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "usdFeed": "0x0000000000000000000000000000000000000000",
+      "maxPriceAge": 0
+    },
+    {
+      "symbol": "EURC",
+      "asset": "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c",
+      "usdFeed": "0x04F84020Fdf10d9ee64D1dcC2986EDF2F556DA11",
+      "maxPriceAge": 90000
+    }
+  ]
+}

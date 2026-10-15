@@ -1,0 +1,37 @@
+Investigate how changing currency prices and project support affect Blossom Budgeting's PB-EAR tally during Slow Quiet Ending.
+
+Historical investigation brief: the user has since selected secured, increase-only USD funding and the fixed_usd settlement policy. Admins update future dates explicitly with overlap validation; initial funding must precede S's first tally and never moves dates. Later increases add equally to registered NFTs' remaining shares. See vote/docs/settlement-policy.md for the accepted decision; the alternatives below remain investigation context.
+
+Work in /home/sem/Projects/thedao-initiatives. Read vote/README.md, vote/docs/quiet-ending-rules.md, and the Python references and tests under vote/reference/. The requirements below take precedence over older documents. Contract implementation is proceeding separately; do not modify the Solidity contracts, shared tally code, or existing reference behavior. Put experiments in clearly named new files or an isolated checkout. The user will relay your findings.
+
+Current requirements:
+- Every eligible NFT is one equal voting unit. Ballots and revisions are keyed by NFT ID, not owner address. One wallet may own several voting NFTs. Ownership transfers retain the same voting unit and nonce; the current owner controls revisions.
+- Voting has an opening timestamp, first tally timestamps for S/A/B, an initial quiet-window duration, and a maximum number of windows per tier INCLUDING the initial window. Successive windows halve in duration.
+- Registration closes at the first S tally plus the initial window. Afterwards, registered NFTs may revise open tiers.
+- Checkpoints are derived deterministically from canonical on-chain history; nobody publishes or approves them.
+- The pool consists of ADMIN-RECORDED amounts in allowed currencies, such as 400 ETH. Its USD valuation can increase or decrease. Pool quantities can also be corrected by admins. The contract does not custody those funds.
+- Projects have addresses and dollar asks. Donations are actual allowed-currency balances at project addresses. Pledges are outstanding promises separately recorded by authorized admins, in an allowed currency or the USD accounting unit.
+- At each tally cutoff, value the pool, donations and pledges using the currency's configured pricing rule and applicable historical oracle state. ERC-20s can explicitly use fixed $1-per-token accounting; the mainnet preset selects this for USDC. Such accounting ignores market depegs, so distinguish recorded USD from realizable market value. The intended project funding need is max(askUSD - donationsUSD - pledgesUSD, 0). Project support reduces that project's ask; it is not fungible pool funding.
+- Unplaced proposals receive no support by default. Earlier drafts settle tiers permanently and may bind supporters of provisionally funded proposals. Investigate whether those rules remain compatible with changing valuations; no final economic settlement policy has been selected.
+
+Investigate:
+1. Whether later price changes can make settled allocations unaffordable, overdraw individual shares, or invalidate the final tally's relationship to PB-EAR.
+2. Whether changes in donations, pledges, or their valuations can invalidate the economic assumptions of a settled tier, even without ballot changes.
+3. Which fixed-input proportionality guarantees still apply, and which claims cannot be carried over to time-varying inputs.
+4. Whether payer-share comparisons and supporter restrictions behave sensibly when pool budgets and project funding needs change.
+5. Whether observable price changes, donations, withdrawals or pledge corrections can be timed strategically around window boundaries.
+6. How to avoid double counting: a pledge becoming a donation, a transfer from the pool appearing as project support, or withdrawn/spent project funds changing balances.
+7. How to distribute equal NFT shares and integer rounding as the USD pool grows or shrinks. NFT registration is fixed after the deadline; owner address must not change a token's share or create extra entries.
+
+Start with small explicit counterexamples, including a pool-price fall after S settles. Then run reproducible simulations using the existing 49-project fixture and invented NFT ballots, plus small random/exhaustive cases. Cover flat prices, gradual changes, sharp shocks, correlated/divergent currency exposures, stablecoin depegs, project-balance withdrawals, and pledge corrections. Use integer arithmetic (the contract uses six decimal places for USD) and report seeds, units, assumptions and commands.
+
+Compare plausible policies rather than assuming one is correct: fixed settled dollar allocations, fixed currency allocations, funding reserves/haircuts, tier-specific valuation locks, and reopening/recomputing tiers. Distinguish a scalar accounting deficit from actual insolvency: the round currently records allocations but does not custody or pay funds. Do not introduce an admin-published checkpoint as a workaround.
+
+Report:
+- A recommendation supported by counterexamples and simulation results.
+- Exact reproducible failing cases.
+- Budget conservation, per-NFT affordability, project coverage, tier finality, termination, and agreement with a fresh final-input tally.
+- Tradeoffs and any impossibility of satisfying all desired guarantees simultaneously.
+- Precise contract/data requirements and decisions that must wait for the user.
+
+Keep theoretical claims separate from empirical observations. Passing simulations are not a proof.

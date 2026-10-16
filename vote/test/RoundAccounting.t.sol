@@ -56,20 +56,27 @@ contract RoundAccountingTest is Fixture {
         assertEq(ballots.poolUsd(), 810_000e6);
     }
 
-    function test_poolIncreasesPreserveEventHistoryAndNeverDecrease() public {
+    function test_poolCanBeCorrectedBeforeFirstTallyThenOnlyIncreases() public {
         vm.expectEmit(false, false, false, true, address(ballots));
         emit PoolUsdSet(0, 810_000e6);
         ballots.setPoolUsd(810_000e6);
         vm.warp(start);
+        // A mistyped total (an 18-decimal amount) is still correctable.
+        ballots.setPoolUsd(810_000e18);
         vm.expectEmit(false, false, false, true, address(ballots));
-        emit PoolUsdSet(810_000e6, 900_000e6);
-        ballots.setPoolUsd(900_000e6);
-        vm.expectRevert(RoundAccounting.PoolCannotDecrease.selector);
+        emit PoolUsdSet(810_000e18, 810_000e6);
         ballots.setPoolUsd(810_000e6);
+        ballots.setPoolUsd(900_000e6);
+        vm.warp(ballots.firstTallyAt(0) - 1);
+        ballots.setPoolUsd(0);
+        assertEq(ballots.poolUsd(), 0);
+        assertTrue(ballots.poolInitialized());
+        ballots.setPoolUsd(900_000e6);
+        vm.warp(ballots.firstTallyAt(0));
+        vm.expectRevert(RoundAccounting.PoolCannotDecrease.selector);
+        ballots.setPoolUsd(900_000e6 - 1);
         vm.expectRevert(RoundAccounting.PoolCannotDecrease.selector);
         ballots.setPoolUsd(0);
-        assertEq(ballots.poolUsd(), 900_000e6);
-        vm.warp(ballots.firstTallyAt(0) - 1);
         ballots.setPoolUsd(900_000e6 + 123_456);
         assertEq(ballots.poolUsd(), 900_000e6 + 123_456);
     }

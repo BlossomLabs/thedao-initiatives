@@ -95,21 +95,22 @@ contract SignedBallotsTest is Fixture {
 
     function test_noncePersistsAcrossTransfersAndRollDoesNotGrow() public {
         vm.warp(start);
-        SignedBallots.Vote[] memory oldSignature = signedVote(1000, 1, 9, ranks);
+        SignedBallots.Vote[] memory oldSignature = signedVote(1000, 1, 3, ranks);
         vm.startPrank(alice);
-        ballots.vote(1, 5, ranks);
+        ballots.vote(1, 1, ranks);
         ballots.transferFrom(alice, bob, 1);
         vm.stopPrank();
         vm.warp(ballots.registrationDeadline());
         vm.prank(bob);
-        ballots.vote(1, 6, hex"0201ff");
+        ballots.vote(1, 2, hex"0201ff");
         assertEq(ballots.registrationReceiptCount(), 1);
-        assertEq(ballots.nonceOf(1), 6);
+        assertEq(ballots.nonceOf(1), 2);
+        // Nonce 3 is next, but the previous owner can no longer authorize it.
         vm.expectRevert(SignedBallots.InvalidSignature.selector);
         ballots.record(oldSignature);
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(SignedBallots.StaleNonce.selector, 1, uint64(5)));
-        ballots.vote(1, 5, ranks);
+        vm.expectRevert(abi.encodeWithSelector(SignedBallots.InvalidNonce.selector, 1, uint64(1)));
+        ballots.vote(1, 1, ranks);
     }
 
     function test_approvedOperatorCannotVoteAsOwner() public {
@@ -136,13 +137,89 @@ contract SignedBallotsTest is Fixture {
         ballots.mint(bob, 4);
     }
 
-    function test_replacementsUseStrictlyIncreasingNonces() public {
+    function test_replacementsUseConsecutiveNonces() public {
         vm.warp(start);
-        ballots.record(signedVote(1000, 1, 5, ranks));
-        ballots.record(signedVote(1000, 1, 6, ranks));
-        SignedBallots.Vote[] memory old = signedVote(1000, 1, 5, ranks);
-        vm.expectRevert(abi.encodeWithSelector(SignedBallots.StaleNonce.selector, 1, uint64(5)));
+        ballots.record(signedVote(1000, 1, 1, ranks));
+        ballots.record(signedVote(1000, 1, 2, ranks));
+        SignedBallots.Vote[] memory old = signedVote(1000, 1, 1, ranks);
+        vm.expectRevert(abi.encodeWithSelector(SignedBallots.InvalidNonce.selector, 1, uint64(1)));
         ballots.record(old);
+        assertEq(ballots.nonceOf(1), 2);
+    }
+
+    function test_skippedNonceRevertsSoAMistypedNonceCannotLockTheToken() public {
+        vm.warp(start);
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(SignedBallots.InvalidNonce.selector, 1, type(uint64).max));
+        ballots.vote(1, type(uint64).max, ranks);
+        SignedBallots.Vote[] memory skipped = signedVote(1000, 1, 2, ranks);
+        vm.expectRevert(abi.encodeWithSelector(SignedBallots.InvalidNonce.selector, 1, uint64(2)));
+        ballots.record(skipped);
+        assertEq(ballots.nonceOf(1), 0);
+        assertFalse(ballots.hasRegistrationReceipt(1));
+        vm.prank(alice);
+        ballots.vote(1, 1, ranks);
+        assertEq(ballots.nonceOf(1), 1);
+    }
+
+    function test_batchMayCarryConsecutiveRevisionsOfOneToken() public {
+        vm.warp(start);
+        SignedBallots.Vote[] memory votes = new SignedBallots.Vote[](2);
+        votes[0] = signedVote(1000, 1, 1, ranks)[0];
+        votes[1] = signedVote(1000, 1, 2, hex"0201ff")[0];
+        ballots.record(votes);
+        assertEq(ballots.nonceOf(1), 2);
+        assertEq(ballots.ballotHashOf(1), keccak256(hex"0201ff"));
+    }
+
+    function test_burnRemovesMistakenMintBeforeOpening() public {
+        ballots.mint(bob, 50);
+        ballots.burn(50);
+        vm.expectRevert();
+        ballots.ownerOf(50);
+        assertEq(ballots.recordCount(), 0);
+        assertEq(ballots.transcript(), bytes32(0));
+        ballots.mint(alice, 50); // The corrected recipient.
+        assertEq(ballots.ownerOf(50), alice);
+    }
+
+    function test_burnRevokesReceiptAndRecordsRevocation() public {
+        vm.warp(start);
+        vm.prank(alice);
+        ballots.vote(1, 1, ranks);
+        bytes32 before = ballots.transcript();
+        vm.expectEmit(true, false, false, false, address(ballots));
+        emit SignedBallots.RegistrationRevoked(1);
+        ballots.burn(1);
+        assertFalse(ballots.hasRegistrationReceipt(1));
+        assertEq(ballots.registrationReceiptCount(), 0);
+        assertEq(ballots.ballotHashOf(1), bytes32(0));
+        assertEq(ballots.recordCount(), 2);
+        assertEq(
+            ballots.transcript(),
+            keccak256(abi.encode(before, uint256(1), address(0), uint64(1), bytes32(0), bytes32(0)))
+        );
+        // Re-minting keeps the nonce, so no earlier signature can be replayed.
+        ballots.mint(bob, 1);
+        assertEq(ballots.nonceOf(1), 1);
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(SignedBallots.InvalidNonce.selector, 1, uint64(1)));
+        ballots.vote(1, 1, ranks);
+        vm.prank(bob);
+        ballots.vote(1, 2, ranks);
+        assertEq(ballots.registrationReceiptCount(), 1);
+    }
+
+    function test_burnRequiresMinterAndClosesWithRegistration() public {
+        vm.prank(bob);
+        vm.expectRevert();
+        ballots.burn(3);
+        vm.warp(ballots.registrationDeadline() - 1);
+        ballots.burn(3);
+        vm.warp(ballots.registrationDeadline());
+        vm.expectRevert(SignedBallots.RegistrationClosed.selector);
+        ballots.burn(2);
+        assertEq(ballots.ownerOf(2), alice);
     }
 
     function test_blobSignatureUsesSameNFTNonceAndTranscript() public {
@@ -154,7 +231,7 @@ contract SignedBallotsTest is Fixture {
             ballots.transcript(),
             keccak256(abi.encode(bytes32(0), uint256(1), alice, uint64(1), keccak256(ranks), hash))
         );
-        vm.expectRevert(abi.encodeWithSelector(SignedBallots.StaleNonce.selector, 1, uint64(1)));
+        vm.expectRevert(abi.encodeWithSelector(SignedBallots.InvalidNonce.selector, 1, uint64(1)));
         ballots.record(votes);
     }
 

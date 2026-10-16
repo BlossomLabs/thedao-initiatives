@@ -36,7 +36,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     error WrongLength();
     error InvalidBallot();
     error NoBlob();
-    error StaleNonce(uint256 tokenId, uint64 nonce);
+    error InvalidNonce(uint256 tokenId, uint64 nonce);
     error InvalidSignature();
 
     struct Schedule {
@@ -92,6 +92,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     );
     event EligibilityConfigured(address indexed collection);
     event RegistrationReceipt(uint256 indexed tokenId);
+    event RegistrationRevoked(uint256 indexed tokenId);
     event BallotRecorded(uint256 indexed tokenId, address indexed voter, uint64 nonce, bytes ballot);
     event BlobBallotRecorded(
         uint256 indexed tokenId, address indexed voter, uint64 nonce, bytes32 ballotHash, bytes32 indexed blobHash
@@ -159,6 +160,26 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         if (eligibilityNFT != address(this)) revert ExternalCollection();
         if (poolInitialized && block.timestamp >= registrationDeadline) revert RegistrationClosed();
         _safeMint(to, tokenId);
+    }
+
+    /// @notice Burn an internal NFT minted by mistake, under the same cutoff as mint.
+    /// @dev No tier can settle before registration closes, so a burn never touches
+    ///      a settled tally. A token with a receipt loses it, and a revocation record
+    ///      (voter zero, unchanged nonce) enters the transcript: replay must void the
+    ///      token's earlier ballots. The nonce persists if the ID is minted again.
+    function burn(uint256 tokenId) external onlyRole(MINTER_ROLE) {
+        if (eligibilityNFT != address(this)) revert ExternalCollection();
+        if (poolInitialized && block.timestamp >= registrationDeadline) revert RegistrationClosed();
+        _burn(tokenId);
+        if (hasRegistrationReceipt[tokenId]) {
+            hasRegistrationReceipt[tokenId] = false;
+            --registrationReceiptCount;
+            delete ballotHashOf[tokenId];
+            transcript =
+                keccak256(abi.encode(transcript, tokenId, address(0), nonceOf[tokenId], bytes32(0), bytes32(0)));
+            ++recordCount;
+            emit RegistrationRevoked(tokenId);
+        }
     }
 
     function setBaseURI(string calldata baseURI) external onlyRole(ADMIN_ROLE) {
@@ -272,7 +293,9 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     }
 
     function _append(uint256 tokenId, address voter, uint64 nonce, bytes32 ballotHash, bytes32 blobHash) private {
-        if (nonce <= nonceOf[tokenId]) revert StaleNonce(tokenId, nonce);
+        // Exactly the next nonce: a mistyped huge nonce would otherwise lock the
+        // NFT out of every later revision.
+        if (nonce != nonceOf[tokenId] + 1) revert InvalidNonce(tokenId, nonce);
         if (!hasRegistrationReceipt[tokenId]) {
             if (poolInitialized && block.timestamp >= registrationDeadline) revert NotRegistered(tokenId);
             hasRegistrationReceipt[tokenId] = true;
@@ -318,8 +341,12 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         if (poolInitialized && block.timestamp >= hardDeadline) revert VotingClosed();
     }
 
+    function _initialFundingOpen() internal view override returns (bool) {
+        return block.timestamp < firstTallyAt[0];
+    }
+
     function _requireInitialFundingOpen() internal view override {
-        if (block.timestamp >= firstTallyAt[0]) revert InitialFundingTooLate();
+        if (!_initialFundingOpen()) revert InitialFundingTooLate();
     }
 
     function _validateSchedule(Schedule memory s) private pure returns (uint256 duration) {

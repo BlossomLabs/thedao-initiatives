@@ -47,7 +47,7 @@ Presentation dates can be derived from the configured schedule.
 ## Funding and project support
 
 The pool records secured USD from actual net conversion proceeds or an enforceable
-guarantee in the award currency. Its recorded total can increase but never decrease.
+guarantee in the award currency. Its recorded total can be corrected before S's first tally and only increases after it.
 Registration closes at the end of S's first window, fixing the NFT count and equal
 initial shares. Later increases add equally to those NFTs' remaining shares, without
 changing settled awards or charges.

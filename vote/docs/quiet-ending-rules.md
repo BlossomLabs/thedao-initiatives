@@ -24,7 +24,9 @@ signatures do not authorize submissions after a transfer.
 
 Administrative permissions use OpenZeppelin AccessControl. DEFAULT_ADMIN_ROLE
 grants/revokes roles; ADMIN_ROLE manages setup and the USD pool budget; PLEDGE_ROLE
-records pledges; MINTER_ROLE issues internal NFTs before registration closes.
+records pledges; MINTER_ROLE issues internal NFTs, and burns mistaken ones, before
+registration closes. A burn revokes the token's receipt and records a revocation in
+the transcript, so replay voids its earlier ballots.
 BLOB_SUBMITTER_ROLE permits hash-only blob receipts because a bad blob can consume
 a signed nonce. The deployment admin initially has all these roles.
 
@@ -83,8 +85,10 @@ There are two distinct sources of value: the pool, and project-specific support.
 
 **The pool** records secured USD from actual net conversion proceeds or an
 enforceable guarantee in the award currency. An oracle valuation alone does not
-secure funding. setPoolUsd records one total in six-decimal USD and rejects every
-decrease with PoolCannotDecrease. Later increases are allowed strictly before the
+secure funding. setPoolUsd records one total in six-decimal USD. Strictly before
+S's first tally, when no tally has committed money, a mistyped total may be
+corrected downward; from then on every decrease reverts with PoolCannotDecrease.
+Replay uses the total in force at each tally. Later increases are allowed strictly before the
 effective hardDeadline. An unchanged total adds nothing. PoolUsdSet logs previous
 and new totals so replay can derive every funding increment. The registry records
 an admin funding assertion; it does not custody funds or prove their conversion.
@@ -205,7 +209,9 @@ Process every receipt. An allowed revision replaces the voter's accepted ballot.
 A disallowed revision is rejected whole; the previous accepted ballot remains.
 Never merge parts of an invalid revision or silently repair it. The registry's
 per-NFT nonce watermark records receipts, not which revision was accepted: a corrected
-submission needs a higher nonce even if its predecessor was rejected.
+submission needs the next nonce even if its predecessor was rejected. The registry
+accepts only nonceOf + 1, never a skipped nonce. A transcript record with voter
+address zero is a burn: discard every earlier ballot of that NFT ID.
 
 An NFT ID enters the accepted roll only through an accepted ballot before the
 registration deadline. Rejected records do not add voting units. If no NFT has an

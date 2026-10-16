@@ -53,7 +53,8 @@ abstract contract RoundAccounting is AccessControl {
     Initiative[] private _initiatives;
     mapping(address asset => bool) private _assetRegistered;
     mapping(address account => bool) private _initiativeRegistered;
-    /// @notice Admin-recorded budget in six-decimal USD. May only increase.
+    /// @notice Admin-recorded budget in six-decimal USD. Correctable before S's
+    ///         first tally; increase-only from then on.
     /// @dev This records a funding assertion, not custody or proof of conversion.
     uint256 public poolUsd;
     /// @notice Records whether the admin explicitly initialized funding before S.
@@ -152,13 +153,15 @@ abstract contract RoundAccounting is AccessControl {
         emit InitiativeConfigured(id, account, askUsd);
     }
 
-    /// @notice Initialize or increase net USD funding while the round is open.
+    /// @notice Initialize, correct or increase net USD funding while the round is open.
     /// @dev Initial funding, including an explicit zero, must precede S's first
-    ///      tally. Funding never changes dates. No conversion occurs.
+    ///      tally. Before that tally no award is committed, so a mistyped total may
+    ///      be lowered; afterwards the total only increases. Funding never changes
+    ///      dates. No conversion occurs.
     function setPoolUsd(uint256 amountUsd) external onlyRole(ADMIN_ROLE) {
         _requireAccountingOpen();
         uint256 previous = poolUsd;
-        if (amountUsd < previous) revert PoolCannotDecrease();
+        if (amountUsd < previous && !_initialFundingOpen()) revert PoolCannotDecrease();
         poolUsd = amountUsd;
         if (!poolInitialized) {
             _requireInitialFundingOpen();
@@ -274,6 +277,7 @@ abstract contract RoundAccounting is AccessControl {
     }
 
     function _requireSetup() internal view virtual;
+    function _initialFundingOpen() internal view virtual returns (bool);
     function _requireInitialFundingOpen() internal view virtual;
     function _requireAccountingOpen() internal view virtual;
 }

@@ -44,14 +44,14 @@ The references retain byte 0 for the older optional unplaced tail.
 | Setting or record | Implementation |
 | --- | --- |
 | Voter NFT | The round issues ERC-721s itself, or uses one external ERC-721 address. |
-| Voting unit | One ballot and one nonce sequence per NFT ID; owners of multiple NFTs can vote each independently. |
+| Voting unit | One ballot and one nonce sequence per NFT ID; owners of multiple NFTs can vote each independently. Each record must use exactly the next nonce. |
 | Ownership | Only the current owner can authorize a revision. Token approvals do not grant voting permission. Transfers preserve the token's nonce and registration receipt. |
 | Initial date | Voting opens at the configured timestamp. |
 | First tally dates | Admin-configured S/A/B timestamps. Future dates can change independently, with overlap checks at deployment and on every update. |
 | Initial window | Shared first-window duration. |
 | Maximum windows | Includes the initial window; durations halve and must remain positive. |
 | Registration deadline | Always first S tally plus the initial window. |
-| Pool | One admin-recorded USD budget, which can increase but never decrease. Initial funding must be recorded strictly before S's first tally. Funding must be secured separately. |
+| Pool | One admin-recorded USD budget. It can be corrected in either direction strictly before S's first tally, then only increases. Initial funding must be recorded strictly before S's first tally. Funding must be secured separately. |
 | Initiatives | Unique project addresses and dollar asks, frozen when voting opens. |
 | Donations | Actual native/ERC-20 balances at each project address, for allowed currencies only. |
 | Pledges | Admin-recorded outstanding amounts keyed by unique pledge IDs; updatable and cancellable. |
@@ -61,7 +61,7 @@ Role administration uses OpenZeppelin AccessControl. The deployment admin initia
 holds DEFAULT_ADMIN_ROLE, ADMIN_ROLE, PLEDGE_ROLE, MINTER_ROLE and
 BLOB_SUBMITTER_ROLE, and can grant/revoke them independently. ADMIN_ROLE controls
 setup and the USD pool budget; PLEDGE_ROLE controls pledges; MINTER_ROLE issues internal
-NFTs before registration closes; BLOB_SUBMITTER_ROLE permits hash-only blob receipts.
+NFTs and burns mistaken ones before registration closes; BLOB_SUBMITTER_ROLE permits hash-only blob receipts.
 External NFT mode disables internal minting.
 
 ## USD accounting API
@@ -79,8 +79,9 @@ All USD inputs and results use **six decimal places**: 1,000,000 means one dolla
   same USD precision and is recorded separately.
 - addInitiative(account, askUsd) and setInitiative(...) configure up to 254 unique
   initiative addresses before opening. There are at most 32 currencies including USD.
-- setPoolUsd(amountUsd) initializes or increases the total USD pool budget.
-  Decreases always revert with PoolCannotDecrease. The first call sets
+- setPoolUsd(amountUsd) initializes, corrects or increases the total USD pool budget.
+  Strictly before firstTallyAt(0) any value is accepted, so a mistyped total can be
+  lowered; from that tally on, decreases revert with PoolCannotDecrease. The first call sets
   poolInitialized and must be strictly before firstTallyAt(0); otherwise it reverts
   with InitialFundingTooLate. An explicit zero also initializes. Funding never
   changes dates. Later increases remain allowed strictly before hardDeadline.
@@ -160,6 +161,15 @@ its current owner, nonce and rank bytes to the chain and this contract. Calldata
 relayed EOA/ERC-1271 signatures and authorized blob submissions are supported.
 The ordered transcript includes NFT ID and submitting owner. Ballot bytes live in
 events or blobs; ballotHashOf and nonceOf identify the latest recorded revision.
+Each record must carry nonceOf + 1, so a mistyped nonce reverts instead of locking
+the NFT out of later revisions; a batch may carry consecutive revisions of one NFT.
+
+burn(tokenId) lets MINTER_ROLE remove an internal NFT minted by mistake, under the
+same cutoff as mint. No tier can settle before registration closes. If the token
+already has a receipt, the burn clears it and its ballotHashOf, emits
+RegistrationRevoked and appends a revocation record to the transcript, with voter
+address zero and the unchanged nonce. Replay must void that token's earlier ballots.
+The nonce persists, so a re-minted ID continues its sequence.
 
 hasRegistrationReceipt and registrationReceiptCount describe timely receipts,
 including unvalidated blobs. They are **not** an accepted-ballot roll. Full replay

@@ -4,8 +4,9 @@ Decision recorded 15 October 2026: adopt **fixed_usd**. Replay locks USD awards 
 settlement, rather than freezing economic inputs at a tier's first tally (tier_lock).
 
 - **Funding:** record actual net USD conversion proceeds or an enforceable guarantee
-  in the award currency. Oracle valuation does not secure funding. The total may
-  increase but never decrease.
+  in the award currency. Oracle valuation does not secure funding. Before S's first
+  tally the total may be corrected in either direction, since no tally has run; from
+  then on it may increase but never decrease.
 - **Timing:** admins set future dates independently, with nonoverlapping windows
   checked at deployment and on updates. Initial funding must be recorded strictly
   before S's first tally; it never moves dates. If funding is missing, registration

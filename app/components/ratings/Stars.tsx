@@ -28,13 +28,15 @@ export function StarRow(
 
 /** Pick 1 to 5 stars: a radio group (arrow keys move, clicking the picked star clears it). */
 export function StarInput(
-  { value, onChange, label, disabled, compact = false }: {
+  { value, onChange, label, disabled, compact = false, nudge = 0 }: {
     value: StarCount | null;
     onChange: (v: StarCount | null) => void;
     label: string;
     disabled?: boolean;
-    /** Smaller cells, for a narrow side card. */
+    /** Smaller cells, for a board card with its review open. */
     compact?: boolean;
+    /** Each bump outlines the stars in yellow, one after another, once, to say "pick here". */
+    nudge?: number;
   },
 ) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -75,14 +77,29 @@ export function StarInput(
             e.preventDefault();
           }}
           className={cn(
-            "group grid cursor-pointer place-items-center rounded-full border-0 bg-transparent p-0 transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-dao-bright disabled:cursor-default disabled:hover:scale-100",
-            compact ? "size-6" : "size-7",
+            // The size eases with the form's own move (0.22s, its EASE).
+            "group grid cursor-pointer place-items-center rounded-full border-0 bg-transparent p-0 transition-[width,height,scale] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-110 focus-visible:outline-2 focus-visible:outline-dao-bright disabled:cursor-default disabled:hover:scale-100 motion-reduce:transition-none",
+            compact ? "size-5" : "size-7",
           )}
         >
+          {nudge > 0 && (
+            // "Pick here": a yellow star-shaped outline about 2px out from the star, star by
+            // star, once (a 2px line at this size); a new key replays it.
+            <Star
+              key={nudge}
+              className="pointer-events-none col-start-1 row-start-1 size-7 animate-star-ring text-dao-amber"
+              // After whatever comes first (--ring-delay: the comment box's arrow).
+              style={{ animationDelay: `calc(var(--ring-delay, 0ms) + ${(n - 1) * 90}ms)` }}
+              strokeWidth={1.7}
+              fill="none"
+              aria-hidden="true"
+            />
+          )}
           <Star
             className={cn(
-              compact ? "size-4" : "size-[18px]",
-              "transition-colors",
+              "col-start-1 row-start-1",
+              compact ? "size-3.5" : "size-[18px]",
+              "transition-[color,fill,width,height] duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
               lit !== null && n <= lit ? "text-dao-amber" : "text-white/25",
             )}
             fill={lit !== null && n <= lit ? "currentColor" : "none"}

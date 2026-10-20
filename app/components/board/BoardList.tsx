@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { Popover } from "@base-ui/react/popover";
+import { useState } from "react";
+import { Users } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRowMotion } from "~/components/board/Shuffle";
 import { TypeBadge } from "~/components/ui/Badge";
@@ -29,10 +29,10 @@ type Watch = { has: (id: string) => boolean; toggle: (id: string) => void };
  * The list's columns, shared by the header and every row (subgrid), so each
  * column lines up down the list: bookmark · type · title · (admins) rating · funded · backers
  * (the pledgers' logos, or the count when nobody pledged) ·
- * raised of goal (phones: the backers on a tap of the amount). Each row carries its own funding bar, inset under the title
+ * raised of goal. Each row carries its own funding bar, inset under the title
  * (not a divider: rounded, inside the content column, the real divider below
  * it). Compact (the list under 720px wide, as on phones, or in a narrow
- * window): bookmark | title, type and label, raised, then the bar with its %
+ * window): bookmark | title, type and label, raised and the backers, then the bar with its %
  * at the end. The rows follow the list's own width (a container query), not
  * the window's.
  */
@@ -42,56 +42,10 @@ const COLUMNS =
  * title. Narrower, the column would squeeze the titles to a word a line, so
  * the star goes at the end of the title line instead (compact rows: after the amount). */
 const RATED_COLUMNS =
-  `${COLUMNS} @min-[880px]/list:grid-cols-[2rem_4.25rem_minmax(0,1fr)_5rem_4rem_5.5rem_11rem]`;
+  `${COLUMNS} @min-[880px]/list:grid-cols-[2rem_4.25rem_minmax(0,1fr)_6rem_4rem_5.5rem_11rem]`;
 const ROW =
   "col-span-full grid grid-cols-subgrid items-center px-4 @max-[720px]/list:grid-cols-[auto_minmax(0,1fr)_auto] @max-[720px]/list:gap-x-3";
 const NUM = "text-right tnum whitespace-nowrap";
-/** The width under which the rows go compact (the `@max-[720px]/list` classes). */
-const COMPACT_PX = 720;
-/** Whether the list is compact, for what CSS cannot decide (the backers popover). */
-const Compact = createContext(false);
-
-/** Whether the element is under `px` wide, kept up to date as it resizes. */
-function useNarrow(ref: React.RefObject<HTMLElement | null>, px: number): boolean {
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(([e]) => setNarrow(e.contentRect.width < px));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [ref, px]);
-  return narrow;
-}
-
-/**
- * Phones: "4 backers" over the amount, in the site's tooltip style (as on the
- * category icon). A popover, not a tooltip, so a tap opens it. Desktop has the
- * Backers column instead, so the amount stays plain there.
- */
-function Backers({ count, children }: { count: number; children: React.ReactElement }) {
-  const compact = useContext(Compact);
-  if (!count || !compact) return children;
-  return (
-    <Popover.Root>
-      <Popover.Trigger
-        render={children}
-        nativeButton={false}
-        openOnHover
-        delay={200}
-        className="rounded underline decoration-white/30 decoration-dotted underline-offset-4 outline-none hover:decoration-white/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dao-bright"
-      />
-      <Popover.Portal>
-        <Popover.Positioner side="top" sideOffset={6} className="z-[210]">
-          <Popover.Popup className="rounded-[14px] border border-edge2 bg-panel px-2.5 py-1.5 font-inter-tight text-[12px] text-white shadow-menu outline-none">
-            {plural(count, "backer")}
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
-    </Popover.Root>
-  );
-}
-
 /** The row's own funding bar: 3px, rounded, a faint track and the funded part in green. */
 function FundingBar(
   { pct, tick, className, children }: {
@@ -170,7 +124,6 @@ function Row(
       open={rating}
       onToggle={() => setRating((o) => !o)}
       controls={`rate-${r.id}`}
-      className="-my-1.5"
     />
   );
   return (
@@ -213,14 +166,14 @@ function Row(
         ))}
         {ratings && (
           // 720 to 880px: at the end of the title line (no room for the column).
-          <span className="-mr-2 ml-auto hidden flex-none @min-[720px]/list:block @min-[880px]/list:hidden">
+          <span className="-mr-1 ml-auto hidden flex-none @min-[720px]/list:block @min-[880px]/list:hidden">
             {chip}
           </span>
         )}
       </div>
       {ratings && (
         // The Rating column (from 880px; narrower, at the end of the title line).
-        <span className="-ml-2 hidden justify-self-start @min-[880px]/list:block">{chip}</span>
+        <span className="-ml-1 hidden justify-self-start @min-[880px]/list:block">{chip}</span>
       )}
       <span
         className={cn(
@@ -273,35 +226,41 @@ function Row(
             className="hidden flex-none px-2 py-[2px] text-[10px] @max-[720px]/list:inline-flex"
           />
         ))}
-        <Backers count={backers}>
-          <span
-            className={cn(
-              NUM,
-              "text-[12.5px] text-white/50 @max-[720px]/list:ml-1 @max-[720px]/list:text-left @max-[720px]/list:text-[12px]",
-            )}
-          >
-            <span className="@max-[720px]/list:hidden">
-              <b className="font-medium text-white/90">{usd(summary.total)}</b> of {usd(r.goalUsd)}
-            </span>
-            {/* Phones: the short form. */}
-            <span className="hidden @max-[720px]/list:inline" aria-hidden="true">
-              <b className="font-medium text-white/90">{usdShort(summary.total)}</b> of{" "}
-              {usdShort(r.goalUsd)}
-            </span>
-            {backers > 0 && <span className="sr-only">, {plural(backers, "backer")}</span>}
+        <span
+          className={cn(
+            NUM,
+            "text-[12.5px] text-white/50 @max-[720px]/list:ml-1 @max-[720px]/list:text-left @max-[720px]/list:text-[12px]",
+          )}
+        >
+          <span className="@max-[720px]/list:hidden">
+            <b className="font-medium text-white/90">{usd(summary.total)}</b> of {usd(r.goalUsd)}
           </span>
-        </Backers>
+          {/* Phones: the short form. */}
+          <span className="hidden @max-[720px]/list:inline" aria-hidden="true">
+            <b className="font-medium text-white/90">{usdShort(summary.total)}</b> of{" "}
+            {usdShort(r.goalUsd)}
+          </span>
+          {backers > 0 && <span className="sr-only">, {plural(backers, "backer")}</span>}
+        </span>
         {ratings && (
           // Compact: after the amount.
           <span className="-ml-1 hidden flex-none @max-[720px]/list:inline-flex">{chip}</span>
         )}
-        {logos.length > 0 && (
-          // Compact: the pledgers' logos last (the amount already says how many backers).
+        {backers > 0 && (
+          // Compact: the backers last, the pledgers' logos and +N for the rest, or just how
+          // many when nobody pledged (screen readers have it with the amount).
           <span
             className="hidden flex-none items-center text-[12px] @max-[720px]/list:flex"
             aria-hidden="true"
           >
-            {logoStack(true)}
+            {logos.length > 0
+              ? logoStack(true)
+              : (
+                <span className="flex items-center gap-1 text-white/50 tnum">
+                  <Users className="size-3" />
+                  {backers}
+                </span>
+              )}
           </span>
         )}
       </div>
@@ -337,8 +296,6 @@ function Row(
               initiativeId={r.id}
               summary={ratings[r.id]}
               onClose={() => setRating(false)}
-              // A wide row would stretch it thin; a card fills its width.
-              className="max-w-[640px]"
             />
           </div>
         </Reveal>
@@ -363,49 +320,45 @@ export default function BoardList(
     ratings?: Ratings;
   },
 ) {
-  const box = useRef<HTMLDivElement>(null);
-  const compact = useNarrow(box, COMPACT_PX);
   return (
     // No overflow clip: the last row's vote callout hangs below the panel.
-    <div ref={box} className="@container/list rounded-2xl border border-white/10 bg-white/[.04]">
-      <Compact.Provider value={compact}>
-        <div className={ratings ? RATED_COLUMNS : COLUMNS}>
-          <div
-            className={cn(
-              ROW,
-              "border-b border-white/10 py-1.5 font-inter-tight text-[10.5px] font-medium uppercase tracking-[.1em] text-muted @max-[720px]/list:hidden",
-            )}
-            aria-hidden="true"
-          >
-            <span />
-            <span>Type</span>
-            <span>Initiative</span>
-            {ratings && <span className="hidden @min-[880px]/list:block">Rating</span>}
-            <span className="text-right">Funded</span>
-            <span className="text-right">Backers</span>
-            <span className="text-right">Raised</span>
-          </div>
-          <ul className="col-span-full m-0 grid list-none grid-cols-subgrid p-0">
-            <AnimatePresence>
-              {cards.map((c) => (
-                <Row
-                  key={c.initiative.id}
-                  card={c}
-                  aiScore={aiScores?.get(c.initiative.id)}
-                  label={cardLabel({
-                    aiTop: aiTop.includes(c.initiative.id),
-                    featured: featured?.has(c.initiative.id),
-                    approvedAt: c.initiative.approvedAt,
-                  })}
-                  watch={watch}
-                  vote={vote}
-                  ratings={ratings}
-                />
-              ))}
-            </AnimatePresence>
-          </ul>
+    <div className="@container/list rounded-2xl border border-white/10 bg-white/[.04]">
+      <div className={ratings ? RATED_COLUMNS : COLUMNS}>
+        <div
+          className={cn(
+            ROW,
+            "border-b border-white/10 py-1.5 font-inter-tight text-[10.5px] font-medium uppercase tracking-[.1em] text-muted @max-[720px]/list:hidden",
+          )}
+          aria-hidden="true"
+        >
+          <span />
+          <span>Type</span>
+          <span>Initiative</span>
+          {ratings && <span className="hidden @min-[880px]/list:block">Rating</span>}
+          <span className="text-right">Funded</span>
+          <span className="text-right">Backers</span>
+          <span className="text-right">Raised</span>
         </div>
-      </Compact.Provider>
+        <ul className="col-span-full m-0 grid list-none grid-cols-subgrid p-0">
+          <AnimatePresence>
+            {cards.map((c) => (
+              <Row
+                key={c.initiative.id}
+                card={c}
+                aiScore={aiScores?.get(c.initiative.id)}
+                label={cardLabel({
+                  aiTop: aiTop.includes(c.initiative.id),
+                  featured: featured?.has(c.initiative.id),
+                  approvedAt: c.initiative.approvedAt,
+                })}
+                watch={watch}
+                vote={vote}
+                ratings={ratings}
+              />
+            ))}
+          </AnimatePresence>
+        </ul>
+      </div>
     </div>
   );
 }

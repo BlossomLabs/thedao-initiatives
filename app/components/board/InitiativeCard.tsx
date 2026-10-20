@@ -299,6 +299,7 @@ export default function InitiativeCard({
               initiativeId={r.id}
               summary={rating.summary}
               onClose={() => setPanel(null)}
+              card
             />
           </div>
         </Reveal>

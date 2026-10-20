@@ -10,6 +10,41 @@
   /* Clear filters, when nothing matches: a light sweeping across the letters, as a
      chat app's "Thinking…" (React Bits' Shiny Text), for as long as nothing matches. */
   --animate-shine: shine 2.2s linear infinite;
+  /* The comment box's stars after the side card's Rate it: each star's yellow outline in and
+     out, one after another, once, to say "pick here". Opacity only, so it stays with reduced
+     motion. */
+  --animate-star-ring: star-ring 0.9s ease-out both;
+  /* Before them, a hand-drawn arrow into the stars: each line draws (staggered by the arrow),
+     and the whole arrow fades once the outlines are done. */
+  --animate-arrow-draw: arrow-draw 0.4s ease-out both;
+  --animate-arrow-fade: arrow-fade 2.6s ease-in both;
+  @keyframes arrow-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes arrow-fade {
+    0%,
+    75% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes star-ring {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    30%,
+    60% {
+      opacity: 1;
+    }
+  }
   @keyframes shine {
     from {
       background-position: 100% 0;

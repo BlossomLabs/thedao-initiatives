@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Lock, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import Identity from "~/components/wallet/Identity";
 import { QaChip } from "~/components/ui/Badge";
 import type { AdminReview } from "~/hooks/use-admin-ratings";
@@ -7,11 +7,13 @@ import { errorMessage } from "~/lib/api";
 import { ago } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import { StarRow } from "./Stars";
+import { REVIEW_LABEL } from "~/lib/reviewer";
 
 /**
- * A private admin review among the comments: only admins ever get it. An
- * amber edge and a lock set it apart from the public entries; one a newer
- * review from the same admin replaced is dimmed, since it no longer counts.
+ * A private admin review among the comments: only admins ever get it, but it
+ * reads as it will once reviews are public (no lock, no "only admins"). An
+ * amber edge sets it apart from the comments; one a newer review from the same
+ * admin replaced is dimmed, since it no longer counts.
  */
 export default function ReviewCard(
   { r, mine, onDelete }: { r: AdminReview; mine: boolean; onDelete: () => Promise<void> },
@@ -28,9 +30,7 @@ export default function ReviewCard(
     >
       <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
         <Identity address={r.address} size={24} />
-        <QaChip>
-          <Lock className="size-3" aria-hidden="true" />Admin review
-        </QaChip>
+        <QaChip>{REVIEW_LABEL}</QaChip>
         <StarRow value={r.stars} />
         <span className="small dim">{ago(r.createdAt)}</span>
       </div>
@@ -40,9 +40,7 @@ export default function ReviewCard(
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3 text-[12px] text-muted">
-        <span>
-          {r.current ? "Only admins see this." : "Replaced by a newer review: it no longer counts."}
-        </span>
+        {!r.current && <span>Replaced by a newer review: it no longer counts.</span>}
         {mine && (
           <button
             type="button"

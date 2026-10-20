@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { COMMENT_BODY_MAX, COMMENT_NAME_MAX } from "@shared/comments";
+import { goRate } from "~/components/ratings/rate-here";
 import Composer from "./Composer";
 
 vi.mock("~/context/wallet", () => ({
@@ -63,10 +64,10 @@ it("picking stars turns the box into a private review: says so, text optional", 
   render(<Composer onPost={onPost} onReview={onReview} />);
   expect(screen.getByRole("button", { name: "Comment" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("radio", { name: "4 stars" }));
-  expect(screen.getByText("Only admins will see this review. The text is optional."))
-    .toBeInTheDocument();
+  expect(screen.getByText("Admin review")).toBeInTheDocument();
+  expect(screen.getByPlaceholderText("Why this rating? (optional)")).toBeInTheDocument();
   expect(screen.queryByPlaceholderText("Your name")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Post private review" }));
+  fireEvent.click(screen.getByRole("button", { name: "Post review" }));
   expect(onReview).toHaveBeenCalledWith(4, "");
   expect(onPost).not.toHaveBeenCalled();
   expect(await screen.findByText("Review saved. Your latest review is your rating."))
@@ -81,5 +82,40 @@ it("clicking the picked star clears it, back to a public comment", () => {
   fireEvent.keyDown(two, { key: "ArrowRight" });
   expect(screen.getByRole("radio", { name: "3 stars" })).toHaveAttribute("aria-checked", "true");
   fireEvent.click(screen.getByRole("radio", { name: "3 stars" }));
+  expect(screen.getByRole("button", { name: "Comment" })).toBeInTheDocument();
+});
+
+it("the side card's Rate it scrolls here, then focuses the stars and outlines them once", () => {
+  vi.useFakeTimers();
+  const scroll = vi.fn();
+  Element.prototype.scrollIntoView = scroll;
+  render(<Composer onPost={vi.fn()} onReview={vi.fn()} />);
+  const one = screen.getByRole("radio", { name: "1 star" });
+  const rings = () => screen.getByRole("radiogroup").querySelectorAll(".animate-star-ring");
+  expect(rings()).toHaveLength(0);
+  act(() => goRate());
+  // Smooth, unless motion is off (as in the tests).
+  expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ block: "center" }));
+  // Not before the scroll ends.
+  expect(one).not.toHaveFocus();
+  act(() => globalThis.dispatchEvent(new Event("scrollend")));
+  expect(one).toHaveFocus();
+  // The arrow, then one outline per star.
+  expect(document.querySelector(".animate-arrow-fade")).not.toBeNull();
+  expect(rings()).toHaveLength(5);
+  vi.useRealTimers();
+});
+
+it("Undo rating takes a review back to a public comment, keeping the text", () => {
+  render(<Composer onPost={vi.fn()} onReview={vi.fn()} />);
+  // Only once there are stars.
+  expect(screen.queryByRole("button", { name: "Undo rating" })).toBeNull();
+  fireEvent.click(screen.getByRole("radio", { name: "4 stars" }));
+  const box = screen.getByPlaceholderText("Why this rating? (optional)");
+  fireEvent.change(box, { target: { value: "Looks solid" } });
+  fireEvent.click(screen.getByRole("button", { name: "Undo rating" }));
+  expect(screen.getByRole("radio", { name: "4 stars" })).toHaveAttribute("aria-checked", "false");
+  expect(screen.getByText("Join the discussion")).toBeInTheDocument();
+  expect(screen.getByPlaceholderText("Add a comment")).toHaveValue("Looks solid");
   expect(screen.getByRole("button", { name: "Comment" })).toBeInTheDocument();
 });

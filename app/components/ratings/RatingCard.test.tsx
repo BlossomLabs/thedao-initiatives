@@ -1,50 +1,45 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { RatingSummary } from "@shared/ratings";
+import { RATE_HERE } from "./rate-here";
 import RatingCard from "./RatingCard";
 
-const postReview = vi.fn();
 let summary: RatingSummary | undefined;
 vi.mock("~/hooks/use-admin-ratings", () => ({
-  usePostReview: () => postReview,
   useReviews: () => ({ summary }),
 }));
 
-afterEach(() => {
-  cleanup();
-  postReview.mockReset();
-});
+afterEach(cleanup);
 
 // 4 and 5; the viewer's is the 4.
 const rated: RatingSummary = { avg: 4.5, count: 2, dist: [0, 0, 0, 1, 1], mine: 4 };
 
-it("rates in the side card: changed stars bring Write review and Send, and move the average", async () => {
+it("shows the bars and yours; Change sends the viewer to the comment box to rate", () => {
   summary = rated;
-  postReview.mockResolvedValue(undefined);
+  const go = vi.fn();
+  globalThis.addEventListener(RATE_HERE, go);
   render(<RatingCard initiativeId="i1" canRate />);
-  expect(screen.queryByRole("link", { name: "Change" })).toBeNull();
   expect(screen.getByText("4.5")).toBeInTheDocument();
-  expect(screen.getByRole("radio", { name: "4 stars" })).toHaveAttribute("aria-checked", "true");
-  // Nothing to send until the stars change.
+  expect(screen.getByRole("img", { name: "4 of 5 stars" })).toBeInTheDocument();
+  // The page rates in one place: nothing to pick or send here.
+  expect(screen.queryByRole("radiogroup")).toBeNull();
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
-  expect(screen.queryByRole("button", { name: "Write review" })).toBeNull();
-  fireEvent.click(screen.getByRole("radio", { name: "2 stars" }));
-  // (5 + 2) / 2, before it is saved.
-  expect(screen.getByText("3.5")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Write review" }));
-  const box = screen.getByPlaceholderText("Why this rating? (optional)");
-  expect(box).toHaveFocus();
-  fireEvent.change(box, { target: { value: "Vague milestones" } });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  await waitFor(() => expect(postReview).toHaveBeenCalledWith("i1", 2, "Vague milestones"));
-  await waitFor(() => expect(screen.queryByPlaceholderText(/Why this rating/)).toBeNull());
+  fireEvent.click(screen.getByRole("link", { name: "Change" }));
+  expect(go).toHaveBeenCalledOnce();
+  globalThis.removeEventListener(RATE_HERE, go);
+});
+
+it("not rated yet: Rate it", () => {
+  summary = { avg: 0, count: 0, dist: [0, 0, 0, 0, 0], mine: null };
+  render(<RatingCard initiativeId="i1" canRate />);
+  expect(screen.getByText("Not rated")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Rate it" })).toHaveAttribute("href", "#reviews");
 });
 
 it("archived: the bars and your rating, nothing to click", () => {
   summary = rated;
   render(<RatingCard initiativeId="i1" canRate={false} />);
-  expect(screen.queryByRole("radiogroup")).toBeNull();
-  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  expect(screen.queryByRole("link")).toBeNull();
   expect(screen.getByText(/Your rating/)).toBeInTheDocument();
 });
 

@@ -2,7 +2,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { ADMIN, harness, PLAIN } from "./app-helpers.ts";
 import { BACKUP_PREFIXES } from "../services/backup.ts";
-import { averageWith, type RatingSummary, summaryWith } from "../../shared/ratings.ts";
+import { averageWith, type RatingSummary } from "../../shared/ratings.ts";
 
 interface ReviewJson {
   id: string;
@@ -155,16 +155,4 @@ Deno.test("ratings: the average as it will be with the viewer's pick", () => {
   // Not rated yet: one more.
   assertEquals(averageWith({ ...s, mine: null }, 3), 4);
   assertEquals(averageWith({ avg: 0, count: 0, dist: [0, 0, 0, 0, 0], mine: null }, 5), 5);
-});
-
-Deno.test("ratings: the whole summary with the viewer's pick, their old one out of the bars", () => {
-  const s: RatingSummary = { avg: 4.5, count: 2, dist: [0, 0, 0, 1, 1], mine: 4 };
-  assertEquals(summaryWith(s, null), s);
-  assertEquals(summaryWith(s, 2), { avg: 3.5, count: 2, dist: [0, 1, 0, 0, 1], mine: 2 });
-  assertEquals(summaryWith({ ...s, mine: null }, 3), {
-    avg: 4,
-    count: 3,
-    dist: [0, 0, 1, 1, 1],
-    mine: 3,
-  });
 });

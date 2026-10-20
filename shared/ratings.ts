@@ -45,18 +45,3 @@ export function averageWith(summary: RatingSummary, stars: Stars | null): number
   const count = summary.count + (summary.mine ? 0 : 1);
   return Math.round((sum / count) * 10) / 10;
 }
-
-/** The whole summary as it will be once the viewer's rating is `stars` (their
- * old one out of the bars); null leaves it as it is. */
-export function summaryWith(summary: RatingSummary, stars: Stars | null): RatingSummary {
-  if (stars === null) return summary;
-  const dist = [...summary.dist] as RatingSummary["dist"];
-  if (summary.mine) dist[summary.mine - 1]--;
-  dist[stars - 1]++;
-  return {
-    avg: averageWith(summary, stars),
-    count: summary.count + (summary.mine ? 0 : 1),
-    dist,
-    mine: stars,
-  };
-}

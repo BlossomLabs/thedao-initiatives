@@ -8,6 +8,7 @@ import type { Card } from "~/lib/api-types";
 import { CATEGORIES, categoryOf } from "~/lib/categories";
 import { plural } from "~/lib/format";
 import type { RatingSummary } from "@shared/ratings";
+import { REVIEWER } from "~/lib/reviewer";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
 export const STATUSES = ["all", "open", "qualified", "funded"] as const;
@@ -259,7 +260,7 @@ export function groupByRating(
   const sections: Omit<RatingGroup, "cards">[] = sort === "rating-avg"
     ? [
       ...AVG_BANDS.map(({ key, label, hint }) => ({ key, label, hint, stars: null })),
-      { key: "none", label: "Not rated yet", hint: "No admin rated these", stars: null },
+      { key: "none", label: "Not rated yet", hint: `No ${REVIEWER} rated these`, stars: null },
     ]
     : [
       ...[5, 4, 3, 2, 1].map((n) => ({

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { Check, Loader2, PencilLine, Send } from "lucide-react";
+import { Loader2, PencilLine, Send } from "lucide-react";
 import { EASE, useInstant } from "~/components/ui/Reveal";
 import { cn } from "~/lib/utils";
 import { errorMessage } from "~/lib/api";
@@ -11,9 +11,9 @@ import { inputMax, tooLong } from "@shared/draft/mod";
 import type { RatingSummary, Stars } from "@shared/ratings";
 
 /**
- * A rating being made, on the board or the initiative's side card: the
+ * A rating being made on the board, under the card or row: the
  * viewer's stars (from their current rating), the optional review text, and
- * the submit. Both post the same private review as the comment box.
+ * the submit. It posts the same private review as the comment box.
  */
 export function useRatingDraft(
   { initiativeId, summary, onSaved }: {
@@ -100,52 +100,55 @@ export function ReviewText({ draft, className }: { draft: Draft; className?: str
 const BTN =
   "inline-flex h-8 flex-none cursor-pointer items-center gap-1.5 rounded-lg px-3 font-inter-tight text-[12.5px] font-bold transition-all duration-150 active:scale-[.97] disabled:cursor-default disabled:opacity-40 disabled:active:scale-100";
 
-/** [Write review] (until the text is open) and [Send] (once there are stars). */
+/** [Write review], a toggle (lit while the text is open; folding it keeps the
+ * text for next time), and [Send] (once there are stars). */
 export function RatingButtons(
-  { draft, saved = false, iconWrite = false }: {
+  { draft, iconWrite = false, iconSend = false }: {
     draft: Draft;
-    /** Just sent: the button says so. */
-    saved?: boolean;
     /** Write review as its pencil alone (named for screen readers and on hover), for a narrow card. */
     iconWrite?: boolean;
+    /** Send as its arrow alone, likewise. */
+    iconSend?: boolean;
   },
 ) {
   return (
     <>
-      {!draft.writing && (
-        <button
-          type="button"
-          onClick={() => draft.setWriting(true)}
-          disabled={draft.busy}
-          aria-label={iconWrite ? "Write review" : undefined}
-          title={iconWrite ? "Write review" : undefined}
-          className={cn(
-            BTN,
-            "border border-edge2 bg-white/5 text-white hover:bg-white/10",
-            iconWrite && "w-8 justify-center px-0",
-          )}
-        >
-          <PencilLine className="size-3.5" aria-hidden="true" />
-          {!iconWrite && "Write review"}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => draft.setWriting(!draft.writing)}
+        disabled={draft.busy}
+        aria-pressed={draft.writing}
+        aria-label={iconWrite ? "Write review" : undefined}
+        title={iconWrite ? (draft.writing ? "Hide the review" : "Write review") : undefined}
+        className={cn(
+          BTN,
+          "border",
+          draft.writing
+            ? "border-[rgba(240,180,41,.45)] bg-[rgba(240,180,41,.12)] text-dao-amber hover:bg-[rgba(240,180,41,.2)]"
+            : "border-edge2 bg-white/5 text-white hover:bg-white/10",
+          iconWrite && "w-8 justify-center px-0",
+        )}
+      >
+        <PencilLine className="size-3.5" aria-hidden="true" />
+        {!iconWrite && "Write review"}
+      </button>
       <button
         type="button"
         onClick={() => void draft.submit()}
-        disabled={draft.busy || !draft.stars || saved}
+        disabled={draft.busy || !draft.stars}
         aria-busy={draft.busy}
+        aria-label={iconSend ? "Send" : undefined}
+        title={iconSend ? "Send" : undefined}
         className={cn(
           BTN,
           "border border-dao-green bg-dao-green text-[#0d1f14] hover:bg-[#6cc96a] disabled:hover:bg-dao-green",
-          saved && "disabled:opacity-100",
+          iconSend && "w-8 justify-center px-0",
         )}
       >
         {draft.busy
           ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-          : saved
-          ? <Check className="size-3.5" aria-hidden="true" />
           : <Send className="size-3.5" aria-hidden="true" />}
-        {saved ? "Saved" : "Send"}
+        {!iconSend && "Send"}
       </button>
     </>
   );

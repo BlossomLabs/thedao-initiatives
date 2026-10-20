@@ -114,31 +114,16 @@ it("each row carries its own funding bar, filled as far as it is funded", () => 
   expect(none.querySelector("[data-funding-fill]")).toBeNull(); // nothing raised: the bare track
 });
 
-/** The list's own width (it goes compact under 720px, whatever the window). */
-const listWidth = (width: number) => {
-  globalThis.ResizeObserver = class {
-    constructor(private cb: ResizeObserverCallback) {}
-    observe() {
-      this.cb([{ contentRect: { width } } as ResizeObserverEntry], this as never);
-    }
-    disconnect() {}
-    unobserve() {}
-  } as unknown as typeof ResizeObserver;
-};
-
-it("compact (a list under 720px, as on phones): tapping the amount shows its backers", async () => {
-  listWidth(617);
+it("compact (a list under 720px, as on phones): the backers after the amount, no popover", () => {
   mount();
-  const amount = [...screen.getAllByRole("listitem")[0].querySelectorAll("[tabindex='0']")]
-    .find((e) => e.textContent?.includes(" of $")) as HTMLElement;
-  expect(amount).toHaveTextContent("$100,000 of $200,000");
-  fireEvent.click(amount); // a tap on phones and touch screens
-  expect(await screen.findByText("3 backers", { selector: "div" })).toBeInTheDocument();
-  listWidth(1000);
+  const row = screen.getAllByRole("listitem")[0];
+  // Nobody pledged: how many, in the Backers column and on the compact line.
+  expect(within(row).getAllByText("3")).toHaveLength(2);
+  // The amount is plain text, nothing to tap.
+  expect(row.querySelector("[tabindex='0']")).toBeNull();
 });
 
 it("desktop: the amount is plain text, the Backers column says it", () => {
-  listWidth(1000);
   mount();
   const row = screen.getAllByRole("listitem")[0];
   const amount = [...row.querySelectorAll("span")].find((e) =>

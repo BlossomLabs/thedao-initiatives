@@ -262,6 +262,12 @@ describe("rating from the board (admins)", () => {
     expect(chip).toHaveAttribute("aria-expanded", "true");
     // Starts from the viewer's current rating.
     expect(screen.getByRole("radio", { name: "4 stars" })).toHaveAttribute("aria-checked", "true");
+    // The chip folds it again, its chevron turned up while open.
+    expect(chip.querySelector(".rotate-180")).not.toBeNull();
+    fireEvent.click(chip);
+    await waitFor(() => expect(screen.queryByRole("radiogroup")).toBeNull());
+    expect(chip.querySelector(".rotate-180")).toBeNull();
+    fireEvent.click(chip);
     // Donate takes the place of the rating form.
     fireEvent.click(screen.getByRole("button", { name: "Donate" }));
     await waitFor(() => expect(screen.queryByRole("radiogroup")).toBeNull());
@@ -275,8 +281,19 @@ describe("rating from the board (admins)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Write review" }));
     const box = screen.getByPlaceholderText("Why this rating? (optional)");
     expect(box).toHaveFocus();
-    expect(screen.queryByRole("button", { name: "Write review" })).toBeNull();
+    // The pencil stays, lit, to fold the text away again.
+    const write = screen.getByRole("button", { name: "Write review" });
+    expect(write).toHaveAttribute("aria-pressed", "true");
+    // Writing, Send is its icon alone and the stars get smaller, to keep their room.
+    expect(screen.getByRole("button", { name: "Send" })).not.toHaveTextContent("Send");
+    expect(screen.getByRole("radio", { name: "2 stars" })).toHaveClass("size-5");
     fireEvent.change(box, { target: { value: " Too vague " } });
+    // Folded and opened again, the text is still there.
+    fireEvent.click(write);
+    expect(screen.queryByPlaceholderText("Why this rating? (optional)")).toBeNull();
+    expect(write).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(write);
+    expect(screen.getByPlaceholderText("Why this rating? (optional)")).toHaveValue(" Too vague ");
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(postReview).toHaveBeenCalledWith("1", 2, "Too vague"));
     await waitFor(() => expect(chip).toHaveAttribute("aria-expanded", "false"));

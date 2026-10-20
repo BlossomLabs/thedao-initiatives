@@ -14,10 +14,12 @@ import {
   Pin,
   Shapes,
   Sparkles,
+  Star,
   Target,
+  UserCheck,
   Users,
 } from "lucide-react";
-import { type BoardSort, SORTS } from "~/lib/board-view";
+import { type BoardSort, RATING_SORTS, SORTS } from "~/lib/board-view";
 import { cn } from "~/lib/utils";
 
 const ITEMS: { value: string; label: string }[] = SORTS.map(([value, label]) => ({
@@ -25,6 +27,8 @@ const ITEMS: { value: string; label: string }[] = SORTS.map(([value, label]) => 
   label,
 }));
 const AI = { value: "ai", label: "AI matches" };
+/** Not offered to admins with the ratings, to keep the menu as long. */
+const RATING_FOR: readonly BoardSort[] = ["goal-asc", "backers"];
 
 /** One icon per sort, drawn in the menu like the Funding menu's glyphs. */
 const ICONS: Record<BoardSort | "ai", LucideIcon> = {
@@ -37,6 +41,8 @@ const ICONS: Record<BoardSort | "ai", LucideIcon> = {
   "goal-asc": ArrowUpNarrowWide,
   "goal-desc": ArrowDownWideNarrow,
   category: Shapes,
+  "rating-avg": Star,
+  "rating-mine": UserCheck,
 };
 
 /**
@@ -45,16 +51,25 @@ const ICONS: Record<BoardSort | "ai", LucideIcon> = {
  * already in the URL, hands the order back to the sort.
  */
 export default function SortSelect(
-  { sort, ai, featured = true, onSort, className }: {
+  { sort, ai, featured = true, rated = false, onSort, className }: {
     sort: BoardSort;
     ai: boolean;
     /** Whether anything is featured; without, the Featured sort is not offered. */
     featured?: boolean;
+    /** An admin with the ratings: the rating sorts are offered. */
+    rated?: boolean;
     onSort: (s: BoardSort) => void;
     className?: string;
   },
 ) {
-  const items = featured ? ITEMS : ITEMS.filter((s) => s.value !== "recommended");
+  const items = ITEMS.filter((s) =>
+    (featured || s.value !== "recommended") &&
+    (rated
+      // The two rating sorts take the place of the least used ones (still
+      // shown while a URL has one on).
+      ? !RATING_FOR.includes(s.value as BoardSort) || s.value === sort
+      : !RATING_SORTS.includes(s.value as BoardSort))
+  );
   return (
     <Select
       value={ai ? "ai" : sort}

@@ -11,6 +11,7 @@ import {
   facetCounts,
   featuredIds,
   groupByPrimary,
+  groupByRating,
   hasFeatured,
   isFiltered,
   readView,
@@ -321,5 +322,61 @@ describe("Qualified for the vote filter", () => {
     const v = { ...DEFAULT_VIEW, status: "qualified" as const };
     expect(applyView([below, past], v).map((c) => c.initiative.title)).toEqual(["Past"]);
     expect(applyView([card("Off")], v)).toHaveLength(1);
+  });
+});
+
+describe("admin ratings", () => {
+  const [a, b, c] = [card("Alpha"), card("Bravo"), card("Charlie")];
+  const cards = [a, b, c];
+  const summary = (avg: number, count: number, mine: 1 | 2 | 3 | 4 | 5 | null) => ({
+    avg,
+    count,
+    dist: [0, 0, 0, 0, 0] as [number, number, number, number, number],
+    mine,
+  });
+  // Alpha: 3.5 from 2, mine 5. Bravo: 4.8 from 3, not mine. Charlie: nobody.
+  const ratings = {
+    [a.initiative.id]: summary(3.5, 2, 5),
+    [b.initiative.id]: summary(4.8, 3, null),
+  };
+  const titles = (l: Card[]) => l.map((x) => x.initiative.title);
+
+  it("groups the rating sorts into sections, best first, the unrated last", () => {
+    const sections = (sort: "rating-avg" | "rating-mine") =>
+      groupByRating(sortCards(cards, sort, ratings), sort, ratings).map((
+        g,
+      ) => [g.label, titles(g.cards)]);
+    expect(sections("rating-avg")).toEqual([
+      ["Loved", ["Bravo"]],
+      ["Liked", ["Alpha"]],
+      ["Not rated yet", ["Charlie"]],
+    ]);
+    expect(sections("rating-mine")).toEqual([
+      ["5 stars", ["Alpha"]],
+      ["Not rated by me", ["Bravo", "Charlie"]],
+    ]);
+    // The bands' edges: 4.5 is Loved, 1.4 is Not for us.
+    const edge = {
+      [a.initiative.id]: summary(4.5, 1, null),
+      [b.initiative.id]: summary(1.4, 1, null),
+    };
+    expect(groupByRating([a, b], "rating-avg", edge).map((g) => g.key)).toEqual([
+      "loved",
+      "not-for-us",
+    ]);
+  });
+
+  it("sorts by the average or mine, unrated last", () => {
+    expect(titles(sortCards(cards, "rating-avg", ratings))).toEqual(["Bravo", "Alpha", "Charlie"]);
+    expect(titles(sortCards(cards, "rating-mine", ratings))).toEqual([
+      "Alpha",
+      "Bravo",
+      "Charlie",
+    ]);
+  });
+
+  it("without the ratings (not an admin) the rating sorts fall back", () => {
+    expect(sortFor("rating-avg", true)).toBe(DEFAULT_VIEW.sort);
+    expect(sortFor("rating-avg", true, true)).toBe("rating-avg");
   });
 });

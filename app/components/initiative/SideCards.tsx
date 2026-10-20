@@ -10,6 +10,7 @@ import type { Initiative, InitiativePage, Summary } from "~/lib/api-types";
 import { openDiscussion } from "~/lib/discussion";
 import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
 import { WHAT_NEXT } from "~/data/what-next";
+import RatingCard from "~/components/ratings/RatingCard";
 
 /** What the donate card says while an initiative has no donation address yet. */
 export const DONATE_SETUP = "This initiative's donation address is being set up. Check back soon.";
@@ -22,13 +23,15 @@ const noDonations = (r: Initiative) => r.status === "pending" ? DONATE_PENDING :
  * renders them from the API, the submit preview from the draft.
  */
 export function PublicCards(
-  { r, summary, links, donate = noDonations(r), placeholder = false }: {
+  { r, summary, links, donate = noDonations(r), rating, placeholder = false }: {
     r: Initiative;
     summary: Summary;
     /** The links of the text on screen; defaults to the initiative's. */
     links?: string[];
     /** The donate card's body: the widget, or a line saying why there is none. */
     donate?: React.ReactNode;
+    /** The rating card, under the key facts (only admins get one for now). */
+    rating?: React.ReactNode;
     placeholder?: boolean;
   },
 ) {
@@ -41,6 +44,7 @@ export function PublicCards(
       {placeholder
         ? <Skeleton className="h-28" />
         : <KeyFacts r={r} summary={summary} links={links} />}
+      {rating}
       {r.discourseUrl && (
         <div className="panel border-[rgba(90,200,250,.35)]">
           <span className="k">Join the discussion</span>
@@ -98,6 +102,9 @@ export default function SideCards(
         summary={page.summary}
         links={links}
         placeholder={placeholder}
+        rating={(r.status === "approved" || r.status === "archived") && (
+          <RatingCard initiativeId={r.id} canRate={r.status === "approved"} />
+        )}
         donate={page.donationsEnabled
           ? (
             <DonateWidget

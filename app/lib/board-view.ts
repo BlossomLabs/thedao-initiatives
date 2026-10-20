@@ -7,6 +7,7 @@
 import type { Card } from "~/lib/api-types";
 import { CATEGORIES, categoryOf } from "~/lib/categories";
 import { plural } from "~/lib/format";
+import type { RatingSummary } from "@shared/ratings";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
 export const STATUSES = ["all", "open", "qualified", "funded"] as const;
@@ -19,7 +20,11 @@ export const SORTS = [
   ["goal-asc", "Goal: low to high"],
   ["goal-desc", "Goal: high to low"],
   ["category", "By category"],
+  ["rating-avg", "Top rated"],
+  ["rating-mine", "My rating"],
 ] as const;
+/** The sorts only admins are offered: they need the admin ratings. */
+export const RATING_SORTS: readonly BoardSort[] = ["rating-avg", "rating-mine"];
 export const VIEWS = ["cards", "list"] as const;
 /** Where this device remembers the layout it used last. */
 export const LAYOUT_KEY = "thedao:board-layout";
@@ -28,6 +33,8 @@ export type BoardType = typeof TYPES[number];
 export type BoardStatus = typeof STATUSES[number];
 export type BoardSort = typeof SORTS[number][0];
 export type BoardViewMode = typeof VIEWS[number];
+/** The admin ratings by initiative id (GET /api/admin/ratings). */
+export type Ratings = Record<string, RatingSummary>;
 
 export interface BoardView {
   type: BoardType;
@@ -154,7 +161,9 @@ export function redrawCategoryOrder(random?: () => number) {
   order = shuffleCategories(random);
 }
 
-const KEYS: Record<Exclude<BoardSort, "category">, ((c: Card) => number) | null> = {
+type SortKey = (c: Card, ratings: Ratings) => number;
+
+const KEYS: Record<Exclude<BoardSort, "category">, SortKey | null> = {
   recommended: null,
   closest: (c) => -c.pct,
   "least-left": left,
@@ -162,24 +171,31 @@ const KEYS: Record<Exclude<BoardSort, "category">, ((c: Card) => number) | null>
   backers: (c) => -c.backers,
   "goal-asc": (c) => c.initiative.goalUsd,
   "goal-desc": (c) => -c.initiative.goalUsd,
+  // Unrated last (1, after every -stars).
+  "rating-avg": (c, r) => r[c.initiative.id]?.count ? -r[c.initiative.id].avg : 1,
+  "rating-mine": (c, r) => -(r[c.initiative.id]?.mine ?? -1),
 };
 
 /** Sorted copy; ties keep the Recommended order the cards arrived in. */
-export function sortCards(cards: Card[], sort: BoardSort): Card[] {
-  let key: ((c: Card) => number) | null;
+export function sortCards(cards: Card[], sort: BoardSort, ratings: Ratings = {}): Card[] {
+  let key: SortKey | null;
   if (sort === "category") {
     const order = categoryOrder();
     key = (c) => order.indexOf(primary(c));
   } else key = KEYS[sort];
   if (!key) return [...cards];
-  return cards.map((c, i) => [c, key(c), i] as const)
+  return cards.map((c, i) => [c, key(c, ratings), i] as const)
     .sort((a, b) => a[1] - b[1] || a[2] - b[2])
     .map(([c]) => c);
 }
 
 /** The cards the view shows, in its order. */
-export const applyView = (cards: Card[], v: BoardView, watched?: string[]): Card[] =>
-  sortCards(cards.filter((c) => matches(c, v, undefined, watched)), v.sort);
+export const applyView = (
+  cards: Card[],
+  v: BoardView,
+  watched?: string[],
+  ratings?: Ratings,
+): Card[] => sortCards(cards.filter((c) => matches(c, v, undefined, watched)), v.sort, ratings);
 
 /** Live counts for the controls: each facet counted with the other filters applied. */
 export function facetCounts(cards: Card[], v: BoardView, watched?: string[]) {
@@ -211,6 +227,61 @@ export function groupByPrimary(
       cards: groups.get(slug)!,
       raised: groups.get(slug)!.reduce((sum, c) => sum + c.summary.total, 0),
     }));
+}
+
+/** "Top rated": the bands the admin average falls in, best first (the
+ * average is rounded to one decimal, so 4.45 is already 4.5). */
+export const AVG_BANDS = [
+  { key: "loved", label: "Loved", min: 4.5, hint: "Average 4.5★ and up" },
+  { key: "liked", label: "Liked", min: 3.5, hint: "Average 3.5 to 4.4★" },
+  { key: "okay", label: "Okay", min: 2.5, hint: "Average 2.5 to 3.4★" },
+  { key: "unsure", label: "Unsure", min: 1.5, hint: "Average 1.5 to 2.4★" },
+  { key: "not-for-us", label: "Not for us", min: 0, hint: "Average under 1.5★" },
+] as const;
+
+export interface RatingGroup {
+  key: string;
+  label: string;
+  /** What the section covers, after its label ("" for none). */
+  hint: string;
+  /** "My rating": the stars every card in it got; null otherwise. */
+  stars: number | null;
+  cards: Card[];
+}
+
+/** "Top rated" and "My rating": sections by the stars, best first, the
+ * unrated last. The cards keep their order within each. */
+export function groupByRating(
+  cards: Card[],
+  sort: "rating-avg" | "rating-mine",
+  ratings: Ratings,
+): RatingGroup[] {
+  const sections: Omit<RatingGroup, "cards">[] = sort === "rating-avg"
+    ? [
+      ...AVG_BANDS.map(({ key, label, hint }) => ({ key, label, hint, stars: null })),
+      { key: "none", label: "Not rated yet", hint: "No admin rated these", stars: null },
+    ]
+    : [
+      ...[5, 4, 3, 2, 1].map((n) => ({
+        key: String(n),
+        label: plural(n, "star"),
+        hint: "",
+        stars: n,
+      })),
+      { key: "none", label: "Not rated by me", hint: "", stars: null },
+    ];
+  const sectionOf = (c: Card): string => {
+    const r = ratings[c.initiative.id];
+    if (sort === "rating-mine") return r?.mine ? String(r.mine) : "none";
+    if (!r?.count) return "none";
+    return AVG_BANDS.find((b) => r.avg >= b.min)!.key;
+  };
+  const by = new Map<string, Card[]>();
+  for (const c of cards) {
+    const k = sectionOf(c);
+    by.set(k, [...(by.get(k) ?? []), c]);
+  }
+  return sections.filter((s) => by.has(s.key)).map((s) => ({ ...s, cards: by.get(s.key)! }));
 }
 
 export const STATUS_LABELS = {
@@ -248,6 +319,10 @@ export const hasFeatured = (cards: Card[]): boolean => featuredIds(cards).size >
 
 /** The sort the board uses: Featured (the server's order, pins first) only
  * while something is featured; a URL that still asks for it otherwise gets
- * closest to funded. */
-export const sortFor = (sort: BoardSort, featured: boolean): BoardSort =>
-  sort === "recommended" && !featured ? "closest" : sort;
+ * closest to funded. The rating sorts need the admin ratings (`rated`). */
+export const sortFor = (sort: BoardSort, featured: boolean, rated = false): BoardSort =>
+  sort === "recommended" && !featured
+    ? "closest"
+    : RATING_SORTS.includes(sort) && !rated
+    ? DEFAULT_VIEW.sort
+    : sort;

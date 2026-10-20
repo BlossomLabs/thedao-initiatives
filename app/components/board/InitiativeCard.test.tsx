@@ -1,11 +1,13 @@
 import { MemoryRouter } from "react-router";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import InitiativeCard, { DonateStandIn } from "./InitiativeCard";
 import type { Card } from "~/lib/api-types";
 
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
 vi.mock("~/components/donate/DonateWidget", () => ({ default: () => <p>donate widget</p> }));
+const postReview = vi.fn();
+vi.mock("~/hooks/use-admin-ratings", () => ({ usePostReview: () => postReview }));
 vi.mock("~/components/ui/Money", () => ({ default: ({ value }: { value: number }) => value }));
 
 const card = (over: Partial<Card>): Card => ({
@@ -235,5 +237,64 @@ describe("vote eligibility", () => {
       "10.0% funded. $150 to qualify for TheDAO's vote",
     );
     expect(screen.queryByText(/Qualified for the vote|to qualify$/)).toBeNull();
+  });
+});
+
+describe("rating from the board (admins)", () => {
+  const rated = { avg: 4.5, count: 2, dist: [0, 0, 0, 1, 1] as [0, 0, 0, 1, 1], mine: 4 as const };
+  const mountRated = (summary?: typeof rated) =>
+    render(
+      <MemoryRouter>
+        <InitiativeCard
+          card={card({ donationsEnabled: true })}
+          tokensOk
+          rating={{ summary }}
+        />
+      </MemoryRouter>,
+    );
+
+  it("the chip unfolds the form under the card, like Donate, one panel at a time", async () => {
+    postReview.mockReset().mockResolvedValue(undefined);
+    mountRated(rated);
+    const chip = screen.getByRole("button", { name: /Admin average 4.5 from 2 admins/ });
+    expect(chip).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(chip);
+    expect(chip).toHaveAttribute("aria-expanded", "true");
+    // Starts from the viewer's current rating.
+    expect(screen.getByRole("radio", { name: "4 stars" })).toHaveAttribute("aria-checked", "true");
+    // Donate takes the place of the rating form.
+    fireEvent.click(screen.getByRole("button", { name: "Donate" }));
+    await waitFor(() => expect(screen.queryByRole("radiogroup")).toBeNull());
+    fireEvent.click(chip);
+    expect(screen.getByRole("button", { name: "Donate" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Average 4.5 of 5" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "2 stars" }));
+    // The average counts the new pick in place of the old one: (5 + 2) / 2.
+    expect(screen.getByRole("img", { name: "Average 3.5 of 5" })).toBeInTheDocument();
+    // Write review opens the text, focused, in the stars' place.
+    fireEvent.click(screen.getByRole("button", { name: "Write review" }));
+    const box = screen.getByPlaceholderText("Why this rating? (optional)");
+    expect(box).toHaveFocus();
+    expect(screen.queryByRole("button", { name: "Write review" })).toBeNull();
+    fireEvent.change(box, { target: { value: " Too vague " } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(postReview).toHaveBeenCalledWith("1", 2, "Too vague"));
+    await waitFor(() => expect(chip).toHaveAttribute("aria-expanded", "false"));
+  });
+
+  it("Send waits for stars, sends stars alone, and an error keeps the form open", async () => {
+    postReview.mockReset().mockRejectedValue(
+      new Error("only initiatives on the board can be rated"),
+    );
+    mountRated();
+    fireEvent.click(screen.getByRole("button", { name: /No admin rated it yet/ }));
+    expect(screen.getByRole("img", { name: "No ratings yet" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("radio", { name: "5 stars" }));
+    expect(screen.getByRole("img", { name: "Average 5 of 5" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText(/only initiatives on the board/i)).toBeInTheDocument();
+    expect(postReview).toHaveBeenCalledWith("1", 5, "");
+    expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
   });
 });

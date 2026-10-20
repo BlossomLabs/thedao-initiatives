@@ -6,6 +6,7 @@ import { donationsRepo } from "./donations.ts";
 import { commentsRepo } from "./comments.ts";
 import { profilesRepo } from "./profiles.ts";
 import { watchlistsRepo } from "./watchlists.ts";
+import { reviewsRepo } from "./reviews.ts";
 import { sessionsRepo } from "./sessions.ts";
 import { rateLimiter, type RateLimiterOptions } from "./ratelimit.ts";
 import type { ReadOptions } from "./keys.ts";
@@ -44,6 +45,7 @@ export function createDb(
     comments: commentsRepo(kv, now, read),
     profiles: profilesRepo(kv, now),
     watchlists: watchlistsRepo(kv, now),
+    reviews: reviewsRepo(kv, now),
     sessions: sessionsRepo(kv, now),
     meta: metaRepo(kv, now, read),
     snapshots: snapshotsRepo(kv, now, read),

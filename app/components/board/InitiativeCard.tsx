@@ -23,6 +23,8 @@ import type { Card } from "~/lib/api-types";
 import { pctText, plural, usd } from "~/lib/format";
 import { usePrefetchInitiative } from "~/hooks/use-initiative";
 import { cn } from "~/lib/utils";
+import RatingChip, { RatingForm } from "~/components/ratings/RatingChip";
+import type { RatingSummary } from "@shared/ratings";
 
 /**
  * Figma card: 16px radius, 24px padding, white/5 fill, white/10 border; Inter
@@ -112,6 +114,7 @@ export default function InitiativeCard({
   onDonated,
   style,
   watch,
+  rating,
   vote,
 }: {
   card: Card;
@@ -119,6 +122,8 @@ export default function InitiativeCard({
   vote?: VoteSettings;
   /** Watchlist state in this browser; omitted = no button. */
   watch?: { on: boolean; toggle: () => void };
+  /** Admins only: the admin rating (summary undefined = nobody rated); omitted = no chip. */
+  rating?: { summary?: RatingSummary };
   tokensOk: boolean;
   aiTop?: boolean;
   aiScore?: number;
@@ -128,7 +133,9 @@ export default function InitiativeCard({
   style?: React.CSSProperties;
 }) {
   const { initiative: r, summary, pct, backers, logos, funded, donationsEnabled } = card;
-  const [open, setOpen] = useState(false);
+  // One panel under the actions at a time: Donate, or (admins) the rating form.
+  const [panel, setPanel] = useState<"donate" | "rate" | null>(null);
+  const toggle = (p: "donate" | "rate") => setPanel((o) => o === p ? null : p);
   const prefetch = usePrefetchInitiative(r.slug);
   const zero = !summary.total;
   // With the vote display on, the % turns green at the vote floor, where the tick is.
@@ -228,10 +235,10 @@ export default function InitiativeCard({
             onFocus={preloadDonate}
             onClick={() => {
               preloadDonate();
-              setOpen((o) => !o);
+              toggle("donate");
             }}
           >
-            {open ? "Close" : "Donate"}
+            {panel === "donate" ? "Close" : "Donate"}
           </Button>
         )}
         <LinkButton
@@ -244,7 +251,24 @@ export default function InitiativeCard({
         >
           Details <ArrowRight className="size-3.5" />
         </LinkButton>
-        {watch && <WatchlistButton on={watch.on} onToggle={watch.toggle} title={r.title} />}
+        {watch && (
+          <WatchlistButton
+            on={watch.on}
+            onToggle={watch.toggle}
+            title={r.title}
+            // As big as the rating star beside it.
+            iconSize="size-3.5"
+          />
+        )}
+        {watch && rating && <span className="h-4 w-px flex-none bg-white/15" aria-hidden="true" />}
+        {rating && (
+          <RatingChip
+            summary={rating.summary}
+            open={panel === "rate"}
+            onToggle={() => toggle("rate")}
+            controls={`rate-${r.id}`}
+          />
+        )}
         {logos.length > 0 && (
           // Right of the buttons; on a card too narrow for both, its own line, still right-aligned.
           <div className="ml-auto flex items-center gap-2">
@@ -256,7 +280,7 @@ export default function InitiativeCard({
           </div>
         )}
       </div>
-      <Reveal show={canDonate && open}>
+      <Reveal show={canDonate && panel === "donate"}>
         <div className="mt-3.5 border-t border-edge pt-3.5">
           <Suspense fallback={<DonateStandIn />}>
             <DonateWidget
@@ -268,6 +292,17 @@ export default function InitiativeCard({
           </Suspense>
         </div>
       </Reveal>
+      {rating && (
+        <Reveal show={panel === "rate"} id={`rate-${r.id}`}>
+          <div className="mt-3.5 border-t border-edge pt-3.5">
+            <RatingForm
+              initiativeId={r.id}
+              summary={rating.summary}
+              onClose={() => setPanel(null)}
+            />
+          </div>
+        </Reveal>
+      )}
     </div>
   );
 }

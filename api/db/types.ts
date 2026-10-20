@@ -1,4 +1,5 @@
 import type { Milestone, Sections } from "../../shared/draft/types.ts";
+import type { Stars } from "../../shared/ratings.ts";
 
 export type InitiativeStatus = "pending" | "approved" | "rejected" | "archived";
 export type InitiativeType = "rfp" | "grant";
@@ -173,6 +174,24 @@ export interface Comment {
 
 export interface Vote {
   value: 1 | -1;
+  at: number;
+}
+
+/** A private admin review (db/reviews.ts). */
+export interface Review {
+  id: string;
+  initiativeId: string;
+  address: string;
+  stars: Stars;
+  /** Optional: a review may be stars only. */
+  body: string;
+  createdAt: number;
+}
+
+/** An admin's current rating of one initiative: their latest review. */
+export interface Rating {
+  stars: Stars;
+  reviewId: string;
   at: number;
 }
 

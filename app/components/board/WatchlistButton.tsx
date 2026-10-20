@@ -3,11 +3,13 @@ import { cn } from "~/lib/utils";
 
 /** Add an initiative to this browser's watchlist (localStorage), for the Watchlist filter. */
 export default function WatchlistButton(
-  { on, onToggle, title, className }: {
+  { on, onToggle, title, className, iconSize = "size-4" }: {
     on: boolean;
     onToggle: () => void;
     title: string;
     className?: string;
+    /** The bookmark's size; a card matches its rating star. */
+    iconSize?: string;
   },
 ) {
   return (
@@ -23,7 +25,7 @@ export default function WatchlistButton(
         className,
       )}
     >
-      <Bookmark className="size-4" fill={on ? "currentColor" : "none"} aria-hidden="true" />
+      <Bookmark className={iconSize} fill={on ? "currentColor" : "none"} aria-hidden="true" />
     </button>
   );
 }

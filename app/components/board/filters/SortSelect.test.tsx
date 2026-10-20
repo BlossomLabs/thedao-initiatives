@@ -38,3 +38,13 @@ it("drops Featured when nothing is featured", async () => {
   await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(7));
   expect(screen.queryByRole("option", { name: "Featured" })).toBeNull();
 });
+
+it("with the ratings: Top rated and My rating in place of Goal low to high and Most backers", async () => {
+  render(<SortSelect sort="closest" ai={false} featured rated onSort={vi.fn()} />);
+  openSort();
+  await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(8));
+  expect(screen.getByRole("option", { name: "Top rated" })).toBeInTheDocument();
+  expect(screen.getByRole("option", { name: "My rating" })).toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: "Goal: low to high" })).toBeNull();
+  expect(screen.queryByRole("option", { name: "Most backers" })).toBeNull();
+});

@@ -114,27 +114,31 @@ it("each row carries its own funding bar, filled as far as it is funded", () => 
   expect(none.querySelector("[data-funding-fill]")).toBeNull(); // nothing raised: the bare track
 });
 
-const phoneScreen = (on: boolean) => {
-  globalThis.matchMedia = ((query: string) => ({
-    matches: on && query === "(max-width: 640px)",
-    addEventListener() {},
-    removeEventListener() {},
-  })) as unknown as typeof matchMedia;
+/** The list's own width (it goes compact under 720px, whatever the window). */
+const listWidth = (width: number) => {
+  globalThis.ResizeObserver = class {
+    constructor(private cb: ResizeObserverCallback) {}
+    observe() {
+      this.cb([{ contentRect: { width } } as ResizeObserverEntry], this as never);
+    }
+    disconnect() {}
+    unobserve() {}
+  } as unknown as typeof ResizeObserver;
 };
 
-it("phones: tapping the amount shows its backers, in the tooltip style", async () => {
-  phoneScreen(true);
+it("compact (a list under 720px, as on phones): tapping the amount shows its backers", async () => {
+  listWidth(617);
   mount();
   const amount = [...screen.getAllByRole("listitem")[0].querySelectorAll("[tabindex='0']")]
     .find((e) => e.textContent?.includes(" of $")) as HTMLElement;
   expect(amount).toHaveTextContent("$100,000 of $200,000");
   fireEvent.click(amount); // a tap on phones and touch screens
   expect(await screen.findByText("3 backers", { selector: "div" })).toBeInTheDocument();
-  phoneScreen(false);
+  listWidth(1000);
 });
 
 it("desktop: the amount is plain text, the Backers column says it", () => {
-  phoneScreen(false);
+  listWidth(1000);
   mount();
   const row = screen.getAllByRole("listitem")[0];
   const amount = [...row.querySelectorAll("span")].find((e) =>
@@ -150,14 +154,16 @@ it("desktop: the Backers column shows the pledgers' logos, and +N for the backer
   const { unmount } = mount({ cards: [withLogos(1, 4)] });
   let row = within(screen.getByRole("listitem"));
   expect(row.getAllByRole("img").map((i) => i.getAttribute("alt"))).toEqual(["A"]);
-  expect(row.getByText("+3")).toBeInTheDocument();
+  // The column, and the compact line's copy after the amount (hidden from screen readers:
+  // the amount already says how many backers).
+  expect(row.getAllByText("+3")).toHaveLength(2);
   expect(row.getByText("4 backers")).toHaveClass("sr-only");
   unmount();
   // four logos fill the column: with more backers than that, three and the rest as +N
   const second = mount({ cards: [withLogos(4, 6)] });
   row = within(screen.getByRole("listitem"));
   expect(row.getAllByRole("img")).toHaveLength(3);
-  expect(row.getByText("+3")).toBeInTheDocument();
+  expect(row.getAllByText("+3")).toHaveLength(2);
   second.unmount();
   // the logos are all the backers: no +N
   mount({ cards: [withLogos(4, 4)] });

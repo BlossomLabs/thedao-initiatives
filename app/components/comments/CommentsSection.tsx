@@ -23,6 +23,8 @@ import {
 } from "./api";
 import EntryCard from "./EntryCard";
 import Composer from "./Composer";
+import ReviewCard from "~/components/ratings/ReviewCard";
+import { type AdminReview, useReviews } from "~/hooks/use-admin-ratings";
 
 const PAGE = 20;
 
@@ -50,6 +52,8 @@ export default function CommentsSection({ initiativeId, slug, open }: {
     enabled: tokens.length > 0,
   });
   const [sort, setSort] = useState<"top" | "new">("top");
+  // Admins only: the private reviews, mixed into the thread below.
+  const reviews = useReviews(initiativeId);
   const [shown, setShown] = useState(PAGE);
 
   const entries = q.data?.entries ?? [];
@@ -83,6 +87,25 @@ export default function CommentsSection({ initiativeId, slug, open }: {
     });
     return l;
   }, [entries, sort, badge.data]);
+
+  // Newest: everything by date. Top score: the featured, then the reviews that
+  // count (newest first), then the rest, and the replaced reviews last.
+  type Item = { kind: "comment"; c: CommentEntry } | { kind: "review"; r: AdminReview };
+  const items = useMemo((): Item[] => {
+    const comments = list.map((c): Item => ({ kind: "comment", c }));
+    const rv = [...reviews.reviews].reverse().map((r): Item => ({ kind: "review", r }));
+    if (!rv.length) return comments;
+    if (sort === "new") {
+      const at = (i: Item) => (i.kind === "comment" ? i.c.createdAt : i.r.createdAt);
+      return [...comments, ...rv].sort((a, b) => at(b) - at(a));
+    }
+    const featured = comments.filter((i) => i.kind === "comment" && i.c.featured);
+    const rest = comments.filter((i) => i.kind === "comment" && !i.c.featured);
+    const current = rv.filter((i) => i.kind === "review" && i.r.current);
+    const replaced = rv.filter((i) => i.kind === "review" && !i.r.current);
+    return [...featured, ...current, ...rest, ...replaced];
+  }, [list, reviews.reviews, sort]);
+  const me = session?.address.toLowerCase();
 
   const held = (mine.data?.held ?? []).filter((h) => !entries.some((e) => e.id === h.id));
   const patch = (fn: (d: CommentsResponse) => CommentsResponse) =>
@@ -155,8 +178,8 @@ export default function CommentsSection({ initiativeId, slug, open }: {
 
   return (
     <section id="qa" className="mt-2">
-      <SectionHeading count={entries.length || undefined}>Comments</SectionHeading>
-      {entries.length > 1 && (
+      <SectionHeading count={items.length || undefined}>Comments</SectionHeading>
+      {items.length > 1 && (
         <div className="mb-3.5 inline-flex gap-0.5 rounded-full border border-white/10 bg-[rgba(9,18,30,.55)] p-1">
           {(["top", "new"] as const).map((s) => (
             <button
@@ -191,23 +214,34 @@ export default function CommentsSection({ initiativeId, slug, open }: {
           </button>
         </p>
       )}
-      {!entries.length && !held.length && q.isSuccess && (
+      {!items.length && !held.length && q.isSuccess && (
         <p className="text-muted">Be the first to ask about this initiative.</p>
       )}
-      {list.slice(0, shown).map((c) => (
-        <EntryCard
-          key={c.id}
-          c={c}
-          canVote={canVote}
-          isAdmin={isAdmin}
-          connected={isConnected}
-          onVote={onVote}
-          onReply={onReply}
-          onReport={onReport}
-          onAdmin={onAdmin}
-        />
-      ))}
-      {list.length > shown && (
+      {items.slice(0, shown).map((i) =>
+        i.kind === "review"
+          ? (
+            <ReviewCard
+              key={i.r.id}
+              r={i.r}
+              mine={i.r.address.toLowerCase() === me}
+              onDelete={() => reviews.remove(i.r.id)}
+            />
+          )
+          : (
+            <EntryCard
+              key={i.c.id}
+              c={i.c}
+              canVote={canVote}
+              isAdmin={isAdmin}
+              connected={isConnected}
+              onVote={onVote}
+              onReply={onReply}
+              onReport={onReport}
+              onAdmin={onAdmin}
+            />
+          )
+      )}
+      {items.length > shown && (
         <button
           type="button"
           className="btn btn-ghost"
@@ -234,7 +268,7 @@ export default function CommentsSection({ initiativeId, slug, open }: {
           </p>
         </div>
       ))}
-      {open && <Composer onPost={onPost} />}
+      {open && <Composer onPost={onPost} onReview={reviews.enabled ? reviews.post : undefined} />}
     </section>
   );
 }

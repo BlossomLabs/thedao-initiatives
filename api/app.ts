@@ -18,6 +18,7 @@ import { aiRoutes } from "./routes/ai.ts";
 import { supportRoutes } from "./routes/support.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { cspRoutes } from "./routes/csp.ts";
+import { reviewRoutes } from "./routes/reviews.ts";
 import { watchlistRoutes } from "./routes/watchlist.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { uploadRoutes } from "./routes/uploads.ts";
@@ -148,6 +149,7 @@ export function createApp(
   app.route("/api", aiRoutes(deps));
   app.route("/api", supportRoutes(deps));
   app.route("/api/admin/audit", auditRoutes(deps));
+  app.route("/api/admin", reviewRoutes(deps));
   app.route("/api/admin", adminRoutes(deps));
   app.route("/initiative", markdownRoutes(deps, feedCache));
 

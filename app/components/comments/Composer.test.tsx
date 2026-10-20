@@ -56,3 +56,30 @@ it("posts a comment exactly at the cap", () => {
   fireEvent.click(screen.getByRole("button", { name: "Comment" }));
   expect(onPost).toHaveBeenCalledWith("c".repeat(COMMENT_BODY_MAX), "Alice", "", false);
 });
+
+it("picking stars turns the box into a private review: says so, text optional", async () => {
+  const onPost = vi.fn();
+  const onReview = vi.fn().mockResolvedValue(undefined);
+  render(<Composer onPost={onPost} onReview={onReview} />);
+  expect(screen.getByRole("button", { name: "Comment" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("radio", { name: "4 stars" }));
+  expect(screen.getByText("Only admins will see this review. The text is optional."))
+    .toBeInTheDocument();
+  expect(screen.queryByPlaceholderText("Your name")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Post private review" }));
+  expect(onReview).toHaveBeenCalledWith(4, "");
+  expect(onPost).not.toHaveBeenCalled();
+  expect(await screen.findByText("Review saved. Your latest review is your rating."))
+    .toBeInTheDocument();
+});
+
+it("clicking the picked star clears it, back to a public comment", () => {
+  render(<Composer onPost={vi.fn()} onReview={vi.fn()} />);
+  const two = screen.getByRole("radio", { name: "2 stars" });
+  fireEvent.click(two);
+  expect(two).toHaveAttribute("aria-checked", "true");
+  fireEvent.keyDown(two, { key: "ArrowRight" });
+  expect(screen.getByRole("radio", { name: "3 stars" })).toHaveAttribute("aria-checked", "true");
+  fireEvent.click(screen.getByRole("radio", { name: "3 stars" }));
+  expect(screen.getByRole("button", { name: "Comment" })).toBeInTheDocument();
+});

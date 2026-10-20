@@ -1,8 +1,17 @@
 import type { AiSearchResult } from "../../shared/ai-search";
+import type { Card } from "~/lib/api-types";
 import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sparkles } from "lucide-react";
+import {
+  CircleQuestionMark,
+  Heart,
+  type LucideIcon,
+  Smile,
+  Sparkles,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react";
 import { Link, useSearchParams } from "react-router";
 import PageMain from "~/components/layout/PageMain";
 import SectionHeading from "~/components/layout/SectionHeading";
@@ -10,6 +19,7 @@ import Hero from "~/components/board/Hero";
 import BoardSearch from "~/components/board/BoardSearch";
 import InitiativeCard from "~/components/board/InitiativeCard";
 import { useWatchlist } from "~/hooks/use-watchlist";
+import { useAdminRatings } from "~/hooks/use-admin-ratings";
 import { usd } from "~/lib/format";
 import SuggestCard from "~/components/board/SuggestCard";
 import { ShuffleItem } from "~/components/board/Shuffle";
@@ -23,6 +33,7 @@ import {
   preloadSheet,
 } from "~/components/board/filters/SheetTrigger";
 import CategoryDot from "~/components/ui/CategoryDot";
+import { StarRow } from "~/components/ratings/Stars";
 import {
   applyView,
   type BoardSort,
@@ -30,6 +41,7 @@ import {
   facetCounts,
   featuredIds,
   groupByPrimary,
+  groupByRating,
   isFiltered,
   LAYOUT_KEY,
   readView,
@@ -53,6 +65,15 @@ export function meta() {
 const SUGGEST_LAST_FROM = 69;
 // The list layout (and its tooltip code) loads only when someone switches to it.
 const BoardList = lazy(() => import("~/components/board/BoardList"));
+
+/** "Top rated": an icon before each band's label (AVG_BANDS' keys). */
+const BAND_ICONS: Record<string, { Icon: LucideIcon; color: string }> = {
+  loved: { Icon: Heart, color: "text-dao-red" },
+  liked: { Icon: ThumbsUp, color: "text-dao-green" },
+  okay: { Icon: Smile, color: "text-dao-amber" },
+  unsure: { Icon: CircleQuestionMark, color: "text-dao-sky" },
+  "not-for-us": { Icon: ThumbsDown, color: "text-white/50" },
+};
 /** The device's last layout (cards or list), used when the URL does not say. */
 
 export default function Board() {
@@ -102,6 +123,8 @@ export default function Board() {
   };
 
   const watchlist = useWatchlist();
+  // Admins only (undefined otherwise): the rating filter and sorts need them.
+  const ratings = useAdminRatings();
   const all = data?.cards ?? [];
   // Featured (pins first) exists only while the team pinned something;
   // otherwise the default order is closest to funded.
@@ -112,10 +135,10 @@ export default function Board() {
   const shownView = useMemo(
     () => ({
       ...view,
-      sort: sortFor(view.sort, featured),
+      sort: sortFor(view.sort, featured, Boolean(ratings)),
       ...(ai || (data?.flags.aiSearchAuto && asking) ? { q: "" } : {}),
     }),
-    [view, featured, ai, data?.flags.aiSearchAuto, asking],
+    [view, featured, ratings, ai, data?.flags.aiSearchAuto, asking],
   );
   const counts = useMemo(() => facetCounts(all, shownView, watchlist.ids), [
     all,
@@ -128,12 +151,12 @@ export default function Board() {
   );
   // Equal scores retain the ordinary order; new proposals follow scored ones.
   const cards = useMemo(() => {
-    const list = applyView(all, shownView, watchlist.ids);
+    const list = applyView(all, shownView, watchlist.ids, ratings);
     if (!ai) return list;
     return list.sort((a, b) =>
       (scores.get(b.initiative.id) ?? -1) - (scores.get(a.initiative.id) ?? -1)
     );
-  }, [all, shownView, watchlist.ids, ai, scores]);
+  }, [all, shownView, watchlist.ids, ratings, ai, scores]);
   const picks = useMemo(
     () =>
       ai
@@ -143,11 +166,46 @@ export default function Board() {
         : [],
     [ai, cards, scores],
   );
-  const filtered = isFiltered(view);
-  // "By category" draws sections; the AI order wins over them while it is on.
-  const groups = view.sort === "category" && !ai
-    ? groupByPrimary(cards)
-    : [{ slug: null, cards, raised: 0, flat: true }];
+  const filtered = isFiltered(shownView);
+  // "By category" and the rating sorts draw sections; the AI order wins over them while it is on.
+  const sort = shownView.sort;
+  const groups: { key: string; cards: Card[]; heading?: React.ReactNode }[] = ai
+    ? [{ key: "all", cards }]
+    : sort === "category"
+    ? groupByPrimary(cards).map((g) => ({
+      key: g.slug ?? "untagged",
+      cards: g.cards,
+      heading: (
+        <>
+          {g.slug
+            ? (
+              <>
+                <CategoryDot slug={g.slug} className="size-2.5" />
+                {categoryOf(g.slug)?.label}
+              </>
+            )
+            : "Untagged"}
+          <span className="small dim tnum">{usd(g.raised)} raised</span>
+        </>
+      ),
+    }))
+    : ratings && (sort === "rating-avg" || sort === "rating-mine")
+    ? groupByRating(cards, sort, ratings).map((g) => {
+      const band = BAND_ICONS[g.key];
+      return {
+        key: g.key,
+        cards: g.cards,
+        heading: (
+          <>
+            {g.stars && <StarRow value={g.stars} />}
+            {band && <band.Icon className={cn("size-4", band.color)} aria-hidden="true" />}
+            {g.label}
+            {g.hint && <span className="small dim">{g.hint}</span>}
+          </>
+        ),
+      };
+    })
+    : [{ key: "all", cards }];
 
   return (
     <>
@@ -180,13 +238,14 @@ export default function Board() {
               total={all.length}
               ai={ai}
               voteFilter={Boolean(data.flags.vote?.show)}
+              rated={Boolean(ratings)}
               onSort={onSort}
               sheet={
                 <Suspense
                   fallback={
                     <FilterSheetStandIn
                       cards={all}
-                      view={view}
+                      view={shownView}
                       watched={watchlist.ids}
                       onApply={setView}
                     />
@@ -194,7 +253,7 @@ export default function Board() {
                 >
                   <FilterSheet
                     cards={all}
-                    view={view}
+                    view={shownView}
                     watched={watchlist.ids}
                     onApply={setView}
                   />
@@ -236,8 +295,8 @@ export default function Board() {
         )}
         {data && (all.length === 0 || cards.length > 0) &&
           groups.map((g, gi) => (
-            <Fragment key={g.slug ?? "all"}>
-              {!("flat" in g) && (
+            <Fragment key={g.key}>
+              {g.heading && (
                 <h3
                   className={cn(
                     "mb-4 flex items-center gap-2.5 font-inter-tight text-[20px] font-semibold leading-[26px] text-white",
@@ -245,15 +304,7 @@ export default function Board() {
                     gi > 0 && "mt-9",
                   )}
                 >
-                  {g.slug
-                    ? (
-                      <>
-                        <CategoryDot slug={g.slug} className="size-2.5" />
-                        {categoryOf(g.slug)?.label}
-                      </>
-                    )
-                    : "Untagged"}
-                  <span className="small dim tnum">{usd(g.raised)} raised</span>
+                  {g.heading}
                 </h3>
               )}
               {view.view === "list"
@@ -266,6 +317,7 @@ export default function Board() {
                       featured={featuredSet}
                       watch={watchlist}
                       vote={data.flags.vote}
+                      ratings={ratings}
                     />
                   </Suspense>
                 )
@@ -277,7 +329,7 @@ export default function Board() {
                         /* Under 69 approved initiatives the suggest card leads the grid (Griff, 20 -> 69 on
                   2026-09-16); while filters narrow the board it goes last. */
                       }
-                      {gi === 0 && all.length < SUGGEST_LAST_FROM && !filtered && "flat" in g && (
+                      {gi === 0 && all.length < SUGGEST_LAST_FROM && !filtered && !g.heading && (
                         <ShuffleItem key="suggest-first" stagger={firstShow}>
                           <SuggestCard />
                         </ShuffleItem>
@@ -298,11 +350,12 @@ export default function Board() {
                               toggle: () =>
                                 watchlist.toggle(c.initiative.id),
                             }}
+                            rating={ratings && { summary: ratings[c.initiative.id] }}
                           />
                         </ShuffleItem>
                       ))}
                       {gi === groups.length - 1 &&
-                        (all.length >= SUGGEST_LAST_FROM || filtered || !("flat" in g)) && (
+                        (all.length >= SUGGEST_LAST_FROM || filtered || Boolean(g.heading)) && (
                         <ShuffleItem
                           key="suggest-last"
                           index={g.cards.length + 1}

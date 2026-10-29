@@ -1,6 +1,6 @@
-/** Admin star ratings: private reviews only admins see (api/routes/reviews.ts). */
+/** NFT-backed star ratings: private reviews for voting NFT holders (api/routes/reviews.ts). */
 
-/** Averages become visible after three distinct reviewers have saved a rating. */
+/** Averages become visible after three distinct voting NFTs have saved a rating. */
 export const MIN_AVERAGE_REVIEWS = 3;
 export const hasRatingAverage = (summary?: Pick<RatingSummary, "count">): boolean =>
   (summary?.count ?? 0) >= MIN_AVERAGE_REVIEWS;
@@ -11,12 +11,12 @@ export type Stars = typeof STARS[number];
 export const isStars = (v: unknown): v is Stars =>
   typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 5;
 
-/** One initiative's ratings: each admin's latest review counts once. */
+/** One initiative's ratings: each voting NFT's latest review counts once. */
 export interface RatingSummary {
   /** Mean of the current ratings, 0 while there are none. */
   avg: number;
   count: number;
-  /** How many admins gave 1..5 stars (index 0 = 1 star). */
+  /** How many NFTs gave 1..5 stars (index 0 = 1 star). */
   dist: [number, number, number, number, number];
   /** The viewer's current rating, null if they have none. */
   mine: Stars | null;
@@ -24,10 +24,10 @@ export interface RatingSummary {
 
 export const EMPTY_SUMMARY: RatingSummary = { avg: 0, count: 0, dist: [0, 0, 0, 0, 0], mine: null };
 
-/** The summary of each admin's current rating (`mine` from the viewer's). */
+/** The summary of each NFT's current rating (`mine` from the viewer's). */
 export function summarize(
-  ratings: { address: string; stars: Stars }[],
-  viewer?: string,
+  ratings: { tokenId: string; stars: Stars }[],
+  viewerTokenId?: string,
 ): RatingSummary {
   const dist: RatingSummary["dist"] = [0, 0, 0, 0, 0];
   let sum = 0;
@@ -35,7 +35,7 @@ export function summarize(
   for (const r of ratings) {
     dist[r.stars - 1]++;
     sum += r.stars;
-    if (viewer && r.address.toLowerCase() === viewer.toLowerCase()) mine = r.stars;
+    if (viewerTokenId !== undefined && r.tokenId === viewerTokenId) mine = r.stars;
   }
   const count = ratings.length;
   return { avg: count ? Math.round((sum / count) * 10) / 10 : 0, count, dist, mine };

@@ -68,6 +68,8 @@ function rateLimitMode(env: Record<string, string | undefined>): RateLimitMode {
 }
 
 // ---------------------------------------------------------- community roles
+/** Mainnet voting NFT: review identity follows the token through transfers. */
+export const REVIEW_BADGE_CONTRACT = "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C";
 /** ETHSecurity badge (ERC-721). balanceOf > 0 grants the EXPERT tag. */
 export const BADGE_CONTRACT = "0xf67C0aDe41c607EfeBf198F9D6065Ab1ec5aD4cd";
 

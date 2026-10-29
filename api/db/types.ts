@@ -177,10 +177,11 @@ export interface Vote {
   at: number;
 }
 
-/** A private admin review (db/reviews.ts). */
+/** A private NFT-backed review (db/reviews.ts). */
 export interface Review {
   id: string;
   initiativeId: string;
+  tokenId: string;
   address: string;
   stars: Stars;
   /** Optional: a review may be stars only. */
@@ -188,7 +189,7 @@ export interface Review {
   createdAt: number;
 }
 
-/** An admin's current rating of one initiative: their latest review. */
+/** A voting NFT's current rating of one initiative: their latest review. */
 export interface Rating {
   stars: Stars;
   reviewId: string;

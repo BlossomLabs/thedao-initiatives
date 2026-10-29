@@ -4,44 +4,65 @@ import { api } from "~/lib/api";
 import type { Ratings } from "~/lib/board-view";
 import type { RatingSummary, Stars } from "@shared/ratings";
 
-/** A private admin review, as /api/admin/initiatives/:id/reviews lists it. */
+/** A private NFT-backed review, as /api/reviews/initiatives/:id/reviews lists it. */
 export interface AdminReview {
   id: string;
   address: string;
+  tokenId: string;
   stars: Stars;
   body: string;
   createdAt: number;
-  /** The author's latest: the one their rating counts. */
+  /** The NFT's latest: the one their rating counts. */
   current: boolean;
 }
 
 // Under "admin": signing out clears them with the other private queries.
-export const ratingsKey = (address: string) => ["admin", "ratings", address.toLowerCase()] as const;
+export const ratingsKey = (address: string) =>
+  ["admin", "nft-ratings-v1", address.toLowerCase()] as const;
 export const reviewsKey = (initiativeId: string, address: string) =>
-  ["admin", "reviews", initiativeId, address.toLowerCase()] as const;
+  ["admin", "nft-reviews-v1", initiativeId, address.toLowerCase()] as const;
 
-/** Every initiative's admin rating, for the board; undefined for anyone not an admin. */
-export function useAdminRatings(): Ratings | undefined {
+/** Server-verified voting NFT ownership; refreshed on focus and every minute. */
+export function useReviewIdentity() {
   const { session } = useSession();
   const q = useQuery({
-    queryKey: ratingsKey(session?.address ?? ""),
+    queryKey: ["admin", "review-identity", session?.address.toLowerCase() ?? ""],
     queryFn: ({ signal }) =>
-      api<{ ratings: Ratings }>("/api/admin/ratings", { signal, passive: true }).then((r) =>
-        r.ratings
+      api<{ tokenIds: string[]; canReview: boolean }>(
+        "/api/reviews/identity",
+        { signal, passive: true },
       ),
-    enabled: Boolean(session?.isAdmin),
+    enabled: Boolean(session),
+    staleTime: 0,
+    refetchInterval: 60_000,
   });
-  return session?.isAdmin ? q.data : undefined;
+  return session && !q.isError ? q.data : undefined;
 }
 
-/** Post a private review (the admin's rating from now on), then refetch the ratings. */
+/** Every initiative's NFT rating, for the board; only fetched for voting NFT holders. */
+export function useAdminRatings(): Ratings | undefined {
+  const { session } = useSession();
+  const identity = useReviewIdentity();
+  const q = useQuery({
+    queryKey: [...ratingsKey(session?.address ?? ""), identity?.tokenIds ?? []],
+    queryFn: ({ signal }) =>
+      api<{ ratings: Ratings }>("/api/reviews/ratings", { signal, passive: true }).then((r) =>
+        r.ratings
+      ),
+    enabled: Boolean(session && identity?.canReview),
+  });
+  return session && identity?.canReview ? q.data : undefined;
+}
+
+/** Post a private review (the NFT's rating from now on), then refetch the ratings. */
 export function usePostReview() {
   const { session } = useSession();
+  const identity = useReviewIdentity();
   const qc = useQueryClient();
   const address = session?.address ?? "";
   return async (initiativeId: string, stars: Stars, body: string) => {
-    await api(`/api/admin/initiatives/${encodeURIComponent(initiativeId)}/reviews`, {
-      json: { stars, body },
+    await api(`/api/reviews/initiatives/${encodeURIComponent(initiativeId)}/reviews`, {
+      json: { stars, body, tokenId: identity?.tokenIds[0] },
     });
     await Promise.all([
       qc.invalidateQueries({ queryKey: reviewsKey(initiativeId, address) }),
@@ -50,20 +71,21 @@ export function usePostReview() {
   };
 }
 
-/** One initiative's reviews and summary; only fetched for an admin. */
+/** One initiative's reviews and summary; only fetched for a voting NFT holder. */
 export function useReviews(initiativeId: string) {
   const { session } = useSession();
   const qc = useQueryClient();
   const address = session?.address ?? "";
+  const identity = useReviewIdentity();
   const key = reviewsKey(initiativeId, address);
   const q = useQuery({
-    queryKey: key,
+    queryKey: [...key, identity?.tokenIds ?? []],
     queryFn: ({ signal }) =>
       api<{ reviews: AdminReview[]; summary: RatingSummary }>(
-        `/api/admin/initiatives/${encodeURIComponent(initiativeId)}/reviews`,
+        `/api/reviews/initiatives/${encodeURIComponent(initiativeId)}/reviews`,
         { signal, passive: true },
       ),
-    enabled: Boolean(session?.isAdmin && initiativeId),
+    enabled: Boolean(session && identity?.canReview && initiativeId),
   });
   const postReview = usePostReview();
   const refresh = () =>
@@ -72,13 +94,14 @@ export function useReviews(initiativeId: string) {
       qc.invalidateQueries({ queryKey: ratingsKey(address) }),
     ]);
   return {
-    enabled: Boolean(session?.isAdmin),
-    reviews: q.data?.reviews ?? [],
-    summary: q.data?.summary,
+    enabled: Boolean(session && identity?.canReview),
+    tokenIds: identity?.tokenIds ?? [],
+    reviews: identity?.canReview ? q.data?.reviews ?? [] : [],
+    summary: identity?.canReview ? q.data?.summary : undefined,
     post: (stars: Stars, body: string) => postReview(initiativeId, stars, body),
     remove: async (id: string) => {
       await api(
-        `/api/admin/initiatives/${encodeURIComponent(initiativeId)}/reviews/${
+        `/api/reviews/initiatives/${encodeURIComponent(initiativeId)}/reviews/${
           encodeURIComponent(id)
         }`,
         { method: "DELETE" },

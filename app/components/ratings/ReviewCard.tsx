@@ -10,10 +10,10 @@ import { StarRow } from "./Stars";
 import { REVIEW_LABEL } from "~/lib/reviewer";
 
 /**
- * A private admin review among the comments: only admins ever get it, but it
+ * A private NFT-backed review among the comments: only holders ever get it, but it
  * reads as it will once reviews are public (no lock, no "only admins"). An
  * amber edge sets it apart from the comments; one a newer review from the same
- * admin replaced is dimmed, since it no longer counts.
+ * NFT replaced is dimmed, since it no longer counts.
  */
 export default function ReviewCard(
   { r, mine, onDelete }: { r: AdminReview; mine: boolean; onDelete: () => Promise<void> },
@@ -30,7 +30,7 @@ export default function ReviewCard(
     >
       <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
         <Identity address={r.address} size={24} />
-        <QaChip>{REVIEW_LABEL}</QaChip>
+        <QaChip>{REVIEW_LABEL} #{r.tokenId}</QaChip>
         <StarRow value={r.stars} />
         <span className="small dim">{ago(r.createdAt)}</span>
       </div>
@@ -47,7 +47,9 @@ export default function ReviewCard(
             disabled={busy}
             className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-muted underline-offset-2 hover:text-white hover:underline disabled:opacity-60"
             onClick={() => {
-              if (!confirm("Delete this review? Your previous one, if any, counts again.")) return;
+              if (
+                !confirm("Delete this review? The NFT’s previous review, if any, counts again.")
+              ) return;
               setBusy(true);
               setError(null);
               onDelete().catch((e) => {

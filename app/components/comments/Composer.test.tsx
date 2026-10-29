@@ -64,13 +64,13 @@ it("picking stars turns the box into a private review: says so, text optional", 
   render(<Composer onPost={onPost} onReview={onReview} />);
   expect(screen.getByRole("button", { name: "Comment" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("radio", { name: "4 stars" }));
-  expect(screen.getByText("Admin review")).toBeInTheDocument();
+  expect(screen.getByText("Voting NFT review")).toBeInTheDocument();
   expect(screen.getByPlaceholderText("Why this rating? (optional)")).toBeInTheDocument();
   expect(screen.queryByPlaceholderText("Your name")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Post review" }));
   expect(onReview).toHaveBeenCalledWith(4, "");
   expect(onPost).not.toHaveBeenCalled();
-  expect(await screen.findByText("Review saved. Your latest review is your rating."))
+  expect(await screen.findByText("Review saved. The latest review for your NFT is its rating."))
     .toBeInTheDocument();
 });
 

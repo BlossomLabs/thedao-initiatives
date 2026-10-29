@@ -1,6 +1,7 @@
-/** Admin star ratings: admins only, latest review counts, delete restores the previous one, nothing leaks. */
+/** NFT-backed ratings: current ownership authorizes writes, token identity survives transfers. */
 import { assert, assertEquals } from "@std/assert";
 import { ADMIN, harness, PLAIN } from "./app-helpers.ts";
+import { REVIEW_BADGE_CONTRACT } from "../config.ts";
 import { BACKUP_PREFIXES } from "../services/backup.ts";
 import { averageWith, type RatingSummary } from "../../shared/ratings.ts";
 
@@ -25,6 +26,34 @@ async function setup() {
   const h = await harness({
     env: { RATE_LIMIT_MODE: "off", ADMIN_ADDRESSES: `${ADMIN},${OTHER_ADMIN}` },
   });
+  const owners = new Map([["1", ADMIN.toLowerCase()], ["2", OTHER_ADMIN.toLowerCase()]]);
+  const fetcher = h.deps.fetch;
+  h.deps.fetch = (input, init) => {
+    const url = new URL(String(input));
+    if (url.hostname === "eth.blockscout.com") {
+      const address = url.pathname.split("/")[4];
+      return Promise.resolve(Response.json({
+        items: [...owners].filter(([, owner]) => owner === address).map(([id]) => ({
+          id,
+          token: { address_hash: REVIEW_BADGE_CONTRACT },
+        })),
+        next_page_params: null,
+      }));
+    }
+    return fetcher(input, init);
+  };
+  const rpc = h.deps.chain.rpc;
+  h.deps.chain.rpc = async (method, params) => {
+    if (method === "eth_call") {
+      const call = params[0] as { to: string; data: string };
+      if (call.to === REVIEW_BADGE_CONTRACT.toLowerCase()) {
+        assert(call.data.startsWith("0x6352211e"));
+        const id = BigInt("0x" + call.data.slice(10)).toString();
+        return "0x" + (owners.get(id)?.slice(2) ?? "0").padStart(64, "0");
+      }
+    }
+    return rpc(method, params);
+  };
   const a = await h.db.initiatives.insert({ title: "Alpha initiative", status: "approved" });
   const pending = await h.db.initiatives.insert({ title: "Pending initiative", status: "pending" });
   const archived = await h.db.initiatives.insert({ title: "Old initiative", status: "archived" });
@@ -32,17 +61,17 @@ async function setup() {
   const other = await h.mint(OTHER_ADMIN, true);
   const plain = await h.mint(PLAIN);
   const post = (token: string, id: string, json: unknown) =>
-    h.req(`/api/admin/initiatives/${id}/reviews`, { method: "POST", token, json });
-  return { h, a, pending, archived, admin, other, plain, post };
+    h.req(`/api/reviews/initiatives/${id}/reviews`, { method: "POST", token, json });
+  return { h, a, pending, archived, admin, other, plain, post, owners };
 }
 
 Deno.test("reviews: signed out is 401 and a plain account is 403 on every route", async () => {
   const { h, a, plain } = await setup();
   const routes: [string, string][] = [
-    ["/api/admin/ratings", "GET"],
-    [`/api/admin/initiatives/${a.id}/reviews`, "GET"],
-    [`/api/admin/initiatives/${a.id}/reviews`, "POST"],
-    [`/api/admin/initiatives/${a.id}/reviews/x`, "DELETE"],
+    ["/api/reviews/ratings", "GET"],
+    [`/api/reviews/initiatives/${a.id}/reviews`, "GET"],
+    [`/api/reviews/initiatives/${a.id}/reviews`, "POST"],
+    [`/api/reviews/initiatives/${a.id}/reviews/x`, "DELETE"],
   ];
   for (const [path, method] of routes) {
     const json = method === "POST" ? { stars: 5 } : undefined;
@@ -57,7 +86,7 @@ Deno.test("reviews: signed out is 401 and a plain account is 403 on every route"
   h.close();
 });
 
-Deno.test("reviews: each admin's latest review counts; average and distribution", async () => {
+Deno.test("reviews: each NFT's latest review counts; average and distribution", async () => {
   const { h, a, admin, other, post } = await setup();
   assertEquals((await post(admin, a.id, { stars: 2, body: "first look" })).status, 201);
   h.clock.now += 10;
@@ -66,12 +95,12 @@ Deno.test("reviews: each admin's latest review counts; average and distribution"
   assertEquals((await j(latest)).review.body, "");
   assertEquals((await post(other, a.id, { stars: 5, body: SECRET })).status, 201);
 
-  const list = await j(await h.req(`/api/admin/initiatives/${a.id}/reviews`, { token: admin }));
+  const list = await j(await h.req(`/api/reviews/initiatives/${a.id}/reviews`, { token: admin }));
   assertEquals(list.reviews.map((r) => r.stars), [2, 4, 5]);
   assertEquals(list.reviews.map((r) => r.current), [false, true, true]);
   assertEquals(list.summary, { avg: 4.5, count: 2, dist: [0, 0, 0, 1, 1], mine: 4 });
 
-  const board = await j(await h.req("/api/admin/ratings", { token: other }));
+  const board = await j(await h.req("/api/reviews/ratings", { token: other }));
   assertEquals(board.ratings, { [a.id]: { avg: 4.5, count: 2, dist: [0, 0, 0, 1, 1], mine: 5 } });
   h.close();
 });
@@ -82,18 +111,18 @@ Deno.test("reviews: deleting the latest brings back the previous; only the autho
   h.clock.now += 10;
   const second = (await j(await post(admin, a.id, { stars: 4 }))).review;
   const del = (token: string, id: string) =>
-    h.req(`/api/admin/initiatives/${a.id}/reviews/${id}`, { method: "DELETE", token });
+    h.req(`/api/reviews/initiatives/${a.id}/reviews/${id}`, { method: "DELETE", token });
 
   assertEquals((await del(other, second.id)).status, 404);
   assertEquals((await del(admin, second.id)).status, 200);
   assertEquals((await del(admin, second.id)).status, 404);
-  const after = await j(await h.req(`/api/admin/initiatives/${a.id}/reviews`, { token: admin }));
+  const after = await j(await h.req(`/api/reviews/initiatives/${a.id}/reviews`, { token: admin }));
   assertEquals(after.summary.mine, 2);
   assertEquals(after.reviews.length, 1);
   assert(after.reviews[0].current);
 
   await del(admin, after.reviews[0].id);
-  const empty = await j(await h.req("/api/admin/ratings", { token: admin }));
+  const empty = await j(await h.req("/api/reviews/ratings", { token: admin }));
   assertEquals(empty.ratings, {});
   h.close();
 });
@@ -110,7 +139,7 @@ Deno.test("reviews: bad stars, long text and non-board initiatives are rejected"
   assertEquals((await post(admin, "nope", { stars: 3 })).status, 404);
   // An archived initiative's reviews stay readable.
   assertEquals(
-    (await h.req(`/api/admin/initiatives/${archived.id}/reviews`, { token: admin })).status,
+    (await h.req(`/api/reviews/initiatives/${archived.id}/reviews`, { token: admin })).status,
     200,
   );
   assertEquals(await h.db.reviews.forInitiative(a.id), []);
@@ -143,8 +172,8 @@ Deno.test("reviews: nothing reaches the board, the comments or the feeds", async
 });
 
 Deno.test("reviews: the backup carries reviews and ratings", () => {
-  assert((BACKUP_PREFIXES as readonly string[]).includes("review"));
-  assert((BACKUP_PREFIXES as readonly string[]).includes("rating"));
+  assert((BACKUP_PREFIXES as readonly string[]).includes("nft_review_v1"));
+  assert((BACKUP_PREFIXES as readonly string[]).includes("nft_rating_v1"));
 });
 
 Deno.test("ratings: the average as it will be with the viewer's pick", () => {
@@ -155,4 +184,82 @@ Deno.test("ratings: the average as it will be with the viewer's pick", () => {
   // Not rated yet: one more.
   assertEquals(averageWith({ ...s, mine: null }, 3), 4);
   assertEquals(averageWith({ avg: 0, count: 0, dist: [0, 0, 0, 0, 0], mine: null }, 5), 5);
+});
+
+Deno.test("reviews: a non-admin holder can review; admins without the NFT cannot", async () => {
+  const { h, a, admin, plain, owners, post } = await setup();
+  owners.set("1", PLAIN.toLowerCase());
+  assertEquals((await post(admin, a.id, { stars: 5 })).status, 403);
+  const saved = await post(plain, a.id, { stars: 3 });
+  assertEquals(saved.status, 201);
+  const body = await saved.json();
+  assertEquals(body.review.tokenId, "1");
+  assertEquals(body.review.address, PLAIN);
+  assertEquals((await post(plain, a.id, { stars: 5, tokenId: "2" })).status, 403);
+  h.close();
+});
+
+Deno.test("reviews: transferring an NFT replaces its rating instead of adding a reviewer", async () => {
+  const { h, a, admin, plain, other, owners, post } = await setup();
+  const old = (await j(await post(admin, a.id, { stars: 5 }))).review;
+  owners.set("1", PLAIN.toLowerCase());
+  assertEquals((await post(plain, a.id, { stars: 1 })).status, 201);
+  assertEquals((await post(admin, a.id, { stars: 5 })).status, 403);
+  const result = await j(await h.req(`/api/reviews/initiatives/${a.id}/reviews`, { token: plain }));
+  assertEquals(result.summary, { avg: 1, count: 1, dist: [1, 0, 0, 0, 0], mine: 1 });
+  assertEquals(result.reviews.map((r) => r.current), [false, true]);
+  // The former owner still cannot delete the old review after acquiring a different NFT.
+  owners.set("3", ADMIN.toLowerCase());
+  assertEquals(
+    (await h.req(`/api/reviews/initiatives/${a.id}/reviews/${old.id}`, {
+      token: admin,
+      method: "DELETE",
+    })).status,
+    404,
+  );
+  const board = await j(await h.req("/api/reviews/ratings", { token: other }));
+  assertEquals(board.ratings[a.id].count, 1);
+  h.close();
+});
+
+Deno.test("reviews: legacy admin keys are excluded from lists and averages", async () => {
+  const { h, a, admin } = await setup();
+  await h.kv.set(["review", a.id, "old"], {
+    id: "old",
+    initiativeId: a.id,
+    address: ADMIN,
+    stars: 5,
+    body: SECRET,
+    createdAt: 1,
+  });
+  await h.kv.set(["rating", a.id, ADMIN.toLowerCase()], { stars: 5, reviewId: "old", at: 1 });
+  assertEquals(await h.db.reviews.forInitiative(a.id), []);
+  const board = await j(await h.req("/api/reviews/ratings", { token: admin }));
+  assertEquals(board.ratings, {});
+  assertEquals(
+    (await h.req(`/api/admin/initiatives/${a.id}/reviews`, { token: admin })).status,
+    404,
+  );
+  h.close();
+});
+
+Deno.test("reviews: ownership lookup failure refuses writes and stores nothing", async () => {
+  const { h, a, admin, post } = await setup();
+  h.deps.chain.rpc = () => Promise.reject(new Error("RPC unavailable"));
+  assertEquals((await post(admin, a.id, { stars: 5 })).status, 503);
+  assertEquals(await h.db.reviews.forInitiative(a.id), []);
+  h.close();
+});
+
+Deno.test("reviews: concurrent writes for the same NFT leave one current rating", async () => {
+  const { h, a, admin, post } = await setup();
+  const results = await Promise.all([
+    post(admin, a.id, { stars: 1 }),
+    post(admin, a.id, { stars: 5 }),
+  ]);
+  assertEquals(results.map((r) => r.status), [201, 201]);
+  const list = await j(await h.req(`/api/reviews/initiatives/${a.id}/reviews`, { token: admin }));
+  assertEquals(list.summary.count, 1);
+  assertEquals(list.reviews.filter((r) => r.current).length, 1);
+  h.close();
 });

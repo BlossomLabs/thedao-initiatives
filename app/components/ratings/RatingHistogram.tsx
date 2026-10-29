@@ -3,7 +3,7 @@ import { hasRatingAverage, type RatingSummary } from "@shared/ratings";
 import { StarRow } from "./Stars";
 import { REVIEWER } from "~/lib/reviewer";
 
-/** The average over five rows, 5★ to 1★, each with its share of the admins who rated. */
+/** The average over five rows, 5★ to 1★, each with its share of the voting NFTs used to rate. */
 export default function RatingHistogram(
   { summary }: { summary: RatingSummary },
 ) {

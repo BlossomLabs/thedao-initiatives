@@ -256,7 +256,7 @@ describe("rating from the board (admins)", () => {
   it("the chip unfolds the form under the card, like Donate, one panel at a time", async () => {
     postReview.mockReset().mockResolvedValue(undefined);
     mountRated(rated);
-    const chip = screen.getByRole("button", { name: /Admin average 4.3 from 3 admins/ });
+    const chip = screen.getByRole("button", { name: /Voting NFT average 4.3 from 3 voting NFTs/ });
     expect(chip).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(chip);
     expect(chip).toHaveAttribute("aria-expanded", "true");
@@ -316,7 +316,7 @@ describe("rating from the board (admins)", () => {
       new Error("only initiatives on the board can be rated"),
     );
     mountRated();
-    fireEvent.click(screen.getByRole("button", { name: /No admin rated it yet/ }));
+    fireEvent.click(screen.getByRole("button", { name: /No voting NFT rated it yet/ }));
     expect(screen.getByRole("img", { name: "Average shown after 3 reviewers" }))
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();

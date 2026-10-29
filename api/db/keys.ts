@@ -27,13 +27,13 @@ export const K = {
   nick: (nick: string) => ["nick", nick.toLowerCase()] as const,
   /** One account's watchlist (db/watchlists.ts): { ids, updatedAt }. */
   watchlist: (addr: string) => ["watchlist", addr.toLowerCase()] as const,
-  /** An admin review (db/reviews.ts): private stars and an optional note. */
-  review: (rfpId: string, id: string) => ["review", rfpId, id] as const,
-  reviews: (rfpId: string) => ["review", rfpId] as const,
-  /** Each admin's current rating of an initiative: their latest review. */
-  rating: (rfpId: string, addr: string) => ["rating", rfpId, addr.toLowerCase()] as const,
-  ratingsFor: (rfpId: string) => ["rating", rfpId] as const,
-  ratings: ["rating"] as const,
+  /** An NFT-backed review (db/reviews.ts): private stars and an optional note. */
+  review: (rfpId: string, id: string) => ["nft_review_v1", rfpId, id] as const,
+  reviews: (rfpId: string) => ["nft_review_v1", rfpId] as const,
+  /** Each voting NFT's current rating of an initiative: their latest review. */
+  rating: (rfpId: string, tokenId: string) => ["nft_rating_v1", rfpId, tokenId] as const,
+  ratingsFor: (rfpId: string) => ["nft_rating_v1", rfpId] as const,
+  ratings: ["nft_rating_v1"] as const,
   nonce: (nonce: string) => ["nonce", nonce] as const,
   session: (tokenHash: string) => ["session", tokenHash] as const,
   sessionsByAddr: (addr: string, tokenHash: string) =>

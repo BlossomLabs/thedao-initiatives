@@ -26,6 +26,8 @@ export const BACKUP_PREFIXES = [
   "donation_association",
   "donation_by_tx",
   "meta",
+  "nft_rating_v1",
+  "nft_review_v1",
   "nick",
   "pending_association",
   "pledge",

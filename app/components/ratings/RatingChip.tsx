@@ -10,7 +10,7 @@ import { REVIEWER, Reviewer } from "~/lib/reviewer";
 import { RatingButtons, ReviewText, useRatingDraft } from "./RatingDraft";
 
 /**
- * Admins only: the average and how many admins rated. Like Donate, it opens
+ * Voting NFT holders only: the average and how many NFTs rated. Like Donate, it opens
  * the card's rating form below (see RatingForm). The star is filled once the
  * viewer rated, outlined while they have not.
  */

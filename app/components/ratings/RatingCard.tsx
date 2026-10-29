@@ -33,7 +33,7 @@ function Yours({ summary }: { summary: RatingSummary }) {
  * The rating side card: the average and the bars, and (while the initiative
  * is on the board) the viewer's own rating with a way to the comment box to
  * give or change it. Its own card (not the admins' panel) so it can go public
- * later; for now only admins get a summary, so it renders nothing for anyone
+ * later; for now only voting NFT holders get a summary, so it renders nothing for anyone
  * else.
  */
 export default function RatingCard(

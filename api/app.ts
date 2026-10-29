@@ -149,7 +149,7 @@ export function createApp(
   app.route("/api", aiRoutes(deps));
   app.route("/api", supportRoutes(deps));
   app.route("/api/admin/audit", auditRoutes(deps));
-  app.route("/api/admin", reviewRoutes(deps));
+  app.route("/api/reviews", reviewRoutes(deps));
   app.route("/api/admin", adminRoutes(deps));
   app.route("/initiative", markdownRoutes(deps, feedCache));
 

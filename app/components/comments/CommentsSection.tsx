@@ -223,7 +223,8 @@ export default function CommentsSection({ initiativeId, slug, open }: {
             <ReviewCard
               key={i.r.id}
               r={i.r}
-              mine={i.r.address.toLowerCase() === me}
+              mine={i.r.address.toLowerCase() === me &&
+                Boolean(reviews.tokenIds?.includes(i.r.tokenId))}
               onDelete={() => reviews.remove(i.r.id)}
             />
           )

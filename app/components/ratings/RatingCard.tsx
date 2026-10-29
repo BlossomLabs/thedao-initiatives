@@ -29,23 +29,17 @@ function Yours({ summary }: { summary: RatingSummary }) {
   );
 }
 
-/**
- * The rating side card: the average and the bars, and (while the initiative
- * is on the board) the viewer's own rating with a way to the comment box to
- * give or change it. Its own card (not the admins' panel) so it can go public
- * later; for now only voting NFT holders get a summary, so it renders nothing for anyone
- * else.
- */
+/** Public averages and distribution; only eligible holders get review controls. */
 export default function RatingCard(
   { initiativeId, canRate }: { initiativeId: string; canRate: boolean },
 ) {
-  const { summary } = useReviews(initiativeId);
+  const { summary, enabled } = useReviews(initiativeId);
   if (!summary) return null;
   return (
     <div className="panel">
       <span className="k">Rating</span>
       <RatingHistogram summary={summary} />
-      {canRate
+      {canRate && enabled
         ? <Yours summary={summary} />
         : summary.mine && (
           <p className="m-0 mt-2.5 flex items-center gap-1.5 small dim">

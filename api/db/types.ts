@@ -177,7 +177,7 @@ export interface Vote {
   at: number;
 }
 
-/** A private NFT-backed review (db/reviews.ts). */
+/** A public NFT-backed review (db/reviews.ts). */
 export interface Review {
   id: string;
   initiativeId: string;

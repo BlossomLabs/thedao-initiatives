@@ -74,13 +74,14 @@ function FundingBar(
 }
 
 function Row(
-  { card, label, watch, vote, aiScore, ratings }: {
+  { card, label, watch, vote, aiScore, ratings, canRate = false }: {
     card: Card;
     label: ReturnType<typeof cardLabel>;
     aiScore?: number;
     watch?: Watch;
-    /** Admins only: the rating chip after the title. */
+    /** Public rating chip after the title. */
     ratings?: Ratings;
+    canRate?: boolean;
     vote?: VoteSettings;
   },
 ) {
@@ -120,6 +121,7 @@ function Row(
   );
   const chip = ratings && (
     <RatingChip
+      canRate={canRate}
       summary={ratings[r.id]}
       open={rating}
       onToggle={() => setRating((o) => !o)}
@@ -284,7 +286,7 @@ function Row(
           {pctText(pct)}
         </span>
       </div>
-      {ratings && (
+      {ratings && canRate && (
         // Under the row, from the title column on (the full row on phones).
         <Reveal
           show={rating}
@@ -306,7 +308,7 @@ function Row(
 
 /** Compact rows: every initiative at a glance, the numbers in aligned columns. */
 export default function BoardList(
-  { cards, aiTop = [], aiScores, featured, watch, vote, ratings }: {
+  { cards, aiTop = [], aiScores, featured, watch, vote, ratings, canRate = false }: {
     cards: Card[];
     /** Initiatives the AI search put first. */
     aiTop?: string[];
@@ -316,8 +318,9 @@ export default function BoardList(
     watch?: Watch;
     /** The vote floor on each bar, while the display is on. */
     vote?: VoteSettings;
-    /** Admins only: each row's rating chip. */
+    /** Each row's public rating chip. */
     ratings?: Ratings;
+    canRate?: boolean;
   },
 ) {
   return (
@@ -354,6 +357,7 @@ export default function BoardList(
                 watch={watch}
                 vote={vote}
                 ratings={ratings}
+                canRate={canRate}
               />
             ))}
           </AnimatePresence>

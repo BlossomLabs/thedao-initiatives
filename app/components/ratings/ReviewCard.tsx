@@ -9,12 +9,7 @@ import { cn } from "~/lib/utils";
 import { StarRow } from "./Stars";
 import { REVIEW_LABEL } from "~/lib/reviewer";
 
-/**
- * A private NFT-backed review among the comments: only holders ever get it, but it
- * reads as it will once reviews are public (no lock, no "only admins"). An
- * amber edge sets it apart from the comments; one a newer review from the same
- * NFT replaced is dimmed, since it no longer counts.
- */
+/** Public badge-backed review. Superseded reviews remain visible but no longer count. */
 export default function ReviewCard(
   { r, mine, onDelete }: { r: AdminReview; mine: boolean; onDelete: () => Promise<void> },
 ) {
@@ -48,7 +43,9 @@ export default function ReviewCard(
             className="inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-muted underline-offset-2 hover:text-white hover:underline disabled:opacity-60"
             onClick={() => {
               if (
-                !confirm("Delete this review? The NFT’s previous review, if any, counts again.")
+                !confirm(
+                  "Delete this review? The voting badge’s previous review, if any, counts again.",
+                )
               ) return;
               setBusy(true);
               setError(null);

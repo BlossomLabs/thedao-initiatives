@@ -24,7 +24,7 @@ export const SORTS = [
   ["rating-avg", "Top rated"],
   ["rating-mine", "My rating"],
 ] as const;
-/** The sorts only admins are offered: they need the admin ratings. */
+/** The rating sorts become available once the public ratings have loaded. */
 export const RATING_SORTS: readonly BoardSort[] = ["rating-avg", "rating-mine"];
 export const VIEWS = ["cards", "list"] as const;
 /** Where this device remembers the layout it used last. */

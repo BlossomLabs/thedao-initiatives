@@ -59,7 +59,8 @@ vi.mock("~/components/donate/DonateWidget", () => ({ default: () => null }));
 const api = vi.fn();
 vi.mock("~/lib/api", async (o) => ({
   ...(await o<typeof import("~/lib/api")>()),
-  api: (...a: unknown[]) => api(...a),
+  api: (...a: unknown[]) =>
+    a[0] === "/api/reviews/ratings" ? Promise.resolve({ ratings: {} }) : api(...a),
 }));
 beforeEach(() => {
   api.mockReset();

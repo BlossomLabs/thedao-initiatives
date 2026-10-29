@@ -122,8 +122,8 @@ export default function InitiativeCard({
   vote?: VoteSettings;
   /** Watchlist state in this browser; omitted = no button. */
   watch?: { on: boolean; toggle: () => void };
-  /** Admins only: the admin rating (summary undefined = nobody rated); omitted = no chip. */
-  rating?: { summary?: RatingSummary };
+  /** Public rating; canRate separately controls reviewing (omitted = no chip). */
+  rating?: { summary?: RatingSummary; canRate?: boolean };
   tokensOk: boolean;
   aiTop?: boolean;
   aiScore?: number;
@@ -263,6 +263,7 @@ export default function InitiativeCard({
         {watch && rating && <span className="h-4 w-px flex-none bg-white/15" aria-hidden="true" />}
         {rating && (
           <RatingChip
+            canRate={rating.canRate}
             summary={rating.summary}
             open={panel === "rate"}
             onToggle={() => toggle("rate")}
@@ -292,7 +293,7 @@ export default function InitiativeCard({
           </Suspense>
         </div>
       </Reveal>
-      {rating && (
+      {rating?.canRate && (
         <Reveal show={panel === "rate"} id={`rate-${r.id}`}>
           <div className="mt-3.5 border-t border-edge pt-3.5">
             <RatingForm

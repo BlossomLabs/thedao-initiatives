@@ -4,7 +4,7 @@ import { api } from "~/lib/api";
 import type { Ratings } from "~/lib/board-view";
 import type { RatingSummary, Stars } from "@shared/ratings";
 
-/** A private NFT-backed review, as /api/reviews/initiatives/:id/reviews lists it. */
+/** A public NFT-backed review, as /api/reviews/initiatives/:id/reviews lists it. */
 export interface AdminReview {
   id: string;
   address: string;
@@ -39,22 +39,22 @@ export function useReviewIdentity() {
   return session && !q.isError ? q.data : undefined;
 }
 
-/** Every initiative's NFT rating, for the board; only fetched for voting NFT holders. */
+/** Every initiative's public rating, optionally personalized for the holder's NFT. */
 export function useAdminRatings(): Ratings | undefined {
   const { session } = useSession();
   const identity = useReviewIdentity();
   const q = useQuery({
     queryKey: [...ratingsKey(session?.address ?? ""), identity?.tokenIds ?? []],
     queryFn: ({ signal }) =>
-      api<{ ratings: Ratings }>("/api/reviews/ratings", { signal, passive: true }).then((r) =>
-        r.ratings
-      ),
-    enabled: Boolean(session && identity?.canReview),
+      api<{ ratings: Ratings }>(
+        `/api/reviews/ratings${identity?.tokenIds[0] ? `?tokenId=${identity.tokenIds[0]}` : ""}`,
+        { signal, passive: true },
+      ).then((r) => r.ratings),
   });
-  return session && identity?.canReview ? q.data : undefined;
+  return q.data;
 }
 
-/** Post a private review (the NFT's rating from now on), then refetch the ratings. */
+/** Post a public review (the NFT's rating from now on), then refetch the ratings. */
 export function usePostReview() {
   const { session } = useSession();
   const identity = useReviewIdentity();
@@ -71,7 +71,7 @@ export function usePostReview() {
   };
 }
 
-/** One initiative's reviews and summary; only fetched for a voting NFT holder. */
+/** Public reviews and summary; enabled controls writing, independently of reading. */
 export function useReviews(initiativeId: string) {
   const { session } = useSession();
   const qc = useQueryClient();
@@ -82,10 +82,12 @@ export function useReviews(initiativeId: string) {
     queryKey: [...key, identity?.tokenIds ?? []],
     queryFn: ({ signal }) =>
       api<{ reviews: AdminReview[]; summary: RatingSummary }>(
-        `/api/reviews/initiatives/${encodeURIComponent(initiativeId)}/reviews`,
+        `/api/reviews/initiatives/${encodeURIComponent(initiativeId)}/reviews${
+          identity?.tokenIds[0] ? `?tokenId=${identity.tokenIds[0]}` : ""
+        }`,
         { signal, passive: true },
       ),
-    enabled: Boolean(session && identity?.canReview && initiativeId),
+    enabled: Boolean(initiativeId),
   });
   const postReview = usePostReview();
   const refresh = () =>
@@ -96,8 +98,8 @@ export function useReviews(initiativeId: string) {
   return {
     enabled: Boolean(session && identity?.canReview),
     tokenIds: identity?.tokenIds ?? [],
-    reviews: identity?.canReview ? q.data?.reviews ?? [] : [],
-    summary: identity?.canReview ? q.data?.summary : undefined,
+    reviews: q.data?.reviews ?? [],
+    summary: q.data?.summary,
     post: (stars: Stars, body: string) => postReview(initiativeId, stars, body),
     remove: async (id: string) => {
       await api(

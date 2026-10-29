@@ -3,15 +3,7 @@ import type { Card } from "~/lib/api-types";
 import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Frown,
-  Heart,
-  type LucideIcon,
-  Smile,
-  Sparkles,
-  ThumbsDown,
-  ThumbsUp,
-} from "lucide-react";
+import { Frown, Heart, type LucideIcon, Smile, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Link, useSearchParams } from "react-router";
 import PageMain from "~/components/layout/PageMain";
 import SectionHeading from "~/components/layout/SectionHeading";
@@ -19,7 +11,7 @@ import Hero from "~/components/board/Hero";
 import BoardSearch from "~/components/board/BoardSearch";
 import InitiativeCard from "~/components/board/InitiativeCard";
 import { useWatchlist } from "~/hooks/use-watchlist";
-import { useAdminRatings } from "~/hooks/use-admin-ratings";
+import { useAdminRatings, useReviewIdentity } from "~/hooks/use-admin-ratings";
 import { usd } from "~/lib/format";
 import SuggestCard from "~/components/board/SuggestCard";
 import { ShuffleItem } from "~/components/board/Shuffle";
@@ -123,8 +115,9 @@ export default function Board() {
   };
 
   const watchlist = useWatchlist();
-  // Admins only (undefined otherwise): the rating filter and sorts need them.
+  // Public ratings enable the rating sorts; ownership separately controls reviewing.
   const ratings = useAdminRatings();
+  const canRate = Boolean(useReviewIdentity()?.canReview);
   const all = data?.cards ?? [];
   // Featured (pins first) exists only while the team pinned something;
   // otherwise the default order is closest to funded.
@@ -318,6 +311,7 @@ export default function Board() {
                       watch={watchlist}
                       vote={data.flags.vote}
                       ratings={ratings}
+                      canRate={canRate}
                     />
                   </Suspense>
                 )
@@ -350,7 +344,7 @@ export default function Board() {
                               toggle: () =>
                                 watchlist.toggle(c.initiative.id),
                             }}
-                            rating={ratings && { summary: ratings[c.initiative.id] }}
+                            rating={ratings && { summary: ratings[c.initiative.id], canRate }}
                           />
                         </ShuffleItem>
                       ))}

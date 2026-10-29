@@ -10,13 +10,14 @@ import { REVIEWER, Reviewer } from "~/lib/reviewer";
 import { RatingButtons, ReviewText, useRatingDraft } from "./RatingDraft";
 
 /**
- * Voting NFT holders only: the average and how many NFTs rated. Like Donate, it opens
+ * Public average and review count. For badge holders, like Donate, it opens
  * the card's rating form below (see RatingForm). The star is filled once the
  * viewer rated, outlined while they have not.
  */
 export default function RatingChip(
-  { summary, open, onToggle, controls, className }: {
+  { summary, open, onToggle, controls, className, canRate = false }: {
     summary?: RatingSummary;
+    canRate?: boolean;
     open: boolean;
     onToggle: () => void;
     /** The id of the form it opens. */
@@ -29,20 +30,26 @@ export default function RatingChip(
   const hasAverage = hasRatingAverage(summary);
   const title = hasAverage
     ? `${Reviewer} average ${summary!.avg} from ${plural(count, REVIEWER)}` +
-      (mine ? ` · yours: ${mine}` : " · you have not rated it")
+      (canRate ? (mine ? ` · yours: ${mine}` : " · you have not rated it") : "")
     : (count
       ? `${plural(count, REVIEWER)} rated it · average shown after 3 reviewers`
       : `No ${REVIEWER} rated it yet`);
+  const Tag = canRate ? "button" : "span";
   return (
-    <button
-      type="button"
+    <Tag
+      {...(canRate
+        ? {
+          type: "button" as const,
+          "aria-expanded": open,
+          "aria-controls": controls,
+          onClick: onToggle,
+        }
+        : {})}
       title={title}
-      aria-label={`${title}. Rate it`}
-      aria-expanded={open}
-      aria-controls={controls}
-      onClick={onToggle}
+      aria-label={canRate ? `${title}. Rate it` : title}
       className={cn(
-        "inline-flex h-5 flex-none cursor-pointer items-center gap-1 rounded-full border-0 bg-transparent px-1 font-inter-tight text-[12px] transition-colors hover:bg-white/[.06] focus-visible:outline-2 focus-visible:outline-dao-bright aria-expanded:bg-white/[.06]",
+        "inline-flex h-5 flex-none items-center gap-1 rounded-full border-0 bg-transparent px-1 font-inter-tight text-[12px] transition-colors hover:bg-white/[.06] focus-visible:outline-2 focus-visible:outline-dao-bright aria-expanded:bg-white/[.06]",
+        canRate && "cursor-pointer",
         count || open ? "text-dao-amber" : "text-white/35 hover:text-dao-amber",
         className,
       )}
@@ -55,16 +62,18 @@ export default function RatingChip(
             <span className="tnum text-white/35">({count})</span>
           </>
         )
-        : <span>Rate</span>}
+        : <span>{canRate ? "Rate" : "No ratings"}</span>}
       {/* Turned up while the form is open: the chip closes it too. */}
-      <ChevronDown
-        className={cn(
-          "size-3 text-white/45 transition-transform duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-          open && "rotate-180",
-        )}
-        aria-hidden="true"
-      />
-    </button>
+      {canRate && (
+        <ChevronDown
+          className={cn(
+            "size-3 text-white/45 transition-transform duration-[220ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+            open && "rotate-180",
+          )}
+          aria-hidden="true"
+        />
+      )}
+    </Tag>
   );
 }
 

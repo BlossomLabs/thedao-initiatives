@@ -65,7 +65,7 @@ async function setup() {
   return { h, a, pending, archived, admin, other, plain, post, owners };
 }
 
-Deno.test("reviews: signed out is 401 and a plain account is 403 on every route", async () => {
+Deno.test("reviews: public reads are open; signed-out writes are 401 and non-holder writes are 403", async () => {
   const { h, a, plain } = await setup();
   const routes: [string, string][] = [
     ["/api/reviews/ratings", "GET"],
@@ -75,10 +75,14 @@ Deno.test("reviews: signed out is 401 and a plain account is 403 on every route"
   ];
   for (const [path, method] of routes) {
     const json = method === "POST" ? { stars: 5 } : undefined;
-    assertEquals((await h.req(path, { method, json })).status, 401, `${method} ${path}`);
+    assertEquals(
+      (await h.req(path, { method, json })).status,
+      method === "GET" ? 200 : 401,
+      `${method} ${path}`,
+    );
     assertEquals(
       (await h.req(path, { method, json, token: plain })).status,
-      403,
+      method === "GET" ? 200 : 403,
       `${method} ${path}`,
     );
   }
@@ -95,12 +99,14 @@ Deno.test("reviews: each NFT's latest review counts; average and distribution", 
   assertEquals((await j(latest)).review.body, "");
   assertEquals((await post(other, a.id, { stars: 5, body: SECRET })).status, 201);
 
-  const list = await j(await h.req(`/api/reviews/initiatives/${a.id}/reviews`, { token: admin }));
+  const list = await j(
+    await h.req(`/api/reviews/initiatives/${a.id}/reviews?tokenId=1`, { token: admin }),
+  );
   assertEquals(list.reviews.map((r) => r.stars), [2, 4, 5]);
   assertEquals(list.reviews.map((r) => r.current), [false, true, true]);
   assertEquals(list.summary, { avg: 4.5, count: 2, dist: [0, 0, 0, 1, 1], mine: 4 });
 
-  const board = await j(await h.req("/api/reviews/ratings", { token: other }));
+  const board = await j(await h.req("/api/reviews/ratings?tokenId=2", { token: other }));
   assertEquals(board.ratings, { [a.id]: { avg: 4.5, count: 2, dist: [0, 0, 0, 1, 1], mine: 5 } });
   h.close();
 });
@@ -116,7 +122,9 @@ Deno.test("reviews: deleting the latest brings back the previous; only the autho
   assertEquals((await del(other, second.id)).status, 404);
   assertEquals((await del(admin, second.id)).status, 200);
   assertEquals((await del(admin, second.id)).status, 404);
-  const after = await j(await h.req(`/api/reviews/initiatives/${a.id}/reviews`, { token: admin }));
+  const after = await j(
+    await h.req(`/api/reviews/initiatives/${a.id}/reviews?tokenId=1`, { token: admin }),
+  );
   assertEquals(after.summary.mine, 2);
   assertEquals(after.reviews.length, 1);
   assert(after.reviews[0].current);
@@ -205,7 +213,9 @@ Deno.test("reviews: transferring an NFT replaces its rating instead of adding a 
   owners.set("1", PLAIN.toLowerCase());
   assertEquals((await post(plain, a.id, { stars: 1 })).status, 201);
   assertEquals((await post(admin, a.id, { stars: 5 })).status, 403);
-  const result = await j(await h.req(`/api/reviews/initiatives/${a.id}/reviews`, { token: plain }));
+  const result = await j(
+    await h.req(`/api/reviews/initiatives/${a.id}/reviews?tokenId=1`, { token: plain }),
+  );
   assertEquals(result.summary, { avg: 1, count: 1, dist: [1, 0, 0, 0, 0], mine: 1 });
   assertEquals(result.reviews.map((r) => r.current), [false, true]);
   // The former owner still cannot delete the old review after acquiring a different NFT.
@@ -217,7 +227,7 @@ Deno.test("reviews: transferring an NFT replaces its rating instead of adding a 
     })).status,
     404,
   );
-  const board = await j(await h.req("/api/reviews/ratings", { token: other }));
+  const board = await j(await h.req("/api/reviews/ratings?tokenId=2", { token: other }));
   assertEquals(board.ratings[a.id].count, 1);
   h.close();
 });
@@ -258,8 +268,44 @@ Deno.test("reviews: concurrent writes for the same NFT leave one current rating"
     post(admin, a.id, { stars: 5 }),
   ]);
   assertEquals(results.map((r) => r.status), [201, 201]);
-  const list = await j(await h.req(`/api/reviews/initiatives/${a.id}/reviews`, { token: admin }));
+  const list = await j(
+    await h.req(`/api/reviews/initiatives/${a.id}/reviews?tokenId=1`, { token: admin }),
+  );
   assertEquals(list.summary.count, 1);
   assertEquals(list.reviews.filter((r) => r.current).length, 1);
+  h.close();
+});
+
+Deno.test("reviews: public reads include badge reviews without relying on NFT services", async () => {
+  const { h, a, pending, archived, admin, plain, post } = await setup();
+  await post(admin, a.id, { stars: 4, body: "Public badge review" });
+  await h.db.reviews.create({
+    initiativeId: pending.id,
+    tokenId: "1",
+    address: ADMIN,
+    stars: 5,
+    body: "Hidden pending review",
+  });
+  h.deps.chain.rpc = () => Promise.reject(new Error("chain unavailable"));
+  h.deps.fetch = () => Promise.reject(new Error("index unavailable"));
+  for (const token of [undefined, plain, admin]) {
+    const response = await h.req(`/api/reviews/initiatives/${a.id}/reviews`, { token });
+    assertEquals(response.status, 200);
+    const body = await j(response);
+    assertEquals(body.reviews[0].body, "Public badge review");
+    assertEquals(body.summary.mine, null);
+    assertEquals(body.summary.count, 1);
+    const ratings = await j(await h.req("/api/reviews/ratings", { token }));
+    assertEquals(ratings.ratings[a.id].mine, null);
+    assertEquals(ratings.ratings[pending.id], undefined);
+    assertEquals(
+      (await h.req(`/api/reviews/initiatives/${pending.id}/reviews`, { token })).status,
+      404,
+    );
+    assertEquals(
+      (await h.req(`/api/reviews/initiatives/${archived.id}/reviews`, { token })).status,
+      200,
+    );
+  }
   h.close();
 });

@@ -4,9 +4,10 @@ import type { RatingSummary } from "@shared/ratings";
 import { RATE_HERE } from "./rate-here";
 import RatingCard from "./RatingCard";
 
+let enabled = true;
 let summary: RatingSummary | undefined;
 vi.mock("~/hooks/use-admin-ratings", () => ({
-  useReviews: () => ({ summary }),
+  useReviews: () => ({ summary, enabled }),
 }));
 
 afterEach(cleanup);
@@ -56,4 +57,14 @@ it.each([1, 2])("hides the average with %s reviewers while keeping your rating",
   expect(screen.getByText("Average shown after 3 reviewers.")).toBeInTheDocument();
   expect(screen.getAllByRole("img", { name: "4 of 5 stars" })).toHaveLength(1);
   expect(screen.getByRole("link", { name: "Change" })).toBeInTheDocument();
+});
+
+it("public visitors see ratings without review controls", () => {
+  enabled = false;
+  summary = { ...rated, mine: null };
+  render(<RatingCard initiativeId="i1" canRate />);
+  expect(screen.getByText("4.3")).toBeInTheDocument();
+  expect(screen.queryByRole("link")).toBeNull();
+  expect(screen.queryByText("Yours")).toBeNull();
+  enabled = true;
 });

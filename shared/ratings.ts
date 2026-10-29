@@ -1,4 +1,4 @@
-/** NFT-backed star ratings: private reviews for voting NFT holders (api/routes/reviews.ts). */
+/** Public NFT-backed star ratings (api/routes/reviews.ts). */
 
 /** Averages become visible after three distinct voting NFTs have saved a rating. */
 export const MIN_AVERAGE_REVIEWS = 3;

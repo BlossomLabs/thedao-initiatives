@@ -5,20 +5,23 @@ import { afterEach, expect, it, vi } from "vitest";
 import { api } from "~/lib/api";
 import { useAdminRatings, useReviews } from "./use-admin-ratings";
 
+const viewer = vi.hoisted(() => ({ signedIn: true }));
 const address = "0x1111111111111111111111111111111111111111";
 vi.mock("~/context/session", () => ({
   useSession: () => ({
-    session: { address: "0x1111111111111111111111111111111111111111", isAdmin: false },
+    session: viewer.signedIn
+      ? { address: "0x1111111111111111111111111111111111111111", isAdmin: false }
+      : null,
   }),
 }));
 vi.mock("~/lib/api", () => ({ api: vi.fn() }));
 afterEach(cleanup);
 
-it("a non-admin NFT holder can read and submit with the NFT ID; losing it hides cached reviews", async () => {
+it("a non-admin NFT holder can read and submit with the NFT ID; losing it disables controls while reviews stay public", async () => {
   const summary = { avg: 4, count: 1, mine: 4, dist: [0, 0, 0, 1, 0] };
   vi.mocked(api).mockImplementation(async (path) => {
     if (path === "/api/reviews/identity") return { tokenIds: ["42"], canReview: true };
-    if (path === "/api/reviews/ratings") return { ratings: { i1: summary } };
+    if (path.startsWith("/api/reviews/ratings")) return { ratings: { i1: summary } };
     return { reviews: [], summary };
   });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -40,8 +43,32 @@ it("a non-admin NFT holder can read and submit with the NFT ID; losing it hides 
     qc.setQueryData(["admin", "review-identity", address], { tokenIds: [], canReview: false })
   );
   await waitFor(() => expect(result.current.reviews.enabled).toBe(false));
-  expect(result.current.ratings).toBeUndefined();
-  expect(result.current.reviews.summary).toBeUndefined();
+  await waitFor(() => expect(result.current.ratings?.i1).toEqual(summary));
+  await waitFor(() => expect(result.current.reviews.summary).toEqual(summary));
   unmount();
   qc.clear();
+});
+
+it("signed-out visitors fetch reviews without requesting NFT identity", async () => {
+  viewer.signedIn = false;
+  vi.mocked(api).mockReset();
+  const summary = { avg: 4, count: 3, mine: null, dist: [0, 0, 0, 3, 0] };
+  vi.mocked(api).mockImplementation(async (path) =>
+    path === "/api/reviews/ratings" ? { ratings: { i1: summary } } : { reviews: [], summary }
+  );
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  );
+  const { result, unmount } = renderHook(
+    () => ({ ratings: useAdminRatings(), reviews: useReviews("i1") }),
+    { wrapper },
+  );
+  await waitFor(() => expect(result.current.ratings?.i1).toEqual(summary));
+  await waitFor(() => expect(result.current.reviews.summary).toEqual(summary));
+  expect(result.current.reviews.enabled).toBe(false);
+  expect(api).not.toHaveBeenCalledWith("/api/reviews/identity", expect.anything());
+  unmount();
+  qc.clear();
+  viewer.signedIn = true;
 });

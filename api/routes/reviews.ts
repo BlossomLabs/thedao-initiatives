@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { type Context, Hono, type Next } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { jsonBody, s } from "../lib/body.ts";
@@ -12,32 +12,32 @@ import { ownsReviewToken, reviewTokenIds } from "../chain/reviewer.ts";
 const WRITES_PER_MINUTE = 30;
 
 /**
- * NFT-backed ratings, mounted under /api/reviews: only holders read or write
- * them. Nothing here reaches the board, the comments or the feeds; each
- * holder's browser fetches them and merges them in.
+ * Public badge-backed reviews. Only authenticated current holders can write.
+ * Optional tokenId personalizes the public summary using already-public ratings.
  */
+type ReviewVars = Vars & { Variables: { reviewTokenIds: string[] } };
+
 export function reviewRoutes(deps: Deps) {
-  const r = new Hono<Vars & { Variables: { reviewTokenIds: string[] } }>();
+  const r = new Hono<ReviewVars>();
   const { db } = deps;
-  r.use("*", requireAuth);
 
   const tokenIdsFor = async (address: string) => {
     try {
       return await reviewTokenIds(deps.chain.rpc, address, deps.fetch);
     } catch {
-      throw new HttpError(503, "Could not verify voting NFT ownership. Please try again.");
+      throw new HttpError(503, "Could not verify voting badge ownership. Please try again.");
     }
   };
-  r.get("/identity", async (c) => {
+  r.get("/identity", requireAuth, async (c) => {
     const ids = await tokenIdsFor(c.var.user!.address);
     return c.json({ tokenIds: ids, canReview: ids.length > 0 });
   });
-  r.use("*", async (c, next) => {
+  const requireHolder = async (c: Context<ReviewVars>, next: Next) => {
     const ids = await tokenIdsFor(c.var.user!.address);
-    if (!ids.length) throw new HttpError(403, "A voting NFT is required to review.");
+    if (!ids.length) throw new HttpError(403, "Only Voting Badge Holders can review.");
     c.set("reviewTokenIds", ids);
     await next();
-  });
+  };
 
   const initiativeOr404 = async (id: string) => {
     const initiative = await db.initiatives.get(id);
@@ -60,7 +60,10 @@ export function reviewRoutes(deps: Deps) {
   r.get("/ratings", async (c) => {
     const out: Record<string, RatingSummary> = {};
     for (const [id, list] of await db.reviews.ratings()) {
-      out[id] = summarize(list, c.var.reviewTokenIds[0]);
+      const initiative = await db.initiatives.get(id);
+      if (initiative && ["approved", "archived"].includes(initiative.status)) {
+        out[id] = summarize(list, c.req.query("tokenId"));
+      }
     }
     return c.json({ ratings: out });
   });
@@ -75,11 +78,11 @@ export function reviewRoutes(deps: Deps) {
     const current = new Set(ratings.map((x) => x.reviewId));
     return c.json({
       reviews: rows.map((row) => reviewJson(row, current.has(row.id))),
-      summary: summarize(ratings, c.var.reviewTokenIds[0]),
+      summary: summarize(ratings, c.req.query("tokenId")),
     });
   });
 
-  r.post("/initiatives/:id/reviews", async (c) => {
+  r.post("/initiatives/:id/reviews", requireAuth, requireHolder, async (c) => {
     const address = c.var.user!.address;
     if (!(await db.rateLimit("review:" + address.toLowerCase(), WRITES_PER_MINUTE, 60))) {
       throw new HttpError(429, "slow down");
@@ -91,7 +94,7 @@ export function reviewRoutes(deps: Deps) {
     const body = await jsonBody(c, ["stars", "body", "tokenId"]);
     const tokenId = body.tokenId === undefined ? c.var.reviewTokenIds[0] : body.tokenId;
     if (typeof tokenId !== "string" || !c.var.reviewTokenIds.includes(tokenId)) {
-      throw new HttpError(403, "You must own the voting NFT used for this review.");
+      throw new HttpError(403, "You must own the voting badge used for this review.");
     }
     if (!isStars(body.stars)) throw new HttpError(400, "stars must be 1 to 5");
     const text = s(body.body, COMMENT_BODY_MAX + 1);
@@ -101,11 +104,11 @@ export function reviewRoutes(deps: Deps) {
     // Recheck immediately before saving; discovery alone never authorizes a write.
     try {
       if (!(await ownsReviewToken(deps.chain.rpc, address, tokenId))) {
-        throw new HttpError(403, "You no longer own this voting NFT.");
+        throw new HttpError(403, "You no longer own this voting badge.");
       }
     } catch (e) {
       if (e instanceof HttpError) throw e;
-      throw new HttpError(503, "Could not verify voting NFT ownership. Please try again.");
+      throw new HttpError(503, "Could not verify voting badge ownership. Please try again.");
     }
     const row = await db.reviews.create({
       initiativeId: initiative.id,
@@ -118,7 +121,7 @@ export function reviewRoutes(deps: Deps) {
   });
 
   /** Only the author deletes a review; their previous one then counts again. */
-  r.delete("/initiatives/:id/reviews/:reviewId", async (c) => {
+  r.delete("/initiatives/:id/reviews/:reviewId", requireAuth, requireHolder, async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"));
     const ok = await db.reviews.remove(
       initiative.id,

@@ -4,7 +4,7 @@ import { newId } from "../lib/ids.ts";
 import type { Stars } from "../../shared/ratings.ts";
 
 /**
- * NFT-backed reviews: stars with an optional note, only voting NFT holders read them. Each
+ * NFT-backed reviews: public stars with an optional note, only voting badge holders write them. Each
  * NFT's latest review is their rating, kept under K.rating so the board
  * summary is one list. Every write checks that entry, so two reviews racing
  * never leave an older one counting.

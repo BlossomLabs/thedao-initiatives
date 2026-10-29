@@ -19,7 +19,7 @@ import { errorMessage } from "~/lib/api";
 /**
  * One generic comment box (the MVP dropped type/topic pickers). Voting NFT holders also
  * get stars at the end of the title's line: picking them turns the box into a
- * private review (only voting NFT holders see it, the text is optional), titled so
+ * public review (the text is optional), titled so
  * before anything is sent.
  */
 export default function Composer(
@@ -30,7 +30,7 @@ export default function Composer(
       website: string,
       signedIn: boolean,
     ) => Promise<string | null>;
-    /** Voting NFT holders on a board initiative: post a private review instead. */
+    /** Voting NFT holders on a board initiative: post a public review instead. */
     onReview?: (stars: Stars, body: string) => Promise<void>;
   },
 ) {
@@ -96,7 +96,7 @@ export default function Composer(
         setText("");
         setStars(null);
         setPosted((n) => n + 1);
-        setNote({ text: "Review saved. The latest review for your NFT is its rating.", ok: true });
+        setNote({ text: "Review saved. Your latest review is your voting badge’s rating.", ok: true });
       } catch (e) {
         setNote({ text: errorMessage(e, "Could not save the review."), ok: false });
       } finally {

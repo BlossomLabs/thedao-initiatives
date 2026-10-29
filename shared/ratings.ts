@@ -1,5 +1,10 @@
 /** Admin star ratings: private reviews only admins see (api/routes/reviews.ts). */
 
+/** Averages become visible after three distinct reviewers have saved a rating. */
+export const MIN_AVERAGE_REVIEWS = 3;
+export const hasRatingAverage = (summary?: Pick<RatingSummary, "count">): boolean =>
+  (summary?.count ?? 0) >= MIN_AVERAGE_REVIEWS;
+
 export const STARS = [1, 2, 3, 4, 5] as const;
 export type Stars = typeof STARS[number];
 

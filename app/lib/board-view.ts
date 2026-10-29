@@ -7,7 +7,7 @@
 import type { Card } from "~/lib/api-types";
 import { CATEGORIES, categoryOf } from "~/lib/categories";
 import { plural } from "~/lib/format";
-import type { RatingSummary } from "@shared/ratings";
+import { hasRatingAverage, type RatingSummary } from "@shared/ratings";
 import { REVIEWER } from "~/lib/reviewer";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
@@ -173,7 +173,7 @@ const KEYS: Record<Exclude<BoardSort, "category">, SortKey | null> = {
   "goal-asc": (c) => c.initiative.goalUsd,
   "goal-desc": (c) => -c.initiative.goalUsd,
   // Unrated last (1, after every -stars).
-  "rating-avg": (c, r) => r[c.initiative.id]?.count ? -r[c.initiative.id].avg : 1,
+  "rating-avg": (c, r) => hasRatingAverage(r[c.initiative.id]) ? -r[c.initiative.id].avg : 1,
   "rating-mine": (c, r) => -(r[c.initiative.id]?.mine ?? -1),
 };
 
@@ -260,6 +260,12 @@ export function groupByRating(
   const sections: Omit<RatingGroup, "cards">[] = sort === "rating-avg"
     ? [
       ...AVG_BANDS.map(({ key, label, hint }) => ({ key, label, hint, stars: null })),
+      {
+        key: "pending",
+        label: "Awaiting reviews",
+        hint: "Average shown after 3 reviewers",
+        stars: null,
+      },
       { key: "none", label: "Not rated yet", hint: `No ${REVIEWER} rated these`, stars: null },
     ]
     : [
@@ -275,6 +281,7 @@ export function groupByRating(
     const r = ratings[c.initiative.id];
     if (sort === "rating-mine") return r?.mine ? String(r.mine) : "none";
     if (!r?.count) return "none";
+    if (!hasRatingAverage(r)) return "pending";
     return AVG_BANDS.find((b) => r.avg >= b.min)!.key;
   };
   const by = new Map<string, Card[]>();

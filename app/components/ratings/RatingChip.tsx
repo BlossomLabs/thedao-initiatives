@@ -4,7 +4,7 @@ import { ChevronDown, Star } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { plural } from "~/lib/format";
 import { FormNote } from "~/components/comments/FormFeedback";
-import { averageWith, EMPTY_SUMMARY, type RatingSummary } from "@shared/ratings";
+import { averageWith, EMPTY_SUMMARY, hasRatingAverage, type RatingSummary } from "@shared/ratings";
 import { StarInput } from "./Stars";
 import { REVIEWER, Reviewer } from "~/lib/reviewer";
 import { RatingButtons, ReviewText, useRatingDraft } from "./RatingDraft";
@@ -26,10 +26,13 @@ export default function RatingChip(
 ) {
   const count = summary?.count ?? 0;
   const mine = summary?.mine ?? null;
-  const title = count
+  const hasAverage = hasRatingAverage(summary);
+  const title = hasAverage
     ? `${Reviewer} average ${summary!.avg} from ${plural(count, REVIEWER)}` +
       (mine ? ` · yours: ${mine}` : " · you have not rated it")
-    : `No ${REVIEWER} rated it yet`;
+    : (count
+      ? `${plural(count, REVIEWER)} rated it · average shown after 3 reviewers`
+      : `No ${REVIEWER} rated it yet`);
   return (
     <button
       type="button"
@@ -48,7 +51,7 @@ export default function RatingChip(
       {count
         ? (
           <>
-            <span className="tnum">{summary!.avg.toFixed(1)}</span>
+            {hasAverage && <span className="tnum">{summary!.avg.toFixed(1)}</span>}
             <span className="tnum text-white/35">({count})</span>
           </>
         )
@@ -120,7 +123,7 @@ export function RatingForm(
   const draft = useRatingDraft({ initiativeId, summary, onSaved: onClose });
   const { stars, writing } = draft;
   const instant = useInstant();
-  const avg = summary.count || stars ? averageWith(summary, stars) : null;
+  const avg = hasRatingAverage(summary) ? averageWith(summary, stars) : null;
 
   return (
     // A container, so a narrow form can drop the buttons under the stars, still in the box.
@@ -147,7 +150,10 @@ export function RatingForm(
             className="flex w-[104px] flex-none flex-col justify-center gap-1 border-r border-edge2 py-2.5 pl-4 pr-3"
           >
             <span className={EYEBROW}>Average</span>
-            <span role="img" aria-label={avg === null ? "No ratings yet" : `Average ${avg} of 5`}>
+            <span
+              role="img"
+              aria-label={avg === null ? "Average shown after 3 reviewers" : `Average ${avg} of 5`}
+            >
               <Average value={avg} preview={avg !== null && draft.preview} />
             </span>
           </motion.div>
@@ -191,6 +197,7 @@ export function RatingForm(
           </motion.div>
         </motion.div>
       </LayoutGroup>
+      {avg === null && <p className="small dim mt-2">Average shown after 3 reviewers.</p>}
       <FormNote note={draft.note} className="mt-2" />
     </div>
   );

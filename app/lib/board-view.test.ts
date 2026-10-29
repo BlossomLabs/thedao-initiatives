@@ -334,9 +334,9 @@ describe("admin ratings", () => {
     dist: [0, 0, 0, 0, 0] as [number, number, number, number, number],
     mine,
   });
-  // Alpha: 3.5 from 2, mine 5. Bravo: 4.8 from 3, not mine. Charlie: nobody.
+  // Alpha: 3.5 from 3, mine 5. Bravo: 4.8 from 3, not mine. Charlie: nobody.
   const ratings = {
-    [a.initiative.id]: summary(3.5, 2, 5),
+    [a.initiative.id]: summary(3.5, 3, 5),
     [b.initiative.id]: summary(4.8, 3, null),
   };
   const titles = (l: Card[]) => l.map((x) => x.initiative.title);
@@ -357,8 +357,8 @@ describe("admin ratings", () => {
     ]);
     // The bands' edges: 4.5 is Loved, 1.4 is Strongly disliked.
     const edge = {
-      [a.initiative.id]: summary(4.5, 1, null),
-      [b.initiative.id]: summary(1.4, 1, null),
+      [a.initiative.id]: summary(4.5, 3, null),
+      [b.initiative.id]: summary(1.4, 3, null),
     };
     expect(groupByRating([a, b], "rating-avg", edge).map((g) => g.key)).toEqual([
       "loved",
@@ -378,8 +378,20 @@ describe("admin ratings", () => {
     [1.9, "strongly-disliked"],
     [1, "strongly-disliked"],
   ])("groups an average of %s as %s", (avg, key) => {
-    const ratings = { [a.initiative.id]: summary(avg, 1, null) };
+    const ratings = { [a.initiative.id]: summary(avg, 3, null) };
     expect(groupByRating([a], "rating-avg", ratings)[0].key).toBe(key);
+  });
+
+  it("keeps one or two reviewers out of average bands and sorting, but preserves My rating", () => {
+    const ratings = {
+      [a.initiative.id]: summary(1, 1, 1),
+      [b.initiative.id]: summary(5, 2, 5),
+      [c.initiative.id]: summary(3, 3, null),
+    };
+    expect(titles(sortCards(cards, "rating-avg", ratings))).toEqual(["Charlie", "Alpha", "Bravo"]);
+    expect(groupByRating(cards, "rating-avg", ratings).map((g) => [g.key, titles(g.cards)]))
+      .toEqual([["okay", ["Charlie"]], ["pending", ["Alpha", "Bravo"]]]);
+    expect(groupByRating([b], "rating-mine", ratings)[0].key).toBe("5");
   });
 
   it("sorts by the average or mine, unrated last", () => {

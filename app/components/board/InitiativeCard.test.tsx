@@ -241,7 +241,7 @@ describe("vote eligibility", () => {
 });
 
 describe("rating from the board (admins)", () => {
-  const rated = { avg: 4.5, count: 2, dist: [0, 0, 0, 1, 1] as [0, 0, 0, 1, 1], mine: 4 as const };
+  const rated = { avg: 4.3, count: 3, dist: [0, 0, 0, 2, 1] as [0, 0, 0, 2, 1], mine: 4 as const };
   const mountRated = (summary?: typeof rated) =>
     render(
       <MemoryRouter>
@@ -256,7 +256,7 @@ describe("rating from the board (admins)", () => {
   it("the chip unfolds the form under the card, like Donate, one panel at a time", async () => {
     postReview.mockReset().mockResolvedValue(undefined);
     mountRated(rated);
-    const chip = screen.getByRole("button", { name: /Admin average 4.5 from 2 admins/ });
+    const chip = screen.getByRole("button", { name: /Admin average 4.3 from 3 admins/ });
     expect(chip).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(chip);
     expect(chip).toHaveAttribute("aria-expanded", "true");
@@ -273,10 +273,10 @@ describe("rating from the board (admins)", () => {
     await waitFor(() => expect(screen.queryByRole("radiogroup")).toBeNull());
     fireEvent.click(chip);
     expect(screen.getByRole("button", { name: "Donate" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Average 4.5 of 5" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Average 4.3 of 5" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: "2 stars" }));
-    // The average counts the new pick in place of the old one: (5 + 2) / 2.
-    expect(screen.getByRole("img", { name: "Average 3.5 of 5" })).toBeInTheDocument();
+    // The average counts the new pick in place of the old one: (4 + 5 + 2) / 3.
+    expect(screen.getByRole("img", { name: "Average 3.7 of 5" })).toBeInTheDocument();
     // Write review opens the text, focused, in the stars' place.
     fireEvent.click(screen.getByRole("button", { name: "Write review" }));
     const box = screen.getByPlaceholderText("Why this rating? (optional)");
@@ -299,16 +299,31 @@ describe("rating from the board (admins)", () => {
     await waitFor(() => expect(chip).toHaveAttribute("aria-expanded", "false"));
   });
 
+  it.each([1, 2])("hides the chip and draft average with %s saved reviewers", (count) => {
+    mountRated({ ...rated, count });
+    const chip = screen.getByRole("button", { name: /average shown after 3 reviewers/ });
+    expect(chip).not.toHaveTextContent("4.3");
+    expect(chip.title).not.toContain("4.3");
+    fireEvent.click(chip);
+    fireEvent.click(screen.getByRole("radio", { name: "5 stars" }));
+    expect(screen.getByRole("img", { name: "Average shown after 3 reviewers" }))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /^Average \d/ })).toBeNull();
+  });
+
   it("Send waits for stars, sends stars alone, and an error keeps the form open", async () => {
     postReview.mockReset().mockRejectedValue(
       new Error("only initiatives on the board can be rated"),
     );
     mountRated();
     fireEvent.click(screen.getByRole("button", { name: /No admin rated it yet/ }));
-    expect(screen.getByRole("img", { name: "No ratings yet" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Average shown after 3 reviewers" }))
+      .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
     fireEvent.click(screen.getByRole("radio", { name: "5 stars" }));
-    expect(screen.getByRole("img", { name: "Average 5 of 5" })).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Average 5 of 5" })).toBeNull();
+    expect(screen.getByRole("img", { name: "Average shown after 3 reviewers" }))
+      .toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     expect(await screen.findByText(/only initiatives on the board/i)).toBeInTheDocument();
     expect(postReview).toHaveBeenCalledWith("1", 5, "");

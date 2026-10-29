@@ -1,5 +1,5 @@
 import { plural } from "~/lib/format";
-import type { RatingSummary } from "@shared/ratings";
+import { hasRatingAverage, type RatingSummary } from "@shared/ratings";
 import { StarRow } from "./Stars";
 import { REVIEWER } from "~/lib/reviewer";
 
@@ -11,14 +11,17 @@ export default function RatingHistogram(
   return (
     <div>
       <div className="flex items-baseline gap-2">
-        {count > 0 && (
+        {hasRatingAverage(summary) && (
           <span className="font-inter-tight text-[28px] font-semibold leading-none tnum text-white">
             {avg.toFixed(1)}
           </span>
         )}
-        <StarRow value={avg} />
+        {hasRatingAverage(summary) && <StarRow value={avg} />}
         <span className="small dim">{count ? plural(count, REVIEWER) : "No ratings yet"}</span>
       </div>
+      {!hasRatingAverage(summary) && (
+        <p className="small dim mt-2">Average shown after 3 reviewers.</p>
+      )}
       {count > 0 && (
         <ul className="m-0 mt-3 flex list-none flex-col gap-1 p-0" aria-label="Ratings by stars">
           {[5, 4, 3, 2, 1].map((n) => {

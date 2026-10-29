@@ -4,7 +4,7 @@ import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "
 import { AnimatePresence } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  CircleQuestionMark,
+  Frown,
   Heart,
   type LucideIcon,
   Smile,
@@ -71,8 +71,8 @@ const BAND_ICONS: Record<string, { Icon: LucideIcon; color: string }> = {
   loved: { Icon: Heart, color: "text-dao-red" },
   liked: { Icon: ThumbsUp, color: "text-dao-green" },
   okay: { Icon: Smile, color: "text-dao-amber" },
-  unsure: { Icon: CircleQuestionMark, color: "text-dao-sky" },
-  "not-for-us": { Icon: ThumbsDown, color: "text-white/50" },
+  disliked: { Icon: Frown, color: "text-dao-sky" },
+  "strongly-disliked": { Icon: ThumbsDown, color: "text-white/50" },
 };
 /** The device's last layout (cards or list), used when the URL does not say. */
 

@@ -234,10 +234,10 @@ export function groupByPrimary(
  * average is rounded to one decimal, so 4.45 is already 4.5). */
 export const AVG_BANDS = [
   { key: "loved", label: "Loved", min: 4.5, hint: "Average 4.5★ and up" },
-  { key: "liked", label: "Liked", min: 3.5, hint: "Average 3.5 to 4.4★" },
-  { key: "okay", label: "Okay", min: 2.5, hint: "Average 2.5 to 3.4★" },
-  { key: "unsure", label: "Unsure", min: 1.5, hint: "Average 1.5 to 2.4★" },
-  { key: "not-for-us", label: "Not for us", min: 0, hint: "Average under 1.5★" },
+  { key: "liked", label: "Liked", min: 4, hint: "Average 4.0 to 4.4★" },
+  { key: "okay", label: "Okay", min: 3, hint: "Average 3.0 to 3.9★" },
+  { key: "disliked", label: "Disliked", min: 2, hint: "Average 2.0 to 2.9★" },
+  { key: "strongly-disliked", label: "Strongly disliked", min: 0, hint: "Average under 2.0★" },
 ] as const;
 
 export interface RatingGroup {

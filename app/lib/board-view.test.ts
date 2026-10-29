@@ -348,22 +348,38 @@ describe("admin ratings", () => {
       ) => [g.label, titles(g.cards)]);
     expect(sections("rating-avg")).toEqual([
       ["Loved", ["Bravo"]],
-      ["Liked", ["Alpha"]],
+      ["Okay", ["Alpha"]],
       ["Not rated yet", ["Charlie"]],
     ]);
     expect(sections("rating-mine")).toEqual([
       ["5 stars", ["Alpha"]],
       ["Not rated by me", ["Bravo", "Charlie"]],
     ]);
-    // The bands' edges: 4.5 is Loved, 1.4 is Not for us.
+    // The bands' edges: 4.5 is Loved, 1.4 is Strongly disliked.
     const edge = {
       [a.initiative.id]: summary(4.5, 1, null),
       [b.initiative.id]: summary(1.4, 1, null),
     };
     expect(groupByRating([a, b], "rating-avg", edge).map((g) => g.key)).toEqual([
       "loved",
-      "not-for-us",
+      "strongly-disliked",
     ]);
+  });
+
+  it.each([
+    [5, "loved"],
+    [4.5, "loved"],
+    [4.4, "liked"],
+    [4, "liked"],
+    [3.9, "okay"],
+    [3, "okay"],
+    [2.9, "disliked"],
+    [2, "disliked"],
+    [1.9, "strongly-disliked"],
+    [1, "strongly-disliked"],
+  ])("groups an average of %s as %s", (avg, key) => {
+    const ratings = { [a.initiative.id]: summary(avg, 1, null) };
+    expect(groupByRating([a], "rating-avg", ratings)[0].key).toBe(key);
   });
 
   it("sorts by the average or mine, unrated last", () => {

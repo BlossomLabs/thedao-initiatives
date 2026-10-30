@@ -109,7 +109,7 @@ Every heading, and the one question it answers:
   Giveth fundraises from this list alongside the proposer, so honest relationships beat impressive names nobody knows. Leave out third parties' private contact details.
 - **Contact** (never published): the proposer's email or Telegram.
 
-Length: as short as the facts allow. Under 600 words across every field together when the ask is below $50,000, and under 1,200 above it. The example at the end runs about 1,300 words because it sets up a new industry body; do not use it as a length target.
+Length: keep it short, concise is good. As a guideline, aim for about 600 words across every field together when the ask is below $50,000, and about 1,200 above it. This is a guideline, not a rule: if the proposer needs to add extra context, let them, especially in the milestones. The example at the end runs about 1,300 words because it sets up a new industry body; do not use it as a length target.
 
 Never write the process, the proposal window, the selection steps, the milestones preamble, the applicant disclosure sentence, milestone review and acceptance, payment terms, the stalled-milestone sentence, milestone letters, the headings themselves, or a closing line. The site adds all of it, and the wording is in "What the site shows next to every initiative", below, so you can answer questions about the process without inventing an answer.
 
@@ -236,7 +236,7 @@ READINESS: READY | NOT READY
 - No ranges and no hedges in any criterion: yes / no
 - Maintainer named: yes / no
 - Budget passes the sanity test: yes / no
-- Concision pass done: every field and criterion reread and cut, no fact repeated across fields, under 600 words (ask below $50,000) or 1,200 words (above): yes / no
+- Concision pass done: every field and criterion reread and cut, no fact repeated across fields, near the length guideline (about 600 words below $50,000, about 1,200 above) unless the proposer needs the extra context: yes / no
 - Fewest criteria per milestone, usually one to three, each one short line with no background: yes / no
 - No headings inside fields, every field under its own ## name: yes / no
 - Banned wording absent (refundable, claimable, held, reserved, escrowed, tax deductible, anonymous), no "the DAO", no em dashes: yes / no

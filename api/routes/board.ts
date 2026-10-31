@@ -57,11 +57,12 @@ export const SPONSOR_MIN_USD = 5000;
 
 /** The leaderboard of pledgers across the published initiatives: withdrawn pledges
  * do not count, and one company is one row whatever the casing or spacing of its
- * name. Only those at SPONSOR_MIN_USD or more, biggest total first, then by name. */
+ * name. Only those at SPONSOR_MIN_USD or more, biggest total first, then by name.
+ * The board scrolls through all of them; `limit` only keeps the response bounded. */
 export function topSponsors(
   config: Deps["config"],
   rows: Pick<CardSummary, "pledges">[],
-  limit = 8,
+  limit = 50,
 ): Sponsor[] {
   const by = new Map<string, { pledges: CardSummary["pledges"]; total: number }>();
   for (const { pledges } of rows) {

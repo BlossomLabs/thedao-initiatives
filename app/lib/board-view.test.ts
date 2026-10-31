@@ -3,6 +3,7 @@ import type { Card } from "./api-types";
 import { CATEGORIES } from "./categories";
 import {
   activeFilterCount,
+  aiPicks,
   applyView,
   type BoardView,
   categoryOrder,
@@ -406,5 +407,42 @@ describe("admin ratings", () => {
   it("without the ratings (not an admin) the rating sorts fall back", () => {
     expect(sortFor("rating-avg", true)).toBe(DEFAULT_VIEW.sort);
     expect(sortFor("rating-avg", true, true)).toBe("rating-avg");
+  });
+});
+
+describe("aiPicks", () => {
+  // `count` cards in AI order, the first `above` scoring over 50%.
+  const ranked = (count: number, above: number) => {
+    const cards = Array.from({ length: count }, (_, i) => card(`Pick ${i}`));
+    const scores = new Map(cards.map((c, i) => [c.initiative.id, i < above ? 0.9 - i / 100 : 0.4]));
+    return { cards, scores, ids: cards.map((c) => c.initiative.id) };
+  };
+
+  it("keeps the top 3 when none clear the threshold", () => {
+    const { cards, scores, ids } = ranked(12, 0);
+    expect(aiPicks(cards, scores, 0.5)).toEqual(ids.slice(0, 3));
+  });
+
+  it("marks every card above the threshold", () => {
+    const { cards, scores, ids } = ranked(12, 6);
+    expect(aiPicks(cards, scores, 0.5)).toEqual(ids.slice(0, 6));
+  });
+
+  it("stops at 10", () => {
+    const { cards, scores, ids } = ranked(20, 14);
+    expect(aiPicks(cards, scores, 0.5)).toEqual(ids.slice(0, 10));
+  });
+
+  it("shows every scored card when fewer than 3 were scored", () => {
+    const { cards, scores, ids } = ranked(2, 0);
+    expect(aiPicks(cards, scores, 0.5)).toEqual(ids);
+  });
+
+  it("exactly the threshold is not above it; unscored cards never count", () => {
+    const { cards, scores, ids } = ranked(8, 0);
+    ids.slice(0, 5).forEach((id) => scores.set(id, 0.5));
+    scores.delete(ids[1]);
+    expect(aiPicks(cards, scores, 0.5)).toEqual([ids[0], ids[2], ids[3]]);
+    expect(aiPicks(cards, scores, 0.4)).toEqual([ids[0], ids[2], ids[3], ids[4]]);
   });
 });

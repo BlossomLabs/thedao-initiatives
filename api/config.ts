@@ -207,7 +207,7 @@ export function webOriginsFrom(env: Record<string, string | undefined>): string[
 }
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
-  const aiPickThreshold = Number((env.AI_PICK_THRESHOLD ?? "").trim() || "0.8");
+  const aiPickThreshold = Number((env.AI_PICK_THRESHOLD ?? "").trim() || "0.5");
   if (!Number.isFinite(aiPickThreshold) || aiPickThreshold < 0 || aiPickThreshold > 1) {
     throw new Error("AI_PICK_THRESHOLD must be between 0 and 1");
   }

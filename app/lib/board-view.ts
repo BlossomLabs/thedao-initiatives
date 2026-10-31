@@ -334,3 +334,16 @@ export const sortFor = (sort: BoardSort, featured: boolean, rated = false): Boar
     : RATING_SORTS.includes(sort) && !rated
     ? DEFAULT_VIEW.sort
     : sort;
+
+export const AI_PICKS_MIN = 3;
+export const AI_PICKS_MAX = 10;
+
+/** The "AI pick" initiatives: every scored card above the threshold, at least
+ * AI_PICKS_MIN (the top ones, whatever they scored) and at most AI_PICKS_MAX.
+ * `cards` come in AI order, highest score first. */
+export function aiPicks(cards: Card[], scores: Map<string, number>, threshold: number): string[] {
+  const scored = cards.filter((c) => scores.has(c.initiative.id));
+  const above = scored.filter((c) => scores.get(c.initiative.id)! > threshold).length;
+  const n = Math.min(AI_PICKS_MAX, Math.max(AI_PICKS_MIN, above));
+  return scored.slice(0, n).map((c) => c.initiative.id);
+}

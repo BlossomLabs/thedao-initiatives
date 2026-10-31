@@ -27,6 +27,7 @@ import {
 import CategoryDot from "~/components/ui/CategoryDot";
 import { StarRow } from "~/components/ratings/Stars";
 import {
+  aiPicks,
   applyView,
   type BoardSort,
   type BoardView,
@@ -151,13 +152,8 @@ export default function Board() {
     );
   }, [all, shownView, watchlist.ids, ratings, ai, scores]);
   const picks = useMemo(
-    () =>
-      ai
-        ? cards.filter((card) => scores.has(card.initiative.id)).slice(0, 3).map((card) =>
-          card.initiative.id
-        )
-        : [],
-    [ai, cards, scores],
+    () => ai && aiResult ? aiPicks(cards, scores, aiResult.pickThreshold) : [],
+    [ai, aiResult, cards, scores],
   );
   const filtered = isFiltered(shownView);
   // "By category" and the rating sorts draw sections; the AI order wins over them while it is on.

@@ -27,7 +27,7 @@ const ITEMS: { value: string; label: string }[] = SORTS.map(([value, label]) => 
   label,
 }));
 const AI = { value: "ai", label: "AI matches" };
-/** Not offered to admins with the ratings, to keep the menu as long. */
+/** Not offered with the ratings, one per rating sort shown, to keep the menu as long. */
 const RATING_FOR: readonly BoardSort[] = ["goal-asc", "backers"];
 
 /** One icon per sort, drawn in the menu like the Funding menu's glyphs. */
@@ -51,25 +51,28 @@ const ICONS: Record<BoardSort | "ai", LucideIcon> = {
  * already in the URL, hands the order back to the sort.
  */
 export default function SortSelect(
-  { sort, ai, featured = true, rated = false, onSort, className }: {
+  { sort, ai, featured = true, rated = false, canRate = false, onSort, className }: {
     sort: BoardSort;
     ai: boolean;
     /** Whether anything is featured; without, the Featured sort is not offered. */
     featured?: boolean;
-    /** An admin with the ratings: the rating sorts are offered. */
+    /** The ratings have loaded: Top rated is offered. */
     rated?: boolean;
+    /** This viewer can rate: My rating is offered too. */
+    canRate?: boolean;
     onSort: (s: BoardSort) => void;
     className?: string;
   },
 ) {
-  const items = ITEMS.filter((s) =>
-    (featured || s.value !== "recommended") &&
-    (rated
-      // The two rating sorts take the place of the least used ones (still
-      // shown while a URL has one on).
-      ? !RATING_FOR.includes(s.value as BoardSort) || s.value === sort
-      : !RATING_SORTS.includes(s.value as BoardSort))
-  );
+  const shown = rated ? (canRate ? RATING_SORTS : ["rating-avg"]) : [];
+  // The rating sorts take the place of the least used ones (still shown while
+  // a URL has one on).
+  const replaced = RATING_FOR.slice(0, shown.length);
+  const items = ITEMS.filter((s) => {
+    const v = s.value as BoardSort;
+    return (featured || v !== "recommended") &&
+      (RATING_SORTS.includes(v) ? shown.includes(v) : !replaced.includes(v) || v === sort);
+  });
   return (
     <Select
       value={ai ? "ai" : sort}

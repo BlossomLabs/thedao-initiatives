@@ -327,11 +327,17 @@ export const hasFeatured = (cards: Card[]): boolean => featuredIds(cards).size >
 
 /** The sort the board uses: Featured (the server's order, pins first) only
  * while something is featured; a URL that still asks for it otherwise gets
- * closest to funded. The rating sorts need the admin ratings (`rated`). */
-export const sortFor = (sort: BoardSort, featured: boolean, rated = false): BoardSort =>
+ * closest to funded. The rating sorts need the ratings (`rated`), and My
+ * rating a viewer who can rate (`canRate`). */
+export const sortFor = (
+  sort: BoardSort,
+  featured: boolean,
+  rated = false,
+  canRate = false,
+): BoardSort =>
   sort === "recommended" && !featured
     ? "closest"
-    : RATING_SORTS.includes(sort) && !rated
+    : (RATING_SORTS.includes(sort) && !rated) || (sort === "rating-mine" && !canRate)
     ? DEFAULT_VIEW.sort
     : sort;
 

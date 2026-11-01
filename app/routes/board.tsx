@@ -129,10 +129,10 @@ export default function Board() {
   const shownView = useMemo(
     () => ({
       ...view,
-      sort: sortFor(view.sort, featured, Boolean(ratings)),
+      sort: sortFor(view.sort, featured, Boolean(ratings), canRate),
       ...(ai || (data?.flags.aiSearchAuto && asking) ? { q: "" } : {}),
     }),
-    [view, featured, ratings, ai, data?.flags.aiSearchAuto, asking],
+    [view, featured, ratings, canRate, ai, data?.flags.aiSearchAuto, asking],
   );
   const counts = useMemo(() => facetCounts(all, shownView, watchlist.ids), [
     all,
@@ -228,6 +228,7 @@ export default function Board() {
               ai={ai}
               voteFilter={Boolean(data.flags.vote?.show)}
               rated={Boolean(ratings)}
+              canRate={canRate}
               onSort={onSort}
               sheet={
                 <Suspense

@@ -126,6 +126,13 @@ describe("board view", () => {
     expect(sortFor("newest", false)).toBe("newest");
   });
 
+  it("My rating needs a viewer who can rate; Top rated only the ratings", () => {
+    expect(sortFor("rating-mine", true, true, true)).toBe("rating-mine");
+    expect(sortFor("rating-mine", true, true, false)).toBe(DEFAULT_VIEW.sort);
+    expect(sortFor("rating-avg", true, true, false)).toBe("rating-avg");
+    expect(sortFor("rating-avg", true, false, true)).toBe(DEFAULT_VIEW.sort);
+  });
+
   it("the default sort is labelled Featured", () => {
     expect(SORTS.find(([v]) => v === "recommended")?.[1]).toBe("Featured");
   });

@@ -127,6 +127,7 @@ export default function FilterBar({
   watchlistCount = 0,
   voteFilter = false,
   rated = false,
+  canRate = false,
 }: {
   view: BoardView;
   onChange: (next: Partial<BoardView>) => void;
@@ -143,8 +144,10 @@ export default function FilterBar({
   watchlistCount?: number;
   /** The vote display is on: Funding offers Qualified for the vote. */
   voteFilter?: boolean;
-  /** Admins with the ratings loaded: the rating sorts are offered. */
+  /** The ratings have loaded: Top rated is offered. */
   rated?: boolean;
+  /** This viewer can rate: My rating is offered too. */
+  canRate?: boolean;
 }) {
   const label = resultLabel(shown, total, isFiltered(view));
   const filtered = isFiltered(view);
@@ -209,6 +212,7 @@ export default function FilterBar({
             ai={ai}
             featured={featured}
             rated={rated}
+            canRate={canRate}
             onSort={onSort}
             className="min-h-[32px] border-transparent bg-transparent px-1.5 hover:border-white/15"
           />

@@ -77,7 +77,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it("keeps old rows visible with an updating indicator until persisted donations arrive", async () => {
+it("keeps old rows visible with a screen-reader updating status until persisted donations arrive", async () => {
   const fresh = deferred<Response>();
   const fetchMock = vi.fn((url: string) =>
     url.includes("?refresh=1") ? fresh.promise : Promise.resolve(Response.json(page(true)))

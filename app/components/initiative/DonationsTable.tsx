@@ -2,7 +2,6 @@ import SectionHeading from "~/components/layout/SectionHeading";
 import Identity from "~/components/wallet/Identity";
 import type { Donation, LedgerStatus } from "~/lib/api-types";
 import { ago, dt, shortAddr, usd } from "~/lib/format";
-import { LoaderCircle } from "lucide-react";
 
 /** Last saved check; refreshes are driven by visitors rather than a schedule. */
 export function ledgerLine(l: LedgerStatus | null | undefined): string {
@@ -26,12 +25,8 @@ export default function DonationsTable(
   return (
     <>
       <SectionHeading count={donations.length}>On-chain donations</SectionHeading>
-      {updating && (
-        <p className="m-0 mb-2 flex items-center gap-2 small dim" role="status">
-          <LoaderCircle className="size-3.5 motion-safe:animate-spin" aria-hidden="true" />
-          Updating donations…
-        </p>
-      )}
+      {/* Screen readers only: a visible line would push the page down mid-refresh. */}
+      {updating && <p className="sr-only" role="status">Updating donations…</p>}
       {line && <p className="m-0 mb-2 small dim">{line}</p>}
       {donations.length
         ? (

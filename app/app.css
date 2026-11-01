@@ -160,6 +160,11 @@
     background: #0b1a28;
     color: #fff;
   }
+  /* Fields are near-black, so the navy above vanishes there too. */
+  :is(input, textarea, [contenteditable])::selection {
+    background: rgba(92, 183, 90, 0.45);
+    color: #fff;
+  }
   body {
     margin: 0;
     min-height: 100vh;

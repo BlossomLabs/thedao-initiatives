@@ -43,13 +43,13 @@ async function setup() {
     return fetcher(input, init);
   };
   const rpc = h.deps.chain.rpc;
-  h.deps.chain.rpc = async (method, params) => {
+  h.deps.chain.rpc = (method, params) => {
     if (method === "eth_call") {
       const call = params[0] as { to: string; data: string };
       if (call.to === REVIEW_BADGE_CONTRACT.toLowerCase()) {
         assert(call.data.startsWith("0x6352211e"));
         const id = BigInt("0x" + call.data.slice(10)).toString();
-        return "0x" + (owners.get(id)?.slice(2) ?? "0").padStart(64, "0");
+        return Promise.resolve("0x" + (owners.get(id)?.slice(2) ?? "0").padStart(64, "0"));
       }
     }
     return rpc(method, params);

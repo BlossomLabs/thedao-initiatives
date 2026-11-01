@@ -19,10 +19,14 @@ afterEach(cleanup);
 
 it("a non-admin NFT holder can read and submit with the NFT ID; losing it disables controls while reviews stay public", async () => {
   const summary = { avg: 4, count: 1, mine: 4, dist: [0, 0, 0, 1, 0] };
-  vi.mocked(api).mockImplementation(async (path) => {
-    if (path === "/api/reviews/identity") return { tokenIds: ["42"], canReview: true };
-    if (path.startsWith("/api/reviews/ratings")) return { ratings: { i1: summary } };
-    return { reviews: [], summary };
+  vi.mocked(api).mockImplementation((path) => {
+    if (path === "/api/reviews/identity") {
+      return Promise.resolve({ tokenIds: ["42"], canReview: true });
+    }
+    if (path.startsWith("/api/reviews/ratings")) {
+      return Promise.resolve({ ratings: { i1: summary } });
+    }
+    return Promise.resolve({ reviews: [], summary });
   });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -53,8 +57,10 @@ it("signed-out visitors fetch reviews without requesting NFT identity", async ()
   viewer.signedIn = false;
   vi.mocked(api).mockReset();
   const summary = { avg: 4, count: 3, mine: null, dist: [0, 0, 0, 3, 0] };
-  vi.mocked(api).mockImplementation(async (path) =>
-    path === "/api/reviews/ratings" ? { ratings: { i1: summary } } : { reviews: [], summary }
+  vi.mocked(api).mockImplementation((path) =>
+    Promise.resolve(
+      path === "/api/reviews/ratings" ? { ratings: { i1: summary } } : { reviews: [], summary },
+    )
   );
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (

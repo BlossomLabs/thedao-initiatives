@@ -96,7 +96,10 @@ export default function Composer(
         setText("");
         setStars(null);
         setPosted((n) => n + 1);
-        setNote({ text: "Review saved. Your latest review is your voting badge’s rating.", ok: true });
+        setNote({
+          text: "Review saved. Your latest review is your voting badge’s rating.",
+          ok: true,
+        });
       } catch (e) {
         setNote({ text: errorMessage(e, "Could not save the review."), ok: false });
       } finally {

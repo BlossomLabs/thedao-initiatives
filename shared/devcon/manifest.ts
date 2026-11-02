@@ -1,4 +1,4 @@
-import manifest from "./manifest.json" with { type: "json" };
+import manifest from "./manifest-data.ts";
 
 /** The DevCon round on Sepolia, written by scripts/devcon-deploy.ts. `slugs[i]` is
  * on-chain initiative `i`, so ballot byte `i` ranks that initiative. */

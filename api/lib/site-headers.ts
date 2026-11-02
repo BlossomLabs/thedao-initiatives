@@ -22,6 +22,8 @@ export const CONNECT_ORIGINS = [
   "https://keys.walletconnect.com",
   "https://keys.walletconnect.org",
   "https://ethereum-rpc.publicnode.com",
+  // The DevCon vote reads Sepolia from the browser (receipts, nonces, self-send).
+  "https://ethereum-sepolia-rpc.publicnode.com",
   "https://eth.merkle.io",
   "https://cloudflare-eth.com",
 ];

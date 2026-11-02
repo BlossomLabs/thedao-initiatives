@@ -7,7 +7,7 @@
 import { useEffect } from "react";
 import { PrivyProvider, usePrivy, useWallets } from "@privy-io/react-auth";
 import type { EIP1193Provider } from "viem";
-import { mainnet } from "viem/chains";
+import { mainnet, sepolia } from "viem/chains";
 import EmailSignInDialog from "~/components/wallet/EmailSignInDialog";
 import { PRIVY_APP_ID, privyStore } from "~/lib/privy-store";
 import { SITE_LOGO, SITE_URL } from "~/data/site";
@@ -77,7 +77,8 @@ export default function PrivyIsland({
           showWalletUIs: false,
         },
         defaultChain: mainnet,
-        supportedChains: [mainnet],
+        // Sepolia for the DevCon vote only; mainnet stays the default.
+        supportedChains: [mainnet, sepolia],
         // Only Privy's residual UIs (recovery, MFA) use this; sign-in is our own dialog.
         appearance: { theme: "#1e3650", accentColor: "#5cb75a", logo: SITE_URL + SITE_LOGO },
       }}

@@ -157,8 +157,13 @@ async function main() {
     issuer: getAddress(issuer),
     slugs: plan.map((p) => p.slug),
   };
-  const out = args.out ?? new URL("../shared/devcon/manifest.json", import.meta.url).pathname;
-  await Deno.writeTextFile(out, JSON.stringify(manifest, null, 2) + "\n");
+  const out = args.out ?? new URL("../shared/devcon/manifest-data.ts", import.meta.url).pathname;
+  await Deno.writeTextFile(
+    out,
+    `// Written by scripts/devcon-deploy.ts. Do not edit by hand.\nexport default ${
+      JSON.stringify(manifest, null, 2)
+    };\n`,
+  );
   console.log(`Manifest written to ${out}`);
 }
 

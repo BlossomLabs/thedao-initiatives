@@ -7,6 +7,7 @@ import { bytesToHex } from "viem";
 import { api, ApiError } from "~/lib/api";
 import { encodeBallot } from "../../shared/devcon/ballot";
 import DevconCode from "./devcon.code";
+import MyBallot from "./devcon.my-ballot";
 
 const ME = "0x1111111111111111111111111111111111111111";
 const SOMEONE = "0x2222222222222222222222222222222222222222";
@@ -364,7 +365,7 @@ function showMine() {
     >
       <MemoryRouter initialEntries={["/devcon/my-ballot"]}>
         <Routes>
-          <Route path="/devcon/my-ballot" element={<DevconCode myBallot />} />
+          <Route path="/devcon/my-ballot" element={<MyBallot />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

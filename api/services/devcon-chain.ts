@@ -22,11 +22,14 @@ export interface DevconChain {
   txStatus(hash: Hex): Promise<"pending" | "success" | "reverted" | "unknown">;
   /** Gas cost (wei) of one recordFor at the current gas price. */
   estimateRecordFor(): Promise<bigint>;
+  /** The relayer account's pending transaction count, as the RPC sees it. */
+  relayerNonce(): Promise<number>;
   send(
     call:
       | { fn: "mint"; args: readonly [Hex, bigint] }
       | { fn: "recordFor"; args: readonly [bigint, bigint, Hex, Hex] }
       | { fn: "drip"; to: Hex; value: bigint },
+    nonce: number,
   ): Promise<Hex>;
   /** Every BallotRecorded and RegistrationRevoked since the deploy block, in chain order. */
   ballots(): Promise<BallotEvent[]>;
@@ -90,12 +93,12 @@ export function createDevconChain(
       // A recordFor of an 81-byte ballot uses well under 150k gas.
       return 150_000n * (await pub.getGasPrice());
     },
-    async send(call) {
+    async relayerNonce() {
+      if (!account) throw new Error("DEVCON_RELAYER_KEY is not configured");
+      return await pub.getTransactionCount({ address: account.address, blockTag: "pending" });
+    },
+    async send(call, nonce) {
       if (!wallet || !account) throw new Error("DEVCON_RELAYER_KEY is not configured");
-      const nonce = await pub.getTransactionCount({
-        address: account.address,
-        blockTag: "pending",
-      });
       if (call.fn === "drip") {
         return await wallet.sendTransaction({ to: call.to, value: call.value, nonce });
       }
@@ -108,7 +111,9 @@ export function createDevconChain(
       });
     },
     async ballots() {
-      const head = await pub.getBlockNumber();
+      const headBlock = await pub.getBlock();
+      const head = headBlock.number!;
+      const headTime = Number(headBlock.timestamp);
       const out: BallotEvent[] = [];
       for (let from = BigInt(m.deployBlock); from <= head; from += LOG_CHUNK) {
         const to = from + LOG_CHUNK - 1n < head ? from + LOG_CHUNK - 1n : head;
@@ -124,12 +129,16 @@ export function createDevconChain(
             ? -1
             : 1
         );
-        for (const log of logs) {
-          let t = blockTimes.get(log.blockNumber!);
+        const times = await stampLogs(logs, headTime, m.closesAt, async (blockNumber) => {
+          let t = blockTimes.get(blockNumber);
           if (t === undefined) {
-            t = Number((await pub.getBlock({ blockNumber: log.blockNumber! })).timestamp);
-            blockTimes.set(log.blockNumber!, t);
+            t = Number((await pub.getBlock({ blockNumber })).timestamp);
+            blockTimes.set(blockNumber, t);
           }
+          return t;
+        });
+        for (const [i, log] of logs.entries()) {
+          const t = times[i];
           const tokenId = log.args.tokenId!.toString();
           out.push(
             "ballot" in log.args && log.args.ballot
@@ -141,4 +150,21 @@ export function createDevconChain(
       return out;
     },
   };
+}
+
+/** Timestamps only matter against the close. Before it, the head block's time is
+ * an upper bound for every log, so no per-block lookups (a cold projector would
+ * otherwise make one RPC per ballot block). After it, one lookup per distinct block. */
+export async function stampLogs(
+  logs: { blockNumber: bigint | null }[],
+  headTime: number,
+  closesAt: number,
+  timeOf: (block: bigint) => Promise<number>,
+): Promise<number[]> {
+  if (headTime < closesAt) return logs.map(() => headTime);
+  const blocks = [...new Set(logs.map((l) => l.blockNumber!))];
+  const times = new Map(
+    await Promise.all(blocks.map(async (b) => [b, await timeOf(b)] as const)),
+  );
+  return logs.map((l) => times.get(l.blockNumber!)!);
 }

@@ -11,7 +11,12 @@ import type { Devcon } from "../services/devcon-chain.ts";
 
 const PER_MINUTE = 30;
 const PENDING_MS = 10 * 60_000;
-const LEASE_MS = 30_000;
+// Covers one send with viem's RPC retries; a lease that outlives its holder just expires.
+const LEASE_MS = 120_000;
+/** A relayed tx the node has never heard of this long after sending was dropped. */
+const UNSEEN_SECS = 60;
+/** The relay pays for this many ballots per badge; after that, "send it yourself". */
+const RELAYS_PER_BADGE = 20;
 /** Long enough for any mint to land; the chain is the record after that. */
 const MINTING_MS = 60 * 60_000;
 const BALLOTS_CACHE_SECS = 5;
@@ -19,6 +24,25 @@ const DRIP_WEI = 5_000_000_000_000_000n; // 0.005 Sepolia ETH
 
 const fail = (status: number, code: string, message: string, extra?: Record<string, unknown>) =>
   new HttpError(status, message, { code, ...extra });
+
+type Call = Parameters<Devcon["chain"]["send"]>[0];
+
+/** Inside the lease: the relayer's next nonce is kept in KV and never goes below
+ * the chain's pending count, so a lagging RPC node can't hand out a used nonce. */
+async function sendNext(kv: Deno.Kv, d: Devcon, call: Call): Promise<Hex> {
+  const key = ["devcon", "relayer-nonce"];
+  const stored = (await kv.get<number>(key)).value ?? 0;
+  const nonce = Math.max(stored, await d.chain.relayerNonce());
+  try {
+    const hash = await d.chain.send(call, nonce);
+    await kv.set(key, nonce + 1);
+    return hash;
+  } catch (e) {
+    // Resync from the chain next time (e.g. "nonce too low" after a manual tx).
+    await kv.delete(key);
+    throw e;
+  }
+}
 
 /** One relayer send at a time across isolates, so account nonces and the
  * one-per-person check never race. */
@@ -105,7 +129,7 @@ export function devconRoutes(deps: Deps) {
       if ((await d.chain.balanceOf(to)) > 0n || (await stillMinting(addrKey))) {
         throw fail(409, "one_per_person", "One badge per person.");
       }
-      const h = await d.chain.send({ fn: "mint", args: [to, n] });
+      const h = await sendNext(kv, d, { fn: "mint", args: [to, n] });
       await kv.atomic()
         .set(tokenKey, h, { expireIn: MINTING_MS })
         .set(addrKey, h, { expireIn: MINTING_MS })
@@ -138,20 +162,43 @@ export function devconRoutes(deps: Deps) {
     }).catch(() => false);
     if (!valid) throw fail(401, "bad_signature", "The signature doesn't match the badge's owner.");
 
+    const kv = deps.db.kv;
     const pendingKey = ["devcon", "pending", tokenId.toString(), nonce.toString()];
-    const hash = await withRelayer(deps.db.kv, async () => {
-      const pending = await deps.db.kv.get<string>(pendingKey);
+    const countKey = ["devcon", "relays", tokenId.toString()];
+    const hash = await withRelayer(kv, async () => {
+      const pending = await kv.get<{ hash: Hex; at: number }>(pendingKey);
       if (pending.value) {
-        throw fail(409, "pending", "This ballot is already on its way.", { hash: pending.value });
+        // Still on its way (or landed): the same hash. Reverted, or never seen
+        // by the node a minute on (dropped): let this one go out again.
+        const status = await d.chain.txStatus(pending.value.hash);
+        const dropped = status === "reverted" ||
+          (status === "unknown" && deps.now() - pending.value.at > UNSEEN_SECS);
+        if (!dropped) {
+          throw fail(409, "pending", "This ballot is already on its way.", {
+            hash: pending.value.hash,
+          });
+        }
+        await kv.delete(pendingKey);
       }
       if (nonce !== (await d.chain.nonceOf(tokenId)) + 1n) {
         throw fail(409, "stale_nonce", "This ballot was replaced; reload to see the latest.");
       }
-      const h = await d.chain.send({
+      const relays = (await kv.get<number>(countKey)).value ?? 0;
+      if (relays >= RELAYS_PER_BADGE) {
+        throw fail(
+          429,
+          "relay_limit",
+          "This badge has used its relayed ballots. Use “Send it yourself” to change it again.",
+        );
+      }
+      const h = await sendNext(kv, d, {
         fn: "recordFor",
         args: [tokenId, nonce, ballot as Hex, signature as Hex],
       });
-      await deps.db.kv.set(pendingKey, h, { expireIn: PENDING_MS });
+      await kv.atomic()
+        .set(pendingKey, { hash: h, at: deps.now() }, { expireIn: PENDING_MS })
+        .set(countKey, relays + 1)
+        .commit();
       return h;
     });
     return c.json({ hash });
@@ -179,7 +226,7 @@ export function devconRoutes(deps: Deps) {
       // Marked before sending: a failed send never pays twice.
       const marked = await kv.atomic().check({ key, versionstamp: null }).set(key, me).commit();
       if (!marked.ok) throw fail(409, "already_dripped", "This badge already got its gas.");
-      return await d.chain.send({ fn: "drip", to: me, value: DRIP_WEI });
+      return await sendNext(kv, d, { fn: "drip", to: me, value: DRIP_WEI });
     });
     return c.json({ hash });
   });

@@ -46,6 +46,9 @@ function fakeChain() {
     })[],
     ballotReads: 0,
     txStatus: new Map<string, "pending" | "success" | "reverted" | "unknown">(),
+    /** What the RPC says the relayer's pending nonce is (may lag). */
+    chainNonce: 0,
+    nonces_used: [] as number[],
   };
   const chain: DevconChain = {
     ownerOf: (n) => Promise.resolve(state.owners.get(n) ?? null),
@@ -60,9 +63,11 @@ function fakeChain() {
     balance: (a) => Promise.resolve(state.balances.get(a.toLowerCase()) ?? 0n),
     txStatus: (hash) => Promise.resolve(state.txStatus.get(hash) ?? "pending"),
     estimateRecordFor: () => Promise.resolve(100_000n * 2_000_000_000n),
-    async send(call) {
+    relayerNonce: () => Promise.resolve(state.chainNonce),
+    async send(call, nonce) {
       if (state.slowSend) await state.slowSend;
       state.sent.push(call);
+      state.nonces_used.push(nonce);
       if (call.fn === "mint" && state.mintsMine) {
         state.owners.set(call.args[1] as bigint, call.args[0] as Hex);
       }
@@ -356,5 +361,69 @@ Deno.test("devcon ballots: a revoked (burned) badge's earlier ballot no longer c
   ];
   const body = await j(await h.req("/api/devcon/ballots"));
   assertEquals(body.ballots, [{ tokenId: "2", ballot: "0xffff01" }]);
+  h.close();
+});
+
+Deno.test("devcon relayer: nonces stay consecutive while the RPC's pending count lags", async () => {
+  const { h, state } = await setup();
+  for (const [i, who] of [PLAIN, OTHER.address].entries()) {
+    const token = await h.mint(who);
+    const res = await h.req("/api/devcon/claim", {
+      method: "POST",
+      token,
+      json: { code: await code(i + 1) },
+    });
+    assertEquals(res.status, 200);
+  }
+  assertEquals(state.nonces_used, [0, 1]);
+  state.chainNonce = 5; // the chain moved on (e.g. a manual tx): follow it
+  const third = privateKeyToAccount(`0x${"44".repeat(32)}`).address;
+  const token = await h.mint(third);
+  await h.req("/api/devcon/claim", { method: "POST", token, json: { code: await code(9) } });
+  assertEquals(state.nonces_used, [0, 1, 5]);
+  h.close();
+});
+
+Deno.test("devcon ballot: a pending relay that reverted no longer blocks a retry", async () => {
+  const { h, state } = await setup();
+  state.owners.set(17n, VOTER.address);
+  const body = await signedBallot(VOTER, 17n, 1n, BALLOT);
+  const first = await j(await h.req("/api/devcon/ballot", { method: "POST", json: body }));
+  state.txStatus.set(first.hash as string, "reverted");
+  const again = await h.req("/api/devcon/ballot", { method: "POST", json: body });
+  assertEquals(again.status, 200);
+  assertEquals(state.sent.length, 2);
+  h.close();
+});
+
+Deno.test("devcon ballot: a pending relay the node never saw frees after a minute", async () => {
+  const { h, state } = await setup();
+  state.owners.set(17n, VOTER.address);
+  const body = await signedBallot(VOTER, 17n, 1n, BALLOT);
+  const first = await j(await h.req("/api/devcon/ballot", { method: "POST", json: body }));
+  state.txStatus.set(first.hash as string, "unknown");
+  assertEquals((await h.req("/api/devcon/ballot", { method: "POST", json: body })).status, 409);
+  h.clock.now += 61;
+  assertEquals((await h.req("/api/devcon/ballot", { method: "POST", json: body })).status, 200);
+  h.close();
+});
+
+Deno.test("devcon ballot: the relay pays for at most 20 ballots per badge", async () => {
+  const { h, state } = await setup();
+  state.owners.set(17n, VOTER.address);
+  for (let i = 1; i <= 20; i++) {
+    const res = await h.req("/api/devcon/ballot", {
+      method: "POST",
+      json: await signedBallot(VOTER, 17n, BigInt(i), BALLOT),
+    });
+    assertEquals(res.status, 200, `relay ${i}`);
+    state.nonces.set(17n, BigInt(i));
+  }
+  const over = await h.req("/api/devcon/ballot", {
+    method: "POST",
+    json: await signedBallot(VOTER, 17n, 21n, BALLOT),
+  });
+  assertEquals([over.status, (await j(over)).code], [429, "relay_limit"]);
+  assertEquals(state.sent.length, 20);
   h.close();
 });

@@ -153,7 +153,7 @@ function Intro(
         <p>
           A <b className="font-medium text-white">{usd(POOL)}</b>{" "}
           demo pool is split equally among voters. The ballots fund whole initiatives, highest tiers
-          first, using Blossom's tier budgeting.
+          first, using Blossom Budgeting.
         </p>
         <p className="mt-2 text-white/60">
           It's a demo: no real funds move. Voting closes {closeText}.
@@ -417,7 +417,7 @@ export default function DevconPage({ myBallot = false }: { myBallot?: boolean } 
               rel="noopener noreferrer"
               className="text-dao-green underline-offset-2 hover:underline"
             >
-              How tier budgeting works
+              How Blossom Budgeting works
             </a>
           </p>
           {isClosed && <p className="mt-2 font-medium text-white">Voting has closed.</p>}

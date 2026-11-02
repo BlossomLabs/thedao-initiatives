@@ -257,9 +257,14 @@ export interface RatingGroup {
   cards: Card[];
 }
 
-/** Fully funded: by what it raised, or (Devcon projector) with its vote share, % of its goal. */
-export const fullyFunded = (c: Card, votePct = 0): boolean =>
-  c.funded || c.pct + votePct >= 100 - 1e-6;
+/** Fully funded: by what it raised, or (Devcon projector) with its vote share, % of its
+ * goal. From the raised amount itself: `pct` comes rounded to a tenth, and 54.1% plus
+ * the 45.875% the vote gives (the exact rest) would fall short of 100. */
+export const fullyFunded = (c: Card, votePct = 0): boolean => {
+  if (c.funded) return true;
+  const goal = c.initiative.goalUsd;
+  return goal > 0 && (c.summary.total / goal) * 100 + votePct >= 100 - 1e-6;
+};
 
 export type FundingSection = "funded" | "qualified" | "open";
 

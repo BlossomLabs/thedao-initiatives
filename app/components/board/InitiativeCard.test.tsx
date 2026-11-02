@@ -367,16 +367,19 @@ it("the DevCon projector draws the vote's share in gold after what was raised", 
 });
 
 it("the DevCon projector: raised plus the vote's share reaching the goal reads FUNDED", () => {
+  // 300 of 1000 raised (30%); the vote's share covers the other 70%.
+  const raised = card({ pct: 30 });
+  raised.summary = { ...raised.summary, total: 300 };
   render(
     <MemoryRouter>
-      <InitiativeCard card={card({ pct: 30 })} tokensOk={false} votePct={70} />
+      <InitiativeCard card={raised} tokensOk={false} votePct={70} />
     </MemoryRouter>,
   );
   expect(screen.getByText("FUNDED")).toBeInTheDocument();
   cleanup();
   render(
     <MemoryRouter>
-      <InitiativeCard card={card({ pct: 30 })} tokensOk={false} votePct={50} />
+      <InitiativeCard card={raised} tokensOk={false} votePct={50} />
     </MemoryRouter>,
   );
   expect(screen.queryByText("FUNDED")).toBeNull();

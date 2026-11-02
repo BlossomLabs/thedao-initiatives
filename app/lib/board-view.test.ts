@@ -11,6 +11,7 @@ import {
   DEFAULT_VIEW,
   facetCounts,
   featuredIds,
+  fullyFunded,
   groupByFunding,
   groupByPrimary,
   groupByRating,
@@ -488,4 +489,14 @@ describe("a board with its own default sort (the Devcon projector)", () => {
       .toBe("category");
     expect(readView(new URLSearchParams("sort=category"), "closest").sort).toBe("category");
   });
+});
+
+it("fullyFunded: the vote's exact rest completes a goal the rounded % shows short of", () => {
+  // 151,013 of 279,000 shows as 54.1%; the vote gives the exact rest (45.875…%).
+  const c = card("Rounded", { goal: 279_000, raised: 151_013 });
+  expect(c.pct).toBe(54.1);
+  const rest = ((279_000 - 151_013) / 279_000) * 100;
+  expect(fullyFunded(c, rest)).toBe(true);
+  expect(fullyFunded(c, rest - 0.01)).toBe(false);
+  expect(groupByFunding([c], new Map([[c.initiative.id, rest]]))[0].key).toBe("funded");
 });

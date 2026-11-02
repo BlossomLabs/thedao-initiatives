@@ -155,19 +155,44 @@ async function main() {
     }),
     "BatchExecutor deploy",
   )).contractAddress!;
-  console.log(`BatchExecutor ${executor}; setting up ${calls.length} steps in one transaction`);
+  console.log(`BatchExecutor ${executor}; setting up ${calls.length} steps in two batches`);
 
-  const delegate = await wallet.signAuthorization({ contractAddress: executor, executor: "self" });
-  const setupHash = await wallet.writeContract({
-    address: account.address,
-    abi: executorArtifact.abi,
-    functionName: "execute",
-    args: [calls],
-    authorizationList: [delegate],
-    gas: 12_000_000n,
-  });
-  await wait(setupHash, "setup batch");
-  console.log(`Setup done in ${setupHash}`);
+  // Two batches: Sepolia's gas schedule puts the whole setup near 28M gas, over
+  // the ~16.7M per-transaction cap (EIP-7825). Batch 1 also delegates the account
+  // (EIP-7702); batch 2 finds the delegation in place. Each batch is estimated
+  // against live state and refused before sending if it can't fit.
+  const TX_GAS_CAP = 16_700_000n;
+  const half = Math.ceil(plan.length / 2);
+  const batches = [calls.slice(0, half), calls.slice(half)];
+  for (const [i, batch] of batches.entries()) {
+    const authorizationList = i === 0
+      ? [await wallet.signAuthorization({ contractAddress: executor, executor: "self" })]
+      : undefined;
+    const data = encodeFunctionData({
+      abi: executorArtifact.abi,
+      functionName: "execute",
+      args: [batch],
+    });
+    const estimate = await pub.estimateGas({
+      account: account.address,
+      to: account.address,
+      data,
+      authorizationList,
+    });
+    const gas = estimate * 12n / 10n < TX_GAS_CAP ? estimate * 12n / 10n : TX_GAS_CAP;
+    if (estimate > gas * 95n / 100n) {
+      throw new Error(`batch ${i + 1} needs ${estimate} gas, too close to the ${TX_GAS_CAP} cap`);
+    }
+    console.log(`Batch ${i + 1}/2: ${batch.length} steps, estimate ${estimate}, limit ${gas}`);
+    const hash = await wallet.sendTransaction({
+      to: account.address,
+      data,
+      authorizationList,
+      gas,
+    });
+    await wait(hash, `setup batch ${i + 1}`);
+    console.log(`  done in ${hash}`);
+  }
 
   // Back to a plain account: delegate to the zero address.
   const undelegate = await wallet.signAuthorization({

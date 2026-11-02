@@ -55,14 +55,15 @@ export default function RatingChip(
       )}
     >
       <Star className="size-3.5" fill={mine ? "currentColor" : "none"} aria-hidden="true" />
-      {count
+      {count || !canRate
         ? (
           <>
-            {hasAverage && <span className="tnum">{summary!.avg.toFixed(1)}</span>}
+            {/* The average, or a dash until there is one (3 reviewers), then how many. */}
+            <span className="tnum">{hasAverage ? summary!.avg.toFixed(1) : "-"}</span>
             <span className="tnum text-white/35">({count})</span>
           </>
         )
-        : <span>{canRate ? "Rate" : "No ratings"}</span>}
+        : <span>Rate</span>}
       {/* Turned up while the form is open: the chip closes it too. */}
       {canRate && (
         <ChevronDown

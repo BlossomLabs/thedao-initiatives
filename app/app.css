@@ -89,6 +89,8 @@
   --color-dao-blue-legal: #28567a;
   --color-dao-green: #5cb75a;
   --color-dao-bright: #00ff88;
+  /* The DevCon vote's share on the projector bars. */
+  --color-vote: #e9b949;
   --color-dao-red: #ff3b38;
   --color-dao-red-hover: #e63633;
   --color-dao-sky: #5ac8fa;

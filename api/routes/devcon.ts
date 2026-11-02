@@ -14,6 +14,7 @@ const PENDING_MS = 10 * 60_000;
 const LEASE_MS = 30_000;
 /** Long enough for any mint to land; the chain is the record after that. */
 const MINTING_MS = 60 * 60_000;
+const BALLOTS_CACHE_SECS = 5;
 
 const fail = (status: number, code: string, message: string, extra?: Record<string, unknown>) =>
   new HttpError(status, message, { code, ...extra });
@@ -153,6 +154,24 @@ export function devconRoutes(deps: Deps) {
       return h;
     });
     return c.json({ hash });
+  });
+
+  // The projector polls this every few seconds; the chain is read at most once per window.
+  r.get("/ballots", async (c) => {
+    const d = dc();
+    const key = ["devcon", "ballots"];
+    const cached = await deps.db.kv.get<{ at: number; ballots: unknown[] }>(key);
+    if (cached.value && deps.now() - cached.value.at < BALLOTS_CACHE_SECS) {
+      return c.json(cached.value);
+    }
+    const latest = new Map<string, string>();
+    for (const b of await d.chain.ballots()) {
+      if (b.timestamp < d.manifest.closesAt) latest.set(b.tokenId, b.ballot);
+    }
+    const ballots = [...latest].map(([tokenId, ballot]) => ({ tokenId, ballot }));
+    const value = { at: deps.now(), ballots };
+    await deps.db.kv.set(key, value, { expireIn: 60_000 });
+    return c.json(value);
   });
 
   return r;

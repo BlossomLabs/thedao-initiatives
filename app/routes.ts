@@ -10,6 +10,7 @@ export default [
   route("mine", "routes/mine.tsx"),
   route("sessions", "routes/sessions.tsx"),
   route("devcon/:code", "routes/devcon.code.tsx"),
+  route("devcon", "routes/devcon.tsx"),
   route("donation-terms", "routes/terms.tsx"),
   route("donation-terms/v/:id", "routes/terms.version.tsx"),
   route("admin", "routes/admin.tsx", [

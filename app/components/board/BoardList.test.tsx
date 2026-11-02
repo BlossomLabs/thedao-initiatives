@@ -167,3 +167,21 @@ it("the last row's vote callout hangs below the list, so nothing around it clips
     expect(el.className).not.toMatch(/\boverflow-(hidden|clip|auto|scroll)\b/);
   }
 });
+
+it("draws the DevCon vote's share as a second segment after the raised part", () => {
+  const { container } = mount({ votePct: new Map([["a", 30]]) });
+  const fills = container.querySelectorAll("[data-vote-fill]");
+  expect(fills).toHaveLength(1);
+  expect((fills[0] as HTMLElement).style.left).toBe("50%");
+  expect((fills[0] as HTMLElement).style.width).toBe("30%");
+});
+
+it("caps raised plus the vote's share at the full bar", () => {
+  const { container } = mount({ votePct: new Map([["a", 80]]) });
+  expect((container.querySelector("[data-vote-fill]") as HTMLElement).style.width).toBe("50%");
+});
+
+it("draws no vote segment without votePct", () => {
+  const { container } = mount();
+  expect(container.querySelector("[data-vote-fill]")).toBeNull();
+});

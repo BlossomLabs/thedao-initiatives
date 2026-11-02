@@ -39,6 +39,8 @@ function fakeChain() {
     slowSend: null as null | Promise<void>,
     /** false: mints stay pending (not visible to ownerOf/balanceOf). */
     mintsMine: true,
+    logs: [] as { tokenId: string; ballot: Hex; timestamp: number }[],
+    ballotReads: 0,
     txStatus: new Map<string, "pending" | "success" | "reverted" | "unknown">(),
   };
   const chain: DevconChain = {
@@ -62,7 +64,10 @@ function fakeChain() {
       }
       return `0x${state.sent.length.toString(16).padStart(64, "0")}` as Hex;
     },
-    ballots: () => Promise.resolve([]),
+    ballots: () => {
+      state.ballotReads++;
+      return Promise.resolve(state.logs);
+    },
   };
   return { state, chain };
 }
@@ -264,5 +269,28 @@ Deno.test("devcon claim: a reverted or dropped mint frees the code and the addre
   });
   assertEquals(retry.status, 200);
   assertEquals(state.sent.length, 2);
+  h.close();
+});
+
+Deno.test("devcon ballots: latest per badge, only before the close, cached briefly", async () => {
+  const { h, state } = await setup();
+  state.logs = [
+    { tokenId: "1", ballot: "0x01ffff", timestamp: NOW - 100 },
+    { tokenId: "2", ballot: "0xff01ff", timestamp: NOW - 90 },
+    { tokenId: "1", ballot: "0xffff01", timestamp: NOW - 80 },
+    { tokenId: "2", ballot: "0x010101", timestamp: manifest.closesAt },
+  ];
+  const res = await h.req("/api/devcon/ballots");
+  assertEquals(res.status, 200);
+  const body = await j(res);
+  assertEquals(body.ballots, [
+    { tokenId: "1", ballot: "0xffff01" },
+    { tokenId: "2", ballot: "0xff01ff" },
+  ]);
+  await h.req("/api/devcon/ballots");
+  assertEquals(state.ballotReads, 1);
+  h.clock.now += 6;
+  await h.req("/api/devcon/ballots");
+  assertEquals(state.ballotReads, 2);
   h.close();
 });

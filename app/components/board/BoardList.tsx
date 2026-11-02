@@ -48,9 +48,11 @@ const ROW =
 const NUM = "text-right tnum whitespace-nowrap";
 /** The row's own funding bar: 3px, rounded, a faint track and the funded part in green. */
 function FundingBar(
-  { pct, tick, className, children }: {
+  { pct, tick, votePct, className, children }: {
     pct: number;
     tick?: number;
+    /** The DevCon vote's share, drawn after the raised part (gold). */
+    votePct?: number;
     className?: string;
     /** The vote callout, over the mark. */
     children?: React.ReactNode;
@@ -66,6 +68,16 @@ function FundingBar(
             style={{ width: `${Math.min(100, pct)}%` }}
           />
         )}
+        {votePct !== undefined && votePct > 0 && pct < 100 && (
+          <i
+            data-vote-fill
+            className="absolute inset-y-0 min-w-[3px] rounded-full bg-vote shadow-bar"
+            style={{
+              left: `${Math.min(100, pct)}%`,
+              width: `${Math.min(votePct, 100 - Math.min(100, pct))}%`,
+            }}
+          />
+        )}
       </span>
       {tick !== undefined && <VoteTick at={tick} reached={pct >= tick} />}
       {children}
@@ -74,8 +86,9 @@ function FundingBar(
 }
 
 function Row(
-  { card, label, watch, vote, aiScore, ratings, canRate = false }: {
+  { card, label, watch, vote, aiScore, ratings, canRate = false, votePct }: {
     card: Card;
+    votePct?: number;
     label: ReturnType<typeof cardLabel>;
     aiScore?: number;
     watch?: Watch;
@@ -270,11 +283,11 @@ function Row(
       <div className="col-start-3 flex items-center gap-2.5 @max-[720px]/list:col-span-2 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-3">
         {vote?.show && standing
           ? (
-            <FundingBar pct={pct} tick={tick} className="flex-1">
+            <FundingBar pct={pct} tick={tick} votePct={votePct} className="flex-1">
               {reveal.open && <VoteCallout state={standing} at={tick} side="bottom" />}
             </FundingBar>
           )
-          : <FundingBar pct={pct} className="flex-1" />}
+          : <FundingBar pct={pct} votePct={votePct} className="flex-1" />}
         <span
           className={cn(
             NUM,
@@ -308,8 +321,10 @@ function Row(
 
 /** Compact rows: every initiative at a glance, the numbers in aligned columns. */
 export default function BoardList(
-  { cards, aiTop = [], aiScores, featured, watch, vote, ratings, canRate = false }: {
+  { cards, aiTop = [], aiScores, featured, watch, vote, ratings, canRate = false, votePct }: {
     cards: Card[];
+    /** The DevCon projector: each initiative's vote share, % of its goal, by initiative id. */
+    votePct?: ReadonlyMap<string, number>;
     /** Initiatives the AI search put first. */
     aiTop?: string[];
     aiScores?: ReadonlyMap<string, number>;
@@ -358,6 +373,7 @@ export default function BoardList(
                 vote={vote}
                 ratings={ratings}
                 canRate={canRate}
+                votePct={votePct?.get(c.initiative.id)}
               />
             ))}
           </AnimatePresence>

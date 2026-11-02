@@ -26,7 +26,8 @@
     "login": "deno run --env-file=.env -A api/scripts/login.ts",
     "seed-categories": "deno run --env-file=.env -A api/scripts/seed-categories.ts",
     "bench": "deno run --allow-net api/scripts/bench.ts",
-    "devcon-codes": "deno run --allow-env=DEVCON_ISSUER_KEY --allow-read --allow-write=devcon-codes scripts/devcon-codes.ts"
+    "devcon-codes": "deno run --allow-env=DEVCON_ISSUER_KEY --allow-read --allow-write=devcon-codes scripts/devcon-codes.ts",
+    "devcon-deploy": "deno run --allow-env=DEVCON_RELAYER_KEY,SEPOLIA_RPC_URL --allow-net --allow-read --allow-write=shared/devcon/manifest.json scripts/devcon-deploy.ts"
   },
   "imports": {
     "@std/http": "jsr:@std/http@^1.1.4",

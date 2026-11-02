@@ -1,0 +1,224 @@
+import { assertEquals } from "@std/assert";
+import { privateKeyToAccount } from "viem/accounts";
+import { bytesToHex, type Hex } from "viem";
+import { harness, j, PLAIN } from "./app-helpers.ts";
+import { codeMessage, formatCode } from "../../shared/devcon/code.ts";
+import { encodeBallot } from "../../shared/devcon/ballot.ts";
+import { voteTypedData } from "../../shared/devcon/typed-data.ts";
+import type { DevconManifest } from "../../shared/devcon/manifest.ts";
+import type { DevconChain } from "../services/devcon-chain.ts";
+
+const ISSUER = privateKeyToAccount(
+  "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
+);
+// PLAIN's key (app-helpers: wallet("0x22..22")).
+const VOTER = privateKeyToAccount(`0x${"22".repeat(32)}`);
+const OTHER = privateKeyToAccount(`0x${"33".repeat(32)}`);
+const NOW = 1_800_000_000;
+
+const manifest: DevconManifest = {
+  chainId: 11155111,
+  contract: "0x1000000000000000000000000000000000000001",
+  deployBlock: 1,
+  opensAt: NOW - 3600,
+  closesAt: NOW + 3600,
+  poolUsd: "913244000000",
+  issuer: ISSUER.address,
+  slugs: ["a", "b", "c"],
+};
+
+type Sent = Parameters<DevconChain["send"]>[0];
+
+function fakeChain() {
+  const state = {
+    owners: new Map<bigint, Hex>(),
+    nonces: new Map<bigint, bigint>(),
+    code: new Set<string>(),
+    balances: new Map<string, bigint>(),
+    sent: [] as Sent[],
+    slowSend: null as null | Promise<void>,
+  };
+  const chain: DevconChain = {
+    ownerOf: (n) => Promise.resolve(state.owners.get(n) ?? null),
+    balanceOf: (a) =>
+      Promise.resolve(
+        BigInt(
+          [...state.owners.values()].filter((o) => o.toLowerCase() === a.toLowerCase()).length,
+        ),
+      ),
+    hasCode: (a) => Promise.resolve(state.code.has(a.toLowerCase())),
+    nonceOf: (n) => Promise.resolve(state.nonces.get(n) ?? 0n),
+    balance: (a) => Promise.resolve(state.balances.get(a.toLowerCase()) ?? 0n),
+    estimateRecordFor: () => Promise.resolve(100_000n * 2_000_000_000n),
+    async send(call) {
+      if (state.slowSend) await state.slowSend;
+      state.sent.push(call);
+      if (call.fn === "mint") state.owners.set(call.args[1] as bigint, call.args[0] as Hex);
+      return `0x${state.sent.length.toString(16).padStart(64, "0")}` as Hex;
+    },
+    ballots: () => Promise.resolve([]),
+  };
+  return { state, chain };
+}
+
+async function setup() {
+  const h = await harness();
+  const fake = fakeChain();
+  h.deps.devcon = { chain: fake.chain, manifest };
+  h.clock.now = NOW;
+  return { h, ...fake };
+}
+
+const code = async (n: number) =>
+  formatCode(n, await ISSUER.signMessage({ message: codeMessage(n) }));
+
+async function signedBallot(
+  signer: typeof VOTER,
+  tokenId: bigint,
+  nonce: bigint,
+  ballot: Hex,
+) {
+  const signature = await signer.signTypedData(
+    voteTypedData(manifest, tokenId, VOTER.address, nonce, ballot),
+  );
+  return { tokenId: tokenId.toString(), nonce: nonce.toString(), ballot, signature };
+}
+
+const BALLOT = bytesToHex(encodeBallot(manifest.slugs, { a: "S", c: "A" }));
+
+Deno.test("devcon code: valid, unclaimed", async () => {
+  const { h } = await setup();
+  const res = await h.req(`/api/devcon/code/${await code(17)}`);
+  assertEquals(res.status, 200);
+  assertEquals(await j(res), { n: 17, claimed: false, owner: null });
+  h.close();
+});
+
+Deno.test("devcon code: claimed shows the owner", async () => {
+  const { h, state } = await setup();
+  state.owners.set(17n, PLAIN);
+  assertEquals(await j(await h.req(`/api/devcon/code/${await code(17)}`)), {
+    n: 17,
+    claimed: true,
+    owner: PLAIN,
+  });
+  h.close();
+});
+
+Deno.test("devcon code: mangled or foreign codes are a 400 bad_code, never a 500", async () => {
+  const { h } = await setup();
+  const foreign = formatCode(17, await OTHER.signMessage({ message: codeMessage(17) }));
+  for (const bad of ["17", "abc", "0.xyz", foreign, (await code(17)).slice(0, -2)]) {
+    const res = await h.req(`/api/devcon/code/${encodeURIComponent(bad)}`);
+    assertEquals(res.status, 400, bad);
+    assertEquals((await j(res)).code, "bad_code");
+  }
+  h.close();
+});
+
+Deno.test("devcon claim: mints token n to the session address", async () => {
+  const { h, state } = await setup();
+  const token = await h.mint(PLAIN);
+  const res = await h.req("/api/devcon/claim", {
+    method: "POST",
+    token,
+    json: { code: await code(17) },
+  });
+  assertEquals(res.status, 200);
+  assertEquals(typeof (await j(res)).hash, "string");
+  assertEquals(state.sent, [{ fn: "mint", args: [PLAIN, 17n] }]);
+  h.close();
+});
+
+Deno.test("devcon claim: needs a session", async () => {
+  const { h } = await setup();
+  const res = await h.req("/api/devcon/claim", { method: "POST", json: { code: await code(17) } });
+  assertEquals(res.status, 401);
+  h.close();
+});
+
+Deno.test("devcon claim: refusals", async () => {
+  const { h, state } = await setup();
+  const token = await h.mint(PLAIN);
+  const claim = async (c: string) => {
+    const res = await h.req("/api/devcon/claim", { method: "POST", token, json: { code: c } });
+    return [res.status, (await j(res)).code];
+  };
+  assertEquals(await claim("nope"), [400, "bad_code"]);
+  state.owners.set(17n, OTHER.address);
+  assertEquals(await claim(await code(17)), [409, "claimed"]);
+  state.owners.set(18n, PLAIN);
+  assertEquals(await claim(await code(19)), [409, "one_per_person"]);
+  state.owners.delete(18n);
+  state.code.add(PLAIN.toLowerCase());
+  assertEquals(await claim(await code(19)), [422, "smart_wallet"]);
+  state.code.clear();
+  h.clock.now = manifest.closesAt;
+  assertEquals(await claim(await code(19)), [410, "closed"]);
+  assertEquals(state.sent, []);
+  h.close();
+});
+
+Deno.test("devcon claim: two codes at once by one address mint once", async () => {
+  const { h, state } = await setup();
+  const token = await h.mint(PLAIN);
+  let release!: () => void;
+  state.slowSend = new Promise((r) => (release = r));
+  const a = h.req("/api/devcon/claim", { method: "POST", token, json: { code: await code(1) } });
+  const b = h.req("/api/devcon/claim", { method: "POST", token, json: { code: await code(2) } });
+  await new Promise((r) => setTimeout(r, 20));
+  release();
+  const statuses = (await Promise.all([a, b])).map((r) => r.status).sort();
+  assertEquals(statuses, [200, 409]);
+  assertEquals(state.sent.length, 1);
+  h.close();
+});
+
+Deno.test("devcon ballot: relays recordFor verbatim", async () => {
+  const { h, state } = await setup();
+  state.owners.set(17n, VOTER.address);
+  const body = await signedBallot(VOTER, 17n, 1n, BALLOT);
+  const res = await h.req("/api/devcon/ballot", { method: "POST", json: body });
+  assertEquals(res.status, 200);
+  assertEquals(state.sent, [{
+    fn: "recordFor",
+    args: [17n, 1n, BALLOT, body.signature],
+  }]);
+  h.close();
+});
+
+Deno.test("devcon ballot: refusals", async () => {
+  const { h, state } = await setup();
+  state.owners.set(17n, VOTER.address);
+  const post = async (body: unknown) => {
+    const res = await h.req("/api/devcon/ballot", { method: "POST", json: body });
+    return [res.status, (await j(res)).code];
+  };
+  const zero = bytesToHex(Uint8Array.from([0, 255, 255]));
+  assertEquals(await post(await signedBallot(VOTER, 17n, 1n, zero)), [400, "bad_ballot"]);
+  assertEquals(await post(await signedBallot(VOTER, 17n, 1n, "0x01ff")), [400, "bad_ballot"]);
+  assertEquals(await post(await signedBallot(OTHER, 17n, 1n, BALLOT)), [401, "bad_signature"]);
+  assertEquals(await post({ tokenId: "x", nonce: "1", ballot: BALLOT, signature: "0x" }), [
+    400,
+    "bad_ballot",
+  ]);
+  assertEquals(await post(await signedBallot(VOTER, 17n, 2n, BALLOT)), [409, "stale_nonce"]);
+  assertEquals(await post(await signedBallot(VOTER, 99n, 1n, BALLOT)), [404, "no_badge"]);
+  h.clock.now = manifest.closesAt;
+  assertEquals(await post(await signedBallot(VOTER, 17n, 1n, BALLOT)), [410, "closed"]);
+  assertEquals(state.sent, []);
+  h.close();
+});
+
+Deno.test("devcon ballot: a second relay of the same nonce returns the pending hash", async () => {
+  const { h, state } = await setup();
+  state.owners.set(17n, VOTER.address);
+  const body = await signedBallot(VOTER, 17n, 1n, BALLOT);
+  const first = await j(await h.req("/api/devcon/ballot", { method: "POST", json: body }));
+  const again = await h.req("/api/devcon/ballot", { method: "POST", json: body });
+  assertEquals(again.status, 409);
+  const out = await j(again);
+  assertEquals([out.code, out.hash], ["pending", first.hash]);
+  assertEquals(state.sent.length, 1);
+  h.close();
+});

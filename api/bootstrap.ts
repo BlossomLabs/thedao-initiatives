@@ -14,6 +14,8 @@ import { toChecksum } from "./chain/address.ts";
 import { ALWAYS_ENFORCED_RATE_LIMITS, BADGE_CONTRACT, CURATOR_ADDRESSES } from "./config.ts";
 import type { Deps } from "./middleware/context.ts";
 import { createAdmins } from "./services/admins.ts";
+import { createDevconChain } from "./services/devcon-chain.ts";
+import { DEVCON } from "../shared/devcon/manifest.ts";
 import { createStaticSite, type SiteOptions } from "./site.ts";
 
 /** Structured events (audit trail, rate limit breaches) are emitted as one JSON
@@ -73,6 +75,17 @@ export async function createServer(siteOptions?: SiteOptions) {
     ens: createEns(fetch, now, { onchain: onchainEns(config.rpcEndpoints, fetch), log }),
     pinata: createPinata(config, fetch),
     log,
+    // Off until the manifest names a deployed contract.
+    devcon: /^0x0{40}$/i.test(DEVCON.contract) ? undefined : {
+      manifest: DEVCON,
+      chain: createDevconChain(
+        DEVCON,
+        config.sepoliaRpcUrl,
+        /^0x[0-9a-fA-F]{64}$/.test(config.devconRelayerKey)
+          ? config.devconRelayerKey as `0x${string}`
+          : null,
+      ),
+    },
   };
   // Load the image decoder before the first upload asks for it.
   if (deps.pinata.enabled) warmImageWorker();

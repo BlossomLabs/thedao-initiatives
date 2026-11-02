@@ -9,6 +9,7 @@ import type { resolvePublicIps } from "../lib/validate.ts";
 import type { Funding } from "../services/funding.ts";
 import type { Admins } from "../services/admins.ts";
 import type { Maintenance } from "../services/maintenance.ts";
+import type { Devcon } from "../services/devcon-chain.ts";
 
 export interface Deps {
   db: Db;
@@ -28,6 +29,8 @@ export interface Deps {
   admins: Admins;
   /** The write freeze admins toggle from the dashboard (services/maintenance.ts). */
   maintenance: Maintenance;
+  /** The DevCon Sepolia vote; absent until a contract is deployed (routes answer 503). */
+  devcon?: Devcon;
 }
 
 export type Vars = {

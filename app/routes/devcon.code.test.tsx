@@ -172,3 +172,42 @@ it("offers to send it yourself next to Send, and next to Retry after a failure",
   expect(await screen.findByRole("button", { name: /retry/i })).toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: /send it yourself/i }).length).toBeGreaterThan(0);
 });
+
+it("accepting, then signing in, goes straight on to claiming — even if the page remounted", async () => {
+  let minted = false;
+  mockApi(
+    () =>
+      Promise.resolve(
+        minted ? { n: 17, claimed: true, owner: ME } : { n: 17, claimed: false, owner: null },
+      ),
+    () => {
+      minted = true;
+      return Promise.resolve({ hash: "0x1" });
+    },
+  );
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: /accept the challenge/i }));
+  expect(openWalletPicker).toHaveBeenCalledTimes(1);
+  // The sign-in modal finishes and the page comes back signed in (a fresh mount).
+  cleanup();
+  session.current = { address: ME };
+  show();
+  await waitFor(() =>
+    expect(vi.mocked(api)).toHaveBeenCalledWith(
+      "/api/devcon/claim",
+      expect.objectContaining({ method: "POST", json: { code: CODE } }),
+    )
+  );
+  // On to the ballot, no second "Accept the challenge".
+  expect(await screen.findByRole("button", { name: /send my ballot|place at least one/i }))
+    .toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /accept the challenge/i })).toBeNull();
+});
+
+it("without accepting, a signed-in visitor still sees the intro and claims only on the button", async () => {
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: false, owner: null }));
+  show();
+  expect(await screen.findByRole("button", { name: /accept the challenge/i })).toBeInTheDocument();
+  expect(vi.mocked(api)).not.toHaveBeenCalledWith("/api/devcon/claim", expect.anything());
+});

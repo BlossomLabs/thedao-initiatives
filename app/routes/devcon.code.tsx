@@ -33,6 +33,21 @@ function loadTiers(n: number): Partial<Record<string, Tier>> {
   }
 }
 
+const acceptedKey = (code: string) => `devcon-accepted:${DEVCON.contract}:${code}`;
+function loadAccepted(code: string): boolean {
+  try {
+    return sessionStorage.getItem(acceptedKey(code)) === "1";
+  } catch {
+    return false;
+  }
+}
+function saveAccepted(code: string, v: boolean) {
+  try {
+    if (v) sessionStorage.setItem(acceptedKey(code), "1");
+    else sessionStorage.removeItem(acceptedKey(code));
+  } catch { /* storage unavailable */ }
+}
+
 function Card({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[.04] p-6 text-[15px] leading-relaxed text-white/80">
@@ -83,7 +98,13 @@ export default function DevconCode() {
     ? session.address
     : null;
 
-  const [accepted, setAccepted] = useState(false);
+  // Accepting survives the sign-in (the modal can remount or reload the page):
+  // once signed in, the claim goes ahead without a second click.
+  const [accepted, setAcceptedState] = useState(() => loadAccepted(code));
+  const setAccepted = (v: boolean) => {
+    setAcceptedState(v);
+    saveAccepted(code, v);
+  };
   const [claim, setClaim] = useState<
     { kind: "idle" } | { kind: "busy" } | { kind: "error"; code?: string; message: string }
   >({ kind: "idle" });

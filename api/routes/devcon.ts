@@ -15,6 +15,7 @@ const LEASE_MS = 30_000;
 /** Long enough for any mint to land; the chain is the record after that. */
 const MINTING_MS = 60 * 60_000;
 const BALLOTS_CACHE_SECS = 5;
+const DRIP_WEI = 5_000_000_000_000_000n; // 0.005 Sepolia ETH
 
 const fail = (status: number, code: string, message: string, extra?: Record<string, unknown>) =>
   new HttpError(status, message, { code, ...extra });
@@ -156,6 +157,33 @@ export function devconRoutes(deps: Deps) {
     return c.json({ hash });
   });
 
+  // "Send it yourself": a voter with no Sepolia ETH gets one small top-up, ever.
+  r.post("/gas", requireAuth, async (c) => {
+    const d = dc();
+    await limit("gas", c.var.ip);
+    open(d);
+    const body = await jsonBody(c, ["tokenId"]);
+    const tokenId = uint(body.tokenId);
+    if (tokenId === null) throw fail(400, "bad_badge", "No such badge.");
+    const me = c.var.user!.address as Hex;
+    const owner = await d.chain.ownerOf(tokenId);
+    if (!owner || owner.toLowerCase() !== me.toLowerCase()) {
+      throw fail(403, "not_owner", "Only the badge's owner can ask for gas.");
+    }
+    if ((await d.chain.balance(me)) >= 2n * (await d.chain.estimateRecordFor())) {
+      return c.json({ hash: null });
+    }
+    const kv = deps.db.kv;
+    const key = ["devcon", "gas", tokenId.toString()];
+    const hash = await withRelayer(kv, async () => {
+      // Marked before sending: a failed send never pays twice.
+      const marked = await kv.atomic().check({ key, versionstamp: null }).set(key, me).commit();
+      if (!marked.ok) throw fail(409, "already_dripped", "This badge already got its gas.");
+      return await d.chain.send({ fn: "drip", to: me, value: DRIP_WEI });
+    });
+    return c.json({ hash });
+  });
+
   // The projector polls this every few seconds; the chain is read at most once per window.
   r.get("/ballots", async (c) => {
     const d = dc();
@@ -166,7 +194,10 @@ export function devconRoutes(deps: Deps) {
     }
     const latest = new Map<string, string>();
     for (const b of await d.chain.ballots()) {
-      if (b.timestamp < d.manifest.closesAt) latest.set(b.tokenId, b.ballot);
+      if (b.timestamp >= d.manifest.closesAt) continue;
+      // A burn voids the badge's ballots so far (SignedBallots.burn).
+      if ("revoked" in b) latest.delete(b.tokenId);
+      else latest.set(b.tokenId, b.ballot);
     }
     const ballots = [...latest].map(([tokenId, ballot]) => ({ tokenId, ballot }));
     const value = { at: deps.now(), ballots };

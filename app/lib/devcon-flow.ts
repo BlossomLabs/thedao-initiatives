@@ -26,6 +26,11 @@ export interface FlowDeps {
   ballotHashOf(tokenId: bigint): Promise<Hex>;
   /** Waits for the receipt, then checkBallotTx. Rejects on timeout. */
   waitResult(hash: Hex, expect: Expected): Promise<BallotTxResult>;
+  /** POST /api/devcon/gas: a one-time top-up hash, or null when not needed. */
+  requestGas(tokenId: bigint): Promise<Hex | null>;
+  waitTx(hash: Hex): Promise<void>;
+  /** recordFor from the voter's own wallet, with their signature. */
+  sendOwn(signed: Signed): Promise<Hex>;
 }
 
 const RESULT_TEXT: Record<Exclude<BallotTxResult, "counted" | "late">, string> = {
@@ -138,4 +143,45 @@ export async function retryBallot(
     return await submitBallot(d, m, last.tokenId, voter, last.ballot, set);
   }
   return await sendAndCheck(d, last, set);
+}
+
+/** "Send it yourself": the same signed ballot, submitted from the voter's wallet. */
+export async function selfSendBallot(
+  d: FlowDeps,
+  m: DevconManifest,
+  tokenId: bigint,
+  voter: Hex,
+  ballot: Hex,
+  last: Signed | null,
+  set: (p: BallotPhase) => void,
+): Promise<Signed | null> {
+  let signed: Signed | null = null;
+  if (last && last.ballot.toLowerCase() === ballot.toLowerCase()) {
+    const onchain = await d.nonceOf(tokenId).catch(() => null);
+    if (onchain !== null && onchain + 1n === last.nonce) {
+      const { hash: _, ...rest } = last;
+      signed = rest;
+    }
+  }
+  signed ??= await signNext(d, m, tokenId, voter, ballot, set);
+  if (!signed) return null;
+  set({ kind: "relaying" });
+  try {
+    await d.ensureSepolia();
+    const gas = await d.requestGas(tokenId).catch(() => null);
+    if (gas) await d.waitTx(gas);
+  } catch {
+    // No top-up: the wallet may hold enough already, so let it try.
+  }
+  let hash: Hex;
+  try {
+    hash = await d.sendOwn(signed);
+  } catch (e) {
+    if (declined(e)) set({ kind: "idle", note: "You didn't confirm, so nothing was sent." });
+    else set({ kind: "failed", reason: message(e) });
+    return signed;
+  }
+  const withHash = { ...signed, hash };
+  await check(d, withHash, hash, set);
+  return withHash;
 }

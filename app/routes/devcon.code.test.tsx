@@ -14,6 +14,9 @@ const session = { current: null as null | { address: string } };
 const openWalletPicker = vi.fn();
 const signOut = vi.fn(() => Promise.resolve(true));
 const submit = vi.fn();
+const selfSend = vi.fn();
+const retry = vi.fn();
+const flow = { phase: { kind: "idle" } as { kind: string; reason?: string } };
 
 vi.mock("../../shared/devcon/manifest", async (original) => ({
   ...await original<typeof import("../../shared/devcon/manifest")>(),
@@ -50,7 +53,7 @@ vi.mock("~/hooks/use-board", () => ({
 }));
 vi.mock("~/hooks/use-devcon", async (original) => ({
   ...await original<typeof import("~/hooks/use-devcon")>(),
-  useBallotSubmit: () => ({ phase: { kind: "idle" }, submit, retry: vi.fn(), last: null }),
+  useBallotSubmit: () => ({ phase: flow.phase, submit, retry, selfSend, last: null }),
   useMintWait: () => ({ wait: () => Promise.resolve() }),
 }));
 vi.mock("~/lib/api", async (original) => ({
@@ -88,6 +91,10 @@ beforeEach(() => {
   session.current = null;
   openWalletPicker.mockReset();
   submit.mockReset();
+  selfSend.mockReset();
+  localStorage.clear();
+  sessionStorage.clear();
+  flow.phase = { kind: "idle" };
 });
 afterEach(cleanup);
 
@@ -147,4 +154,21 @@ it("the badge's owner gets the ballot, and sending posts the encoded tiers", asy
   expect(tokenId).toBe(17n);
   expect(ballot).toBe(bytesToHex(encodeBallot(["alpha", "beta", "gamma"], { beta: "S" })));
   expect(ballot.includes("00")).toBe(false);
+});
+
+it("offers to send it yourself next to Send, and next to Retry after a failure", async () => {
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: /BETA/ }));
+  fireEvent.click(screen.getByRole("button", { name: /move here: must fund/i }));
+  fireEvent.click(screen.getByRole("button", { name: /send it yourself/i }));
+  await waitFor(() => expect(selfSend).toHaveBeenCalled());
+  expect(selfSend.mock.calls[0][0]).toBe(17n);
+  cleanup();
+
+  flow.phase = { kind: "failed", reason: "busy" };
+  show();
+  expect(await screen.findByRole("button", { name: /retry/i })).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: /send it yourself/i }).length).toBeGreaterThan(0);
 });

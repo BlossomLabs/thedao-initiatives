@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { type Hex, keccak256 } from "viem";
 import type { DevconManifest } from "../../shared/devcon/manifest";
-import { type BallotPhase, type FlowDeps, retryBallot, submitBallot } from "./devcon-flow";
+import {
+  type BallotPhase,
+  type FlowDeps,
+  retryBallot,
+  selfSendBallot,
+  submitBallot,
+} from "./devcon-flow";
 
 const m: DevconManifest = {
   chainId: 11155111,
@@ -17,6 +23,8 @@ const VOTER: Hex = "0x3000000000000000000000000000000000000003";
 const BALLOT: Hex = "0x01ff";
 const SIG: Hex = `0x${"ab".repeat(65)}`;
 const HASH: Hex = `0x${"cd".repeat(32)}`;
+const OWN: Hex = `0x${"ef".repeat(32)}`;
+const GAS: Hex = `0x${"99".repeat(32)}`;
 
 function deps(over: Partial<FlowDeps> = {}) {
   const d: FlowDeps = {
@@ -26,6 +34,9 @@ function deps(over: Partial<FlowDeps> = {}) {
     nonceOf: vi.fn(() => Promise.resolve(0n)),
     ballotHashOf: vi.fn(() => Promise.resolve(`0x${"00".repeat(32)}` as Hex)),
     waitResult: vi.fn(() => Promise.resolve("counted" as const)),
+    requestGas: vi.fn(() => Promise.resolve(null)),
+    waitTx: vi.fn(() => Promise.resolve()),
+    sendOwn: vi.fn(() => Promise.resolve(OWN)),
     ...over,
   };
   return d;
@@ -156,5 +167,63 @@ describe("retryBallot", () => {
     expect(d.signVote).toHaveBeenCalledWith(
       expect.objectContaining({ message: expect.objectContaining({ nonce: 4n }) }),
     );
+  });
+});
+
+describe("selfSendBallot", () => {
+  it("fresh: signs, gets gas once, waits for it, sends from the wallet, then checks", async () => {
+    const d = deps({
+      nonceOf: vi.fn(() => Promise.resolve(0n)),
+      requestGas: vi.fn(() => Promise.resolve(GAS)),
+    });
+    const { phases, set } = record();
+    const out = await selfSendBallot(d, m, 7n, VOTER, BALLOT, null, set);
+    expect(d.signVote).toHaveBeenCalled();
+    expect(d.requestGas).toHaveBeenCalledWith(7n);
+    expect(d.waitTx).toHaveBeenCalledWith(GAS);
+    expect(d.sendOwn).toHaveBeenCalledWith({
+      tokenId: 7n,
+      nonce: 1n,
+      ballot: BALLOT,
+      signature: SIG,
+    });
+    expect(d.relay).not.toHaveBeenCalled();
+    expect(d.waitResult).toHaveBeenCalledWith(OWN, { tokenId: 7n, nonce: 1n, ballot: BALLOT });
+    expect(phases.at(-1)).toEqual({ kind: "counted", hash: OWN });
+    expect(out?.hash).toBe(OWN);
+  });
+
+  it("after a failed relay: reuses the signature when its nonce is still next", async () => {
+    const d = deps({ nonceOf: vi.fn(() => Promise.resolve(2n)) });
+    const last = { tokenId: 7n, nonce: 3n, ballot: BALLOT, signature: SIG, hash: HASH };
+    const { set } = record();
+    await selfSendBallot(d, m, 7n, VOTER, BALLOT, last, set);
+    expect(d.signVote).not.toHaveBeenCalled();
+    expect(d.sendOwn).toHaveBeenCalledWith({
+      tokenId: 7n,
+      nonce: 3n,
+      ballot: BALLOT,
+      signature: SIG,
+    });
+  });
+
+  it("no gas to be had (already given) still lets the wallet try", async () => {
+    const d = deps({ requestGas: vi.fn(() => Promise.reject(new Error("already got its gas"))) });
+    const { phases, set } = record();
+    await selfSendBallot(d, m, 7n, VOTER, BALLOT, null, set);
+    expect(d.sendOwn).toHaveBeenCalled();
+    expect(phases.at(-1)?.kind).toBe("counted");
+  });
+
+  it("a wallet that refuses the transaction goes back to idle", async () => {
+    const d = deps({
+      sendOwn: vi.fn(() => Promise.reject(new Error("User rejected the request"))),
+    });
+    const { phases, set } = record();
+    await selfSendBallot(d, m, 7n, VOTER, BALLOT, null, set);
+    expect(phases.at(-1)).toEqual({
+      kind: "idle",
+      note: "You didn't confirm, so nothing was sent.",
+    });
   });
 });

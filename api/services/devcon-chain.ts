@@ -28,9 +28,13 @@ export interface DevconChain {
       | { fn: "recordFor"; args: readonly [bigint, bigint, Hex, Hex] }
       | { fn: "drip"; to: Hex; value: bigint },
   ): Promise<Hex>;
-  /** Every BallotRecorded since the deploy block, oldest first. */
-  ballots(): Promise<{ tokenId: string; ballot: Hex; timestamp: number }[]>;
+  /** Every BallotRecorded and RegistrationRevoked since the deploy block, in chain order. */
+  ballots(): Promise<BallotEvent[]>;
 }
+
+export type BallotEvent =
+  | { tokenId: string; ballot: Hex; timestamp: number }
+  | { tokenId: string; revoked: true; timestamp: number };
 
 export interface Devcon {
   chain: DevconChain;
@@ -40,6 +44,7 @@ export interface Devcon {
 const BALLOT_RECORDED = parseAbiItem(
   "event BallotRecorded(uint256 indexed tokenId, address indexed voter, uint64 nonce, bytes ballot)",
 );
+const REGISTRATION_REVOKED = parseAbiItem("event RegistrationRevoked(uint256 indexed tokenId)");
 const LOG_CHUNK = 50_000n;
 
 export function createDevconChain(
@@ -104,26 +109,33 @@ export function createDevconChain(
     },
     async ballots() {
       const head = await pub.getBlockNumber();
-      const out: { tokenId: string; ballot: Hex; timestamp: number }[] = [];
+      const out: BallotEvent[] = [];
       for (let from = BigInt(m.deployBlock); from <= head; from += LOG_CHUNK) {
         const to = from + LOG_CHUNK - 1n < head ? from + LOG_CHUNK - 1n : head;
-        const logs = await pub.getLogs({
-          address: m.contract,
-          event: BALLOT_RECORDED,
-          fromBlock: from,
-          toBlock: to,
-        });
+        const range = { address: m.contract, fromBlock: from, toBlock: to } as const;
+        const [votes, revokes] = await Promise.all([
+          pub.getLogs({ ...range, event: BALLOT_RECORDED }),
+          pub.getLogs({ ...range, event: REGISTRATION_REVOKED }),
+        ]);
+        const logs = [...votes, ...revokes].sort((a, b) =>
+          a.blockNumber === b.blockNumber
+            ? a.logIndex! - b.logIndex!
+            : a.blockNumber! < b.blockNumber!
+            ? -1
+            : 1
+        );
         for (const log of logs) {
           let t = blockTimes.get(log.blockNumber!);
           if (t === undefined) {
             t = Number((await pub.getBlock({ blockNumber: log.blockNumber! })).timestamp);
             blockTimes.set(log.blockNumber!, t);
           }
-          out.push({
-            tokenId: log.args.tokenId!.toString(),
-            ballot: log.args.ballot!,
-            timestamp: t,
-          });
+          const tokenId = log.args.tokenId!.toString();
+          out.push(
+            "ballot" in log.args && log.args.ballot
+              ? { tokenId, ballot: log.args.ballot, timestamp: t }
+              : { tokenId, revoked: true, timestamp: t },
+          );
         }
       }
       return out;

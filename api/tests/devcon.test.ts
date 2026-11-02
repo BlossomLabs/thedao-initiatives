@@ -39,7 +39,11 @@ function fakeChain() {
     slowSend: null as null | Promise<void>,
     /** false: mints stay pending (not visible to ownerOf/balanceOf). */
     mintsMine: true,
-    logs: [] as { tokenId: string; ballot: Hex; timestamp: number }[],
+    logs: [] as ({ tokenId: string; ballot: Hex; timestamp: number } | {
+      tokenId: string;
+      revoked: true;
+      timestamp: number;
+    })[],
     ballotReads: 0,
     txStatus: new Map<string, "pending" | "success" | "reverted" | "unknown">(),
   };
@@ -292,5 +296,65 @@ Deno.test("devcon ballots: latest per badge, only before the close, cached brief
   h.clock.now += 6;
   await h.req("/api/devcon/ballots");
   assertEquals(state.ballotReads, 2);
+  h.close();
+});
+
+Deno.test("devcon gas: tops up a low balance once per badge, only for its owner", async () => {
+  const { h, state } = await setup();
+  state.owners.set(17n, PLAIN);
+  const token = await h.mint(PLAIN);
+  const other = await h.mint(OTHER.address);
+  const gas = (t: string) =>
+    h.req("/api/devcon/gas", { method: "POST", token: t, json: { tokenId: "17" } });
+
+  const notOwner = await gas(other);
+  assertEquals(notOwner.status, 403);
+
+  const first = await gas(token);
+  assertEquals(first.status, 200);
+  assertEquals(typeof (await j(first)).hash, "string");
+  assertEquals(state.sent.at(-1), { fn: "drip", to: PLAIN, value: 5_000_000_000_000_000n });
+
+  const again = await gas(token);
+  assertEquals([again.status, (await j(again)).code], [409, "already_dripped"]);
+  assertEquals(state.sent.length, 1);
+  h.close();
+});
+
+Deno.test("devcon gas: enough balance already needs no drip and leaves the one-time drip unused", async () => {
+  const { h, state } = await setup();
+  state.owners.set(17n, PLAIN);
+  state.balances.set(PLAIN.toLowerCase(), 10n ** 18n);
+  const token = await h.mint(PLAIN);
+  const res = await h.req("/api/devcon/gas", { method: "POST", token, json: { tokenId: "17" } });
+  assertEquals(await j(res), { hash: null });
+  state.balances.set(PLAIN.toLowerCase(), 0n);
+  const later = await h.req("/api/devcon/gas", { method: "POST", token, json: { tokenId: "17" } });
+  assertEquals(later.status, 200);
+  assertEquals(state.sent.length, 1);
+  h.close();
+});
+
+Deno.test("devcon gas: closed after the vote", async () => {
+  const { h, state } = await setup();
+  state.owners.set(17n, PLAIN);
+  const token = await h.mint(PLAIN);
+  h.clock.now = manifest.closesAt;
+  const res = await h.req("/api/devcon/gas", { method: "POST", token, json: { tokenId: "17" } });
+  assertEquals([res.status, (await j(res)).code], [410, "closed"]);
+  h.close();
+});
+
+Deno.test("devcon ballots: a revoked (burned) badge's earlier ballot no longer counts", async () => {
+  const { h, state } = await setup();
+  state.logs = [
+    { tokenId: "1", ballot: "0x01ffff", timestamp: NOW - 100 },
+    { tokenId: "2", ballot: "0xff01ff", timestamp: NOW - 95 },
+    { tokenId: "1", revoked: true, timestamp: NOW - 90 },
+    { tokenId: "2", revoked: true, timestamp: NOW - 85 },
+    { tokenId: "2", ballot: "0xffff01", timestamp: NOW - 80 },
+  ];
+  const body = await j(await h.req("/api/devcon/ballots"));
+  assertEquals(body.ballots, [{ tokenId: "2", ballot: "0xffff01" }]);
   h.close();
 });

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createPublicClient, type Hex, http, type PublicClient } from "viem";
 import { sepolia } from "viem/chains";
-import { signTypedData } from "wagmi/actions";
+import { signTypedData, writeContract } from "wagmi/actions";
 import { api, ApiError } from "~/lib/api";
 import { useWallet } from "~/context/wallet";
 import { useEnsureSepolia } from "~/hooks/use-sepolia";
@@ -11,6 +11,7 @@ import {
   check,
   type FlowDeps,
   retryBallot,
+  selfSendBallot,
   type Signed,
   submitBallot,
 } from "~/lib/devcon-flow";
@@ -149,6 +150,26 @@ export function useBallotSubmit(tokenId: bigint | null) {
     nonceOf: async (id) => BigInt(await read<bigint>("nonceOf", [id])),
     ballotHashOf: (id) => read<Hex>("ballotHashOf", [id]),
     waitResult,
+    requestGas: async (id) =>
+      (await api<{ hash: Hex | null }>("/api/devcon/gas", {
+        method: "POST",
+        json: { tokenId: id.toString() },
+      })).hash,
+    waitTx: async (hash) => {
+      await sepoliaClient().waitForTransactionReceipt({ hash, timeout: WAIT_MS });
+    },
+    sendOwn: (s) => {
+      if (!wallet.config || !wallet.address) throw new Error("Connect your wallet first.");
+      return writeContract(wallet.config, {
+        address: DEVCON.contract,
+        abi: SIGNED_BALLOTS_ABI,
+        functionName: "recordFor",
+        args: [s.tokenId, s.nonce, s.ballot, s.signature],
+        chainId: DEVCON.chainId,
+        account: wallet.address,
+        connector: wallet.connector,
+      } as never);
+    },
   }), [ensureSepolia, wallet.config, wallet.address, wallet.connector]);
 
   const keep = useCallback((s: Signed | null) => {
@@ -173,5 +194,10 @@ export function useBallotSubmit(tokenId: bigint | null) {
     await check(deps, signed, hash, setPhase);
   }, [deps, keep]);
 
-  return { phase, submit, retry, track, last, deps };
+  const selfSend = useCallback(async (id: bigint, ballot: Hex) => {
+    if (!wallet.address) return;
+    keep(await selfSendBallot(deps, DEVCON, id, wallet.address, ballot, last, setPhase));
+  }, [deps, keep, last, wallet.address]);
+
+  return { phase, submit, retry, selfSend, track, last, deps };
 }

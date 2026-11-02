@@ -208,6 +208,8 @@ export default function DevconCode() {
     const isClosed = closed();
     const busy = ["signing", "relaying", "waiting"].includes(ballotFlow.phase.kind);
     const placed = Object.keys(tiers).length;
+    const sendYourself = () =>
+      void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(DEVCON.slugs, tiers)));
     body = (
       <div className="space-y-5">
         <Card>
@@ -221,7 +223,13 @@ export default function DevconCode() {
         </Card>
         <TierBallot items={items} tiers={tiers} disabled={isClosed || busy} onChange={setTier} />
         <div className="sticky bottom-3 space-y-3 rounded-2xl border border-white/10 bg-panel/95 p-4 backdrop-blur">
-          <BallotStatus phase={ballotFlow.phase} onRetry={() => void ballotFlow.retry()} />
+          <BallotStatus
+            phase={ballotFlow.phase}
+            onRetry={() => void ballotFlow.retry()}
+            selfSend={!isClosed && placed > 0 && (
+              <Button onClick={sendYourself}>Send it yourself</Button>
+            )}
+          />
           {!isClosed && (
             <Button
               variant="primary"
@@ -235,6 +243,16 @@ export default function DevconCode() {
             >
               {placed === 0 ? "Place at least one proposal" : "Send my ballot"}
             </Button>
+          )}
+          {!isClosed && ballotFlow.phase.kind !== "failed" && (
+            <button
+              type="button"
+              disabled={busy || placed === 0}
+              onClick={sendYourself}
+              className="w-full text-center text-[13px] text-white/55 underline underline-offset-2 disabled:opacity-40"
+            >
+              Send it yourself (from your wallet, on Sepolia)
+            </button>
           )}
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useWallet } from "~/context/wallet";
+import { liveConnector } from "~/lib/wallet-store";
 import { SEPOLIA_CHAIN_ID } from "../../shared/devcon/manifest";
 
 export class WrongChainError extends Error {
@@ -12,7 +13,8 @@ export class WrongChainError extends Error {
  * so switch before asking for a signature or a transaction. */
 export function useEnsureSepolia(): () => Promise<void> {
   const wallet = useWallet();
-  const { chainId, connector, switchChain } = wallet;
+  const { chainId, switchChain } = wallet;
+  const connector = liveConnector(wallet);
   return useCallback(async () => {
     if (chainId === SEPOLIA_CHAIN_ID) return;
     try {

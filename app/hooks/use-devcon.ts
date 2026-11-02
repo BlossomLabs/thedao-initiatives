@@ -5,6 +5,7 @@ import { sepolia } from "viem/chains";
 import { signTypedData, writeContract } from "wagmi/actions";
 import { api, ApiError } from "~/lib/api";
 import { useWallet } from "~/context/wallet";
+import { liveConnector } from "~/lib/wallet-store";
 import { useEnsureSepolia } from "~/hooks/use-sepolia";
 import {
   type BallotPhase,
@@ -140,7 +141,7 @@ export function useBallotSubmit(tokenId: bigint | null) {
       return signTypedData(wallet.config, {
         ...typed,
         account: wallet.address,
-        connector: wallet.connector,
+        connector: liveConnector(wallet),
       } as never);
     },
     relay: async (body) => {
@@ -183,10 +184,10 @@ export function useBallotSubmit(tokenId: bigint | null) {
         args: [[recordVote(s)]],
         chainId: DEVCON.chainId,
         account: wallet.address,
-        connector: wallet.connector,
+        connector: liveConnector(wallet),
       } as never);
     },
-  }), [ensureSepolia, wallet.config, wallet.address, wallet.connector]);
+  }), [ensureSepolia, wallet]);
 
   const keep = useCallback((s: Signed | null) => {
     if (!s) return;

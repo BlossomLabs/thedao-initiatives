@@ -172,3 +172,18 @@ export function createWalletStore(
 }
 
 export const walletStore = createWalletStore();
+
+/**
+ * The connection's connector, ready to use. A connection wagmi restored from
+ * storage starts with a stand-in ({ id, name, type, uid }, no methods) until its
+ * reconnect lands; a slow wallet (Privy's email wallet) can keep it, and actions
+ * handed that stand-in fail with "getAccounts is not a function". The set-up
+ * connector with the same id is the real one.
+ */
+export function liveConnector(
+  w: Pick<WalletSnapshot, "connector" | "connectors">,
+): Connector | undefined {
+  const c = w.connector;
+  if (!c || typeof c.getAccounts === "function") return c;
+  return w.connectors.find((x) => x.id === c.id) ?? undefined;
+}

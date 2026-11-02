@@ -1,7 +1,8 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createWalletStore,
   hasStoredWagmiConnection,
+  liveConnector,
   type WalletApi,
   type WalletIsland,
   type WalletStore,
@@ -190,4 +191,17 @@ it("a failing island setup is reported like a failed download and retried by the
   await store.load();
   expect(loader).toHaveBeenCalledTimes(2);
   expect(store.getSnapshot()).toMatchObject({ attached: true, failed: null });
+});
+
+describe("liveConnector", () => {
+  const real = { id: "privy", uid: "u2", getAccounts: () => Promise.resolve([]) } as never;
+  it("keeps a set-up connector", () => {
+    expect(liveConnector({ connector: real, connectors: [real] })).toBe(real);
+  });
+  it("swaps a restored stand-in (no methods) for the set-up connector with its id", () => {
+    const stub = { id: "privy", uid: "u1", name: "Email", type: "privy" } as never;
+    expect(liveConnector({ connector: stub, connectors: [real] })).toBe(real);
+    expect(liveConnector({ connector: stub, connectors: [] })).toBeUndefined();
+    expect(liveConnector({ connector: undefined, connectors: [real] })).toBeUndefined();
+  });
 });

@@ -76,4 +76,25 @@ describe("checkBallotTx", () => {
     expect(other({ tx: { to: m.contract, input: mint } })).toBe("mismatch");
     expect(other({ tx: { to: m.contract, input: "0xdeadbeef" } })).toBe("mismatch");
   });
+
+  test("counted for record() (the relay's ECDSA path that 7702 wallets need)", () => {
+    const record = (tokenId: bigint, nonce: bigint, b: Hex) =>
+      encodeFunctionData({
+        abi: SIGNED_BALLOTS_ABI,
+        functionName: "record",
+        args: [[{
+          tokenId,
+          nonce,
+          r: `0x${"11".repeat(32)}`,
+          vs: `0x${"22".repeat(32)}`,
+          ballot: b,
+        }]],
+      });
+    expect(checkBallotTx({ ...base, tx: { to: m.contract, input: record(7n, 2n, ballot) } }))
+      .toBe("counted");
+    expect(checkBallotTx({ ...base, tx: { to: m.contract, input: record(7n, 3n, ballot) } }))
+      .toBe("mismatch");
+    expect(checkBallotTx({ ...base, tx: { to: m.contract, input: record(8n, 2n, ballot) } }))
+      .toBe("mismatch");
+  });
 });

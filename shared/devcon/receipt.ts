@@ -20,8 +20,19 @@ export function checkBallotTx(input: {
   } catch {
     return "mismatch";
   }
-  if (call.functionName !== "recordFor" && call.functionName !== "vote") return "mismatch";
-  const [tokenId, nonce, ballot] = call.args as readonly [bigint, bigint, `0x${string}`];
+  let tokenId: bigint, nonce: bigint, ballot: `0x${string}`;
+  if (call.functionName === "recordFor" || call.functionName === "vote") {
+    [tokenId, nonce, ballot] = call.args as readonly [bigint, bigint, `0x${string}`];
+  } else if (call.functionName === "record") {
+    // The relay sends one vote per record() call.
+    const votes = call.args[0] as readonly {
+      tokenId: bigint;
+      nonce: bigint;
+      ballot: `0x${string}`;
+    }[];
+    if (votes.length !== 1) return "mismatch";
+    ({ tokenId, nonce, ballot } = votes[0]);
+  } else return "mismatch";
   if (
     tokenId !== expect.tokenId || nonce !== expect.nonce ||
     ballot.toLowerCase() !== expect.ballot.toLowerCase()

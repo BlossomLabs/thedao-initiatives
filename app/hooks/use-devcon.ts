@@ -18,6 +18,7 @@ import {
 import { SIGNED_BALLOTS_ABI } from "../../shared/devcon/abi";
 import { DEVCON } from "../../shared/devcon/manifest";
 import { checkBallotTx } from "../../shared/devcon/receipt";
+import { recordVote } from "../../shared/devcon/record";
 
 const SEPOLIA_RPC = (import.meta.env?.VITE_SEPOLIA_RPC_URL as string | undefined) ||
   "https://ethereum-sepolia-rpc.publicnode.com";
@@ -163,8 +164,9 @@ export function useBallotSubmit(tokenId: bigint | null) {
       return writeContract(wallet.config, {
         address: DEVCON.contract,
         abi: SIGNED_BALLOTS_ABI,
-        functionName: "recordFor",
-        args: [s.tokenId, s.nonce, s.ballot, s.signature],
+        // record(): plain ECDSA, so EIP-7702 wallets work too (see recordVote).
+        functionName: "record",
+        args: [[recordVote(s)]],
         chainId: DEVCON.chainId,
         account: wallet.address,
         connector: wallet.connector,

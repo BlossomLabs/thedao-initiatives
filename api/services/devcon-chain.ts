@@ -15,19 +15,27 @@ import type { DevconManifest } from "../../shared/devcon/manifest.ts";
 export interface DevconChain {
   ownerOf(n: bigint): Promise<Hex | null>;
   balanceOf(a: Hex): Promise<bigint>;
-  hasCode(a: Hex): Promise<boolean>;
+  /** The account's code: "0x" for a plain EOA, 0xef0100… for an EIP-7702 delegation. */
+  codeOf(a: Hex): Promise<Hex>;
+  /** Would the relayer's mint(to, n) succeed (simulated)? */
+  canMint(to: Hex, n: bigint): Promise<boolean>;
   nonceOf(n: bigint): Promise<bigint>;
   balance(a: Hex): Promise<bigint>;
   /** A relayed transaction's fate; "unknown" when the node has never seen it (dropped). */
   txStatus(hash: Hex): Promise<"pending" | "success" | "reverted" | "unknown">;
-  /** Gas cost (wei) of one recordFor at the current gas price. */
+  /** Gas cost (wei) of one self-sent ballot at the current gas price. */
   estimateRecordFor(): Promise<bigint>;
   /** The relayer account's pending transaction count, as the RPC sees it. */
   relayerNonce(): Promise<number>;
   send(
     call:
       | { fn: "mint"; args: readonly [Hex, bigint] }
-      | { fn: "recordFor"; args: readonly [bigint, bigint, Hex, Hex] }
+      | {
+        fn: "record";
+        args: readonly [
+          readonly { tokenId: bigint; nonce: bigint; r: Hex; vs: Hex; ballot: Hex }[],
+        ];
+      }
       | { fn: "drip"; to: Hex; value: bigint },
     nonce: number,
   ): Promise<Hex>;
@@ -80,7 +88,22 @@ export function createDevconChain(
       }
     },
     balanceOf: (a) => read<bigint>("balanceOf", [a]),
-    hasCode: async (a) => ((await pub.getCode({ address: a })) ?? "0x") !== "0x",
+    codeOf: async (a) => (await pub.getCode({ address: a })) ?? "0x",
+    async canMint(to, n) {
+      if (!account) return false;
+      try {
+        await pub.simulateContract({
+          address: m.contract,
+          abi: SIGNED_BALLOTS_ABI,
+          functionName: "mint",
+          args: [to, n],
+          account: account.address,
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    },
     nonceOf: async (n) => BigInt(await read<bigint>("nonceOf", [n])),
     balance: (a) => pub.getBalance({ address: a }),
     async txStatus(hash) {
@@ -90,7 +113,7 @@ export function createDevconChain(
       return tx ? "pending" : "unknown";
     },
     async estimateRecordFor() {
-      // A recordFor of an 81-byte ballot uses well under 150k gas.
+      // A record() of an 81-byte ballot uses well under 150k gas.
       return 150_000n * (await pub.getGasPrice());
     },
     async relayerNonce() {

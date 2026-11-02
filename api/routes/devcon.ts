@@ -7,6 +7,7 @@ import { HttpError } from "../lib/errors.ts";
 import { verifyCode } from "../../shared/devcon/code.ts";
 import { isValidOnchainBallot } from "../../shared/devcon/ballot.ts";
 import { voteTypedData } from "../../shared/devcon/typed-data.ts";
+import { recordVote } from "../../shared/devcon/record.ts";
 import type { Devcon } from "../services/devcon-chain.ts";
 
 const PER_MINUTE = 30;
@@ -118,7 +119,12 @@ export function devconRoutes(deps: Deps) {
     const body = await jsonBody(c, ["code"]);
     const n = await codeNumber(d, body.code);
     const to = c.var.user!.address as Hex;
-    if (await d.chain.hasCode(to)) {
+    // An EIP-7702 account (code 0xef0100 + delegate) is still a key-held wallet:
+    // its ECDSA signatures verify (the relay uses record()). Other code is a
+    // contract wallet, which can't sign on Sepolia like the voter's key does.
+    const code = (await d.chain.codeOf(to)).toLowerCase();
+    const delegated = code.startsWith("0xef0100") && code.length === 2 + 2 * 23;
+    if (code !== "0x" && !delegated) {
       throw fail(422, "smart_wallet", "Use email or a regular wallet for this one.");
     }
     const kv = deps.db.kv;
@@ -140,6 +146,14 @@ export function devconRoutes(deps: Deps) {
       }
       if ((await d.chain.balanceOf(to)) > 0n || (await stillMinting(addrKey))) {
         throw fail(409, "one_per_person", "One badge per person.");
+      }
+      // _safeMint asks a delegated wallet's code to accept the badge; check first.
+      if (delegated && !(await d.chain.canMint(to, n))) {
+        throw fail(
+          422,
+          "cannot_receive",
+          "This wallet can't receive the badge. Use email or another wallet.",
+        );
       }
       const h = await sendNext(kv, d, deps.now(), { fn: "mint", args: [to, n] });
       await kv.atomic()
@@ -204,8 +218,10 @@ export function devconRoutes(deps: Deps) {
         );
       }
       const h = await sendNext(kv, d, deps.now(), {
-        fn: "recordFor",
-        args: [tokenId, nonce, ballot as Hex, signature as Hex],
+        fn: "record",
+        args: [[
+          recordVote({ tokenId, nonce, ballot: ballot as Hex, signature: signature as Hex }),
+        ]],
       });
       await kv.atomic()
         .set(pendingKey, { hash: h, at: deps.now() }, { expireIn: PENDING_MS })

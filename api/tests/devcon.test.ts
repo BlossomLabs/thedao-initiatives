@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { privateKeyToAccount } from "viem/accounts";
-import { bytesToHex, type Hex } from "viem";
+import { bytesToHex, type Hex, parseSignature, signatureToCompactSignature } from "viem";
 import { harness, j, PLAIN } from "./app-helpers.ts";
 import { codeMessage, formatCode } from "../../shared/devcon/code.ts";
 import { encodeBallot } from "../../shared/devcon/ballot.ts";
@@ -33,7 +33,10 @@ function fakeChain() {
   const state = {
     owners: new Map<bigint, Hex>(),
     nonces: new Map<bigint, bigint>(),
-    code: new Set<string>(),
+    /** Account code by lowercase address ("0xef0100…" = an EIP-7702 delegation). */
+    code: new Map<string, Hex>(),
+    /** Addresses whose wallet code would make _safeMint revert. */
+    unmintable: new Set<string>(),
     balances: new Map<string, bigint>(),
     sent: [] as Sent[],
     slowSend: null as null | Promise<void>,
@@ -58,7 +61,8 @@ function fakeChain() {
           [...state.owners.values()].filter((o) => o.toLowerCase() === a.toLowerCase()).length,
         ),
       ),
-    hasCode: (a) => Promise.resolve(state.code.has(a.toLowerCase())),
+    codeOf: (a) => Promise.resolve(state.code.get(a.toLowerCase()) ?? "0x"),
+    canMint: (to) => Promise.resolve(!state.unmintable.has(to.toLowerCase())),
     nonceOf: (n) => Promise.resolve(state.nonces.get(n) ?? 0n),
     balance: (a) => Promise.resolve(state.balances.get(a.toLowerCase()) ?? 0n),
     txStatus: (hash) => Promise.resolve(state.txStatus.get(hash) ?? "pending"),
@@ -170,7 +174,7 @@ Deno.test("devcon claim: refusals", async () => {
   state.owners.set(18n, PLAIN);
   assertEquals(await claim(await code(19)), [409, "one_per_person"]);
   state.owners.delete(18n);
-  state.code.add(PLAIN.toLowerCase());
+  state.code.set(PLAIN.toLowerCase(), "0x6080604052");
   assertEquals(await claim(await code(19)), [422, "smart_wallet"]);
   state.code.clear();
   h.clock.now = manifest.closesAt;
@@ -194,16 +198,54 @@ Deno.test("devcon claim: two codes at once by one address mint once", async () =
   h.close();
 });
 
-Deno.test("devcon ballot: relays recordFor verbatim", async () => {
+Deno.test("devcon ballot: relays record() with the signature as r and vs (plain ECDSA)", async () => {
   const { h, state } = await setup();
   state.owners.set(17n, VOTER.address);
   const body = await signedBallot(VOTER, 17n, 1n, BALLOT);
   const res = await h.req("/api/devcon/ballot", { method: "POST", json: body });
   assertEquals(res.status, 200);
+  const { r, yParityAndS } = signatureToCompactSignature(parseSignature(body.signature));
   assertEquals(state.sent, [{
-    fn: "recordFor",
-    args: [17n, 1n, BALLOT, body.signature],
+    fn: "record",
+    args: [[{ tokenId: 17n, nonce: 1n, r, vs: yParityAndS, ballot: BALLOT }]],
   }]);
+  h.close();
+});
+
+Deno.test("devcon claim: an EIP-7702 wallet is a wallet; a contract wallet is not", async () => {
+  const { h, state } = await setup();
+  const token = await h.mint(PLAIN);
+  state.code.set(PLAIN.toLowerCase(), `0xef0100${"ab".repeat(20)}`);
+  const ok = await h.req("/api/devcon/claim", {
+    method: "POST",
+    token,
+    json: { code: await code(5) },
+  });
+  assertEquals(ok.status, 200);
+
+  const other = await h.mint(OTHER.address);
+  state.code.set(OTHER.address.toLowerCase(), "0x6080604052");
+  const no = await h.req("/api/devcon/claim", {
+    method: "POST",
+    token: other,
+    json: { code: await code(6) },
+  });
+  assertEquals([no.status, (await j(no)).code], [422, "smart_wallet"]);
+  h.close();
+});
+
+Deno.test("devcon claim: a 7702 wallet whose delegate can't take the badge is told so, nothing sent", async () => {
+  const { h, state } = await setup();
+  const token = await h.mint(PLAIN);
+  state.code.set(PLAIN.toLowerCase(), `0xef0100${"ab".repeat(20)}`);
+  state.unmintable.add(PLAIN.toLowerCase());
+  const res = await h.req("/api/devcon/claim", {
+    method: "POST",
+    token,
+    json: { code: await code(5) },
+  });
+  assertEquals([res.status, (await j(res)).code], [422, "cannot_receive"]);
+  assertEquals(state.sent, []);
   h.close();
 });
 

@@ -33,9 +33,10 @@ export const sepoliaClient = (): PublicClient => (client ??= createPublicClient(
 export type CodeInfo = { n: number; claimed: boolean; owner: string | null };
 
 /** The paper code's number and whether it is claimed; `bad` for a code the issuer never signed. */
-export function useDevconCode(code: string) {
+export function useDevconCode(code: string, enabled = true) {
   return useQuery({
     queryKey: ["devcon-code", code],
+    enabled,
     queryFn: async (): Promise<CodeInfo | "bad"> => {
       try {
         return await api<CodeInfo>(`/api/devcon/code/${encodeURIComponent(code)}`);
@@ -43,6 +44,19 @@ export function useDevconCode(code: string) {
         if (e instanceof ApiError && e.status === 400) return "bad";
         throw e;
       }
+    },
+  });
+}
+
+/** The signed-in account's badge (found on-chain), as a code's info would say it;
+ * `none` when the account holds no Devcon badge. Off until `me` is known. */
+export function useMyBadge(me: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["devcon-mine", me?.toLowerCase()],
+    enabled: enabled && Boolean(me),
+    queryFn: async (): Promise<CodeInfo | "none"> => {
+      const { n } = await api<{ n: number | null }>("/api/devcon/mine");
+      return n === null ? "none" : { n, claimed: true, owner: me };
     },
   });
 }

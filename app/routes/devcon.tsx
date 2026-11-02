@@ -6,6 +6,8 @@ import Hero from "~/components/board/Hero";
 import { LinkButton } from "~/components/ui/Button";
 import { useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/devcon-local";
+import { useSession } from "~/context/session";
+import { useMyBadge } from "~/hooks/use-devcon";
 import { api } from "~/lib/api";
 import { usd } from "~/lib/format";
 import { DEVCON } from "../../shared/devcon/manifest";
@@ -51,9 +53,17 @@ export default function Devcon() {
     retry: false,
   });
   const now = useNow();
-  // This browser's badge, if it has opened its ballot: a way back to it.
-  const [mine, setMine] = useState<string | null>(null);
-  useEffect(() => setMine(myCode()), []);
+  // The way back to your ballot: by the code this browser opened it with, else by the
+  // signed-in account's badge (found on-chain).
+  const [code, setCode] = useState<string | null>(null);
+  useEffect(() => setCode(myCode()), []);
+  const { session } = useSession();
+  const badge = useMyBadge(session?.address ?? null, !code);
+  const mine = code
+    ? `/devcon/${code}`
+    : badge.data && badge.data !== "none"
+    ? "/devcon/my-ballot"
+    : null;
 
   const cards = useMemo(
     () => (board.data?.cards ?? []).filter((c) => IN_ROUND.has(c.initiative.slug)),
@@ -121,7 +131,7 @@ export default function Devcon() {
       </div>
       {mine && (
         <div className="mt-5 flex justify-center">
-          <LinkButton variant="primary" to={`/devcon/${mine}`}>
+          <LinkButton variant="primary" to={mine}>
             {isClosed ? "See your ballot" : "See or change your ballot"}
           </LinkButton>
         </div>

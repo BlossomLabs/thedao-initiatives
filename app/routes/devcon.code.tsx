@@ -12,7 +12,13 @@ import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
 import { useWalletPicker } from "~/context/wallet-picker";
 import { useBoard } from "~/hooks/use-board";
-import { apiCode, useBallotSubmit, useDevconCode, useMintWait } from "~/hooks/use-devcon";
+import {
+  apiCode,
+  useBallotSubmit,
+  useDevconCode,
+  useMintWait,
+  useMyBadge,
+} from "~/hooks/use-devcon";
 import { api, errorMessage } from "~/lib/api";
 import { usd } from "~/lib/format";
 import { encodeBallot, type Tier } from "../../shared/devcon/ballot";
@@ -178,11 +184,14 @@ function Intro(
   );
 }
 
-export default function DevconCode() {
-  const code = useParams().code ?? "";
+/** The ballot of a paper code (/devcon/:code), or with `myBallot`, of the signed-in
+ * account's badge (/devcon/my-ballot: the way back from /devcon, no code needed). */
+export default function DevconCode({ myBallot = false }: { myBallot?: boolean } = {}) {
+  const params = useParams();
+  const code = myBallot ? "" : params.code ?? "";
   const qc = useQueryClient();
-  const info = useDevconCode(code);
-  const { session, signOut } = useSession();
+  const byCode = useDevconCode(code, !myBallot);
+  const { session, signOut, restoring } = useSession();
   const { address } = useWallet();
   const { openWalletPicker } = useWalletPicker();
   const board = useBoard();
@@ -191,6 +200,8 @@ export default function DevconCode() {
   const me = session && address && session.address.toLowerCase() === address.toLowerCase()
     ? session.address
     : null;
+  const byAccount = useMyBadge(me, myBallot);
+  const info = myBallot ? byAccount : byCode;
 
   // Accepting survives the sign-in (the modal can remount or reload the page):
   // once signed in, the claim goes ahead without a second click.
@@ -206,7 +217,8 @@ export default function DevconCode() {
   // Dev only: ?mock shows the ballot without a real code or a sign-in (stripped from builds).
   const [sp] = useSearchParams();
   const mock = import.meta.env.DEV && sp.has("mock");
-  const data = mock ? { n: 1, claimed: true, owner: "0x0" } as const : info.data;
+  const found = info.data === "none" ? undefined : info.data;
+  const data = mock ? { n: 1, claimed: true, owner: "0x0" } as const : found;
   const n = data && data !== "bad" ? data.n : null;
   const owner = data && data !== "bad" ? data.owner : null;
   const mine = mock || Boolean(me && owner && owner.toLowerCase() === me.toLowerCase());
@@ -260,7 +272,7 @@ export default function DevconCode() {
     try {
       localStorage.setItem(ballotSeenKey(n), "1");
     } catch { /* storage unavailable */ }
-    rememberMyCode(code);
+    if (code) rememberMyCode(code);
   }, [showsBallot, n, mock, code]);
 
   const [tiers, setTiers] = useState<Partial<Record<string, Tier>>>({});
@@ -295,8 +307,27 @@ export default function DevconCode() {
 
   let body: React.ReactNode;
   let wide = false;
-  if (info.isPending && !mock) {
-    wide = ballotSeen(code);
+  if (myBallot && !mock && !me && !restoring) {
+    body = (
+      <Panel>
+        <Headline>Sign in to see your ballot.</Headline>
+        <p>Use the wallet or email you claimed your Devcon badge with.</p>
+        <Button className="mt-4" onClick={openWalletPicker}>Sign in</Button>
+      </Panel>
+    );
+  } else if (myBallot && !mock && info.data === "none") {
+    body = (
+      <Panel>
+        <Headline>No Devcon badge on this account.</Headline>
+        <p>
+          Scan the QR code on your badge to claim it, or sign in with the account you claimed it
+          with.
+        </p>
+        <Button className="mt-4" onClick={() => void signOut()}>Sign out</Button>
+      </Panel>
+    );
+  } else if (info.isPending && !mock) {
+    wide = myBallot || ballotSeen(code);
     body = wide ? <BallotSkeleton /> : <IntroSkeleton />;
   } else if (info.isError && !mock) {
     body = (
@@ -435,7 +466,7 @@ export default function DevconCode() {
       </div>
     );
   } else {
-    wide = ballotSeen(code);
+    wide = myBallot || ballotSeen(code);
     body = wide ? <BallotSkeleton /> : <IntroSkeleton />;
   }
 

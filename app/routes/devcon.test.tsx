@@ -20,6 +20,10 @@ vi.mock("../../shared/devcon/manifest", async (original) => ({
     slugs: ["alpha", "beta"],
   },
 }));
+const signedIn = vi.hoisted(() => ({
+  address: null as string | null,
+  badge: null as number | null,
+}));
 const boardCards = [
   { id: "A", slug: "alpha", title: "Alpha fuzzing", goalUsd: 60_000, total: 10_000 },
   { id: "B", slug: "beta", title: "Beta audits", goalUsd: 30_000, total: 0 },
@@ -56,7 +60,12 @@ vi.mock("~/hooks/use-board", () => ({
     isError: false,
   }),
 }));
-vi.mock("~/context/session", () => ({ useSession: () => ({ session: null, me: null }) }));
+vi.mock("~/context/session", () => ({
+  useSession: () => ({
+    session: signedIn.address ? { address: signedIn.address } : null,
+    me: null,
+  }),
+}));
 vi.mock("~/components/board/PledgeBand", () => ({ default: () => null }));
 vi.mock("~/components/donate/DonateWidget", () => ({ default: () => null }));
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
@@ -66,7 +75,11 @@ vi.mock("~/lib/api", async (original) => {
     ...await original<typeof import("~/lib/api")>(),
     api: Object.assign(
       (...a: unknown[]) =>
-        a[0] === "/api/devcon/ballots" ? api(...a) : Promise.reject(new Error("not in test")),
+        a[0] === "/api/devcon/ballots"
+          ? api(...a)
+          : a[0] === "/api/devcon/mine"
+          ? Promise.resolve({ n: signedIn.badge })
+          : Promise.reject(new Error("not in test")),
       {
         mock: api.mock,
         mockResolvedValue: api.mockResolvedValue.bind(api),
@@ -156,4 +169,22 @@ it("links back to this browser's ballot, once it has opened one", async () => {
   expect(await screen.findByRole("link", { name: /see or change your ballot/i }))
     .toHaveAttribute("href", "/devcon/7.sig");
   localStorage.clear();
+});
+
+it("links a signed-in badge holder to their ballot, even without the code in this browser", async () => {
+  localStorage.clear();
+  signedIn.address = "0x1111111111111111111111111111111111111111";
+  signedIn.badge = 7;
+  vi.mocked(api).mockResolvedValue({ at: 1, ballots: [] });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>
+        <Devcon />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByRole("link", { name: /see or change your ballot/i }))
+    .toHaveAttribute("href", "/devcon/my-ballot");
+  signedIn.address = null;
+  signedIn.badge = null;
 });

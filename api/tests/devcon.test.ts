@@ -61,6 +61,10 @@ function fakeChain() {
           [...state.owners.values()].filter((o) => o.toLowerCase() === a.toLowerCase()).length,
         ),
       ),
+    badgeOf: (a) =>
+      Promise.resolve(
+        [...state.owners].find(([, o]) => o.toLowerCase() === a.toLowerCase())?.[0] ?? null,
+      ),
     codeOf: (a) => Promise.resolve(state.code.get(a.toLowerCase()) ?? "0x"),
     canMint: (to) => Promise.resolve(!state.unmintable.has(to.toLowerCase())),
     nonceOf: (n) => Promise.resolve(state.nonces.get(n) ?? 0n),
@@ -137,6 +141,16 @@ Deno.test("devcon code: mangled or foreign codes are a 400 bad_code, never a 500
     assertEquals(res.status, 400, bad);
     assertEquals((await j(res)).code, "bad_code");
   }
+  h.close();
+});
+
+Deno.test("devcon mine: the signed-in account's badge, or null; needs a session", async () => {
+  const { h, state } = await setup();
+  assertEquals((await h.req("/api/devcon/mine")).status, 401);
+  const token = await h.mint(PLAIN);
+  assertEquals(await j(await h.req("/api/devcon/mine", { token })), { n: null });
+  state.owners.set(17n, PLAIN);
+  assertEquals(await j(await h.req("/api/devcon/mine", { token })), { n: 17 });
   h.close();
 });
 

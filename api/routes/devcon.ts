@@ -112,6 +112,14 @@ export function devconRoutes(deps: Deps) {
     return c.json({ n: Number(n), claimed: owner !== null, owner });
   });
 
+  /** The signed-in account's badge number, so /devcon can lead back to its ballot. */
+  r.get("/mine", requireAuth, async (c) => {
+    const d = dc();
+    await limit("mine", c.var.ip);
+    const n = await d.chain.badgeOf(c.var.user!.address as Hex);
+    return c.json({ n: n === null ? null : Number(n) });
+  });
+
   r.post("/claim", requireAuth, async (c) => {
     const d = dc();
     await limit("claim", c.var.ip);

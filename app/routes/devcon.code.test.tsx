@@ -356,3 +356,44 @@ it("Enter asks AI, which orders the list; typing again goes back to keywords", a
   fireEvent.click(screen.getByRole("button", { name: /back to keywords/i }));
   expect(screen.queryByText(/ordered by ai relevance/i)).toBeNull();
 });
+
+function showMine() {
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <MemoryRouter initialEntries={["/devcon/my-ballot"]}>
+        <Routes>
+          <Route path="/devcon/my-ballot" element={<DevconCode myBallot />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+it("my ballot (from /devcon, no code): signed out asks to sign in", async () => {
+  showMine();
+  fireEvent.click(await screen.findByRole("button", { name: /sign in/i }));
+  expect(openWalletPicker).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(api)).not.toHaveBeenCalled();
+});
+
+it("my ballot: the signed-in account's badge opens its ballot", async () => {
+  session.current = { address: ME };
+  vi.mocked(api).mockImplementation(
+    ((path: string) =>
+      path === "/api/devcon/mine"
+        ? Promise.resolve({ n: 17 })
+        : Promise.reject(new Error("unexpected " + path))) as typeof api,
+  );
+  showMine();
+  expect(await screen.findByRole("heading", { name: /your ballot/i })).toBeInTheDocument();
+  expect(screen.getByText(/devcon badge #17/i)).toBeInTheDocument();
+});
+
+it("my ballot: an account without a badge says so", async () => {
+  session.current = { address: ME };
+  vi.mocked(api).mockResolvedValue({ n: null });
+  showMine();
+  expect(await screen.findByText(/no devcon badge on this account/i)).toBeInTheDocument();
+});

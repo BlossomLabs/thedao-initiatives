@@ -15,6 +15,8 @@ import type { DevconManifest } from "../../shared/devcon/manifest.ts";
 export interface DevconChain {
   ownerOf(n: bigint): Promise<Hex | null>;
   balanceOf(a: Hex): Promise<bigint>;
+  /** The badge an account holds now (the latest one sent to it that it still owns). */
+  badgeOf(a: Hex): Promise<bigint | null>;
   /** The account's code: "0x" for a plain EOA, 0xef0100… for an EIP-7702 delegation. */
   codeOf(a: Hex): Promise<Hex>;
   /** Would the relayer's mint(to, n) succeed (simulated)? */
@@ -56,6 +58,9 @@ const BALLOT_RECORDED = parseAbiItem(
   "event BallotRecorded(uint256 indexed tokenId, address indexed voter, uint64 nonce, bytes ballot)",
 );
 const REGISTRATION_REVOKED = parseAbiItem("event RegistrationRevoked(uint256 indexed tokenId)");
+const TRANSFER = parseAbiItem(
+  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+);
 const LOG_CHUNK = 50_000n;
 /** _safeMint to a wallet is ~100k gas; the rest is room for a small receive hook. */
 const MINT_GAS = 250_000n;
@@ -137,6 +142,27 @@ export function createDevconChain(
         // limit keeps a gas-hungry delegate from draining the relayer.
         ...(call.fn === "mint" ? { gas: MINT_GAS } : {}),
       });
+    },
+    async badgeOf(a) {
+      // No enumeration on the contract: the Transfer logs to the account, newest first,
+      // and the first token it still owns.
+      const head = await pub.getBlockNumber();
+      const sent: bigint[] = [];
+      for (let from = BigInt(m.deployBlock); from <= head; from += LOG_CHUNK) {
+        const to = from + LOG_CHUNK - 1n < head ? from + LOG_CHUNK - 1n : head;
+        const logs = await pub.getLogs({
+          address: m.contract,
+          event: TRANSFER,
+          args: { to: a },
+          fromBlock: from,
+          toBlock: to,
+        });
+        for (const l of logs) sent.push(l.args.tokenId!);
+      }
+      for (const n of sent.reverse()) {
+        if ((await this.ownerOf(n))?.toLowerCase() === a.toLowerCase()) return n;
+      }
+      return null;
     },
     async ballots() {
       const headBlock = await pub.getBlock();

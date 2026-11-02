@@ -1,8 +1,16 @@
 {
   "nodeModulesDir": "auto",
-  "unstable": ["kv", "cron"],
+  "unstable": [
+    "kv",
+    "cron"
+  ],
   "tasks": {
-    "dev": { "dependencies": ["dev:api", "dev:web"] },
+    "dev": {
+      "dependencies": [
+        "dev:api",
+        "dev:web"
+      ]
+    },
     "dev:web": "deno run -A npm:@react-router/dev dev",
     "dev:api": "deno run --env-file=.env -A --watch api/main.ts",
     "build": "deno run -A npm:@react-router/dev build",
@@ -17,7 +25,8 @@
     "sync-content": "deno run --env-file=.env -A api/scripts/sync-content.ts",
     "login": "deno run --env-file=.env -A api/scripts/login.ts",
     "seed-categories": "deno run --env-file=.env -A api/scripts/seed-categories.ts",
-    "bench": "deno run --allow-net api/scripts/bench.ts"
+    "bench": "deno run --allow-net api/scripts/bench.ts",
+    "devcon-codes": "deno run --allow-env=DEVCON_ISSUER_KEY --allow-read --allow-write=devcon-codes scripts/devcon-codes.ts"
   },
   "imports": {
     "@std/http": "jsr:@std/http@^1.1.4",
@@ -27,13 +36,41 @@
     "@std/encoding": "jsr:@std/encoding@^1.0.11"
   },
   "compilerOptions": {
-    "lib": ["ES2022", "DOM", "DOM.Iterable", "deno.ns", "deno.unstable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable",
+      "deno.ns",
+      "deno.unstable"
+    ],
     "jsx": "react-jsx",
     "jsxImportSource": "react"
   },
   "lint": {
-    "include": ["app/", "api/", "shared/", "server.ts"],
-    "rules": { "tags": ["recommended"], "exclude": ["no-explicit-any"] }
+    "include": [
+      "app/",
+      "api/",
+      "shared/",
+      "server.ts"
+    ],
+    "rules": {
+      "tags": [
+        "recommended"
+      ],
+      "exclude": [
+        "no-explicit-any"
+      ]
+    }
   },
-  "fmt": { "include": ["app/", "api/", "shared/", "server.ts", "test/"], "lineWidth": 100, "indentWidth": 2 }
+  "fmt": {
+    "include": [
+      "app/",
+      "api/",
+      "shared/",
+      "server.ts",
+      "test/"
+    ],
+    "lineWidth": 100,
+    "indentWidth": 2
+  }
 }

@@ -1,5 +1,5 @@
 import { MemoryRouter } from "react-router";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import InitiativeCard, { DonateStandIn } from "./InitiativeCard";
 import type { Card } from "~/lib/api-types";
@@ -350,4 +350,18 @@ it("public ratings are read-only and never unfold the reviewing UI", () => {
   expect(screen.queryByRole("button", { name: /Voting Badge Holder average/ })).toBeNull();
   expect(screen.queryByRole("radiogroup")).toBeNull();
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+});
+
+it("the DevCon projector draws the vote's share in gold after what was raised", () => {
+  const { container } = render(
+    <MemoryRouter>
+      <InitiativeCard card={card({ pct: 30 })} tokensOk={false} votePct={50} />
+    </MemoryRouter>,
+  );
+  const gold = container.querySelector<HTMLElement>("[data-vote-fill]");
+  expect(gold?.style.left).toBe("30%");
+  expect(gold?.style.width).toBe("50%");
+  cleanup();
+  mount(card({ pct: 30 }));
+  expect(document.querySelector("[data-vote-fill]")).toBeNull();
 });

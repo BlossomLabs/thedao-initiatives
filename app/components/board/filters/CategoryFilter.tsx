@@ -22,10 +22,14 @@ const labelOf = (s: string) => categoryOf(s)?.label ?? s;
  * open for the next one.
  */
 export default function CategoryFilter(
-  { value, counts, onChange }: {
+  { value, counts, onChange, className, align = "start" }: {
     value: string[];
     counts: Record<string, number>;
     onChange: (cats: string[]) => void;
+    /** Extra classes for the trigger pill (e.g. a smaller size). */
+    className?: string;
+    /** Which edge of the pill the menu lines up with. */
+    align?: "start" | "end";
   },
 ) {
   const trigger = useRef<HTMLButtonElement>(null);
@@ -45,12 +49,12 @@ export default function CategoryFilter(
       <Combobox.Trigger
         ref={trigger}
         aria-label={triggerLabel(value.length)}
-        className={cn(TRIGGER, value.length > 0 && FILTER_PILL_ON)}
+        className={cn(TRIGGER, value.length > 0 && FILTER_PILL_ON, className)}
       >
         <TriggerFace value={value} />
       </Combobox.Trigger>
       <Combobox.Portal>
-        <Combobox.Positioner sideOffset={6} align="start" className="z-[210]">
+        <Combobox.Positioner sideOffset={6} align={align} className="z-[210]">
           <Combobox.Popup className="w-[min(300px,calc(100vw-32px))] rounded-[14px] border border-edge2 bg-panel shadow-menu outline-none">
             <div className="relative border-b border-white/10 p-1.5">
               <Search

@@ -18,6 +18,38 @@
      and the whole arrow fades once the outlines are done. */
   --animate-arrow-draw: arrow-draw 0.4s ease-out both;
   --animate-arrow-fade: arrow-fade 2.6s ease-in both;
+  /* Devcon ballot: an initiative dropped in a tier. The tier flashes green and fades back,
+     its grade letter bumps, and the dropped chip pops in. With reduced motion, only the
+     flash (opacity) plays. */
+  --animate-tier-land: tier-land 0.7s ease-out both;
+  --animate-grade-bump: grade-bump 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  --animate-chip-land: chip-land 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  @keyframes tier-land {
+    0% {
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes grade-bump {
+    40% {
+      scale: 1.35;
+    }
+  }
+  @keyframes chip-land {
+    0% {
+      scale: 0.6;
+      opacity: 0;
+    }
+    100% {
+      scale: 1;
+      opacity: 1;
+    }
+  }
   @keyframes arrow-draw {
     from {
       stroke-dashoffset: 1;

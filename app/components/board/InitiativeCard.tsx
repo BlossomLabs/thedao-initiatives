@@ -116,8 +116,11 @@ export default function InitiativeCard({
   watch,
   rating,
   vote,
+  votePct,
 }: {
   card: Card;
+  /** The DevCon projector: this initiative's vote share, % of its goal (gold on the bar). */
+  votePct?: number;
   /** The vote floor on the bar, while the display is on. */
   vote?: VoteSettings;
   /** Watchlist state in this browser; omitted = no button. */
@@ -183,6 +186,7 @@ export default function InitiativeCard({
           <div className={cn("mt-auto", callout && "pt-9")}>
             <Bar
               pct={pct}
+              votePct={votePct}
               tick={tick}
               label={`${pctText(pct)} funded. ${
                 calloutText(voteStanding(summary.total, r.goalUsd, vote))
@@ -192,7 +196,7 @@ export default function InitiativeCard({
             </Bar>
           </div>
         )
-        : <Bar pct={pct} className="mt-auto" />}
+        : <Bar pct={pct} votePct={votePct} className="mt-auto" />}
       <div
         className={cn(
           "mt-2 flex justify-between gap-2.5 text-[13px]",

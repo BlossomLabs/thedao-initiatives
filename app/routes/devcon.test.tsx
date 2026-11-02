@@ -1,6 +1,6 @@
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { bytesToHex } from "viem";
 import { api } from "~/lib/api";
@@ -23,6 +23,7 @@ vi.mock("../../shared/devcon/manifest", async (original) => ({
 const boardCards = [
   { id: "A", slug: "alpha", title: "Alpha fuzzing", goalUsd: 60_000, total: 10_000 },
   { id: "B", slug: "beta", title: "Beta audits", goalUsd: 30_000, total: 0 },
+  { id: "G", slug: "gamma", title: "Gamma outside", goalUsd: 10_000, total: 0 },
 ].map((c) => ({
   initiative: {
     id: c.id,
@@ -48,13 +49,45 @@ const boardCards = [
   donationsEnabled: false,
 }));
 vi.mock("~/hooks/use-board", () => ({
-  useBoard: () => ({ data: { cards: boardCards, flags: {} } }),
+  boardKey: ["board"],
+  useBoard: () => ({
+    data: { cards: boardCards, totals: { raised: 10_000 }, flags: {}, sponsors: [] },
+    isLoading: false,
+    isError: false,
+  }),
 }));
+vi.mock("~/context/session", () => ({ useSession: () => ({ session: null, me: null }) }));
+vi.mock("~/components/board/PledgeBand", () => ({ default: () => null }));
+vi.mock("~/components/donate/DonateWidget", () => ({ default: () => null }));
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
-vi.mock("~/lib/api", async (original) => ({
-  ...await original<typeof import("~/lib/api")>(),
-  api: vi.fn(),
-}));
+vi.mock("~/lib/api", async (original) => {
+  const api = vi.fn();
+  return {
+    ...await original<typeof import("~/lib/api")>(),
+    api: Object.assign(
+      (...a: unknown[]) =>
+        a[0] === "/api/devcon/ballots" ? api(...a) : Promise.reject(new Error("not in test")),
+      {
+        mock: api.mock,
+        mockResolvedValue: api.mockResolvedValue.bind(api),
+        mockRejectedValue: api.mockRejectedValue.bind(api),
+      },
+    ),
+  };
+});
+
+// The hero's count-up waits to be on screen.
+vi.stubGlobal(
+  "IntersectionObserver",
+  class {
+    constructor(private cb: (e: { isIntersecting: boolean }[]) => void) {}
+    observe() {
+      this.cb([{ isIntersecting: true }]);
+    }
+    unobserve() {}
+    disconnect() {}
+  },
+);
 
 afterEach(cleanup);
 
@@ -73,10 +106,13 @@ it("says what is going on and what the vote would fund right now", async () => {
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  expect(await screen.findByText(/Devcon is voting/)).toBeInTheDocument();
-  expect(await screen.findByText(/\$50,000/)).toBeInTheDocument();
-  expect(screen.getByText(/1 ballot/)).toBeInTheDocument();
-  expect(screen.getByText("Alpha fuzzing")).toBeInTheDocument();
+  expect(await screen.findByText(/Devcon 8 · demo vote/i)).toBeInTheDocument();
+  expect(await screen.findByText(/would be funded by 1 ballot/)).toBeInTheDocument();
+  expect(await screen.findByText("Alpha fuzzing")).toBeInTheDocument();
+  // The front page's board: its search box, only the round's initiatives, gold shares.
+  expect(screen.getByRole("searchbox")).toBeInTheDocument();
+  expect(screen.queryByText("Gamma outside")).toBeNull();
+  await waitFor(() => expect(document.querySelector("[data-vote-fill]")).not.toBeNull());
 });
 
 it("an RPC hiccup keeps the last result and says how old it is", async () => {
@@ -92,9 +128,9 @@ it("an RPC hiccup keeps the last result and says how old it is", async () => {
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  expect(await screen.findByText(/\$50,000/)).toBeInTheDocument();
+  expect(await screen.findByText(/would be funded by 1 ballot/)).toBeInTheDocument();
   vi.mocked(api).mockRejectedValue(new Error("rpc down"));
   await act(() => qc.refetchQueries({ queryKey: ["devcon-ballots"] }).catch(() => {}));
-  expect(screen.getByText(/\$50,000/)).toBeInTheDocument();
+  expect(screen.getByText(/would be funded by 1 ballot/)).toBeInTheDocument();
   expect(screen.getByText(/updated .* ago/i)).toBeInTheDocument();
 });

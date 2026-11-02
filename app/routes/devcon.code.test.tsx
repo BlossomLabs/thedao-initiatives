@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { bytesToHex } from "viem";
 import { api, ApiError } from "~/lib/api";
@@ -45,8 +45,16 @@ vi.mock("~/context/wallet-picker", () => ({
 vi.mock("~/hooks/use-board", () => ({
   useBoard: () => ({
     data: {
+      flags: { aiSearch: true },
       cards: ["alpha", "beta", "gamma"].map((slug) => ({
-        initiative: { id: slug, slug, title: slug.toUpperCase(), goalUsd: 1000 },
+        initiative: {
+          id: slug,
+          slug,
+          title: slug.toUpperCase(),
+          summary: slug === "gamma" ? "Formal verification of bridges" : "",
+          categories: [],
+          goalUsd: 1000,
+        },
         summary: { total: 0 },
       })),
     },
@@ -115,10 +123,18 @@ it("a code someone else claimed says it is taken", async () => {
 it("the intro explains first; sign-in opens only on the button", async () => {
   mockApi(() => Promise.resolve({ n: 17, claimed: false, owner: null }));
   show();
-  expect(await screen.findByText(/badge holder/i)).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: /congrats/i })).toBeInTheDocument();
   expect(screen.getByText(/\$913,244/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /security hub/i })).toHaveAttribute(
+    "href",
+    "https://securityhub.thedao.fund/",
+  );
+  expect(screen.getByRole("link", { name: /blossom budgeting/i })).toHaveAttribute(
+    "href",
+    "https://blossom.software/budgeting",
+  );
   expect(openWalletPicker).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: /accept the challenge/i }));
+  fireEvent.click(screen.getByRole("button", { name: /claim my devcon badge/i }));
   expect(openWalletPicker).toHaveBeenCalledTimes(1);
 });
 
@@ -139,7 +155,7 @@ it("a second badge for the same person gets the bad-kid line", async () => {
     () => Promise.reject(new ApiError(409, "One badge per person.", { code: "one_per_person" })),
   );
   show();
-  fireEvent.click(await screen.findByRole("button", { name: /accept the challenge/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /claim my devcon badge/i }));
   expect(await screen.findByText(/Nice try, bad kid/)).toBeInTheDocument();
 });
 
@@ -149,7 +165,7 @@ it("the badge's owner gets the ballot, and sending posts the encoded tiers", asy
   show();
   expect(await screen.findByText("ALPHA")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /BETA/ }));
-  fireEvent.click(screen.getByRole("button", { name: /move here: must fund/i }));
+  fireEvent.click(screen.getByRole("button", { name: "Place in Must fund" }));
   fireEvent.click(screen.getByRole("button", { name: /send my ballot/i }));
   await waitFor(() => expect(submit).toHaveBeenCalled());
   const [tokenId, ballot] = submit.mock.calls[0];
@@ -163,7 +179,7 @@ it("offers to send it yourself next to Send, and next to Retry after a failure",
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
   fireEvent.click(await screen.findByRole("button", { name: /BETA/ }));
-  fireEvent.click(screen.getByRole("button", { name: /move here: must fund/i }));
+  fireEvent.click(screen.getByRole("button", { name: "Place in Must fund" }));
   fireEvent.click(screen.getByRole("button", { name: /send it yourself/i }));
   await waitFor(() => expect(selfSend).toHaveBeenCalled());
   expect(selfSend.mock.calls[0][0]).toBe(17n);
@@ -188,7 +204,7 @@ it("accepting, then signing in, goes straight on to claiming — even if the pag
     },
   );
   show();
-  fireEvent.click(await screen.findByRole("button", { name: /accept the challenge/i }));
+  fireEvent.click(await screen.findByRole("button", { name: /claim my devcon badge/i }));
   expect(openWalletPicker).toHaveBeenCalledTimes(1);
   // The sign-in modal finishes and the page comes back signed in (a fresh mount).
   cleanup();
@@ -203,14 +219,14 @@ it("accepting, then signing in, goes straight on to claiming — even if the pag
   // On to the ballot, no second "Accept the challenge".
   expect(await screen.findByRole("button", { name: /send my ballot|place at least one/i }))
     .toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /accept the challenge/i })).toBeNull();
+  expect(screen.queryByRole("button", { name: /claim my devcon badge/i })).toBeNull();
 });
 
 it("without accepting, a signed-in visitor still sees the intro and claims only on the button", async () => {
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: false, owner: null }));
   show();
-  expect(await screen.findByRole("button", { name: /accept the challenge/i })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: /claim my devcon badge/i })).toBeInTheDocument();
   expect(vi.mocked(api)).not.toHaveBeenCalledWith("/api/devcon/claim", expect.anything());
 });
 
@@ -241,4 +257,98 @@ it("the automatic claim after sign-in is sent once, even when effects run twice 
   await new Promise((r) => setTimeout(r, 50));
   expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/devcon/claim").length).toBe(1);
   resolveClaim({ hash: "0x1" });
+});
+
+it("the ballot: search narrows the unranked list; a tile's tier buttons place it", async () => {
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  expect(await screen.findByText("ALPHA")).toBeInTheDocument();
+  fireEvent.change(screen.getByRole("textbox", { name: /search initiatives/i }), {
+    target: { value: "bridges" },
+  });
+  expect(screen.queryByText("ALPHA")).toBeNull();
+  expect(screen.getByText("GAMMA")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /clear the search/i }));
+  expect(screen.getByText("ALPHA")).toBeInTheDocument();
+
+  // Tap it, then tap a tier.
+  fireEvent.click(screen.getByRole("button", { name: /^ALPHA/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Place in Should fund" }));
+  expect(within(screen.getByRole("list", { name: "Should fund" })).getByText("ALPHA"))
+    .toBeInTheDocument();
+});
+
+it("dragging a tile onto a tier ranks it; tiles keep their size", async () => {
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  await screen.findByText("BETA");
+  const tile = document.querySelector('[data-ballot-tile="beta"]') as HTMLElement;
+  const before = tile.className;
+  let under: Element | null = null;
+  document.elementFromPoint = () => under;
+  fireEvent.pointerDown(tile, {
+    pointerId: 1,
+    pointerType: "mouse",
+    button: 0,
+    clientX: 10,
+    clientY: 10,
+  });
+  fireEvent.pointerMove(document, { pointerId: 1, clientX: 30, clientY: 30 });
+  // Picked up: the source only fades.
+  expect(tile.className.replace(" opacity-40", "")).toBe(before);
+  under = screen.getByRole("button", { name: "Place in Must fund" });
+  fireEvent.pointerMove(document, { pointerId: 1, clientX: 40, clientY: 50 });
+  fireEvent.pointerUp(document, { pointerId: 1, clientX: 40, clientY: 50 });
+  expect(within(screen.getByRole("list", { name: "Must fund" })).getByText("BETA"))
+    .toBeInTheDocument();
+  // In the tier it is a chip; the list's tiles keep their size.
+  expect(document.querySelector('[data-ballot-chip="beta"]')).not.toBeNull();
+  const other = document.querySelector('[data-ballot-tile="alpha"]') as HTMLElement;
+  expect(other.className).toBe(before.replace("beta", "alpha"));
+});
+
+it("Cancel drops a tapped initiative without moving it", async () => {
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: /^GAMMA/ }));
+  expect(screen.getByRole("button", { name: /^GAMMA/ })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+  expect(screen.getByRole("button", { name: /^GAMMA/ })).toHaveAttribute("aria-pressed", "false");
+  expect(within(screen.getByRole("list", { name: "Not ranked yet" })).getByText("GAMMA"))
+    .toBeInTheDocument();
+});
+
+it("Enter asks AI, which orders the list; typing again goes back to keywords", async () => {
+  session.current = { address: ME };
+  vi.mocked(api).mockImplementation(
+    ((path: string) => {
+      if (path.startsWith("/api/devcon/code/")) {
+        return Promise.resolve({ n: 17, claimed: true, owner: ME });
+      }
+      if (path === "/api/ai-search") {
+        return Promise.resolve({
+          scores: [{ id: "gamma", score: 90 }, { id: "alpha", score: 40 }, {
+            id: "beta",
+            score: 10,
+          }],
+          pickThreshold: 50,
+        });
+      }
+      return Promise.reject(new Error("unexpected " + path));
+    }) as typeof api,
+  );
+  show();
+  await screen.findByText("ALPHA");
+  const box = screen.getByRole("textbox", { name: /search initiatives/i });
+  fireEvent.change(box, { target: { value: "who protects cross-chain bridges" } });
+  fireEvent.submit(box.closest("form")!);
+  expect(await screen.findByText(/ordered by ai relevance/i)).toBeInTheDocument();
+  const order = within(screen.getByRole("list", { name: "Not ranked yet" }))
+    .getAllByRole("button").map((b) => b.getAttribute("data-ballot-tile"));
+  expect(order).toEqual(["gamma", "alpha", "beta"]);
+  fireEvent.click(screen.getByRole("button", { name: /back to keywords/i }));
+  expect(screen.queryByText(/ordered by ai relevance/i)).toBeNull();
 });

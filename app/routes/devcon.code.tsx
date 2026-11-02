@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { bytesToHex, type Hex } from "viem";
 import PageMain from "~/components/layout/PageMain";
 import { Button } from "~/components/ui/Button";
-import TierBallot from "~/components/devcon/TierBallot";
+import TierBallot, { type BallotItem } from "~/components/devcon/TierBallot";
 import BallotStatus from "~/components/devcon/BallotStatus";
 import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
@@ -17,7 +17,7 @@ import { encodeBallot, type Tier } from "../../shared/devcon/ballot";
 import { DEVCON } from "../../shared/devcon/manifest";
 
 export function meta() {
-  return [{ title: "Badge holder for a day · TheDAO" }, { name: "robots", content: "noindex" }];
+  return [{ title: "Devcon badge · TheDAO" }, { name: "robots", content: "noindex" }];
 }
 
 const POOL = Number(BigInt(DEVCON.poolUsd) / 1_000_000n);
@@ -48,19 +48,48 @@ function saveAccepted(code: string, v: boolean) {
   } catch { /* storage unavailable */ }
 }
 
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[.04] p-6 text-[15px] leading-relaxed text-white/80">
-      {children}
-    </div>
-  );
+function Panel({ children }: { children: React.ReactNode }) {
+  return <div className="card text-[15px] leading-relaxed text-white/80">{children}</div>;
 }
 
 function Headline({ children }: { children: React.ReactNode }) {
   return (
-    <h1 className="mb-3 font-inter-tight text-[28px] font-semibold leading-tight text-white">
+    <h1 className="mb-3 font-inter-tight text-[28px] font-semibold leading-tight tracking-[-.01em] text-white">
       {children}
     </h1>
+  );
+}
+
+const SECURITY_HUB = "https://securityhub.thedao.fund/";
+const BLOSSOM = "https://blossom.software/budgeting";
+
+function Out(
+  { href, title, children }: { href: string; title: string; children: React.ReactNode },
+) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex items-baseline gap-2 text-white hover:text-dao-green"
+    >
+      <span aria-hidden="true" className="text-dao-green">→</span>
+      <span>
+        <b className="font-medium">{title}</b>{" "}
+        <span className="text-white/60 group-hover:text-dao-green/80">{children}</span>
+      </span>
+    </a>
+  );
+}
+
+function Step({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span className="grid size-6 flex-none place-items-center rounded-full border border-[rgba(92,183,90,.5)] font-inter-tight text-[12px] text-dao-green tnum">
+        {n}
+      </span>
+      <span>{children}</span>
+    </li>
   );
 }
 
@@ -68,19 +97,70 @@ function Intro(
   { onAccept, busy, note }: { onAccept: () => void; busy: boolean; note?: React.ReactNode },
 ) {
   return (
-    <Card>
-      <Headline>You're a TheDAO badge holder. For one day.</Headline>
-      <p>
-        Rank the security initiatives TheDAO could fund from a{" "}
-        <b className="text-white">{usd(POOL)}</b>{" "}
-        pool. Every ballot moves the result live on the big screen.
-      </p>
-      <p className="mt-2 text-white/60">Voting closes {closeText}.</p>
-      <Button variant="primary" className="mt-5 w-full" disabled={busy} onClick={onAccept}>
-        {busy ? "One moment…" : "Accept the challenge"}
-      </Button>
-      {note && <div className="mt-4">{note}</div>}
-    </Card>
+    <div className="space-y-5">
+      <header className="pt-4 text-center">
+        <p className="kicker m-0">Devcon 8 · Demo vote on Sepolia</p>
+        <h1 className="mt-3 font-inter-tight text-[clamp(36px,9vw,56px)] font-bold leading-[1.05] tracking-[-.03em] text-white">
+          Congrats!
+        </h1>
+        <p className="mx-auto mt-3 max-w-[540px] font-inter-tight text-[clamp(18px,3vw,22px)] leading-snug text-white/80">
+          You're a TheDAO <span className="text-dao-green">Badge Holder</span> for a day
+        </p>
+      </header>
+      <div className="shimmer shimmer-soft !my-6" />
+      <Panel>
+        <h2 className="k">What you'll do</h2>
+        <p className="mb-4">
+          TheDAO Security Fund backs initiatives that keep{" "}
+          <span className="text-dao-green">Ethereum safe</span>. Its badge holders decide where the
+          money goes, and today you're one of them.
+        </p>
+        <ol className="space-y-3">
+          <Step n={1}>
+            <b className="font-medium text-white">Claim your Devcon badge.</b>{" "}
+            Sign in with a wallet or an email, and we will mint an NFT on Sepolia for you.
+          </Step>
+          <Step n={2}>
+            <b className="font-medium text-white">Sort the security initiatives into tiers:</b>{" "}
+            <span className="text-dao-green">S</span> Must fund ·{" "}
+            <span className="text-dao-green">A</span> Should fund ·{" "}
+            <span className="text-dao-green">B</span> Nice to have.
+          </Step>
+          <Step n={3}>
+            <b className="font-medium text-white">Send your ballot.</b>{" "}
+            It moves the live result on the big screen at the booth.
+          </Step>
+        </ol>
+      </Panel>
+      <Panel>
+        <h2 className="k">How the money is split</h2>
+        <p>
+          A <b className="font-medium text-white">{usd(POOL)}</b>{" "}
+          demo pool is split equally among voters. The ballots fund whole initiatives, highest tiers
+          first, using Blossom's tier budgeting.
+        </p>
+        <p className="mt-2 text-white/60">
+          It's a demo: no real funds move. Voting closes {closeText}.
+        </p>
+      </Panel>
+      <Panel>
+        <h2 className="k">Learn more</h2>
+        <div className="space-y-2">
+          <Out href={SECURITY_HUB} title="Security Hub">
+            Come to discuss and learn about security initiatives around Ethereum
+          </Out>
+          <Out href={BLOSSOM} title="Blossom Budgeting">
+            Learn how this participatory budgeting works
+          </Out>
+        </div>
+      </Panel>
+      <div className="pt-1 text-center">
+        <Button variant="primary" className="w-full" disabled={busy} onClick={onAccept}>
+          {busy ? "One moment…" : "Claim my Devcon badge"}
+        </Button>
+        {note && <div className="mt-4 text-left">{note}</div>}
+      </div>
+    </div>
   );
 }
 
@@ -109,10 +189,13 @@ export default function DevconCode() {
     { kind: "idle" } | { kind: "busy" } | { kind: "error"; code?: string; message: string }
   >({ kind: "idle" });
 
-  const data = info.data;
+  // Dev only: ?mock shows the ballot without a real code or a sign-in (stripped from builds).
+  const [sp] = useSearchParams();
+  const mock = import.meta.env.DEV && sp.has("mock");
+  const data = mock ? { n: 1, claimed: true, owner: "0x0" } as const : info.data;
   const n = data && data !== "bad" ? data.n : null;
   const owner = data && data !== "bad" ? data.owner : null;
-  const mine = Boolean(me && owner && owner.toLowerCase() === me.toLowerCase());
+  const mine = mock || Boolean(me && owner && owner.toLowerCase() === me.toLowerCase());
   const ballotFlow = useBallotSubmit(mine && n !== null ? BigInt(n) : null);
 
   // One claim at a time: the sign-in lands in several renders, and the
@@ -162,46 +245,57 @@ export default function DevconCode() {
     });
   };
 
-  const items = useMemo(() => {
-    const titles = new Map(board.data?.cards.map((c) => [c.initiative.slug, c.initiative.title]));
-    return DEVCON.slugs.map((slug) => ({ slug, title: titles.get(slug) ?? slug }));
+  const replaceTiers = (next: Partial<Record<string, Tier>>) => {
+    setTiers(next);
+    try {
+      if (n !== null) localStorage.setItem(tiersKey(n), JSON.stringify(next));
+    } catch { /* storage unavailable */ }
+  };
+
+  const items = useMemo<BallotItem[]>(() => {
+    const cards = new Map(board.data?.cards.map((c) => [c.initiative.slug, c]));
+    return DEVCON.slugs.map((slug) => {
+      const card = cards.get(slug);
+      return { slug, title: card?.initiative.title ?? slug, card };
+    });
   }, [board.data]);
 
   let body: React.ReactNode;
-  if (info.isPending) {
-    body = <Card>Checking your code…</Card>;
-  } else if (info.isError) {
+  let wide = false;
+  if (info.isPending && !mock) {
+    body = <Panel>Checking your code…</Panel>;
+  } else if (info.isError && !mock) {
     body = (
-      <Card>
+      <Panel>
         <p>We couldn't check this code right now. {errorMessage(info.error)}</p>
         <Button className="mt-4" onClick={() => info.refetch()}>Try again</Button>
-      </Card>
+      </Panel>
     );
   } else if (data === "bad") {
     body = (
-      <Card>
+      <Panel>
         <Headline>This code doesn't look right.</Headline>
         <p>Try scanning it again, slowly. If it still fails, ask at the booth for a new one.</p>
-      </Card>
+      </Panel>
     );
   } else if (data && data.claimed && !mine) {
     body = me
       ? (
-        <Card>
+        <Panel>
           <Headline>This badge belongs to another account.</Headline>
           <p>
             You're signed in with a different one. Sign out, then sign in with the account you
             claimed it with.
           </p>
           <Button className="mt-4" onClick={() => void signOut()}>Sign out</Button>
-        </Card>
+        </Panel>
       )
       : (
-        <Card>
+        <Panel>
           <Headline>This badge is already taken.</Headline>
           <p>Already yours? Sign in with the account you claimed it with.</p>
           <Button className="mt-4" onClick={openWalletPicker}>Sign in</Button>
-        </Card>
+        </Panel>
       );
   } else if (data && !data.claimed) {
     const note = claim.kind === "error"
@@ -217,7 +311,7 @@ export default function DevconCode() {
         ? <p className="text-white/70">Voting has closed. Thanks for stopping by!</p>
         : <p className="text-red-300">{claim.message}</p>
       : claim.kind === "busy"
-      ? <p className="text-white/60">Minting your one-day badge on Sepolia…</p>
+      ? <p className="text-white/60">Minting your Devcon badge on Sepolia…</p>
       : null;
     body = (
       <Intro
@@ -233,61 +327,82 @@ export default function DevconCode() {
       />
     );
   } else if (data && mine && n !== null) {
+    wide = true;
     const isClosed = closed();
     const busy = ["signing", "relaying", "waiting"].includes(ballotFlow.phase.kind);
     const placed = Object.keys(tiers).length;
     const sendYourself = () =>
       void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(DEVCON.slugs, tiers)));
     body = (
-      <div className="space-y-5">
-        <Card>
-          <Headline>Badge #{n}: your ballot</Headline>
-          <p>
-            Put what TheDAO must fund first. Proposals in the same tier are equal. The {usd(POOL)}
+      <div className="space-y-6">
+        <header className="pt-4 text-center">
+          <p className="kicker m-0">Devcon badge #{n} · Demo vote on Sepolia</p>
+          <h1 className="mt-3 font-inter-tight text-[clamp(28px,5vw,40px)] font-bold leading-[1.1] tracking-[-.03em] text-white">
+            Your ballot
+          </h1>
+          <p className="mx-auto mt-3 max-w-[640px] font-inter-tight text-[16px] leading-snug text-white/70">
+            Put what TheDAO must fund first. Initiatives in the same tier are equal. The {usd(POOL)}
             {" "}
-            pool is split equally between everyone who votes.
+            demo pool is split equally between everyone who votes.{" "}
+            <a
+              href={BLOSSOM}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-dao-green underline-offset-2 hover:underline"
+            >
+              How tier budgeting works
+            </a>
           </p>
           {isClosed && <p className="mt-2 font-medium text-white">Voting has closed.</p>}
-        </Card>
-        <TierBallot items={items} tiers={tiers} disabled={isClosed || busy} onChange={setTier} />
-        <div className="sticky bottom-3 space-y-3 rounded-2xl border border-white/10 bg-panel/95 p-4 backdrop-blur">
-          <BallotStatus
-            phase={ballotFlow.phase}
-            onRetry={() => void ballotFlow.retry()}
-            selfSend={!isClosed && placed > 0 && (
-              <Button onClick={sendYourself}>Send it yourself</Button>
-            )}
-          />
-          {!isClosed && (
-            <Button
-              variant="primary"
-              className="w-full"
-              disabled={busy || placed === 0}
-              onClick={() =>
-                void ballotFlow.submit(
-                  BigInt(n),
-                  bytesToHex(encodeBallot(DEVCON.slugs, tiers)),
+        </header>
+        <TierBallot
+          items={items}
+          tiers={tiers}
+          disabled={isClosed || busy}
+          onChange={setTier}
+          onReplace={replaceTiers}
+          search={{ ai: board.data?.flags?.aiSearch, aiAuto: board.data?.flags?.aiSearchAuto }}
+          actions={
+            <div className="mx-auto max-w-[560px] space-y-3 rounded-2xl border border-white/10 bg-panel/95 p-4 shadow-[0_14px_30px_rgba(0,0,0,.35)] backdrop-blur sm:max-w-none sm:bg-white/[.03] sm:shadow-none sm:backdrop-blur-none">
+              <BallotStatus
+                phase={ballotFlow.phase}
+                onRetry={() => void ballotFlow.retry()}
+                selfSend={!isClosed && placed > 0 && (
+                  <Button onClick={sendYourself}>Send it yourself</Button>
                 )}
-            >
-              {placed === 0 ? "Place at least one proposal" : "Send my ballot"}
-            </Button>
-          )}
-          {!isClosed && ballotFlow.phase.kind !== "failed" && (
-            <button
-              type="button"
-              disabled={busy || placed === 0}
-              onClick={sendYourself}
-              className="w-full text-center text-[13px] text-white/55 underline underline-offset-2 disabled:opacity-40"
-            >
-              Send it yourself (from your wallet, on Sepolia)
-            </button>
-          )}
-        </div>
+              />
+              {!isClosed && (
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  disabled={busy || placed === 0}
+                  onClick={() =>
+                    void ballotFlow.submit(
+                      BigInt(n),
+                      bytesToHex(encodeBallot(DEVCON.slugs, tiers)),
+                    )}
+                >
+                  {placed === 0 ? "Place at least one proposal" : "Send my ballot"}
+                </Button>
+              )}
+              {!isClosed && ballotFlow.phase.kind !== "failed" && (
+                <button
+                  type="button"
+                  disabled={busy || placed === 0}
+                  onClick={sendYourself}
+                  className="w-full text-center text-[13px] text-white/55 underline underline-offset-2 disabled:opacity-40"
+                >
+                  Send it yourself (from your wallet, on Sepolia)
+                </button>
+              )}
+            </div>
+          }
+        />
       </div>
     );
   } else {
-    body = <Card>Checking your code…</Card>;
+    body = <Panel>Checking your code…</Panel>;
   }
 
-  return <PageMain narrow className="pt-8">{body}</PageMain>;
+  return <PageMain narrow={!wide} className="pt-8">{body}</PageMain>;
 }

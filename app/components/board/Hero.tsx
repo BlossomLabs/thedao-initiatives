@@ -5,11 +5,18 @@ import Shimmer from "~/components/layout/Shimmer";
 /** `raised` is undefined until the board has loaded. The amount keeps its
  * place but stays invisible until then; once known it fades in while counting
  * up from 0 (CountUp animates a change of `to` from the number on screen). */
-export default function Hero({ raised }: { raised?: number }) {
+export default function Hero({ raised, kicker, sub, children }: {
+  raised?: number;
+  /** The DevCon projector's own kicker and line under the amount (defaults: the homepage's). */
+  kicker?: React.ReactNode;
+  sub?: React.ReactNode;
+  /** Below the line, before the shimmer rule. */
+  children?: React.ReactNode;
+}) {
   const known = raised !== undefined;
   return (
     <section className="mx-auto max-w-[1100px] px-6 pb-2 pt-[72px] text-center max-[760px]:pt-28">
-      <p className="kicker m-0">Ecosystem-funded security initiatives</p>
+      <p className="kicker m-0">{kicker ?? "Ecosystem-funded security initiatives"}</p>
       <div
         className={`mt-3.5 font-inter-tight text-[clamp(40px,10vw,100px)] font-bold leading-none tracking-[-.04em] text-white tnum transition-opacity duration-700 motion-reduce:transition-none ${
           known ? "opacity-100" : "opacity-0"
@@ -25,8 +32,13 @@ export default function Hero({ raised }: { raised?: number }) {
         />
       </div>
       <p className="m-0 mt-2.5 font-inter-tight text-[clamp(17px,2.6vw,22px)] text-white/80">
-        raised for <span className="text-dao-green">Ethereum security</span> initiatives
+        {sub ?? (
+          <>
+            raised for <span className="text-dao-green">Ethereum security</span> initiatives
+          </>
+        )}
       </p>
+      {children}
       <Shimmer />
     </section>
   );

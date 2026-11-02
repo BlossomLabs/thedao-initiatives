@@ -1,24 +1,23 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { hexToBytes } from "viem";
-import BoardList from "~/components/board/BoardList";
-import CategoryDot from "~/components/ui/CategoryDot";
+import BoardPage from "~/components/board/BoardPage";
+import Hero from "~/components/board/Hero";
 import { useBoard } from "~/hooks/use-board";
 import { api } from "~/lib/api";
-import { applyView, DEFAULT_VIEW, groupByPrimary } from "~/lib/board-view";
-import { categoryOf } from "~/lib/categories";
 import { usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import { DEVCON } from "../../shared/devcon/manifest";
 import { devconTally } from "../../shared/devcon/tally";
 
 export function meta() {
-  return [{ title: "Devcon is voting · TheDAO" }, { name: "robots", content: "noindex" }];
+  return [{ title: "Devcon demo vote · TheDAO" }, { name: "robots", content: "noindex" }];
 }
 
 const POLL_MS = 5_000;
 const POOL = BigInt(DEVCON.poolUsd);
 const POOL_USD = Number(POOL / 1_000_000n);
+const IN_ROUND: ReadonlySet<string> = new Set(DEVCON.slugs);
 
 type Ballots = { at: number; ballots: { tokenId: string; ballot: `0x${string}` }[] };
 
@@ -39,8 +38,9 @@ function timeLeft(secs: number): string {
   return d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${String(m).padStart(2, "0")}m`;
 }
 
-/** The projector: the homepage list, with the share the Devcon vote would give each
- * initiative if voting closed right now drawn in gold after what it has raised. */
+/** The projector: the front page, limited to the round's initiatives, with what the
+ * Devcon demo vote would fund if it closed right now: the hero's amount, and each
+ * initiative's share drawn in gold after what it has raised. */
 export default function Devcon() {
   const board = useBoard();
   const ballots = useQuery({
@@ -51,13 +51,10 @@ export default function Devcon() {
   });
   const now = useNow();
 
-  const cards = useMemo(() => {
-    const inRound = new Set(DEVCON.slugs);
-    return applyView(
-      (board.data?.cards ?? []).filter((c) => inRound.has(c.initiative.slug)),
-      DEFAULT_VIEW,
-    );
-  }, [board.data]);
+  const cards = useMemo(
+    () => (board.data?.cards ?? []).filter((c) => IN_ROUND.has(c.initiative.slug)),
+    [board.data],
+  );
 
   const tally = useMemo(() => {
     if (!ballots.data) return null;
@@ -91,58 +88,41 @@ export default function Devcon() {
     ? Math.max(0, Math.round((now - ballots.dataUpdatedAt) / 1000))
     : 0;
   const n = tally?.ballots ?? 0;
+  const ballotsText = n === 1 ? "1 ballot" : `${n} ballots`;
 
-  return (
-    <main className="mx-auto max-w-[1400px] px-6 pb-20 pt-6 text-[1.15em]">
-      <header className="mb-8">
-        <p className="mb-2 font-inter-tight text-[14px] font-semibold uppercase tracking-[.14em] text-vote">
-          Badge holder for a day · Devcon 8
-        </p>
-        <h1 className="font-inter-tight text-[44px] font-semibold leading-[1.1] text-white">
-          {isClosed ? "Voting closed. Final result." : "Devcon is voting. Live."}
-        </h1>
-        <p className="mt-3 max-w-[900px] text-[20px] leading-snug text-white/75">
-          {isClosed
-            ? "Badge holders fund "
-            : "If voting closed right now, badge holders would fund "}
-          <b className="text-vote">{usd(tally?.fundedUsd ?? 0)}</b> of the {usd(POOL_USD)}{" "}
-          pool, with {n === 1 ? "1 ballot" : `${n} ballots`} so far.
-          {!isClosed && <>{" "}Closes in {timeLeft(secsLeft)}.</>}
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-[14px] text-white/60">
-          <span className="flex items-center gap-2">
-            <i className="inline-block h-[6px] w-6 rounded-full bg-gradient-to-r from-dao-green to-dao-bright" />
-            already raised
-          </span>
-          <span className="flex items-center gap-2">
-            <i className="inline-block h-[6px] w-6 rounded-full bg-vote" />
-            from the Devcon vote
-          </span>
-          <span className={cn("ml-auto", ballots.isError && "text-amber-300")}>
-            {ballots.dataUpdatedAt ? `Updated ${age}s ago` : "Loading ballots…"}
-          </span>
-        </div>
-      </header>
-      {groupByPrimary(cards).map((g, gi) => (
-        <Fragment key={g.slug ?? "untagged"}>
-          <h3
-            className={cn(
-              "mb-4 flex items-center gap-2.5 font-inter-tight text-[20px] font-semibold leading-[26px] text-white",
-              gi > 0 && "mt-9",
-            )}
-          >
-            {g.slug
-              ? (
-                <>
-                  <CategoryDot slug={g.slug} className="size-2.5" />
-                  {categoryOf(g.slug)?.label}
-                </>
-              )
-              : "Untagged"}
-          </h3>
-          <BoardList cards={g.cards} votePct={votePct} />
-        </Fragment>
-      ))}
-    </main>
+  const hero = (
+    <Hero
+      raised={tally ? tally.fundedUsd : undefined}
+      kicker={<span className="text-vote">Devcon 8 · demo vote</span>}
+      sub={isClosed
+        ? (
+          <>
+            Voting closed. Final result: funded by {ballotsText} from the {usd(POOL_USD)}{" "}
+            <span className="text-vote">demo pool</span>
+          </>
+        )
+        : (
+          <>
+            would be funded by {ballotsText} from the {usd(POOL_USD)}{" "}
+            <span className="text-vote">demo pool</span> · closes in {timeLeft(secsLeft)}
+          </>
+        )}
+    >
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] text-white/55">
+        <span className="flex items-center gap-2">
+          <i className="inline-block h-[6px] w-6 rounded-full bg-gradient-to-r from-dao-green to-dao-bright" />
+          already raised
+        </span>
+        <span className="flex items-center gap-2">
+          <i className="inline-block h-[6px] w-6 rounded-full bg-vote" />
+          from the Devcon vote
+        </span>
+        <span className={cn(ballots.isError && "text-amber-300")}>
+          {ballots.dataUpdatedAt ? `Updated ${age}s ago` : "Loading ballots…"}
+        </span>
+      </div>
+    </Hero>
   );
+
+  return <BoardPage only={IN_ROUND} votePct={votePct} hero={hero} />;
 }

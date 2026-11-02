@@ -74,6 +74,11 @@ async function withRelayer<T>(kv: Deno.Kv, fn: () => Promise<T>): Promise<T> {
   throw fail(503, "busy", "The vote relayer is busy; try again in a moment.");
 }
 
+/** A round's own records (claims in flight, relays, gas, the ballot cache) live
+ * under its contract, so a redeployed round starts clean with the same codes.
+ * The relayer's nonce and lease are the account's, shared by every round. */
+const round = (d: Devcon): string[] => ["devcon", d.manifest.contract.toLowerCase()];
+
 const uint = (v: unknown): bigint | null => {
   if (typeof v !== "string" || !/^\d{1,20}$/.test(v)) return null;
   return BigInt(v);
@@ -117,8 +122,8 @@ export function devconRoutes(deps: Deps) {
       throw fail(422, "smart_wallet", "Use email or a regular wallet for this one.");
     }
     const kv = deps.db.kv;
-    const tokenKey = ["devcon", "minting", "token", n.toString()];
-    const addrKey = ["devcon", "minting", "address", to.toLowerCase()];
+    const tokenKey = [...round(d), "minting", "token", n.toString()];
+    const addrKey = [...round(d), "minting", "address", to.toLowerCase()];
     // A mint just sent is not on-chain yet: its markers hold the token and the
     // address until it lands, and are dropped if it reverted or was dropped.
     const stillMinting = async (key: Deno.KvKey) => {
@@ -170,8 +175,8 @@ export function devconRoutes(deps: Deps) {
     if (!valid) throw fail(401, "bad_signature", "The signature doesn't match the badge's owner.");
 
     const kv = deps.db.kv;
-    const pendingKey = ["devcon", "pending", tokenId.toString(), nonce.toString()];
-    const countKey = ["devcon", "relays", tokenId.toString()];
+    const pendingKey = [...round(d), "pending", tokenId.toString(), nonce.toString()];
+    const countKey = [...round(d), "relays", tokenId.toString()];
     const hash = await withRelayer(kv, async () => {
       const pending = await kv.get<{ hash: Hex; at: number }>(pendingKey);
       if (pending.value) {
@@ -228,7 +233,7 @@ export function devconRoutes(deps: Deps) {
       return c.json({ hash: null });
     }
     const kv = deps.db.kv;
-    const key = ["devcon", "gas", tokenId.toString()];
+    const key = [...round(d), "gas", tokenId.toString()];
     const hash = await withRelayer(kv, async () => {
       // Marked before sending: a failed send never pays twice.
       const marked = await kv.atomic().check({ key, versionstamp: null }).set(key, me).commit();
@@ -241,7 +246,7 @@ export function devconRoutes(deps: Deps) {
   // The projector polls this every few seconds; the chain is read at most once per window.
   r.get("/ballots", async (c) => {
     const d = dc();
-    const key = ["devcon", "ballots"];
+    const key = [...round(d), "ballots"];
     const cached = await deps.db.kv.get<{ at: number; ballots: unknown[] }>(key);
     if (cached.value && deps.now() - cached.value.at < BALLOTS_CACHE_SECS) {
       return c.json(cached.value);

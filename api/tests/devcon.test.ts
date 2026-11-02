@@ -449,3 +449,40 @@ Deno.test("devcon relayer: a dropped relay's nonce is reused, so later sends don
   assertEquals(state.nonces_used, [0, 1, 0]);
   h.close();
 });
+
+Deno.test("devcon: a new round starts clean (gas, relay count and mint markers are per contract)", async () => {
+  const { h, state } = await setup();
+  state.mintsMine = false;
+  state.owners.set(17n, PLAIN);
+  const token = await h.mint(PLAIN);
+  // Team test round: a mint of code 1 still pending, and badge 17's gas drip.
+  const other = await h.mint(OTHER.address);
+  const first = await h.req("/api/devcon/claim", {
+    method: "POST",
+    token: other,
+    json: { code: await code(1) },
+  });
+  assertEquals(first.status, 200);
+  assertEquals(
+    (await h.req("/api/devcon/gas", { method: "POST", token, json: { tokenId: "17" } })).status,
+    200,
+  );
+
+  // The public round: same codes and badge numbers, a new contract.
+  const next = fakeChain();
+  next.state.owners.set(17n, PLAIN);
+  h.deps.devcon = {
+    chain: next.chain,
+    manifest: { ...manifest, contract: "0x2000000000000000000000000000000000000002" },
+  };
+  const third = await h.mint(privateKeyToAccount(`0x${"44".repeat(32)}`).address);
+  const claim = await h.req("/api/devcon/claim", {
+    method: "POST",
+    token: third,
+    json: { code: await code(1) },
+  });
+  assertEquals(claim.status, 200, "code 1 is unclaimed in the new round");
+  const gas = await h.req("/api/devcon/gas", { method: "POST", token, json: { tokenId: "17" } });
+  assertEquals(gas.status, 200, "the badge's one drip is per round");
+  h.close();
+});

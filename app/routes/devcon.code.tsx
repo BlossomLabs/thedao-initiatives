@@ -5,6 +5,7 @@ import { bytesToHex, type Hex } from "viem";
 import PageMain from "~/components/layout/PageMain";
 import { Button } from "~/components/ui/Button";
 import TierBallot, { type BallotItem } from "~/components/devcon/TierBallot";
+import { BallotSkeleton, IntroSkeleton } from "~/components/devcon/DevconSkeleton";
 import BallotStatus from "~/components/devcon/BallotStatus";
 import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
@@ -30,6 +31,18 @@ function loadTiers(n: number): Partial<Record<string, Tier>> {
     return JSON.parse(localStorage.getItem(tiersKey(n)) ?? "{}");
   } catch {
     return {};
+  }
+}
+
+/** Set once this browser has shown badge n's ballot: its loading skeleton is the ballot's. */
+const ballotSeenKey = (n: number) => `devcon-ballot-seen:${DEVCON.contract}:${n}`;
+function ballotSeen(code: string): boolean {
+  const n = Number(code.split(".")[0]);
+  if (!Number.isInteger(n)) return false;
+  try {
+    return localStorage.getItem(ballotSeenKey(n)) === "1";
+  } catch {
+    return false;
   }
 }
 
@@ -104,7 +117,7 @@ function Intro(
           Congrats!
         </h1>
         <p className="mx-auto mt-3 max-w-[540px] font-inter-tight text-[clamp(18px,3vw,22px)] leading-snug text-white/80">
-          You're a TheDAO <span className="text-dao-green">Badge Holder</span> for a day
+          You'll be a TheDAO <span className="text-dao-green">Badge Holder</span> for a day.
         </p>
       </header>
       <div className="shimmer shimmer-soft !my-6" />
@@ -230,6 +243,24 @@ export default function DevconCode() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accepted, me, data, claim.kind]);
 
+  const showsBallot = Boolean(data && data !== "bad" && mine && n !== null);
+  // From the claim page (minting) to the ballot: start the ballot at the top.
+  const showsIntro = Boolean(data && data !== "bad" && !data.claimed);
+  const wasIntro = useRef(false);
+  useEffect(() => {
+    if (showsIntro) wasIntro.current = true;
+    else if (showsBallot && wasIntro.current) {
+      wasIntro.current = false;
+      globalThis.scrollTo({ top: 0 });
+    }
+  }, [showsIntro, showsBallot]);
+  useEffect(() => {
+    if (!showsBallot || n === null || mock) return;
+    try {
+      localStorage.setItem(ballotSeenKey(n), "1");
+    } catch { /* storage unavailable */ }
+  }, [showsBallot, n, mock]);
+
   const [tiers, setTiers] = useState<Partial<Record<string, Tier>>>({});
   useEffect(() => {
     if (n !== null) setTiers(loadTiers(n));
@@ -263,7 +294,8 @@ export default function DevconCode() {
   let body: React.ReactNode;
   let wide = false;
   if (info.isPending && !mock) {
-    body = <Panel>Checking your code…</Panel>;
+    wide = ballotSeen(code);
+    body = wide ? <BallotSkeleton /> : <IntroSkeleton />;
   } else if (info.isError && !mock) {
     body = (
       <Panel>
@@ -363,7 +395,7 @@ export default function DevconCode() {
           onReplace={replaceTiers}
           search={{ ai: board.data?.flags?.aiSearch, aiAuto: board.data?.flags?.aiSearchAuto }}
           actions={
-            <div className="mx-auto max-w-[560px] space-y-3 rounded-2xl border border-white/10 bg-panel/95 p-4 shadow-[0_14px_30px_rgba(0,0,0,.35)] backdrop-blur sm:max-w-none sm:bg-white/[.03] sm:shadow-none sm:backdrop-blur-none">
+            <div className="space-y-3 rounded-t-2xl border-t border-white/10 bg-panel/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[0_-10px_30px_rgba(0,0,0,.35)] backdrop-blur sm:rounded-2xl sm:border sm:bg-white/[.03] sm:p-4 sm:shadow-none sm:backdrop-blur-none">
               <BallotStatus
                 phase={ballotFlow.phase}
                 onRetry={() => void ballotFlow.retry()}
@@ -401,7 +433,8 @@ export default function DevconCode() {
       </div>
     );
   } else {
-    body = <Panel>Checking your code…</Panel>;
+    wide = ballotSeen(code);
+    body = wide ? <BallotSkeleton /> : <IntroSkeleton />;
   }
 
   return <PageMain narrow={!wide} className="pt-8">{body}</PageMain>;

@@ -643,8 +643,11 @@ export default function TierBallot(
             )}
           </div>
           {actions && (
-            // Phone: floats at the bottom, after the list; wider: under the tier list.
-            <div className="sticky bottom-3 z-10 order-last mt-4 sm:static sm:mt-3">{actions}</div>
+            // Phone: a bar pinned to the bottom and both sides of the screen, after the list;
+            // wider: under the tier list.
+            <div className="sticky bottom-0 z-10 order-last -mx-6 mt-4 sm:static sm:mx-0 sm:mt-3">
+              {actions}
+            </div>
           )}
         </div>
 

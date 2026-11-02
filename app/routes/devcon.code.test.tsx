@@ -209,6 +209,7 @@ it("accepting, then signing in, goes straight on to claiming — even if the pag
   // The sign-in modal finishes and the page comes back signed in (a fresh mount).
   cleanup();
   session.current = { address: ME };
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   show();
   await waitFor(() =>
     expect(vi.mocked(api)).toHaveBeenCalledWith(
@@ -220,6 +221,9 @@ it("accepting, then signing in, goes straight on to claiming — even if the pag
   expect(await screen.findByRole("button", { name: /send my ballot|place at least one/i }))
     .toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /claim my devcon badge/i })).toBeNull();
+  // The ballot starts at the top, not where the claim button was.
+  expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
+  scrollTo.mockRestore();
 });
 
 it("without accepting, a signed-in visitor still sees the intro and claims only on the button", async () => {

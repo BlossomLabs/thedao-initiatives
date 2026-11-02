@@ -8,8 +8,10 @@
 // sending key. Everything here must finish before opensAt (setup freezes then).
 import { parseArgs } from "jsr:@std/cli@1.0.24/parse-args";
 import {
+  type Abi,
   createPublicClient,
   createWalletClient,
+  encodeFunctionData,
   getAddress,
   type Hex,
   http,
@@ -25,7 +27,7 @@ import { DEVCON_CLOSE, type DevconManifest } from "../shared/devcon/manifest.ts"
 
 export const ADMIN = "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF"; // sem-the-bee.eth
 export const POOL_USD = 913_244_000_000n; // 400 ETH × $2,283.11, six decimals
-const SETUP_MINUTES = 15;
+const SETUP_MINUTES = 30;
 
 export type BoardCard = { slug: string; goalUsd: number; safeAddress: string };
 export type PlannedInitiative = { slug: string; account: `0x${string}`; askUsd: bigint };
@@ -66,8 +68,10 @@ async function main() {
   }/api/board`;
 
   const account = privateKeyToAccount(key);
-  const pub = createPublicClient({ chain: sepolia, transport: http(rpc) });
-  const wallet = createWalletClient({ account, chain: sepolia, transport: http(rpc) });
+  // Public Sepolia RPCs are slow at times: long timeouts, several retries.
+  const transport = http(rpc, { timeout: 60_000, retryCount: 6, retryDelay: 1_000 });
+  const pub = createPublicClient({ chain: sepolia, transport });
+  const wallet = createWalletClient({ account, chain: sepolia, transport });
   if ((await pub.getChainId()) !== sepolia.id) throw new Error("RPC is not Sepolia");
 
   const board = await (await fetch(boardUrl)).json() as { cards: { initiative: BoardCard }[] };
@@ -111,20 +115,9 @@ async function main() {
     }`,
   );
 
-  const call = async (functionName: string, fnArgs: readonly unknown[]) => {
-    const hash = await wallet.writeContract({
-      address: contract,
-      abi: SIGNED_BALLOTS_ABI,
-      functionName: functionName as never,
-      args: fnArgs as never,
-    });
-    await wait(hash, functionName);
-  };
-  for (const [i, p] of plan.entries()) {
-    await call("addInitiative", [p.account, p.askUsd]);
-    if ((i + 1) % 10 === 0) console.log(`  ${i + 1}/${plan.length} initiatives`);
-  }
-  await call("setPoolUsd", [POOL_USD]);
+  // The whole setup is one atomic transaction (EIP-7702): the relayer account
+  // delegates to BatchExecutor and calls itself, so every step runs with the
+  // relayer as msg.sender. All of it lands or none of it does.
   const role = (name: string) =>
     pub.readContract({
       address: contract,
@@ -132,11 +125,90 @@ async function main() {
       functionName: name as never,
     }) as Promise<Hex>;
   const handed = await Promise.all(["DEFAULT_ADMIN_ROLE", "ADMIN_ROLE", "PLEDGE_ROLE"].map(role));
-  for (const r of handed) await call("grantRole", [r, ADMIN]);
-  // The default admin goes last: renouncing it first would still work, but this keeps the order obvious.
-  for (const r of [...handed.slice(1), await role("BLOB_SUBMITTER_ROLE"), handed[0]]) {
-    await call("renounceRole", [r, account.address]);
+  const blob = await role("BLOB_SUBMITTER_ROLE");
+  const step = (functionName: string, fnArgs: readonly unknown[]) => ({
+    to: contract,
+    value: 0n,
+    data: encodeFunctionData({
+      abi: SIGNED_BALLOTS_ABI,
+      functionName: functionName as never,
+      args: fnArgs as never,
+    }),
+  });
+  const calls = [
+    ...plan.map((p) => step("addInitiative", [p.account, p.askUsd])),
+    step("setPoolUsd", [POOL_USD]),
+    ...handed.map((r) => step("grantRole", [r, ADMIN])),
+    // The default admin goes last.
+    ...[...handed.slice(1), blob, handed[0]].map((r) => step("renounceRole", [r, account.address])),
+  ];
+
+  const executorArtifact = JSON.parse(
+    await Deno.readTextFile(
+      new URL("../vote/out/BatchExecutor.sol/BatchExecutor.json", import.meta.url),
+    ),
+  ) as { abi: Abi; bytecode: { object: Hex } };
+  const executor = (await wait(
+    await wallet.deployContract({
+      abi: executorArtifact.abi,
+      bytecode: executorArtifact.bytecode.object,
+    }),
+    "BatchExecutor deploy",
+  )).contractAddress!;
+  console.log(`BatchExecutor ${executor}; setting up ${calls.length} steps in one transaction`);
+
+  const delegate = await wallet.signAuthorization({ contractAddress: executor, executor: "self" });
+  const setupHash = await wallet.writeContract({
+    address: account.address,
+    abi: executorArtifact.abi,
+    functionName: "execute",
+    args: [calls],
+    authorizationList: [delegate],
+    gas: 12_000_000n,
+  });
+  await wait(setupHash, "setup batch");
+  console.log(`Setup done in ${setupHash}`);
+
+  // Back to a plain account: delegate to the zero address.
+  const undelegate = await wallet.signAuthorization({
+    contractAddress: "0x0000000000000000000000000000000000000000",
+    executor: "self",
+  });
+  await wait(
+    await wallet.sendTransaction({
+      to: account.address,
+      value: 0n,
+      authorizationList: [undelegate],
+    }),
+    "clear delegation",
+  );
+  const code = await pub.getCode({ address: account.address });
+  if (code && code !== "0x") console.warn(`Note: the relayer still has code ${code}`);
+
+  const minter = await role("MINTER_ROLE");
+  for (
+    const [r, who, want] of [
+      [handed[0], ADMIN, true],
+      [handed[1], ADMIN, true],
+      [handed[0], account.address, false],
+      [handed[1], account.address, false],
+      [minter, account.address, true],
+    ] as const
+  ) {
+    const has = await pub.readContract({
+      address: contract,
+      abi: SIGNED_BALLOTS_ABI,
+      functionName: "hasRole",
+      args: [r, who],
+    });
+    if (has !== want) throw new Error(`role ${r} for ${who} is ${has}, expected ${want}`);
   }
+  const pool = await pub.readContract({
+    address: contract,
+    abi: SIGNED_BALLOTS_ABI,
+    functionName: "poolUsd",
+  });
+  if (pool !== POOL_USD) throw new Error(`poolUsd ${pool} != ${POOL_USD}`);
 
   const now = Number((await pub.getBlock()).timestamp);
   if (now >= s.opensAt) throw new Error("Setup ran past opensAt: redeploy (the round is frozen).");

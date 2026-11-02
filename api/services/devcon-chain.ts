@@ -57,6 +57,8 @@ const BALLOT_RECORDED = parseAbiItem(
 );
 const REGISTRATION_REVOKED = parseAbiItem("event RegistrationRevoked(uint256 indexed tokenId)");
 const LOG_CHUNK = 50_000n;
+/** _safeMint to a wallet is ~100k gas; the rest is room for a small receive hook. */
+const MINT_GAS = 250_000n;
 
 export function createDevconChain(
   m: DevconManifest,
@@ -131,6 +133,9 @@ export function createDevconChain(
         functionName: call.fn as never,
         args: call.args as never,
         nonce,
+        // A mint calls an EIP-7702 wallet's code (onERC721Received): a fixed
+        // limit keeps a gas-hungry delegate from draining the relayer.
+        ...(call.fn === "mint" ? { gas: MINT_GAS } : {}),
       });
     },
     async ballots() {

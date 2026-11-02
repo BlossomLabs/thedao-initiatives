@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { bytesToHex, type Hex } from "viem";
@@ -115,7 +115,12 @@ export default function DevconCode() {
   const mine = Boolean(me && owner && owner.toLowerCase() === me.toLowerCase());
   const ballotFlow = useBallotSubmit(mine && n !== null ? BigInt(n) : null);
 
+  // One claim at a time: the sign-in lands in several renders, and the
+  // auto-claim effect can fire again before its own state updates show.
+  const claiming = useRef(false);
   const doClaim = async () => {
+    if (claiming.current) return;
+    claiming.current = true;
     setClaim({ kind: "busy" });
     try {
       const { hash } = await api<{ hash: Hex }>("/api/devcon/claim", {
@@ -127,6 +132,8 @@ export default function DevconCode() {
       setClaim({ kind: "idle" });
     } catch (e) {
       setClaim({ kind: "error", code: apiCode(e), message: errorMessage(e) });
+    } finally {
+      claiming.current = false;
     }
   };
 

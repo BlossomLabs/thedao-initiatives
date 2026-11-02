@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -91,6 +92,7 @@ beforeEach(() => {
   session.current = null;
   openWalletPicker.mockReset();
   submit.mockReset();
+  vi.mocked(api).mockReset();
   selfSend.mockReset();
   localStorage.clear();
   sessionStorage.clear();
@@ -210,4 +212,33 @@ it("without accepting, a signed-in visitor still sees the intro and claims only 
   show();
   expect(await screen.findByRole("button", { name: /accept the challenge/i })).toBeInTheDocument();
   expect(vi.mocked(api)).not.toHaveBeenCalledWith("/api/devcon/claim", expect.anything());
+});
+
+it("the automatic claim after sign-in is sent once, even when effects run twice (StrictMode)", async () => {
+  sessionStorage.setItem(`devcon-accepted:0x1000000000000000000000000000000000000001:${CODE}`, "1");
+  session.current = { address: ME };
+  let resolveClaim!: (v: unknown) => void;
+  mockApi(
+    () => Promise.resolve({ n: 17, claimed: false, owner: null }),
+    () => new Promise((r) => (resolveClaim = r)),
+  );
+  render(
+    <StrictMode>
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoryRouter initialEntries={[`/devcon/${CODE}`]}>
+          <Routes>
+            <Route path="/devcon/:code" element={<DevconCode />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </StrictMode>,
+  );
+  await waitFor(() =>
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/devcon/claim").length).toBe(1)
+  );
+  await new Promise((r) => setTimeout(r, 50));
+  expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/devcon/claim").length).toBe(1);
+  resolveClaim({ hash: "0x1" });
 });

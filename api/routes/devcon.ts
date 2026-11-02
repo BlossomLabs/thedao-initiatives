@@ -12,6 +12,8 @@ import type { Devcon } from "../services/devcon-chain.ts";
 const PER_MINUTE = 30;
 const PENDING_MS = 10 * 60_000;
 const LEASE_MS = 30_000;
+/** Long enough for any mint to land; the chain is the record after that. */
+const MINTING_MS = 60 * 60_000;
 
 const fail = (status: number, code: string, message: string, extra?: Record<string, unknown>) =>
   new HttpError(status, message, { code, ...extra });
@@ -81,14 +83,32 @@ export function devconRoutes(deps: Deps) {
     if (await d.chain.hasCode(to)) {
       throw fail(422, "smart_wallet", "Use email or a regular wallet for this one.");
     }
-    const hash = await withRelayer(deps.db.kv, async () => {
-      if ((await d.chain.ownerOf(n)) !== null) {
+    const kv = deps.db.kv;
+    const tokenKey = ["devcon", "minting", "token", n.toString()];
+    const addrKey = ["devcon", "minting", "address", to.toLowerCase()];
+    // A mint just sent is not on-chain yet: its markers hold the token and the
+    // address until it lands, and are dropped if it reverted or was dropped.
+    const stillMinting = async (key: Deno.KvKey) => {
+      const m = await kv.get<string>(key);
+      if (!m.value) return false;
+      const status = await d.chain.txStatus(m.value as Hex);
+      if (status === "pending" || status === "success") return true;
+      await kv.delete(key);
+      return false;
+    };
+    const hash = await withRelayer(kv, async () => {
+      if ((await d.chain.ownerOf(n)) !== null || (await stillMinting(tokenKey))) {
         throw fail(409, "claimed", "This badge is already taken.");
       }
-      if ((await d.chain.balanceOf(to)) > 0n) {
+      if ((await d.chain.balanceOf(to)) > 0n || (await stillMinting(addrKey))) {
         throw fail(409, "one_per_person", "One badge per person.");
       }
-      return await d.chain.send({ fn: "mint", args: [to, n] });
+      const h = await d.chain.send({ fn: "mint", args: [to, n] });
+      await kv.atomic()
+        .set(tokenKey, h, { expireIn: MINTING_MS })
+        .set(addrKey, h, { expireIn: MINTING_MS })
+        .commit();
+      return h;
     });
     return c.json({ hash });
   });

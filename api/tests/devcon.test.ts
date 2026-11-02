@@ -37,6 +37,9 @@ function fakeChain() {
     balances: new Map<string, bigint>(),
     sent: [] as Sent[],
     slowSend: null as null | Promise<void>,
+    /** false: mints stay pending (not visible to ownerOf/balanceOf). */
+    mintsMine: true,
+    txStatus: new Map<string, "pending" | "success" | "reverted" | "unknown">(),
   };
   const chain: DevconChain = {
     ownerOf: (n) => Promise.resolve(state.owners.get(n) ?? null),
@@ -49,11 +52,14 @@ function fakeChain() {
     hasCode: (a) => Promise.resolve(state.code.has(a.toLowerCase())),
     nonceOf: (n) => Promise.resolve(state.nonces.get(n) ?? 0n),
     balance: (a) => Promise.resolve(state.balances.get(a.toLowerCase()) ?? 0n),
+    txStatus: (hash) => Promise.resolve(state.txStatus.get(hash) ?? "pending"),
     estimateRecordFor: () => Promise.resolve(100_000n * 2_000_000_000n),
     async send(call) {
       if (state.slowSend) await state.slowSend;
       state.sent.push(call);
-      if (call.fn === "mint") state.owners.set(call.args[1] as bigint, call.args[0] as Hex);
+      if (call.fn === "mint" && state.mintsMine) {
+        state.owners.set(call.args[1] as bigint, call.args[0] as Hex);
+      }
       return `0x${state.sent.length.toString(16).padStart(64, "0")}` as Hex;
     },
     ballots: () => Promise.resolve([]),
@@ -220,5 +226,43 @@ Deno.test("devcon ballot: a second relay of the same nonce returns the pending h
   const out = await j(again);
   assertEquals([out.code, out.hash], ["pending", first.hash]);
   assertEquals(state.sent.length, 1);
+  h.close();
+});
+
+Deno.test("devcon claim: a pending mint still blocks a second code and a second claimer", async () => {
+  const { h, state } = await setup();
+  state.mintsMine = false;
+  const token = await h.mint(PLAIN);
+  const other = await h.mint(OTHER.address);
+  const claim = async (t: string, n: number) => {
+    const res = await h.req("/api/devcon/claim", {
+      method: "POST",
+      token: t,
+      json: { code: await code(n) },
+    });
+    return [res.status, (await j(res)).code];
+  };
+  assertEquals((await claim(token, 1))[0], 200);
+  assertEquals(await claim(token, 2), [409, "one_per_person"]);
+  assertEquals(await claim(other, 1), [409, "claimed"]);
+  assertEquals(state.sent.length, 1);
+  h.close();
+});
+
+Deno.test("devcon claim: a reverted or dropped mint frees the code and the address", async () => {
+  const { h, state } = await setup();
+  state.mintsMine = false;
+  const token = await h.mint(PLAIN);
+  const first = await j(
+    await h.req("/api/devcon/claim", { method: "POST", token, json: { code: await code(1) } }),
+  );
+  state.txStatus.set(first.hash as string, "reverted");
+  const retry = await h.req("/api/devcon/claim", {
+    method: "POST",
+    token,
+    json: { code: await code(1) },
+  });
+  assertEquals(retry.status, 200);
+  assertEquals(state.sent.length, 2);
   h.close();
 });

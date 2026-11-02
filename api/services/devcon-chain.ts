@@ -18,6 +18,8 @@ export interface DevconChain {
   hasCode(a: Hex): Promise<boolean>;
   nonceOf(n: bigint): Promise<bigint>;
   balance(a: Hex): Promise<bigint>;
+  /** A relayed transaction's fate; "unknown" when the node has never seen it (dropped). */
+  txStatus(hash: Hex): Promise<"pending" | "success" | "reverted" | "unknown">;
   /** Gas cost (wei) of one recordFor at the current gas price. */
   estimateRecordFor(): Promise<bigint>;
   send(
@@ -73,6 +75,12 @@ export function createDevconChain(
     hasCode: async (a) => ((await pub.getCode({ address: a })) ?? "0x") !== "0x",
     nonceOf: async (n) => BigInt(await read<bigint>("nonceOf", [n])),
     balance: (a) => pub.getBalance({ address: a }),
+    async txStatus(hash) {
+      const r = await pub.getTransactionReceipt({ hash }).catch(() => null);
+      if (r) return r.status === "success" ? "success" : "reverted";
+      const tx = await pub.getTransaction({ hash }).catch(() => null);
+      return tx ? "pending" : "unknown";
+    },
     async estimateRecordFor() {
       // A recordFor of an 81-byte ballot uses well under 150k gas.
       return 150_000n * (await pub.getGasPrice());

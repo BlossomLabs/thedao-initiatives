@@ -257,6 +257,10 @@ export interface RatingGroup {
   cards: Card[];
 }
 
+/** Fully funded: by what it raised, or (Devcon projector) with its vote share, % of its goal. */
+export const fullyFunded = (c: Card, votePct = 0): boolean =>
+  c.funded || c.pct + votePct >= 100 - 1e-6;
+
 export type FundingSection = "funded" | "qualified" | "open";
 
 /** "Closest to funded" in sections, as the Funding filter names them: Fully funded,
@@ -268,7 +272,7 @@ export function groupByFunding(
   votePct: ReadonlyMap<string, number> = new Map(),
 ): { key: FundingSection; cards: Card[] }[] {
   const sectionOf = (c: Card): FundingSection =>
-    c.funded || c.pct + (votePct.get(c.initiative.id) ?? 0) >= 100 - 1e-6
+    fullyFunded(c, votePct.get(c.initiative.id))
       ? "funded"
       : c.vote && c.vote !== "below"
       ? "qualified"

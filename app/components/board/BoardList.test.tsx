@@ -1,5 +1,5 @@
 import { MemoryRouter } from "react-router";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import BoardList from "./BoardList";
 import type { Card } from "~/lib/api-types";
@@ -184,4 +184,15 @@ it("caps raised plus the vote's share at the full bar", () => {
 it("draws no vote segment without votePct", () => {
   const { container } = mount();
   expect(container.querySelector("[data-vote-fill]")).toBeNull();
+});
+
+it("the DevCon projector: a row the vote completes says Funded instead of its %", () => {
+  mount({ votePct: new Map([["a", 50]]) });
+  const row = screen.getByText("Echidna fuzzing").closest("li")!;
+  expect(within(row).getAllByText("Funded").length).toBeGreaterThan(0);
+  expect(within(row).queryByText("50%")).toBeNull();
+  cleanup();
+  mount({ votePct: new Map([["a", 30]]) });
+  expect(within(screen.getByText("Echidna fuzzing").closest("li")!).queryAllByText("Funded"))
+    .toHaveLength(0);
 });

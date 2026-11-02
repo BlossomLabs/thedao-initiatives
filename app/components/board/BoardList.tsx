@@ -9,7 +9,7 @@ import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import WatchlistButton from "~/components/board/WatchlistButton";
 import RatingChip, { RatingForm } from "~/components/ratings/RatingChip";
 import Reveal from "~/components/ui/Reveal";
-import type { Ratings } from "~/lib/board-view";
+import { fullyFunded, type Ratings } from "~/lib/board-view";
 import type { Card } from "~/lib/api-types";
 import { pctText, plural, usd, usdShort } from "~/lib/format";
 import { usePrefetchInitiative } from "~/hooks/use-initiative";
@@ -105,6 +105,9 @@ function Row(
   const shownLogos = backers > logos.length ? logos.slice(0, 3) : logos;
   const more = backers - shownLogos.length;
   const pctOn = standing ? standing.kind === "eligible" : pct >= 1;
+  // Devcon projector: the vote completes it, so it reads Funded rather than its %.
+  const votedFull = (votePct ?? 0) > 0 && fullyFunded(card, votePct);
+  const pctShown = votedFull ? "Funded" : pctText(pct);
   const tick = vote ? voteFloorPct(r.goalUsd, vote) : 0;
   // Hovering or tapping the row shows its vote callout under the bar.
   const reveal = useVoteReveal(Boolean(standing));
@@ -194,11 +197,14 @@ function Row(
         className={cn(
           NUM,
           "text-[12.5px] font-medium @max-[720px]/list:hidden",
-          pctOn ? "text-dao-green" : "text-white/40",
+          pctOn || votedFull ? "text-dao-green" : "text-white/40",
         )}
       >
-        {pctText(pct)}
-        <span className="sr-only">funded{standing && `. ${calloutText(standing)}`}</span>
+        {pctShown}
+        <span className="sr-only">
+          {votedFull ? " with the Devcon vote" : "funded"}
+          {standing && `. ${calloutText(standing)}`}
+        </span>
       </span>
       {/* Desktop: the Backers column, the pledgers' logos when there are any. */}
       <span className={cn(NUM, "text-[12.5px] text-white/60 @max-[720px]/list:hidden")}>
@@ -292,11 +298,11 @@ function Row(
           className={cn(
             NUM,
             "hidden w-12 text-[12.5px] font-semibold @max-[720px]/list:inline-block",
-            pctOn ? "text-dao-green" : "text-white/40",
+            pctOn || votedFull ? "text-dao-green" : "text-white/40",
           )}
           aria-hidden="true"
         >
-          {pctText(pct)}
+          {pctShown}
         </span>
       </div>
       {ratings && canRate && (

@@ -3,6 +3,7 @@ import BackerLogo from "~/components/ui/BackerLogo";
 import { ArrowRight, Landmark, Wallet } from "lucide-react";
 import { Link } from "react-router";
 import { FundedChip, TypeBadge } from "~/components/ui/Badge";
+import { fullyFunded } from "~/lib/board-view";
 import CardTitle from "./CardTitle";
 import WatchlistButton from "~/components/board/WatchlistButton";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
@@ -217,18 +218,20 @@ export default function InitiativeCard({
             <span className="text-[12px] text-white/30">· {plural(backers, "backer")}</span>
           )}
         </span>
-        {funded ? <FundedChip /> : (
-          <span className="flex items-center gap-2">
-            <span
-              className={cn(
-                "text-[12px]",
-                pctOn ? "text-dao-green" : zero ? "text-white/25" : "text-white/45",
-              )}
-            >
-              {pctText(pct)}
+        {funded || fullyFunded(card, votePct)
+          ? <FundedChip />
+          : (
+            <span className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "text-[12px]",
+                  pctOn ? "text-dao-green" : zero ? "text-white/25" : "text-white/45",
+                )}
+              >
+                {pctText(pct)}
+              </span>
             </span>
-          </span>
-        )}
+          )}
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {canDonate && (

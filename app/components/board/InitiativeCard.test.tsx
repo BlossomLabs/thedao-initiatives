@@ -365,3 +365,19 @@ it("the DevCon projector draws the vote's share in gold after what was raised", 
   mount(card({ pct: 30 }));
   expect(document.querySelector("[data-vote-fill]")).toBeNull();
 });
+
+it("the DevCon projector: raised plus the vote's share reaching the goal reads FUNDED", () => {
+  render(
+    <MemoryRouter>
+      <InitiativeCard card={card({ pct: 30 })} tokensOk={false} votePct={70} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText("FUNDED")).toBeInTheDocument();
+  cleanup();
+  render(
+    <MemoryRouter>
+      <InitiativeCard card={card({ pct: 30 })} tokensOk={false} votePct={50} />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByText("FUNDED")).toBeNull();
+});

@@ -427,3 +427,25 @@ Deno.test("devcon ballot: the relay pays for at most 20 ballots per badge", asyn
   assertEquals(state.sent.length, 20);
   h.close();
 });
+
+Deno.test("devcon relayer: a dropped relay's nonce is reused, so later sends don't queue behind a gap", async () => {
+  const { h, state } = await setup();
+  const claim = async (who: string, n: number) => {
+    const token = await h.mint(who);
+    return await h.req("/api/devcon/claim", {
+      method: "POST",
+      token,
+      json: { code: await code(n) },
+    });
+  };
+  const first = await j(await claim(PLAIN, 1));
+  // The node never saw it, and its pending count stays at 0.
+  state.txStatus.set(first.hash as string, "unknown");
+  await claim(OTHER.address, 2);
+  assertEquals(state.nonces_used, [0, 1], "within a minute it may still arrive");
+  state.txStatus.set(`0x${(2).toString(16).padStart(64, "0")}`, "unknown");
+  h.clock.now += 61;
+  await claim(privateKeyToAccount(`0x${"44".repeat(32)}`).address, 3);
+  assertEquals(state.nonces_used, [0, 1, 0]);
+  h.close();
+});

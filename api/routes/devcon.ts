@@ -28,14 +28,21 @@ const fail = (status: number, code: string, message: string, extra?: Record<stri
 type Call = Parameters<Devcon["chain"]["send"]>[0];
 
 /** Inside the lease: the relayer's next nonce is kept in KV and never goes below
- * the chain's pending count, so a lagging RPC node can't hand out a used nonce. */
-async function sendNext(kv: Deno.Kv, d: Devcon, call: Call): Promise<Hex> {
+ * the chain's pending count, so a lagging RPC node can't hand out a used nonce.
+ * If the last send was dropped (the node still hasn't seen it a minute later and
+ * the chain is behind), fall back to the chain's count so nothing queues behind
+ * the gap. */
+async function sendNext(kv: Deno.Kv, d: Devcon, now: number, call: Call): Promise<Hex> {
   const key = ["devcon", "relayer-nonce"];
-  const stored = (await kv.get<number>(key)).value ?? 0;
-  const nonce = Math.max(stored, await d.chain.relayerNonce());
+  const stored = (await kv.get<{ next: number; hash: Hex; at: number }>(key)).value;
+  const pending = await d.chain.relayerNonce();
+  let nonce = Math.max(stored?.next ?? 0, pending);
+  if (stored && stored.next > pending && now - stored.at > UNSEEN_SECS) {
+    if ((await d.chain.txStatus(stored.hash)) === "unknown") nonce = pending;
+  }
   try {
     const hash = await d.chain.send(call, nonce);
-    await kv.set(key, nonce + 1);
+    await kv.set(key, { next: nonce + 1, hash, at: now });
     return hash;
   } catch (e) {
     // Resync from the chain next time (e.g. "nonce too low" after a manual tx).
@@ -129,7 +136,7 @@ export function devconRoutes(deps: Deps) {
       if ((await d.chain.balanceOf(to)) > 0n || (await stillMinting(addrKey))) {
         throw fail(409, "one_per_person", "One badge per person.");
       }
-      const h = await sendNext(kv, d, { fn: "mint", args: [to, n] });
+      const h = await sendNext(kv, d, deps.now(), { fn: "mint", args: [to, n] });
       await kv.atomic()
         .set(tokenKey, h, { expireIn: MINTING_MS })
         .set(addrKey, h, { expireIn: MINTING_MS })
@@ -191,7 +198,7 @@ export function devconRoutes(deps: Deps) {
           "This badge has used its relayed ballots. Use “Send it yourself” to change it again.",
         );
       }
-      const h = await sendNext(kv, d, {
+      const h = await sendNext(kv, d, deps.now(), {
         fn: "recordFor",
         args: [tokenId, nonce, ballot as Hex, signature as Hex],
       });
@@ -226,7 +233,7 @@ export function devconRoutes(deps: Deps) {
       // Marked before sending: a failed send never pays twice.
       const marked = await kv.atomic().check({ key, versionstamp: null }).set(key, me).commit();
       if (!marked.ok) throw fail(409, "already_dripped", "This badge already got its gas.");
-      return await sendNext(kv, d, { fn: "drip", to: me, value: DRIP_WEI });
+      return await sendNext(kv, d, deps.now(), { fn: "drip", to: me, value: DRIP_WEI });
     });
     return c.json({ hash });
   });

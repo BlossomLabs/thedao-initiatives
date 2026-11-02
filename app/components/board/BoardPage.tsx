@@ -33,14 +33,17 @@ import {
   type BoardView,
   facetCounts,
   featuredIds,
+  groupByFunding,
   groupByPrimary,
   groupByRating,
   isFiltered,
   LAYOUT_KEY,
   readView,
   sortFor,
+  STATUS_LABELS,
   writeView,
 } from "~/lib/board-view";
+import FundingGlyph from "~/components/board/filters/FundingGlyph";
 import BoardSkeleton, { ListSkeleton, markBoardLayout } from "~/components/board/BoardSkeleton";
 import { categoryOf } from "~/lib/categories";
 import { cn } from "~/lib/utils";
@@ -60,17 +63,19 @@ const BAND_ICONS: Record<string, { Icon: LucideIcon; color: string }> = {
 };
 /** The front page's board. The DevCon projector reuses it with `only` (the round's
  * slugs), `votePct` (each initiative's vote share, % of its goal, by id) and its own hero. */
-export default function BoardPage({ only, votePct, hero }: {
+export default function BoardPage({ only, votePct, hero, defaultSort }: {
   only?: ReadonlySet<string>;
   votePct?: ReadonlyMap<string, number>;
   hero?: React.ReactNode;
+  /** The order a plain URL opens in (the front page's: By category). */
+  defaultSort?: BoardSort;
 } = {}) {
   const { data, isLoading, isError } = useBoard();
   const qc = useQueryClient();
   const [aiResult, setAiResult] = useState<AiSearchResult | null>(null);
   const [asking, setAsking] = useState(false);
   const [params, setParams] = useSearchParams();
-  const view = useMemo(() => readView(params), [params]);
+  const view = useMemo(() => readView(params, defaultSort), [params, defaultSort]);
   useEffect(() => {
     void preloadFilters();
     void preloadDots();
@@ -84,7 +89,10 @@ export default function BoardPage({ only, votePct, hero }: {
         localStorage.setItem(LAYOUT_KEY, next.view);
       } catch { /* storage off: the URL still carries it */ }
     }
-    setParams(writeView({ ...view, ...next }), { replace: true, preventScrollReset: true });
+    setParams(writeView({ ...view, ...next }, defaultSort), {
+      replace: true,
+      preventScrollReset: true,
+    });
   };
   // A plain board URL opens in the layout this device used last.
   useEffect(() => {
@@ -173,6 +181,18 @@ export default function BoardPage({ only, votePct, hero }: {
             )
             : "Untagged"}
           <span className="small dim tnum">{usd(g.raised)} raised</span>
+        </>
+      ),
+    }))
+    : sort === "closest"
+    ? groupByFunding(cards, votePct).map((g) => ({
+      key: g.key,
+      cards: g.cards,
+      heading: (
+        <>
+          <FundingGlyph status={g.key} />
+          {STATUS_LABELS[g.key]}
+          <span className="small dim tnum">{g.cards.length}</span>
         </>
       ),
     }))

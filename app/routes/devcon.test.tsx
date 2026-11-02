@@ -115,7 +115,7 @@ it("says what is going on and what the vote would fund right now", async () => {
   await waitFor(() => expect(document.querySelector("[data-vote-fill]")).not.toBeNull());
 });
 
-it("an RPC hiccup keeps the last result and says how old it is", async () => {
+it("an RPC hiccup keeps the last result", async () => {
   const qc = new QueryClient();
   vi.mocked(api).mockResolvedValue({
     at: 1,
@@ -132,5 +132,28 @@ it("an RPC hiccup keeps the last result and says how old it is", async () => {
   vi.mocked(api).mockRejectedValue(new Error("rpc down"));
   await act(() => qc.refetchQueries({ queryKey: ["devcon-ballots"] }).catch(() => {}));
   expect(screen.getByText(/would be funded by 1 ballot/)).toBeInTheDocument();
-  expect(screen.getByText(/updated .* ago/i)).toBeInTheDocument();
+  expect(screen.queryByText(/updated .* ago/i)).toBeNull();
+});
+
+it("links back to this browser's ballot, once it has opened one", async () => {
+  vi.mocked(api).mockResolvedValue({ at: 1, ballots: [] });
+  const show = () =>
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <Devcon />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  localStorage.clear();
+  show();
+  expect(await screen.findByText(/Devcon 8 · demo vote/i)).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /your ballot/i })).toBeNull();
+  cleanup();
+
+  localStorage.setItem("devcon-my-code:0x1000000000000000000000000000000000000001", "7.sig");
+  show();
+  expect(await screen.findByRole("link", { name: /see or change your ballot/i }))
+    .toHaveAttribute("href", "/devcon/7.sig");
+  localStorage.clear();
 });

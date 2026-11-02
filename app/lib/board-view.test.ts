@@ -11,6 +11,7 @@ import {
   DEFAULT_VIEW,
   facetCounts,
   featuredIds,
+  groupByFunding,
   groupByPrimary,
   groupByRating,
   hasFeatured,
@@ -451,5 +452,40 @@ describe("aiPicks", () => {
     scores.delete(ids[1]);
     expect(aiPicks(cards, scores, 0.5)).toEqual([ids[0], ids[2], ids[3]]);
     expect(aiPicks(cards, scores, 0.4)).toEqual([ids[0], ids[2], ids[3], ids[4]]);
+  });
+});
+
+describe("groupByFunding (Closest to funded)", () => {
+  it("draws Fully funded, Qualified for the vote, Open for funding, in that order", () => {
+    const open = card("Open one", { raised: 10_000 });
+    const qualified = { ...card("Qualified one", { raised: 40_000 }), vote: "eligible" as const };
+    const below = { ...card("Below one", { raised: 5_000 }), vote: "below" as const };
+    const funded = card("Funded one", { raised: 100_000 });
+    const groups = groupByFunding([open, qualified, below, funded]);
+    expect(groups.map((g) => g.key)).toEqual(["funded", "qualified", "open"]);
+    expect(groups[0].cards).toEqual([funded]);
+    expect(groups[1].cards).toEqual([qualified]);
+    expect(groups[2].cards).toEqual([open, below]);
+  });
+
+  it("leaves empty sections out, and counts a Devcon vote share toward fully funded", () => {
+    const a = card("Half way", { raised: 50_000 });
+    const b = card("Barely started", { raised: 1_000 });
+    expect(groupByFunding([a, b]).map((g) => g.key)).toEqual(["open"]);
+    const groups = groupByFunding([a, b], new Map([[a.initiative.id, 50]]));
+    expect(groups.map((g) => [g.key, g.cards.map((c) => c.initiative.title)])).toEqual([
+      ["funded", ["Half way"]],
+      ["open", ["Barely started"]],
+    ]);
+  });
+});
+
+describe("a board with its own default sort (the Devcon projector)", () => {
+  it("opens in it, and leaves it out of the URL", () => {
+    expect(readView(new URLSearchParams(), "closest").sort).toBe("closest");
+    expect(writeView({ ...DEFAULT_VIEW, sort: "closest" }, "closest").has("sort")).toBe(false);
+    expect(writeView({ ...DEFAULT_VIEW, sort: "category" }, "closest").get("sort"))
+      .toBe("category");
+    expect(readView(new URLSearchParams("sort=category"), "closest").sort).toBe("category");
   });
 });

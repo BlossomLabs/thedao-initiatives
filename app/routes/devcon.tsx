@@ -3,10 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { hexToBytes } from "viem";
 import BoardPage from "~/components/board/BoardPage";
 import Hero from "~/components/board/Hero";
+import { LinkButton } from "~/components/ui/Button";
 import { useBoard } from "~/hooks/use-board";
+import { myCode } from "~/lib/devcon-local";
 import { api } from "~/lib/api";
 import { usd } from "~/lib/format";
-import { cn } from "~/lib/utils";
 import { DEVCON } from "../../shared/devcon/manifest";
 import { devconTally } from "../../shared/devcon/tally";
 
@@ -50,6 +51,9 @@ export default function Devcon() {
     retry: false,
   });
   const now = useNow();
+  // This browser's badge, if it has opened its ballot: a way back to it.
+  const [mine, setMine] = useState<string | null>(null);
+  useEffect(() => setMine(myCode()), []);
 
   const cards = useMemo(
     () => (board.data?.cards ?? []).filter((c) => IN_ROUND.has(c.initiative.slug)),
@@ -84,9 +88,6 @@ export default function Devcon() {
 
   const secsLeft = DEVCON.closesAt - Math.floor(now / 1000);
   const isClosed = secsLeft <= 0;
-  const age = ballots.dataUpdatedAt
-    ? Math.max(0, Math.round((now - ballots.dataUpdatedAt) / 1000))
-    : 0;
   const n = tally?.ballots ?? 0;
   const ballotsText = n === 1 ? "1 ballot" : `${n} ballots`;
 
@@ -117,12 +118,16 @@ export default function Devcon() {
           <i className="inline-block h-[6px] w-6 rounded-full bg-vote" />
           from the Devcon vote
         </span>
-        <span className={cn(ballots.isError && "text-amber-300")}>
-          {ballots.dataUpdatedAt ? `Updated ${age}s ago` : "Loading ballots…"}
-        </span>
       </div>
+      {mine && (
+        <div className="mt-5 flex justify-center">
+          <LinkButton variant="primary" to={`/devcon/${mine}`}>
+            {isClosed ? "See your ballot" : "See or change your ballot"}
+          </LinkButton>
+        </div>
+      )}
     </Hero>
   );
 
-  return <BoardPage only={IN_ROUND} votePct={votePct} hero={hero} />;
+  return <BoardPage only={IN_ROUND} votePct={votePct} hero={hero} defaultSort="closest" />;
 }

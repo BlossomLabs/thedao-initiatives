@@ -6,6 +6,7 @@ import PageMain from "~/components/layout/PageMain";
 import { Button } from "~/components/ui/Button";
 import TierBallot, { type BallotItem } from "~/components/devcon/TierBallot";
 import { BallotSkeleton, IntroSkeleton } from "~/components/devcon/DevconSkeleton";
+import { rememberMyCode } from "~/lib/devcon-local";
 import BallotStatus from "~/components/devcon/BallotStatus";
 import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
@@ -259,7 +260,8 @@ export default function DevconCode() {
     try {
       localStorage.setItem(ballotSeenKey(n), "1");
     } catch { /* storage unavailable */ }
-  }, [showsBallot, n, mock]);
+    rememberMyCode(code);
+  }, [showsBallot, n, mock, code]);
 
   const [tiers, setTiers] = useState<Partial<Record<string, Tier>>>({});
   useEffect(() => {

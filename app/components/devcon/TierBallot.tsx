@@ -613,34 +613,37 @@ export default function TierBallot(
                 </button>
               </div>
             )}
-            {onReplace && !(pickedTitle && !drag) && (cleared || (placedCount > 0 && !disabled)) && (
-              <div className="mt-1.5 flex items-center justify-end gap-2 text-[12px] sm:mt-2 sm:text-[12.5px]">
-                {cleared
-                  ? (
-                    <>
-                      <span className="min-w-0 flex-1 truncate text-white/60">Ballot cleared.</span>
+            {onReplace && !(pickedTitle && !drag) && (cleared || (placedCount > 0 && !disabled)) &&
+              (
+                <div className="mt-1.5 flex items-center justify-end gap-2 text-[12px] sm:mt-2 sm:text-[12.5px]">
+                  {cleared
+                    ? (
+                      <>
+                        <span className="min-w-0 flex-1 truncate text-white/60">
+                          Ballot cleared.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={undoClear}
+                          className="rounded-md border border-white/20 px-2 py-1 text-white/75 hover:bg-white/10"
+                        >
+                          Undo
+                        </button>
+                      </>
+                    )
+                    : (
                       <button
                         type="button"
-                        onClick={undoClear}
-                        className="rounded-md border border-white/20 px-2 py-1 text-white/75 hover:bg-white/10"
+                        disabled={Boolean(drag)}
+                        onClick={clearAll}
+                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-white/50 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
                       >
-                        Undo
+                        <RotateCcw className="size-3.5" aria-hidden="true" />
+                        Clear ballot
                       </button>
-                    </>
-                  )
-                  : (
-                    <button
-                      type="button"
-                      disabled={Boolean(drag)}
-                      onClick={clearAll}
-                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-white/50 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
-                    >
-                      <RotateCcw className="size-3.5" aria-hidden="true" />
-                      Clear ballot
-                    </button>
-                  )}
-              </div>
-            )}
+                    )}
+                </div>
+              )}
           </div>
           {actions && (
             // Phone: a bar pinned to the bottom and both sides of the screen, after the list;

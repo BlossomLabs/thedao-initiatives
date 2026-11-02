@@ -61,8 +61,12 @@ export const DEFAULT_VIEW: BoardView = {
 const pick = <T extends string>(v: string | null, allowed: readonly T[], fallback: T): T =>
   allowed.includes(v as T) ? v as T : fallback;
 
-/** The view a URL asks for; unknown values fall back to the defaults. */
-export function readView(params: URLSearchParams): BoardView {
+/** The view a URL asks for; unknown values fall back to the defaults (`defaultSort`:
+ * a board with its own default order, as the Devcon projector's Closest to funded). */
+export function readView(
+  params: URLSearchParams,
+  defaultSort: BoardSort = DEFAULT_VIEW.sort,
+): BoardView {
   const cats = (params.get("cat") ?? "").split(",").filter((s) => categoryOf(s));
   return {
     type: pick(params.get("type"), TYPES, "all"),
@@ -73,7 +77,7 @@ export function readView(params: URLSearchParams): BoardView {
       "all",
     ),
     cats: [...new Set(cats)],
-    sort: pick(params.get("sort"), SORTS.map((s) => s[0]), DEFAULT_VIEW.sort),
+    sort: pick(params.get("sort"), SORTS.map((s) => s[0]), defaultSort),
     view: pick(params.get("view"), VIEWS, DEFAULT_VIEW.view),
     q: (params.get("q") ?? "").slice(0, 100),
     watchlist: params.get("watchlist") === "1",
@@ -81,12 +85,15 @@ export function readView(params: URLSearchParams): BoardView {
 }
 
 /** The URL for a view, defaults left out so a plain board is a plain URL. */
-export function writeView(v: BoardView): URLSearchParams {
+export function writeView(
+  v: BoardView,
+  defaultSort: BoardSort = DEFAULT_VIEW.sort,
+): URLSearchParams {
   const p = new URLSearchParams();
   if (v.type !== "all") p.set("type", v.type);
   if (v.cats.length) p.set("cat", v.cats.join(","));
   if (v.status !== "all") p.set("status", v.status);
-  if (v.sort !== DEFAULT_VIEW.sort) p.set("sort", v.sort);
+  if (v.sort !== defaultSort) p.set("sort", v.sort);
   if (v.view !== DEFAULT_VIEW.view) p.set("view", v.view);
   if (v.q.trim()) p.set("q", v.q.trim());
   if (v.watchlist) p.set("watchlist", "1");
@@ -248,6 +255,28 @@ export interface RatingGroup {
   /** "My rating": the stars every card in it got; null otherwise. */
   stars: number | null;
   cards: Card[];
+}
+
+export type FundingSection = "funded" | "qualified" | "open";
+
+/** "Closest to funded" in sections, as the Funding filter names them: Fully funded,
+ * Qualified for the vote (only while the cards carry the vote state), Open for
+ * funding. On the Devcon projector `votePct` (each one's vote share, % of its goal,
+ * by id) counts toward fully funded. The cards keep their order within each. */
+export function groupByFunding(
+  cards: Card[],
+  votePct: ReadonlyMap<string, number> = new Map(),
+): { key: FundingSection; cards: Card[] }[] {
+  const sectionOf = (c: Card): FundingSection =>
+    c.funded || c.pct + (votePct.get(c.initiative.id) ?? 0) >= 100 - 1e-6
+      ? "funded"
+      : c.vote && c.vote !== "below"
+      ? "qualified"
+      : "open";
+  const order: FundingSection[] = ["funded", "qualified", "open"];
+  return order
+    .map((key) => ({ key, cards: cards.filter((c) => sectionOf(c) === key) }))
+    .filter((g) => g.cards.length > 0);
 }
 
 /** "Top rated" and "My rating": sections by the stars, best first, the

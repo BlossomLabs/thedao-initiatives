@@ -129,11 +129,11 @@ it("says what is going on and what the vote would fund right now", async () => {
 });
 
 it.each(["/devcon", "/devcon?view=cards"])(
-  "shows the vote's result tiers in %s",
+  "orders the funded group by result tier in %s",
   async (url) => {
     vi.mocked(api).mockResolvedValue({
       at: 1,
-      ballots: [{ tokenId: "1", ballot: ballot({ alpha: "S", beta: "A" }) }],
+      ballots: [{ tokenId: "1", ballot: ballot({ alpha: "A", beta: "S" }) }],
     });
     render(
       <QueryClientProvider client={new QueryClient()}>
@@ -142,11 +142,17 @@ it.each(["/devcon", "/devcon?view=cards"])(
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    const s = await screen.findByText("S-TIER");
-    const a = await screen.findByText("A-TIER");
+    const s = (await screen.findAllByText("S-TIER"))[0];
+    const a = (await screen.findAllByText("A-TIER"))[0];
     const funded = (element: HTMLElement) => element.closest("li, [data-initiative-id]")!;
-    expect(within(funded(s) as HTMLElement).getByText("Alpha fuzzing")).toBeInTheDocument();
-    expect(within(funded(a) as HTMLElement).getByText("Beta audits")).toBeInTheDocument();
+    expect(within(funded(s) as HTMLElement).getByText("Beta audits")).toBeInTheDocument();
+    expect(within(funded(a) as HTMLElement).getByText("Alpha fuzzing")).toBeInTheDocument();
+    // List rows have separate desktop and mobile status slots.
+    const rows = [...new Set(screen.getAllByText(/^[SAB]-TIER$/).map(funded))];
+    expect(
+      rows.map((row) => within(row as HTMLElement).getAllByText(/^[SAB]-TIER$/)[0].textContent),
+    )
+      .toEqual(["S-TIER", "A-TIER"]);
     expect(screen.queryByText("B-TIER")).toBeNull();
   },
 );

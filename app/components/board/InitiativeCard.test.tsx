@@ -52,7 +52,7 @@ const mount = (c: Card) =>
     </MemoryRouter>,
   );
 
-it("shows the result tier beside Funded only when the DAO vote supplies funding", () => {
+it("uses the funding-status slot for a DAO tier or existing-support Funded chip", () => {
   const funded = card({ pct: 100, funded: true });
   const { rerender } = render(
     <MemoryRouter>
@@ -60,12 +60,14 @@ it("shows the result tier beside Funded only when the DAO vote supplies funding"
     </MemoryRouter>,
   );
   expect(screen.queryByText("S-TIER")).toBeNull();
+  expect(screen.getByTitle("Fully funded from existing support")).toBeInTheDocument();
+  expect(screen.getByText("FUNDED")).toBeInTheDocument();
   rerender(
     <MemoryRouter>
       <InitiativeCard card={card({ pct: 0 })} tokensOk={false} votePct={100} voteTier="B" />
     </MemoryRouter>,
   );
-  expect(screen.getByText("FUNDED")).toBeInTheDocument();
+  expect(screen.queryByText("FUNDED")).toBeNull();
   expect(screen.getByText("B-TIER")).toBeInTheDocument();
 });
 
@@ -383,7 +385,7 @@ it("the DevCon projector draws the vote's share in gold after what was raised", 
   expect(document.querySelector("[data-vote-fill]")).toBeNull();
 });
 
-it("the DevCon projector: raised plus the vote's share reaching the goal reads FUNDED", () => {
+it("the DevCon projector marks a completed goal, but leaves a partial goal as a percentage", () => {
   // 300 of 1000 raised (30%); the vote's share covers the other 70%.
   const raised = card({ pct: 30 });
   raised.summary = { ...raised.summary, total: 300 };
@@ -392,12 +394,12 @@ it("the DevCon projector: raised plus the vote's share reaching the goal reads F
       <InitiativeCard card={raised} tokensOk={false} votePct={70} />
     </MemoryRouter>,
   );
-  expect(screen.getByText("FUNDED")).toBeInTheDocument();
+  expect(screen.getByTitle("Funded with the Devcon vote")).toBeInTheDocument();
   cleanup();
   render(
     <MemoryRouter>
       <InitiativeCard card={raised} tokensOk={false} votePct={50} />
     </MemoryRouter>,
   );
-  expect(screen.queryByText("FUNDED")).toBeNull();
+  expect(screen.queryByTitle("Funded with the Devcon vote")).toBeNull();
 });

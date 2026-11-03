@@ -186,14 +186,21 @@ it("draws no vote segment without votePct", () => {
   expect(container.querySelector("[data-vote-fill]")).toBeNull();
 });
 
-it("the DevCon projector: a row the vote completes says Funded instead of its %", () => {
+it("a completed vote result keeps an accessible funding label", () => {
   mount({ votePct: new Map([["a", 50]]) });
   const row = screen.getByText("Echidna fuzzing").closest("li")!;
-  expect(within(row).getAllByText("Funded").length).toBeGreaterThan(0);
+  expect(within(row).getAllByTitle("Funded with the Devcon vote").length).toBeGreaterThan(0);
+  for (const label of within(row).getAllByText("Funded with the Devcon vote")) {
+    expect(label).toHaveClass("sr-only");
+  }
+  expect(within(row).queryByText("Funded", { exact: true })).toBeNull();
   expect(within(row).queryByText("50%")).toBeNull();
   cleanup();
   mount({ votePct: new Map([["a", 30]]) });
-  expect(within(screen.getByText("Echidna fuzzing").closest("li")!).queryAllByText("Funded"))
+  expect(
+    within(screen.getByText("Echidna fuzzing").closest("li")!)
+      .queryAllByTitle("Funded with the Devcon vote"),
+  )
     .toHaveLength(0);
 });
 
@@ -203,6 +210,15 @@ it("shows result tiers only for initiatives funded by the DAO vote", () => {
     voteTiers: new Map([["a", "A"], ["b", "B"]]),
   });
   const first = screen.getByText("Echidna fuzzing").closest("li")!;
-  expect(within(first).getByText("A-TIER")).toBeInTheDocument();
+  expect(within(first).getAllByText("A-TIER").length).toBeGreaterThan(0);
   expect(screen.queryByText("B-TIER")).toBeNull();
+});
+
+it("shows a Funded chip for existing support, without a DAO tier", () => {
+  mount({ cards: [card("paid", "Already funded", {}, 200_000)] });
+  const row = screen.getByText("Already funded").closest("li")!;
+  expect(within(row).getAllByTitle("Fully funded from existing support").length).toBeGreaterThan(0);
+  expect(within(row).getAllByText("FUNDED").length).toBeGreaterThan(0);
+  expect(within(row).queryByText(/^[SAB]-TIER$/)).toBeNull();
+  expect(within(row).queryByText("100.0%")).toBeNull();
 });

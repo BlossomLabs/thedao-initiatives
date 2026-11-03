@@ -485,6 +485,31 @@ describe("groupByFunding (Closest to funded)", () => {
       ["open", ["Barely started"]],
     ]);
   });
+
+  it("orders funded results S/A/B, preserving ties and the other groups' order", () => {
+    const b1 = card("B first");
+    const untiered = card("Already funded", { raised: 100_000 });
+    const s2 = card("S second");
+    const open1 = card("Open first");
+    const a = card("A");
+    const s1 = card("S first");
+    const b2 = card("B second");
+    const open2 = card("Open second");
+    const input = [b1, untiered, s2, open1, a, s1, b2, open2];
+    const tiers = new Map([
+      [b1.initiative.id, "B" as const],
+      [s2.initiative.id, "S" as const],
+      [a.initiative.id, "A" as const],
+      [s1.initiative.id, "S" as const],
+      [b2.initiative.id, "B" as const],
+    ]);
+    const vote = new Map([...tiers.keys()].map((id) => [id, 100]));
+    const groups = groupByFunding(input, vote, tiers);
+    expect(groups[0].cards).toEqual([s2, s1, a, b1, b2, untiered]);
+    expect(groups[1].cards).toEqual([open1, open2]);
+    expect(input).toEqual([b1, untiered, s2, open1, a, s1, b2, open2]);
+    expect(groupByFunding(input, vote)[0].cards).toEqual([b1, untiered, s2, a, s1, b2]);
+  });
 });
 
 describe("a board with its own default sort (the Devcon projector)", () => {

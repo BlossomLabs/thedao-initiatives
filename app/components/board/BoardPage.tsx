@@ -188,7 +188,7 @@ export default function BoardPage({ only, votePct, voteTiers, hero, defaultSort 
       ),
     }))
     : sort === "closest"
-    ? groupByFunding(cards, votePct).map((g) => ({
+    ? groupByFunding(cards, votePct, voteTiers).map((g) => ({
       key: g.key,
       cards: g.cards,
       heading: (

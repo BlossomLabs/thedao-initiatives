@@ -153,6 +153,13 @@ used by `vote/reference/quiet_ending_steps.py` (`tier_levels` / `bound`), withou
 settlement windows. A ballot's ranks count proposals above a tier, so they must not be
 read as literal tier numbers 1/2/3. A short ballot's B choices can already contribute in
 the result's A stage. Already-funded initiatives taking no DAO allocation get no tier chip.
+Within the Fully funded group, display S, A and B results in that order, retaining the
+existing order within each tier and placing untiered initiatives last. The tier chip replaces
+the completed funding label: in the list's Funded column on desktop, at the bar's end on
+mobile, and below the bar on cards. An initiative fully funded from existing support shows
+the existing green Funded chip instead. Both have accessible funding labels. Mobile list
+bars share a fixed status slot wide enough for the longest chip, so their tracks have the
+same length and horizontal alignment whether the status is a tier, Funded, or a percentage.
 
 - Ballots: replay `BallotRecorded` events from the deploy block (latest per tokenId), ignoring any
   with block timestamp ≥ C and voids from `RegistrationRevoked`.

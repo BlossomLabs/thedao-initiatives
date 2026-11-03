@@ -8,7 +8,7 @@ import BackerLogo from "~/components/ui/BackerLogo";
 import CardTitle from "~/components/board/CardTitle";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import WatchlistButton from "~/components/board/WatchlistButton";
-import VoteTierChip from "~/components/board/VoteTierChip";
+import FundingStatus from "~/components/board/FundingStatus";
 import RatingChip, { RatingForm } from "~/components/ratings/RatingChip";
 import Reveal from "~/components/ui/Reveal";
 import { fullyFunded, type Ratings } from "~/lib/board-view";
@@ -62,7 +62,10 @@ function FundingBar(
 ) {
   return (
     <span className={cn("relative block", className)} aria-hidden="true">
-      <span className="relative block h-[3px] overflow-hidden rounded-full bg-white/[.08]">
+      <span
+        data-funding-track
+        className="relative block h-[3px] overflow-hidden rounded-full bg-white/[.08]"
+      >
         {pct > 0 && (
           <i
             data-funding-fill
@@ -108,9 +111,14 @@ function Row(
   const shownLogos = backers > logos.length ? logos.slice(0, 3) : logos;
   const more = backers - shownLogos.length;
   const pctOn = standing ? standing.kind === "eligible" : pct >= 1;
-  // Devcon projector: the vote completes it, so it reads Funded rather than its %.
-  const votedFull = (votePct ?? 0) > 0 && fullyFunded(card, votePct);
-  const pctShown = votedFull ? "Funded" : pctText(pct);
+  const full = fullyFunded(card, votePct);
+  const votedFull = (votePct ?? 0) > 0 && full;
+  const pctShown = full ? <FundingStatus tier={voteTier} byVote={votedFull} /> : (
+    <>
+      {pctText(pct)}
+      <span className="sr-only">funded</span>
+    </>
+  );
   const tick = vote ? voteFloorPct(r.goalUsd, vote) : 0;
   // Hovering or tapping the row shows its vote callout under the bar.
   const reveal = useVoteReveal(Boolean(standing));
@@ -177,7 +185,6 @@ function Row(
           onPrefetch={prefetch}
           className="min-w-0 pr-0 text-[14px] leading-[1.3]"
         />
-        {votedFull && voteTier && <VoteTierChip tier={voteTier} />}
         {label.map((k) => (
           <CardLabel
             key={k}
@@ -201,12 +208,11 @@ function Row(
         className={cn(
           NUM,
           "text-[12.5px] font-medium @max-[720px]/list:hidden",
-          pctOn || votedFull ? "text-dao-green" : "text-white/40",
+          pctOn || full ? "text-dao-green" : "text-white/40",
         )}
       >
         {pctShown}
         <span className="sr-only">
-          {votedFull ? " with the Devcon vote" : "funded"}
           {standing && `. ${calloutText(standing)}`}
         </span>
       </span>
@@ -234,10 +240,10 @@ function Row(
           )}
       </span>
       {
-        /* Desktop: the Raised cell. Phones: one line under the title, the chips then the
-          amount at the right; it never wraps, so the amount stays beside the chips. */
+        /* Desktop: the Raised cell. Phones: chips, amount and backers under the title;
+          wrap between items on narrow screens so they cannot push the row wider. */
       }
-      <div className="contents @max-[720px]/list:col-span-2 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-2 @max-[720px]/list:flex @max-[720px]/list:flex-nowrap @max-[720px]/list:items-center @max-[720px]/list:gap-x-2">
+      <div className="contents @max-[720px]/list:col-span-2 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-2 @max-[720px]/list:flex @max-[720px]/list:flex-wrap @max-[720px]/list:items-center @max-[720px]/list:gap-x-2 @max-[720px]/list:gap-y-1">
         <TypeBadge
           type={r.type}
           inline
@@ -289,8 +295,8 @@ function Row(
           </span>
         )}
       </div>
-      {/* The row's own bar: under the title on desktop, the last line on phones (with its %). */}
-      <div className="col-start-3 flex items-center gap-2.5 @max-[720px]/list:col-span-2 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-3">
+      {/* On phones every bar reserves the same 5rem status slot, sized for the Funded chip. */}
+      <div className="col-start-3 flex min-w-0 items-center gap-2.5 @max-[720px]/list:col-span-2 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-3 @max-[720px]/list:grid @max-[720px]/list:grid-cols-[minmax(0,1fr)_5rem]">
         {vote?.show && standing
           ? (
             <FundingBar pct={pct} tick={tick} votePct={votePct} className="flex-1">
@@ -301,10 +307,9 @@ function Row(
         <span
           className={cn(
             NUM,
-            "hidden w-12 text-[12.5px] font-semibold @max-[720px]/list:inline-block",
-            pctOn || votedFull ? "text-dao-green" : "text-white/40",
+            "hidden text-[12.5px] font-semibold @max-[720px]/list:flex @max-[720px]/list:items-center @max-[720px]/list:justify-end",
+            pctOn || full ? "text-dao-green" : "text-white/40",
           )}
-          aria-hidden="true"
         >
           {pctShown}
         </span>

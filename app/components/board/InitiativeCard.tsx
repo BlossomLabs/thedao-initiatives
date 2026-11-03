@@ -3,11 +3,11 @@ import type { Tier } from "@shared/devcon/ballot";
 import BackerLogo from "~/components/ui/BackerLogo";
 import { ArrowRight, Landmark, Wallet } from "lucide-react";
 import { Link } from "react-router";
-import { FundedChip, TypeBadge } from "~/components/ui/Badge";
+import { TypeBadge } from "~/components/ui/Badge";
 import { fullyFunded } from "~/lib/board-view";
 import CardTitle from "./CardTitle";
 import WatchlistButton from "~/components/board/WatchlistButton";
-import VoteTierChip from "~/components/board/VoteTierChip";
+import FundingStatus from "~/components/board/FundingStatus";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import Bar from "~/components/ui/Bar";
 import {
@@ -223,12 +223,7 @@ export default function InitiativeCard({
           )}
         </span>
         {funded || fullyFunded(card, votePct)
-          ? (
-            <span className="flex flex-wrap justify-end gap-1.5">
-              <FundedChip />
-              {(votePct ?? 0) > 0 && voteTier && <VoteTierChip tier={voteTier} />}
-            </span>
-          )
+          ? <FundingStatus tier={voteTier} byVote={(votePct ?? 0) > 0} />
           : (
             <span className="flex items-center gap-2">
               <span

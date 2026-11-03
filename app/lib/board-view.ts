@@ -9,6 +9,7 @@ import { CATEGORIES, categoryOf } from "~/lib/categories";
 import { plural } from "~/lib/format";
 import { hasRatingAverage, type RatingSummary } from "@shared/ratings";
 import { REVIEWER } from "~/lib/reviewer";
+import { type Tier, TIERS } from "@shared/devcon/ballot";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
 export const STATUSES = ["all", "open", "qualified", "funded"] as const;
@@ -279,10 +280,12 @@ export type FundingSection = "funded" | "qualified" | "open";
 /** "Closest to funded" in sections, as the Funding filter names them: Fully funded,
  * Qualified for the vote (only while the cards carry the vote state), Open for
  * funding. On the Devcon projector `votePct` (each one's vote share, % of its goal,
- * by id) counts toward fully funded. The cards keep their order within each. */
+ * by id) counts toward fully funded. Funded results with `voteTiers` are ordered
+ * S/A/B, then untiered; the existing order is preserved within each tier and other group. */
 export function groupByFunding(
   cards: Card[],
   votePct: ReadonlyMap<string, number> = new Map(),
+  voteTiers?: ReadonlyMap<string, Tier>,
 ): { key: FundingSection; cards: Card[] }[] {
   const sectionOf = (c: Card): FundingSection =>
     fullyFunded(c, votePct.get(c.initiative.id))
@@ -291,8 +294,16 @@ export function groupByFunding(
       ? "qualified"
       : "open";
   const order: FundingSection[] = ["funded", "qualified", "open"];
+  const tierOrder = (c: Card) => {
+    const tier = voteTiers?.get(c.initiative.id);
+    return tier ? TIERS.indexOf(tier) : TIERS.length;
+  };
   return order
-    .map((key) => ({ key, cards: cards.filter((c) => sectionOf(c) === key) }))
+    .map((key) => {
+      const group = cards.filter((c) => sectionOf(c) === key);
+      if (key === "funded" && voteTiers) group.sort((a, b) => tierOrder(a) - tierOrder(b));
+      return { key, cards: group };
+    })
     .filter((g) => g.cards.length > 0);
 }
 

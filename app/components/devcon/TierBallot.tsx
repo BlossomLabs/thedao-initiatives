@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { GripVertical, RotateCcw, X } from "lucide-react";
+import { ArrowRight, ChevronDown, GripVertical, RotateCcw, X } from "lucide-react";
 import CategoryDot from "~/components/ui/CategoryDot";
+import { LinkButton } from "~/components/ui/Button";
 import type { Card } from "~/lib/api-types";
 import type { AiSearchResult } from "../../../shared/ai-search";
 import BoardSearch from "~/components/board/BoardSearch";
@@ -131,6 +132,7 @@ export default function TierBallot(
   const [picked, setPicked] = useState<string>();
   const [drag, setDrag] = useState<Drag>();
   const [over, setOver] = useState<Where>();
+  const [expanded, setExpanded] = useState<string>();
   // The front page's search (keywords, or AI) and category filter, over the list.
   const [view, setView] = useState<BoardView>({ ...DEFAULT_VIEW });
   const [aiResult, setAiResult] = useState<AiSearchResult | null>(null);
@@ -361,10 +363,19 @@ export default function TierBallot(
 
   const tile = (i: BallotItem) => {
     const on = picked === i.slug;
+    const open = expanded === i.slug;
+    const r = i.card?.initiative;
+    const detailsId = `${id}-details-${i.slug}`;
     return (
       <li
         key={i.slug}
-        className={cn(landed?.slug === i.slug && "motion-safe:animate-chip-land")}
+        className={cn(
+          "relative overflow-hidden rounded-xl border transition-colors",
+          on && !drag
+            ? "border-[rgba(92,183,90,.6)] bg-dao-green/10"
+            : "border-white/10 bg-white/5",
+          landed?.slug === i.slug && "motion-safe:animate-chip-land",
+        )}
       >
         <button
           type="button"
@@ -375,18 +386,52 @@ export default function TierBallot(
           {...grab(i.slug)}
           className={cn(
             TILE,
-            "relative flex w-full select-none items-center gap-2 overflow-hidden rounded-xl border pl-2 pr-3 text-left transition-[border-color,opacity,background-color] duration-150 [-webkit-touch-callout:none]",
-            on && !drag
-              ? "border-[rgba(92,183,90,.6)] bg-dao-green/10"
-              : "border-white/10 bg-white/5",
-            !disabled && !(on && !drag) && "hover:border-[rgba(92,183,90,.4)]",
-            !disabled && "cursor-grab",
+            "relative flex w-full select-none items-center gap-2 overflow-hidden pl-2 pr-12 text-left transition-opacity duration-150 [-webkit-touch-callout:none]",
+            !disabled && "cursor-grab hover:bg-white/[.03]",
             drag?.slug === i.slug && "opacity-40",
             disabled && "opacity-60",
           )}
         >
           {tileFace(i)}
         </button>
+        <button
+          type="button"
+          aria-label={`${open ? "Hide" : "Show"} preview for ${i.title}`}
+          aria-expanded={open}
+          aria-controls={detailsId}
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(open ? undefined : i.slug);
+          }}
+          className="absolute right-1 top-[14px] grid size-11 place-items-center rounded-lg text-white/55 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-dao-green"
+        >
+          <ChevronDown
+            className={cn(
+              "size-[18px] transition-transform motion-reduce:transition-none",
+              open && "rotate-180",
+            )}
+            aria-hidden="true"
+          />
+        </button>
+        {open && (
+          <div
+            id={detailsId}
+            className="space-y-3 border-t border-white/10 px-4 py-3.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {r?.summary && <p className="text-[13px] leading-relaxed text-white/75">{r.summary}</p>}
+            <LinkButton
+              variant="ghost"
+              sm
+              to={`/initiative/${i.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Details for ${i.title} (opens in a new tab)`}
+            >
+              Details <ArrowRight className="size-3.5" aria-hidden="true" />
+            </LinkButton>
+          </div>
+        )}
       </li>
     );
   };

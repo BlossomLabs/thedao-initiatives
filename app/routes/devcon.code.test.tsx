@@ -53,6 +53,7 @@ vi.mock("~/hooks/use-board", () => ({
           slug,
           title: slug.toUpperCase(),
           summary: slug === "gamma" ? "Formal verification of bridges" : "",
+          recipientTeam: slug === "gamma" ? "Bridge researchers" : "",
           categories: [],
           goalUsd: 1000,
         },
@@ -165,7 +166,7 @@ it("the badge's owner gets the ballot, and sending posts the encoded tiers", asy
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
   expect(await screen.findByText("ALPHA")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: /BETA/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^BETA/ }));
   fireEvent.click(screen.getByRole("button", { name: "Place in Must fund" }));
   fireEvent.click(screen.getByRole("button", { name: /send my ballot/i }));
   await waitFor(() => expect(submit).toHaveBeenCalled());
@@ -179,7 +180,7 @@ it("offers to send it yourself next to Send, and next to Retry after a failure",
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
-  fireEvent.click(await screen.findByRole("button", { name: /BETA/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /^BETA/ }));
   fireEvent.click(screen.getByRole("button", { name: "Place in Must fund" }));
   fireEvent.click(screen.getByRole("button", { name: /send it yourself/i }));
   await waitFor(() => expect(selfSend).toHaveBeenCalled());
@@ -351,11 +352,39 @@ it("Enter asks AI, which orders the list; typing again goes back to keywords", a
   fireEvent.change(box, { target: { value: "who protects cross-chain bridges" } });
   fireEvent.submit(box.closest("form")!);
   expect(await screen.findByText(/initiatives ordered by relevance/i)).toBeInTheDocument();
-  const order = within(screen.getByRole("list", { name: "Not ranked yet" }))
-    .getAllByRole("button").map((b) => b.getAttribute("data-ballot-tile"));
+  const order = Array.from(document.querySelectorAll("[data-ballot-tile]"))
+    .map((b) => b.getAttribute("data-ballot-tile"));
   expect(order).toEqual(["gamma", "alpha", "beta"]);
   fireEvent.click(screen.getByRole("button", { name: /back to keywords/i }));
   expect(screen.queryByText(/initiatives ordered by relevance/i)).toBeNull();
+});
+
+it("a proposal's chevron shows a preview and Details without selecting or moving it", async () => {
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  const toggle = await screen.findByRole("button", { name: "Show preview for GAMMA" });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByText("Formal verification of bridges")).toBeNull();
+  // Even with another initiative picked, previewing must not trigger a list drop.
+  fireEvent.click(screen.getByRole("button", { name: /^ALPHA/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Place in Must fund" }));
+  fireEvent.click(screen.getByRole("button", { name: "ALPHA" }));
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByText("Formal verification of bridges")).toBeInTheDocument();
+  expect(screen.queryByText("Bridge researchers")).toBeNull();
+  expect(screen.queryByText("Raised")).toBeNull();
+  const details = screen.getByRole("link", { name: /Details for GAMMA/ });
+  expect(details).toHaveAttribute("href", "/initiative/gamma");
+  expect(details).toHaveAttribute("target", "_blank");
+  expect(details).toHaveAttribute("rel", "noopener noreferrer");
+  expect(within(screen.getByRole("list", { name: "Must fund" })).getByText("ALPHA"))
+    .toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /^GAMMA/ })).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(toggle);
+  expect(screen.queryByText("Formal verification of bridges")).toBeNull();
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
 });
 
 function showMine() {

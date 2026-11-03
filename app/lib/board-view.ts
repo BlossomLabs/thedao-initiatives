@@ -79,7 +79,7 @@ export function readView(
     cats: [...new Set(cats)],
     sort: pick(params.get("sort"), SORTS.map((s) => s[0]), defaultSort),
     view: pick(params.get("view"), VIEWS, DEFAULT_VIEW.view),
-    q: (params.get("q") ?? "").slice(0, 100),
+    q: (params.get("q") ?? "").slice(0, 300),
     watchlist: params.get("watchlist") === "1",
   };
 }
@@ -108,13 +108,21 @@ export const isFiltered = (v: BoardView) =>
 const words = (q: string) => q.toLowerCase().split(/\s+/).filter(Boolean);
 
 /** The text the keyword filter searches: title, summary, team, category labels. */
-const haystack = (c: Card) =>
-  [
+// API initiative objects are immutable: a refreshed row gets a new object. Share
+// this index across keyword filtering and facet counts, releasing old rows with GC.
+const searchText = new WeakMap<Card["initiative"], string>();
+const haystack = (c: Card) => {
+  const cached = searchText.get(c.initiative);
+  if (cached !== undefined) return cached;
+  const text = [
     c.initiative.title,
     c.initiative.summary,
     c.initiative.recipientTeam ?? "",
     ...c.initiative.categories.map((s) => categoryOf(s)?.label ?? ""),
   ].join(" ").toLowerCase();
+  searchText.set(c.initiative, text);
+  return text;
+};
 
 type Facet = "type" | "status" | "cats" | "q";
 

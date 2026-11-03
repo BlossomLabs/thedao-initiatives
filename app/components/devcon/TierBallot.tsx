@@ -1,10 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { GripVertical, RotateCcw, Search, Sparkles, X } from "lucide-react";
+import { GripVertical, RotateCcw, X } from "lucide-react";
 import CategoryDot from "~/components/ui/CategoryDot";
 import type { Card } from "~/lib/api-types";
 import type { AiSearchResult } from "../../../shared/ai-search";
-import { isAiSearchQuery } from "../../../shared/ai-search";
-import { api, errorMessage } from "~/lib/api";
+import BoardSearch from "~/components/board/BoardSearch";
 import CategoryFilter from "~/components/board/filters/CategoryFilter";
 import { type BoardView, DEFAULT_VIEW, facetCounts, isFiltered, matches } from "~/lib/board-view";
 import { categoryOf } from "~/lib/categories";
@@ -303,65 +302,8 @@ export default function TierBallot(
     return () => document.removeEventListener("keydown", onKey);
   }, [picked]);
 
-  const unranked = items.filter((i) => where(i.slug) === "unplaced");
+  const unranked = useMemo(() => items.filter((i) => !tiers[i.slug]), [items, tiers]);
   const ai = Boolean(aiResult?.scores.length);
-  const [aiNote, setAiNote] = useState<{ text: string; failed?: boolean } | null>(null);
-  // The latest question wins: an answer to an earlier one is dropped.
-  const aiSeq = useRef(0);
-  const aiTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  /** Typing filters by keyword at once; new words drop the AI order. */
-  const typed = (q: string, force = false) => {
-    if (force || q.trim() !== view.q.trim()) {
-      ++aiSeq.current;
-      if (aiTimer.current) clearTimeout(aiTimer.current);
-      aiTimer.current = null;
-      setAiResult(null);
-      setAsking(false);
-      setAiNote(null);
-    }
-    setView((v) => ({ ...v, q }));
-    // Automatic AI: the words go to the model after a pause in typing.
-    if (search.ai && search.aiAuto && isAiSearchQuery(q.trim())) {
-      aiTimer.current = setTimeout(() => void askAi(q), 500);
-    }
-  };
-
-  /** Enter (or the pause, when automatic): the model orders the whole list. */
-  const askAi = async (q = view.q) => {
-    const words = q.trim();
-    if (!search.ai || !words) return;
-    if (!isAiSearchQuery(words)) {
-      setAiNote({
-        text: "Describe what you want to fund in a few words, then press Enter.",
-        failed: true,
-      });
-      return;
-    }
-    const mine = ++aiSeq.current;
-    setAsking(true);
-    setAiNote(null);
-    try {
-      const result = await api<AiSearchResult>("/api/ai-search", { json: { query: words } });
-      if (mine !== aiSeq.current) return;
-      if (!Array.isArray(result?.scores) || !result.scores.length) {
-        setAiResult(null);
-        setAiNote({ text: "No AI matches; filtering by your keywords." });
-        return;
-      }
-      setAiResult(result);
-      setAiNote({ text: "Ordered by AI relevance." });
-    } catch (err) {
-      if (mine !== aiSeq.current) return;
-      setAiNote({ text: errorMessage(err), failed: true });
-    } finally {
-      if (mine === aiSeq.current) setAsking(false);
-    }
-  };
-  useEffect(() => () => {
-    ++aiSeq.current;
-    if (aiTimer.current) clearTimeout(aiTimer.current);
-  }, []);
   // While the AI order is on, the model ranked everything: the words stop filtering.
   const shownView = useMemo(
     () => (ai || (search.aiAuto && asking) ? { ...view, q: "" } : view),
@@ -683,91 +625,16 @@ export default function TierBallot(
             Anything you leave here gets none of your share.
           </p>
           <div onClick={(e) => e.stopPropagation()}>
-            <form
-              className="relative mb-3"
-              autoComplete="off"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void askAi();
-              }}
-            >
-              {ai || asking
-                ? (
-                  <Sparkles
-                    className={cn(
-                      "pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dao-green",
-                      asking && "animate-pulse",
-                    )}
-                    aria-hidden="true"
-                  />
-                )
-                : (
-                  <Search
-                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/45"
-                    aria-hidden="true"
-                  />
-                )}
-              <input
-                type="text"
-                className={cn(
-                  "field py-2.5 pl-9 pr-9 placeholder:text-white/25",
-                  ai && "border-[rgba(92,183,90,.55)]",
-                )}
-                placeholder={search.ai
-                  ? search.aiAuto
-                    ? "Search, or describe what to fund"
-                    : "Search, or Enter to ask AI"
-                  : "Search initiatives"}
-                aria-label={search.ai
-                  ? "Search initiatives by keyword, or describe the work you want to fund and press Enter to ask AI"
-                  : "Search initiatives"}
-                aria-describedby={aiNote ? `${id}-ai` : undefined}
-                maxLength={300}
-                spellCheck={false}
-                value={view.q}
-                onChange={(e) => typed(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape" && (view.q || ai)) {
-                    e.stopPropagation();
-                    typed("");
-                  }
-                }}
-              />
-              {view.q && (
-                <button
-                  type="button"
-                  aria-label="Clear the search"
-                  onClick={() => typed("")}
-                  className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-white/50 hover:bg-white/10 hover:text-white"
-                >
-                  <X className="size-3.5" aria-hidden="true" />
-                </button>
-              )}
-            </form>
-            {aiNote && (
-              <p
-                id={`${id}-ai`}
-                role={aiNote.failed ? "alert" : "status"}
-                className={cn(
-                  "-mt-1.5 mb-3 px-1 text-[12px]",
-                  aiNote.failed ? "text-[#ffd7d6]" : "text-white/50",
-                )}
-              >
-                {aiNote.text}
-                {ai && (
-                  <>
-                    {" "}
-                    <button
-                      type="button"
-                      onClick={() => typed(view.q, true)}
-                      className="text-dao-green underline underline-offset-2"
-                    >
-                      Back to keywords
-                    </button>
-                  </>
-                )}
-              </p>
-            )}
+            <BoardSearch
+              compact
+              view={view}
+              onFilter={(next) => setView((v) => ({ ...v, ...next }))}
+              aiEnabled={Boolean(search.ai)}
+              aiAuto={Boolean(search.aiAuto)}
+              active={ai}
+              onResults={setAiResult}
+              onAsking={setAsking}
+            />
           </div>
           {shown.length > 0
             ? <ul className="space-y-2" aria-label={UNRANKED}>{shown.map(tile)}</ul>

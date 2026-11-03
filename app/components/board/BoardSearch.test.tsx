@@ -2,7 +2,7 @@ import type { AiSearchResult } from "../../../shared/ai-search";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import BoardSearch from "./BoardSearch";
+import BoardSearch, { FILTER_THROTTLE_MS } from "./BoardSearch";
 import { type BoardView, DEFAULT_VIEW } from "~/lib/board-view";
 
 const api = vi.fn();
@@ -21,10 +21,11 @@ afterEach(() => vi.useRealTimers());
 // The board around the box: its filters and the AI order.
 const board = { view: DEFAULT_VIEW as BoardView, matches: null as string[] | null };
 function Host(
-  { aiEnabled = true, aiAuto = false, start = {} }: {
+  { aiEnabled = true, aiAuto = false, start = {}, compact = false }: {
     aiEnabled?: boolean;
     aiAuto?: boolean;
     start?: Partial<BoardView>;
+    compact?: boolean;
   },
 ) {
   const [view, setView] = useState<BoardView>({ ...DEFAULT_VIEW, ...start });
@@ -34,6 +35,7 @@ function Host(
   return (
     <>
       <BoardSearch
+        compact={compact}
         view={view}
         onFilter={(next) => setView((v) => ({ ...v, ...next }))}
         aiEnabled={aiEnabled}
@@ -45,6 +47,7 @@ function Host(
       <button type="button" onClick={() => setView((v) => ({ ...v, type: "rfp" }))}>
         RFPs pill
       </button>
+      <button type="button" onClick={() => setView({ ...DEFAULT_VIEW })}>Clear filters</button>
       <button type="button" onClick={() => setResult(null)}>Manual sort</button>
       <button type="button" onClick={() => setView((v) => ({ ...v, sort: "newest" }))}>
         Newest sort
@@ -57,15 +60,19 @@ const box = () => screen.getByRole("searchbox", { name: /Search initiatives/ });
 const type = (q: string) => fireEvent.change(box(), { target: { value: q } });
 const enter = () => fireEvent.submit(box().closest("form")!);
 
-it("typing filters by keywords at once, and qualifiers move the filters", () => {
+it("typing filters by keywords after the throttle, and qualifiers move the filters", async () => {
   render(<Host />);
   type("wallet type:grant cat:opsec funding:open");
-  expect(board.view).toMatchObject({
-    q: "wallet",
-    type: "grant",
-    cats: ["opsec"],
-    status: "open",
-  });
+  expect(box()).toHaveValue("wallet type:grant cat:opsec funding:open");
+  expect(board.view.q).toBe("");
+  await waitFor(() =>
+    expect(board.view).toMatchObject({
+      q: "wallet",
+      type: "grant",
+      cats: ["opsec"],
+      status: "open",
+    })
+  );
   expect(api).not.toHaveBeenCalled(); // no AI until Enter
   expect(screen.getAllByText("Ask AI", { selector: "span" })).toHaveLength(2); // the ↵ hint + the button
 });
@@ -114,7 +121,7 @@ it("Esc, editing the text, or a manual sort go back to keywords", async () => {
   await waitFor(() => expect(board.matches).toEqual(["a"]));
   type("fuzzing tool");
   expect(board.matches).toBeNull();
-  expect(board.view.q).toBe("fuzzing tool");
+  await waitFor(() => expect(board.view.q).toBe("fuzzing tool"));
 
   enter();
   await waitFor(() => expect(board.matches).toEqual(["a"]));
@@ -173,6 +180,74 @@ const tick = async (ms: number) => {
     await vi.advanceTimersByTimeAsync(ms);
   });
 };
+
+it.each([false, true])("throttles bursts and continuous typing (compact: %s)", async (compact) => {
+  vi.useFakeTimers();
+  render(<Host aiEnabled={false} compact={compact} />);
+  for (const value of ["w", "wa", "wal", "wall", "wallet"]) type(value);
+  expect(box()).toHaveValue("wallet");
+  expect(board.view.q).toBe("");
+  await tick(FILTER_THROTTLE_MS - 1);
+  expect(board.view.q).toBe("");
+  await tick(1);
+  expect(board.view.q).toBe("wallet");
+  type("wallet s");
+  await tick(100);
+  type("wallet security");
+  await tick(100);
+  // A throttle continues publishing during typing, rather than waiting for silence.
+  expect(board.view.q).toBe("wallet security");
+  type("wallet security tools");
+  type("");
+  expect(board.view.q).toBe("");
+  await tick(FILTER_THROTTLE_MS);
+  expect(board.view.q).toBe("");
+});
+
+it("a pill during the throttle preserves pending words, and Clear cancels them", async () => {
+  vi.useFakeTimers();
+  render(<Host aiEnabled={false} start={{ q: "old" }} />);
+  type("wallet");
+  fireEvent.click(screen.getByRole("button", { name: "RFPs pill" }));
+  expect(box()).toHaveValue("wallet type:rfp");
+  await tick(FILTER_THROTTLE_MS);
+  expect(board.view).toMatchObject({ q: "wallet", type: "rfp" });
+  type("pending");
+  fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+  expect(box()).toHaveValue("");
+  await tick(FILTER_THROTTLE_MS);
+  expect(board.view).toEqual(DEFAULT_VIEW);
+});
+
+it("unmounting drops a pending keyword update", async () => {
+  vi.useFakeTimers();
+  const { unmount } = render(<Host aiEnabled={false} />);
+  type("wallet");
+  unmount();
+  await tick(FILTER_THROTTLE_MS);
+  expect(board.view.q).toBe("");
+});
+
+it("an earlier filter acknowledgement cannot overwrite newer typing", async () => {
+  vi.useFakeTimers();
+  const onFilter = vi.fn();
+  const props = {
+    view: DEFAULT_VIEW,
+    onFilter,
+    aiEnabled: false,
+    active: false,
+    onResults: vi.fn(),
+  };
+  const { rerender } = render(<BoardSearch {...props} />);
+  type("wallet");
+  await tick(FILTER_THROTTLE_MS);
+  expect(onFilter).toHaveBeenCalledTimes(1);
+  type("wallet security");
+  rerender(<BoardSearch {...props} view={{ ...DEFAULT_VIEW, q: "wallet" }} />);
+  expect(box()).toHaveValue("wallet security");
+  await tick(FILTER_THROTTLE_MS);
+  expect(onFilter).toHaveBeenLastCalledWith(expect.objectContaining({ q: "wallet security" }));
+});
 
 it("Jev debounces typing and sends only the latest words", async () => {
   vi.useFakeTimers();

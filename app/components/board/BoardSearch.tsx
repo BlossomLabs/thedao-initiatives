@@ -1,7 +1,7 @@
 import type { AiSearchResult } from "../../../shared/ai-search";
 import { isAiSearchQuery } from "../../../shared/ai-search";
-import { useEffect, useId, useRef, useState } from "react";
-import { CornerDownLeft, Search, Sparkles } from "lucide-react";
+import { startTransition, useEffect, useId, useMemo, useRef, useState } from "react";
+import { CornerDownLeft, Search, Sparkles, X } from "lucide-react";
 import { api, errorMessage } from "~/lib/api";
 import { upgradeNow } from "~/lib/app-upgrade";
 import { Button } from "~/components/ui/Button";
@@ -19,9 +19,11 @@ type Filters =
   & Pick<BoardView, "q" | "type" | "cats" | "status">
   & Partial<Pick<BoardView, "sort">>;
 
+export const FILTER_THROTTLE_MS = 200;
+
 /**
  * The board's one search box, in two modes.
- * - Keywords (as you type): every word must match an initiative's title,
+ * - Keywords (at most once per 200 ms): every word must match an initiative's title,
  *   summary, team or category; `type:grant cat:opsec funding:open` move the
  *   pills, and the pills write them back.
  * - Jev searches after a 500 ms typing pause; the LLM uses Enter or Ask AI.
@@ -32,7 +34,7 @@ type Filters =
  * The icon, a tag in the box and the note under it say which mode is on.
  */
 export default function BoardSearch(
-  { view, onFilter, aiEnabled, aiAuto = false, active, onResults, onAsking }: {
+  { view, onFilter, aiEnabled, aiAuto = false, active, onResults, onAsking, compact = false }: {
     view: Filters;
     onFilter: (next: Partial<BoardView>) => void;
     aiEnabled: boolean;
@@ -43,9 +45,40 @@ export default function BoardSearch(
     onResults: (result: AiSearchResult | null) => void;
     /** While the model is thinking: the board says so instead of an empty result. */
     onAsking?: (asking: boolean) => void;
+    /** The ballot's smaller box, with a clear button and Enter to ask AI. */
+    compact?: boolean;
   },
 ) {
   const [text, setText] = useState(() => boardQueryText(view));
+  // Keep keystrokes in this component. Filtering and URL navigation only happen
+  // once per interval, in a transition so the input keeps priority over the list.
+  const filterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingFilter = useRef<Filters | null>(null);
+  const emittedFilter = useRef<Filters | null>(null);
+  const previousView = useRef(view);
+  const onFilterRef = useRef(onFilter);
+  onFilterRef.current = onFilter;
+  function cancelFilter() {
+    if (filterTimer.current !== null) clearTimeout(filterTimer.current);
+    filterTimer.current = null;
+    pendingFilter.current = null;
+  }
+  function flushFilter() {
+    const next = pendingFilter.current;
+    cancelFilter();
+    if (!next) return;
+    emittedFilter.current = next;
+    startTransition(() => onFilterRef.current(next));
+  }
+  function scheduleFilter(next: string) {
+    const p = parseBoardQuery(next).query;
+    pendingFilter.current = { type: p.type, cats: p.cats, status: p.status, q: p.words.join(" ") };
+    // Clearing and submitting should never wait for the throttle.
+    if (!next.trim()) flushFilter();
+    else if (filterTimer.current === null) {
+      filterTimer.current = setTimeout(flushFilter, FILTER_THROTTLE_MS);
+    }
+  }
   const [aiMode, setAiMode] = useState(false);
   const noteId = useId();
   // The latest search wins: an answer to an earlier one is dropped.
@@ -57,22 +90,36 @@ export default function BoardSearch(
   const [note, setNote] = useState<React.ReactNode>(null);
   const [failed, setFailed] = useState(false);
   const phone = usePhone();
-  const { query, problems } = parseBoardQuery(text);
+  const { query, problems } = useMemo(() => parseBoardQuery(text), [text]);
   useEffect(() => onAsking?.(busy), [busy]); // eslint-disable-line react-hooks/exhaustive-deps
   const words = query.words.join(" ");
 
   // Keep the box and the filters in step when they change elsewhere (a pill,
   // Clear filters): rewrite only what differs, so typing is never disturbed.
   useEffect(() => {
-    const p = parseBoardQuery(text).query;
+    const before = previousView.current;
+    previousView.current = view;
+    const emitted = emittedFilter.current;
+    emittedFilter.current = null;
     let next = text;
-    if (p.type !== view.type) next = setBoardQualifier(next, "type", view.type);
-    if (p.cats.join() !== view.cats.join()) next = setBoardQualifier(next, "cat", view.cats);
-    if (p.status !== view.status) next = setBoardQualifier(next, "funding", view.status);
-    if (p.words.join(" ") !== view.q.trim().toLowerCase()) {
+    // An acknowledgement of our last update must not overwrite newer typing.
+    // External changes only replace their own field (a pill preserves pending words).
+    if (before.type !== view.type && emitted?.type !== view.type) {
+      next = setBoardQualifier(next, "type", view.type);
+    }
+    if (before.cats.join() !== view.cats.join() && emitted?.cats.join() !== view.cats.join()) {
+      next = setBoardQualifier(next, "cat", view.cats);
+    }
+    if (before.status !== view.status && emitted?.status !== view.status) {
+      next = setBoardQualifier(next, "funding", view.status);
+    }
+    if (before.q !== view.q && emitted?.q !== view.q) {
       next = setBoardWords(next, view.q);
     }
-    if (next !== text) setText(next);
+    if (next !== text) {
+      setText(next);
+      if (pendingFilter.current) scheduleFilter(next);
+    }
   }, [view.type, view.cats.join(), view.status, view.q]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Back to keywords: the AI order goes, so the words filter again.
@@ -87,7 +134,7 @@ export default function BoardSearch(
     setBusy(false);
     setAiMode(false);
     setNote(null);
-    onResults(null);
+    startTransition(() => onResults(null));
   };
 
   // The board cleared the AI order (a manual sort): back to keywords.
@@ -105,7 +152,7 @@ export default function BoardSearch(
     if (p.words.join(" ") !== words) {
       leaveAi();
     } else if (note && !aiMode) setNote(null);
-    onFilter({ type: p.type, cats: p.cats, status: p.status, q: p.words.join(" ") });
+    scheduleFilter(next);
   }
 
   async function search() {
@@ -165,6 +212,7 @@ export default function BoardSearch(
 
   function run(e: React.FormEvent) {
     e.preventDefault();
+    flushFilter();
     void search();
   }
 
@@ -177,19 +225,28 @@ export default function BoardSearch(
     setBusy(true);
     timer.current = setTimeout(() => {
       timer.current = null;
+      flushFilter();
       void search();
     }, 500);
     return cancel;
   }, [words, automatic]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Invalidate any pending response when the box unmounts.
-  useEffect(() => cancel, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => {
+    cancel();
+    cancelFilter();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hint = problems.length ? problems.join(" ") : null;
   return (
     <>
       {/* The text is in the URL, so it never holds back a reload onto a new build. */}
-      <form className="mb-5 mt-1 flex" autoComplete="off" onSubmit={run} data-upgrade-safe>
+      <form
+        className={compact ? "mb-3 flex" : "mb-5 mt-1 flex"}
+        autoComplete="off"
+        onSubmit={run}
+        data-upgrade-safe
+      >
         <div className="relative min-w-0 flex-1">
           {aiMode || automatic
             ? (
@@ -207,14 +264,19 @@ export default function BoardSearch(
           <input
             type="search"
             className={cn(
-              "field pl-11 placeholder:text-white/25 [&::-webkit-search-cancel-button]:opacity-30 [&::-webkit-search-cancel-button:hover]:opacity-60",
-              aiEnabled && !automatic ? "min-[641px]:pr-[8.5rem]" : "pr-4",
-              aiEnabled && "rounded-r-none border-r-0",
+              "field placeholder:text-white/25 [&::-webkit-search-cancel-button]:opacity-30 [&::-webkit-search-cancel-button:hover]:opacity-60",
+              compact ? "py-2.5 pl-11 pr-9 [&::-webkit-search-cancel-button]:hidden" : "pl-11",
+              !compact && (aiEnabled && !automatic ? "min-[641px]:pr-[8.5rem]" : "pr-4"),
+              aiEnabled && !compact && "rounded-r-none border-r-0",
               aiMode ? "border-[rgba(92,183,90,.55)]" : "border-white/10",
             )}
             maxLength={300}
             spellCheck={false}
-            placeholder={automatic
+            placeholder={compact
+              ? aiEnabled
+                ? automatic ? "Search, or describe what to fund" : "Search, or Enter to ask AI"
+                : "Search initiatives"
+              : automatic
               ? "Describe the work you want to fund"
               : aiEnabled
               ? phone
@@ -230,14 +292,29 @@ export default function BoardSearch(
             value={text}
             onChange={(e) => edit(e.target.value)}
             onKeyDown={(e) => {
+              if (e.key === "Escape" && compact && (text || active)) {
+                e.stopPropagation();
+                edit("");
+                return;
+              }
               if (e.key === "Escape" && (aiMode || busy)) {
                 e.preventDefault();
                 leaveAi();
               }
             }}
           />
+          {compact && text && (
+            <button
+              type="button"
+              aria-label="Clear the search"
+              onClick={() => edit("")}
+              className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-white/50 hover:bg-white/10 hover:text-white"
+            >
+              <X className="size-3.5" aria-hidden="true" />
+            </button>
+          )}
           {/* Which mode the box is in, at its end (desktop). */}
-          {aiEnabled && !automatic && (aiMode || words) && (
+          {!compact && aiEnabled && !automatic && (aiMode || words) && (
             <span
               className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5 font-inter-tight text-[12px] max-[640px]:hidden"
               aria-hidden="true"
@@ -260,7 +337,7 @@ export default function BoardSearch(
           )}
         </div>
         {/* Joined to the input's end on every width; on phones it shrinks to its icon. */}
-        {aiEnabled && (
+        {aiEnabled && !compact && (
           <Button
             variant="primary"
             type="submit"

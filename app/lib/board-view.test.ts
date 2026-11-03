@@ -194,6 +194,12 @@ describe("board view", () => {
     expect(readView(new URLSearchParams(""))).toEqual(DEFAULT_VIEW);
   });
 
+  it("preserves a full search-box query through the URL, capped at 300 characters", () => {
+    const q = "wallet security ".repeat(20).slice(0, 299);
+    expect(readView(writeView({ ...DEFAULT_VIEW, q })).q).toBe(q.trim());
+    expect(readView(new URLSearchParams({ q: "x".repeat(301) })).q).toHaveLength(300);
+  });
+
   it("filters: categories OR, AND with type, status and keywords", () => {
     const v = { ...DEFAULT_VIEW, cats: ["opsec", "defi"] };
     expect(titles(applyView(board, v))).toEqual(["Directory of value", "Safe lockdown"]);

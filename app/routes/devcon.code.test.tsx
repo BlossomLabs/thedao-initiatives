@@ -269,10 +269,10 @@ it("the ballot: search narrows the unranked list; a tile's tier buttons place it
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
   expect(await screen.findByText("ALPHA")).toBeInTheDocument();
-  fireEvent.change(screen.getByRole("textbox", { name: /search initiatives/i }), {
+  fireEvent.change(screen.getByRole("searchbox", { name: /search initiatives/i }), {
     target: { value: "bridges" },
   });
-  expect(screen.queryByText("ALPHA")).toBeNull();
+  await waitFor(() => expect(screen.queryByText("ALPHA")).toBeNull());
   expect(screen.getByText("GAMMA")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /clear the search/i }));
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
@@ -347,15 +347,15 @@ it("Enter asks AI, which orders the list; typing again goes back to keywords", a
   );
   show();
   await screen.findByText("ALPHA");
-  const box = screen.getByRole("textbox", { name: /search initiatives/i });
+  const box = screen.getByRole("searchbox", { name: /search initiatives/i });
   fireEvent.change(box, { target: { value: "who protects cross-chain bridges" } });
   fireEvent.submit(box.closest("form")!);
-  expect(await screen.findByText(/ordered by ai relevance/i)).toBeInTheDocument();
+  expect(await screen.findByText(/initiatives ordered by relevance/i)).toBeInTheDocument();
   const order = within(screen.getByRole("list", { name: "Not ranked yet" }))
     .getAllByRole("button").map((b) => b.getAttribute("data-ballot-tile"));
   expect(order).toEqual(["gamma", "alpha", "beta"]);
   fireEvent.click(screen.getByRole("button", { name: /back to keywords/i }));
-  expect(screen.queryByText(/ordered by ai relevance/i)).toBeNull();
+  expect(screen.queryByText(/initiatives ordered by relevance/i)).toBeNull();
 });
 
 function showMine() {

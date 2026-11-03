@@ -1,9 +1,12 @@
 import { pbearTranscript } from "../../vote/shared/pbear";
+import { type Tier, WITHHELD } from "./ballot";
 
 export type TallyCard = { slug: string; goalUsd: number; total: number };
 export type DevconTally = {
   /** USD the vote would give each initiative if voting closed now (0 = not funded). */
   bySlug: Map<string, number>;
+  /** Result stage in which a positive USD award was funded; not a settled quiet-ending tier. */
+  tierBySlug: Map<string, Tier>;
   fundedUsd: number;
   ballots: number;
 };
@@ -21,7 +24,8 @@ export function devconTally(
   poolUsd: bigint,
 ): DevconTally {
   const bySlug = new Map<string, number>(slugs.map((s) => [s, 0]));
-  if (ballots.length === 0) return { bySlug, fundedUsd: 0, ballots: 0 };
+  const tierBySlug = new Map<string, Tier>();
+  if (ballots.length === 0) return { bySlug, tierBySlug, fundedUsd: 0, ballots: 0 };
   const card = new Map(cards.map((c) => [c.slug, c]));
   const costs = slugs.map((s) => {
     const c = card.get(s);
@@ -29,7 +33,7 @@ export function devconTally(
     return BigInt(Math.max(0, Math.round((c.goalUsd - c.total) * MICRO)));
   });
   const weight = poolUsd / BigInt(ballots.length);
-  const { funded } = pbearTranscript(
+  const { funded, transcript } = pbearTranscript(
     costs,
     ballots.map((b) => ({ weight, ballot: [...b] })),
     [],
@@ -41,5 +45,19 @@ export function devconTally(
     bySlug.set(slugs[i], usd);
     fundedUsd += usd;
   }
-  return { bySlug, fundedUsd, ballots: ballots.length };
+  // Match the result stages in quiet_ending_steps.py's tier_levels/bound:
+  // S ends at level 1; A ends once every ballot's second tier has opened.
+  // Competition ranks count proposals, not tiers, so A can open above level 2.
+  // A short ballot's B choices can already contribute during the result's A stage.
+  const aLevel = ballots.reduce((highest, ballot) => {
+    const ranks = [...new Set(ballot)].filter((r) => r !== WITHHELD).sort((a, b) => a - b);
+    return Math.max(highest, ranks[1] ?? 1);
+  }, 1);
+  for (const step of transcript) {
+    const index = Number(step[costs.length + 1]);
+    if (index >= slugs.length || costs[index] === 0n) continue; // no award at this step
+    const level = Number(step[0]);
+    tierBySlug.set(slugs[index], level === 1 ? "S" : level <= aLevel ? "A" : "B");
+  }
+  return { bySlug, tierBySlug, fundedUsd, ballots: ballots.length };
 }

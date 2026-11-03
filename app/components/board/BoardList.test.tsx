@@ -196,3 +196,13 @@ it("the DevCon projector: a row the vote completes says Funded instead of its %"
   expect(within(screen.getByText("Echidna fuzzing").closest("li")!).queryAllByText("Funded"))
     .toHaveLength(0);
 });
+
+it("shows result tiers only for initiatives funded by the DAO vote", () => {
+  mount({
+    votePct: new Map([["a", 50]]),
+    voteTiers: new Map([["a", "A"], ["b", "B"]]),
+  });
+  const first = screen.getByText("Echidna fuzzing").closest("li")!;
+  expect(within(first).getByText("A-TIER")).toBeInTheDocument();
+  expect(screen.queryByText("B-TIER")).toBeNull();
+});

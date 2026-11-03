@@ -12,6 +12,7 @@ import { api } from "~/lib/api";
 import { usd } from "~/lib/format";
 import { DEVCON } from "../../shared/devcon/manifest";
 import { devconTally } from "../../shared/devcon/tally";
+import type { Tier } from "../../shared/devcon/ballot";
 
 export function meta() {
   return [{ title: "Devcon demo vote · TheDAO" }, { name: "robots", content: "noindex" }];
@@ -96,6 +97,15 @@ export default function Devcon() {
     return m;
   }, [tally, cards]);
 
+  const voteTiers = useMemo(() => {
+    const tiers = new Map<string, Tier>();
+    for (const c of cards) {
+      const tier = tally?.tierBySlug.get(c.initiative.slug);
+      if (tier) tiers.set(c.initiative.id, tier);
+    }
+    return tiers;
+  }, [tally, cards]);
+
   const secsLeft = DEVCON.closesAt - Math.floor(now / 1000);
   const isClosed = secsLeft <= 0;
   const n = tally?.ballots ?? 0;
@@ -139,5 +149,13 @@ export default function Devcon() {
     </Hero>
   );
 
-  return <BoardPage only={IN_ROUND} votePct={votePct} hero={hero} defaultSort="closest" />;
+  return (
+    <BoardPage
+      only={IN_ROUND}
+      votePct={votePct}
+      voteTiers={voteTiers}
+      hero={hero}
+      defaultSort="closest"
+    />
+  );
 }

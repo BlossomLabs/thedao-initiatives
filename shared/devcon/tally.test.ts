@@ -17,12 +17,14 @@ describe("devconTally", () => {
     expect(t.fundedUsd).toBe(0);
     expect(t.ballots).toBe(0);
     expect([...t.bySlug.values()].every((v) => v === 0)).toBe(true);
+    expect(t.tierBySlug.size).toBe(0);
   });
 
   test("one ballot holds the whole pool and funds what it puts first, at the remaining cost", () => {
     const t = devconTally(cards, [encodeBallot(slugs, { a: "S" })], slugs, POOL);
     expect(t.bySlug.get("a")).toBe(50_000);
     expect(t.bySlug.get("b")).toBe(0);
+    expect([...t.tierBySlug]).toEqual([["a", "S"]]);
     expect(t.fundedUsd).toBe(50_000);
     expect(t.ballots).toBe(1);
   });
@@ -31,6 +33,7 @@ describe("devconTally", () => {
     const funded = cards.map((c) => (c.slug === "a" ? { ...c, total: 60_000 } : c));
     const t = devconTally(funded, [encodeBallot(slugs, { a: "S", b: "A" })], slugs, POOL);
     expect(t.bySlug.get("a")).toBe(0);
+    expect(t.tierBySlug.has("a")).toBe(false);
     expect(t.bySlug.get("b")).toBe(30_000);
   });
 
@@ -57,5 +60,43 @@ describe("devconTally", () => {
   test("slugs missing from the board count as fully needed nothing (cost 0, share 0)", () => {
     const t = devconTally(cards.slice(0, 2), [encodeBallot(slugs, { c: "S" })], slugs, POOL);
     expect(t.bySlug.get("c")).toBe(0);
+    expect(t.tierBySlug.has("c")).toBe(false);
+  });
+
+  test("result tiers follow competition-rank stage boundaries, not levels 1/2/3", () => {
+    const slugs = ["s1", "s2", "s3", "a", "b", "unfunded"];
+    const cards = slugs.map((slug) => ({ slug, goalUsd: 10, total: 0 }));
+    const ballot = encodeBallot(slugs, { s1: "S", s2: "S", s3: "S", a: "A", b: "B" });
+    expect([...ballot]).toEqual([1, 1, 1, 4, 5, 255]);
+    const tally = devconTally(cards, [ballot], slugs, 50_000_000n);
+    expect([...tally.tierBySlug]).toEqual([
+      ["s1", "S"],
+      ["s2", "S"],
+      ["s3", "S"],
+      ["a", "A"],
+      ["b", "B"],
+    ]);
+    expect(tally.bySlug.get("unfunded")).toBe(0);
+    expect(tally.fundedUsd).toBe(50);
+  });
+
+  test("A finishes only after every ballot's second tier has opened", () => {
+    const slugs = ["a", "b", "c", "d", "e"];
+    const cards = slugs.map((slug) => ({ slug, goalUsd: 20, total: 0 }));
+    const ballots = [
+      encodeBallot(slugs, { a: "S", b: "S", c: "S", d: "A", e: "B" }),
+      encodeBallot(slugs, { a: "S", d: "A", e: "B" }),
+    ];
+    const tally = devconTally(cards, ballots, slugs, 100_000_000n);
+    expect(tally.tierBySlug.get("d")).toBe("A");
+    // The short ballot can fund e at level 3, before the long ballot's A opens at 4.
+    expect(tally.tierBySlug.get("e")).toBe("A");
+    expect(tally.fundedUsd).toBe(100);
+  });
+
+  test("withheld proposals get no award or tier even when budget remains", () => {
+    const tally = devconTally(cards, [encodeBallot(slugs, {})], slugs, POOL);
+    expect(tally.fundedUsd).toBe(0);
+    expect(tally.tierBySlug.size).toBe(0);
   });
 });

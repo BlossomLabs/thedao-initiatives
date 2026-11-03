@@ -1,5 +1,6 @@
 import type { AiSearchResult } from "../../../shared/ai-search";
 import type { Card } from "~/lib/api-types";
+import type { Tier } from "@shared/devcon/ballot";
 import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -63,9 +64,11 @@ const BAND_ICONS: Record<string, { Icon: LucideIcon; color: string }> = {
 };
 /** The front page's board. The DevCon projector reuses it with `only` (the round's
  * slugs), `votePct` (each initiative's vote share, % of its goal, by id) and its own hero. */
-export default function BoardPage({ only, votePct, hero, defaultSort }: {
+export default function BoardPage({ only, votePct, voteTiers, hero, defaultSort }: {
   only?: ReadonlySet<string>;
   votePct?: ReadonlyMap<string, number>;
+  /** Current result tiers, only for initiatives receiving a DAO vote award. */
+  voteTiers?: ReadonlyMap<string, Tier>;
   hero?: React.ReactNode;
   /** The order a plain URL opens in (the front page's: By category). */
   defaultSort?: BoardSort;
@@ -328,6 +331,7 @@ export default function BoardPage({ only, votePct, hero, defaultSort }: {
                       ratings={ratings}
                       canRate={canRate}
                       votePct={votePct}
+                      voteTiers={voteTiers}
                     />
                   </Suspense>
                 )
@@ -362,6 +366,7 @@ export default function BoardPage({ only, votePct, hero, defaultSort }: {
                             }}
                             rating={ratings && { summary: ratings[c.initiative.id], canRate }}
                             votePct={votePct?.get(c.initiative.id)}
+                            voteTier={voteTiers?.get(c.initiative.id)}
                           />
                         </ShuffleItem>
                       ))}

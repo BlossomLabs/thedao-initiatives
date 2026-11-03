@@ -52,6 +52,23 @@ const mount = (c: Card) =>
     </MemoryRouter>,
   );
 
+it("shows the result tier beside Funded only when the DAO vote supplies funding", () => {
+  const funded = card({ pct: 100, funded: true });
+  const { rerender } = render(
+    <MemoryRouter>
+      <InitiativeCard card={funded} tokensOk={false} voteTier="S" />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByText("S-TIER")).toBeNull();
+  rerender(
+    <MemoryRouter>
+      <InitiativeCard card={card({ pct: 0 })} tokensOk={false} votePct={100} voteTier="B" />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText("FUNDED")).toBeInTheDocument();
+  expect(screen.getByText("B-TIER")).toBeInTheDocument();
+});
+
 it("counts donors as backers, but only pledgers go in the Pledged by strip", () => {
   mount(card({ backers: 3 }));
   expect(screen.getByText("· 3 backers")).toBeInTheDocument();

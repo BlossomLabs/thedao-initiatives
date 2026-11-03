@@ -1,4 +1,5 @@
 import { Suspense, useState } from "react";
+import type { Tier } from "@shared/devcon/ballot";
 import BackerLogo from "~/components/ui/BackerLogo";
 import { ArrowRight, Landmark, Wallet } from "lucide-react";
 import { Link } from "react-router";
@@ -6,6 +7,7 @@ import { FundedChip, TypeBadge } from "~/components/ui/Badge";
 import { fullyFunded } from "~/lib/board-view";
 import CardTitle from "./CardTitle";
 import WatchlistButton from "~/components/board/WatchlistButton";
+import VoteTierChip from "~/components/board/VoteTierChip";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import Bar from "~/components/ui/Bar";
 import {
@@ -118,10 +120,12 @@ export default function InitiativeCard({
   rating,
   vote,
   votePct,
+  voteTier,
 }: {
   card: Card;
   /** The DevCon projector: this initiative's vote share, % of its goal (gold on the bar). */
   votePct?: number;
+  voteTier?: Tier;
   /** The vote floor on the bar, while the display is on. */
   vote?: VoteSettings;
   /** Watchlist state in this browser; omitted = no button. */
@@ -219,7 +223,12 @@ export default function InitiativeCard({
           )}
         </span>
         {funded || fullyFunded(card, votePct)
-          ? <FundedChip />
+          ? (
+            <span className="flex flex-wrap justify-end gap-1.5">
+              <FundedChip />
+              {(votePct ?? 0) > 0 && voteTier && <VoteTierChip tier={voteTier} />}
+            </span>
+          )
           : (
             <span className="flex items-center gap-2">
               <span

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { Tier } from "@shared/devcon/ballot";
 import { Users } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRowMotion } from "~/components/board/Shuffle";
@@ -7,6 +8,7 @@ import BackerLogo from "~/components/ui/BackerLogo";
 import CardTitle from "~/components/board/CardTitle";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import WatchlistButton from "~/components/board/WatchlistButton";
+import VoteTierChip from "~/components/board/VoteTierChip";
 import RatingChip, { RatingForm } from "~/components/ratings/RatingChip";
 import Reveal from "~/components/ui/Reveal";
 import { fullyFunded, type Ratings } from "~/lib/board-view";
@@ -86,9 +88,10 @@ function FundingBar(
 }
 
 function Row(
-  { card, label, watch, vote, aiScore, ratings, canRate = false, votePct }: {
+  { card, label, watch, vote, aiScore, ratings, canRate = false, votePct, voteTier }: {
     card: Card;
     votePct?: number;
+    voteTier?: Tier;
     label: ReturnType<typeof cardLabel>;
     aiScore?: number;
     watch?: Watch;
@@ -174,6 +177,7 @@ function Row(
           onPrefetch={prefetch}
           className="min-w-0 pr-0 text-[14px] leading-[1.3]"
         />
+        {votedFull && voteTier && <VoteTierChip tier={voteTier} />}
         {label.map((k) => (
           <CardLabel
             key={k}
@@ -327,10 +331,22 @@ function Row(
 
 /** Compact rows: every initiative at a glance, the numbers in aligned columns. */
 export default function BoardList(
-  { cards, aiTop = [], aiScores, featured, watch, vote, ratings, canRate = false, votePct }: {
+  {
+    cards,
+    aiTop = [],
+    aiScores,
+    featured,
+    watch,
+    vote,
+    ratings,
+    canRate = false,
+    votePct,
+    voteTiers,
+  }: {
     cards: Card[];
     /** The DevCon projector: each initiative's vote share, % of its goal, by initiative id. */
     votePct?: ReadonlyMap<string, number>;
+    voteTiers?: ReadonlyMap<string, Tier>;
     /** Initiatives the AI search put first. */
     aiTop?: string[];
     aiScores?: ReadonlyMap<string, number>;
@@ -380,6 +396,7 @@ export default function BoardList(
                 ratings={ratings}
                 canRate={canRate}
                 votePct={votePct?.get(c.initiative.id)}
+                voteTier={voteTiers?.get(c.initiative.id)}
               />
             ))}
           </AnimatePresence>

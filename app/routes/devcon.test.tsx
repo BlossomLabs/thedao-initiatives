@@ -1,6 +1,6 @@
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { bytesToHex } from "viem";
 import { api } from "~/lib/api";
@@ -127,6 +127,29 @@ it("says what is going on and what the vote would fund right now", async () => {
   expect(screen.queryByText("Gamma outside")).toBeNull();
   await waitFor(() => expect(document.querySelector("[data-vote-fill]")).not.toBeNull());
 });
+
+it.each(["/devcon", "/devcon?view=cards"])(
+  "shows the vote's result tiers in %s",
+  async (url) => {
+    vi.mocked(api).mockResolvedValue({
+      at: 1,
+      ballots: [{ tokenId: "1", ballot: ballot({ alpha: "S", beta: "A" }) }],
+    });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={[url]}>
+          <Devcon />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const s = await screen.findByText("S-TIER");
+    const a = await screen.findByText("A-TIER");
+    const funded = (element: HTMLElement) => element.closest("li, [data-initiative-id]")!;
+    expect(within(funded(s) as HTMLElement).getByText("Alpha fuzzing")).toBeInTheDocument();
+    expect(within(funded(a) as HTMLElement).getByText("Beta audits")).toBeInTheDocument();
+    expect(screen.queryByText("B-TIER")).toBeNull();
+  },
+);
 
 it("an RPC hiccup keeps the last result", async () => {
   const qc = new QueryClient();

@@ -26,7 +26,8 @@ on-chain, and sees the projector move.
 ## Non-goals
 
 - No contract changes. `vote/contracts/SignedBallots.sol` is deployed as-is.
-- No slow-quiet-ending tiers in the results. One straight PB-EAR tally of the current ballots.
+- No slow-quiet-ending settlement windows. One straight PB-EAR tally of the current ballots;
+  result-tier chips describe the current tally, without locking any tier before closing.
 - No database records for codes or claims.
 - Existing TheDAO badge holders do not vote in this round. Only DevCon code holders.
 - Initiatives submitted during Devcon do not join the ballot (the list freezes at opening).
@@ -143,6 +144,15 @@ sending key with MINTER_ROLE and Sepolia ETH).
   few seconds. Same order as the homepage (no live re-sorting). After C: final result.
 
 ### Results tally
+
+Initiatives receiving a positive vote allocation show an S-TIER, A-TIER or B-TIER chip in
+both list and card layouts. The tier is the stage in which the existing PB-EAR transcript
+funds the initiative: S ends at rank level 1; A ends once every ballot's second nonempty
+tier has opened; B covers the remaining levels. These are the result-stage boundaries
+used by `vote/reference/quiet_ending_steps.py` (`tier_levels` / `bound`), without its
+settlement windows. A ballot's ranks count proposals above a tier, so they must not be
+read as literal tier numbers 1/2/3. A short ballot's B choices can already contribute in
+the result's A stage. Already-funded initiatives taking no DAO allocation get no tier chip.
 
 - Ballots: replay `BallotRecorded` events from the deploy block (latest per tokenId), ignoring any
   with block timestamp ≥ C and voids from `RegistrationRevoked`.

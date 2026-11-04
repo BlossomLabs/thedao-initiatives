@@ -1,5 +1,5 @@
 /** Bundles the chain helpers with the per-process token state. */
-import { NATIVE_ETH, TOKENS } from "../config.ts";
+import { NATIVE_ETH, REVIEW_BADGE_CONTRACT, TOKENS } from "../config.ts";
 import { createRpc, getBlockNumber, type Rpc } from "./rpc.ts";
 import { activeTokens, type TokenCheck, verifyTokens } from "./tokens.ts";
 import { createPricer, type UsdRate } from "./price.ts";
@@ -31,6 +31,8 @@ export interface Chain {
   rpc: Rpc;
   usdRate: UsdRate;
   hasBadge: HasBadge;
+  /** Holds a voting badge (the review NFT); hour-cached like `hasBadge`. */
+  hasVotingBadge: HasBadge;
   /** Pass false for a snapshot that never waits on token verification. */
   state(refresh?: boolean): Promise<ChainState>;
   activeTokens(): Promise<Record<string, [string, number]>>;
@@ -59,6 +61,7 @@ export function createChain(opts: ChainOptions = {}): Chain {
     createRpc({ endpoints: opts.endpoints ?? [], fetch: opts.fetch });
   const usdRate = createPricer(rpc, now);
   const hasBadge = createBadgeChecker(rpc, now);
+  const hasVotingBadge = createBadgeChecker(rpc, now, REVIEW_BADGE_CONTRACT);
   const tokens = opts.tokens ?? TOKENS;
   const st: ChainState = { tokens: {}, detail: "not yet checked", checkedAt: 0 };
   let inflight: Promise<ChainState> | null = null;
@@ -88,6 +91,7 @@ export function createChain(opts: ChainOptions = {}): Chain {
     rpc,
     usdRate,
     hasBadge,
+    hasVotingBadge,
     state,
     activeTokens: active,
     donorTokens: async () => {

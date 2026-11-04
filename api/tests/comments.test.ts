@@ -219,6 +219,34 @@ Deno.test("AI screen: constructive publishes, unclear holds, spam discards but l
   h.close();
 });
 
+Deno.test("voting badge holders skip the review queue for comments and replies, unlabelled", async () => {
+  const { h, post } = await setup();
+  try {
+    const VOTER = "0x6666666666666666666666666666666666666666";
+    h.script.votingBadgeHolders.add(VOTER);
+    const voter = await h.mint(VOTER);
+    const plain = await h.mint(PLAIN);
+    const c = await j(await post(voter, { body: "voter q" })) as {
+      status: string;
+      id: string;
+      entry: { roles: string[] };
+    };
+    assertEquals(c.status, "published");
+    assertEquals(c.entry.roles, []); // the fast lane, not the ETHSecurity badge label
+    assertEquals((await h.db.comments.get(c.id))?.roles, []); // never stored
+    const reply = (token: string) =>
+      h.req(`/api/comments/${c.id}/reply`, { method: "POST", token, json: { body: "answer" } });
+    const r = await j(await reply(voter)) as { status: string; reply: { roles: string[] } };
+    assertEquals(r.status, "published");
+    assertEquals(r.reply.roles, []);
+    // Without either badge, the same wallet shape still waits for review.
+    assertEquals((await j(await post(plain, { body: "plain q" }))).status, "held");
+    assertEquals((await j(await reply(plain))).status, "held");
+  } finally {
+    h.close();
+  }
+});
+
 Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, featured cap", async () => {
   const { h, initiative, post } = await setup();
   const curator = await h.mint(CURATOR);

@@ -3,11 +3,15 @@ import { CURATOR_ADDRESSES, MIN_VOTE_DONATION_USD } from "../config.ts";
 import type { Db } from "../db/mod.ts";
 import type { Chain } from "../chain/mod.ts";
 
-export const ROLE_FAST_LANE = new Set(["ADMIN", "PROPOSER", "CURATOR", "EXPERT"]);
+/** VOTER holds a voting badge: trusted to rate initiatives, so trusted to
+ * skip the review queue. It only opens the fast lane: it has no label, is
+ * never stored on a comment, and is never shown in a comment's roles. */
+export const ROLE_FAST_LANE = new Set(["ADMIN", "PROPOSER", "CURATOR", "EXPERT", "VOTER"]);
 
 /** Roles shown from the current state, never stored on a comment: the team,
- * the initiative's proposer and the badge can change, and the label follows. */
-export const LIVE_ROLES = new Set(["ADMIN", "PROPOSER", "EXPERT"]);
+ * the initiative's proposer and the badge can change, and the label follows.
+ * (VOTER is here only so it is never stored; nothing shows it.) */
+export const LIVE_ROLES = new Set(["ADMIN", "PROPOSER", "EXPERT", "VOTER"]);
 
 /** The order role tags are shown in; a comment carries the first two. */
 export const ROLE_ORDER = ["ADMIN", "PROPOSER", "CURATOR", "EXPERT", "DONOR"];
@@ -68,6 +72,7 @@ export async function commentRoles(
   if (await isProposer(deps.db, address, rfpId)) roles.push("PROPOSER");
   if (isCurator(address)) roles.push("CURATOR");
   if (withBadge && await deps.chain.hasBadge(address)) roles.push("EXPERT");
+  if (withBadge && await deps.chain.hasVotingBadge(address)) roles.push("VOTER");
   if ((await deps.db.donations.totalFor(rfpId, address)) > 0) roles.push("DONOR");
   return roles;
 }

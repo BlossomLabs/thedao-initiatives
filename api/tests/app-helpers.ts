@@ -44,6 +44,8 @@ export interface ChainScript {
   receipts: Record<string, unknown>;
   txs: Record<string, unknown>;
   badgeHolders: Set<string>;
+  /** Voting badge (review NFT) holders, lowercase. */
+  votingBadgeHolders: Set<string>;
   ethUsd: number;
   brokenTokens: Set<string>;
   brokenFeeds: Set<string>;
@@ -123,6 +125,15 @@ export function scriptedRpc(script: ChainScript, now: () => number) {
             "0x" + word(script.badgeHolders.has(addr.toLowerCase()) ? 1 : 0),
           );
         }
+        if (
+          to.toLowerCase() === config.REVIEW_BADGE_CONTRACT.toLowerCase() &&
+          sel === SEL_BALANCE_OF
+        ) {
+          const addr = "0x" + data.slice(-40);
+          return Promise.resolve(
+            "0x" + word(script.votingBadgeHolders.has(addr.toLowerCase()) ? 1 : 0),
+          );
+        }
         if (sel === SEL_GET_THRESHOLD) {
           return Promise.resolve("0x" + word(script.brokenSafe ? 1 : config.SAFE_THRESHOLD));
         }
@@ -194,6 +205,7 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     receipts: {},
     txs: {},
     badgeHolders: new Set(),
+    votingBadgeHolders: new Set(),
     ethUsd: 2000,
     brokenTokens: new Set(),
     brokenFeeds: new Set(),

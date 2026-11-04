@@ -49,6 +49,7 @@ import BoardSkeleton, { ListSkeleton, markBoardLayout } from "~/components/board
 import { categoryOf } from "~/lib/categories";
 import { cn } from "~/lib/utils";
 import { afterLoad } from "~/lib/after-load";
+import { HERO_COUNT_FROM } from "~/lib/hero-count";
 import { boardKey, useBoard } from "~/hooks/use-board";
 
 const SUGGEST_LAST_FROM = 69;
@@ -227,7 +228,7 @@ export default function BoardPage({ only, votePct, voteTiers, hero, defaultSort 
 
   return (
     <>
-      {hero ?? <Hero raised={data?.totals.raised} />}
+      {hero ?? <Hero raised={data?.totals.raised} countFrom={HERO_COUNT_FROM} earlyCount />}
       <Sponsors sponsors={data?.sponsors} loading={isLoading} />
       <PageMain>
         <SectionHeading id="rfps" className="max-[640px]:text-center">

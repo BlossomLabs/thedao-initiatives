@@ -7,7 +7,8 @@ import type { CardSummary } from "../db/cards.ts";
 import { SAFE_OWNER_COUNT, SAFE_THRESHOLD } from "../config.ts";
 import type { FundingSummary } from "../services/funding.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
-import { ledgerStatus, refreshLedgers } from "../services/ledger.ts";
+import { ledgerStatus, refreshLedgers, safeApiPausedUntil } from "../services/ledger.ts";
+import { sharedChainState } from "../services/chain-state.ts";
 import { createSnapshotCache, type SnapshotCache } from "../lib/snapshot-cache.ts";
 import { DEFAULT_VOTE, type VoteSettings, voteState } from "../../shared/vote.ts";
 
@@ -117,6 +118,7 @@ export async function buildCard(
   r: CardRow,
   s: CardSummary,
   tokensOk: boolean,
+  safeApiPausedUntil = 0,
 ): Promise<Card> {
   const sumOf = (status: Pledge["status"]) =>
     s.pledges.filter((p) => p.status === status).reduce((n, p) => n + p.amountUsd, 0);
@@ -125,7 +127,7 @@ export async function buildCard(
       r,
       { pledged: sumOf("pledged"), received: sumOf("received"), ledger: s.donatedUsd },
     ),
-    ledgerStatus(deps, r),
+    ledgerStatus(deps, r, safeApiPausedUntil),
   ]);
   const withLogo = s.pledges.filter((p) => p.logoCid);
   return {
@@ -164,7 +166,7 @@ async function buildBoard(deps: Deps, refresh: boolean) {
   const { db, config } = deps;
   const [initiatives, state, vote] = await Promise.all([
     db.initiatives.cards("approved"),
-    deps.chain.state(refresh),
+    sharedChainState(deps, refresh),
     voteSettings(deps),
   ]);
   if (refresh) {
@@ -176,10 +178,14 @@ async function buildBoard(deps: Deps, refresh: boolean) {
     ]);
   }
   const tokensOk = tokensUsable(state);
-  const summaries = await db.cards.summaries(initiatives.map((x) => x.id));
+  // Read after the ledgers ran, so a 429 they just hit already quiets every card.
+  const [summaries, pausedUntil] = await Promise.all([
+    db.cards.summaries(initiatives.map((x) => x.id)),
+    safeApiPausedUntil(deps),
+  ]);
   const cards = orderCards(
     await Promise.all(
-      initiatives.map((x, i) => buildCard(deps, x, summaries[i], tokensOk)),
+      initiatives.map((x, i) => buildCard(deps, x, summaries[i], tokensOk, pausedUntil)),
     ),
   ).map((c): Card =>
     vote.show ? { ...c, vote: voteState(c.summary.total, c.initiative.goalUsd, vote).kind } : c

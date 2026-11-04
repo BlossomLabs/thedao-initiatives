@@ -25,7 +25,8 @@ import {
 import type { Initiative, Pledge, Revision, Session } from "../db/types.ts";
 import { isLive } from "../db/revisions.ts";
 import { isPublished, pickText } from "../db/initiatives.ts";
-import { ledgerStatus, refreshLedger } from "../services/ledger.ts";
+import { ledgerStatus, refreshLedger, safeApiPausedUntil } from "../services/ledger.ts";
+import { sharedChainState } from "../services/chain-state.ts";
 import { chainStateFresh, tokensUsable } from "../chain/mod.ts";
 import {
   assertNoErrors,
@@ -176,13 +177,16 @@ export function initiativeRoutes(deps: Deps) {
     const paused = asked && await deps.maintenance.on();
     const refresh = asked && !paused;
     if (refresh) await refreshLedger(deps, initiative);
-    const [pledges, donations, chainState, revisions, ledger] = await Promise.all([
+    const [pledges, donations, chainState, revisions, ledger, pausedUntil] = await Promise.all([
       db.pledges.list(initiative.id),
       db.donations.list(initiative.id),
-      deps.chain.state(refresh),
+      sharedChainState(deps, refresh),
       db.revisions.list(initiative.id, Boolean(user?.isAdmin)),
       ledgerStatus(deps, initiative),
+      safeApiPausedUntil(deps),
     ]);
+    // While the Safe API is rate limiting us, the ledger is not due (ledgerStatus).
+    if (ledger && pausedUntil > deps.now()) ledger.refreshDue = false;
     const summary = await deps.funding.summaryFrom(initiative, pledges, donations, refresh);
     if (paused) summary.refreshDue = false;
     const privateFields = canReadPrivateFields(initiative, user, deps.now());

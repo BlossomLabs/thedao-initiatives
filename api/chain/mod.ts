@@ -35,6 +35,8 @@ export interface Chain {
   hasVotingBadge: HasBadge;
   /** Pass false for a snapshot that never waits on token verification. */
   state(refresh?: boolean): Promise<ChainState>;
+  /** Adopt a token check another instance saved, when it is newer than ours. */
+  seed(state: ChainState): void;
   activeTokens(): Promise<Record<string, [string, number]>>;
   donorTokens(): Promise<Record<string, [string, number]>>;
   verifyDonation(
@@ -86,6 +88,12 @@ export function createChain(opts: ChainOptions = {}): Chain {
     return await inflight;
   };
   const active = async () => activeTokens((await state()).tokens);
+  const seed = (saved: ChainState) => {
+    if (saved.checkedAt <= st.checkedAt || !Object.keys(saved.tokens).length) return;
+    st.tokens = saved.tokens;
+    st.detail = saved.detail;
+    st.checkedAt = saved.checkedAt;
+  };
 
   return {
     rpc,
@@ -93,6 +101,7 @@ export function createChain(opts: ChainOptions = {}): Chain {
     hasBadge,
     hasVotingBadge,
     state,
+    seed,
     activeTokens: active,
     donorTokens: async () => {
       const out = { ...(await active()) };

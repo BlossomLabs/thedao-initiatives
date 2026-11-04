@@ -111,6 +111,21 @@ Deno.test("reviews: each NFT's latest review counts; average and distribution", 
   h.close();
 });
 
+Deno.test("ratings: only initiatives on the board (approved or archived) are listed", async () => {
+  const { h, a, pending, archived, admin, post } = await setup();
+  assertEquals((await post(admin, a.id, { stars: 4 })).status, 201);
+  // Ratings outlive a status change; the list must not show ones whose initiative left the board.
+  const stale = { stars: 2, reviewId: "x", at: h.clock.now };
+  await h.kv.set(["nft_rating_v1", pending.id, "1"], stale);
+  await h.kv.set(["nft_rating_v1", archived.id, "1"], stale);
+  await h.kv.set(["nft_rating_v1", "no-such-initiative", "1"], stale);
+
+  const { ratings } = await j(await h.req("/api/reviews/ratings"));
+  assertEquals(Object.keys(ratings).sort(), [a.id, archived.id].sort());
+  assertEquals(ratings[archived.id].avg, 2);
+  h.close();
+});
+
 Deno.test("reviews: deleting the latest brings back the previous; only the author deletes", async () => {
   const { h, a, admin, other, post } = await setup();
   await post(admin, a.id, { stars: 2 });

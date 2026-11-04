@@ -58,12 +58,17 @@ export function reviewRoutes(deps: Deps) {
 
   /** Every initiative's summary, for the board: { [id]: RatingSummary }. */
   r.get("/ratings", async (c) => {
+    // Which initiatives are on the board comes from the status index: two lists,
+    // not one read per rated initiative (that was ~2 s at 42 initiatives).
+    const [ratings, approved, archived] = await Promise.all([
+      db.reviews.ratings(),
+      db.initiatives.cards("approved"),
+      db.initiatives.cards("archived"),
+    ]);
+    const onBoard = new Set([...approved, ...archived].map((r) => r.id));
     const out: Record<string, RatingSummary> = {};
-    for (const [id, list] of await db.reviews.ratings()) {
-      const initiative = await db.initiatives.get(id);
-      if (initiative && ["approved", "archived"].includes(initiative.status)) {
-        out[id] = summarize(list, c.req.query("tokenId"));
-      }
+    for (const [id, list] of ratings) {
+      if (onBoard.has(id)) out[id] = summarize(list, c.req.query("tokenId"));
     }
     return c.json({ ratings: out });
   });

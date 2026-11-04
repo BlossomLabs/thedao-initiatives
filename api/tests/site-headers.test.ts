@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertMatch, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertFalse, assertMatch, assertStringIncludes } from "@std/assert";
 import {
   collectScriptHashes,
   fullCsp,
@@ -88,7 +88,9 @@ Deno.test("site headers: report-only by default, full policy enforced with CSP_E
   assertStringIncludes(full, "base-uri 'none'");
   assertStringIncludes(full, "form-action 'self'");
   assertStringIncludes(full, "object-src 'none'");
-  assertStringIncludes(full, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com");
+  assertStringIncludes(full, "style-src 'self' 'unsafe-inline';");
+  assertStringIncludes(full, "font-src 'self';");
+  assertFalse(full.includes("fonts.g"), "fonts are self-hosted: no Google Fonts origins");
   assertStringIncludes(full, "connect-src 'self' https://auth.privy.io");
   assert(!full.includes(" https: "));
   assertStringIncludes(full, "report-uri /api/csp-report");

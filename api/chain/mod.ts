@@ -88,8 +88,20 @@ export function createChain(opts: ChainOptions = {}): Chain {
     return await inflight;
   };
   const active = async () => activeTokens((await state()).tokens);
+  // A saved check describes the token config of the deploy that ran it. After a
+  // deploy that adds, drops or corrects a token it no longer applies, so it is
+  // adopted only when its symbols, addresses and decimals match this config exactly.
+  const matchesConfig = (saved: ChainState) => {
+    const names = Object.keys(tokens);
+    return names.length === Object.keys(saved.tokens).length &&
+      names.every((sym) => {
+        const check = saved.tokens[sym];
+        return check?.address.toLowerCase() === tokens[sym][0].toLowerCase() &&
+          check.decimals === tokens[sym][1];
+      });
+  };
   const seed = (saved: ChainState) => {
-    if (saved.checkedAt <= st.checkedAt || !Object.keys(saved.tokens).length) return;
+    if (saved.checkedAt <= st.checkedAt || !matchesConfig(saved)) return;
     st.tokens = saved.tokens;
     st.detail = saved.detail;
     st.checkedAt = saved.checkedAt;

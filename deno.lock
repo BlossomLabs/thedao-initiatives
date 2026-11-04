@@ -18,6 +18,8 @@
     "jsr:@std/streams@^1.2.0": "1.2.0",
     "jsr:@std/ulid@1": "1.0.0",
     "npm:@base-ui/react@^1.9.0": "1.9.0_@types+react@19.3.0_react@19.3.1_react-dom@19.3.1",
+    "npm:@fontsource-variable/inter-tight@^5.3.0": "5.3.0",
+    "npm:@fontsource-variable/roboto-mono@^5.3.0": "5.3.0",
     "npm:@imagemagick/magick-wasm@0.0.45": "0.0.45",
     "npm:@imagemagick/magick-wasm@^0.0.45": "0.0.45",
     "npm:@privy-io/react-auth@^3.51.0": "3.51.0_@solana+kit@5.5.1_react@19.3.1_react-dom@19.3.1_@solana+sysvars@5.5.1_@stripe+stripe-js@1.54.2_@tanstack+react-query@5.105.0_@types+react@19.3.0_typescript@7.0.2",
@@ -446,6 +448,12 @@
     },
     "@floating-ui/utils@0.2.12": {
       "integrity": "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="
+    },
+    "@fontsource-variable/inter-tight@5.3.0": {
+      "integrity": "sha512-ZhZZ29sNZ15P1K+cUt13GeBRYON0akgmNiftshUeDLos7X7zGcRgPzt434879Xhq1QbwlW3M/apBMk7jWabwvA=="
+    },
+    "@fontsource-variable/roboto-mono@5.3.0": {
+      "integrity": "sha512-h5r+KY/6qy8JEOj33JgcrFO81YAnvrc1EAwMpl/EPJLb2OIvOy0/jmB5M7qs7x/uXk5JUP5Ux4LrkeOK7faHkQ=="
     },
     "@hcaptcha/loader@2.4.2": {
       "integrity": "sha512-+Pf0Vin6iJlJj5u/mq6XMgbJT1mi/Sg5LWHxxqO4YHt2YvdZgecp5V2sbC6vRaNPJUqQGk2HOu1K/i12mqs5vw=="
@@ -4895,6 +4903,8 @@
     "packageJson": {
       "dependencies": [
         "npm:@base-ui/react@^1.9.0",
+        "npm:@fontsource-variable/inter-tight@^5.3.0",
+        "npm:@fontsource-variable/roboto-mono@^5.3.0",
         "npm:@imagemagick/magick-wasm@^0.0.45",
         "npm:@privy-io/react-auth@^3.51.0",
         "npm:@react-router/dev@^8.5.1",

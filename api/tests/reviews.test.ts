@@ -4,6 +4,7 @@ import { ADMIN, harness, PLAIN } from "./app-helpers.ts";
 import { REVIEW_BADGE_CONTRACT } from "../config.ts";
 import { BACKUP_PREFIXES } from "../services/backup.ts";
 import { averageWith, type RatingSummary } from "../../shared/ratings.ts";
+import { IDENTITY_HOLDER_TTL_SECS, IDENTITY_NONE_TTL_SECS } from "../routes/reviews.ts";
 
 interface ReviewJson {
   id: string;
@@ -111,6 +112,21 @@ Deno.test("reviews: each NFT's latest review counts; average and distribution", 
   h.close();
 });
 
+Deno.test("ratings: only initiatives on the board (approved or archived) are listed", async () => {
+  const { h, a, pending, archived, admin, post } = await setup();
+  assertEquals((await post(admin, a.id, { stars: 4 })).status, 201);
+  // Ratings outlive a status change; the list must not show ones whose initiative left the board.
+  const stale = { stars: 2, reviewId: "x", at: h.clock.now };
+  await h.kv.set(["nft_rating_v1", pending.id, "1"], stale);
+  await h.kv.set(["nft_rating_v1", archived.id, "1"], stale);
+  await h.kv.set(["nft_rating_v1", "no-such-initiative", "1"], stale);
+
+  const { ratings } = await j(await h.req("/api/reviews/ratings"));
+  assertEquals(Object.keys(ratings).sort(), [a.id, archived.id].sort());
+  assertEquals(ratings[archived.id].avg, 2);
+  h.close();
+});
+
 Deno.test("reviews: deleting the latest brings back the previous; only the author deletes", async () => {
   const { h, a, admin, other, post } = await setup();
   await post(admin, a.id, { stars: 2 });
@@ -211,6 +227,7 @@ Deno.test("reviews: transferring an NFT replaces its rating instead of adding a 
   const { h, a, admin, plain, other, owners, post } = await setup();
   const old = (await j(await post(admin, a.id, { stars: 5 }))).review;
   owners.set("1", PLAIN.toLowerCase());
+  h.clock.now += 10; // ids are ULIDs: two in the same instant sort at random
   assertEquals((await post(plain, a.id, { stars: 1 })).status, 201);
   assertEquals((await post(admin, a.id, { stars: 5 })).status, 403);
   const result = await j(
@@ -307,5 +324,66 @@ Deno.test("reviews: public reads include badge reviews without relying on NFT se
       200,
     );
   }
+  h.close();
+});
+
+/** Counts badge index lookups (Blockscout) made from here on. */
+function countLookups(h: Awaited<ReturnType<typeof setup>>["h"], fail = { now: false }) {
+  const f = h.deps.fetch;
+  const count = { n: 0 };
+  h.deps.fetch = (input, init) => {
+    if (new URL(String(input)).hostname === "eth.blockscout.com") {
+      count.n++;
+      if (fail.now) return Promise.resolve(new Response("down", { status: 502 }));
+    }
+    return f(input, init);
+  };
+  return count;
+}
+type Identity = { tokenIds: string[]; canReview: boolean };
+const identity = async (h: Awaited<ReturnType<typeof setup>>["h"], token: string) =>
+  await (await h.req("/api/reviews/identity", { token })).json() as Identity;
+
+Deno.test("identity: a holder's lookup is reused for five minutes", async () => {
+  const { h, admin } = await setup();
+  const lookups = countLookups(h);
+  assertEquals(await identity(h, admin), { tokenIds: ["1"], canReview: true });
+  h.clock.now += IDENTITY_HOLDER_TTL_SECS - 1;
+  assertEquals((await identity(h, admin)).tokenIds, ["1"]);
+  assertEquals(lookups.n, 1, "polls inside the window reuse the lookup");
+  h.clock.now += 1;
+  await identity(h, admin);
+  assertEquals(lookups.n, 2);
+  h.close();
+});
+
+Deno.test("identity: a non-holder who gets a badge sees it within a minute", async () => {
+  const { h, plain, owners } = await setup();
+  assertEquals(await identity(h, plain), { tokenIds: [], canReview: false });
+  owners.set("4", PLAIN.toLowerCase());
+  h.clock.now += IDENTITY_NONE_TTL_SECS - 1;
+  assertEquals((await identity(h, plain)).tokenIds, [], "still the cached answer");
+  h.clock.now += 1;
+  assertEquals(await identity(h, plain), { tokenIds: ["4"], canReview: true });
+  h.close();
+});
+
+Deno.test("identity: the cache never authorizes a write", async () => {
+  const { h, a, admin, owners, post } = await setup();
+  assert((await identity(h, admin)).canReview);
+  owners.set("1", PLAIN.toLowerCase()); // transferred away while the cache says holder
+  assert((await identity(h, admin)).canReview, "the page may still offer it for a few minutes");
+  assertEquals((await post(admin, a.id, { stars: 5 })).status, 403);
+  h.close();
+});
+
+Deno.test("identity: a failed lookup is not cached", async () => {
+  const { h, admin } = await setup();
+  const fail = { now: true };
+  const lookups = countLookups(h, fail);
+  assertEquals((await h.req("/api/reviews/identity", { token: admin })).status, 503);
+  fail.now = false;
+  assertEquals((await identity(h, admin)).tokenIds, ["1"]);
+  assertEquals(lookups.n, 2, "the retry looked up again");
   h.close();
 });

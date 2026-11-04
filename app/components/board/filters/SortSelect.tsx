@@ -19,14 +19,17 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import { useRef } from "react";
 import { type BoardSort, RATING_SORTS, SORTS } from "~/lib/board-view";
+import { useTakeFocus } from "~/lib/focus-handover";
 import { cn } from "~/lib/utils";
+import { AI_SORT_LABEL, SORT_FOCUS_KEY, SORT_TRIGGER, SortFaceLead } from "./faces";
 
 const ITEMS: { value: string; label: string }[] = SORTS.map(([value, label]) => ({
   value,
   label,
 }));
-const AI = { value: "ai", label: "AI matches" };
+const AI = { value: "ai", label: AI_SORT_LABEL };
 /** Not offered with the ratings, one per rating sort shown, to keep the menu as long. */
 const RATING_FOR: readonly BoardSort[] = ["goal-asc", "backers"];
 
@@ -73,6 +76,8 @@ export default function SortSelect(
     return (featured || v !== "recommended") &&
       (RATING_SORTS.includes(v) ? shown.includes(v) : !replaced.includes(v) || v === sort);
   });
+  const trigger = useRef<HTMLButtonElement>(null);
+  useTakeFocus(SORT_FOCUS_KEY, trigger);
   return (
     <Select
       value={ai ? "ai" : sort}
@@ -82,11 +87,12 @@ export default function SortSelect(
       }}
     >
       <SelectTrigger
+        ref={trigger}
         size="sm"
         aria-label="Sort"
-        className={cn("min-h-[40px] max-[641px]:min-h-[44px]", className)}
+        className={cn(SORT_TRIGGER, className)}
       >
-        <span className="text-white/50 max-[641px]:hidden">Sort by:</span>
+        <SortFaceLead />
         <SelectValue />
       </SelectTrigger>
       <SelectContent align="end">

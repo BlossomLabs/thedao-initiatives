@@ -1,9 +1,9 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select";
-import { ChevronDown } from "lucide-react";
+import { useRef } from "react";
 import { Select, SelectContent, SelectItem } from "~/components/ui/Select";
 import { type BoardStatus, STATUS_LABELS } from "~/lib/board-view";
-import { cn } from "~/lib/utils";
-import { FILTER_PILL, FILTER_PILL_ON } from "./CategoryTrigger";
+import { useTakeFocus } from "~/lib/focus-handover";
+import { STATUS_FOCUS_KEY, StatusFace, statusPill } from "./faces";
 import FundingGlyph from "./FundingGlyph";
 
 const ITEMS: { value: BoardStatus; label: string }[] = [
@@ -23,15 +23,16 @@ export default function StatusSelect(
   },
 ) {
   const items = vote ? ITEMS : ITEMS.filter((s) => s.value !== "qualified");
+  const trigger = useRef<HTMLButtonElement>(null);
+  useTakeFocus(STATUS_FOCUS_KEY, trigger);
   return (
     <Select value={value} items={items} onValueChange={(v) => v && onChange(v as BoardStatus)}>
       <SelectPrimitive.Trigger
+        ref={trigger}
         aria-label="Funding status"
-        className={cn(FILTER_PILL, value !== "all" && FILTER_PILL_ON)}
+        className={statusPill(value)}
       >
-        <FundingGlyph status={value} />
-        <span>{value === "all" ? "Funding" : STATUS_LABELS[value]}</span>
-        <ChevronDown className="size-3.5 text-white/45" aria-hidden="true" />
+        <StatusFace value={value} />
       </SelectPrimitive.Trigger>
       <SelectContent>
         {items.map((s) => (

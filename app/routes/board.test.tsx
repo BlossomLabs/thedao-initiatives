@@ -2,9 +2,13 @@ import type { AiSearchResult } from "../../shared/ai-search";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Card } from "~/lib/api-types";
 import Board from "./board";
+import { preloadSelects } from "~/components/board/FilterBar";
+
+// The Sort menu loads after the board in the app; these tests drive the real one.
+beforeAll(() => preloadSelects());
 
 const searchMode = vi.hoisted(() => ({ automatic: false }));
 
@@ -117,7 +121,7 @@ it("AI order: Sort shows AI matches, filters still narrow, a manual sort clears 
     expect(screen.getAllByRole("combobox", { name: "Sort" })[0]).toHaveTextContent("AI matches")
   );
   expect(screen.getAllByText("AI pick")).toHaveLength(1);
-  const sort = screen.getAllByRole("combobox", { name: "Sort" })[0];
+  const sort = (await screen.findAllByRole("combobox", { name: "Sort" }))[0];
   sort.focus();
   fireEvent.keyDown(sort, { key: "ArrowDown" });
   const opt = await screen.findByRole("option", { name: "Newest" });
@@ -164,7 +168,9 @@ it("the phone Filters sheet applies its picks to the URL", async () => {
 
 it("a plain board is the list in sections by category", async () => {
   at("/");
-  expect(screen.getAllByRole("combobox", { name: "Sort" })[0]).toHaveTextContent("By category");
+  expect((await screen.findAllByRole("combobox", { name: "Sort" }))[0]).toHaveTextContent(
+    "By category",
+  );
   expect(screen.getByRole("button", { name: "List" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("heading", { name: /Fuzzing & Testing\s*\$0 raised/ }))
     .toBeInTheDocument();
@@ -172,9 +178,9 @@ it("a plain board is the list in sections by category", async () => {
   await waitFor(() => expect(screen.getAllByRole("listitem")).toHaveLength(3));
 });
 
-it("with nothing featured, Featured orders by closest to funded and Sort does not offer it", () => {
+it("with nothing featured, Featured orders by closest to funded and Sort does not offer it", async () => {
   at("/?sort=recommended");
-  expect(screen.getAllByRole("combobox", { name: "Sort" })[0]).toHaveTextContent(
+  expect((await screen.findAllByRole("combobox", { name: "Sort" }))[0]).toHaveTextContent(
     "Closest to funded",
   );
   expect(screen.queryByText("Featured")).toBeNull();
@@ -247,7 +253,9 @@ it("orders every proposal and labels the first three even with low scores", asyn
   expect(screen.getByText("70%")).toBeInTheDocument();
   expect(screen.getByText("50%")).toBeInTheDocument();
   expect(screen.getByText("10%")).toBeInTheDocument();
-  expect(screen.getAllByRole("combobox", { name: "Sort" })[0]).toHaveTextContent("AI matches");
+  expect((await screen.findAllByRole("combobox", { name: "Sort" }))[0]).toHaveTextContent(
+    "AI matches",
+  );
 });
 
 it("labels the first three and displays each score as a percentage", async () => {

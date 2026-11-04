@@ -24,12 +24,7 @@ export async function refreshDailyCache(
     initiative.safeAddress
   );
   await refreshLedgers(deps, initiatives);
-  // Sequential balance reads reuse price feeds and bound upstream concurrency.
-  // `true` requests revalidation; it does not bypass freshness or active leases.
-  for (
-    const safe of new Set(initiatives.map((initiative) => initiative.safeAddress.toLowerCase()))
-  ) {
-    await deps.funding.balances(safe, true);
-  }
+  // One batched balance read for every due Safe; freshness and active leases still apply.
+  await deps.funding.refreshMany(initiatives.map((initiative) => initiative.safeAddress));
   deps.log?.(`daily cache refresh: ${initiatives.length} approved Safe(s) checked`);
 }

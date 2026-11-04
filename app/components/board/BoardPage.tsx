@@ -18,7 +18,7 @@ import SuggestCard from "~/components/board/SuggestCard";
 import { ShuffleItem } from "~/components/board/Shuffle";
 import PledgeBand from "~/components/board/PledgeBand";
 import Sponsors from "~/components/board/Sponsors";
-import FilterBar, { preloadFilters } from "~/components/board/FilterBar";
+import FilterBar, { preloadFilters, preloadSelects } from "~/components/board/FilterBar";
 import { preloadDots } from "~/components/board/CardTitle";
 import {
   FilterSheet,
@@ -48,6 +48,8 @@ import FundingGlyph from "~/components/board/filters/FundingGlyph";
 import BoardSkeleton, { ListSkeleton, markBoardLayout } from "~/components/board/BoardSkeleton";
 import { categoryOf } from "~/lib/categories";
 import { cn } from "~/lib/utils";
+import { afterLoad } from "~/lib/after-load";
+import { HERO_COUNT_FROM } from "~/lib/hero-count";
 import { boardKey, useBoard } from "~/hooks/use-board";
 
 const SUGGEST_LAST_FROM = 69;
@@ -79,11 +81,18 @@ export default function BoardPage({ only, votePct, voteTiers, hero, defaultSort 
   const [asking, setAsking] = useState(false);
   const [params, setParams] = useSearchParams();
   const view = useMemo(() => readView(params, defaultSort), [params, defaultSort]);
+  // The filters' and dots' code comes after the board's data, once the browser is
+  // idle: on a slow link it shared the bandwidth with the data and delayed it.
+  const hasData = Boolean(data);
   useEffect(() => {
-    void preloadFilters();
-    void preloadDots();
-    void preloadSheet();
-  }, []);
+    if (!hasData) return;
+    return afterLoad(() => {
+      void preloadFilters();
+      void preloadDots();
+      void preloadSheet();
+      void preloadSelects();
+    });
+  }, [hasData]);
   const setView = (next: Partial<BoardView>) => {
     // The layout is also remembered on this device; everything else lives in the URL only.
     if (next.view) {
@@ -219,7 +228,7 @@ export default function BoardPage({ only, votePct, voteTiers, hero, defaultSort 
 
   return (
     <>
-      {hero ?? <Hero raised={data?.totals.raised} />}
+      {hero ?? <Hero raised={data?.totals.raised} countFrom={HERO_COUNT_FROM} earlyCount />}
       <Sponsors sponsors={data?.sponsors} loading={isLoading} />
       <PageMain>
         <SectionHeading id="rfps" className="max-[640px]:text-center">

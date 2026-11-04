@@ -46,8 +46,8 @@ export function fullCsp(
   return [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
     "img-src 'self' data: blob: https:",
     `connect-src 'self' ${
       [...new Set([...CONNECT_ORIGINS, ...connectOrigins.map(connectOrigin)])].join(" ")

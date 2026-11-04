@@ -85,7 +85,7 @@ Deno.test("funding: old values return during a slow refresh, with one lease acro
     gate.resolve();
     assertEquals((await refreshing)?.usd, 2);
     assertEquals((await second.summary(initiative)).donated, 2);
-    assertEquals(h.script.calls.length - warmCalls, 10);
+    assertEquals(h.script.calls.length - warmCalls, 11, "one batch of 10 balance reads");
   } finally {
     gate.resolve();
     h.close();
@@ -137,17 +137,20 @@ Deno.test("funding: 30-second board polls share one two-minute refresh across 19
     }
     await h.deps.chain.state();
     h.script.calls.length = 0;
+    const batches = () => h.script.calls.filter((m) => m === "multicall").length;
     await h.req("/api/board?refresh=1");
-    assertEquals(h.script.calls.length, 190);
+    assertEquals(batches(), 1, "all 19 Safes' balances in one RPC request");
+    assertEquals(h.script.calls.length, 191, "190 balance reads inside it");
     for (let i = 0; i < 3; i++) {
       h.clock.now += 30;
       await h.req("/api/board");
       await h.req("/api/board?refresh=1");
     }
-    assertEquals(h.script.calls.length, 190, "even redundant refresh requests reuse the snapshot");
+    assertEquals(h.script.calls.length, 191, "even redundant refresh requests reuse the snapshot");
     h.clock.now += 30;
     await h.req("/api/board?refresh=1");
-    assertEquals(h.script.calls.length, 380);
+    assertEquals(batches(), 2);
+    assertEquals(h.script.calls.length, 382);
   } finally {
     h.close();
   }

@@ -228,4 +228,6 @@ export interface SafeSyncState {
   /** Freshness deadline, failure cooldown, or refresh lease expiry. */
   refreshAfter?: number;
   updating?: boolean;
+  /** Failed refreshes in a row; each one doubles the cooldown (ledgerBackoff). */
+  failures?: number;
 }

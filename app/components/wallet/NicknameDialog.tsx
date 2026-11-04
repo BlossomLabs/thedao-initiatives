@@ -9,7 +9,7 @@ import { useSession } from "~/context/session";
 import { useIdentity } from "~/hooks/use-identity";
 import { cn } from "~/lib/utils";
 import { NICKNAME_MAX } from "@shared/profile";
-import { inputMax, tooLong } from "@shared/draft/mod";
+import { inputMax, tooLong } from "@shared/draft/caps";
 
 const ENS_APP = "https://app.ens.domains";
 

@@ -13,7 +13,7 @@ import { cn } from "~/lib/utils";
 import { nameInput, signedInAs } from "./styles";
 import { FormNote, type Note, SubmitButton } from "./FormFeedback";
 import { COMMENT_BODY_MAX, COMMENT_NAME_MAX } from "@shared/comments";
-import { inputMax, tooLong } from "@shared/draft/mod";
+import { inputMax, tooLong } from "@shared/draft/caps";
 import { errorMessage } from "~/lib/api";
 
 /**

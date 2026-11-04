@@ -35,6 +35,8 @@ export interface Chain {
   hasVotingBadge: HasBadge;
   /** Pass false for a snapshot that never waits on token verification. */
   state(refresh?: boolean): Promise<ChainState>;
+  /** Adopt a token check another instance saved, when it is newer than ours. */
+  seed(state: ChainState): void;
   activeTokens(): Promise<Record<string, [string, number]>>;
   donorTokens(): Promise<Record<string, [string, number]>>;
   verifyDonation(
@@ -86,6 +88,24 @@ export function createChain(opts: ChainOptions = {}): Chain {
     return await inflight;
   };
   const active = async () => activeTokens((await state()).tokens);
+  // A saved check describes the token config of the deploy that ran it. After a
+  // deploy that adds, drops or corrects a token it no longer applies, so it is
+  // adopted only when its symbols, addresses and decimals match this config exactly.
+  const matchesConfig = (saved: ChainState) => {
+    const names = Object.keys(tokens);
+    return names.length === Object.keys(saved.tokens).length &&
+      names.every((sym) => {
+        const check = saved.tokens[sym];
+        return check?.address.toLowerCase() === tokens[sym][0].toLowerCase() &&
+          check.decimals === tokens[sym][1];
+      });
+  };
+  const seed = (saved: ChainState) => {
+    if (saved.checkedAt <= st.checkedAt || !matchesConfig(saved)) return;
+    st.tokens = saved.tokens;
+    st.detail = saved.detail;
+    st.checkedAt = saved.checkedAt;
+  };
 
   return {
     rpc,
@@ -93,6 +113,7 @@ export function createChain(opts: ChainOptions = {}): Chain {
     hasBadge,
     hasVotingBadge,
     state,
+    seed,
     activeTokens: active,
     donorTokens: async () => {
       const out = { ...(await active()) };

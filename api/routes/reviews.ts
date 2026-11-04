@@ -6,10 +6,18 @@ import { HttpError } from "../lib/errors.ts";
 import { COMMENT_BODY_MAX } from "../config.ts";
 import { isStars, type RatingSummary, summarize } from "../../shared/ratings.ts";
 import type { Review } from "../db/types.ts";
+import { K } from "../db/keys.ts";
 
 import { ownsReviewToken, reviewTokenIds } from "../chain/reviewer.ts";
 
 const WRITES_PER_MINUTE = 30;
+/** How long GET /identity reuses a lookup: a holder's for 5 minutes, a non-holder's for 1. */
+export const IDENTITY_HOLDER_TTL_SECS = 5 * 60;
+export const IDENTITY_NONE_TTL_SECS = 60;
+interface CachedIdentity {
+  ids: string[];
+  at: number;
+}
 
 /**
  * Public badge-backed reviews. Only authenticated current holders can write.
@@ -28,8 +36,22 @@ export function reviewRoutes(deps: Deps) {
       throw new HttpError(503, "Could not verify voting badge ownership. Please try again.");
     }
   };
+  // The identity only decides what the page offers, and every signed-in tab polls
+  // it each minute: a lookup is reused for a few minutes across instances. A new
+  // holder waits at most a minute; writes (requireHolder) always check fresh.
+  const cachedTokenIds = async (address: string) => {
+    const key = K.reviewIdentity(address);
+    const hit = (await db.kv.get<CachedIdentity>(key, db.read)).value;
+    const ttl = (ids: string[]) => ids.length ? IDENTITY_HOLDER_TTL_SECS : IDENTITY_NONE_TTL_SECS;
+    if (hit && deps.now() - hit.at < ttl(hit.ids)) return hit.ids;
+    const ids = await tokenIdsFor(address);
+    await db.kv.set(key, { ids, at: deps.now() } satisfies CachedIdentity, {
+      expireIn: ttl(ids) * 1000,
+    });
+    return ids;
+  };
   r.get("/identity", requireAuth, async (c) => {
-    const ids = await tokenIdsFor(c.var.user!.address);
+    const ids = await cachedTokenIds(c.var.user!.address);
     return c.json({ tokenIds: ids, canReview: ids.length > 0 });
   });
   const requireHolder = async (c: Context<ReviewVars>, next: Next) => {
@@ -58,12 +80,17 @@ export function reviewRoutes(deps: Deps) {
 
   /** Every initiative's summary, for the board: { [id]: RatingSummary }. */
   r.get("/ratings", async (c) => {
+    // Which initiatives are on the board comes from the status index: two lists,
+    // not one read per rated initiative (that was ~2 s at 42 initiatives).
+    const [ratings, approved, archived] = await Promise.all([
+      db.reviews.ratings(),
+      db.initiatives.cards("approved"),
+      db.initiatives.cards("archived"),
+    ]);
+    const onBoard = new Set([...approved, ...archived].map((r) => r.id));
     const out: Record<string, RatingSummary> = {};
-    for (const [id, list] of await db.reviews.ratings()) {
-      const initiative = await db.initiatives.get(id);
-      if (initiative && ["approved", "archived"].includes(initiative.status)) {
-        out[id] = summarize(list, c.req.query("tokenId"));
-      }
+    for (const [id, list] of ratings) {
+      if (onBoard.has(id)) out[id] = summarize(list, c.req.query("tokenId"));
     }
     return c.json({ ratings: out });
   });

@@ -48,8 +48,12 @@ funding numbers keep their number animation.
 A per-initiative KV lease prevents concurrent visitors and instances from repeating
 the refresh; it expires after two minutes if a worker dies. Other visitors poll KV
 every two seconds while a lease is active, then return to normal polling. Failed
-refreshes keep the saved rows and wait sixty seconds before retrying. Incomplete
-backfills also resume after sixty seconds while viewed. Late workers cannot replace
+refreshes keep the saved rows and wait sixty seconds before retrying, doubling
+with each failure in a row up to thirty minutes (updated 2026-11-04). A 429 from
+the Safe API pauses every Safe's ledger the same way (one minute, doubling while
+it repeats within an hour): no ledger is tried or reported due until the pause
+ends, so a rate-limited API no longer makes every visit ask for a refresh.
+Incomplete backfills that are making progress still resume after sixty seconds. Late workers cannot replace
 newer sync metadata or cursors. Admin sync uses the same lease but can refresh early.
 
 The board refreshes the published Safes whose donation counts it displays; an
@@ -85,7 +89,9 @@ or overwrite a newer result. The lease expires after two minutes if a worker die
 The refresh stays attached to an HTTP request rather than detached server work
 that could be terminated after the first response on Deno Deploy.
 Cold token-verification state also sets a top-level `refreshDue` flag so the
-initial page does not block on token verification. Donation actions still
+initial page does not block on token verification. Since 2026-11-04 the last
+check that verified tokens is saved in KV and a new instance adopts it, so only
+a check older than six hours makes the board due, not every new isolate. Donation actions still
 verify token configuration on the server as before.
 
 A newly confirmed wallet donation invalidates that Safe's snapshot freshness,

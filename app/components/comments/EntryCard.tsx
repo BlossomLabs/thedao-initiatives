@@ -17,7 +17,7 @@ import ConnectInline from "~/components/wallet/ConnectInline";
 import { nameInput, signedInAs } from "./styles";
 import { FormNote, type Note, SENT_MS, SubmitButton } from "./FormFeedback";
 import { COMMENT_BODY_MAX, COMMENT_NAME_MAX } from "@shared/comments";
-import { inputMax, tooLong } from "@shared/draft/mod";
+import { inputMax, tooLong } from "@shared/draft/caps";
 
 export function IdentityRow({ c }: { c: CommentEntry }) {
   const label = c.roles.includes("ADMIN") ? "TheDAO team" : c.displayName || "Anonymous";

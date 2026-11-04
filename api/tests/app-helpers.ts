@@ -18,6 +18,14 @@ import {
   SEL_SYMBOL,
 } from "../chain/abi.ts";
 import { keccakHex, utf8 } from "../chain/keccak.ts";
+import { MULTICALL3 } from "../chain/multicall.ts";
+import {
+  decodeFunctionData,
+  encodeFunctionResult,
+  type Hex,
+  multicall3Abi,
+  toFunctionSelector,
+} from "viem";
 import { predictSafeAddress } from "../chain/safe.ts";
 import { chainlinkRound, SIGNERS, word } from "./helpers.ts";
 import { createMaintenance } from "../services/maintenance.ts";
@@ -71,7 +79,37 @@ export function scriptedRpc(script: ChainScript, now: () => number) {
   const encodedOwners = "0x" + word(32) + word(SIGNERS.length) +
     SIGNERS.map((a) => "0".repeat(24) + a.slice(2).toLowerCase()).join("");
   const fbSlot = keccakHex(utf8("fallback_manager.handler.address"));
-  return (method: string, params: unknown[]): Promise<unknown> => {
+  // Multicall3: each sub-call goes through the same handlers and is logged as if
+  // sent on its own (getEthBalance as eth_getBalance), plus one "multicall" per batch.
+  const getEthBalance = toFunctionSelector("getEthBalance(address)");
+  const rpc = async (method: string, params: unknown[]): Promise<unknown> => {
+    const p0 = params[0] as { to?: string; data?: Hex } | undefined;
+    if (method !== "eth_call" || p0?.to?.toLowerCase() !== MULTICALL3.toLowerCase()) {
+      return handle(method, params);
+    }
+    script.calls.push("multicall");
+    const { args: [calls] } = decodeFunctionData({ abi: multicall3Abi, data: p0.data! }) as {
+      args: readonly [readonly { target: string; callData: Hex }[]];
+    };
+    const results = await Promise.all(calls.map(async ({ target, callData }) => {
+      try {
+        // getEthBalance answers a uint256 word, not eth_getBalance's short hex.
+        const out = callData.startsWith(getEthBalance)
+          ? "0x" +
+            word(BigInt(String(await handle("eth_getBalance", ["0x" + callData.slice(-40)]))))
+          : await handle("eth_call", [{ to: target, data: callData }, "latest"]);
+        return { success: true, returnData: String(out ?? "0x") as Hex };
+      } catch {
+        return { success: false, returnData: "0x" as Hex };
+      }
+    }));
+    return encodeFunctionResult({
+      abi: multicall3Abi,
+      functionName: "aggregate3",
+      result: results,
+    });
+  };
+  const handle = (method: string, params: unknown[]): Promise<unknown> => {
     script.calls.push(method);
     const p0 = params[0] as { to?: string; data?: string } | string;
     switch (method) {
@@ -143,6 +181,7 @@ export function scriptedRpc(script: ChainScript, now: () => number) {
     }
     throw new Error(`unexpected rpc ${method}`);
   };
+  return rpc;
 }
 
 export type FetchLog = { url: string; init?: RequestInit }[];

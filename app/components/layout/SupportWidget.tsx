@@ -19,7 +19,7 @@ import {
   SUPPORT_SCREENSHOT_MAX,
   type SupportCategory,
 } from "@shared/support";
-import { inputMax, tooLong } from "@shared/draft/mod";
+import { inputMax, tooLong } from "@shared/draft/caps";
 import { api, ApiError, errorMessage } from "~/lib/api";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { Button } from "~/components/ui/Button";

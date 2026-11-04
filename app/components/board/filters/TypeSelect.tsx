@@ -1,13 +1,16 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select";
-import { Check, ChevronDown } from "lucide-react";
+import { Check } from "lucide-react";
+import { useRef } from "react";
 import { Select, SelectContent } from "~/components/ui/Select";
 import type { BoardType } from "~/lib/board-view";
-import { cn } from "~/lib/utils";
-import { FILTER_PILL, FILTER_PILL_ON } from "./CategoryTrigger";
+import { useTakeFocus } from "~/lib/focus-handover";
+import { TYPE_FOCUS_KEY, TYPE_LABELS, TypeFace, typePill } from "./faces";
 import TypeGlyph from "./TypeGlyph";
 
-const LABELS: Record<BoardType, string> = { all: "All types", rfp: "RFPs", grant: "Grants" };
-const ITEMS = (["all", "rfp", "grant"] as const).map((value) => ({ value, label: LABELS[value] }));
+const ITEMS = (["all", "rfp", "grant"] as const).map((value) => ({
+  value,
+  label: TYPE_LABELS[value],
+}));
 
 /** The type pill: all initiatives, RFPs or grants, each with its live count. */
 export default function TypeSelect(
@@ -17,17 +20,12 @@ export default function TypeSelect(
     onChange: (t: BoardType) => void;
   },
 ) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  useTakeFocus(TYPE_FOCUS_KEY, trigger);
   return (
     <Select value={value} items={ITEMS} onValueChange={(v) => v && onChange(v as BoardType)}>
-      <SelectPrimitive.Trigger
-        aria-label="Type"
-        className={cn(FILTER_PILL, value !== "all" && FILTER_PILL_ON)}
-      >
-        <TypeGlyph type={value} />
-        <span>
-          {LABELS[value]} <span className="tnum text-white/50">{counts[value]}</span>
-        </span>
-        <ChevronDown className="size-3.5 text-white/45" aria-hidden="true" />
+      <SelectPrimitive.Trigger ref={trigger} aria-label="Type" className={typePill(value)}>
+        <TypeFace value={value} count={counts[value]} />
       </SelectPrimitive.Trigger>
       <SelectContent>
         {ITEMS.map((t) => (

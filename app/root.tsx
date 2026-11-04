@@ -19,15 +19,9 @@ import { BOARD_SCRIPT } from "~/components/board/BoardSkeleton";
 import { SPONSORS_SCRIPT } from "~/lib/sponsors-height";
 import "./app.css";
 
-// Fonts as a <link> rather than an @import inside app.css: the browser fetches
-// them in parallel with the stylesheet instead of after it.
-const FONTS_URL =
-  "https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Roboto+Mono:wght@400;500;600&display=swap";
-
+// The fonts are self-hosted (app.css, font-display: swap). No preload: on a slow
+// link it competes with the stylesheet for bandwidth and delays the first paint.
 export const links: Route.LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-  { rel: "stylesheet", href: FONTS_URL },
   { rel: "icon", href: "/dao-logo.svg" },
   { rel: "apple-touch-icon", href: "/dao-logo.svg" },
 ];

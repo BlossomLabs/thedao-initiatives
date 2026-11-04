@@ -5,9 +5,12 @@ import { loadConfig, TOKENS } from "../config.ts";
 import { createDb } from "../db/mod.ts";
 import {
   LEDGER_LEASE_SECS,
+  LEDGER_MAX_BACKOFF_SECS,
   LEDGER_RETRY_SECS,
   ledgerStatus,
   refreshLedger,
+  refreshLedgers,
+  safeApiPausedUntil,
 } from "../services/ledger.ts";
 import { MAX_PAGES_PER_RUN } from "../services/safe-api.ts";
 
@@ -325,6 +328,119 @@ Deno.test("ledger: an incomplete backfill resumes after the short cooldown while
     assertEquals(h.fetchLog.length, MAX_PAGES_PER_RUN + 1);
     assertEquals(h.script.calls, []);
   } finally {
+    h.close();
+  }
+});
+
+Deno.test("ledger: failures in a row double the cooldown up to 30 minutes, a success resets it", async () => {
+  let status = 500;
+  const h = await harness({
+    fetch: () => status === 200 ? result([]) : new Response("{}", { status }),
+  });
+  try {
+    const initiative = await h.db.initiatives.insert({
+      title: "Failing ledger",
+      status: "approved",
+      safeAddress: SAFE_ADDR,
+    });
+    const waits: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      const state = (await refreshLedger(h.deps, initiative))!;
+      assertFalse(state.ok);
+      waits.push(state.refreshAfter! - h.clock.now);
+      h.clock.now = state.refreshAfter!;
+    }
+    assertEquals(waits, [60, 120, 240, 480, 960, LEDGER_MAX_BACKOFF_SECS, LEDGER_MAX_BACKOFF_SECS]);
+    status = 200;
+    const ok = (await refreshLedger(h.deps, initiative))!;
+    assert(ok.ok);
+    assertEquals(ok.failures, 0);
+    status = 500;
+    h.clock.now = ok.refreshAfter!;
+    const again = (await refreshLedger(h.deps, initiative))!;
+    assertEquals(again.refreshAfter! - h.clock.now, LEDGER_RETRY_SECS);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("ledger: a 429 pauses every Safe and quiets their refresh flags, doubling while it repeats", async () => {
+  let limited = true;
+  const h = await harness({
+    fetch: () => limited ? new Response("{}", { status: 429 }) : result([]),
+  });
+  try {
+    const rows = [];
+    for (let i = 1; i <= 5; i++) {
+      rows.push(
+        await h.db.initiatives.insert({
+          title: `Paused ${i}`,
+          status: "approved",
+          safeAddress: "0x" + i.toString(16).padStart(40, "0"),
+        }),
+      );
+    }
+    await refreshLedgers(h.deps, rows);
+    const tried = h.fetchLog.length;
+    assert(tried >= 1 && tried <= 3, "the first 429 stops the batch");
+    const until = await safeApiPausedUntil(h.deps);
+    assertEquals(until, h.clock.now + LEDGER_RETRY_SECS);
+    // Untried Safes are overdue, but nothing is due while the API is paused.
+    for (const r of rows) {
+      assertFalse((await ledgerStatus(h.deps, r, until))!.refreshDue);
+    }
+    assert((await ledgerStatus(h.deps, rows[4]))!.refreshDue, "due again once the pause ends");
+    await refreshLedgers(h.deps, rows);
+    await refreshLedger(h.deps, rows[4]);
+    assertEquals(h.fetchLog.length, tried, "no Safe API call during the pause");
+
+    h.clock.now = until;
+    await refreshLedgers(h.deps, rows);
+    assertEquals(await safeApiPausedUntil(h.deps), h.clock.now + 2 * LEDGER_RETRY_SECS);
+
+    limited = false;
+    h.clock.now = await safeApiPausedUntil(h.deps);
+    await refreshLedgers(h.deps, rows);
+    assertEquals(await safeApiPausedUntil(h.deps), 0, "a success after the pause clears it");
+    for (const r of rows) assertFalse((await ledgerStatus(h.deps, r))!.refreshDue);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("ledger: 429s from parallel lanes count as one pause", async () => {
+  // Three syncs already past the pause check; their 429s land one after another.
+  const gates = [deferred<void>(), deferred<void>(), deferred<void>()];
+  let calls = 0;
+  const allIn = deferred<void>();
+  const h = await harness({
+    fetch: async () => {
+      const gate = gates[calls++];
+      if (calls === 3) allIn.resolve();
+      await gate.promise;
+      return new Response("{}", { status: 429 });
+    },
+  });
+  try {
+    const rows = [];
+    for (let i = 1; i <= 3; i++) {
+      rows.push(
+        await h.db.initiatives.insert({
+          title: `Lane ${i}`,
+          status: "approved",
+          safeAddress: "0x" + i.toString(16).padStart(40, "0"),
+        }),
+      );
+    }
+    const runs = rows.map((r) => refreshLedger(h.deps, r));
+    await allIn.promise;
+    for (let i = 0; i < 3; i++) {
+      gates[i].resolve();
+      await runs[i];
+    }
+    assertEquals(await safeApiPausedUntil(h.deps), h.clock.now + LEDGER_RETRY_SECS);
+  } finally {
+    for (const g of gates) g.resolve();
     h.close();
   }
 });

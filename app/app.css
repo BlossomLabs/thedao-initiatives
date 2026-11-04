@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+/* Self-hosted variable fonts (one file per script covers every weight); Vite bundles
+   them into /assets, so no third-party stylesheet blocks the first paint. */
+@import "@fontsource-variable/inter-tight";
+@import "@fontsource-variable/roboto-mono";
 
 /* Tokens: Figma "TheDAO Sites" via the MVP's style.css :root. */
 @theme {
@@ -138,9 +142,8 @@
   --color-panel-reply: #213c58;
   --color-panel-modal: #22405c;
 
-  --font-inter-tight: "Inter Tight", "Inter", sans-serif;
-  --font-inter: "Inter", sans-serif;
-  --font-mono: "Roboto Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-inter-tight: "Inter Tight Variable", sans-serif;
+  --font-mono: "Roboto Mono Variable", ui-monospace, SFMono-Regular, monospace;
 
   --shadow-btn: 0 4px 6px -4px rgba(130, 24, 26, 0.3), 0 10px 15px -3px rgba(130, 24, 26, 0.3);
   --shadow-btn-primary:

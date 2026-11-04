@@ -226,6 +226,7 @@ Deno.test("reviews: transferring an NFT replaces its rating instead of adding a 
   const { h, a, admin, plain, other, owners, post } = await setup();
   const old = (await j(await post(admin, a.id, { stars: 5 }))).review;
   owners.set("1", PLAIN.toLowerCase());
+  h.clock.now += 10; // ids are ULIDs: two in the same instant sort at random
   assertEquals((await post(plain, a.id, { stars: 1 })).status, 201);
   assertEquals((await post(admin, a.id, { stars: 5 })).status, 403);
   const result = await j(

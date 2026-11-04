@@ -8,9 +8,8 @@
  * both the snapshot and refresh lease across instances; no timer is needed.
  * The donation ledger is the fallback before the first successful read.
  */
-import { encodeHex } from "@std/encoding";
-import { abiWord, decodeHexInt, SEL_BALANCE_OF } from "../chain/abi.ts";
-import { ethCall } from "../chain/rpc.ts";
+import { type Address, hexToBigInt } from "viem";
+import { balanceCall, multicall } from "../chain/multicall.ts";
 import type { Chain } from "../chain/mod.ts";
 import type { Db } from "../db/mod.ts";
 import type { Donation, Initiative, Pledge } from "../db/types.ts";
@@ -71,48 +70,91 @@ export function createFunding(deps: FundingDeps) {
   const inflight = new Map<string, Promise<CachedBalances | null>>();
   const kv = deps.db.kv;
 
-  async function read(safe: string): Promise<SafeBalances> {
-    const tokens = await deps.chain.donorTokens();
-    const data = SEL_BALANCE_OF + encodeHex(abiWord(safe));
-    // One wave of balance calls, then one wave of prices for the non-zero ones.
-    const amounts = await Promise.all(
-      Object.entries(tokens).map(async ([symbol, [address, decimals]]) => {
-        const raw = symbol === "ETH"
-          ? await deps.chain.rpc("eth_getBalance", [safe, "latest"])
-          : await ethCall(deps.chain.rpc, address, data);
-        return { symbol, amount: Number(decodeHexInt(raw)) / 10 ** decimals };
-      }),
+  /** Every Safe's balance of every donor token in one Multicall3 batch (chunked),
+   * then one price per symbol held. A Safe with any failed read is an Error, so
+   * its last good snapshot stays rather than dropping to a partial total. */
+  async function readMany(safes: string[]): Promise<(SafeBalances | Error)[]> {
+    const tokens = Object.entries(await deps.chain.donorTokens());
+    const calls = safes.flatMap((safe) =>
+      tokens.map(([symbol, [address]]) =>
+        balanceCall(symbol === "ETH" ? "native" : address as Address, safe as Address)
+      )
     );
-    const holdings: Holding[] = await Promise.all(
-      amounts.filter((t) => t.amount > 0).map(async ({ symbol, amount }) => {
-        const rate = await deps.chain.usdRate(symbol);
-        return { symbol, amount, usd: cents(amount * rate) };
-      }),
+    const results = await multicall(deps.chain.rpc, calls);
+    const amounts = safes.map((_, s) =>
+      tokens.map(([symbol, [, decimals]], t) => {
+        const r = results[s * tokens.length + t];
+        // A token address without code answers "0x": zero, as a direct balanceOf did.
+        const raw = r.data === "0x" ? 0n : hexToBigInt(r.data);
+        return r.ok ? { symbol, amount: Number(raw) / 10 ** decimals } : null;
+      })
     );
-    holdings.sort((a, b) => b.usd - a.usd);
-    return { usd: cents(holdings.reduce((s, h) => s + h.usd, 0)), holdings, at: deps.now() };
+    const held = new Set(amounts.flat().filter((a) => a && a.amount > 0).map((a) => a!.symbol));
+    const rates = new Map<string, number | Error>(
+      await Promise.all(
+        [...held].map(async (symbol): Promise<[string, number | Error]> => {
+          try {
+            return [symbol, await deps.chain.usdRate(symbol)];
+          } catch (e) {
+            return [symbol, e instanceof Error ? e : new Error(String(e))];
+          }
+        }),
+      ),
+    );
+    return amounts.map((row, s) => {
+      if (row.some((a) => a === null)) {
+        return new Error(`balance read reverted for ${safes[s]}`);
+      }
+      const holdings: Holding[] = [];
+      for (const { symbol, amount } of row as { symbol: string; amount: number }[]) {
+        if (amount <= 0) continue;
+        const rate = rates.get(symbol)!;
+        if (rate instanceof Error) return rate;
+        holdings.push({ symbol, amount, usd: cents(amount * rate) });
+      }
+      holdings.sort((a, b) => b.usd - a.usd);
+      return { usd: cents(holdings.reduce((n, h) => n + h.usd, 0)), holdings, at: deps.now() };
+    });
+  }
+
+  /** Refreshes every given Safe that is due and not leased elsewhere, with one
+   * batched chain read for all of them. Each Safe keeps its own KV snapshot and lease. */
+  async function refreshMany(safes: string[]): Promise<void> {
+    const leased = (await Promise.all(
+      [...new Set(safes.map((s) => s.toLowerCase()))].map(async (safe) => {
+        const key = K.safeBalances(safe);
+        const previous = await kv.get<CachedBalances>(key);
+        if (previous.value && previous.value.refreshAfter > deps.now()) return null;
+        const value = previous.value?.value ?? null;
+        const lease = await kv.atomic().check(previous)
+          .set(key, { value, refreshAfter: deps.now() + BALANCE_LEASE_SECS })
+          .commit();
+        return lease.ok ? { safe, key, value, versionstamp: lease.versionstamp } : null;
+      }),
+    )).filter((x) => x !== null);
+    if (!leased.length) return;
+
+    let read: (SafeBalances | Error)[];
+    try {
+      read = await readMany(leased.map((l) => l.safe));
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      read = leased.map(() => err);
+    }
+    await Promise.all(leased.map(async ({ safe, key, value, versionstamp }, i) => {
+      const got = read[i];
+      if (got instanceof Error) deps.log?.(`balances ${safe}: ${got.message}`);
+      const next: CachedBalances = got instanceof Error
+        ? { value, refreshAfter: deps.now() + BALANCE_RETRY_SECS }
+        : { value: got, refreshAfter: deps.now() + BALANCE_TTL_SECS };
+      // A late worker must not overwrite a newer refresh or a donation invalidation.
+      await kv.atomic().check({ key, versionstamp }).set(key, next).commit();
+    }));
   }
 
   async function refresh(safe: string): Promise<CachedBalances | null> {
-    const key = K.safeBalances(safe);
-    const previous = await kv.get<CachedBalances>(key);
-    if (previous.value && previous.value.refreshAfter > deps.now()) return previous.value;
-    const value = previous.value?.value ?? null;
-    const lease = await kv.atomic().check(previous)
-      .set(key, { value, refreshAfter: deps.now() + BALANCE_LEASE_SECS })
-      .commit();
-    if (!lease.ok) return (await kv.get<CachedBalances>(key)).value;
-
-    let next: CachedBalances;
-    try {
-      next = { value: await read(safe), refreshAfter: deps.now() + BALANCE_TTL_SECS };
-    } catch (e) {
-      deps.log?.(`balances ${safe}: ${e instanceof Error ? e.message : String(e)}`);
-      next = { value, refreshAfter: deps.now() + BALANCE_RETRY_SECS };
-    }
-    // A late worker must not overwrite a newer refresh or a donation invalidation.
-    await kv.atomic().check({ key, versionstamp: lease.versionstamp }).set(key, next).commit();
-    return (await kv.get<CachedBalances>(key)).value;
+    await refreshMany([safe]);
+    return (await kv.get<CachedBalances>(K.safeBalances(safe))).value;
   }
 
   async function cached(safe: string, revalidate: boolean): Promise<CachedBalances | null> {
@@ -200,7 +242,7 @@ export function createFunding(deps: FundingDeps) {
     return summaryFrom(initiative, pledges, donations, revalidate);
   }
 
-  return { balances, summary, summaryFrom, summaryOf, invalidate };
+  return { balances, refreshMany, summary, summaryFrom, summaryOf, invalidate };
 }
 
 export type Funding = ReturnType<typeof createFunding>;

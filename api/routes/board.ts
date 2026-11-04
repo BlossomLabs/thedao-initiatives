@@ -117,7 +117,6 @@ export async function buildCard(
   r: CardRow,
   s: CardSummary,
   tokensOk: boolean,
-  refresh = false,
 ): Promise<Card> {
   const sumOf = (status: Pledge["status"]) =>
     s.pledges.filter((p) => p.status === status).reduce((n, p) => n + p.amountUsd, 0);
@@ -125,7 +124,6 @@ export async function buildCard(
     deps.funding.summaryOf(
       r,
       { pledged: sumOf("pledged"), received: sumOf("received"), ledger: s.donatedUsd },
-      refresh,
     ),
     ledgerStatus(deps, r),
   ]);
@@ -169,12 +167,19 @@ async function buildBoard(deps: Deps, refresh: boolean) {
     deps.chain.state(refresh),
     voteSettings(deps),
   ]);
-  if (refresh) await refreshLedgers(deps, initiatives);
+  if (refresh) {
+    // Every due Safe's balances in one batched chain read, alongside the ledgers;
+    // the cards then read the snapshots it saved.
+    await Promise.all([
+      refreshLedgers(deps, initiatives),
+      deps.funding.refreshMany(initiatives.map((x) => x.safeAddress).filter(Boolean)),
+    ]);
+  }
   const tokensOk = tokensUsable(state);
   const summaries = await db.cards.summaries(initiatives.map((x) => x.id));
   const cards = orderCards(
     await Promise.all(
-      initiatives.map((x, i) => buildCard(deps, x, summaries[i], tokensOk, refresh)),
+      initiatives.map((x, i) => buildCard(deps, x, summaries[i], tokensOk)),
     ),
   ).map((c): Card =>
     vote.show ? { ...c, vote: voteState(c.summary.total, c.initiative.goalUsd, vote).kind } : c

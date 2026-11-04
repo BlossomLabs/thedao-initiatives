@@ -5,9 +5,10 @@ import { RATE_HERE } from "./rate-here";
 import RatingCard from "./RatingCard";
 
 let enabled = true;
+let checking = false;
 let summary: RatingSummary | undefined;
 vi.mock("~/hooks/use-admin-ratings", () => ({
-  useReviews: () => ({ summary, enabled }),
+  useReviews: () => ({ summary, enabled, checking }),
 }));
 
 afterEach(cleanup);
@@ -66,5 +67,31 @@ it("public visitors see ratings without review controls", () => {
   expect(screen.getByText("4.3")).toBeInTheDocument();
   expect(screen.queryByRole("link")).toBeNull();
   expect(screen.queryByText("Yours")).toBeNull();
+  enabled = true;
+});
+
+const HINT = "Only Voting Badge Holders can rate, signed in with their private badge wallet.";
+
+it("without a voting badge (or signed out): says who rates", () => {
+  enabled = false;
+  summary = { avg: 0, count: 0, dist: [0, 0, 0, 0, 0], mine: null };
+  render(<RatingCard initiativeId="i1" canRate />);
+  expect(screen.getByText(HINT)).toBeInTheDocument();
+  enabled = true;
+});
+
+it("no hint while the badge check runs, for holders, or once rating is closed", () => {
+  summary = { avg: 0, count: 0, dist: [0, 0, 0, 0, 0], mine: null };
+  render(<RatingCard initiativeId="i1" canRate />); // a holder
+  expect(screen.queryByText(HINT)).toBeNull();
+  cleanup();
+  enabled = false;
+  checking = true;
+  render(<RatingCard initiativeId="i1" canRate />);
+  expect(screen.queryByText(HINT)).toBeNull();
+  cleanup();
+  checking = false;
+  render(<RatingCard initiativeId="i1" canRate={false} />);
+  expect(screen.queryByText(HINT)).toBeNull();
   enabled = true;
 });

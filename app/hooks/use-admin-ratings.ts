@@ -97,6 +97,8 @@ export function useReviews(initiativeId: string) {
     ]);
   return {
     enabled: Boolean(session && identity?.canReview),
+    /** Signed in, the badge check not back yet: neither controls nor the hint. */
+    checking: Boolean(session) && identity === undefined,
     tokenIds: identity?.tokenIds ?? [],
     reviews: q.data?.reviews ?? [],
     summary: q.data?.summary,

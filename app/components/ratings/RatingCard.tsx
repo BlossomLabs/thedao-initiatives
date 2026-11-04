@@ -3,6 +3,7 @@ import type { RatingSummary } from "@shared/ratings";
 import RatingHistogram from "./RatingHistogram";
 import { goRate } from "./rate-here";
 import { StarRow } from "./Stars";
+import { Reviewer } from "~/lib/reviewer";
 
 const EYEBROW = "font-inter-tight text-[10.5px] font-medium uppercase tracking-[.1em] text-muted";
 
@@ -33,17 +34,22 @@ function Yours({ summary }: { summary: RatingSummary }) {
 export default function RatingCard(
   { initiativeId, canRate }: { initiativeId: string; canRate: boolean },
 ) {
-  const { summary, enabled } = useReviews(initiativeId);
+  const { summary, enabled, checking } = useReviews(initiativeId);
   if (!summary) return null;
   return (
     <div className="panel">
       <span className="k">Rating</span>
       <RatingHistogram summary={summary} />
-      {canRate && enabled
-        ? <Yours summary={summary} />
-        : summary.mine && (
+      {canRate && enabled ? <Yours summary={summary} /> : summary.mine
+        ? (
           <p className="m-0 mt-2.5 flex items-center gap-1.5 small dim">
             Your rating: <StarRow value={summary.mine} size="size-3" />
+          </p>
+        )
+        // Signed out or with another wallet: say who rates, so it never looks broken.
+        : canRate && !checking && (
+          <p className="m-0 mt-3 border-t border-white/10 pt-3 small dim">
+            Only {Reviewer}s can rate, signed in with their private badge wallet.
           </p>
         )}
     </div>

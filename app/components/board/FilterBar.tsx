@@ -20,9 +20,85 @@ import {
   TriggerFace,
   triggerLabel,
 } from "./filters/CategoryTrigger";
-import SortSelect from "./filters/SortSelect";
-import StatusSelect from "./filters/StatusSelect";
-import TypeSelect from "./filters/TypeSelect";
+import {
+  SORT_FOCUS_KEY,
+  sortStandInClass,
+  SortStandInFace,
+  STATUS_FOCUS_KEY,
+  StatusFace,
+  statusPill,
+  TYPE_FOCUS_KEY,
+  TypeFace,
+  typePill,
+} from "./filters/faces";
+import type { BoardStatus } from "~/lib/board-view";
+
+// Type, Funding and Sort are Base UI Selects (with Floating UI, about 90 KB): not in
+// the board's first load, where they slowed its data on phones. Until they arrive,
+// plain buttons with the same face stand in; focus passes on (useTakeFocus).
+const SORT_PILL = "min-h-[32px] border-transparent bg-transparent px-1.5 hover:border-white/15";
+
+function TypeSelectStandIn(
+  { value, counts }: { value: BoardType; counts: Record<BoardType, number> },
+) {
+  return (
+    <button
+      type="button"
+      aria-label="Type"
+      className={typePill(value)}
+      onPointerEnter={preloadSelects}
+      {...standInFocus(TYPE_FOCUS_KEY)}
+      onFocusCapture={preloadSelects}
+      onClick={preloadSelects}
+    >
+      <TypeFace value={value} count={counts[value]} />
+    </button>
+  );
+}
+
+function StatusSelectStandIn({ value }: { value: BoardStatus }) {
+  return (
+    <button
+      type="button"
+      aria-label="Funding status"
+      className={statusPill(value)}
+      onPointerEnter={preloadSelects}
+      {...standInFocus(STATUS_FOCUS_KEY)}
+      onFocusCapture={preloadSelects}
+      onClick={preloadSelects}
+    >
+      <StatusFace value={value} />
+    </button>
+  );
+}
+
+function SortSelectStandIn(
+  { sort, ai, className }: { sort: BoardSort; ai: boolean; className?: string },
+) {
+  return (
+    <button
+      type="button"
+      aria-label="Sort"
+      className={sortStandInClass(className)}
+      onPointerEnter={preloadSelects}
+      {...standInFocus(SORT_FOCUS_KEY)}
+      onFocusCapture={preloadSelects}
+      onClick={preloadSelects}
+    >
+      <SortStandInFace sort={sort} ai={ai} />
+    </button>
+  );
+}
+
+const typeSelect = lazyPart(() => import("./filters/TypeSelect"), TypeSelectStandIn);
+const statusSelect = lazyPart(() => import("./filters/StatusSelect"), StatusSelectStandIn);
+const sortSelect = lazyPart(() => import("./filters/SortSelect"), SortSelectStandIn);
+const TypeSelect = typeSelect.Component;
+const StatusSelect = statusSelect.Component;
+const SortSelect = sortSelect.Component;
+/** The three Selects' code (one shared chunk underneath): the board calls it once its data is in. */
+export const preloadSelects = () =>
+  Promise.all([typeSelect.preload(), statusSelect.preload(), sortSelect.preload()]);
 
 /** A plain button with the Category dropdown's face, until (or if never) its code arrives. */
 function CategoryFilterStandIn({ value }: { value: string[] }) {
@@ -181,11 +257,13 @@ export default function FilterBar({
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-1 small dim max-[641px]:hidden">Filters:</span>
         <div className="contents max-[641px]:hidden">
-          <TypeSelect
-            value={view.type}
-            counts={counts.type}
-            onChange={(type) => onChange({ type })}
-          />
+          <Suspense fallback={<TypeSelectStandIn value={view.type} counts={counts.type} />}>
+            <TypeSelect
+              value={view.type}
+              counts={counts.type}
+              onChange={(type) => onChange({ type })}
+            />
+          </Suspense>
           <Suspense fallback={<CategoryFilterStandIn value={view.cats} />}>
             <CategoryFilter
               value={view.cats}
@@ -193,11 +271,13 @@ export default function FilterBar({
               onChange={(cats) => onChange({ cats })}
             />
           </Suspense>
-          <StatusSelect
-            value={view.status}
-            vote={voteFilter}
-            onChange={(status) => onChange({ status })}
-          />
+          <Suspense fallback={<StatusSelectStandIn value={view.status} />}>
+            <StatusSelect
+              value={view.status}
+              vote={voteFilter}
+              onChange={(status) => onChange({ status })}
+            />
+          </Suspense>
           {watchlist()}
         </div>
         <div className="hidden max-[641px]:contents">
@@ -207,15 +287,19 @@ export default function FilterBar({
         <span className="max-[641px]:hidden">{clear}</span>
         <span className="ml-auto flex items-center gap-3">
           <span className="small dim tnum max-[641px]:hidden" aria-live="polite">{label}</span>
-          <SortSelect
-            sort={view.sort}
-            ai={ai}
-            featured={featured}
-            rated={rated}
-            canRate={canRate}
-            onSort={onSort}
-            className="min-h-[32px] border-transparent bg-transparent px-1.5 hover:border-white/15"
-          />
+          <Suspense
+            fallback={<SortSelectStandIn sort={view.sort} ai={ai} className={SORT_PILL} />}
+          >
+            <SortSelect
+              sort={view.sort}
+              ai={ai}
+              featured={featured}
+              rated={rated}
+              canRate={canRate}
+              onSort={onSort}
+              className={SORT_PILL}
+            />
+          </Suspense>
           <LayoutToggle value={view.view} onChange={(v) => onChange({ view: v })} />
         </span>
       </div>

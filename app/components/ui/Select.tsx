@@ -1,6 +1,7 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "~/lib/utils";
+import { SELECT_ICON, SELECT_TRIGGER, SELECT_TRIGGER_SM, SELECT_VALUE } from "./select-styles";
 
 /**
  * Select in the site's input style: the trigger is a `.field`, the list is the
@@ -17,10 +18,7 @@ export function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props
 export function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
   return (
     <SelectPrimitive.Value
-      className={cn(
-        "min-w-0 flex-1 truncate text-left data-[placeholder]:text-white/30",
-        className,
-      )}
+      className={cn(SELECT_VALUE, className)}
       {...props}
     />
   );
@@ -34,15 +32,11 @@ export function SelectTrigger({
 }: SelectPrimitive.Trigger.Props & { size?: "sm" | "default" }) {
   return (
     <SelectPrimitive.Trigger
-      className={cn(
-        "field flex cursor-pointer items-center justify-between gap-2 whitespace-nowrap data-[popup-open]:border-[rgba(92,183,90,.6)] data-[disabled]:cursor-default data-[disabled]:opacity-50",
-        size === "sm" && "w-auto rounded-[10px] px-2.5 py-1.5 text-[12px]",
-        className,
-      )}
+      className={cn(SELECT_TRIGGER, size === "sm" && SELECT_TRIGGER_SM, className)}
       {...props}
     >
       {children}
-      <SelectPrimitive.Icon className="flex flex-none text-white/50">
+      <SelectPrimitive.Icon className={SELECT_ICON}>
         <ChevronDown className={size === "sm" ? "size-3.5" : "size-4"} aria-hidden="true" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>

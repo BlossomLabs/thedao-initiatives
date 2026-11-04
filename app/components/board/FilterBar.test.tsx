@@ -1,8 +1,11 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
-import FilterBar from "./FilterBar";
+import { beforeAll, expect, it, vi } from "vitest";
+import FilterBar, { preloadSelects } from "./FilterBar";
 import { type BoardView, DEFAULT_VIEW } from "~/lib/board-view";
 import { CATEGORIES } from "~/lib/categories";
+
+// These tests drive the real menus; FilterBar.standins.test.tsx covers the stand-ins.
+beforeAll(() => preloadSelects());
 
 const counts = {
   type: { all: 12, rfp: 7, grant: 5 },
@@ -44,7 +47,7 @@ it("a focused Category stand-in hands focus to the real dropdown", async () => {
 
 it("has a Type pill with counts, and no row of category chips", async () => {
   const { onChange } = bar();
-  const type = screen.getByRole("combobox", { name: "Type" });
+  const type = await screen.findByRole("combobox", { name: "Type" });
   expect(type).toHaveTextContent("All types 12");
   type.focus();
   fireEvent.keyDown(type, { key: "ArrowDown" });
@@ -91,12 +94,12 @@ it("several categories read N Categories", () => {
   expect(pill).not.toHaveTextContent("OpSec");
 });
 
-it("no row of applied filters: the pills carry the state", () => {
+it("no row of applied filters: the pills carry the state", async () => {
   bar({ type: "grant", cats: ["opsec"], status: "open" });
   expect(screen.queryByRole("group", { name: "Active filters" })).toBeNull();
   expect(document.querySelector("hr")).toBeNull();
-  expect(screen.getByRole("combobox", { name: "Type" })).toHaveTextContent("Grants");
-  expect(screen.getByRole("combobox", { name: "Funding status" })).toHaveTextContent(
+  expect(await screen.findByRole("combobox", { name: "Type" })).toHaveTextContent("Grants");
+  expect(await screen.findByRole("combobox", { name: "Funding status" })).toHaveTextContent(
     "Open for funding",
   );
 });
@@ -122,7 +125,7 @@ it("no Clear filters with nothing filtered, and the count reads N initiatives", 
 
 it("the Type pill and its options carry a type icon", async () => {
   bar({ type: "grant" });
-  const type = screen.getByRole("combobox", { name: "Type" });
+  const type = await screen.findByRole("combobox", { name: "Type" });
   expect(type.querySelector("[data-type-glyph='grant']")).not.toBeNull();
   type.focus();
   fireEvent.keyDown(type, { key: "ArrowDown" });

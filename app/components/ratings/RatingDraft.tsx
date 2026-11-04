@@ -7,7 +7,7 @@ import { errorMessage } from "~/lib/api";
 import { usePostReview } from "~/hooks/use-admin-ratings";
 import type { Note } from "~/components/comments/FormFeedback";
 import { COMMENT_BODY_MAX } from "@shared/comments";
-import { inputMax, tooLong } from "@shared/draft/mod";
+import { inputMax, tooLong } from "@shared/draft/caps";
 import type { RatingSummary, Stars } from "@shared/ratings";
 
 /**

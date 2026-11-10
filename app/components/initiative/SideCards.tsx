@@ -126,6 +126,8 @@ export default function SideCards(
           <p className="m-0 mb-2 small dim">
             {r.status === "pending"
               ? "You proposed this initiative. While it waits for review you can change everything here; every version stays in the history."
+              : session?.isAdmin
+              ? "You proposed this initiative. Edits to the text, milestones, links and goal go to another admin for review, and this page keeps the approved version until they accept; as an admin you can still change the other facts directly."
               : "You proposed this initiative. Edits to the text, categories, milestones and links go to the team for review, and this page keeps the approved version until they accept; the money facts are locked."}
           </p>
           <LinkButton variant="ghost" className="mt-1 w-full" to={`/initiative/${r.slug}/edit`}>

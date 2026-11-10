@@ -460,3 +460,10 @@ it("an admin's own edit is introduced as theirs, not as one for them to accept",
   expect(within(panel).queryByText(/until you accept the edit/)).toBeNull();
   expect(within(panel).getByText(/You proposed this initiative/)).toBeInTheDocument();
 });
+
+it("the admin list is not fetched when no edit is waiting", async () => {
+  current = page({ status: "approved", safeAddress: SAFE });
+  renderPage();
+  await screen.findByRole("heading", { level: 1 });
+  expect(calls()).not.toContain("/api/admin/admins");
+});

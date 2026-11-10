@@ -474,3 +474,42 @@ it("an admin proposer is told their text edits wait for another admin", () => {
   unmount();
   qc.clear();
 });
+
+it("an admin proposer with an edit in review starts from it, and the new save waits too", async () => {
+  const row = {
+    ...structuredRow(),
+    slug: "same-url",
+    status: "approved" as const,
+    proposer: ME,
+    categories: ["opsec"],
+    pendingRevision: 3,
+  };
+  revs.byN = {
+    3: { ...row, title: "A title already in review", categories: ["defi"], state: "pending" },
+  };
+  feed(row);
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.getByText(/Your last edit is waiting for review/)).toBeInTheDocument();
+  expect(screen.getByLabelText("Title")).toHaveValue("A title already in review");
+  fireEvent.change(screen.getByLabelText("Title"), {
+    target: { value: "A second title in review" },
+  });
+  fireEvent.click(screen.getByText("Save"));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/initiatives/same-url/revisions", {
+      json: expect.objectContaining({ title: "A second title in review" }),
+    })
+  );
+  unmount();
+  qc.clear();
+});
+
+it("an admin proposer is told categories alone change at once unless an edit waits", () => {
+  mineApproved();
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.getByText(/categories alone change at once/i)).toBeInTheDocument();
+  unmount();
+  qc.clear();
+});

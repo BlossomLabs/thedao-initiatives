@@ -32,7 +32,7 @@ export default function PendingEdit({ r, run }: { r: AdminInitiative; run: Run }
   const { data: team } = useQuery({
     queryKey: [...adminsKey, sessionKey(session)],
     queryFn: ({ signal }) => api<AdminList>("/api/admin/admins", { signal }),
-    enabled: Boolean(session?.isAdmin),
+    enabled: Boolean(session?.isAdmin && n),
   });
   if (!n) return null;
   const author = edit?.author.toLowerCase();

@@ -1,7 +1,7 @@
 import { MemoryRouter, Route, Routes } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { structuredRow } from "../../test/fixtures";
 import type { InitiativePage } from "~/lib/api-types";
 import { useInitiative } from "~/hooks/use-initiative";
@@ -18,8 +18,11 @@ vi.mock("~/hooks/use-revision", () => ({
     error: null,
   }),
 }));
+const who = vi.hoisted(() => ({
+  session: null as null | { address: string; isAdmin: boolean },
+}));
 vi.mock("~/context/session", () => ({
-  useSession: () => ({ session: null }),
+  useSession: () => ({ session: who.session }),
   sessionKey: () => "anon",
 }));
 vi.mock("~/components/wallet/Identity", () => ({ default: () => <span>identity</span> }));
@@ -218,4 +221,29 @@ it("says when comments open on an unpublished page instead of loading them", () 
   expect(screen.queryByText(/Comments open once/)).toBeNull();
   expect(screen.queryByRole("note", { name: "In review" })).toBeNull();
   expect(document.querySelector('meta[name="robots"]')).toBeNull();
+});
+
+afterEach(() => {
+  who.session = null;
+});
+
+it("the proposer's card says the money facts are locked after approval", () => {
+  who.session = { address: "0x1111", isAdmin: false };
+  feed(false);
+  const qc = new QueryClient();
+  const { unmount } = render(tree(qc));
+  expect(screen.getByText(/the money facts are locked/)).toBeInTheDocument();
+  unmount();
+  qc.clear();
+});
+
+it("an admin proposer's card says their edits wait for another admin and the facts stay theirs", () => {
+  who.session = { address: "0x1111", isAdmin: true };
+  feed(false);
+  const qc = new QueryClient();
+  const { unmount } = render(tree(qc));
+  expect(screen.queryByText(/the money facts are locked/)).toBeNull();
+  expect(screen.getByText(/another admin/)).toBeInTheDocument();
+  unmount();
+  qc.clear();
 });

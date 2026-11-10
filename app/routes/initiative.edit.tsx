@@ -209,7 +209,7 @@ function WhatYouCanChange(
       <span className="k">What you can change</span>
       <p className="m-0 small dim">
         {manage && hold
-          ? "As an admin you can change the facts here directly. This is your own initiative, so text edits and the goal wait for another admin to accept them, like any proposer's."
+          ? "As an admin you can change the facts here directly. This is your own initiative, so text edits and the goal wait for another admin to accept them, like any proposer's. Categories alone change at once, unless an edit of yours is already waiting."
           : manage
           ? "As an admin you can change everything here, the facts locked after approval included. The same checks apply, and your edits are tagged as the team's."
           : status === "pending"

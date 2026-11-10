@@ -569,3 +569,14 @@ Deno.test("an admin proposer's held edit may carry the goal; accepting moves it"
   assertEquals((await row()).goalUsd, 11500);
   h.close();
 });
+
+Deno.test("an admin proposer is recognised whatever the letter case of their address", async () => {
+  const { h, edit, row } = await adminProposer();
+  const lower = await h.mint(PLAIN.toLowerCase(), true);
+  const out = await j(
+    await edit(lower, retitled("Retitled from a lowercase session")),
+  ) as unknown as Out;
+  assertEquals(out.pending, true);
+  assertEquals((await row()).title, GOOD.title);
+  h.close();
+});

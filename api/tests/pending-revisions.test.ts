@@ -475,3 +475,97 @@ Deno.test("a goal change alone is an edit, and a bad goal is refused (#71)", asy
   assertEquals((await edit(token, { ...regoaled(11500), initiativeId: id })).status, 400);
   h.close();
 });
+
+/** `approved()`, with PLAIN, the proposer, also an admin: `self` is their admin session. */
+async function adminProposer(approve = true) {
+  const h = await harness({
+    env: { RATE_LIMIT_MODE: "off", ADMIN_ADDRESSES: `${ADMIN},${PLAIN}` },
+  });
+  const a = await approved(h, approve);
+  const self = await h.mint(PLAIN, true);
+  return { h, ...a, self };
+}
+
+Deno.test("an admin's text edit to an initiative they proposed is held like any proposer's", async () => {
+  const { h, self, edit, row } = await adminProposer();
+  const res = await edit(self, retitled("An admin's own retitle"));
+  assertEquals(res.status, 201);
+  const out = await j(res) as unknown as Out;
+  assertEquals(out.pending, true);
+  assertEquals([out.revision.state, out.revision.source], ["pending", "proposer"]);
+  const live = await row();
+  assertEquals([live.title, live.pendingRevision], [GOOD.title, 2]);
+  h.close();
+});
+
+Deno.test("another admin accepts it, and the proposing admin may too", async () => {
+  {
+    const { h, self, edit, review, row } = await adminProposer();
+    await edit(self, retitled("Accepted by another admin"));
+    assertEquals((await review(2, "accept")).status, 200);
+    assertEquals((await row()).title, "Accepted by another admin");
+    h.close();
+  }
+  const { h, self, id, edit, row } = await adminProposer();
+  await edit(self, retitled("Accepted by its own author"));
+  const res = await h.req(`/api/admin/initiatives/${id}/revisions/2/accept`, {
+    method: "POST",
+    token: self,
+    json: {},
+  });
+  assertEquals(res.status, 200);
+  assertEquals((await row()).title, "Accepted by its own author");
+  assertEquals((await h.db.revisions.get(id, 2))!.reviewedBy?.toLowerCase(), PLAIN.toLowerCase());
+  h.close();
+});
+
+Deno.test("an admin proposer retags directly, unless their own edit is waiting", async () => {
+  const { h, self, id, edit, review, row } = await adminProposer();
+  const direct = await j(
+    await edit(self, { categories: ["defi"], initiativeId: id }),
+  ) as unknown as Out;
+  assertEquals(direct.pending ?? false, false);
+  assertEquals((await row()).categories, ["defi"]);
+  const held = await j(await edit(self, retitled("A waiting retitle"))) as unknown as Out;
+  assertEquals(held.pending, true);
+  const n = held.revision.n;
+  const joined = await j(
+    await edit(self, { categories: ["defi", "opsec"], initiativeId: id }),
+  ) as unknown as Out;
+  assertEquals(joined.pending, true);
+  assertEquals((await row()).categories, ["defi"]);
+  const waiting = (await row()).pendingRevision!;
+  assertEquals((await h.db.revisions.get(id, waiting))!.categories, ["defi", "opsec"]);
+  assert(waiting >= n);
+  assertEquals((await review(waiting, "accept")).status, 200);
+  const live = await row();
+  assertEquals([live.title, live.categories], ["A waiting retitle", ["defi", "opsec"]]);
+  h.close();
+});
+
+Deno.test("an admin proposer's edits to a pending initiative go live", async () => {
+  const { h, self, edit, row } = await adminProposer(false);
+  const out = await j(await edit(self, retitled("Retitled while pending"))) as unknown as Out;
+  assertEquals(out.pending ?? false, false);
+  assertEquals((await row()).title, "Retitled while pending");
+  h.close();
+});
+
+Deno.test("an admin's edit to someone else's approved initiative still goes live", async () => {
+  const h = await harness({ env: { RATE_LIMIT_MODE: "off" } });
+  const { admin, edit, row } = await approved(h);
+  const out = await j(await edit(admin, retitled("The team's retitle"))) as unknown as Out;
+  assertEquals(out.pending ?? false, false);
+  assertEquals((await row()).title, "The team's retitle");
+  h.close();
+});
+
+Deno.test("an admin proposer's held edit may carry the goal; accepting moves it", async () => {
+  const { h, self, id, edit, review, row } = await adminProposer();
+  const out = await j(await edit(self, { ...regoaled(11500), initiativeId: id })) as Out;
+  assertEquals(out.pending, true);
+  assertEquals((await row()).goalUsd, 25000);
+  assertEquals((await review(out.revision.n, "accept")).status, 200);
+  assertEquals((await row()).goalUsd, 11500);
+  h.close();
+});

@@ -229,7 +229,9 @@ export function initiativeRoutes(deps: Deps) {
    * only way either changes. Goes live at once, with the previous version
    * kept in the history, except a proposer's edit to an approved initiative:
    * approval is a review of the text, so that edit is held (`pending: true`)
-   * and the approved version stays live until an admin accepts it. Text edits
+   * and the approved version stays live until an admin accepts it. An admin
+   * who proposed the initiative is held the same way, except that their
+   * category-only edit is direct unless an edit is already waiting. Text edits
    * use structured sections, milestones and links, migrating legacy rows when
    * necessary; a body with only `categories` keeps the text as it is. A text
    * edit may carry `goal`: the milestones are checked against it and the goal
@@ -267,7 +269,11 @@ export function initiativeRoutes(deps: Deps) {
     const holdWhen = (row: Initiative) => {
       assertEditor(row, user);
       assertOpen(row);
-      return !user.isAdmin && row.status === "approved";
+      // An admin's own initiative is reviewed like anyone's: their text waits;
+      // a retag is direct unless it would be lost under an edit already waiting.
+      return row.status === "approved" &&
+        (!user.isAdmin ||
+          (isProposer(row, user) && (!tagsOnly || Boolean(row.pendingRevision))));
     };
     const saved = (next: Initiative, revision: Revision, warnings: Finding[]) => {
       const held = !isLive(revision);

@@ -9,6 +9,7 @@ import Reveal from "~/components/ui/Reveal";
 import WalletMenu from "~/components/wallet/WalletMenu";
 import type { CommentEntry } from "~/lib/api-types";
 import { errorMessage } from "~/lib/api";
+import { ago } from "~/lib/format";
 import { useIdentity } from "~/hooks/use-identity";
 import { avatarSrc } from "~/lib/avatar";
 import { cn } from "~/lib/utils";
@@ -32,6 +33,8 @@ export function IdentityRow({ c }: { c: CommentEntry }) {
           </span>
         )}
       <RoleTags roles={c.roles} />
+      {/* When it was posted, as on reviews. */}
+      <span className="small dim">{ago(c.createdAt)}</span>
     </span>
   );
 }

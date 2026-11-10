@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { IdentityRow } from "./EntryCard";
 import type { CommentEntry } from "~/lib/api-types";
+import { dt } from "~/lib/format";
 
 const entry = (roles: string[]): CommentEntry => ({
   id: "c1",
@@ -36,4 +37,13 @@ it("the Badge holder chip shows beside two other role chips (outside their cap)"
 it("no Badge holder chip without the badge", () => {
   render(<IdentityRow c={entry(["DONOR"])} />);
   expect(screen.queryByText("Badge holder")).toBeNull();
+});
+
+it("shows when the comment was posted, the way reviews do", () => {
+  const now = Date.now() / 1000;
+  const { unmount } = render(<IdentityRow c={{ ...entry([]), createdAt: now - 300 }} />);
+  expect(screen.getByText("5 min ago")).toHaveClass("small", "dim");
+  unmount();
+  render(<IdentityRow c={{ ...entry([]), createdAt: 1_760_000_000 }} />);
+  expect(screen.getByText(dt(1_760_000_000))).toBeInTheDocument();
 });

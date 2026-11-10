@@ -431,3 +431,32 @@ it("the panel works without the admin list", async () => {
   expect(within(panel).getByRole("button", { name: "Accept edit" })).toBeInTheDocument();
   expect(within(panel).queryByText(/proposer is an admin/)).toBeNull();
 });
+
+it("categories that join the admin's own waiting edit say so, and the form goes back to the live tags", async () => {
+  current = page({ categories: ["opsec", "defi"] });
+  const fallback = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, options) =>
+    String(path) === "/api/initiatives/audit-tooling/revisions"
+      ? Promise.resolve({ initiative: current.initiative, pending: true })
+      : fallback(path, options)
+  );
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: "Remove DeFi Safety" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save categories" }));
+  expect(
+    await screen.findByText("Categories added to your edit waiting for review."),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("Categories saved.")).toBeNull();
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Save categories" })).toBeDisabled()
+  );
+});
+
+it("an admin's own edit is introduced as theirs, not as one for them to accept", async () => {
+  withPendingEdit({ author: SELF });
+  withAdmins([SELF]);
+  renderPage();
+  const panel = await pendingPanel();
+  expect(within(panel).queryByText(/until you accept the edit/)).toBeNull();
+  expect(within(panel).getByText(/You proposed this initiative/)).toBeInTheDocument();
+});

@@ -74,8 +74,9 @@ export default function ManageInitiative() {
   const runAt = (at: string): Run => async (fn, ok) => {
     setMsg(null);
     try {
-      await fn();
-      if (ok) setMsg({ at, kind: "ok", text: ok });
+      const result = await fn();
+      const text = typeof ok === "function" ? ok(result) : ok;
+      if (text) setMsg({ at, kind: "ok", text });
       refresh();
       return true;
     } catch (e) {

@@ -69,7 +69,9 @@ export default function PendingEdit({ r, run }: { r: AdminInitiative; run: Run }
     <div className="panel mt-7 border-[rgba(240,180,41,.45)]">
       <span className="k">Edit awaiting approval</span>
       <p className="m-0 small dim">
-        {byAdmin
+        {own
+          ? "You proposed this initiative, so your edit waits for review like anyone's. The public page keeps the approved version until it is accepted."
+          : byAdmin
           ? "The proposer is an admin, so another admin should review this edit. The public page keeps the approved version until it is accepted."
           : "The proposer edited this approved initiative. The public page keeps the approved version until you accept the edit."}
       </p>

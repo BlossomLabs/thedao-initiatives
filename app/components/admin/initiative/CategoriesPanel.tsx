@@ -28,10 +28,17 @@ export default function CategoriesPanel({ r, run }: { r: AdminInitiative; run: R
             setBusy(true);
             void run(
               () =>
-                adminApi(`/api/initiatives/${encodeURIComponent(r.slug)}/revisions`, {
-                  json: { categories: value, initiativeId: r.id },
-                }),
-              "Categories saved.",
+                adminApi<{ pending?: boolean }>(
+                  `/api/initiatives/${encodeURIComponent(r.slug)}/revisions`,
+                  { json: { categories: value, initiativeId: r.id } },
+                ),
+              (out) => {
+                // On an admin's own initiative with their edit waiting, the tags
+                // join that edit: the live ones stay until it is accepted.
+                if (!out.pending) return "Categories saved.";
+                setValue(r.categories);
+                return "Categories added to your edit waiting for review.";
+              },
             ).finally(() => setBusy(false));
           }}
         >

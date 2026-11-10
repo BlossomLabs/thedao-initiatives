@@ -1,12 +1,15 @@
 import { useId, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { adminsKey } from "~/components/admin/Admins";
 import { DiffBlock, RevisionAuthor } from "~/components/initiative/RevisionBar";
 import { Button } from "~/components/ui/Button";
 import { CategoryTag } from "~/components/ui/CategoryTag";
 import { Textarea } from "~/components/ui/Field";
+import { sessionKey, useSession } from "~/context/session";
 import { useAdminApi } from "~/hooks/use-admin-api";
 import { useRevision } from "~/hooks/use-revision";
-import type { AdminInitiative } from "~/lib/api-types";
-import { errorMessage } from "~/lib/api";
+import type { AdminInitiative, AdminList } from "~/lib/api-types";
+import { api, errorMessage } from "~/lib/api";
 import { dt, usd } from "~/lib/format";
 import { changed, type Chunk, diffCategories, diffRevisions } from "~/lib/revision-diff";
 import type { Run } from "./run";
@@ -24,7 +27,20 @@ export default function PendingEdit({ r, run }: { r: AdminInitiative; run: Run }
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<"accept" | "reject" | null>(null);
   const noteId = useId();
+  const { session } = useSession();
+  // Shared with the Admins panel; without it the panel only loses the marker.
+  const { data: team } = useQuery({
+    queryKey: [...adminsKey, sessionKey(session)],
+    queryFn: ({ signal }) => api<AdminList>("/api/admin/admins", { signal }),
+    enabled: Boolean(session?.isAdmin),
+  });
   if (!n) return null;
+  const author = edit?.author.toLowerCase();
+  // Team policy, not a lock: another admin accepts an admin's own edit.
+  const own = Boolean(author && author === session?.address.toLowerCase());
+  const byAdmin = !own && Boolean(
+    author && team?.admins?.some((a) => a.address.toLowerCase() === author),
+  );
   const decide = (verdict: "accept" | "reject") => {
     setBusy(verdict);
     void run(
@@ -53,8 +69,9 @@ export default function PendingEdit({ r, run }: { r: AdminInitiative; run: Run }
     <div className="panel mt-7 border-[rgba(240,180,41,.45)]">
       <span className="k">Edit awaiting approval</span>
       <p className="m-0 small dim">
-        The proposer edited this approved initiative. The public page keeps the approved version
-        until you accept the edit.
+        {byAdmin
+          ? "The proposer is an admin, so another admin should review this edit. The public page keeps the approved version until it is accepted."
+          : "The proposer edited this approved initiative. The public page keeps the approved version until you accept the edit."}
       </p>
       {edit && (
         <p className="m-0 mt-2 flex flex-wrap items-center gap-x-2 small dim">
@@ -118,6 +135,7 @@ export default function PendingEdit({ r, run }: { r: AdminInitiative; run: Run }
           />
         </div>
       )}
+      {own && <p className="m-0 mt-4 small dim">{OWN_EDIT_NOTE}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-2.5">
         {!rejecting && (
           <Button
@@ -154,3 +172,5 @@ export default function PendingEdit({ r, run }: { r: AdminInitiative; run: Run }
     </div>
   );
 }
+
+const OWN_EDIT_NOTE = "This is your own edit. Team policy is that another admin accepts it.";

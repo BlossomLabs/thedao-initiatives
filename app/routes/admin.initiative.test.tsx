@@ -369,3 +369,65 @@ it("no edit waiting: no approval panel", async () => {
   await screen.findByRole("heading", { level: 1 });
   expect(screen.queryByText("Edit awaiting approval")).toBeNull();
 });
+
+const SELF = "0x1111111111111111111111111111111111111111";
+const OWN_NOTE = "This is your own edit. Team policy is that another admin accepts it.";
+
+/** Answer the admin list with these admins (or fail it), on top of the page's mock. */
+function withAdmins(admins: string[] | Error) {
+  const fallback = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation((path, options) =>
+    String(path) === "/api/admin/admins"
+      ? admins instanceof Error ? Promise.reject(admins) : Promise.resolve({
+        admins: admins.map((address) => ({ address, fixed: false })),
+        you: SELF,
+      })
+      : fallback(path, options)
+  );
+}
+
+const pendingPanel = async () => {
+  const panel = (await screen.findByText("Edit awaiting approval")).closest(
+    ".panel",
+  ) as HTMLElement;
+  await waitFor(() => expect(panel.querySelector("ins")).not.toBeNull());
+  return panel;
+};
+
+it("an admin's own edit says another admin should accept it, and Accept still works", async () => {
+  withPendingEdit({ author: SELF });
+  withAdmins([SELF]);
+  renderPage();
+  const panel = await pendingPanel();
+  expect(within(panel).getByText(OWN_NOTE)).toBeInTheDocument();
+  fireEvent.click(within(panel).getByRole("button", { name: "Accept edit" }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/admin/initiatives/1/revisions/3/accept", { json: {} })
+  );
+});
+
+it("someone else's edit has no own-edit note", async () => {
+  withPendingEdit();
+  withAdmins([SELF]);
+  renderPage();
+  const panel = await pendingPanel();
+  expect(within(panel).queryByText(OWN_NOTE)).toBeNull();
+  expect(within(panel).queryByText(/proposer is an admin/)).toBeNull();
+});
+
+it("an edit by an admin proposer is marked as such", async () => {
+  withPendingEdit();
+  withAdmins([SELF, "0x2222222222222222222222222222222222222222"]);
+  renderPage();
+  const panel = await pendingPanel();
+  expect(await within(panel).findByText(/proposer is an admin/)).toBeInTheDocument();
+});
+
+it("the panel works without the admin list", async () => {
+  withPendingEdit();
+  withAdmins(new Error("down"));
+  renderPage();
+  const panel = await pendingPanel();
+  expect(within(panel).getByRole("button", { name: "Accept edit" })).toBeInTheDocument();
+  expect(within(panel).queryByText(/proposer is an admin/)).toBeNull();
+});

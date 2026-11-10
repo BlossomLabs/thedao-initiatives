@@ -55,8 +55,9 @@ export default function EditInitiative() {
   const team = Boolean(session?.isAdmin);
   const allowed = mine || team;
   const open = r?.status === "pending" || r?.status === "approved";
-  // Approval is a review of the text: the proposer's edit to it waits for the team.
-  const hold = !team && r?.status === "approved";
+  // Approval is a review of the text: the proposer's edit to it waits for the
+  // team, an admin's edit to their own initiative included.
+  const hold = (!team || mine) && r?.status === "approved";
   const waitingN = hold && r?.pendingRevision ? r.pendingRevision : null;
   const waiting = useRevision(slug, waitingN);
   const edit = waitingN ? waiting.data : undefined;
@@ -189,6 +190,7 @@ export default function EditInitiative() {
               <WhatYouCanChange
                 status={r?.status}
                 manage={session?.isAdmin && r ? `/admin/initiatives/${r.slug}` : undefined}
+                hold={hold}
               />
               <RevisionsCard hold={hold} />
             </StickyAside>
@@ -200,13 +202,15 @@ export default function EditInitiative() {
 
 /** What can change, by status; an admin also gets the way to everything else (`manage`). */
 function WhatYouCanChange(
-  { status, manage }: { status?: Initiative["status"]; manage?: string },
+  { status, manage, hold }: { status?: Initiative["status"]; manage?: string; hold?: boolean },
 ) {
   return (
     <div className="panel">
       <span className="k">What you can change</span>
       <p className="m-0 small dim">
-        {manage
+        {manage && hold
+          ? "As an admin you can change the facts here directly. This is your own initiative, so text edits and the goal wait for another admin to accept them, like any proposer's."
+          : manage
           ? "As an admin you can change everything here, the facts locked after approval included. The same checks apply, and your edits are tagged as the team's."
           : status === "pending"
           ? "Everything you submitted can still be changed here. Backers are added by the team."
@@ -291,7 +295,8 @@ function EditForm(
 
   async function onSubmit(payload: SubmitPayload) {
     await requireSession();
-    const facts = open ? pageFactsPatch(payload, r) : null;
+    // A held edit carries the goal, with the milestones that add up to it.
+    const facts = open ? withoutHeldGoal(pageFactsPatch(payload, r), hold) : null;
     const text = textChanged(payload, r);
     // Categories are part of the proposal: they change with the text, in the revision.
     const cats = payload.categories.join() !== r.categories.join()
@@ -347,6 +352,7 @@ function EditForm(
         <WhatYouCanChange
           status={r.status}
           manage={team ? `/admin/initiatives/${r.slug}` : undefined}
+          hold={hold}
         />
       }
       asideBottom={<RevisionsCard hold={hold} />}
@@ -357,4 +363,11 @@ function EditForm(
       }
     />
   );
+}
+
+/** The facts to PATCH, less the goal when it travels in a held edit; null when nothing is left. */
+function withoutHeldGoal<T extends Record<string, unknown>>(facts: T | null, hold: boolean) {
+  if (!facts || !hold || !("goal" in facts)) return facts;
+  const { goal: _, ...rest } = facts;
+  return Object.keys(rest).length ? rest : null;
 }

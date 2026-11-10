@@ -23,6 +23,7 @@ vi.mock("~/hooks/use-revision", () => ({
   }),
 }));
 const ME = "0x1111111111111111111111111111111111111111";
+const SOMEONE = "0x2222222222222222222222222222222222222222";
 const who = vi.hoisted(() => ({ isAdmin: true }));
 const auth = vi.hoisted(() => ({ signIn: vi.fn() }));
 vi.mock("~/context/session", () => ({
@@ -62,6 +63,19 @@ vi.mock("~/components/initiative-form/InitiativeForm", () => ({
             )}
         >
           Lower the goal
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            void onSubmit(
+              toPayload({
+                ...initial!,
+                page: { ...initial!.page, goal: "100,000", duration: "7" },
+              }),
+              initial!,
+            )}
+        >
+          Lower the goal and the duration
         </button>
         <button
           type="button"
@@ -234,7 +248,7 @@ it("the proposer of an approved initiative changes the goal in the edit, not in 
 });
 
 it("the team's goal change still goes in the PATCH, and no edit carries it", async () => {
-  feed({ ...structuredRow(), slug: "same-url", status: "approved" as const });
+  feed({ ...structuredRow(), slug: "same-url", status: "approved" as const, proposer: SOMEONE });
   const qc = new QueryClient();
   const { unmount } = render(page(qc));
   expect(screen.getByLabelText("Goal")).toHaveTextContent(/^open$/);
@@ -358,6 +372,7 @@ it("the proposer of an approved initiative is told the edit waits for review; th
   expect(screen.getByText(/keeps the approved version until the team accepts/)).toBeInTheDocument();
   mine.unmount();
   who.isAdmin = true;
+  feed({ ...structuredRow(), slug: "same-url", status: "approved" as const, proposer: SOMEONE });
   const team = render(page(qc));
   expect(screen.queryByText(/until the team accepts/)).toBeNull();
   expect(screen.getByText(/Changes go live as soon as you save/)).toBeInTheDocument();
@@ -394,6 +409,68 @@ it("with an edit in review the form starts from it, and a new save is compared a
   expect(json.title).toBe("A second title in review");
   // the categories of the edit in review were kept, so they are not sent again
   expect("categories" in json).toBe(false);
+  unmount();
+  qc.clear();
+});
+
+const mineApproved = () =>
+  feed({ ...structuredRow(), slug: "same-url", status: "approved" as const, proposer: ME });
+const patched = () =>
+  vi.mocked(api).mock.calls.filter(([, o]) => (o as { method?: string })?.method === "PATCH");
+
+it("an admin proposer of an approved initiative sends the edit for review", () => {
+  mineApproved();
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.getByText(/keeps the approved version until the team accepts/)).toBeInTheDocument();
+  unmount();
+  qc.clear();
+});
+
+it("an admin proposer's goal change goes in the held edit, not in the PATCH", async () => {
+  mineApproved();
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  fireEvent.click(screen.getByText("Lower the goal"));
+  expect(await screen.findByText("The public page")).toBeInTheDocument();
+  expect(api).toHaveBeenCalledWith("/api/initiatives/same-url/revisions", {
+    json: expect.objectContaining({ goal: "100000" }),
+  });
+  expect(patched()).toEqual([]);
+  unmount();
+  qc.clear();
+});
+
+it("an admin proposer's other facts still go in the PATCH", async () => {
+  mineApproved();
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  fireEvent.click(screen.getByText("Lower the goal and the duration"));
+  expect(await screen.findByText("The public page")).toBeInTheDocument();
+  const [[, patch]] = patched() as [string, { json: Record<string, unknown> }][];
+  expect(patch.json).toEqual(expect.objectContaining({ durationMonths: "7" }));
+  expect(patch.json).not.toHaveProperty("goal");
+  expect(api).toHaveBeenCalledWith("/api/initiatives/same-url/revisions", {
+    json: expect.objectContaining({ goal: "100000" }),
+  });
+  unmount();
+  qc.clear();
+});
+
+it("an admin proposer of a pending initiative saves straight away", () => {
+  feed({ ...structuredRow(), slug: "same-url", status: "pending" as const, proposer: ME });
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.queryByText(/until the team accepts/)).toBeNull();
+  unmount();
+  qc.clear();
+});
+
+it("an admin proposer is told their text edits wait for another admin", () => {
+  mineApproved();
+  const qc = new QueryClient();
+  const { unmount } = render(page(qc));
+  expect(screen.getByText(/wait for another admin/)).toBeInTheDocument();
   unmount();
   qc.clear();
 });

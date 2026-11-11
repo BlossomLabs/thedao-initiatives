@@ -17,6 +17,10 @@ const POOL = BigInt(ROUND.poolUsd);
 const POOL_USD = Number(POOL / 1_000_000n);
 const IN_ROUND: ReadonlySet<string> = new Set(ROUND.slugs);
 
+/** Every 5 s while voting is open; nothing once it has closed (the result is final). */
+export const pollEvery = (closesAt: number, nowMs: number): number | false =>
+  nowMs / 1000 < closesAt ? POLL_MS : false;
+
 function useNow(ms = 1000) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -43,8 +47,8 @@ const POOL_NAME = REAL ? "pool" : "demo pool";
  * (voters only) for a test vote. */
 export default function VoteResults() {
   const board = useBoard();
-  const ballots = useVoteBallots(POLL_MS);
   const now = useNow();
+  const ballots = useVoteBallots(pollEvery(ROUND.closesAt, now));
   // The way back to your ballot: by the code this browser opened it with, else by the
   // signed-in account's badge (found on-chain).
   const [code, setCode] = useState<string | null>(null);

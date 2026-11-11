@@ -208,6 +208,15 @@ describe("selfSendBallot", () => {
     });
   });
 
+  it("another badge's last ballot is never reused, even when the nonces line up", async () => {
+    const d = deps({ nonceOf: vi.fn(() => Promise.resolve(0n)) });
+    const last = { tokenId: 12n, nonce: 1n, ballot: BALLOT, signature: SIG, hash: HASH };
+    const { set } = record();
+    await selfSendBallot(d, m, 40n, VOTER, BALLOT, last, set);
+    expect(d.signVote).toHaveBeenCalled();
+    expect(d.sendOwn).toHaveBeenCalledWith(expect.objectContaining({ tokenId: 40n, nonce: 1n }));
+  });
+
   it("no gas to be had (already given) still lets the wallet try", async () => {
     const d = deps({ requestGas: vi.fn(() => Promise.reject(new Error("already got its gas"))) });
     const { phases, set } = record();

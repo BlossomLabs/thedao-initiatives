@@ -156,7 +156,7 @@ export async function selfSendBallot(
   set: (p: BallotPhase) => void,
 ): Promise<Signed | null> {
   let signed: Signed | null = null;
-  if (last && last.ballot.toLowerCase() === ballot.toLowerCase()) {
+  if (last && last.tokenId === tokenId && last.ballot.toLowerCase() === ballot.toLowerCase()) {
     const onchain = await d.nonceOf(tokenId).catch(() => null);
     if (onchain !== null && onchain + 1n === last.nonce) {
       const { hash: _, ...rest } = last;

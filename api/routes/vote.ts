@@ -24,6 +24,8 @@ const RELAY_FLOOR_WEI = 10_000_000_000_000_000n; // 0.01 ETH
 /** Long enough for any mint to land; the chain is the record after that. */
 const MINTING_MS = 60 * 60_000;
 const BALLOTS_CACHE_SECS = 5;
+/** Blocks before the close are final well within this, so ballots can't change after. */
+const FINAL_AFTER_SECS = 30 * 60;
 const DRIP_WEI = 5_000_000_000_000_000n; // 0.005 Sepolia ETH
 
 const fail = (status: number, code: string, message: string, extra?: Record<string, unknown>) =>
@@ -291,11 +293,14 @@ export function voteRoutes(deps: Deps) {
     return c.json({ hash });
   });
 
-  // The vote results poll this every few seconds; the chain is read at most once per window.
+  // The vote results poll this every few seconds; the chain is read at most once per
+  // window. Once the close is final, the last read is the result: read once, kept.
   r.get("/ballots", async (c) => {
     const d = dc();
     const key = [...round(d), "ballots"];
     const cached = await deps.db.kv.get<{ at: number; ballots: unknown[] }>(key);
+    const finalAt = d.manifest.closesAt + FINAL_AFTER_SECS;
+    if (cached.value && cached.value.at >= finalAt) return c.json(cached.value);
     if (cached.value && deps.now() - cached.value.at < BALLOTS_CACHE_SECS) {
       return c.json(cached.value);
     }
@@ -308,7 +313,8 @@ export function voteRoutes(deps: Deps) {
     }
     const ballots = [...latest].map(([tokenId, ballot]) => ({ tokenId, ballot }));
     const value = { at: deps.now(), ballots };
-    await deps.db.kv.set(key, value, { expireIn: 60_000 });
+    // A final result is kept for good; a live one only for a minute.
+    await deps.db.kv.set(key, value, deps.now() >= finalAt ? undefined : { expireIn: 60_000 });
     return c.json(value);
   });
 

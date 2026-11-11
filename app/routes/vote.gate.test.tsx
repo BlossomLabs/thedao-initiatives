@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api } from "~/lib/api";
 import Board from "./board";
@@ -138,4 +139,11 @@ it("no vote deployed: /vote says so", async () => {
   round.contract = `0x${"0".repeat(40)}`;
   at("/vote");
   expect(await screen.findByText("There's no vote right now.")).toBeInTheDocument();
+});
+
+it("the real vote, open: the first render is still the board, as prerendered (no hydration mismatch)", () => {
+  round.kind = "real";
+  const html = renderToString(<Board />);
+  expect(html).toContain("the board");
+  expect(html).not.toContain("vote results");
 });

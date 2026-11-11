@@ -146,6 +146,13 @@ export function useBallotSubmit(tokenId: bigint | null) {
   const [last, setLast] = useState<Signed | null>(
     () => (tokenId === null ? null : loadLast(tokenId)),
   );
+  // Another badge (the picker): its own last ballot and a fresh status, never this one's.
+  const [forToken, setForToken] = useState(tokenId);
+  if (forToken !== tokenId) {
+    setForToken(tokenId);
+    setLast(tokenId === null ? null : loadLast(tokenId));
+    setPhase({ kind: "idle" });
+  }
 
   const deps = useMemo<FlowDeps>(() => ({
     ensureChain,

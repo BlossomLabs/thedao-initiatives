@@ -17,8 +17,9 @@ const realVoteOpen = () =>
   roundDeployed() && ROUND.kind === "real" && Date.now() / 1000 >= ROUND.opensAt;
 
 export default function Board() {
-  // Checked again after the first render: the prerendered page may predate the opening.
-  const [vote, setVote] = useState(realVoteOpen);
+  // The prerendered page is the board, so the first render is too (hydration must
+  // match); the vote results take over right after, once the clock is known.
+  const [vote, setVote] = useState(false);
   useEffect(() => setVote(realVoteOpen()), []);
   return vote ? <VoteResults /> : <BoardPage />;
 }

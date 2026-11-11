@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { bytesToHex } from "viem";
 import { api } from "~/lib/api";
 import { encodeBallot } from "../../../shared/vote/ballot";
-import VoteResults from "./VoteResults";
+import VoteResults, { pollEvery } from "./VoteResults";
 
 vi.mock("../../../shared/vote/manifest", async (original) => ({
   ...await original<typeof import("../../../shared/vote/manifest")>(),
@@ -217,4 +217,9 @@ it("links a signed-in badge holder to their ballot, even without the code in thi
     .toHaveAttribute("href", "/vote/ballot");
   signedIn.address = null;
   signedIn.badge = null;
+});
+
+it("polls every 5 s while voting is open, and stops once it has closed", () => {
+  expect(pollEvery(1_000, 999_000)).toBe(5_000);
+  expect(pollEvery(1_000, 1_000_000)).toBe(false);
 });

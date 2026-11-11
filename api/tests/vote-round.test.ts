@@ -467,6 +467,16 @@ Deno.test("vote round ballots: latest per badge, only before the close, cached b
   h.close();
 });
 
+Deno.test("vote round ballots: once the close is final, the chain is read once and kept", async () => {
+  const { h, state } = await setup();
+  h.clock.now = manifest.closesAt + 60 * 60;
+  await h.req("/api/vote/ballots");
+  h.clock.now += 24 * 60 * 60;
+  await h.req("/api/vote/ballots");
+  assertEquals(state.ballotReads, 1);
+  h.close();
+});
+
 Deno.test("vote round gas: tops up a low balance once per badge, only for its owner", async () => {
   const { h, state } = await setup();
   state.owners.set(17n, PLAIN);

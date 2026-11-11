@@ -4,6 +4,7 @@ import Hero from "~/components/board/Hero";
 import { LinkButton } from "~/components/ui/Button";
 import { useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/vote-local";
+import { dollars } from "~/lib/vote-results";
 import { useSession } from "~/context/session";
 import { type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd } from "~/lib/format";
@@ -33,7 +34,6 @@ function timeLeft(secs: number): string {
 }
 
 const REAL = ROUND.kind === "real";
-const dollars = (micro: string) => Number(BigInt(micro) / 10_000n) / 100;
 const utc = (secs: number, withDay = true) =>
   `${
     new Intl.DateTimeFormat("en-GB", {

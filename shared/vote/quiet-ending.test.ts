@@ -201,8 +201,10 @@ describe("quiet-ending replay", () => {
   });
 
   it("chainTally on liveInputs reproduces the live tally", () => {
+    // Both voters also back proposal 1 (needing 40) next, so A has one to fund.
+    const both = () => [r("a", 1, [1, 2]), r("b", 2, [1, 2])];
     const check = (now: number) => {
-      const st = run(base(), now);
+      const st = run(both(), now, { needs: [150n, 40n] });
       const again = () => chainTally(st.liveInputs!, st.firstOpen);
       const stages = again();
       const tiers = new Map(
@@ -216,8 +218,8 @@ describe("quiet-ending replay", () => {
       expect(again()).toEqual(stages);
       return st.live.order;
     };
-    expect(check(T + 50)).toEqual([0]); // S settling, a non-empty live tally
-    check(T + 6300 + 50); // S settled, A settling
+    expect(check(T + 50)).toEqual([0, 1]); // S settling: S funds 0, A funds 1
+    expect(check(T + 6300 + 50)).toEqual([1]); // S settled, A settling
   });
 });
 

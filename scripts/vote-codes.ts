@@ -104,7 +104,8 @@ export async function codesPdf(codes: SignedCode[]): Promise<Uint8Array> {
 
 if (import.meta.main) {
   const args = parseArgs(Deno.args, { string: ["from", "to", "base-url", "out"] });
-  const key = Deno.env.get("VOTE_ISSUER_KEY")?.trim();
+  // DEVCON_ISSUER_KEY: the name before the rename, still accepted.
+  const key = (Deno.env.get("VOTE_ISSUER_KEY") || Deno.env.get("DEVCON_ISSUER_KEY"))?.trim();
   if (!key || !/^0x[0-9a-fA-F]{64}$/.test(key)) {
     console.error("Set VOTE_ISSUER_KEY to the issuer's private key (0x + 64 hex).");
     Deno.exit(1);

@@ -254,7 +254,9 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     // Not the Alchemy key: that app may not have Sepolia enabled (every vote route would fail).
     sepoliaRpcUrl: (env.SEPOLIA_RPC_URL ?? "").trim() ||
       "https://ethereum-sepolia-rpc.publicnode.com",
-    voteRelayerKey: (env.VOTE_RELAYER_KEY ?? "").trim(),
+    // DEVCON_RELAYER_KEY is the secret's name from before the rename; still accepted so a
+    // deploy doesn't need the secret renamed in the same release.
+    voteRelayerKey: (env.VOTE_RELAYER_KEY ?? "").trim() || (env.DEVCON_RELAYER_KEY ?? "").trim(),
     pinataJwt: (env.PINATA_JWT ?? "").trim(),
     pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "ipfs.blossom.software",
     supportUrl: (env.SUPPORT_URL ?? "").trim(),

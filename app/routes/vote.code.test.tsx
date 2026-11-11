@@ -906,3 +906,22 @@ it("prefill: a counted ballot or a saved draft wins over ratings", async () => {
   )
     .toBeInTheDocument();
 });
+
+it("paste: settled tiers stay as counted, and the page says so", async () => {
+  await ballotWith(roundBody({
+    accepted: { "17": "0x01ffff" },
+    tiers: [
+      { tier: "S", status: "settled", at: 1, forced: false, funded: ["alpha"], awards: {} },
+      waiting("A"),
+      waiting("B"),
+    ],
+  }));
+  fireEvent.click(await screen.findByRole("button", { name: "Paste a ballot" }));
+  fireEvent.change(screen.getByLabelText("Ballot to paste"), { target: { value: "beta,gamma" } });
+  fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+  expect(await screen.findByText("Settled tiers stay as they were counted.")).toBeInTheDocument();
+  const s = screen.getByRole("list", { name: "Must fund" });
+  expect(within(s).getByRole("button", { name: /ALPHA/ })).toBeInTheDocument();
+  expect(within(s).queryByRole("button", { name: /BETA/ })).toBeNull();
+  expect(submit).not.toHaveBeenCalled();
+});

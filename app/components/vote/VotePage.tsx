@@ -33,6 +33,7 @@ import { prefillFromRatings, ratingsToken } from "~/lib/vote-prefill";
 import { ruleMessage } from "~/lib/vote-rules-copy";
 import { useReviewIdentity } from "~/hooks/use-admin-ratings";
 import BallotRules from "~/components/vote/BallotRules";
+import PasteBallot from "~/components/vote/PasteBallot";
 import { checkBallot } from "../../../shared/vote/rules";
 import { usd } from "~/lib/format";
 import { encodeBallot, type Tier } from "../../../shared/vote/ballot";
@@ -614,6 +615,22 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
         ))}
       </div>
     );
+    // A pasted ballot replaces the draft; the settled tiers stay as they were counted.
+    const applyPasted = (next: Partial<Record<string, Tier>>): boolean => {
+      if (!countedHex) {
+        replaceTiers(next);
+        return false;
+      }
+      const counted = countedTiers(countedHex, tiers, ROUND.slugs);
+      const frozen = lockedLabels(counted, settledCount);
+      const out: Partial<Record<string, Tier>> = Object.fromEntries(
+        Object.entries(next).filter(([, t]) => t && !frozen.has(t)),
+      );
+      for (const [slug, t] of Object.entries(counted)) if (t && frozen.has(t)) out[slug] = t;
+      replaceTiers(out);
+      return Object.keys(out).length !== Object.keys(next).length ||
+        Object.entries(out).some(([k, t]) => next[k] !== t);
+    };
     // The ballot rules (rounds deployed with them), with the pool on-chain now.
     const rules = ROUND.ballotRules && placed > 0
       ? checkBallot(
@@ -728,6 +745,14 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
                     Send it yourself (from your wallet, on {REAL() ? "Ethereum" : "Sepolia"})
                   </button>
                 )}
+                <PasteBallot
+                  slugs={ROUND.slugs}
+                  titles={(slug) => titles.get(slug) ?? slug}
+                  askUsd={(slug) =>
+                    BigInt(ROUND.projects[ROUND.slugs.indexOf(slug)]?.askUsd ?? "0")}
+                  tiers={tiers}
+                  onApply={applyPasted}
+                />
               </div>
             )}
         />

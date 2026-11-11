@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ArrowRight, ChevronDown, GripVertical, RotateCcw, X } from "lucide-react";
 import CategoryDot from "~/components/ui/CategoryDot";
 import { LinkButton } from "~/components/ui/Button";
@@ -578,70 +578,79 @@ export default function TierBallot(
               {TIER_LABELS.map((t) => {
                 const inHere = items.filter((i) => where(i.slug) === t.tier);
                 return (
-                  <div
-                    key={t.tier}
-                    data-drop={t.tier}
-                    onClick={placeTapped(t.tier)}
-                    className={cn(
-                      "relative flex h-9 items-center gap-2 rounded-lg border pl-1.5 transition-colors sm:h-auto sm:min-h-[76px] sm:items-stretch sm:rounded-xl sm:p-1.5",
-                      lit(t.tier)
-                        ? "border-dao-green bg-dao-green/20"
-                        : !drag && takes(t.tier)
-                        ? "cursor-pointer border-[rgba(92,183,90,.4)] bg-dao-green/[.06]"
-                        : "border-transparent bg-white/[.03] sm:border-white/10",
-                    )}
-                  >
-                    {landed?.to === t.tier && (
-                      <span
-                        key={landed.n}
-                        aria-hidden="true"
-                        className="pointer-events-none absolute -inset-px animate-tier-land rounded-[inherit] border border-dao-green bg-dao-green/20 shadow-[0_0_18px_rgba(92,183,90,.45)]"
-                      />
-                    )}
-                    <button
-                      type="button"
-                      aria-label={isLocked(t.tier) ? `${t.label} (settled)` : `Place in ${t.label}`}
-                      disabled={!takes(t.tier) || Boolean(drag)}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        placeTapped(t.tier)();
-                      }}
-                      className="flex size-7 flex-none flex-col items-center justify-center rounded-md bg-white/[.06] disabled:cursor-default sm:h-auto sm:w-[76px] sm:gap-1 sm:rounded-lg"
+                  <Fragment key={t.tier}>
+                    <div
+                      data-drop={t.tier}
+                      onClick={placeTapped(t.tier)}
+                      className={cn(
+                        "relative flex h-9 items-center gap-2 rounded-lg border pl-1.5 transition-colors sm:h-auto sm:min-h-[76px] sm:items-stretch sm:rounded-xl sm:p-1.5",
+                        lit(t.tier)
+                          ? "border-dao-green bg-dao-green/20"
+                          : !drag && takes(t.tier)
+                          ? "cursor-pointer border-[rgba(92,183,90,.4)] bg-dao-green/[.06]"
+                          : "border-transparent bg-white/[.03] sm:border-white/10",
+                      )}
                     >
-                      <b
-                        key={landed?.to === t.tier ? landed.n : 0}
-                        className={cn(
-                          "font-inter-tight text-[16px] font-bold leading-none text-dao-green sm:text-[26px]",
-                          landed?.to === t.tier && "motion-safe:animate-grade-bump",
-                        )}
+                      {landed?.to === t.tier && (
+                        <span
+                          key={landed.n}
+                          aria-hidden="true"
+                          className="pointer-events-none absolute -inset-px animate-tier-land rounded-[inherit] border border-dao-green bg-dao-green/20 shadow-[0_0_18px_rgba(92,183,90,.45)]"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        aria-label={isLocked(t.tier)
+                          ? `${t.label} (settled)`
+                          : `Place in ${t.label}`}
+                        disabled={!takes(t.tier) || Boolean(drag)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          placeTapped(t.tier)();
+                        }}
+                        className="flex size-7 flex-none flex-col items-center justify-center rounded-md bg-white/[.06] disabled:cursor-default sm:h-auto sm:w-[76px] sm:gap-1 sm:rounded-lg"
                       >
-                        {t.grade}
-                      </b>
-                      <span className="hidden text-center text-[11px] leading-tight text-white/60 sm:block">
-                        {t.label}
-                      </span>
-                      {isLocked(t.tier) && (
-                        <span className="hidden text-[10px] uppercase tracking-[.08em] text-vote sm:block">
-                          Settled
-                        </span>
-                      )}
-                    </button>
-                    {inHere.length === 0
-                      ? (
-                        <span className="flex min-w-0 flex-1 items-center truncate text-[11.5px] text-white/35 sm:justify-center sm:text-[13px]">
-                          <span className="sm:hidden">{t.label}:&nbsp;</span>
-                          {picked ? "tap to place here" : "drag or tap to fill"}
-                        </span>
-                      )
-                      : (
-                        <ul
-                          className="flex min-w-0 flex-1 gap-1 overflow-x-auto pr-1.5 [scrollbar-width:none] sm:flex-wrap sm:content-start sm:gap-1.5 sm:overflow-visible sm:py-0.5"
-                          aria-label={t.label}
+                        <b
+                          key={landed?.to === t.tier ? landed.n : 0}
+                          className={cn(
+                            "font-inter-tight text-[16px] font-bold leading-none text-dao-green sm:text-[26px]",
+                            landed?.to === t.tier && "motion-safe:animate-grade-bump",
+                          )}
                         >
-                          {inHere.map(chip)}
-                        </ul>
-                      )}
-                  </div>
+                          {t.grade}
+                        </b>
+                        <span className="hidden text-center text-[11px] leading-tight text-white/60 sm:block">
+                          {t.label}
+                        </span>
+                        {isLocked(t.tier) && (
+                          <span className="hidden text-[10px] uppercase tracking-[.08em] text-vote sm:block">
+                            Settled
+                          </span>
+                        )}
+                      </button>
+                      {inHere.length === 0
+                        ? (
+                          <span className="flex min-w-0 flex-1 items-center truncate text-[11.5px] text-white/35 sm:justify-center sm:text-[13px]">
+                            <span className="sm:hidden">{t.label}:&nbsp;</span>
+                            {picked ? "tap to place here" : "drag or tap to fill"}
+                          </span>
+                        )
+                        : (
+                          <ul
+                            className="flex min-w-0 flex-1 gap-1 overflow-x-auto pr-1.5 [scrollbar-width:none] sm:flex-wrap sm:content-start sm:gap-1.5 sm:overflow-visible sm:py-0.5"
+                            aria-label={t.label}
+                          >
+                            {inHere.map(chip)}
+                          </ul>
+                        )}
+                    </div>
+                    {t.tier === "B" && (
+                      <p className="px-1 text-[12.5px] text-white/45">
+                        Tier-B is funded only if the pool lasts and enough voters back the same
+                        initiatives. It may fund nothing.
+                      </p>
+                    )}
+                  </Fragment>
                 );
               })}
             </div>

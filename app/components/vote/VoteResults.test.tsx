@@ -419,3 +419,39 @@ it("a closed round shows no gap", async () => {
   expect(screen.queryByRole("button", { name: /to Tier-/ })).toBeNull();
   expect(screen.queryByText(/Out of reach/)).toBeNull();
 });
+
+async function showOpen(round: Record<string, unknown>) {
+  vi.mocked(api).mockResolvedValue(round);
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>
+        <VoteResults />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  await screen.findByText(/Test vote/i);
+}
+
+it("the hero says when Tier-B funds nothing yet", async () => {
+  await showOpen(roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] }));
+  expect(await screen.findByText(/Tier-B: nothing funded yet, the pool may not reach it\./))
+    .toBeInTheDocument();
+  cleanup();
+  // Once a tier has started, the stage line carries it too.
+  await showOpen(
+    roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] }, {
+      tiers: [
+        { tier: "S", status: "settling", window: 1, windowEndsAt: 4_000_000_000 },
+        waiting("A"),
+        waiting("B"),
+      ],
+    }),
+  );
+  expect(await screen.findByText(/Tier-S settling.*Tier-B: nothing funded yet/))
+    .toBeInTheDocument();
+});
+
+it("no warning while Tier-B funds something", async () => {
+  await showOpen(roundOf({ "1": ballot({ alpha: "B" }) }, { alpha: [50_000, "B"] }));
+  expect(screen.queryByText(/Tier-B: nothing funded yet/)).toBeNull();
+});

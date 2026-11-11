@@ -68,6 +68,11 @@ function stageLine(rv: RoundView): string {
   }
   return parts.join(" · ");
 }
+/** Voters should expect Tier-B may be empty: it only funds what the pool has left. */
+const tierBEmpty = (rv: RoundView) =>
+  rv.tiers.find((t) => t.tier === "B")?.status !== "settled" &&
+  !Object.values(rv.live.tiers ?? {}).includes("B");
+const TIER_B_NOTE = " · Tier-B: nothing funded yet, the pool may not reach it.";
 const POOL_NAME = REAL ? "pool" : "demo pool";
 
 /** The vote results: the front page, limited to the round's initiatives, with what the
@@ -185,12 +190,13 @@ export default function VoteResults() {
           </>
         )
         : started && rv
-        ? <>{stageLine(rv)}</>
+        ? <>{stageLine(rv)}{tierBEmpty(rv) && TIER_B_NOTE}</>
         : (
           <>
             would be funded by {ballotsText} from the {usd(POOL_USD)}{" "}
             <span className="text-vote">{POOL_NAME}</span> · Tier-S starts settling in{" "}
             {timeLeft(sTally - Math.floor(now / 1000))}
+            {rv && tierBEmpty(rv) && TIER_B_NOTE}
           </>
         )}
     >

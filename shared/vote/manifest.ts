@@ -26,7 +26,7 @@ export type VoteManifest = {
   slugs: string[];
   /** Per slug, in the same order: what the contract registered (the ballot rules). */
   projects: { askUsd: string; rfp: boolean; groups: number[] }[];
-  /** Group (tag) names; a project's `groups` index into this. */
+  /** Group (affiliation) names; a project's `groups` index into this. */
   groups: string[];
   /** Tiers held to the independence rules: bit 0 Tier-S (always), bit 1 Tier-A. */
   independentTiers: number;
@@ -53,7 +53,7 @@ export function checkManifest(m: VoteManifest): VoteManifest {
     throw new Error("vote manifest: projects must match slugs one to one");
   }
   for (const p of m.projects) {
-    if (p.rfp && p.groups.length) throw new Error("vote manifest: an RFP can't have tags");
+    if (p.rfp && p.groups.length) throw new Error("vote manifest: an RFP can't have affiliations");
     if (p.groups.some((g) => g < 0 || g >= m.groups.length)) {
       throw new Error("vote manifest: a project names an unknown group");
     }

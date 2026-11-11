@@ -1,7 +1,7 @@
 /** The ballot rules (docs/superpowers/specs/2026-11-11-ballot-rules-design.md): a valid
  * ballot requests at least 1.5× the pool, and each enforced tier (Tier-S always, Tier-A
  * when the round says so) holds at least 3 pairwise-unrelated projects with no related
- * group over half its funds. Related = sharing a group (tag); RFPs have none. Mirrored by
+ * group over half its funds. Related = sharing a group (an affiliation); RFPs have none. Mirrored by
  * vote/reference/ballot_rules.py and the contract; shared fixtures keep them equal.
  * Amounts are micro-USD bigints. Browser and Deno. */
 

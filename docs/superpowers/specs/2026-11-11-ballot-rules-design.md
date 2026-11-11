@@ -24,7 +24,7 @@ Three things follow:
 
 **Anti-goals.** The explanation voters read must match exactly what the algorithm does:
 no hidden option, no checkbox that changes what happens to leftover money, no C tier.
-Tags must not appear in the UI as decoration or labels.
+Affiliations must not appear in the UI as decoration or labels.
 
 ## Decisions (the user's)
 
@@ -42,16 +42,16 @@ Tags must not appear in the UI as decoration or labels.
   - No single related group can hold more than half of the tier's funds.
   - These rules never apply to Tier-B. Whether they apply to Tier-A is undecided, so it is
     a per-round setting (default: Tier-S only).
-- **Relatedness is tags.** Projects get a new `tags` field (e.g. `Seal`). Projects sharing
-  a tag are related. The tag is its own display name. A project may have several tags.
-  **No chains:** relatedness is only a direct shared tag (if a–b share one tag and b–c
+- **Relatedness is affiliations** (first called tags; renamed at the user's request). Projects get a new `affiliations` field (e.g. `Seal`). Projects sharing
+  an affiliation are related. The affiliation is its own display name. A project may have several affiliations.
+  **No chains:** relatedness is only a direct shared affiliation (if a–b share one affiliation and b–c
   another, a and c are not related).
-- **RFPs cannot have tags.**
-- **Tags stay out of the UI**, except in a ballot error ("X and Y are related to Seal…")
+- **RFPs cannot have affiliations.**
+- **Affiliations stay out of the UI**, except in a ballot error ("X and Y are affiliated with Seal…")
   and in the admin's edit form. They **are** listed in `/vote/llms.txt`.
 - **Rules block sending.** A ballot breaking any rule is invalid.
 - **The tally refuses invalid ballots too**, not just the page.
-- **The contract registers the tags** (as pre-computed groups, see below) and checks the
+- **The contract registers the affiliations** (as pre-computed groups, see below) and checks the
   rules. Independence is checked against a **proof** sent alongside the ballot.
 - **New projects can be added after the vote opens**, but not while a tier's quiet ending
   is running.
@@ -77,7 +77,7 @@ Definitions, for one ballot, at the block that records it:
   least 3 projects, so it is always the voter's Tier-A: an empty Tier-A is then invalid
   ("Tier-A needs at least 3 independent projects"), and the page blocks it like any rule.
   *(My call: the rule read literally. The proof is then always 6 indexes.)*
-- **Related:** two projects share at least one tag (group). RFPs have no groups.
+- **Related:** two projects share at least one affiliation (group). RFPs have no groups.
 
 A ballot is **valid** when all of these hold:
 
@@ -114,7 +114,7 @@ are signed by the issuer, not tied to a contract). *(My call.)*
 
 - **Groups.** `addGroup(bytes32 name) returns (uint8 id)`, at most 256 groups, emits
   `GroupAdded(id, name)`. Each project stores a `uint256 groups` bitmask. Related means
-  `groupsA & groupsB != 0`. This is the "pre-grouping": the deploy script turns tags into
+  `groupsA & groupsB != 0`. This is the "pre-grouping": the deploy script turns affiliations into
   groups once, so Solidity only ANDs masks.
 - **Projects.** `Initiative` gains `bool rfp` and `uint256 groups`.
   `addInitiative(account, askUsd, rfp, groups)`; `rfp && groups != 0` reverts.
@@ -165,24 +165,24 @@ are signed by the issuer, not tied to a contract). *(My call.)*
 
 ## Round file and deploy
 
-- The manifest's project list becomes objects: `{ slug, askUsd, rfp, tags }`, plus
+- The manifest's project list becomes objects: `{ slug, askUsd, rfp, affiliations }`, plus
   `independentTiers`. The list is **append-only**; a project's index never changes.
-- `deno task vote-deploy` builds groups from the initiatives' tags (one group per distinct
-  tag, named by the tag) and registers them with the projects.
-- New: `deno task vote-deploy --add <slug>…` sends `addGroup` for any new tag and
+- `deno task vote-deploy` builds groups from the initiatives' affiliations (one group per distinct
+  affiliation, named by the affiliation) and registers them with the projects.
+- New: `deno task vote-deploy --add <slug>…` sends `addGroup` for any new affiliation and
   `addInitiative` for each slug, refuses inside a quiet-ending span (saying when the next
   gap opens), appends to the manifest, and the app is redeployed. Until the app redeploys,
   the page encodes ballots against the shorter list, which the contract accepts.
 
-## Tags on initiatives (site)
+## Affiliations on initiatives (site)
 
-- `Initiative` gets `tags: string[]` (KV and content front matter `tags:`). Admin edit form
-  only. Saving tags on an RFP is refused ("RFPs can't have tags").
-- Tags are not shown on cards, initiative pages, the board, the site `/llms.txt`,
+- `Initiative` gets `affiliations: string[]` (KV and content front matter `affiliations:`). Admin edit form
+  only. Saving affiliations on an RFP is refused ("RFPs can't have affiliations").
+- Affiliations are not shown on cards, initiative pages, the board, the site `/llms.txt`,
   `/initiatives.json` or the `.md` facts. They appear only in ballot errors and in
   `/vote/llms.txt`. (They are in the shipped round file, so they are not secret: hiding
   them is a presentation choice.)
-- Tag text: trimmed, 1–32 characters, compared case-insensitively, shown as first written.
+- Affiliation text: trimmed, 1–32 characters, compared case-insensitively, shown as first written.
 
 ## The ballot page
 
@@ -204,8 +204,8 @@ prefill. *(The user's decision.)* *(My call: no "reset to my ratings" button.)*
 - A rules box in the tier column, above the send box (above the tiers on a phone,
   like "Your share"), lists each problem in plain words, for example:
   - "Tier-S needs at least 3 independent projects. Seal Audits and Seal Tooling are
-    related to Seal, so they count as one."
-  - "Projects related to Seal take $310,000 of Tier-S's $500,000. One related group can
+    affiliated with Seal, so they count as one."
+  - "Projects affiliated with Seal take $310,000 of Tier-S's $500,000. One affiliation can
     hold at most half."
   - "Your ballot requests $1,100,000. It must request at least $1,369,866 (1.5× the
     $913,244 pool). Add more projects; Tier-B is a good place for them."
@@ -266,7 +266,7 @@ sections), served by the API with the same caching. For the deployed round:
 - The rules, exactly as above, including the 1.5× number in dollars.
 - The paste format with an example.
 - Every project in the round: slug, title, type (RFP/grant), requested amount, remaining
-  need, tags, and a link to its `.md` page.
+  need, affiliations, and a link to its `.md` page.
 - An instruction for the LLM: ask the voter for their ratings or priorities (it can't
   see them), produce one vote line that satisfies the rules, and list which three Tier-S
   projects make it independent.
@@ -288,7 +288,7 @@ The ballot page links to it ("Build your ballot with an LLM") next to Paste and 
 ## Out of scope
 
 - Re-judging recorded ballots when a project is added (validity is fixed when recorded).
-- Showing tags anywhere else, or letting voters see/suggest tags.
+- Showing affiliations anywhere else, or letting voters see/suggest affiliations.
 - Changing the stage tally math, the quiet ending, or per-badge share accounting.
 - Fixing the empty-Tier-A lossiness of the on-chain encoding (with Tier-A enforced it
   can't arise; with Tier-S only, an empty Tier-A just shifts Tier-B up, as today).

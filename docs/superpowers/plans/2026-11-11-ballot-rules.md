@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make a ballot valid only if it spreads money (minimum size, Tier-S independence by hidden project tags), enforce that on the page, the relayer, the contract and the tally, prefill ballots from the badge's star ratings, and let voters paste/copy pabutools ballots and use `/vote/llms.txt`.
+**Goal:** Make a ballot valid only if it spreads money (minimum size, Tier-S independence by hidden project affiliations), enforce that on the page, the relayer, the contract and the tally, prefill ballots from the badge's star ratings, and let voters paste/copy pabutools ballots and use `/vote/llms.txt`.
 
-**Architecture:** One rules core (`shared/vote/rules.ts`) mirrored by a Python reference and the Solidity contract, kept equal by shared fixtures. The contract stores tag groups as per-project bitmasks and checks a 3-index independence proof sent with each ballot. The replay refuses invalid ballots (covers blob ballots) and pads ballots recorded before a project was added.
+**Architecture:** One rules core (`shared/vote/rules.ts`) mirrored by a Python reference and the Solidity contract, kept equal by shared fixtures. The contract stores affiliation groups as per-project bitmasks and checks a 3-index independence proof sent with each ballot. The replay refuses invalid ballots (covers blob ballots) and pads ballots recorded before a project was added.
 
 **Tech Stack:** Solidity 0.8.28 + Foundry (`vote/`), Python 3 + pytest (`vote/reference`), Deno + Hono API, React + Vitest app, viem.
 
@@ -14,8 +14,8 @@
 
 - In running text a tier is always `Tier-S` / `Tier-A` / `Tier-B` (use `tierName` from `shared/vote/ballot.ts`); the bare letter only in the tier table.
 - Never call the results a "projector".
-- Tags never render in the UI except in ballot-rule errors and the admin initiative edit form; they are listed in `/vote/llms.txt`.
-- RFPs can't have tags (site and contract both refuse).
+- Affiliations never render in the UI except in ballot-rule errors and the admin initiative edit form; they are listed in `/vote/llms.txt`.
+- RFPs can't have affiliations (site and contract both refuse).
 - Requested amount = the project's `askUsd` frozen in the contract (micro-USD), never the remaining need.
 - Minimum size: `2 × Σ requested(placed) ≥ 3 × pool`. Group rule: `2 × Σ requested(tier ∩ g) ≤ Σ requested(tier)` (exactly half passes).
 - Enforced tiers: a bitmask, bit 0 Tier-S, bit 1 Tier-A; Tier-B never; default `1`.
@@ -176,17 +176,17 @@
 - [ ] **Step 4: Run, expect PASS** — plus `deno test -A api/ scripts/`.
 - [ ] **Step 5: Commit.**
 
-### Task 7: Tags on initiatives
+### Task 7: Affiliations on initiatives
 
 **Files:**
-- Modify: `api/db/types.ts` (`Initiative.tags: string[]`), `api/db/initiatives.ts`, `api/routes/initiatives.ts` (admin update accepts `tags`), `api/services/content.ts` (front matter `tags:` list), `content/initiatives/README.md` (document `tags`), `app/routes/admin.initiative.tsx` (a Tags field), tests next to each.
+- Modify: `api/db/types.ts` (`Initiative.affiliations: string[]`), `api/db/initiatives.ts`, `api/routes/initiatives.ts` (admin update accepts `affiliations`), `api/services/content.ts` (front matter `affiliations:` list), `content/initiatives/README.md` (document `affiliations`), `app/routes/admin.initiative.tsx` (a Affiliations field), tests next to each.
 
 **Interfaces:**
-- Produces: `normalizeTags(raw: string[]): string[]` in `shared/tags.ts` — trims, drops empties, 1–32 chars (else error "Tags are 1–32 characters"), dedupes case-insensitively keeping the first spelling. An RFP with tags → 400 `"RFPs can't have tags."` (API) / parse error (content). Tags are an admin field saved directly, outside the proposer edit review. Missing `tags` reads as `[]`.
-- [ ] **Step 1: Failing tests**: `shared/tags.test.ts` (`normalizeTags` cases); API: `"admin sets tags; an RFP's tags are refused"`; content: `"tags parse; an RFP with tags is an error"`; feeds: `"tags appear in no public feed"` — `/llms.txt`, `/llms-full.txt`, `/api/initiatives.json` and `/initiative/<slug>.md` don't contain a tag value set on a grant; admin form test: the field saves.
+- Produces: `normalizeAffiliations(raw: string[]): string[]` in `shared/affiliations.ts` — trims, drops empties, 1–32 chars (else error "Affiliations are 1–32 characters"), dedupes case-insensitively keeping the first spelling. An RFP with affiliations → 400 `"RFPs can't have affiliations."` (API) / parse error (content). Affiliations are an admin field saved directly, outside the proposer edit review. Missing `affiliations` reads as `[]`.
+- [ ] **Step 1: Failing tests**: `shared/affiliations.test.ts` (`normalizeAffiliations` cases); API: `"admin sets affiliations; an RFP's affiliations are refused"`; content: `"affiliations parse; an RFP with affiliations is an error"`; feeds: `"affiliations appear in no public feed"` — `/llms.txt`, `/llms-full.txt`, `/api/initiatives.json` and `/initiative/<slug>.md` don't contain an affiliation value set on a grant; admin form test: the field saves.
 - [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implement.** Public API responses that already spread the whole `Initiative` must drop `tags` (check `toPublic`/card builders; the feed test catches leaks).
-- [ ] **Step 4: Run, expect PASS** — `npx vitest run app/routes/admin.initiative.test.tsx shared/tags.test.ts` and `deno test -A api/`.
+- [ ] **Step 3: Implement.** Public API responses that already spread the whole `Initiative` must drop `affiliations` (check `toPublic`/card builders; the feed test catches leaks).
+- [ ] **Step 4: Run, expect PASS** — `npx vitest run app/routes/admin.initiative.test.tsx shared/affiliations.test.ts` and `deno test -A api/`.
 - [ ] **Step 5: Commit.**
 
 ### Task 8: Deploy and add projects
@@ -195,13 +195,13 @@
 - Modify: `scripts/vote-deploy.ts`, `scripts/vote-deploy.test.ts`, `deno.json` (task flags unchanged)
 
 **Interfaces:**
-- Consumes: board cards (add `type` and `tags` to `BoardCard`), Task 3 ABI, Task 4 manifest.
+- Consumes: board cards (add `type` and `affiliations` to `BoardCard`), Task 3 ABI, Task 4 manifest.
 - Produces:
-  - `planGroups(cards): { names: string[]; maskOf: (slug) => bigint }` — one group per distinct tag (case-insensitive, first spelling), ordered by first appearance in board order.
+  - `planGroups(cards): { names: string[]; maskOf: (slug) => bigint }` — one group per distinct affiliation (case-insensitive, first spelling), ordered by first appearance in board order.
   - `planInitiatives` returns `{ slug, account, askUsd, rfp, groups }`.
   - Deploy sends `addGroup` per name before `addInitiative`, `setIndependentTiers(--independent-tiers, default 1)`, and writes `projects`, `groups`, `independentTiers` to the manifest.
-  - `--add <slug>[,<slug>…]` with `--contract`: reads the manifest, refuses when `addingOpen(schedule, now)` is false with `"Adding is closed until <ISO time>"` (the next gap), sends `addGroup` for new tags and `addInitiative` per slug, appends to the manifest. `export function addingOpen(s: Schedule, latestEnds: number[], hardDeadline: number, now: number): boolean`.
-- [ ] **Step 1: Failing tests**: `"planGroups: one group per tag, case-insensitive"`, `"planInitiatives carries rfp and groups; an RFP with tags throws"`, `"addingOpen: before opening, between tiers, never inside a span or after the deadline"`, `"--add appends to the manifest without reordering"`.
+  - `--add <slug>[,<slug>…]` with `--contract`: reads the manifest, refuses when `addingOpen(schedule, now)` is false with `"Adding is closed until <ISO time>"` (the next gap), sends `addGroup` for new affiliations and `addInitiative` per slug, appends to the manifest. `export function addingOpen(s: Schedule, latestEnds: number[], hardDeadline: number, now: number): boolean`.
+- [ ] **Step 1: Failing tests**: `"planGroups: one group per affiliation, case-insensitive"`, `"planInitiatives carries rfp and groups; an RFP with affiliations throws"`, `"addingOpen: before opening, between tiers, never inside a span or after the deadline"`, `"--add appends to the manifest without reordering"`.
 - [ ] **Step 2: Run, expect FAIL** — `deno test -A scripts/vote-deploy.test.ts`.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run, expect PASS.**
@@ -218,8 +218,8 @@
 - Produces:
   - `ruleMessage(e: RuleError, titleOf: (i: number) => string, groupName: (g: number) => string): string` with exactly this copy (whole dollars, `$1,234`):
     - size: `Your ballot requests {requested}. It must request at least {needed} (1.5× the {pool} pool). Add more projects; Tier-B is a good place for them.`
-    - independent: `{Tier-X} needs at least 3 independent projects. ` + per related group `{A and B} are related to {Seal}, so they count as one.` (names joined "A, B and C")
-    - group: `Projects related to {Seal} take {groupUsd} of {Tier-X}'s {tierUsd}. One related group can hold at most half.`
+    - independent: `{Tier-X} needs at least 3 independent projects. ` + per related group `{A and B} are affiliated with {Seal}, so they count as one.` (names joined "A, B and C")
+    - group: `Projects affiliated with {Seal} take {groupUsd} of {Tier-X}'s {tierUsd}. One affiliation can hold at most half.`
     - tiers: `Use at most three tiers.` · shape: `This ballot can't be read.`
   - `prefillFromRatings(mine: Record<string /*slug*/, number /*stars*/>, slugs: string[]): Partial<Record<string, Tier>>` — 5→S, 4→A, 3→B, else nothing; slugs outside the round ignored.
   - `useRatingsPrefill(tokenId: string | null)` → `{ data?: Record<slug, stars> }` from `/api/reviews/ratings?tokenId=` mapped id→slug through the board cards. Token: the badge number in the real vote; in a test round the signed-in account's lowest review-badge token id (`/api/reviews/identity`), none → no prefill.
@@ -256,8 +256,8 @@
 
 **Interfaces:**
 - Consumes: manifest, board cards (titles, needs, type), `formatBallotPb` example, `tierName`.
-- Produces: `voteLlms(m: VoteManifest, cards, origin: string): string` — `# TheDAO vote: build your ballot`, `> ` summary (pool, dates in UTC, kind), sections `## How the tally spends your share` (same words as the page instructions), `## Ballot rules` (the three rules with the 1.5× amount in dollars and the enforced tiers), `## Ballot format` (the pabutools/Blossom example), `## Projects` (one line each: `- {slug} — {title} · {RFP|Grant} · requests ${ask} · still needs ${need} · tags: {tags or none} · [details]({origin}/initiative/{slug}.md)`), `## What to do` (ask the voter for ratings/priorities, output one vote line that passes the rules, name the three unrelated Tier-S projects). Served `text/plain; charset=utf-8`, `Cache-Control: max-age=300`, ETag like the other feeds; 404 when no round is deployed.
-- [ ] **Step 1: Failing tests**: `"lists every round project with type, amounts and tags"`, `"states the rules with the pool's 1.5× in dollars"`, `"includes a format example that parses"` (`parseBallotText` on the example), `"404 without a round"`.
+- Produces: `voteLlms(m: VoteManifest, cards, origin: string): string` — `# TheDAO vote: build your ballot`, `> ` summary (pool, dates in UTC, kind), sections `## How the tally spends your share` (same words as the page instructions), `## Ballot rules` (the three rules with the 1.5× amount in dollars and the enforced tiers), `## Ballot format` (the pabutools/Blossom example), `## Projects` (one line each: `- {slug} — {title} · {RFP|Grant} · requests ${ask} · still needs ${need} · affiliations: {affiliations or none} · [details]({origin}/initiative/{slug}.md)`), `## What to do` (ask the voter for ratings/priorities, output one vote line that passes the rules, name the three unrelated Tier-S projects). Served `text/plain; charset=utf-8`, `Cache-Control: max-age=300`, ETag like the other feeds; 404 when no round is deployed.
+- [ ] **Step 1: Failing tests**: `"lists every round project with type, amounts and affiliations"`, `"states the rules with the pool's 1.5× in dollars"`, `"includes a format example that parses"` (`parseBallotText` on the example), `"404 without a round"`.
 - [ ] **Step 2: Run, expect FAIL** — `deno test -A api/tests/vote-llms.test.ts`.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run, expect PASS.**
@@ -276,5 +276,5 @@
 
 ## Self-review notes
 
-- Spec coverage: prefill (9), no C tier/no checkbox copy (9, 12), minimum size (1–3, 5, 6, 9), independence + RFP + half (1–3), Tier-A setting (1, 3, 8), tags hidden (7, 9, 11), RFP no tags (3, 7, 8), invalid blocks everywhere (3, 5, 6, 9), proof (1, 3, 4, 6), additions during the vote (3, 5, 8), paste/copy (10), llms.txt (11), test-round prefill (9), docs (12).
+- Spec coverage: prefill (9), no C tier/no checkbox copy (9, 12), minimum size (1–3, 5, 6, 9), independence + RFP + half (1–3), Tier-A setting (1, 3, 8), affiliations hidden (7, 9, 11), RFP no affiliations (3, 7, 8), invalid blocks everywhere (3, 5, 6, 9), proof (1, 3, 4, 6), additions during the vote (3, 5, 8), paste/copy (10), llms.txt (11), test-round prefill (9), docs (12).
 - The contract can't see blob ballots' bytes; Task 5's replay check covers them.

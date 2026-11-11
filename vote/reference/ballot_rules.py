@@ -2,7 +2,7 @@
 
 A valid ballot requests at least 1.5x the pool, and each enforced tier (Tier-S always,
 Tier-A when the round says so) holds at least 3 pairwise-unrelated projects with no
-related group over half its funds. Related = sharing a group (tag); RFPs have none.
+related group over half its funds. Related = sharing a group (an affiliation); RFPs have none.
 
 Ballots are in on-chain form: competition ranks, 255 = unplaced; a ballot shorter than
 the projects reads the missing ones as unplaced. Mirrors shared/vote/rules.ts and the

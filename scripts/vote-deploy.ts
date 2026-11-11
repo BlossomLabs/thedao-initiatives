@@ -375,7 +375,7 @@ async function main() {
     poolUsd,
     issuer: issuer as `0x${string}` | undefined,
     slugs: plan.map((p) => p.slug),
-    // Task 8 registers each initiative's type and tags; until then none.
+    // Task 8 registers each initiative's type and affiliations; until then none.
     projects: plan.map((p) => ({ askUsd: p.askUsd.toString(), rfp: false, groups: [] })),
     groups: [],
     independentTiers: 1,

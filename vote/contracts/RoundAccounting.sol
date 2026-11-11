@@ -41,7 +41,7 @@ abstract contract RoundAccounting is AccessControl {
         uint32 maxPriceAge;
     }
 
-    /// @dev `groups` is a bitmask over the registered groups (tags): two projects are
+    /// @dev `groups` is a bitmask over the registered groups (affiliations): two projects are
     ///      related when their masks overlap. RFPs belong to no group.
     struct Initiative {
         address account;
@@ -151,7 +151,7 @@ abstract contract RoundAccounting is AccessControl {
         return _groupNames[id];
     }
 
-    /// @notice A group of related projects (a tag). Allowed whenever projects may be added.
+    /// @notice A group of related projects (an affiliation). Allowed whenever projects may be added.
     function addGroup(bytes32 name) external onlyRole(ADMIN_ROLE) returns (uint8 id) {
         _requireAdding();
         if (_groupNames.length == MAX_GROUPS) revert TooManyGroups();

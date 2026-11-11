@@ -19,7 +19,7 @@ import {
   type TierState,
 } from "../../shared/vote/quiet-ending.ts";
 import { rulesRound } from "../../shared/vote/manifest.ts";
-import { findProof } from "../../shared/vote/rules.ts";
+import { checkBallot, findProof } from "../../shared/vote/rules.ts";
 import type { Tier } from "../../shared/vote/ballot.ts";
 
 const PER_MINUTE = 30;
@@ -412,6 +412,20 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       signature,
     }).catch(() => false);
     if (!valid) throw fail(401, "bad_signature", "The signature doesn't match the badge's owner.");
+    // The ballot rules, judged with the pool on-chain now: the contract would refuse it.
+    if (d.manifest.ballotRules) {
+      const { poolUsd } = await recentRound(d);
+      const checked = checkBallot(hexToBytes(ballot), rulesRound(d.manifest, poolUsd));
+      if (!checked.ok) {
+        throw fail(422, "invalid_ballot", "This ballot breaks the ballot rules.", {
+          errors: checked.errors.map((e) =>
+            Object.fromEntries(
+              Object.entries(e).map(([k, v]) => [k, typeof v === "bigint" ? v.toString() : v]),
+            )
+          ),
+        });
+      }
+    }
     // What the quiet ending would refuse is refused here, before anyone pays gas for it.
     // Nothing can be refused before registration closes (no tier settles before it).
     const regDeadline = d.manifest.schedule.firstTallyAt[0] + d.manifest.schedule.initialWindow;

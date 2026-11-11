@@ -898,3 +898,40 @@ Deno.test("round: the pool the chain raised judges later ballots", async () => {
   assertEquals(body.poolUsd, "1000");
   h.close();
 });
+
+Deno.test("ballot: a ballot breaking a rule is refused with its errors, nothing sent", async () => {
+  const { h, state } = await setup(ruled);
+  state.owners.set(17n, VOTER.address);
+  const body = await signedBallot(VOTER, 17n, 1n, `0x01${X}${X}${X}`, ruled);
+  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  assertEquals(res.status, 422);
+  const out = await j(res) as { code: string; errors: { rule: string }[] };
+  assertEquals(out.code, "invalid_ballot");
+  assertEquals(out.errors.map((e) => e.rule), ["size", "independent"]);
+  assertEquals(state.sent, []);
+  h.close();
+});
+
+Deno.test("ballot: a valid ballot is relayed with its proof", async () => {
+  const { h, state } = await setup(ruled);
+  state.owners.set(17n, VOTER.address);
+  const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
+  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  assertEquals(res.status, 200);
+  const sent = state.sent[0] as unknown as { args: [{ proof: number[] }[]] };
+  assertEquals(sent.args[0][0].proof, [0, 1, 2]);
+  h.close();
+});
+
+Deno.test("ballot: judged with the chain's current pool", async () => {
+  const { h, state } = await setup(ruled);
+  state.owners.set(17n, VOTER.address);
+  state.history.pool = [{ timestamp: NOW - 10, poolUsd: 1_000n }];
+  const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
+  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  assertEquals(res.status, 422);
+  const out = await j(res) as { errors: Record<string, unknown>[] };
+  assertEquals(out.errors, [{ rule: "size", requested: "400", needed: "1500", pool: "1000" }]);
+  assertEquals(state.sent, []);
+  h.close();
+});

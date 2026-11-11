@@ -139,8 +139,40 @@ describe("quiet-ending replay", () => {
   });
 
   it("a settled tier uses the needs it settled with, not today's", () => {
-    const s = run(base(), T + 3600, { needs: [10n, 10n], settleNeeds: { S: [150n, 150n] } });
+    const s = run(base(), T + 3600, {
+      needs: [10n, 10n],
+      settleNeeds: { S: { at: T + 3600, forced: false, needs: [150n, 150n] } },
+    });
     expect(s.tiers[0].status === "settled" && s.tiers[0].awards.get(0)).toBe(150n);
+  });
+
+  it("a stored settlement pins when S settled, whatever today's needs say about its windows", () => {
+    // Without the snapshot, b's change at T+100 would extend S into window 2.
+    const snapshot = {
+      tier: "S" as const,
+      at: T + 3600,
+      forced: false,
+      funded: [0],
+      awards: new Map([[0, 150n]]),
+      shares: new Map([[0, new Map([["a", 75n], ["b", 75n]])]]),
+    };
+    const s = run(
+      [...base(), r("b", T + 100, [X, 1]), r("a", T + 3700, [X, 1])],
+      T + 3800,
+      { snapshots: [snapshot] },
+    );
+    expect(s.tiers[0]).toMatchObject({ status: "settled", at: T + 3600, funded: [0] });
+    expect(s.rejected).toEqual([{ tokenId: "a", nonce: 0, reason: "tier_settled" }]);
+  });
+
+  it("kept settle needs pin it too, before the settlement is stored for good", () => {
+    const s = run(
+      [...base(), r("b", T + 100, [X, 1]), r("a", T + 3700, [X, 1])],
+      T + 3800,
+      { settleNeeds: { S: { at: T + 3600, forced: false, needs: [150n, 150n] } } },
+    );
+    expect(s.tiers[0]).toMatchObject({ status: "settled", at: T + 3600 });
+    expect(s.rejected.map((x) => x.tokenId)).toEqual(["a"]);
   });
 
   it("once B settles, the round is closed", () => {

@@ -73,8 +73,13 @@ export function windowEnds(s: Schedule, tier: number): number[] {
   return out;
 }
 
-const sameSet = (a: number[], b: number[]) =>
-  a.length === b.length && [...a].sort().every((x, i) => x === [...b].sort()[i]);
+const sameSet = (a: number[], b: number[]) => {
+  if (a.length !== b.length) return false;
+  const y = new Set(b);
+  return a.every((x) => y.has(x));
+};
+/** When and how a tier settled, kept the first time it was seen settled. */
+export type SettleNeeds = { at: number; forced: boolean; needs: bigint[] };
 
 export function replay(
   input: {
@@ -86,7 +91,7 @@ export function replay(
     snapshots?: Settled[];
     /** The needs each tier settled with, kept when it first settled: a later donation
      * never moves a settled tier, even before its settlement is stored for good. */
-    settleNeeds?: Partial<Record<Tier, bigint[]>>;
+    settleNeeds?: Partial<Record<Tier, SettleNeeds>>;
   },
   now: number,
 ): RoundState {
@@ -138,7 +143,8 @@ export function replay(
   };
 
   /** The chained stage tallies from tier `first` on, after the settled tiers' payments. */
-  const tally = (first: number, costs: bigint[] = needs) => {
+  /** Stages `first` up to (not including) `upTo`; the comparisons need only the first. */
+  const tally = (first: number, costs: bigint[] = needs, upTo = TIERS.length) => {
     const voters = [...roll].filter((t) => accepted.has(t)).sort();
     const n = BigInt(voters.length);
     const each = n ? poolUsd / n : 0n;
@@ -155,7 +161,7 @@ export function replay(
       0n,
     );
     const stages: { order: number[]; shares: Map<number, Map<string, bigint>> }[] = [];
-    for (let t = first; t < TIERS.length; t++) {
+    for (let t = first; t < upTo; t++) {
       // B, the last tier, counts to the last level (the Python's stage after the tiers).
       const bound = t === TIERS.length - 1 ? m : stageBound(ballots, t, TIERS.length, m);
       const candidates = [...Array(m).keys()].filter((c) => !done.has(c));
@@ -175,7 +181,7 @@ export function replay(
   const settle = (t: number, at: number, forced: boolean) => {
     const snap = input.snapshots?.find((x) => x.tier === TIERS[t]);
     if (snap) return settled.push(snap);
-    const { order, shares } = tally(t, input.settleNeeds?.[TIERS[t]] ?? needs)[0];
+    const { order, shares } = tally(t, input.settleNeeds?.[TIERS[t]]?.needs ?? needs, t + 1)[0];
     const awards = new Map(
       order.map((c) => [c, [...shares.get(c)!.values()].reduce((a, b) => a + b, 0n)] as const),
     );
@@ -190,14 +196,26 @@ export function replay(
       tiers.push({ tier: TIERS[t], status: "waiting", startsAt: start });
       continue;
     }
+    // A tier already seen settled stays settled when it was: today's needs must not
+    // re-judge its windows (they could reopen it, or close it earlier after the fact).
+    const snap = input.snapshots?.find((x) => x.tier === TIERS[t]);
+    const kept = input.settleNeeds?.[TIERS[t]];
+    const pinned = snap ?? (kept && { at: kept.at, forced: kept.forced });
+    if (pinned && now >= pinned.at) {
+      applyBefore(pinned.at);
+      settle(t, pinned.at, pinned.forced);
+      tiers.push({ status: "settled", ...settled[settled.length - 1] });
+      continue;
+    }
     applyBefore(start);
-    let baseline = tally(t)[0].order;
+    const first = () => tally(t, needs, t + 1)[0].order;
+    let baseline = first();
     let state: TierState | null = null;
     for (let k = 0; k < ends.length; k++) {
       const end = ends[k];
       let quiet = true;
       const check = () => {
-        if (!sameSet(tally(t)[0].order, baseline)) quiet = false;
+        if (!sameSet(first(), baseline)) quiet = false;
       };
       if (now < end) {
         applyBefore(now, check);
@@ -208,12 +226,12 @@ export function replay(
           windowEndsAt: end,
           latestEndAt: ends[ends.length - 1],
           quiet,
-          funded: tally(t)[0].order,
+          funded: first(),
         };
         break;
       }
       applyBefore(end, check);
-      const closing = tally(t)[0].order;
+      const closing = first();
       if (!sameSet(closing, baseline)) quiet = false;
       if (quiet || k === ends.length - 1) {
         settle(t, end, !quiet);

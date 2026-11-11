@@ -49,6 +49,9 @@ const FINAL_AFTER_SECS = 30 * 60;
 const DRIP_WEI = 5_000_000_000_000_000n; // 0.005 Sepolia ETH
 /** Deno KV refuses values over 64 KiB; JSON longer than this is kept out with room to spare. */
 const KV_VALUE_MAX = 60_000;
+/** A closed round's final what-ifs that failed (the search, or the replay to start it)
+ * are tried again after this long. */
+const FINAL_RETRY_SECS = 60;
 
 const fail = (status: number, code: string, message: string, extra?: Record<string, unknown>) =>
   new HttpError(status, message, { code, ...extra });
@@ -427,10 +430,16 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       const work = (async () => {
         const slugs = d.manifest.slugs;
         const next = nextJson(await nextTiersAsync(liveInputs, firstOpen), slugs);
-        // A lead only means something while Tier-S can still change.
-        const lead = firstOpen === 0
-          ? leadJson(await liveLeadsAsync(liveInputs, firstOpen), slugs)
-          : undefined;
+        // A lead only means something while Tier-S can still change. A failed lead search
+        // still keeps the gaps.
+        let lead: Record<string, string> | undefined;
+        if (firstOpen === 0) {
+          try {
+            lead = leadJson(await liveLeadsAsync(liveInputs, firstOpen), slugs);
+          } catch (e) {
+            deps.log(`vote lead: ${e instanceof Error ? e.message : e}`);
+          }
+        }
         const known: KnownNext = {
           key,
           firstOpen,
@@ -450,9 +459,12 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
   /** The final what-ifs, the same way: searched once per digest in the background (one
    * search at a time, shared with the gap search), kept in KV, never waited for. */
   let lastFinal: (KnownFinal & { contract: string }) | null = null;
-  /** The digest this isolate last started a final search for, so a search that failed
-   * isn't run again on every request. */
-  let finalTried: string | null = null;
+  /** The digest this isolate last tried to find the final what-ifs for (a search started,
+   * or the replay to start one failed), and when: a failure is retried about once a
+   * minute, not on every request. */
+  let finalTried: { key: string; at: number } | null = null;
+  const triedRecently = (key: string) =>
+    finalTried?.key === key && deps.now() - finalTried.at < FINAL_RETRY_SECS;
   const finalStoreKey = (d: VoteRound) => [...round(d), "final"];
   /** The final what-ifs judged from `key`, if this isolate or KV has them. */
   const knownFinal = async (d: VoteRound, key: string | undefined) => {
@@ -478,9 +490,9 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
   ): Promise<FinalJson | undefined> => {
     if (key === undefined) return undefined;
     const known = await knownFinal(d, key);
-    if (known || searching || finalTried === key) return known;
+    if (known || searching || triedRecently(key)) return known;
     searching = true;
-    finalTried = key;
+    finalTried = { key, at: deps.now() };
     const contract = d.manifest.contract;
     // Each initiative's final tier: the settled tier that funded it.
     const finalTier = new Map<number, number>();
@@ -767,22 +779,32 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       },
       ...(final ? { final } : {}),
     });
+    let replayed: (RoundState & { poolUsd: bigint }) | undefined;
     if (
       cached &&
       (isFinal(cached.body, cached.at) || deps.now() - cached.at < BALLOTS_CACHE_SECS)
     ) {
       const final = await knownFinal(d, cached.finalKey);
+      const fromCache = async () =>
+        c.json(withAhead(cached.body, await knownNext(d, cached.firstOpen ?? null), final));
       // A closed round whose what-ifs nobody here has, or is searching for, is replayed
       // once more below: the cached round has no inputs to start the search from.
-      const started = searching ||
-        (cached.finalKey !== undefined && finalTried === cached.finalKey);
-      if (!cached.body.closed || final || started) {
-        return c.json(
-          withAhead(cached.body, await knownNext(d, cached.firstOpen ?? null), final),
-        );
+      // (An entry cached before it carried a digest is tried under "".)
+      const tried = cached.finalKey ?? "";
+      if (!cached.body.closed || final || searching || triedRecently(tried)) {
+        return await fromCache();
+      }
+      // That replay is only for the what-ifs: if it fails (RPC or board down), the
+      // cached round is still served, and the replay waits a minute before trying again.
+      try {
+        replayed = await roundState(d);
+      } catch (e) {
+        deps.log(`vote final: replay failed (${e instanceof Error ? e.message : e})`);
+        finalTried = { key: tried, at: deps.now() };
+        return await fromCache();
       }
     }
-    const st = await roundState(d);
+    const st = replayed ?? await roundState(d);
     const body = roundJson(st, d.manifest.slugs);
     const at = deps.now();
     const firstOpen = st.liveInputs ? st.firstOpen : null;

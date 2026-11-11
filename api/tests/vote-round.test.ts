@@ -825,14 +825,80 @@ Deno.test("no leads once Tier-S has settled", async () => {
   h.close();
 });
 
-Deno.test("a closed round serves the final what-ifs", async () => {
-  // $10K pool. Both voters back a first, then b and c: a is funded in Tier-S, b in
-  // Tier-A, and c needs more than what's left once a and b are paid, so it never is.
-  const { h, state } = await setup({ ...qe, poolUsd: "10000000000" });
+/** A closed round. $10K pool. Both voters back a first, then b and c: a is funded in
+ * Tier-S, b in Tier-A, and c needs more than what's left once a and b are paid, so it
+ * never is. */
+async function closedSetup() {
+  const got = await setup({ ...qe, poolUsd: "10000000000" });
+  const { h, state } = got;
   h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 5_000_000_000n]);
   const ballot = bytesToHex(encodeBallot(qe.slugs, { a: "S", b: "B", c: "B" })).slice(2);
   state.logs = [logOf("1", ballot, NOW - 100, 1), logOf("2", ballot, NOW - 90, 2)];
   h.clock.now = NOW + 7200;
+  return got;
+}
+const roundKey = ["vote", qe.contract.toLowerCase(), "round"];
+/** The closed round's cached entry as another isolate wrote it, without the what-ifs:
+ * this isolate has nothing in memory, and KV has no `final` entry. */
+async function closedCachedElsewhere() {
+  const other = await closedSetup();
+  await other.h.req("/api/vote/round");
+  await other.h.settle();
+  const entry = (await other.h.kv.get<{ body: unknown; finalKey?: string }>(roundKey)).value!;
+  other.h.close();
+  assertEquals(typeof entry.finalKey, "string");
+  const here = await closedSetup();
+  await here.h.kv.set(roundKey, entry);
+  return { ...here, entry };
+}
+
+Deno.test("a closed round cached without its what-ifs replays once to start them", async () => {
+  const { h, state } = await closedCachedElsewhere();
+  type Body = { final?: unknown };
+  const first = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(first.final, undefined);
+  assertEquals(state.ballotReads, 1, "replayed to start the search");
+  // The search is running: the cached round is served, no second replay.
+  const second = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(second.final, undefined);
+  assertEquals(state.ballotReads, 1);
+  await h.settle();
+  const done = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(done.final !== undefined, true);
+  assertEquals(state.ballotReads, 1);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("a failed replay for the what-ifs serves the cached round, retried a minute on", async () => {
+  const { h, state, chain, entry } = await closedCachedElsewhere();
+  const ballots = chain.ballots;
+  chain.ballots = () => {
+    state.ballotReads++;
+    return Promise.reject(new Error("RPC down"));
+  };
+  const first = await h.req("/api/vote/round");
+  assertEquals(first.status, 200);
+  assertEquals(await j(first), entry.body);
+  assertEquals(state.ballotReads, 1);
+  // Not tried again on every request.
+  h.clock.now += 30;
+  assertEquals((await h.req("/api/vote/round")).status, 200);
+  assertEquals(state.ballotReads, 1);
+  // A minute on it is tried again; once the chain answers, the search starts.
+  chain.ballots = ballots;
+  h.clock.now += 31;
+  await h.req("/api/vote/round");
+  assertEquals(state.ballotReads, 2);
+  await h.settle();
+  const done = await j(await h.req("/api/vote/round")) as { final?: unknown };
+  assertEquals(done.final !== undefined, true);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("a closed round serves the final what-ifs", async () => {
+  const { h } = await closedSetup();
   type Final = {
     next: Record<string, { tier: string; gap: string | null }>;
     lead: Record<string, string>;

@@ -724,6 +724,18 @@ Deno.test("round: S's settlement is kept only once the blocks before it are fina
   h.close();
 });
 
+Deno.test("round: each badge's share, and what it paid in a settled tier", async () => {
+  const { h } = await qeSetup();
+  h.clock.now = NOW + 700;
+  const body = await j(await h.req("/api/vote/round")) as {
+    share: string;
+    tiers: { paid?: Record<string, Record<string, string>> }[];
+  };
+  assertEquals(body.share, "100");
+  assertEquals(body.tiers[0].paid, { "1": { a: "75" }, "2": { a: "75" } });
+  h.close();
+});
+
 Deno.test("ballots: only what the quiet ending counts (a refused revision isn't served)", async () => {
   const { h, state } = await qeSetup();
   state.logs.push(logOf("1", `${X}01${X}`, NOW + 700, 3)); // moves a out of settled S
@@ -747,6 +759,7 @@ Deno.test("round: a quiet window settles S; later need changes never move it", a
     forced: false,
     funded: ["a"],
     awards: { a: "150" },
+    paid: { "1": { a: "75" }, "2": { a: "75" } },
   });
   n.needs = [10n, 10n, 10n];
   h.clock.now += 10;

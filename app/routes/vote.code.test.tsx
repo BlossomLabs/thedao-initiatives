@@ -670,9 +670,10 @@ it("quiet ending: S changed in this window", async () => {
     .toBeInTheDocument();
 });
 
-it("quiet ending: a settled S is named and locked on the ballot", async () => {
+it("quiet ending: a settled S is named and locked; the badge sees what it paid and what's left", async () => {
   await ballotWith(roundBody({
     accepted: { "17": "0x01ffff" },
+    share: "2000000000",
     tiers: [
       {
         tier: "S",
@@ -680,14 +681,20 @@ it("quiet ending: a settled S is named and locked on the ballot", async () => {
         at: 1,
         forced: false,
         funded: ["alpha"],
-        awards: { alpha: "1000000" },
+        awards: { alpha: "30000000000" },
+        paid: { "17": { alpha: "900000000" }, "18": { alpha: "1000000" } },
       },
       waiting("A"),
       waiting("B"),
     ],
   }));
-  expect(await screen.findByText("S settled: ALPHA.")).toBeInTheDocument();
+  const share = await screen.findByRole("region", { name: "Your share" });
+  expect(within(share).getByText(/Your share: \$2,000/)).toBeInTheDocument();
+  expect(within(share).getByText(/S settled, funding ALPHA\./)).toBeInTheDocument();
+  expect(within(share).getByText(/You paid \$900/)).toBeInTheDocument();
+  expect(within(share).getByText(/\$1,100 left for A and B/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Must fund (settled)" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "ALPHA, funded: you paid $900" })).toBeDisabled();
 });
 
 it("quiet ending: a sent ballot the round refused says the earlier one still counts", async () => {
@@ -780,6 +787,31 @@ it("quiet ending: in the last window, a change can't buy another one", async () 
     await screen.findByText(
       "It changed, but this is the last window: it settles at its end anyway.",
     ),
+  )
+    .toBeInTheDocument();
+});
+
+it("quiet ending: an unsent edit that moved a settled initiative is put back as it counted", async () => {
+  localStorage.setItem(
+    "vote-tiers:0x1000000000000000000000000000000000000001:17",
+    JSON.stringify({ alpha: "A", beta: "B" }),
+  );
+  await ballotWith(roundBody({
+    accepted: { "17": "0x01ffff" },
+    share: "2000000000",
+    tiers: [
+      { tier: "S", status: "settled", at: 1, forced: false, funded: ["alpha"], awards: {} },
+      waiting("A"),
+      waiting("B"),
+    ],
+  }));
+  const s = await screen.findByRole("list", { name: "Must fund" });
+  expect(within(s).getByRole("button", { name: "ALPHA, funded" })).toBeDisabled();
+  // What isn't settled stays as this browser had it.
+  expect(
+    within(screen.getByRole("list", { name: "Nice to have" })).getByRole("button", {
+      name: "BETA",
+    }),
   )
     .toBeInTheDocument();
 });

@@ -8,6 +8,8 @@ import TierBallot, { type BallotItem } from "~/components/vote/TierBallot";
 import { BallotSkeleton, IntroSkeleton } from "~/components/vote/VoteSkeleton";
 import { rememberMyCode } from "~/lib/vote-local";
 import BallotStatus from "~/components/vote/BallotStatus";
+import ShareSpent from "~/components/vote/ShareSpent";
+import { spentRound } from "~/components/vote/mock-round";
 import VoteClosed, { badgeKicker } from "~/components/vote/VoteClosed";
 import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
@@ -31,6 +33,7 @@ const POOL = Number(BigInt(ROUND.poolUsd) / 1_000_000n);
 const closed = () => Date.now() / 1000 >= ROUND.closesAt;
 const notOpenYet = () => Date.now() / 1000 < ROUND.opensAt;
 const REAL = () => ROUND.kind === "real";
+const microUsd = (v: string) => Number(BigInt(v) / 10_000n) / 100;
 const utc = (secs: number) =>
   `${
     new Intl.DateTimeFormat("en-GB", {
@@ -261,7 +264,13 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
   const ballotFlow = useBallotSubmit(mine && n !== null ? BigInt(n) : null);
   // The quiet ending: which tiers are settling or settled, and what counts.
   const roundQ = useVoteRound(5_000, mine && n !== null);
-  const rv = roundQ.data;
+  // Dev only: ?mock=spent is a round where S settled and spent part of this badge's share.
+  const mockSpent = mock && sp.get("mock") === "spent";
+  const spentMock = useMemo(
+    () => import.meta.env.DEV && mockSpent ? spentRound(ROUND.slugs, ROUND.poolUsd, 1) : undefined,
+    [mockSpent],
+  );
+  const rv = spentMock ?? roundQ.data;
 
   // One claim at a time: the sign-in lands in several renders, and the
   // auto-claim effect can fire again before its own state updates show.
@@ -328,6 +337,27 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
       return next;
     });
   };
+
+  // Start from the ballot that counts when this browser has none, and keep the settled
+  // tiers as they were counted: they can't change, whatever this browser last had.
+  const countedNow = n !== null ? rv?.accepted[String(n)] : undefined;
+  const settledNow = rv?.tiers.filter((t) => t.status === "settled").length ?? 0;
+  useEffect(() => {
+    if (!countedNow) return;
+    setTiers((prev) => {
+      const counted = countedTiers(countedNow, prev, ROUND.slugs);
+      if (Object.keys(prev).length === 0) return counted;
+      const frozen = lockedLabels(counted, settledNow);
+      if (frozen.size === 0) return prev;
+      const next: Partial<Record<string, Tier>> = Object.fromEntries(
+        Object.entries(prev).filter(([, t]) => t && !frozen.has(t)),
+      );
+      for (const [slug, t] of Object.entries(counted)) if (t && frozen.has(t)) next[slug] = t;
+      const same = Object.keys(next).length === Object.keys(prev).length &&
+        Object.entries(next).every(([k, t]) => prev[k] === t);
+      return same ? prev : next;
+    });
+  }, [countedNow, settledNow]);
 
   const replaceTiers = (next: Partial<Record<string, Tier>>) => {
     setTiers(next);
@@ -479,7 +509,7 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
         }}
       />
     );
-  } else if (data && mine && n !== null && (closed() || rv?.closed)) {
+  } else if (data && mine && n !== null && ((closed() && !spentMock) || rv?.closed)) {
     body = (
       <>
         {picker}
@@ -511,8 +541,13 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     const locked = countedHex
       ? lockedLabels(countedTiers(countedHex, tiers, ROUND.slugs), settledCount)
       : new Set<Tier>();
-    const names = (slugs: string[]) =>
-      slugs.length ? slugs.map((x) => titles.get(x) ?? x).join(", ") : "nothing";
+    // What this badge has paid in the settled tiers, for good, and what is left.
+    const settledTiers = rv?.tiers.flatMap((t) => t.status === "settled" ? [t] : []) ?? [];
+    const paidHere = (t: (typeof settledTiers)[number]) =>
+      Object.entries(t.paid?.[String(n)] ?? {}).map(([slug, v]) => [slug, microUsd(v)] as const);
+    const paid = new Map(settledTiers.flatMap(paidHere));
+    const funded = new Set(settledTiers.flatMap((t) => t.funded));
+    const titleOf = (slug: string) => titles.get(slug) ?? slug;
     const refused = rv?.rejected.find((r) =>
       r.tokenId === String(n) && ballotFlow.last && BigInt(r.nonce) === ballotFlow.last.nonce
     );
@@ -527,9 +562,7 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
           <p className="font-medium text-white">Registration closed before this badge voted.</p>
         )}
         {rv.tiers.map((t) =>
-          t.status === "settled"
-            ? <p key={t.tier}>{t.tier} settled: {names(t.funded)}.</p>
-            : t.status === "settling"
+          t.status === "settling"
             ? (
               <div key={t.tier}>
                 <p className="font-medium text-white">
@@ -546,6 +579,17 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
               </div>
             )
             : null
+        )}
+        {counted && settledTiers.length > 0 && (
+          <ShareSpent
+            share={microUsd(rv.share ?? "0")}
+            settled={settledTiers.map((t) => ({
+              tier: t.tier,
+              funded: t.funded.map(titleOf),
+              paid: paidHere(t).map(([slug, usd]) => ({ title: titleOf(slug), usd })),
+            }))}
+            open={rv.tiers.flatMap((t) => t.status === "settled" ? [] : [t.tier])}
+          />
         )}
       </div>
     );
@@ -580,6 +624,8 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
           tiers={tiers}
           disabled={busy || early}
           locked={locked}
+          funded={settledTiers.length ? funded : undefined}
+          paid={paid}
           onChange={setTier}
           onReplace={replaceTiers}
           search={{ ai: board.data?.flags?.aiSearch, aiAuto: board.data?.flags?.aiSearchAuto }}

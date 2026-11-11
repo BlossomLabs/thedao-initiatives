@@ -46,3 +46,22 @@ it("Clear ballot keeps a settled tier", () => {
   fireEvent.click(screen.getByRole("button", { name: /clear ballot/i }));
   expect(onReplace).toHaveBeenCalledWith({ alpha: "S" });
 });
+
+it("a settled chip says what this badge paid for it", () => {
+  render(
+    <TierBallot
+      items={items}
+      tiers={{ alpha: "S", beta: "S" }}
+      disabled={false}
+      locked={new Set<Tier>(["S"])}
+      funded={new Set(["alpha"])}
+      paid={new Map([["alpha", 900]])}
+      onChange={vi.fn()}
+    />,
+  );
+  const list = within(screen.getByRole("list", { name: "Must fund" }));
+  expect(list.getByRole("button", { name: "ALPHA, funded: you paid $900" })).toHaveTextContent(
+    "$900",
+  );
+  expect(list.getByRole("button", { name: "BETA, not funded" })).toBeDisabled();
+});

@@ -56,6 +56,8 @@ export type RoundState = {
   accepted: Map<string, Uint8Array>;
   rejected: Rejection[];
   closed: boolean;
+  /** Each voting badge's equal share of the pool (micro-USD), before it pays anything. */
+  share: bigint;
   /** "If it settled now": the open tiers' chained tallies, from the first unsettled one. */
   live: { order: number[]; awards: Map<number, bigint>; tiers: Map<number, Tier> };
 };
@@ -259,6 +261,7 @@ export function replay(
   }
   applyBefore(now);
 
+  const voters = [...roll].filter((t) => accepted.has(t)).length;
   const firstOpen = settled.length;
   const live = {
     order: [] as number[],
@@ -280,6 +283,7 @@ export function replay(
     accepted: new Map([...accepted].map(([k, v]) => [k, Uint8Array.from(v)])),
     rejected,
     closed: settled.length === TIERS.length,
+    share: voters ? poolUsd / BigInt(voters) : 0n,
     live,
   };
 }

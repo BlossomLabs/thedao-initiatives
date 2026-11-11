@@ -119,6 +119,13 @@ describe("quiet-ending replay", () => {
     expect(s.live.order).toEqual([]);
   });
 
+  it("says each badge's share, and what each paid when a tier settled", () => {
+    const s = run(base(), T + 3600);
+    expect(s.share).toBe(100n);
+    const S = s.tiers[0];
+    expect(S.status === "settled" && [...S.shares.get(0)!]).toEqual([["a", 75n], ["b", 75n]]);
+  });
+
   it("a burned badge's ballot no longer counts", () => {
     const s = run([...base(), r("b", 3, null)], T - 1);
     expect(s.accepted.has("b")).toBe(false);

@@ -127,6 +127,14 @@ function roundJson(st: RoundState, slugs: string[]) {
   const named = (cs: number[]) => cs.map((c) => slugs[c]);
   const money = (m: Map<number, bigint>) =>
     Object.fromEntries([...m].map(([c, v]) => [slugs[c], v.toString()]));
+  /** tokenId → slug → what that badge paid for it (only what it paid). */
+  const paidBy = (shares: Map<number, Map<string, bigint>>) => {
+    const out: Record<string, Record<string, string>> = {};
+    for (const [c, byBadge] of shares) {
+      for (const [t, v] of byBadge) if (v > 0n) (out[t] ??= {})[slugs[c]] = v.toString();
+    }
+    return out;
+  };
   const tier = (t: TierState) =>
     t.status === "settled"
       ? {
@@ -136,6 +144,7 @@ function roundJson(st: RoundState, slugs: string[]) {
         forced: t.forced,
         funded: named(t.funded),
         awards: money(t.awards),
+        paid: paidBy(t.shares),
       }
       : t.status === "settling"
       ? { ...t, funded: named(t.funded) }
@@ -143,6 +152,7 @@ function roundJson(st: RoundState, slugs: string[]) {
   return {
     registrationClosesAt: st.registrationClosesAt,
     closed: st.closed,
+    share: st.share.toString(),
     tiers: st.tiers.map(tier),
     accepted: Object.fromEntries(
       [...st.accepted].map((

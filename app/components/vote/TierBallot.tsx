@@ -114,7 +114,7 @@ function targetAt(x: number, y: number): Where | undefined {
 }
 
 export default function TierBallot(
-  { items, tiers, disabled, onChange, onReplace, search = {}, actions, locked }: {
+  { items, tiers, disabled, onChange, onReplace, search = {}, actions, locked, funded, paid }: {
     items: BallotItem[];
     /** The send bar: under the tier list on wider screens, floating at the bottom on a phone. */
     actions?: React.ReactNode;
@@ -127,6 +127,10 @@ export default function TierBallot(
     onReplace?: (tiers: Partial<Record<string, Tier>>) => void;
     /** Tiers the quiet ending has settled: nothing moves into or out of them. */
     locked?: ReadonlySet<Tier>;
+    /** What the settled tiers funded (slugs). */
+    funded?: ReadonlySet<string>;
+    /** USD this badge paid for each initiative a settled tier funded. */
+    paid?: ReadonlyMap<string, number>;
   },
 ) {
   const id = useId();
@@ -448,6 +452,15 @@ export default function TierBallot(
   const chip = (i: BallotItem) => {
     const on = picked === i.slug;
     const cat = i.card?.initiative.categories[0];
+    const settledHere = isLocked(where(i.slug));
+    const isFunded = settledHere && Boolean(funded?.has(i.slug));
+    const youPaid = isFunded ? paid?.get(i.slug) : undefined;
+    const paidText = youPaid ? `$${Math.round(youPaid).toLocaleString("en-US")}` : undefined;
+    const label = !settledHere || !funded
+      ? i.title
+      : isFunded
+      ? paidText ? `${i.title}, funded: you paid ${paidText}` : `${i.title}, funded`
+      : `${i.title}, not funded`;
     return (
       <li
         key={i.slug}
@@ -460,8 +473,8 @@ export default function TierBallot(
           type="button"
           disabled={disabled || isLocked(where(i.slug))}
           aria-pressed={on}
-          aria-label={i.title}
-          title={i.title}
+          aria-label={label}
+          title={label}
           data-ballot-chip={i.slug}
           {...grab(i.slug)}
           className={cn(
@@ -470,6 +483,9 @@ export default function TierBallot(
               ? "border-[rgba(92,183,90,.7)] bg-dao-green/15 pr-6 sm:pr-7"
               : "border-white/15 bg-white/[.07]",
             drag?.slug === i.slug && "opacity-40",
+            isFunded && "border-vote/50 bg-vote/[.12] disabled:opacity-100",
+            settledHere && funded && !isFunded && "opacity-55",
+            paidText && "sm:w-[176px]",
           )}
         >
           {cat
@@ -478,6 +494,11 @@ export default function TierBallot(
           <span className="truncate text-[11.5px] leading-none text-white/85 sm:text-[12.5px]">
             {i.title}
           </span>
+          {paidText && (
+            <span className="ml-auto hidden flex-none text-[11.5px] font-semibold leading-none text-vote tnum sm:inline">
+              {paidText}
+            </span>
+          )}
         </button>
         {on && !drag && !disabled && (
           // Picked in a tier: an x inside the chip takes it out of the ballot.

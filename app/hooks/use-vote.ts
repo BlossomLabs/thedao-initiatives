@@ -83,11 +83,15 @@ export type RoundTier =
     funded: string[];
     /** Micro-USD per initiative, as decimal strings. */
     awards: Record<string, string>;
+    /** tokenId → slug → micro-USD that badge paid for it (only what it paid). */
+    paid?: Record<string, Record<string, string>>;
   };
 /** GET /api/vote/round: the quiet ending as it stands. */
 export type RoundView = {
   registrationClosesAt: number;
   closed: boolean;
+  /** Each voting badge's equal share of the pool, micro-USD. */
+  share?: string;
   tiers: RoundTier[];
   /** tokenId → the ballot that counts (hex). */
   accepted: Record<string, string>;

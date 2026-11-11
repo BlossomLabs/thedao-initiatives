@@ -125,7 +125,12 @@ async function setup(m: VoteManifest = manifest) {
   const fake = fakeChain();
   // The relayer has gas unless a test says otherwise.
   fake.state.balances.set(RELAYER, 10n ** 18n);
-  h.deps.vote = { chain: fake.chain, manifest: m };
+  // Every initiative needs $100 unless a test says otherwise (the board isn't seeded).
+  h.deps.vote = {
+    chain: fake.chain,
+    manifest: m,
+    needs: () => Promise.resolve(m.slugs.map(() => 100_000_000n)),
+  };
   h.clock.now = NOW;
   return { h, ...fake };
 }
@@ -772,5 +777,33 @@ Deno.test("round ballot: a settled tier can't change; registration closes; B set
     json: await signedBallot(VOTER, 1n, 2n, `0x0102${X}`, qe),
   });
   assertEquals([over.status, (await j(over)).code], [410, "closed"]);
+  h.close();
+});
+
+Deno.test("round: an initiative missing from the board holds the round instead of costing $0", async () => {
+  const { h } = await qeSetup();
+  h.deps.vote!.needs = undefined; // read the board, which has none of a, b, c
+  const res = await h.req("/api/vote/round");
+  assertEquals([res.status, (await j(res)).code], [503, "needs_unavailable"]);
+  h.close();
+});
+
+Deno.test("round ballot: relayed ballots reuse one replay for a few seconds; none before registration closes", async () => {
+  const { h, state } = await qeSetup();
+  state.owners.set(1n, VOTER.address);
+  const send = async (nonce: bigint) =>
+    await h.req("/api/vote/ballot", {
+      method: "POST",
+      json: await signedBallot(VOTER, 1n, nonce, `0x0102${X}`, qe),
+    });
+  state.nonces.set(1n, 1n);
+  assertEquals((await send(2n)).status, 200); // before registration closes: no replay
+  assertEquals(state.ballotReads, 0);
+  h.clock.now = NOW + 700;
+  state.nonces.set(1n, 2n);
+  assertEquals((await send(3n)).status, 200);
+  state.nonces.set(1n, 3n);
+  assertEquals((await send(4n)).status, 200);
+  assertEquals(state.ballotReads, 1);
   h.close();
 });

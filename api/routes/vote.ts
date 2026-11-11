@@ -175,7 +175,14 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     const cards = new Map((await readBoard(deps, board)).cards.map((c) => [c.initiative.slug, c]));
     return d.manifest.slugs.map((slug) => {
       const c = cards.get(slug);
-      if (!c) return 0n;
+      // Never $0: that would fund it at the first level that opens it, maybe for good.
+      if (!c) {
+        throw fail(
+          503,
+          "needs_unavailable",
+          "An initiative in the vote isn't on the board right now.",
+        );
+      }
       return BigInt(Math.max(0, Math.round((c.initiative.goalUsd - c.summary.total) * 1e6)));
     });
   };
@@ -234,6 +241,20 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
         .commit();
     }
     return st;
+  };
+
+  /** The replay, reused for a few seconds in this isolate: every relayed ballot asks. */
+  let recent: { at: number; contract: string; state: Promise<RoundState> } | null = null;
+  const recentRound = (d: VoteRound): Promise<RoundState> => {
+    if (
+      !recent || recent.contract !== d.manifest.contract ||
+      deps.now() - recent.at >= BALLOTS_CACHE_SECS
+    ) {
+      const state = roundState(d);
+      recent = { at: deps.now(), contract: d.manifest.contract, state };
+      state.catch(() => (recent = null));
+    }
+    return recent.state;
   };
 
   const open = (d: VoteRound) => {
@@ -351,8 +372,10 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     }).catch(() => false);
     if (!valid) throw fail(401, "bad_signature", "The signature doesn't match the badge's owner.");
     // What the quiet ending would refuse is refused here, before anyone pays gas for it.
-    const no = refusal(
-      await roundState(d),
+    // Nothing can be refused before registration closes (no tier settles before it).
+    const regDeadline = d.manifest.schedule.firstTallyAt[0] + d.manifest.schedule.initialWindow;
+    const no = deps.now() < regDeadline ? null : refusal(
+      await recentRound(d),
       tokenId.toString(),
       hexToBytes(ballot),
       deps.now(),

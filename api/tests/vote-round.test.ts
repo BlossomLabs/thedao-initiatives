@@ -703,9 +703,36 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
   h.close();
 });
 
+Deno.test("round: S's settlement is kept only once the blocks before it are final", async () => {
+  const { h, n } = await qeSetup();
+  h.clock.now = NOW + 700; // settled at NOW + 660, but logs before it may still arrive
+  await h.req("/api/vote/round");
+  assertEquals(
+    (await h.deps.db.kv.get(["vote", qe.contract.toLowerCase(), "settled", "S"])).value,
+    null,
+  );
+  n.needs = [10n, 10n, 10n];
+  h.clock.now += 10;
+  const fresh = await j(await h.req("/api/vote/round")) as { tiers: { awards: unknown }[] };
+  assertEquals(fresh.tiers[0].awards, { a: "10" });
+  h.close();
+});
+
+Deno.test("ballots: only what the quiet ending counts (a refused revision isn't served)", async () => {
+  const { h, state } = await qeSetup();
+  state.logs.push(logOf("1", `${X}01${X}`, NOW + 700, 3)); // moves a out of settled S
+  h.clock.now = NOW + 710;
+  const body = await j(await h.req("/api/vote/ballots")) as { ballots: unknown[] };
+  assertEquals(body.ballots, [
+    { tokenId: "1", ballot: `0x01${X}${X}` },
+    { tokenId: "2", ballot: `0x01${X}${X}` },
+  ]);
+  h.close();
+});
+
 Deno.test("round: a quiet window settles S; later need changes never move it", async () => {
   const { h, n } = await qeSetup();
-  h.clock.now = NOW + 700;
+  h.clock.now = NOW + 660 + 30 * 60;
   const first = await j(await h.req("/api/vote/round")) as { tiers: unknown[] };
   assertEquals(first.tiers[0], {
     tier: "S",

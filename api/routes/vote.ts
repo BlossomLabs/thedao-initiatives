@@ -115,6 +115,13 @@ const loadSettled = (x: StoredSettled): Settled => ({
   shares: new Map(x.shares.map(([c, m]) => [c, new Map(m.map(([t, v]) => [t, BigInt(v)]))])),
 });
 
+/** Over, and the blocks before the last settlement are final: nothing can change it. */
+function isFinal(body: { closed: boolean; tiers: { status: string; at?: number }[] }, now: number) {
+  const last = body.tiers[body.tiers.length - 1];
+  return body.closed && last.status === "settled" &&
+    now >= (last.at ?? Infinity) + FINAL_AFTER_SECS;
+}
+
 /** The round state as JSON: slugs for initiatives, decimal strings for micro-USD. */
 function roundJson(st: RoundState, slugs: string[]) {
   const named = (cs: number[]) => cs.map((c) => slugs[c]);
@@ -193,7 +200,10 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       snapshots,
     }, deps.now());
     for (const [i, t] of st.tiers.entries()) {
+      // Kept only once the blocks before the settlement are final: until then a
+      // lagging RPC may still be missing a ballot that changes it.
       if (t.status !== "settled" || stored[i].value) continue;
+      if (deps.now() < t.at + FINAL_AFTER_SECS) continue;
       const { status: _, ...x } = t;
       await kv.atomic().check(stored[i]).set([...round(d), "settled", t.tier], storeSettled(x))
         .commit();
@@ -417,42 +427,34 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     const d = dc();
     const key = [...round(d), "round"];
     const cached = await deps.db.kv.get<{ at: number; body: ReturnType<typeof roundJson> }>(key);
-    if (cached.value?.body.closed) return c.json(cached.value.body);
+    if (cached.value && isFinal(cached.value.body, cached.value.at)) {
+      return c.json(cached.value.body);
+    }
     if (cached.value && deps.now() - cached.value.at < BALLOTS_CACHE_SECS) {
       return c.json(cached.value.body);
     }
     const body = roundJson(await roundState(d), d.manifest.slugs);
-    await deps.db.kv.set(
-      key,
-      { at: deps.now(), body },
-      body.closed ? undefined : { expireIn: 60_000 },
-    );
+    const at = deps.now();
+    await deps.db.kv.set(key, { at, body }, isFinal(body, at) ? undefined : { expireIn: 60_000 });
     return c.json(body);
   });
 
-  // The vote results poll this every few seconds; the chain is read at most once per
-  // window. Once the close is final, the last read is the result: read once, kept.
+  // The ballots that count (the quiet ending's accepted ones), for the vote results.
+  // Read at most once per few seconds; once the round's end is final, read once, kept.
   r.get("/ballots", async (c) => {
     const d = dc();
     const key = [...round(d), "ballots"];
-    const cached = await deps.db.kv.get<{ at: number; ballots: unknown[] }>(key);
-    const finalAt = d.manifest.closesAt + FINAL_AFTER_SECS;
-    if (cached.value && cached.value.at >= finalAt) return c.json(cached.value);
+    const cached = await deps.db.kv.get<{ at: number; final: boolean; ballots: unknown[] }>(key);
+    if (cached.value?.final) return c.json({ at: cached.value.at, ballots: cached.value.ballots });
     if (cached.value && deps.now() - cached.value.at < BALLOTS_CACHE_SECS) {
-      return c.json(cached.value);
+      return c.json({ at: cached.value.at, ballots: cached.value.ballots });
     }
-    const latest = new Map<string, string>();
-    for (const b of await d.chain.ballots()) {
-      if (b.timestamp >= d.manifest.closesAt) continue;
-      // A burn voids the badge's ballots so far (SignedBallots.burn).
-      if ("revoked" in b) latest.delete(b.tokenId);
-      else latest.set(b.tokenId, b.ballot);
-    }
-    const ballots = [...latest].map(([tokenId, ballot]) => ({ tokenId, ballot }));
-    const value = { at: deps.now(), ballots };
-    // A final result is kept for good; a live one only for a minute.
-    await deps.db.kv.set(key, value, deps.now() >= finalAt ? undefined : { expireIn: 60_000 });
-    return c.json(value);
+    const body = roundJson(await roundState(d), d.manifest.slugs);
+    const ballots = Object.entries(body.accepted).map(([tokenId, ballot]) => ({ tokenId, ballot }));
+    const at = deps.now();
+    const final = isFinal(body, at);
+    await deps.db.kv.set(key, { at, final, ballots }, final ? undefined : { expireIn: 60_000 });
+    return c.json({ at, ballots });
   });
 
   return r;

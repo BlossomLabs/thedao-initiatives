@@ -34,3 +34,39 @@ Deno.test("Sepolia RPC: SEPOLIA_RPC_URL, else the public node — never the main
     "https://s.example",
   );
 });
+
+Deno.test("a real round reads ownerOf from the voting badge, not the ballots contract", async () => {
+  const { createVoteChain } = await import("../services/vote-chain.ts");
+  const { custom } = await import("viem");
+  const BADGE = "0x3b49f45ec8796f64febb1ae0f5661791845ce35c";
+  const BALLOTS = "0x1000000000000000000000000000000000000001";
+  const calls: string[] = [];
+  const transport = custom({
+    request: ({ method, params }: { method: string; params: unknown[] }) => {
+      if (method === "eth_chainId") return Promise.resolve("0x1");
+      if (method === "eth_call") {
+        calls.push((params[0] as { to: string }).to.toLowerCase());
+        return Promise.resolve("0x" + "0".repeat(24) + "11".repeat(20));
+      }
+      return Promise.reject(new Error("unexpected " + method));
+    },
+  });
+  const chain = createVoteChain(
+    {
+      kind: "real",
+      chainId: 1,
+      contract: BALLOTS,
+      badge: BADGE,
+      deployBlock: 1,
+      opensAt: 0,
+      closesAt: 1,
+      poolUsd: "1",
+      slugs: ["a"],
+    },
+    "http://unused",
+    null,
+    transport,
+  );
+  assertEquals((await chain.ownerOf(7n))?.toLowerCase(), "0x" + "11".repeat(20));
+  assertEquals(calls, [BADGE]);
+});

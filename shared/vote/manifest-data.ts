@@ -1,5 +1,6 @@
 // Written by scripts/vote-deploy.ts. Do not edit by hand.
 export default {
+  "kind": "test",
   "chainId": 11155111,
   "contract": "0x681d51e64126dfecaa17bab3343ab27f7602f603",
   "deployBlock": 12050220,

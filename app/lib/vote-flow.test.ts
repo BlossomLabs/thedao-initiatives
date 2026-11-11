@@ -10,6 +10,7 @@ import {
 } from "./vote-flow";
 
 const m: VoteManifest = {
+  kind: "test",
   chainId: 11155111,
   contract: "0x1000000000000000000000000000000000000001",
   deployBlock: 1,
@@ -28,7 +29,7 @@ const GAS: Hex = `0x${"99".repeat(32)}`;
 
 function deps(over: Partial<FlowDeps> = {}) {
   const d: FlowDeps = {
-    ensureSepolia: vi.fn(() => Promise.resolve()),
+    ensureChain: vi.fn(() => Promise.resolve()),
     signVote: vi.fn(() => Promise.resolve(SIG)),
     relay: vi.fn(() => Promise.resolve(HASH)),
     nonceOf: vi.fn(() => Promise.resolve(0n)),
@@ -51,7 +52,7 @@ describe("submitBallot", () => {
     const d = deps({ nonceOf: vi.fn(() => Promise.resolve(2n)) });
     const { phases, set } = record();
     const signed = await submitBallot(d, m, 7n, VOTER, BALLOT, set);
-    expect(d.ensureSepolia).toHaveBeenCalled();
+    expect(d.ensureChain).toHaveBeenCalled();
     expect(d.signVote).toHaveBeenCalledWith(
       expect.objectContaining({
         message: { tokenId: 7n, voter: VOTER, nonce: 3n, ballot: BALLOT },

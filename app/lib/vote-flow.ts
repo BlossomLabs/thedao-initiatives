@@ -18,7 +18,7 @@ export type Expected = { tokenId: bigint; nonce: bigint; ballot: Hex };
 export type Signed = Expected & { signature: Hex; hash?: Hex };
 
 export interface FlowDeps {
-  ensureSepolia(): Promise<void>;
+  ensureChain(): Promise<void>;
   signVote(typed: ReturnType<typeof voteTypedData>): Promise<Hex>;
   /** POST /api/vote/ballot; a 409 "pending" resolves to the hash already on its way. */
   relay(body: Signed): Promise<Hex>;
@@ -94,7 +94,7 @@ async function signNext(
 ): Promise<Signed | null> {
   set({ kind: "signing" });
   try {
-    await d.ensureSepolia();
+    await d.ensureChain();
     const nonce = (await d.nonceOf(tokenId)) + 1n;
     const signature = await d.signVote(voteTypedData(m, tokenId, voter, nonce, ballot));
     return { tokenId, nonce, ballot, signature };
@@ -167,7 +167,7 @@ export async function selfSendBallot(
   if (!signed) return null;
   set({ kind: "relaying" });
   try {
-    await d.ensureSepolia();
+    await d.ensureChain();
     const gas = await d.requestGas(tokenId).catch(() => null);
     if (gas) await d.waitTx(gas);
   } catch {

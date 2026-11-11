@@ -256,6 +256,7 @@ async function main() {
   if (count !== BigInt(plan.length)) throw new Error(`initiativeCount ${count} != ${plan.length}`);
 
   const manifest: VoteManifest = {
+    kind: "test",
     chainId: sepolia.id,
     contract,
     deployBlock: Number(deployed.blockNumber),

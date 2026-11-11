@@ -3,13 +3,14 @@ import {
   createWalletClient,
   type Hex,
   http,
+  parseAbi,
   parseAbiItem,
   type PublicClient,
+  type Transport,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { sepolia } from "viem/chains";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
-import type { VoteManifest } from "../../shared/vote/manifest.ts";
+import { voteChain, type VoteManifest, voterNft } from "../../shared/vote/manifest.ts";
 
 /** What the vote routes need from the chain. Injected so tests run without a chain. */
 export interface VoteChain {
@@ -61,6 +62,7 @@ const REGISTRATION_REVOKED = parseAbiItem("event RegistrationRevoked(uint256 ind
 const TRANSFER = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
 );
+const OWNER_OF_ABI = parseAbi(["function ownerOf(uint256) view returns (address)"]);
 const LOG_CHUNK = 50_000n;
 /** _safeMint to a wallet is ~100k gas; the rest is room for a small receive hook. */
 const MINT_GAS = 250_000n;
@@ -69,12 +71,12 @@ export function createVoteChain(
   m: VoteManifest,
   rpcUrl: string,
   relayerKey: Hex | null,
+  transport: Transport = http(rpcUrl),
 ): VoteChain {
-  const pub = createPublicClient({ chain: sepolia, transport: http(rpcUrl) }) as PublicClient;
+  const chain = voteChain(m);
+  const pub = createPublicClient({ chain, transport }) as PublicClient;
   const account = relayerKey ? privateKeyToAccount(relayerKey) : null;
-  const wallet = account
-    ? createWalletClient({ account, chain: sepolia, transport: http(rpcUrl) })
-    : null;
+  const wallet = account ? createWalletClient({ account, chain, transport }) : null;
   const read = <T>(functionName: string, args: readonly unknown[]) =>
     pub.readContract({
       address: m.contract,
@@ -87,7 +89,13 @@ export function createVoteChain(
   return {
     async ownerOf(n) {
       try {
-        return await read<Hex>("ownerOf", [n]);
+        // The voters' NFT: the voting badge in the real round, the round's own badges in tests.
+        return await pub.readContract({
+          address: voterNft(m),
+          abi: OWNER_OF_ABI,
+          functionName: "ownerOf",
+          args: [n],
+        });
       } catch (e) {
         // ERC721NonexistentToken: not minted yet.
         if (String(e).includes("ERC721NonexistentToken")) return null;

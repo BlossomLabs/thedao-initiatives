@@ -100,7 +100,7 @@ export function voteRoutes(deps: Deps) {
     }
   };
   const codeNumber = async (d: VoteRound, code: unknown) => {
-    const n = typeof code === "string" ? await verifyCode(code, d.manifest.issuer) : null;
+    const n = typeof code === "string" ? await verifyCode(code, d.manifest.issuer ?? "") : null;
     if (n === null) throw fail(400, "bad_code", "This code doesn't look right.");
     return BigInt(n);
   };

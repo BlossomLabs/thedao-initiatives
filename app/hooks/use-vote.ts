@@ -1,12 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createPublicClient, type Hex, http, type PublicClient } from "viem";
-import { sepolia } from "viem/chains";
 import { signTypedData, writeContract } from "wagmi/actions";
 import { api, ApiError } from "~/lib/api";
 import { useWallet } from "~/context/wallet";
 import { liveConnector } from "~/lib/wallet-store";
-import { useEnsureSepolia } from "~/hooks/use-sepolia";
+import { useEnsureVoteChain } from "~/hooks/use-vote-chain";
 import {
   type BallotPhase,
   check,
@@ -17,18 +16,21 @@ import {
   submitBallot,
 } from "~/lib/vote-flow";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi";
-import { ROUND } from "../../shared/vote/manifest";
+import { MAINNET_CHAIN_ID, ROUND, voteChain } from "../../shared/vote/manifest";
 import { checkBallotTx } from "../../shared/vote/receipt";
 import { recordVote } from "../../shared/vote/record";
 
 const SEPOLIA_RPC = (import.meta.env?.VITE_SEPOLIA_RPC_URL as string | undefined) ||
   "https://ethereum-sepolia-rpc.publicnode.com";
+const MAINNET_RPC = (import.meta.env?.VITE_RPC_URL as string | undefined) ||
+  "https://ethereum-rpc.publicnode.com";
 const WAIT_MS = 3 * 60_000;
 
 let client: PublicClient | null = null;
-export const sepoliaClient = (): PublicClient => (client ??= createPublicClient({
-  chain: sepolia,
-  transport: http(SEPOLIA_RPC),
+/** Reads the round's chain from the browser (receipts, nonces, self-send). */
+export const voteClient = (): PublicClient => (client ??= createPublicClient({
+  chain: voteChain(),
+  transport: http(ROUND.chainId === MAINNET_CHAIN_ID ? MAINNET_RPC : SEPOLIA_RPC),
 }) as PublicClient);
 
 export type CodeInfo = { n: number; claimed: boolean; owner: string | null };
@@ -83,14 +85,14 @@ export const apiCode = (e: unknown): string | undefined =>
 export function useMintWait() {
   return {
     wait: async (hash: Hex) => {
-      const r = await sepoliaClient().waitForTransactionReceipt({ hash, timeout: WAIT_MS });
+      const r = await voteClient().waitForTransactionReceipt({ hash, timeout: WAIT_MS });
       if (r.status !== "success") throw new Error("The mint failed on-chain. Try again.");
     },
   };
 }
 
 const read = <T>(functionName: string, args: readonly unknown[]) =>
-  sepoliaClient().readContract({
+  voteClient().readContract({
     address: ROUND.contract,
     abi: SIGNED_BALLOTS_ABI,
     functionName: functionName as never,
@@ -122,7 +124,7 @@ export async function waitResult(
   hash: Hex,
   expect: { tokenId: bigint; nonce: bigint; ballot: Hex },
 ) {
-  const pub = sepoliaClient();
+  const pub = voteClient();
   const receipt = await pub.waitForTransactionReceipt({ hash, timeout: WAIT_MS });
   const [tx, block] = await Promise.all([
     pub.getTransaction({ hash }),
@@ -140,14 +142,14 @@ export async function waitResult(
 /** Sign, relay, wait and check one ballot; Retry and the last send survive a reload. */
 export function useBallotSubmit(tokenId: bigint | null) {
   const wallet = useWallet();
-  const ensureSepolia = useEnsureSepolia();
+  const ensureChain = useEnsureVoteChain();
   const [phase, setPhase] = useState<BallotPhase>({ kind: "idle" });
   const [last, setLast] = useState<Signed | null>(
     () => (tokenId === null ? null : loadLast(tokenId)),
   );
 
   const deps = useMemo<FlowDeps>(() => ({
-    ensureSepolia,
+    ensureChain,
     signVote: (typed) => {
       if (!wallet.config || !wallet.address) throw new Error("Connect your wallet first.");
       return signTypedData(wallet.config, {
@@ -184,7 +186,7 @@ export function useBallotSubmit(tokenId: bigint | null) {
         json: { tokenId: id.toString() },
       })).hash,
     waitTx: async (hash) => {
-      await sepoliaClient().waitForTransactionReceipt({ hash, timeout: WAIT_MS });
+      await voteClient().waitForTransactionReceipt({ hash, timeout: WAIT_MS });
     },
     sendOwn: (s) => {
       if (!wallet.config || !wallet.address) throw new Error("Connect your wallet first.");
@@ -199,7 +201,7 @@ export function useBallotSubmit(tokenId: bigint | null) {
         connector: liveConnector(wallet),
       } as never);
     },
-  }), [ensureSepolia, wallet]);
+  }), [ensureChain, wallet]);
 
   const keep = useCallback((s: Signed | null) => {
     if (!s) return;

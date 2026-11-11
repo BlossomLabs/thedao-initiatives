@@ -5,6 +5,7 @@ import { checkBallotTx } from "./receipt.ts";
 import type { VoteManifest } from "./manifest.ts";
 
 const m: VoteManifest = {
+  kind: "test",
   chainId: 11155111,
   contract: "0x1000000000000000000000000000000000000001",
   deployBlock: 1,
@@ -71,7 +72,7 @@ describe("checkBallotTx", () => {
     const mint = encodeFunctionData({
       abi: SIGNED_BALLOTS_ABI,
       functionName: "mint",
-      args: [m.issuer, 7n],
+      args: [m.issuer!, 7n],
     });
     expect(other({ tx: { to: m.contract, input: mint } })).toBe("mismatch");
     expect(other({ tx: { to: m.contract, input: "0xdeadbeef" } })).toBe("mismatch");

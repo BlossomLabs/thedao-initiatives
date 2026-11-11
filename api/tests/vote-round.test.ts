@@ -17,6 +17,7 @@ const OTHER = privateKeyToAccount(`0x${"33".repeat(32)}`);
 const NOW = 1_800_000_000;
 
 const manifest: VoteManifest = {
+  kind: "test",
   chainId: 11155111,
   contract: "0x1000000000000000000000000000000000000001",
   deployBlock: 1,

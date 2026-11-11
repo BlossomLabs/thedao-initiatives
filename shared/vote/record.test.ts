@@ -6,6 +6,7 @@ import { voteTypedData } from "./typed-data.ts";
 import type { VoteManifest } from "./manifest.ts";
 
 const m: VoteManifest = {
+  kind: "test",
   chainId: 11155111,
   contract: "0x1000000000000000000000000000000000000001",
   deployBlock: 1,

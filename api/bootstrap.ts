@@ -15,7 +15,7 @@ import { ALWAYS_ENFORCED_RATE_LIMITS, BADGE_CONTRACT, CURATOR_ADDRESSES } from "
 import type { Deps } from "./middleware/context.ts";
 import { createAdmins } from "./services/admins.ts";
 import { createVoteChain } from "./services/vote-chain.ts";
-import { ROUND } from "../shared/vote/manifest.ts";
+import { MAINNET_CHAIN_ID, ROUND, roundDeployed } from "../shared/vote/manifest.ts";
 import { createStaticSite, type SiteOptions } from "./site.ts";
 
 /** Structured events (audit trail, rate limit breaches) are emitted as one JSON
@@ -76,11 +76,11 @@ export async function createServer(siteOptions?: SiteOptions) {
     pinata: createPinata(config, fetch),
     log,
     // Off until the manifest names a deployed contract.
-    vote: /^0x0{40}$/i.test(ROUND.contract) ? undefined : {
+    vote: !roundDeployed(ROUND) ? undefined : {
       manifest: ROUND,
       chain: createVoteChain(
         ROUND,
-        config.sepoliaRpcUrl,
+        ROUND.chainId === MAINNET_CHAIN_ID ? config.rpcEndpoints[0] : config.sepoliaRpcUrl,
         /^0x[0-9a-fA-F]{64}$/.test(config.voteRelayerKey)
           ? config.voteRelayerKey as `0x${string}`
           : null,

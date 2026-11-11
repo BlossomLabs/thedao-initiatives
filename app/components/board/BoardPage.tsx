@@ -236,7 +236,9 @@ export default function BoardPage(
         heading: (
           <>
             Not funded
-            <span className="small dim tnum">{results.notFunded.length}</span>
+            <span className="small dim tnum">
+              {results.notFunded.length} initiative{results.notFunded.length === 1 ? "" : "s"}
+            </span>
           </>
         ),
       },

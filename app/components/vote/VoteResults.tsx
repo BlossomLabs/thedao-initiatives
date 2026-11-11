@@ -161,21 +161,12 @@ export default function VoteResults() {
     () => rv?.closed ? splitResults(cards, rv.tiers) : undefined,
     [rv, cards],
   );
-  /** One line per tier: what it funded, or that it funded nothing. */
+  /** The list has a section per tier with what it funded; a tier that funded nothing has
+   * no section, so the hero says so. */
   const tierLines = isClosed && rv
-    ? rv.tiers.map((t) => {
-      const sum = t.status === "settled"
-        ? Object.values(t.awards).reduce((a, v) => a + dollars(v), 0)
-        : 0;
-      const n = t.status === "waiting" ? 0 : t.funded.length;
-      return (
-        <p key={t.tier} className="m-0">
-          {n > 0
-            ? `${tierName(t.tier)}: ${usd(sum)} to ${plural(n, "initiative")}`
-            : `${tierName(t.tier)}: no initiatives funded`}
-        </p>
-      );
-    })
+    ? rv.tiers.filter((t) => t.status === "waiting" || !t.funded.length).map((t) => (
+      <p key={t.tier} className="m-0">{tierName(t.tier)}: no initiatives funded</p>
+    ))
     : null;
 
   const hero = (

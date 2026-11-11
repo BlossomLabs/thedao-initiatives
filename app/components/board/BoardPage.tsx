@@ -1,6 +1,6 @@
 import type { AiSearchResult } from "../../../shared/ai-search";
 import type { Card } from "~/lib/api-types";
-import type { Tier } from "@shared/vote/ballot";
+import { type Tier, tierName, TIERS } from "@shared/vote/ballot";
 import type { NextTierEntry } from "~/hooks/use-vote";
 import type { ResultRow } from "~/lib/vote-results";
 import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -208,23 +208,38 @@ export default function BoardPage(
         : undefined,
     [results],
   );
+  // The final result: one section per tier (what it funded and how much the vote gave),
+  // then the rest. A tier that funded nothing draws no section; the hero says so.
   const resultGroups = results
-    ? ([["funded", "Funded", results.funded], [
-      "not-funded",
-      "Not funded",
-      results.notFunded,
-    ]] as const)
-      .filter(([, , rows]) => rows.length > 0)
-      .map(([key, label, rows]) => ({
-        key,
-        cards: rows.map((r) => r.card),
+    ? [
+      ...TIERS.map((t) => {
+        const rows = results.funded.filter((r) => r.tier === t);
+        const fromVote = rows.reduce((a, r) => a + r.finalUsd - r.card.summary.total, 0);
+        return {
+          key: `tier-${t}`,
+          rows,
+          heading: (
+            <>
+              {tierName(t)}
+              <span className="small dim tnum">{rows.length}</span>
+              <span className="small dim tnum">· {usd(fromVote)} from the vote</span>
+            </>
+          ),
+        };
+      }),
+      {
+        key: "not-funded",
+        rows: results.notFunded,
         heading: (
           <>
-            {label}
-            <span className="small dim tnum">{rows.length}</span>
+            Not funded
+            <span className="small dim tnum">{results.notFunded.length}</span>
           </>
         ),
-      }))
+      },
+    ]
+      .filter((g) => g.rows.length > 0)
+      .map(({ key, rows, heading }) => ({ key, cards: rows.map((r) => r.card), heading }))
     : null;
   const groups: { key: string; cards: Card[]; heading?: React.ReactNode }[] = resultGroups ??
     (ai ? [{ key: "all", cards }] : sort === "category"

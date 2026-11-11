@@ -314,14 +314,16 @@ async function showClosed(over: Record<string, unknown> = {}, url = "/") {
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  await screen.findByText(/^Tier-S:/);
+  await screen.findByText((_, el) =>
+    el?.tagName === "P" && /pool spent/.test(el.textContent ?? "")
+  );
 }
 /** The hero line: its words are split by the coloured "pool". */
 const hero = (re: RegExp) =>
   screen.getByText((_, el) => el?.tagName === "P" && re.test(el.textContent ?? ""));
 const heading = (name: string) => screen.queryByRole("heading", { name: new RegExp(`^${name}`) });
 
-it("once B settles, the final result: spent of the pool, a line per tier", async () => {
+it("once B settles, the final result: spent of the pool, a section per tier", async () => {
   await showClosed({
     tiers: [
       settled("S", ["beta"], { beta: usdMicro(30_000) }),
@@ -330,13 +332,18 @@ it("once B settles, the final result: spent of the pool, a line per tier", async
     ],
   });
   expect(hero(/\$80k of \$100k demo pool spent/)).toBeInTheDocument();
-  expect(screen.getByText("Tier-S: $30,000 to 1 initiative")).toBeInTheDocument();
-  expect(screen.getByText("Tier-A: $50,000 to 1 initiative")).toBeInTheDocument();
+  // Each tier heads its own section, with its count and what the vote gave it.
+  expect(heading("Tier-S")).toHaveTextContent("Tier-S1· $30,000 from the vote");
+  expect(heading("Tier-A")).toHaveTextContent("Tier-A1· $50,000 from the vote");
+  // Tier-B funded nothing: no section, the hero says so.
+  expect(heading("Tier-B")).toBeNull();
+  expect(screen.getByText("Tier-B: no initiatives funded")).toBeInTheDocument();
+  expect(screen.queryByText(/^Tier-[SA]: /)).toBeNull();
 });
 
-it("the final result: funded and not funded lists", async () => {
+it("the final result: tier sections, then not funded", async () => {
   await showClosed();
-  expect(heading("Funded")).toHaveTextContent("Funded1");
+  expect(heading("Tier-S")).toHaveTextContent("Tier-S1");
   expect(heading("Not funded")).toHaveTextContent("Not funded1");
   // The list's header names the final amount and no type column.
   expect(screen.getAllByText("Final").length).toBeGreaterThan(0);
@@ -367,7 +374,7 @@ it("an empty list draws no heading", async () => {
       settled("B", [], {}),
     ],
   });
-  expect(heading("Funded")).not.toBeNull();
+  expect(heading("Tier-S")).not.toBeNull();
   expect(heading("Not funded")).toBeNull();
 });
 

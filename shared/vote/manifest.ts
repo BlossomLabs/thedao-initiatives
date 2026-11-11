@@ -1,5 +1,6 @@
 import { type Chain, mainnet, sepolia } from "viem/chains";
 import manifest from "./manifest-data.ts";
+import type { Schedule } from "./quiet-ending.ts";
 
 /** The current vote round, written by scripts/vote-deploy.ts. `slugs[i]` is
  * on-chain initiative `i`, so ballot byte `i` ranks that initiative. A test round
@@ -11,8 +12,10 @@ export type VoteManifest = {
   contract: `0x${string}`;
   deployBlock: number;
   opensAt: number;
-  /** Ballots and mints count only in blocks strictly before this (unix seconds). */
+  /** The latest the round can end (B's last window): nothing counts from here on. */
   closesAt: number;
+  /** The contract's quiet-ending schedule: tiers settle one at a time from these dates. */
+  schedule: Schedule;
   /** Six-decimal USD, as a decimal string (it exceeds 2^53 in some rounds). */
   poolUsd: string;
   /** Test rounds: the address that signs the paper codes; the site only ever knows this. */
@@ -28,6 +31,7 @@ export const MAINNET_CHAIN_ID = 1;
 /** Throws on a manifest the site can't run: a real round without its badge, a test
  * round without its code issuer or off Sepolia (its badges and gas drip are free). */
 export function checkManifest(m: VoteManifest): VoteManifest {
+  if (!m.schedule) throw new Error("vote manifest: the round needs its schedule");
   if (m.kind === "real" && !m.badge) throw new Error("vote manifest: a real round needs a badge");
   if (m.kind === "test" && !m.issuer) {
     throw new Error("vote manifest: a test round needs an issuer");

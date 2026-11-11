@@ -2,8 +2,21 @@
  * (vote/reference/quiet_ending.py `_ear`, quiet_ending_steps.py `tier_levels`,
  * `bound`, `tier_of`) and checked against fixtures it writes
  * (vote/reference/export_stage_fixtures.py). Amounts are micro-USD bigints.
- * Browser and Deno: extensionless imports, as shared/vote/tally.ts. */
-import { cumulativeDeductions } from "../../vote/shared/pbear";
+ * Browser and Deno. */
+/** pbear's cumulative_deductions: `thr` deducted from `weights` in proportion,
+ * integer-exact (vote/shared/pbear.ts has the same; that module only loads in the
+ * browser, and this one runs on the server too). */
+function cumulativeDeductions(weights: bigint[], thr: bigint): bigint[] {
+  const total = weights.reduce((a, b) => a + b, 0n);
+  const out: bigint[] = [];
+  let cum = 0n;
+  for (const w of weights) {
+    const next = cum + w;
+    out.push((next * thr) / total - (cum * thr) / total);
+    cum = next;
+  }
+  return out;
+}
 
 const WITHHELD = 255;
 

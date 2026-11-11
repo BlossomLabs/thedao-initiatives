@@ -10,6 +10,8 @@ const base: VoteManifest = {
   deployBlock: 1,
   opensAt: 0,
   closesAt: 1,
+
+  schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
   poolUsd: "1",
   issuer: "0x2000000000000000000000000000000000000002",
   slugs: ["a"],
@@ -30,6 +32,9 @@ describe("round manifest", () => {
     );
     expect(() => checkManifest({ ...base, issuer: undefined })).toThrow(/issuer/);
     expect(() => checkManifest(base)).not.toThrow();
+  });
+  it("every round carries the contract's quiet-ending schedule", () => {
+    expect(() => checkManifest({ ...base, schedule: undefined as never })).toThrow(/schedule/);
   });
   it("a test round never runs on mainnet (its badges and gas drip are free)", () => {
     expect(() => checkManifest({ ...base, chainId: 1 })).toThrow(/Sepolia/);

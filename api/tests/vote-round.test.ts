@@ -23,6 +23,12 @@ const manifest: VoteManifest = {
   deployBlock: 1,
   opensAt: NOW - 3600,
   closesAt: NOW + 3600,
+  schedule: {
+    opensAt: NOW - 3600,
+    firstTallyAt: [NOW + 600, NOW + 660, NOW + 720],
+    initialWindow: 60,
+    maxWindows: 1,
+  },
   poolUsd: "913244000000",
   issuer: ISSUER.address,
   slugs: ["a", "b", "c"],
@@ -38,6 +44,7 @@ const real: VoteManifest = {
   deployBlock: 1,
   opensAt: NOW - 3600,
   closesAt: NOW + 3600,
+  schedule: manifest.schedule,
   poolUsd: "913244000000",
   slugs: ["a", "b", "c"],
 };
@@ -657,5 +664,85 @@ Deno.test("vote round: a new round starts clean (gas, relay count and mint marke
   assertEquals(claim.status, 200, "code 1 is unclaimed in the new round");
   const gas = await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } });
   assertEquals(gas.status, 200, "the badge's one drip is per round");
+  h.close();
+});
+
+// ---------------------------------------------------------------- quiet ending
+/** Pool $200 (micro-units here: 200), three initiatives needing 150 each. */
+const qe: VoteManifest = { ...manifest, poolUsd: "200" };
+const X = "ff";
+const logOf = (tokenId: string, ballot: string, timestamp: number, block: number) => ({
+  tokenId,
+  ballot: `0x${ballot}` as Hex,
+  timestamp,
+  block,
+  nonce: 1,
+});
+
+async function qeSetup(needs = [150n, 150n, 150n]) {
+  const { h, state } = await setup(qe);
+  const n = { needs };
+  h.deps.vote!.needs = () => Promise.resolve(n.needs);
+  state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
+  return { h, state, n };
+}
+
+Deno.test("round: before S's first tally every tier waits; the live tally funds a", async () => {
+  const { h } = await qeSetup();
+  const body = await j(await h.req("/api/vote/round")) as
+    & { tiers: { status: string }[] }
+    & Record<string, unknown>;
+  assertEquals(body.tiers.map((t: { status: string }) => t.status), [
+    "waiting",
+    "waiting",
+    "waiting",
+  ]);
+  assertEquals(body.live, { funded: ["a"], awards: { a: "150" } });
+  assertEquals(body.registrationClosesAt, NOW + 660);
+  assertEquals(body.accepted, { "1": `0x01${X}${X}`, "2": `0x01${X}${X}` });
+  h.close();
+});
+
+Deno.test("round: a quiet window settles S; later need changes never move it", async () => {
+  const { h, n } = await qeSetup();
+  h.clock.now = NOW + 700;
+  const first = await j(await h.req("/api/vote/round")) as { tiers: unknown[] };
+  assertEquals(first.tiers[0], {
+    tier: "S",
+    status: "settled",
+    at: NOW + 660,
+    forced: false,
+    funded: ["a"],
+    awards: { a: "150" },
+  });
+  n.needs = [10n, 10n, 10n];
+  h.clock.now += 10;
+  const later = await j(await h.req("/api/vote/round")) as { tiers: { awards: unknown }[] };
+  assertEquals(later.tiers[0].awards, { a: "150" });
+  h.close();
+});
+
+Deno.test("round ballot: a settled tier can't change; registration closes; B settled closes", async () => {
+  const { h, state } = await qeSetup();
+  state.owners.set(1n, VOTER.address);
+  state.owners.set(3n, VOTER.address);
+  state.nonces.set(1n, 1n);
+  h.clock.now = NOW + 700;
+  const moved = await h.req("/api/vote/ballot", {
+    method: "POST",
+    json: await signedBallot(VOTER, 1n, 2n, `0x${X}01${X}`, qe),
+  });
+  assertEquals([moved.status, (await j(moved)).code], [409, "tier_settled"]);
+  const late = await h.req("/api/vote/ballot", {
+    method: "POST",
+    json: await signedBallot(VOTER, 3n, 1n, `0x01${X}${X}`, qe),
+  });
+  assertEquals([late.status, (await j(late)).code], [403, "registration_closed"]);
+  h.clock.now = NOW + 800;
+  const over = await h.req("/api/vote/ballot", {
+    method: "POST",
+    json: await signedBallot(VOTER, 1n, 2n, `0x0102${X}`, qe),
+  });
+  assertEquals([over.status, (await j(over)).code], [410, "closed"]);
   h.close();
 });

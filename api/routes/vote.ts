@@ -9,6 +9,16 @@ import { isValidOnchainBallot } from "../../shared/vote/ballot.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { recordVote } from "../../shared/vote/record.ts";
 import type { VoteRound } from "../services/vote-chain.ts";
+import { type BoardCache, createBoardCache, readBoard } from "./board.ts";
+import {
+  type Receipt,
+  refusal,
+  replay,
+  type RoundState,
+  type Settled,
+  type TierState,
+} from "../../shared/vote/quiet-ending.ts";
+import type { Tier } from "../../shared/vote/ballot.ts";
 
 const PER_MINUTE = 30;
 const PENDING_MS = 10 * 60_000;
@@ -90,7 +100,54 @@ const uint = (v: unknown): bigint | null => {
   return BigInt(v);
 };
 
-export function voteRoutes(deps: Deps) {
+type StoredSettled = Omit<Settled, "awards" | "shares"> & {
+  awards: [number, string][];
+  shares: [number, [string, string][]][];
+};
+const storeSettled = (x: Settled): StoredSettled => ({
+  ...x,
+  awards: [...x.awards].map(([c, v]) => [c, v.toString()]),
+  shares: [...x.shares].map(([c, m]) => [c, [...m].map(([t, v]) => [t, v.toString()])]),
+});
+const loadSettled = (x: StoredSettled): Settled => ({
+  ...x,
+  awards: new Map(x.awards.map(([c, v]) => [c, BigInt(v)])),
+  shares: new Map(x.shares.map(([c, m]) => [c, new Map(m.map(([t, v]) => [t, BigInt(v)]))])),
+});
+
+/** The round state as JSON: slugs for initiatives, decimal strings for micro-USD. */
+function roundJson(st: RoundState, slugs: string[]) {
+  const named = (cs: number[]) => cs.map((c) => slugs[c]);
+  const money = (m: Map<number, bigint>) =>
+    Object.fromEntries([...m].map(([c, v]) => [slugs[c], v.toString()]));
+  const tier = (t: TierState) =>
+    t.status === "settled"
+      ? {
+        tier: t.tier,
+        status: t.status,
+        at: t.at,
+        forced: t.forced,
+        funded: named(t.funded),
+        awards: money(t.awards),
+      }
+      : t.status === "settling"
+      ? { ...t, funded: named(t.funded) }
+      : t;
+  return {
+    registrationClosesAt: st.registrationClosesAt,
+    closed: st.closed,
+    tiers: st.tiers.map(tier),
+    accepted: Object.fromEntries(
+      [...st.accepted].map((
+        [t, b],
+      ) => [t, `0x${[...b].map((x) => x.toString(16).padStart(2, "0")).join("")}`]),
+    ),
+    rejected: st.rejected,
+    live: { funded: named(st.live.order), awards: money(st.live.awards) },
+  };
+}
+
+export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
   const r = new Hono<Vars>();
   const dc = (): VoteRound => {
     if (!deps.vote) throw fail(503, "off", "No vote is deployed right now.");
@@ -100,6 +157,50 @@ export function voteRoutes(deps: Deps) {
   const testOnly = (d: VoteRound) => {
     if (d.manifest.kind !== "test") throw fail(404, "off", "This vote doesn't use paper codes.");
   };
+  const board = boardCache ?? createBoardCache(deps);
+  /** Each initiative's need, micro-USD, as the vote results count it: goal − raised. */
+  const needsOf = async (d: VoteRound): Promise<bigint[]> => {
+    if (d.needs) return await d.needs();
+    const cards = new Map((await readBoard(deps, board)).cards.map((c) => [c.initiative.slug, c]));
+    return d.manifest.slugs.map((slug) => {
+      const c = cards.get(slug);
+      if (!c) return 0n;
+      return BigInt(Math.max(0, Math.round((c.initiative.goalUsd - c.summary.total) * 1e6)));
+    });
+  };
+  /** The quiet ending replayed now. A tier's settlement is written once and reused, so
+   * later donations (needs) never move it. */
+  const roundState = async (d: VoteRound): Promise<RoundState> => {
+    const kv = deps.db.kv;
+    const tiers: Tier[] = ["S", "A", "B"];
+    const stored = await Promise.all(
+      tiers.map((t) => kv.get<StoredSettled>([...round(d), "settled", t])),
+    );
+    const snapshots = stored.flatMap((x) => (x.value ? [loadSettled(x.value)] : []));
+    const receipts: Receipt[] = (await d.chain.ballots()).map((b, i) => ({
+      tokenId: b.tokenId,
+      nonce: "revoked" in b ? 0 : b.nonce ?? 0,
+      ballot: "revoked" in b ? null : hexToBytes(b.ballot),
+      block: b.block ?? i + 1,
+      timestamp: b.timestamp,
+    }));
+    const st = replay({
+      schedule: d.manifest.schedule,
+      m: d.manifest.slugs.length,
+      poolUsd: BigInt(d.manifest.poolUsd),
+      needs: await needsOf(d),
+      receipts,
+      snapshots,
+    }, deps.now());
+    for (const [i, t] of st.tiers.entries()) {
+      if (t.status !== "settled" || stored[i].value) continue;
+      const { status: _, ...x } = t;
+      await kv.atomic().check(stored[i]).set([...round(d), "settled", t.tier], storeSettled(x))
+        .commit();
+    }
+    return st;
+  };
+
   const open = (d: VoteRound) => {
     if (deps.now() >= d.manifest.closesAt) throw fail(410, "closed", "Voting has closed.");
   };
@@ -214,6 +315,23 @@ export function voteRoutes(deps: Deps) {
       signature,
     }).catch(() => false);
     if (!valid) throw fail(401, "bad_signature", "The signature doesn't match the badge's owner.");
+    // What the quiet ending would refuse is refused here, before anyone pays gas for it.
+    const no = refusal(
+      await roundState(d),
+      tokenId.toString(),
+      hexToBytes(ballot),
+      deps.now(),
+      d.manifest.slugs.length,
+    );
+    if (no?.code === "closed") throw fail(410, "closed", "Voting has closed.");
+    if (no?.code === "registration_closed") {
+      throw fail(403, "registration_closed", "Registration closed before this badge voted.");
+    }
+    if (no?.code === "tier_settled") {
+      throw fail(409, "tier_settled", `${no.tier} has settled: its initiatives can't move.`, {
+        tier: no.tier,
+      });
+    }
     if (d.manifest.kind === "real") {
       const relayer = d.chain.relayerAddress();
       if (!relayer || (await d.chain.balance(relayer)) < RELAY_FLOOR_WEI) {
@@ -291,6 +409,25 @@ export function voteRoutes(deps: Deps) {
       return await sendNext(kv, d, deps.now(), { fn: "drip", to: me, value: DRIP_WEI });
     });
     return c.json({ hash });
+  });
+
+  /** The quiet ending: each tier's state, the accepted ballots, refusals, and what the
+   * open tiers would fund if they settled now. Polled; read at most once per window. */
+  r.get("/round", async (c) => {
+    const d = dc();
+    const key = [...round(d), "round"];
+    const cached = await deps.db.kv.get<{ at: number; body: ReturnType<typeof roundJson> }>(key);
+    if (cached.value?.body.closed) return c.json(cached.value.body);
+    if (cached.value && deps.now() - cached.value.at < BALLOTS_CACHE_SECS) {
+      return c.json(cached.value.body);
+    }
+    const body = roundJson(await roundState(d), d.manifest.slugs);
+    await deps.db.kv.set(
+      key,
+      { at: deps.now(), body },
+      body.closed ? undefined : { expireIn: 60_000 },
+    );
+    return c.json(body);
   });
 
   // The vote results poll this every few seconds; the chain is read at most once per

@@ -3,10 +3,10 @@
  * has an opening tally, one after every block holding a receipt, and a closing tally;
  * only the settling tier's funded set is compared. The tally itself is the Python's
  * stage tally (./stage.ts). Amounts are micro-USD bigints.
- * Browser and Deno: extensionless imports. */
-import { effectiveRanks } from "../../vote/shared/ranks";
-import type { Tier } from "./ballot";
-import { stageBound, stageTally, tierOf } from "./stage";
+ * Browser and Deno. */
+import { effectiveRanks } from "../../vote/shared/ranks.ts";
+import type { Tier } from "./ballot.ts";
+import { stageBound, stageTally, tierOf } from "./stage.ts";
 
 export type Schedule = {
   opensAt: number;
@@ -248,4 +248,31 @@ export function replay(
     closed: settled.length === TIERS.length,
     live,
   };
+}
+
+/** Why the replay would not count `ballot` for `tokenId` if it landed now: the round
+ * is over, registration closed before the badge voted, or it changes a settled tier. */
+export function refusal(
+  state: RoundState,
+  tokenId: string,
+  ballot: Uint8Array,
+  now: number,
+  m: number,
+):
+  | { code: "closed" }
+  | { code: "registration_closed" }
+  | { code: "tier_settled"; tier: Tier }
+  | null {
+  if (state.closed) return { code: "closed" };
+  const old = state.accepted.get(tokenId);
+  if (!old) return now >= state.registrationClosesAt ? { code: "registration_closed" } : null;
+  const before = [...old];
+  const after = [...ballot];
+  for (const [t, tier] of state.tiers.entries()) {
+    if (tier.status !== "settled") break;
+    const a = [...Array(m).keys()].filter((c) => tierOf(before, c) === t);
+    const b = [...Array(m).keys()].filter((c) => tierOf(after, c) === t);
+    if (!sameSet(a, b)) return { code: "tier_settled", tier: tier.tier };
+  }
+  return null;
 }

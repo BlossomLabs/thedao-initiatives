@@ -6,6 +6,12 @@ export default {
   "deployBlock": 12050220,
   "opensAt": 1793649336,
   "closesAt": 1793989800,
+  "schedule": {
+    "opensAt": 1793649336,
+    "firstTallyAt": [1793989799, 1793989800, 1793989801],
+    "initialWindow": 1,
+    "maxWindows": 1,
+  },
   "poolUsd": "913244000000",
   "issuer": "0xD30fb0bA65C696e271ffA2e8b80F8c74B9d0998B",
   "slugs": [

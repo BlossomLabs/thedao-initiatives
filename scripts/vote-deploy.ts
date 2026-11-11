@@ -136,8 +136,9 @@ export function manifestFor(
     contract: r.contract,
     deployBlock: r.deployBlock,
     opensAt: r.schedule.opensAt,
-    // Until the app follows the quiet ending, the site closes at S's first tally.
-    closesAt: r.schedule.firstTallyAt[0],
+    // The latest the round can end: B's last window. The quiet ending settles earlier.
+    closesAt: r.schedule.firstTallyAt[2] + TIER_MAX,
+    schedule: r.schedule,
     poolUsd: r.poolUsd.toString(),
     ...(r.kind === "real" ? { badge: REVIEW_BADGE_CONTRACT } : { issuer: getAddress(r.issuer!) }),
     slugs: r.slugs,

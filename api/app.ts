@@ -145,7 +145,7 @@ export function createApp(
   app.route("/api/donate", donateRoutes(deps));
   app.route("/api/uploads", uploadRoutes(deps));
   app.route("/api/watchlist", watchlistRoutes(deps));
-  app.route("/api/vote", voteRoutes(deps));
+  app.route("/api/vote", voteRoutes(deps, boardCache));
   app.route("/api", profileRoutes(deps));
   app.route("/api", commentRoutes(deps));
   app.route("/api", aiRoutes(deps));

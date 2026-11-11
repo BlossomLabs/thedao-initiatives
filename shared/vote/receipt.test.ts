@@ -11,6 +11,8 @@ const m: VoteManifest = {
   deployBlock: 1,
   opensAt: 1_000,
   closesAt: 2_000,
+
+  schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
   poolUsd: "913244000000",
   issuer: "0x2000000000000000000000000000000000000002",
   slugs: ["a", "b"],

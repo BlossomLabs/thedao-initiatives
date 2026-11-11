@@ -51,13 +51,17 @@ export interface VoteChain {
   ballots(): Promise<BallotEvent[]>;
 }
 
+/** In chain order; `block` and `nonce` let the quiet ending group a block's receipts. */
 export type BallotEvent =
-  | { tokenId: string; ballot: Hex; timestamp: number }
-  | { tokenId: string; revoked: true; timestamp: number };
+  | { tokenId: string; ballot: Hex; timestamp: number; block?: number; nonce?: number }
+  | { tokenId: string; revoked: true; timestamp: number; block?: number };
 
 export interface VoteRound {
   chain: VoteChain;
   manifest: VoteManifest;
+  /** Each initiative's need (goal − raised, micro-USD) in manifest order; the API
+   * reads the board when absent. */
+  needs?: () => Promise<bigint[]>;
 }
 
 const BALLOT_RECORDED = parseAbiItem(
@@ -208,21 +212,33 @@ export function createVoteChain(
             ? -1
             : 1
         );
-        const times = await stampLogs(logs, headTime, m.closesAt, async (blockNumber) => {
-          let t = blockTimes.get(blockNumber);
-          if (t === undefined) {
-            t = Number((await pub.getBlock({ blockNumber })).timestamp);
-            blockTimes.set(blockNumber, t);
-          }
-          return t;
-        });
+        const times = await stampLogs(
+          logs,
+          headTime,
+          m.schedule.firstTallyAt[0],
+          async (blockNumber) => {
+            let t = blockTimes.get(blockNumber);
+            if (t === undefined) {
+              t = Number((await pub.getBlock({ blockNumber })).timestamp);
+              blockTimes.set(blockNumber, t);
+            }
+            return t;
+          },
+        );
         for (const [i, log] of logs.entries()) {
           const t = times[i];
           const tokenId = log.args.tokenId!.toString();
+          const block = Number(log.blockNumber);
           out.push(
             "ballot" in log.args && log.args.ballot
-              ? { tokenId, ballot: log.args.ballot, timestamp: t }
-              : { tokenId, revoked: true, timestamp: t },
+              ? {
+                tokenId,
+                ballot: log.args.ballot,
+                timestamp: t,
+                block,
+                nonce: Number(log.args.nonce),
+              }
+              : { tokenId, revoked: true, timestamp: t, block },
           );
         }
       }
@@ -231,16 +247,17 @@ export function createVoteChain(
   };
 }
 
-/** Timestamps only matter against the close. Before it, the head block's time is
- * an upper bound for every log, so no per-block lookups (a cold results page would
- * otherwise make one RPC per ballot block). After it, one lookup per distinct block. */
+/** Exact times matter from S's first tally on (windows, registration, the close).
+ * Before it, the head block's time bounds every log, so no per-block lookups (a cold
+ * results page would otherwise make one RPC per ballot block). From it, one lookup per
+ * distinct block (cached in the isolate). */
 export async function stampLogs(
   logs: { blockNumber: bigint | null }[],
   headTime: number,
-  closesAt: number,
+  exactFrom: number,
   timeOf: (block: bigint) => Promise<number>,
 ): Promise<number[]> {
-  if (headTime < closesAt) return logs.map(() => headTime);
+  if (headTime < exactFrom) return logs.map(() => headTime);
   const blocks = [...new Set(logs.map((l) => l.blockNumber!))];
   const times = new Map(
     await Promise.all(blocks.map(async (b) => [b, await timeOf(b)] as const)),

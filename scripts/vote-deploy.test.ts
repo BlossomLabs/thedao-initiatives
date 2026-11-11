@@ -120,7 +120,9 @@ Deno.test("manifestFor: the real vote names the badge on mainnet, a test vote it
     contract: SAFE2,
     deployBlock: 5,
     opensAt: 1_000,
-    closesAt: 100_000,
+    // The latest the round can end: B's last window (the quiet ending runs the rest).
+    closesAt: 100_000 + 3 * (7200 + 3600 + 1800 + 900),
+    schedule: s,
     poolUsd: "7",
     badge: "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C",
     slugs: ["x"],

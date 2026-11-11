@@ -3,7 +3,7 @@ import { stampLogs } from "../services/vote-chain.ts";
 
 const logs = [{ blockNumber: 10n }, { blockNumber: 10n }, { blockNumber: 12n }];
 
-Deno.test("stampLogs: before the close, no block lookups (the head's time bounds every log)", async () => {
+Deno.test("stampLogs: before S's first tally, no block lookups (the head's time bounds every log)", async () => {
   let calls = 0;
   const out = await stampLogs(logs, 1_000, 2_000, () => {
     calls++;
@@ -13,7 +13,7 @@ Deno.test("stampLogs: before the close, no block lookups (the head's time bounds
   assertEquals(out, [1_000, 1_000, 1_000]);
 });
 
-Deno.test("stampLogs: after the close, one lookup per distinct block", async () => {
+Deno.test("stampLogs: from S's first tally, one lookup per distinct block", async () => {
   const seen: bigint[] = [];
   const out = await stampLogs(logs, 3_000, 2_000, (b) => {
     seen.push(b);
@@ -60,6 +60,7 @@ Deno.test("a real round reads ownerOf from the voting badge, not the ballots con
       deployBlock: 1,
       opensAt: 0,
       closesAt: 1,
+      schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
       poolUsd: "1",
       slugs: ["a"],
     },

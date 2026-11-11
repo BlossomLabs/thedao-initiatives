@@ -114,7 +114,7 @@ function targetAt(x: number, y: number): Where | undefined {
 }
 
 export default function TierBallot(
-  { items, tiers, disabled, onChange, onReplace, search = {}, actions }: {
+  { items, tiers, disabled, onChange, onReplace, search = {}, actions, locked }: {
     items: BallotItem[];
     /** The send bar: under the tier list on wider screens, floating at the bottom on a phone. */
     actions?: React.ReactNode;
@@ -125,6 +125,8 @@ export default function TierBallot(
     onChange: (slug: string, tier: Tier | undefined) => void;
     /** Sets the whole ballot at once: Clear ballot, and its Undo. */
     onReplace?: (tiers: Partial<Record<string, Tier>>) => void;
+    /** Tiers the quiet ending has settled: nothing moves into or out of them. */
+    locked?: ReadonlySet<Tier>;
   },
 ) {
   const id = useId();
@@ -150,7 +152,8 @@ export default function TierBallot(
     if (!onReplace || placedCount === 0) return;
     done();
     setCleared({ ...tiers });
-    onReplace({});
+    // A settled tier stays as it is.
+    onReplace(Object.fromEntries(Object.entries(tiers).filter(([, t]) => t && isLocked(t))));
     setAnnounce("Ballot cleared. Every initiative is back in the list.");
   };
   const undoClear = () => {
@@ -171,6 +174,7 @@ export default function TierBallot(
   /** A drag ends in a click on what was pressed; that click must not pick it up again. */
   const justDragged = useRef(false);
   const where = (slug: string): Where => tiers[slug] ?? "unplaced";
+  const isLocked = (w: Where) => w !== "unplaced" && Boolean(locked?.has(w));
   const labelOf = (w: Where) => TIER_LABELS.find((t) => t.tier === w)?.label ?? UNRANKED;
   const titleOf = (slug: string) => items.find((i) => i.slug === slug)?.title ?? slug;
 
@@ -184,6 +188,7 @@ export default function TierBallot(
   const place = (slug: string, dest: Where | undefined) => {
     done();
     if (!dest || where(slug) === dest) return;
+    if (isLocked(where(slug)) || isLocked(dest)) return;
     onChange(slug, dest === "unplaced" ? undefined : dest);
     setLanded((l) => ({ slug, to: dest, n: (l?.n ?? 0) + 1 }));
     setAnnounce(`${titleOf(slug)} moved to ${labelOf(dest)}.`);
@@ -272,7 +277,9 @@ export default function TierBallot(
   /** Pressing a tile or a chip: a drag once it moves (mouse) or rests (touch). */
   const grab = (slug: string) => ({
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
-      if (disabled || (e.pointerType === "mouse" && e.button !== 0)) return;
+      if (disabled || isLocked(where(slug)) || (e.pointerType === "mouse" && e.button !== 0)) {
+        return;
+      }
       const p: Press = {
         slug,
         pointerId: e.pointerId,
@@ -332,7 +339,8 @@ export default function TierBallot(
   const filtered = isFiltered(shownView);
 
   /** A tier (or the list) that would take the initiative being dragged or tapped. */
-  const takes = (t: Where) => picked !== undefined && where(picked) !== t;
+  const takes = (t: Where) =>
+    picked !== undefined && where(picked) !== t && !isLocked(t) && !isLocked(where(picked));
   const lit = (t: Where) => Boolean(drag) && over === t && takes(t);
 
   /** A card's insides: the grip, the title, and its category and goal. */
@@ -450,7 +458,7 @@ export default function TierBallot(
       >
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || isLocked(where(i.slug))}
           aria-pressed={on}
           aria-label={i.title}
           title={i.title}
@@ -546,7 +554,7 @@ export default function TierBallot(
                     )}
                     <button
                       type="button"
-                      aria-label={`Place in ${t.label}`}
+                      aria-label={isLocked(t.tier) ? `${t.label} (settled)` : `Place in ${t.label}`}
                       disabled={!takes(t.tier) || Boolean(drag)}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -566,6 +574,11 @@ export default function TierBallot(
                       <span className="hidden text-center text-[11px] leading-tight text-white/60 sm:block">
                         {t.label}
                       </span>
+                      {isLocked(t.tier) && (
+                        <span className="hidden text-[10px] uppercase tracking-[.08em] text-vote sm:block">
+                          Settled
+                        </span>
+                      )}
                     </button>
                     {inHere.length === 0
                       ? (

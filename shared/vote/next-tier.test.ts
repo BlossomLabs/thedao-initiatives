@@ -315,6 +315,17 @@ describe("the final what-ifs", () => {
     });
   });
 
+  it("already in the target tier at its settlement: no figure", () => {
+    // A stored snapshot put initiative 0 in Tier-A, yet Tier-S's inputs fund it in Tier-S.
+    const { at, finalTier } = round();
+    expect(chainTally(at[0], 0, 1)[0].order).toContain(0);
+    const forced = new Map([...finalTier, [0, 1]]);
+    const got = finalWhatIfs(at, forced, 4);
+    expect(got.next.has(0)).toBe(false);
+    expect(got.lead.has(0)).toBe(false);
+    expect(got.next.has(3)).toBe(true);
+  });
+
   it("the async variant gives the same result", async () => {
     const { at, finalTier } = round();
     expect(await finalWhatIfsAsync(at, finalTier, 4)).toEqual(finalWhatIfs(at, finalTier, 4));

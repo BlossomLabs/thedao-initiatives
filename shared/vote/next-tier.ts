@@ -208,6 +208,9 @@ function* finalSearch(
       lives.set(t, live);
       yield;
     }
+    // Already in the target tier at these inputs (a stored snapshot the re-tally doesn't
+    // reproduce): there is no gap to tell.
+    if (live.has(c) && live.get(c)! <= t) return;
     next.set(c, yield* gapSearch(inp, t, c, t, live, tally, true));
   }
   for (let c = 0; c < m; c++) {

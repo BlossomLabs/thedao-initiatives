@@ -412,7 +412,10 @@ it.each(["/", "/?view=cards"])("an open round shows each initiative's gap in %s"
 });
 
 it("a closed round shows no gap", async () => {
-  await showClosed();
-  expect(screen.queryByText(/to Tier-S$/)).toBeNull();
+  // Even if the server still sent gaps, a closed round draws none.
+  await showClosed({
+    live: { funded: [], awards: {}, next: { alpha: gap(), beta: gap({ gap: null, tier: "B" }) } },
+  });
+  expect(screen.queryByRole("button", { name: /to Tier-/ })).toBeNull();
   expect(screen.queryByText(/Out of reach/)).toBeNull();
 });

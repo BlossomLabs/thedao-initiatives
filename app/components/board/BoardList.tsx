@@ -243,6 +243,8 @@ function Row(
           NUM,
           "text-[12.5px] font-medium @max-[720px]/list:hidden",
           pctOn || full ? "text-dao-green" : "text-white/40",
+          // The gap wraps inside the column rather than spilling into Backers.
+          next && "min-w-0 whitespace-normal",
         )}
       >
         {pctShown}
@@ -359,6 +361,7 @@ function Row(
             NUM,
             "hidden text-[12.5px] font-semibold @max-[720px]/list:flex @max-[720px]/list:items-center @max-[720px]/list:justify-end",
             pctOn || full ? "text-dao-green" : "text-white/40",
+            next && "min-w-0 whitespace-normal",
           )}
         >
           {pctShown}

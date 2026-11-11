@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dt, pct, shortAddr, usd, usdShort } from "./format";
+import { dt, pct, shortAddr, usd, usdShort, usdShortUp } from "./format";
 import { parseUsd, toBaseUnits, tokenQty, transferCalldata } from "./donate";
 import { avatarSrc, pfpDefaultIndex, presetUri } from "./avatar";
 
@@ -74,5 +74,14 @@ describe("usdShort (list rows on phones)", () => {
     expect(usdShort(999_600)).toBe("$1M");
     expect(usdShort(1_250_000)).toBe("$1.3M");
     expect(usdShort(-5)).toBe("$0");
+  });
+});
+
+describe("usdShortUp (a missing amount, never read as less)", () => {
+  it("rounds up at every size", () => {
+    expect(usdShortUp(41_200)).toBe("$42k");
+    expect(usdShortUp(950.2)).toBe("$951");
+    expect(usdShortUp(1_234_500)).toBe("$1.3M");
+    expect(usdShortUp(1_200_000)).toBe("$1.2M");
   });
 });

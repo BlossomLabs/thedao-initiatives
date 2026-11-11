@@ -21,7 +21,12 @@ export function usdShort(v: unknown): string {
 /** A missing amount, short and rounded up so it never reads as less than it is. */
 export const usdShortUp = (n: number): string =>
   usdShort(
-    n < 1000 ? Math.ceil(n) : n < 10_000 ? Math.ceil(n / 100) * 100 : Math.ceil(n / 1000) * 1000,
+    n < 1000 ? Math.ceil(n) : n < 10_000
+      ? Math.ceil(n / 100) * 100
+      // From $1M the short form has one decimal: round up to the next 0.1M.
+      : n < 1_000_000
+      ? Math.ceil(n / 1000) * 1000
+      : Math.ceil(n / 100_000) * 100_000,
   );
 
 export function shortAddr(a: string | null | undefined): string {

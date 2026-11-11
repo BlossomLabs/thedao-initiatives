@@ -4,6 +4,10 @@ import type { NextTierEntry } from "~/hooks/use-vote";
 import { usdShortUp } from "~/lib/format";
 import { dollars } from "~/lib/vote-results";
 
+/** In a list cell the figure wraps (two lines at most in its column) instead of spilling
+ * into the neighbours: right-aligned, tight leading, never wider than its cell. */
+const WRAP = "block max-w-full whitespace-normal text-right text-[12px] leading-tight";
+
 /** One line of the hover: who comes in, drops out or moves, if anyone does. */
 function Line({ label, items }: { label: string; items: string[] }) {
   if (items.length === 0) return null;
@@ -27,7 +31,7 @@ export function NextTierFigure(
   const id = useId();
   const name = tierName(next.tier);
   if (next.gap === null) {
-    return <span className="text-[12px] text-white/40">Out of reach for {name}</span>;
+    return <span className={`${WRAP} text-white/40`}>Out of reach for {name}</span>;
   }
   const title = (slug: string) => titles.get(slug) ?? slug;
   const gap = usdShortUp(dollars(next.gap));
@@ -38,7 +42,7 @@ export function NextTierFigure(
   };
   const none = !lines.comesIn.length && !lines.dropsOut.length && !lines.moves.length;
   return (
-    <span className="relative inline-block">
+    <span className={`relative ${WRAP}`}>
       <button
         type="button"
         aria-describedby={open ? id : undefined}
@@ -48,7 +52,7 @@ export function NextTierFigure(
         onBlur={() => setOpen(false)}
         onClick={() => setOpen(true)}
         onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
-        className="cursor-help rounded border-0 bg-transparent p-0 font-[inherit] text-[12px] text-vote underline decoration-dotted underline-offset-2"
+        className={`cursor-help rounded border-0 bg-transparent p-0 font-[inherit] ${WRAP} text-vote underline decoration-dotted underline-offset-2`}
       >
         {gap} to {name}
       </button>

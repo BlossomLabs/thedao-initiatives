@@ -1,8 +1,12 @@
 import { assertEquals, assertNotEquals, assertThrows } from "@std/assert";
 import { getAddress, keccak256, slice, toBytes } from "viem";
 import {
+  addingOpen,
+  addPlan,
   manifestFor,
+  nextAddingOpen,
   parseRealArgs,
+  planGroups,
   planInitiatives,
   realSchedule,
   voteSchedule,
@@ -139,4 +143,97 @@ Deno.test("manifestFor: the real vote names the badge on mainnet, a test vote it
     manifestFor({ ...base, kind: "test", issuer: SAFE as `0x${string}` }).chainId,
     11155111,
   );
+});
+
+// ------------------------------------------------------------ ballot rules
+Deno.test("planGroups: one group per affiliation, ignoring case, in board order", () => {
+  const g = planGroups([
+    { slug: "a", goalUsd: 1, safeAddress: "", affiliations: ["Seal"] },
+    { slug: "b", goalUsd: 1, safeAddress: "", affiliations: ["wallets", "seal"] },
+    { slug: "c", goalUsd: 1, safeAddress: "" },
+  ]);
+  assertEquals(g.names, ["Seal", "wallets"]);
+  assertEquals(["a", "b", "c"].map(g.groupsOf), [[0], [1, 0], []]);
+  // Adding to a round keeps its groups' indexes.
+  const more = planGroups([{
+    slug: "d",
+    goalUsd: 1,
+    safeAddress: "",
+    affiliations: ["SEAL", "Keys"],
+  }], [
+    "Seal",
+    "wallets",
+  ]);
+  assertEquals(more.names, ["Seal", "wallets", "Keys"]);
+  assertEquals(more.groupsOf("d"), [0, 2]);
+});
+
+Deno.test("planInitiatives carries rfp and groups; an RFP with affiliations throws", () => {
+  const plan = planInitiatives([
+    { slug: "a", goalUsd: 1, safeAddress: "", type: "grant", affiliations: ["Seal"] },
+    { slug: "r", goalUsd: 1, safeAddress: "", type: "rfp" },
+  ]);
+  assertEquals(plan.map((p) => [p.rfp, p.groups]), [[false, [0]], [true, []]]);
+  assertThrows(
+    () =>
+      planInitiatives([{
+        slug: "r",
+        goalUsd: 1,
+        safeAddress: "",
+        type: "rfp",
+        affiliations: ["X"],
+      }]),
+    Error,
+    "r: an RFP can't have affiliations",
+  );
+});
+
+Deno.test("addingOpen: before opening, between tiers, never inside a span or after the end", () => {
+  const s = realSchedule(1_000, 100_000);
+  const span = 7200 + 3600 + 1800 + 900;
+  assertEquals(addingOpen(s, 500), true); // before opening
+  assertEquals(addingOpen(s, 50_000), true); // open, before S
+  assertEquals(addingOpen(s, 100_000), false); // S's first tally
+  // A starts when S can no longer be running, B likewise: no gap until the end.
+  assertEquals(addingOpen(s, 100_000 + span), false);
+  assertEquals(nextAddingOpen(s, 100_000), null);
+  assertEquals(addingOpen(s, s.firstTallyAt[2] + span), false); // the end
+  // With a gap between S and A, a project may join in it.
+  const gap = {
+    ...s,
+    firstTallyAt: [100_000, 100_000 + span + 500, 100_000 + 2 * span + 500] as [
+      number,
+      number,
+      number,
+    ],
+  };
+  assertEquals(nextAddingOpen(gap, 100_000), 100_000 + span);
+  assertEquals(addingOpen(gap, 100_000 + span), true);
+});
+
+Deno.test("addPlan: new groups and projects for the admin, appended without reordering", () => {
+  const base = manifestFor({
+    kind: "test",
+    contract: SAFE as `0x${string}`,
+    deployBlock: 5,
+    schedule: realSchedule(1_000, 100_000),
+    poolUsd: 7n,
+    issuer: SAFE as `0x${string}`,
+    slugs: ["a", "b"],
+    projects: [
+      { askUsd: "1", rfp: false, groups: [0] },
+      { askUsd: "1", rfp: false, groups: [] },
+    ],
+    groups: ["Seal"],
+    independentTiers: 1,
+  });
+  const { calls, manifest } = addPlan(base, [
+    { slug: "c", goalUsd: 2, safeAddress: "", type: "grant", affiliations: ["seal", "Keys"] },
+  ]);
+  assertEquals(calls.map((c) => c.fn), ["addGroup", "addInitiative"]);
+  assertEquals(calls[1].args.slice(1), [2_000_000n, false, 0b11n]);
+  assertEquals(manifest.slugs, ["a", "b", "c"]);
+  assertEquals(manifest.groups, ["Seal", "Keys"]);
+  assertEquals(manifest.projects[2], { askUsd: "2000000", rfp: false, groups: [0, 1] });
+  assertThrows(() => addPlan(base, [{ slug: "a", goalUsd: 1, safeAddress: "" }]), Error, "already");
 });

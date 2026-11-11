@@ -13,6 +13,13 @@
 //
 // The relayer key deploys and keeps only MINTER_ROLE; it is also the server's
 // sending key. Everything here must finish before opensAt (setup freezes then).
+// `--independent-tiers 3` holds Tier-A to the independence rules too (default: Tier-S).
+//
+// Adding projects to a deployed round (outside every quiet-ending span; the admin
+// holds the role, so the admin's wallet sends the calls):
+//   deno task vote-deploy --add slug-a,slug-b [--rpc …] > add.json   (Safe Transaction Builder batch)
+//   … the admin executes it …
+//   deno task vote-deploy --added slug-a,slug-b [--rpc …]            (checks on-chain, appends to the manifest)
 import { parseArgs } from "jsr:@std/cli@1.0.24/parse-args";
 import {
   type Abi,
@@ -25,6 +32,7 @@ import {
   isAddress,
   keccak256,
   slice,
+  stringToHex,
   toBytes,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -45,8 +53,72 @@ export const MAX_WINDOWS = 4;
 const TIER_MAX = Array.from({ length: MAX_WINDOWS }, (_, k) => INITIAL_WINDOW >> k)
   .reduce((a, b) => a + b, 0);
 
-export type BoardCard = { slug: string; goalUsd: number; safeAddress: string };
-export type PlannedInitiative = { slug: string; account: `0x${string}`; askUsd: bigint };
+export type BoardCard = {
+  slug: string;
+  goalUsd: number;
+  safeAddress: string;
+  type?: "rfp" | "grant";
+  /** From /api/initiatives/affiliations (the board doesn't carry them). */
+  affiliations?: string[];
+};
+export type PlannedInitiative = {
+  slug: string;
+  account: `0x${string}`;
+  askUsd: bigint;
+  rfp: boolean;
+  /** Indexes into the round's group names (one group per affiliation). */
+  groups: number[];
+};
+
+/** The round's groups: one per affiliation (compared ignoring case, first spelling kept),
+ * after the `existing` ones in their order, then in board order. A group name is a
+ * bytes32 on-chain. */
+export function planGroups(
+  cards: BoardCard[],
+  existing: string[] = [],
+): { names: string[]; groupsOf: (slug: string) => number[] } {
+  const names = [...existing];
+  const index = new Map(names.map((n, i) => [n.toLowerCase(), i]));
+  const bySlug = new Map<string, number[]>();
+  for (const c of cards) {
+    const ids: number[] = [];
+    for (const a of c.affiliations ?? []) {
+      if (new TextEncoder().encode(a).length > 32) {
+        throw new Error(`${c.slug}: affiliation "${a}" is over 32 bytes`);
+      }
+      let i = index.get(a.toLowerCase());
+      if (i === undefined) {
+        i = names.push(a) - 1;
+        index.set(a.toLowerCase(), i);
+      }
+      if (!ids.includes(i)) ids.push(i);
+    }
+    bySlug.set(c.slug, ids);
+  }
+  return { names, groupsOf: (slug) => bySlug.get(slug) ?? [] };
+}
+
+export const groupMask = (groups: number[]): bigint =>
+  groups.reduce((m, g) => m | (1n << BigInt(g)), 0n);
+
+/** Projects may join before opening, or later outside every tier's quiet-ending span
+ * [first tally, latest end), never at or after the last end (as the contract checks). */
+export function addingOpen(s: Schedule, now: number): boolean {
+  if (now < s.opensAt) return true;
+  if (now >= s.firstTallyAt[2] + TIER_MAX) return false;
+  return s.firstTallyAt.every((t) => now < t || now >= t + TIER_MAX);
+}
+
+/** When adding opens again: the end of the span `now` is in; null once the round is over. */
+export function nextAddingOpen(s: Schedule, now: number): number | null {
+  let t = now;
+  // Spans can follow each other with no gap (A starts as S's latest end passes).
+  while (!addingOpen(s, t)) {
+    if (t >= s.firstTallyAt[2] + TIER_MAX) return null;
+    t = s.firstTallyAt.find((x) => t >= x && t < x + TIER_MAX)! + TIER_MAX;
+  }
+  return t;
+}
 
 const placeholder = (slug: string) =>
   getAddress(slice(keccak256(toBytes(`test-round:${slug}`)), 12));
@@ -56,16 +128,30 @@ const placeholder = (slug: string) =>
  * The real vote pays out to these accounts, so a missing or shared Safe stops it. */
 export function planInitiatives(
   cards: BoardCard[],
-  { real = false }: { real?: boolean } = {},
+  { real = false, groups = planGroups(cards) }: {
+    real?: boolean;
+    groups?: ReturnType<typeof planGroups>;
+  } = {},
 ): PlannedInitiative[] {
   const seen = new Set<string>();
+  for (const c of cards) {
+    if (c.type === "rfp" && c.affiliations?.length) {
+      throw new Error(`${c.slug}: an RFP can't have affiliations`);
+    }
+  }
   return cards.map((c) => {
     const safe = c.safeAddress && isAddress(c.safeAddress) ? getAddress(c.safeAddress) : null;
     if (real && !safe) throw new Error(`missing Safe: ${c.slug}`);
     if (real && seen.has(safe!.toLowerCase())) throw new Error(`Safe used twice: ${c.slug}`);
     const account = safe && !seen.has(safe.toLowerCase()) ? safe : placeholder(c.slug);
     seen.add(account.toLowerCase());
-    return { slug: c.slug, account, askUsd: BigInt(Math.round(c.goalUsd * 1e6)) };
+    return {
+      slug: c.slug,
+      account,
+      askUsd: BigInt(Math.round(c.goalUsd * 1e6)),
+      rfp: c.type === "rfp",
+      groups: groups.groupsOf(c.slug),
+    };
   });
 }
 
@@ -152,11 +238,174 @@ export function manifestFor(
   };
 }
 
+/** Adding projects to a deployed round: the admin's calls (new groups, then each
+ * project) and the manifest with them appended (indexes never move). */
+export function addPlan(
+  m: VoteManifest,
+  cards: BoardCard[],
+): {
+  calls: { fn: "addGroup" | "addInitiative"; args: readonly unknown[] }[];
+  manifest: VoteManifest;
+} {
+  for (const c of cards) {
+    if (m.slugs.includes(c.slug)) throw new Error(`${c.slug} is already in the round`);
+  }
+  const groups = planGroups(cards, m.groups);
+  const plan = planInitiatives(cards, { real: m.kind === "real", groups });
+  const calls = [
+    ...groups.names.slice(m.groups.length).map((n) => ({
+      fn: "addGroup" as const,
+      args: [stringToHex(n, { size: 32 })] as const,
+    })),
+    ...plan.map((p) => ({
+      fn: "addInitiative" as const,
+      args: [p.account, p.askUsd, p.rfp, groupMask(p.groups)] as const,
+    })),
+  ];
+  return {
+    calls,
+    manifest: {
+      ...m,
+      slugs: [...m.slugs, ...plan.map((p) => p.slug)],
+      projects: [
+        ...m.projects,
+        ...plan.map((p) => ({ askUsd: p.askUsd.toString(), rfp: p.rfp, groups: p.groups })),
+      ],
+      groups: groups.names,
+    },
+  };
+}
+
+/** The board's initiatives with their affiliations (the board itself doesn't carry them). */
+async function boardCards(board = "https://initiatives.thedao.fund"): Promise<BoardCard[]> {
+  const base = board.replace(/\/+$/, "");
+  const [b, a] = await Promise.all([
+    fetch(`${base}/api/board`).then((r) => r.json()) as Promise<{
+      cards: { initiative: BoardCard }[];
+    }>,
+    fetch(`${base}/api/initiatives/affiliations`).then((r) => r.json()) as Promise<{
+      affiliations: Record<string, string[]>;
+    }>,
+  ]);
+  return b.cards.map((c) => ({ ...c.initiative, affiliations: a.affiliations[c.initiative.slug] }));
+}
+
+/** --add: the admin's calls as a Safe Transaction Builder batch, if adding is open now.
+ * --added: after the admin ran them, checks each project on-chain and appends it to
+ * the manifest. */
+async function addMain(
+  args: { add?: string; added?: string; board?: string; rpc?: string; out?: string },
+) {
+  const m = (await import("../shared/vote/manifest-data.ts")).default as unknown as VoteManifest;
+  const chain = m.chainId === mainnet.id ? mainnet : sepolia;
+  const rpc = args.rpc ??
+    Deno.env.get(chain.id === mainnet.id ? "MAINNET_RPC_URL" : "SEPOLIA_RPC_URL");
+  if (!rpc) throw new Error("--rpc or the chain's RPC env var is required");
+  const pub = createPublicClient({
+    chain,
+    transport: http(rpc, { timeout: 60_000, retryCount: 6 }),
+  });
+  const slugs = (args.add ?? args.added)!.split(",").map((x) => x.trim()).filter(Boolean);
+  const bySlug = new Map((await boardCards(args.board)).map((c) => [c.slug, c]));
+  const cards = slugs.map((slug) => {
+    const c = bySlug.get(slug);
+    if (!c) throw new Error(`not on the board: ${slug}`);
+    return c;
+  });
+  const { calls, manifest } = addPlan(m, cards);
+  if (args.add) {
+    const now = Number((await pub.getBlock()).timestamp);
+    if (!addingOpen(m.schedule, now)) {
+      const next = nextAddingOpen(m.schedule, now);
+      throw new Error(
+        next === null
+          ? "Adding is closed: the round is over."
+          : `Adding is closed until ${new Date(next * 1000).toISOString()}`,
+      );
+    }
+    const batch = {
+      version: "1.0",
+      chainId: String(chain.id),
+      meta: { name: `Add ${slugs.join(", ")} to the vote` },
+      transactions: calls.map((c) => ({
+        to: m.contract,
+        value: "0",
+        data: encodeFunctionData({
+          abi: SIGNED_BALLOTS_ABI,
+          functionName: c.fn,
+          args: c.args as never,
+        }),
+      })),
+    };
+    console.log(JSON.stringify(batch, null, 2));
+    return;
+  }
+  const read = (functionName: string, a: readonly unknown[] = []) =>
+    pub.readContract({
+      address: m.contract,
+      abi: SIGNED_BALLOTS_ABI,
+      functionName: functionName as never,
+      args: a as never,
+    });
+  const count = Number(await read("initiativeCount"));
+  if (count !== manifest.slugs.length) {
+    throw new Error(
+      `initiativeCount ${count}, expected ${manifest.slugs.length}: run the batch first`,
+    );
+  }
+  for (const [i, name] of manifest.groups.entries()) {
+    if (await read("groupName", [BigInt(i)]) !== stringToHex(name, { size: 32 })) {
+      throw new Error(`group ${i} on-chain isn't ${name}`);
+    }
+  }
+  const plan = planInitiatives(cards, {
+    real: m.kind === "real",
+    groups: planGroups(cards, m.groups),
+  });
+  for (const [k, p] of plan.entries()) {
+    const x = await read("initiative", [BigInt(m.slugs.length + k)]) as {
+      account: string;
+      askUsd: bigint;
+      rfp: boolean;
+      groups: bigint;
+    };
+    if (
+      x.account.toLowerCase() !== p.account.toLowerCase() || x.askUsd !== p.askUsd ||
+      x.rfp !== p.rfp || x.groups !== groupMask(p.groups)
+    ) throw new Error(`initiative ${m.slugs.length + k} on-chain doesn't match ${p.slug}`);
+  }
+  const out = args.out ?? new URL("../shared/vote/manifest-data.ts", import.meta.url).pathname;
+  await Deno.writeTextFile(
+    out,
+    `// Written by scripts/vote-deploy.ts. Do not edit by hand.\nexport default ${
+      JSON.stringify(manifest, null, 2)
+    };\n`,
+  );
+  console.log(`Appended ${slugs.join(", ")}; manifest written to ${out}`);
+}
+
 async function main() {
   const args = parseArgs(Deno.args, {
     boolean: ["real"],
-    string: ["issuer", "board", "rpc", "out", "opens", "s-tally", "pool-usd", "slugs"],
+    string: [
+      "issuer",
+      "board",
+      "rpc",
+      "out",
+      "opens",
+      "s-tally",
+      "pool-usd",
+      "slugs",
+      "independent-tiers",
+      "add",
+      "added",
+    ],
   });
+  if (args.add || args.added) return await addMain(args);
+  const independentTiers = Number(args["independent-tiers"] ?? 1);
+  if (independentTiers !== 1 && independentTiers !== 3) {
+    throw new Error("--independent-tiers is 1 (Tier-S) or 3 (Tier-S and Tier-A)");
+  }
   const real = args.real ? parseRealArgs(args) : null;
   const chain = real ? mainnet : sepolia;
   const key = Deno.env.get("VOTE_RELAYER_KEY")?.trim() as Hex | undefined;
@@ -168,9 +417,6 @@ async function main() {
   const rpcEnv = real ? "MAINNET_RPC_URL" : "SEPOLIA_RPC_URL";
   const rpc = args.rpc ?? Deno.env.get(rpcEnv);
   if (!rpc) throw new Error(`--rpc or ${rpcEnv} is required`);
-  const boardUrl = `${
-    (args.board ?? "https://initiatives.thedao.fund").replace(/\/+$/, "")
-  }/api/board`;
 
   const account = privateKeyToAccount(key);
   // Public RPCs are slow at times: long timeouts, several retries.
@@ -179,8 +425,7 @@ async function main() {
   const wallet = createWalletClient({ account, chain, transport });
   if ((await pub.getChainId()) !== chain.id) throw new Error(`RPC is not ${chain.name}`);
 
-  const board = await (await fetch(boardUrl)).json() as { cards: { initiative: BoardCard }[] };
-  let cards = board.cards.map((c) => c.initiative);
+  let cards = await boardCards(args.board);
   if (real) {
     // The real vote's initiatives, in the file's order (ballot byte i = line i).
     const slugs = (await Deno.readTextFile(real.slugsFile)).split("\n").map((l) => l.trim())
@@ -192,9 +437,10 @@ async function main() {
       return c;
     });
   }
-  const plan = planInitiatives(cards, { real: Boolean(real) });
+  const groups = planGroups(cards);
+  const plan = planInitiatives(cards, { real: Boolean(real), groups });
   const poolUsd = real ? real.poolUsd : POOL_USD;
-  console.log(`${plan.length} initiatives from ${boardUrl}`);
+  console.log(`${plan.length} initiatives, ${groups.names.length} affiliations`);
 
   const artifact = JSON.parse(
     await Deno.readTextFile(
@@ -258,7 +504,9 @@ async function main() {
     }),
   });
   const calls = [
-    ...plan.map((p) => step("addInitiative", [p.account, p.askUsd, false, 0n])),
+    ...groups.names.map((n) => step("addGroup", [stringToHex(n, { size: 32 })])),
+    ...plan.map((p) => step("addInitiative", [p.account, p.askUsd, p.rfp, groupMask(p.groups)])),
+    ...(independentTiers === 1 ? [] : [step("setIndependentTiers", [independentTiers])]),
     step("setPoolUsd", [poolUsd]),
     ...handed.map((r) => step("grantRole", [r, ADMIN])),
     // The default admin goes last.
@@ -375,10 +623,9 @@ async function main() {
     poolUsd,
     issuer: issuer as `0x${string}` | undefined,
     slugs: plan.map((p) => p.slug),
-    // Task 8 registers each initiative's type and affiliations; until then none.
-    projects: plan.map((p) => ({ askUsd: p.askUsd.toString(), rfp: false, groups: [] })),
-    groups: [],
-    independentTiers: 1,
+    projects: plan.map((p) => ({ askUsd: p.askUsd.toString(), rfp: p.rfp, groups: p.groups })),
+    groups: groups.names,
+    independentTiers,
   });
   const out = args.out ?? new URL("../shared/vote/manifest-data.ts", import.meta.url).pathname;
   await Deno.writeTextFile(

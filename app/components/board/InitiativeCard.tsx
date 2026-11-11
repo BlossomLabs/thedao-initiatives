@@ -159,7 +159,8 @@ export default function InitiativeCard({
   const [panel, setPanel] = useState<"donate" | "rate" | null>(null);
   const toggle = (p: "donate" | "rate") => setPanel((o) => o === p ? null : p);
   const prefetch = usePrefetchInitiative(r.slug);
-  const zero = !summary.total;
+  // A result card shows only its final amount, so that is what reads as nothing raised.
+  const zero = final === undefined ? !summary.total : !final;
   // With the vote display on, the % turns green at the vote floor, where the tick is.
   const pctOn = vote?.show
     ? voteStanding(summary.total, r.goalUsd, vote).kind === "eligible"
@@ -238,7 +239,13 @@ export default function InitiativeCard({
           )}
         </span>
         {next && titles
-          ? <NextTierFigure next={next} titles={titles} />
+          ? (
+            // Funded now: its tier stays in sight beside what the next one would take.
+            <span className="flex min-w-0 items-center gap-2">
+              {voteTier && <FundingStatus tier={voteTier} byVote />}
+              <NextTierFigure next={next} now={voteTier} titles={titles} />
+            </span>
+          )
           : funded || fullyFunded(card, votePct) || (final !== undefined && voteTier)
           ? <FundingStatus tier={voteTier} byVote={(votePct ?? 0) > 0 || final !== undefined} />
           : (

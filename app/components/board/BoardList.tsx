@@ -142,7 +142,7 @@ function Row(
   const full = fullyFunded(card, votePct);
   const votedFull = (votePct ?? 0) > 0 && full;
   const pctShown = next && titles
-    ? <NextTierFigure next={next} titles={titles} />
+    ? <NextTierFigure next={next} now={voteTier} titles={titles} />
     : full || (final !== undefined && voteTier)
     ? <FundingStatus tier={voteTier} byVote={votedFull || final !== undefined} />
     : (

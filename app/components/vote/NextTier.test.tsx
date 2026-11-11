@@ -46,7 +46,7 @@ it("the hover lists who comes in and who drops out", () => {
   fireEvent.focus(button);
   const tip = screen.getByRole("tooltip");
   expect(button).toHaveAttribute("aria-describedby", tip.id);
-  expect(tip).toHaveTextContent("With $42k more at Tier-S:");
+  expect(tip).toHaveTextContent("With $42k more backing:");
   expect(tip).toHaveTextContent("Comes in: Beta audits (Tier-A)");
   expect(tip).toHaveTextContent("Drops out: Gamma tools (Tier-B)");
   expect(tip).toHaveTextContent("Moves: Delta docs Tier-A → Tier-S");
@@ -71,4 +71,14 @@ it("nothing else changes", () => {
   render(<NextTierFigure next={entry()} titles={titles} />);
   fireEvent.focus(screen.getByRole("button"));
   expect(screen.getByRole("tooltip")).toHaveTextContent("Nothing else changes.");
+});
+
+it("the hover first says where it stands now", () => {
+  render(<NextTierFigure next={entry()} now="A" titles={titles} />);
+  fireEvent.focus(screen.getByRole("button"));
+  expect(screen.getByRole("tooltip").firstChild).toHaveTextContent("Now Tier-A.");
+  cleanup();
+  render(<NextTierFigure next={entry({ tier: "B" })} titles={titles} />);
+  fireEvent.focus(screen.getByRole("button"));
+  expect(screen.getByRole("tooltip").firstChild).toHaveTextContent("Now not funded.");
 });

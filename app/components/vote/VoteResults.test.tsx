@@ -408,7 +408,47 @@ it.each(["/", "/?view=cards"])("an open round shows each initiative's gap in %s"
   const button = (await screen.findAllByRole("button", { name: "$42k to Tier-S" }))[0];
   expect(screen.getAllByText("Out of reach for Tier-B").length).toBeGreaterThan(0);
   fireEvent.focus(button);
-  expect(screen.getByRole("tooltip")).toHaveTextContent("Comes in: Beta audits (Tier-A)");
+  const tip = screen.getByRole("tooltip");
+  expect(tip).toHaveTextContent("Now Tier-A.");
+  expect(tip).toHaveTextContent("Comes in: Beta audits (Tier-A)");
+});
+
+it("a funded card keeps its tier next to the gap", async () => {
+  const view = roundOf({ "1": ballot({ alpha: "A" }) }, { alpha: [50_000, "A"] });
+  vi.mocked(api).mockResolvedValue({
+    ...view,
+    live: { ...view.live, next: { alpha: gap(), beta: gap({ tier: "B" }) } },
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={["/?view=cards"]}>
+        <VoteResults />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  const button = await screen.findByRole("button", { name: "$42k to Tier-S" });
+  const alpha = button.closest("[data-initiative-id]")!;
+  expect(within(alpha as HTMLElement).getByText("Tier-A")).toBeInTheDocument();
+  // Beta isn't funded: the gap alone.
+  const beta = screen.getByRole("button", { name: "$42k to Tier-B" })
+    .closest("[data-initiative-id]")!;
+  expect(within(beta as HTMLElement).queryByText(/^Tier-[SAB]$/)).toBeNull();
+  fireEvent.focus(screen.getByRole("button", { name: "$42k to Tier-B" }));
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Now not funded.");
+});
+
+it("a result card funded from $0 shows its final amount in green", async () => {
+  await showClosed({
+    tiers: [
+      settled("S", ["alpha", "beta"], { alpha: usdMicro(50_000), beta: usdMicro(30_000) }),
+      settled("A", [], {}),
+      settled("B", [], {}),
+    ],
+  }, "/?view=cards");
+  const beta = (await screen.findAllByText("Beta audits"))[0].closest("[data-initiative-id]")!;
+  const amount = within(beta as HTMLElement).getByText("$30k");
+  expect(amount).toHaveClass("text-dao-green");
+  expect(amount).not.toHaveClass("text-white/40");
 });
 
 it("a closed round shows no gap", async () => {

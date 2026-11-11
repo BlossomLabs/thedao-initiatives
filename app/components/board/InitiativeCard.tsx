@@ -23,7 +23,7 @@ import { Button, LinkButton } from "~/components/ui/Button";
 import { lazyPart } from "~/lib/lazy-part";
 import Reveal from "~/components/ui/Reveal";
 import type { Card } from "~/lib/api-types";
-import { pctText, plural, usd } from "~/lib/format";
+import { pctText, plural, usd, usdShort } from "~/lib/format";
 import { usePrefetchInitiative } from "~/hooks/use-initiative";
 import { cn } from "~/lib/utils";
 import RatingChip, { RatingForm } from "~/components/ratings/RatingChip";
@@ -122,8 +122,11 @@ export default function InitiativeCard({
   votePct,
   votePendingPct,
   voteTier,
+  final,
 }: {
   card: Card;
+  /** The closed vote's final amount: shown alone, with no goal and no type. */
+  final?: number;
   /** The vote results: this initiative's vote share, % of its goal (gold on the bar). */
   votePct?: number;
   /** The part of it the settling tier would add if it settled now (lighter gold). */
@@ -178,7 +181,7 @@ export default function InitiativeCard({
           {label.map((k) => <CardLabel key={k} kind={k} aiScore={aiScore} />)}
         </span>
       )}
-      <TypeBadge type={r.type} />
+      {final === undefined && <TypeBadge type={r.type} />}
       <CardTitle
         title={r.title}
         href={`/initiative/${r.slug}`}
@@ -219,15 +222,15 @@ export default function InitiativeCard({
               zero ? "text-white/40" : "text-dao-green",
             )}
           >
-            <Money value={summary.total} />
-          </b>{" "}
-          of {usd(r.goalUsd)}
+            {final === undefined ? <Money value={summary.total} /> : usdShort(final)}
+          </b>
+          {final === undefined && <>{" "}of {usd(r.goalUsd)}</>}
           {backers > 0 && (
             <span className="text-[12px] text-white/30">· {plural(backers, "backer")}</span>
           )}
         </span>
-        {funded || fullyFunded(card, votePct)
-          ? <FundingStatus tier={voteTier} byVote={(votePct ?? 0) > 0} />
+        {funded || fullyFunded(card, votePct) || (final !== undefined && voteTier)
+          ? <FundingStatus tier={voteTier} byVote={(votePct ?? 0) > 0 || final !== undefined} />
           : (
             <span className="flex items-center gap-2">
               <span

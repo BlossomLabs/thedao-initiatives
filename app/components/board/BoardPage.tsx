@@ -1,6 +1,7 @@
 import type { AiSearchResult } from "../../../shared/ai-search";
 import type { Card } from "~/lib/api-types";
 import type { Tier } from "@shared/vote/ballot";
+import type { ResultRow } from "~/lib/vote-results";
 import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -67,17 +68,22 @@ const BAND_ICONS: Record<string, { Icon: LucideIcon; color: string }> = {
 };
 /** The front page's board. The vote results reuse it with `only` (the round's
  * slugs), `votePct` (each initiative's vote share, % of its goal, by id) and its own hero. */
-export default function BoardPage({ only, votePct, votePendingPct, voteTiers, hero, defaultSort }: {
-  only?: ReadonlySet<string>;
-  votePct?: ReadonlyMap<string, number>;
-  /** The part of `votePct` the settling tier would add if it settled now. */
-  votePendingPct?: ReadonlyMap<string, number>;
-  /** Current result tiers, only for initiatives receiving a DAO vote award. */
-  voteTiers?: ReadonlyMap<string, Tier>;
-  hero?: React.ReactNode;
-  /** The order a plain URL opens in (the front page's: By category). */
-  defaultSort?: BoardSort;
-} = {}) {
+export default function BoardPage(
+  { only, votePct, votePendingPct, voteTiers, results, hero, defaultSort }: {
+    only?: ReadonlySet<string>;
+    votePct?: ReadonlyMap<string, number>;
+    /** The part of `votePct` the settling tier would add if it settled now. */
+    votePendingPct?: ReadonlyMap<string, number>;
+    /** Current result tiers, only for initiatives receiving a DAO vote award. */
+    voteTiers?: ReadonlyMap<string, Tier>;
+    /** The closed vote's final result: Funded and Not funded lists, no search or filters;
+     * each card shows only its final amount. */
+    results?: { funded: ResultRow[]; notFunded: ResultRow[] };
+    hero?: React.ReactNode;
+    /** The order a plain URL opens in (the front page's: By category). */
+    defaultSort?: BoardSort;
+  } = {},
+) {
   const { data, isLoading, isError } = useBoard();
   const qc = useQueryClient();
   const [aiResult, setAiResult] = useState<AiSearchResult | null>(null);
@@ -179,55 +185,90 @@ export default function BoardPage({ only, votePct, votePendingPct, voteTiers, he
   const filtered = isFiltered(shownView);
   // "By category" and the rating sorts draw sections; the AI order wins over them while it is on.
   const sort = shownView.sort;
-  const groups: { key: string; cards: Card[]; heading?: React.ReactNode }[] = ai
-    ? [{ key: "all", cards }]
-    : sort === "category"
-    ? groupByPrimary(cards).map((g) => ({
-      key: g.slug ?? "untagged",
-      cards: g.cards,
-      heading: (
-        <>
-          {g.slug
-            ? (
-              <>
-                <CategoryDot slug={g.slug} className="size-2.5" />
-                {categoryOf(g.slug)?.label}
-              </>
-            )
-            : "Untagged"}
-          <span className="small dim tnum">{usd(g.raised)} raised</span>
-        </>
-      ),
-    }))
-    : sort === "closest"
-    ? groupByFunding(cards, votePct, voteTiers).map((g) => ({
-      key: g.key,
-      cards: g.cards,
-      heading: (
-        <>
-          <FundingGlyph status={g.key} />
-          {STATUS_LABELS[g.key]}
-          <span className="small dim tnum">{g.cards.length}</span>
-        </>
-      ),
-    }))
-    : ratings && (sort === "rating-avg" || sort === "rating-mine")
-    ? groupByRating(cards, sort, ratings).map((g) => {
-      const band = BAND_ICONS[g.key];
-      return {
+  const finals = useMemo(
+    () =>
+      results
+        ? new Map(
+          [...results.funded, ...results.notFunded].map((r) => [r.card.initiative.id, r.finalUsd]),
+        )
+        : undefined,
+    [results],
+  );
+  const resultTiers = useMemo(
+    () =>
+      results
+        ? new Map(
+          results.funded.flatMap((r) => r.tier ? [[r.card.initiative.id, r.tier] as const] : []),
+        )
+        : undefined,
+    [results],
+  );
+  const resultGroups = results
+    ? ([["funded", "Funded", results.funded], [
+      "not-funded",
+      "Not funded",
+      results.notFunded,
+    ]] as const)
+      .filter(([, , rows]) => rows.length > 0)
+      .map(([key, label, rows]) => ({
+        key,
+        cards: rows.map((r) => r.card),
+        heading: (
+          <>
+            {label}
+            <span className="small dim tnum">{rows.length}</span>
+          </>
+        ),
+      }))
+    : null;
+  const groups: { key: string; cards: Card[]; heading?: React.ReactNode }[] = resultGroups ??
+    (ai ? [{ key: "all", cards }] : sort === "category"
+      ? groupByPrimary(cards).map((g) => ({
+        key: g.slug ?? "untagged",
+        cards: g.cards,
+        heading: (
+          <>
+            {g.slug
+              ? (
+                <>
+                  <CategoryDot slug={g.slug} className="size-2.5" />
+                  {categoryOf(g.slug)?.label}
+                </>
+              )
+              : "Untagged"}
+            <span className="small dim tnum">{usd(g.raised)} raised</span>
+          </>
+        ),
+      }))
+      : sort === "closest"
+      ? groupByFunding(cards, votePct, voteTiers).map((g) => ({
         key: g.key,
         cards: g.cards,
         heading: (
           <>
-            {g.stars && <StarRow value={g.stars} />}
-            {band && <band.Icon className={cn("size-4", band.color)} aria-hidden="true" />}
-            {g.label}
-            {g.hint && <span className="small dim">{g.hint}</span>}
+            <FundingGlyph status={g.key} />
+            {STATUS_LABELS[g.key]}
+            <span className="small dim tnum">{g.cards.length}</span>
           </>
         ),
-      };
-    })
-    : [{ key: "all", cards }];
+      }))
+      : ratings && (sort === "rating-avg" || sort === "rating-mine")
+      ? groupByRating(cards, sort, ratings).map((g) => {
+        const band = BAND_ICONS[g.key];
+        return {
+          key: g.key,
+          cards: g.cards,
+          heading: (
+            <>
+              {g.stars && <StarRow value={g.stars} />}
+              {band && <band.Icon className={cn("size-4", band.color)} aria-hidden="true" />}
+              {g.label}
+              {g.hint && <span className="small dim">{g.hint}</span>}
+            </>
+          ),
+        };
+      })
+      : [{ key: "all", cards }]);
 
   return (
     <>
@@ -237,7 +278,7 @@ export default function BoardPage({ only, votePct, votePendingPct, voteTiers, he
         <SectionHeading id="rfps" className="max-[640px]:text-center">
           Security initiatives looking for funding
         </SectionHeading>
-        {data && all.length > 0 && (
+        {data && all.length > 0 && !results && (
           <BoardSearch
             view={view}
             onFilter={setView}
@@ -248,7 +289,7 @@ export default function BoardPage({ only, votePct, votePendingPct, voteTiers, he
             onAsking={setAsking}
           />
         )}
-        {data && all.length > 0 && (
+        {data && all.length > 0 && !results && (
           <>
             <FilterBar
               view={shownView}
@@ -301,14 +342,14 @@ export default function BoardPage({ only, votePct, votePendingPct, voteTiers, he
             No initiatives published yet. <Link to="/submit">Suggest the first one.</Link>
           </p>
         )}
-        {data && all.length > 0 && !cards.length && asking && (
+        {data && all.length > 0 && !cards.length && asking && !results && (
           // A sentence for the AI rarely matches as keywords: not "nothing matches" while it thinks.
           <p className="mb-[46px] flex items-center gap-2.5 text-muted" role="status">
             <Sparkles className="size-4 animate-pulse text-dao-green" aria-hidden="true" />
             Asking AI for the best matches…
           </p>
         )}
-        {data && all.length > 0 && !cards.length && !asking && (
+        {data && all.length > 0 && !cards.length && !asking && !results && (
           <div className="mb-[46px] flex flex-wrap items-center gap-3 text-muted">
             No Initiatives match these filters.
             {view.q.trim() && data.flags.aiSearch && (
@@ -316,7 +357,7 @@ export default function BoardPage({ only, votePct, votePendingPct, voteTiers, he
             )}
           </div>
         )}
-        {data && (all.length === 0 || cards.length > 0) &&
+        {data && (all.length === 0 || cards.length > 0 || results) &&
           groups.map((g, gi) => (
             <Fragment key={g.key}>
               {g.heading && (
@@ -339,12 +380,13 @@ export default function BoardPage({ only, votePct, votePendingPct, voteTiers, he
                       aiScores={scores}
                       featured={featuredSet}
                       watch={watchlist}
-                      vote={data.flags.vote}
+                      vote={results ? undefined : data.flags.vote}
                       ratings={ratings}
                       canRate={canRate}
                       votePct={votePct}
                       votePendingPct={votePendingPct}
-                      voteTiers={voteTiers}
+                      voteTiers={resultTiers ?? voteTiers}
+                      finals={finals}
                     />
                   </Suspense>
                 )
@@ -366,7 +408,7 @@ export default function BoardPage({ only, votePct, votePendingPct, voteTiers, he
                           <InitiativeCard
                             card={c}
                             tokensOk={data.flags.tokensOk}
-                            vote={data.flags.vote}
+                            vote={results ? undefined : data.flags.vote}
                             aiTop={picks.includes(c.initiative.id)}
                             aiScore={scores.get(c.initiative.id)}
                             featured={featuredSet.has(c.initiative.id)}
@@ -380,7 +422,8 @@ export default function BoardPage({ only, votePct, votePendingPct, voteTiers, he
                             rating={ratings && { summary: ratings[c.initiative.id], canRate }}
                             votePct={votePct?.get(c.initiative.id)}
                             votePendingPct={votePendingPct?.get(c.initiative.id)}
-                            voteTier={voteTiers?.get(c.initiative.id)}
+                            voteTier={(resultTiers ?? voteTiers)?.get(c.initiative.id)}
+                            final={finals?.get(c.initiative.id)}
                           />
                         </ShuffleItem>
                       ))}

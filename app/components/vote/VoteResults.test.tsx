@@ -286,31 +286,99 @@ it("S settled is solid gold; A settling is lighter, with its window and B's star
   expect(screen.getByText("if it settled now")).toBeInTheDocument();
 });
 
-it("once B settles, the final result", async () => {
-  const settled = (tier: string, funded: string[], awards: Record<string, string>) => ({
-    tier,
-    status: "settled",
-    at: 1,
-    forced: false,
-    funded,
-    awards,
-  });
+const settled = (tier: string, funded: string[], awards: Record<string, string>) => ({
+  tier,
+  status: "settled",
+  at: 1,
+  forced: false,
+  funded,
+  awards,
+});
+/** A closed round: alpha funded in S with $60K, beta not, unless `tiers` says otherwise. */
+async function showClosed(over: Record<string, unknown> = {}, url = "/") {
   vi.mocked(api).mockResolvedValue(
-    roundOf({ "1": ballot({ alpha: "A", beta: "S" }) }, {}, {
+    roundOf({ "1": ballot({ alpha: "S" }) }, {}, {
       closed: true,
       tiers: [
-        settled("S", ["beta"], { beta: usdMicro(30_000) }),
-        settled("A", ["alpha"], { alpha: usdMicro(50_000) }),
+        settled("S", ["alpha"], { alpha: usdMicro(60_000) }),
+        settled("A", [], {}),
         settled("B", [], {}),
       ],
+      ...over,
     }),
   );
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <VoteResults />
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  expect(await screen.findByText(/Final result: \$80,000 to 2 initiatives/)).toBeInTheDocument();
+  await screen.findByText(/^Tier-S:/);
+}
+/** The hero line: its words are split by the coloured "pool". */
+const hero = (re: RegExp) =>
+  screen.getByText((_, el) => el?.tagName === "P" && re.test(el.textContent ?? ""));
+const heading = (name: string) => screen.queryByRole("heading", { name: new RegExp(`^${name}`) });
+
+it("once B settles, the final result: spent of the pool, a line per tier", async () => {
+  await showClosed({
+    tiers: [
+      settled("S", ["beta"], { beta: usdMicro(30_000) }),
+      settled("A", ["alpha"], { alpha: usdMicro(50_000) }),
+      settled("B", [], {}),
+    ],
+  });
+  expect(hero(/\$80k of \$100k demo pool spent/)).toBeInTheDocument();
+  expect(screen.getByText("Tier-S: $30,000 to 1 initiative")).toBeInTheDocument();
+  expect(screen.getByText("Tier-A: $50,000 to 1 initiative")).toBeInTheDocument();
+});
+
+it("the final result: funded and not funded lists", async () => {
+  await showClosed();
+  expect(heading("Funded")).toHaveTextContent("Funded1");
+  expect(heading("Not funded")).toHaveTextContent("Not funded1");
+});
+
+it.each(["/", "/?view=cards"])("cards show the final amount only in %s", async (url) => {
+  await showClosed({}, url);
+  const card = (await screen.findAllByText("Alpha fuzzing"))[0].closest(
+    "li, [data-initiative-id]",
+  )!;
+  // Alpha had $10K and the vote gave it $60K.
+  expect(card).toHaveTextContent("$70k");
+  const text = ["Alpha fuzzing", "Beta audits"].map((t) =>
+    screen.getAllByText(t)[0].closest("li, [data-initiative-id]")!.textContent
+  ).join(" ");
+  expect(text).not.toMatch(/of \$\d/);
+  expect(text).not.toMatch(/Qualified/);
+  expect(text).not.toMatch(/Grant/i);
+});
+
+it("an empty list draws no heading", async () => {
+  await showClosed({
+    tiers: [
+      settled("S", ["alpha", "beta"], { alpha: usdMicro(50_000), beta: usdMicro(30_000) }),
+      settled("A", [], {}),
+      settled("B", [], {}),
+    ],
+  });
+  expect(heading("Funded")).not.toBeNull();
+  expect(heading("Not funded")).toBeNull();
+});
+
+it("spent of the pool uses the pool on-chain", async () => {
+  await showClosed({ poolUsd: usdMicro(250_000) });
+  expect(hero(/\$60k of \$250k demo pool spent/)).toBeInTheDocument();
+});
+
+it("a tier that funded nothing says so", async () => {
+  await showClosed();
+  expect(screen.getByText("Tier-B: no initiatives funded")).toBeInTheDocument();
+});
+
+it("no search or filters on the final result", async () => {
+  await showClosed();
+  expect(screen.queryByRole("searchbox")).toBeNull();
+  expect(screen.queryByRole("button", { name: /filter/i })).toBeNull();
 });

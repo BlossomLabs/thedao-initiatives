@@ -4,10 +4,10 @@ import Hero from "~/components/board/Hero";
 import { LinkButton } from "~/components/ui/Button";
 import { useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/vote-local";
-import { dollars } from "~/lib/vote-results";
+import { dollars, splitResults } from "~/lib/vote-results";
 import { useSession } from "~/context/session";
 import { type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
-import { usd } from "~/lib/format";
+import { usd, usdShort } from "~/lib/format";
 import { ROUND } from "../../../shared/vote/manifest";
 import { type Tier, tierName } from "../../../shared/vote/ballot";
 
@@ -138,7 +138,28 @@ export default function VoteResults() {
   const isClosed = Boolean(rv?.closed);
   const started = rv?.tiers.some((t) => t.status !== "waiting");
   const sTally = ROUND.schedule?.firstTallyAt[0] ?? ROUND.closesAt;
-  const fundedCount = money ? new Set([...money.settled.keys(), ...money.pending.keys()]).size : 0;
+  const pool = dollars(rv?.poolUsd ?? ROUND.poolUsd);
+  // Once closed, the two lists; the cards carry only their final amount.
+  const results = useMemo(
+    () => rv?.closed ? splitResults(cards, rv.tiers) : undefined,
+    [rv, cards],
+  );
+  /** One line per tier: what it funded, or that it funded nothing. */
+  const tierLines = isClosed && rv
+    ? rv.tiers.map((t) => {
+      const sum = t.status === "settled"
+        ? Object.values(t.awards).reduce((a, v) => a + dollars(v), 0)
+        : 0;
+      const n = t.status === "waiting" ? 0 : t.funded.length;
+      return (
+        <p key={t.tier} className="m-0">
+          {n > 0
+            ? `${tierName(t.tier)}: ${usd(sum)} to ${plural(n, "initiative")}`
+            : `${tierName(t.tier)}: no initiatives funded`}
+        </p>
+      );
+    })
+    : null;
 
   const hero = (
     <Hero
@@ -147,8 +168,8 @@ export default function VoteResults() {
       sub={isClosed
         ? (
           <>
-            Final result: {usd(raised ?? 0)} to {plural(fundedCount, "initiative")} from the{" "}
-            {usd(POOL_USD)} <span className="text-vote">{POOL_NAME}</span>
+            {usdShort(raised ?? 0)} of {usdShort(pool)}{" "}
+            <span className="text-vote">{POOL_NAME}</span> spent
           </>
         )
         : started && rv
@@ -161,6 +182,7 @@ export default function VoteResults() {
           </>
         )}
     >
+      {tierLines && <div className="mt-3 space-y-1 text-[14px] text-white/60">{tierLines}</div>}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] text-white/55">
         <span className="flex items-center gap-2">
           <i className="inline-block h-[6px] w-6 rounded-full bg-gradient-to-r from-dao-green to-dao-bright" />
@@ -193,6 +215,7 @@ export default function VoteResults() {
       votePct={votePct}
       votePendingPct={votePendingPct}
       voteTiers={voteTiers}
+      results={results}
       hero={hero}
       defaultSort="closest"
     />

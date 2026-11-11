@@ -110,8 +110,10 @@ function Row(
     votePct,
     votePendingPct,
     voteTier,
+    final,
   }: {
     card: Card;
+    final?: number;
     votePct?: number;
     votePendingPct?: number;
     voteTier?: Tier;
@@ -133,12 +135,14 @@ function Row(
   const pctOn = standing ? standing.kind === "eligible" : pct >= 1;
   const full = fullyFunded(card, votePct);
   const votedFull = (votePct ?? 0) > 0 && full;
-  const pctShown = full ? <FundingStatus tier={voteTier} byVote={votedFull} /> : (
-    <>
-      {pctText(pct)}
-      <span className="sr-only">funded</span>
-    </>
-  );
+  const pctShown = full || (final !== undefined && voteTier)
+    ? <FundingStatus tier={voteTier} byVote={votedFull || final !== undefined} />
+    : (
+      <>
+        {pctText(pct)}
+        <span className="sr-only">funded</span>
+      </>
+    );
   const tick = vote ? voteFloorPct(r.goalUsd, vote) : 0;
   // Hovering or tapping the row shows its vote callout under the bar.
   const reveal = useVoteReveal(Boolean(standing));
@@ -195,7 +199,9 @@ function Row(
           />
         )}
       </span>
-      <TypeBadge type={r.type} inline className="justify-self-start @max-[720px]/list:hidden" />
+      {final === undefined
+        ? <TypeBadge type={r.type} inline className="justify-self-start @max-[720px]/list:hidden" />
+        : <span />}
       <div className="flex min-w-0 items-center gap-2.5 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-1">
         {/* The same title as the cards: the primary category's icon names them all. */}
         <CardTitle
@@ -264,11 +270,13 @@ function Row(
           wrap between items on narrow screens so they cannot push the row wider. */
       }
       <div className="contents @max-[720px]/list:col-span-2 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-2 @max-[720px]/list:flex @max-[720px]/list:flex-wrap @max-[720px]/list:items-center @max-[720px]/list:gap-x-2 @max-[720px]/list:gap-y-1">
-        <TypeBadge
-          type={r.type}
-          inline
-          className="hidden flex-none px-2 py-[2px] text-[10px] @max-[720px]/list:inline-flex"
-        />
+        {final === undefined && (
+          <TypeBadge
+            type={r.type}
+            inline
+            className="hidden flex-none px-2 py-[2px] text-[10px] @max-[720px]/list:inline-flex"
+          />
+        )}
         {label.map((k) => (
           <CardLabel
             key={k}
@@ -284,12 +292,13 @@ function Row(
           )}
         >
           <span className="@max-[720px]/list:hidden">
-            <b className="font-medium text-white/90">{usd(summary.total)}</b> of {usd(r.goalUsd)}
+            <b className="font-medium text-white/90">{usd(final ?? summary.total)}</b>
+            {final === undefined && <>{" "}of {usd(r.goalUsd)}</>}
           </span>
           {/* Phones: the short form. */}
           <span className="hidden @max-[720px]/list:inline" aria-hidden="true">
-            <b className="font-medium text-white/90">{usdShort(summary.total)}</b> of{" "}
-            {usdShort(r.goalUsd)}
+            <b className="font-medium text-white/90">{usdShort(final ?? summary.total)}</b>
+            {final === undefined && <>{" "}of {usdShort(r.goalUsd)}</>}
           </span>
           {backers > 0 && <span className="sr-only">, {plural(backers, "backer")}</span>}
         </span>
@@ -381,8 +390,11 @@ export default function BoardList(
     votePct,
     votePendingPct,
     voteTiers,
+    finals,
   }: {
     cards: Card[];
+    /** The closed vote's final amounts by initiative id: shown alone, no goal, no type. */
+    finals?: ReadonlyMap<string, number>;
     /** The vote results: each initiative's vote share, % of its goal, by initiative id. */
     votePct?: ReadonlyMap<string, number>;
     /** The part of it the settling tier would add if it settled now. */
@@ -439,6 +451,7 @@ export default function BoardList(
                 votePct={votePct?.get(c.initiative.id)}
                 votePendingPct={votePendingPct?.get(c.initiative.id)}
                 voteTier={voteTiers?.get(c.initiative.id)}
+                final={finals?.get(c.initiative.id)}
               />
             ))}
           </AnimatePresence>

@@ -644,9 +644,12 @@ it("quiet ending: S settling, quiet so far", async () => {
       waiting("B"),
     ],
   }));
-  expect(await screen.findByText(/S is settling: window 1 of 3, ends .* UTC\./))
-    .toBeInTheDocument();
-  expect(screen.getByText("No change so far: it settles then.")).toBeInTheDocument();
+  // Its own box, in the ballot's column.
+  const box = await screen.findByRole("region", { name: "S settling" });
+  expect(within(box).getByText("S is settling")).toBeInTheDocument();
+  expect(within(box).getByText("Window 1 of 3")).toBeInTheDocument();
+  expect(within(box).getByText(/^Ends .* UTC$/)).toBeInTheDocument();
+  expect(within(box).getByText("No change so far: it settles then.")).toBeInTheDocument();
 });
 
 it("quiet ending: S changed in this window", async () => {
@@ -689,10 +692,8 @@ it("quiet ending: a settled S is named and locked; the badge sees what it paid a
     ],
   }));
   const share = await screen.findByRole("region", { name: "Your share" });
-  expect(within(share).getByText(/Your share: \$2,000/)).toBeInTheDocument();
-  expect(within(share).getByText(/S settled, funding ALPHA\./)).toBeInTheDocument();
-  expect(within(share).getByText(/Your share paid \$900/)).toBeInTheDocument();
-  expect(within(share).getByText(/Remaining share: \$1,100, for A and B/)).toBeInTheDocument();
+  expect(within(share).getByText("$1,100 left of $2,000")).toBeInTheDocument();
+  expect(within(share).getByText("S paid $900 to 1 initiative")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Must fund (settled)" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "ALPHA, funded: your share paid $900" }))
     .toBeDisabled();

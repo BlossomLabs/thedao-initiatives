@@ -2,69 +2,81 @@ import type { Tier } from "../../../shared/vote/ballot";
 
 /** Whole dollars: a badge's share is thousands, the cents say nothing here. */
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
-const and = (xs: string[]) =>
-  xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 
-/** On the ballot once a tier has settled: this badge's share of the pool, what it
- * paid in each settled tier (for good: those initiatives are funded), and what is left
- * for the tiers still open. */
-export default function ShareSpent({ share, settled, open }: {
+const RING = 64;
+const STROKE = 4;
+const R = (RING - STROKE) / 2;
+const C = 2 * Math.PI * R;
+
+/** On the ballot once a tier has settled: the voter's avatar ringed in gold by what is
+ * left of this badge's share, and what each settled tier took from it (for good). */
+export default function ShareSpent({ avatar, share, settled }: {
+  /** The voter's avatar, drawn inside the ring. */
+  avatar: React.ReactNode;
   /** This badge's equal share of the pool, in USD. */
   share: number;
-  /** Each settled tier: what it funded (titles), and what this badge paid of that. */
-  settled: { tier: Tier; funded: string[]; paid: { title: string; usd: number }[] }[];
-  /** The tiers not settled yet, in order. */
-  open: Tier[];
+  /** Each settled tier: how many initiatives it funded, and what this badge paid (USD). */
+  settled: { tier: Tier; funded: number; paid: number }[];
 }) {
-  const spent = settled.reduce((a, t) => a + t.paid.reduce((p, x) => p + x.usd, 0), 0);
+  const spent = settled.reduce((a, t) => a + t.paid, 0);
   const left = Math.max(0, share - spent);
-  const pct = share > 0 ? Math.min(100, (spent / share) * 100) : 0;
+  const frac = share > 0 ? left / share : 0;
   return (
     <section
       aria-label="Your share"
-      className="rounded-xl border border-vote/30 bg-vote/[.06] p-4 text-left"
+      className="flex items-center gap-4 rounded-xl border border-vote/30 bg-vote/[.06] p-4"
     >
-      <p className="flex items-baseline justify-between gap-3">
-        <b className="font-inter-tight text-[15px] font-semibold text-white">
-          Your share: {dollars(share)}
-        </b>
-        <span className="text-[13px] text-white/60 tnum">{dollars(spent)} spent</span>
-      </p>
       <div
         role="meter"
-        aria-label="Your share spent"
+        aria-label="Your share left"
         aria-valuemin={0}
         aria-valuemax={Math.round(share)}
-        aria-valuenow={Math.round(spent)}
-        className="mt-2.5 h-2 overflow-hidden rounded-full bg-white/10"
+        aria-valuenow={Math.round(left)}
+        className="relative grid flex-none place-items-center"
+        style={{ width: RING, height: RING }}
       >
-        <i className="block h-full rounded-full bg-vote" style={{ width: `${pct}%` }} />
+        <svg width={RING} height={RING} className="absolute inset-0 -rotate-90" aria-hidden="true">
+          <circle
+            cx={RING / 2}
+            cy={RING / 2}
+            r={R}
+            fill="none"
+            strokeWidth={STROKE}
+            className="stroke-white/15"
+          />
+          <circle
+            cx={RING / 2}
+            cy={RING / 2}
+            r={R}
+            fill="none"
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+            strokeDasharray={C}
+            strokeDashoffset={C * (1 - frac)}
+            className="stroke-vote transition-[stroke-dashoffset] duration-500"
+          />
+        </svg>
+        <div className="grid size-[48px] place-items-center overflow-hidden rounded-full [&_img]:!size-full">
+          {avatar}
+        </div>
       </div>
-      <ul className="mt-3 space-y-1.5 text-[13.5px] text-white/75">
-        {settled.map((t) => {
-          const sum = t.paid.reduce((a, x) => a + x.usd, 0);
-          const what = `${t.tier} settled, funding ${t.funded.length ? and(t.funded) : "nothing"}.`;
-          return (
-            <li key={t.tier}>
-              {t.paid.length === 0
-                ? <>{t.funded.length ? `${what} None of your share went to it.` : what}</>
-                : (
-                  <>
-                    {what} <span className="text-white">Your share paid {dollars(sum)}</span>{" "}
-                    <span className="text-white/60">
-                      ({t.paid.map((x) => `${x.title} ${dollars(x.usd)}`).join(" · ")})
-                    </span>
-                  </>
-                )}
-            </li>
-          );
-        })}
-      </ul>
-      {open.length > 0 && (
-        <p className="mt-2 text-[13.5px] font-medium text-white">
-          Remaining share: {dollars(left)}, for {and(open)}. It goes where you rank them.
+      <div className="min-w-0 space-y-0.5">
+        <p className="text-[12px] uppercase tracking-[.08em] text-white/55">Your share</p>
+        <p className="font-inter-tight text-[16px] font-semibold text-white tnum">
+          {dollars(left)} left of {dollars(share)}
         </p>
-      )}
+        {settled.map((t) => (
+          <p key={t.tier} className="text-[13px] text-white/65 tnum">
+            {t.paid > 0
+              ? `${t.tier} paid ${dollars(t.paid)} to ${t.funded} initiative${
+                t.funded === 1 ? "" : "s"
+              }`
+              : t.funded > 0
+              ? `${t.tier} paid nothing from your share`
+              : `${t.tier} funded nothing`}
+          </p>
+        ))}
+      </div>
     </section>
   );
 }

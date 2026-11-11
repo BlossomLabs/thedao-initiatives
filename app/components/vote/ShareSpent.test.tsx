@@ -4,38 +4,32 @@ import ShareSpent from "./ShareSpent";
 
 afterEach(cleanup);
 
-it("says what the badge paid in each settled tier and what is left for the open ones", () => {
+it("the ring around the avatar is what is left of the share; one line per settled tier", () => {
   render(
     <ShareSpent
+      avatar={<img alt="" />}
       share={2_000}
-      settled={[{
-        tier: "S",
-        funded: ["Alpha fuzzing", "Beta audits"],
-        paid: [{ title: "Alpha fuzzing", usd: 900 }, { title: "Beta audits", usd: 350 }],
-      }]}
-      open={["A", "B"]}
+      settled={[{ tier: "S", funded: 2, paid: 1_250 }]}
     />,
   );
-  expect(screen.getByText(/Your share: \$2,000/)).toBeInTheDocument();
-  expect(screen.getByText(/S settled, funding Alpha fuzzing and Beta audits\./))
-    .toBeInTheDocument();
-  expect(screen.getByText(/Your share paid \$1,250/)).toBeInTheDocument();
-  expect(screen.getByText(/Alpha fuzzing \$900/)).toBeInTheDocument();
-  expect(screen.getByText(/Beta audits \$350/)).toBeInTheDocument();
-  expect(screen.getByText(/Remaining share: \$750, for A and B/)).toBeInTheDocument();
-  expect(screen.getByRole("meter")).toHaveAttribute("aria-valuenow", "1250");
+  expect(screen.getByText("Your share")).toBeInTheDocument();
+  expect(screen.getByText("$750 left of $2,000")).toBeInTheDocument();
+  expect(screen.getByText("S paid $1,250 to 2 initiatives")).toBeInTheDocument();
+  expect(screen.getByRole("meter", { name: "Your share left" })).toHaveAttribute(
+    "aria-valuenow",
+    "750",
+  );
 });
 
 it("a settled tier that took nothing from this badge says so", () => {
   render(
     <ShareSpent
+      avatar={<img alt="" />}
       share={2_000}
-      settled={[{ tier: "S", funded: ["Gamma"], paid: [] }, { tier: "A", funded: [], paid: [] }]}
-      open={["B"]}
+      settled={[{ tier: "S", funded: 1, paid: 0 }, { tier: "A", funded: 0, paid: 0 }]}
     />,
   );
-  expect(screen.getByText(/S settled, funding Gamma\. None of your share went to it\./))
-    .toBeInTheDocument();
-  expect(screen.getByText(/A settled, funding nothing\./)).toBeInTheDocument();
-  expect(screen.getByText(/Remaining share: \$2,000, for B/)).toBeInTheDocument();
+  expect(screen.getByText("S paid nothing from your share")).toBeInTheDocument();
+  expect(screen.getByText("A funded nothing")).toBeInTheDocument();
+  expect(screen.getByText("$2,000 left of $2,000")).toBeInTheDocument();
 });

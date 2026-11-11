@@ -9,6 +9,9 @@ import { BallotSkeleton, IntroSkeleton } from "~/components/vote/VoteSkeleton";
 import { rememberMyCode } from "~/lib/vote-local";
 import BallotStatus from "~/components/vote/BallotStatus";
 import ShareSpent from "~/components/vote/ShareSpent";
+import SettlingBox from "~/components/vote/SettlingBox";
+import { AddressAvatar, Avatar } from "~/components/wallet/Avatar";
+import { avatarSrc } from "~/lib/avatar";
 import { spentRound } from "~/components/vote/mock-round";
 import VoteClosed, { badgeKicker } from "~/components/vote/VoteClosed";
 import { useSession } from "~/context/session";
@@ -547,20 +550,40 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
       Object.entries(t.paid?.[String(n)] ?? {}).map(([slug, v]) => [slug, microUsd(v)] as const);
     const paid = new Map(settledTiers.flatMap(paidHere));
     const funded = new Set(settledTiers.flatMap((t) => t.funded));
-    const titleOf = (slug: string) => titles.get(slug) ?? slug;
     const refused = rv?.rejected.find((r) =>
       r.tokenId === String(n) && ballotFlow.last && BigInt(r.nonce) === ballotFlow.last.nonce
     );
     const sharePanel = rv && counted && settledTiers.length > 0 && (
       <ShareSpent
+        avatar={me
+          ? <AddressAvatar address={me} size={48} />
+          : <Avatar src={avatarSrc(`badge-${n}`)} size={48} />}
         share={microUsd(rv.share ?? "0")}
-        settled={settledTiers.map((t) => ({
-          tier: t.tier,
-          funded: t.funded.map(titleOf),
-          paid: paidHere(t).map(([slug, usd]) => ({ title: titleOf(slug), usd })),
-        }))}
-        open={rv.tiers.flatMap((t) => t.status === "settled" ? [] : [t.tier])}
+        settled={settledTiers.map((t) => {
+          const mine = paidHere(t);
+          return {
+            tier: t.tier,
+            funded: mine.length || t.funded.length,
+            paid: mine.reduce((a, [, v]) => a + v, 0),
+          };
+        })}
       />
+    );
+    const settling = rv?.tiers.flatMap((t) => t.status === "settling" ? [t] : []) ?? [];
+    const aside = (sharePanel || settling.length > 0) && (
+      <div className="space-y-3">
+        {sharePanel}
+        {settling.map((t) => (
+          <SettlingBox
+            key={t.tier}
+            tier={t.tier}
+            window={t.window}
+            maxWindows={ROUND.schedule.maxWindows}
+            endsAt={utc(t.windowEndsAt)}
+            quiet={t.quiet}
+          />
+        ))}
+      </div>
     );
     const stage = rv && (
       <div className="mx-auto mt-3 max-w-[640px] space-y-1 text-[14.5px] text-white/80">
@@ -571,25 +594,6 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
         )}
         {shut && (
           <p className="font-medium text-white">Registration closed before this badge voted.</p>
-        )}
-        {rv.tiers.map((t) =>
-          t.status === "settling"
-            ? (
-              <div key={t.tier}>
-                <p className="font-medium text-white">
-                  {t.tier} is settling: window {t.window} of {ROUND.schedule.maxWindows}, ends{" "}
-                  {utc(t.windowEndsAt)}.
-                </p>
-                <p>
-                  {t.quiet
-                    ? "No change so far: it settles then."
-                    : t.window >= ROUND.schedule.maxWindows
-                    ? "It changed, but this is the last window: it settles at its end anyway."
-                    : "It changed in this window: a shorter window follows."}
-                </p>
-              </div>
-            )
-            : null
         )}
       </div>
     );
@@ -624,7 +628,7 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
           tiers={tiers}
           disabled={busy || early}
           locked={locked}
-          aside={sharePanel}
+          aside={aside}
           funded={settledTiers.length ? funded : undefined}
           paid={paid}
           onChange={setTier}

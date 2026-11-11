@@ -18,6 +18,12 @@ export function usdShort(v: unknown): string {
   return `$${trim(n / 1_000_000, 1)}M`;
 }
 
+/** A missing amount, short and rounded up so it never reads as less than it is. */
+export const usdShortUp = (n: number): string =>
+  usdShort(
+    n < 1000 ? Math.ceil(n) : n < 10_000 ? Math.ceil(n / 100) * 100 : Math.ceil(n / 1000) * 1000,
+  );
+
 export function shortAddr(a: string | null | undefined): string {
   return a && a.length > 12 ? a.slice(0, 6) + "…" + a.slice(-4) : a ?? "";
 }

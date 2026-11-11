@@ -1,13 +1,8 @@
 import { type VoteSettings, voteState } from "@shared/vote";
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
-import { usdShort } from "~/lib/format";
+import { usdShortUp } from "~/lib/format";
 
-/** A missing amount, short and rounded up so it never reads as less than it is. */
-const upShort = (n: number) =>
-  usdShort(
-    n < 1000 ? Math.ceil(n) : n < 10_000 ? Math.ceil(n / 100) * 100 : Math.ceil(n / 1000) * 1000,
-  );
 import { cn } from "~/lib/utils";
 
 /** How close counts as "almost there": the tag shows within this many points of the floor. */
@@ -37,13 +32,13 @@ export function voteStanding(raised: number, goal: number, vote: VoteSettings): 
 
 /** The callout's words, as it shows them. */
 export const calloutLabel = (state: CalloutState): string =>
-  state.kind === "eligible" ? "Qualified for the vote" : `${upShort(state.missing)} to qualify`;
+  state.kind === "eligible" ? "Qualified for the vote" : `${usdShortUp(state.missing)} to qualify`;
 
 /** The callout's words for screen readers. */
 export const calloutText = (state: CalloutState): string =>
   state.kind === "eligible"
     ? "Qualified for TheDAO's vote"
-    : `${upShort(state.missing)} to qualify for TheDAO's vote`;
+    : `${usdShortUp(state.missing)} to qualify for TheDAO's vote`;
 
 /**
  * "$2k to qualify" (or "Qualified for the vote"): a small callout that stays open over the bar's mark, its

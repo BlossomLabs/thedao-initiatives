@@ -1,6 +1,6 @@
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { bytesToHex } from "viem";
 import { api } from "~/lib/api";
@@ -381,4 +381,38 @@ it("no search or filters on the final result", async () => {
   await showClosed();
   expect(screen.queryByRole("searchbox")).toBeNull();
   expect(screen.queryByRole("button", { name: /filter/i })).toBeNull();
+});
+
+const gap = (over: Record<string, unknown> = {}) => ({
+  tier: "S",
+  gap: "41200000000",
+  comesIn: [{ slug: "beta", tier: "A" }],
+  dropsOut: [],
+  moves: [],
+  ...over,
+});
+
+it.each(["/", "/?view=cards"])("an open round shows each initiative's gap in %s", async (url) => {
+  const view = roundOf({ "1": ballot({ alpha: "A" }) }, { alpha: [50_000, "A"] });
+  vi.mocked(api).mockResolvedValue({
+    ...view,
+    live: { ...view.live, next: { alpha: gap(), beta: gap({ gap: null, tier: "B" }) } },
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={[url]}>
+        <VoteResults />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  const button = (await screen.findAllByRole("button", { name: "$42k to Tier-S" }))[0];
+  expect(screen.getAllByText("Out of reach for Tier-B").length).toBeGreaterThan(0);
+  fireEvent.focus(button);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Comes in: Beta audits (Tier-A)");
+});
+
+it("a closed round shows no gap", async () => {
+  await showClosed();
+  expect(screen.queryByText(/to Tier-S$/)).toBeNull();
+  expect(screen.queryByText(/Out of reach/)).toBeNull();
 });

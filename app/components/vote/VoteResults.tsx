@@ -6,7 +6,7 @@ import { useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/vote-local";
 import { dollars, splitResults } from "~/lib/vote-results";
 import { useSession } from "~/context/session";
-import { type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
+import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd, usdShort } from "~/lib/format";
 import { ROUND } from "../../../shared/vote/manifest";
 import { type Tier, tierName } from "../../../shared/vote/ballot";
@@ -130,6 +130,18 @@ export default function VoteResults() {
     return { votePct: total, votePendingPct: pend, voteTiers: tiers };
   }, [money, cards]);
 
+  // The gaps (open round only), by initiative id, and the titles the hover names.
+  const { next, titles } = useMemo(() => {
+    const next = new Map<string, NextTierEntry>();
+    const titles = new Map<string, string>();
+    for (const c of cards) {
+      titles.set(c.initiative.slug, c.initiative.title);
+      const e = rv && !rv.closed ? rv.live.next?.[c.initiative.slug] : undefined;
+      if (e) next.set(c.initiative.id, e);
+    }
+    return { next, titles };
+  }, [rv, cards]);
+
   const raised = money
     ? [...money.settled.values(), ...money.pending.values()].reduce((a, b) => a + b, 0)
     : undefined;
@@ -216,6 +228,8 @@ export default function VoteResults() {
       votePendingPct={votePendingPct}
       voteTiers={voteTiers}
       results={results}
+      next={next}
+      titles={titles}
       hero={hero}
       defaultSort="closest"
     />

@@ -8,6 +8,8 @@ import { fullyFunded } from "~/lib/board-view";
 import CardTitle from "./CardTitle";
 import WatchlistButton from "~/components/board/WatchlistButton";
 import FundingStatus from "~/components/board/FundingStatus";
+import { NextTierFigure } from "~/components/vote/NextTier";
+import type { NextTierEntry } from "~/hooks/use-vote";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import Bar from "~/components/ui/Bar";
 import {
@@ -123,8 +125,14 @@ export default function InitiativeCard({
   votePendingPct,
   voteTier,
   final,
+  next,
+  titles,
 }: {
   card: Card;
+  /** The open vote's gap to this initiative's next tier, drawn in place of the %. */
+  next?: NextTierEntry;
+  /** Slug → title, for the names in the gap's hover. */
+  titles?: ReadonlyMap<string, string>;
   /** The closed vote's final amount: shown alone, with no goal and no type. */
   final?: number;
   /** The vote results: this initiative's vote share, % of its goal (gold on the bar). */
@@ -229,7 +237,9 @@ export default function InitiativeCard({
             <span className="text-[12px] text-white/30">· {plural(backers, "backer")}</span>
           )}
         </span>
-        {funded || fullyFunded(card, votePct) || (final !== undefined && voteTier)
+        {next && titles
+          ? <NextTierFigure next={next} titles={titles} />
+          : funded || fullyFunded(card, votePct) || (final !== undefined && voteTier)
           ? <FundingStatus tier={voteTier} byVote={(votePct ?? 0) > 0 || final !== undefined} />
           : (
             <span className="flex items-center gap-2">

@@ -10,6 +10,8 @@ import CardTitle from "~/components/board/CardTitle";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import WatchlistButton from "~/components/board/WatchlistButton";
 import FundingStatus from "~/components/board/FundingStatus";
+import { NextTierFigure } from "~/components/vote/NextTier";
+import type { NextTierEntry } from "~/hooks/use-vote";
 import RatingChip, { RatingForm } from "~/components/ratings/RatingChip";
 import Reveal from "~/components/ui/Reveal";
 import { fullyFunded, type Ratings } from "~/lib/board-view";
@@ -111,8 +113,12 @@ function Row(
     votePendingPct,
     voteTier,
     final,
+    next,
+    titles,
   }: {
     card: Card;
+    next?: NextTierEntry;
+    titles?: ReadonlyMap<string, string>;
     final?: number;
     votePct?: number;
     votePendingPct?: number;
@@ -135,7 +141,9 @@ function Row(
   const pctOn = standing ? standing.kind === "eligible" : pct >= 1;
   const full = fullyFunded(card, votePct);
   const votedFull = (votePct ?? 0) > 0 && full;
-  const pctShown = full || (final !== undefined && voteTier)
+  const pctShown = next && titles
+    ? <NextTierFigure next={next} titles={titles} />
+    : full || (final !== undefined && voteTier)
     ? <FundingStatus tier={voteTier} byVote={votedFull || final !== undefined} />
     : (
       <>
@@ -391,8 +399,14 @@ export default function BoardList(
     votePendingPct,
     voteTiers,
     finals,
+    next,
+    titles,
   }: {
     cards: Card[];
+    /** The open vote's gap to each initiative's next tier, by initiative id. */
+    next?: ReadonlyMap<string, NextTierEntry>;
+    /** Slug → title, for the names in the gap's hover. */
+    titles?: ReadonlyMap<string, string>;
     /** The closed vote's final amounts by initiative id: shown alone, no goal, no type. */
     finals?: ReadonlyMap<string, number>;
     /** The vote results: each initiative's vote share, % of its goal, by initiative id. */
@@ -452,6 +466,8 @@ export default function BoardList(
                 votePendingPct={votePendingPct?.get(c.initiative.id)}
                 voteTier={voteTiers?.get(c.initiative.id)}
                 final={finals?.get(c.initiative.id)}
+                next={next?.get(c.initiative.id)}
+                titles={titles}
               />
             ))}
           </AnimatePresence>

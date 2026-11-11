@@ -1,6 +1,7 @@
 import type { AiSearchResult } from "../../../shared/ai-search";
 import type { Card } from "~/lib/api-types";
 import type { Tier } from "@shared/vote/ballot";
+import type { NextTierEntry } from "~/hooks/use-vote";
 import type { ResultRow } from "~/lib/vote-results";
 import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
@@ -69,7 +70,7 @@ const BAND_ICONS: Record<string, { Icon: LucideIcon; color: string }> = {
 /** The front page's board. The vote results reuse it with `only` (the round's
  * slugs), `votePct` (each initiative's vote share, % of its goal, by id) and its own hero. */
 export default function BoardPage(
-  { only, votePct, votePendingPct, voteTiers, results, hero, defaultSort }: {
+  { only, votePct, votePendingPct, voteTiers, results, next, titles, hero, defaultSort }: {
     only?: ReadonlySet<string>;
     votePct?: ReadonlyMap<string, number>;
     /** The part of `votePct` the settling tier would add if it settled now. */
@@ -79,6 +80,10 @@ export default function BoardPage(
     /** The closed vote's final result: Funded and Not funded lists, no search or filters;
      * each card shows only its final amount. */
     results?: { funded: ResultRow[]; notFunded: ResultRow[] };
+    /** The open vote's gap to each initiative's next tier, by id, drawn on the right of the
+     * amount row; `titles` (slug → title) names the initiatives in its hover. */
+    next?: ReadonlyMap<string, NextTierEntry>;
+    titles?: ReadonlyMap<string, string>;
     hero?: React.ReactNode;
     /** The order a plain URL opens in (the front page's: By category). */
     defaultSort?: BoardSort;
@@ -387,6 +392,8 @@ export default function BoardPage(
                       votePendingPct={votePendingPct}
                       voteTiers={resultTiers ?? voteTiers}
                       finals={finals}
+                      next={next}
+                      titles={titles}
                     />
                   </Suspense>
                 )
@@ -424,6 +431,8 @@ export default function BoardPage(
                             votePendingPct={votePendingPct?.get(c.initiative.id)}
                             voteTier={(resultTiers ?? voteTiers)?.get(c.initiative.id)}
                             final={finals?.get(c.initiative.id)}
+                            next={next?.get(c.initiative.id)}
+                            titles={titles}
                           />
                         </ShuffleItem>
                       ))}

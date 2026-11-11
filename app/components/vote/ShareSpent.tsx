@@ -22,7 +22,7 @@ export default function ShareSpent({ share, settled, open }: {
   return (
     <section
       aria-label="Your share"
-      className="mx-auto mt-4 max-w-[640px] rounded-xl border border-vote/30 bg-vote/[.06] p-4 text-left"
+      className="rounded-xl border border-vote/30 bg-vote/[.06] p-4 text-left"
     >
       <p className="flex items-baseline justify-between gap-3">
         <b className="font-inter-tight text-[15px] font-semibold text-white">

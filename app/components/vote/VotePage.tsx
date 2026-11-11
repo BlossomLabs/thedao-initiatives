@@ -551,6 +551,17 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     const refused = rv?.rejected.find((r) =>
       r.tokenId === String(n) && ballotFlow.last && BigInt(r.nonce) === ballotFlow.last.nonce
     );
+    const sharePanel = rv && counted && settledTiers.length > 0 && (
+      <ShareSpent
+        share={microUsd(rv.share ?? "0")}
+        settled={settledTiers.map((t) => ({
+          tier: t.tier,
+          funded: t.funded.map(titleOf),
+          paid: paidHere(t).map(([slug, usd]) => ({ title: titleOf(slug), usd })),
+        }))}
+        open={rv.tiers.flatMap((t) => t.status === "settled" ? [] : [t.tier])}
+      />
+    );
     const stage = rv && (
       <div className="mx-auto mt-3 max-w-[640px] space-y-1 text-[14.5px] text-white/80">
         {!counted && !registrationOver && (
@@ -579,17 +590,6 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
               </div>
             )
             : null
-        )}
-        {counted && settledTiers.length > 0 && (
-          <ShareSpent
-            share={microUsd(rv.share ?? "0")}
-            settled={settledTiers.map((t) => ({
-              tier: t.tier,
-              funded: t.funded.map(titleOf),
-              paid: paidHere(t).map(([slug, usd]) => ({ title: titleOf(slug), usd })),
-            }))}
-            open={rv.tiers.flatMap((t) => t.status === "settled" ? [] : [t.tier])}
-          />
         )}
       </div>
     );
@@ -624,6 +624,7 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
           tiers={tiers}
           disabled={busy || early}
           locked={locked}
+          aside={sharePanel}
           funded={settledTiers.length ? funded : undefined}
           paid={paid}
           onChange={setTier}

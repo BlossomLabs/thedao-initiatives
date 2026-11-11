@@ -114,10 +114,24 @@ function targetAt(x: number, y: number): Where | undefined {
 }
 
 export default function TierBallot(
-  { items, tiers, disabled, onChange, onReplace, search = {}, actions, locked, funded, paid }: {
+  {
+    items,
+    tiers,
+    disabled,
+    onChange,
+    onReplace,
+    search = {},
+    actions,
+    aside,
+    locked,
+    funded,
+    paid,
+  }: {
     items: BallotItem[];
     /** The send bar: under the tier list on wider screens, floating at the bottom on a phone. */
     actions?: React.ReactNode;
+    /** Under the send bar on wider screens; above the tiers on a phone. */
+    aside?: React.ReactNode;
     /** The board's AI search flags: the box offers AI only while it is on. */
     search?: { ai?: boolean; aiAuto?: boolean };
     tiers: Partial<Record<string, Tier>>;
@@ -548,7 +562,15 @@ export default function TierBallot(
             screens, with the send bar under it there. On a phone this wrapper steps aside. */
         }
         <div className="contents sm:sticky sm:top-20 sm:block sm:self-start lg:top-24">
-          <div className="sticky top-[57px] z-20 -mx-6 mb-4 border-b border-white/10 bg-panel/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:max-h-[calc(100dvh-19rem)] sm:overflow-y-auto sm:overscroll-contain sm:rounded-2xl sm:border sm:bg-white/[.03] sm:p-3 sm:backdrop-blur-none">
+          <div
+            className={cn(
+              "sticky top-[57px] z-20 -mx-6 mb-4 border-b border-white/10 bg-panel/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:overflow-y-auto sm:overscroll-contain sm:rounded-2xl sm:border sm:bg-white/[.03] sm:p-3 sm:backdrop-blur-none",
+              // The column stays on screen: leave room for the send bar, and the aside under it.
+              aside
+                ? "sm:max-h-[calc(100dvh-34rem)] sm:min-h-[180px]"
+                : "sm:max-h-[calc(100dvh-19rem)]",
+            )}
+          >
             <div className="space-y-1 sm:space-y-2">
               {TIER_LABELS.map((t) => {
                 const inHere = items.filter((i) => where(i.slug) === t.tier);
@@ -673,6 +695,10 @@ export default function TierBallot(
               {actions}
             </div>
           )}
+          {
+            // Phone: first, above the tiers; wider: under the send bar.
+            aside && <div className="order-first mb-4 sm:mb-0 sm:mt-3">{aside}</div>
+          }
         </div>
 
         <section

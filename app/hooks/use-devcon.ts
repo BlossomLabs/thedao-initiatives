@@ -49,6 +49,18 @@ export function useDevconCode(code: string, enabled = true) {
   });
 }
 
+export type DevconBallots = { at: number; ballots: { tokenId: string; ballot: Hex }[] };
+
+/** Every badge's latest ballot sent before the close (the projector polls it). */
+export function useDevconBallots(refetchInterval: number | false = false) {
+  return useQuery({
+    queryKey: ["devcon-ballots"],
+    queryFn: () => api<DevconBallots>("/api/devcon/ballots", { passive: true }),
+    refetchInterval,
+    retry: false,
+  });
+}
+
 /** The signed-in account's badge (found on-chain), as a code's info would say it;
  * `none` when the account holds no Devcon badge. Off until `me` is known. */
 export function useMyBadge(me: string | null, enabled = true) {

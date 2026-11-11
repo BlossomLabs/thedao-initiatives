@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { hexToBytes } from "viem";
 import BoardPage from "~/components/board/BoardPage";
 import Hero from "~/components/board/Hero";
@@ -7,8 +6,7 @@ import { LinkButton } from "~/components/ui/Button";
 import { useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/devcon-local";
 import { useSession } from "~/context/session";
-import { useMyBadge } from "~/hooks/use-devcon";
-import { api } from "~/lib/api";
+import { useDevconBallots, useMyBadge } from "~/hooks/use-devcon";
 import { usd } from "~/lib/format";
 import { DEVCON } from "../../shared/devcon/manifest";
 import { devconTally } from "../../shared/devcon/tally";
@@ -22,8 +20,6 @@ const POLL_MS = 5_000;
 const POOL = BigInt(DEVCON.poolUsd);
 const POOL_USD = Number(POOL / 1_000_000n);
 const IN_ROUND: ReadonlySet<string> = new Set(DEVCON.slugs);
-
-type Ballots = { at: number; ballots: { tokenId: string; ballot: `0x${string}` }[] };
 
 function useNow(ms = 1000) {
   const [now, setNow] = useState(() => Date.now());
@@ -47,12 +43,7 @@ function timeLeft(secs: number): string {
  * initiative's share drawn in gold after what it has raised. */
 export default function Devcon() {
   const board = useBoard();
-  const ballots = useQuery({
-    queryKey: ["devcon-ballots"],
-    queryFn: () => api<Ballots>("/api/devcon/ballots", { passive: true }),
-    refetchInterval: POLL_MS,
-    retry: false,
-  });
+  const ballots = useDevconBallots(POLL_MS);
   const now = useNow();
   // The way back to your ballot: by the code this browser opened it with, else by the
   // signed-in account's badge (found on-chain).

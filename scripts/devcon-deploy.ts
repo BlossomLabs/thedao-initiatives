@@ -23,11 +23,19 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia } from "viem/chains";
 import { SIGNED_BALLOTS_ABI } from "../shared/devcon/abi.ts";
-import { DEVCON_CLOSE, type DevconManifest } from "../shared/devcon/manifest.ts";
+import type { DevconManifest } from "../shared/devcon/manifest.ts";
 
 export const ADMIN = "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF"; // sem-the-bee.eth
 export const POOL_USD = 913_244_000_000n; // 400 ETH × $2,283.11, six decimals
 const SETUP_MINUTES = 30;
+// Slow Quiet Ending: S's first tally a day after opening, then windows of
+// 2 h, 1 h, 30 min and 15 min at most; A and B each start when the tier above
+// can no longer still be running.
+const VOTING_HOURS = 24;
+export const INITIAL_WINDOW = 2 * 60 * 60;
+export const MAX_WINDOWS = 4;
+const TIER_MAX = Array.from({ length: MAX_WINDOWS }, (_, k) => INITIAL_WINDOW >> k)
+  .reduce((a, b) => a + b, 0);
 
 export type BoardCard = { slug: string; goalUsd: number; safeAddress: string };
 export type PlannedInitiative = { slug: string; account: `0x${string}`; askUsd: bigint };
@@ -47,11 +55,13 @@ export function planInitiatives(cards: BoardCard[]): PlannedInitiative[] {
 }
 
 export function devconSchedule(now: number) {
+  const opensAt = now + SETUP_MINUTES * 60;
+  const s = opensAt + VOTING_HOURS * 60 * 60;
   return {
-    opensAt: now + SETUP_MINUTES * 60,
-    initialWindow: 1,
-    firstTallyAt: [DEVCON_CLOSE - 1, DEVCON_CLOSE, DEVCON_CLOSE + 1] as [number, number, number],
-    maxWindows: 1,
+    opensAt,
+    initialWindow: INITIAL_WINDOW,
+    firstTallyAt: [s, s + TIER_MAX, s + 2 * TIER_MAX] as [number, number, number],
+    maxWindows: MAX_WINDOWS,
   };
 }
 
@@ -249,7 +259,8 @@ async function main() {
     contract,
     deployBlock: Number(deployed.blockNumber),
     opensAt: s.opensAt,
-    closesAt: DEVCON_CLOSE,
+    // Until the app follows the quiet ending, the site closes at S's first tally.
+    closesAt: s.firstTallyAt[0],
     poolUsd: POOL_USD.toString(),
     issuer: getAddress(issuer),
     slugs: plan.map((p) => p.slug),

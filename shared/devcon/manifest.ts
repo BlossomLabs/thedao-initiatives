@@ -18,6 +18,4 @@ export type DevconManifest = {
 
 export const DEVCON = manifest as DevconManifest;
 
-/** 2026-11-06 18:30:00 UTC: the end of 6 November in Mumbai. */
-export const DEVCON_CLOSE = 1793989800;
 export const SEPOLIA_CHAIN_ID = 11155111;

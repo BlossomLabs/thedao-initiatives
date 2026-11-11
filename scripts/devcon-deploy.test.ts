@@ -28,12 +28,15 @@ Deno.test("planInitiatives: a Safe used twice gets a placeholder the second time
   assertNotEquals(plan[1].account.toLowerCase(), SAFE.toLowerCase());
 });
 
-Deno.test("devconSchedule: one 1-second window ending at the close", () => {
+Deno.test("devconSchedule: S a day after opening, quiet windows 2 h down to 15 min", () => {
   const s = devconSchedule(1793800000);
+  const open = 1793800000 + 30 * 60;
+  const S = open + 24 * 3600;
+  const tier = 7200 + 3600 + 1800 + 900;
   assertEquals(s, {
-    opensAt: 1793800000 + 15 * 60,
-    initialWindow: 1,
-    firstTallyAt: [1793989799, 1793989800, 1793989801],
-    maxWindows: 1,
+    opensAt: open,
+    initialWindow: 7200,
+    firstTallyAt: [S, S + tier, S + 2 * tier],
+    maxWindows: 4,
   });
 });

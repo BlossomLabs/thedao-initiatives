@@ -8,6 +8,7 @@ import TierBallot, { type BallotItem } from "~/components/devcon/TierBallot";
 import { BallotSkeleton, IntroSkeleton } from "~/components/devcon/DevconSkeleton";
 import { rememberMyCode } from "~/lib/devcon-local";
 import BallotStatus from "~/components/devcon/BallotStatus";
+import VoteClosed from "~/components/devcon/VoteClosed";
 import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
 import { useWalletPicker } from "~/context/wallet-picker";
@@ -26,7 +27,16 @@ import { DEVCON } from "../../../shared/devcon/manifest";
 
 const POOL = Number(BigInt(DEVCON.poolUsd) / 1_000_000n);
 const closed = () => Date.now() / 1000 >= DEVCON.closesAt;
-const closeText = "Friday 6 November, midnight in Mumbai";
+const closeText = `${
+  new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(DEVCON.closesAt * 1000)
+} UTC`;
 
 const tiersKey = (n: number) => `devcon-tiers:${DEVCON.contract}:${n}`;
 function loadTiers(n: number): Partial<Record<string, Tier>> {
@@ -303,6 +313,8 @@ export default function DevconPage({ myBallot = false }: { myBallot?: boolean } 
     });
   }, [board.data]);
 
+  const titles = useMemo(() => new Map(items.map((i) => [i.slug, i.title])), [items]);
+
   let body: React.ReactNode;
   let wide = false;
   if (myBallot && !mock && !me && !restoring) {
@@ -364,6 +376,8 @@ export default function DevconPage({ myBallot = false }: { myBallot?: boolean } 
           <Button className="mt-4" onClick={openWalletPicker}>Sign in</Button>
         </Panel>
       );
+  } else if (data && !data.claimed && closed()) {
+    body = <VoteClosed n={null} titles={titles} closeText={closeText} />;
   } else if (data && !data.claimed) {
     const note = claim.kind === "error"
       ? claim.code === "one_per_person"
@@ -393,9 +407,10 @@ export default function DevconPage({ myBallot = false }: { myBallot?: boolean } 
         }}
       />
     );
+  } else if (data && mine && n !== null && closed()) {
+    body = <VoteClosed n={n} titles={titles} closeText={closeText} saved={tiers} />;
   } else if (data && mine && n !== null) {
     wide = true;
-    const isClosed = closed();
     const busy = ["signing", "relaying", "waiting"].includes(ballotFlow.phase.kind);
     const placed = Object.keys(tiers).length;
     const sendYourself = () =>
@@ -420,12 +435,11 @@ export default function DevconPage({ myBallot = false }: { myBallot?: boolean } 
               How Blossom Budgeting works
             </a>
           </p>
-          {isClosed && <p className="mt-2 font-medium text-white">Voting has closed.</p>}
         </header>
         <TierBallot
           items={items}
           tiers={tiers}
-          disabled={isClosed || busy}
+          disabled={busy}
           onChange={setTier}
           onReplace={replaceTiers}
           search={{ ai: board.data?.flags?.aiSearch, aiAuto: board.data?.flags?.aiSearchAuto }}
@@ -434,25 +448,21 @@ export default function DevconPage({ myBallot = false }: { myBallot?: boolean } 
               <BallotStatus
                 phase={ballotFlow.phase}
                 onRetry={() => void ballotFlow.retry()}
-                selfSend={!isClosed && placed > 0 && (
-                  <Button onClick={sendYourself}>Send it yourself</Button>
-                )}
+                selfSend={placed > 0 && <Button onClick={sendYourself}>Send it yourself</Button>}
               />
-              {!isClosed && (
-                <Button
-                  variant="primary"
-                  className="w-full"
-                  disabled={busy || placed === 0}
-                  onClick={() =>
-                    void ballotFlow.submit(
-                      BigInt(n),
-                      bytesToHex(encodeBallot(DEVCON.slugs, tiers)),
-                    )}
-                >
-                  {placed === 0 ? "Place at least one proposal" : "Send my ballot"}
-                </Button>
-              )}
-              {!isClosed && ballotFlow.phase.kind !== "failed" && (
+              <Button
+                variant="primary"
+                className="w-full"
+                disabled={busy || placed === 0}
+                onClick={() =>
+                  void ballotFlow.submit(
+                    BigInt(n),
+                    bytesToHex(encodeBallot(DEVCON.slugs, tiers)),
+                  )}
+              >
+                {placed === 0 ? "Place at least one proposal" : "Send my ballot"}
+              </Button>
+              {ballotFlow.phase.kind !== "failed" && (
                 <button
                   type="button"
                   disabled={busy || placed === 0}

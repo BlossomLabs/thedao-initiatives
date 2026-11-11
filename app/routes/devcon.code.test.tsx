@@ -19,6 +19,8 @@ const submit = vi.fn();
 const selfSend = vi.fn();
 const retry = vi.fn();
 const flow = { phase: { kind: "idle" } as { kind: string; reason?: string } };
+const OPEN_UNTIL = 4_000_000_000;
+const round = vi.hoisted(() => ({ closesAt: 4_000_000_000 }));
 
 vi.mock("../../shared/devcon/manifest", async (original) => ({
   ...await original<typeof import("../../shared/devcon/manifest")>(),
@@ -27,7 +29,9 @@ vi.mock("../../shared/devcon/manifest", async (original) => ({
     contract: "0x1000000000000000000000000000000000000001",
     deployBlock: 1,
     opensAt: 0,
-    closesAt: 4_000_000_000,
+    get closesAt() {
+      return round.closesAt;
+    },
     poolUsd: "913244000000",
     issuer: "0x2000000000000000000000000000000000000002",
     slugs: ["alpha", "beta", "gamma"],
@@ -107,6 +111,7 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
   flow.phase = { kind: "idle" };
+  round.closesAt = OPEN_UNTIL;
 });
 afterEach(cleanup);
 
@@ -426,4 +431,81 @@ it("my ballot: an account without a badge says so", async () => {
   vi.mocked(api).mockResolvedValue({ n: null });
   showMine();
   expect(await screen.findByText(/no devcon badge on this account/i)).toBeInTheDocument();
+});
+
+it("after the close, an unclaimed code says voting has closed instead of offering the badge", async () => {
+  round.closesAt = 1;
+  mockApi(() => Promise.resolve({ n: 17, claimed: false, owner: null }));
+  show();
+  expect(await screen.findByRole("heading", { name: /voting has closed/i })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /claim my devcon badge/i })).toBeNull();
+  expect(screen.getByRole("link", { name: /see the result/i })).toHaveAttribute("href", "/devcon");
+});
+
+it("after the close, the owner sees the ballot their badge sent, not the ballot to edit", async () => {
+  round.closesAt = 1;
+  session.current = { address: ME };
+  const sent = bytesToHex(encodeBallot(["alpha", "beta", "gamma"], { gamma: "S", alpha: "B" }));
+  vi.mocked(api).mockImplementation(
+    ((path: string) =>
+      path.startsWith("/api/devcon/code/")
+        ? Promise.resolve({ n: 17, claimed: true, owner: ME })
+        : path === "/api/devcon/ballots"
+        ? Promise.resolve({
+          at: 0,
+          ballots: [{ tokenId: "3", ballot: "0x0101ff" }, {
+            tokenId: "17",
+            ballot: sent,
+          }],
+        })
+        : Promise.reject(new Error("unexpected " + path))) as typeof api,
+  );
+  // Sent from this browser: its saved tiers say B, which the chain alone reads as A.
+  localStorage.setItem(
+    "devcon-tiers:0x1000000000000000000000000000000000000001:17",
+    JSON.stringify({ gamma: "S", alpha: "B" }),
+  );
+  show();
+  expect(await screen.findByRole("heading", { name: /voting has closed/i })).toBeInTheDocument();
+  const s = await screen.findByRole("region", { name: /S · Must fund/ });
+  expect(within(s).getByText("GAMMA")).toBeInTheDocument();
+  expect(within(screen.getByRole("region", { name: /B · Nice to have/ })).getByText("ALPHA"))
+    .toBeInTheDocument();
+  expect(screen.queryByText("BETA")).toBeNull();
+  expect(screen.queryByRole("button", { name: /send my ballot/i })).toBeNull();
+});
+
+it("after the close, a badge that never voted says so", async () => {
+  round.closesAt = 1;
+  session.current = { address: ME };
+  vi.mocked(api).mockImplementation(
+    ((path: string) =>
+      path === "/api/devcon/mine"
+        ? Promise.resolve({ n: 17 })
+        : path === "/api/devcon/ballots"
+        ? Promise.resolve({ at: 0, ballots: [] })
+        : Promise.reject(new Error("unexpected " + path))) as typeof api,
+  );
+  showMine();
+  expect(await screen.findByText(/didn't send a ballot before voting closed/i))
+    .toBeInTheDocument();
+});
+
+it("after the close, on another device the sent ballot is read from the chain", async () => {
+  round.closesAt = 1;
+  session.current = { address: ME };
+  const sent = bytesToHex(encodeBallot(["alpha", "beta", "gamma"], { beta: "S", alpha: "A" }));
+  vi.mocked(api).mockImplementation(
+    ((path: string) =>
+      path === "/api/devcon/mine"
+        ? Promise.resolve({ n: 17 })
+        : path === "/api/devcon/ballots"
+        ? Promise.resolve({ at: 0, ballots: [{ tokenId: "17", ballot: sent }] })
+        : Promise.reject(new Error("unexpected " + path))) as typeof api,
+  );
+  showMine();
+  const s = await screen.findByRole("region", { name: /S · Must fund/ });
+  expect(within(s).getByText("BETA")).toBeInTheDocument();
+  expect(within(screen.getByRole("region", { name: /A · Should fund/ })).getByText("ALPHA"))
+    .toBeInTheDocument();
 });

@@ -150,7 +150,11 @@ function roundJson(st: RoundState, slugs: string[]) {
       ) => [t, `0x${[...b].map((x) => x.toString(16).padStart(2, "0")).join("")}`]),
     ),
     rejected: st.rejected,
-    live: { funded: named(st.live.order), awards: money(st.live.awards) },
+    live: {
+      funded: named(st.live.order),
+      awards: money(st.live.awards),
+      tiers: Object.fromEntries([...st.live.tiers].map(([c, t]) => [slugs[c], t])),
+    },
   };
 }
 
@@ -184,6 +188,14 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       tiers.map((t) => kv.get<StoredSettled>([...round(d), "settled", t])),
     );
     const snapshots = stored.flatMap((x) => (x.value ? [loadSettled(x.value)] : []));
+    // The needs each tier settled with, kept the first time it settled.
+    const kept = await Promise.all(
+      tiers.map((t) => kv.get<string[]>([...round(d), "settle-needs", t])),
+    );
+    const settleNeeds = Object.fromEntries(
+      tiers.flatMap((t, i) => (kept[i].value ? [[t, kept[i].value!.map(BigInt)]] : [])),
+    );
+    const needs = await needsOf(d);
     const receipts: Receipt[] = (await d.chain.ballots()).map((b, i) => ({
       tokenId: b.tokenId,
       nonce: "revoked" in b ? 0 : b.nonce ?? 0,
@@ -195,11 +207,16 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       schedule: d.manifest.schedule,
       m: d.manifest.slugs.length,
       poolUsd: BigInt(d.manifest.poolUsd),
-      needs: await needsOf(d),
+      needs,
       receipts,
       snapshots,
+      settleNeeds,
     }, deps.now());
     for (const [i, t] of st.tiers.entries()) {
+      if (t.status === "settled" && !kept[i].value) {
+        await kv.atomic().check(kept[i])
+          .set([...round(d), "settle-needs", t.tier], needs.map(String)).commit();
+      }
       // Kept only once the blocks before the settlement are final: until then a
       // lagging RPC may still be missing a ballot that changes it.
       if (t.status !== "settled" || stored[i].value) continue;

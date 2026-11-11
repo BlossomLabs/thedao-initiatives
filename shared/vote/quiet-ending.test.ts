@@ -39,6 +39,7 @@ describe("quiet-ending replay", () => {
     expect(s.tiers.map((t) => t.status)).toEqual(["waiting", "waiting", "waiting"]);
     expect(s.live.order).toEqual([0]);
     expect(s.registrationClosesAt).toBe(T + W);
+    expect(s.live.tiers.get(0)).toBe("S");
   });
 
   it("a quiet window settles S with its closing tally; A waits for its date", () => {
@@ -135,6 +136,11 @@ describe("quiet-ending replay", () => {
     };
     const s = run(base(), T + 3600, { snapshots: [snapshot] });
     expect(s.tiers[0]).toMatchObject({ status: "settled", funded: [1] });
+  });
+
+  it("a settled tier uses the needs it settled with, not today's", () => {
+    const s = run(base(), T + 3600, { needs: [10n, 10n], settleNeeds: { S: [150n, 150n] } });
+    expect(s.tiers[0].status === "settled" && s.tiers[0].awards.get(0)).toBe(150n);
   });
 
   it("once B settles, the round is closed", () => {

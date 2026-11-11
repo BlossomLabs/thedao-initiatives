@@ -697,7 +697,7 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
     "waiting",
     "waiting",
   ]);
-  assertEquals(body.live, { funded: ["a"], awards: { a: "150" } });
+  assertEquals(body.live, { funded: ["a"], awards: { a: "150" }, tiers: { a: "S" } });
   assertEquals(body.registrationClosesAt, NOW + 660);
   assertEquals(body.accepted, { "1": `0x01${X}${X}`, "2": `0x01${X}${X}` });
   h.close();
@@ -711,10 +711,11 @@ Deno.test("round: S's settlement is kept only once the blocks before it are fina
     (await h.deps.db.kv.get(["vote", qe.contract.toLowerCase(), "settled", "S"])).value,
     null,
   );
+  // A donation meanwhile doesn't move it: the needs it settled with are kept at once.
   n.needs = [10n, 10n, 10n];
   h.clock.now += 10;
   const fresh = await j(await h.req("/api/vote/round")) as { tiers: { awards: unknown }[] };
-  assertEquals(fresh.tiers[0].awards, { a: "10" });
+  assertEquals(fresh.tiers[0].awards, { a: "150" });
   h.close();
 });
 

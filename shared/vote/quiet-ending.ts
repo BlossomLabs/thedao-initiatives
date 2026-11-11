@@ -57,7 +57,7 @@ export type RoundState = {
   rejected: Rejection[];
   closed: boolean;
   /** "If it settled now": the open tiers' chained tallies, from the first unsettled one. */
-  live: { order: number[]; awards: Map<number, bigint> };
+  live: { order: number[]; awards: Map<number, bigint>; tiers: Map<number, Tier> };
 };
 
 const TIERS: Tier[] = ["S", "A", "B"];
@@ -84,6 +84,9 @@ export function replay(
     needs: bigint[];
     receipts: Receipt[];
     snapshots?: Settled[];
+    /** The needs each tier settled with, kept when it first settled: a later donation
+     * never moves a settled tier, even before its settlement is stored for good. */
+    settleNeeds?: Partial<Record<Tier, bigint[]>>;
   },
   now: number,
 ): RoundState {
@@ -135,7 +138,7 @@ export function replay(
   };
 
   /** The chained stage tallies from tier `first` on, after the settled tiers' payments. */
-  const tally = (first: number) => {
+  const tally = (first: number, costs: bigint[] = needs) => {
     const voters = [...roll].filter((t) => accepted.has(t)).sort();
     const n = BigInt(voters.length);
     const each = n ? poolUsd / n : 0n;
@@ -156,7 +159,7 @@ export function replay(
       // B, the last tier, counts to the last level (the Python's stage after the tiers).
       const bound = t === TIERS.length - 1 ? m : stageBound(ballots, t, TIERS.length, m);
       const candidates = [...Array(m).keys()].filter((c) => !done.has(c));
-      const got = stageTally(needs, weights, ranks, poolUsd, spent, candidates, bound);
+      const got = stageTally(costs, weights, ranks, poolUsd, spent, candidates, bound);
       const shares = new Map<number, Map<string, bigint>>();
       for (const c of got.order) {
         const paid = new Map<string, bigint>();
@@ -172,7 +175,7 @@ export function replay(
   const settle = (t: number, at: number, forced: boolean) => {
     const snap = input.snapshots?.find((x) => x.tier === TIERS[t]);
     if (snap) return settled.push(snap);
-    const { order, shares } = tally(t)[0];
+    const { order, shares } = tally(t, input.settleNeeds?.[TIERS[t]] ?? needs)[0];
     const awards = new Map(
       order.map((c) => [c, [...shares.get(c)!.values()].reduce((a, b) => a + b, 0n)] as const),
     );
@@ -231,11 +234,16 @@ export function replay(
   applyBefore(now);
 
   const firstOpen = settled.length;
-  const live = { order: [] as number[], awards: new Map<number, bigint>() };
+  const live = {
+    order: [] as number[],
+    awards: new Map<number, bigint>(),
+    tiers: new Map<number, Tier>(),
+  };
   if (firstOpen < TIERS.length) {
-    for (const stage of tally(firstOpen)) {
+    for (const [k, stage] of tally(firstOpen).entries()) {
       for (const c of stage.order) {
         live.order.push(c);
+        live.tiers.set(c, TIERS[firstOpen + k]);
         live.awards.set(c, [...stage.shares.get(c)!.values()].reduce((a, b) => a + b, 0n));
       }
     }

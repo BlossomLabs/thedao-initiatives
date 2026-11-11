@@ -63,6 +63,49 @@ export function useVoteBallots(refetchInterval: number | false = false) {
   });
 }
 
+export type RoundTier =
+  | { tier: Tier; status: "waiting"; startsAt: number }
+  | {
+    tier: Tier;
+    status: "settling";
+    window: number;
+    windowEndsAt: number;
+    latestEndAt: number;
+    quiet: boolean;
+    funded: string[];
+  }
+  | {
+    tier: Tier;
+    status: "settled";
+    at: number;
+    forced: boolean;
+    funded: string[];
+    /** Micro-USD per initiative, as decimal strings. */
+    awards: Record<string, string>;
+  };
+/** GET /api/vote/round: the quiet ending as it stands. */
+export type RoundView = {
+  registrationClosesAt: number;
+  closed: boolean;
+  tiers: RoundTier[];
+  /** tokenId → the ballot that counts (hex). */
+  accepted: Record<string, string>;
+  rejected: { tokenId: string; nonce: number; reason: "tier_settled" | "registration_closed" }[];
+  live: { funded: string[]; awards: Record<string, string> };
+};
+
+/** The round's quiet ending (each tier's state, what counts, what was refused). */
+export function useVoteRound(refetchInterval: number | false = false, enabled = true) {
+  return useQuery({
+    queryKey: ["vote-round"],
+    enabled,
+    queryFn: () => api<RoundView>("/api/vote/round", { passive: true }),
+    // Nothing changes once the round is over.
+    refetchInterval: (q) => (q.state.data?.closed ? false : refetchInterval),
+    retry: false,
+  });
+}
+
 /** The badges the signed-in account votes with in this round (the voting badges it
  * holds in the real vote; its one test badge in a test vote), ascending. Off until
  * `me` is known. */

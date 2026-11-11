@@ -18,7 +18,12 @@ const signOut = vi.fn(() => Promise.resolve(true));
 const submit = vi.fn();
 const selfSend = vi.fn();
 const retry = vi.fn();
-const flow = { phase: { kind: "idle" } as { kind: string; reason?: string } };
+const flow = {
+  phase: { kind: "idle" } as { kind: string; reason?: string },
+  last: null as null | { nonce: bigint },
+};
+/** What /api/vote/round answers (none: the request fails, as before phase 2). */
+const roundIs = { body: null as null | Record<string, unknown> };
 const OPEN_UNTIL = 4_000_000_000;
 const round = vi.hoisted(() => ({
   closesAt: 4_000_000_000,
@@ -44,6 +49,7 @@ vi.mock("../../shared/vote/manifest", async (original) => ({
     get closesAt() {
       return round.closesAt;
     },
+    schedule: { opensAt: 0, firstTallyAt: [100, 200, 300], initialWindow: 60, maxWindows: 3 },
     poolUsd: "913244000000",
     issuer: "0x2000000000000000000000000000000000000002",
     slugs: ["alpha", "beta", "gamma"],
@@ -80,7 +86,7 @@ vi.mock("~/hooks/use-board", () => ({
 }));
 vi.mock("~/hooks/use-vote", async (original) => ({
   ...await original<typeof import("~/hooks/use-vote")>(),
-  useBallotSubmit: () => ({ phase: flow.phase, submit, retry, selfSend, last: null }),
+  useBallotSubmit: () => ({ phase: flow.phase, submit, retry, selfSend, last: flow.last }),
   useMintWait: () => ({ wait: () => Promise.resolve() }),
 }));
 vi.mock("~/lib/api", async (original) => ({
@@ -95,6 +101,7 @@ function mockApi(code: () => Promise<unknown>, claim?: () => Promise<unknown>) {
     ((path: string) => {
       if (path.startsWith("/api/vote/code/")) return code();
       if (path === "/api/vote/claim") return claim ? claim() : Promise.resolve({ hash: "0x1" });
+      if (path === "/api/vote/round" && roundIs.body) return Promise.resolve(roundIs.body);
       return Promise.reject(new Error("unexpected " + path));
     }) as typeof api,
   );
@@ -126,6 +133,8 @@ beforeEach(() => {
   round.closesAt = OPEN_UNTIL;
   round.opensAt = 0;
   round.kind = "test";
+  roundIs.body = null;
+  flow.last = null;
 });
 afterEach(cleanup);
 
@@ -583,3 +592,150 @@ it("real vote: before it opens, the ballot says when and offers no Send", async 
   expect(await screen.findByText(/Voting opens/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /send my ballot|place at least one/i })).toBeNull();
 });
+
+// ---------------------------------------------------------------- quiet ending
+const waiting = (tier: string, startsAt = 4_000_000_000) => ({ tier, status: "waiting", startsAt });
+function roundBody(over: Record<string, unknown> = {}) {
+  return {
+    registrationClosesAt: 4_000_000_000,
+    closed: false,
+    tiers: [waiting("S"), waiting("A"), waiting("B")],
+    accepted: {},
+    rejected: [],
+    live: { funded: [], awards: {} },
+    ...over,
+  };
+}
+async function ballotWith(body: Record<string, unknown>) {
+  roundIs.body = body;
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  expect(await screen.findByRole("heading", { name: /your ballot/i })).toBeInTheDocument();
+}
+
+it("quiet ending: before registration closes, a badge that hasn't voted is told the deadline", async () => {
+  await ballotWith(roundBody());
+  expect(await screen.findByText(/Vote before .* UTC, or this badge can't vote\./))
+    .toBeInTheDocument();
+});
+
+it("quiet ending: after registration, a badge that never voted can't send", async () => {
+  await ballotWith(roundBody({ registrationClosesAt: 1 }));
+  expect(await screen.findByText("Registration closed before this badge voted."))
+    .toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /send my ballot|place at least one/i })).toBeNull();
+});
+
+it("quiet ending: S settling, quiet so far", async () => {
+  await ballotWith(roundBody({
+    accepted: { "17": "0x01ffff" },
+    tiers: [
+      {
+        tier: "S",
+        status: "settling",
+        window: 1,
+        windowEndsAt: 4_000_000_000,
+        latestEndAt: 4_000_000_100,
+        quiet: true,
+        funded: ["alpha"],
+      },
+      waiting("A"),
+      waiting("B"),
+    ],
+  }));
+  expect(await screen.findByText(/S is settling: window 1 of 3, ends .* UTC\./))
+    .toBeInTheDocument();
+  expect(screen.getByText("No change so far: it settles then.")).toBeInTheDocument();
+});
+
+it("quiet ending: S changed in this window", async () => {
+  await ballotWith(roundBody({
+    accepted: { "17": "0x01ffff" },
+    tiers: [
+      {
+        tier: "S",
+        status: "settling",
+        window: 2,
+        windowEndsAt: 4_000_000_000,
+        latestEndAt: 4_000_000_100,
+        quiet: false,
+        funded: [],
+      },
+      waiting("A"),
+      waiting("B"),
+    ],
+  }));
+  expect(await screen.findByText("It changed in this window: a shorter window follows."))
+    .toBeInTheDocument();
+});
+
+it("quiet ending: a settled S is named and locked on the ballot", async () => {
+  await ballotWith(roundBody({
+    accepted: { "17": "0x01ffff" },
+    tiers: [
+      {
+        tier: "S",
+        status: "settled",
+        at: 1,
+        forced: false,
+        funded: ["alpha"],
+        awards: { alpha: "1000000" },
+      },
+      waiting("A"),
+      waiting("B"),
+    ],
+  }));
+  expect(await screen.findByText("S settled: ALPHA.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Must fund (settled)" })).toBeDisabled();
+});
+
+it("quiet ending: a sent ballot the round refused says the earlier one still counts", async () => {
+  flow.last = { nonce: 2n };
+  await ballotWith(roundBody({
+    accepted: { "17": "0x01ffff" },
+    rejected: [{ tokenId: "17", nonce: 2, reason: "tier_settled" }],
+  }));
+  expect(
+    await screen.findByText(
+      /Not counted: it changed a settled tier\. Your earlier ballot still counts\./,
+    ),
+  )
+    .toBeInTheDocument();
+});
+
+it("quiet ending: once B settles the ballot is closed, with what each tier funded", async () => {
+  const settled = (tier: string, funded: string[]) => ({
+    tier,
+    status: "settled",
+    at: 1,
+    forced: false,
+    funded,
+    awards: {},
+  });
+  vi.mocked(api).mockReset();
+  await ballotWithClosed(roundBody({
+    closed: true,
+    accepted: { "17": "0x01ffff" },
+    tiers: [settled("S", ["alpha"]), settled("A", ["beta"]), settled("B", [])],
+  }));
+  expect(await screen.findByText("S: ALPHA")).toBeInTheDocument();
+  expect(screen.getByText("A: BETA")).toBeInTheDocument();
+});
+
+async function ballotWithClosed(body: Record<string, unknown>) {
+  roundIs.body = body;
+  session.current = { address: ME };
+  vi.mocked(api).mockImplementation(
+    ((path: string) =>
+      path.startsWith("/api/vote/code/")
+        ? Promise.resolve({ n: 17, claimed: true, owner: ME })
+        : path === "/api/vote/round"
+        ? Promise.resolve(body)
+        : path === "/api/vote/ballots"
+        ? Promise.resolve({ at: 0, ballots: [] })
+        : Promise.reject(new Error("unexpected " + path))) as typeof api,
+  );
+  show();
+  expect(await screen.findByRole("heading", { name: /voting has closed/i })).toBeInTheDocument();
+}

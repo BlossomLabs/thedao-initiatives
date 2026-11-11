@@ -39,8 +39,10 @@ const SeeResult = () => (
  * over and, for the badge's owner, shows the ballot they sent (read from the chain,
  * so it shows on any device). `n` is null for a code nobody claimed. */
 export default function VoteClosed(
-  { n, titles, closeText, saved = NOTHING }: {
+  { n, titles, closeText, saved = NOTHING, settled }: {
     n: number | null;
+    /** What each tier settled on (the quiet ending), when known. */
+    settled?: { tier: Tier; funded: string[] }[];
     /** This browser's tiers for the badge: shown when they are what was sent, since
      * the chain's ranks can't tell an empty A from an empty S. */
     saved?: Partial<Record<string, Tier>>;
@@ -114,6 +116,22 @@ export default function VoteClosed(
         <h2 className="k">Your ballot</h2>
         {ballot}
       </div>
+      {settled && settled.length > 0 && (
+        <div className="card text-[15px] leading-relaxed text-white/80">
+          <h2 className="k">What the vote funded</h2>
+          <ul className="space-y-1.5">
+            {settled.map((t) => (
+              <li key={t.tier}>
+                {`${t.tier}: ${
+                  t.funded.length
+                    ? t.funded.map((x) => titles.get(x) ?? x).join(", ")
+                    : "nothing"
+                }`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <SeeResult />
     </div>
   );

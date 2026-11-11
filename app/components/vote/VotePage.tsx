@@ -13,7 +13,14 @@ import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
 import { useWalletPicker } from "~/context/wallet-picker";
 import { useBoard } from "~/hooks/use-board";
-import { apiCode, useBallotSubmit, useMintWait, useMyBadges, useVoteCode } from "~/hooks/use-vote";
+import {
+  apiCode,
+  useBallotSubmit,
+  useMintWait,
+  useMyBadges,
+  useVoteCode,
+  useVoteRound,
+} from "~/hooks/use-vote";
 import { api, errorMessage } from "~/lib/api";
 import { usd } from "~/lib/format";
 import { encodeBallot, type Tier } from "../../../shared/vote/ballot";
@@ -251,6 +258,9 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
   const owner = data && data !== "bad" ? data.owner : null;
   const mine = mock || Boolean(me && owner && owner.toLowerCase() === me.toLowerCase());
   const ballotFlow = useBallotSubmit(mine && n !== null ? BigInt(n) : null);
+  // The quiet ending: which tiers are settling or settled, and what counts.
+  const roundQ = useVoteRound(5_000, mine && n !== null);
+  const rv = roundQ.data;
 
   // One claim at a time: the sign-in lands in several renders, and the
   // auto-claim effect can fire again before its own state updates show.
@@ -468,11 +478,19 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
         }}
       />
     );
-  } else if (data && mine && n !== null && closed()) {
+  } else if (data && mine && n !== null && (closed() || rv?.closed)) {
     body = (
       <>
         {picker}
-        <VoteClosed n={n} titles={titles} closeText={closeText} saved={tiers} />
+        <VoteClosed
+          n={n}
+          titles={titles}
+          closeText={closeText}
+          saved={tiers}
+          settled={rv?.tiers.flatMap((t) =>
+            t.status === "settled" ? [{ tier: t.tier, funded: t.funded }] : []
+          )}
+        />
       </>
     );
   } else if (data && mine && n !== null) {
@@ -481,7 +499,49 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     const placed = Object.keys(tiers).length;
     const sendYourself = () =>
       void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(ROUND.slugs, tiers)));
-    const early = notOpenYet();
+    const counted = rv ? Boolean(rv.accepted[String(n)]) : true;
+    const registrationOver = rv ? Date.now() / 1000 >= rv.registrationClosesAt : false;
+    const shut = !counted && registrationOver;
+    const early = notOpenYet() || shut;
+    const locked = new Set<Tier>(
+      rv?.tiers.flatMap((t) => (t.status === "settled" ? [t.tier] : [])) ?? [],
+    );
+    const names = (slugs: string[]) =>
+      slugs.length ? slugs.map((x) => titles.get(x) ?? x).join(", ") : "nothing";
+    const refused = rv?.rejected.find((r) =>
+      r.tokenId === String(n) && ballotFlow.last && BigInt(r.nonce) === ballotFlow.last.nonce
+    );
+    const stage = rv && (
+      <div className="mx-auto mt-3 max-w-[640px] space-y-1 text-[14.5px] text-white/80">
+        {!counted && !registrationOver && (
+          <p className="font-medium text-white">
+            Vote before {utc(rv.registrationClosesAt)}, or this badge can't vote.
+          </p>
+        )}
+        {shut && (
+          <p className="font-medium text-white">Registration closed before this badge voted.</p>
+        )}
+        {rv.tiers.map((t) =>
+          t.status === "settled"
+            ? <p key={t.tier}>{t.tier} settled: {names(t.funded)}.</p>
+            : t.status === "settling"
+            ? (
+              <div key={t.tier}>
+                <p className="font-medium text-white">
+                  {t.tier} is settling: window {t.window} of {ROUND.schedule.maxWindows}, ends{" "}
+                  {utc(t.windowEndsAt)}.
+                </p>
+                <p>
+                  {t.quiet
+                    ? "No change so far: it settles then."
+                    : "It changed in this window: a shorter window follows."}
+                </p>
+              </div>
+            )
+            : null
+        )}
+      </div>
+    );
     body = (
       <div className="space-y-6">
         {picker}
@@ -503,14 +563,16 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
               How Blossom Budgeting works
             </a>
           </p>
-          {early && (
+          {notOpenYet() && (
             <p className="mt-3 font-medium text-white">Voting opens {utc(ROUND.opensAt)}.</p>
           )}
+          {stage}
         </header>
         <TierBallot
           items={items}
           tiers={tiers}
           disabled={busy || early}
+          locked={locked}
           onChange={setTier}
           onReplace={replaceTiers}
           search={{ ai: board.data?.flags?.aiSearch, aiAuto: board.data?.flags?.aiSearchAuto }}
@@ -518,6 +580,13 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
             ? undefined
             : (
               <div className="space-y-3 rounded-t-2xl border-t border-white/10 bg-panel/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[0_-10px_30px_rgba(0,0,0,.35)] backdrop-blur sm:rounded-2xl sm:border sm:bg-white/[.03] sm:p-4 sm:shadow-none sm:backdrop-blur-none">
+                {refused && (
+                  <p className="text-[13.5px] text-amber-200">
+                    Not counted: {refused.reason === "tier_settled"
+                      ? "it changed a settled tier"
+                      : "registration had closed"}. Your earlier ballot still counts.
+                  </p>
+                )}
                 <BallotStatus
                   phase={ballotFlow.phase}
                   onRetry={() => void ballotFlow.retry()}

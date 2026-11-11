@@ -59,6 +59,8 @@ type Sent = Parameters<VoteChain["send"]>[0];
 
 function fakeChain() {
   const state = {
+    /** What the next send throws (a contract revert the RPC reports). */
+    sendError: null as Error | null,
     /** Projects added and pool changes on-chain (the ballot rules judge by them). */
     history: {
       addedAt: [] as ({ block: number; logIndex: number } | null)[],
@@ -116,6 +118,7 @@ function fakeChain() {
     relayerNonce: () => Promise.resolve(state.chainNonce),
     async send(call, nonce) {
       if (state.slowSend) await state.slowSend;
+      if (state.sendError) throw state.sendError;
       state.sent.push(call);
       state.nonces_used.push(nonce);
       if (call.fn === "mint" && state.mintsMine) {
@@ -948,5 +951,19 @@ Deno.test("ballot: a ballot signed before a project was added still relays (shor
   assertEquals(res.status, 200);
   const sent = state.sent[0] as unknown as { args: [{ ballot: string; proof: number[] }[]] };
   assertEquals([sent.args[0][0].ballot, sent.args[0][0].proof], ["0x010101", [0, 1, 2]]);
+  h.close();
+});
+
+Deno.test("ballot: a rule the contract enforced after a pool change is a 422, not a 500", async () => {
+  const { h, state } = await setup(ruled);
+  state.owners.set(17n, VOTER.address);
+  // The pool rose after the replay this relay judged with: the contract refuses it.
+  state.sendError = new Error(
+    'The contract function "record" reverted.\n\nError: BallotTooSmall()',
+  );
+  const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
+  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  assertEquals(res.status, 422);
+  assertEquals((await j(res)).code, "invalid_ballot");
   h.close();
 });

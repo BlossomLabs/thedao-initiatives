@@ -31,6 +31,9 @@ const UNSEEN_SECS = 60;
 /** The relay pays for this many ballots per badge; after that, "send it yourself".
  * Mainnet gas is real money, so the real round gets fewer. */
 const relaysPerBadge = (d: VoteRound) => d.manifest.kind === "real" ? 5 : 20;
+/** The contract's ballot-rule reverts (vote/contracts/SignedBallots.sol). */
+const RULE_REVERT = /\b(BallotTooSmall|TooFewIndependent|BadProof|GroupOverHalf|TooManyTiers)\b/;
+
 /** Below this the real round's relayer stops and voters send it themselves. */
 const RELAY_FLOOR_WEI = 10_000_000_000_000_000n; // 0.01 ETH
 /** Long enough for any mint to land; the chain is the record after that. */
@@ -505,6 +508,18 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
             proof: findProof(hexToBytes(ballot as Hex), rulesRound(d.manifest)) ?? [],
           }),
         ]],
+      }).catch((e) => {
+        // The contract enforced a rule this check passed: the pool rose meanwhile (the
+        // check uses a replay up to a few seconds old). Say so, not "internal error".
+        if (RULE_REVERT.test(String(e))) {
+          throw fail(
+            422,
+            "invalid_ballot",
+            "This ballot breaks the ballot rules: the pool may have just changed. Check it and send again.",
+            { errors: [] },
+          );
+        }
+        throw e;
       });
       await kv.atomic()
         .set(pendingKey, { hash: h, at: deps.now() }, { expireIn: PENDING_MS })

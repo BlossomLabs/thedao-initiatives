@@ -60,7 +60,10 @@ type Sent = Parameters<VoteChain["send"]>[0];
 function fakeChain() {
   const state = {
     /** Projects added and pool changes on-chain (the ballot rules judge by them). */
-    history: { addedAt: [] as number[], pool: [] as { timestamp: number; poolUsd: bigint }[] },
+    history: {
+      addedAt: [] as ({ block: number; logIndex: number } | null)[],
+      pool: [] as { block: number; logIndex: number; poolUsd: bigint }[],
+    },
     owners: new Map<bigint, Hex>(),
     nonces: new Map<bigint, bigint>(),
     /** Account code by lowercase address ("0xef0100…" = an EIP-7702 delegation). */
@@ -885,7 +888,8 @@ Deno.test("round: an invalid ballot shows as refused with invalid_ballot", async
 
 Deno.test("round: the pool the chain raised judges later ballots", async () => {
   const { h, state } = await setup(ruled);
-  state.history = { addedAt: [], pool: [{ timestamp: NOW - 95, poolUsd: 1_000n }] };
+  // Raised after ballot 1 (block 1) and before ballot 2 (block 2).
+  state.history = { addedAt: [], pool: [{ block: 1, logIndex: 5, poolUsd: 1_000n }] };
   state.logs = [
     logOf("1", "01010101", NOW - 100, 1), // 400 ≥ 1.5 × 200
     logOf("2", "01010101", NOW - 90, 2), // 400 < 1.5 × 1,000
@@ -926,7 +930,7 @@ Deno.test("ballot: a valid ballot is relayed with its proof", async () => {
 Deno.test("ballot: judged with the chain's current pool", async () => {
   const { h, state } = await setup(ruled);
   state.owners.set(17n, VOTER.address);
-  state.history.pool = [{ timestamp: NOW - 10, poolUsd: 1_000n }];
+  state.history.pool = [{ block: 1, logIndex: 0, poolUsd: 1_000n }];
   const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
   const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
   assertEquals(res.status, 422);

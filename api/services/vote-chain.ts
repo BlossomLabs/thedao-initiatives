@@ -62,13 +62,20 @@ export interface VoteChain {
 }
 
 export type RulesHistory = {
-  addedAt: number[];
-  pool: { timestamp: number; poolUsd: bigint }[];
+  addedAt: ({ block: number; logIndex: number } | null)[];
+  pool: { block: number; logIndex: number; poolUsd: bigint }[];
 };
 
 /** In chain order; `block` and `nonce` let the quiet ending group a block's receipts. */
 export type BallotEvent =
-  | { tokenId: string; ballot: Hex; timestamp: number; block?: number; nonce?: number }
+  | {
+    tokenId: string;
+    ballot: Hex;
+    timestamp: number;
+    block?: number;
+    logIndex?: number;
+    nonce?: number;
+  }
   | { tokenId: string; revoked: true; timestamp: number; block?: number };
 
 export interface VoteRound {
@@ -255,6 +262,7 @@ export function createVoteChain(
                 ballot: log.args.ballot,
                 timestamp: t,
                 block,
+                logIndex: log.logIndex!,
                 nonce: Number(log.args.nonce),
               }
               : { tokenId, revoked: true, timestamp: t, block },
@@ -264,9 +272,9 @@ export function createVoteChain(
       return out;
     },
     async rulesHistory() {
-      const headBlock = await pub.getBlock();
-      const head = headBlock.number!;
-      const headTime = Number(headBlock.timestamp);
+      // Positions, not times: the replay orders these against ballots exactly as the
+      // contract saw them (a pool raise in a ballot's own block may come after it).
+      const head = await pub.getBlockNumber();
       const out: RulesHistory = { addedAt: [], pool: [] };
       for (let from = BigInt(m.deployBlock); from <= head; from += LOG_CHUNK) {
         const to = from + LOG_CHUNK - 1n < head ? from + LOG_CHUNK - 1n : head;
@@ -275,28 +283,22 @@ export function createVoteChain(
           pub.getLogs({ ...range, event: INITIATIVE_CONFIGURED }),
           pub.getLogs({ ...range, event: POOL_USD_SET }),
         ]);
-        const logs = [...added, ...pools];
-        const times = await stampLogs(logs, headTime, m.schedule.firstTallyAt[0], async (b) => {
-          let t = blockTimes.get(b);
-          if (t === undefined) {
-            t = Number((await pub.getBlock({ blockNumber: b })).timestamp);
-            blockTimes.set(b, t);
-          }
-          return t;
-        });
-        for (const [i, log] of logs.entries()) {
-          if ("initiativeId" in log.args) {
-            const id = Number(log.args.initiativeId);
-            out.addedAt[id] ??= times[i]; // setInitiative re-emits it: the first counts
-          } else {
-            out.pool.push({
-              timestamp: times[i],
-              poolUsd: (log.args as { amountUsd: bigint }).amountUsd,
-            });
-          }
+        for (const log of added) {
+          // setInitiative re-emits it before opening: the first one counts.
+          out.addedAt[Number(log.args.initiativeId)] ??= {
+            block: Number(log.blockNumber),
+            logIndex: log.logIndex!,
+          };
+        }
+        for (const log of pools) {
+          out.pool.push({
+            block: Number(log.blockNumber),
+            logIndex: log.logIndex!,
+            poolUsd: log.args.amountUsd!,
+          });
         }
       }
-      out.pool.sort((a, b) => a.timestamp - b.timestamp);
+      out.pool.sort((a, b) => a.block - b.block || a.logIndex - b.logIndex);
       return out;
     },
   };

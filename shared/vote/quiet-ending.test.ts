@@ -201,8 +201,9 @@ describe("quiet-ending replay", () => {
 
 describe("ballot rules in the replay", () => {
   /** Four unrelated projects asking 100 each; pool 200 unless the chain raised it. */
+  type Pos = { block: number; logIndex: number };
   const rules = (
-    over: { addedAt?: number[]; pool?: { timestamp: number; poolUsd: bigint }[] } = {},
+    over: { addedAt?: (Pos | null)[]; pool?: (Pos & { poolUsd: bigint })[] } = {},
   ) => ({
     round: {
       projects: [100n, 100n, 100n, 100n].map((askUsd) => ({ askUsd, rfp: false, groups: [] })),
@@ -210,7 +211,7 @@ describe("ballot rules in the replay", () => {
       poolUsd: 200n,
       independentTiers: 1,
     },
-    addedAt: over.addedAt ?? [0, 0, 0, 0],
+    addedAt: over.addedAt ?? [null, null, null, null],
     pool: over.pool ?? [],
   });
   const run4 = (receipts: Receipt[], r = rules()) =>
@@ -231,19 +232,24 @@ describe("ballot rules in the replay", () => {
     expect(s.rejected).toEqual([{ tokenId: "b", nonce: 0, reason: "invalid_ballot" }]);
   });
 
-  it("validity uses the pool at that receipt", () => {
+  it("validity uses the pool at that receipt, by chain position (not time)", () => {
+    const a = r("a", 3, [1, 1, 1, X]);
+    const b = { ...r("b", 3, [1, 1, 1, X], true), logIndex: 2 }; // same block, a later log
+    // The pool was raised between them, in the same block (log 1).
     const s = run4(
-      [r("a", 3, [1, 1, 1, X]), r("b", 6, [1, 1, 1, X])],
-      rules({ pool: [{ timestamp: 5, poolUsd: 1_000n }] }),
+      [{ ...a, logIndex: 0 }, b],
+      rules({ pool: [{ block: a.block, logIndex: 1, poolUsd: 1_000n }] }),
     );
     expect(s.accepted.has("a")).toBe(true); // 300 ≥ 1.5 × 200 when it landed
     expect(s.accepted.has("b")).toBe(false); // 300 < 1.5 × 1,000
   });
 
   it("a ballot recorded before a project was added reads it as unplaced", () => {
+    const a = r("a", 5, [1, 1, 1]);
+    const b = r("b", 5, [1, 1, 1, 1]);
     const s = run4(
-      [r("a", 5, [1, 1, 1]), r("b", 6, [1, 1, 1, 1])],
-      rules({ addedAt: [0, 0, 0, 10] }),
+      [a, b],
+      rules({ addedAt: [null, null, null, { block: b.block + 1, logIndex: 0 }] }),
     );
     expect([...s.accepted.get("a")!]).toEqual([1, 1, 1, X]);
     // Four bytes when only three projects existed: unreadable.

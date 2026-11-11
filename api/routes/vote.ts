@@ -229,6 +229,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       nonce: "revoked" in b ? 0 : b.nonce ?? 0,
       ballot: "revoked" in b ? null : hexToBytes(b.ballot),
       block: b.block ?? i + 1,
+      ...("logIndex" in b && b.logIndex !== undefined ? { logIndex: b.logIndex } : {}),
       timestamp: b.timestamp,
     }));
     const m = d.manifest;
@@ -248,7 +249,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
         ? {
           rules: {
             round: rulesRound(m),
-            addedAt: m.slugs.map((_, i) => history.addedAt[i] ?? 0),
+            addedAt: m.slugs.map((_, i) => history.addedAt[i] ?? null),
             pool: history.pool,
           },
         }

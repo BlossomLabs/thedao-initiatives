@@ -21,8 +21,12 @@ export type Receipt = {
   nonce: number;
   ballot: Uint8Array | null;
   block: number;
+  /** Its log's index in the block: orders it against pool changes and new projects. */
+  logIndex?: number;
   timestamp: number;
 };
+/** Where a log sits in the chain. */
+export type ChainPos = { block: number; logIndex: number };
 export type Settled = {
   tier: Tier;
   at: number;
@@ -102,13 +106,14 @@ export function replay(
     /** The needs each tier settled with, kept when it first settled: a later donation
      * never moves a settled tier, even before its settlement is stored for good. */
     settleNeeds?: Partial<Record<Tier, SettleNeeds>>;
-    /** The ballot rules, judged as of each receipt: the projects registered by then
-     * (`addedAt[i]` = when project i joined, 0 for the deploy) and the pool then (the
-     * last change at or before it, else `round.poolUsd`). Without it, nothing is checked. */
+    /** The ballot rules, judged as the contract did: with the projects registered and
+     * the pool set before that receipt in chain order (block, then log index), not by
+     * time. `addedAt[i]` is where project i joined (null: at deploy); `pool` is every
+     * change in chain order, else `round.poolUsd`. Without it, nothing is checked. */
     rules?: {
       round: RulesRound;
-      addedAt: number[];
-      pool: { timestamp: number; poolUsd: bigint }[];
+      addedAt: (ChainPos | null)[];
+      pool: (ChainPos & { poolUsd: bigint })[];
     };
   },
   now: number,
@@ -124,9 +129,10 @@ export function replay(
 
   const valid = (r: Receipt): boolean => {
     const { round, addedAt, pool } = input.rules!;
-    const count = addedAt.filter((t) => t <= r.timestamp).length;
-    const poolUsd = pool.filter((p) => p.timestamp <= r.timestamp).at(-1)?.poolUsd ??
-      round.poolUsd;
+    const before = (p: ChainPos) =>
+      p.block < r.block || (p.block === r.block && p.logIndex < (r.logIndex ?? 0));
+    const count = addedAt.filter((p) => p === null || before(p)).length;
+    const poolUsd = pool.filter(before).at(-1)?.poolUsd ?? round.poolUsd;
     return checkBallot(r.ballot!, { ...round, projects: round.projects.slice(0, count), poolUsd })
       .ok;
   };

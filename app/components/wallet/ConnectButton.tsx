@@ -7,6 +7,8 @@ import { sessionKey, useSession } from "~/context/session";
 import { useProfileDialog } from "~/context/profile-dialog";
 import { useWalletPicker } from "~/context/wallet-picker";
 import { useIdentity } from "~/hooks/use-identity";
+import { useMyBadges } from "~/hooks/use-vote";
+import { roundDeployed } from "../../../shared/vote/manifest";
 import { Avatar } from "./Avatar";
 import WalletMenu, { type WalletMenuItem } from "./WalletMenu";
 import { shortAddr } from "~/lib/format";
@@ -26,6 +28,8 @@ export default function ConnectButton() {
     isConnected && address && session && session.address.toLowerCase() === address.toLowerCase(),
   );
   const identity = useIdentity(address);
+  // The badges this account votes with in the current round (none: no Vote item).
+  const voteBadges = useMyBadges(signedIn ? session!.address : null, roundDeployed());
   const { profileOpen, openProfile } = useProfileDialog();
   const { openWalletPicker, walletPickerOpen } = useWalletPicker();
   const navigate = useNavigate();
@@ -120,6 +124,14 @@ export default function ConnectButton() {
         label: "My initiatives",
         lucide: "list" as const,
         onClick: () => void navigate("/mine"),
+      }]
+      : []),
+    ...(signedIn && voteBadges.data?.length
+      ? [{
+        key: "vote",
+        label: "Vote",
+        lucide: "vote" as const,
+        onClick: () => void navigate("/vote/ballot"),
       }]
       : []),
     {

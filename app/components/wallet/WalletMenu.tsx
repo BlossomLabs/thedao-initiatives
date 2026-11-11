@@ -7,6 +7,7 @@ import {
   Mail,
   Pencil,
   ShieldCheck,
+  Vote,
   Wallet,
 } from "lucide-react";
 import type { Connector } from "wagmi";
@@ -18,7 +19,7 @@ export interface WalletMenuItem {
   key: string;
   label: string;
   icon?: string;
-  lucide?: "wallet" | "mail" | "edit" | "power" | "sign" | "admin" | "copy" | "list";
+  lucide?: "wallet" | "mail" | "edit" | "power" | "sign" | "admin" | "copy" | "list" | "vote";
   active?: boolean;
   danger?: boolean;
   separator?: boolean;
@@ -40,6 +41,7 @@ const ICONS = {
   sign: ShieldCheck,
   admin: LayoutDashboard,
   list: List,
+  vote: Vote,
 };
 
 /** The MVP's wallet picker / account menu, anchored under the top-bar button. */

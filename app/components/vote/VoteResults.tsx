@@ -228,6 +228,7 @@ export default function VoteResults() {
       next={next}
       titles={titles}
       hero={hero}
+      heading={isClosed ? "The vote's final result" : "If the vote ended now"}
       defaultSort="closest"
     />
   );

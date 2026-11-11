@@ -70,7 +70,7 @@ const BAND_ICONS: Record<string, { Icon: LucideIcon; color: string }> = {
 /** The front page's board. The vote results reuse it with `only` (the round's
  * slugs), `votePct` (each initiative's vote share, % of its goal, by id) and its own hero. */
 export default function BoardPage(
-  { only, votePct, votePendingPct, voteTiers, results, next, titles, hero, defaultSort }: {
+  { only, votePct, votePendingPct, voteTiers, results, next, titles, hero, heading, defaultSort }: {
     only?: ReadonlySet<string>;
     votePct?: ReadonlyMap<string, number>;
     /** The part of `votePct` the settling tier would add if it settled now. */
@@ -80,6 +80,8 @@ export default function BoardPage(
     /** The closed vote's final result: Funded and Not funded lists, no search or filters;
      * each card shows only its final amount. */
     results?: { funded: ResultRow[]; notFunded: ResultRow[] };
+    /** The list's section title (the vote results name theirs); the board's own by default. */
+    heading?: string;
     /** The open vote's gap to each initiative's next tier, by id, drawn on the right of the
      * amount row; `titles` (slug → title) names the initiatives in its hover. */
     next?: ReadonlyMap<string, NextTierEntry>;
@@ -297,7 +299,7 @@ export default function BoardPage(
       <Sponsors sponsors={data?.sponsors} loading={isLoading} />
       <PageMain>
         <SectionHeading id="rfps" className="max-[640px]:text-center">
-          Security initiatives looking for funding
+          {heading ?? "Security initiatives looking for funding"}
         </SectionHeading>
         {data && all.length > 0 && !results && (
           <BoardSearch

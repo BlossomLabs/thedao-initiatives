@@ -148,6 +148,9 @@ it("says what is going on and what the vote would fund right now", async () => {
   // The front page's board: its search box, only the round's initiatives, gold shares.
   expect(screen.getByRole("searchbox")).toBeInTheDocument();
   expect(screen.queryByText("Gamma outside")).toBeNull();
+  // The list's title is the vote's, not the board's.
+  expect(screen.getByText("If the vote ended now")).toBeInTheDocument();
+  expect(screen.queryByText("Security initiatives looking for funding")).toBeNull();
   // Nothing has settled: it is all "if it settled now".
   await waitFor(() => expect(document.querySelector("[data-vote-pending]")).not.toBeNull());
 });
@@ -343,6 +346,7 @@ it("once B settles, the final result: spent of the pool, a section per tier", as
 
 it("the final result: tier sections, then not funded", async () => {
   await showClosed();
+  expect(screen.getByText("The vote's final result")).toBeInTheDocument();
   expect(heading("Tier-S")).toHaveTextContent("Tier-S$60,000 allocated to 1 initiative");
   expect(heading("Not funded")).toHaveTextContent("Not funded1");
   // The list's header names the final amount and no type column.

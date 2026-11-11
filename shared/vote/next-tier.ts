@@ -21,10 +21,15 @@ export type NextTier = {
 /** The tally the search re-runs; a parameter so tests can count the runs. */
 export type Tally = typeof chainTally;
 
-/** Candidate → tier index, over the stages from `first`. */
-function tiersOf(tally: Tally, inp: ChainInputs, first: number): Map<number, number> {
+/** Candidate → tier index, over the stages from `first` up to (not including) `upTo`. */
+function tiersOf(
+  tally: Tally,
+  inp: ChainInputs,
+  first: number,
+  upTo: number = TIERS.length,
+): Map<number, number> {
   const out = new Map<number, number>();
-  tally(inp, first).forEach((stage, k) => {
+  tally(inp, first, upTo).forEach((stage, k) => {
     for (const c of stage.order) out.set(c, first + k);
   });
   return out;
@@ -69,7 +74,9 @@ function* gapSearch(
   if (target < first) return entry;
   const room = inp.poolUsd - inp.spent;
   const hiSteps = room / STEP; // bigint division rounds down
-  const run = (k: bigint) => tiersOf(tally, withPhantom(inp, c, k * STEP), first);
+  // Reaching and an onlyTarget knock-on only look at the stages up to the target.
+  const upTo = onlyTarget ? target + 1 : TIERS.length;
+  const run = (k: bigint) => tiersOf(tally, withPhantom(inp, c, k * STEP), first, upTo);
   const reaches = (r: Map<number, number>) => r.has(c) && r.get(c)! <= target;
   // What's left of the pool can't pay for it, whoever backs it.
   if (hiSteps < 1n || inp.costs[c] > room) return entry;
@@ -218,7 +225,8 @@ function* finalSearch(
     if (!inp) return;
     let live = lives.get(t);
     if (!live) {
-      live = tiersOf(tally, inp, t);
+      // Every figure here targets tier t itself: the later stages aren't looked at.
+      live = tiersOf(tally, inp, t, t + 1);
       lives.set(t, live);
       yield;
     }
@@ -287,8 +295,9 @@ export function gapTo(
   opts: { onlyTarget?: boolean; tally?: Tally } = {},
 ): NextTier {
   const tally = opts.tally ?? chainTally;
-  const live = tiersOf(tally, inp, first);
-  return drive(gapSearch(inp, first, c, target, live, tally, opts.onlyTarget ?? false));
+  const onlyTarget = opts.onlyTarget ?? false;
+  const live = tiersOf(tally, inp, first, onlyTarget ? target + 1 : TIERS.length);
+  return drive(gapSearch(inp, first, c, target, live, tally, onlyTarget));
 }
 
 /** Largest STEP multiple L (rounded down) with c still funded in tier `first` when its

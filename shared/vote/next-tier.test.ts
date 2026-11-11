@@ -246,6 +246,20 @@ describe("the gap to a chosen tier", () => {
     expect(only.comesIn).toEqual([]);
   });
 
+  it("gapTo with onlyTarget tallies no stage past the target", () => {
+    const inp = knockOn();
+    const upTos: (number | undefined)[] = [];
+    const counting: typeof chainTally = (i, first, upTo) => {
+      upTos.push(upTo);
+      return chainTally(i, first, upTo);
+    };
+    const only = gapTo(inp, 0, 0, 0, { onlyTarget: true, tally: counting });
+    expect(upTos.length).toBeGreaterThan(1);
+    expect(upTos.every((u) => u === 1)).toBe(true);
+    expect(only).toEqual(gapTo(inp, 0, 0, 0, { onlyTarget: true }));
+    expect(only.gap).toBe(gapTo(inp, 0, 0, 0).gap);
+  });
+
   it("gapTo lists who comes into the target tier", () => {
     // Initiatives 0 and 1 are in Tier-S, 2 in Tier-A, 3 not funded. With $3K more behind
     // initiative 2, Tier-S takes 0, 2 and 3: initiative 1 drops out and 3 comes in.

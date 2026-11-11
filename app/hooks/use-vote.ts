@@ -16,6 +16,7 @@ import {
   submitBallot,
 } from "~/lib/vote-flow";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi";
+import type { Tier } from "../../shared/vote/ballot";
 import { MAINNET_CHAIN_ID, ROUND, voteChain } from "../../shared/vote/manifest";
 import { checkBallotTx } from "../../shared/vote/receipt";
 import { recordVote } from "../../shared/vote/record";

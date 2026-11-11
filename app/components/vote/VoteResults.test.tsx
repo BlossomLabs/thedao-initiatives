@@ -485,6 +485,65 @@ it("a closed round shows no gap", async () => {
   expect(screen.queryByText(/Out of reach/)).toBeNull();
 });
 
+const rowOf = (title: string) =>
+  screen.getAllByText(title)[0].closest("li, [data-initiative-id]") as HTMLElement;
+
+it("needed opens what would have happened", async () => {
+  await showClosed({
+    final: {
+      next: {
+        beta: gap({
+          tier: "B",
+          gap: "30000000000",
+          comesIn: [],
+          dropsOut: [{ slug: "alpha", tier: "B" }],
+        }),
+      },
+      lead: {},
+    },
+  });
+  const button = within(rowOf("Beta audits")).getAllByRole("button", { name: "needed $30k" })[0];
+  fireEvent.focus(button);
+  const tip = screen.getByRole("tooltip");
+  expect(tip).toHaveTextContent("With $30k more backing it would have made Tier-B:");
+  expect(tip).toHaveTextContent("Drops out of Tier-B: Alpha fuzzing");
+});
+
+it("needed with no way in has no hover", async () => {
+  await showClosed({
+    final: { next: { beta: gap({ tier: "B", gap: null }) }, lead: {} },
+  });
+  const row = rowOf("Beta audits");
+  expect(row).toHaveTextContent("needed $30k");
+  expect(within(row).queryByRole("button", { name: /needed/ })).toBeNull();
+});
+
+it("closed Tier-S rows show their lead in place of the chip", async () => {
+  await showClosed({ final: { next: {}, lead: { alpha: "12000000000" } } });
+  const row = rowOf("Alpha fuzzing");
+  expect(within(row).getAllByRole("button", { name: "$12k ahead" })[0]).toBeInTheDocument();
+  expect(within(row).queryByText("Tier-S")).toBeNull();
+});
+
+it("an open round shows Tier-S leads", async () => {
+  const view = roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] });
+  vi.mocked(api).mockResolvedValue({
+    ...view,
+    live: { ...view.live, lead: { alpha: "12000000000" } },
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={["/?view=cards"]}>
+        <VoteResults />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  const button = await screen.findByRole("button", { name: "$12k ahead" });
+  // Beside its tier chip.
+  expect(within(button.closest("[data-initiative-id]") as HTMLElement).getByText("Tier-S"))
+    .toBeInTheDocument();
+});
+
 async function showOpen(round: Record<string, unknown>) {
   vi.mocked(api).mockResolvedValue(round);
   render(

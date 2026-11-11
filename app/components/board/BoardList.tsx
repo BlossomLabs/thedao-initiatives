@@ -10,7 +10,7 @@ import CardTitle from "~/components/board/CardTitle";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import WatchlistButton from "~/components/board/WatchlistButton";
 import FundingStatus from "~/components/board/FundingStatus";
-import { NextTierFigure } from "~/components/vote/NextTier";
+import { finalFigure, LeadFigure, NextTierFigure } from "~/components/vote/NextTier";
 import type { NextTierEntry } from "~/hooks/use-vote";
 import RatingChip, { RatingForm } from "~/components/ratings/RatingChip";
 import Reveal from "~/components/ui/Reveal";
@@ -115,10 +115,13 @@ function Row(
     voteTier,
     final,
     next,
+    lead,
     titles,
   }: {
     card: Card;
     next?: NextTierEntry;
+    /** Tier-S's lead, micro-USD. */
+    lead?: string;
     titles?: ReadonlyMap<string, string>;
     final?: number;
     votePct?: number;
@@ -142,13 +145,27 @@ function Row(
   const pctOn = standing ? standing.kind === "eligible" : pct >= 1;
   const full = fullyFunded(card, votePct);
   const votedFull = (votePct ?? 0) > 0 && full;
-  const pctShown = next && titles
+  const needed = `needed ${usdShort(neededUsd(card))}`;
+  // After the vote the figure takes the place of the tier chip (the section names the tier)
+  // and of "needed $X"; with nothing for the row, they stay.
+  const closedFigure = final !== undefined
+    ? finalFigure({ tier: voteTier, next, lead, titles, needed })
+    : null;
+  const pctShown = closedFigure ? closedFigure : final === undefined && voteTier === "S" && lead
+    // Open: Tier-S keeps its chip and says how far ahead it is.
+    ? (
+      <span className="flex flex-wrap items-center justify-end gap-x-2">
+        <FundingStatus tier={voteTier} byVote />
+        <LeadFigure lead={lead} />
+      </span>
+    )
+    : next && titles && final === undefined
     ? <NextTierFigure next={next} now={voteTier} titles={titles} />
     : full || (final !== undefined && voteTier)
     ? <FundingStatus tier={voteTier} byVote={votedFull || final !== undefined} />
     : final !== undefined
     // The vote didn't fund it: what it still needs, in place of the %.
-    ? <span className="text-white/45">needed {usdShort(neededUsd(card))}</span>
+    ? <span className="text-white/45">{needed}</span>
     : (
       <>
         {pctText(pct)}
@@ -248,7 +265,7 @@ function Row(
           "text-[12.5px] font-medium @max-[720px]/list:hidden",
           pctOn || full ? "text-dao-green" : "text-white/40",
           // The gap wraps inside the column rather than spilling into Backers.
-          next && "min-w-0 whitespace-normal",
+          (next || lead) && "min-w-0 whitespace-normal",
         )}
       >
         {pctShown}
@@ -368,7 +385,7 @@ function Row(
             NUM,
             "hidden text-[12.5px] font-semibold @max-[720px]/list:flex @max-[720px]/list:items-center @max-[720px]/list:justify-end",
             pctOn || full ? "text-dao-green" : "text-white/40",
-            next && "min-w-0 whitespace-normal",
+            (next || lead) && "min-w-0 whitespace-normal",
           )}
         >
           {pctShown}
@@ -410,9 +427,12 @@ export default function BoardList(
     voteTiers,
     finals,
     next,
+    lead,
     titles,
   }: {
     cards: Card[];
+    /** Tier-S's lead (micro-USD), by initiative id. */
+    lead?: ReadonlyMap<string, string>;
     /** The open vote's gap to each initiative's next tier, by initiative id. */
     next?: ReadonlyMap<string, NextTierEntry>;
     /** Slug → title, for the names in the gap's hover. */
@@ -478,6 +498,7 @@ export default function BoardList(
                 voteTier={voteTiers?.get(c.initiative.id)}
                 final={finals?.get(c.initiative.id)}
                 next={next?.get(c.initiative.id)}
+                lead={lead?.get(c.initiative.id)}
                 titles={titles}
               />
             ))}

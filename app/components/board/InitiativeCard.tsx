@@ -8,7 +8,7 @@ import { fullyFunded } from "~/lib/board-view";
 import CardTitle from "./CardTitle";
 import WatchlistButton from "~/components/board/WatchlistButton";
 import FundingStatus from "~/components/board/FundingStatus";
-import { NextTierFigure } from "~/components/vote/NextTier";
+import { finalFigure, LeadFigure, NextTierFigure } from "~/components/vote/NextTier";
 import type { NextTierEntry } from "~/hooks/use-vote";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import Bar from "~/components/ui/Bar";
@@ -127,9 +127,12 @@ export default function InitiativeCard({
   voteTier,
   final,
   next,
+  lead,
   titles,
 }: {
   card: Card;
+  /** Tier-S's lead, micro-USD. */
+  lead?: string;
   /** The open vote's gap to this initiative's next tier, drawn in place of the %. */
   next?: NextTierEntry;
   /** Slug → title, for the names in the gap's hover. */
@@ -166,6 +169,12 @@ export default function InitiativeCard({
   const pctOn = vote?.show
     ? voteStanding(summary.total, r.goalUsd, vote).kind === "eligible"
     : !zero;
+  const needed = `needed ${usdShort(neededUsd(card))}`;
+  // After the vote the figure takes the place of the tier chip and of "needed $X"; with
+  // nothing for the card, they stay.
+  const closedFigure = final !== undefined
+    ? finalFigure({ tier: voteTier, next, lead, titles, needed })
+    : null;
   const tick = vote ? voteFloorPct(r.goalUsd, vote) : 0;
   // Near the floor or past it: always shown. Otherwise the card shows it on hover or tap.
   const callout = voteCallout(summary.total, r.goalUsd, vote);
@@ -239,7 +248,15 @@ export default function InitiativeCard({
             <span className="text-[12px] text-white/30">· {plural(backers, "backer")}</span>
           )}
         </span>
-        {next && titles
+        {closedFigure ? closedFigure : final === undefined && voteTier === "S" && lead
+          // Tier-S keeps its chip and says how far ahead it is.
+          ? (
+            <span className="flex min-w-0 items-center gap-2">
+              <FundingStatus tier={voteTier} byVote />
+              <LeadFigure lead={lead} />
+            </span>
+          )
+          : next && titles && final === undefined
           ? (
             // Funded now: its tier stays in sight beside what the next one would take.
             <span className="flex min-w-0 items-center gap-2">
@@ -251,7 +268,7 @@ export default function InitiativeCard({
           ? <FundingStatus tier={voteTier} byVote={(votePct ?? 0) > 0 || final !== undefined} />
           : final !== undefined
           // The vote didn't fund it: what it still needs, in place of the %.
-          ? <span className="text-[12px] text-white/45">needed {usdShort(neededUsd(card))}</span>
+          ? <span className="text-[12px] text-white/45">{needed}</span>
           : (
             <span className="flex items-center gap-2">
               <span

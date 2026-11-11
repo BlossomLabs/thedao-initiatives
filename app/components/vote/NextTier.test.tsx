@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import type { NextTierEntry } from "~/hooks/use-vote";
-import { NextTierFigure } from "./NextTier";
+import { LeadFigure, NextTierFigure } from "./NextTier";
 
 afterEach(cleanup);
 
@@ -85,4 +85,47 @@ it("the hover first says where it stands now", () => {
   render(<NextTierFigure next={entry({ tier: "B" })} titles={titles} />);
   fireEvent.focus(screen.getByRole("button"));
   expect(screen.getByRole("tooltip").firstChild).toHaveTextContent("Now not funded.");
+});
+
+it("Tier-S shows how far ahead it is", () => {
+  render(<LeadFigure lead="12400000000" />);
+  const button = screen.getByRole("button", { name: "$12k ahead" });
+  expect(button).toHaveClass("text-vote");
+  fireEvent.focus(button);
+  const tip = screen.getByRole("tooltip");
+  expect(tip).toHaveTextContent("Could lose this much backing and still be funded in Tier-S.");
+  expect(screen.getByText("Tier-S")).toHaveClass("whitespace-nowrap");
+  fireEvent.keyDown(button, { key: "Escape" });
+  expect(screen.queryByRole("tooltip")).toBeNull();
+});
+
+it("a lead under $1K shows nothing", () => {
+  const { container } = render(<LeadFigure lead="999999999" />);
+  expect(container).toBeEmptyDOMElement();
+});
+
+it("after the vote, the hover names the target tier", () => {
+  render(
+    <NextTierFigure
+      final
+      next={entry({
+        comesIn: [{ slug: "beta", tier: "S" }],
+        dropsOut: [{ slug: "gamma", tier: "S" }],
+      })}
+      now="A"
+      titles={titles}
+    />,
+  );
+  fireEvent.focus(screen.getByRole("button", { name: "$42k to Tier-S" }));
+  const tip = screen.getByRole("tooltip");
+  expect(tip).toHaveTextContent("With $42k more backing it would have made Tier-S:");
+  expect(tip).toHaveTextContent("Comes into Tier-S: Beta audits");
+  expect(tip).toHaveTextContent("Drops out of Tier-S: Gamma tools");
+  expect(tip).not.toHaveTextContent("Now");
+});
+
+it("a label replaces the trigger text", () => {
+  render(<NextTierFigure final label="needed $30k" next={entry({ tier: "B" })} titles={titles} />);
+  fireEvent.focus(screen.getByRole("button", { name: "needed $30k" }));
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Nothing else changes.");
 });

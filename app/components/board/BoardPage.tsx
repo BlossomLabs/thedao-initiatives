@@ -70,7 +70,19 @@ const BAND_ICONS: Record<string, { Icon: LucideIcon; color: string }> = {
 /** The front page's board. The vote results reuse it with `only` (the round's
  * slugs), `votePct` (each initiative's vote share, % of its goal, by id) and its own hero. */
 export default function BoardPage(
-  { only, votePct, votePendingPct, voteTiers, results, next, titles, hero, heading, defaultSort }: {
+  {
+    only,
+    votePct,
+    votePendingPct,
+    voteTiers,
+    results,
+    next,
+    lead,
+    titles,
+    hero,
+    heading,
+    defaultSort,
+  }: {
     only?: ReadonlySet<string>;
     votePct?: ReadonlyMap<string, number>;
     /** The part of `votePct` the settling tier would add if it settled now. */
@@ -85,6 +97,8 @@ export default function BoardPage(
     /** The open vote's gap to each initiative's next tier, by id, drawn on the right of the
      * amount row; `titles` (slug → title) names the initiatives in its hover. */
     next?: ReadonlyMap<string, NextTierEntry>;
+    /** Tier-S's lead (micro-USD), by id: how far ahead of falling out of Tier-S it is. */
+    lead?: ReadonlyMap<string, string>;
     titles?: ReadonlyMap<string, string>;
     hero?: React.ReactNode;
     /** The order a plain URL opens in (the front page's: By category). */
@@ -413,6 +427,7 @@ export default function BoardPage(
                       voteTiers={resultTiers ?? voteTiers}
                       finals={finals}
                       next={next}
+                      lead={lead}
                       titles={titles}
                     />
                   </Suspense>
@@ -452,6 +467,7 @@ export default function BoardPage(
                             voteTier={(resultTiers ?? voteTiers)?.get(c.initiative.id)}
                             final={finals?.get(c.initiative.id)}
                             next={next?.get(c.initiative.id)}
+                            lead={lead?.get(c.initiative.id)}
                             titles={titles}
                           />
                         </ShuffleItem>

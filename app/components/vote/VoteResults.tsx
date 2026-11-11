@@ -135,16 +135,22 @@ export default function VoteResults() {
     return { votePct: total, votePendingPct: pend, voteTiers: tiers };
   }, [money, cards]);
 
-  // The gaps (open round only), by initiative id, and the titles the hover names.
-  const { next, titles } = useMemo(() => {
+  // The gaps and Tier-S leads by initiative id (live while the round is open, frozen at
+  // each settlement once it is closed), and the titles the hover names.
+  const { next, lead, titles } = useMemo(() => {
     const next = new Map<string, NextTierEntry>();
+    const lead = new Map<string, string>();
     const titles = new Map<string, string>();
+    const src = rv ? (rv.closed ? rv.final : rv.live) : undefined;
     for (const c of cards) {
-      titles.set(c.initiative.slug, c.initiative.title);
-      const e = rv && !rv.closed ? rv.live.next?.[c.initiative.slug] : undefined;
+      const slug = c.initiative.slug;
+      titles.set(slug, c.initiative.title);
+      const e = src?.next?.[slug];
       if (e) next.set(c.initiative.id, e);
+      const l = src?.lead?.[slug];
+      if (l) lead.set(c.initiative.id, l);
     }
-    return { next, titles };
+    return { next, lead, titles };
   }, [rv, cards]);
 
   const raised = money
@@ -226,6 +232,7 @@ export default function VoteResults() {
       voteTiers={voteTiers}
       results={results}
       next={next}
+      lead={lead}
       titles={titles}
       hero={hero}
       heading={isClosed ? "The vote's final result" : "If the vote ended now"}

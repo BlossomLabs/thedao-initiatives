@@ -6,7 +6,7 @@ import { LinkButton } from "~/components/ui/Button";
 import { useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/vote-local";
 import { useSession } from "~/context/session";
-import { useMyBadge, useVoteBallots } from "~/hooks/use-vote";
+import { useMyBadges, useVoteBallots } from "~/hooks/use-vote";
 import { usd } from "~/lib/format";
 import { ROUND } from "../../shared/vote/manifest";
 import { voteTally } from "../../shared/vote/tally";
@@ -50,8 +50,8 @@ export default function VoteRoute() {
   const [code, setCode] = useState<string | null>(null);
   useEffect(() => setCode(myCode()), []);
   const { session } = useSession();
-  const badge = useMyBadge(session?.address ?? null, !code);
-  const mine = code ? `/vote/${code}` : badge.data && badge.data !== "none" ? "/vote/ballot" : null;
+  const badges = useMyBadges(session?.address ?? null, !code);
+  const mine = code ? `/vote/${code}` : badges.data?.length ? "/vote/ballot" : null;
 
   const cards = useMemo(
     () => (board.data?.cards ?? []).filter((c) => IN_ROUND.has(c.initiative.slug)),

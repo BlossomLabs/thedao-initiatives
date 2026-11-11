@@ -23,6 +23,10 @@ function Header({ kicker, children }: { kicker: string; children?: React.ReactNo
   );
 }
 
+/** "TheDAO vote · Badge #12" or "Test vote · Badge #12". */
+export const badgeKicker = (n: number) =>
+  `${ROUND.kind === "real" ? "TheDAO vote" : "Test vote"} · Badge #${n}`;
+
 const NOTHING: Partial<Record<string, Tier>> = {};
 
 const SeeResult = () => (
@@ -57,7 +61,7 @@ export default function VoteClosed(
   if (n === null) {
     return (
       <div className="space-y-6">
-        <Header kicker="Test vote · Demo on Sepolia">
+        <Header kicker={ROUND.kind === "real" ? "TheDAO vote" : "Test vote · Demo on Sepolia"}>
           The vote ended {closeText}. Thanks for stopping by!
         </Header>
         <SeeResult />
@@ -103,7 +107,7 @@ export default function VoteClosed(
 
   return (
     <div className="space-y-6">
-      <Header kicker={`Test vote · Badge #${n}`}>
+      <Header kicker={badgeKicker(n)}>
         The vote ended {closeText}. Here is what your badge voted.
       </Header>
       <div className="card text-[15px] leading-relaxed text-white/80">

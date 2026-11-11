@@ -78,7 +78,7 @@ vi.mock("~/lib/api", async (original) => {
         a[0] === "/api/vote/ballots"
           ? api(...a)
           : a[0] === "/api/vote/mine"
-          ? Promise.resolve({ n: signedIn.badge })
+          ? Promise.resolve({ ids: signedIn.badge === null ? [] : [signedIn.badge] })
           : Promise.reject(new Error("not in test")),
       {
         mock: api.mock,

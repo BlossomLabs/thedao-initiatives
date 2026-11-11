@@ -63,16 +63,15 @@ export function useVoteBallots(refetchInterval: number | false = false) {
   });
 }
 
-/** The signed-in account's badge (found on-chain), as a code's info would say it;
- * `none` when the account holds no badge in this round. Off until `me` is known. */
-export function useMyBadge(me: string | null, enabled = true) {
+/** The badges the signed-in account votes with in this round (the voting badges it
+ * holds in the real vote; its one test badge in a test vote), ascending. Off until
+ * `me` is known. */
+export function useMyBadges(me: string | null, enabled = true) {
   return useQuery({
     queryKey: ["vote-mine", me?.toLowerCase()],
     enabled: enabled && Boolean(me),
-    queryFn: async (): Promise<CodeInfo | "none"> => {
-      const { n } = await api<{ n: number | null }>("/api/vote/mine");
-      return n === null ? "none" : { n, claimed: true, owner: me };
-    },
+    staleTime: 10 * 60_000,
+    queryFn: async (): Promise<number[]> => (await api<{ ids: number[] }>("/api/vote/mine")).ids,
   });
 }
 

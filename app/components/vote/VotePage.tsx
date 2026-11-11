@@ -3,17 +3,17 @@ import { useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { bytesToHex, type Hex } from "viem";
 import PageMain from "~/components/layout/PageMain";
-import { Button } from "~/components/ui/Button";
+import { Button, LinkButton } from "~/components/ui/Button";
 import TierBallot, { type BallotItem } from "~/components/vote/TierBallot";
 import { BallotSkeleton, IntroSkeleton } from "~/components/vote/VoteSkeleton";
 import { rememberMyCode } from "~/lib/vote-local";
 import BallotStatus from "~/components/vote/BallotStatus";
-import VoteClosed from "~/components/vote/VoteClosed";
+import VoteClosed, { badgeKicker } from "~/components/vote/VoteClosed";
 import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
 import { useWalletPicker } from "~/context/wallet-picker";
 import { useBoard } from "~/hooks/use-board";
-import { apiCode, useBallotSubmit, useMintWait, useMyBadge, useVoteCode } from "~/hooks/use-vote";
+import { apiCode, useBallotSubmit, useMintWait, useMyBadges, useVoteCode } from "~/hooks/use-vote";
 import { api, errorMessage } from "~/lib/api";
 import { usd } from "~/lib/format";
 import { encodeBallot, type Tier } from "../../../shared/vote/ballot";
@@ -21,6 +21,19 @@ import { ROUND } from "../../../shared/vote/manifest";
 
 const POOL = Number(BigInt(ROUND.poolUsd) / 1_000_000n);
 const closed = () => Date.now() / 1000 >= ROUND.closesAt;
+const notOpenYet = () => Date.now() / 1000 < ROUND.opensAt;
+const REAL = () => ROUND.kind === "real";
+const utc = (secs: number) =>
+  `${
+    new Intl.DateTimeFormat("en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC",
+    }).format(secs * 1000)
+  } UTC`;
 const closeText = `${
   new Intl.DateTimeFormat("en-GB", {
     weekday: "long",
@@ -193,7 +206,7 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
   const params = useParams();
   const code = myBallot ? "" : params.code ?? "";
   const qc = useQueryClient();
-  const byCode = useVoteCode(code, !myBallot);
+  const byCode = useVoteCode(code, !myBallot && !REAL());
   const { session, signOut, restoring } = useSession();
   const { address } = useWallet();
   const { openWalletPicker } = useWalletPicker();
@@ -203,7 +216,20 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
   const me = session && address && session.address.toLowerCase() === address.toLowerCase()
     ? session.address
     : null;
-  const byAccount = useMyBadge(me, myBallot);
+  const badges = useMyBadges(me, myBallot);
+  const [sp, setSp] = useSearchParams();
+  // Several badges: ?badge= picks one, else the first.
+  const ids = badges.data ?? [];
+  const asked = Number(sp.get("badge"));
+  const chosen = ids.includes(asked) ? asked : ids[0];
+  const byAccount = {
+    ...badges,
+    data: badges.data === undefined
+      ? undefined
+      : chosen === undefined
+      ? "none" as const
+      : { n: chosen, claimed: true, owner: me },
+  };
   const info = myBallot ? byAccount : byCode;
 
   // Accepting survives the sign-in (the modal can remount or reload the page):
@@ -218,7 +244,6 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
   >({ kind: "idle" });
 
   // Dev only: ?mock shows the ballot without a real code or a sign-in (stripped from builds).
-  const [sp] = useSearchParams();
   const mock = import.meta.env.DEV && sp.has("mock");
   const found = info.data === "none" ? undefined : info.data;
   const data = mock ? { n: 1, claimed: true, owner: "0x0" } as const : found;
@@ -308,16 +333,54 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     });
   }, [board.data]);
 
+  // A holder of several voting badges votes once per badge: pick which one.
+  const picker = myBallot && ids.length > 1 && (
+    <div className="flex flex-wrap justify-center gap-2 pt-4" role="group" aria-label="Your badges">
+      {ids.map((id) => (
+        <Button
+          key={id}
+          variant={id === chosen ? "primary" : undefined}
+          aria-pressed={id === chosen}
+          onClick={() => setSp({ badge: String(id) }, { replace: true })}
+        >
+          Badge #{id}
+        </Button>
+      ))}
+    </div>
+  );
+
   const titles = useMemo(() => new Map(items.map((i) => [i.slug, i.title])), [items]);
 
   let body: React.ReactNode;
   let wide = false;
-  if (myBallot && !mock && !me && !restoring) {
+  if (!myBallot && REAL()) {
+    body = (
+      <Panel>
+        <Headline>TheDAO's vote uses the voting badge.</Headline>
+        <p>Paper codes were for test votes. Sign in with the wallet that holds your badge.</p>
+        <LinkButton className="mt-4" variant="primary" to="/vote/ballot">
+          Open your ballot
+        </LinkButton>
+      </Panel>
+    );
+  } else if (myBallot && !mock && !me && !restoring) {
     body = (
       <Panel>
         <Headline>Sign in to see your ballot.</Headline>
-        <p>Use the wallet or email you claimed your badge with.</p>
+        <p>
+          {REAL()
+            ? "Use the wallet that holds your TheDAO voting badge."
+            : "Use the wallet or email you claimed your badge with."}
+        </p>
         <Button className="mt-4" onClick={openWalletPicker}>Sign in</Button>
+      </Panel>
+    );
+  } else if (myBallot && !mock && info.data === "none" && REAL()) {
+    body = (
+      <Panel>
+        <Headline>This account has no voting badge.</Headline>
+        <p>Only TheDAO's voting badge holders vote. Sign in with the wallet that holds yours.</p>
+        <Button className="mt-4" onClick={() => void signOut()}>Sign out</Button>
       </Panel>
     );
   } else if (myBallot && !mock && info.data === "none") {
@@ -406,24 +469,31 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
       />
     );
   } else if (data && mine && n !== null && closed()) {
-    body = <VoteClosed n={n} titles={titles} closeText={closeText} saved={tiers} />;
+    body = (
+      <>
+        {picker}
+        <VoteClosed n={n} titles={titles} closeText={closeText} saved={tiers} />
+      </>
+    );
   } else if (data && mine && n !== null) {
     wide = true;
     const busy = ["signing", "relaying", "waiting"].includes(ballotFlow.phase.kind);
     const placed = Object.keys(tiers).length;
     const sendYourself = () =>
       void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(ROUND.slugs, tiers)));
+    const early = notOpenYet();
     body = (
       <div className="space-y-6">
+        {picker}
         <header className="pt-4 text-center">
-          <p className="kicker m-0">Test vote · Badge #{n}</p>
+          <p className="kicker m-0">{badgeKicker(n)}</p>
           <h1 className="mt-3 font-inter-tight text-[clamp(28px,5vw,40px)] font-bold leading-[1.1] tracking-[-.03em] text-white">
             Your ballot
           </h1>
           <p className="mx-auto mt-3 max-w-[640px] font-inter-tight text-[16px] leading-snug text-white/70">
             Put what TheDAO must fund first. Initiatives in the same tier are equal. The {usd(POOL)}
             {" "}
-            demo pool is split equally between everyone who votes.{" "}
+            {REAL() ? "pool" : "demo pool"} is split equally between every badge that votes.{" "}
             <a
               href={BLOSSOM}
               target="_blank"
@@ -433,45 +503,50 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
               How Blossom Budgeting works
             </a>
           </p>
+          {early && (
+            <p className="mt-3 font-medium text-white">Voting opens {utc(ROUND.opensAt)}.</p>
+          )}
         </header>
         <TierBallot
           items={items}
           tiers={tiers}
-          disabled={busy}
+          disabled={busy || early}
           onChange={setTier}
           onReplace={replaceTiers}
           search={{ ai: board.data?.flags?.aiSearch, aiAuto: board.data?.flags?.aiSearchAuto }}
-          actions={
-            <div className="space-y-3 rounded-t-2xl border-t border-white/10 bg-panel/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[0_-10px_30px_rgba(0,0,0,.35)] backdrop-blur sm:rounded-2xl sm:border sm:bg-white/[.03] sm:p-4 sm:shadow-none sm:backdrop-blur-none">
-              <BallotStatus
-                phase={ballotFlow.phase}
-                onRetry={() => void ballotFlow.retry()}
-                selfSend={placed > 0 && <Button onClick={sendYourself}>Send it yourself</Button>}
-              />
-              <Button
-                variant="primary"
-                className="w-full"
-                disabled={busy || placed === 0}
-                onClick={() =>
-                  void ballotFlow.submit(
-                    BigInt(n),
-                    bytesToHex(encodeBallot(ROUND.slugs, tiers)),
-                  )}
-              >
-                {placed === 0 ? "Place at least one proposal" : "Send my ballot"}
-              </Button>
-              {ballotFlow.phase.kind !== "failed" && (
-                <button
-                  type="button"
+          actions={early
+            ? undefined
+            : (
+              <div className="space-y-3 rounded-t-2xl border-t border-white/10 bg-panel/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[0_-10px_30px_rgba(0,0,0,.35)] backdrop-blur sm:rounded-2xl sm:border sm:bg-white/[.03] sm:p-4 sm:shadow-none sm:backdrop-blur-none">
+                <BallotStatus
+                  phase={ballotFlow.phase}
+                  onRetry={() => void ballotFlow.retry()}
+                  selfSend={placed > 0 && <Button onClick={sendYourself}>Send it yourself</Button>}
+                />
+                <Button
+                  variant="primary"
+                  className="w-full"
                   disabled={busy || placed === 0}
-                  onClick={sendYourself}
-                  className="w-full text-center text-[13px] text-white/55 underline underline-offset-2 disabled:opacity-40"
+                  onClick={() =>
+                    void ballotFlow.submit(
+                      BigInt(n),
+                      bytesToHex(encodeBallot(ROUND.slugs, tiers)),
+                    )}
                 >
-                  Send it yourself (from your wallet, on Sepolia)
-                </button>
-              )}
-            </div>
-          }
+                  {placed === 0 ? "Place at least one proposal" : "Send my ballot"}
+                </Button>
+                {ballotFlow.phase.kind !== "failed" && (
+                  <button
+                    type="button"
+                    disabled={busy || placed === 0}
+                    onClick={sendYourself}
+                    className="w-full text-center text-[13px] text-white/55 underline underline-offset-2 disabled:opacity-40"
+                  >
+                    Send it yourself (from your wallet, on {REAL() ? "Ethereum" : "Sepolia"})
+                  </button>
+                )}
+              </div>
+            )}
         />
       </div>
     );

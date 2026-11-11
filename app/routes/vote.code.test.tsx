@@ -20,15 +20,27 @@ const selfSend = vi.fn();
 const retry = vi.fn();
 const flow = { phase: { kind: "idle" } as { kind: string; reason?: string } };
 const OPEN_UNTIL = 4_000_000_000;
-const round = vi.hoisted(() => ({ closesAt: 4_000_000_000 }));
+const round = vi.hoisted(() => ({
+  closesAt: 4_000_000_000,
+  opensAt: 0,
+  kind: "test" as "test" | "real",
+}));
 
 vi.mock("../../shared/vote/manifest", async (original) => ({
   ...await original<typeof import("../../shared/vote/manifest")>(),
   ROUND: {
-    chainId: 11155111,
+    get kind() {
+      return round.kind;
+    },
+    get chainId() {
+      return round.kind === "real" ? 1 : 11155111;
+    },
+    badge: "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C",
     contract: "0x1000000000000000000000000000000000000001",
     deployBlock: 1,
-    opensAt: 0,
+    get opensAt() {
+      return round.opensAt;
+    },
     get closesAt() {
       return round.closesAt;
     },
@@ -112,6 +124,8 @@ beforeEach(() => {
   sessionStorage.clear();
   flow.phase = { kind: "idle" };
   round.closesAt = OPEN_UNTIL;
+  round.opensAt = 0;
+  round.kind = "test";
 });
 afterEach(cleanup);
 
@@ -392,12 +406,12 @@ it("a proposal's chevron shows a preview and Details without selecting or moving
   expect(toggle).toHaveAttribute("aria-expanded", "false");
 });
 
-function showMine() {
+function showMine(path = "/vote/ballot") {
   render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter initialEntries={["/vote/ballot"]}>
+      <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/vote/ballot" element={<MyBallot />} />
         </Routes>
@@ -418,7 +432,7 @@ it("my ballot: the signed-in account's badge opens its ballot", async () => {
   vi.mocked(api).mockImplementation(
     ((path: string) =>
       path === "/api/vote/mine"
-        ? Promise.resolve({ n: 17 })
+        ? Promise.resolve({ ids: [17] })
         : Promise.reject(new Error("unexpected " + path))) as typeof api,
   );
   showMine();
@@ -428,7 +442,7 @@ it("my ballot: the signed-in account's badge opens its ballot", async () => {
 
 it("my ballot: an account without a badge says so", async () => {
   session.current = { address: ME };
-  vi.mocked(api).mockResolvedValue({ n: null });
+  vi.mocked(api).mockResolvedValue({ ids: [] });
   showMine();
   expect(await screen.findByText(/no badge on this account/i)).toBeInTheDocument();
 });
@@ -481,7 +495,7 @@ it("after the close, a badge that never voted says so", async () => {
   vi.mocked(api).mockImplementation(
     ((path: string) =>
       path === "/api/vote/mine"
-        ? Promise.resolve({ n: 17 })
+        ? Promise.resolve({ ids: [17] })
         : path === "/api/vote/ballots"
         ? Promise.resolve({ at: 0, ballots: [] })
         : Promise.reject(new Error("unexpected " + path))) as typeof api,
@@ -498,7 +512,7 @@ it("after the close, on another device the sent ballot is read from the chain", 
   vi.mocked(api).mockImplementation(
     ((path: string) =>
       path === "/api/vote/mine"
-        ? Promise.resolve({ n: 17 })
+        ? Promise.resolve({ ids: [17] })
         : path === "/api/vote/ballots"
         ? Promise.resolve({ at: 0, ballots: [{ tokenId: "17", ballot: sent }] })
         : Promise.reject(new Error("unexpected " + path))) as typeof api,
@@ -508,4 +522,64 @@ it("after the close, on another device the sent ballot is read from the chain", 
   expect(within(s).getByText("BETA")).toBeInTheDocument();
   expect(within(screen.getByRole("region", { name: /A · Should fund/ })).getByText("ALPHA"))
     .toBeInTheDocument();
+});
+
+function mineIs(ids: number[]) {
+  vi.mocked(api).mockImplementation(
+    ((path: string) =>
+      path === "/api/vote/mine"
+        ? Promise.resolve({ ids })
+        : Promise.reject(new Error("unexpected " + path))) as typeof api,
+  );
+}
+
+it("real vote: a holder of two voting badges picks one; ?badge= opens it", async () => {
+  round.kind = "real";
+  session.current = { address: ME };
+  mineIs([12, 40]);
+  showMine("/vote/ballot?badge=40");
+  expect(await screen.findByText(/TheDAO vote · Badge #40/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Badge #12" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Badge #40" })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByRole("button", { name: "Badge #12" }));
+  expect(await screen.findByText(/TheDAO vote · Badge #12/)).toBeInTheDocument();
+});
+
+it("real vote: an unknown ?badge= falls back to the first badge", async () => {
+  round.kind = "real";
+  session.current = { address: ME };
+  mineIs([12, 40]);
+  showMine("/vote/ballot?badge=99");
+  expect(await screen.findByText(/TheDAO vote · Badge #12/)).toBeInTheDocument();
+});
+
+it("real vote: an account without a voting badge says so", async () => {
+  round.kind = "real";
+  session.current = { address: ME };
+  mineIs([]);
+  showMine();
+  expect(await screen.findByText("This account has no voting badge.")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: /your ballot/i })).toBeNull();
+});
+
+it("real vote: a paper code says the vote uses the voting badge, and claims nothing", async () => {
+  round.kind = "real";
+  show();
+  expect(await screen.findByText(/TheDAO's vote uses the voting badge/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /your ballot/i })).toHaveAttribute(
+    "href",
+    "/vote/ballot",
+  );
+  expect(screen.queryByRole("button", { name: /claim/i })).toBeNull();
+  expect(vi.mocked(api)).not.toHaveBeenCalled();
+});
+
+it("real vote: before it opens, the ballot says when and offers no Send", async () => {
+  round.kind = "real";
+  round.opensAt = 4_000_000_000 - 1;
+  session.current = { address: ME };
+  mineIs([12]);
+  showMine();
+  expect(await screen.findByText(/Voting opens/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /send my ballot|place at least one/i })).toBeNull();
 });

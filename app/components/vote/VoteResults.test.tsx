@@ -349,14 +349,17 @@ it("the final result: tier sections, then not funded", async () => {
   expect(screen.getByText("The vote's final result")).toBeInTheDocument();
   expect(heading("Tier-S")).toHaveTextContent("Tier-S$60,000 allocated to 1 initiative");
   expect(heading("Not funded")).toHaveTextContent("Not funded1 initiative");
-  // Beta wasn't funded: it asked $30K and raised nothing, so it still needs all of it.
+  // Beta wasn't funded: no "needed $X" (its bar's what-if says how close it came).
   expect(screen.getAllByText("Beta audits")[0].closest("li, [data-initiative-id]"))
-    .toHaveTextContent("needed $30k");
+    .not.toHaveTextContent(/needed/i);
   // The list's header names the final amount and no type column.
-  // The tier sections show the final amount; Not funded shows what it needed and raised.
+  // The tier sections read Initiative · Backers · Final, Not funded Initiative · Backers ·
+  // Raised: no Funded column, the bars' what-ifs carry it.
   expect(screen.getAllByText("Final")).toHaveLength(1);
-  expect(screen.getAllByText("Needed")).toHaveLength(1);
   expect(screen.getAllByText("Raised")).toHaveLength(1);
+  expect(screen.getAllByText("Backers")).toHaveLength(2);
+  expect(screen.queryByText("Needed")).toBeNull();
+  expect(screen.queryByText("Funded")).toBeNull();
   expect(screen.queryByText("Type")).toBeNull();
 });
 
@@ -412,6 +415,25 @@ const gap = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+/** The row (list) or card holding a title. */
+const rowOf = (title: string) =>
+  screen.getAllByText(title)[0].closest("li, [data-initiative-id]") as HTMLElement;
+/** A mouse on the row or card: its what-if callout opens over the bar. */
+function hover(el: HTMLElement): HTMLElement {
+  fireEvent.pointerEnter(el, { pointerType: "mouse" });
+  return el.querySelector("[data-vote-callout]") as HTMLElement;
+}
+/** The what-if tick's position on the bar, % of the ask, or null without one. */
+const tickAt = (el: HTMLElement) => {
+  const t = el.querySelector<HTMLElement>("[data-vote-tick][data-what-if]");
+  return t ? parseFloat(t.style.left) : null;
+};
+/** No figure looks like a link: no button, underline or help cursor. */
+function plainFigures(el: HTMLElement) {
+  expect(within(el).queryByRole("button", { name: /to Tier-|ahead|Out of reach/ })).toBeNull();
+  expect(el.querySelector(".cursor-help, .underline, .decoration-dotted")).toBeNull();
+}
+
 it.each(["/", "/?view=cards"])("an open round shows each initiative's gap in %s", async (url) => {
   const view = roundOf({ "1": ballot({ alpha: "A" }) }, { alpha: [50_000, "A"] });
   vi.mocked(api).mockResolvedValue({
@@ -425,16 +447,37 @@ it.each(["/", "/?view=cards"])("an open round shows each initiative's gap in %s"
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  const button = (await screen.findAllByRole("button", { name: "$42k to Tier-S" }))[0];
-  expect(
-    screen.getAllByText("Tier-B").some((e) =>
-      e.parentElement?.textContent === "Out of reach for Tier-B"
-    ),
-  ).toBe(true);
-  fireEvent.focus(button);
-  const tip = screen.getByRole("tooltip");
-  expect(tip).toHaveTextContent("Now Tier-A.");
-  expect(tip).toHaveTextContent("Comes in: Beta audits (Tier-A)");
+  await screen.findAllByText("Alpha fuzzing");
+  const alpha = rowOf("Alpha fuzzing");
+  // Alpha raised $10k of $60k and is $41.2k from Tier-S (the figure rounds it up to $42k,
+  // the tick does not): the tick at 51.2/60.
+  await waitFor(() => expect(tickAt(alpha)).toBeCloseTo((51_200 / 60_000) * 100, 5));
+  const callout = hover(alpha);
+  expect(callout).toHaveTextContent("$42k to Tier-S");
+  expect(callout).toHaveTextContent("Comes in: Beta audits (Tier-A)");
+  // Out of reach: no tick, the callout at the bar's end.
+  const beta = rowOf("Beta audits");
+  expect(tickAt(beta)).toBeNull();
+  const reach = hover(beta);
+  expect(reach).toHaveTextContent("Out of reach for Tier-B");
+  expect(reach.style.right).toBe("calc(0% - 14px)");
+  plainFigures(document.body);
+});
+
+it("the open vote's list has no Funded column; its tier sits after the title", async () => {
+  const view = roundOf({ "1": ballot({ alpha: "A" }) }, { alpha: [50_000, "A"] });
+  vi.mocked(api).mockResolvedValue({ ...view, live: { ...view.live, next: { alpha: gap() } } });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>
+        <VoteResults />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  await screen.findAllByText("Alpha fuzzing");
+  expect(screen.queryByText("Funded")).toBeNull();
+  expect(screen.getAllByText("Backers").length).toBeGreaterThan(0);
+  expect(within(rowOf("Alpha fuzzing")).getAllByText("Tier-A").length).toBeGreaterThan(0);
 });
 
 it("a funded card keeps its tier next to the gap", async () => {
@@ -450,18 +493,27 @@ it("a funded card keeps its tier next to the gap", async () => {
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  const button = await screen.findByRole("button", { name: "$42k to Tier-S" });
-  const alpha = button.closest("[data-initiative-id]")!;
-  expect(within(alpha as HTMLElement).getByText("Tier-A")).toBeInTheDocument();
+  await screen.findAllByText("Alpha fuzzing");
+  // The figure stays in the amount row, plain: the value big, the words small.
+  const alpha = await waitFor(() => {
+    const el = rowOf("Alpha fuzzing");
+    expect(el.querySelector("[data-what-if-figure]")).toHaveTextContent("$42k to Tier-S");
+    return el;
+  });
+  expect(within(alpha).getByText("Tier-A")).toBeInTheDocument();
   // Beta isn't funded: the gap alone.
-  const beta = screen.getByRole("button", { name: "$42k to Tier-B" })
-    .closest("[data-initiative-id]")!;
+  const beta = rowOf("Beta audits");
+  const figure = beta.querySelector("[data-what-if-figure]")!;
+  expect(figure).toHaveTextContent("$42k to Tier-B");
   // The gap names its tier too ("to Tier-B"); no chip outside it.
   expect(
-    within(beta as HTMLElement).queryAllByText(/^Tier-[SAB]$/).filter((e) => !e.closest("button")),
+    within(beta).queryAllByText(/^Tier-[SAB]$/).filter((e) => !figure.contains(e)),
   ).toEqual([]);
-  fireEvent.focus(screen.getByRole("button", { name: "$42k to Tier-B" }));
-  expect(screen.getByRole("tooltip")).toHaveTextContent("Now not funded.");
+  // Its details are in the bar's callout, on hover.
+  const details = hover(beta);
+  expect(details).toHaveTextContent("$42k to Tier-B");
+  expect(details).toHaveTextContent("Comes in: Beta audits (Tier-A)");
+  plainFigures(document.body);
 });
 
 it("a result card funded from $0 shows its final amount in green", async () => {
@@ -483,49 +535,64 @@ it("a closed round shows no gap", async () => {
   await showClosed({
     live: { funded: [], awards: {}, next: { alpha: gap(), beta: gap({ gap: null, tier: "B" }) } },
   });
-  expect(screen.queryByRole("button", { name: /to Tier-/ })).toBeNull();
+  expect(screen.queryByText(/to Tier-/)).toBeNull();
   expect(screen.queryByText(/Out of reach/)).toBeNull();
+  expect(document.querySelector("[data-what-if]")).toBeNull();
 });
 
-const rowOf = (title: string) =>
-  screen.getAllByText(title)[0].closest("li, [data-initiative-id]") as HTMLElement;
-
-it("needed opens what would have happened", async () => {
+it.each(["/", "/?view=cards"])("not funded: its gap to Tier-B, no needed, in %s", async (url) => {
   await showClosed({
     final: {
       next: {
         beta: gap({
           tier: "B",
-          gap: "30000000000",
+          gap: "12000000000",
           comesIn: [],
           dropsOut: [{ slug: "alpha", tier: "B" }],
         }),
       },
       lead: {},
     },
-  });
-  const button = within(rowOf("Beta audits")).getAllByRole("button", { name: "needed $30k" })[0];
-  fireEvent.focus(button);
-  const tip = screen.getByRole("tooltip");
-  expect(tip).toHaveTextContent("With $30k more backing it would have made Tier-B:");
-  expect(tip).toHaveTextContent("Drops out of Tier-B: Alpha fuzzing");
+  }, url);
+  const row = rowOf("Beta audits");
+  expect(row).not.toHaveTextContent(/needed/i);
+  // Raised $0 of a $30k ask, $12k to Tier-B: the tick at (0 + 12k) / 30k.
+  expect(tickAt(row)).toBeCloseTo(40, 5);
+  const callout = hover(row);
+  expect(callout).toHaveTextContent("$12k to Tier-B");
+  expect(callout).toHaveTextContent("Drops out of Tier-B: Alpha fuzzing");
+  plainFigures(document.body);
 });
 
-it("needed with no way in has no hover", async () => {
+it("not funded and out of reach: no tick, the callout at the bar's end", async () => {
   await showClosed({
     final: { next: { beta: gap({ tier: "B", gap: null }) }, lead: {} },
   });
   const row = rowOf("Beta audits");
-  expect(row).toHaveTextContent("needed $30k");
-  expect(within(row).queryByRole("button", { name: /needed/ })).toBeNull();
+  expect(row).not.toHaveTextContent(/needed/i);
+  expect(tickAt(row)).toBeNull();
+  const callout = hover(row);
+  expect(callout).toHaveTextContent("Out of reach for Tier-B");
+  expect(callout.style.right).toBe("calc(0% - 14px)");
 });
 
-it("closed Tier-S rows show their lead in place of the chip", async () => {
-  await showClosed({ final: { next: {}, lead: { alpha: "12000000000" } } });
-  const row = rowOf("Alpha fuzzing");
-  expect(within(row).getAllByRole("button", { name: "$12k ahead" })[0]).toBeInTheDocument();
-  expect(within(row).queryByText("Tier-S")).toBeNull();
-});
+it.each(["/", "/?view=cards"])(
+  "closed Tier-S shows its lead in place of the chip in %s",
+  async (url) => {
+    await showClosed({ final: { next: {}, lead: { alpha: "46000000000" } } }, url);
+    const row = rowOf("Alpha fuzzing");
+    expect(within(row).queryByText("Tier-S")).toBeNull();
+    // No tick for Tier-S: the callout sits at the bar's end.
+    expect(tickAt(row)).toBeNull();
+    const callout = hover(row);
+    expect(callout).toHaveTextContent("$46k ahead");
+    expect(callout).toHaveTextContent(
+      "Its backers could give this much less between them and it would still be funded in Tier-S.",
+    );
+    expect(callout.style.right).toBe("calc(0% - 14px)");
+    plainFigures(document.body);
+  },
+);
 
 it("an open round shows Tier-S leads", async () => {
   const view = roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] });
@@ -540,10 +607,15 @@ it("an open round shows Tier-S leads", async () => {
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  const button = await screen.findByRole("button", { name: "$12k ahead" });
+  await screen.findAllByText("Alpha fuzzing");
+  const card = await waitFor(() => {
+    const el = rowOf("Alpha fuzzing");
+    expect(el.querySelector("[data-what-if-figure]")).toHaveTextContent("$12k ahead");
+    return el;
+  });
   // Beside its tier chip.
-  expect(within(button.closest("[data-initiative-id]") as HTMLElement).getByText("Tier-S"))
-    .toBeInTheDocument();
+  expect(within(card).getByText("Tier-S")).toBeInTheDocument();
+  plainFigures(document.body);
 });
 
 async function showOpen(round: Record<string, unknown>) {

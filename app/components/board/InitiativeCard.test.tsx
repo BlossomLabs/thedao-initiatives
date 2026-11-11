@@ -415,3 +415,83 @@ it("the vote results mark a completed goal, but leaves a partial goal as a perce
   );
   expect(screen.queryByTitle("Funded with the vote")).toBeNull();
 });
+
+describe("the vote results' what-ifs", () => {
+  const asked = card({
+    initiative: { ...card({}).initiative, goalUsd: 44_000 },
+  });
+  const toS = {
+    tier: "S" as const,
+    gap: "23000000000",
+    comesIn: [{ slug: "b", tier: "S" as const }],
+    dropsOut: [],
+    moves: [],
+  };
+
+  it("a gap: plain figure in the amount row, a tick on the bar, the callout on hover", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <InitiativeCard
+          card={asked}
+          tokensOk={false}
+          voteTier="A"
+          votePct={100}
+          next={toS}
+          titles={new Map([["b", "Beta audits"]])}
+        />
+      </MemoryRouter>,
+    );
+    const figure = container.querySelector("[data-what-if-figure]")!;
+    expect(figure).toHaveTextContent("$23k to Tier-S");
+    expect(screen.getByText("$23k").tagName).toBe("B");
+    expect(screen.getByText("Tier-A")).toBeInTheDocument();
+    const tick = container.querySelector<HTMLElement>("[data-vote-tick][data-what-if]")!;
+    expect(parseFloat(tick.style.left)).toBeCloseTo(52.3, 1);
+    const el = container.querySelector<HTMLElement>("[data-initiative-id]")!;
+    expect(container.querySelector("[data-vote-callout]")).toBeNull();
+    fireEvent.pointerEnter(el, { pointerType: "mouse" });
+    const callout = container.querySelector("[data-vote-callout]")!;
+    expect(callout).toHaveTextContent("$23k to Tier-S");
+    expect(callout).toHaveTextContent("Comes in: Beta audits (Tier-S)");
+    expect(screen.queryByRole("button", { name: /to Tier-/ })).toBeNull();
+    expect(container.querySelector(".cursor-help, .underline, .decoration-dotted")).toBeNull();
+  });
+
+  it("not funded after the vote: its gap to Tier-B, no needed", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <InitiativeCard
+          card={asked}
+          tokensOk={false}
+          final={0}
+          next={{ ...toS, tier: "B", comesIn: [] }}
+          titles={new Map()}
+        />
+      </MemoryRouter>,
+    );
+    expect(container).not.toHaveTextContent(/needed/i);
+    expect(container.querySelector("[data-what-if-figure]")).toHaveTextContent("$23k to Tier-B");
+    fireEvent.pointerEnter(container.querySelector<HTMLElement>("[data-initiative-id]")!, {
+      pointerType: "mouse",
+    });
+    expect(container.querySelector("[data-vote-callout]")).toHaveTextContent(
+      "Nothing else changes.",
+    );
+  });
+
+  it("Tier-S: its lead, no tick", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <InitiativeCard
+          card={asked}
+          tokensOk={false}
+          voteTier="S"
+          votePct={100}
+          lead="46000000000"
+        />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector("[data-what-if-figure]")).toHaveTextContent("$46k ahead");
+    expect(container.querySelector("[data-vote-tick]")).toBeNull();
+  });
+});

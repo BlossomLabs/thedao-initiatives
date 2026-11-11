@@ -206,6 +206,9 @@ export default function BoardPage(
   const filtered = isFiltered(shownView);
   // "By category" and the rating sorts draw sections; the AI order wins over them while it is on.
   const sort = shownView.sort;
+  // The vote results show only the round's initiatives, all of them qualified, so the
+  // "qualify" mark says nothing there; their bars carry the what-if mark instead.
+  const qualifyMark = !results && !next && !lead;
   const finals = useMemo(
     () =>
       results
@@ -419,7 +422,7 @@ export default function BoardPage(
                       aiScores={scores}
                       featured={featuredSet}
                       watch={watchlist}
-                      vote={results ? undefined : data.flags.vote}
+                      vote={qualifyMark ? data.flags.vote : undefined}
                       ratings={ratings}
                       canRate={canRate}
                       votePct={votePct}
@@ -451,7 +454,7 @@ export default function BoardPage(
                           <InitiativeCard
                             card={c}
                             tokensOk={data.flags.tokensOk}
-                            vote={results ? undefined : data.flags.vote}
+                            vote={qualifyMark ? data.flags.vote : undefined}
                             aiTop={picks.includes(c.initiative.id)}
                             aiScore={scores.get(c.initiative.id)}
                             featured={featuredSet.has(c.initiative.id)}

@@ -41,48 +41,52 @@ export const calloutText = (state: CalloutState): string =>
     : `${usdShortUp(state.missing)} to qualify for TheDAO's vote`;
 
 /**
- * "$2k to qualify" (or "Qualified for the vote"): a small callout that stays open over the bar's mark, its
- * arrow on the mark, for initiatives close to the floor. `side` is where it sits
- * (above on cards, below in list rows, where the title fills the space above).
- * The parent is `relative`, as for VoteTick.
+ * A small callout over a mark on the bar, its arrow on the mark: a panel with a
+ * border and a tight shadow. `side` is where it sits (above on cards, below in list
+ * rows, where the title fills the space above). `align` "start" anchors the arrow 14px
+ * in from the panel's left, so it grows rightwards from the mark; "end" anchors it 14px
+ * in from the right, for a mark near the bar's end, so it never leaves the row.
+ * `className` sets the panel's layout and type. The parent is `relative`, as for VoteTick.
  */
-export function VoteCallout(
-  { state, at, side }: { state: CalloutState; at: number; side: "top" | "bottom" },
+export function Callout(
+  { at, side, align = "start", edge = "border-white/30", className, children }: {
+    at: number;
+    side: "top" | "bottom";
+    align?: "start" | "end";
+    /** The border's colour, on the panel and its arrow alike. */
+    edge?: string;
+    className?: string;
+    children: React.ReactNode;
+  },
 ) {
-  const ok = state.kind === "eligible";
-  const edge = ok ? "border-[rgba(92,183,90,.6)]" : "border-white/30";
+  const pos = Math.max(0, Math.min(100, at));
   return (
     <span
       data-vote-callout
       className={cn(
-        // Anchored by its arrow, 14px in from the left: it grows rightwards from the
-        // mark (the floor sits on the left of the bar), so it never leaves the row.
         "pointer-events-none absolute z-[1]",
         // ~3px between the arrow's tip and the tick (which stands 2px off the bar).
         side === "top" ? "bottom-full mb-[13px]" : "top-full mt-[13px]",
       )}
-      style={{ left: `calc(${Math.max(0, Math.min(100, at))}% - 14px)` }}
+      style={align === "end"
+        ? { right: `calc(${100 - pos}% - 14px)` }
+        : { left: `calc(${pos}% - 14px)` }}
     >
       <span
         className={cn(
           // A tight shadow: a soft wide one dims the text around it, as if it showed through.
-          "relative flex items-center gap-1 whitespace-nowrap rounded-lg border bg-panel px-2 py-[3px] font-inter-tight text-[11px] font-semibold leading-none text-white shadow-[0_2px_6px_rgba(0,0,0,.3)]",
+          "relative block rounded-lg border bg-panel px-2 py-[3px] font-inter-tight text-[11px] font-semibold leading-none text-white shadow-[0_2px_6px_rgba(0,0,0,.3)]",
           edge,
+          className,
         )}
       >
-        {ok
-          ? (
-            <>
-              <Check className="size-3 text-dao-green" strokeWidth={3} aria-hidden="true" />
-              {calloutLabel(state)}
-            </>
-          )
-          : calloutLabel(state)}
+        {children}
         {/* The arrow: a square turned 45°, its two outer edges bordered, pointing at the mark. */}
         <span
           aria-hidden="true"
           className={cn(
-            "absolute left-[14px] size-[9px] -translate-x-1/2 rotate-45 bg-panel",
+            "absolute size-[9px] rotate-45 bg-panel",
+            align === "end" ? "right-[14px] translate-x-1/2" : "left-[14px] -translate-x-1/2",
             edge,
             side === "top" ? "-bottom-[5.5px] border-b border-r" : "-top-[5.5px] border-l border-t",
           )}
@@ -93,13 +97,39 @@ export function VoteCallout(
 }
 
 /**
- * The vote floor on a funding bar: a 1px mark a little taller than the bar,
- * quiet until the bar reaches it. The parent is `relative`.
+ * "$2k to qualify" (or "Qualified for the vote"): the callout over the vote floor's
+ * mark, for initiatives close to the floor. The floor sits on the left of the bar, so
+ * it grows rightwards from the mark.
  */
-export function VoteTick({ at, reached }: { at: number; reached: boolean }) {
+export function VoteCallout(
+  { state, at, side }: { state: CalloutState; at: number; side: "top" | "bottom" },
+) {
+  const ok = state.kind === "eligible";
+  return (
+    <Callout
+      at={at}
+      side={side}
+      edge={ok ? "border-[rgba(92,183,90,.6)]" : "border-white/30"}
+      className="flex items-center gap-1 whitespace-nowrap"
+    >
+      {ok && <Check className="size-3 text-dao-green" strokeWidth={3} aria-hidden="true" />}
+      {calloutLabel(state)}
+    </Callout>
+  );
+}
+
+/**
+ * A mark on a funding bar, 1px and a little taller than the bar: the vote floor,
+ * quiet once the bar reaches it, or (`whatIf`) where the vote results' next tier is
+ * reached. The parent is `relative`.
+ */
+export function VoteTick(
+  { at, reached, whatIf = false }: { at: number; reached: boolean; whatIf?: boolean },
+) {
   return (
     <span
       data-vote-tick
+      data-what-if={whatIf || undefined}
       aria-hidden="true"
       className={cn(
         "pointer-events-none absolute -inset-y-[2px] w-px rounded-full",

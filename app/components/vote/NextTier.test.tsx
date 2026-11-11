@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import type { NextTierEntry } from "~/hooks/use-vote";
-import { LeadFigure, NextTierFigure } from "./NextTier";
+import { whatIf, WhatIfCallout, WhatIfFigure, whatIfText, whatIfTick } from "./NextTier";
 
 afterEach(cleanup);
 
@@ -17,117 +17,135 @@ const entry = (over: Partial<NextTierEntry> = {}): NextTierEntry => ({
   moves: [],
   ...over,
 });
+const gapOf = (over: Partial<NextTierEntry> = {}) => ({ kind: "gap" as const, next: entry(over) });
 
-it("shows the gap to the next tier, rounded up", () => {
-  render(<NextTierFigure next={entry()} titles={titles} />);
+it("Tier-S says its lead (from $1K), any other tier its gap", () => {
+  expect(whatIf({ tier: "S", lead: "12400000000", next: entry() })).toEqual({
+    kind: "lead",
+    amount: 12_400,
+  });
+  // Under one $1K step there is nothing to say; Tier-S has nothing above it.
+  expect(whatIf({ tier: "S", lead: "999999999" })).toBeNull();
+  expect(whatIf({ tier: "S", next: entry() })).toBeNull();
+  expect(whatIf({ tier: "A", next: entry() })).toEqual(gapOf());
+  expect(whatIf({ next: entry({ tier: "B" }) })).toEqual(gapOf({ tier: "B" }));
+  expect(whatIf({ tier: "A" })).toBeNull();
+});
+
+it("the tick sits at raised plus the gap, on the ask's scale, capped at the end", () => {
+  // Raised $0, ask $44k, $23k to Tier-S: 52.3%.
+  expect(whatIfTick(gapOf({ gap: "23000000000" }), 0, 44_000)).toBeCloseTo(52.27, 1);
+  expect(whatIfTick(gapOf({ gap: "23000000000" }), 10_000, 44_000)).toBeCloseTo(75, 5);
+  expect(whatIfTick(gapOf({ gap: "90000000000" }), 0, 44_000)).toBe(100);
+  // No tick out of reach, for a lead, or without an ask.
+  expect(whatIfTick(gapOf({ gap: null }), 0, 44_000)).toBeUndefined();
+  expect(whatIfTick({ kind: "lead", amount: 46_000 }, 0, 44_000)).toBeUndefined();
+  expect(whatIfTick(gapOf(), 0, 0)).toBeUndefined();
+  expect(whatIfTick(null, 0, 44_000)).toBeUndefined();
+});
+
+it("the figure is plain text: the value big, the words small, rounded up", () => {
+  const { container } = render(<WhatIfFigure w={gapOf()} />);
   // usdShort writes thousands with a lowercase k.
-  expect(screen.getByRole("button", { name: "$42k to Tier-S" })).toBeInTheDocument();
-  // A narrow column wraps before the tier, never inside "Tier-S".
+  expect(container).toHaveTextContent("$42k to Tier-S");
+  expect(screen.getByText("$42k").tagName).toBe("B");
   expect(screen.getByText("Tier-S")).toHaveClass("whitespace-nowrap");
-});
-
-it("out of reach", () => {
-  render(<NextTierFigure next={entry({ gap: null, tier: "B" })} titles={titles} />);
-  const tier = screen.getByText("Tier-B");
-  expect(tier).toHaveClass("whitespace-nowrap");
-  expect(tier.parentElement).toHaveTextContent("Out of reach for Tier-B");
+  expect(screen.getByText("Tier-S").closest("small")).not.toBeNull();
   expect(screen.queryByRole("button")).toBeNull();
+  expect(container.querySelector(".cursor-help, .underline, .decoration-dotted")).toBeNull();
 });
 
-it("the hover lists who comes in and who drops out", () => {
-  render(
-    <NextTierFigure
-      next={entry({
-        comesIn: [{ slug: "beta", tier: "A" }],
-        dropsOut: [{ slug: "gamma", tier: "B" }],
-        moves: [{ slug: "delta", from: "A", to: "S" }],
-      })}
-      titles={titles}
-    />,
+it("out of reach and a lead read as plain text too", () => {
+  const { container, rerender } = render(<WhatIfFigure w={gapOf({ gap: null, tier: "B" })} />);
+  expect(container).toHaveTextContent("Out of reach for Tier-B");
+  expect(screen.getByText("Tier-B")).toHaveClass("whitespace-nowrap");
+  rerender(<WhatIfFigure w={{ kind: "lead", amount: 12_400 }} />);
+  expect(container).toHaveTextContent("$12k ahead");
+  expect(screen.queryByRole("button")).toBeNull();
+  expect(container.querySelector(".cursor-help, .underline, .decoration-dotted")).toBeNull();
+});
+
+it("during the vote the callout lists who comes in, drops out or moves", () => {
+  const { container } = render(
+    <div className="relative">
+      <WhatIfCallout
+        w={gapOf({
+          comesIn: [{ slug: "beta", tier: "A" }],
+          dropsOut: [{ slug: "gamma", tier: "B" }],
+          moves: [{ slug: "delta", from: "A", to: "S" }],
+        })}
+        at={30}
+        side="bottom"
+        titles={titles}
+      />
+    </div>,
   );
-  const button = screen.getByRole("button");
-  expect(screen.queryByRole("tooltip")).toBeNull();
-  fireEvent.focus(button);
-  const tip = screen.getByRole("tooltip");
-  expect(button).toHaveAttribute("aria-describedby", tip.id);
-  expect(tip).toHaveTextContent("With $42k more backing:");
-  expect(tip).toHaveTextContent("Comes in: Beta audits (Tier-A)");
-  expect(tip).toHaveTextContent("Drops out: Gamma tools (Tier-B)");
-  expect(tip).toHaveTextContent("Moves: Delta docs Tier-A → Tier-S");
-  fireEvent.keyDown(button, { key: "Escape" });
-  expect(screen.queryByRole("tooltip")).toBeNull();
-});
-
-it("opens on hover and on tap, closes on blur", () => {
-  render(<NextTierFigure next={entry()} titles={titles} />);
-  const button = screen.getByRole("button");
-  fireEvent.mouseEnter(button);
-  expect(screen.getByRole("tooltip")).toBeInTheDocument();
-  fireEvent.mouseLeave(button);
-  expect(screen.queryByRole("tooltip")).toBeNull();
-  fireEvent.click(button);
-  expect(screen.getByRole("tooltip")).toBeInTheDocument();
-  fireEvent.blur(button);
-  expect(screen.queryByRole("tooltip")).toBeNull();
+  const callout = container.querySelector("[data-vote-callout]") as HTMLElement;
+  expect(callout).toHaveTextContent("$42k to Tier-S");
+  expect(callout).toHaveTextContent("Comes in: Beta audits (Tier-A)");
+  expect(callout).toHaveTextContent("Drops out: Gamma tools (Tier-B)");
+  expect(callout).toHaveTextContent("Moves: Delta docs Tier-A → Tier-S");
+  expect(callout).not.toHaveTextContent("Nothing else changes.");
+  // Its arrow on the tick: anchored 14px in from its left.
+  expect(callout.style.left).toBe("calc(30% - 14px)");
 });
 
 it("nothing else changes", () => {
-  render(<NextTierFigure next={entry()} titles={titles} />);
-  fireEvent.focus(screen.getByRole("button"));
-  expect(screen.getByRole("tooltip")).toHaveTextContent("Nothing else changes.");
+  render(<WhatIfCallout w={gapOf()} at={30} side="top" titles={titles} />);
+  expect(screen.getByText("Nothing else changes.")).toBeInTheDocument();
 });
 
-it("the hover first says where it stands now", () => {
-  render(<NextTierFigure next={entry()} now="A" titles={titles} />);
-  fireEvent.focus(screen.getByRole("button"));
-  expect(screen.getByRole("tooltip").firstChild).toHaveTextContent("Now Tier-A.");
-  cleanup();
-  render(<NextTierFigure next={entry({ tier: "B" })} titles={titles} />);
-  fireEvent.focus(screen.getByRole("button"));
-  expect(screen.getByRole("tooltip").firstChild).toHaveTextContent("Now not funded.");
-});
-
-it("Tier-S shows how far ahead it is", () => {
-  render(<LeadFigure lead="12400000000" />);
-  const button = screen.getByRole("button", { name: "$12k ahead" });
-  expect(button).toHaveClass("text-vote");
-  fireEvent.focus(button);
-  const tip = screen.getByRole("tooltip");
-  expect(tip).toHaveTextContent(
-    "Its backers could give this much less between them and it would still be funded in Tier-S.",
-  );
-  expect(screen.getByText("Tier-S")).toHaveClass("whitespace-nowrap");
-  fireEvent.keyDown(button, { key: "Escape" });
-  expect(screen.queryByRole("tooltip")).toBeNull();
-});
-
-it("a lead under $1K shows nothing", () => {
-  const { container } = render(<LeadFigure lead="999999999" />);
-  expect(container).toBeEmptyDOMElement();
-});
-
-it("after the vote, the hover names the target tier", () => {
-  render(
-    <NextTierFigure
+it("after the vote, the callout names the target tier", () => {
+  const { container } = render(
+    <WhatIfCallout
       final
-      next={entry({
+      w={gapOf({
         comesIn: [{ slug: "beta", tier: "S" }],
         dropsOut: [{ slug: "gamma", tier: "S" }],
       })}
-      now="A"
+      at={30}
+      side="top"
       titles={titles}
     />,
   );
-  fireEvent.focus(screen.getByRole("button", { name: "$42k to Tier-S" }));
-  const tip = screen.getByRole("tooltip");
-  expect(tip).toHaveTextContent("With $42k more backing it would have made Tier-S:");
-  expect(tip).toHaveTextContent("Comes into Tier-S: Beta audits");
-  expect(tip).toHaveTextContent("Drops out of Tier-S: Gamma tools");
-  expect(tip).not.toHaveTextContent("Now");
+  const callout = container.querySelector("[data-vote-callout]")!;
+  expect(callout).toHaveTextContent("Comes into Tier-S: Beta audits");
+  expect(callout).toHaveTextContent("Drops out of Tier-S: Gamma tools");
 });
 
-it("a label replaces the trigger text", () => {
-  render(<NextTierFigure final label="needed $30k" next={entry({ tier: "B" })} titles={titles} />);
-  fireEvent.focus(screen.getByRole("button", { name: "needed $30k" }));
-  expect(screen.getByRole("tooltip")).toHaveTextContent("Nothing else changes.");
+it("a lead's callout sits at the bar's end and says what it means", () => {
+  const { container } = render(
+    <WhatIfCallout w={{ kind: "lead", amount: 46_000 }} side="bottom" titles={titles} />,
+  );
+  const callout = container.querySelector("[data-vote-callout]") as HTMLElement;
+  expect(callout).toHaveTextContent("$46k ahead");
+  expect(callout).toHaveTextContent(
+    "Its backers could give this much less between them and it would still be funded in Tier-S.",
+  );
+  // At the end, anchored on its right so it opens back over the bar.
+  expect(callout.style.right).toBe("calc(0% - 14px)");
+  expect(callout.style.left).toBe("");
+});
+
+it("out of reach: the callout at the bar's end, no knock-on", () => {
+  const { container } = render(
+    <WhatIfCallout w={gapOf({ gap: null, tier: "B" })} side="bottom" titles={titles} />,
+  );
+  const callout = container.querySelector("[data-vote-callout]") as HTMLElement;
+  expect(callout).toHaveTextContent("Out of reach for Tier-B");
+  expect(callout).not.toHaveTextContent("Nothing else changes.");
+  expect(callout.style.right).toBe("calc(0% - 14px)");
+});
+
+it("screen readers hear the same in one go", () => {
+  expect(whatIfText(gapOf({ dropsOut: [{ slug: "gamma", tier: "S" }] }), titles, true)).toBe(
+    "$42k to Tier-S. Drops out of Tier-S: Gamma tools.",
+  );
+  expect(whatIfText(gapOf(), titles, false)).toBe("$42k to Tier-S. Nothing else changes.");
+  expect(whatIfText({ kind: "lead", amount: 46_000 }, titles, false)).toBe(
+    "$46k ahead. Its backers could give this much less between them and it would still be funded in Tier-S.",
+  );
+  expect(whatIfText(gapOf({ gap: null, tier: "B" }), titles, false)).toBe(
+    "Out of reach for Tier-B.",
+  );
 });

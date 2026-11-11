@@ -1,157 +1,151 @@
-import { useId, useState } from "react";
 import { type Tier, tierName } from "@shared/vote/ballot";
 import type { NextTierEntry } from "~/hooks/use-vote";
+import { Callout } from "~/components/board/VoteMark";
 import { usdShort, usdShortUp } from "~/lib/format";
 import { dollars } from "~/lib/vote-results";
 
-/** In a list cell the figure wraps (two lines at most in its column) instead of spilling
- * into the neighbours: right-aligned, tight leading, never wider than its cell. */
-const WRAP = "block max-w-full whitespace-normal text-right text-[12px] leading-tight";
+/**
+ * What the vote results say about one initiative: a Tier-S initiative how far ahead
+ * it is (`amount`, dollars), any other how much more backing takes it to the next tier
+ * (`next`, whose gap is null when no amount alone gets it there).
+ */
+export type WhatIf =
+  | { kind: "lead"; amount: number }
+  | { kind: "gap"; next: NextTierEntry };
 
-/** One line of the hover: who comes in, drops out or moves, if anyone does. */
-function Line({ label, items }: { label: string; items: string[] }) {
-  if (items.length === 0) return null;
-  return (
-    <p className="m-0 mt-1">
-      <b className="font-semibold text-white">{label}:</b> {items.join(", ")}
-    </p>
-  );
+/** The initiative's what-if, or null when the round has nothing for it. A Tier-S lead
+ * under one $1K step says nothing, and Tier-S has no tier above to reach. */
+export function whatIf(
+  { tier, next, lead }: { tier?: Tier; next?: NextTierEntry; lead?: string },
+): WhatIf | null {
+  if (tier === "S") {
+    const amount = lead ? dollars(lead) : 0;
+    return amount >= 1000 ? { kind: "lead", amount } : null;
+  }
+  return next ? { kind: "gap", next } : null;
 }
 
-const TIP =
-  "absolute bottom-full right-0 z-20 mb-2 block w-64 rounded-lg border border-white/30 bg-panel p-2.5 text-left text-[12px] font-normal leading-snug text-white/70 shadow-[0_2px_6px_rgba(0,0,0,.3)]";
+/** Where the tick goes, % of the bar (the ask): what donors and pledgers raised plus the
+ * gap, capped at the bar's end. Undefined (no tick) for a lead, for a gap no amount
+ * closes, and without an ask to measure against. */
+export function whatIfTick(w: WhatIf | null, raised: number, goal: number): number | undefined {
+  if (w?.kind !== "gap" || w.next.gap === null || goal <= 0) return undefined;
+  return Math.min(100, ((raised + dollars(w.next.gap)) / goal) * 100);
+}
 
-/** A trigger with a small tooltip: opens on hover, on focus and on a tap (touch has no
- * hover), closes on Escape, on blur or when the pointer leaves. */
-function HoverTip(
-  { trigger, className, children }: {
-    trigger: React.ReactNode;
-    className: string;
-    children: React.ReactNode;
-  },
-) {
-  const [open, setOpen] = useState(false);
-  const id = useId();
+/** The value and its words: "$23k" and "to Tier-S", "$46k" and "ahead", or no value and
+ * "Out of reach for Tier-B". Gaps round up, so they never read as less than they are. */
+function parts(w: WhatIf): { value?: string; words: React.ReactNode; text: string } {
+  if (w.kind === "lead") return { value: usdShort(w.amount), words: "ahead", text: "ahead" };
+  const name = tierName(w.next.tier);
+  // A tier's name never breaks inside "Tier-S".
+  const tier = <span className="whitespace-nowrap">{name}</span>;
+  if (w.next.gap === null) {
+    return { words: <>Out of reach for {tier}</>, text: `Out of reach for ${name}` };
+  }
+  return { value: usdShortUp(dollars(w.next.gap)), words: <>to {tier}</>, text: `to ${name}` };
+}
+
+/** The knock-on lines: who comes into or drops out of the target tier (after the vote,
+ * where lower tiers were decided later), or who comes in, drops out or moves anywhere
+ * (during it). Empty when nothing else changes. */
+function knockOn(
+  next: NextTierEntry,
+  titles: ReadonlyMap<string, string> | undefined,
+  final: boolean,
+): { label: string; items: string[] }[] {
+  const title = (slug: string) => titles?.get(slug) ?? slug;
+  const name = tierName(next.tier);
+  const named = (e: { slug: string; tier: Tier }) =>
+    final ? title(e.slug) : `${title(e.slug)} (${tierName(e.tier)})`;
+  return [
+    { label: final ? `Comes into ${name}` : "Comes in", items: next.comesIn.map(named) },
+    { label: final ? `Drops out of ${name}` : "Drops out", items: next.dropsOut.map(named) },
+    {
+      label: "Moves",
+      items: next.moves.map((e) => `${title(e.slug)} ${tierName(e.from)} → ${tierName(e.to)}`),
+    },
+  ].filter((l) => l.items.length > 0);
+}
+
+const LEAD_NOTE =
+  "Its backers could give this much less between them and it would still be funded in";
+
+/**
+ * The figure as plain text, the value big and the words small: "$23k to Tier-S",
+ * "$46k ahead", "Out of reach for Tier-B". On a card it sits in the amount row; the
+ * details are in the bar's callout.
+ */
+export function WhatIfFigure({ w }: { w: WhatIf }) {
+  const { value, words } = parts(w);
   return (
-    <span className={`relative ${WRAP}`}>
-      <button
-        type="button"
-        aria-describedby={open ? id : undefined}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onClick={() => setOpen(true)}
-        onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
-        className={`cursor-help rounded border-0 bg-transparent p-0 font-[inherit] ${WRAP} underline decoration-dotted underline-offset-2 ${className}`}
-      >
-        {trigger}
-      </button>
-      {open && <span id={id} role="tooltip" className={TIP}>{children}</span>}
+    <span data-what-if-figure className="whitespace-nowrap px-1 leading-none">
+      {value && <b className="font-inter-tight text-[15px] font-semibold text-vote">{value}</b>}
+      {value && " "}
+      <small className="text-[11.5px] text-white/55">{words}</small>
     </span>
   );
 }
 
-/** How far ahead a Tier-S initiative is: how much less its backers could give, between
- * them, and it would still be funded in Tier-S. `lead` is micro-USD; under one $1K step
- * there is nothing to say. */
-export function LeadFigure({ lead }: { lead: string }) {
-  const amount = dollars(lead);
-  if (amount < 1000) return null;
-  return (
-    <HoverTip trigger={<>{usdShort(amount)} ahead</>} className="text-vote">
-      Its backers could give this much less between them and it would still be funded in{" "}
-      <span className="whitespace-nowrap">Tier-S</span>.
-    </HoverTip>
-  );
+/** The same, said in one go, for screen readers (the bar and its callout are hidden from them). */
+export function whatIfText(
+  w: WhatIf,
+  titles: ReadonlyMap<string, string> | undefined,
+  final: boolean,
+): string {
+  const { value, text } = parts(w);
+  const head = value ? `${value} ${text}.` : `${text}.`;
+  if (w.kind === "lead") return `${head} ${LEAD_NOTE} Tier-S.`;
+  if (w.next.gap === null) return head;
+  const lines = knockOn(w.next, titles, final);
+  return lines.length
+    ? `${head} ${lines.map((l) => `${l.label}: ${l.items.join(", ")}.`).join(" ")}`
+    : `${head} Nothing else changes.`;
 }
 
 /**
- * How much more backing moves an initiative up a tier, and what that would change.
- * The detail opens on hover, on focus and on a tap (touch has no hover), and closes
- * on Escape, on blur or when the pointer leaves. Without an amount that gets it
- * there, it is only a sentence. `now` is its tier in the live tally, if it is funded.
+ * The bar's callout for a what-if, in the look of the "qualify" callout: its arrow on
+ * the tick, or at the bar's end when there is no tick (Tier-S, out of reach). The value
+ * big, the words small, then the knock-on lines (or "Nothing else changes."), or for
+ * Tier-S what the lead means. A tick past the bar's middle anchors it on the right, so
+ * it opens towards the bar and stays in the row.
  */
-export function NextTierFigure(
-  { next, now, titles, label, final }: {
-    next: NextTierEntry;
-    now?: Tier;
-    titles: ReadonlyMap<string, string>;
-    /** Replaces the trigger text ("needed $X" on a row the vote did not fund). */
-    label?: string;
-    /** After the vote: the knock-on lists name only the target tier, and there is no "Now"
-     * line (the row already says where the initiative finished). */
+export function WhatIfCallout(
+  { w, at, side, titles, final = false }: {
+    w: WhatIf;
+    /** The tick, % of the bar; undefined puts the callout at the bar's end. */
+    at?: number;
+    side: "top" | "bottom";
+    titles?: ReadonlyMap<string, string>;
     final?: boolean;
   },
 ) {
-  const name = tierName(next.tier);
-  if (next.gap === null) {
-    return (
-      <span className={`${WRAP} text-white/40`}>
-        Out of reach for <span className="whitespace-nowrap">{name}</span>
-      </span>
-    );
-  }
-  const title = (slug: string) => titles.get(slug) ?? slug;
-  const gap = usdShortUp(dollars(next.gap));
-  const named = (e: { slug: string; tier: Tier }) =>
-    final ? title(e.slug) : `${title(e.slug)} (${tierName(e.tier)})`;
-  const lines = {
-    comesIn: next.comesIn.map(named),
-    dropsOut: next.dropsOut.map(named),
-    moves: next.moves.map((e) => `${title(e.slug)} ${tierName(e.from)} → ${tierName(e.to)}`),
-  };
-  const none = !lines.comesIn.length && !lines.dropsOut.length && !lines.moves.length;
+  const { value, words } = parts(w);
+  const pos = at ?? 100;
+  const lines = w.kind === "gap" && w.next.gap !== null ? knockOn(w.next, titles, final) : null;
   return (
-    <HoverTip
-      className={label ? "text-white/45" : "text-vote"}
-      trigger={label ?? (
-        // In a narrow column it wraps before the tier, never inside "Tier-S".
-        <>
-          {gap} to <span className="whitespace-nowrap">{name}</span>
-        </>
-      )}
+    <Callout
+      at={pos}
+      side={side}
+      align={pos > 50 ? "end" : "start"}
+      className="w-60 whitespace-normal px-2.5 py-2 text-[12px] font-normal leading-snug text-white/70"
     >
-      {!final && <p className="m-0 mb-1">{now ? `Now ${tierName(now)}.` : "Now not funded."}</p>}
-      {/* The search backs it first of all, so this is the least it could take. */}
-      <b className="font-semibold text-white">
-        {final
-          ? (
-            <>
-              With {gap} more backing it would have made{" "}
-              <span className="whitespace-nowrap">{name}</span>:
-            </>
-          )
-          : <>With {gap} more backing:</>}
-      </b>
-      {none ? <p className="m-0 mt-1">Nothing else changes.</p> : (
-        <>
-          <Line label={final ? `Comes into ${name}` : "Comes in"} items={lines.comesIn} />
-          <Line label={final ? `Drops out of ${name}` : "Drops out"} items={lines.dropsOut} />
-          <Line label="Moves" items={lines.moves} />
-        </>
+      <span className="block whitespace-nowrap text-white">
+        {value && <b className="font-inter-tight text-[16px] font-semibold text-vote">{value}</b>}
+        {value && " "}
+        <small className="text-[12px] text-white/70">{words}</small>
+      </span>
+      {w.kind === "lead" && (
+        <span className="mt-1 block">
+          {LEAD_NOTE} <span className="whitespace-nowrap">Tier-S</span>.
+        </span>
       )}
-    </HoverTip>
+      {lines && lines.length === 0 && <span className="mt-1 block">Nothing else changes.</span>}
+      {lines?.map((l) => (
+        <span key={l.label} className="mt-1 block">
+          <b className="font-semibold text-white">{l.label}:</b> {l.items.join(", ")}
+        </span>
+      ))}
+    </Callout>
   );
-}
-
-/** What a row of the closed vote shows in place of its tier chip or "needed $X", or null
- * when the round has nothing for it: Tier-S rows their lead, Tier-A/B rows the gap to the
- * tier above, and a row the vote did not fund its "needed $X" as the trigger of what
- * would have happened. `needed` is that text. */
-export function finalFigure(
-  { tier, next, lead, titles, needed }: {
-    tier?: Tier;
-    next?: NextTierEntry;
-    lead?: string;
-    titles?: ReadonlyMap<string, string>;
-    needed: string;
-  },
-): React.ReactNode | null {
-  if (tier === "S") return lead ? <LeadFigure lead={lead} /> : null;
-  if (!next || !titles) return null;
-  if (tier) return <NextTierFigure next={next} titles={titles} final />;
-  return next.gap === null
-    ? null
-    : <NextTierFigure next={next} titles={titles} final label={needed} />;
 }

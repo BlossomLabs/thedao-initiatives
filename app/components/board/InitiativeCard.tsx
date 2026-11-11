@@ -8,7 +8,7 @@ import { fullyFunded } from "~/lib/board-view";
 import CardTitle from "./CardTitle";
 import WatchlistButton from "~/components/board/WatchlistButton";
 import FundingStatus from "~/components/board/FundingStatus";
-import { finalFigure, LeadFigure, NextTierFigure } from "~/components/vote/NextTier";
+import { whatIf, WhatIfCallout, WhatIfFigure, whatIfTick } from "~/components/vote/NextTier";
 import type { NextTierEntry } from "~/hooks/use-vote";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import Bar from "~/components/ui/Bar";
@@ -26,7 +26,6 @@ import { lazyPart } from "~/lib/lazy-part";
 import Reveal from "~/components/ui/Reveal";
 import type { Card } from "~/lib/api-types";
 import { pctText, plural, usd, usdShort } from "~/lib/format";
-import { neededUsd } from "~/lib/vote-results";
 import { usePrefetchInitiative } from "~/hooks/use-initiative";
 import { cn } from "~/lib/utils";
 import RatingChip, { RatingForm } from "~/components/ratings/RatingChip";
@@ -169,16 +168,15 @@ export default function InitiativeCard({
   const pctOn = vote?.show
     ? voteStanding(summary.total, r.goalUsd, vote).kind === "eligible"
     : !zero;
-  const needed = `needed ${usdShort(neededUsd(card))}`;
-  // After the vote the figure takes the place of the tier chip and of "needed $X"; with
-  // nothing for the card, they stay.
-  const closedFigure = final !== undefined
-    ? finalFigure({ tier: voteTier, next, lead, titles, needed })
-    : null;
+  // The vote results' what-if: Tier-S's lead, or the gap to the next tier (to Tier-B for
+  // one the vote didn't fund). Its tick and callout sit on the bar; the figure stays in
+  // the amount row.
+  const w = whatIf({ tier: voteTier, next, lead });
+  const wTick = whatIfTick(w, summary.total, r.goalUsd);
   const tick = vote ? voteFloorPct(r.goalUsd, vote) : 0;
   // Near the floor or past it: always shown. Otherwise the card shows it on hover or tap.
   const callout = voteCallout(summary.total, r.goalUsd, vote);
-  const reveal = useVoteReveal(Boolean(vote?.show) && !callout);
+  const reveal = useVoteReveal(Boolean(w) || (Boolean(vote?.show) && !callout));
   const shown = callout ??
     (reveal.open && vote ? voteStanding(summary.total, r.goalUsd, vote) : null);
   // The top edge: AI pick or New, then the Featured pin.
@@ -210,7 +208,28 @@ export default function InitiativeCard({
       <p className="mb-5 mt-2.5 line-clamp-3 min-h-[42px] text-[13px] leading-[1.6] text-white/55">
         {r.summary}
       </p>
-      {vote?.show
+      {w
+        ? (
+          <Bar
+            pct={pct}
+            votePct={votePct}
+            votePendingPct={votePendingPct}
+            tick={wTick}
+            whatIf
+            className="mt-auto"
+          >
+            {reveal.open && (
+              <WhatIfCallout
+                w={w}
+                at={wTick}
+                side="top"
+                titles={titles}
+                final={final !== undefined}
+              />
+            )}
+          </Bar>
+        )
+        : vote?.show
         ? (
           // Room above the bar for the callout.
           <div className={cn("mt-auto", callout && "pt-9")}>
@@ -248,27 +267,22 @@ export default function InitiativeCard({
             <span className="text-[12px] text-white/30">· {plural(backers, "backer")}</span>
           )}
         </span>
-        {closedFigure ? closedFigure : final === undefined && voteTier === "S" && lead
-          // Tier-S keeps its chip and says how far ahead it is.
+        {w && final !== undefined
+          // After the vote the figure takes the place of the tier chip (the section names it).
+          ? <WhatIfFigure w={w} />
+          : w
           ? (
-            <span className="flex min-w-0 items-center gap-2">
-              <FundingStatus tier={voteTier} byVote />
-              <LeadFigure lead={lead} />
-            </span>
-          )
-          : next && titles && final === undefined
-          ? (
-            // Funded now: its tier stays in sight beside what the next one would take.
-            <span className="flex min-w-0 items-center gap-2">
+            // During the vote its tier stays in sight beside the figure.
+            <span className="flex min-w-0 items-center gap-3">
               {voteTier && <FundingStatus tier={voteTier} byVote />}
-              <NextTierFigure next={next} now={voteTier} titles={titles} />
+              <WhatIfFigure w={w} />
             </span>
           )
           : funded || fullyFunded(card, votePct) || (final !== undefined && voteTier)
           ? <FundingStatus tier={voteTier} byVote={(votePct ?? 0) > 0 || final !== undefined} />
           : final !== undefined
-          // The vote didn't fund it: what it still needs, in place of the %.
-          ? <span className="text-[12px] text-white/45">{needed}</span>
+          // Not funded and nothing computed for it yet: the final amount says it all.
+          ? null
           : (
             <span className="flex items-center gap-2">
               <span

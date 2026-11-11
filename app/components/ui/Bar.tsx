@@ -20,30 +20,37 @@ export function voteSegments(pct: number, votePct = 0, pendingPct = 0) {
   };
 }
 
-/** Progress bar; `tick` marks the vote floor (a percentage), `label` is what a screen reader hears. */
+/** Progress bar; `tick` marks the vote floor (a percentage), or with `whatIf` where the vote
+ * results' next tier is reached; `label` is what a screen reader hears. */
 export default function Bar(
-  { pct, big, tick, label, className, children, votePct, votePendingPct }: {
+  { pct, big, tick, whatIf, label, className, children, votePct, votePendingPct }: {
     pct: number;
     /** The vote's share (% of the goal), drawn in gold after the raised part. */
     votePct?: number;
     /** The part of `votePct` a settling tier would add if it settled now (lighter gold). */
     votePendingPct?: number;
-    /** Drawn over the bar with the tick (the vote callout). */
+    /** Drawn over the bar with the tick (the vote callout), or without one (a what-if
+     * callout at the bar's end). */
     children?: React.ReactNode;
     big?: boolean;
     tick?: number;
+    /** The vote results' what-if: the tick marks where the next tier is reached. */
+    whatIf?: boolean;
     label?: string;
     className?: string;
   },
 ) {
   const seg = voteSegments(pct, votePct, votePendingPct);
+  // A tick or a callout needs the bar wrapped in a box they can sit on. A what-if bar
+  // keeps that box while its callout is closed, so hovering never rebuilds the bar.
+  const marked = tick !== undefined || Boolean(whatIf) || (children != null && children !== false);
   const bar = (
     <div
       className={cn(
         "bar",
         big && "bar-big",
         votePct !== undefined && "relative",
-        tick === undefined && className,
+        !marked && className,
       )}
       role="progressbar"
       aria-valuenow={pct}
@@ -68,11 +75,11 @@ export default function Bar(
       )}
     </div>
   );
-  if (tick === undefined) return bar;
+  if (!marked) return bar;
   return (
     <div className={cn("relative", big && "max-w-[760px]", className)}>
       {bar}
-      <VoteTick at={tick} reached={pct >= tick} />
+      {tick !== undefined && <VoteTick at={tick} reached={pct >= tick} whatIf={whatIf} />}
       {children}
     </div>
   );

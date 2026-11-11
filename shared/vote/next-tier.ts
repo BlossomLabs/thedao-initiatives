@@ -1,10 +1,12 @@
 /** For each initiative, how much more backing it needs to be funded one tier higher,
  * and who would come in or drop out if it were. The tally is re-run with a made-up
- * voter ("phantom") who backs only that initiative. Pure; browser and Deno. */
+ * voter ("phantom") who backs only that initiative. Also how far ahead a Tier-S
+ * initiative is, and the same figures judged at each settlement once the round has
+ * closed. Pure; browser and Deno. */
 import { type Tier, TIERS } from "./ballot.ts";
 import { type ChainInputs, chainTally } from "./chain.ts";
 
-/** Gaps are whole $1K steps, rounded up. */
+/** Gaps are whole $1K steps, rounded up; leads are rounded down. */
 export const STEP = 1_000_000_000n;
 
 export type NextTier = {
@@ -43,8 +45,74 @@ function withPhantom(inp: ChainInputs, c: number, weight: bigint): ChainInputs {
   };
 }
 
-/** The search. It yields after every tally it runs, so the async variant can let other
- * work in between; it returns the entries. */
+/** The gap search for one initiative, against `live` (the run from `first` without a
+ * phantom). The searches are generators that yield after every tally they run, so the
+ * async variants can let other work in between; they return the result. */
+function* gapSearch(
+  inp: ChainInputs,
+  first: number,
+  c: number,
+  target: number,
+  live: Map<number, number>,
+  tally: Tally,
+  onlyTarget: boolean,
+): Generator<void, NextTier> {
+  const entry: NextTier = {
+    tier: TIERS[target],
+    gap: null,
+    comesIn: [],
+    dropsOut: [],
+    moves: [],
+  };
+  // A target before the first tier counted has already settled: nothing can reach it.
+  if (target < first) return entry;
+  const room = inp.poolUsd - inp.spent;
+  const hiSteps = room / STEP; // bigint division rounds down
+  const run = (k: bigint) => tiersOf(tally, withPhantom(inp, c, k * STEP), first);
+  const reaches = (r: Map<number, number>) => r.has(c) && r.get(c)! <= target;
+  // What's left of the pool can't pay for it, whoever backs it.
+  if (hiSteps < 1n || inp.costs[c] > room) return entry;
+  // Backing its whole need almost always gets it there, so look below that first, and
+  // up to the whole pool only when it doesn't.
+  const need = (inp.costs[c] + STEP - 1n) / STEP;
+  const cap = need < 1n ? 1n : need < hiSteps ? need : hiSteps;
+  let hi = cap, after = run(cap);
+  yield;
+  if (!reaches(after)) {
+    if (cap === hiSteps) return entry;
+    [hi, after] = [hiSteps, run(hiSteps)];
+    yield;
+    if (!reaches(after)) return entry;
+  }
+  // Reaching is not assumed monotone in the amount: the search only ever returns a
+  // step whose run reached, and keeps that run for the knock-on.
+  let lo = 1n;
+  while (lo < hi) {
+    const mid = (lo + hi) / 2n;
+    const r = run(mid);
+    yield;
+    if (reaches(r)) [hi, after] = [mid, r];
+    else lo = mid + 1n;
+  }
+  entry.gap = hi * STEP;
+  for (let o = 0; o < inp.m; o++) {
+    if (o === c) continue;
+    const was = live.get(o), is = after.get(o);
+    if (onlyTarget) {
+      // The tiers below the target settle later, so where an initiative pushed out of
+      // it would finally have landed isn't known: only the target tier is listed.
+      if (was !== target && is === target) entry.comesIn.push([o, TIERS[target]]);
+      else if (was === target && is !== target) entry.dropsOut.push([o, TIERS[target]]);
+    } else if (was === undefined && is !== undefined) entry.comesIn.push([o, TIERS[is]]);
+    else if (was !== undefined && is === undefined) entry.dropsOut.push([o, TIERS[was]]);
+    else if (was !== undefined && is !== undefined && was !== is) {
+      entry.moves.push([o, TIERS[was], TIERS[is]]);
+    }
+  }
+  return entry;
+}
+
+/** Every open initiative's gap to the tier above where the live tally puts it. */
 function* search(
   inp: ChainInputs,
   firstOpen: number,
@@ -52,60 +120,119 @@ function* search(
 ): Generator<void, Map<number, NextTier>> {
   const live = tiersOf(tally, inp, firstOpen);
   yield;
-  const room = inp.poolUsd - inp.spent;
-  const hiSteps = room / STEP; // bigint division rounds down
   const out = new Map<number, NextTier>();
   for (let c = 0; c < inp.m; c++) {
     if (inp.done.has(c)) continue;
     const now = live.get(c);
     const target = now === undefined ? TIERS.length - 1 : now - 1;
     if (target < firstOpen || target < 0) continue;
-    const run = (k: bigint) => tiersOf(tally, withPhantom(inp, c, k * STEP), firstOpen);
-    const reaches = (r: Map<number, number>) => r.has(c) && r.get(c)! <= target;
-    const entry: NextTier = {
-      tier: TIERS[target],
-      gap: null,
-      comesIn: [],
-      dropsOut: [],
-      moves: [],
-    };
-    out.set(c, entry);
-    // What's left of the pool can't pay for it, whoever backs it.
-    if (hiSteps < 1n || inp.costs[c] > room) continue;
-    // Backing its whole need almost always gets it there, so look below that first, and
-    // up to the whole pool only when it doesn't.
-    const need = (inp.costs[c] + STEP - 1n) / STEP;
-    const cap = need < 1n ? 1n : need < hiSteps ? need : hiSteps;
-    let hi = cap, after = run(cap);
-    yield;
-    if (!reaches(after)) {
-      if (cap === hiSteps) continue;
-      [hi, after] = [hiSteps, run(hiSteps)];
-      yield;
-      if (!reaches(after)) continue;
-    }
-    // Reaching is not assumed monotone in the amount: the search only ever returns a
-    // step whose run reached, and keeps that run for the knock-on.
-    let lo = 1n;
-    while (lo < hi) {
-      const mid = (lo + hi) / 2n;
-      const r = run(mid);
-      yield;
-      if (reaches(r)) [hi, after] = [mid, r];
-      else lo = mid + 1n;
-    }
-    entry.gap = hi * STEP;
-    for (let o = 0; o < inp.m; o++) {
-      if (o === c) continue;
-      const was = live.get(o), is = after.get(o);
-      if (was === undefined && is !== undefined) entry.comesIn.push([o, TIERS[is]]);
-      else if (was !== undefined && is === undefined) entry.dropsOut.push([o, TIERS[was]]);
-      else if (was !== undefined && is !== undefined && was !== is) {
-        entry.moves.push([o, TIERS[was], TIERS[is]]);
-      }
-    }
+    out.set(c, yield* gapSearch(inp, firstOpen, c, target, live, tally, false));
   }
   return out;
+}
+
+/** The lead search: the largest step verified to keep `c` funded in tier `first`. */
+function* leadSearch(
+  inp: ChainInputs,
+  first: number,
+  c: number,
+  tally: Tally,
+): Generator<void, bigint | null> {
+  // Raising the pool with the cost keeps the budget left for the others where it was.
+  const funded = (l: bigint) => {
+    const costs = inp.costs.map((x, i) => (i === c ? x + l * STEP : x));
+    const run = tally({ ...inp, costs, poolUsd: inp.poolUsd + l * STEP }, first, first + 1);
+    return run[0].order.includes(c);
+  };
+  const now = funded(0n);
+  yield;
+  if (!now) return null;
+  // Its backers can't pay more than everything the voters hold.
+  const hiSteps = inp.weights.reduce((a, b) => a + b, 0n) / STEP;
+  if (hiSteps < 1n) return 0n;
+  const top = funded(hiSteps);
+  yield;
+  if (top) return hiSteps * STEP;
+  // Not assumed monotone: `lo` is always a step that was funded, `hi` one that wasn't.
+  let lo = 0n, hi = hiSteps;
+  while (hi - lo > 1n) {
+    const mid = (lo + hi) / 2n;
+    const ok = funded(mid);
+    yield;
+    if (ok) lo = mid;
+    else hi = mid;
+  }
+  return lo * STEP;
+}
+
+function* liveLeadsSearch(
+  inp: ChainInputs,
+  firstOpen: number,
+  tally: Tally,
+): Generator<void, Map<number, bigint>> {
+  const out = new Map<number, bigint>();
+  if (firstOpen !== 0) return out;
+  const inS = tally(inp, 0, 1)[0].order;
+  yield;
+  for (const c of inS) {
+    const lead = yield* leadSearch(inp, 0, c, tally);
+    if (lead !== null) out.set(c, lead);
+  }
+  return out;
+}
+
+export type FinalWhatIfs = { next: Map<number, NextTier>; lead: Map<number, bigint> };
+
+function* finalSearch(
+  settleInputs: (ChainInputs | null)[],
+  finalTier: Map<number, number>,
+  m: number,
+  tally: Tally,
+): Generator<void, FinalWhatIfs> {
+  const next = new Map<number, NextTier>();
+  const lead = new Map<number, bigint>();
+  // A settlement nobody had voted at has nothing to compare against.
+  const at = (t: number) => {
+    const inp = settleInputs[t];
+    return inp && inp.voters.length > 0 ? inp : null;
+  };
+  // Each tier is judged where it would have had to win: at its own settlement.
+  function* gap(t: number, c: number): Generator<void, void> {
+    const inp = at(t);
+    if (!inp) return;
+    const live = tiersOf(tally, inp, t);
+    yield;
+    next.set(c, yield* gapSearch(inp, t, c, t, live, tally, true));
+  }
+  for (let c = 0; c < m; c++) {
+    const k = finalTier.get(c);
+    if (k === undefined) yield* gap(TIERS.length - 1, c);
+    else if (k >= 1) yield* gap(k - 1, c);
+    else {
+      const inp = at(0);
+      if (!inp) continue;
+      const l = yield* leadSearch(inp, 0, c, tally);
+      if (l !== null) lead.set(c, l);
+    }
+  }
+  return { next, lead };
+}
+
+function drive<T>(it: Generator<void, T>): T {
+  for (;;) {
+    const step = it.next();
+    if (step.done) return step.value;
+  }
+}
+
+/** `drive`, handing the event loop back after every tally: a server isolate keeps
+ * answering (ballot relays among them) while a large round is searched. */
+async function driveAsync<T>(it: Generator<void, T>): Promise<T> {
+  for (;;) {
+    const step = it.next();
+    if (step.done) return step.value;
+    await new Promise((r) => setTimeout(r, 0));
+  }
 }
 
 /** Keyed by initiative index; an initiative with no higher tier to reach has no entry.
@@ -115,24 +242,79 @@ export function nextTiers(
   firstOpen: number,
   tally: Tally = chainTally,
 ): Map<number, NextTier> {
-  const it = search(inp, firstOpen, tally);
-  for (;;) {
-    const step = it.next();
-    if (step.done) return step.value;
-  }
+  return drive(search(inp, firstOpen, tally));
 }
 
-/** `nextTiers`, handing the event loop back after every tally it runs: a server isolate
- * keeps answering (ballot relays among them) while a large round is searched. */
-export async function nextTiersAsync(
+/** `nextTiers`, yielding between tallies. */
+export function nextTiersAsync(
   inp: ChainInputs,
   firstOpen: number,
   tally: Tally = chainTally,
 ): Promise<Map<number, NextTier>> {
-  const it = search(inp, firstOpen, tally);
-  for (;;) {
-    const step = it.next();
-    if (step.done) return step.value;
-    await new Promise((r) => setTimeout(r, 0));
-  }
+  return driveAsync(search(inp, firstOpen, tally));
+}
+
+/** Gap for one initiative to reach `target` (tier index), judged with `inp` from tier `first`.
+ * `onlyTarget`: the knock-on lists only cover changes in the target tier. */
+export function gapTo(
+  inp: ChainInputs,
+  first: number,
+  c: number,
+  target: number,
+  opts: { onlyTarget?: boolean; tally?: Tally } = {},
+): NextTier {
+  const tally = opts.tally ?? chainTally;
+  const live = tiersOf(tally, inp, first);
+  return drive(gapSearch(inp, first, c, target, live, tally, opts.onlyTarget ?? false));
+}
+
+/** Largest STEP multiple L (rounded down) with c still funded in tier `first` when its cost
+ * and the pool are both raised by L; null when it isn't funded there at all; 0n under $1K. */
+export function leadIn(
+  inp: ChainInputs,
+  first: number,
+  c: number,
+  tally: Tally = chainTally,
+): bigint | null {
+  return drive(leadSearch(inp, first, c, tally));
+}
+
+/** Open round: leads for initiatives funded in Tier-S by the live tally (only while firstOpen = 0). */
+export function liveLeads(
+  inp: ChainInputs,
+  firstOpen: number,
+  tally: Tally = chainTally,
+): Map<number, bigint> {
+  return drive(liveLeadsSearch(inp, firstOpen, tally));
+}
+
+/** `liveLeads`, yielding between tallies. */
+export function liveLeadsAsync(
+  inp: ChainInputs,
+  firstOpen: number,
+  tally: Tally = chainTally,
+): Promise<Map<number, bigint>> {
+  return driveAsync(liveLeadsSearch(inp, firstOpen, tally));
+}
+
+/** Closed round: tier k's initiatives (k ≥ 1) → gapTo tier k−1 judged at settleInputs[k−1];
+ * Tier-S's → leadIn at settleInputs[0]; not funded → gapTo Tier-B at settleInputs[2].
+ * Knock-on: onlyTarget. Missing settle inputs → no figure. */
+export function finalWhatIfs(
+  settleInputs: (ChainInputs | null)[],
+  finalTier: Map<number, number>,
+  m: number,
+  tally: Tally = chainTally,
+): FinalWhatIfs {
+  return drive(finalSearch(settleInputs, finalTier, m, tally));
+}
+
+/** `finalWhatIfs`, yielding between tallies. */
+export function finalWhatIfsAsync(
+  settleInputs: (ChainInputs | null)[],
+  finalTier: Map<number, number>,
+  m: number,
+  tally: Tally = chainTally,
+): Promise<FinalWhatIfs> {
+  return driveAsync(finalSearch(settleInputs, finalTier, m, tally));
 }

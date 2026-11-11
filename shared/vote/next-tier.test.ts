@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { effectiveRanks } from "../../vote/shared/ranks";
 import { type ChainInputs, chainTally } from "./chain";
-import { nextTiers, nextTiersAsync, STEP } from "./next-tier";
+import {
+  finalWhatIfs,
+  finalWhatIfsAsync,
+  gapTo,
+  leadIn,
+  liveLeads,
+  liveLeadsAsync,
+  nextTiers,
+  nextTiersAsync,
+  STEP,
+} from "./next-tier";
 
 const K = STEP; // $1K in micro-USD
 
@@ -167,5 +177,146 @@ describe("the gap to the next tier", () => {
   it("the async variant gives the same result", async () => {
     const inp = large();
     expect(await nextTiersAsync(inp, 0)).toEqual(nextTiers(inp, 0));
+  });
+});
+
+/** Whether `c` is funded in tier `first` with its cost and the pool both raised by `l` steps. */
+function fundedWithLead(inp: ChainInputs, first: number, c: number, l: bigint): boolean {
+  const costs = inp.costs.map((x, i) => (i === c ? x + l * K : x));
+  const run = chainTally({ ...inp, costs, poolUsd: inp.poolUsd + l * K }, first, first + 1);
+  return run[0].order.includes(c);
+}
+
+/** The inputs each tier settles from, chained as the replay does it. */
+function settlements(inp: ChainInputs): { at: ChainInputs[]; finalTier: Map<number, number> } {
+  const at: ChainInputs[] = [];
+  const finalTier = new Map<number, number>();
+  let cur = inp;
+  for (let t = 0; t < 3; t++) {
+    at.push(cur);
+    const { order, shares } = chainTally(cur, t, t + 1)[0];
+    const weights = [...cur.weights];
+    let spent = cur.spent;
+    for (const c of order) {
+      finalTier.set(c, t);
+      for (const [v, d] of shares.get(c)!) {
+        weights[cur.voters.indexOf(v)] -= d;
+        spent += d;
+      }
+    }
+    cur = { ...cur, weights, spent, done: new Set([...cur.done, ...order]) };
+  }
+  return { at, finalTier };
+}
+
+describe("the gap to a chosen tier", () => {
+  it("gapTo reaches a chosen tier and lists only that tier's changes", () => {
+    // Initiative 2 reaching Tier-S moves initiative 0 from Tier-S to Tier-A.
+    const inp = inputs([10, 10, 10, 10], [10, 10, 10], [[3, 1, 2, 3], [1, 3, 1, 3], [2, 1, 3, 3]]);
+    const full = gapTo(inp, 0, 2, 0);
+    expect(full).toEqual(nextTiers(inp, 0).get(2));
+    const only = gapTo(inp, 0, 2, 0, { onlyTarget: true });
+    expect(only.tier).toBe("S");
+    expect(only.gap).toBe(full.gap);
+    expect(tierWith(inp, 2, only.gap! / K)).toBe(0);
+    expect(tierWith(inp, 2, only.gap! / K - 1n)).not.toBe(0);
+    expect(only.dropsOut).toEqual([[0, "S"]]);
+    expect(only.comesIn).toEqual([]);
+    expect(only.moves).toEqual([]);
+  });
+
+  it("gapTo ignores changes outside the target tier", () => {
+    // Funding initiative 0 in Tier-S pushes initiative 1 out of Tier-A, not Tier-S.
+    const inp = knockOn();
+    expect(gapTo(inp, 0, 0, 0).dropsOut).toEqual([[1, "A"]]);
+    const only = gapTo(inp, 0, 0, 0, { onlyTarget: true });
+    expect(only.gap).toBe(30n * K);
+    expect(only.dropsOut).toEqual([]);
+    expect(only.comesIn).toEqual([]);
+  });
+
+  it("gapTo lists who comes into the target tier", () => {
+    // Initiatives 0 and 1 are in Tier-S, 2 in Tier-A, 3 not funded. With $3K more behind
+    // initiative 2, Tier-S takes 0, 2 and 3: initiative 1 drops out and 3 comes in.
+    const inp = inputs([5, 5, 5, 5], [5, 5, 5], [[1, 1, 1, 3], [1, 3, 3, 1], [3, 2, 3, 2]], 40);
+    expect(tierWith(inp, 2, 0n)).toBe(1);
+    const only = gapTo(inp, 0, 2, 0, { onlyTarget: true });
+    expect(only.tier).toBe("S");
+    expect(only.gap).toBe(3n * K);
+    expect(tierWith(inp, 2, 3n)).toBe(0);
+    expect(tierWith(inp, 2, 2n)).not.toBe(0);
+    expect(only.comesIn).toEqual([[3, "S"]]);
+    expect(only.dropsOut).toEqual([[1, "S"]]);
+    expect(only.moves).toEqual([]);
+  });
+});
+
+describe("the Tier-S lead", () => {
+  it("a lead is the backing it could lose and stay in Tier-S", () => {
+    // Initiative 0 ($10K) has $49.7K behind it.
+    const inp = inputs([10, 40], [49.7], [[1, 2]]);
+    const lead = leadIn(inp, 0, 0)!;
+    expect(lead).toBe(39n * K);
+    expect(fundedWithLead(inp, 0, 0, lead / K)).toBe(true);
+    expect(fundedWithLead(inp, 0, 0, lead / K + 1n)).toBe(false);
+  });
+
+  it("a lead under $1K is no lead", () => {
+    const inp = inputs([10], [10.5], [[1]]);
+    expect(leadIn(inp, 0, 0)).toBe(0n);
+  });
+
+  it("leadIn is null when not funded in Tier-S", () => {
+    const inp = knockOn();
+    expect(leadIn(inp, 0, 0)).toBe(null);
+    expect(leadIn(inp, 0, 1)).toBe(null);
+  });
+
+  it("live leads: only while Tier-S is open, only for Tier-S initiatives", async () => {
+    const inp = inputs([10, 40], [49.7], [[1, 2]]);
+    expect(liveLeads(inp, 0)).toEqual(new Map([[0, 39n * K]]));
+    expect(liveLeads(inp, 1).size).toBe(0);
+    expect(await liveLeadsAsync(inp, 0)).toEqual(liveLeads(inp, 0));
+  });
+});
+
+describe("the final what-ifs", () => {
+  // Initiative 0 is funded in Tier-S, 3 in Tier-A, 1 in Tier-B; 2 is not funded.
+  const round = () =>
+    settlements(inputs([5, 5, 5, 5], [5, 5, 5], [[1, 3, 3, 2], [1, 2, 2, 3], [1, 1, 2, 1]], 40));
+
+  it("finalWhatIfs judges each figure at the settlement above", () => {
+    const { at, finalTier } = round();
+    expect(finalTier).toEqual(new Map([[0, 0], [3, 1], [1, 2]]));
+    const got = finalWhatIfs(at, finalTier, 4);
+    expect([...got.lead.keys()]).toEqual([0]);
+    expect(got.lead.get(0)).toBe(leadIn(at[0], 0, 0));
+    expect(got.next.has(0)).toBe(false);
+    expect(got.next.get(3)).toEqual(gapTo(at[0], 0, 3, 0, { onlyTarget: true }));
+    expect(got.next.get(3)!.tier).toBe("S");
+    expect(got.next.get(1)).toEqual(gapTo(at[1], 1, 1, 1, { onlyTarget: true }));
+    expect(got.next.get(1)!.tier).toBe("A");
+    expect(got.next.get(2)).toEqual(gapTo(at[2], 2, 2, 2, { onlyTarget: true }));
+    expect(got.next.get(2)!.tier).toBe("B");
+    for (const c of [1, 2, 3]) expect(got.next.get(c)!.gap).not.toBe(null);
+  });
+
+  it("no ballots at a settlement: no figures", () => {
+    const { at, finalTier } = round();
+    const empty = { ...at[1], voters: [], weights: [], ranks: [], ballots: [] };
+    const got = finalWhatIfs([at[0], empty, null], finalTier, 4);
+    expect(got.next.has(3)).toBe(true);
+    expect(got.lead.has(0)).toBe(true);
+    expect(got.next.has(1)).toBe(false);
+    expect(got.next.has(2)).toBe(false);
+    expect(finalWhatIfs([null, null, null], finalTier, 4)).toEqual({
+      next: new Map(),
+      lead: new Map(),
+    });
+  });
+
+  it("the async variant gives the same result", async () => {
+    const { at, finalTier } = round();
+    expect(await finalWhatIfsAsync(at, finalTier, 4)).toEqual(finalWhatIfs(at, finalTier, 4));
   });
 });

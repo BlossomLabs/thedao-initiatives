@@ -353,8 +353,10 @@ it("the final result: tier sections, then not funded", async () => {
   expect(screen.getAllByText("Beta audits")[0].closest("li, [data-initiative-id]"))
     .toHaveTextContent("needed $30k");
   // The list's header names the final amount and no type column.
-  expect(screen.getAllByText("Final").length).toBeGreaterThan(0);
-  expect(screen.queryByText("Raised")).toBeNull();
+  // The tier sections show the final amount; Not funded shows what it needed and raised.
+  expect(screen.getAllByText("Final")).toHaveLength(1);
+  expect(screen.getAllByText("Needed")).toHaveLength(1);
+  expect(screen.getAllByText("Raised")).toHaveLength(1);
   expect(screen.queryByText("Type")).toBeNull();
 });
 

@@ -426,6 +426,7 @@ export default function BoardList(
     votePendingPct,
     voteTiers,
     finals,
+    unfunded,
     next,
     lead,
     titles,
@@ -439,6 +440,9 @@ export default function BoardList(
     titles?: ReadonlyMap<string, string>;
     /** The closed vote's final amounts by initiative id: shown alone, no goal, no type. */
     finals?: ReadonlyMap<string, number>;
+    /** The closed vote's "Not funded" section: its rows show what they still needed and
+     * what they raised on their own, so the columns say so. */
+    unfunded?: boolean;
     /** The vote results: each initiative's vote share, % of its goal, by initiative id. */
     votePct?: ReadonlyMap<string, number>;
     /** The part of it the settling tier would add if it settled now. */
@@ -473,9 +477,9 @@ export default function BoardList(
           <span>{finals ? "" : "Type"}</span>
           <span>Initiative</span>
           {ratings && <span className="hidden @min-[880px]/list:block">Rating</span>}
-          <span className="text-right">Funded</span>
+          <span className="text-right">{unfunded ? "Needed" : "Funded"}</span>
           <span className="text-right">Backers</span>
-          <span className="text-right">{finals ? "Final" : "Raised"}</span>
+          <span className="text-right">{finals && !unfunded ? "Final" : "Raised"}</span>
         </div>
         <ul className="col-span-full m-0 grid list-none grid-cols-subgrid p-0">
           <AnimatePresence>

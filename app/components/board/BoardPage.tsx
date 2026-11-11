@@ -426,6 +426,7 @@ export default function BoardPage(
                       votePendingPct={votePendingPct}
                       voteTiers={resultTiers ?? voteTiers}
                       finals={finals}
+                      unfunded={g.key === "not-funded"}
                       next={next}
                       lead={lead}
                       titles={titles}

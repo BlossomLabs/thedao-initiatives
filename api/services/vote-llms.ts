@@ -85,7 +85,8 @@ export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: str
     "## What to do",
     "",
     "Ask the voter for their star ratings or their priorities: you can't see them. Then " +
-    "write one vote line that passes the rules, and name the three Tier-S projects with no " +
+    "write the vote as one bare line (just the slugs, `=` and `,`, no voter id) that passes " +
+    "the rules, and name the three Tier-S projects with no " +
     "shared affiliation that make it independent.",
     "",
   ].join("\n");

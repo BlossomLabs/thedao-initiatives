@@ -113,3 +113,39 @@ projects (the pool is spent on S and A, or B's backing is too thin to cover any 
 2. **"279K" is the final total**: what the initiative raised plus its vote award (its ask, when funded).
 3. **The phantom ballot is good enough** for the gap and the knock-on, even though real voters moving an initiative up also bring backing they had given to others.
 4. **Unfunded initiatives show the gap to the next tier up** (Tier-B), not always to Tier-S.
+
+## 3. What-ifs on every initiative (2026-11-12)
+
+Asked after seeing the screens: every initiative should say how close it is to the next
+tier, Tier-S initiatives how far ahead they are, and an unfunded initiative's "needed $X"
+what would happen if it went in.
+
+### Decisions
+5. **After the vote, each figure is judged at the settlement that decided it**, with the
+   ballots, needs and remaining shares of that moment (the replay's inputs as that tier
+   settled). Earlier tiers stay locked.
+6. **"Ahead" for Tier-S = backing it could lose** and still be funded in Tier-S, in $1K
+   steps rounded **down** (never overstates).
+7. **The figures show during the vote too**: Tier-S initiatives show their lead; the
+   others keep their gap. The final result shows the same figures frozen at each settlement.
+
+### What each initiative shows (final result)
+- **Tier-S:** "$12k ahead" — judged at Tier-S's settlement.
+- **Tier-A / Tier-B:** "$Xk to Tier-S" / "$Xk to Tier-A" with the hover — judged at the
+  settlement of the tier above (that's where it would have had to win).
+- **Not funded:** "needed $X" (ask − raised) becomes the hover's trigger: "With $G more
+  backing it would have made Tier-B", and which initiatives it would have pushed out —
+  judged at Tier-B's settlement.
+- **Knock-on lists after the vote only cover the target tier** (who would have come into
+  or dropped out of it): lower tiers were decided later, so where a dropped initiative
+  would finally have landed isn't known. The hover says "drops out of Tier-S".
+- A tier that settled with nothing to compare against (no ballots) shows no figure.
+
+### During the vote
+- Tier-S initiatives (while Tier-S is open) show "$12k ahead"; everything else as before.
+
+### How "ahead" is measured
+Raise the initiative's cost by L and the pool by the same L (so the budget left for the
+others doesn't move); L is the largest $1K step at which it is still funded in Tier-S.
+It approximates "L less backing". Payers paying L more leaves them a little less for
+others, so the lead is slightly conservative.

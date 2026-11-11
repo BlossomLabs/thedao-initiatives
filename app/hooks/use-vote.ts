@@ -102,8 +102,23 @@ export type RoundView = {
   }[];
   /** The pool on-chain now (micro-USD): what a new ballot's size is judged against. */
   poolUsd?: string;
-  live: { funded: string[]; awards: Record<string, string>; tiers?: Record<string, Tier> };
+  live: {
+    funded: string[];
+    awards: Record<string, string>;
+    tiers?: Record<string, Tier>;
+    /** Each unsettled initiative's gap to its next tier; absent once the round is closed. */
+    next?: Record<string, {
+      tier: Tier;
+      /** Micro-USD; null when no amount alone gets it there. */
+      gap: string | null;
+      comesIn: { slug: string; tier: Tier }[];
+      dropsOut: { slug: string; tier: Tier }[];
+      moves: { slug: string; from: Tier; to: Tier }[];
+    }>;
+  };
 };
+
+export type NextTierEntry = NonNullable<RoundView["live"]["next"]>[string];
 
 /** The round's quiet ending (each tier's state, what counts, what was refused). */
 export function useVoteRound(refetchInterval: number | false = false, enabled = true) {

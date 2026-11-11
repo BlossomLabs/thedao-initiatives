@@ -10,6 +10,7 @@ import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { recordVote } from "../../shared/vote/record.ts";
 import type { VoteRound } from "../services/vote-chain.ts";
 import { type BoardCache, createBoardCache, readBoard } from "./board.ts";
+import { type NextTier, nextTiers } from "../../shared/vote/next-tier.ts";
 import {
   type Receipt,
   refusal,
@@ -124,6 +125,17 @@ function isFinal(body: { closed: boolean; tiers: { status: string; at?: number }
     now >= (last.at ?? Infinity) + FINAL_AFTER_SECS;
 }
 
+/** Each initiative's gap to its next tier, as JSON (slugs for indices, a string for the gap). */
+function nextJson(next: Map<number, NextTier>, slugs: string[]) {
+  return Object.fromEntries([...next].map(([c, n]) => [slugs[c], {
+    tier: n.tier,
+    gap: n.gap === null ? null : n.gap.toString(),
+    comesIn: n.comesIn.map(([i, tier]) => ({ slug: slugs[i], tier })),
+    dropsOut: n.dropsOut.map(([i, tier]) => ({ slug: slugs[i], tier })),
+    moves: n.moves.map(([i, from, to]) => ({ slug: slugs[i], from, to })),
+  }]));
+}
+
 /** The round state as JSON: slugs for initiatives, decimal strings for micro-USD. */
 function roundJson(st: RoundState & { poolUsd: bigint }, slugs: string[]) {
   const named = (cs: number[]) => cs.map((c) => slugs[c]);
@@ -168,6 +180,8 @@ function roundJson(st: RoundState & { poolUsd: bigint }, slugs: string[]) {
       funded: named(st.live.order),
       awards: money(st.live.awards),
       tiers: Object.fromEntries([...st.live.tiers].map(([c, t]) => [slugs[c], t])),
+      // Only while a tier is still open: a closed round has no live tally to look ahead from.
+      ...(st.liveInputs && { next: nextJson(nextTiers(st.liveInputs, st.firstOpen), slugs) }),
     },
   };
 }

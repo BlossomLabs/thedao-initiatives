@@ -704,6 +704,28 @@ async function qeSetup(needs = [150n, 150n, 150n]) {
   return { h, state, n };
 }
 
+Deno.test("the round lists each initiative's gap to the next tier", async () => {
+  // Real-sized money: gaps are whole $1K steps, so a $200 pool could never reach one.
+  const { h, state } = await setup({ ...qe, poolUsd: "6000000000" });
+  h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 3_000_000_000n]);
+  state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
+  type Next = { tier: string; gap: string | null };
+  const open = await j(await h.req("/api/vote/round")) as { live: { next?: Record<string, Next> } };
+  const next = open.live.next!;
+  assertEquals(next.a, undefined, "funded in Tier-S: no next tier");
+  assertEquals(next.b.tier, "B");
+  assertEquals(next.b.gap, "3000000000");
+  // Once the round closes there is no live tally, so nothing to look ahead at.
+  h.clock.now = NOW + 7200;
+  const closed = await j(await h.req("/api/vote/round")) as {
+    closed: boolean;
+    live: { next?: unknown };
+  };
+  assertEquals(closed.closed, true);
+  assertEquals(closed.live.next, undefined);
+  h.close();
+});
+
 Deno.test("round: before S's first tally every tier waits; the live tally funds a", async () => {
   const { h } = await qeSetup();
   const body = await j(await h.req("/api/vote/round")) as
@@ -714,7 +736,8 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
     "waiting",
     "waiting",
   ]);
-  assertEquals(body.live, { funded: ["a"], awards: { a: "150" }, tiers: { a: "S" } });
+  const { next: _next, ...live } = body.live as { next?: unknown };
+  assertEquals(live, { funded: ["a"], awards: { a: "150" }, tiers: { a: "S" } });
   assertEquals(body.registrationClosesAt, NOW + 660);
   assertEquals(body.accepted, { "1": `0x01${X}${X}`, "2": `0x01${X}${X}` });
   h.close();

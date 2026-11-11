@@ -349,6 +349,9 @@ it("the final result: tier sections, then not funded", async () => {
   expect(screen.getByText("The vote's final result")).toBeInTheDocument();
   expect(heading("Tier-S")).toHaveTextContent("Tier-S$60,000 allocated to 1 initiative");
   expect(heading("Not funded")).toHaveTextContent("Not funded1");
+  // Beta wasn't funded: it asked $30K and raised nothing, so it still needs all of it.
+  expect(screen.getAllByText("Beta audits")[0].closest("li, [data-initiative-id]"))
+    .toHaveTextContent("needed $30k");
   // The list's header names the final amount and no type column.
   expect(screen.getAllByText("Final").length).toBeGreaterThan(0);
   expect(screen.queryByText("Raised")).toBeNull();

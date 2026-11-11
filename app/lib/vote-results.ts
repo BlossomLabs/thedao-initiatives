@@ -7,6 +7,10 @@ export const dollars = (micro: string) => Number(BigInt(micro) / 10_000n) / 100;
 
 export type ResultRow = { card: Card; finalUsd: number; tier?: Tier };
 
+/** What an initiative the vote didn't fund still needs: its ask minus what it raised. */
+export const neededUsd = (card: Card): number =>
+  Math.max(0, card.initiative.goalUsd - card.summary.total);
+
 /** Funded = an award in a settled tier: tier order, then the order the tally funded them. */
 export function splitResults(
   cards: Card[],

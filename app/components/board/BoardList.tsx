@@ -17,6 +17,7 @@ import Reveal from "~/components/ui/Reveal";
 import { fullyFunded, type Ratings } from "~/lib/board-view";
 import type { Card } from "~/lib/api-types";
 import { pctText, plural, usd, usdShort } from "~/lib/format";
+import { neededUsd } from "~/lib/vote-results";
 import { usePrefetchInitiative } from "~/hooks/use-initiative";
 import { cn } from "~/lib/utils";
 import { voteFloorPct, type VoteSettings } from "@shared/vote";
@@ -145,6 +146,9 @@ function Row(
     ? <NextTierFigure next={next} now={voteTier} titles={titles} />
     : full || (final !== undefined && voteTier)
     ? <FundingStatus tier={voteTier} byVote={votedFull || final !== undefined} />
+    : final !== undefined
+    // The vote didn't fund it: what it still needs, in place of the %.
+    ? <span className="text-white/45">needed {usdShort(neededUsd(card))}</span>
     : (
       <>
         {pctText(pct)}

@@ -26,6 +26,7 @@ import { lazyPart } from "~/lib/lazy-part";
 import Reveal from "~/components/ui/Reveal";
 import type { Card } from "~/lib/api-types";
 import { pctText, plural, usd, usdShort } from "~/lib/format";
+import { neededUsd } from "~/lib/vote-results";
 import { usePrefetchInitiative } from "~/hooks/use-initiative";
 import { cn } from "~/lib/utils";
 import RatingChip, { RatingForm } from "~/components/ratings/RatingChip";
@@ -248,6 +249,9 @@ export default function InitiativeCard({
           )
           : funded || fullyFunded(card, votePct) || (final !== undefined && voteTier)
           ? <FundingStatus tier={voteTier} byVote={(votePct ?? 0) > 0 || final !== undefined} />
+          : final !== undefined
+          // The vote didn't fund it: what it still needs, in place of the %.
+          ? <span className="text-[12px] text-white/45">needed {usdShort(neededUsd(card))}</span>
           : (
             <span className="flex items-center gap-2">
               <span

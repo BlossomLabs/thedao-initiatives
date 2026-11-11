@@ -196,12 +196,18 @@ function* finalSearch(
     const inp = settleInputs[t];
     return inp && inp.voters.length > 0 ? inp : null;
   };
+  // Each settlement's run without a phantom, shared by every figure judged there.
+  const lives = new Map<number, Map<number, number>>();
   // Each tier is judged where it would have had to win: at its own settlement.
   function* gap(t: number, c: number): Generator<void, void> {
     const inp = at(t);
     if (!inp) return;
-    const live = tiersOf(tally, inp, t);
-    yield;
+    let live = lives.get(t);
+    if (!live) {
+      live = tiersOf(tally, inp, t);
+      lives.set(t, live);
+      yield;
+    }
     next.set(c, yield* gapSearch(inp, t, c, t, live, tally, true));
   }
   for (let c = 0; c < m; c++) {

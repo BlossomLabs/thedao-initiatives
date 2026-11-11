@@ -145,7 +145,16 @@ what would happen if it went in.
 - Tier-S initiatives (while Tier-S is open) show "$12k ahead"; everything else as before.
 
 ### How "ahead" is measured
-Raise the initiative's cost by L and the pool by the same L (so the budget left for the
-others doesn't move); L is the largest $1K step at which it is still funded in Tier-S.
-It approximates "L less backing". Payers paying L more leaves them a little less for
-others, so the lead is slightly conservative.
+Take L away from the initiative's backers, spread evenly: each gives up a share of L in
+proportion to their weight (exact integer shares, any remainder on the last backer, as
+the tally deducts payments). A backer is a voter whose rank for it opens within Tier-S's
+stage; a voter who left it unplaced, ranked past that, is not one. Cost and pool stay as
+they are. L is the largest $1K step (rounded down) at which it is still funded in
+Tier-S, found by a search that only returns a step it has checked; the most it can be is
+everything its backers hold. Less backing lowers its support, so a rival that shares its
+backers can now be picked before it, and the lead counts that.
+
+So "$12k ahead" reads "still funded in Tier-S if its backers gave $12k less, spread
+evenly". It is one scenario: the same loss from a single backer can be worse (that
+backer may also be what kept a rival behind, or carry most of its support), and the
+initiative can drop out with less.

@@ -5,6 +5,7 @@
  * closed. Pure; browser and Deno. */
 import { type Tier, TIERS } from "./ballot.ts";
 import { type ChainInputs, chainTally } from "./chain.ts";
+import { cumulativeDeductions, stageBound } from "./stage.ts";
 
 /** Gaps are whole $1K steps, rounded up; leads are rounded down. */
 export const STEP = 1_000_000_000n;
@@ -131,24 +132,37 @@ function* search(
   return out;
 }
 
-/** The lead search: the largest step verified to keep `c` funded in tier `first`. */
+/** The lead search: the largest step verified to keep `c` funded in tier `first` when
+ * its backers give that much less, spread over them by weight. Less backing lowers its
+ * support, so a rival that shares its backers can be picked before it. */
 function* leadSearch(
   inp: ChainInputs,
   first: number,
   c: number,
   tally: Tally,
 ): Generator<void, bigint | null> {
-  // Raising the pool with the cost keeps the budget left for the others where it was.
+  // A backer is a voter whose rank for `c` opens within the stage, as chainTally bounds
+  // it. An unplaced initiative gets a real rank too, but one past the stage's bound
+  // counts for nothing there, and spreading the loss onto it would overstate the lead.
+  const last = TIERS.length - 1;
+  const bound = first >= last ? inp.m : stageBound(inp.ballots, first, TIERS.length, inp.m);
+  const opens = Math.min(inp.m, bound);
+  const backers = inp.ranks.flatMap((r, i) => (r[c] <= opens ? [i] : []));
+  const backing = backers.map((i) => inp.weights[i]);
   const funded = (l: bigint) => {
-    const costs = inp.costs.map((x, i) => (i === c ? x + l * STEP : x));
-    const run = tally({ ...inp, costs, poolUsd: inp.poolUsd + l * STEP }, first, first + 1);
-    return run[0].order.includes(c);
+    const weights = [...inp.weights];
+    if (l > 0n) {
+      // Exact integer shares; the remainder falls on the last backer.
+      const less = cumulativeDeductions(backing, l * STEP);
+      backers.forEach((i, k) => (weights[i] -= less[k]));
+    }
+    return tally({ ...inp, weights }, first, first + 1)[0].order.includes(c);
   };
   const now = funded(0n);
   yield;
   if (!now) return null;
-  // Its backers can't pay more than everything the voters hold.
-  const hiSteps = inp.weights.reduce((a, b) => a + b, 0n) / STEP;
+  // Its backers can't give less than everything they hold.
+  const hiSteps = backing.reduce((a, b) => a + b, 0n) / STEP;
   if (hiSteps < 1n) return 0n;
   const top = funded(hiSteps);
   yield;
@@ -277,8 +291,9 @@ export function gapTo(
   return drive(gapSearch(inp, first, c, target, live, tally, opts.onlyTarget ?? false));
 }
 
-/** Largest STEP multiple L (rounded down) with c still funded in tier `first` when its cost
- * and the pool are both raised by L; null when it isn't funded there at all; 0n under $1K. */
+/** Largest STEP multiple L (rounded down) with c still funded in tier `first` when its
+ * backers give L less, spread over them by weight (cost and pool as they are); null when
+ * it isn't funded there at all; 0n under $1K. */
 export function leadIn(
   inp: ChainInputs,
   first: number,

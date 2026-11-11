@@ -6,7 +6,7 @@
 /** pbear's cumulative_deductions: `thr` deducted from `weights` in proportion,
  * integer-exact (vote/shared/pbear.ts has the same; that module only loads in the
  * browser, and this one runs on the server too). */
-function cumulativeDeductions(weights: bigint[], thr: bigint): bigint[] {
+export function cumulativeDeductions(weights: bigint[], thr: bigint): bigint[] {
   const total = weights.reduce((a, b) => a + b, 0n);
   const out: bigint[] = [];
   let cum = 0n;

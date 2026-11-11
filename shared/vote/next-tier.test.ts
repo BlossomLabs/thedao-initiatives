@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { effectiveRanks } from "../../vote/shared/ranks";
 import { type ChainInputs, chainTally } from "./chain";
+import { stageBound } from "./stage";
 import {
   finalWhatIfs,
   finalWhatIfsAsync,
@@ -181,10 +182,20 @@ describe("the gap to the next tier", () => {
 });
 
 /** Whether `c` is funded in tier `first` with its cost and the pool both raised by `l` steps. */
+/** Whether `c` is still funded in tier `first` (Tier-S or Tier-A) when its backers there
+ * give `l` steps less, spread over them by weight (the remainder on the last backer). */
 function fundedWithLead(inp: ChainInputs, first: number, c: number, l: bigint): boolean {
-  const costs = inp.costs.map((x, i) => (i === c ? x + l * K : x));
-  const run = chainTally({ ...inp, costs, poolUsd: inp.poolUsd + l * K }, first, first + 1);
-  return run[0].order.includes(c);
+  const bound = Math.min(inp.m, stageBound(inp.ballots, first, 3, inp.m));
+  const backers = inp.voters.map((_, i) => i).filter((i) => inp.ranks[i][c] <= bound);
+  const total = backers.reduce((a, i) => a + inp.weights[i], 0n);
+  const weights = [...inp.weights];
+  let cum = 0n;
+  for (const i of backers) {
+    const next = cum + inp.weights[i];
+    weights[i] -= (next * l * K) / total - (cum * l * K) / total;
+    cum = next;
+  }
+  return chainTally({ ...inp, weights }, first, first + 1)[0].order.includes(c);
 }
 
 /** The inputs each tier settles from, chained as the replay does it. */
@@ -259,6 +270,43 @@ describe("the Tier-S lead", () => {
     expect(lead).toBe(39n * K);
     expect(fundedWithLead(inp, 0, 0, lead / K)).toBe(true);
     expect(fundedWithLead(inp, 0, 0, lead / K + 1n)).toBe(false);
+  });
+
+  it("a lead is measured by its backers giving less, not by a higher cost", () => {
+    // The reviewer's case: A and B back 0 and its rival 1, E backs 0 only, F backs 1 only.
+    // Raising 0's cost leaves its support, and so its place ahead of 1, as it was.
+    const inp: ChainInputs = {
+      m: 2,
+      costs: [50n * K, 50n * K],
+      voters: ["A", "B", "E", "F"],
+      weights: [25n * K, 25n * K, 40n * K, 20n * K],
+      ranks: [[1, 1], [1, 1], [1, 4], [4, 1]],
+      ballots: [[1, 1], [1, 1], [1, 0], [0, 1]],
+      poolUsd: 1000n * K,
+      spent: 0n,
+      done: new Set(),
+    };
+    expect(chainTally(inp, 0, 1)[0].order).toEqual([0]);
+    const lead = leadIn(inp, 0, 0)!;
+    expect(lead % K).toBe(0n);
+    expect(fundedWithLead(inp, 0, 0, lead / K)).toBe(true);
+    expect(fundedWithLead(inp, 0, 0, lead / K + 1n)).toBe(false);
+  });
+
+  it("backers it shares with a rival lower the lead", () => {
+    // 0 ($30K): A ($40K) and B ($20K). Rival 1 ($25K): A and F ($10K). The pool ($40K)
+    // fits one. Each $3K A and B give less costs 0 $3K of support but 1 only $2K, so at
+    // $30K the two tie and the cheaper rival goes first: the lead is $29K, not the $30K
+    // a rival with backers of its own would leave. F leaves 0 unplaced, which ranks it
+    // past Tier-S: F is no backer of 0 there, and giving F part of the loss would make
+    // the lead $35K.
+    const inp = inputs([30, 25], [40, 20, 10], [[1, 1], [1, 0], [0, 1]], 40);
+    expect(chainTally(inp, 0, 1)[0].order).toEqual([0]);
+    expect(leadIn(inp, 0, 0)).toBe(29n * K);
+    expect(fundedWithLead(inp, 0, 0, 29n)).toBe(true);
+    expect(fundedWithLead(inp, 0, 0, 30n)).toBe(false);
+    const own = inputs([30, 25], [40, 20, 28], [[1, 0], [1, 0], [0, 1]], 40);
+    expect(leadIn(own, 0, 0)).toBe(30n * K);
   });
 
   it("a lead under $1K is no lead", () => {

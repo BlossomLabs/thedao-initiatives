@@ -9,10 +9,12 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { type BoardCache, readBoard } from "./board.ts";
 import { buildFeed, type Feed, filterFeed, llmsFull, llmsIndex } from "../services/feed.ts";
 import { FEED_JSON_SCHEMA } from "../services/feed-schema.ts";
+import { voteLlms } from "../services/vote-llms.ts";
 import { gunzip, gzip } from "../lib/gzip.ts";
 
 export const FEED_PATHS = [
   "/llms.txt",
+  "/vote/llms.txt",
   "/llms-full.txt",
   "/api/initiatives.json",
   "/api/initiatives.schema.json",
@@ -111,8 +113,16 @@ export async function feedResponse(c: Context, body: string, type: string): Prom
   return c.body(body, 200, headers);
 }
 
-export function feedRoutes(feeds: FeedCache) {
+export function feedRoutes(feeds: FeedCache, deps?: Pick<Deps, "vote">) {
   const r = new Hono<Vars>();
+  // For an LLM drafting a voter's ballot: the deployed round, its rules and projects.
+  r.get("/vote/llms.txt", async (c) => {
+    const round = deps?.vote;
+    if (!round) return c.text("No vote is deployed right now.", 404);
+    const o = feeds.origin(c);
+    const body = voteLlms(round.manifest, (await feeds.get(o)).initiatives, o);
+    return feedResponse(c, body, "text/plain; charset=utf-8");
+  });
   r.get("/llms.txt", async (c) => {
     const o = feeds.origin(c);
     return feedResponse(c, llmsIndex(await feeds.get(o), o), "text/plain; charset=utf-8");

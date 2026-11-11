@@ -138,7 +138,7 @@ export function createApp(
 
   app.route("/healthz", healthRoutes(deps));
   // Before /api/initiatives, so /api/initiatives.json is never read as a slug.
-  app.route("/", feedRoutes(feedCache));
+  app.route("/", feedRoutes(feedCache, deps));
   app.route("/api/auth", authRoutes(deps));
   app.route("/api/board", boardRoutes(deps, boardCache));
   app.route("/api/initiatives", initiativeRoutes(deps));

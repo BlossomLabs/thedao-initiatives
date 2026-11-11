@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkBallot, checkProof, type RulesRound, tiersOf } from "./rules";
+import { checkBallot, checkProof, findProof, type RulesRound, tiersOf } from "./rules";
 import fixtures from "./fixtures/ballot-rules.json";
 
 /** Six projects: 0 and 1 related to Seal, 5 an RFP. Pool 200. Tier-S enforced. */
@@ -98,6 +98,13 @@ describe("ballot rules", () => {
     expect(checkProof(b, round(), [0, 1, 2])).toBe(false); // 0 and 1 share Seal
     expect(checkProof(b, round(), [2, 3, 4])).toBe(false); // 4 is in Tier-B
     expect(checkProof(b, round(), [2, 3])).toBe(false);
+  });
+
+  it("findProof names the unrelated triples whatever the pool, or null", () => {
+    expect(findProof(ballot({ S: [0, 2, 3] }), round({ poolUsd: 10_000n }))).toEqual([0, 2, 3]);
+    expect(findProof(ballot({ S: [0, 1, 2] }), round())).toBeNull();
+    expect(findProof(ballot({ S: [0, 2, 3], A: [1, 4, 5] }), round({ independentTiers: 3 })))
+      .toEqual([0, 2, 3, 1, 4, 5]);
   });
 
   it("tiersOf groups by competition rank", () => {

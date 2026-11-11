@@ -128,6 +128,9 @@ export function manifestFor(
     poolUsd: bigint;
     issuer?: `0x${string}`;
     slugs: string[];
+    projects: VoteManifest["projects"];
+    groups: string[];
+    independentTiers: number;
   },
 ): VoteManifest {
   return {
@@ -142,6 +145,9 @@ export function manifestFor(
     poolUsd: r.poolUsd.toString(),
     ...(r.kind === "real" ? { badge: REVIEW_BADGE_CONTRACT } : { issuer: getAddress(r.issuer!) }),
     slugs: r.slugs,
+    projects: r.projects,
+    groups: r.groups,
+    independentTiers: r.independentTiers,
   };
 }
 
@@ -251,7 +257,7 @@ async function main() {
     }),
   });
   const calls = [
-    ...plan.map((p) => step("addInitiative", [p.account, p.askUsd])),
+    ...plan.map((p) => step("addInitiative", [p.account, p.askUsd, false, 0n])),
     step("setPoolUsd", [poolUsd]),
     ...handed.map((r) => step("grantRole", [r, ADMIN])),
     // The default admin goes last.
@@ -368,6 +374,10 @@ async function main() {
     poolUsd,
     issuer: issuer as `0x${string}` | undefined,
     slugs: plan.map((p) => p.slug),
+    // Task 8 registers each initiative's type and tags; until then none.
+    projects: plan.map((p) => ({ askUsd: p.askUsd.toString(), rfp: false, groups: [] })),
+    groups: [],
+    independentTiers: 1,
   });
   const out = args.out ?? new URL("../shared/vote/manifest-data.ts", import.meta.url).pathname;
   await Deno.writeTextFile(

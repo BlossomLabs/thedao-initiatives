@@ -18,6 +18,8 @@ import {
   type Settled,
   type TierState,
 } from "../../shared/vote/quiet-ending.ts";
+import { rulesRound } from "../../shared/vote/manifest.ts";
+import { findProof } from "../../shared/vote/rules.ts";
 import type { Tier } from "../../shared/vote/ballot.ts";
 
 const PER_MINUTE = 30;
@@ -455,7 +457,13 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       const h = await sendNext(kv, d, deps.now(), {
         fn: "record",
         args: [[
-          recordVote({ tokenId, nonce, ballot: ballot as Hex, signature: signature as Hex }),
+          recordVote({
+            tokenId,
+            nonce,
+            ballot: ballot as Hex,
+            signature: signature as Hex,
+            proof: findProof(hexToBytes(ballot as Hex), rulesRound(d.manifest)) ?? [],
+          }),
         ]],
       });
       await kv.atomic()

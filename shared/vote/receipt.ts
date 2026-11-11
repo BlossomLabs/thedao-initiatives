@@ -22,7 +22,8 @@ export function checkBallotTx(input: {
   }
   let tokenId: bigint, nonce: bigint, ballot: `0x${string}`;
   if (call.functionName === "recordFor" || call.functionName === "vote") {
-    [tokenId, nonce, ballot] = call.args as readonly [bigint, bigint, `0x${string}`];
+    // vote(tokenId, nonce, ballot, proof); recordFor(tokenId, nonce, ballot, signature, proof).
+    [tokenId, nonce, ballot] = call.args.slice(0, 3) as [bigint, bigint, `0x${string}`];
   } else if (call.functionName === "record") {
     // The relay sends one vote per record() call.
     const votes = call.args[0] as readonly {

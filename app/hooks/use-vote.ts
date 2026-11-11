@@ -242,14 +242,14 @@ export function useBallotSubmit(tokenId: bigint | null) {
     waitTx: async (hash) => {
       await voteClient().waitForTransactionReceipt({ hash, timeout: WAIT_MS });
     },
-    sendOwn: (s) => {
+    sendOwn: (s, proof) => {
       if (!wallet.config || !wallet.address) throw new Error("Connect your wallet first.");
       return writeContract(wallet.config, {
         address: ROUND.contract,
         abi: SIGNED_BALLOTS_ABI,
         // record(): plain ECDSA, so EIP-7702 wallets work too (see recordVote).
         functionName: "record",
-        args: [[recordVote(s)]],
+        args: [[recordVote({ ...s, proof })]],
         chainId: ROUND.chainId,
         account: wallet.address,
         connector: liveConnector(wallet),

@@ -20,10 +20,15 @@ const m: VoteManifest = {
   schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
   poolUsd: "913244000000",
   issuer: "0x2000000000000000000000000000000000000002",
-  slugs: ["a", "b"],
+  slugs: ["a", "b", "c", "d"],
+  projects: ["a", "b", "c", "d"].map(() => ({ askUsd: "1", rfp: false, groups: [] })),
+  groups: [],
+  independentTiers: 1,
 };
 const VOTER: Hex = "0x3000000000000000000000000000000000000003";
-const BALLOT: Hex = "0x01ff";
+/** Tier-S = a, b, c (unrelated): its proof is [0, 1, 2]. */
+const BALLOT: Hex = "0x010101ff";
+const PROOF = [0, 1, 2];
 const SIG: Hex = `0x${"ab".repeat(65)}`;
 const HASH: Hex = `0x${"cd".repeat(32)}`;
 const OWN: Hex = `0x${"ef".repeat(32)}`;
@@ -184,12 +189,10 @@ describe("selfSendBallot", () => {
     expect(d.signVote).toHaveBeenCalled();
     expect(d.requestGas).toHaveBeenCalledWith(7n);
     expect(d.waitTx).toHaveBeenCalledWith(GAS);
-    expect(d.sendOwn).toHaveBeenCalledWith({
-      tokenId: 7n,
-      nonce: 1n,
-      ballot: BALLOT,
-      signature: SIG,
-    });
+    expect(d.sendOwn).toHaveBeenCalledWith(
+      { tokenId: 7n, nonce: 1n, ballot: BALLOT, signature: SIG },
+      PROOF,
+    );
     expect(d.relay).not.toHaveBeenCalled();
     expect(d.waitResult).toHaveBeenCalledWith(OWN, { tokenId: 7n, nonce: 1n, ballot: BALLOT });
     expect(phases.at(-1)).toEqual({ kind: "counted", hash: OWN });
@@ -202,12 +205,10 @@ describe("selfSendBallot", () => {
     const { set } = record();
     await selfSendBallot(d, m, 7n, VOTER, BALLOT, last, set);
     expect(d.signVote).not.toHaveBeenCalled();
-    expect(d.sendOwn).toHaveBeenCalledWith({
-      tokenId: 7n,
-      nonce: 3n,
-      ballot: BALLOT,
-      signature: SIG,
-    });
+    expect(d.sendOwn).toHaveBeenCalledWith(
+      { tokenId: 7n, nonce: 3n, ballot: BALLOT, signature: SIG },
+      PROOF,
+    );
   });
 
   it("another badge's last ballot is never reused, even when the nonces line up", async () => {
@@ -216,7 +217,10 @@ describe("selfSendBallot", () => {
     const { set } = record();
     await selfSendBallot(d, m, 40n, VOTER, BALLOT, last, set);
     expect(d.signVote).toHaveBeenCalled();
-    expect(d.sendOwn).toHaveBeenCalledWith(expect.objectContaining({ tokenId: 40n, nonce: 1n }));
+    expect(d.sendOwn).toHaveBeenCalledWith(
+      expect.objectContaining({ tokenId: 40n, nonce: 1n }),
+      PROOF,
+    );
   });
 
   it("no gas to be had (already given) still lets the wallet try", async () => {

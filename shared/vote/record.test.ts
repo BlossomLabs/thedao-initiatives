@@ -17,14 +17,17 @@ const m: VoteManifest = {
   poolUsd: "1",
   issuer: "0x2000000000000000000000000000000000000002",
   slugs: ["a", "b"],
+  projects: [{ askUsd: "1", rfp: false, groups: [] }, { askUsd: "1", rfp: false, groups: [] }],
+  groups: [],
+  independentTiers: 1,
 };
 
 test("recordVote splits the signature into r and vs that still recover the voter", async () => {
   const voter = privateKeyToAccount(`0x${"42".repeat(32)}`);
   const typed = voteTypedData(m, 7n, voter.address, 2n, "0x01ff");
   const signature = await voter.signTypedData(typed);
-  const v = recordVote({ tokenId: 7n, nonce: 2n, ballot: "0x01ff", signature });
-  expect([v.tokenId, v.nonce, v.ballot]).toEqual([7n, 2n, "0x01ff"]);
+  const v = recordVote({ tokenId: 7n, nonce: 2n, ballot: "0x01ff", signature, proof: [0, 1, 2] });
+  expect([v.tokenId, v.nonce, v.ballot, v.proof]).toEqual([7n, 2n, "0x01ff", [0, 1, 2]]);
   // Re-expand the compact form and recover: it must be the voter (what ECDSA.tryRecover(r, vs) does).
   const yParity = BigInt(v.vs) >> 255n;
   const s = BigInt(v.vs) & ((1n << 255n) - 1n);

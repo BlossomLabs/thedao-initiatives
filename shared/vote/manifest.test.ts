@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkManifest, roundDeployed, type VoteManifest, voterNft } from "./manifest";
+import { checkManifest, roundDeployed, rulesRound, type VoteManifest, voterNft } from "./manifest";
 
 const C = "0x1000000000000000000000000000000000000001";
 const B = "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C";
@@ -15,6 +15,9 @@ const base: VoteManifest = {
   poolUsd: "1",
   issuer: "0x2000000000000000000000000000000000000002",
   slugs: ["a"],
+  projects: [{ askUsd: "5", rfp: false, groups: [0] }],
+  groups: ["Seal"],
+  independentTiers: 1,
 };
 
 describe("round manifest", () => {
@@ -32,6 +35,22 @@ describe("round manifest", () => {
     );
     expect(() => checkManifest({ ...base, issuer: undefined })).toThrow(/issuer/);
     expect(() => checkManifest(base)).not.toThrow();
+  });
+  it("checkManifest refuses misaligned projects, tagged RFPs and unknown groups", () => {
+    expect(() => checkManifest({ ...base, projects: [] })).toThrow(/projects/);
+    expect(() => checkManifest({ ...base, projects: [{ askUsd: "5", rfp: true, groups: [0] }] }))
+      .toThrow(/RFP/);
+    expect(() => checkManifest({ ...base, projects: [{ askUsd: "5", rfp: false, groups: [1] }] }))
+      .toThrow(/group/);
+  });
+  it("rulesRound maps the manifest", () => {
+    expect(rulesRound(base)).toEqual({
+      projects: [{ askUsd: 5n, rfp: false, groups: [0] }],
+      groupNames: ["Seal"],
+      poolUsd: 1n,
+      independentTiers: 1,
+    });
+    expect(rulesRound(base, 9n).poolUsd).toBe(9n);
   });
   it("every round carries the contract's quiet-ending schedule", () => {
     expect(() => checkManifest({ ...base, schedule: undefined as never })).toThrow(/schedule/);

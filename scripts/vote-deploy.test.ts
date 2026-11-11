@@ -113,6 +113,9 @@ Deno.test("manifestFor: the real vote names the badge on mainnet, a test vote it
     schedule: s,
     poolUsd: 7n,
     slugs: ["x"],
+    projects: [{ askUsd: "5", rfp: false, groups: [] }],
+    groups: [],
+    independentTiers: 1,
   };
   assertEquals(manifestFor({ ...base, kind: "real" }), {
     kind: "real",
@@ -126,6 +129,9 @@ Deno.test("manifestFor: the real vote names the badge on mainnet, a test vote it
     poolUsd: "7",
     badge: "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C",
     slugs: ["x"],
+    projects: [{ askUsd: "5", rfp: false, groups: [] }],
+    groups: [],
+    independentTiers: 1,
   });
   assertEquals(manifestFor({ ...base, kind: "test", issuer: SAFE as `0x${string}` }).issuer, SAFE);
   assertEquals(

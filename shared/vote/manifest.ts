@@ -1,6 +1,7 @@
 import { type Chain, mainnet, sepolia } from "viem/chains";
 import manifest from "./manifest-data.ts";
 import type { Schedule } from "./quiet-ending.ts";
+import type { RulesRound } from "./rules.ts";
 
 /** The current vote round, written by scripts/vote-deploy.ts. `slugs[i]` is
  * on-chain initiative `i`, so ballot byte `i` ranks that initiative. A test round
@@ -23,6 +24,12 @@ export type VoteManifest = {
   /** The real round: the voting badge (the contract's eligibility NFT). */
   badge?: `0x${string}`;
   slugs: string[];
+  /** Per slug, in the same order: what the contract registered (the ballot rules). */
+  projects: { askUsd: string; rfp: boolean; groups: number[] }[];
+  /** Group (tag) names; a project's `groups` index into this. */
+  groups: string[];
+  /** Tiers held to the independence rules: bit 0 Tier-S (always), bit 1 Tier-A. */
+  independentTiers: number;
 };
 
 export const SEPOLIA_CHAIN_ID = 11155111;
@@ -39,10 +46,27 @@ export function checkManifest(m: VoteManifest): VoteManifest {
   if (m.kind === "test" && m.chainId !== SEPOLIA_CHAIN_ID) {
     throw new Error("vote manifest: a test round runs on Sepolia");
   }
+  if (m.projects?.length !== m.slugs.length) {
+    throw new Error("vote manifest: projects must match slugs one to one");
+  }
+  for (const p of m.projects) {
+    if (p.rfp && p.groups.length) throw new Error("vote manifest: an RFP can't have tags");
+    if (p.groups.some((g) => g < 0 || g >= m.groups.length)) {
+      throw new Error("vote manifest: a project names an unknown group");
+    }
+  }
   return m;
 }
 
-export const ROUND = checkManifest(manifest as VoteManifest);
+export const ROUND = checkManifest(manifest as unknown as VoteManifest);
+
+/** The ballot rules' view of the round; `poolUsd` defaults to the manifest's. */
+export const rulesRound = (m: VoteManifest, poolUsd?: bigint): RulesRound => ({
+  projects: m.projects.map((p) => ({ askUsd: BigInt(p.askUsd), rfp: p.rfp, groups: p.groups })),
+  groupNames: m.groups,
+  poolUsd: poolUsd ?? BigInt(m.poolUsd),
+  independentTiers: m.independentTiers,
+});
 
 /** False while the manifest names no contract: no round, nothing to show. */
 export const roundDeployed = (m: VoteManifest = ROUND): boolean => !/^0x0{40}$/i.test(m.contract);

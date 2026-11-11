@@ -16,6 +16,9 @@ const m: VoteManifest = {
   poolUsd: "913244000000",
   issuer: "0x2000000000000000000000000000000000000002",
   slugs: ["a", "b"],
+  projects: [{ askUsd: "1", rfp: false, groups: [] }, { askUsd: "1", rfp: false, groups: [] }],
+  groups: [],
+  independentTiers: 1,
 };
 const ballot: Hex = "0x01ff";
 const sig: Hex = `0x${"11".repeat(65)}`;
@@ -23,7 +26,7 @@ const recordFor = (tokenId: bigint, nonce: bigint, b: Hex) =>
   encodeFunctionData({
     abi: SIGNED_BALLOTS_ABI,
     functionName: "recordFor",
-    args: [tokenId, nonce, b, sig],
+    args: [tokenId, nonce, b, sig, [0, 1, 2]],
   });
 const expectOk = { tokenId: 7n, nonce: 2n, ballot };
 const base = {
@@ -43,7 +46,7 @@ describe("checkBallotTx", () => {
     const input = encodeFunctionData({
       abi: SIGNED_BALLOTS_ABI,
       functionName: "vote",
-      args: [7n, 2n, ballot],
+      args: [7n, 2n, ballot, [0, 1, 2]],
     });
     expect(checkBallotTx({ ...base, tx: { to: m.contract, input } })).toBe("counted");
   });
@@ -91,6 +94,7 @@ describe("checkBallotTx", () => {
           r: `0x${"11".repeat(32)}`,
           vs: `0x${"22".repeat(32)}`,
           ballot: b,
+          proof: [0, 1, 2],
         }]],
       });
     expect(checkBallotTx({ ...base, tx: { to: m.contract, input: record(7n, 2n, ballot) } }))

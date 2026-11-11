@@ -41,7 +41,14 @@ export interface VoteChain {
       | {
         fn: "record";
         args: readonly [
-          readonly { tokenId: bigint; nonce: bigint; r: Hex; vs: Hex; ballot: Hex }[],
+          readonly {
+            tokenId: bigint;
+            nonce: bigint;
+            r: Hex;
+            vs: Hex;
+            ballot: Hex;
+            proof: number[];
+          }[],
         ];
       }
       | { fn: "drip"; to: Hex; value: bigint },

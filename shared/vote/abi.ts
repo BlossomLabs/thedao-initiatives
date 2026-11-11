@@ -107,6 +107,19 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "MAX_GROUPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "MAX_PROJECTS",
     "inputs": [],
     "outputs": [
@@ -185,6 +198,25 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "addGroup",
+    "inputs": [
+      {
+        "name": "name",
+        "type": "bytes32",
+        "internalType": "bytes32",
+      },
+    ],
+    "outputs": [
+      {
+        "name": "id",
+        "type": "uint8",
+        "internalType": "uint8",
+      },
+    ],
+    "stateMutability": "nonpayable",
+  },
+  {
+    "type": "function",
     "name": "addInitiative",
     "inputs": [
       {
@@ -194,6 +226,16 @@ export const SIGNED_BALLOTS_ABI = [
       },
       {
         "name": "askUsd",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+      {
+        "name": "rfp",
+        "type": "bool",
+        "internalType": "bool",
+      },
+      {
+        "name": "groups",
         "type": "uint256",
         "internalType": "uint256",
       },
@@ -497,6 +539,38 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "groupCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
+    "name": "groupName",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "hardDeadline",
     "inputs": [],
     "outputs": [
@@ -553,6 +627,19 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "independentTiers",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "initialWindow",
     "inputs": [],
     "outputs": [
@@ -586,7 +673,17 @@ export const SIGNED_BALLOTS_ABI = [
             "internalType": "address",
           },
           {
+            "name": "rfp",
+            "type": "bool",
+            "internalType": "bool",
+          },
+          {
             "name": "askUsd",
+            "type": "uint256",
+            "internalType": "uint256",
+          },
+          {
+            "name": "groups",
             "type": "uint256",
             "internalType": "uint256",
           },
@@ -977,6 +1074,11 @@ export const SIGNED_BALLOTS_ABI = [
             "type": "bytes",
             "internalType": "bytes",
           },
+          {
+            "name": "proof",
+            "type": "uint8[]",
+            "internalType": "uint8[]",
+          },
         ],
       },
     ],
@@ -1064,6 +1166,11 @@ export const SIGNED_BALLOTS_ABI = [
         "name": "signature",
         "type": "bytes",
         "internalType": "bytes",
+      },
+      {
+        "name": "proof",
+        "type": "uint8[]",
+        "internalType": "uint8[]",
       },
     ],
     "outputs": [],
@@ -1262,6 +1369,19 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "setIndependentTiers",
+    "inputs": [
+      {
+        "name": "mask",
+        "type": "uint8",
+        "internalType": "uint8",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable",
+  },
+  {
+    "type": "function",
     "name": "setInitiative",
     "inputs": [
       {
@@ -1276,6 +1396,16 @@ export const SIGNED_BALLOTS_ABI = [
       },
       {
         "name": "askUsd",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+      {
+        "name": "rfp",
+        "type": "bool",
+        "internalType": "bool",
+      },
+      {
+        "name": "groups",
         "type": "uint256",
         "internalType": "uint256",
       },
@@ -1429,6 +1559,11 @@ export const SIGNED_BALLOTS_ABI = [
         "name": "ballot",
         "type": "bytes",
         "internalType": "bytes",
+      },
+      {
+        "name": "proof",
+        "type": "uint8[]",
+        "internalType": "uint8[]",
       },
     ],
     "outputs": [],
@@ -1678,6 +1813,25 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "event",
+    "name": "GroupAdded",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8",
+      },
+      {
+        "name": "name",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32",
+      },
+    ],
+    "anonymous": false,
+  },
+  {
+    "type": "event",
     "name": "InitiativeConfigured",
     "inputs": [
       {
@@ -1694,6 +1848,18 @@ export const SIGNED_BALLOTS_ABI = [
       },
       {
         "name": "askUsd",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256",
+      },
+      {
+        "name": "rfp",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool",
+      },
+      {
+        "name": "groups",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256",
@@ -1956,6 +2122,27 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "error",
+    "name": "AddingClosed",
+    "inputs": [],
+  },
+  {
+    "type": "error",
+    "name": "BadProof",
+    "inputs": [
+      {
+        "name": "tier",
+        "type": "uint8",
+        "internalType": "uint8",
+      },
+    ],
+  },
+  {
+    "type": "error",
+    "name": "BallotTooSmall",
+    "inputs": [],
+  },
+  {
+    "type": "error",
     "name": "ConfigurationFrozen",
     "inputs": [],
   },
@@ -2084,6 +2271,22 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "error",
+    "name": "GroupOverHalf",
+    "inputs": [
+      {
+        "name": "tier",
+        "type": "uint8",
+        "internalType": "uint8",
+      },
+      {
+        "name": "group",
+        "type": "uint8",
+        "internalType": "uint8",
+      },
+    ],
+  },
+  {
+    "type": "error",
     "name": "InitialFundingTooLate",
     "inputs": [],
   },
@@ -2156,6 +2359,11 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "error",
+    "name": "InvalidTiers",
+    "inputs": [],
+  },
+  {
+    "type": "error",
     "name": "NoBlob",
     "inputs": [],
   },
@@ -2203,6 +2411,11 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "error",
+    "name": "RfpWithGroups",
+    "inputs": [],
+  },
+  {
+    "type": "error",
     "name": "StalePrice",
     "inputs": [
       {
@@ -2225,7 +2438,23 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "error",
+    "name": "TooFewIndependent",
+    "inputs": [
+      {
+        "name": "tier",
+        "type": "uint8",
+        "internalType": "uint8",
+      },
+    ],
+  },
+  {
+    "type": "error",
     "name": "TooManyCurrencies",
+    "inputs": [],
+  },
+  {
+    "type": "error",
+    "name": "TooManyGroups",
     "inputs": [],
   },
   {
@@ -2235,7 +2464,17 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "error",
+    "name": "TooManyTiers",
+    "inputs": [],
+  },
+  {
+    "type": "error",
     "name": "UnknownCurrency",
+    "inputs": [],
+  },
+  {
+    "type": "error",
+    "name": "UnknownGroup",
     "inputs": [],
   },
   {

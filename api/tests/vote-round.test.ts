@@ -32,6 +32,9 @@ const manifest: VoteManifest = {
   poolUsd: "913244000000",
   issuer: ISSUER.address,
   slugs: ["a", "b", "c"],
+  projects: ["a", "b", "c"].map(() => ({ askUsd: "1", rfp: false, groups: [] })),
+  groups: [],
+  independentTiers: 1,
 };
 
 const RELAYER = "0x9000000000000000000000000000000000000009" as const;
@@ -47,6 +50,9 @@ const real: VoteManifest = {
   schedule: manifest.schedule,
   poolUsd: "913244000000",
   slugs: ["a", "b", "c"],
+  projects: ["a", "b", "c"].map(() => ({ askUsd: "1", rfp: false, groups: [] })),
+  groups: [],
+  independentTiers: 1,
 };
 
 type Sent = Parameters<VoteChain["send"]>[0];
@@ -340,7 +346,7 @@ Deno.test("vote round ballot: relays record() with the signature as r and vs (pl
   const { r, yParityAndS } = signatureToCompactSignature(parseSignature(body.signature));
   assertEquals(state.sent, [{
     fn: "record",
-    args: [[{ tokenId: 17n, nonce: 1n, r, vs: yParityAndS, ballot: BALLOT }]],
+    args: [[{ tokenId: 17n, nonce: 1n, r, vs: yParityAndS, ballot: BALLOT, proof: [] }]],
   }]);
   h.close();
 });

@@ -5,8 +5,15 @@ import { type Hex, parseSignature, signatureToCompactSignature } from "viem";
  * key-held wallet, EIP-7702-delegated ones included; recordFor would ask a
  * delegated wallet's code for ERC-1271 instead. */
 export function recordVote(
-  s: { tokenId: bigint; nonce: bigint; ballot: Hex; signature: Hex },
-): { tokenId: bigint; nonce: bigint; r: Hex; vs: Hex; ballot: Hex } {
+  s: { tokenId: bigint; nonce: bigint; ballot: Hex; signature: Hex; proof: number[] },
+): { tokenId: bigint; nonce: bigint; r: Hex; vs: Hex; ballot: Hex; proof: number[] } {
   const { r, yParityAndS } = signatureToCompactSignature(parseSignature(s.signature));
-  return { tokenId: s.tokenId, nonce: s.nonce, r, vs: yParityAndS, ballot: s.ballot };
+  return {
+    tokenId: s.tokenId,
+    nonce: s.nonce,
+    r,
+    vs: yParityAndS,
+    ballot: s.ballot,
+    proof: s.proof,
+  };
 }

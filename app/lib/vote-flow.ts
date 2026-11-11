@@ -1,7 +1,8 @@
 /** The ballot's send-and-check flow, with every chain, wallet and API call
  * injected so it can be tested on its own. */
-import { type Hex, keccak256 } from "viem";
-import type { VoteManifest } from "../../shared/vote/manifest";
+import { type Hex, hexToBytes, keccak256 } from "viem";
+import { rulesRound, type VoteManifest } from "../../shared/vote/manifest";
+import { findProof } from "../../shared/vote/rules";
 import type { BallotTxResult } from "../../shared/vote/receipt";
 import { voteTypedData } from "../../shared/vote/typed-data";
 
@@ -29,8 +30,8 @@ export interface FlowDeps {
   /** POST /api/vote/gas: a one-time top-up hash, or null when not needed. */
   requestGas(tokenId: bigint): Promise<Hex | null>;
   waitTx(hash: Hex): Promise<void>;
-  /** recordFor from the voter's own wallet, with their signature. */
-  sendOwn(signed: Signed): Promise<Hex>;
+  /** record() from the voter's own wallet, with their signature and the ballot's proof. */
+  sendOwn(signed: Signed, proof: number[]): Promise<Hex>;
 }
 
 const RESULT_TEXT: Record<Exclude<BallotTxResult, "counted" | "late">, string> = {
@@ -175,7 +176,9 @@ export async function selfSendBallot(
   }
   let hash: Hex;
   try {
-    hash = await d.sendOwn(signed);
+    // The page only offers this for a ballot that passes the rules; without a proof the
+    // contract refuses it and the failure says so.
+    hash = await d.sendOwn(signed, findProof(hexToBytes(ballot), rulesRound(m)) ?? []);
   } catch (e) {
     if (declined(e)) set({ kind: "idle", note: "You didn't confirm, so nothing was sent." });
     else set({ kind: "failed", reason: message(e) });

@@ -121,6 +121,21 @@ export function checkBallot(ballot: Uint8Array, round: RulesRound): RulesResult 
   return errors.length ? { ok: false, errors, proof: [] } : { ok: true, errors, proof };
 }
 
+/** The proof the contract wants for this ballot (three unrelated projects per enforced
+ * tier, Tier-S first), whatever the pool; null when a tier has no unrelated triple or the
+ * ballot can't be read. */
+export function findProof(ballot: Uint8Array, round: RulesRound): number[] | null {
+  if (!readable(ballot, round.projects.length)) return null;
+  const groups = tiersOf(ballot);
+  const proof: number[] = [];
+  for (const t of enforced(round)) {
+    const found = independent(round, groups[t] ?? []).proof;
+    if (!found) return null;
+    proof.push(...found);
+  }
+  return proof;
+}
+
 /** Whether `proof` names, for each enforced tier in order, three pairwise-unrelated
  * projects in that tier: what the contract checks instead of searching. */
 export function checkProof(ballot: Uint8Array, round: RulesRound, proof: number[]): boolean {

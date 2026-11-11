@@ -34,7 +34,7 @@ import { ruleMessage } from "~/lib/vote-rules-copy";
 import { useReviewIdentity } from "~/hooks/use-admin-ratings";
 import BallotRules from "~/components/vote/BallotRules";
 import PasteBallot from "~/components/vote/PasteBallot";
-import { checkBallot } from "../../../shared/vote/rules";
+import { checkBallot, emptyTierErrors } from "../../../shared/vote/rules";
 import { usd } from "~/lib/format";
 import { encodeBallot, type Tier } from "../../../shared/vote/ballot";
 import { ROUND, rulesRound } from "../../../shared/vote/manifest";
@@ -561,8 +561,11 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     wide = true;
     const busy = ["signing", "relaying", "waiting"].includes(ballotFlow.phase.kind);
     const placed = Object.keys(tiers).length;
-    const sendYourself = () =>
+    const sendYourself = () => {
+      // The contract would refuse it: never open the wallet for a ballot breaking a rule.
+      if (broken) return;
       void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(ROUND.slugs, tiers)));
+    };
     const counted = rv ? Boolean(rv.accepted[String(n)]) : true;
     const registrationOver = rv ? Date.now() / 1000 >= rv.registrationClosesAt : false;
     const shut = !counted && registrationOver;
@@ -638,10 +641,17 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
         rulesRound(ROUND, BigInt(rv?.poolUsd ?? ROUND.poolUsd)),
       )
       : null;
-    const broken = Boolean(rules && !rules.ok);
+    // An enforced tier left empty: the bytes would read the next one in its place.
+    const empty = ROUND.ballotRules && placed > 0
+      ? emptyTierErrors(tiers, ROUND.independentTiers)
+      : [];
+    const errors = empty.length
+      ? [...empty, ...(rules?.errors.filter((e) => e.rule === "size") ?? [])]
+      : rules?.errors ?? [];
+    const broken = errors.length > 0;
     const rulesBox = broken && (
       <BallotRules
-        messages={rules!.errors.map((e) =>
+        messages={errors.map((e) =>
           ruleMessage(
             e,
             (i) => titles.get(ROUND.slugs[i]) ?? ROUND.slugs[i],
@@ -721,7 +731,9 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
                 <BallotStatus
                   phase={ballotFlow.phase}
                   onRetry={() => void ballotFlow.retry()}
-                  selfSend={placed > 0 && <Button onClick={sendYourself}>Send it yourself</Button>}
+                  selfSend={placed > 0 && !broken && (
+                    <Button onClick={sendYourself}>Send it yourself</Button>
+                  )}
                 />
                 <Button
                   variant="primary"

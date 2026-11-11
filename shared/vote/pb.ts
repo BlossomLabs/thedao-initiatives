@@ -7,16 +7,23 @@ import type { Tier } from "./ballot.ts";
 
 const TIER_ORDER: Tier[] = ["S", "A", "B"];
 
-/** The vote line: from a full `.pb` (its single VOTES row's `vote` column) or bare. */
+/** The vote line: from a full `.pb` (its single VOTES row's `vote` column), a VOTES row
+ * with or without its header, a `voter_id;vote` row, or bare; code fences ignored (an
+ * LLM's answer often comes in one). */
 function voteLine(text: string): string | null {
-  const lines = text.replace(/\r/g, "").split("\n").map((l) => l.trim()).filter(Boolean);
-  if (!lines.some((l) => /^(META|PROJECTS|VOTES)$/i.test(l))) return lines[0] ?? null;
+  const lines = text.replace(/\r/g, "").split("\n").map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("```"));
   const at = lines.findIndex((l) => /^VOTES$/i.test(l));
-  if (at < 0 || !lines[at + 1] || !lines[at + 2]) return null;
-  const header = lines[at + 1].split(";").map((h) => h.trim().toLowerCase());
-  const col = header.indexOf("vote");
-  if (col < 0) return null;
-  return lines[at + 2].split(";")[col]?.trim() || null;
+  let row: string | undefined;
+  if (at >= 0) {
+    const rest = lines.slice(at + 1).filter((l) => !/^voter_id\s*;/i.test(l));
+    const header = lines[at + 1]?.split(";").map((h) => h.trim().toLowerCase());
+    const col = header?.includes("vote") ? header.indexOf("vote") : -1;
+    row = col >= 0 ? rest[0]?.split(";")[col] : rest[0];
+  } else if (!lines.some((l) => /^(META|PROJECTS)$/i.test(l))) row = lines[0];
+  // A `voter_id;vote` row: the vote is what follows the last `;`.
+  const vote = row?.includes(";") ? row.slice(row.lastIndexOf(";") + 1) : row;
+  return vote?.trim() || null;
 }
 
 export function parseBallotText(

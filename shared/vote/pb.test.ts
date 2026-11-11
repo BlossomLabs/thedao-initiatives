@@ -59,3 +59,15 @@ describe("pabutools ballots (Blossom ties)", () => {
     expect(parseBallotText(text, slugs)).toEqual({ tiers });
   });
 });
+
+describe("what an LLM answers", () => {
+  it("reads a voter-id row, a fenced reply, and a VOTES row without its header", () => {
+    const want = { tiers: { evm: "S", vyper: "S", fuzz: "A" } };
+    expect(parseBallotText("1;evm=vyper,fuzz", slugs)).toEqual(want);
+    expect(parseBallotText("```\nevm=vyper,fuzz\n```", slugs)).toEqual(want);
+    expect(parseBallotText("```text\nVOTES\nvoter_id;vote\n1;evm=vyper,fuzz\n```", slugs)).toEqual(
+      want,
+    );
+    expect(parseBallotText("VOTES\n1;evm=vyper,fuzz", slugs)).toEqual(want);
+  });
+});

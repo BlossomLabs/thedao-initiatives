@@ -39,6 +39,9 @@ const UNSEEN_SECS = 60;
 /** The relay pays for this many ballots per badge; after that, "send it yourself".
  * Mainnet gas is real money, so the real round gets fewer. */
 const relaysPerBadge = (d: VoteRound) => d.manifest.kind === "real" ? 5 : 20;
+/** The contract's ballot-rule reverts (vote/contracts/SignedBallots.sol). */
+const RULE_REVERT = /\b(BallotTooSmall|TooFewIndependent|BadProof|GroupOverHalf|TooManyTiers)\b/;
+
 /** Below this the real round's relayer stops and voters send it themselves. */
 const RELAY_FLOOR_WEI = 10_000_000_000_000_000n; // 0.01 ETH
 /** Long enough for any mint to land; the chain is the record after that. */
@@ -337,6 +340,16 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     // Rounds deployed with the ballot rules: judge each ballot by the projects and pool
     // on-chain when it landed (projects missing from the history were there at deploy).
     const history = m.ballotRules ? await d.chain.rulesHistory() : null;
+    // A project the admin added on-chain that this site's manifest doesn't have yet
+    // (before `vote-deploy --added` and a redeploy): its ballots can't be read, so hold
+    // the round rather than refuse them (or settle without them).
+    if (history && history.addedAt.length > m.slugs.length) {
+      throw fail(
+        503,
+        "round_out_of_date",
+        "A project was just added to the vote; the results are back once this site knows it.",
+      );
+    }
     const poolUsd = history?.pool.at(-1)?.poolUsd ?? BigInt(m.poolUsd);
     const st = replay({
       schedule: m.schedule,
@@ -623,10 +636,17 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     const nonce = uint(body.nonce);
     const ballot = body.ballot;
     const signature = body.signature;
+    const m = d.manifest.slugs.length;
+    // With the ballot rules a ballot may be shorter than the projects (signed before one
+    // was added): the missing ones are unplaced. Older rounds need every byte.
+    const bytes = typeof ballot === "string" && isHex(ballot) ? hexToBytes(ballot) : null;
+    const padded = bytes && d.manifest.ballotRules && bytes.length >= 1 && bytes.length <= m
+      ? Uint8Array.from([...bytes, ...Array(m - bytes.length).fill(255)])
+      : bytes;
     if (
       tokenId === null || nonce === null || typeof ballot !== "string" || !isHex(ballot) ||
-      typeof signature !== "string" || !isHex(signature) ||
-      !isValidOnchainBallot(hexToBytes(ballot), d.manifest.slugs.length)
+      !padded || typeof signature !== "string" ||
+      !isHex(signature) || !isValidOnchainBallot(padded, m)
     ) throw fail(400, "bad_ballot", "That ballot isn't valid.");
     const owner = await d.chain.ownerOf(tokenId);
     if (!owner) throw fail(404, "no_badge", "No such badge.");
@@ -656,7 +676,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     const no = deps.now() < regDeadline ? null : refusal(
       await recentRound(d),
       tokenId.toString(),
-      hexToBytes(ballot),
+      padded,
       deps.now(),
       d.manifest.slugs.length,
     );
@@ -721,6 +741,18 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
             proof: findProof(hexToBytes(ballot as Hex), rulesRound(d.manifest)) ?? [],
           }),
         ]],
+      }).catch((e) => {
+        // The contract enforced a rule this check passed: the pool rose meanwhile (the
+        // check uses a replay up to a few seconds old). Say so, not "internal error".
+        if (RULE_REVERT.test(String(e))) {
+          throw fail(
+            422,
+            "invalid_ballot",
+            "This ballot breaks the ballot rules: the pool may have just changed. Check it and send again.",
+            { errors: [] },
+          );
+        }
+        throw e;
       });
       await kv.atomic()
         .set(pendingKey, { hash: h, at: deps.now() }, { expireIn: PENDING_MS })

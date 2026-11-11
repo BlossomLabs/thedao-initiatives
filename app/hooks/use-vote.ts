@@ -127,14 +127,27 @@ export type NextTierEntry = {
   moves: { slug: string; from: Tier; to: Tier }[];
 };
 
+const CLOSED_POLL_MS = 15_000;
+
+/** How often a page that polls every `refetchInterval` asks for the round in `view`'s state. */
+export function roundPollInterval(
+  view: RoundView | undefined,
+  refetchInterval: number | false,
+): number | false {
+  if (!view?.closed || refetchInterval === false) return refetchInterval;
+  // The tally can't change once the round is over, but the final what-ifs are worked
+  // out in the background after it closes and only come in a later response: wait for
+  // them, at an unhurried pace, then stop.
+  return view.final ? false : Math.max(refetchInterval, CLOSED_POLL_MS);
+}
+
 /** The round's quiet ending (each tier's state, what counts, what was refused). */
 export function useVoteRound(refetchInterval: number | false = false, enabled = true) {
   return useQuery({
     queryKey: ["vote-round"],
     enabled,
     queryFn: () => api<RoundView>("/api/vote/round", { passive: true }),
-    // Nothing changes once the round is over.
-    refetchInterval: (q) => (q.state.data?.closed ? false : refetchInterval),
+    refetchInterval: (q) => roundPollInterval(q.state.data, refetchInterval),
     retry: false,
   });
 }

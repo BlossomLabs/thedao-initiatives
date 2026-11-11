@@ -239,6 +239,16 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     // Rounds deployed with the ballot rules: judge each ballot by the projects and pool
     // on-chain when it landed (projects missing from the history were there at deploy).
     const history = m.ballotRules ? await d.chain.rulesHistory() : null;
+    // A project the admin added on-chain that this site's manifest doesn't have yet
+    // (before `vote-deploy --added` and a redeploy): its ballots can't be read, so hold
+    // the round rather than refuse them (or settle without them).
+    if (history && history.addedAt.length > m.slugs.length) {
+      throw fail(
+        503,
+        "round_out_of_date",
+        "A project was just added to the vote; the results are back once this site knows it.",
+      );
+    }
     const poolUsd = history?.pool.at(-1)?.poolUsd ?? BigInt(m.poolUsd);
     const st = replay({
       schedule: m.schedule,

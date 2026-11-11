@@ -967,3 +967,13 @@ Deno.test("ballot: a rule the contract enforced after a pool change is a 422, no
   assertEquals((await j(res)).code, "invalid_ballot");
   h.close();
 });
+
+Deno.test("round: held while the chain has a project this site doesn't know yet", async () => {
+  const { h, state } = await setup(ruled);
+  // The admin added a fifth project; the manifest (and so the replay) still has four.
+  state.history.addedAt = [null, null, null, null, { block: 5, logIndex: 0 }];
+  const res = await h.req("/api/vote/round");
+  assertEquals(res.status, 503);
+  assertEquals((await j(res)).code, "round_out_of_date");
+  h.close();
+});

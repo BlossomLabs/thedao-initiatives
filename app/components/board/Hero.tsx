@@ -17,7 +17,7 @@ export default function Hero(
     countFrom?: number;
     /** Count while the amount loads (the homepage). */
     countEarly?: boolean;
-    /** The DevCon projector's own kicker and line under the amount (defaults: the homepage's). */
+    /** the vote results' own kicker and line under the amount (defaults: the homepage's). */
     kicker?: React.ReactNode;
     sub?: React.ReactNode;
     /** Below the line, before the shimmer rule. */

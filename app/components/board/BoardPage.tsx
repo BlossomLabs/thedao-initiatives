@@ -1,6 +1,6 @@
 import type { AiSearchResult } from "../../../shared/ai-search";
 import type { Card } from "~/lib/api-types";
-import type { Tier } from "@shared/devcon/ballot";
+import type { Tier } from "@shared/vote/ballot";
 import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -65,7 +65,7 @@ const BAND_ICONS: Record<string, { Icon: LucideIcon; color: string }> = {
   disliked: { Icon: Frown, color: "text-dao-sky" },
   "strongly-disliked": { Icon: ThumbsDown, color: "text-white/50" },
 };
-/** The front page's board. The DevCon projector reuses it with `only` (the round's
+/** The front page's board. The vote results reuse it with `only` (the round's
  * slugs), `votePct` (each initiative's vote share, % of its goal, by id) and its own hero. */
 export default function BoardPage({ only, votePct, voteTiers, hero, defaultSort }: {
   only?: ReadonlySet<string>;

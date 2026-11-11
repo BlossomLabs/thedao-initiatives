@@ -5,7 +5,7 @@ import { cn } from "~/lib/utils";
 export default function Bar(
   { pct, big, tick, label, className, children, votePct }: {
     pct: number;
-    /** The DevCon vote's share (% of the goal), drawn in gold after the raised part. */
+    /** The vote's share (% of the goal), drawn in gold after the raised part. */
     votePct?: number;
     /** Drawn over the bar with the tick (the vote callout). */
     children?: React.ReactNode;

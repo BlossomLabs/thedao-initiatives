@@ -1,5 +1,5 @@
 import { Suspense, useState } from "react";
-import type { Tier } from "@shared/devcon/ballot";
+import type { Tier } from "@shared/vote/ballot";
 import BackerLogo from "~/components/ui/BackerLogo";
 import { ArrowRight, Landmark, Wallet } from "lucide-react";
 import { Link } from "react-router";
@@ -123,7 +123,7 @@ export default function InitiativeCard({
   voteTier,
 }: {
   card: Card;
-  /** The DevCon projector: this initiative's vote share, % of its goal (gold on the bar). */
+  /** The vote results: this initiative's vote share, % of its goal (gold on the bar). */
   votePct?: number;
   voteTier?: Tier;
   /** The vote floor on the bar, while the display is on. */

@@ -146,10 +146,10 @@ export interface Config {
   rateLimitMode: RateLimitMode;
   /** Alchemy app key: an extra mainnet RPC ahead of the public fallbacks. */
   alchemyApiKey: string;
-  /** DevCon vote: Sepolia RPC (SEPOLIA_RPC_URL, else publicnode). */
+  /** Vote: Sepolia RPC (SEPOLIA_RPC_URL, else publicnode). */
   sepoliaRpcUrl: string;
-  /** DevCon vote: the relayer's private key (MINTER_ROLE + Sepolia ETH); "" = relay off. */
-  devconRelayerKey: string;
+  /** Vote: the relayer's private key (MINTER_ROLE + Sepolia ETH); "" = relay off. */
+  voteRelayerKey: string;
   pinataJwt: string;
   pinataGateway: string;
   /** Where the support widget's messages are forwarded; empty = widget disabled (503). */
@@ -251,10 +251,10 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
       : 600,
     rateLimitMode: rateLimitMode(env),
     alchemyApiKey,
-    // Not the Alchemy key: that app may not have Sepolia enabled (every DevCon route would fail).
+    // Not the Alchemy key: that app may not have Sepolia enabled (every vote route would fail).
     sepoliaRpcUrl: (env.SEPOLIA_RPC_URL ?? "").trim() ||
       "https://ethereum-sepolia-rpc.publicnode.com",
-    devconRelayerKey: (env.DEVCON_RELAYER_KEY ?? "").trim(),
+    voteRelayerKey: (env.VOTE_RELAYER_KEY ?? "").trim(),
     pinataJwt: (env.PINATA_JWT ?? "").trim(),
     pinataGateway: (env.PINATA_GATEWAY ?? "").trim() || "ipfs.blossom.software",
     supportUrl: (env.SUPPORT_URL ?? "").trim(),

@@ -1,4 +1,4 @@
-import type { Tier } from "@shared/devcon/ballot";
+import type { Tier } from "@shared/vote/ballot";
 
 /** A live tally's result tier, styled like the other funding chips. */
 export default function VoteTierChip({ tier }: { tier: Tier }) {

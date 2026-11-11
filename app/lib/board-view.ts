@@ -9,7 +9,7 @@ import { CATEGORIES, categoryOf } from "~/lib/categories";
 import { plural } from "~/lib/format";
 import { hasRatingAverage, type RatingSummary } from "@shared/ratings";
 import { REVIEWER } from "~/lib/reviewer";
-import { type Tier, TIERS } from "@shared/devcon/ballot";
+import { type Tier, TIERS } from "@shared/vote/ballot";
 
 export const TYPES = ["all", "rfp", "grant"] as const;
 export const STATUSES = ["all", "open", "qualified", "funded"] as const;
@@ -63,7 +63,7 @@ const pick = <T extends string>(v: string | null, allowed: readonly T[], fallbac
   allowed.includes(v as T) ? v as T : fallback;
 
 /** The view a URL asks for; unknown values fall back to the defaults (`defaultSort`:
- * a board with its own default order, as the Devcon projector's Closest to funded). */
+ * a board with its own default order, as the vote results' Closest to funded). */
 export function readView(
   params: URLSearchParams,
   defaultSort: BoardSort = DEFAULT_VIEW.sort,
@@ -266,7 +266,7 @@ export interface RatingGroup {
   cards: Card[];
 }
 
-/** Fully funded: by what it raised, or (Devcon projector) with its vote share, % of its
+/** Fully funded: by what it raised, or (vote results) with its vote share, % of its
  * goal. From the raised amount itself: `pct` comes rounded to a tenth, and 54.1% plus
  * the 45.875% the vote gives (the exact rest) would fall short of 100. */
 export const fullyFunded = (c: Card, votePct = 0): boolean => {
@@ -279,7 +279,7 @@ export type FundingSection = "funded" | "qualified" | "open";
 
 /** "Closest to funded" in sections, as the Funding filter names them: Fully funded,
  * Qualified for the vote (only while the cards carry the vote state), Open for
- * funding. On the Devcon projector `votePct` (each one's vote share, % of its goal,
+ * funding. On the vote results `votePct` (each one's vote share, % of its goal,
  * by id) counts toward fully funded. Funded results with `voteTiers` are ordered
  * S/A/B, then untiered; the existing order is preserved within each tier and other group. */
 export function groupByFunding(

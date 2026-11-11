@@ -475,7 +475,7 @@ describe("groupByFunding (Closest to funded)", () => {
     expect(groups[2].cards).toEqual([open, below]);
   });
 
-  it("leaves empty sections out, and counts a Devcon vote share toward fully funded", () => {
+  it("leaves empty sections out, and counts a vote share toward fully funded", () => {
     const a = card("Half way", { raised: 50_000 });
     const b = card("Barely started", { raised: 1_000 });
     expect(groupByFunding([a, b]).map((g) => g.key)).toEqual(["open"]);
@@ -512,7 +512,7 @@ describe("groupByFunding (Closest to funded)", () => {
   });
 });
 
-describe("a board with its own default sort (the Devcon projector)", () => {
+describe("a board with its own default sort (the vote results)", () => {
   it("opens in it, and leaves it out of the URL", () => {
     expect(readView(new URLSearchParams(), "closest").sort).toBe("closest");
     expect(writeView({ ...DEFAULT_VIEW, sort: "closest" }, "closest").has("sort")).toBe(false);

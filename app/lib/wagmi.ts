@@ -7,7 +7,7 @@ import { privy, PRIVY_APP_ID } from "./privy";
 import { MOCK_WALLET, WALLETCONNECT_PROJECT_ID } from "./wallet-env";
 
 const RPC_URL = (import.meta.env?.VITE_RPC_URL as string | undefined) || undefined;
-// The DevCon vote (Sepolia); mainnet stays first, so it stays the default chain.
+// Test votes (Sepolia); mainnet stays first, so it stays the default chain.
 const SEPOLIA_RPC_URL = (import.meta.env?.VITE_SEPOLIA_RPC_URL as string | undefined) ||
   "https://ethereum-sepolia-rpc.publicnode.com";
 

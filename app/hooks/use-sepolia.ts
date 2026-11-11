@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useWallet } from "~/context/wallet";
 import { liveConnector } from "~/lib/wallet-store";
-import { SEPOLIA_CHAIN_ID } from "../../shared/devcon/manifest";
+import { SEPOLIA_CHAIN_ID } from "../../shared/vote/manifest";
 
 export class WrongChainError extends Error {
   constructor(cause: unknown) {
@@ -9,7 +9,7 @@ export class WrongChainError extends Error {
   }
 }
 
-/** The DevCon vote lives on Sepolia: wallets refuse typed data for another chain,
+/** Test votes live on Sepolia: wallets refuse typed data for another chain,
  * so switch before asking for a signature or a transaction. */
 export function useEnsureSepolia(): () => Promise<void> {
   const wallet = useWallet();

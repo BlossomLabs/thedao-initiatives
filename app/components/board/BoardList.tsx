@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Tier } from "@shared/devcon/ballot";
+import type { Tier } from "@shared/vote/ballot";
 import { Users } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRowMotion } from "~/components/board/Shuffle";
@@ -53,7 +53,7 @@ function FundingBar(
   { pct, tick, votePct, className, children }: {
     pct: number;
     tick?: number;
-    /** The DevCon vote's share, drawn after the raised part (gold). */
+    /** The vote's share, drawn after the raised part (gold). */
     votePct?: number;
     className?: string;
     /** The vote callout, over the mark. */
@@ -349,7 +349,7 @@ export default function BoardList(
     voteTiers,
   }: {
     cards: Card[];
-    /** The DevCon projector: each initiative's vote share, % of its goal, by initiative id. */
+    /** The vote results: each initiative's vote share, % of its goal, by initiative id. */
     votePct?: ReadonlyMap<string, number>;
     voteTiers?: ReadonlyMap<string, Tier>;
     /** Initiatives the AI search put first. */

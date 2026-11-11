@@ -75,7 +75,7 @@ it("with reduced motion the homepage waits for the amount, as before", () => {
   expect(amount).toHaveTextContent("655215");
 });
 
-it("elsewhere (the DevCon projector) it waits for the amount and counts from 0", () => {
+it("elsewhere (the vote results) it waits for the amount and counts from 0", () => {
   render(<Hero />);
   const amount = screen.getByTestId("amount");
   expect(amount.parentElement).toHaveClass("opacity-0");

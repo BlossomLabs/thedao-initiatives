@@ -27,7 +27,7 @@ import { createSiteLock, type SiteLock } from "./lib/sitelock.ts";
 import { auditIntent, securityAudit } from "./services/audit.ts";
 import { maintenanceGate } from "./services/maintenance.ts";
 import { auditRoutes } from "./routes/audit.ts";
-import { devconRoutes } from "./routes/devcon.ts";
+import { voteRoutes } from "./routes/vote.ts";
 import type { StaticSite } from "./site.ts";
 import { isPublished } from "./db/initiatives.ts";
 
@@ -145,7 +145,7 @@ export function createApp(
   app.route("/api/donate", donateRoutes(deps));
   app.route("/api/uploads", uploadRoutes(deps));
   app.route("/api/watchlist", watchlistRoutes(deps));
-  app.route("/api/devcon", devconRoutes(deps));
+  app.route("/api/vote", voteRoutes(deps));
   app.route("/api", profileRoutes(deps));
   app.route("/api", commentRoutes(deps));
   app.route("/api", aiRoutes(deps));

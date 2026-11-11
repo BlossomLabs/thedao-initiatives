@@ -77,7 +77,7 @@ export default function PrivyIsland({
           showWalletUIs: false,
         },
         defaultChain: mainnet,
-        // Sepolia for the DevCon vote only; mainnet stays the default.
+        // Sepolia for test votes; mainnet stays the default.
         supportedChains: [mainnet, sepolia],
         // Only Privy's residual UIs (recovery, MFA) use this; sign-in is our own dialog.
         appearance: { theme: "#1e3650", accentColor: "#5cb75a", logo: SITE_URL + SITE_LOGO },

@@ -22,7 +22,7 @@
      and the whole arrow fades once the outlines are done. */
   --animate-arrow-draw: arrow-draw 0.4s ease-out both;
   --animate-arrow-fade: arrow-fade 2.6s ease-in both;
-  /* Devcon ballot: an initiative dropped in a tier. The tier flashes green and fades back,
+  /* Ballot: an initiative dropped in a tier. The tier flashes green and fades back,
      its grade letter bumps, and the dropped chip pops in. With reduced motion, only the
      flash (opacity) plays. */
   --animate-tier-land: tier-land 0.7s ease-out both;
@@ -125,7 +125,7 @@
   --color-dao-blue-legal: #28567a;
   --color-dao-green: #5cb75a;
   --color-dao-bright: #00ff88;
-  /* The DevCon vote's share on the projector bars. */
+  /* The vote's share on the result bars. */
   --color-vote: #e9b949;
   --color-dao-red: #ff3b38;
   --color-dao-red-hover: #e63633;

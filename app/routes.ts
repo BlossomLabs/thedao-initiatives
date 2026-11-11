@@ -9,9 +9,10 @@ export default [
   route("submit/thanks", "routes/submitted.tsx"),
   route("mine", "routes/mine.tsx"),
   route("sessions", "routes/sessions.tsx"),
-  route("devcon/my-ballot", "routes/devcon.my-ballot.tsx"),
-  route("devcon/:code", "routes/devcon.code.tsx"),
-  route("devcon", "routes/devcon.tsx"),
+  route("vote/ballot", "routes/vote.ballot.tsx"),
+  route("vote/:code", "routes/vote.code.tsx"),
+  route("devcon/:code", "routes/code-redirect.tsx"),
+  route("vote", "routes/vote.tsx"),
   route("donation-terms", "routes/terms.tsx"),
   route("donation-terms/v/:id", "routes/terms.version.tsx"),
   route("admin", "routes/admin.tsx", [

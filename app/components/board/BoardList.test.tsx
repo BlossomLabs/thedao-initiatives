@@ -168,7 +168,7 @@ it("the last row's vote callout hangs below the list, so nothing around it clips
   }
 });
 
-it("draws the DevCon vote's share as a second segment after the raised part", () => {
+it("draws the vote's share as a second segment after the raised part", () => {
   const { container } = mount({ votePct: new Map([["a", 30]]) });
   const fills = container.querySelectorAll("[data-vote-fill]");
   expect(fills).toHaveLength(1);
@@ -189,8 +189,8 @@ it("draws no vote segment without votePct", () => {
 it("a completed vote result keeps an accessible funding label", () => {
   mount({ votePct: new Map([["a", 50]]) });
   const row = screen.getByText("Echidna fuzzing").closest("li")!;
-  expect(within(row).getAllByTitle("Funded with the Devcon vote").length).toBeGreaterThan(0);
-  for (const label of within(row).getAllByText("Funded with the Devcon vote")) {
+  expect(within(row).getAllByTitle("Funded with the vote").length).toBeGreaterThan(0);
+  for (const label of within(row).getAllByText("Funded with the vote")) {
     expect(label).toHaveClass("sr-only");
   }
   expect(within(row).queryByText("Funded", { exact: true })).toBeNull();
@@ -199,7 +199,7 @@ it("a completed vote result keeps an accessible funding label", () => {
   mount({ votePct: new Map([["a", 30]]) });
   expect(
     within(screen.getByText("Echidna fuzzing").closest("li")!)
-      .queryAllByTitle("Funded with the Devcon vote"),
+      .queryAllByTitle("Funded with the vote"),
   )
     .toHaveLength(0);
 });

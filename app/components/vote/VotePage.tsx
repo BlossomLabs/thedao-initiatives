@@ -561,8 +561,11 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     wide = true;
     const busy = ["signing", "relaying", "waiting"].includes(ballotFlow.phase.kind);
     const placed = Object.keys(tiers).length;
-    const sendYourself = () =>
+    const sendYourself = () => {
+      // The contract would refuse it: never open the wallet for a ballot breaking a rule.
+      if (broken) return;
       void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(ROUND.slugs, tiers)));
+    };
     const counted = rv ? Boolean(rv.accepted[String(n)]) : true;
     const registrationOver = rv ? Date.now() / 1000 >= rv.registrationClosesAt : false;
     const shut = !counted && registrationOver;
@@ -721,7 +724,9 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
                 <BallotStatus
                   phase={ballotFlow.phase}
                   onRetry={() => void ballotFlow.retry()}
-                  selfSend={placed > 0 && <Button onClick={sendYourself}>Send it yourself</Button>}
+                  selfSend={placed > 0 && !broken && (
+                    <Button onClick={sendYourself}>Send it yourself</Button>
+                  )}
                 />
                 <Button
                   variant="primary"

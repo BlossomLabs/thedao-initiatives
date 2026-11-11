@@ -925,3 +925,13 @@ it("paste: settled tiers stay as counted, and the page says so", async () => {
   expect(within(s).queryByRole("button", { name: /BETA/ })).toBeNull();
   expect(submit).not.toHaveBeenCalled();
 });
+
+it("ballot rules: after a failure, Send it yourself stays off while a rule is broken", async () => {
+  round.ballotRules = true;
+  round.seal = true;
+  flow.phase = { kind: "failed", reason: "This ballot breaks the ballot rules." };
+  localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "S", beta: "S", gamma: "S" }));
+  await ballotWith(roundBody({ poolUsd: "500000000" }));
+  await screen.findByRole("region", { name: "Ballot rules" });
+  expect(screen.queryByRole("button", { name: "Send it yourself" })).toBeNull();
+});

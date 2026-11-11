@@ -60,8 +60,9 @@ it("a settled chip says what this badge paid for it", () => {
     />,
   );
   const list = within(screen.getByRole("list", { name: "Must fund" }));
-  expect(list.getByRole("button", { name: "ALPHA, funded: you paid $900" })).toHaveTextContent(
-    "$900",
-  );
+  expect(list.getByRole("button", { name: "ALPHA, funded: your share paid $900" }))
+    .toHaveTextContent(
+      "$900",
+    );
   expect(list.getByRole("button", { name: "BETA, not funded" })).toBeDisabled();
 });

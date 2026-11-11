@@ -50,7 +50,7 @@ export default function ShareSpent({ share, settled, open }: {
                 ? <>{t.funded.length ? `${what} None of your share went to it.` : what}</>
                 : (
                   <>
-                    {what} <span className="text-white">You paid {dollars(sum)}</span>{" "}
+                    {what} <span className="text-white">Your share paid {dollars(sum)}</span>{" "}
                     <span className="text-white/60">
                       ({t.paid.map((x) => `${x.title} ${dollars(x.usd)}`).join(" · ")})
                     </span>
@@ -62,7 +62,7 @@ export default function ShareSpent({ share, settled, open }: {
       </ul>
       {open.length > 0 && (
         <p className="mt-2 text-[13.5px] font-medium text-white">
-          {dollars(left)} left for {and(open)}. It goes where you rank them.
+          Remaining share: {dollars(left)}, for {and(open)}. It goes where you rank them.
         </p>
       )}
     </section>

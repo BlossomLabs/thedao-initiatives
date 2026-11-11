@@ -19,10 +19,10 @@ it("says what the badge paid in each settled tier and what is left for the open 
   expect(screen.getByText(/Your share: \$2,000/)).toBeInTheDocument();
   expect(screen.getByText(/S settled, funding Alpha fuzzing and Beta audits\./))
     .toBeInTheDocument();
-  expect(screen.getByText(/You paid \$1,250/)).toBeInTheDocument();
+  expect(screen.getByText(/Your share paid \$1,250/)).toBeInTheDocument();
   expect(screen.getByText(/Alpha fuzzing \$900/)).toBeInTheDocument();
   expect(screen.getByText(/Beta audits \$350/)).toBeInTheDocument();
-  expect(screen.getByText(/\$750 left for A and B/)).toBeInTheDocument();
+  expect(screen.getByText(/Remaining share: \$750, for A and B/)).toBeInTheDocument();
   expect(screen.getByRole("meter")).toHaveAttribute("aria-valuenow", "1250");
 });
 
@@ -37,5 +37,5 @@ it("a settled tier that took nothing from this badge says so", () => {
   expect(screen.getByText(/S settled, funding Gamma\. None of your share went to it\./))
     .toBeInTheDocument();
   expect(screen.getByText(/A settled, funding nothing\./)).toBeInTheDocument();
-  expect(screen.getByText(/\$2,000 left for B/)).toBeInTheDocument();
+  expect(screen.getByText(/Remaining share: \$2,000, for B/)).toBeInTheDocument();
 });

@@ -473,7 +473,7 @@ export default function TierBallot(
     const label = !settledHere || !funded
       ? i.title
       : isFunded
-      ? paidText ? `${i.title}, funded: you paid ${paidText}` : `${i.title}, funded`
+      ? paidText ? `${i.title}, funded: your share paid ${paidText}` : `${i.title}, funded`
       : `${i.title}, not funded`;
     return (
       <li

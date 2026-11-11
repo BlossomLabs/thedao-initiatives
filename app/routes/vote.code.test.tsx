@@ -691,10 +691,11 @@ it("quiet ending: a settled S is named and locked; the badge sees what it paid a
   const share = await screen.findByRole("region", { name: "Your share" });
   expect(within(share).getByText(/Your share: \$2,000/)).toBeInTheDocument();
   expect(within(share).getByText(/S settled, funding ALPHA\./)).toBeInTheDocument();
-  expect(within(share).getByText(/You paid \$900/)).toBeInTheDocument();
-  expect(within(share).getByText(/\$1,100 left for A and B/)).toBeInTheDocument();
+  expect(within(share).getByText(/Your share paid \$900/)).toBeInTheDocument();
+  expect(within(share).getByText(/Remaining share: \$1,100, for A and B/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Must fund (settled)" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "ALPHA, funded: you paid $900" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "ALPHA, funded: your share paid $900" }))
+    .toBeDisabled();
 });
 
 it("quiet ending: a sent ballot the round refused says the earlier one still counts", async () => {

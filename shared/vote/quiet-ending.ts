@@ -6,6 +6,7 @@
  * Browser and Deno. */
 import { effectiveRanks } from "../../vote/shared/ranks.ts";
 import type { Tier } from "./ballot.ts";
+import { checkBallot, type RulesRound } from "./rules.ts";
 import { stageBound, stageTally, tierOf } from "./stage.ts";
 
 export type Schedule = {
@@ -48,7 +49,7 @@ export type TierState =
 export type Rejection = {
   tokenId: string;
   nonce: number;
-  reason: "tier_settled" | "registration_closed";
+  reason: "tier_settled" | "registration_closed" | "invalid_ballot";
 };
 export type RoundState = {
   registrationClosesAt: number;
@@ -101,6 +102,14 @@ export function replay(
     /** The needs each tier settled with, kept when it first settled: a later donation
      * never moves a settled tier, even before its settlement is stored for good. */
     settleNeeds?: Partial<Record<Tier, SettleNeeds>>;
+    /** The ballot rules, judged as of each receipt: the projects registered by then
+     * (`addedAt[i]` = when project i joined, 0 for the deploy) and the pool then (the
+     * last change at or before it, else `round.poolUsd`). Without it, nothing is checked. */
+    rules?: {
+      round: RulesRound;
+      addedAt: number[];
+      pool: { timestamp: number; poolUsd: bigint }[];
+    };
   },
   now: number,
 ): RoundState {
@@ -113,17 +122,31 @@ export function replay(
   const settled: Settled[] = [];
   let next = 0; // the next receipt to apply
 
+  const valid = (r: Receipt): boolean => {
+    const { round, addedAt, pool } = input.rules!;
+    const count = addedAt.filter((t) => t <= r.timestamp).length;
+    const poolUsd = pool.filter((p) => p.timestamp <= r.timestamp).at(-1)?.poolUsd ??
+      round.poolUsd;
+    return checkBallot(r.ballot!, { ...round, projects: round.projects.slice(0, count), poolUsd })
+      .ok;
+  };
+
   const apply = (r: Receipt) => {
     if (r.ballot === null) {
       accepted.delete(r.tokenId);
       if (r.timestamp < regDeadline) roll.delete(r.tokenId);
       return;
     }
-    const ballot = [...r.ballot];
     if (!roll.has(r.tokenId) && r.timestamp >= regDeadline) {
       rejected.push({ tokenId: r.tokenId, nonce: r.nonce, reason: "registration_closed" });
       return;
     }
+    if (input.rules && !valid(r)) {
+      rejected.push({ tokenId: r.tokenId, nonce: r.nonce, reason: "invalid_ballot" });
+      return;
+    }
+    // A ballot recorded before later projects joined leaves them unplaced.
+    const ballot = [...r.ballot, ...Array(Math.max(0, m - r.ballot.length)).fill(255)];
     const old = accepted.get(r.tokenId);
     if (old) {
       // Tiers settle in order, so the settled ones are tiers 0..k-1 of the ballot.

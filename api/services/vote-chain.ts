@@ -56,7 +56,15 @@ export interface VoteChain {
   ): Promise<Hex>;
   /** Every BallotRecorded and RegistrationRevoked since the deploy block, in chain order. */
   ballots(): Promise<BallotEvent[]>;
+  /** What the ballot rules judge by: when each project joined (`addedAt[id]`, its first
+   * InitiativeConfigured) and every PoolUsdSet, stamped like ballots. */
+  rulesHistory(): Promise<RulesHistory>;
 }
+
+export type RulesHistory = {
+  addedAt: number[];
+  pool: { timestamp: number; poolUsd: bigint }[];
+};
 
 /** In chain order; `block` and `nonce` let the quiet ending group a block's receipts. */
 export type BallotEvent =
@@ -75,6 +83,10 @@ const BALLOT_RECORDED = parseAbiItem(
   "event BallotRecorded(uint256 indexed tokenId, address indexed voter, uint64 nonce, bytes ballot)",
 );
 const REGISTRATION_REVOKED = parseAbiItem("event RegistrationRevoked(uint256 indexed tokenId)");
+const INITIATIVE_CONFIGURED = parseAbiItem(
+  "event InitiativeConfigured(uint256 indexed initiativeId, address indexed account, uint256 askUsd, bool rfp, uint256 groups)",
+);
+const POOL_USD_SET = parseAbiItem("event PoolUsdSet(uint256 previousAmountUsd, uint256 amountUsd)");
 const TRANSFER = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
 );
@@ -249,6 +261,42 @@ export function createVoteChain(
           );
         }
       }
+      return out;
+    },
+    async rulesHistory() {
+      const headBlock = await pub.getBlock();
+      const head = headBlock.number!;
+      const headTime = Number(headBlock.timestamp);
+      const out: RulesHistory = { addedAt: [], pool: [] };
+      for (let from = BigInt(m.deployBlock); from <= head; from += LOG_CHUNK) {
+        const to = from + LOG_CHUNK - 1n < head ? from + LOG_CHUNK - 1n : head;
+        const range = { address: m.contract, fromBlock: from, toBlock: to } as const;
+        const [added, pools] = await Promise.all([
+          pub.getLogs({ ...range, event: INITIATIVE_CONFIGURED }),
+          pub.getLogs({ ...range, event: POOL_USD_SET }),
+        ]);
+        const logs = [...added, ...pools];
+        const times = await stampLogs(logs, headTime, m.schedule.firstTallyAt[0], async (b) => {
+          let t = blockTimes.get(b);
+          if (t === undefined) {
+            t = Number((await pub.getBlock({ blockNumber: b })).timestamp);
+            blockTimes.set(b, t);
+          }
+          return t;
+        });
+        for (const [i, log] of logs.entries()) {
+          if ("initiativeId" in log.args) {
+            const id = Number(log.args.initiativeId);
+            out.addedAt[id] ??= times[i]; // setInitiative re-emits it: the first counts
+          } else {
+            out.pool.push({
+              timestamp: times[i],
+              poolUsd: (log.args as { amountUsd: bigint }).amountUsd,
+            });
+          }
+        }
+      }
+      out.pool.sort((a, b) => a.timestamp - b.timestamp);
       return out;
     },
   };

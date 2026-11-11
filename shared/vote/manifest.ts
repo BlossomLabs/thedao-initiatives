@@ -30,6 +30,9 @@ export type VoteManifest = {
   groups: string[];
   /** Tiers held to the independence rules: bit 0 Tier-S (always), bit 1 Tier-A. */
   independentTiers: number;
+  /** Deployed with the ballot rules: the contract checks them, and so must the replay,
+   * the relayer and the page. Absent for rounds from before them (the Devcon round). */
+  ballotRules?: boolean;
 };
 
 export const SEPOLIA_CHAIN_ID = 11155111;

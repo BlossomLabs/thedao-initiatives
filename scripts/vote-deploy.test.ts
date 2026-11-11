@@ -132,6 +132,7 @@ Deno.test("manifestFor: the real vote names the badge on mainnet, a test vote it
     projects: [{ askUsd: "5", rfp: false, groups: [] }],
     groups: [],
     independentTiers: 1,
+    ballotRules: true,
   });
   assertEquals(manifestFor({ ...base, kind: "test", issuer: SAFE as `0x${string}` }).issuer, SAFE);
   assertEquals(

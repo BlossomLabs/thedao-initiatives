@@ -125,7 +125,7 @@ function isFinal(body: { closed: boolean; tiers: { status: string; at?: number }
 }
 
 /** The round state as JSON: slugs for initiatives, decimal strings for micro-USD. */
-function roundJson(st: RoundState, slugs: string[]) {
+function roundJson(st: RoundState & { poolUsd: bigint }, slugs: string[]) {
   const named = (cs: number[]) => cs.map((c) => slugs[c]);
   const money = (m: Map<number, bigint>) =>
     Object.fromEntries([...m].map(([c, v]) => [slugs[c], v.toString()]));
@@ -155,6 +155,8 @@ function roundJson(st: RoundState, slugs: string[]) {
     registrationClosesAt: st.registrationClosesAt,
     closed: st.closed,
     share: st.share.toString(),
+    /** The pool on-chain now (micro-USD): what a new ballot's size is judged against. */
+    poolUsd: st.poolUsd.toString(),
     tiers: st.tiers.map(tier),
     accepted: Object.fromEntries(
       [...st.accepted].map((
@@ -200,7 +202,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
   };
   /** The quiet ending replayed now. A tier's settlement is written once and reused, so
    * later donations (needs) never move it. */
-  const roundState = async (d: VoteRound): Promise<RoundState> => {
+  const roundState = async (d: VoteRound): Promise<RoundState & { poolUsd: bigint }> => {
     const kv = deps.db.kv;
     const tiers: Tier[] = ["S", "A", "B"];
     const stored = await Promise.all(
@@ -229,14 +231,28 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       block: b.block ?? i + 1,
       timestamp: b.timestamp,
     }));
+    const m = d.manifest;
+    // Rounds deployed with the ballot rules: judge each ballot by the projects and pool
+    // on-chain when it landed (projects missing from the history were there at deploy).
+    const history = m.ballotRules ? await d.chain.rulesHistory() : null;
+    const poolUsd = history?.pool.at(-1)?.poolUsd ?? BigInt(m.poolUsd);
     const st = replay({
-      schedule: d.manifest.schedule,
-      m: d.manifest.slugs.length,
-      poolUsd: BigInt(d.manifest.poolUsd),
+      schedule: m.schedule,
+      m: m.slugs.length,
+      poolUsd: BigInt(m.poolUsd),
       needs,
       receipts,
       snapshots,
       settleNeeds,
+      ...(history
+        ? {
+          rules: {
+            round: rulesRound(m),
+            addedAt: m.slugs.map((_, i) => history.addedAt[i] ?? 0),
+            pool: history.pool,
+          },
+        }
+        : {}),
     }, deps.now());
     for (const [i, t] of st.tiers.entries()) {
       const k = kept[i].value;
@@ -263,12 +279,14 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       await kv.atomic().check(stored[i]).set([...round(d), "settled", t.tier], storeSettled(x))
         .commit();
     }
-    return st;
+    return Object.assign(st, { poolUsd });
   };
 
   /** The replay, reused for a few seconds in this isolate: every relayed ballot asks. */
-  let recent: { at: number; contract: string; state: Promise<RoundState> } | null = null;
-  const recentRound = (d: VoteRound): Promise<RoundState> => {
+  let recent:
+    | { at: number; contract: string; state: Promise<RoundState & { poolUsd: bigint }> }
+    | null = null;
+  const recentRound = (d: VoteRound): Promise<RoundState & { poolUsd: bigint }> => {
     if (
       !recent || recent.contract !== d.manifest.contract ||
       deps.now() - recent.at >= BALLOTS_CACHE_SECS

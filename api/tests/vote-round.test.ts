@@ -59,6 +59,8 @@ type Sent = Parameters<VoteChain["send"]>[0];
 
 function fakeChain() {
   const state = {
+    /** Projects added and pool changes on-chain (the ballot rules judge by them). */
+    history: { addedAt: [] as number[], pool: [] as { timestamp: number; poolUsd: bigint }[] },
     owners: new Map<bigint, Hex>(),
     nonces: new Map<bigint, bigint>(),
     /** Account code by lowercase address ("0xef0100…" = an EIP-7702 delegation). */
@@ -122,6 +124,7 @@ function fakeChain() {
       state.ballotReads++;
       return Promise.resolve(state.logs);
     },
+    rulesHistory: () => Promise.resolve(state.history),
   };
   return { state, chain };
 }
@@ -850,5 +853,48 @@ Deno.test("round: a ballot the RPC returned late can still unsettle S before it 
   h.clock.now = NOW + 660 + 30 * 60;
   await h.req("/api/vote/round");
   assertEquals((await h.deps.db.kv.get<{ at: number; forced: boolean }>(key)).value?.forced, true);
+  h.close();
+});
+
+// ---------------------------------------------------------------- ballot rules
+/** A round deployed with the ballot rules: four unrelated projects asking $100, pool $200. */
+const ruled: VoteManifest = {
+  ...manifest,
+  poolUsd: "200",
+  slugs: ["a", "b", "c", "d"],
+  projects: ["a", "b", "c", "d"].map(() => ({ askUsd: "100", rfp: false, groups: [] })),
+  ballotRules: true,
+};
+
+Deno.test("round: an invalid ballot shows as refused with invalid_ballot", async () => {
+  const { h, state } = await setup(ruled);
+  state.logs = [
+    logOf("1", "01010101", NOW - 100, 1), // Tier-S = a, b, c, d: valid
+    logOf("2", `01${X}${X}${X}`, NOW - 90, 2), // Tier-S = a alone: invalid
+  ];
+  const body = await j(await h.req("/api/vote/round")) as {
+    accepted: Record<string, string>;
+    rejected: { tokenId: string; reason: string }[];
+    poolUsd: string;
+  };
+  assertEquals(Object.keys(body.accepted), ["1"]);
+  assertEquals(body.rejected.map((r) => [r.tokenId, r.reason]), [["2", "invalid_ballot"]]);
+  assertEquals(body.poolUsd, "200");
+  h.close();
+});
+
+Deno.test("round: the pool the chain raised judges later ballots", async () => {
+  const { h, state } = await setup(ruled);
+  state.history = { addedAt: [], pool: [{ timestamp: NOW - 95, poolUsd: 1_000n }] };
+  state.logs = [
+    logOf("1", "01010101", NOW - 100, 1), // 400 ≥ 1.5 × 200
+    logOf("2", "01010101", NOW - 90, 2), // 400 < 1.5 × 1,000
+  ];
+  const body = await j(await h.req("/api/vote/round")) as {
+    accepted: Record<string, string>;
+    poolUsd: string;
+  };
+  assertEquals(Object.keys(body.accepted), ["1"]);
+  assertEquals(body.poolUsd, "1000");
   h.close();
 });

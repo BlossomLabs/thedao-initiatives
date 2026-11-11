@@ -148,6 +148,7 @@ export function manifestFor(
     projects: r.projects,
     groups: r.groups,
     independentTiers: r.independentTiers,
+    ballotRules: true,
   };
 }
 

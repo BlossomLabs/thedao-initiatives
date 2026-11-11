@@ -95,7 +95,13 @@ export type RoundView = {
   tiers: RoundTier[];
   /** tokenId → the ballot that counts (hex). */
   accepted: Record<string, string>;
-  rejected: { tokenId: string; nonce: number; reason: "tier_settled" | "registration_closed" }[];
+  rejected: {
+    tokenId: string;
+    nonce: number;
+    reason: "tier_settled" | "registration_closed" | "invalid_ballot";
+  }[];
+  /** The pool on-chain now (micro-USD): what a new ballot's size is judged against. */
+  poolUsd?: string;
   live: { funded: string[]; awards: Record<string, string>; tiers?: Record<string, Tier> };
 };
 

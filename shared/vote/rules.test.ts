@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { checkBallot, checkProof, type RulesRound, tiersOf } from "./rules";
+import fixtures from "./fixtures/ballot-rules.json";
 
 /** Six projects: 0 and 1 related to Seal, 5 an RFP. Pool 200. Tier-S enforced. */
 const round = (over: Partial<RulesRound> = {}): RulesRound => ({
@@ -101,5 +102,20 @@ describe("ballot rules", () => {
 
   it("tiersOf groups by competition rank", () => {
     expect(tiersOf(Uint8Array.from([1, 1, 3, 255, 3, 1]))).toEqual([[0, 1, 5], [2, 4]]);
+  });
+});
+
+describe("parity with the Python reference", () => {
+  it("matches the Python reference on every fixture", () => {
+    for (const c of fixtures) {
+      const r = checkBallot(Uint8Array.from(c.ballot), {
+        projects: c.projects.map((p) => ({ ...p, askUsd: BigInt(p.askUsd) })),
+        groupNames: c.groupNames,
+        poolUsd: BigInt(c.poolUsd),
+        independentTiers: c.independentTiers,
+      });
+      expect({ name: c.name, ok: r.ok, rules: r.errors.map((e) => e.rule), proof: r.proof })
+        .toEqual({ name: c.name, ok: c.ok, rules: c.rules, proof: c.proof });
+    }
   });
 });

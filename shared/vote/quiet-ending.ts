@@ -79,7 +79,14 @@ const sameSet = (a: number[], b: number[]) => {
   return a.every((x) => y.has(x));
 };
 /** When and how a tier settled, kept the first time it was seen settled. */
-export type SettleNeeds = { at: number; forced: boolean; needs: bigint[] };
+export type SettleNeeds = {
+  at: number;
+  forced: boolean;
+  needs: bigint[];
+  /** The blocks before `at` are final: the time is pinned. Before, the windows are
+   * judged again (a lagging RPC may have missed a ballot), with these needs. */
+  final?: boolean;
+};
 
 export function replay(
   input: {
@@ -200,7 +207,7 @@ export function replay(
     // re-judge its windows (they could reopen it, or close it earlier after the fact).
     const snap = input.snapshots?.find((x) => x.tier === TIERS[t]);
     const kept = input.settleNeeds?.[TIERS[t]];
-    const pinned = snap ?? (kept && { at: kept.at, forced: kept.forced });
+    const pinned = snap ?? (kept?.final ? { at: kept.at, forced: kept.forced } : undefined);
     if (pinned && now >= pinned.at) {
       applyBefore(pinned.at);
       settle(t, pinned.at, pinned.forced);
@@ -208,7 +215,8 @@ export function replay(
       continue;
     }
     applyBefore(start);
-    const first = () => tally(t, needs, t + 1)[0].order;
+    // Once seen settled, its windows are judged with the needs it settled with.
+    const first = () => tally(t, kept?.needs ?? needs, t + 1)[0].order;
     let baseline = first();
     let state: TierState | null = null;
     for (let k = 0; k < ends.length; k++) {

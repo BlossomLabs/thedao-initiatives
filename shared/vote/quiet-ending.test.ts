@@ -165,14 +165,24 @@ describe("quiet-ending replay", () => {
     expect(s.rejected).toEqual([{ tokenId: "a", nonce: 0, reason: "tier_settled" }]);
   });
 
-  it("kept settle needs pin it too, before the settlement is stored for good", () => {
+  it("kept settle needs pin the time once final", () => {
     const s = run(
       [...base(), r("b", T + 100, [X, 1]), r("a", T + 3700, [X, 1])],
       T + 3800,
-      { settleNeeds: { S: { at: T + 3600, forced: false, needs: [150n, 150n] } } },
+      { settleNeeds: { S: { at: T + 3600, forced: false, needs: [150n, 150n], final: true } } },
     );
     expect(s.tiers[0]).toMatchObject({ status: "settled", at: T + 3600 });
     expect(s.rejected.map((x) => x.tokenId)).toEqual(["a"]);
+  });
+
+  it("before final, a late ballot still re-judges the window, but with the kept needs", () => {
+    const kept = { at: T + 3600, forced: false, needs: [150n, 150n], final: false };
+    // A ballot the RPC returned late changes S in window 1: S isn't settled after all.
+    const late = run([...base(), r("b", T + 100, [X, 1])], T + 3700, { settleNeeds: { S: kept } });
+    expect(late.tiers[0]).toMatchObject({ status: "settling", window: 2 });
+    // Today's needs would make nothing fundable; the kept ones still settle S on 0.
+    const donated = run(base(), T + 3700, { needs: [400n, 400n], settleNeeds: { S: kept } });
+    expect(donated.tiers[0]).toMatchObject({ status: "settled", funded: [0] });
   });
 
   it("once B settles, the round is closed", () => {

@@ -807,3 +807,24 @@ Deno.test("round ballot: relayed ballots reuse one replay for a few seconds; non
   assertEquals(state.ballotReads, 1);
   h.close();
 });
+
+Deno.test("round: a ballot the RPC returned late can still unsettle S before it is final", async () => {
+  const { h, state } = await qeSetup();
+  h.clock.now = NOW + 700;
+  const key = ["vote", qe.contract.toLowerCase(), "settle-needs", "S"];
+  assertEquals(
+    (await j(await h.req("/api/vote/round")) as { tiers: { status: string }[] }).tiers[0].status,
+    "settled",
+  );
+  assertEquals((await h.deps.db.kv.get<{ at: number }>(key)).value?.at, NOW + 660);
+  // A ballot inside S's window that the RPC hadn't returned: S changed after all.
+  state.logs.push(logOf("2", `${X}01${X}`, NOW + 610, 3));
+  h.clock.now += 10;
+  const again = await j(await h.req("/api/vote/round")) as { tiers: { status: string }[] };
+  assertEquals(again.tiers[0].status, "settled"); // maxWindows 1: forced at the same cutoff
+  // Pinned for good only once final: then today's needs and late logs can't move it.
+  h.clock.now = NOW + 660 + 30 * 60;
+  await h.req("/api/vote/round");
+  assertEquals((await h.deps.db.kv.get<{ at: number; forced: boolean }>(key)).value?.forced, true);
+  h.close();
+});

@@ -204,7 +204,9 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     const settleNeeds = Object.fromEntries(
       tiers.flatMap((t, i) => {
         const k = kept[i].value;
-        return k ? [[t, { at: k.at, forced: k.forced, needs: k.needs.map(BigInt) }]] : [];
+        if (!k) return [];
+        const final = deps.now() >= k.at + FINAL_AFTER_SECS;
+        return [[t, { at: k.at, forced: k.forced, needs: k.needs.map(BigInt), final }]];
       }),
     );
     const needs = await needsOf(d);
@@ -225,12 +227,21 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       settleNeeds,
     }, deps.now());
     for (const [i, t] of st.tiers.entries()) {
-      if (t.status === "settled" && !kept[i].value) {
-        await kv.atomic().check(kept[i]).set([...round(d), "settle-needs", t.tier], {
+      const k = kept[i].value;
+      const keyT = [...round(d), "settle-needs", tiers[i]];
+      if (!k && t.status === "settled") {
+        // First seen settled: keep its needs (a donation can't move it from here on).
+        await kv.atomic().check(kept[i]).set(keyT, {
           at: t.at,
           forced: t.forced,
           needs: needs.map(String),
         }).commit();
+      } else if (k && deps.now() < k.at + FINAL_AFTER_SECS) {
+        // Not final yet: follow the replay (a late ballot may move or undo it), same needs.
+        if (t.status !== "settled") await kv.atomic().check(kept[i]).delete(keyT).commit();
+        else if (t.at !== k.at || t.forced !== k.forced) {
+          await kv.atomic().check(kept[i]).set(keyT, { ...k, at: t.at, forced: t.forced }).commit();
+        }
       }
       // Kept only once the blocks before the settlement are final: until then a
       // lagging RPC may still be missing a ballot that changes it.

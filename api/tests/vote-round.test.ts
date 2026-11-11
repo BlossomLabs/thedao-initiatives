@@ -939,3 +939,14 @@ Deno.test("ballot: judged with the chain's current pool", async () => {
   assertEquals(state.sent, []);
   h.close();
 });
+
+Deno.test("ballot: a ballot signed before a project was added still relays (short)", async () => {
+  const { h, state } = await setup(ruled);
+  state.owners.set(17n, VOTER.address);
+  const body = await signedBallot(VOTER, 17n, 1n, "0x010101", ruled); // a tab that knew 3
+  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  assertEquals(res.status, 200);
+  const sent = state.sent[0] as unknown as { args: [{ ballot: string; proof: number[] }[]] };
+  assertEquals([sent.args[0][0].ballot, sent.args[0][0].proof], ["0x010101", [0, 1, 2]]);
+  h.close();
+});

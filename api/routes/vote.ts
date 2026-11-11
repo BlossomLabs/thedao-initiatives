@@ -400,10 +400,17 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     const nonce = uint(body.nonce);
     const ballot = body.ballot;
     const signature = body.signature;
+    const m = d.manifest.slugs.length;
+    // With the ballot rules a ballot may be shorter than the projects (signed before one
+    // was added): the missing ones are unplaced. Older rounds need every byte.
+    const bytes = typeof ballot === "string" && isHex(ballot) ? hexToBytes(ballot) : null;
+    const padded = bytes && d.manifest.ballotRules && bytes.length >= 1 && bytes.length <= m
+      ? Uint8Array.from([...bytes, ...Array(m - bytes.length).fill(255)])
+      : bytes;
     if (
       tokenId === null || nonce === null || typeof ballot !== "string" || !isHex(ballot) ||
-      typeof signature !== "string" || !isHex(signature) ||
-      !isValidOnchainBallot(hexToBytes(ballot), d.manifest.slugs.length)
+      !padded || typeof signature !== "string" ||
+      !isHex(signature) || !isValidOnchainBallot(padded, m)
     ) throw fail(400, "bad_ballot", "That ballot isn't valid.");
     const owner = await d.chain.ownerOf(tokenId);
     if (!owner) throw fail(404, "no_badge", "No such badge.");
@@ -433,7 +440,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     const no = deps.now() < regDeadline ? null : refusal(
       await recentRound(d),
       tokenId.toString(),
-      hexToBytes(ballot),
+      padded,
       deps.now(),
       d.manifest.slugs.length,
     );

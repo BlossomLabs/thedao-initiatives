@@ -117,6 +117,23 @@ export function useVoteRound(refetchInterval: number | false = false, enabled = 
   });
 }
 
+/** A review badge's own star ratings, by initiative id (only what it rated). */
+export function useBadgeRatings(tokenId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: ["vote-ratings", tokenId],
+    enabled: enabled && tokenId !== null,
+    staleTime: 60_000,
+    queryFn: async (): Promise<Record<string, number>> => {
+      const r = await api<{ ratings: Record<string, { mine: number | null }> }>(
+        `/api/reviews/ratings?tokenId=${tokenId}`,
+      );
+      return Object.fromEntries(
+        Object.entries(r.ratings).flatMap(([id, x]) => (x.mine ? [[id, x.mine]] : [])),
+      );
+    },
+  });
+}
+
 /** The badges the signed-in account votes with in this round (the voting badges it
  * holds in the real vote; its one test badge in a test vote), ascending. Off until
  * `me` is known. */

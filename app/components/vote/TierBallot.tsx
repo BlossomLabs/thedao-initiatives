@@ -123,6 +123,7 @@ export default function TierBallot(
     search = {},
     actions,
     aside,
+    notice,
     locked,
     funded,
     paid,
@@ -132,6 +133,8 @@ export default function TierBallot(
     actions?: React.ReactNode;
     /** Under the send bar on wider screens; above the tiers on a phone. */
     aside?: React.ReactNode;
+    /** Between the tier list and the send bar on wider screens; above the tiers on a phone. */
+    notice?: React.ReactNode;
     /** The board's AI search flags: the box offers AI only while it is on. */
     search?: { ai?: boolean; aiAuto?: boolean };
     tiers: Partial<Record<string, Tier>>;
@@ -688,6 +691,7 @@ export default function TierBallot(
                 </div>
               )}
           </div>
+          {notice && <div className="order-first mb-4 sm:mb-0 sm:mt-3">{notice}</div>}
           {actions && (
             // Phone: a bar pinned to the bottom and both sides of the screen, after the list;
             // wider: under the tier list.

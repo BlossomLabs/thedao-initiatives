@@ -20,6 +20,7 @@ import { useWalletPicker } from "~/context/wallet-picker";
 import { useBoard } from "~/hooks/use-board";
 import {
   apiCode,
+  useBadgeRatings,
   useBallotSubmit,
   useMintWait,
   useMyBadges,
@@ -28,9 +29,14 @@ import {
 } from "~/hooks/use-vote";
 import { api, errorMessage } from "~/lib/api";
 import { countedTiers, lockedLabels } from "~/lib/vote-locks";
+import { prefillFromRatings, ratingsToken } from "~/lib/vote-prefill";
+import { ruleMessage } from "~/lib/vote-rules-copy";
+import { useReviewIdentity } from "~/hooks/use-admin-ratings";
+import BallotRules from "~/components/vote/BallotRules";
+import { checkBallot } from "../../../shared/vote/rules";
 import { usd } from "~/lib/format";
 import { encodeBallot, type Tier } from "../../../shared/vote/ballot";
-import { ROUND } from "../../../shared/vote/manifest";
+import { ROUND, rulesRound } from "../../../shared/vote/manifest";
 
 const POOL = Number(BigInt(ROUND.poolUsd) / 1_000_000n);
 const closed = () => Date.now() / 1000 >= ROUND.closesAt;
@@ -362,6 +368,29 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     });
   }, [countedNow, settledNow]);
 
+  // A fresh ballot starts from this badge's own star ratings (5★ S, 4★ A, 3★ B), once
+  // the round is known: never over a ballot that counts or a draft in this browser.
+  const identity = useReviewIdentity();
+  const fresh = Boolean(rv) && n !== null && !countedNow && !mock &&
+    Object.keys(loadTiers(n)).length === 0;
+  const ratings = useBadgeRatings(
+    n === null ? null : ratingsToken(ROUND.kind, n, identity?.tokenIds),
+    fresh,
+  );
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (!fresh || prefilled.current || !ratings.data || !board.data) return;
+    prefilled.current = true;
+    const slugOf = new Map(board.data.cards.map((c) => [c.initiative.id, c.initiative.slug]));
+    const mine = Object.fromEntries(
+      Object.entries(ratings.data).flatMap(([id, stars]) => {
+        const slug = slugOf.get(id);
+        return slug ? [[slug, stars]] : [];
+      }),
+    );
+    setTiers((prev) => Object.keys(prev).length ? prev : prefillFromRatings(mine, ROUND.slugs));
+  }, [fresh, ratings.data, board.data]);
+
   const replaceTiers = (next: Partial<Record<string, Tier>>) => {
     setTiers(next);
     try {
@@ -585,6 +614,25 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
         ))}
       </div>
     );
+    // The ballot rules (rounds deployed with them), with the pool on-chain now.
+    const rules = ROUND.ballotRules && placed > 0
+      ? checkBallot(
+        encodeBallot(ROUND.slugs, tiers),
+        rulesRound(ROUND, BigInt(rv?.poolUsd ?? ROUND.poolUsd)),
+      )
+      : null;
+    const broken = Boolean(rules && !rules.ok);
+    const rulesBox = broken && (
+      <BallotRules
+        messages={rules!.errors.map((e) =>
+          ruleMessage(
+            e,
+            (i) => titles.get(ROUND.slugs[i]) ?? ROUND.slugs[i],
+            (g) => ROUND.groups[g],
+          )
+        )}
+      />
+    );
     const stage = rv && (
       <div className="mx-auto mt-3 max-w-[640px] space-y-1 text-[14.5px] text-white/80">
         {!counted && !registrationOver && (
@@ -609,6 +657,11 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
             Put what TheDAO must fund first. Initiatives in the same tier are equal. The {usd(POOL)}
             {" "}
             {REAL() ? "pool" : "demo pool"} is split equally between every badge that votes.{" "}
+            {ROUND.ballotRules &&
+              "A ballot needs at least 3 unrelated projects in Tier-S and must request at least 1.5× the pool in total. "}
+            Anything you leave unranked gets nothing from you; your share of it returns to TheDAO.
+            Put every project you'd be glad to see funded in Tier-B: it only takes money once Tier-S
+            and Tier-A are done.{" "}
             <a
               href={BLOSSOM}
               target="_blank"
@@ -629,6 +682,7 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
           disabled={busy || early}
           locked={locked}
           aside={aside}
+          notice={rulesBox}
           funded={settledTiers.length ? funded : undefined}
           paid={paid}
           onChange={setTier}
@@ -642,6 +696,8 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
                   <p className="text-[13.5px] text-amber-200">
                     Not counted: {refused.reason === "tier_settled"
                       ? "it changed a settled tier"
+                      : refused.reason === "invalid_ballot"
+                      ? "it breaks the ballot rules"
                       : "registration had closed"}. Your earlier ballot still counts.
                   </p>
                 )}
@@ -653,7 +709,7 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
                 <Button
                   variant="primary"
                   className="w-full"
-                  disabled={busy || placed === 0}
+                  disabled={busy || placed === 0 || broken}
                   onClick={() =>
                     void ballotFlow.submit(
                       BigInt(n),
@@ -665,7 +721,7 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
                 {ballotFlow.phase.kind !== "failed" && (
                   <button
                     type="button"
-                    disabled={busy || placed === 0}
+                    disabled={busy || placed === 0 || broken}
                     onClick={sendYourself}
                     className="w-full text-center text-[13px] text-white/55 underline underline-offset-2 disabled:opacity-40"
                   >

@@ -29,7 +29,12 @@ const round = vi.hoisted(() => ({
   closesAt: 4_000_000_000,
   opensAt: 0,
   kind: "test" as "test" | "real",
+  /** The ballot rules: alpha and beta affiliated with Seal when `seal`. */
+  ballotRules: false,
+  seal: false,
 }));
+/** What the API answers beyond the round: ratings and review badges. */
+const extra = { paths: {} as Record<string, unknown> };
 
 vi.mock("../../shared/vote/manifest", async (original) => ({
   ...await original<typeof import("../../shared/vote/manifest")>(),
@@ -53,6 +58,18 @@ vi.mock("../../shared/vote/manifest", async (original) => ({
     poolUsd: "913244000000",
     issuer: "0x2000000000000000000000000000000000000002",
     slugs: ["alpha", "beta", "gamma"],
+    get projects() {
+      return ["alpha", "beta", "gamma"].map((_, i) => ({
+        askUsd: "400000000",
+        rfp: false,
+        groups: round.seal && i < 2 ? [0] : [],
+      }));
+    },
+    groups: ["Seal"],
+    independentTiers: 1,
+    get ballotRules() {
+      return round.ballotRules;
+    },
   },
 }));
 vi.mock("~/context/session", () => ({
@@ -102,6 +119,7 @@ function mockApi(code: () => Promise<unknown>, claim?: () => Promise<unknown>) {
       if (path.startsWith("/api/vote/code/")) return code();
       if (path === "/api/vote/claim") return claim ? claim() : Promise.resolve({ hash: "0x1" });
       if (path === "/api/vote/round" && roundIs.body) return Promise.resolve(roundIs.body);
+      if (path in extra.paths) return Promise.resolve(extra.paths[path]);
       return Promise.reject(new Error("unexpected " + path));
     }) as typeof api,
   );
@@ -133,6 +151,9 @@ beforeEach(() => {
   round.closesAt = OPEN_UNTIL;
   round.opensAt = 0;
   round.kind = "test";
+  round.ballotRules = false;
+  round.seal = false;
+  extra.paths = {};
   roundIs.body = null;
   flow.last = null;
 });
@@ -814,6 +835,74 @@ it("quiet ending: an unsent edit that moved a settled initiative is put back as 
     within(screen.getByRole("list", { name: "Nice to have" })).getByRole("button", {
       name: "BETA",
     }),
+  )
+    .toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------- ballot rules
+const TIERS_KEY = "vote-tiers:0x1000000000000000000000000000000000000001:17";
+
+it("ballot rules: a ballot breaking a rule shows why and can't be sent", async () => {
+  round.ballotRules = true;
+  round.seal = true;
+  localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "S", beta: "S", gamma: "S" }));
+  // $500 pool: $1,200 requested clears 1.5×; Seal holds $800 of Tier-S's $1,200.
+  await ballotWith(roundBody({ poolUsd: "500000000" }));
+  const box = await screen.findByRole("region", { name: "Ballot rules" });
+  expect(
+    within(box).getByText(
+      "Tier-S needs at least 3 independent projects. ALPHA and BETA are affiliated with Seal, so they count as one.",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    within(box).getByText(
+      "Projects affiliated with Seal take $800 of Tier-S's $1,200. One affiliation can hold at most half.",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /send my ballot/i })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /send it yourself/i })).toBeDisabled();
+});
+
+it("ballot rules: a valid ballot shows no rules box and can be sent", async () => {
+  round.ballotRules = true;
+  localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "S", beta: "S", gamma: "S" }));
+  await ballotWith(roundBody({ poolUsd: "500000000" }));
+  expect(screen.queryByRole("region", { name: "Ballot rules" })).toBeNull();
+  expect(screen.getByRole("button", { name: /send my ballot/i })).toBeEnabled();
+});
+
+it("prefill: in a test round the signed-in reviewer's ratings fill a fresh ballot", async () => {
+  extra.paths = {
+    "/api/reviews/identity": { tokenIds: ["9", "5"], canReview: true },
+    "/api/reviews/ratings?tokenId=5": {
+      ratings: { alpha: { mine: 5 }, beta: { mine: 4 }, gamma: { mine: 2 } },
+    },
+  };
+  await ballotWith(roundBody());
+  const s = await screen.findByRole("list", { name: "Must fund" });
+  expect(within(s).getByRole("button", { name: "ALPHA" })).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("list", { name: "Should fund" })).getByRole("button", { name: "BETA" }),
+  )
+    .toBeInTheDocument();
+  expect(screen.queryByRole("list", { name: "Nice to have" })).toBeNull();
+});
+
+it("prefill: a counted ballot or a saved draft wins over ratings", async () => {
+  extra.paths = {
+    "/api/reviews/identity": { tokenIds: ["5"], canReview: true },
+    "/api/reviews/ratings?tokenId=5": { ratings: { alpha: { mine: 5 } } },
+  };
+  localStorage.setItem(TIERS_KEY, JSON.stringify({ gamma: "B" }));
+  await ballotWith(roundBody());
+  expect(await screen.findByRole("list", { name: "Nice to have" })).toBeInTheDocument();
+  expect(screen.queryByRole("list", { name: "Must fund" })).toBeNull();
+  cleanup();
+  localStorage.clear();
+  await ballotWith(roundBody({ accepted: { "17": "0xffff01" } }));
+  expect(await screen.findByRole("list", { name: "Must fund" })).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("list", { name: "Must fund" })).getByRole("button", { name: "GAMMA" }),
   )
     .toBeInTheDocument();
 });

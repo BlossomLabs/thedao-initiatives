@@ -4,12 +4,13 @@ import { act, cleanup, render, screen, waitFor, within } from "@testing-library/
 import { afterEach, expect, it, vi } from "vitest";
 import { bytesToHex } from "viem";
 import { api } from "~/lib/api";
-import { encodeBallot } from "../../shared/vote/ballot";
-import VoteResultsRoute from "./vote";
+import { encodeBallot } from "../../../shared/vote/ballot";
+import VoteResults from "./VoteResults";
 
-vi.mock("../../shared/vote/manifest", async (original) => ({
-  ...await original<typeof import("../../shared/vote/manifest")>(),
+vi.mock("../../../shared/vote/manifest", async (original) => ({
+  ...await original<typeof import("../../../shared/vote/manifest")>(),
   ROUND: {
+    kind: "test",
     chainId: 11155111,
     contract: "0x1000000000000000000000000000000000000001",
     deployBlock: 1,
@@ -115,7 +116,7 @@ it("says what is going on and what the vote would fund right now", async () => {
   render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
-        <VoteResultsRoute />
+        <VoteResults />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -138,7 +139,7 @@ it.each(["/vote", "/vote?view=cards"])(
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={[url]}>
-          <VoteResultsRoute />
+          <VoteResults />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -166,7 +167,7 @@ it("an RPC hiccup keeps the last result", async () => {
   render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
-        <VoteResultsRoute />
+        <VoteResults />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -183,7 +184,7 @@ it("links back to this browser's ballot, once it has opened one", async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter>
-          <VoteResultsRoute />
+          <VoteResults />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -208,7 +209,7 @@ it("links a signed-in badge holder to their ballot, even without the code in thi
   render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
-        <VoteResultsRoute />
+        <VoteResults />
       </MemoryRouter>
     </QueryClientProvider>,
   );

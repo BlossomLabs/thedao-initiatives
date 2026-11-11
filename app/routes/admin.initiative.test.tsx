@@ -241,6 +241,28 @@ it("settings: only the changed field is sent", async () => {
   await screen.findByText("Settings saved.");
 });
 
+it("settings: a grant's affiliations save as one comma-separated field", async () => {
+  current = page({ proposer: ADMIN, type: "grant", affiliations: ["Seal"] });
+  renderPage();
+  const field = await screen.findByLabelText(/^Affiliations/);
+  expect(field).toHaveValue("Seal");
+  fireEvent.change(field, { target: { value: "Seal, Wallets" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith("/api/admin/initiatives/1", {
+      method: "PATCH",
+      json: { affiliations: "Seal, Wallets" },
+    })
+  );
+});
+
+it("settings: an RFP has no affiliations field", async () => {
+  current = page({ proposer: ADMIN, type: "rfp" });
+  renderPage();
+  await screen.findByRole("button", { name: "Save settings" });
+  expect(screen.queryByLabelText(/^Affiliations/)).toBeNull();
+});
+
 it("open points: the edit page's checks, read next to Approve", async () => {
   renderPage();
   await screen.findByRole("button", { name: "Approve" });

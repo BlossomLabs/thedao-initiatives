@@ -122,6 +122,7 @@ export function adminInitiative(r: Initiative, privateFields: boolean) {
   return {
     ...publicInitiative(r),
     ...(privateFields ? { contact: r.contact, funders: r.funders } : {}),
+    affiliations: r.affiliations ?? [],
     pendingRevision: r.pendingRevision ?? null,
   };
 }

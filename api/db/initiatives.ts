@@ -67,6 +67,7 @@ export const CARD_FIELDS = [
   "paidOutUsd",
   "categories",
   "recipientTeam",
+  "affiliations",
   "createdAt",
   "approvedAt",
 ] as const;
@@ -80,7 +81,7 @@ export function cardRow(r: Initiative): CardRow {
 /** Under meta: the status index (#47) is complete at this shape. Missing (a database from
  * before it, or one restored from a backup) means the next cards() read rebuilds it. */
 export const STATUS_INDEX_MARK = "rfp_by_status";
-const STATUS_INDEX_VERSION = 2; // 2: cards carry recipientTeam
+const STATUS_INDEX_VERSION = 3; // 2: cards carry recipientTeam; 3: and vote affiliations
 
 export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
   /** Every row write also writes its card under its status, off the old status when it moved. */
@@ -382,6 +383,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     "recipientUrl",
     "topup",
     "milestoneReviewer",
+    "affiliations",
   ]);
 
   /** Patch allowed fields; keeps the Safe index in step. `allow` sees the row
@@ -634,6 +636,8 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
       recipientUrl: string;
       topup: boolean;
       milestoneReviewer: string;
+      /** Only when the file has a `affiliations:` line; otherwise the admin's affiliations stay. */
+      affiliations?: string[];
     },
   ): Promise<{ action: "created" | "updated"; id: string }> {
     const origin: RevisionOrigin = { author: "", source: "content" };
@@ -650,6 +654,7 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
         milestoneReviewer: f.milestoneReviewer,
       };
       if (f.sortRank !== null) patch.sortRank = f.sortRank;
+      if (f.affiliations !== undefined) patch.affiliations = f.affiliations;
       await update(existing.id, patch);
       await revise(existing.id, f, origin);
       return { action: "updated", id: existing.id };

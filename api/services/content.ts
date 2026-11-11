@@ -3,6 +3,7 @@
  * header. The filename is a permanent source key; its original proposal ID
  * survives public URL changes. Files own words and goal; admins own lifecycle.
  */
+import { parseAffiliations } from "../../shared/affiliations.ts";
 import { MAX_SUMMARY, MAX_TITLE } from "../config.ts";
 import { parseDuration, parseGoal, validateHttpsLink } from "../lib/validate.ts";
 import type { Db } from "../db/mod.ts";
@@ -46,6 +47,8 @@ export interface ContentFields {
   recipientUrl: string;
   topup: boolean;
   milestoneReviewer: string;
+  /** `affiliations:`, comma-separated (vote affiliations, shared/affiliations.ts); absent when the line is. */
+  affiliations?: string[];
   /** `backers:` block, one 'Org | $amount | https://link' per line. */
   backers: PastedBacker[];
 }
@@ -203,6 +206,10 @@ export function parseInitiativeFile(text: string): ContentFields {
     recipientTeam ? fields.recipient_url ?? "" : "",
   );
   if (urlErr) throw new Error(`recipient_url: ${urlErr}`);
+  const affiliations = fields.affiliations === undefined
+    ? undefined
+    : parseAffiliations(fields.affiliations);
+  if (affiliations?.length && type === "rfp") throw new Error("RFPs can't have affiliations");
   const structured = parseStructuredBody(body, type, goal!);
   return {
     title,
@@ -219,6 +226,7 @@ export function parseInitiativeFile(text: string): ContentFields {
     recipientUrl: recipientUrl!,
     topup,
     milestoneReviewer,
+    ...(affiliations === undefined ? {} : { affiliations }),
     backers: parseContentBackers(fields.backers ?? ""),
   };
 }

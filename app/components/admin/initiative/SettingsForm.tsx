@@ -14,6 +14,7 @@ const settingsOf = (r: AdminInitiative) => ({
   proposer: r.proposer,
   sortRank: r.sortRank ? String(r.sortRank) : "",
   paidOutUsd: r.paidOutUsd ? String(r.paidOutUsd) : "",
+  affiliations: (r.affiliations ?? []).join(", "),
 });
 
 /**
@@ -30,7 +31,7 @@ export default function SettingsForm({ r, run }: { r: AdminInitiative; run: Run 
     const next = settingsOf(r);
     setSaved(next);
     setForm(next);
-  }, [r.proposer, r.sortRank, r.paidOutUsd]);
+  }, [r.proposer, r.sortRank, r.paidOutUsd, r.affiliations?.join(", ")]);
   const keys = Object.keys(saved) as (keyof typeof saved)[];
   const changed = Object.fromEntries(
     keys.filter((k) => form[k].trim() !== saved[k]).map((k) => [k, form[k].trim()]),
@@ -97,6 +98,21 @@ export default function SettingsForm({ r, run }: { r: AdminInitiative; run: Run 
           />
         </Field>
       </div>
+      {r.type === "grant" && (
+        <Field
+          label="Affiliations"
+          htmlFor="s-affiliations"
+          hint="Comma-separated, e.g. Seal. Projects that share one count as one for the vote's Tier-S rules. Never shown on the site."
+        >
+          <Input
+            id="s-affiliations"
+            maxLength={400}
+            placeholder="None"
+            value={form.affiliations}
+            onChange={set("affiliations")}
+          />
+        </Field>
+      )}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button type="submit" sm loading={busy} disabled={!dirty}>Save settings</Button>
         {r.contact && (

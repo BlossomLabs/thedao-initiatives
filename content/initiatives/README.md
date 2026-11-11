@@ -41,6 +41,9 @@ Frontmatter keys:
 - `status` (optional, `approved` or `pending`; only used when the file is
   first created, default `approved`)
 - `pin` (optional, board position 1 = top; sets the admin pin)
+- `affiliations` (grants only, optional, comma-separated, e.g. `Seal`): projects that
+  share one count as one for the vote's Tier-S rules. Never shown on the site;
+  without the line, the admin's affiliations stay.
 - `type` (optional, `rfp` or `grant`, default `rfp`: an RFP is an open
   competitive bid with no preset vendor; a Grant means the team presenting
   the idea does the work)

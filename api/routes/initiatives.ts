@@ -168,6 +168,17 @@ export function initiativeRoutes(deps: Deps) {
     return c.json({ initiatives });
   });
 
+  /** Affiliations by slug, for the vote deploy (scripts/vote-deploy.ts). Not UI: the page
+   * never shows them; they ship in the round file and /vote/llms.txt anyway. */
+  r.get("/affiliations", async (c) => {
+    const rows = await db.initiatives.cards("approved");
+    return c.json({
+      affiliations: Object.fromEntries(
+        rows.filter((x) => x.affiliations?.length).map((x) => [x.slug, x.affiliations]),
+      ),
+    });
+  });
+
   r.get("/:slug", async (c) => {
     const user = c.var.user;
     const initiative = await visibleOr404(c.req.param("slug"), user);

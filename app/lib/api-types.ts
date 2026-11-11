@@ -108,6 +108,8 @@ export type RevisionText = Pick<
 export interface AdminInitiative extends Initiative {
   /** The proposer's edit waiting for an admin, if any (approved initiatives). */
   pendingRevision: number | null;
+  /** Related projects share an affiliation (the vote's ballot rules). Grants only. */
+  affiliations?: string[];
 }
 
 export interface Summary {

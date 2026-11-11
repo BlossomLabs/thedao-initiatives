@@ -47,6 +47,9 @@ export interface Initiative {
    * the proposal: they change only through a revision, which snapshots them.
    * Rows written before it lack the key; readers treat it as none. */
   categories?: string[];
+  /** Affiliations (shared/affiliations.ts): related projects share one for the ballot rules.
+   * Admin-only, never on an RFP, not in any public shape. */
+  affiliations?: string[];
   /** Structured body (submission redesign, Sep 2026): one answer per section
    * of the type, milestone rows, links. A structured row stores `details: ""`
    * (structured XOR details, enforced by `revise`). Rows written before it

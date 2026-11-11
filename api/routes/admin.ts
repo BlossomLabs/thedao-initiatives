@@ -1,3 +1,4 @@
+import { parseAffiliations } from "../../shared/affiliations.ts";
 import { type Context, Hono } from "hono";
 import { voteSettings } from "./board.ts";
 import { readVoteSettings } from "../../shared/vote.ts";
@@ -246,7 +247,7 @@ export function adminRoutes(deps: Deps) {
    */
   r.patch("/initiatives/:id", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"), true);
-    const body = await jsonBody(c, ["sortRank", "paidOutUsd", "proposer"]);
+    const body = await jsonBody(c, ["sortRank", "paidOutUsd", "proposer", "affiliations"]);
     if (body.paidOutUsd !== undefined || body.proposer !== undefined) assertRecentAuth(c, deps.now);
     const patch: Partial<Initiative> = {};
     if (body.sortRank !== undefined) {
@@ -280,6 +281,19 @@ export function adminRoutes(deps: Deps) {
         if (!resolved) throw new HttpError(400, `${raw} does not resolve to an address.`);
         patch.proposer = resolved;
       } else throw new HttpError(400, "Owner must be a wallet address or an ENS name.");
+    }
+    // Affiliations: related projects share one (the ballot rules). Never on an RFP.
+    if (body.affiliations !== undefined) {
+      let affiliations: string[];
+      try {
+        affiliations = parseAffiliations(s(body.affiliations, 400));
+      } catch (e) {
+        throw new HttpError(400, (e as Error).message);
+      }
+      if (affiliations.length && initiative.type === "rfp") {
+        throw new HttpError(400, "RFPs can't have affiliations.");
+      }
+      patch.affiliations = affiliations;
     }
     const next = Object.keys(patch).length
       ? await db.initiatives.update(initiative.id, patch)

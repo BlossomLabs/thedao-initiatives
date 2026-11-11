@@ -201,6 +201,8 @@ export interface Harness {
     path: string,
     init?: RequestInit & { token?: string; json?: unknown },
   ): Promise<Response>;
+  /** Wait for the work requests started in the background (and any it starts). */
+  settle(): Promise<void>;
   close(): void;
 }
 
@@ -266,6 +268,7 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     if (opts.fetch) return Promise.resolve(opts.fetch(url, init));
     return Promise.resolve(new Response("not mocked", { status: 599 }));
   }) as typeof fetch;
+  const background: Promise<unknown>[] = [];
   const deps: Deps = {
     db,
     chain,
@@ -283,6 +286,7 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
       Promise.resolve(
         host.endsWith(".invalid") ? [null, "host does not resolve"] : [["93.184.216.34"], null],
       ),
+    background: (work) => background.push(work),
   };
   const app = createApp(deps);
   return {
@@ -308,6 +312,9 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
       return Promise.resolve(
         app.request("http://api.test" + path, { ...init, headers, body }, testConnection()),
       );
+    },
+    async settle() {
+      while (background.length) await background.shift();
     },
     close: () => kv.close(),
   };

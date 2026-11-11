@@ -10,7 +10,8 @@ import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { recordVote } from "../../shared/vote/record.ts";
 import type { VoteRound } from "../services/vote-chain.ts";
 import { type BoardCache, createBoardCache, readBoard } from "./board.ts";
-import { type NextTier, nextTiers } from "../../shared/vote/next-tier.ts";
+import { type NextTier, nextTiersAsync } from "../../shared/vote/next-tier.ts";
+import type { ChainInputs } from "../../shared/vote/chain.ts";
 import {
   type Receipt,
   refusal,
@@ -40,6 +41,8 @@ const BALLOTS_CACHE_SECS = 5;
 /** Blocks before the close are final well within this, so ballots can't change after. */
 const FINAL_AFTER_SECS = 30 * 60;
 const DRIP_WEI = 5_000_000_000_000_000n; // 0.005 Sepolia ETH
+/** Deno KV refuses values over 64 KiB; JSON longer than this is kept out with room to spare. */
+const KV_VALUE_MAX = 60_000;
 
 const fail = (status: number, code: string, message: string, extra?: Record<string, unknown>) =>
   new HttpError(status, message, { code, ...extra });
@@ -125,6 +128,51 @@ function isFinal(body: { closed: boolean; tiers: { status: string; at?: number }
     now >= (last.at ?? Infinity) + FINAL_AFTER_SECS;
 }
 
+/** A cache write that never fails the request: a value too large for one KV entry is
+ * not cached (the caller still serves it), and a failed write is only logged. */
+export async function cacheSet(
+  kv: Deno.Kv,
+  key: Deno.KvKey,
+  value: unknown,
+  opts?: { expireIn?: number },
+  log: (msg: string) => void = () => {},
+): Promise<boolean> {
+  const size = new TextEncoder().encode(JSON.stringify(value)).length;
+  if (size > KV_VALUE_MAX) {
+    log(`vote cache: ${key.join("/")} not cached (${size} bytes)`);
+    return false;
+  }
+  try {
+    await kv.set(key, value, opts);
+    return true;
+  } catch (e) {
+    log(`vote cache: ${key.join("/")} not cached (${e instanceof Error ? e.message : e})`);
+    return false;
+  }
+}
+
+/** A digest of everything the gap search reads, so the same tally is searched once. */
+async function inputsKey(contract: string, inp: ChainInputs, firstOpen: number) {
+  const text = JSON.stringify(
+    [
+      contract,
+      firstOpen,
+      inp.m,
+      inp.costs,
+      inp.voters,
+      inp.weights,
+      inp.ranks,
+      inp.ballots,
+      inp.poolUsd,
+      inp.spent,
+      [...inp.done].sort((a, b) => a - b),
+    ],
+    (_, v) => typeof v === "bigint" ? v.toString() : v,
+  );
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(hash)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+
 /** Each initiative's gap to its next tier, as JSON (slugs for indices, a string for the gap). */
 function nextJson(next: Map<number, NextTier>, slugs: string[]) {
   return Object.fromEntries([...next].map(([c, n]) => [slugs[c], {
@@ -135,6 +183,9 @@ function nextJson(next: Map<number, NextTier>, slugs: string[]) {
     moves: n.moves.map(([i, from, to]) => ({ slug: slugs[i], from, to })),
   }]));
 }
+type NextJson = ReturnType<typeof nextJson>;
+/** A finished search: the digest of its inputs, the open tier it looked from, and when. */
+type KnownNext = { key: string; firstOpen: number; at: number; next: NextJson };
 
 /** The round state as JSON: slugs for initiatives, decimal strings for micro-USD. */
 function roundJson(st: RoundState & { poolUsd: bigint }, slugs: string[]) {
@@ -180,8 +231,6 @@ function roundJson(st: RoundState & { poolUsd: bigint }, slugs: string[]) {
       funded: named(st.live.order),
       awards: money(st.live.awards),
       tiers: Object.fromEntries([...st.live.tiers].map(([c, t]) => [slugs[c], t])),
-      // Only while a tier is still open: a closed round has no live tally to look ahead from.
-      ...(st.liveInputs && { next: nextJson(nextTiers(st.liveInputs, st.firstOpen), slugs) }),
     },
   };
 }
@@ -311,6 +360,52 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       state.catch(() => (recent = null));
     }
     return recent.state;
+  };
+
+  /** The last gap search finished in this isolate. The search is long for a large round
+   * and shares the isolate with the ballot relays, so it yields between tallies, only
+   * one runs at a time, and no request waits for it. */
+  let lastNext: (KnownNext & { contract: string }) | null = null;
+  let searching = false;
+  const nextKey = (d: VoteRound) => [...round(d), "next"];
+  /** The newest search known (this isolate's or the stored one) for the open tier
+   * `firstOpen`, whichever inputs it ran on; none once no tier is open. */
+  const knownNext = async (d: VoteRound, firstOpen: number | null, stored?: KnownNext | null) => {
+    if (firstOpen === null) return undefined;
+    stored ??= (await deps.db.kv.get<KnownNext>(nextKey(d))).value;
+    const mine = lastNext?.contract === d.manifest.contract ? lastNext : null;
+    const known = [stored, mine].filter((k): k is KnownNext => k?.firstOpen === firstOpen);
+    return known.sort((a, b) => b.at - a.at)[0]?.next;
+  };
+  /** The gap to the next tier for this replay. The same inputs are searched once (across
+   * isolates through KV); new ones start a search in the background, and until it is
+   * done the last one known for the same open tier is served (or none). */
+  const nextFor = async (
+    d: VoteRound,
+    st: RoundState,
+  ): Promise<NextJson | undefined> => {
+    if (!st.liveInputs) return undefined;
+    const contract = d.manifest.contract;
+    const key = await inputsKey(contract, st.liveInputs, st.firstOpen);
+    if (lastNext?.contract === contract && lastNext.key === key) return lastNext.next;
+    const stored = (await deps.db.kv.get<KnownNext>(nextKey(d))).value;
+    if (stored?.key === key) {
+      lastNext = { ...stored, contract };
+      return stored.next;
+    }
+    if (!searching) {
+      searching = true;
+      const { liveInputs, firstOpen } = st;
+      const work = (async () => {
+        const next = nextJson(await nextTiersAsync(liveInputs, firstOpen), d.manifest.slugs);
+        const known = { key, firstOpen, at: deps.now(), next };
+        lastNext = { ...known, contract };
+        await cacheSet(deps.db.kv, nextKey(d), known, undefined, deps.log);
+      })().catch((e) => deps.log(`vote next: ${e instanceof Error ? e.message : e}`))
+        .finally(() => (searching = false));
+      deps.background?.(work);
+    }
+    return await knownNext(d, st.firstOpen, stored);
   };
 
   const open = (d: VoteRound) => {
@@ -554,18 +649,31 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
    * open tiers would fund if they settled now. Polled; read at most once per window. */
   r.get("/round", async (c) => {
     const d = dc();
+    const kv = deps.db.kv;
     const key = [...round(d), "round"];
-    const cached = await deps.db.kv.get<{ at: number; body: ReturnType<typeof roundJson> }>(key);
-    if (cached.value && isFinal(cached.value.body, cached.value.at)) {
-      return c.json(cached.value.body);
+    // firstOpen: the first open tier, or null once none is (no live tally to look ahead from).
+    type Cached = { at: number; body: ReturnType<typeof roundJson>; firstOpen?: number | null };
+    const cached = (await kv.get<Cached>(key)).value;
+    const withNext = (body: Cached["body"], next: NextJson | undefined) =>
+      next ? { ...body, live: { ...body.live, next } } : body;
+    if (
+      cached &&
+      (isFinal(cached.body, cached.at) || deps.now() - cached.at < BALLOTS_CACHE_SECS)
+    ) {
+      return c.json(withNext(cached.body, await knownNext(d, cached.firstOpen ?? null)));
     }
-    if (cached.value && deps.now() - cached.value.at < BALLOTS_CACHE_SECS) {
-      return c.json(cached.value.body);
-    }
-    const body = roundJson(await roundState(d), d.manifest.slugs);
+    const st = await roundState(d);
+    const body = roundJson(st, d.manifest.slugs);
     const at = deps.now();
-    await deps.db.kv.set(key, { at, body }, isFinal(body, at) ? undefined : { expireIn: 60_000 });
-    return c.json(body);
+    const firstOpen = st.liveInputs ? st.firstOpen : null;
+    await cacheSet(
+      kv,
+      key,
+      { at, body, firstOpen },
+      isFinal(body, at) ? undefined : { expireIn: 60_000 },
+      deps.log,
+    );
+    return c.json(withNext(body, await nextFor(d, st)));
   });
 
   // The ballots that count (the quiet ending's accepted ones), for the vote results.
@@ -582,7 +690,13 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     const ballots = Object.entries(body.accepted).map(([tokenId, ballot]) => ({ tokenId, ballot }));
     const at = deps.now();
     const final = isFinal(body, at);
-    await deps.db.kv.set(key, { at, final, ballots }, final ? undefined : { expireIn: 60_000 });
+    await cacheSet(
+      deps.db.kv,
+      key,
+      { at, final, ballots },
+      final ? undefined : { expireIn: 60_000 },
+      deps.log,
+    );
     return c.json({ at, ballots });
   });
 

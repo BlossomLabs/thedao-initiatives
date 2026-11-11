@@ -7,6 +7,7 @@ import { encodeBallot } from "../../shared/vote/ballot.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import type { VoteChain } from "../services/vote-chain.ts";
+import { cacheSet } from "../routes/vote.ts";
 
 const ISSUER = privateKeyToAccount(
   "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
@@ -710,7 +711,13 @@ Deno.test("the round lists each initiative's gap to the next tier", async () => 
   h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 3_000_000_000n]);
   state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
   type Next = { tier: string; gap: string | null };
-  const open = await j(await h.req("/api/vote/round")) as { live: { next?: Record<string, Next> } };
+  type Body = { live: { next?: Record<string, Next> } };
+  // The first read starts the search and doesn't wait for it.
+  const first = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(first.live.next, undefined);
+  await h.settle();
+  // Once it is done, the cached round carries it.
+  const open = await j(await h.req("/api/vote/round")) as Body;
   const next = open.live.next!;
   assertEquals(next.a, undefined, "funded in Tier-S: no next tier");
   assertEquals(next.b.tier, "B");
@@ -723,7 +730,88 @@ Deno.test("the round lists each initiative's gap to the next tier", async () => 
   };
   assertEquals(closed.closed, true);
   assertEquals(closed.live.next, undefined);
+  await h.settle();
   h.close();
+});
+
+Deno.test("round next: who it knocks out is named by slug", async () => {
+  // $100K pool. Two voters back b ($40K) below c (out of anyone's reach), so b is funded
+  // after the first tier. Backing a ($70K) to Tier-B's gap funds it first and leaves
+  // too little for b.
+  const { h, state } = await setup({ ...qe, poolUsd: "100000000000" });
+  h.deps.vote!.needs = () => Promise.resolve([70_000_000_000n, 40_000_000_000n, 1n << 60n]);
+  const backsB = bytesToHex(encodeBallot(qe.slugs, { c: "S", b: "B" })).slice(2);
+  state.logs = [logOf("1", backsB, NOW - 100, 1), logOf("2", backsB, NOW - 90, 2)];
+  await h.req("/api/vote/round");
+  await h.settle();
+  type Knock = { slug: string; tier: string };
+  const body = await j(await h.req("/api/vote/round")) as {
+    live: {
+      tiers: Record<string, string>;
+      next: Record<string, { gap: string; comesIn: Knock[]; dropsOut: Knock[]; moves: Knock[] }>;
+    };
+  };
+  assertEquals(body.live.tiers, { b: "A" });
+  const a = body.live.next.a;
+  assertEquals(a.gap, "70000000000");
+  assertEquals(a.dropsOut, [{ slug: "b", tier: "A" }]);
+  assertEquals([a.comesIn, a.moves], [[], []]);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round next: the same tally inputs are searched once", async () => {
+  const { h, state } = await setup({ ...qe, poolUsd: "6000000000" });
+  h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 3_000_000_000n]);
+  state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
+  let searches = 0;
+  const collect = h.deps.background!;
+  h.deps.background = (work) => (searches++, collect(work));
+  // The ballots replay the round too, but need no gaps.
+  await h.req("/api/vote/ballots");
+  assertEquals(searches, 0);
+  await h.req("/api/vote/round");
+  await h.settle();
+  // The round cache has expired, but nothing the tally reads has changed.
+  h.clock.now += 10;
+  const body = await j(await h.req("/api/vote/round")) as { live: { next?: unknown } };
+  await h.settle();
+  assertEquals(searches, 1);
+  assertEquals(body.live.next !== undefined, true);
+  // A new ballot changes the inputs: searched again, the last result served meanwhile.
+  state.logs.push(logOf("3", `0101${X}`, NOW - 5, 3));
+  h.clock.now += 10;
+  const again = await j(await h.req("/api/vote/round")) as { live: { next?: unknown } };
+  assertEquals(again.live.next, body.live.next);
+  await h.settle();
+  assertEquals(searches, 2);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: a round too large for one KV value is served, just not cached", async () => {
+  const { h, state } = await qeSetup();
+  // Thousands of accepted ballots: the round's JSON is well over KV's 64 KiB.
+  state.logs = Array.from(
+    { length: 4000 },
+    (_, i) => logOf(String(i + 1), `01${X}${X}`, NOW - 100, i + 1),
+  );
+  const res = await h.req("/api/vote/round");
+  assertEquals(res.status, 200);
+  assertEquals(Object.keys((await j(res) as { accepted: object }).accepted).length, 4000);
+  await h.settle();
+  assertEquals((await h.kv.get(["vote", qe.contract.toLowerCase(), "round"])).value, null);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("cacheSet: a value over the KV limit is skipped, never thrown", async () => {
+  const kv = await Deno.openKv(":memory:");
+  assertEquals(await cacheSet(kv, ["big"], { stub: "x".repeat(70_000) }), false);
+  assertEquals((await kv.get(["big"])).value, null);
+  assertEquals(await cacheSet(kv, ["small"], { stub: "x" }), true);
+  assertEquals((await kv.get(["small"])).value, { stub: "x" });
+  kv.close();
 });
 
 Deno.test("round: before S's first tally every tier waits; the live tally funds a", async () => {
@@ -740,6 +828,7 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
   assertEquals(live, { funded: ["a"], awards: { a: "150" }, tiers: { a: "S" } });
   assertEquals(body.registrationClosesAt, NOW + 660);
   assertEquals(body.accepted, { "1": `0x01${X}${X}`, "2": `0x01${X}${X}` });
+  await h.settle();
   h.close();
 });
 
@@ -756,6 +845,7 @@ Deno.test("round: S's settlement is kept only once the blocks before it are fina
   h.clock.now += 10;
   const fresh = await j(await h.req("/api/vote/round")) as { tiers: { awards: unknown }[] };
   assertEquals(fresh.tiers[0].awards, { a: "150" });
+  await h.settle();
   h.close();
 });
 
@@ -768,6 +858,7 @@ Deno.test("round: each badge's share, and what it paid in a settled tier", async
   };
   assertEquals(body.share, "100");
   assertEquals(body.tiers[0].paid, { "1": { a: "75" }, "2": { a: "75" } });
+  await h.settle();
   h.close();
 });
 
@@ -800,6 +891,7 @@ Deno.test("round: a quiet window settles S; later need changes never move it", a
   h.clock.now += 10;
   const later = await j(await h.req("/api/vote/round")) as { tiers: { awards: unknown }[] };
   assertEquals(later.tiers[0].awards, { a: "150" });
+  await h.settle();
   h.close();
 });
 
@@ -838,6 +930,7 @@ Deno.test("round: an initiative missing from the board holds the round instead o
   h.deps.vote!.needs = undefined; // read the board, which has none of a, b, c
   const res = await h.req("/api/vote/round");
   assertEquals([res.status, (await j(res)).code], [503, "needs_unavailable"]);
+  await h.settle();
   h.close();
 });
 
@@ -879,6 +972,7 @@ Deno.test("round: a ballot the RPC returned late can still unsettle S before it 
   h.clock.now = NOW + 660 + 30 * 60;
   await h.req("/api/vote/round");
   assertEquals((await h.deps.db.kv.get<{ at: number; forced: boolean }>(key)).value?.forced, true);
+  await h.settle();
   h.close();
 });
 
@@ -906,6 +1000,7 @@ Deno.test("round: an invalid ballot shows as refused with invalid_ballot", async
   assertEquals(Object.keys(body.accepted), ["1"]);
   assertEquals(body.rejected.map((r) => [r.tokenId, r.reason]), [["2", "invalid_ballot"]]);
   assertEquals(body.poolUsd, "200");
+  await h.settle();
   h.close();
 });
 
@@ -923,6 +1018,7 @@ Deno.test("round: the pool the chain raised judges later ballots", async () => {
   };
   assertEquals(Object.keys(body.accepted), ["1"]);
   assertEquals(body.poolUsd, "1000");
+  await h.settle();
   h.close();
 });
 

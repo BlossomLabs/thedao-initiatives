@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { chainTally } from "./chain";
 import { type Receipt, replay, type Schedule, windowEnds } from "./quiet-ending";
 
 const T = 10_000;
@@ -196,6 +197,27 @@ describe("quiet-ending replay", () => {
     const s = run(base(), T + 20_000);
     expect(s.tiers.map((t) => t.status)).toEqual(["settled", "settled", "settled"]);
     expect(s.closed).toBe(true);
+    expect(s.liveInputs).toBeNull();
+  });
+
+  it("chainTally on liveInputs reproduces the live tally", () => {
+    const check = (now: number) => {
+      const st = run(base(), now);
+      const again = () => chainTally(st.liveInputs!, st.firstOpen);
+      const stages = again();
+      const tiers = new Map(
+        stages.flatMap((s, k) =>
+          s.order.map((c) => [c, (["S", "A", "B"] as const)[st.firstOpen + k]])
+        ),
+      );
+      expect(stages.flatMap((s) => s.order)).toEqual(st.live.order);
+      expect(tiers).toEqual(st.live.tiers);
+      // It must not spend the inputs: a second call gives the same stages.
+      expect(again()).toEqual(stages);
+      return st.live.order;
+    };
+    expect(check(T + 50)).toEqual([0]); // S settling, a non-empty live tally
+    check(T + 6300 + 50); // S settled, A settling
   });
 });
 

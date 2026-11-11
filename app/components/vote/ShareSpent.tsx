@@ -1,4 +1,4 @@
-import type { Tier } from "../../../shared/vote/ballot";
+import { type Tier, tierName } from "../../../shared/vote/ballot";
 
 /** Whole dollars: a badge's share is thousands, the cents say nothing here. */
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
@@ -68,12 +68,12 @@ export default function ShareSpent({ avatar, share, settled }: {
         {settled.map((t) => (
           <p key={t.tier} className="text-[13px] text-white/65 tnum">
             {t.paid > 0
-              ? `${t.tier} paid ${dollars(t.paid)} to ${t.funded} initiative${
+              ? `${tierName(t.tier)} paid ${dollars(t.paid)} to ${t.funded} initiative${
                 t.funded === 1 ? "" : "s"
               }`
               : t.funded > 0
-              ? `${t.tier} paid nothing from your share`
-              : `${t.tier} funded nothing`}
+              ? `${tierName(t.tier)} paid nothing from your share`
+              : `${tierName(t.tier)} funded nothing`}
           </p>
         ))}
       </div>

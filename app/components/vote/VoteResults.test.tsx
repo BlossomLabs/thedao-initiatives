@@ -142,7 +142,8 @@ it("says what is going on and what the vote would fund right now", async () => {
     </QueryClientProvider>,
   );
   expect(await screen.findByText(/Test vote/i)).toBeInTheDocument();
-  expect(await screen.findByText(/would be funded by 1 ballot/)).toBeInTheDocument();
+  expect(await screen.findByText(/would be funded by 1 ballot.*Tier-S starts settling in/))
+    .toBeInTheDocument();
   expect(await screen.findByText("Alpha fuzzing")).toBeInTheDocument();
   // The front page's board: its search box, only the round's initiatives, gold shares.
   expect(screen.getByRole("searchbox")).toBeInTheDocument();
@@ -167,18 +168,18 @@ it.each(["/vote", "/vote?view=cards"])(
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    const s = (await screen.findAllByText("S-TIER"))[0];
-    const a = (await screen.findAllByText("A-TIER"))[0];
+    const s = (await screen.findAllByText("Tier-S"))[0];
+    const a = (await screen.findAllByText("Tier-A"))[0];
     const funded = (element: HTMLElement) => element.closest("li, [data-initiative-id]")!;
     expect(within(funded(s) as HTMLElement).getByText("Beta audits")).toBeInTheDocument();
     expect(within(funded(a) as HTMLElement).getByText("Alpha fuzzing")).toBeInTheDocument();
     // List rows have separate desktop and mobile status slots.
-    const rows = [...new Set(screen.getAllByText(/^[SAB]-TIER$/).map(funded))];
+    const rows = [...new Set(screen.getAllByText(/^Tier-[SAB]$/).map(funded))];
     expect(
-      rows.map((row) => within(row as HTMLElement).getAllByText(/^[SAB]-TIER$/)[0].textContent),
+      rows.map((row) => within(row as HTMLElement).getAllByText(/^Tier-[SAB]$/)[0].textContent),
     )
-      .toEqual(["S-TIER", "A-TIER"]);
-    expect(screen.queryByText("B-TIER")).toBeNull();
+      .toEqual(["Tier-S", "Tier-A"]);
+    expect(screen.queryByText("Tier-B")).toBeNull();
   },
 );
 
@@ -276,7 +277,7 @@ it("S settled is solid gold; A settling is lighter, with its window and B's star
   );
   expect(
     await screen.findByText(
-      /S settled: \$30,000 to 1 initiative · A settling, window 2 ends .* UTC · B starts .* UTC/,
+      /Tier-S settled: \$30,000 to 1 initiative · Tier-A settling, window 2 ends .* UTC · Tier-B starts .* UTC/,
     ),
   ).toBeInTheDocument();
   const row = (title: string) => screen.getAllByText(title)[0].closest("li, [data-initiative-id]")!;

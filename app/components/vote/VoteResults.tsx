@@ -8,7 +8,7 @@ import { useSession } from "~/context/session";
 import { type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd } from "~/lib/format";
 import { ROUND } from "../../../shared/vote/manifest";
-import type { Tier } from "../../../shared/vote/ballot";
+import { type Tier, tierName } from "../../../shared/vote/ballot";
 
 const POLL_MS = 5_000;
 const POOL = BigInt(ROUND.poolUsd);
@@ -53,12 +53,16 @@ function stageLine(rv: RoundView): string {
   for (const t of rv.tiers) {
     if (t.status === "settled") {
       const sum = Object.values(t.awards).reduce((a, v) => a + dollars(v), 0);
-      parts.push(`${t.tier} settled: ${usd(sum)} to ${plural(t.funded.length, "initiative")}`);
+      parts.push(
+        `${tierName(t.tier)} settled: ${usd(sum)} to ${plural(t.funded.length, "initiative")}`,
+      );
     } else if (t.status === "settling") {
-      parts.push(`${t.tier} settling, window ${t.window} ends ${utc(t.windowEndsAt, false)}`);
+      parts.push(
+        `${tierName(t.tier)} settling, window ${t.window} ends ${utc(t.windowEndsAt, false)}`,
+      );
       next = true;
     } else if (next || parts.length) {
-      parts.push(`${t.tier} starts ${utc(t.startsAt)}`);
+      parts.push(`${tierName(t.tier)} starts ${utc(t.startsAt)}`);
       break;
     }
   }
@@ -152,7 +156,7 @@ export default function VoteResults() {
         : (
           <>
             would be funded by {ballotsText} from the {usd(POOL_USD)}{" "}
-            <span className="text-vote">{POOL_NAME}</span> · S starts settling in{" "}
+            <span className="text-vote">{POOL_NAME}</span> · Tier-S starts settling in{" "}
             {timeLeft(sTally - Math.floor(now / 1000))}
           </>
         )}

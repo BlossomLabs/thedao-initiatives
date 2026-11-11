@@ -59,7 +59,7 @@ it("uses the funding-status slot for a DAO tier or existing-support Funded chip"
       <InitiativeCard card={funded} tokensOk={false} voteTier="S" />
     </MemoryRouter>,
   );
-  expect(screen.queryByText("S-TIER")).toBeNull();
+  expect(screen.queryByText("Tier-S")).toBeNull();
   expect(screen.getByTitle("Fully funded from existing support")).toBeInTheDocument();
   expect(screen.getByText("FUNDED")).toBeInTheDocument();
   rerender(
@@ -68,7 +68,7 @@ it("uses the funding-status slot for a DAO tier or existing-support Funded chip"
     </MemoryRouter>,
   );
   expect(screen.queryByText("FUNDED")).toBeNull();
-  expect(screen.getByText("B-TIER")).toBeInTheDocument();
+  expect(screen.getByText("Tier-B")).toBeInTheDocument();
 });
 
 it("counts donors as backers, but only pledgers go in the Pledged by strip", () => {

@@ -221,8 +221,8 @@ it("shows result tiers only for initiatives funded by the DAO vote", () => {
     voteTiers: new Map([["a", "A"], ["b", "B"]]),
   });
   const first = screen.getByText("Echidna fuzzing").closest("li")!;
-  expect(within(first).getAllByText("A-TIER").length).toBeGreaterThan(0);
-  expect(screen.queryByText("B-TIER")).toBeNull();
+  expect(within(first).getAllByText("Tier-A").length).toBeGreaterThan(0);
+  expect(screen.queryByText("Tier-B")).toBeNull();
 });
 
 it("shows a Funded chip for existing support, without a DAO tier", () => {
@@ -230,6 +230,6 @@ it("shows a Funded chip for existing support, without a DAO tier", () => {
   const row = screen.getByText("Already funded").closest("li")!;
   expect(within(row).getAllByTitle("Fully funded from existing support").length).toBeGreaterThan(0);
   expect(within(row).getAllByText("FUNDED").length).toBeGreaterThan(0);
-  expect(within(row).queryByText(/^[SAB]-TIER$/)).toBeNull();
+  expect(within(row).queryByText(/^Tier-[SAB]$/)).toBeNull();
   expect(within(row).queryByText("100.0%")).toBeNull();
 });

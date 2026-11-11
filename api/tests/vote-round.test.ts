@@ -778,7 +778,12 @@ Deno.test("round ballot: a settled tier can't change; registration closes; B set
     method: "POST",
     json: await signedBallot(VOTER, 1n, 2n, `0x${X}01${X}`, qe),
   });
-  assertEquals([moved.status, (await j(moved)).code], [409, "tier_settled"]);
+  const refusedBody = await j(moved) as { code: string; error?: string; message?: string };
+  assertEquals([moved.status, refusedBody.code], [409, "tier_settled"]);
+  assertEquals(
+    refusedBody.error ?? refusedBody.message,
+    "Tier-S has settled: its initiatives can't move.",
+  );
   const late = await h.req("/api/vote/ballot", {
     method: "POST",
     json: await signedBallot(VOTER, 3n, 1n, `0x01${X}${X}`, qe),

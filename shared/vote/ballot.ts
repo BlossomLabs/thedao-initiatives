@@ -4,6 +4,8 @@
 
 export type Tier = "S" | "A" | "B";
 export const TIERS: readonly Tier[] = ["S", "A", "B"];
+/** A tier in running text: "Tier-S". The letter stands alone only in the tier table. */
+export const tierName = (t: Tier): string => `Tier-${t}`;
 export const WITHHELD = 255;
 
 export function encodeBallot(

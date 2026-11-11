@@ -5,7 +5,7 @@ import { requireAdmin, requireAuth } from "../middleware/auth.ts";
 import { jsonBody } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
 import { verifyCode } from "../../shared/vote/code.ts";
-import { isValidOnchainBallot } from "../../shared/vote/ballot.ts";
+import { isValidOnchainBallot, tierName } from "../../shared/vote/ballot.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { recordVote } from "../../shared/vote/record.ts";
 import type { VoteRound } from "../services/vote-chain.ts";
@@ -407,9 +407,14 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       throw fail(403, "registration_closed", "Registration closed before this badge voted.");
     }
     if (no?.code === "tier_settled") {
-      throw fail(409, "tier_settled", `${no.tier} has settled: its initiatives can't move.`, {
-        tier: no.tier,
-      });
+      throw fail(
+        409,
+        "tier_settled",
+        `${tierName(no.tier)} has settled: its initiatives can't move.`,
+        {
+          tier: no.tier,
+        },
+      );
     }
     if (d.manifest.kind === "real") {
       const relayer = d.chain.relayerAddress();

@@ -645,8 +645,8 @@ it("quiet ending: S settling, quiet so far", async () => {
     ],
   }));
   // Its own box, in the ballot's column.
-  const box = await screen.findByRole("region", { name: "S settling" });
-  expect(within(box).getByText("S is settling")).toBeInTheDocument();
+  const box = await screen.findByRole("region", { name: "Tier-S settling" });
+  expect(within(box).getByText("Tier-S is settling")).toBeInTheDocument();
   expect(within(box).getByText("Window 1 of 3")).toBeInTheDocument();
   expect(within(box).getByText(/^Ends .* UTC$/)).toBeInTheDocument();
   expect(within(box).getByText("No change so far: it settles then.")).toBeInTheDocument();
@@ -693,7 +693,7 @@ it("quiet ending: a settled S is named and locked; the badge sees what it paid a
   }));
   const share = await screen.findByRole("region", { name: "Your share" });
   expect(within(share).getByText("$1,100 left of $2,000")).toBeInTheDocument();
-  expect(within(share).getByText("S paid $900 to 1 initiative")).toBeInTheDocument();
+  expect(within(share).getByText("Tier-S paid $900 to 1 initiative")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Must fund (settled)" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "ALPHA, funded: your share paid $900" }))
     .toBeDisabled();
@@ -728,8 +728,8 @@ it("quiet ending: once B settles the ballot is closed, with what each tier funde
     accepted: { "17": "0x01ffff" },
     tiers: [settled("S", ["alpha"]), settled("A", ["beta"]), settled("B", [])],
   }));
-  expect(await screen.findByText("S: ALPHA")).toBeInTheDocument();
-  expect(screen.getByText("A: BETA")).toBeInTheDocument();
+  expect(await screen.findByText("Tier-S: ALPHA")).toBeInTheDocument();
+  expect(screen.getByText("Tier-A: BETA")).toBeInTheDocument();
 });
 
 async function ballotWithClosed(body: Record<string, unknown>) {

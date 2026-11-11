@@ -4,7 +4,7 @@ import { Button, LinkButton } from "~/components/ui/Button";
 import { TIER_LABELS } from "~/components/vote/TierBallot";
 import { useVoteBallots } from "~/hooks/use-vote";
 import { errorMessage } from "~/lib/api";
-import { decodeBallot, encodeBallot, type Tier } from "../../../shared/vote/ballot";
+import { decodeBallot, encodeBallot, type Tier, tierName } from "../../../shared/vote/ballot";
 import { ROUND } from "../../../shared/vote/manifest";
 
 function Header({ kicker, children }: { kicker: string; children?: React.ReactNode }) {
@@ -122,7 +122,7 @@ export default function VoteClosed(
           <ul className="space-y-1.5">
             {settled.map((t) => (
               <li key={t.tier}>
-                {`${t.tier}: ${
+                {`${tierName(t.tier)}: ${
                   t.funded.length
                     ? t.funded.map((x) => titles.get(x) ?? x).join(", ")
                     : "nothing"

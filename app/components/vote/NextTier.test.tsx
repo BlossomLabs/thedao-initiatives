@@ -22,11 +22,15 @@ it("shows the gap to the next tier, rounded up", () => {
   render(<NextTierFigure next={entry()} titles={titles} />);
   // usdShort writes thousands with a lowercase k.
   expect(screen.getByRole("button", { name: "$42k to Tier-S" })).toBeInTheDocument();
+  // A narrow column wraps before the tier, never inside "Tier-S".
+  expect(screen.getByText("Tier-S")).toHaveClass("whitespace-nowrap");
 });
 
 it("out of reach", () => {
   render(<NextTierFigure next={entry({ gap: null, tier: "B" })} titles={titles} />);
-  expect(screen.getByText("Out of reach for Tier-B")).toBeInTheDocument();
+  const tier = screen.getByText("Tier-B");
+  expect(tier).toHaveClass("whitespace-nowrap");
+  expect(tier.parentElement).toHaveTextContent("Out of reach for Tier-B");
   expect(screen.queryByRole("button")).toBeNull();
 });
 

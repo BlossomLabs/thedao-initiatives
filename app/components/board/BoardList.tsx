@@ -302,7 +302,10 @@ function Row(
           )}
         >
           <span className="@max-[720px]/list:hidden">
-            <b className="font-medium text-white/90">{usd(final ?? summary.total)}</b>
+            {/* The final amount is short everywhere ("$279k"), as on the cards. */}
+            <b className="font-medium text-white/90">
+              {final === undefined ? usd(summary.total) : usdShort(final)}
+            </b>
             {final === undefined && <>{" "}of {usd(r.goalUsd)}</>}
           </span>
           {/* Phones: the short form. */}
@@ -442,12 +445,13 @@ export default function BoardList(
           aria-hidden="true"
         >
           <span />
-          <span>Type</span>
+          {/* The closed vote's rows show no type, and their amount is the final one. */}
+          <span>{finals ? "" : "Type"}</span>
           <span>Initiative</span>
           {ratings && <span className="hidden @min-[880px]/list:block">Rating</span>}
           <span className="text-right">Funded</span>
           <span className="text-right">Backers</span>
-          <span className="text-right">Raised</span>
+          <span className="text-right">{finals ? "Final" : "Raised"}</span>
         </div>
         <ul className="col-span-full m-0 grid list-none grid-cols-subgrid p-0">
           <AnimatePresence>

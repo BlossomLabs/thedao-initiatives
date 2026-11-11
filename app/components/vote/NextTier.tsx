@@ -35,7 +35,11 @@ export function NextTierFigure(
   const id = useId();
   const name = tierName(next.tier);
   if (next.gap === null) {
-    return <span className={`${WRAP} text-white/40`}>Out of reach for {name}</span>;
+    return (
+      <span className={`${WRAP} text-white/40`}>
+        Out of reach for <span className="whitespace-nowrap">{name}</span>
+      </span>
+    );
   }
   const title = (slug: string) => titles.get(slug) ?? slug;
   const gap = usdShortUp(dollars(next.gap));
@@ -58,7 +62,8 @@ export function NextTierFigure(
         onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
         className={`cursor-help rounded border-0 bg-transparent p-0 font-[inherit] ${WRAP} text-vote underline decoration-dotted underline-offset-2`}
       >
-        {gap} to {name}
+        {/* In a narrow column it wraps before the tier, never inside "Tier-S". */}
+        {gap} to <span className="whitespace-nowrap">{name}</span>
       </button>
       {open && (
         <span

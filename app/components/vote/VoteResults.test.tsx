@@ -338,6 +338,10 @@ it("the final result: funded and not funded lists", async () => {
   await showClosed();
   expect(heading("Funded")).toHaveTextContent("Funded1");
   expect(heading("Not funded")).toHaveTextContent("Not funded1");
+  // The list's header names the final amount and no type column.
+  expect(screen.getAllByText("Final").length).toBeGreaterThan(0);
+  expect(screen.queryByText("Raised")).toBeNull();
+  expect(screen.queryByText("Type")).toBeNull();
 });
 
 it.each(["/", "/?view=cards"])("cards show the final amount only in %s", async (url) => {
@@ -406,7 +410,11 @@ it.each(["/", "/?view=cards"])("an open round shows each initiative's gap in %s"
     </QueryClientProvider>,
   );
   const button = (await screen.findAllByRole("button", { name: "$42k to Tier-S" }))[0];
-  expect(screen.getAllByText("Out of reach for Tier-B").length).toBeGreaterThan(0);
+  expect(
+    screen.getAllByText("Tier-B").some((e) =>
+      e.parentElement?.textContent === "Out of reach for Tier-B"
+    ),
+  ).toBe(true);
   fireEvent.focus(button);
   const tip = screen.getByRole("tooltip");
   expect(tip).toHaveTextContent("Now Tier-A.");
@@ -432,7 +440,10 @@ it("a funded card keeps its tier next to the gap", async () => {
   // Beta isn't funded: the gap alone.
   const beta = screen.getByRole("button", { name: "$42k to Tier-B" })
     .closest("[data-initiative-id]")!;
-  expect(within(beta as HTMLElement).queryByText(/^Tier-[SAB]$/)).toBeNull();
+  // The gap names its tier too ("to Tier-B"); no chip outside it.
+  expect(
+    within(beta as HTMLElement).queryAllByText(/^Tier-[SAB]$/).filter((e) => !e.closest("button")),
+  ).toEqual([]);
   fireEvent.focus(screen.getByRole("button", { name: "$42k to Tier-B" }));
   expect(screen.getByRole("tooltip")).toHaveTextContent("Now not funded.");
 });

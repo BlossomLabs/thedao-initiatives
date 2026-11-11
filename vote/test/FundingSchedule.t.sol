@@ -10,7 +10,9 @@ contract FundingScheduleTest is Fixture {
     function setUp() public override {
         super.setUp();
         round = new SignedBallots(address(this), address(0), "Funding test", "FUND", schedule());
-        round.addInitiative(INITIATIVE_A, 1_000e6);
+        round.addInitiative(INITIATIVE_A, 1_000e6, false, 0);
+        round.addInitiative(INITIATIVE_B, 1_000e6, false, 0);
+        round.addInitiative(INITIATIVE_C, 1_000e6, false, 0);
         round.mint(alice, 1);
     }
 
@@ -57,7 +59,7 @@ contract FundingScheduleTest is Fixture {
         uint64 oldEnd = round.hardDeadline();
         vm.warp(oldS);
         vm.prank(alice);
-        round.vote(1, 1, hex"01");
+        round.vote(1, 1, hex"010101", proofOf(hex"010101"));
         next[0] += 1 hours;
         round.setDates(round.opensAt(), next);
         assertEq(round.firstTallyAt(0), oldS + 1 hours);
@@ -74,7 +76,7 @@ contract FundingScheduleTest is Fixture {
         vm.warp(uint256(round.hardDeadline()) + 1 days);
         round.mint(bob, 2);
         vm.prank(alice);
-        round.vote(1, 1, hex"01");
+        round.vote(1, 1, hex"010101", proofOf(hex"010101"));
         round.setPledge(keccak256("waiting"), 0, round.USD(), 100e6);
         uint64[3] memory next;
         next[0] = uint64(block.timestamp + 1 days);
@@ -90,7 +92,7 @@ contract FundingScheduleTest is Fixture {
         vm.warp(round.registrationDeadline());
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(SignedBallots.NotRegistered.selector, 2));
-        round.vote(2, 1, hex"01");
+        round.vote(2, 1, hex"010101", proofOf(hex"010101"));
     }
 
     function test_futureTierCanMoveIndependentlyAfterSStarts() public {
@@ -143,10 +145,10 @@ contract FundingScheduleTest is Fixture {
         assertEq(round.opensAt(), newOpening);
         vm.prank(alice);
         vm.expectRevert(SignedBallots.VotingNotStarted.selector);
-        round.vote(1, 1, hex"01");
+        round.vote(1, 1, hex"010101", proofOf(hex"010101"));
         vm.warp(newOpening);
         vm.prank(alice);
-        round.vote(1, 1, hex"01");
+        round.vote(1, 1, hex"010101", proofOf(hex"010101"));
         vm.expectRevert(SignedBallots.DateAlreadyStarted.selector);
         round.setDates(newOpening + 1 hours, next);
     }

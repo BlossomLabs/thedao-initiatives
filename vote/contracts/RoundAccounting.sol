@@ -13,6 +13,7 @@ abstract contract RoundAccounting is AccessControl {
     uint256 public constant USD_SCALE = 1e6;
     uint256 public constant MAX_CURRENCIES = 32;
     uint256 public constant MAX_PROJECTS = 254;
+    uint256 public constant MAX_GROUPS = 256;
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant PLEDGE_ROLE = keccak256("PLEDGE_ROLE");
 
@@ -28,6 +29,9 @@ abstract contract RoundAccounting is AccessControl {
     error TooManyInitiatives();
     error InvalidPledgeId();
     error PoolCannotDecrease();
+    error TooManyGroups();
+    error UnknownGroup();
+    error RfpWithGroups();
 
     struct Currency {
         address asset; // address(0) means native currency, except virtual currency USD.
@@ -37,9 +41,13 @@ abstract contract RoundAccounting is AccessControl {
         uint32 maxPriceAge;
     }
 
+    /// @dev `groups` is a bitmask over the registered groups (tags): two projects are
+    ///      related when their masks overlap. RFPs belong to no group.
     struct Initiative {
         address account;
+        bool rfp;
         uint256 askUsd; // Six decimal places.
+        uint256 groups;
     }
 
     struct Pledge {
@@ -51,6 +59,7 @@ abstract contract RoundAccounting is AccessControl {
 
     Currency[] private _currencies;
     Initiative[] private _initiatives;
+    bytes32[] private _groupNames;
     mapping(address asset => bool) private _assetRegistered;
     mapping(address account => bool) private _initiativeRegistered;
     /// @notice Admin-recorded budget in six-decimal USD. Correctable before S's
@@ -70,7 +79,10 @@ abstract contract RoundAccounting is AccessControl {
         uint8 feedDecimals,
         uint32 maxPriceAge
     );
-    event InitiativeConfigured(uint256 indexed initiativeId, address indexed account, uint256 askUsd);
+    event InitiativeConfigured(
+        uint256 indexed initiativeId, address indexed account, uint256 askUsd, bool rfp, uint256 groups
+    );
+    event GroupAdded(uint8 indexed id, bytes32 name);
     event PoolUsdSet(uint256 previousAmountUsd, uint256 amountUsd);
     event PledgeSet(bytes32 indexed pledgeId, uint256 indexed initiativeId, uint256 indexed currencyId, uint256 amount);
 
@@ -130,27 +142,57 @@ abstract contract RoundAccounting is AccessControl {
         return _initiatives[id];
     }
 
-    function addInitiative(address account, uint256 askUsd) external onlyRole(ADMIN_ROLE) returns (uint256 id) {
-        _requireSetup();
-        if (_initiatives.length == MAX_PROJECTS) revert TooManyInitiatives();
-        _checkInitiativeAccount(account);
-        id = _initiatives.length;
-        _initiatives.push(Initiative(account, askUsd));
-        _initiativeRegistered[account] = true;
-        emit InitiativeConfigured(id, account, askUsd);
+    function groupCount() public view returns (uint256) {
+        return _groupNames.length;
     }
 
-    function setInitiative(uint256 id, address account, uint256 askUsd) external onlyRole(ADMIN_ROLE) {
+    function groupName(uint256 id) external view returns (bytes32) {
+        if (id >= _groupNames.length) revert UnknownGroup();
+        return _groupNames[id];
+    }
+
+    /// @notice A group of related projects (a tag). Allowed whenever projects may be added.
+    function addGroup(bytes32 name) external onlyRole(ADMIN_ROLE) returns (uint8 id) {
+        _requireAdding();
+        if (_groupNames.length == MAX_GROUPS) revert TooManyGroups();
+        id = uint8(_groupNames.length);
+        _groupNames.push(name);
+        emit GroupAdded(id, name);
+    }
+
+    /// @notice Before voting opens, or during the vote outside every tier's quiet-ending
+    ///         span. Existing projects never change once voting opens, so an addition
+    ///         cannot change whether an earlier ballot was valid.
+    function addInitiative(address account, uint256 askUsd, bool rfp, uint256 groups)
+        external
+        onlyRole(ADMIN_ROLE)
+        returns (uint256 id)
+    {
+        _requireAdding();
+        if (_initiatives.length == MAX_PROJECTS) revert TooManyInitiatives();
+        _checkInitiativeAccount(account);
+        _checkGroups(rfp, groups);
+        id = _initiatives.length;
+        _initiatives.push(Initiative(account, rfp, askUsd, groups));
+        _initiativeRegistered[account] = true;
+        emit InitiativeConfigured(id, account, askUsd, rfp, groups);
+    }
+
+    function setInitiative(uint256 id, address account, uint256 askUsd, bool rfp, uint256 groups)
+        external
+        onlyRole(ADMIN_ROLE)
+    {
         _requireSetup();
         _requireInitiative(id);
+        _checkGroups(rfp, groups);
         address previous = _initiatives[id].account;
         if (account != previous) {
             _checkInitiativeAccount(account);
             _initiativeRegistered[previous] = false;
             _initiativeRegistered[account] = true;
         }
-        _initiatives[id] = Initiative(account, askUsd);
-        emit InitiativeConfigured(id, account, askUsd);
+        _initiatives[id] = Initiative(account, rfp, askUsd, groups);
+        emit InitiativeConfigured(id, account, askUsd, rfp, groups);
     }
 
     /// @notice Initialize, correct or increase net USD funding while the round is open.
@@ -276,7 +318,20 @@ abstract contract RoundAccounting is AccessControl {
         if (_initiativeRegistered[account]) revert DuplicateInitiative();
     }
 
+    function _checkGroups(bool rfp, uint256 groups) private view {
+        if (rfp && groups != 0) revert RfpWithGroups();
+        uint256 n = _groupNames.length;
+        if (n < MAX_GROUPS && groups >> n != 0) revert UnknownGroup();
+    }
+
+    /// @dev Ask and groups of project `id`, for ballot validation (two storage reads).
+    function _askAndGroups(uint256 id) internal view returns (uint256 askUsd, uint256 groups) {
+        Initiative storage x = _initiatives[id];
+        return (x.askUsd, x.groups);
+    }
+
     function _requireSetup() internal view virtual;
+    function _requireAdding() internal view virtual;
     function _initialFundingOpen() internal view virtual returns (bool);
     function _requireInitialFundingOpen() internal view virtual;
     function _requireAccountingOpen() internal view virtual;

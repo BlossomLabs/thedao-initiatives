@@ -106,8 +106,9 @@ contract MockFeed is IPriceFeed {
         address internal constant INITIATIVE_A = address(0xA01);
         address internal constant INITIATIVE_B = address(0xA02);
         address internal constant INITIATIVE_C = address(0xA03);
+        address internal constant INITIATIVE_D = address(0xA04);
         uint64 internal start;
-        bytes internal ranks = hex"0102ff";
+        bytes internal ranks = hex"010101ff";
 
         function setUp() public virtual {
             vm.warp(1_000_000);
@@ -116,9 +117,10 @@ contract MockFeed is IPriceFeed {
             SignedBallots.Schedule memory s = schedule();
             start = s.opensAt;
             ballots = new SignedBallots(address(this), address(0), "Blossom voter", "VOTE", s);
-            ballots.addInitiative(INITIATIVE_A, 20_000e6);
-            ballots.addInitiative(INITIATIVE_B, 10_000e6);
-            ballots.addInitiative(INITIATIVE_C, 5_000e6);
+            ballots.addInitiative(INITIATIVE_A, 20_000e6, false, 0);
+            ballots.addInitiative(INITIATIVE_B, 10_000e6, false, 0);
+            ballots.addInitiative(INITIATIVE_C, 5_000e6, false, 0);
+            ballots.addInitiative(INITIATIVE_D, 5_000e6, false, 0);
             ballots.mint(alice, 1);
             ballots.mint(alice, 2);
             ballots.mint(bob, 3);
@@ -141,7 +143,21 @@ contract MockFeed is IPriceFeed {
         {
             votes = new SignedBallots.Vote[](1);
             (bytes32 r, bytes32 vs) = vm.signCompact(key, ballots.digestOf(tokenId, nonce, keccak256(ballot)));
-            votes[0] = SignedBallots.Vote(tokenId, nonce, r, vs, ballot);
+            votes[0] = SignedBallots.Vote(tokenId, nonce, r, vs, ballot, proofOf(ballot));
+        }
+
+        /// The first three projects of Tier-S (rank 1): a proof when they are unrelated,
+        /// as every fixture project is. Shorter when Tier-S has fewer.
+        function proofOf(bytes memory ballot) internal pure returns (uint8[] memory proof) {
+            uint256 n;
+            for (uint256 i; i < ballot.length; ++i) {
+                if (uint8(ballot[i]) == 1) ++n;
+            }
+            proof = new uint8[](n < 3 ? n : 3);
+            uint256 k;
+            for (uint256 i; i < ballot.length && k < proof.length; ++i) {
+                if (uint8(ballot[i]) == 1) proof[k++] = uint8(i);
+            }
         }
 
         function blobVotes(SignedBallots.Vote[] memory votes)

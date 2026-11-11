@@ -34,7 +34,9 @@ contract BatchExecutorTest is Test {
         uint256 k;
         for (uint256 i; i < initiatives; ++i) {
             calls[k++] = BatchExecutor.Call(
-                address(round), 0, abi.encodeCall(round.addInitiative, (address(uint160(0x1000 + i)), 1_000e6))
+                address(round),
+                0,
+                abi.encodeCall(round.addInitiative, (address(uint160(0x1000 + i)), 1_000e6, false, 0))
             );
         }
         calls[k++] = BatchExecutor.Call(address(round), 0, abi.encodeCall(round.setPoolUsd, (913_244e6)));

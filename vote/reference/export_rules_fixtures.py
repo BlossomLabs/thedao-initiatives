@@ -79,6 +79,14 @@ def main():
             "ok": r["ok"],
             "rules": [e["rule"] for e in r["errors"]],
             "proof": r["proof"],
+            # Flat, numbers only: what the Solidity test reads with vm.parseJson*.
+            "sol": {
+                "asks": [p["askUsd"] for p in projects],
+                "rfp": [p["rfp"] for p in projects],
+                "masks": [sum(1 << g for g in p["groups"]) for p in projects],
+                "groupCount": len(names),
+                "pool": pool,
+            },
         })
     json.dump(out, sys.stdout, indent=1)
     sys.stdout.write("\n")

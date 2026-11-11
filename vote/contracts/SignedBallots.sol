@@ -38,6 +38,13 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     error NoBlob();
     error InvalidNonce(uint256 tokenId, uint64 nonce);
     error InvalidSignature();
+    error AddingClosed();
+    error InvalidTiers();
+    error TooManyTiers();
+    error BallotTooSmall();
+    error TooFewIndependent(uint8 tier);
+    error BadProof(uint8 tier);
+    error GroupOverHalf(uint8 tier, uint8 group);
 
     struct Schedule {
         uint64 opensAt;
@@ -52,6 +59,9 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         bytes32 r;
         bytes32 vs;
         bytes ballot;
+        /// @dev Three pairwise-unrelated projects per enforced tier, Tier-S first. Not
+        ///      signed: it only shows the ballot is valid, so any correct proof works.
+        uint8[] proof;
     }
 
     struct BlobVote {
@@ -71,6 +81,8 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     uint64 public registrationDeadline;
     uint64 public immutable maximumTierDuration;
     uint64 public hardDeadline;
+    /// @notice Tiers held to the independence rules: bit 0 Tier-S (always), bit 1 Tier-A.
+    uint8 public independentTiers = 1;
     string private _metadataBaseURI;
 
     mapping(uint256 tokenId => uint64 nonce) public nonceOf;
@@ -182,6 +194,14 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         }
     }
 
+    /// @notice Whether Tier-A is held to the independence rules too. Tier-S always is,
+    ///         Tier-B never. Fixed when voting opens.
+    function setIndependentTiers(uint8 mask) external onlyRole(ADMIN_ROLE) {
+        _requireSetup();
+        if (mask & 1 == 0 || mask > 3) revert InvalidTiers();
+        independentTiers = mask;
+    }
+
     function setBaseURI(string calldata baseURI) external onlyRole(ADMIN_ROLE) {
         _requireSetup();
         _metadataBaseURI = baseURI;
@@ -226,7 +246,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         _open(votes.length);
         for (uint256 i; i < votes.length; ++i) {
             Vote calldata v = votes[i];
-            _validateBallot(v.ballot);
+            _validateBallot(v.ballot, v.proof);
             address voter = voterOwner(v.tokenId);
             bytes32 ballotHash = keccak256(v.ballot);
             (address signer, ECDSA.RecoverError err,) =
@@ -237,19 +257,25 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         }
     }
 
-    function vote(uint256 tokenId, uint64 nonce, bytes calldata ballot) external {
+    function vote(uint256 tokenId, uint64 nonce, bytes calldata ballot, uint8[] calldata proof) external {
         _open(1);
         address voter = voterOwner(tokenId);
         if (msg.sender != voter) revert NotNFTOwner(tokenId);
-        _validateBallot(ballot);
+        _validateBallot(ballot, proof);
         _append(tokenId, voter, nonce, keccak256(ballot), bytes32(0));
         emit BallotRecorded(tokenId, voter, nonce, ballot);
     }
 
     /// @notice Relayed signatures from the current NFT owner, including ERC-1271 wallets.
-    function recordFor(uint256 tokenId, uint64 nonce, bytes calldata ballot, bytes calldata signature) external {
+    function recordFor(
+        uint256 tokenId,
+        uint64 nonce,
+        bytes calldata ballot,
+        bytes calldata signature,
+        uint8[] calldata proof
+    ) external {
         _open(1);
-        _validateBallot(ballot);
+        _validateBallot(ballot, proof);
         address voter = voterOwner(tokenId);
         if (!SignatureChecker.isValidSignatureNow(
                 voter, _voteDigest(tokenId, voter, nonce, keccak256(ballot)), signature
@@ -308,21 +334,88 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         ++recordCount;
     }
 
-    function _validateBallot(bytes calldata ballot) private view {
+    /// @dev The ballot rules (docs/superpowers/specs/2026-11-11-ballot-rules-design.md),
+    ///      mirrored by shared/vote/rules.ts and vote/reference/ballot_rules.py. A ballot
+    ///      may be shorter than the project list: the missing projects are unplaced.
+    function _validateBallot(bytes calldata ballot, uint8[] calldata proof) private view {
+        (uint256[] memory counts, uint256 requested) = _rankCounts(ballot);
+        (uint8[3] memory tierRank, uint256 tiers) = _tierRanks(counts);
+        if (2 * requested < 3 * poolUsd) revert BallotTooSmall();
+        uint8 mask = independentTiers;
+        uint256 enforced = (mask & 1) + ((mask >> 1) & 1);
+        uint256 k;
+        for (uint8 t; t < 2; ++t) {
+            if ((mask >> t) & 1 == 0) continue;
+            uint8 rank = t < tiers ? tierRank[t] : 0;
+            if (rank == 0 || counts[rank] < 3) revert TooFewIndependent(t);
+            if (proof.length != 3 * enforced) revert BadProof(t);
+            _checkProof(ballot, rank, t, proof[3 * k:3 * k + 3]);
+            _checkGroups(ballot, rank, t);
+            ++k;
+        }
+    }
+
+    /// @dev How many projects hold each rank, and the placed projects' requested total.
+    function _rankCounts(bytes calldata ballot) private view returns (uint256[] memory counts, uint256 requested) {
         uint256 m = projectCount();
-        if (ballot.length != m) revert WrongLength();
-        uint256[] memory counts = new uint256[](m + 1);
-        for (uint256 i; i < m; ++i) {
+        if (ballot.length == 0 || ballot.length > m) revert WrongLength();
+        counts = new uint256[](m + 1);
+        for (uint256 i; i < ballot.length; ++i) {
             uint8 rank = uint8(ballot[i]);
             if (rank == 255) continue;
             // The default is explicit withholding, not implicit tail approval.
             if (rank == 0 || rank > m) revert InvalidBallot();
             ++counts[rank];
+            (uint256 ask,) = _askAndGroups(i);
+            requested += ask;
         }
+    }
+
+    /// @dev The rank of each group of equal rank (Tier-S, Tier-A, Tier-B): competition
+    ///      ranks without gaps, at most three groups.
+    function _tierRanks(uint256[] memory counts) private pure returns (uint8[3] memory tierRank, uint256 tiers) {
         uint256 seen;
-        for (uint256 rank = 1; rank <= m; ++rank) {
-            if (counts[rank] != 0 && rank != seen + 1) revert InvalidBallot();
+        for (uint256 rank = 1; rank < counts.length; ++rank) {
+            if (counts[rank] == 0) continue;
+            if (rank != seen + 1) revert InvalidBallot();
+            if (tiers == 3) revert TooManyTiers();
+            tierRank[tiers++] = uint8(rank);
             seen += counts[rank];
+        }
+    }
+
+    /// @dev Three distinct projects of the tier whose group masks don't overlap.
+    function _checkProof(bytes calldata ballot, uint8 rank, uint8 t, uint8[] calldata p) private view {
+        uint256 n = ballot.length;
+        (uint8 a, uint8 b, uint8 c) = (p[0], p[1], p[2]);
+        if (a >= n || b >= n || c >= n || a == b || a == c || b == c) revert BadProof(t);
+        if (uint8(ballot[a]) != rank || uint8(ballot[b]) != rank || uint8(ballot[c]) != rank) revert BadProof(t);
+        (, uint256 ga) = _askAndGroups(a);
+        (, uint256 gb) = _askAndGroups(b);
+        (, uint256 gc) = _askAndGroups(c);
+        if (ga & gb != 0 || ga & gc != 0 || gb & gc != 0) revert BadProof(t);
+    }
+
+    /// @dev No group holds more than half of the tier's requested total (half passes).
+    function _checkGroups(bytes calldata ballot, uint8 rank, uint8 t) private view {
+        uint256 n = ballot.length;
+        uint256[] memory asks = new uint256[](n);
+        uint256[] memory masks = new uint256[](n);
+        uint256 tierUsd;
+        uint256 union;
+        for (uint256 i; i < n; ++i) {
+            if (uint8(ballot[i]) != rank) continue;
+            (asks[i], masks[i]) = _askAndGroups(i);
+            tierUsd += asks[i];
+            union |= masks[i];
+        }
+        for (uint256 g; union >> g != 0; ++g) {
+            if ((union >> g) & 1 == 0) continue;
+            uint256 groupUsd;
+            for (uint256 i; i < n; ++i) {
+                if ((masks[i] >> g) & 1 == 1) groupUsd += asks[i];
+            }
+            if (2 * groupUsd > tierUsd) revert GroupOverHalf(t, uint8(g));
         }
     }
 
@@ -335,6 +428,17 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
 
     function _requireSetup() internal view override {
         if (block.timestamp >= opensAt) revert ConfigurationFrozen();
+    }
+
+    /// @dev Projects and groups join before voting opens, or later outside every tier's
+    ///      quiet-ending span [first tally, latest settlement), and never at the end.
+    function _requireAdding() internal view override {
+        if (block.timestamp < opensAt) return;
+        if (block.timestamp >= hardDeadline) revert AddingClosed();
+        for (uint256 t; t < 3; ++t) {
+            uint256 from = firstTallyAt[t];
+            if (block.timestamp >= from && block.timestamp < from + maximumTierDuration) revert AddingClosed();
+        }
     }
 
     function _requireAccountingOpen() internal view override {

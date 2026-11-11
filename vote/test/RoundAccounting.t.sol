@@ -381,9 +381,9 @@ contract RoundAccountingTest is Fixture {
         vm.expectRevert(RoundAccounting.InvalidCurrency.selector);
         ballots.registerCurrency(address(excessiveDecimals), address(ethFeed), 3600);
         vm.expectRevert(RoundAccounting.DuplicateInitiative.selector);
-        ballots.addInitiative(INITIATIVE_A, 1e6);
+        ballots.addInitiative(INITIATIVE_A, 1e6, false, 0);
         vm.expectRevert(RoundAccounting.InvalidAddress.selector);
-        ballots.addInitiative(address(ballots), 1e6);
+        ballots.addInitiative(address(ballots), 1e6, false, 0);
         vm.expectRevert(RoundAccounting.UnknownCurrency.selector);
         ballots.quoteUsd(999, 0);
         vm.expectRevert(RoundAccounting.UnknownInitiative.selector);
@@ -394,11 +394,11 @@ contract RoundAccountingTest is Fixture {
 
     function test_initiativeEditsKeepBalanceOwnershipUnambiguous() public {
         vm.expectRevert(RoundAccounting.DuplicateInitiative.selector);
-        ballots.setInitiative(0, INITIATIVE_B, 1e6);
-        ballots.setInitiative(0, address(0xA04), 123e6);
-        ballots.addInitiative(INITIATIVE_A, 1e6); // Old address is available again.
+        ballots.setInitiative(0, INITIATIVE_B, 1e6, false, 0);
+        ballots.setInitiative(0, address(0xA05), 123e6, false, 0);
+        ballots.addInitiative(INITIATIVE_A, 1e6, false, 0); // Old address is available again.
         RoundAccounting.Initiative memory p = ballots.initiative(0);
-        assertEq(p.account, address(0xA04));
+        assertEq(p.account, address(0xA05));
         assertEq(p.askUsd, 123e6);
     }
 }

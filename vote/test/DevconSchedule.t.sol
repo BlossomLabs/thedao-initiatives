@@ -24,15 +24,33 @@ contract DevconScheduleTest is Test {
         opensAt = uint64(block.timestamp + 15 minutes);
         uint64[3] memory tally = [C - 1, C, C + 1];
         vm.startPrank(relayer);
-        round = new SignedBallots(relayer, address(0), "TheDAO Devcon 8", "DEVCON", SignedBallots.Schedule(opensAt, 1, tally, 1));
-        round.addInitiative(makeAddr("i0"), 10_000e6);
-        round.addInitiative(makeAddr("i1"), 20_000e6);
+        round = new SignedBallots(
+            relayer, address(0), "TheDAO Devcon 8", "DEVCON", SignedBallots.Schedule(opensAt, 1, tally, 1)
+        );
+        // Four unrelated asks of $500k: a ballot of three or more clears 1.5x the pool.
+        for (uint256 i; i < 4; ++i) {
+            round.addInitiative(makeAddr(string.concat("i", vm.toString(i))), 500_000e6, false, 0);
+        }
         round.setPoolUsd(POOL);
         bytes32[3] memory handed = [round.DEFAULT_ADMIN_ROLE(), round.ADMIN_ROLE(), round.PLEDGE_ROLE()];
-        for (uint256 i; i < 3; ++i) round.grantRole(handed[i], ADMIN);
-        for (uint256 i; i < 3; ++i) round.renounceRole(handed[i], relayer);
+        for (uint256 i; i < 3; ++i) {
+            round.grantRole(handed[i], ADMIN);
+        }
+        for (uint256 i; i < 3; ++i) {
+            round.renounceRole(handed[i], relayer);
+        }
         round.renounceRole(round.BLOB_SUBMITTER_ROLE(), relayer);
         vm.stopPrank();
+    }
+
+    function proof() internal pure returns (uint8[] memory p) {
+        p = new uint8[](3);
+        (p[0], p[1], p[2]) = (0, 1, 2);
+    }
+
+    function proofB() internal pure returns (uint8[] memory p) {
+        p = new uint8[](3);
+        (p[0], p[1], p[2]) = (1, 2, 3);
     }
 
     function test_deadlinesLandOnTheClose() public view {
@@ -69,7 +87,7 @@ contract DevconScheduleTest is Test {
         vm.warp(C);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(SignedBallots.NotRegistered.selector, 1));
-        round.vote(1, 1, hex"01ff");
+        round.vote(1, 1, hex"010101ff", proof());
     }
 
     /// The contract still takes revisions for two seconds after C; the app and the
@@ -79,14 +97,14 @@ contract DevconScheduleTest is Test {
         vm.prank(relayer);
         round.mint(alice, 1);
         vm.prank(alice);
-        round.vote(1, 1, hex"01ff");
+        round.vote(1, 1, hex"010101ff", proof());
         vm.warp(C + 1);
         vm.prank(alice);
-        round.vote(1, 2, hex"ff01");
+        round.vote(1, 2, hex"ff010101", proofB());
         vm.warp(C + 2);
         vm.prank(alice);
         vm.expectRevert(SignedBallots.VotingClosed.selector);
-        round.vote(1, 3, hex"0101");
+        round.vote(1, 3, hex"01010101", proof());
     }
 
     function test_relayerKeepsOnlyMinting() public {
@@ -99,16 +117,25 @@ contract DevconScheduleTest is Test {
         assertTrue(round.hasRole(round.ADMIN_ROLE(), ADMIN));
         vm.startPrank(relayer);
         vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, relayer, round.ADMIN_ROLE())
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, relayer, round.ADMIN_ROLE()
+            )
         );
         round.setPoolUsd(POOL + 1);
         vm.stopPrank();
     }
 
+    /// Existing projects freeze at opening; a new one may join, but not while a tier
+    /// is settling (here S's one-second span starts at C - 1).
     function test_initiativesFreezeAtOpening() public {
         vm.warp(opensAt);
-        vm.prank(ADMIN);
+        vm.startPrank(ADMIN);
         vm.expectRevert(SignedBallots.ConfigurationFrozen.selector);
-        round.addInitiative(makeAddr("late"), 1e6);
+        round.setInitiative(0, makeAddr("i0"), 1e6, false, 0);
+        round.addInitiative(makeAddr("late"), 1e6, false, 0);
+        vm.warp(C - 1);
+        vm.expectRevert(SignedBallots.AddingClosed.selector);
+        round.addInitiative(makeAddr("later"), 1e6, false, 0);
+        vm.stopPrank();
     }
 }

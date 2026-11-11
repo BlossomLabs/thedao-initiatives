@@ -19,8 +19,8 @@ contract SignedBallotsTest is Fixture {
     function test_eachNFTGetsItsOwnBallotEvenWithOneOwner() public {
         vm.warp(start);
         vm.startPrank(alice);
-        ballots.vote(1, 1, ranks);
-        ballots.vote(2, 1, hex"0201ff");
+        ballots.vote(1, 1, ranks, proofOf(ranks));
+        ballots.vote(2, 1, hex"01010101", proofOf(hex"01010101"));
         vm.stopPrank();
         assertEq(ballots.registrationReceiptCount(), 2);
         assertEq(ballots.nonceOf(1), 1);
@@ -37,7 +37,7 @@ contract SignedBallotsTest is Fixture {
             uint256 key = 10_000 + i;
             ballots.mint(vm.addr(key), tokenId);
             (bytes32 r, bytes32 vs) = vm.signCompact(key, ballots.digestOf(tokenId, 1, keccak256(ranks)));
-            votes[i] = SignedBallots.Vote(tokenId, 1, r, vs, ranks);
+            votes[i] = SignedBallots.Vote(tokenId, 1, r, vs, ranks, proofOf(ranks));
         }
         vm.warp(start);
         ballots.record(votes);
@@ -64,7 +64,7 @@ contract SignedBallotsTest is Fixture {
     function test_tamperingWithBallotOrTokenIdRejects() public {
         vm.warp(start);
         SignedBallots.Vote[] memory votes = signedVote(1000, 1, 1, ranks);
-        votes[0].ballot = hex"0201ff";
+        votes[0].ballot = hex"01010101";
         vm.expectRevert(SignedBallots.InvalidSignature.selector);
         ballots.record(votes);
         votes = signedVote(1000, 1, 1, ranks);
@@ -76,9 +76,10 @@ contract SignedBallotsTest is Fixture {
 
     function test_signatureCannotBeReplayedInAnotherRound() public {
         SignedBallots other = new SignedBallots(address(this), address(ballots), "Other", "OTHER", schedule());
-        other.addInitiative(INITIATIVE_A, 20_000e6);
-        other.addInitiative(INITIATIVE_B, 10_000e6);
-        other.addInitiative(INITIATIVE_C, 5_000e6);
+        other.addInitiative(INITIATIVE_A, 20_000e6, false, 0);
+        other.addInitiative(INITIATIVE_B, 10_000e6, false, 0);
+        other.addInitiative(INITIATIVE_C, 5_000e6, false, 0);
+        other.addInitiative(INITIATIVE_D, 5_000e6, false, 0);
         vm.warp(start);
         SignedBallots.Vote[] memory votes = signedVote(1000, 1, 1, ranks);
         vm.expectRevert(SignedBallots.InvalidSignature.selector);
@@ -97,12 +98,12 @@ contract SignedBallotsTest is Fixture {
         vm.warp(start);
         SignedBallots.Vote[] memory oldSignature = signedVote(1000, 1, 3, ranks);
         vm.startPrank(alice);
-        ballots.vote(1, 1, ranks);
+        ballots.vote(1, 1, ranks, proofOf(ranks));
         ballots.transferFrom(alice, bob, 1);
         vm.stopPrank();
         vm.warp(ballots.registrationDeadline());
         vm.prank(bob);
-        ballots.vote(1, 2, hex"0201ff");
+        ballots.vote(1, 2, hex"01010101", proofOf(hex"01010101"));
         assertEq(ballots.registrationReceiptCount(), 1);
         assertEq(ballots.nonceOf(1), 2);
         // Nonce 3 is next, but the previous owner can no longer authorize it.
@@ -110,7 +111,7 @@ contract SignedBallotsTest is Fixture {
         ballots.record(oldSignature);
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(SignedBallots.InvalidNonce.selector, 1, uint64(1)));
-        ballots.vote(1, 1, ranks);
+        ballots.vote(1, 1, ranks, proofOf(ranks));
     }
 
     function test_approvedOperatorCannotVoteAsOwner() public {
@@ -119,20 +120,20 @@ contract SignedBallotsTest is Fixture {
         vm.warp(start);
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(SignedBallots.NotNFTOwner.selector, 1));
-        ballots.vote(1, 1, ranks);
+        ballots.vote(1, 1, ranks, proofOf(ranks));
     }
 
     function test_registrationDeadlineIsDerivedAndExclusive() public {
         assertEq(ballots.registrationDeadline(), ballots.firstTallyAt(0) + ballots.initialWindow());
         vm.warp(ballots.registrationDeadline() - 1);
         vm.prank(alice);
-        ballots.vote(1, 1, ranks);
+        ballots.vote(1, 1, ranks, proofOf(ranks));
         vm.warp(ballots.registrationDeadline());
         vm.prank(alice);
-        ballots.vote(1, 2, ranks);
+        ballots.vote(1, 2, ranks, proofOf(ranks));
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(SignedBallots.NotRegistered.selector, 2));
-        ballots.vote(2, 1, ranks);
+        ballots.vote(2, 1, ranks, proofOf(ranks));
         vm.expectRevert(SignedBallots.RegistrationClosed.selector);
         ballots.mint(bob, 4);
     }
@@ -151,14 +152,14 @@ contract SignedBallotsTest is Fixture {
         vm.warp(start);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(SignedBallots.InvalidNonce.selector, 1, type(uint64).max));
-        ballots.vote(1, type(uint64).max, ranks);
+        ballots.vote(1, type(uint64).max, ranks, proofOf(ranks));
         SignedBallots.Vote[] memory skipped = signedVote(1000, 1, 2, ranks);
         vm.expectRevert(abi.encodeWithSelector(SignedBallots.InvalidNonce.selector, 1, uint64(2)));
         ballots.record(skipped);
         assertEq(ballots.nonceOf(1), 0);
         assertFalse(ballots.hasRegistrationReceipt(1));
         vm.prank(alice);
-        ballots.vote(1, 1, ranks);
+        ballots.vote(1, 1, ranks, proofOf(ranks));
         assertEq(ballots.nonceOf(1), 1);
     }
 
@@ -166,10 +167,10 @@ contract SignedBallotsTest is Fixture {
         vm.warp(start);
         SignedBallots.Vote[] memory votes = new SignedBallots.Vote[](2);
         votes[0] = signedVote(1000, 1, 1, ranks)[0];
-        votes[1] = signedVote(1000, 1, 2, hex"0201ff")[0];
+        votes[1] = signedVote(1000, 1, 2, hex"01010101")[0];
         ballots.record(votes);
         assertEq(ballots.nonceOf(1), 2);
-        assertEq(ballots.ballotHashOf(1), keccak256(hex"0201ff"));
+        assertEq(ballots.ballotHashOf(1), keccak256(hex"01010101"));
     }
 
     function test_burnRemovesMistakenMintBeforeOpening() public {
@@ -186,7 +187,7 @@ contract SignedBallotsTest is Fixture {
     function test_burnRevokesReceiptAndRecordsRevocation() public {
         vm.warp(start);
         vm.prank(alice);
-        ballots.vote(1, 1, ranks);
+        ballots.vote(1, 1, ranks, proofOf(ranks));
         bytes32 before = ballots.transcript();
         vm.expectEmit(true, false, false, false, address(ballots));
         emit SignedBallots.RegistrationRevoked(1);
@@ -204,9 +205,9 @@ contract SignedBallotsTest is Fixture {
         assertEq(ballots.nonceOf(1), 1);
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(SignedBallots.InvalidNonce.selector, 1, uint64(1)));
-        ballots.vote(1, 1, ranks);
+        ballots.vote(1, 1, ranks, proofOf(ranks));
         vm.prank(bob);
-        ballots.vote(1, 2, ranks);
+        ballots.vote(1, 2, ranks, proofOf(ranks));
         assertEq(ballots.registrationReceiptCount(), 1);
     }
 
@@ -261,11 +262,15 @@ contract SignedBallotsTest is Fixture {
         assertEq(ballots.recordCount(), 1);
     }
 
+    /// Ties, a ballot shorter than the projects, and explicit withholding are valid;
+    /// a ballot that withholds everything has no Tier-S and is refused.
     function test_validTiesAndExplicitWithholding() public {
         vm.warp(start);
         vm.startPrank(alice);
-        ballots.vote(1, 1, hex"010103");
-        ballots.vote(1, 2, hex"ffffff");
+        ballots.vote(1, 1, hex"01010104", proofOf(hex"01010104"));
+        ballots.vote(1, 2, hex"010101", proofOf(hex"010101"));
+        vm.expectRevert(abi.encodeWithSelector(SignedBallots.TooFewIndependent.selector, uint8(0)));
+        ballots.vote(1, 3, hex"ffffffff", proofOf(hex"ffffffff"));
         vm.stopPrank();
     }
 
@@ -273,13 +278,15 @@ contract SignedBallotsTest is Fixture {
         vm.warp(start);
         vm.startPrank(alice);
         vm.expectRevert(SignedBallots.WrongLength.selector);
-        ballots.vote(1, 1, hex"0102");
+        ballots.vote(1, 1, hex"0101010101", proofOf(hex"0101010101")); // more bytes than projects
+        vm.expectRevert(SignedBallots.WrongLength.selector);
+        ballots.vote(1, 1, hex"", proofOf(hex""));
         vm.expectRevert(SignedBallots.InvalidBallot.selector);
-        ballots.vote(1, 1, hex"0103ff");
+        ballots.vote(1, 1, hex"0103ff", proofOf(hex"0103ff"));
         vm.expectRevert(SignedBallots.InvalidBallot.selector);
-        ballots.vote(1, 1, hex"010004");
+        ballots.vote(1, 1, hex"010004", proofOf(hex"010004"));
         vm.expectRevert(SignedBallots.InvalidBallot.selector);
-        ballots.vote(1, 1, hex"010200");
+        ballots.vote(1, 1, hex"010200", proofOf(hex"010200"));
         vm.stopPrank();
         assertEq(ballots.recordCount(), 0);
     }
@@ -291,7 +298,7 @@ contract SignedBallotsTest is Fixture {
         SignedBallots.Vote[] memory votes = new SignedBallots.Vote[](2);
         votes[0] = first[0];
         votes[1] = second[0];
-        votes[1].ballot = hex"0201ff";
+        votes[1].ballot = hex"01010101";
         vm.expectRevert(SignedBallots.InvalidSignature.selector);
         ballots.record(votes);
         assertEq(ballots.recordCount(), 0);
@@ -304,19 +311,19 @@ contract SignedBallotsTest is Fixture {
         ballots.mint(address(wallet), 7);
         vm.warp(start);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(7, ballots.digestOf(7, 1, keccak256(ranks)));
-        ballots.recordFor(7, 1, ranks, abi.encodePacked(r, s, v));
+        ballots.recordFor(7, 1, ranks, abi.encodePacked(r, s, v), proofOf(ranks));
         vm.prank(vm.addr(7));
-        wallet.execute(address(ballots), abi.encodeCall(SignedBallots.vote, (7, 2, ranks)));
+        wallet.execute(address(ballots), abi.encodeCall(SignedBallots.vote, (7, 2, ranks, proofOf(ranks))));
         assertEq(ballots.nonceOf(7), 2);
         (v, r, s) = vm.sign(8, ballots.digestOf(7, 3, keccak256(ranks)));
         vm.expectRevert(SignedBallots.InvalidSignature.selector);
-        ballots.recordFor(7, 3, ranks, abi.encodePacked(r, s, v));
+        ballots.recordFor(7, 3, ranks, abi.encodePacked(r, s, v), proofOf(ranks));
     }
 
     function test_genericEOASignatureRelay() public {
         vm.warp(start);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(1000, ballots.digestOf(1, 1, keccak256(ranks)));
-        ballots.recordFor(1, 1, ranks, abi.encodePacked(r, s, v));
+        ballots.recordFor(1, 1, ranks, abi.encodePacked(r, s, v), proofOf(ranks));
         assertEq(ballots.nonceOf(1), 1);
     }
 
@@ -325,13 +332,15 @@ contract SignedBallotsTest is Fixture {
         nft.mint(alice, 0);
         nft.mint(alice, 999);
         SignedBallots externalRound = new SignedBallots(address(this), address(nft), "Unused", "EXT", schedule());
-        externalRound.addInitiative(INITIATIVE_A, 1e6);
+        externalRound.addInitiative(INITIATIVE_A, 1e6, false, 0);
+        externalRound.addInitiative(INITIATIVE_B, 1e6, false, 0);
+        externalRound.addInitiative(INITIATIVE_C, 1e6, false, 0);
         vm.expectRevert(SignedBallots.ExternalCollection.selector);
         externalRound.mint(alice, 1);
         vm.warp(start);
         vm.startPrank(alice);
-        externalRound.vote(0, 1, hex"01");
-        externalRound.vote(999, 1, hex"ff");
+        externalRound.vote(0, 1, hex"010101", proofOf(hex"010101"));
+        externalRound.vote(999, 1, hex"010101", proofOf(hex"010101"));
         vm.stopPrank();
         assertEq(externalRound.registrationReceiptCount(), 2);
         assertEq(externalRound.nonceOf(0), 1);
@@ -388,20 +397,25 @@ contract SignedBallotsTest is Fixture {
         ballots.mint(bob, 4);
         vm.prank(bob);
         vm.expectRevert();
-        ballots.addInitiative(address(0xB00), 1e6);
+        ballots.addInitiative(address(0xB00), 1e6, false, 0);
         ballots.setBaseURI("ipfs://badges/");
         assertEq(ballots.tokenURI(1), "ipfs://badges/1");
         vm.warp(start);
         vm.expectRevert(SignedBallots.ConfigurationFrozen.selector);
-        ballots.addInitiative(address(0xB00), 1e6);
+        ballots.setInitiative(0, INITIATIVE_A, 1e6, false, 0);
         vm.expectRevert(SignedBallots.ConfigurationFrozen.selector);
-        ballots.setInitiative(0, INITIATIVE_A, 1e6);
+        ballots.setIndependentTiers(3);
+        // New projects may still join during the vote, outside the quiet-ending spans.
+        vm.warp(ballots.firstTallyAt(0));
+        vm.expectRevert(SignedBallots.AddingClosed.selector);
+        ballots.addInitiative(address(0xB00), 1e6, false, 0);
+        vm.warp(start);
     }
 
     function test_startAndHardDeadlineBoundAllReceiptPaths() public {
         vm.prank(alice);
         vm.expectRevert(SignedBallots.VotingNotStarted.selector);
-        ballots.vote(1, 1, ranks);
+        ballots.vote(1, 1, ranks, proofOf(ranks));
         vm.warp(start);
         vm.expectRevert(SignedBallots.NoVotes.selector);
         ballots.record(new SignedBallots.Vote[](0));
@@ -411,9 +425,9 @@ contract SignedBallotsTest is Fixture {
         ballots.record(votes);
         vm.prank(alice);
         vm.expectRevert(SignedBallots.VotingClosed.selector);
-        ballots.vote(1, 1, ranks);
+        ballots.vote(1, 1, ranks, proofOf(ranks));
         vm.expectRevert(SignedBallots.VotingClosed.selector);
-        ballots.recordFor(1, 1, ranks, "");
+        ballots.recordFor(1, 1, ranks, "", proofOf(ranks));
         attachBlob();
         vm.expectRevert(SignedBallots.VotingClosed.selector);
         ballots.recordBlob(0, blobVotes(votes));

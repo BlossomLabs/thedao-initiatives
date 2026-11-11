@@ -93,7 +93,9 @@ it("Tier-S shows how far ahead it is", () => {
   expect(button).toHaveClass("text-vote");
   fireEvent.focus(button);
   const tip = screen.getByRole("tooltip");
-  expect(tip).toHaveTextContent("Could lose this much backing and still be funded in Tier-S.");
+  expect(tip).toHaveTextContent(
+    "Its backers could give this much less between them and it would still be funded in Tier-S.",
+  );
   expect(screen.getByText("Tier-S")).toHaveClass("whitespace-nowrap");
   fireEvent.keyDown(button, { key: "Escape" });
   expect(screen.queryByRole("tooltip")).toBeNull();

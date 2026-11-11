@@ -52,14 +52,15 @@ function HoverTip(
   );
 }
 
-/** How far ahead a Tier-S initiative is: the backing it could lose and still be funded in
- * Tier-S. `lead` is micro-USD; under one $1K step there is nothing to say. */
+/** How far ahead a Tier-S initiative is: how much less its backers could give, between
+ * them, and it would still be funded in Tier-S. `lead` is micro-USD; under one $1K step
+ * there is nothing to say. */
 export function LeadFigure({ lead }: { lead: string }) {
   const amount = dollars(lead);
   if (amount < 1000) return null;
   return (
     <HoverTip trigger={<>{usdShort(amount)} ahead</>} className="text-vote">
-      Could lose this much backing and still be funded in{" "}
+      Its backers could give this much less between them and it would still be funded in{" "}
       <span className="whitespace-nowrap">Tier-S</span>.
     </HoverTip>
   );

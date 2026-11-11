@@ -124,8 +124,8 @@ what would happen if it went in.
 5. **After the vote, each figure is judged at the settlement that decided it**, with the
    ballots, needs and remaining shares of that moment (the replay's inputs as that tier
    settled). Earlier tiers stay locked.
-6. **"Ahead" for Tier-S = backing it could lose** and still be funded in Tier-S, in $1K
-   steps rounded **down** (never overstates).
+6. **"Ahead" for Tier-S = how much less its backers could give** between them and it would still be funded in Tier-S, in $1K
+   steps rounded **down** (for a loss spread evenly; one backer pulling out can hurt more).
 7. **The figures show during the vote too**: Tier-S initiatives show their lead; the
    others keep their gap. The final result shows the same figures frozen at each settlement.
 

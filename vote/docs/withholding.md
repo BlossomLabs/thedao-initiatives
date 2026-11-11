@@ -2,6 +2,12 @@
 
 Oct 6, 2026 · @Sem
 
+> **Historical (11 November 2026).** The vote has no optional withholding choice and no
+> unplaced tail: anything a voter leaves unranked gets nothing from them, and their share of
+> it returns to TheDAO. Voter-facing text must say exactly that. Ballots also follow the
+> [ballot rules](../../docs/superpowers/specs/2026-11-11-ballot-rules-design.md) (minimum
+> size, Tier-S independence by affiliation).
+
 Design background and optional ballot behavior. See the [contract requirements](../README.md#contract-requirements)
 for the current round and the [published mechanism](../README.md#published-mechanism)
 for the default ballot behavior. References to "today" below describe the earlier baseline;

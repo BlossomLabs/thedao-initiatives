@@ -200,3 +200,9 @@ fixtures before those land; it does not ship to a real round until they do.
 - How the results code is shared between `/` and `/vote`.
 - Docs under `docs/superpowers/` and `comms/` that mention Devcon stay as history; they are not
   renamed.
+
+## Ballot rules
+
+Prefill from star ratings, the minimum ballot size, Tier-S independence by affiliation, the
+contract's proof, adding projects during the vote, pabutools paste and `/vote/llms.txt`:
+see [the ballot rules design](2026-11-11-ballot-rules-design.md).

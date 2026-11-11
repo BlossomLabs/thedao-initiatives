@@ -34,7 +34,7 @@ import { ruleMessage } from "~/lib/vote-rules-copy";
 import { useReviewIdentity } from "~/hooks/use-admin-ratings";
 import BallotRules from "~/components/vote/BallotRules";
 import PasteBallot from "~/components/vote/PasteBallot";
-import { checkBallot } from "../../../shared/vote/rules";
+import { checkBallot, emptyTierErrors } from "../../../shared/vote/rules";
 import { usd } from "~/lib/format";
 import { encodeBallot, type Tier } from "../../../shared/vote/ballot";
 import { ROUND, rulesRound } from "../../../shared/vote/manifest";
@@ -641,10 +641,17 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
         rulesRound(ROUND, BigInt(rv?.poolUsd ?? ROUND.poolUsd)),
       )
       : null;
-    const broken = Boolean(rules && !rules.ok);
+    // An enforced tier left empty: the bytes would read the next one in its place.
+    const empty = ROUND.ballotRules && placed > 0
+      ? emptyTierErrors(tiers, ROUND.independentTiers)
+      : [];
+    const errors = empty.length
+      ? [...empty, ...(rules?.errors.filter((e) => e.rule === "size") ?? [])]
+      : rules?.errors ?? [];
+    const broken = errors.length > 0;
     const rulesBox = broken && (
       <BallotRules
-        messages={rules!.errors.map((e) =>
+        messages={errors.map((e) =>
           ruleMessage(
             e,
             (i) => titles.get(ROUND.slugs[i]) ?? ROUND.slugs[i],

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { checkBallot, checkProof, findProof, type RulesRound, tiersOf } from "./rules";
+import {
+  checkBallot,
+  checkProof,
+  emptyTierErrors,
+  findProof,
+  type RulesRound,
+  tiersOf,
+} from "./rules";
 import fixtures from "./fixtures/ballot-rules.json";
 
 /** Six projects: 0 and 1 related to Seal, 5 an RFP. Pool 200. Tier-S enforced. */
@@ -124,5 +131,18 @@ describe("parity with the Python reference", () => {
       expect({ name: c.name, ok: r.ok, rules: r.errors.map((e) => e.rule), proof: r.proof })
         .toEqual({ name: c.name, ok: c.ok, rules: c.rules, proof: c.proof });
     }
+  });
+});
+
+describe("empty tiers by label", () => {
+  it("an enforced tier the voter left empty is an independence error (the chain can't see it)", () => {
+    expect(emptyTierErrors({ a: "A", b: "A", c: "A" }, 1)).toEqual([
+      { rule: "independent", tier: 0, count: 0, related: [] },
+    ]);
+    expect(emptyTierErrors({ a: "S", b: "B" }, 3)).toEqual([
+      { rule: "independent", tier: 1, count: 0, related: [] },
+    ]);
+    expect(emptyTierErrors({ a: "S", b: "A" }, 3)).toEqual([]);
+    expect(emptyTierErrors({ a: "S" }, 1)).toEqual([]);
   });
 });

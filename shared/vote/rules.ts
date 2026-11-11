@@ -149,3 +149,16 @@ export function checkProof(ballot: Uint8Array, round: RulesRound, proof: number[
       !related(round, a, b) && !related(round, a, c) && !related(round, b, c);
   });
 }
+
+/** What the bytes can't show: an enforced tier the voter left empty. On-chain ranks only
+ * keep groups, so an empty Tier-S makes Tier-A the first group (read as Tier-S); the
+ * spec makes such a ballot invalid, so the page refuses it by label. */
+export function emptyTierErrors(
+  tiers: Partial<Record<string, "S" | "A" | "B">>,
+  independentTiers: number,
+): RuleError[] {
+  const used = new Set(Object.values(tiers));
+  return ([0, 1] as const)
+    .filter((t) => (independentTiers >> t) & 1 && !used.has((["S", "A"] as const)[t]))
+    .map((tier) => ({ rule: "independent", tier, count: 0, related: [] }));
+}

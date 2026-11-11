@@ -935,3 +935,13 @@ it("ballot rules: after a failure, Send it yourself stays off while a rule is br
   await screen.findByRole("region", { name: "Ballot rules" });
   expect(screen.queryByRole("button", { name: "Send it yourself" })).toBeNull();
 });
+
+it("ballot rules: an empty Tier-S is refused, though the chain would read Tier-A as Tier-S", async () => {
+  round.ballotRules = true;
+  localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "A", beta: "A", gamma: "A" }));
+  await ballotWith(roundBody({ poolUsd: "500000000" }));
+  const box = await screen.findByRole("region", { name: "Ballot rules" });
+  expect(within(box).getByText("Tier-S needs at least 3 independent projects."))
+    .toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /send my ballot/i })).toBeDisabled();
+});

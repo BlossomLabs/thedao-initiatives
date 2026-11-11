@@ -1,8 +1,15 @@
-// Deploys a test SignedBallots round on Sepolia, sets it up, hands the admin
-// roles to sem-the-bee.eth and writes shared/vote/manifest.json.
+// Deploys a SignedBallots round, sets it up, hands the admin roles to
+// sem-the-bee.eth and writes shared/vote/manifest-data.ts.
 //
+// A test vote, on Sepolia, with paper codes and the board's initiatives:
 //   VOTE_RELAYER_KEY=0x… SEPOLIA_RPC_URL=https://… \
 //     deno task vote-deploy --issuer 0x… [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
+//
+// TheDAO's vote, on mainnet, counting the private voting badges; every flag is required
+// and every initiative in the slugs file needs its own Safe:
+//   VOTE_RELAYER_KEY=0x… MAINNET_RPC_URL=https://… \
+//     deno task vote-deploy --real --opens 2026-12-01T12:00:00Z --s-tally 2026-12-03T12:00:00Z \
+//       --pool-usd 1250000 --slugs round.txt
 //
 // The relayer key deploys and keeps only MINTER_ROLE; it is also the server's
 // sending key. Everything here must finish before opensAt (setup freezes then).
@@ -21,7 +28,8 @@ import {
   toBytes,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { sepolia } from "viem/chains";
+import { mainnet, sepolia } from "viem/chains";
+import { REVIEW_BADGE_CONTRACT } from "../api/config.ts";
 import { SIGNED_BALLOTS_ABI } from "../shared/vote/abi.ts";
 import type { VoteManifest } from "../shared/vote/manifest.ts";
 
@@ -43,12 +51,18 @@ export type PlannedInitiative = { slug: string; account: `0x${string}`; askUsd: 
 const placeholder = (slug: string) =>
   getAddress(slice(keccak256(toBytes(`test-round:${slug}`)), 12));
 
-/** On-chain initiatives in board order: the Safe when set and unused, else a
- * deterministic placeholder (the contract needs unique accounts). */
-export function planInitiatives(cards: BoardCard[]): PlannedInitiative[] {
+/** On-chain initiatives in the given order: the Safe when set and unused, else (test
+ * votes only) a deterministic placeholder, since the contract needs unique accounts.
+ * The real vote pays out to these accounts, so a missing or shared Safe stops it. */
+export function planInitiatives(
+  cards: BoardCard[],
+  { real = false }: { real?: boolean } = {},
+): PlannedInitiative[] {
   const seen = new Set<string>();
   return cards.map((c) => {
     const safe = c.safeAddress && isAddress(c.safeAddress) ? getAddress(c.safeAddress) : null;
+    if (real && !safe) throw new Error(`missing Safe: ${c.slug}`);
+    if (real && seen.has(safe!.toLowerCase())) throw new Error(`Safe used twice: ${c.slug}`);
     const account = safe && !seen.has(safe.toLowerCase()) ? safe : placeholder(c.slug);
     seen.add(account.toLowerCase());
     return { slug: c.slug, account, askUsd: BigInt(Math.round(c.goalUsd * 1e6)) };
@@ -66,27 +80,112 @@ export function voteSchedule(now: number) {
   };
 }
 
+export type Schedule = ReturnType<typeof voteSchedule>;
+
+/** The real vote: S's first tally where the team sets it; A and B follow once the
+ * tier above can no longer be running. */
+export function realSchedule(opensAt: number, sTally: number): Schedule {
+  return {
+    opensAt,
+    initialWindow: INITIAL_WINDOW,
+    firstTallyAt: [sTally, sTally + TIER_MAX, sTally + 2 * TIER_MAX],
+    maxWindows: MAX_WINDOWS,
+  };
+}
+
+export type RealArgs = { opensAt: number; sTally: number; poolUsd: bigint; slugsFile: string };
+
+/** `--real` takes no defaults: the opening, S's first tally (ISO dates), the pool in
+ * whole dollars and a file of initiative slugs, one per line, in ballot order. */
+export function parseRealArgs(
+  a: { opens?: string; "s-tally"?: string; "pool-usd"?: string; slugs?: string },
+): RealArgs {
+  const need = (flag: keyof typeof a) => {
+    const v = a[flag]?.trim();
+    if (!v) throw new Error(`--${flag} is required with --real`);
+    return v;
+  };
+  const date = (flag: "opens" | "s-tally") => {
+    const t = Date.parse(need(flag));
+    if (!Number.isFinite(t)) throw new Error(`--${flag} is not a date`);
+    return Math.floor(t / 1000);
+  };
+  const opensAt = date("opens");
+  const sTally = date("s-tally");
+  if (sTally <= opensAt) throw new Error("--s-tally must come after --opens");
+  const dollars = need("pool-usd").replace(/[,_\s]/g, "");
+  if (!/^\d+$/.test(dollars)) throw new Error("--pool-usd must be whole dollars");
+  return { opensAt, sTally, poolUsd: BigInt(dollars) * 1_000_000n, slugsFile: need("slugs") };
+}
+
+/** What the site reads (shared/vote/manifest-data.ts). */
+export function manifestFor(
+  r: {
+    kind: "test" | "real";
+    contract: `0x${string}`;
+    deployBlock: number;
+    schedule: Schedule;
+    poolUsd: bigint;
+    issuer?: `0x${string}`;
+    slugs: string[];
+  },
+): VoteManifest {
+  return {
+    kind: r.kind,
+    chainId: r.kind === "real" ? mainnet.id : sepolia.id,
+    contract: r.contract,
+    deployBlock: r.deployBlock,
+    opensAt: r.schedule.opensAt,
+    // Until the app follows the quiet ending, the site closes at S's first tally.
+    closesAt: r.schedule.firstTallyAt[0],
+    poolUsd: r.poolUsd.toString(),
+    ...(r.kind === "real" ? { badge: REVIEW_BADGE_CONTRACT } : { issuer: getAddress(r.issuer!) }),
+    slugs: r.slugs,
+  };
+}
+
 async function main() {
-  const args = parseArgs(Deno.args, { string: ["issuer", "board", "rpc", "out"] });
+  const args = parseArgs(Deno.args, {
+    boolean: ["real"],
+    string: ["issuer", "board", "rpc", "out", "opens", "s-tally", "pool-usd", "slugs"],
+  });
+  const real = args.real ? parseRealArgs(args) : null;
+  const chain = real ? mainnet : sepolia;
   const key = Deno.env.get("VOTE_RELAYER_KEY")?.trim() as Hex | undefined;
   if (!key || !/^0x[0-9a-fA-F]{64}$/.test(key)) throw new Error("VOTE_RELAYER_KEY is required");
   const issuer = args.issuer;
-  if (!issuer || !isAddress(issuer)) throw new Error("--issuer <address> is required");
-  const rpc = args.rpc ?? Deno.env.get("SEPOLIA_RPC_URL");
-  if (!rpc) throw new Error("--rpc or SEPOLIA_RPC_URL is required");
+  if (!real && (!issuer || !isAddress(issuer))) {
+    throw new Error("--issuer <address> is required");
+  }
+  const rpcEnv = real ? "MAINNET_RPC_URL" : "SEPOLIA_RPC_URL";
+  const rpc = args.rpc ?? Deno.env.get(rpcEnv);
+  if (!rpc) throw new Error(`--rpc or ${rpcEnv} is required`);
   const boardUrl = `${
     (args.board ?? "https://initiatives.thedao.fund").replace(/\/+$/, "")
   }/api/board`;
 
   const account = privateKeyToAccount(key);
-  // Public Sepolia RPCs are slow at times: long timeouts, several retries.
+  // Public RPCs are slow at times: long timeouts, several retries.
   const transport = http(rpc, { timeout: 60_000, retryCount: 6, retryDelay: 1_000 });
-  const pub = createPublicClient({ chain: sepolia, transport });
-  const wallet = createWalletClient({ account, chain: sepolia, transport });
-  if ((await pub.getChainId()) !== sepolia.id) throw new Error("RPC is not Sepolia");
+  const pub = createPublicClient({ chain, transport });
+  const wallet = createWalletClient({ account, chain, transport });
+  if ((await pub.getChainId()) !== chain.id) throw new Error(`RPC is not ${chain.name}`);
 
   const board = await (await fetch(boardUrl)).json() as { cards: { initiative: BoardCard }[] };
-  const plan = planInitiatives(board.cards.map((c) => c.initiative));
+  let cards = board.cards.map((c) => c.initiative);
+  if (real) {
+    // The real vote's initiatives, in the file's order (ballot byte i = line i).
+    const slugs = (await Deno.readTextFile(real.slugsFile)).split("\n").map((l) => l.trim())
+      .filter(Boolean);
+    const bySlug = new Map(cards.map((c) => [c.slug, c]));
+    cards = slugs.map((slug) => {
+      const c = bySlug.get(slug);
+      if (!c) throw new Error(`not on the board: ${slug}`);
+      return c;
+    });
+  }
+  const plan = planInitiatives(cards, { real: Boolean(real) });
+  const poolUsd = real ? real.poolUsd : POOL_USD;
   console.log(`${plan.length} initiatives from ${boardUrl}`);
 
   const artifact = JSON.parse(
@@ -95,7 +194,10 @@ async function main() {
     ),
   ) as { bytecode: { object: Hex } };
   const block = await pub.getBlock();
-  const s = voteSchedule(Number(block.timestamp));
+  const s = real ? realSchedule(real.opensAt, real.sTally) : voteSchedule(Number(block.timestamp));
+  if (real && Number(block.timestamp) + SETUP_MINUTES * 60 > s.opensAt) {
+    throw new Error(`--opens must leave ${SETUP_MINUTES} minutes for the setup`);
+  }
   const wait = async (hash: Hex, what: string) => {
     const r = await pub.waitForTransactionReceipt({ hash });
     if (r.status !== "success") throw new Error(`${what} reverted: ${hash}`);
@@ -107,9 +209,10 @@ async function main() {
     bytecode: artifact.bytecode.object,
     args: [
       account.address,
-      "0x0000000000000000000000000000000000000000",
-      "TheDAO test vote",
-      "ROUND",
+      // The real vote counts TheDAO's voting badges; a test vote mints its own.
+      real ? REVIEW_BADGE_CONTRACT : "0x0000000000000000000000000000000000000000",
+      real ? "TheDAO vote" : "TheDAO test vote",
+      real ? "VOTE" : "TESTVOTE",
       {
         opensAt: BigInt(s.opensAt),
         initialWindow: BigInt(s.initialWindow),
@@ -148,7 +251,7 @@ async function main() {
   });
   const calls = [
     ...plan.map((p) => step("addInitiative", [p.account, p.askUsd])),
-    step("setPoolUsd", [POOL_USD]),
+    step("setPoolUsd", [poolUsd]),
     ...handed.map((r) => step("grantRole", [r, ADMIN])),
     // The default admin goes last.
     ...[...handed.slice(1), blob, handed[0]].map((r) => step("renounceRole", [r, account.address])),
@@ -228,7 +331,8 @@ async function main() {
       [handed[1], ADMIN, true],
       [handed[0], account.address, false],
       [handed[1], account.address, false],
-      [minter, account.address, true],
+      // A test vote's relayer mints the paper-code badges.
+      ...(real ? [] : [[minter, account.address, true] as const]),
     ] as const
   ) {
     const has = await pub.readContract({
@@ -244,7 +348,7 @@ async function main() {
     abi: SIGNED_BALLOTS_ABI,
     functionName: "poolUsd",
   });
-  if (pool !== POOL_USD) throw new Error(`poolUsd ${pool} != ${POOL_USD}`);
+  if (pool !== poolUsd) throw new Error(`poolUsd ${pool} != ${poolUsd}`);
 
   const now = Number((await pub.getBlock()).timestamp);
   if (now >= s.opensAt) throw new Error("Setup ran past opensAt: redeploy (the round is frozen).");
@@ -255,18 +359,15 @@ async function main() {
   });
   if (count !== BigInt(plan.length)) throw new Error(`initiativeCount ${count} != ${plan.length}`);
 
-  const manifest: VoteManifest = {
-    kind: "test",
-    chainId: sepolia.id,
+  const manifest = manifestFor({
+    kind: real ? "real" : "test",
     contract,
     deployBlock: Number(deployed.blockNumber),
-    opensAt: s.opensAt,
-    // Until the app follows the quiet ending, the site closes at S's first tally.
-    closesAt: s.firstTallyAt[0],
-    poolUsd: POOL_USD.toString(),
-    issuer: getAddress(issuer),
+    schedule: s,
+    poolUsd,
+    issuer: issuer as `0x${string}` | undefined,
     slugs: plan.map((p) => p.slug),
-  };
+  });
   const out = args.out ?? new URL("../shared/vote/manifest-data.ts", import.meta.url).pathname;
   await Deno.writeTextFile(
     out,

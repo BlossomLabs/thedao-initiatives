@@ -1,6 +1,8 @@
 import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import VoteSettings from "~/components/admin/VoteSettings";
+import VoteRelayer from "~/components/admin/VoteRelayer";
+import { roundDeployed } from "../../shared/vote/manifest";
 import { generateMeta } from "~/utils/meta";
 
 export function meta() {
@@ -19,6 +21,7 @@ export default function VotePage() {
         When an initiative can go to TheDAO's vote, and whether the site shows it.
       </p>
       <VoteSettings />
+      {roundDeployed() && <VoteRelayer />}
     </PageMain>
   );
 }

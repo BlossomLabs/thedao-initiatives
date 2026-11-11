@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { effectiveRanks } from "../../vote/shared/ranks";
 import { type ChainInputs, chainTally } from "./chain";
-import { nextTiers, STEP } from "./next-tier";
+import { nextTiers, nextTiersAsync, STEP } from "./next-tier";
 
 const K = STEP; // $1K in micro-USD
 
@@ -122,7 +122,8 @@ describe("the gap to the next tier", () => {
     expect(nextTiers(inp, 0).get(0)!.gap).toBe(26n * K);
   });
 
-  it("fast enough", () => {
+  /** 40 initiatives, 200 voters, a $300K pool. */
+  const large = () => {
     const m = 40, n = 200;
     const costsK = Array.from({ length: m }, (_, c) => 5 + ((c * 37) % 23));
     const weightsK = Array.from({ length: n }, (_, v) => 1 + ((v * 11) % 7));
@@ -130,11 +131,41 @@ describe("the gap to the next tier", () => {
       { length: n },
       (_, v) => Array.from({ length: m }, (_, c) => 1 + ((v * 7 + c * 13) % 3)),
     );
-    const inp = inputs(costsK, weightsK, ballots, 300);
-    const t = performance.now();
-    const got = nextTiers(inp, 0);
-    const ms = performance.now() - t;
+    return inputs(costsK, weightsK, ballots, 300);
+  };
+
+  it("runs the tally a bounded number of times", () => {
+    const inp = large();
+    let runs = 0;
+    const got = nextTiers(inp, 0, (...a) => (runs++, chainTally(...a)));
     expect(got.size).toBeGreaterThan(0);
-    expect(ms).toBeLessThan(500);
+    const hiSteps = 300;
+    expect(runs).toBeGreaterThan(0);
+    expect(runs).toBeLessThanOrEqual(inp.m * (Math.ceil(Math.log2(hiSteps)) + 2));
+  });
+
+  it("every gap found reaches its tier", () => {
+    const inp = large();
+    for (const [c, e] of nextTiers(inp, 0)) {
+      if (e.gap === null) continue;
+      const tier = ["S", "A", "B"].indexOf(e.tier);
+      expect(tierWith(inp, c, e.gap / K)).toBeLessThanOrEqual(tier);
+    }
+  });
+
+  it("a need larger than what's left of the pool is out of reach without a search", () => {
+    const inp = inputs([150, 40], [40], [[1, 2]]);
+    let backing0 = 0;
+    const got = nextTiers(inp, 0, (x, first, upTo) => {
+      if (x.voters.at(-1) === "phantom" && x.ranks.at(-1)![0] === 1) backing0++;
+      return chainTally(x, first, upTo);
+    });
+    expect(got.get(0)!.gap).toBe(null);
+    expect(backing0).toBe(0);
+  });
+
+  it("the async variant gives the same result", async () => {
+    const inp = large();
+    expect(await nextTiersAsync(inp, 0)).toEqual(nextTiers(inp, 0));
   });
 });

@@ -173,8 +173,16 @@ const inputsParts = (inp: ChainInputs) => [
   [...inp.done].sort((a, b) => a - b),
 ];
 
+/** The what-if search's own version, part of every cache digest: when the way gaps, leads or
+ * final figures are computed changes, bump it, and figures cached under the old code are
+ * computed again instead of being served. */
+export const WHAT_IFS_VERSION = 2;
+
 async function digest(parts: unknown[]) {
-  const text = JSON.stringify(parts, (_, v) => typeof v === "bigint" ? v.toString() : v);
+  const text = JSON.stringify(
+    [WHAT_IFS_VERSION, ...parts],
+    (_, v) => typeof v === "bigint" ? v.toString() : v,
+  );
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(hash)].map((x) => x.toString(16).padStart(2, "0")).join("");
 }

@@ -173,6 +173,36 @@ describe("quiet-ending replay", () => {
     expect(s.rejected).toEqual([{ tokenId: "a", nonce: 0, reason: "tier_settled" }]);
   });
 
+  it("each settlement keeps its inputs", () => {
+    const st = run(base(), T + 14000);
+    expect(st.tiers[0].status).toBe("settled");
+    expect(st.tiers[1].status).toBe("settled");
+    for (const t of [0, 1]) {
+      const tier = st.tiers[t];
+      const again = chainTally(st.settleInputs[t]!, t, t + 1)[0].order;
+      expect(again).toEqual(tier.status === "settled" ? tier.funded : null);
+    }
+    expect(st.tiers[2].status).not.toBe("settled");
+    expect(st.settleInputs[2]).toBeNull();
+  });
+
+  it("settle inputs are kept when the settlement comes from a snapshot", () => {
+    const snapshot = {
+      tier: "S" as const,
+      at: T + 3600,
+      forced: false,
+      funded: [1],
+      awards: new Map([[1, 99n]]),
+      shares: new Map([[1, new Map([["a", 99n]])]]),
+    };
+    const st = run(base(), T + 3600, { snapshots: [snapshot] });
+    const i = st.settleInputs[0]!;
+    expect(i).not.toBeNull();
+    expect(i.voters).toEqual(["a", "b"]);
+    expect(i.spent).toBe(0n);
+    expect(i.costs).toEqual([150n, 150n]);
+  });
+
   it("kept settle needs pin the time once final", () => {
     const s = run(
       [...base(), r("b", T + 100, [X, 1]), r("a", T + 3700, [X, 1])],

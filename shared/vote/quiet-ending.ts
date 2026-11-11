@@ -70,6 +70,9 @@ export type RoundState = {
   liveInputs: ChainInputs | null;
   /** How many tiers have settled: the live tally starts at this tier. */
   firstOpen: number;
+  /** The inputs each tier settled from (index = tier; null until it settles): what the
+   * tally saw at that moment, to ask later what the settlement would have taken. */
+  settleInputs: (ChainInputs | null)[];
 };
 
 const TIERS: Tier[] = ["S", "A", "B"];
@@ -207,10 +210,14 @@ export function replay(
   /** Stages `first` up to (not including) `upTo`; the comparisons need only the first. */
   const tally = (first: number, costs: bigint[] = needs, upTo = TIERS.length) =>
     chainTally(inputs(costs), first, upTo);
+  const settleInputs: (ChainInputs | null)[] = TIERS.map(() => null);
   const settle = (t: number, at: number, forced: boolean) => {
+    const costs = input.settleNeeds?.[TIERS[t]]?.needs ?? needs;
+    // Kept before the snapshot return: a frozen settlement still has the state it was made in.
+    settleInputs[t] = inputs(costs);
     const snap = input.snapshots?.find((x) => x.tier === TIERS[t]);
     if (snap) return settled.push(snap);
-    const { order, shares } = tally(t, input.settleNeeds?.[TIERS[t]]?.needs ?? needs, t + 1)[0];
+    const { order, shares } = tally(t, costs, t + 1)[0];
     const awards = new Map(
       order.map((c) => [c, [...shares.get(c)!.values()].reduce((a, b) => a + b, 0n)] as const),
     );
@@ -307,6 +314,7 @@ export function replay(
     live,
     liveInputs: firstOpen < TIERS.length ? inputs(needs) : null,
     firstOpen,
+    settleInputs,
   };
 }
 

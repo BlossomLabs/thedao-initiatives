@@ -333,8 +333,8 @@ it("once B settles, the final result: spent of the pool, a section per tier", as
   });
   expect(hero(/\$80k of \$100k demo pool spent/)).toBeInTheDocument();
   // Each tier heads its own section, with its count and what the vote gave it.
-  expect(heading("Tier-S")).toHaveTextContent("Tier-S1· $30,000 from the vote");
-  expect(heading("Tier-A")).toHaveTextContent("Tier-A1· $50,000 from the vote");
+  expect(heading("Tier-S")).toHaveTextContent("Tier-S$30,000 allocated to 1 initiative");
+  expect(heading("Tier-A")).toHaveTextContent("Tier-A$50,000 allocated to 1 initiative");
   // Tier-B funded nothing: no section, the hero says so.
   expect(heading("Tier-B")).toBeNull();
   expect(screen.getByText("Tier-B: no initiatives funded")).toBeInTheDocument();
@@ -343,7 +343,7 @@ it("once B settles, the final result: spent of the pool, a section per tier", as
 
 it("the final result: tier sections, then not funded", async () => {
   await showClosed();
-  expect(heading("Tier-S")).toHaveTextContent("Tier-S1");
+  expect(heading("Tier-S")).toHaveTextContent("Tier-S$60,000 allocated to 1 initiative");
   expect(heading("Not funded")).toHaveTextContent("Not funded1");
   // The list's header names the final amount and no type column.
   expect(screen.getAllByText("Final").length).toBeGreaterThan(0);

@@ -221,8 +221,9 @@ export default function BoardPage(
           heading: (
             <>
               {tierName(t)}
-              <span className="small dim tnum">{rows.length}</span>
-              <span className="small dim tnum">· {usd(fromVote)} from the vote</span>
+              <span className="small dim tnum">
+                {usd(fromVote)} allocated to {rows.length} initiative{rows.length === 1 ? "" : "s"}
+              </span>
             </>
           ),
         };

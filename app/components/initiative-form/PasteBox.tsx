@@ -128,7 +128,7 @@ export const PASTE_PLACEHOLDER = [
   "Paste the draft your AI wrote. It sorts as soon as it lands. The shape it reads:",
   "",
   "## Title",
-  'One line, no "RFP:" prefix',
+  "RFP: one line, or for a grant the product or team name, then a colon",
   "",
   "## Categories",
   "OpSec",

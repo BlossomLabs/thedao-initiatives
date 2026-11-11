@@ -18,6 +18,11 @@ export interface VoteChain {
   balanceOf(a: Hex): Promise<bigint>;
   /** The badge an account holds now (the latest one sent to it that it still owns). */
   badgeOf(a: Hex): Promise<bigint | null>;
+  /** Every badge the account can vote with: the voting badges it holds in
+   * the real round, its one round badge in a test round. */
+  idsOf(a: Hex): Promise<number[]>;
+  /** The relayer's address, or null when no relayer key is configured. */
+  relayerAddress(): Hex | null;
   /** The account's code: "0x" for a plain EOA, 0xef0100… for an EIP-7702 delegation. */
   codeOf(a: Hex): Promise<Hex>;
   /** Would the relayer's mint(to, n) succeed (simulated)? */
@@ -72,6 +77,9 @@ export function createVoteChain(
   rpcUrl: string,
   relayerKey: Hex | null,
   transport: Transport = http(rpcUrl),
+  /** The real round: the voting-badge ids an address holds (an explorer index, then
+   * fresh ownerOf checks; api/chain/reviewer.ts). */
+  votingBadgeIds?: (a: Hex) => Promise<string[]>,
 ): VoteChain {
   const chain = voteChain(m);
   const pub = createPublicClient({ chain, transport }) as PublicClient;
@@ -150,6 +158,15 @@ export function createVoteChain(
         // limit keeps a gas-hungry delegate from draining the relayer.
         ...(call.fn === "mint" ? { gas: MINT_GAS } : {}),
       });
+    },
+    relayerAddress: () => account?.address ?? null,
+    async idsOf(a) {
+      if (m.kind === "real") {
+        if (!votingBadgeIds) throw new Error("voting badge lookup is not configured");
+        return (await votingBadgeIds(a)).map(Number);
+      }
+      const n = await this.badgeOf(a);
+      return n === null ? [] : [Number(n)];
     },
     async badgeOf(a) {
       // No enumeration on the contract: the Transfer logs to the account, newest first,

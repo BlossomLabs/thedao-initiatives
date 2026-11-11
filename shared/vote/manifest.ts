@@ -26,11 +26,14 @@ export const SEPOLIA_CHAIN_ID = 11155111;
 export const MAINNET_CHAIN_ID = 1;
 
 /** Throws on a manifest the site can't run: a real round without its badge, a test
- * round without its code issuer. */
+ * round without its code issuer or off Sepolia (its badges and gas drip are free). */
 export function checkManifest(m: VoteManifest): VoteManifest {
   if (m.kind === "real" && !m.badge) throw new Error("vote manifest: a real round needs a badge");
   if (m.kind === "test" && !m.issuer) {
     throw new Error("vote manifest: a test round needs an issuer");
+  }
+  if (m.kind === "test" && m.chainId !== SEPOLIA_CHAIN_ID) {
+    throw new Error("vote manifest: a test round runs on Sepolia");
   }
   return m;
 }

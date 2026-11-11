@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { privateKeyToAccount } from "viem/accounts";
 import { bytesToHex, type Hex, parseSignature, signatureToCompactSignature } from "viem";
-import { harness, j, PLAIN } from "./app-helpers.ts";
+import { ADMIN, harness, j, PLAIN } from "./app-helpers.ts";
 import { codeMessage, formatCode } from "../../shared/vote/code.ts";
 import { encodeBallot } from "../../shared/vote/ballot.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
@@ -25,6 +25,20 @@ const manifest: VoteManifest = {
   closesAt: NOW + 3600,
   poolUsd: "913244000000",
   issuer: ISSUER.address,
+  slugs: ["a", "b", "c"],
+};
+
+const RELAYER = "0x9000000000000000000000000000000000000009" as const;
+const BADGE = "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C" as const;
+const real: VoteManifest = {
+  kind: "real",
+  chainId: 1,
+  contract: "0x1000000000000000000000000000000000000001",
+  badge: BADGE,
+  deployBlock: 1,
+  opensAt: NOW - 3600,
+  closesAt: NOW + 3600,
+  poolUsd: "913244000000",
   slugs: ["a", "b", "c"],
 };
 
@@ -53,6 +67,8 @@ function fakeChain() {
     /** What the RPC says the relayer's pending nonce is (may lag). */
     chainNonce: 0,
     nonces_used: [] as number[],
+    /** Voting-badge ids per lowercase address (the real round's index lookup). */
+    badges: new Map<string, number[]>(),
   };
   const chain: VoteChain = {
     ownerOf: (n) => Promise.resolve(state.owners.get(n) ?? null),
@@ -62,6 +78,13 @@ function fakeChain() {
           [...state.owners.values()].filter((o) => o.toLowerCase() === a.toLowerCase()).length,
         ),
       ),
+    idsOf: (a) =>
+      Promise.resolve(
+        state.badges.get(a.toLowerCase()) ??
+          [...state.owners].filter(([, o]) => o.toLowerCase() === a.toLowerCase())
+            .map(([n]) => Number(n)),
+      ),
+    relayerAddress: () => RELAYER,
     badgeOf: (a) =>
       Promise.resolve(
         [...state.owners].find(([, o]) => o.toLowerCase() === a.toLowerCase())?.[0] ?? null,
@@ -90,10 +113,12 @@ function fakeChain() {
   return { state, chain };
 }
 
-async function setup() {
+async function setup(m: VoteManifest = manifest) {
   const h = await harness();
   const fake = fakeChain();
-  h.deps.vote = { chain: fake.chain, manifest };
+  // The relayer has gas unless a test says otherwise.
+  fake.state.balances.set(RELAYER, 10n ** 18n);
+  h.deps.vote = { chain: fake.chain, manifest: m };
   h.clock.now = NOW;
   return { h, ...fake };
 }
@@ -106,9 +131,10 @@ async function signedBallot(
   tokenId: bigint,
   nonce: bigint,
   ballot: Hex,
+  m: VoteManifest = manifest,
 ) {
   const signature = await signer.signTypedData(
-    voteTypedData(manifest, tokenId, VOTER.address, nonce, ballot),
+    voteTypedData(m, tokenId, VOTER.address, nonce, ballot),
   );
   return { tokenId: tokenId.toString(), nonce: nonce.toString(), ballot, signature };
 }
@@ -145,13 +171,93 @@ Deno.test("vote round code: mangled or foreign codes are a 400 bad_code, never a
   h.close();
 });
 
-Deno.test("vote round mine: the signed-in account's badge, or null; needs a session", async () => {
+Deno.test("vote round mine: the signed-in account's badges, or none; needs a session", async () => {
   const { h, state } = await setup();
   assertEquals((await h.req("/api/vote/mine")).status, 401);
   const token = await h.mint(PLAIN);
-  assertEquals(await j(await h.req("/api/vote/mine", { token })), { n: null });
+  assertEquals(await j(await h.req("/api/vote/mine", { token })), { ids: [] });
   state.owners.set(17n, PLAIN);
-  assertEquals(await j(await h.req("/api/vote/mine", { token })), { n: 17 });
+  assertEquals(await j(await h.req("/api/vote/mine", { token })), { ids: [17] });
+  h.close();
+});
+
+Deno.test("real round mine: every voting badge the account holds, in order", async () => {
+  const { h, state } = await setup(real);
+  state.badges.set(PLAIN.toLowerCase(), [40, 12]);
+  const token = await h.mint(PLAIN);
+  assertEquals(await j(await h.req("/api/vote/mine", { token })), { ids: [12, 40] });
+  h.close();
+});
+
+Deno.test("real round: no paper codes, no claims, no gas drip", async () => {
+  const { h, state } = await setup(real);
+  const token = await h.mint(PLAIN);
+  state.owners.set(17n, PLAIN);
+  const c = await code(1);
+  for (
+    const res of [
+      await h.req(`/api/vote/code/${c}`),
+      await h.req("/api/vote/claim", { method: "POST", token, json: { code: c } }),
+      await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } }),
+    ]
+  ) assertEquals([res.status, (await j(res)).code], [404, "off"]);
+  assertEquals(state.sent.length, 0);
+  h.close();
+});
+
+Deno.test("real round ballot: the badge's owner votes; another wallet's signature is refused", async () => {
+  const { h, state } = await setup(real);
+  state.owners.set(12n, VOTER.address);
+  const ok = await h.req("/api/vote/ballot", {
+    method: "POST",
+    json: await signedBallot(VOTER, 12n, 1n, BALLOT, real),
+  });
+  assertEquals(ok.status, 200);
+  const bad = await h.req("/api/vote/ballot", {
+    method: "POST",
+    json: await signedBallot(OTHER, 12n, 1n, BALLOT, real),
+  });
+  assertEquals([bad.status, (await j(bad)).code], [401, "bad_signature"]);
+  h.close();
+});
+
+Deno.test("real round ballot: the relay pays for at most 5 ballots per badge", async () => {
+  const { h, state } = await setup(real);
+  state.owners.set(12n, VOTER.address);
+  for (let i = 1; i <= 5; i++) {
+    const res = await h.req("/api/vote/ballot", {
+      method: "POST",
+      json: await signedBallot(VOTER, 12n, BigInt(i), BALLOT, real),
+    });
+    assertEquals(res.status, 200, `relay ${i}`);
+    state.nonces.set(12n, BigInt(i));
+  }
+  const over = await h.req("/api/vote/ballot", {
+    method: "POST",
+    json: await signedBallot(VOTER, 12n, 6n, BALLOT, real),
+  });
+  assertEquals([over.status, (await j(over)).code], [429, "relay_limit"]);
+  h.close();
+});
+
+Deno.test("real round ballot: a relayer low on gas says to send it yourself", async () => {
+  const { h, state } = await setup(real);
+  state.owners.set(12n, VOTER.address);
+  state.balances.set(RELAYER, 0n);
+  const res = await h.req("/api/vote/ballot", {
+    method: "POST",
+    json: await signedBallot(VOTER, 12n, 1n, BALLOT, real),
+  });
+  assertEquals([res.status, (await j(res)).code], [503, "relay_low"]);
+  assertEquals(state.sent.length, 0);
+  h.close();
+});
+
+Deno.test("vote relayer: admins see its address and balance; nobody else", async () => {
+  const { h } = await setup(real);
+  assertEquals((await h.req("/api/vote/relayer", { token: await h.mint(PLAIN) })).status, 403);
+  const res = await h.req("/api/vote/relayer", { token: await h.mint(ADMIN, true) });
+  assertEquals(await j(res), { address: RELAYER, balanceWei: (10n ** 18n).toString(), chainId: 1 });
   h.close();
 });
 

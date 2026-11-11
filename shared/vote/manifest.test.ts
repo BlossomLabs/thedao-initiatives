@@ -31,4 +31,7 @@ describe("round manifest", () => {
     expect(() => checkManifest({ ...base, issuer: undefined })).toThrow(/issuer/);
     expect(() => checkManifest(base)).not.toThrow();
   });
+  it("a test round never runs on mainnet (its badges and gas drip are free)", () => {
+    expect(() => checkManifest({ ...base, chainId: 1 })).toThrow(/Sepolia/);
+  });
 });

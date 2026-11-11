@@ -15,6 +15,7 @@ import { ALWAYS_ENFORCED_RATE_LIMITS, BADGE_CONTRACT, CURATOR_ADDRESSES } from "
 import type { Deps } from "./middleware/context.ts";
 import { createAdmins } from "./services/admins.ts";
 import { createVoteChain } from "./services/vote-chain.ts";
+import { reviewTokenIds } from "./chain/reviewer.ts";
 import { MAINNET_CHAIN_ID, ROUND, roundDeployed } from "../shared/vote/manifest.ts";
 import { createStaticSite, type SiteOptions } from "./site.ts";
 
@@ -84,6 +85,8 @@ export async function createServer(siteOptions?: SiteOptions) {
         /^0x[0-9a-fA-F]{64}$/.test(config.voteRelayerKey)
           ? config.voteRelayerKey as `0x${string}`
           : null,
+        undefined,
+        (a) => reviewTokenIds(chain.rpc, a, fetch),
       ),
     },
   };

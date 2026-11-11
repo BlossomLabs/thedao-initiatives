@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { type Hex, hexToBytes, isHex, verifyTypedData } from "viem";
 import type { Deps, Vars } from "../middleware/context.ts";
-import { requireAuth } from "../middleware/auth.ts";
+import { requireAdmin, requireAuth } from "../middleware/auth.ts";
 import { jsonBody } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
 import { verifyCode } from "../../shared/vote/code.ts";
@@ -16,8 +16,11 @@ const PENDING_MS = 10 * 60_000;
 const LEASE_MS = 120_000;
 /** A relayed tx the node has never heard of this long after sending was dropped. */
 const UNSEEN_SECS = 60;
-/** The relay pays for this many ballots per badge; after that, "send it yourself". */
-const RELAYS_PER_BADGE = 20;
+/** The relay pays for this many ballots per badge; after that, "send it yourself".
+ * Mainnet gas is real money, so the real round gets fewer. */
+const relaysPerBadge = (d: VoteRound) => d.manifest.kind === "real" ? 5 : 20;
+/** Below this the real round's relayer stops and voters send it themselves. */
+const RELAY_FLOOR_WEI = 10_000_000_000_000_000n; // 0.01 ETH
 /** Long enough for any mint to land; the chain is the record after that. */
 const MINTING_MS = 60 * 60_000;
 const BALLOTS_CACHE_SECS = 5;
@@ -91,6 +94,10 @@ export function voteRoutes(deps: Deps) {
     if (!deps.vote) throw fail(503, "off", "No vote is deployed right now.");
     return deps.vote;
   };
+  /** Paper codes, claims and the gas drip belong to test rounds only. */
+  const testOnly = (d: VoteRound) => {
+    if (d.manifest.kind !== "test") throw fail(404, "off", "This vote doesn't use paper codes.");
+  };
   const open = (d: VoteRound) => {
     if (deps.now() >= d.manifest.closesAt) throw fail(410, "closed", "Voting has closed.");
   };
@@ -107,21 +114,31 @@ export function voteRoutes(deps: Deps) {
 
   r.get("/code/:code", async (c) => {
     const d = dc();
+    testOnly(d);
     const n = await codeNumber(d, c.req.param("code"));
     const owner = await d.chain.ownerOf(n);
     return c.json({ n: Number(n), claimed: owner !== null, owner });
   });
 
-  /** The signed-in account's badge number, so /vote can lead back to its ballot. */
+  /** The badges the signed-in account votes with, so the menu and /vote lead to its ballot. */
   r.get("/mine", requireAuth, async (c) => {
     const d = dc();
     await limit("mine", c.var.ip);
-    const n = await d.chain.badgeOf(c.var.user!.address as Hex);
-    return c.json({ n: n === null ? null : Number(n) });
+    const ids = await d.chain.idsOf(c.var.user!.address as Hex);
+    return c.json({ ids: [...ids].sort((a, b) => a - b) });
+  });
+
+  /** Admin → Vote: who pays for relayed ballots, and what it has left. */
+  r.get("/relayer", requireAdmin, async (c) => {
+    const d = dc();
+    const address = d.chain.relayerAddress();
+    const balanceWei = address ? (await d.chain.balance(address)).toString() : null;
+    return c.json({ address, balanceWei, chainId: d.manifest.chainId });
   });
 
   r.post("/claim", requireAuth, async (c) => {
     const d = dc();
+    testOnly(d);
     await limit("claim", c.var.ip);
     open(d);
     const body = await jsonBody(c, ["code"]);
@@ -195,6 +212,12 @@ export function voteRoutes(deps: Deps) {
       signature,
     }).catch(() => false);
     if (!valid) throw fail(401, "bad_signature", "The signature doesn't match the badge's owner.");
+    if (d.manifest.kind === "real") {
+      const relayer = d.chain.relayerAddress();
+      if (!relayer || (await d.chain.balance(relayer)) < RELAY_FLOOR_WEI) {
+        throw fail(503, "relay_low", "The relay is out of gas for now. Use “Send it yourself”.");
+      }
+    }
 
     const kv = deps.db.kv;
     const pendingKey = [...round(d), "pending", tokenId.toString(), nonce.toString()];
@@ -218,7 +241,7 @@ export function voteRoutes(deps: Deps) {
         throw fail(409, "stale_nonce", "This ballot was replaced; reload to see the latest.");
       }
       const relays = (await kv.get<number>(countKey)).value ?? 0;
-      if (relays >= RELAYS_PER_BADGE) {
+      if (relays >= relaysPerBadge(d)) {
         throw fail(
           429,
           "relay_limit",
@@ -243,6 +266,7 @@ export function voteRoutes(deps: Deps) {
   // "Send it yourself": a voter with no Sepolia ETH gets one small top-up, ever.
   r.post("/gas", requireAuth, async (c) => {
     const d = dc();
+    testOnly(d);
     await limit("gas", c.var.ip);
     open(d);
     const body = await jsonBody(c, ["tokenId"]);

@@ -84,7 +84,7 @@ A grant is the same document with `## Recipient team` after the duration, `## Th
 
 Every heading, and the one question it answers:
 
-- **Title**: up to 140 characters, no "RFP:" or "Grant:" prefix. Tell the proposer which radio button to pick, and for a top-up to tick "Work is already under way with another funder".
+- **Title**: 1 to 3 words, then a colon, then what it does, up to 140 characters in total. The first words are the product name or the team name; when the team has more than one initiative on the board, or backs its own initiative, always the team name. An RFP has no team, so its title starts with "RFP:". Exactly one colon, no "Grant:" prefix, no full stop at the end. Like "NorthScan: DPRK IT Worker Screening for the Ethereum Ecosystem", "Auditware: Decentralized, Privacy-Preserving EDR", "HackViz: Interactive Real-World Ethereum Exploit Learning Sandbox", "RFP: Wallet Security for Post-Quantum Ethereum". Tell the proposer which radio button to pick, and for a top-up to tick "Work is already under way with another funder".
 - **Short summary**: what gets built and why it matters, 2 to 4 sentences. This is the board card text.
 - **Categories**: 1 to 3 of these names, one per line, the main topic first, written exactly as here: Compilers & Languages, Formal Verification, Fuzzing & Testing, Audits & Analysis, Wallets & Signing, OpSec, Detection & Response, DeFi Safety, Infrastructure & Clients, Research & Education. Pick by what the work is, not by who pays for it; one is often right.
 - **Funding goal (USD)**: one flat number, written `$150,000`, never "up to $150,000". The form reads `150,000` and `150.000` alike and echoes back what it read, so check the echo.
@@ -316,7 +316,7 @@ A real initiative from the board, an RFP, written as the document you hand over.
 ```markdown
 ## Title
 
-OPSEC Ratings Coalition to Build & Maintain an "L2Beat for OPSEC"
+RFP: OPSEC Ratings Coalition to Build & Maintain an "L2Beat for OPSEC"
 
 ## Short summary
 

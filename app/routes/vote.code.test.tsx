@@ -739,3 +739,47 @@ async function ballotWithClosed(body: Record<string, unknown>) {
   show();
   expect(await screen.findByRole("heading", { name: /voting has closed/i })).toBeInTheDocument();
 }
+
+it("quiet ending: an A-only ballot's A freezes once S settles (the server counts its first group)", async () => {
+  // Badge 17's counted ballot puts beta in its only group: rank 1, which this browser
+  // shows in A.
+  localStorage.setItem(
+    "vote-tiers:0x1000000000000000000000000000000000000001:17",
+    JSON.stringify({ beta: "A" }),
+  );
+  await ballotWith(roundBody({
+    accepted: { "17": "0xff01ff" },
+    tiers: [
+      { tier: "S", status: "settled", at: 1, forced: false, funded: [], awards: {} },
+      waiting("A"),
+      waiting("B"),
+    ],
+  }));
+  expect(await screen.findByRole("button", { name: "Should fund (settled)" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Must fund (settled)" })).toBeDisabled();
+});
+
+it("quiet ending: in the last window, a change can't buy another one", async () => {
+  await ballotWith(roundBody({
+    accepted: { "17": "0x01ffff" },
+    tiers: [
+      {
+        tier: "S",
+        status: "settling",
+        window: 3,
+        windowEndsAt: 4_000_000_000,
+        latestEndAt: 4_000_000_000,
+        quiet: false,
+        funded: [],
+      },
+      waiting("A"),
+      waiting("B"),
+    ],
+  }));
+  expect(
+    await screen.findByText(
+      "It changed, but this is the last window: it settles at its end anyway.",
+    ),
+  )
+    .toBeInTheDocument();
+});

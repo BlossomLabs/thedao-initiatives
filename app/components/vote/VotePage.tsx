@@ -22,6 +22,7 @@ import {
   useVoteRound,
 } from "~/hooks/use-vote";
 import { api, errorMessage } from "~/lib/api";
+import { countedTiers, lockedLabels } from "~/lib/vote-locks";
 import { usd } from "~/lib/format";
 import { encodeBallot, type Tier } from "../../../shared/vote/ballot";
 import { ROUND } from "../../../shared/vote/manifest";
@@ -503,9 +504,13 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     const registrationOver = rv ? Date.now() / 1000 >= rv.registrationClosesAt : false;
     const shut = !counted && registrationOver;
     const early = notOpenYet() || shut;
-    const locked = new Set<Tier>(
-      rv?.tiers.flatMap((t) => (t.status === "settled" ? [t.tier] : [])) ?? [],
-    );
+    // What the server compares is the voter's own groups of equal rank, so lock from
+    // the ballot that counts.
+    const settledCount = rv?.tiers.filter((t) => t.status === "settled").length ?? 0;
+    const countedHex = rv?.accepted[String(n)];
+    const locked = countedHex
+      ? lockedLabels(countedTiers(countedHex, tiers, ROUND.slugs), settledCount)
+      : new Set<Tier>();
     const names = (slugs: string[]) =>
       slugs.length ? slugs.map((x) => titles.get(x) ?? x).join(", ") : "nothing";
     const refused = rv?.rejected.find((r) =>
@@ -534,6 +539,8 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
                 <p>
                   {t.quiet
                     ? "No change so far: it settles then."
+                    : t.window >= ROUND.schedule.maxWindows
+                    ? "It changed, but this is the last window: it settles at its end anyway."
                     : "It changed in this window: a shorter window follows."}
                 </p>
               </div>

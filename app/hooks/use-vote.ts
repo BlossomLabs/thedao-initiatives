@@ -107,18 +107,25 @@ export type RoundView = {
     awards: Record<string, string>;
     tiers?: Record<string, Tier>;
     /** Each unsettled initiative's gap to its next tier; absent once the round is closed. */
-    next?: Record<string, {
-      tier: Tier;
-      /** Micro-USD; null when no amount alone gets it there. */
-      gap: string | null;
-      comesIn: { slug: string; tier: Tier }[];
-      dropsOut: { slug: string; tier: Tier }[];
-      moves: { slug: string; from: Tier; to: Tier }[];
-    }>;
+    next?: Record<string, NextTierEntry>;
+    /** While Tier-S is open: how far ahead each of its initiatives is, micro-USD
+     * (only leads of at least $1K). */
+    lead?: Record<string, string>;
   };
+  /** Once closed: each initiative's gap to the tier above where it finished, judged at
+   * that tier's settlement (comesIn/dropsOut name only the target tier), and Tier-S's
+   * leads (micro-USD, at least $1K). Absent until computed. */
+  final?: { next: Record<string, NextTierEntry>; lead: Record<string, string> };
 };
 
-export type NextTierEntry = NonNullable<RoundView["live"]["next"]>[string];
+export type NextTierEntry = {
+  tier: Tier;
+  /** Micro-USD; null when no amount alone gets it there. */
+  gap: string | null;
+  comesIn: { slug: string; tier: Tier }[];
+  dropsOut: { slug: string; tier: Tier }[];
+  moves: { slug: string; from: Tier; to: Tier }[];
+};
 
 /** The round's quiet ending (each tier's state, what counts, what was refused). */
 export function useVoteRound(refetchInterval: number | false = false, enabled = true) {

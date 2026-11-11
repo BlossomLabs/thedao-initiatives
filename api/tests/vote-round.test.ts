@@ -789,6 +789,83 @@ Deno.test("round next: the same tally inputs are searched once", async () => {
   h.close();
 });
 
+/** $6K pool, $3K needs; both voters back a alone, so the live tally funds a in Tier-S. */
+async function leadSetup() {
+  const { h, state } = await setup({ ...qe, poolUsd: "6000000000" });
+  h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 3_000_000_000n]);
+  state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
+  return { h, state };
+}
+type LiveBody = { live: { next?: unknown; lead?: Record<string, string> } };
+
+Deno.test("an open round serves Tier-S leads", async () => {
+  const { h } = await leadSetup();
+  // Like the gaps: the first read starts the work and doesn't wait for it.
+  const first = await j(await h.req("/api/vote/round")) as LiveBody;
+  assertEquals(first.live.lead, undefined);
+  await h.settle();
+  const body = await j(await h.req("/api/vote/round")) as LiveBody;
+  assertEquals(body.live.next !== undefined, true);
+  // The voters hold $6K and a costs $3K: its backers could pay $3K more and keep it.
+  assertEquals(body.live.lead, { a: "3000000000" });
+  await h.settle();
+  h.close();
+});
+
+Deno.test("no leads once Tier-S has settled", async () => {
+  const { h } = await leadSetup();
+  h.clock.now = NOW + 700; // S settled at NOW + 660; A is open
+  await h.req("/api/vote/round");
+  await h.settle();
+  h.clock.now += 10;
+  const body = await j(await h.req("/api/vote/round")) as LiveBody;
+  assertEquals(body.live.next !== undefined, true, "the search ran");
+  assertEquals(body.live.lead, undefined);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("a closed round serves the final what-ifs", async () => {
+  // $10K pool. Both voters back a first, then b and c: a is funded in Tier-S, b in
+  // Tier-A, and c needs more than what's left once a and b are paid, so it never is.
+  const { h, state } = await setup({ ...qe, poolUsd: "10000000000" });
+  h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 5_000_000_000n]);
+  const ballot = bytesToHex(encodeBallot(qe.slugs, { a: "S", b: "B", c: "B" })).slice(2);
+  state.logs = [logOf("1", ballot, NOW - 100, 1), logOf("2", ballot, NOW - 90, 2)];
+  h.clock.now = NOW + 7200;
+  type Final = {
+    next: Record<string, { tier: string; gap: string | null }>;
+    lead: Record<string, string>;
+  };
+  type Body = {
+    closed: boolean;
+    tiers: { funded: string[] }[];
+    live: { next?: unknown; lead?: unknown };
+    final?: Final;
+  };
+  // Never waits for the what-ifs.
+  const first = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(first.closed, true);
+  assertEquals(first.tiers.map((t) => t.funded), [["a"], ["b"], []]);
+  assertEquals(first.final, undefined);
+  await h.settle();
+  // The round itself is cached for good now; the what-ifs come with it.
+  const body = await j(await h.req("/api/vote/round")) as Body;
+  const final = body.final!;
+  assertEquals([body.live.next, body.live.lead], [undefined, undefined]);
+  assertEquals(final.next.b.tier, "S");
+  assertEquals(final.next.c.tier, "B");
+  assertEquals(final.next.a, undefined, "Tier-S has a lead, not a next tier");
+  assertEquals(final.lead.a !== undefined && BigInt(final.lead.a) >= 1_000_000_000n, true);
+  assertEquals(
+    ((await h.kv.get(["vote", qe.contract.toLowerCase(), "final"])).value as { final: Final })
+      .final,
+    final,
+  );
+  await h.settle();
+  h.close();
+});
+
 Deno.test("round: a round too large for one KV value is served, just not cached", async () => {
   const { h, state } = await qeSetup();
   // Thousands of accepted ballots: the round's JSON is well over KV's 64 KiB.

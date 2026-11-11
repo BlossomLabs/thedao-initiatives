@@ -10,7 +10,13 @@ import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { recordVote } from "../../shared/vote/record.ts";
 import type { VoteRound } from "../services/vote-chain.ts";
 import { type BoardCache, createBoardCache, readBoard } from "./board.ts";
-import { type NextTier, nextTiersAsync } from "../../shared/vote/next-tier.ts";
+import {
+  finalWhatIfsAsync,
+  liveLeadsAsync,
+  type NextTier,
+  nextTiersAsync,
+  STEP,
+} from "../../shared/vote/next-tier.ts";
 import type { ChainInputs } from "../../shared/vote/chain.ts";
 import {
   type Receipt,
@@ -151,27 +157,33 @@ export async function cacheSet(
   }
 }
 
-/** A digest of everything the gap search reads, so the same tally is searched once. */
-async function inputsKey(contract: string, inp: ChainInputs, firstOpen: number) {
-  const text = JSON.stringify(
-    [
-      contract,
-      firstOpen,
-      inp.m,
-      inp.costs,
-      inp.voters,
-      inp.weights,
-      inp.ranks,
-      inp.ballots,
-      inp.poolUsd,
-      inp.spent,
-      [...inp.done].sort((a, b) => a - b),
-    ],
-    (_, v) => typeof v === "bigint" ? v.toString() : v,
-  );
+/** Everything a tally reads, in a fixed order. */
+const inputsParts = (inp: ChainInputs) => [
+  inp.m,
+  inp.costs,
+  inp.voters,
+  inp.weights,
+  inp.ranks,
+  inp.ballots,
+  inp.poolUsd,
+  inp.spent,
+  [...inp.done].sort((a, b) => a - b),
+];
+
+async function digest(parts: unknown[]) {
+  const text = JSON.stringify(parts, (_, v) => typeof v === "bigint" ? v.toString() : v);
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(hash)].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
+
+/** A digest of everything the gap search reads, so the same tally is searched once. */
+const inputsKey = (contract: string, inp: ChainInputs, firstOpen: number) =>
+  digest([contract, firstOpen, ...inputsParts(inp)]);
+
+/** A digest of what the final what-ifs read: each settlement's inputs and what each tier
+ * funded. A closed round never changes, so it is searched once. */
+const finalKey = (contract: string, settleInputs: (ChainInputs | null)[], funded: number[][]) =>
+  digest([contract, settleInputs.map((x) => x && inputsParts(x)), funded]);
 
 /** Each initiative's gap to its next tier, as JSON (slugs for indices, a string for the gap). */
 function nextJson(next: Map<number, NextTier>, slugs: string[]) {
@@ -184,8 +196,23 @@ function nextJson(next: Map<number, NextTier>, slugs: string[]) {
   }]));
 }
 type NextJson = ReturnType<typeof nextJson>;
-/** A finished search: the digest of its inputs, the open tier it looked from, and when. */
-type KnownNext = { key: string; firstOpen: number; at: number; next: NextJson };
+/** How far ahead each initiative is, as JSON. Under one step there's nothing to tell. */
+const leadJson = (lead: Map<number, bigint>, slugs: string[]): Record<string, string> =>
+  Object.fromEntries(
+    [...lead].filter(([, v]) => v >= STEP).map(([c, v]) => [slugs[c], v.toString()]),
+  );
+/** A finished search: the digest of its inputs, the open tier it looked from, and when.
+ * Tier-S's leads come with it while Tier-S is open. */
+type KnownNext = {
+  key: string;
+  firstOpen: number;
+  at: number;
+  next: NextJson;
+  lead?: Record<string, string>;
+};
+type FinalJson = { next: NextJson; lead: Record<string, string> };
+/** A closed round's final what-ifs, with the digest of what they were judged from. */
+type KnownFinal = { key: string; at: number; final: FinalJson };
 
 /** The round state as JSON: slugs for initiatives, decimal strings for micro-USD. */
 function roundJson(st: RoundState & { poolUsd: bigint }, slugs: string[]) {
@@ -368,6 +395,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
   let lastNext: (KnownNext & { contract: string }) | null = null;
   let searching = false;
   const nextKey = (d: VoteRound) => [...round(d), "next"];
+  type Ahead = Pick<KnownNext, "next" | "lead">;
   /** The newest search known (this isolate's or the stored one) for the open tier
    * `firstOpen`, whichever inputs it ran on; none once no tier is open. */
   const knownNext = async (d: VoteRound, firstOpen: number | null, stored?: KnownNext | null) => {
@@ -375,7 +403,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     stored ??= (await deps.db.kv.get<KnownNext>(nextKey(d))).value;
     const mine = lastNext?.contract === d.manifest.contract ? lastNext : null;
     const known = [stored, mine].filter((k): k is KnownNext => k?.firstOpen === firstOpen);
-    return known.sort((a, b) => b.at - a.at)[0]?.next;
+    return known.sort((a, b) => b.at - a.at)[0];
   };
   /** The gap to the next tier for this replay. The same inputs are searched once (across
    * isolates through KV); new ones start a search in the background, and until it is
@@ -383,22 +411,33 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
   const nextFor = async (
     d: VoteRound,
     st: RoundState,
-  ): Promise<NextJson | undefined> => {
+  ): Promise<Ahead | undefined> => {
     if (!st.liveInputs) return undefined;
     const contract = d.manifest.contract;
     const key = await inputsKey(contract, st.liveInputs, st.firstOpen);
-    if (lastNext?.contract === contract && lastNext.key === key) return lastNext.next;
+    if (lastNext?.contract === contract && lastNext.key === key) return lastNext;
     const stored = (await deps.db.kv.get<KnownNext>(nextKey(d))).value;
     if (stored?.key === key) {
       lastNext = { ...stored, contract };
-      return stored.next;
+      return stored;
     }
     if (!searching) {
       searching = true;
       const { liveInputs, firstOpen } = st;
       const work = (async () => {
-        const next = nextJson(await nextTiersAsync(liveInputs, firstOpen), d.manifest.slugs);
-        const known = { key, firstOpen, at: deps.now(), next };
+        const slugs = d.manifest.slugs;
+        const next = nextJson(await nextTiersAsync(liveInputs, firstOpen), slugs);
+        // A lead only means something while Tier-S can still change.
+        const lead = firstOpen === 0
+          ? leadJson(await liveLeadsAsync(liveInputs, firstOpen), slugs)
+          : undefined;
+        const known: KnownNext = {
+          key,
+          firstOpen,
+          at: deps.now(),
+          next,
+          ...(lead ? { lead } : {}),
+        };
         lastNext = { ...known, contract };
         await cacheSet(deps.db.kv, nextKey(d), known, undefined, deps.log);
       })().catch((e) => deps.log(`vote next: ${e instanceof Error ? e.message : e}`))
@@ -406,6 +445,61 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       deps.background?.(work);
     }
     return await knownNext(d, st.firstOpen, stored);
+  };
+
+  /** The final what-ifs, the same way: searched once per digest in the background (one
+   * search at a time, shared with the gap search), kept in KV, never waited for. */
+  let lastFinal: (KnownFinal & { contract: string }) | null = null;
+  /** The digest this isolate last started a final search for, so a search that failed
+   * isn't run again on every request. */
+  let finalTried: string | null = null;
+  const finalStoreKey = (d: VoteRound) => [...round(d), "final"];
+  /** The final what-ifs judged from `key`, if this isolate or KV has them. */
+  const knownFinal = async (d: VoteRound, key: string | undefined) => {
+    if (key === undefined) return undefined;
+    if (lastFinal?.contract === d.manifest.contract && lastFinal.key === key) {
+      return lastFinal.final;
+    }
+    const stored = (await deps.db.kv.get<KnownFinal>(finalStoreKey(d))).value;
+    if (stored?.key !== key) return undefined;
+    lastFinal = { ...stored, contract: d.manifest.contract };
+    return stored.final;
+  };
+  /** The digest a closed round's final what-ifs are judged from; none while it is open. */
+  const finalDigest = (d: VoteRound, st: RoundState) => {
+    if (!st.closed) return Promise.resolve(undefined);
+    const funded = st.tiers.map((t) => (t.status === "settled" ? t.funded : []));
+    return finalKey(d.manifest.contract, st.settleInputs, funded);
+  };
+  const finalFor = async (
+    d: VoteRound,
+    st: RoundState,
+    key: string | undefined,
+  ): Promise<FinalJson | undefined> => {
+    if (key === undefined) return undefined;
+    const known = await knownFinal(d, key);
+    if (known || searching || finalTried === key) return known;
+    searching = true;
+    finalTried = key;
+    const contract = d.manifest.contract;
+    // Each initiative's final tier: the settled tier that funded it.
+    const finalTier = new Map<number, number>();
+    for (const [k, t] of st.tiers.entries()) {
+      if (t.status !== "settled") continue;
+      for (const c of t.funded) finalTier.set(c, k);
+    }
+    const { settleInputs } = st;
+    const work = (async () => {
+      const slugs = d.manifest.slugs;
+      const got = await finalWhatIfsAsync(settleInputs, finalTier, slugs.length);
+      const final = { next: nextJson(got.next, slugs), lead: leadJson(got.lead, slugs) };
+      const known = { key, at: deps.now(), final };
+      lastFinal = { ...known, contract };
+      await cacheSet(deps.db.kv, finalStoreKey(d), known, undefined, deps.log);
+    })().catch((e) => deps.log(`vote final: ${e instanceof Error ? e.message : e}`))
+      .finally(() => (searching = false));
+    deps.background?.(work);
+    return undefined;
   };
 
   const open = (d: VoteRound) => {
@@ -652,28 +746,55 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     const kv = deps.db.kv;
     const key = [...round(d), "round"];
     // firstOpen: the first open tier, or null once none is (no live tally to look ahead from).
-    type Cached = { at: number; body: ReturnType<typeof roundJson>; firstOpen?: number | null };
+    // finalKey: once closed, the digest its final what-ifs are judged from.
+    type Cached = {
+      at: number;
+      body: ReturnType<typeof roundJson>;
+      firstOpen?: number | null;
+      finalKey?: string;
+    };
     const cached = (await kv.get<Cached>(key)).value;
-    const withNext = (body: Cached["body"], next: NextJson | undefined) =>
-      next ? { ...body, live: { ...body.live, next } } : body;
+    const withAhead = (
+      body: Cached["body"],
+      ahead: Ahead | undefined,
+      final: FinalJson | undefined,
+    ) => ({
+      ...body,
+      live: {
+        ...body.live,
+        ...(ahead ? { next: ahead.next } : {}),
+        ...(ahead?.lead ? { lead: ahead.lead } : {}),
+      },
+      ...(final ? { final } : {}),
+    });
     if (
       cached &&
       (isFinal(cached.body, cached.at) || deps.now() - cached.at < BALLOTS_CACHE_SECS)
     ) {
-      return c.json(withNext(cached.body, await knownNext(d, cached.firstOpen ?? null)));
+      const final = await knownFinal(d, cached.finalKey);
+      // A closed round whose what-ifs nobody here has, or is searching for, is replayed
+      // once more below: the cached round has no inputs to start the search from.
+      const started = searching ||
+        (cached.finalKey !== undefined && finalTried === cached.finalKey);
+      if (!cached.body.closed || final || started) {
+        return c.json(
+          withAhead(cached.body, await knownNext(d, cached.firstOpen ?? null), final),
+        );
+      }
     }
     const st = await roundState(d);
     const body = roundJson(st, d.manifest.slugs);
     const at = deps.now();
     const firstOpen = st.liveInputs ? st.firstOpen : null;
+    const fk = await finalDigest(d, st);
     await cacheSet(
       kv,
       key,
-      { at, body, firstOpen },
+      { at, body, firstOpen, ...(fk ? { finalKey: fk } : {}) },
       isFinal(body, at) ? undefined : { expireIn: 60_000 },
       deps.log,
     );
-    return c.json(withNext(body, await nextFor(d, st)));
+    return c.json(withAhead(body, await nextFor(d, st), await finalFor(d, st, fk)));
   });
 
   // The ballots that count (the quiet ending's accepted ones), for the vote results.

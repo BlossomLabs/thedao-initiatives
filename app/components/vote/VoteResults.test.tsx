@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { bytesToHex } from "viem";
 import { api } from "~/lib/api";
 import { encodeBallot } from "../../../shared/vote/ballot";
-import VoteResults, { pollEvery } from "./VoteResults";
+import VoteResults from "./VoteResults";
 
 vi.mock("../../../shared/vote/manifest", async (original) => ({
   ...await original<typeof import("../../../shared/vote/manifest")>(),
@@ -76,7 +76,7 @@ vi.mock("~/lib/api", async (original) => {
     ...await original<typeof import("~/lib/api")>(),
     api: Object.assign(
       (...a: unknown[]) =>
-        a[0] === "/api/vote/ballots"
+        a[0] === "/api/vote/round"
           ? api(...a)
           : a[0] === "/api/vote/mine"
           ? Promise.resolve({ ids: signedIn.badge === null ? [] : [signedIn.badge] })
@@ -107,12 +107,33 @@ afterEach(cleanup);
 
 const ballot = (t: Record<string, "S" | "A" | "B">) =>
   bytesToHex(encodeBallot(["alpha", "beta"], t));
+const usdMicro = (usd: number) => String(usd * 1_000_000);
+const waiting = (tier: string) => ({ tier, status: "waiting", startsAt: 4_000_000_000 });
+/** /api/vote/round with nothing settled yet: the live tally is everything. */
+function roundOf(
+  accepted: Record<string, string>,
+  live: Record<string, [number, "S" | "A" | "B"]>,
+  over: Record<string, unknown> = {},
+) {
+  return {
+    registrationClosesAt: 4_000_000_000,
+    closed: false,
+    tiers: [waiting("S"), waiting("A"), waiting("B")],
+    accepted,
+    rejected: [],
+    live: {
+      funded: Object.keys(live),
+      awards: Object.fromEntries(Object.entries(live).map(([k, [v]]) => [k, usdMicro(v)])),
+      tiers: Object.fromEntries(Object.entries(live).map(([k, [, t]]) => [k, t])),
+    },
+    ...over,
+  };
+}
 
 it("says what is going on and what the vote would fund right now", async () => {
-  vi.mocked(api).mockResolvedValue({
-    at: 1,
-    ballots: [{ tokenId: "1", ballot: ballot({ alpha: "S" }) }],
-  });
+  vi.mocked(api).mockResolvedValue(
+    roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] }),
+  );
   render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
@@ -126,16 +147,19 @@ it("says what is going on and what the vote would fund right now", async () => {
   // The front page's board: its search box, only the round's initiatives, gold shares.
   expect(screen.getByRole("searchbox")).toBeInTheDocument();
   expect(screen.queryByText("Gamma outside")).toBeNull();
-  await waitFor(() => expect(document.querySelector("[data-vote-fill]")).not.toBeNull());
+  // Nothing has settled: it is all "if it settled now".
+  await waitFor(() => expect(document.querySelector("[data-vote-pending]")).not.toBeNull());
 });
 
 it.each(["/vote", "/vote?view=cards"])(
   "orders the funded group by result tier in %s",
   async (url) => {
-    vi.mocked(api).mockResolvedValue({
-      at: 1,
-      ballots: [{ tokenId: "1", ballot: ballot({ alpha: "A", beta: "S" }) }],
-    });
+    vi.mocked(api).mockResolvedValue(
+      roundOf({ "1": ballot({ alpha: "A", beta: "S" }) }, {
+        beta: [30_000, "S"],
+        alpha: [50_000, "A"],
+      }),
+    );
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={[url]}>
@@ -160,10 +184,9 @@ it.each(["/vote", "/vote?view=cards"])(
 
 it("an RPC hiccup keeps the last result", async () => {
   const qc = new QueryClient();
-  vi.mocked(api).mockResolvedValue({
-    at: 1,
-    ballots: [{ tokenId: "1", ballot: ballot({ alpha: "S" }) }],
-  });
+  vi.mocked(api).mockResolvedValue(
+    roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] }),
+  );
   render(
     <QueryClientProvider client={qc}>
       <MemoryRouter>
@@ -173,13 +196,13 @@ it("an RPC hiccup keeps the last result", async () => {
   );
   expect(await screen.findByText(/would be funded by 1 ballot/)).toBeInTheDocument();
   vi.mocked(api).mockRejectedValue(new Error("rpc down"));
-  await act(() => qc.refetchQueries({ queryKey: ["vote-ballots"] }).catch(() => {}));
+  await act(() => qc.refetchQueries({ queryKey: ["vote-round"] }).catch(() => {}));
   expect(screen.getByText(/would be funded by 1 ballot/)).toBeInTheDocument();
   expect(screen.queryByText(/updated .* ago/i)).toBeNull();
 });
 
 it("links back to this browser's ballot, once it has opened one", async () => {
-  vi.mocked(api).mockResolvedValue({ at: 1, ballots: [] });
+  vi.mocked(api).mockResolvedValue(roundOf({}, {}));
   const show = () =>
     render(
       <QueryClientProvider client={new QueryClient()}>
@@ -205,7 +228,7 @@ it("links a signed-in badge holder to their ballot, even without the code in thi
   localStorage.clear();
   signedIn.address = "0x1111111111111111111111111111111111111111";
   signedIn.badge = 7;
-  vi.mocked(api).mockResolvedValue({ at: 1, ballots: [] });
+  vi.mocked(api).mockResolvedValue(roundOf({}, {}));
   render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
@@ -219,7 +242,74 @@ it("links a signed-in badge holder to their ballot, even without the code in thi
   signedIn.badge = null;
 });
 
-it("polls every 5 s while voting is open, and stops once it has closed", () => {
-  expect(pollEvery(1_000, 999_000)).toBe(5_000);
-  expect(pollEvery(1_000, 1_000_000)).toBe(false);
+it("S settled is solid gold; A settling is lighter, with its window and B's start", async () => {
+  vi.mocked(api).mockResolvedValue(
+    roundOf({ "1": ballot({ alpha: "A", beta: "S" }) }, { alpha: [50_000, "A"] }, {
+      tiers: [
+        {
+          tier: "S",
+          status: "settled",
+          at: 1,
+          forced: false,
+          funded: ["beta"],
+          awards: { beta: usdMicro(30_000) },
+        },
+        {
+          tier: "A",
+          status: "settling",
+          window: 2,
+          windowEndsAt: 4_000_000_000,
+          latestEndAt: 4_000_000_100,
+          quiet: false,
+          funded: ["alpha"],
+        },
+        waiting("B"),
+      ],
+    }),
+  );
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>
+        <VoteResults />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  expect(
+    await screen.findByText(
+      /S settled: \$30,000 to 1 initiative · A settling, window 2 ends .* UTC · B starts .* UTC/,
+    ),
+  ).toBeInTheDocument();
+  const row = (title: string) => screen.getAllByText(title)[0].closest("li, [data-initiative-id]")!;
+  expect(row("Beta audits").querySelector("[data-vote-fill]")).not.toBeNull();
+  expect(row("Alpha fuzzing").querySelector("[data-vote-pending]")).not.toBeNull();
+  expect(screen.getByText("if it settled now")).toBeInTheDocument();
+});
+
+it("once B settles, the final result", async () => {
+  const settled = (tier: string, funded: string[], awards: Record<string, string>) => ({
+    tier,
+    status: "settled",
+    at: 1,
+    forced: false,
+    funded,
+    awards,
+  });
+  vi.mocked(api).mockResolvedValue(
+    roundOf({ "1": ballot({ alpha: "A", beta: "S" }) }, {}, {
+      closed: true,
+      tiers: [
+        settled("S", ["beta"], { beta: usdMicro(30_000) }),
+        settled("A", ["alpha"], { alpha: usdMicro(50_000) }),
+        settled("B", [], {}),
+      ],
+    }),
+  );
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>
+        <VoteResults />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByText(/Final result: \$80,000 to 2 initiatives/)).toBeInTheDocument();
 });

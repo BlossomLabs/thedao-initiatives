@@ -1,25 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { hexToBytes } from "viem";
 import BoardPage from "~/components/board/BoardPage";
 import Hero from "~/components/board/Hero";
 import { LinkButton } from "~/components/ui/Button";
 import { useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/vote-local";
 import { useSession } from "~/context/session";
-import { useMyBadges, useVoteBallots } from "~/hooks/use-vote";
+import { type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd } from "~/lib/format";
 import { ROUND } from "../../../shared/vote/manifest";
-import { voteTally } from "../../../shared/vote/tally";
 import type { Tier } from "../../../shared/vote/ballot";
 
 const POLL_MS = 5_000;
 const POOL = BigInt(ROUND.poolUsd);
 const POOL_USD = Number(POOL / 1_000_000n);
 const IN_ROUND: ReadonlySet<string> = new Set(ROUND.slugs);
-
-/** Every 5 s while voting is open; nothing once it has closed (the result is final). */
-export const pollEvery = (closesAt: number, nowMs: number): number | false =>
-  nowMs / 1000 < closesAt ? POLL_MS : false;
 
 function useNow(ms = 1000) {
   const [now, setNow] = useState(() => Date.now());
@@ -39,6 +33,37 @@ function timeLeft(secs: number): string {
 }
 
 const REAL = ROUND.kind === "real";
+const dollars = (micro: string) => Number(BigInt(micro) / 10_000n) / 100;
+const utc = (secs: number, withDay = true) =>
+  `${
+    new Intl.DateTimeFormat("en-GB", {
+      ...(withDay ? { weekday: "long", day: "numeric", month: "long" } : {}),
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC",
+    }).format(secs * 1000)
+  } UTC`;
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+
+/** The hero's line for a round under way: settled tiers, the settling one's window,
+ * and when the next one starts. */
+function stageLine(rv: RoundView): string {
+  const parts: string[] = [];
+  let next = false;
+  for (const t of rv.tiers) {
+    if (t.status === "settled") {
+      const sum = Object.values(t.awards).reduce((a, v) => a + dollars(v), 0);
+      parts.push(`${t.tier} settled: ${usd(sum)} to ${plural(t.funded.length, "initiative")}`);
+    } else if (t.status === "settling") {
+      parts.push(`${t.tier} settling, window ${t.window} ends ${utc(t.windowEndsAt, false)}`);
+      next = true;
+    } else if (next || parts.length) {
+      parts.push(`${t.tier} starts ${utc(t.startsAt)}`);
+      break;
+    }
+  }
+  return parts.join(" · ");
+}
 const POOL_NAME = REAL ? "pool" : "demo pool";
 
 /** The vote results: the front page, limited to the round's initiatives, with what the
@@ -48,7 +73,8 @@ const POOL_NAME = REAL ? "pool" : "demo pool";
 export default function VoteResults() {
   const board = useBoard();
   const now = useNow();
-  const ballots = useVoteBallots(pollEvery(ROUND.closesAt, now));
+  const round = useVoteRound(POLL_MS);
+  const rv = round.data;
   // The way back to your ballot: by the code this browser opened it with, else by the
   // signed-in account's badge (found on-chain).
   const [code, setCode] = useState<string | null>(null);
@@ -62,61 +88,72 @@ export default function VoteResults() {
     [board.data],
   );
 
-  const tally = useMemo(() => {
-    if (!ballots.data) return null;
-    return voteTally(
-      cards.map((c) => ({
-        slug: c.initiative.slug,
-        goalUsd: c.initiative.goalUsd,
-        total: c.summary.total,
-      })),
-      ballots.data.ballots.map((b) => hexToBytes(b.ballot)),
-      ROUND.slugs,
-      POOL,
-    );
-  }, [ballots.data, cards]);
-
-  const votePct = useMemo(() => {
-    const m = new Map<string, number>();
-    if (!tally) return m;
-    for (const c of cards) {
-      const share = tally.bySlug.get(c.initiative.slug) ?? 0;
-      if (share > 0 && c.initiative.goalUsd > 0) {
-        m.set(c.initiative.id, (share / c.initiative.goalUsd) * 100);
+  /** USD per slug: what settled tiers fund, and what the open ones would if they settled now. */
+  const money = useMemo(() => {
+    const settled = new Map<string, number>();
+    const pending = new Map<string, number>();
+    const tiers = new Map<string, Tier>();
+    if (!rv) return null;
+    for (const t of rv.tiers) {
+      if (t.status !== "settled") continue;
+      for (const [slug, v] of Object.entries(t.awards)) {
+        settled.set(slug, dollars(v));
+        tiers.set(slug, t.tier);
       }
     }
-    return m;
-  }, [tally, cards]);
+    for (const [slug, v] of Object.entries(rv.live.awards)) {
+      pending.set(slug, dollars(v));
+      const t = rv.live.tiers?.[slug];
+      if (t) tiers.set(slug, t);
+    }
+    return { settled, pending, tiers };
+  }, [rv]);
 
-  const voteTiers = useMemo(() => {
+  const { votePct, votePendingPct, voteTiers } = useMemo(() => {
+    const total = new Map<string, number>();
+    const pend = new Map<string, number>();
     const tiers = new Map<string, Tier>();
     for (const c of cards) {
-      const tier = tally?.tierBySlug.get(c.initiative.slug);
-      if (tier) tiers.set(c.initiative.id, tier);
+      const goal = c.initiative.goalUsd;
+      if (!money || goal <= 0) continue;
+      const s = money.settled.get(c.initiative.slug) ?? 0;
+      const p = money.pending.get(c.initiative.slug) ?? 0;
+      if (s + p > 0) total.set(c.initiative.id, ((s + p) / goal) * 100);
+      if (p > 0) pend.set(c.initiative.id, (p / goal) * 100);
+      const t = money.tiers.get(c.initiative.slug);
+      if (t) tiers.set(c.initiative.id, t);
     }
-    return tiers;
-  }, [tally, cards]);
+    return { votePct: total, votePendingPct: pend, voteTiers: tiers };
+  }, [money, cards]);
 
-  const secsLeft = ROUND.closesAt - Math.floor(now / 1000);
-  const isClosed = secsLeft <= 0;
-  const n = tally?.ballots ?? 0;
-  const ballotsText = n === 1 ? "1 ballot" : `${n} ballots`;
+  const raised = money
+    ? [...money.settled.values(), ...money.pending.values()].reduce((a, b) => a + b, 0)
+    : undefined;
+  const n = rv ? Object.keys(rv.accepted).length : 0;
+  const ballotsText = plural(n, "ballot");
+  const isClosed = Boolean(rv?.closed);
+  const started = rv?.tiers.some((t) => t.status !== "waiting");
+  const sTally = ROUND.schedule?.firstTallyAt[0] ?? ROUND.closesAt;
+  const fundedCount = money ? new Set([...money.settled.keys(), ...money.pending.keys()]).size : 0;
 
   const hero = (
     <Hero
-      raised={tally ? tally.fundedUsd : undefined}
+      raised={raised}
       kicker={<span className="text-vote">{REAL ? "TheDAO vote" : "Test vote"}</span>}
       sub={isClosed
         ? (
           <>
-            Voting closed. Final result: funded by {ballotsText} from the {usd(POOL_USD)}{" "}
-            <span className="text-vote">{POOL_NAME}</span>
+            Final result: {usd(raised ?? 0)} to {plural(fundedCount, "initiative")} from the{" "}
+            {usd(POOL_USD)} <span className="text-vote">{POOL_NAME}</span>
           </>
         )
+        : started && rv
+        ? <>{stageLine(rv)}</>
         : (
           <>
             would be funded by {ballotsText} from the {usd(POOL_USD)}{" "}
-            <span className="text-vote">{POOL_NAME}</span> · closes in {timeLeft(secsLeft)}
+            <span className="text-vote">{POOL_NAME}</span> · S starts settling in{" "}
+            {timeLeft(sTally - Math.floor(now / 1000))}
           </>
         )}
     >
@@ -129,6 +166,12 @@ export default function VoteResults() {
           <i className="inline-block h-[6px] w-6 rounded-full bg-vote" />
           from the vote
         </span>
+        {votePendingPct.size > 0 && (
+          <span className="flex items-center gap-2">
+            <i className="inline-block h-[6px] w-6 rounded-full bg-vote/45" />
+            if it settled now
+          </span>
+        )}
       </div>
       {mine && (
         <div className="mt-5 flex justify-center">
@@ -144,6 +187,7 @@ export default function VoteResults() {
     <BoardPage
       only={IN_ROUND}
       votePct={votePct}
+      votePendingPct={votePendingPct}
       voteTiers={voteTiers}
       hero={hero}
       defaultSort="closest"

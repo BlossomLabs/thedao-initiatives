@@ -385,6 +385,18 @@ it("the vote results draw the vote's share in gold after what was raised", () =>
   expect(document.querySelector("[data-vote-fill]")).toBeNull();
 });
 
+it("settled money is solid gold; the settling tier's share follows it, lighter", () => {
+  const { container } = render(
+    <MemoryRouter>
+      <InitiativeCard card={card({ pct: 30 })} tokensOk={false} votePct={50} votePendingPct={20} />
+    </MemoryRouter>,
+  );
+  const gold = container.querySelector<HTMLElement>("[data-vote-fill]");
+  const pending = container.querySelector<HTMLElement>("[data-vote-pending]");
+  expect([gold?.style.left, gold?.style.width]).toEqual(["30%", "30%"]);
+  expect([pending?.style.left, pending?.style.width]).toEqual(["60%", "20%"]);
+});
+
 it("the vote results mark a completed goal, but leaves a partial goal as a percentage", () => {
   // 300 of 1000 raised (30%); the vote's share covers the other 70%.
   const raised = card({ pct: 30 });

@@ -67,9 +67,11 @@ const BAND_ICONS: Record<string, { Icon: LucideIcon; color: string }> = {
 };
 /** The front page's board. The vote results reuse it with `only` (the round's
  * slugs), `votePct` (each initiative's vote share, % of its goal, by id) and its own hero. */
-export default function BoardPage({ only, votePct, voteTiers, hero, defaultSort }: {
+export default function BoardPage({ only, votePct, votePendingPct, voteTiers, hero, defaultSort }: {
   only?: ReadonlySet<string>;
   votePct?: ReadonlyMap<string, number>;
+  /** The part of `votePct` the settling tier would add if it settled now. */
+  votePendingPct?: ReadonlyMap<string, number>;
   /** Current result tiers, only for initiatives receiving a DAO vote award. */
   voteTiers?: ReadonlyMap<string, Tier>;
   hero?: React.ReactNode;
@@ -341,6 +343,7 @@ export default function BoardPage({ only, votePct, voteTiers, hero, defaultSort 
                       ratings={ratings}
                       canRate={canRate}
                       votePct={votePct}
+                      votePendingPct={votePendingPct}
                       voteTiers={voteTiers}
                     />
                   </Suspense>
@@ -376,6 +379,7 @@ export default function BoardPage({ only, votePct, voteTiers, hero, defaultSort 
                             }}
                             rating={ratings && { summary: ratings[c.initiative.id], canRate }}
                             votePct={votePct?.get(c.initiative.id)}
+                            votePendingPct={votePendingPct?.get(c.initiative.id)}
                             voteTier={voteTiers?.get(c.initiative.id)}
                           />
                         </ShuffleItem>

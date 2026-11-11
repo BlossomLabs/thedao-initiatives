@@ -120,11 +120,14 @@ export default function InitiativeCard({
   rating,
   vote,
   votePct,
+  votePendingPct,
   voteTier,
 }: {
   card: Card;
   /** The vote results: this initiative's vote share, % of its goal (gold on the bar). */
   votePct?: number;
+  /** The part of it the settling tier would add if it settled now (lighter gold). */
+  votePendingPct?: number;
   voteTier?: Tier;
   /** The vote floor on the bar, while the display is on. */
   vote?: VoteSettings;
@@ -192,6 +195,7 @@ export default function InitiativeCard({
             <Bar
               pct={pct}
               votePct={votePct}
+              votePendingPct={votePendingPct}
               tick={tick}
               label={`${pctText(pct)} funded. ${
                 calloutText(voteStanding(summary.total, r.goalUsd, vote))
@@ -201,7 +205,7 @@ export default function InitiativeCard({
             </Bar>
           </div>
         )
-        : <Bar pct={pct} votePct={votePct} className="mt-auto" />}
+        : <Bar pct={pct} votePct={votePct} votePendingPct={votePendingPct} className="mt-auto" />}
       <div
         className={cn(
           "mt-2 flex justify-between gap-2.5 text-[13px]",

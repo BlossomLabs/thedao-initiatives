@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRowMotion } from "~/components/board/Shuffle";
 import { TypeBadge } from "~/components/ui/Badge";
 import BackerLogo from "~/components/ui/BackerLogo";
+import { voteSegments } from "~/components/ui/Bar";
 import CardTitle from "~/components/board/CardTitle";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import WatchlistButton from "~/components/board/WatchlistButton";
@@ -50,16 +51,19 @@ const ROW =
 const NUM = "text-right tnum whitespace-nowrap";
 /** The row's own funding bar: 3px, rounded, a faint track and the funded part in green. */
 function FundingBar(
-  { pct, tick, votePct, className, children }: {
+  { pct, tick, votePct, votePendingPct, className, children }: {
     pct: number;
     tick?: number;
     /** The vote's share, drawn after the raised part (gold). */
     votePct?: number;
+    /** The part of it a settling tier would add (lighter gold). */
+    votePendingPct?: number;
     className?: string;
     /** The vote callout, over the mark. */
     children?: React.ReactNode;
   },
 ) {
+  const seg = voteSegments(pct, votePct, votePendingPct);
   return (
     <span className={cn("relative block", className)} aria-hidden="true">
       <span
@@ -73,14 +77,18 @@ function FundingBar(
             style={{ width: `${Math.min(100, pct)}%` }}
           />
         )}
-        {votePct !== undefined && votePct > 0 && pct < 100 && (
+        {seg?.settled && (
           <i
             data-vote-fill
             className="absolute inset-y-0 min-w-[3px] rounded-full bg-vote shadow-bar"
-            style={{
-              left: `${Math.min(100, pct)}%`,
-              width: `${Math.min(votePct, 100 - Math.min(100, pct))}%`,
-            }}
+            style={seg.settled}
+          />
+        )}
+        {seg?.pending && (
+          <i
+            data-vote-pending
+            className="absolute inset-y-0 min-w-[3px] rounded-full bg-vote/45"
+            style={seg.pending}
           />
         )}
       </span>
@@ -91,9 +99,21 @@ function FundingBar(
 }
 
 function Row(
-  { card, label, watch, vote, aiScore, ratings, canRate = false, votePct, voteTier }: {
+  {
+    card,
+    label,
+    watch,
+    vote,
+    aiScore,
+    ratings,
+    canRate = false,
+    votePct,
+    votePendingPct,
+    voteTier,
+  }: {
     card: Card;
     votePct?: number;
+    votePendingPct?: number;
     voteTier?: Tier;
     label: ReturnType<typeof cardLabel>;
     aiScore?: number;
@@ -299,11 +319,24 @@ function Row(
       <div className="col-start-3 flex min-w-0 items-center gap-2.5 @max-[720px]/list:col-span-2 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-3 @max-[720px]/list:grid @max-[720px]/list:grid-cols-[minmax(0,1fr)_5rem]">
         {vote?.show && standing
           ? (
-            <FundingBar pct={pct} tick={tick} votePct={votePct} className="flex-1">
+            <FundingBar
+              pct={pct}
+              tick={tick}
+              votePct={votePct}
+              votePendingPct={votePendingPct}
+              className="flex-1"
+            >
               {reveal.open && <VoteCallout state={standing} at={tick} side="bottom" />}
             </FundingBar>
           )
-          : <FundingBar pct={pct} votePct={votePct} className="flex-1" />}
+          : (
+            <FundingBar
+              pct={pct}
+              votePct={votePct}
+              votePendingPct={votePendingPct}
+              className="flex-1"
+            />
+          )}
         <span
           className={cn(
             NUM,
@@ -346,11 +379,14 @@ export default function BoardList(
     ratings,
     canRate = false,
     votePct,
+    votePendingPct,
     voteTiers,
   }: {
     cards: Card[];
     /** The vote results: each initiative's vote share, % of its goal, by initiative id. */
     votePct?: ReadonlyMap<string, number>;
+    /** The part of it the settling tier would add if it settled now. */
+    votePendingPct?: ReadonlyMap<string, number>;
     voteTiers?: ReadonlyMap<string, Tier>;
     /** Initiatives the AI search put first. */
     aiTop?: string[];
@@ -401,6 +437,7 @@ export default function BoardList(
                 ratings={ratings}
                 canRate={canRate}
                 votePct={votePct?.get(c.initiative.id)}
+                votePendingPct={votePendingPct?.get(c.initiative.id)}
                 voteTier={voteTiers?.get(c.initiative.id)}
               />
             ))}

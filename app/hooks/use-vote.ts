@@ -92,7 +92,7 @@ export type RoundView = {
   /** tokenId → the ballot that counts (hex). */
   accepted: Record<string, string>;
   rejected: { tokenId: string; nonce: number; reason: "tier_settled" | "registration_closed" }[];
-  live: { funded: string[]; awards: Record<string, string> };
+  live: { funded: string[]; awards: Record<string, string>; tiers?: Record<string, Tier> };
 };
 
 /** The round's quiet ending (each tier's state, what counts, what was refused). */

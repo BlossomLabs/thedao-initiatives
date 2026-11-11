@@ -176,6 +176,17 @@ it("draws the vote's share as a second segment after the raised part", () => {
   expect((fills[0] as HTMLElement).style.width).toBe("30%");
 });
 
+it("draws the settling tier's share after the settled one, lighter", () => {
+  const { container } = mount({
+    votePct: new Map([["a", 30]]),
+    votePendingPct: new Map([["a", 10]]),
+  });
+  const gold = container.querySelector<HTMLElement>("[data-vote-fill]")!;
+  const pending = container.querySelector<HTMLElement>("[data-vote-pending]")!;
+  expect([gold.style.left, gold.style.width]).toEqual(["50%", "20%"]);
+  expect([pending.style.left, pending.style.width]).toEqual(["70%", "10%"]);
+});
+
 it("caps raised plus the vote's share at the full bar", () => {
   const { container } = mount({ votePct: new Map([["a", 80]]) });
   expect((container.querySelector("[data-vote-fill]") as HTMLElement).style.width).toBe("50%");

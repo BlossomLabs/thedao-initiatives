@@ -486,7 +486,7 @@ describe("groupByFunding (Closest to funded)", () => {
     ]);
   });
 
-  it("orders funded results S/A/B, preserving ties and the other groups' order", () => {
+  it("orders funded results Tier-S, Tier-A, Tier-B, preserving ties and the other groups' order", () => {
     const b1 = card("B first");
     const untiered = card("Already funded", { raised: 100_000 });
     const s2 = card("S second");

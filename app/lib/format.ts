@@ -22,14 +22,33 @@ export function shortAddr(a: string | null | undefined): string {
   return a && a.length > 12 ? a.slice(0, 6) + "…" + a.slice(-4) : a ?? "";
 }
 
+/** "Nov 1, 2026". */
 export function dt(ts: number | null | undefined): string {
   if (!ts) return "";
   return new Date(ts * 1000).toLocaleDateString("en-US", {
     month: "short",
-    day: "2-digit",
+    day: "numeric",
     year: "numeric",
   });
 }
+
+/* Dates near now, in the reader's time zone: "Nov 1, 14:00". No weekday, no year,
+ * no time zone name, 24-hour clock. `utc: true` reads the same instant in UTC. */
+const fmt = (opts: Intl.DateTimeFormatOptions) => ({
+  local: new Intl.DateTimeFormat("en-US", { ...opts, hourCycle: "h23" }),
+  utc: new Intl.DateTimeFormat("en-US", { ...opts, hourCycle: "h23", timeZone: "UTC" }),
+});
+const DAY = fmt({ month: "short", day: "numeric" });
+const CLOCK = fmt({ hour: "2-digit", minute: "2-digit" });
+/** "Nov 1". */
+export const shortDay = (secs: number, utc = false) =>
+  DAY[utc ? "utc" : "local"].format(secs * 1000);
+/** "14:00". */
+export const clock = (secs: number, utc = false) =>
+  CLOCK[utc ? "utc" : "local"].format(secs * 1000);
+/** "Nov 1, 14:00". */
+export const dayTime = (secs: number, utc = false) =>
+  `${shortDay(secs, utc)}, ${clock(secs, utc)}`;
 
 /** "just now", "4 min ago", "3 h ago", or the date for anything older than a day. */
 export function ago(ts: number, now: number = Date.now() / 1000): string {

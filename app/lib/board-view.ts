@@ -281,7 +281,7 @@ export type FundingSection = "funded" | "qualified" | "open";
  * Qualified for the vote (only while the cards carry the vote state), Open for
  * funding. On the vote results `votePct` (each one's vote share, % of its goal,
  * by id) counts toward fully funded. Funded results with `voteTiers` are ordered
- * S/A/B, then untiered; the existing order is preserved within each tier and other group. */
+ * Tier-S, Tier-A, Tier-B, then untiered; the existing order is preserved within each tier and other group. */
 export function groupByFunding(
   cards: Card[],
   votePct: ReadonlyMap<string, number> = new Map(),

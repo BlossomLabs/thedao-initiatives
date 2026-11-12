@@ -18,7 +18,7 @@
 - Schedule: `maxWindows = 1`, `initialWindow = 1`, `firstTallyAt = [C-1, C, C+1]`.
 - Code message (EIP-191): `` `TheDAO Devcon 8 badge #${n}` ``; code string `<n>.<base64url(65-byte sig)>`; `n` positive integer, no upper bound.
 - EIP-712 domain: name `BlossomBallots`, version `2`, chainId `11155111`, verifyingContract = manifest contract. Type `Vote(uint256 tokenId,address voter,uint64 nonce,bytes ballot)`.
-- Ballot bytes: one per initiative in manifest order; unplaced = `255`; tiers S/A/B use competition ranks; `0` never appears.
+- Ballot bytes: one per initiative in manifest order; unplaced = `255`; Tier-S, Tier-A and Tier-B use competition ranks; `0` never appears.
 - Admin handoff to `0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF` (sem-the-bee.eth); relayer keeps only `MINTER_ROLE`.
 - The QR issuer private key never enters the repo, the server, or env files the server reads. Server knows only `DEVCON_ISSUER` (address).
 - Gas drip: ≤ 1 per tokenId ever, `0.005` ETH, only on "Send it yourself" click and only if balance is below 2× the `recordFor` estimate.
@@ -92,7 +92,7 @@ test("reverted: status reverted");
 ```
 
 - [ ] **Step 2: Run `deno task test shared/devcon` — FAIL (modules missing)**
-- [ ] **Step 3: Implement the six modules.** `encodeBallot`: rank of tier S = 1, A = 1 + |S|, B = 1 + |S| + |A|. base64url via `@std/encoding`-free code (shared runs in both runtimes: use `btoa`/`atob` with `-_` replacement). `parseCode` requires `^[1-9]\d{0,9}\.[A-Za-z0-9_-]{86,88}$` and a decoded length of exactly 65.
+- [ ] **Step 3: Implement the six modules.** `encodeBallot`: rank of Tier-S = 1, A = 1 + |S|, B = 1 + |S| + |A|. base64url via `@std/encoding`-free code (shared runs in both runtimes: use `btoa`/`atob` with `-_` replacement). `parseCode` requires `^[1-9]\d{0,9}\.[A-Za-z0-9_-]{86,88}$` and a decoded length of exactly 65.
 - [ ] **Step 4: Run tests — PASS**
 - [ ] **Step 5: Commit** `git commit -m "DevCon: shared code, ballot, typed data and receipt check"`
 
@@ -186,7 +186,7 @@ test("reverted: status reverted");
 
 **Files:**
 - Modify: `app/routes.ts` (`route("devcon/:code", "routes/devcon.code.tsx")` before `route("devcon", ...)`)
-- Create: `app/routes/devcon.code.tsx`, `app/components/devcon/Intro.tsx`, `app/components/devcon/TierBallot.tsx` (port of `../blossomlabs.eth/src/components/budgeting/voting/tier-list.tsx` restyled with this site's tokens/`Button`; tiers S "Must fund", A "Should fund", B "Nice to have"), `app/components/devcon/BallotStatus.tsx`, `app/hooks/use-devcon.ts`
+- Create: `app/routes/devcon.code.tsx`, `app/components/devcon/Intro.tsx`, `app/components/devcon/TierBallot.tsx` (port of `../blossomlabs.eth/src/components/budgeting/voting/tier-list.tsx` restyled with this site's tokens/`Button`; Tier-S "Must fund", Tier-A "Should fund", Tier-B "Nice to have"), `app/components/devcon/BallotStatus.tsx`, `app/hooks/use-devcon.ts`
 - Test: `app/routes/devcon.code.test.tsx`, `app/hooks/use-devcon.test.ts`
 
 **Interfaces:**

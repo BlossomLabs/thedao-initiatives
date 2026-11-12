@@ -13,16 +13,16 @@ for the current round and the [published mechanism](../README.md#published-mecha
 for the default ballot behavior. References to "today" below describe the earlier baseline;
 the simulations assume fixed funding and do not cover later currency-price changes.
 
-> **Your share only funds what you chose.** Today, money a voter has left after their S, A and B tiers can still fund proposals they never placed. With withholding, a voter can keep their share away from those proposals, one by one or all at once. Whatever is left goes back to TheDAO.
+> **Your share only funds what you chose.** Today, money a voter has left after their Tier-S, Tier-A and Tier-B can still fund proposals they never placed. With withholding, a voter can keep their share away from those proposals, one by one or all at once. Whatever is left goes back to TheDAO.
 
 ## Leftover money funds what nobody chose
 
-In Blossom Budgeting a voter sorts the proposals they want into S, A and B tiers and leaves the rest unplaced. The tally then treats the unplaced proposals as one more tier at the bottom of the ballot, all tied. Once a voter's own tiers have been counted, whatever is left of their share backs every unplaced proposal equally.
+In Blossom Budgeting a voter sorts the proposals they want into Tier-S, Tier-A and Tier-B and leaves the rest unplaced. The tally then treats the unplaced proposals as one more tier at the bottom of the ballot, all tied. Once a voter's own tiers have been counted, whatever is left of their share backs every unplaced proposal equally.
 
 That has two effects we do not want.
 
 - **Money goes where nobody sent it.** When every voter's leftover backs every remaining proposal equally, nothing separates them, and the tie is broken by price: the cheapest one is funded first. In our simulations about $73,000 of a $1,000,000 pool is paid by voters for proposals they had not placed, and about three proposals per round are funded mostly that way.
-- **Short ballots lose their own choices.** A voter who places only a few proposals reaches the unplaced tier early, while others are still on their A tier. Their money can be spent on something they never chose before one of their own choices has gathered enough support.
+- **Short ballots lose their own choices.** A voter who places only a few proposals reaches the unplaced tier early, while others are still on their Tier-A. Their money can be spent on something they never chose before one of their own choices has gathered enough support.
 
 Today a voter has no way to say no. Leaving a proposal unplaced means "not a priority", and the tally reads it as "fine, if money is left".
 
@@ -30,7 +30,7 @@ Today a voter has no way to say no. Leaving a proposal unplaced means "not a pri
 
 Withholding lets a voter mark proposals their share must not fund. A ballot then reads, from top to bottom:
 
-1. **S, A and B tiers.** What the voter wants, exactly as today.
+1. **Tier-S, Tier-A and Tier-B.** What the voter wants, exactly as today.
 2. **Unplaced.** Proposals the voter did not rank and did not withhold. Leftover money may still reach them, as today.
 3. **Return to TheDAO.** A line every ballot has, at the same place. Whatever the voter has left when the tally gets here goes back.
 4. **Withheld.** Proposals below that line. The voter's money never reaches them.

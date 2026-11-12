@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dt, pct, shortAddr, usd, usdShort } from "./format";
+import { clock, dayTime, dt, pct, shortAddr, shortDay, usd, usdShort } from "./format";
 import { parseUsd, toBaseUnits, tokenQty, transferCalldata } from "./donate";
 import { avatarSrc, pfpDefaultIndex, presetUri } from "./avatar";
 
@@ -15,7 +15,7 @@ describe("format", () => {
   it("shortAddr / dt / pct", () => {
     expect(shortAddr("0x839395e20bbB182fa440d08F850E6c7A8f6F0780")).toBe("0x8393…0780");
     expect(shortAddr("")).toBe("");
-    expect(dt(1788953372)).toMatch(/Sep 0[89], 2026/);
+    expect(dt(1788953372)).toMatch(/^Sep [89], 2026$/);
     expect(pct(150938, 236438)).toBe(63.8);
     expect(pct(500, 100)).toBe(100);
     expect(pct(1, 0)).toBe(0);
@@ -74,5 +74,15 @@ describe("usdShort (list rows on phones)", () => {
     expect(usdShort(999_600)).toBe("$1M");
     expect(usdShort(1_250_000)).toBe("$1.3M");
     expect(usdShort(-5)).toBe("$0");
+  });
+});
+
+describe("dates near now", () => {
+  const at = Date.UTC(2026, 10, 1, 9, 5) / 1000;
+  it("read as \"Nov 1, 09:05\": no weekday, no year, no time zone, 24-hour clock", () => {
+    expect(dayTime(at, true)).toBe("Nov 1, 09:05");
+    expect(shortDay(at, true)).toBe("Nov 1");
+    expect(clock(Date.UTC(2026, 10, 1, 23, 0) / 1000, true)).toBe("23:00");
+    expect(dayTime(at)).toMatch(/^[A-Z][a-z]{2} \d{1,2}, \d{2}:\d{2}$/);
   });
 });

@@ -48,7 +48,7 @@ tree; read, never edit). Reference: `vote/reference/quiet_ending.py` (`_ear`),
 - Project need = `max(0, goal − raised)` from the board at replay time, micro-USD
   (as `voteTally` does today). Settled tiers keep the need they settled with (KV
   snapshot).
-- Ballot bytes: 255 = withheld (never supported). Tier S/A/B on the ballot UI = the
+- Ballot bytes: 255 = withheld (never supported). Tier-S/Tier-A/Tier-B on the ballot UI = the
   voter's 1st/2nd/3rd distinct rank. B's stage counts to the last level (Python's
   `bound(stage ≥ tiers) = m`).
 - Copy: "S is settling", "window 2 of 4", "settled", "if it settled now"; never

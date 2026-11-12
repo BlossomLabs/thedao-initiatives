@@ -184,14 +184,6 @@ async function pickIn(card: HTMLElement, name: string) {
   }
   fireEvent.keyDown(option, { key: "Enter" });
 }
-/** Opens the card's selector and returns its options. */
-async function optionsIn(card: HTMLElement) {
-  const trigger = within(card).getByRole("combobox");
-  trigger.focus();
-  fireEvent.keyDown(trigger, { key: "ArrowDown" });
-  await screen.findByRole("listbox");
-  return (name: string) => screen.getByRole("option", { name });
-}
 async function placeIn(title: RegExp, choice: string) {
   fireEvent.click(await screen.findByRole("button", { name: title }));
   await pickIn(await screen.findByRole("dialog"), choice);

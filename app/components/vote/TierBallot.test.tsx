@@ -52,6 +52,15 @@ function show(tiers: Partial<Record<string, Tier>>, onChange = vi.fn(), onReplac
   return { onChange, onReplace };
 }
 
+it("the ballot warns that Tier-B may fund nothing", () => {
+  show({});
+  expect(
+    screen.getByText(
+      "Tier-B is funded only if the pool lasts and enough voters back the same initiatives. It may fund nothing.",
+    ),
+  ).toBeInTheDocument();
+});
+
 it("a settled tier says so, and its card locks the choices", async () => {
   const { onChange } = show({ alpha: "S" });
   expect(screen.getByText("Settled")).toBeInTheDocument();

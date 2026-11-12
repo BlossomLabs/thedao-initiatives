@@ -233,3 +233,79 @@ it("shows a Funded chip for existing support, without a DAO tier", () => {
   expect(within(row).queryByText(/^Tier-[SAB]$/)).toBeNull();
   expect(within(row).queryByText("100.0%")).toBeNull();
 });
+
+// The vote results: a row raised $0 of a $44k ask, $23k from Tier-S, and a Tier-S row.
+const voteCards = [
+  card("x", "Tier-A row", { goalUsd: 44_000, slug: "x" }),
+  card("y", "Tier-S row", { goalUsd: 44_000, slug: "y" }),
+];
+const toS = {
+  tier: "S" as const,
+  gap: "23000000000",
+  comesIn: [],
+  dropsOut: [{ slug: "y", tier: "S" as const }],
+  moves: [],
+};
+const mountVote = () =>
+  mount({
+    cards: voteCards,
+    voteTiers: new Map([["x", "A"], ["y", "S"]]),
+    votePct: new Map([["x", 100], ["y", 100]]),
+    next: new Map([["x", toS]]),
+    lead: new Map([["y", "46000000000"]]),
+    titles: new Map([["x", "Tier-A row"], ["y", "Tier-S row"]]),
+  });
+const rowOf = (title: string) => screen.getByText(title).closest("li")!;
+
+it("the vote results: a tick where the next tier is reached, its callout on hover", () => {
+  mountVote();
+  const row = rowOf("Tier-A row");
+  const tick = row.querySelector<HTMLElement>("[data-vote-tick][data-what-if]")!;
+  // (0 + $23k) / $44k
+  expect(parseFloat(tick.style.left)).toBeCloseTo(52.3, 1);
+  expect(row.querySelector("[data-vote-callout]")).toBeNull();
+  fireEvent.pointerEnter(row, { pointerType: "mouse" });
+  const callout = row.querySelector("[data-vote-callout]")!;
+  expect(callout).toHaveTextContent("$23k to Tier-S");
+  expect(callout).toHaveTextContent("Drops out: Tier-S row (Tier-S)");
+  fireEvent.pointerLeave(row, { pointerType: "mouse" });
+  expect(row.querySelector("[data-vote-callout]")).toBeNull();
+});
+
+it("the vote results: Tier-S has no tick, its lead at the bar's end", () => {
+  mountVote();
+  const row = rowOf("Tier-S row");
+  expect(row.querySelector("[data-vote-tick]")).toBeNull();
+  fireEvent.pointerEnter(row, { pointerType: "mouse" });
+  const callout = row.querySelector<HTMLElement>("[data-vote-callout]")!;
+  expect(callout).toHaveTextContent("$46k ahead");
+  expect(callout).toHaveTextContent(
+    "Its backers could give this much less between them and it would still be funded in Tier-S.",
+  );
+  expect(callout.style.right).toBe("calc(0% - 14px)");
+});
+
+it("the vote results' list has no Funded column, and no figure looks like a link", () => {
+  const { container } = mountVote();
+  expect(screen.queryByText("Funded")).toBeNull();
+  for (const name of ["Type", "Initiative", "Backers", "Raised"]) {
+    expect(screen.getByText(name)).toBeInTheDocument();
+  }
+  // The rows drop the cell too: its grid has one column fewer than the board's.
+  expect(
+    container.querySelector(".grid-cols-\\[2rem_4\\.25rem_minmax\\(0\\,1fr\\)_5\\.5rem_11rem\\]"),
+  )
+    .not.toBeNull();
+  expect(screen.queryByText(/needed/i)).toBeNull();
+  for (const row of screen.getAllByRole("listitem")) {
+    fireEvent.pointerEnter(row, { pointerType: "mouse" });
+  }
+  expect(screen.queryByRole("button", { name: /to Tier-|ahead/ })).toBeNull();
+  expect(container.querySelector(".cursor-help, .underline, .decoration-dotted")).toBeNull();
+});
+
+it("the board's list keeps its Funded column", () => {
+  const { container } = mount();
+  expect(screen.getByText("Funded")).toBeInTheDocument();
+  expect(container.querySelector("[data-what-if]")).toBeNull();
+});

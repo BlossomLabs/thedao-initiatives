@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { chainTally } from "./chain";
 import { type Receipt, replay, type Schedule, windowEnds } from "./quiet-ending";
 
 const T = 10_000;
@@ -191,6 +192,36 @@ describe("quiet-ending replay", () => {
     expect(s.rejected).toEqual([{ tokenId: "a", nonce: 0, reason: "tier_settled" }]);
   });
 
+  it("each settlement keeps its inputs", () => {
+    const st = run(base(), T + 14000);
+    expect(st.tiers[0].status).toBe("settled");
+    expect(st.tiers[1].status).toBe("settled");
+    for (const t of [0, 1]) {
+      const tier = st.tiers[t];
+      const again = chainTally(st.settleInputs[t]!, t, t + 1)[0].order;
+      expect(again).toEqual(tier.status === "settled" ? tier.funded : null);
+    }
+    expect(st.tiers[2].status).not.toBe("settled");
+    expect(st.settleInputs[2]).toBeNull();
+  });
+
+  it("settle inputs are kept when the settlement comes from a snapshot", () => {
+    const snapshot = {
+      tier: "S" as const,
+      at: T + 3600,
+      forced: false,
+      funded: [1],
+      awards: new Map([[1, 99n]]),
+      shares: new Map([[1, new Map([["a", 99n]])]]),
+    };
+    const st = run(base(), T + 3600, { snapshots: [snapshot] });
+    const i = st.settleInputs[0]!;
+    expect(i).not.toBeNull();
+    expect(i.voters).toEqual(["a", "b"]);
+    expect(i.spent).toBe(0n);
+    expect(i.costs).toEqual([150n, 150n]);
+  });
+
   it("kept settle needs pin the time once final", () => {
     const s = run(
       [...base(), r("b", T + 100, [X, 1]), r("a", T + 3700, [X, 1])],
@@ -215,6 +246,29 @@ describe("quiet-ending replay", () => {
     const s = run(base(), T + 20_000);
     expect(s.tiers.map((t) => t.status)).toEqual(["settled", "settled", "settled"]);
     expect(s.closed).toBe(true);
+    expect(s.liveInputs).toBeNull();
+  });
+
+  it("chainTally on liveInputs reproduces the live tally", () => {
+    // Both voters also back proposal 1 (needing 40) next, so A has one to fund.
+    const both = () => [r("a", 1, [1, 2]), r("b", 2, [1, 2])];
+    const check = (now: number) => {
+      const st = run(both(), now, { needs: [150n, 40n] });
+      const again = () => chainTally(st.liveInputs!, st.firstOpen);
+      const stages = again();
+      const tiers = new Map(
+        stages.flatMap((s, k) =>
+          s.order.map((c) => [c, (["S", "A", "B"] as const)[st.firstOpen + k]])
+        ),
+      );
+      expect(stages.flatMap((s) => s.order)).toEqual(st.live.order);
+      expect(tiers).toEqual(st.live.tiers);
+      // It must not spend the inputs: a second call gives the same stages.
+      expect(again()).toEqual(stages);
+      return st.live.order;
+    };
+    expect(check(T + 50)).toEqual([0, 1]); // S settling: S funds 0, A funds 1
+    expect(check(T + 6300 + 50)).toEqual([1]); // S settled, A settling
   });
 });
 

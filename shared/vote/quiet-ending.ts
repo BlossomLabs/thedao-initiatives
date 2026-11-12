@@ -7,7 +7,8 @@
 import { effectiveRanks } from "../../vote/shared/ranks.ts";
 import type { Tier } from "./ballot.ts";
 import { checkBallot, type RulesRound } from "./rules.ts";
-import { stageBound, stageTally, tierOf } from "./stage.ts";
+import { type ChainInputs, chainTally } from "./chain.ts";
+import { tierOf } from "./stage.ts";
 
 export type Schedule = {
   opensAt: number;
@@ -65,6 +66,13 @@ export type RoundState = {
   share: bigint;
   /** "If it settled now": the open tiers' chained tallies, from the first unsettled one. */
   live: { order: number[]; awards: Map<number, bigint>; tiers: Map<number, Tier> };
+  /** The live tally's inputs, to re-run it with another ballot; null once closed. */
+  liveInputs: ChainInputs | null;
+  /** How many tiers have settled: the live tally starts at this tier. */
+  firstOpen: number;
+  /** The inputs each tier settled from (index = tier; null until it settles): what the
+   * tally saw at that moment, to ask later what the settlement would have taken. */
+  settleInputs: (ChainInputs | null)[];
 };
 
 const TIERS: Tier[] = ["S", "A", "B"];
@@ -184,9 +192,8 @@ export function replay(
     }
   };
 
-  /** The chained stage tallies from tier `first` on, after the settled tiers' payments. */
-  /** Stages `first` up to (not including) `upTo`; the comparisons need only the first. */
-  const tally = (first: number, costs: bigint[] = needs, upTo = TIERS.length) => {
+  /** What the chained tally starts from: the voters, after the settled tiers' payments. */
+  const inputs = (costs: bigint[]): ChainInputs => {
     const voters = [...roll].filter((t) => accepted.has(t)).sort();
     const n = BigInt(voters.length);
     const each = n ? poolUsd / n : 0n;
@@ -198,32 +205,23 @@ export function replay(
     const ballots = voters.map((t) => accepted.get(t)!);
     const ranks = ballots.map((b) => effectiveRanks(b, m));
     const done = new Set(settled.flatMap((x) => x.funded));
-    let spent = settled.reduce(
+    const spent = settled.reduce(
       (a, x) => a + [...x.awards.values()].reduce((p, q) => p + q, 0n),
       0n,
     );
-    const stages: { order: number[]; shares: Map<number, Map<string, bigint>> }[] = [];
-    for (let t = first; t < upTo; t++) {
-      // B, the last tier, counts to the last level (the Python's stage after the tiers).
-      const bound = t === TIERS.length - 1 ? m : stageBound(ballots, t, TIERS.length, m);
-      const candidates = [...Array(m).keys()].filter((c) => !done.has(c));
-      const got = stageTally(costs, weights, ranks, poolUsd, spent, candidates, bound);
-      const shares = new Map<number, Map<string, bigint>>();
-      for (const c of got.order) {
-        const paid = new Map<string, bigint>();
-        for (const [i, d] of got.shares.get(c)!) paid.set(voters[i], d);
-        shares.set(c, paid);
-        done.add(c);
-        spent += [...paid.values()].reduce((a, b) => a + b, 0n);
-      }
-      stages.push({ order: got.order, shares });
-    }
-    return stages;
+    return { m, costs, voters, weights, ranks, ballots, poolUsd, spent, done };
   };
+  /** Stages `first` up to (not including) `upTo`; the comparisons need only the first. */
+  const tally = (first: number, costs: bigint[] = needs, upTo = TIERS.length) =>
+    chainTally(inputs(costs), first, upTo);
+  const settleInputs: (ChainInputs | null)[] = TIERS.map(() => null);
   const settle = (t: number, at: number, forced: boolean) => {
+    const costs = input.settleNeeds?.[TIERS[t]]?.needs ?? needs;
+    // Kept before the snapshot return: a frozen settlement still has the state it was made in.
+    settleInputs[t] = inputs(costs);
     const snap = input.snapshots?.find((x) => x.tier === TIERS[t]);
     if (snap) return settled.push(snap);
-    const { order, shares } = tally(t, input.settleNeeds?.[TIERS[t]]?.needs ?? needs, t + 1)[0];
+    const { order, shares } = tally(t, costs, t + 1)[0];
     const awards = new Map(
       order.map((c) => [c, [...shares.get(c)!.values()].reduce((a, b) => a + b, 0n)] as const),
     );
@@ -318,6 +316,9 @@ export function replay(
     closed: settled.length === TIERS.length,
     share: voters ? poolUsd / BigInt(voters) : 0n,
     live,
+    liveInputs: firstOpen < TIERS.length ? inputs(needs) : null,
+    firstOpen,
+    settleInputs,
   };
 }
 

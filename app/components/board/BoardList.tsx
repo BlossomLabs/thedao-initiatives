@@ -10,6 +10,8 @@ import CardTitle from "~/components/board/CardTitle";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import WatchlistButton from "~/components/board/WatchlistButton";
 import FundingStatus from "~/components/board/FundingStatus";
+import { whatIf, WhatIfCallout, whatIfText, whatIfTick } from "~/components/vote/NextTier";
+import type { NextTierEntry } from "~/hooks/use-vote";
 import RatingChip, { RatingForm } from "~/components/ratings/RatingChip";
 import Reveal from "~/components/ui/Reveal";
 import { fullyFunded, type Ratings } from "~/lib/board-view";
@@ -46,14 +48,22 @@ const COLUMNS =
  * the star goes at the end of the title line instead (compact rows: after the amount). */
 const RATED_COLUMNS =
   `${COLUMNS} @min-[880px]/list:grid-cols-[2rem_4.25rem_minmax(0,1fr)_6rem_4rem_5.5rem_11rem]`;
+/** The vote results' list: no Funded column, since each bar's what-if tick and callout
+ * carry it. The same widths otherwise, with and without the Rating column. */
+const VOTE_COLUMNS =
+  "grid grid-cols-[2rem_4.25rem_minmax(0,1fr)_5.5rem_11rem] gap-x-4 @max-[720px]/list:grid-cols-1";
+const VOTE_RATED_COLUMNS =
+  `${VOTE_COLUMNS} @min-[880px]/list:grid-cols-[2rem_4.25rem_minmax(0,1fr)_6rem_5.5rem_11rem]`;
 const ROW =
   "col-span-full grid grid-cols-subgrid items-center px-4 @max-[720px]/list:grid-cols-[auto_minmax(0,1fr)_auto] @max-[720px]/list:gap-x-3";
 const NUM = "text-right tnum whitespace-nowrap";
 /** The row's own funding bar: 3px, rounded, a faint track and the funded part in green. */
 function FundingBar(
-  { pct, tick, votePct, votePendingPct, className, children }: {
+  { pct, tick, whatIf, votePct, votePendingPct, className, children }: {
     pct: number;
     tick?: number;
+    /** The tick marks where the vote results' next tier is reached, not the floor. */
+    whatIf?: boolean;
     /** The vote's share, drawn after the raised part (gold). */
     votePct?: number;
     /** The part of it a settling tier would add (lighter gold). */
@@ -92,7 +102,7 @@ function FundingBar(
           />
         )}
       </span>
-      {tick !== undefined && <VoteTick at={tick} reached={pct >= tick} />}
+      {tick !== undefined && <VoteTick at={tick} reached={pct >= tick} whatIf={whatIf} />}
       {children}
     </span>
   );
@@ -110,8 +120,20 @@ function Row(
     votePct,
     votePendingPct,
     voteTier,
+    final,
+    next,
+    lead,
+    titles,
+    voteResults = false,
   }: {
     card: Card;
+    /** On the vote results page: no Funded cell, the tier after the title. */
+    voteResults?: boolean;
+    next?: NextTierEntry;
+    /** Tier-S's lead, micro-USD. */
+    lead?: string;
+    titles?: ReadonlyMap<string, string>;
+    final?: number;
     votePct?: number;
     votePendingPct?: number;
     voteTier?: Tier;
@@ -139,9 +161,18 @@ function Row(
       <span className="sr-only">funded</span>
     </>
   );
+  // The vote results' what-if: Tier-S's lead, or the gap to the next tier (to Tier-B for
+  // one the vote didn't fund), as a tick on the bar and its callout.
+  const w = whatIf({ tier: voteTier, next, lead });
+  const wTick = whatIfTick(w, summary.total, r.goalUsd);
+  // While the vote runs, the row's tier sits after its title (there is no Funded column);
+  // after it, the section names the tier.
+  const status = voteResults && final === undefined && (voteTier || full)
+    ? <FundingStatus tier={voteTier} byVote={votedFull || Boolean(voteTier)} />
+    : null;
   const tick = vote ? voteFloorPct(r.goalUsd, vote) : 0;
   // Hovering or tapping the row shows its vote callout under the bar.
-  const reveal = useVoteReveal(Boolean(standing));
+  const reveal = useVoteReveal(Boolean(standing) || Boolean(w));
   // Rows come and go with the filters: a fade, and a glide when others move.
   const rowMotion = useRowMotion();
   const prefetch = usePrefetchInitiative(r.slug);
@@ -195,7 +226,9 @@ function Row(
           />
         )}
       </span>
-      <TypeBadge type={r.type} inline className="justify-self-start @max-[720px]/list:hidden" />
+      {final === undefined
+        ? <TypeBadge type={r.type} inline className="justify-self-start @max-[720px]/list:hidden" />
+        : <span />}
       <div className="flex min-w-0 items-center gap-2.5 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-1">
         {/* The same title as the cards: the primary category's icon names them all. */}
         <CardTitle
@@ -213,6 +246,8 @@ function Row(
             className="flex-none @max-[720px]/list:hidden"
           />
         ))}
+        {status}
+        {w && <span className="sr-only">{whatIfText(w, titles, final !== undefined)}</span>}
         {ratings && (
           // 720 to 880px: at the end of the title line (no room for the column).
           <span className="-mr-1 ml-auto hidden flex-none @min-[720px]/list:block @min-[880px]/list:hidden">
@@ -224,18 +259,20 @@ function Row(
         // The Rating column (from 880px; narrower, at the end of the title line).
         <span className="-ml-1 hidden justify-self-start @min-[880px]/list:block">{chip}</span>
       )}
-      <span
-        className={cn(
-          NUM,
-          "text-[12.5px] font-medium @max-[720px]/list:hidden",
-          pctOn || full ? "text-dao-green" : "text-white/40",
-        )}
-      >
-        {pctShown}
-        <span className="sr-only">
-          {standing && `. ${calloutText(standing)}`}
+      {!voteResults && (
+        <span
+          className={cn(
+            NUM,
+            "text-[12.5px] font-medium @max-[720px]/list:hidden",
+            pctOn || full ? "text-dao-green" : "text-white/40",
+          )}
+        >
+          {pctShown}
+          <span className="sr-only">
+            {standing && `. ${calloutText(standing)}`}
+          </span>
         </span>
-      </span>
+      )}
       {/* Desktop: the Backers column, the pledgers' logos when there are any. */}
       <span className={cn(NUM, "text-[12.5px] text-white/60 @max-[720px]/list:hidden")}>
         {logos.length > 0
@@ -264,11 +301,13 @@ function Row(
           wrap between items on narrow screens so they cannot push the row wider. */
       }
       <div className="contents @max-[720px]/list:col-span-2 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-2 @max-[720px]/list:flex @max-[720px]/list:flex-wrap @max-[720px]/list:items-center @max-[720px]/list:gap-x-2 @max-[720px]/list:gap-y-1">
-        <TypeBadge
-          type={r.type}
-          inline
-          className="hidden flex-none px-2 py-[2px] text-[10px] @max-[720px]/list:inline-flex"
-        />
+        {final === undefined && (
+          <TypeBadge
+            type={r.type}
+            inline
+            className="hidden flex-none px-2 py-[2px] text-[10px] @max-[720px]/list:inline-flex"
+          />
+        )}
         {label.map((k) => (
           <CardLabel
             key={k}
@@ -284,12 +323,16 @@ function Row(
           )}
         >
           <span className="@max-[720px]/list:hidden">
-            <b className="font-medium text-white/90">{usd(summary.total)}</b> of {usd(r.goalUsd)}
+            {/* The final amount is short everywhere ("$279k"), as on the cards. */}
+            <b className="font-medium text-white/90">
+              {final === undefined ? usd(summary.total) : usdShort(final)}
+            </b>
+            {final === undefined && <>{" "}of {usd(r.goalUsd)}</>}
           </span>
           {/* Phones: the short form. */}
           <span className="hidden @max-[720px]/list:inline" aria-hidden="true">
-            <b className="font-medium text-white/90">{usdShort(summary.total)}</b> of{" "}
-            {usdShort(r.goalUsd)}
+            <b className="font-medium text-white/90">{usdShort(final ?? summary.total)}</b>
+            {final === undefined && <>{" "}of {usdShort(r.goalUsd)}</>}
           </span>
           {backers > 0 && <span className="sr-only">, {plural(backers, "backer")}</span>}
         </span>
@@ -315,9 +358,40 @@ function Row(
           </span>
         )}
       </div>
-      {/* On phones every bar reserves the same 5rem status slot, sized for the Funded chip. */}
-      <div className="col-start-3 flex min-w-0 items-center gap-2.5 @max-[720px]/list:col-span-2 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-3 @max-[720px]/list:grid @max-[720px]/list:grid-cols-[minmax(0,1fr)_5rem]">
-        {vote?.show && standing
+      {
+        /* On phones every bar reserves the same 5rem status slot, sized for the Funded chip;
+          the vote results' bars have none (their tier is after the title, the rest in the
+          callout). */
+      }
+      <div
+        className={cn(
+          "col-start-3 flex min-w-0 items-center gap-2.5 @max-[720px]/list:col-span-2 @max-[720px]/list:col-start-2 @max-[720px]/list:row-start-3",
+          !voteResults &&
+            "@max-[720px]/list:grid @max-[720px]/list:grid-cols-[minmax(0,1fr)_5rem]",
+        )}
+      >
+        {w
+          ? (
+            <FundingBar
+              pct={pct}
+              tick={wTick}
+              whatIf
+              votePct={votePct}
+              votePendingPct={votePendingPct}
+              className="flex-1"
+            >
+              {reveal.open && (
+                <WhatIfCallout
+                  w={w}
+                  at={wTick}
+                  side="bottom"
+                  titles={titles}
+                  final={final !== undefined}
+                />
+              )}
+            </FundingBar>
+          )
+          : vote?.show && standing
           ? (
             <FundingBar
               pct={pct}
@@ -337,15 +411,17 @@ function Row(
               className="flex-1"
             />
           )}
-        <span
-          className={cn(
-            NUM,
-            "hidden text-[12.5px] font-semibold @max-[720px]/list:flex @max-[720px]/list:items-center @max-[720px]/list:justify-end",
-            pctOn || full ? "text-dao-green" : "text-white/40",
-          )}
-        >
-          {pctShown}
-        </span>
+        {!voteResults && (
+          <span
+            className={cn(
+              NUM,
+              "hidden text-[12.5px] font-semibold @max-[720px]/list:flex @max-[720px]/list:items-center @max-[720px]/list:justify-end",
+              pctOn || full ? "text-dao-green" : "text-white/40",
+            )}
+          >
+            {pctShown}
+          </span>
+        )}
       </div>
       {ratings && canRate && (
         // Under the row, from the title column on (the full row on phones).
@@ -381,8 +457,25 @@ export default function BoardList(
     votePct,
     votePendingPct,
     voteTiers,
+    finals,
+    unfunded,
+    next,
+    lead,
+    titles,
   }: {
     cards: Card[];
+    /** Tier-S's lead (micro-USD), by initiative id. */
+    lead?: ReadonlyMap<string, string>;
+    /** The vote's gap to each initiative's next tier, by initiative id (live while it is
+     * open, frozen at each settlement once closed). */
+    next?: ReadonlyMap<string, NextTierEntry>;
+    /** Slug → title, for the names in the gap's hover. */
+    titles?: ReadonlyMap<string, string>;
+    /** The closed vote's final amounts by initiative id: shown alone, no goal, no type. */
+    finals?: ReadonlyMap<string, number>;
+    /** The closed vote's "Not funded" section: its rows show what they raised on their
+     * own, so the last column says Raised, not Final. */
+    unfunded?: boolean;
     /** The vote results: each initiative's vote share, % of its goal, by initiative id. */
     votePct?: ReadonlyMap<string, number>;
     /** The part of it the settling tier would add if it settled now. */
@@ -401,10 +494,16 @@ export default function BoardList(
     canRate?: boolean;
   },
 ) {
+  // The vote results page (the open vote's gaps and leads, or the closed vote's finals):
+  // the bars' what-ifs carry what the Funded column said, so it goes.
+  const voteResults = Boolean(next || lead || finals);
+  const columns = voteResults
+    ? (ratings ? VOTE_RATED_COLUMNS : VOTE_COLUMNS)
+    : (ratings ? RATED_COLUMNS : COLUMNS);
   return (
     // No overflow clip: the last row's vote callout hangs below the panel.
     <div className="@container/list rounded-2xl border border-white/10 bg-white/[.04]">
-      <div className={ratings ? RATED_COLUMNS : COLUMNS}>
+      <div className={columns}>
         <div
           className={cn(
             ROW,
@@ -413,12 +512,13 @@ export default function BoardList(
           aria-hidden="true"
         >
           <span />
-          <span>Type</span>
+          {/* The closed vote's rows show no type, and their amount is the final one. */}
+          <span>{finals ? "" : "Type"}</span>
           <span>Initiative</span>
           {ratings && <span className="hidden @min-[880px]/list:block">Rating</span>}
-          <span className="text-right">Funded</span>
+          {!voteResults && <span className="text-right">Funded</span>}
           <span className="text-right">Backers</span>
-          <span className="text-right">Raised</span>
+          <span className="text-right">{finals && !unfunded ? "Final" : "Raised"}</span>
         </div>
         <ul className="col-span-full m-0 grid list-none grid-cols-subgrid p-0">
           <AnimatePresence>
@@ -439,6 +539,11 @@ export default function BoardList(
                 votePct={votePct?.get(c.initiative.id)}
                 votePendingPct={votePendingPct?.get(c.initiative.id)}
                 voteTier={voteTiers?.get(c.initiative.id)}
+                final={finals?.get(c.initiative.id)}
+                next={next?.get(c.initiative.id)}
+                lead={lead?.get(c.initiative.id)}
+                titles={titles}
+                voteResults={voteResults}
               />
             ))}
           </AnimatePresence>

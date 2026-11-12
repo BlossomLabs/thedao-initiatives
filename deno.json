@@ -27,8 +27,8 @@
     "login": "deno run --env-file=.env -A api/scripts/login.ts",
     "seed-categories": "deno run --env-file=.env -A api/scripts/seed-categories.ts",
     "bench": "deno run --allow-net api/scripts/bench.ts",
-    "vote-codes": "deno run --allow-env=VOTE_ISSUER_KEY --allow-read --allow-write=vote-codes scripts/vote-codes.ts",
-    "vote-deploy": "deno run --allow-env=VOTE_RELAYER_KEY,SEPOLIA_RPC_URL,MAINNET_RPC_URL --allow-net --allow-read --allow-write=shared/vote/manifest-data.ts scripts/vote-deploy.ts"
+    "vote-codes": "deno run --allow-env=VOTE_ISSUER_KEY,DEVCON_ISSUER_KEY --allow-read --allow-write=vote-codes scripts/vote-codes.ts",
+    "vote-deploy": "deno run --allow-env=VOTE_RELAYER_KEY,DEVCON_RELAYER_KEY,SEPOLIA_RPC_URL,MAINNET_RPC_URL --allow-net --allow-read --allow-write=shared/vote/manifest-data.ts scripts/vote-deploy.ts"
   },
   "imports": {
     "@std/http": "jsr:@std/http@^1.1.4",

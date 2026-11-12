@@ -31,6 +31,9 @@ export interface Deps {
   maintenance: Maintenance;
   /** The vote round; absent until a contract is deployed (routes answer 503). */
   vote?: VoteRound;
+  /** Handed work a request starts but doesn't wait for (the vote's gap to the next
+   * tier). Absent, it just runs; tests collect it so they can wait for it. */
+  background?: (work: Promise<unknown>) => void;
 }
 
 export type Vars = {

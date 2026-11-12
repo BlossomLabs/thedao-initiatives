@@ -5,11 +5,12 @@ import Hero from "~/components/board/Hero";
 import { LinkButton } from "~/components/ui/Button";
 import { useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/vote-local";
+import { dollars, splitResults } from "~/lib/vote-results";
 import { useSession } from "~/context/session";
-import { useMyBadges, useVoteRound } from "~/hooks/use-vote";
-import { usd } from "~/lib/format";
+import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
+import { usd, usdShort } from "~/lib/format";
 import { ROUND } from "../../../shared/vote/manifest";
-import type { Tier } from "../../../shared/vote/ballot";
+import { type Tier, tierName } from "../../../shared/vote/ballot";
 
 const POLL_MS = 5_000;
 const POOL = BigInt(ROUND.poolUsd);
@@ -17,9 +18,13 @@ const POOL_USD = Number(POOL / 1_000_000n);
 const IN_ROUND: ReadonlySet<string> = new Set(ROUND.slugs);
 
 const REAL = ROUND.kind === "real";
-const dollars = (micro: string) => Number(BigInt(micro) / 10_000n) / 100;
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
+/** Voters should expect Tier-B may be empty: it only funds what the pool has left. */
+const tierBEmpty = (rv: RoundView) =>
+  rv.tiers.find((t) => t.tier === "B")?.status !== "settled" &&
+  !Object.values(rv.live.tiers ?? {}).includes("B");
+const TIER_B_NOTE = " · Tier-B: nothing funded yet, the pool may not reach it.";
 const POOL_NAME = REAL ? "pool" : "demo pool";
 
 /** The vote results: the front page, limited to the round's initiatives, with what the
@@ -81,13 +86,43 @@ export default function VoteResults() {
     return { votePct: total, votePendingPct: pend, voteTiers: tiers };
   }, [money, cards]);
 
+  // The gaps and Tier-S leads by initiative id (live while the round is open, frozen at
+  // each settlement once it is closed), and the titles the hover names.
+  const { next, lead, titles } = useMemo(() => {
+    const next = new Map<string, NextTierEntry>();
+    const lead = new Map<string, string>();
+    const titles = new Map<string, string>();
+    const src = rv ? (rv.closed ? rv.final : rv.live) : undefined;
+    for (const c of cards) {
+      const slug = c.initiative.slug;
+      titles.set(slug, c.initiative.title);
+      const e = src?.next?.[slug];
+      if (e) next.set(c.initiative.id, e);
+      const l = src?.lead?.[slug];
+      if (l) lead.set(c.initiative.id, l);
+    }
+    return { next, lead, titles };
+  }, [rv, cards]);
+
   const raised = money
     ? [...money.settled.values(), ...money.pending.values()].reduce((a, b) => a + b, 0)
     : undefined;
   const n = rv ? Object.keys(rv.accepted).length : 0;
   const ballotsText = plural(n, "ballot");
   const isClosed = Boolean(rv?.closed);
-  const fundedCount = money ? new Set([...money.settled.keys(), ...money.pending.keys()]).size : 0;
+  const pool = dollars(rv?.poolUsd ?? ROUND.poolUsd);
+  // Once closed, the two lists; the cards carry only their final amount.
+  const results = useMemo(
+    () => rv?.closed ? splitResults(cards, rv.tiers) : undefined,
+    [rv, cards],
+  );
+  /** The list has a section per tier with what it funded; a tier that funded nothing has
+   * no section, so the hero says so. */
+  const tierLines = isClosed && rv
+    ? rv.tiers.filter((t) => t.status === "waiting" || !t.funded.length).map((t) => (
+      <p key={t.tier} className="m-0">{tierName(t.tier)}: no initiatives funded</p>
+    ))
+    : null;
 
   const hero = (
     <Hero
@@ -96,14 +131,16 @@ export default function VoteResults() {
       sub={isClosed
         ? (
           <>
-            Final result: {usd(raised ?? 0)} to {plural(fundedCount, "initiative")} from the{" "}
-            {usd(POOL_USD)} <span className="text-vote">{POOL_NAME}</span>
+            {usdShort(raised ?? 0)} of {usdShort(pool)}{" "}
+            <span className="text-vote">{POOL_NAME}</span> spent
           </>
         )
         : (
+          // Where the round is: the round box below.
           <>
             would be funded by {ballotsText} from the {usd(POOL_USD)}{" "}
             <span className="text-vote">{POOL_NAME}</span>
+            {rv && tierBEmpty(rv) && TIER_B_NOTE}
           </>
         )}
     >
@@ -112,6 +149,7 @@ export default function VoteResults() {
           <RoundBox schedule={ROUND.schedule} rv={rv} large />
         </div>
       )}
+      {tierLines && <div className="mt-3 space-y-1 text-[14px] text-white/60">{tierLines}</div>}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] text-white/55">
         <span className="flex items-center gap-2">
           <i className="inline-block h-[6px] w-6 rounded-full bg-gradient-to-r from-dao-green to-dao-bright" />
@@ -144,7 +182,12 @@ export default function VoteResults() {
       votePct={votePct}
       votePendingPct={votePendingPct}
       voteTiers={voteTiers}
+      results={results}
+      next={next}
+      lead={lead}
+      titles={titles}
       hero={hero}
+      heading={isClosed ? "The vote's final result" : "If the vote ended now"}
       defaultSort="closest"
     />
   );

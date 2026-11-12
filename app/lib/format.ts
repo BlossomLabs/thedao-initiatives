@@ -18,6 +18,17 @@ export function usdShort(v: unknown): string {
   return `$${trim(n / 1_000_000, 1)}M`;
 }
 
+/** A missing amount, short and rounded up so it never reads as less than it is. */
+export const usdShortUp = (n: number): string =>
+  usdShort(
+    n < 1000 ? Math.ceil(n) : n < 10_000
+      ? Math.ceil(n / 100) * 100
+      // From $1M the short form has one decimal: round up to the next 0.1M.
+      : n < 1_000_000
+      ? Math.ceil(n / 1000) * 1000
+      : Math.ceil(n / 100_000) * 100_000,
+  );
+
 export function shortAddr(a: string | null | undefined): string {
   return a && a.length > 12 ? a.slice(0, 6) + "…" + a.slice(-4) : a ?? "";
 }
@@ -47,8 +58,7 @@ export const shortDay = (secs: number, utc = false) =>
 export const clock = (secs: number, utc = false) =>
   CLOCK[utc ? "utc" : "local"].format(secs * 1000);
 /** "Nov 1, 14:00". */
-export const dayTime = (secs: number, utc = false) =>
-  `${shortDay(secs, utc)}, ${clock(secs, utc)}`;
+export const dayTime = (secs: number, utc = false) => `${shortDay(secs, utc)}, ${clock(secs, utc)}`;
 
 /** "just now", "4 min ago", "3 h ago", or the date for anything older than a day. */
 export function ago(ts: number, now: number = Date.now() / 1000): string {

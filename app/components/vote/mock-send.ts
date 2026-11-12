@@ -41,15 +41,18 @@ export function useMockBallotSubmit(counted: (ballot: Hex) => void) {
   }, []);
 
   /** Through the relayer: sign, send, record. */
-  const submit = useCallback(async (_id: bigint, ballot: Hex) => {
+  const submit = useCallback((_id: bigint, ballot: Hex) => {
     run(ballot, [{ kind: "signing" }, { kind: "relaying" }, { kind: "waiting", hash: NO_TX }]);
+    return Promise.resolve();
   }, [run]);
   /** From the voter's own wallet: sign, confirm the transaction, record. */
-  const selfSend = useCallback(async (_id: bigint, ballot: Hex) => {
+  const selfSend = useCallback((_id: bigint, ballot: Hex) => {
     run(ballot, [{ kind: "signing" }, { kind: "relaying" }, { kind: "waiting", hash: NO_TX }]);
+    return Promise.resolve();
   }, [run]);
-  const retry = useCallback(async () => {
+  const retry = useCallback(() => {
     if (last.current) run(last.current.ballot, last.current.steps);
+    return Promise.resolve();
   }, [run]);
   /** Back to nothing sent (another example opened). */
   const reset = useCallback(() => {

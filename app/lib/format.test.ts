@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clock, dayTime, dt, pct, shortAddr, shortDay, usd, usdShort } from "./format";
+import { clock, dayTime, dt, pct, shortAddr, shortDay, usd, usdShort, usdShortUp } from "./format";
 import { parseUsd, toBaseUnits, tokenQty, transferCalldata } from "./donate";
 import { avatarSrc, pfpDefaultIndex, presetUri } from "./avatar";
 
@@ -79,10 +79,19 @@ describe("usdShort (list rows on phones)", () => {
 
 describe("dates near now", () => {
   const at = Date.UTC(2026, 10, 1, 9, 5) / 1000;
-  it("read as \"Nov 1, 09:05\": no weekday, no year, no time zone, 24-hour clock", () => {
+  it('read as "Nov 1, 09:05": no weekday, no year, no time zone, 24-hour clock', () => {
     expect(dayTime(at, true)).toBe("Nov 1, 09:05");
     expect(shortDay(at, true)).toBe("Nov 1");
     expect(clock(Date.UTC(2026, 10, 1, 23, 0) / 1000, true)).toBe("23:00");
     expect(dayTime(at)).toMatch(/^[A-Z][a-z]{2} \d{1,2}, \d{2}:\d{2}$/);
+  });
+});
+
+describe("usdShortUp (a missing amount, never read as less)", () => {
+  it("rounds up at every size", () => {
+    expect(usdShortUp(41_200)).toBe("$42k");
+    expect(usdShortUp(950.2)).toBe("$951");
+    expect(usdShortUp(1_234_500)).toBe("$1.3M");
+    expect(usdShortUp(1_200_000)).toBe("$1.2M");
   });
 });

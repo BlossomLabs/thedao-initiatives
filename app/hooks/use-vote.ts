@@ -103,8 +103,44 @@ export type RoundView = {
   }[];
   /** The pool on-chain now (micro-USD): what a new ballot's size is judged against. */
   poolUsd?: string;
-  live: { funded: string[]; awards: Record<string, string>; tiers?: Record<string, Tier> };
+  live: {
+    funded: string[];
+    awards: Record<string, string>;
+    tiers?: Record<string, Tier>;
+    /** Each unsettled initiative's gap to its next tier; absent once the round is closed. */
+    next?: Record<string, NextTierEntry>;
+    /** While Tier-S is open: how far ahead each of its initiatives is, micro-USD
+     * (only leads of at least $1K). */
+    lead?: Record<string, string>;
+  };
+  /** Once closed: each initiative's gap to the tier above where it finished, judged at
+   * that tier's settlement (comesIn/dropsOut name only the target tier), and Tier-S's
+   * leads (micro-USD, at least $1K). Absent until computed. */
+  final?: { next: Record<string, NextTierEntry>; lead: Record<string, string> };
 };
+
+export type NextTierEntry = {
+  tier: Tier;
+  /** Micro-USD; null when no amount alone gets it there. */
+  gap: string | null;
+  comesIn: { slug: string; tier: Tier }[];
+  dropsOut: { slug: string; tier: Tier }[];
+  moves: { slug: string; from: Tier; to: Tier }[];
+};
+
+const CLOSED_POLL_MS = 15_000;
+
+/** How often a page that polls every `refetchInterval` asks for the round in `view`'s state. */
+export function roundPollInterval(
+  view: RoundView | undefined,
+  refetchInterval: number | false,
+): number | false {
+  if (!view?.closed || refetchInterval === false) return refetchInterval;
+  // The tally can't change once the round is over, but the final what-ifs are worked
+  // out in the background after it closes and only come in a later response: wait for
+  // them, at an unhurried pace, then stop.
+  return view.final ? false : Math.max(refetchInterval, CLOSED_POLL_MS);
+}
 
 /** The round's quiet ending (each tier's state, what counts, what was refused). */
 export function useVoteRound(refetchInterval: number | false = false, enabled = true) {
@@ -112,8 +148,7 @@ export function useVoteRound(refetchInterval: number | false = false, enabled = 
     queryKey: ["vote-round"],
     enabled,
     queryFn: () => api<RoundView>("/api/vote/round", { passive: true }),
-    // Nothing changes once the round is over.
-    refetchInterval: (q) => (q.state.data?.closed ? false : refetchInterval),
+    refetchInterval: (q) => roundPollInterval(q.state.data, refetchInterval),
     retry: false,
   });
 }

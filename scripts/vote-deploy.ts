@@ -439,7 +439,10 @@ async function main() {
   }
   const real = args.real ? parseRealArgs(args) : null;
   const chain = real ? mainnet : sepolia;
-  const key = Deno.env.get("VOTE_RELAYER_KEY")?.trim() as Hex | undefined;
+  // DEVCON_RELAYER_KEY: the name before the rename, still accepted.
+  const key = (Deno.env.get("VOTE_RELAYER_KEY") || Deno.env.get("DEVCON_RELAYER_KEY"))?.trim() as
+    | Hex
+    | undefined;
   if (!key || !/^0x[0-9a-fA-F]{64}$/.test(key)) throw new Error("VOTE_RELAYER_KEY is required");
   const issuer = args.issuer;
   if (!real && (!issuer || !isAddress(issuer))) {

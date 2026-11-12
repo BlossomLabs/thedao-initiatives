@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Tooltip } from "@base-ui/react/tooltip";
 import { ChevronDown, Eye, EyeOff, GripVertical, RotateCcw } from "lucide-react";
 import CategoryDot from "~/components/ui/CategoryDot";
@@ -776,22 +776,39 @@ export default function TierBallot(
                       )}
                   </div>
                 );
-                if (!note) return row;
+                // Voters should expect Tier-B may be empty: it funds only what the pool has left.
+                const bNote = t.tier === "B" && (
+                  <p className="px-1 text-[12.5px] text-white/45">
+                    Tier-B is funded only if the pool lasts and enough voters back the same
+                    initiatives. It may fund nothing.
+                  </p>
+                );
+                if (!note) {
+                  return (
+                    <Fragment key={t.tier}>
+                      {row}
+                      {bNote}
+                    </Fragment>
+                  );
+                }
                 return (
-                  <Tooltip.Root
-                    key={t.tier}
-                    open={noteOpen === t.tier}
-                    onOpenChange={(open) => setNoteOpen(open ? t.tier : undefined)}
-                  >
-                    <Tooltip.Trigger delay={300} closeOnClick={false} render={row} />
-                    <Tooltip.Portal>
-                      <Tooltip.Positioner sideOffset={6} className="z-[210]">
-                        <Tooltip.Popup className="max-w-[260px] rounded-[14px] border border-edge2 bg-panel px-2.5 py-1.5 font-inter-tight text-[12px] leading-snug text-white shadow-menu outline-none">
-                          {note}
-                        </Tooltip.Popup>
-                      </Tooltip.Positioner>
-                    </Tooltip.Portal>
-                  </Tooltip.Root>
+                  <Fragment key={t.tier}>
+                    <Tooltip.Root
+                      key={t.tier}
+                      open={noteOpen === t.tier}
+                      onOpenChange={(open) => setNoteOpen(open ? t.tier : undefined)}
+                    >
+                      <Tooltip.Trigger delay={300} closeOnClick={false} render={row} />
+                      <Tooltip.Portal>
+                        <Tooltip.Positioner sideOffset={6} className="z-[210]">
+                          <Tooltip.Popup className="max-w-[260px] rounded-[14px] border border-edge2 bg-panel px-2.5 py-1.5 font-inter-tight text-[12px] leading-snug text-white shadow-menu outline-none">
+                            {note}
+                          </Tooltip.Popup>
+                        </Tooltip.Positioner>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
+                    {bNote}
+                  </Fragment>
                 );
               })}
             </div>

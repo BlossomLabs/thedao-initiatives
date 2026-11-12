@@ -1,57 +1,375 @@
 import { bytesToHex } from "viem";
-import type { RoundView } from "~/hooks/use-vote";
+import type { RoundTier, RoundView } from "~/hooks/use-vote";
+import type { Card } from "~/lib/api-types";
 import { encodeBallot, type Tier } from "../../../shared/vote/ballot";
+import type { VoteManifest } from "../../../shared/vote/manifest";
+
+/** Examples of the ballot through the vote, public at `/vote/mock/<kind>` (and in dev at
+ * `?mock=<kind>`): the real round's dates and the board's real proposals, with a made-up
+ * pool, voters and ballot. Nothing is sent from them. In the order they happen. */
+export const MOCKS = [
+  "started",
+  "prefilled",
+  "s-settling",
+  "s-extended",
+  "s-last",
+  "spent",
+  "b-settling",
+  "missed",
+  "finished",
+] as const;
+export type MockKind = (typeof MOCKS)[number];
+export const MOCK_LABELS: Record<MockKind, string> = {
+  started: "Just opened",
+  prefilled: "Prefilled from ratings",
+  "s-settling": "Tier-S settling",
+  "s-extended": "Tier-S extended",
+  "s-last": "Tier-S last window",
+  spent: "Tier-S settled",
+  "b-settling": "Tier-B settling",
+  missed: "Badge that never voted",
+  finished: "Finished",
+};
+export const isMockKind = (s: string | null): s is MockKind =>
+  (MOCKS as readonly string[]).includes(s ?? "");
+
+export type Mock = {
+  round: VoteManifest;
+  view: RoundView;
+  /** The badge's own star ratings, by slug: what a fresh ballot starts from. */
+  ratings?: Record<string, number>;
+  /** What this badge skipped (its 1–2★), when the ballot was already sent. */
+  skipped?: string[];
+  /** The ballot the badge sent, for a finished round. */
+  sent?: Partial<Record<string, Tier>>;
+};
+
+const H = 3600;
+const D = 24 * H;
+const VOTERS = 40;
+const POOL_USD = 1_000_000;
+/* The real round's dates (docs/factsheet.md): voting opens Tue Nov 17 (its hour is still
+ * to be set), Tier-S first tallies Thu Dec 3, Tier-A Mon Dec 7, Tier-B Wed Dec 9, each at
+ * 21:00 UTC; 9 windows of 24h, 12h, 6h… halving (the last 5m 37s), as deployed. */
+const at = (iso: string) => Date.parse(iso) / 1000;
+const OPENS = at("2026-11-17T17:00:00Z");
+const FIRST: [number, number, number] = [
+  at("2026-12-03T21:00:00Z"),
+  at("2026-12-07T21:00:00Z"),
+  at("2026-12-09T21:00:00Z"),
+];
+const WINDOW = D;
+const MAX_WINDOWS = 9;
+/** The longest a tier can take: 47h 54m 22s. */
+const LONGEST = Array.from({ length: MAX_WINDOWS }, (_, k) => WINDOW >> k).reduce((a, b) => a + b);
+
+/** Each state's moment in the real round: the vote page runs its clock from it while the
+ * mock is shown (When.tsx), so countdowns and phases read as they will on the day. */
+export const MOCK_NOW: Record<MockKind, number> = {
+  // Voting opened five hours ago.
+  started: OPENS + 5 * H,
+  prefilled: OPENS + 5 * H,
+  // Tier-S 12h into its first window, nothing changed yet.
+  "s-settling": FIRST[0] + 12 * H,
+  // Tier-S changed in its first window: 6h into the 12h second one (Sat Dec 5, 03:00 UTC).
+  "s-extended": FIRST[0] + WINDOW + 6 * H,
+  // Tier-S changed in every window: three minutes left of its last one.
+  "s-last": FIRST[0] + Array.from({ length: 9 }, (_, k) => D >> k).reduce((a, b) => a + b) -
+    3 * 60,
+  // Tier-A and Tier-S settled; Tier-B 10h into its first window.
+  "b-settling": FIRST[2] + 10 * H,
+  // Tier-S settled (Fri Dec 4) before this badge sent a first ballot.
+  missed: FIRST[1] + 20 * H,
+  // Tier-S settled in its first window (Fri Dec 4); Tier-A is 20h into its first.
+  spent: FIRST[1] + 20 * H,
+  // Every tier settled in its first window; Tier-B on Thu Dec 10. Now: Sat Dec 12.
+  finished: FIRST[2] + 2 * D + 15 * H,
+};
 
 const micro = (usd: number) => String(Math.round(usd * 1_000_000));
 
-/** Dev only (`/vote/ballot?mock=spent`): badge `n` coming back to change its ballot after
- * S settled and spent part of its share. 40 badges vote; S funded the first two
- * initiatives (badge `n` paid for both) and left the third unfunded; A is in its first window. */
-export function spentRound(slugs: string[], poolMicro: string, n: number): RoundView {
-  const voters = 40;
-  const share = BigInt(poolMicro) / BigInt(voters);
-  const usd = Number(share / 1_000_000n);
-  const ballot: Partial<Record<string, Tier>> = {
-    [slugs[0]]: "S",
-    [slugs[1]]: "S",
-    [slugs[2]]: "S",
-    [slugs[3]]: "A",
-    [slugs[4]]: "A",
-    [slugs[5]]: "B",
+/** The fictional round: the board's proposals, oldest first, each asking what it still needs. */
+function fictionalRound(cards: Card[], opensAt: number, firstTally: [number, number, number]) {
+  const list = [...cards]
+    .filter((c) => c.initiative.goalUsd > 0)
+    .sort((a, b) => a.initiative.createdAt - b.initiative.createdAt);
+  const round: VoteManifest = {
+    kind: "real",
+    chainId: 1,
+    contract: "0x00000000000000000000000000000000000d0e70",
+    deployBlock: 0,
+    opensAt,
+    closesAt: firstTally[2] + LONGEST,
+    schedule: { opensAt, firstTallyAt: firstTally, initialWindow: WINDOW, maxWindows: MAX_WINDOWS },
+    poolUsd: micro(POOL_USD),
+    badge: "0x00000000000000000000000000000000000ba06e",
+    slugs: list.map((c) => c.initiative.slug),
+    projects: list.map((c) => ({
+      askUsd: micro(Math.max(1, c.initiative.goalUsd - (c.summary?.total ?? 0))),
+      rfp: c.initiative.type === "rfp",
+      groups: [],
+    })),
+    groups: [],
+    independentTiers: 1,
+    ballotRules: true,
   };
-  const now = Math.floor(Date.now() / 1000);
-  const paid = { [slugs[0]]: micro(usd * 0.28), [slugs[1]]: micro(usd * 0.14) };
   return {
-    registrationClosesAt: now - 3 * 3600,
-    closed: false,
-    share: share.toString(),
-    tiers: [
-      {
-        tier: "S",
-        status: "settled",
-        at: now - 2 * 3600,
-        forced: false,
-        funded: [slugs[0], slugs[1]],
-        awards: { [slugs[0]]: micro(usd * 0.28 * 31), [slugs[1]]: micro(usd * 0.14 * 22) },
-        paid: { [String(n)]: paid },
-      },
-      {
-        tier: "A",
-        status: "settling",
-        window: 1,
-        windowEndsAt: now + 50 * 60,
-        latestEndAt: now + 95 * 60,
-        quiet: true,
-        funded: [slugs[3]],
-      },
-      { tier: "B", status: "waiting", startsAt: now + 6 * 3600 },
-    ],
-    accepted: { [String(n)]: bytesToHex(encodeBallot(slugs, ballot)) },
-    rejected: [],
-    live: {
-      funded: [slugs[3]],
-      awards: { [slugs[3]]: micro(usd * 9) },
-      tiers: { [slugs[3]]: "A" },
+    round,
+    ask: (slug: string) => Number(BigInt(round.projects[round.slugs.indexOf(slug)].askUsd)) / 1e6,
+  };
+}
+
+/** The badge's ballot in every state: 3 in Tier-S, 4 in Tier-A, and Tier-B from 6 on
+ * until the ballot asks for 1.5× the pool (the ballot rules). */
+function sampleBallot(round: VoteManifest) {
+  const { slugs } = round;
+  const ask = (i: number) => BigInt(round.projects[i].askUsd);
+  const needed = (BigInt(round.poolUsd) * 3n) / 2n;
+  let total = 0n;
+  for (let i = 0; i < 13 && i < slugs.length; i++) total += ask(i);
+  let end = Math.min(13, slugs.length);
+  while (total < needed && end < slugs.length) total += ask(end++);
+  const s = slugs.slice(0, 3);
+  const a = slugs.slice(3, 7);
+  const b = slugs.slice(7, end);
+  const ballot: Partial<Record<string, Tier>> = {};
+  for (const x of s) ballot[x] = "S";
+  for (const x of a) ballot[x] = "A";
+  for (const x of b) ballot[x] = "B";
+  return { ballot, s, a, b };
+}
+
+/** A tier settled in its first window, funding `funded` (what the badge paid for each). */
+function settled(
+  tier: Tier,
+  at: number,
+  funded: { slug: string; award: number; paid: number }[],
+  n: number,
+): RoundTier {
+  return {
+    tier,
+    status: "settled",
+    at,
+    forced: false,
+    funded: funded.map((f) => f.slug),
+    awards: Object.fromEntries(funded.map((f) => [f.slug, micro(f.award)])),
+    // Only what this badge paid: the other winners were funded by other ballots.
+    paid: {
+      [String(n)]: Object.fromEntries(
+        funded.filter((f) => f.paid > 0).map((f) => [f.slug, micro(f.paid)]),
+      ),
     },
   };
+}
+
+/** Badge `n` in the fictional round, in state `kind`, over the board's `cards`. */
+export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
+  const share = POOL_USD / VOTERS;
+  const base = { closed: false, share: micro(share), rejected: [], poolUsd: micro(POOL_USD) };
+  const empty = { funded: [], awards: {} };
+
+  if (kind === "started" || kind === "prefilled") {
+    const first = FIRST;
+    const { round } = fictionalRound(cards, OPENS, first);
+    const { s, a, b } = sampleBallot(round);
+    const view: RoundView = {
+      ...base,
+      registrationClosesAt: first[0] + WINDOW,
+      tiers: (["S", "A", "B"] as const).map((tier, i) => ({
+        tier,
+        status: "waiting",
+        startsAt: first[i],
+      })),
+      accepted: {},
+      live: empty,
+    };
+    if (kind === "started") return { round, view };
+    // What this badge rated on the board: 5★ Tier-S, 4★ Tier-A, 3★ Tier-B, the rest stay out.
+    const ratings: Record<string, number> = {};
+    for (const x of s) ratings[x] = 5;
+    for (const x of a) ratings[x] = 4;
+    for (const x of b) ratings[x] = 3;
+    const rest = round.slugs.filter((x) => !ratings[x]);
+    for (const x of rest.slice(0, 4)) ratings[x] = 2;
+    for (const x of rest.slice(4, 6)) ratings[x] = 1;
+    return { round, view, ratings };
+  }
+
+  // Tier-S settling: in its first window, quiet; changed, in its second; or in its last,
+  // where it settles whatever happens. The badge has voted.
+  if (kind === "s-settling" || kind === "s-extended" || kind === "s-last") {
+    const first = FIRST;
+    const { round, ask } = fictionalRound(cards, OPENS, first);
+    const { ballot, s, a } = sampleBallot(round);
+    const window = kind === "s-settling" ? 1 : kind === "s-extended" ? 2 : MAX_WINDOWS;
+    const endsAt = first[0] +
+      Array.from({ length: window }, (_, k) => WINDOW >> k).reduce((x, y) => x + y);
+    const live = [s[0], s[1], a[0]];
+    const view: RoundView = {
+      ...base,
+      registrationClosesAt: first[0] + LONGEST,
+      tiers: [
+        {
+          tier: "S",
+          status: "settling",
+          window,
+          windowEndsAt: endsAt,
+          latestEndAt: first[0] + LONGEST,
+          quiet: kind === "s-settling",
+          funded: [s[0], s[1]],
+        },
+        { tier: "A", status: "waiting", startsAt: first[1] },
+        { tier: "B", status: "waiting", startsAt: first[2] },
+      ],
+      accepted: { [String(n)]: bytesToHex(encodeBallot(round.slugs, ballot)) },
+      live: {
+        funded: live,
+        awards: Object.fromEntries(live.map((x) => [x, micro(ask(x))])),
+        tiers: { [s[0]]: "S", [s[1]]: "S", [a[0]]: "A" },
+      },
+    };
+    return { round, view, skipped: round.slugs.filter((x) => !ballot[x]).slice(0, 6) };
+  }
+
+  // Tier-S and Tier-A settled in their first windows; Tier-B in its first, quiet.
+  if (kind === "b-settling") {
+    const first = FIRST;
+    const { round, ask } = fictionalRound(cards, OPENS, first);
+    const { ballot, s, a, b } = sampleBallot(round);
+    const view: RoundView = {
+      ...base,
+      registrationClosesAt: first[0] + WINDOW,
+      tiers: [
+        settled("S", first[0] + WINDOW, [
+          { slug: s[0], award: ask(s[0]), paid: share * 0.28 },
+          { slug: s[1], award: ask(s[1]), paid: share * 0.14 },
+        ], n),
+        settled("A", first[1] + WINDOW, [
+          { slug: a[0], award: ask(a[0]), paid: share * 0.2 },
+          { slug: a[2], award: ask(a[2]), paid: share * 0.1 },
+        ], n),
+        {
+          tier: "B",
+          status: "settling",
+          window: 1,
+          windowEndsAt: first[2] + WINDOW,
+          latestEndAt: first[2] + LONGEST,
+          quiet: true,
+          funded: [b[1]],
+        },
+      ],
+      accepted: { [String(n)]: bytesToHex(encodeBallot(round.slugs, ballot)) },
+      live: { funded: [b[1]], awards: { [b[1]]: micro(ask(b[1])) }, tiers: { [b[1]]: "B" } },
+    };
+    return { round, view, skipped: round.slugs.filter((x) => !ballot[x]).slice(0, 6) };
+  }
+
+  // A badge that never sent a ballot: Tier-S settled without it, so it can't vote now.
+  if (kind === "missed") {
+    const first = FIRST;
+    const { round, ask } = fictionalRound(cards, OPENS, first);
+    const { s, a } = sampleBallot(round);
+    const view: RoundView = {
+      ...base,
+      registrationClosesAt: first[0] + WINDOW,
+      tiers: [
+        settled("S", first[0] + WINDOW, [
+          { slug: s[0], award: ask(s[0]), paid: 0 },
+          { slug: s[1], award: ask(s[1]), paid: 0 },
+        ], n),
+        {
+          tier: "A",
+          status: "settling",
+          window: 1,
+          windowEndsAt: first[1] + WINDOW,
+          latestEndAt: first[1] + LONGEST,
+          quiet: true,
+          funded: [a[0]],
+        },
+        { tier: "B", status: "waiting", startsAt: first[2] },
+      ],
+      accepted: {},
+      live: { funded: [a[0]], awards: { [a[0]]: micro(ask(a[0])) }, tiers: { [a[0]]: "A" } },
+    };
+    return { round, view };
+  }
+
+  if (kind === "spent") {
+    // Tier-S settled quietly after its first window; Tier-A is in its first window now.
+    const first = FIRST;
+    const aFirst = first[1];
+    const { round, ask } = fictionalRound(cards, OPENS, first);
+    const { ballot, s, a } = sampleBallot(round);
+    const view: RoundView = {
+      ...base,
+      registrationClosesAt: first[0] + WINDOW,
+      tiers: [
+        settled("S", first[0] + WINDOW, [
+          { slug: s[0], award: ask(s[0]), paid: share * 0.28 },
+          { slug: s[1], award: ask(s[1]), paid: share * 0.14 },
+        ], n),
+        {
+          tier: "A",
+          status: "settling",
+          window: 1,
+          windowEndsAt: aFirst + WINDOW,
+          latestEndAt: aFirst + LONGEST,
+          quiet: true,
+          funded: [a[0]],
+        },
+        { tier: "B", status: "waiting", startsAt: first[2] },
+      ],
+      accepted: { [String(n)]: bytesToHex(encodeBallot(round.slugs, ballot)) },
+      live: { funded: [a[0]], awards: { [a[0]]: micro(ask(a[0])) }, tiers: { [a[0]]: "A" } },
+    };
+    // Like the prefilled state: six it rated 1–2★, skipped.
+    return { round, view, skipped: round.slugs.filter((x) => !ballot[x]).slice(0, 6) };
+  }
+
+  // Finished: every tier settled in its first window.
+  const first = FIRST;
+  const { round, ask } = fictionalRound(cards, OPENS, first);
+  const { ballot, s, a, b } = sampleBallot(round);
+  const funded = (slug: string, paid: number) => ({ slug, award: ask(slug), paid: share * paid });
+  const mine = {
+    S: [funded(s[0], 0.28), funded(s[1], 0.14)],
+    A: [funded(a[0], 0.2), funded(a[2], 0.1)],
+    B: [funded(b[1], 0.15)],
+  };
+  // Winners this badge didn't rank, funded by the other ballots: each tier gets a few,
+  // as long as the whole result stays within the pool.
+  let spent = Object.values(mine).flat().reduce((x, f) => x + f.award, 0);
+  const others = round.slugs.filter((slug) => !ballot[slug]);
+  const more = (count: number) => {
+    const out: ReturnType<typeof funded>[] = [];
+    while (out.length < count && others.length) {
+      const slug = others.shift()!;
+      if (spent + ask(slug) > POOL_USD) continue;
+      spent += ask(slug);
+      out.push(funded(slug, 0));
+    }
+    return out;
+  };
+  const tiers = [
+    settled("S", first[0] + WINDOW, [...mine.S, ...more(2)], n),
+    settled("A", first[1] + WINDOW, [...mine.A, ...more(3)], n),
+    settled("B", first[2] + WINDOW, [...mine.B, ...more(3)], n),
+  ];
+  const all = tiers.flatMap((t) => (t.status === "settled" ? t.funded : []));
+  const tierOf = Object.fromEntries(
+    tiers.flatMap((t) => t.status === "settled" ? t.funded.map((x) => [x, t.tier]) : []),
+  );
+  const view: RoundView = {
+    ...base,
+    closed: true,
+    registrationClosesAt: first[0] + WINDOW,
+    tiers,
+    accepted: { [String(n)]: bytesToHex(encodeBallot(round.slugs, ballot)) },
+    live: {
+      funded: all,
+      awards: Object.fromEntries(all.map((x) => [x, micro(ask(x))])),
+      tiers: tierOf,
+    },
+  };
+  return { round: { ...round, closesAt: first[2] + WINDOW }, view, sent: ballot };
 }

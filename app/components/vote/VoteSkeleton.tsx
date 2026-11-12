@@ -59,6 +59,16 @@ export function BallotSkeleton() {
       </div>
       <div className="grid grid-cols-1 items-start gap-0 sm:grid-cols-2 sm:gap-6">
         <div>
+          {/* The ballot box: the ring round the avatar, the ask and the share, the menu. */}
+          <div className="relative mb-4 flex items-center gap-4 rounded-xl border border-vote/30 bg-vote/[.06] p-4 sm:mb-3">
+            <Skeleton className="size-16 flex-none rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-44" />
+            </div>
+            <Skeleton className="absolute right-3 top-3 h-2 w-5 rounded-full" />
+          </div>
           <div className="-mx-6 mb-4 space-y-1 border-b border-white/10 bg-panel/95 px-4 py-2 sm:mx-0 sm:mb-0 sm:space-y-2 sm:rounded-2xl sm:border sm:bg-white/[.03] sm:p-3">
             {TIERS.map((t) => (
               <div
@@ -76,15 +86,30 @@ export function BallotSkeleton() {
             <Skeleton className="mx-auto h-3 w-56" />
           </div>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-3">
-          <div className="mb-1 flex h-7 items-center gap-2 px-1">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="ml-auto h-7 w-28 rounded-full sm:h-8" />
+        <div>
+          {/* The round box: the stepper, the current step, the badge's line. */}
+          <div className="mb-4 space-y-4 rounded-xl border border-white/15 bg-white/[.04] p-4">
+            <div className="grid grid-cols-5">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex flex-col items-center gap-2">
+                  <Skeleton className="size-[22px] rounded-full" />
+                  <Skeleton className="h-3 w-12 max-sm:hidden" />
+                </div>
+              ))}
+            </div>
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-[min(90%,420px)]" />
           </div>
-          <Skeleton className="mx-1 mb-3 mt-2 h-3 w-64" />
-          <Skeleton className="mb-3 h-11 rounded-xl" />
-          <div className="space-y-2">
-            {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-[72px] rounded-xl" />)}
+          <div className="rounded-2xl border border-white/10 bg-white/[.03] p-3">
+            <div className="mb-1 flex h-7 items-center gap-2 px-1">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="ml-auto h-7 w-28 rounded-full sm:h-8" />
+            </div>
+            <Skeleton className="mx-1 mb-3 mt-2 h-3 w-64" />
+            <Skeleton className="mb-3 h-11 rounded-xl" />
+            <div className="space-y-2">
+              {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-[72px] rounded-xl" />)}
+            </div>
           </div>
         </div>
       </div>

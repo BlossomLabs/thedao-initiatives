@@ -4,7 +4,7 @@ import { cn } from "~/lib/utils";
 /** Space under the top bar; matches the old `top-[86px]`. */
 export const TOP = 86;
 export const GAP = 16;
-/** Below this width the callers make the aside `static` (max-[960px]:static). */
+/** Below this width most callers make the aside `static` (max-[960px]:static). */
 const NARROW = "(max-width: 960px)";
 
 /**
@@ -53,13 +53,18 @@ export function nextMode(mode: Mode, dir: "down" | "up", f: Frame): Mode {
  * there is no inner scrollbar.
  */
 export default function StickyAside(
-  { className, children, ...rest }: React.HTMLAttributes<HTMLElement>,
+  { className, children, narrow: narrowQuery = NARROW, ...rest }:
+    & React.HTMLAttributes<HTMLElement>
+    & {
+      /** The media query under which the caller unpins the aside. */
+      narrow?: string;
+    },
 ) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const narrow = globalThis.matchMedia?.(NARROW) ??
+    const narrow = globalThis.matchMedia?.(narrowQuery) ??
       { matches: false, addEventListener() {}, removeEventListener() {} };
     let mode: Mode = "top";
     let lastY = globalThis.scrollY;
@@ -118,7 +123,7 @@ export default function StickyAside(
       narrow.removeEventListener("change", reset);
       globalThis.removeEventListener("scroll", onScroll);
     };
-  }, []);
+  }, [narrowQuery]);
   return (
     <aside ref={ref} className={cn("sticky top-[86px]", className)} {...rest}>
       {children}

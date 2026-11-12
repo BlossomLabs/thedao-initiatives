@@ -37,3 +37,39 @@ export function ruleMessage(
       return "This ballot can't be read.";
   }
 }
+
+/** The ballot box's one line in place of the share: the first rule still to meet, or that
+ * the ballot is valid. Size first (it is what most ballots miss), then each tier's
+ * independence, then the rest. */
+export function ruleStatus(errors: RuleError[]): { ok: boolean; text: string } {
+  const order = (e: RuleError) =>
+    e.rule === "size" ? 0 : e.rule === "independent" ? 1 + e.tier : e.rule === "group" ? 3 : 4;
+  const e = [...errors].sort((a, b) => order(a) - order(b))[0];
+  if (!e) return { ok: true, text: "You can keep adding initiatives" };
+  switch (e.rule) {
+    case "size":
+      return { ok: false, text: `Needs at least ${dollars(e.needed)} to be valid` };
+    case "independent":
+      return {
+        ok: false,
+        text: `Needs at least 3 independent projects in ${tierName(TIERS[e.tier])}`,
+      };
+    case "group":
+      return {
+        ok: false,
+        text: `One affiliation holds over half of ${tierName(TIERS[e.tier])}`,
+      };
+    case "tiers":
+      return { ok: false, text: "Use at most three tiers" };
+    case "shape":
+      return { ok: false, text: "This ballot can't be read" };
+  }
+}
+
+/** Whether a broken rule also gets the box under the tiers: only what the ballot box's
+ * line can't explain, the affiliations (projects that count as one, or one affiliation
+ * over half a tier). A short ballot or a tier with too few projects is said there alone. */
+export function explainBelow(e: RuleError): boolean {
+  return (e.rule === "independent" && e.related.length > 0) || e.rule === "group" ||
+    e.rule === "tiers" || e.rule === "shape";
+}

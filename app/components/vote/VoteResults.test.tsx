@@ -16,6 +16,7 @@ vi.mock("../../../shared/vote/manifest", async (original) => ({
     deployBlock: 1,
     opensAt: 0,
     closesAt: 4_000_000_000,
+    schedule: { opensAt: 0, firstTallyAt: [100, 200, 300], initialWindow: 60, maxWindows: 3 },
     poolUsd: "100000000000",
     issuer: "0x2000000000000000000000000000000000000002",
     slugs: ["alpha", "beta"],
@@ -142,8 +143,11 @@ it("says what is going on and what the vote would fund right now", async () => {
     </QueryClientProvider>,
   );
   expect(await screen.findByText(/Test vote/i)).toBeInTheDocument();
-  expect(await screen.findByText(/would be funded by 1 ballot.*Tier-S starts settling in/))
-    .toBeInTheDocument();
+  expect(await screen.findByText(/would be funded by 1 ballot/)).toBeInTheDocument();
+  // Where the round is: the stepper box in the header, without a badge's line.
+  const box = await screen.findByRole("region", { name: "Where the round is" });
+  expect(within(box).getByRole("heading", { name: "Voting is open" })).toBeInTheDocument();
+  expect(within(box).queryByRole("status")).toBeNull();
   expect(await screen.findByText("Alpha fuzzing")).toBeInTheDocument();
   // The front page's board: its search box, only the round's initiatives, gold shares.
   expect(screen.getByRole("searchbox")).toBeInTheDocument();
@@ -168,18 +172,27 @@ it.each(["/vote", "/vote?view=cards"])(
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    const s = (await screen.findAllByText("Tier-S"))[0];
-    const a = (await screen.findAllByText("Tier-A"))[0];
+    // The result chips, not the round box's stepper (which names every tier too).
+    const board = (els: HTMLElement[]) =>
+      els.filter((e) => !e.closest('[aria-label="Where the round is"]'));
+    const chip = (name: string) =>
+      waitFor(() => {
+        const found = board(screen.getAllByText(name))[0];
+        expect(found).toBeDefined();
+        return found;
+      });
+    const s = await chip("Tier-S");
+    const a = await chip("Tier-A");
     const funded = (element: HTMLElement) => element.closest("li, [data-initiative-id]")!;
     expect(within(funded(s) as HTMLElement).getByText("Beta audits")).toBeInTheDocument();
     expect(within(funded(a) as HTMLElement).getByText("Alpha fuzzing")).toBeInTheDocument();
     // List rows have separate desktop and mobile status slots.
-    const rows = [...new Set(screen.getAllByText(/^Tier-[SAB]$/).map(funded))];
+    const rows = [...new Set(board(screen.getAllByText(/^Tier-[SAB]$/)).map(funded))];
     expect(
       rows.map((row) => within(row as HTMLElement).getAllByText(/^Tier-[SAB]$/)[0].textContent),
     )
       .toEqual(["Tier-S", "Tier-A"]);
-    expect(screen.queryByText("Tier-B")).toBeNull();
+    expect(board(screen.queryAllByText("Tier-B"))).toEqual([]);
   },
 );
 
@@ -275,11 +288,12 @@ it("S settled is solid gold; A settling is lighter, with its window and B's star
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  expect(
-    await screen.findByText(
-      /Tier-S settled: \$30,000 to 1 initiative · Tier-A settling, window 2 ends .* UTC · Tier-B starts .* UTC/,
-    ),
-  ).toBeInTheDocument();
+  // The round box: Tier-S done with what it funded, Tier-A settling with its windows.
+  const box = await screen.findByRole("region", { name: "Where the round is" });
+  expect(within(box).getByRole("heading", { name: "Tier-A is settling" })).toBeInTheDocument();
+  expect(box).toHaveTextContent("1 funded · $30k");
+  expect([...box.querySelectorAll("[data-window]")].map((w) => w.getAttribute("data-window")))
+    .toEqual(["past", "current", "coming"]);
   const row = (title: string) => screen.getAllByText(title)[0].closest("li, [data-initiative-id]")!;
   expect(row("Beta audits").querySelector("[data-vote-fill]")).not.toBeNull();
   expect(row("Alpha fuzzing").querySelector("[data-vote-pending]")).not.toBeNull();

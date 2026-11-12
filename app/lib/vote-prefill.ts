@@ -3,7 +3,8 @@ import type { Tier } from "../../shared/vote/ballot";
 const BY_STARS: Partial<Record<number, Tier>> = { 5: "S", 4: "A", 3: "B" };
 
 /** A fresh ballot from the badge's own star ratings: 5★ Tier-S, 4★ Tier-A, 3★ Tier-B.
- * 1–2★, unrated, and anything outside the round stay unplaced. */
+ * 1–2★ are skipped (`skipsFromRatings`); unrated and anything outside the round stay
+ * unplaced. */
 export function prefillFromRatings(
   mine: Record<string, number>,
   slugs: string[],
@@ -14,6 +15,11 @@ export function prefillFromRatings(
     if (t) out[slug] = t;
   }
   return out;
+}
+
+/** What a fresh ballot skips: everything this badge rated 1★ or 2★, in round order. */
+export function skipsFromRatings(mine: Record<string, number>, slugs: string[]): string[] {
+  return slugs.filter((slug) => mine[slug] === 1 || mine[slug] === 2);
 }
 
 /** Whose ratings fill the ballot: in the real vote the voting badge is the review badge

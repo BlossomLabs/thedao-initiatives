@@ -54,7 +54,15 @@ vi.mock("../../shared/vote/manifest", async (original) => ({
     get closesAt() {
       return round.closesAt;
     },
-    schedule: { opensAt: 0, firstTallyAt: [100, 200, 300], initialWindow: 60, maxWindows: 3 },
+    // Opens when the round does (a test can move it).
+    get schedule() {
+      return {
+        opensAt: round.opensAt,
+        firstTallyAt: [100, 200, 300],
+        initialWindow: 60,
+        maxWindows: 3,
+      };
+    },
     poolUsd: "913244000000",
     issuer: "0x2000000000000000000000000000000000000002",
     slugs: ["alpha", "beta", "gamma"],
@@ -159,6 +167,39 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/** Tap an initiative, then choose where it goes on its card. */
+/** The card's selector: opens it and picks an option by its read-out name. */
+async function pickIn(card: HTMLElement, name: string) {
+  const trigger = within(card).getByRole("combobox");
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  const option = await screen.findByRole("option", { name });
+  // Keyboard, as Base UI ignores a click that lands the instant the list opens.
+  const list = screen.getByRole("listbox");
+  for (const key of ["ArrowDown", "ArrowUp"]) {
+    for (let i = 0; i < 6 && !option.hasAttribute("data-highlighted"); i++) {
+      fireEvent.keyDown(list, { key });
+      await waitFor(() => {}, { timeout: 20 }).catch(() => {});
+    }
+  }
+  fireEvent.keyDown(option, { key: "Enter" });
+}
+/** Opens the card's selector and returns its options. */
+async function optionsIn(card: HTMLElement) {
+  const trigger = within(card).getByRole("combobox");
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  await screen.findByRole("listbox");
+  return (name: string) => screen.getByRole("option", { name });
+}
+async function placeIn(title: RegExp, choice: string) {
+  fireEvent.click(await screen.findByRole("button", { name: title }));
+  await pickIn(await screen.findByRole("dialog"), choice);
+  // The card stays open after a choice: close it.
+  fireEvent.keyDown(document, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+}
+
 it("a mangled code says so", async () => {
   mockApi(() => Promise.reject(new ApiError(400, "bad", { code: "bad_code" })));
   show();
@@ -215,8 +256,7 @@ it("the badge's owner gets the ballot, and sending posts the encoded tiers", asy
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
   expect(await screen.findByText("ALPHA")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: /^BETA/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Place in Must fund" }));
+  await placeIn(/^BETA/, "Tier-S, Must fund");
   fireEvent.click(screen.getByRole("button", { name: /send my ballot/i }));
   await waitFor(() => expect(submit).toHaveBeenCalled());
   const [tokenId, ballot] = submit.mock.calls[0];
@@ -229,8 +269,7 @@ it("offers to send it yourself next to Send, and next to Retry after a failure",
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
-  fireEvent.click(await screen.findByRole("button", { name: /^BETA/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Place in Must fund" }));
+  await placeIn(/^BETA/, "Tier-S, Must fund");
   fireEvent.click(screen.getByRole("button", { name: /send it yourself/i }));
   await waitFor(() => expect(selfSend).toHaveBeenCalled());
   expect(selfSend.mock.calls[0][0]).toBe(17n);
@@ -327,9 +366,8 @@ it("the ballot: search narrows the unranked list; a tile's tier buttons place it
   fireEvent.click(screen.getByRole("button", { name: /clear the search/i }));
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
 
-  // Tap it, then tap a tier.
-  fireEvent.click(screen.getByRole("button", { name: /^ALPHA/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Place in Should fund" }));
+  // Tap it, then choose a tier on its card.
+  await placeIn(/^ALPHA/, "Tier-A, Should fund");
   expect(within(screen.getByRole("list", { name: "Should fund" })).getByText("ALPHA"))
     .toBeInTheDocument();
 });
@@ -353,7 +391,7 @@ it("dragging a tile onto a tier ranks it; tiles keep their size", async () => {
   fireEvent.pointerMove(document, { pointerId: 1, clientX: 30, clientY: 30 });
   // Picked up: the source only fades.
   expect(tile.className.replace(" opacity-40", "")).toBe(before);
-  under = screen.getByRole("button", { name: "Place in Must fund" });
+  under = document.querySelector('[data-drop="S"]');
   fireEvent.pointerMove(document, { pointerId: 1, clientX: 40, clientY: 50 });
   fireEvent.pointerUp(document, { pointerId: 1, clientX: 40, clientY: 50 });
   expect(within(screen.getByRole("list", { name: "Must fund" })).getByText("BETA"))
@@ -364,14 +402,34 @@ it("dragging a tile onto a tier ranks it; tiles keep their size", async () => {
   expect(other.className).toBe(before.replace("beta", "alpha"));
 });
 
-it("Cancel drops a tapped initiative without moving it", async () => {
+it("a skipped initiative leaves the list, is kept in this browser, and isn't sent", async () => {
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  await placeIn(/^GAMMA/, "Skip: hide it from the list");
+  expect(within(screen.getByRole("list", { name: "Not ranked yet" })).queryByText("GAMMA"))
+    .toBeNull();
+  expect(
+    JSON.parse(
+      localStorage.getItem("vote-skipped:0x1000000000000000000000000000000000000001:17")!,
+    ),
+  ).toEqual(["gamma"]);
+  await placeIn(/^BETA/, "Tier-S, Must fund");
+  fireEvent.click(screen.getByRole("button", { name: /send my ballot/i }));
+  await waitFor(() => expect(submit).toHaveBeenCalled());
+  expect(submit.mock.calls[0][1]).toBe(
+    bytesToHex(encodeBallot(["alpha", "beta", "gamma"], { beta: "S" })),
+  );
+});
+
+it("closing a card leaves the initiative where it was", async () => {
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
   fireEvent.click(await screen.findByRole("button", { name: /^GAMMA/ }));
-  expect(screen.getByRole("button", { name: /^GAMMA/ })).toHaveAttribute("aria-pressed", "true");
-  fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
-  expect(screen.getByRole("button", { name: /^GAMMA/ })).toHaveAttribute("aria-pressed", "false");
+  const card = await screen.findByRole("dialog", { name: "GAMMA" });
+  fireEvent.click(within(card).getByRole("button", { name: "Close" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(within(screen.getByRole("list", { name: "Not ranked yet" })).getByText("GAMMA"))
     .toBeInTheDocument();
 });
@@ -408,32 +466,27 @@ it("Enter asks AI, which orders the list; typing again goes back to keywords", a
   expect(screen.queryByText(/initiatives ordered by relevance/i)).toBeNull();
 });
 
-it("a proposal's chevron shows a preview and Details without selecting or moving it", async () => {
+it("a proposal's card shows its summary and Details, and moves it only when asked", async () => {
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
-  const toggle = await screen.findByRole("button", { name: "Show preview for GAMMA" });
-  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await placeIn(/^ALPHA/, "Tier-S, Must fund");
   expect(screen.queryByText("Formal verification of bridges")).toBeNull();
-  // Even with another initiative picked, previewing must not trigger a list drop.
-  fireEvent.click(screen.getByRole("button", { name: /^ALPHA/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Place in Must fund" }));
-  fireEvent.click(screen.getByRole("button", { name: "ALPHA" }));
-  fireEvent.click(toggle);
-  expect(toggle).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByText("Formal verification of bridges")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /^GAMMA/ }));
+  const card = await screen.findByRole("dialog", { name: "GAMMA" });
+  expect(card).toHaveTextContent("Formal verification of bridges");
   expect(screen.queryByText("Bridge researchers")).toBeNull();
   expect(screen.queryByText("Raised")).toBeNull();
-  const details = screen.getByRole("link", { name: /Details for GAMMA/ });
+  const details = within(card).getByRole("link", { name: /Details for GAMMA/ });
   expect(details).toHaveAttribute("href", "/initiative/gamma");
   expect(details).toHaveAttribute("target", "_blank");
   expect(details).toHaveAttribute("rel", "noopener noreferrer");
+  fireEvent.click(within(card).getByRole("button", { name: "Close" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "GAMMA" })).toBeNull());
   expect(within(screen.getByRole("list", { name: "Must fund" })).getByText("ALPHA"))
     .toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /^GAMMA/ })).toHaveAttribute("aria-pressed", "false");
-  fireEvent.click(toggle);
-  expect(screen.queryByText("Formal verification of bridges")).toBeNull();
-  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(within(screen.getByRole("list", { name: "Not ranked yet" })).getByText("GAMMA"))
+    .toBeInTheDocument();
 });
 
 function showMine(path = "/vote/ballot") {
@@ -467,7 +520,9 @@ it("my ballot: the signed-in account's badge opens its ballot", async () => {
   );
   showMine();
   expect(await screen.findByRole("heading", { name: /your ballot/i })).toBeInTheDocument();
-  expect(screen.getByText(/badge #17/i)).toBeInTheDocument();
+  // Badge 17's ballot: its editor, with the tiers to place initiatives in.
+  expect(document.querySelector('[data-drop="S"]')).not.toBeNull();
+  expect(vi.mocked(api)).toHaveBeenCalledWith("/api/vote/mine");
 });
 
 it("my ballot: an account without a badge says so", async () => {
@@ -510,7 +565,8 @@ it("after the close, the owner sees the ballot their badge sent, not the ballot 
     JSON.stringify({ gamma: "S", alpha: "B" }),
   );
   show();
-  expect(await screen.findByRole("heading", { name: /voting has closed/i })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { level: 1, name: "Your ballot" })).toBeInTheDocument();
+  expect(screen.getByText(/Voting has closed/)).toBeInTheDocument();
   const s = await screen.findByRole("region", { name: /S · Must fund/ });
   expect(within(s).getByText("GAMMA")).toBeInTheDocument();
   expect(within(screen.getByRole("region", { name: /B · Nice to have/ })).getByText("ALPHA"))
@@ -568,11 +624,15 @@ it("real vote: a holder of two voting badges picks one; ?badge= opens it", async
   session.current = { address: ME };
   mineIs([12, 40]);
   showMine("/vote/ballot?badge=40");
-  expect(await screen.findByText(/TheDAO vote · Badge #40/)).toBeInTheDocument();
+  // The picker's pressed badge says which ballot is open.
+  expect(await screen.findByRole("button", { name: "Badge #40" }))
+    .toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("button", { name: "Badge #12" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Badge #40" })).toHaveAttribute("aria-pressed", "true");
   fireEvent.click(screen.getByRole("button", { name: "Badge #12" }));
-  expect(await screen.findByText(/TheDAO vote · Badge #12/)).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Badge #12" }))
+      .toHaveAttribute("aria-pressed", "true")
+  );
 });
 
 it("real vote: an unknown ?badge= falls back to the first badge", async () => {
@@ -580,7 +640,8 @@ it("real vote: an unknown ?badge= falls back to the first badge", async () => {
   session.current = { address: ME };
   mineIs([12, 40]);
   showMine("/vote/ballot?badge=99");
-  expect(await screen.findByText(/TheDAO vote · Badge #12/)).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: "Badge #12" }))
+    .toHaveAttribute("aria-pressed", "true");
 });
 
 it("real vote: an account without a voting badge says so", async () => {
@@ -632,66 +693,110 @@ async function ballotWith(body: Record<string, unknown>) {
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
-  expect(await screen.findByRole("heading", { name: /your ballot/i })).toBeInTheDocument();
+  // A ballot that counts opens on the page that shows it: these tests are about editing.
+  await openEditor();
 }
 
-it("quiet ending: before registration closes, a badge that hasn't voted is told the deadline", async () => {
-  await ballotWith(roundBody());
-  expect(await screen.findByText(/Vote before .* UTC, or this badge can't vote\./))
-    .toBeInTheDocument();
+/** Into the editor: from the "your ballot" page (a counted ballot) once the round has
+ * loaded and shown it, or straight there. */
+async function openEditor() {
+  await waitFor(() => {
+    const edit = screen.queryByRole("button", { name: "Edit my ballot" });
+    if (edit) fireEvent.click(edit);
+    expect(document.querySelector('[data-drop="S"]')).not.toBeNull();
+  });
+}
+
+/** The round box, and the window kinds of its bar (if a tier is settling). */
+const roundBox = () => screen.findByRole("region", { name: "Where the round is" });
+const windows = (box: HTMLElement) =>
+  [...box.querySelectorAll("[data-window]")].map((w) => w.getAttribute("data-window"));
+const settlingS = (window: number, quiet: boolean, last = false) => ({
+  tier: "S",
+  status: "settling",
+  window,
+  windowEndsAt: 4_000_000_000,
+  latestEndAt: last ? 4_000_000_000 : 4_000_000_100,
+  quiet,
+  funded: [],
 });
 
-it("quiet ending: after registration, a badge that never voted can't send", async () => {
-  await ballotWith(roundBody({ registrationClosesAt: 1 }));
-  expect(await screen.findByText("Registration closed before this badge voted."))
-    .toBeInTheDocument();
+it("quiet ending: before Tier-S settles, a badge that hasn't voted is told so in the round box", async () => {
+  await ballotWith(roundBody());
+  const box = await roundBox();
+  expect(within(box).getByRole("status")).toHaveTextContent(
+    "This badge hasn’t voted yet. Send a first ballot before Tier-S settles, or it won’t be able to vote.",
+  );
+  // Dates in local time, UTC only in their titles.
+  expect(box.querySelector("time")!.title).toMatch(/ UTC$/);
+});
+
+it("quiet ending: after registration, a badge that never voted gets no ballot at all", async () => {
+  // Not ballotWith: the ballot shows only until the round loads, then the 404 replaces it.
+  roundIs.body = roundBody({ registrationClosesAt: 1 });
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  expect(await screen.findByRole("heading", { name: "No ballot found" })).toBeInTheDocument();
+  expect(screen.getByText(/can’t\s+vote this round/)).toBeInTheDocument();
+  // Where the vote is, read only, and where to follow it: no tiers, no Send.
+  expect(await roundBox()).toBeInTheDocument();
+  expect(screen.queryByRole("list", { name: "Must fund" })).toBeNull();
   expect(screen.queryByRole("button", { name: /send my ballot|place at least one/i })).toBeNull();
+  expect(screen.getByRole("link", { name: "Follow the results live" })).toBeInTheDocument();
+});
+
+it("a ballot that counts opens on the page that shows it; Edit goes back to the ballot", async () => {
+  // Badge 17's counted ballot: alpha alone in its group, read as Tier-S.
+  roundIs.body = roundBody({
+    accepted: { "17": "0x01ffff" },
+    // If it ended now, Tier-S would fund ALPHA: the live result, beside the ballot.
+    live: { funded: ["alpha"], awards: { alpha: "30000000000" }, tiers: { alpha: "S" } },
+  });
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  const edit = await screen.findByRole("button", { name: "Edit my ballot" });
+  expect(screen.getByRole("heading", { level: 2, name: "The live result" })).toBeInTheDocument();
+  expect(screen.getByText(/\$30,000 of the .* pool if it ended now · 1 initiative/))
+    .toBeInTheDocument();
+  expect(screen.getByRole("heading", { level: 1, name: "Your ballot" })).toBeInTheDocument();
+  expect(screen.getByText(/It counts\. You can change it until each tier settles/))
+    .toBeInTheDocument();
+  // No editor here: no tiers to drop into, no Send.
+  expect(document.querySelector('[data-drop="S"]')).toBeNull();
+  expect(screen.queryByRole("button", { name: /send my ballot/i })).toBeNull();
+  fireEvent.click(edit);
+  expect(document.querySelector('[data-drop="S"]')).not.toBeNull();
+  // Unchanged, it still counts: the send panel says so, and its button leads back.
+  expect(screen.getByText("Your ballot counts")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "See my ballot" }));
+  expect(await screen.findByRole("button", { name: "Edit my ballot" })).toBeInTheDocument();
 });
 
 it("quiet ending: S settling, quiet so far", async () => {
   await ballotWith(roundBody({
     accepted: { "17": "0x01ffff" },
-    tiers: [
-      {
-        tier: "S",
-        status: "settling",
-        window: 1,
-        windowEndsAt: 4_000_000_000,
-        latestEndAt: 4_000_000_100,
-        quiet: true,
-        funded: ["alpha"],
-      },
-      waiting("A"),
-      waiting("B"),
-    ],
+    tiers: [{ ...settlingS(1, true), funded: ["alpha"] }, waiting("A"), waiting("B")],
   }));
-  // Its own box, in the ballot's column.
-  const box = await screen.findByRole("region", { name: "Tier-S settling" });
-  expect(within(box).getByText("Tier-S is settling")).toBeInTheDocument();
-  expect(within(box).getByText("Window 1 of 3")).toBeInTheDocument();
-  expect(within(box).getByText(/^Ends .* UTC$/)).toBeInTheDocument();
-  expect(within(box).getByText("No change so far: it settles then.")).toBeInTheDocument();
+  const box = await roundBox();
+  expect(within(box).getByRole("heading", { name: "Tier-S is settling" })).toBeInTheDocument();
+  expect(within(box).getByRole("timer")).toHaveTextContent(/^in \d+d \d+h$/);
+  expect(windows(box)).toEqual(["current", "maybe", "maybe"]);
+  expect(box).toHaveTextContent("No change so far: Tier-S settles when this window ends");
+  expect(within(box).getByRole("status")).toHaveTextContent(
+    "Your ballot counts. You can still change every tier.",
+  );
 });
 
-it("quiet ending: S changed in this window", async () => {
+it("quiet ending: S changed in this window: the next one will follow", async () => {
   await ballotWith(roundBody({
     accepted: { "17": "0x01ffff" },
-    tiers: [
-      {
-        tier: "S",
-        status: "settling",
-        window: 2,
-        windowEndsAt: 4_000_000_000,
-        latestEndAt: 4_000_000_100,
-        quiet: false,
-        funded: [],
-      },
-      waiting("A"),
-      waiting("B"),
-    ],
+    tiers: [settlingS(2, false), waiting("A"), waiting("B")],
   }));
-  expect(await screen.findByText("It changed in this window: a shorter window follows."))
-    .toBeInTheDocument();
+  const box = await roundBox();
+  expect(box).toHaveTextContent("Tier-S changed in this window: a shorter window follows at");
+  expect(windows(box)).toEqual(["past", "current", "coming"]);
 });
 
 it("quiet ending: a settled S is named and locked; the badge sees what it paid and what's left", async () => {
@@ -712,12 +817,13 @@ it("quiet ending: a settled S is named and locked; the badge sees what it paid a
       waiting("B"),
     ],
   }));
-  const share = await screen.findByRole("region", { name: "Your share" });
-  expect(within(share).getByText("$1,100 left of $2,000")).toBeInTheDocument();
-  expect(within(share).getByText("Tier-S paid $900 to 1 initiative")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Must fund (settled)" })).toBeDisabled();
+  // What's left of the share heads the ballot; the round box says what Tier-S took.
+  expect(await screen.findByText("$1,100 of your $2,000 share left")).toBeInTheDocument();
+  expect(await roundBox()).toHaveTextContent("1 of the 1 was on your ballot. You paid $900.00");
+  // Settled: the tier says so, and its chip opens a card that can't move it.
+  expect(document.querySelector('[data-drop="S"]')).toHaveTextContent("Settled");
   expect(screen.getByRole("button", { name: "ALPHA, funded: your share paid $900" }))
-    .toBeDisabled();
+    .toBeInTheDocument();
 });
 
 it("quiet ending: a sent ballot the round refused says the earlier one still counts", async () => {
@@ -749,8 +855,12 @@ it("quiet ending: once B settles the ballot is closed, with what each tier funde
     accepted: { "17": "0x01ffff" },
     tiers: [settled("S", ["alpha"]), settled("A", ["beta"]), settled("B", [])],
   }));
-  expect(await screen.findByText("Tier-S: ALPHA")).toBeInTheDocument();
-  expect(screen.getByText("Tier-A: BETA")).toBeInTheDocument();
+  // TheDAO's result, as the same tier table as the ballot beside it.
+  const result = await screen.findByRole("group", { name: "TheDAO's result" });
+  expect(within(within(result).getByRole("region", { name: "S · Must fund" })).getByText("ALPHA"))
+    .toBeInTheDocument();
+  expect(within(within(result).getByRole("region", { name: "A · Should fund" })).getByText("BETA"))
+    .toBeInTheDocument();
 });
 
 async function ballotWithClosed(body: Record<string, unknown>) {
@@ -767,7 +877,8 @@ async function ballotWithClosed(body: Record<string, unknown>) {
         : Promise.reject(new Error("unexpected " + path))) as typeof api,
   );
   show();
-  expect(await screen.findByRole("heading", { name: /voting has closed/i })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { level: 1, name: "Your ballot" })).toBeInTheDocument();
+  expect(screen.getByText(/Voting has closed/)).toBeInTheDocument();
 }
 
 it("quiet ending: an A-only ballot's A freezes once S settles (the server counts its first group)", async () => {
@@ -785,33 +896,24 @@ it("quiet ending: an A-only ballot's A freezes once S settles (the server counts
       waiting("B"),
     ],
   }));
-  expect(await screen.findByRole("button", { name: "Should fund (settled)" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Must fund (settled)" })).toBeDisabled();
+  await waitFor(() =>
+    expect(document.querySelector('[data-drop="A"]')).toHaveTextContent("Settled")
+  );
+  expect(document.querySelector('[data-drop="S"]')).toHaveTextContent("Settled");
+  // Its card can't move it out of the frozen tier.
+  fireEvent.click(screen.getByRole("button", { name: /^BETA/ }));
+  const card = await screen.findByRole("dialog", { name: "BETA" });
+  expect(within(card).queryByRole("combobox", { name: /^Change where/ })).toBeNull();
 });
 
 it("quiet ending: in the last window, a change can't buy another one", async () => {
   await ballotWith(roundBody({
     accepted: { "17": "0x01ffff" },
-    tiers: [
-      {
-        tier: "S",
-        status: "settling",
-        window: 3,
-        windowEndsAt: 4_000_000_000,
-        latestEndAt: 4_000_000_000,
-        quiet: false,
-        funded: [],
-      },
-      waiting("A"),
-      waiting("B"),
-    ],
+    tiers: [settlingS(3, false, true), waiting("A"), waiting("B")],
   }));
-  expect(
-    await screen.findByText(
-      "It changed, but this is the last window: it settles at its end anyway.",
-    ),
-  )
-    .toBeInTheDocument();
+  const box = await roundBox();
+  expect(box).toHaveTextContent("The last window: Tier-S settles at");
+  expect(windows(box)).toEqual(["past", "past", "current"]);
 });
 
 it("quiet ending: an unsent edit that moved a settled initiative is put back as it counted", async () => {
@@ -829,7 +931,7 @@ it("quiet ending: an unsent edit that moved a settled initiative is put back as 
     ],
   }));
   const s = await screen.findByRole("list", { name: "Must fund" });
-  expect(within(s).getByRole("button", { name: "ALPHA, funded" })).toBeDisabled();
+  expect(within(s).getByRole("button", { name: "ALPHA, funded" })).toBeInTheDocument();
   // What isn't settled stays as this browser had it.
   expect(
     within(screen.getByRole("list", { name: "Nice to have" })).getByRole("button", {
@@ -840,6 +942,7 @@ it("quiet ending: an unsent edit that moved a settled initiative is put back as 
 });
 
 // ---------------------------------------------------------------- ballot rules
+const SKIPPED_KEY = "vote-skipped:0x1000000000000000000000000000000000000001:17";
 const TIERS_KEY = "vote-tiers:0x1000000000000000000000000000000000000001:17";
 
 it("ballot rules: a ballot breaking a rule shows why and can't be sent", async () => {
@@ -886,6 +989,11 @@ it("prefill: in a test round the signed-in reviewer's ratings fill a fresh ballo
   )
     .toBeInTheDocument();
   expect(screen.queryByRole("list", { name: "Nice to have" })).toBeNull();
+  // 2★ is skipped: off the list, behind the link at its end.
+  expect(screen.getByText("All ranked or skipped.")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Show 1 skipped/ }));
+  expect(within(screen.getByRole("list", { name: "Skipped" })).getByText("GAMMA"))
+    .toBeInTheDocument();
 });
 
 it("prefill: a counted ballot or a saved draft wins over ratings", async () => {
@@ -907,6 +1015,33 @@ it("prefill: a counted ballot or a saved draft wins over ratings", async () => {
     .toBeInTheDocument();
 });
 
+it("prefill: a ballot already counted (Tier-S settled) still gets its 1–2★ skipped, once", async () => {
+  extra.paths = {
+    "/api/reviews/identity": { tokenIds: ["5"], canReview: true },
+    "/api/reviews/ratings?tokenId=5": {
+      ratings: { alpha: { mine: 1 }, beta: { mine: 2 }, gamma: { mine: 5 } },
+    },
+  };
+  await ballotWith(roundBody({
+    accepted: { "17": "0xff01ff" },
+    tiers: [
+      { tier: "S", status: "settled", at: 1, forced: false, funded: [], awards: {} },
+      waiting("A"),
+      waiting("B"),
+    ],
+  }));
+  // The counted ballot stays as it is (BETA in Tier-S, 2★ or not); ALPHA is skipped.
+  expect(
+    within(await screen.findByRole("list", { name: "Must fund" })).getByRole("button", {
+      name: /^BETA/,
+    }),
+  ).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole("button", { name: /Show 1 skipped/ }));
+  expect(within(screen.getByRole("list", { name: "Skipped" })).getByText("ALPHA"))
+    .toBeInTheDocument();
+  expect(JSON.parse(localStorage.getItem(SKIPPED_KEY)!)).toEqual(["alpha", "beta"]);
+});
+
 it("paste: settled tiers stay as counted, and the page says so", async () => {
   await ballotWith(roundBody({
     accepted: { "17": "0x01ffff" },
@@ -916,13 +1051,14 @@ it("paste: settled tiers stay as counted, and the page says so", async () => {
       waiting("B"),
     ],
   }));
-  fireEvent.click(await screen.findByRole("button", { name: "Paste a ballot" }));
-  fireEvent.change(screen.getByLabelText("Ballot to paste"), { target: { value: "beta,gamma" } });
-  fireEvent.click(screen.getByRole("button", { name: "Apply" }));
-  expect(await screen.findByText("Settled tiers stay as they were counted.")).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole("button", { name: "Use an LLM…" }));
+  fireEvent.change(screen.getByLabelText("Paste its ballot"), { target: { value: "beta,gamma" } });
+  fireEvent.click(screen.getByRole("button", { name: "Use this ballot" }));
+  expect(await screen.findByText("Pasted. Settled tiers stay as they were counted."))
+    .toBeInTheDocument();
   const s = screen.getByRole("list", { name: "Must fund" });
-  expect(within(s).getByRole("button", { name: /ALPHA/ })).toBeInTheDocument();
-  expect(within(s).queryByRole("button", { name: /BETA/ })).toBeNull();
+  expect(within(s).getByRole("button", { name: /^ALPHA/ })).toBeInTheDocument();
+  expect(within(s).queryByRole("button", { name: /^BETA/ })).toBeNull();
   expect(submit).not.toHaveBeenCalled();
 });
 
@@ -940,8 +1076,9 @@ it("ballot rules: an empty Tier-S is refused, though the chain would read Tier-A
   round.ballotRules = true;
   localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "A", beta: "A", gamma: "A" }));
   await ballotWith(roundBody({ poolUsd: "500000000" }));
-  const box = await screen.findByRole("region", { name: "Ballot rules" });
-  expect(within(box).getByText("Tier-S needs at least 3 independent projects."))
+  // The ballot box says what's missing; with no affiliations to explain, no box below.
+  expect(await screen.findByText("Needs at least 3 independent projects in Tier-S"))
     .toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Ballot rules" })).toBeNull();
   expect(screen.getByRole("button", { name: /send my ballot/i })).toBeDisabled();
 });

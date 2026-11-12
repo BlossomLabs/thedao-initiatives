@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { bytesToHex, type Hex } from "viem";
 import PageMain from "~/components/layout/PageMain";
@@ -7,13 +7,22 @@ import { Button, LinkButton } from "~/components/ui/Button";
 import TierBallot, { type BallotItem } from "~/components/vote/TierBallot";
 import { BallotSkeleton, IntroSkeleton } from "~/components/vote/VoteSkeleton";
 import { rememberMyCode } from "~/lib/vote-local";
-import BallotStatus from "~/components/vote/BallotStatus";
-import ShareSpent from "~/components/vote/ShareSpent";
-import SettlingBox from "~/components/vote/SettlingBox";
+import BallotStatus, { type SendRoute } from "~/components/vote/BallotStatus";
+import BallotMeter from "~/components/vote/BallotMeter";
+import RoundBox, { badgeLine } from "~/components/vote/RoundBox";
+import { roundSteps } from "~/components/vote/round-steps";
 import { AddressAvatar, Avatar } from "~/components/wallet/Avatar";
 import { avatarSrc } from "~/lib/avatar";
-import { spentRound } from "~/components/vote/mock-round";
-import VoteClosed, { badgeKicker } from "~/components/vote/VoteClosed";
+import {
+  isMockKind,
+  MOCK_LABELS,
+  MOCK_NOW,
+  type MockKind,
+  mockRound,
+  MOCKS,
+} from "~/components/vote/mock-round";
+import VoteClosed from "~/components/vote/VoteClosed";
+import { ArrowUpRight } from "lucide-react";
 import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
 import { useWalletPicker } from "~/context/wallet-picker";
@@ -29,42 +38,25 @@ import {
 } from "~/hooks/use-vote";
 import { api, errorMessage } from "~/lib/api";
 import { countedTiers, lockedLabels } from "~/lib/vote-locks";
-import { prefillFromRatings, ratingsToken } from "~/lib/vote-prefill";
-import { ruleMessage } from "~/lib/vote-rules-copy";
+import { prefillFromRatings, ratingsToken, skipsFromRatings } from "~/lib/vote-prefill";
+import { explainBelow, ruleMessage, ruleStatus } from "~/lib/vote-rules-copy";
 import { useReviewIdentity } from "~/hooks/use-admin-ratings";
 import BallotRules from "~/components/vote/BallotRules";
-import PasteBallot from "~/components/vote/PasteBallot";
+import BallotMenu from "~/components/vote/BallotMenu";
+import { Deadline, setVoteClock, voteNow, When } from "~/components/vote/When";
+import { useMockBallotSubmit } from "~/components/vote/mock-send";
 import { checkBallot, emptyTierErrors } from "../../../shared/vote/rules";
-import { usd } from "~/lib/format";
+import { shortDay, usd, usdShort } from "~/lib/format";
 import { encodeBallot, type Tier } from "../../../shared/vote/ballot";
-import { ROUND, rulesRound } from "../../../shared/vote/manifest";
+import { ROUND, rulesRound, type VoteManifest } from "../../../shared/vote/manifest";
 
-const POOL = Number(BigInt(ROUND.poolUsd) / 1_000_000n);
-const closed = () => Date.now() / 1000 >= ROUND.closesAt;
-const notOpenYet = () => Date.now() / 1000 < ROUND.opensAt;
-const REAL = () => ROUND.kind === "real";
+const poolOf = (m: VoteManifest) => Number(BigInt(m.poolUsd) / 1_000_000n);
+const POOL = poolOf(ROUND);
+const closed = (m = ROUND) => voteNow() / 1000 >= m.closesAt;
+const notOpenYet = (m = ROUND) => voteNow() / 1000 < m.opensAt;
+const REAL = (m = ROUND) => m.kind === "real";
 const microUsd = (v: string) => Number(BigInt(v) / 10_000n) / 100;
-const utc = (secs: number) =>
-  `${
-    new Intl.DateTimeFormat("en-GB", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "UTC",
-    }).format(secs * 1000)
-  } UTC`;
-const closeText = `${
-  new Intl.DateTimeFormat("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "UTC",
-  }).format(ROUND.closesAt * 1000)
-} UTC`;
+const closeTextOf = (m: VoteManifest) => <When at={m.closesAt} />;
 
 const tiersKey = (n: number) => `vote-tiers:${ROUND.contract}:${n}`;
 function loadTiers(n: number): Partial<Record<string, Tier>> {
@@ -72,6 +64,26 @@ function loadTiers(n: number): Partial<Record<string, Tier>> {
     return JSON.parse(localStorage.getItem(tiersKey(n)) ?? "{}");
   } catch {
     return {};
+  }
+}
+
+/** What this voter skipped on badge n's ballot: this browser only, never sent (a skipped
+ * initiative is as unranked as the list). */
+const skippedKey = (n: number) => `vote-skipped:${ROUND.contract}:${n}`;
+/** No skips saved for badge n in this browser yet (not even an empty list). */
+function skipsUnset(n: number): boolean {
+  try {
+    return localStorage.getItem(skippedKey(n)) === null;
+  } catch {
+    return false;
+  }
+}
+function loadSkipped(n: number): Set<string> {
+  try {
+    const v = JSON.parse(localStorage.getItem(skippedKey(n)) ?? "[]");
+    return new Set(Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
+  } catch {
+    return new Set();
   }
 }
 
@@ -195,7 +207,7 @@ function Intro(
           first, using Blossom Budgeting.
         </p>
         <p className="mt-2 text-white/60">
-          It's a demo: no real funds move. Voting closes {closeText}.
+          It's a demo: no real funds move. Voting closes <Deadline at={ROUND.closesAt} />.
         </p>
       </Panel>
       <Panel>
@@ -223,11 +235,17 @@ function Intro(
  * route module's own default export only gets the router's props). The ballot of a
  * paper code, or with `myBallot`, of the signed-in
  * account's badge (/vote/ballot: the way back from /vote, no code needed). */
-export default function VotePage({ myBallot = false }: { myBallot?: boolean } = {}) {
+export default function VotePage(
+  { myBallot = false, mockId }: {
+    myBallot?: boolean;
+    /** An example ballot (/vote/mock/:id): one of the mocks, nothing sent. */
+    mockId?: string;
+  } = {},
+) {
   const params = useParams();
-  const code = myBallot ? "" : params.code ?? "";
+  const code = myBallot || mockId !== undefined ? "" : params.code ?? "";
   const qc = useQueryClient();
-  const byCode = useVoteCode(code, !myBallot && !REAL());
+  const byCode = useVoteCode(code, !myBallot && mockId === undefined && !REAL());
   const { session, signOut, restoring } = useSession();
   const { address } = useWallet();
   const { openWalletPicker } = useWalletPicker();
@@ -264,23 +282,68 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     { kind: "idle" } | { kind: "busy" } | { kind: "error"; code?: string; message: string }
   >({ kind: "idle" });
 
-  // Dev only: ?mock shows the ballot without a real code or a sign-in (stripped from builds).
-  const mock = import.meta.env.DEV && sp.has("mock");
+  // An example ballot: /vote/mock/<kind> for everyone, or ?mock=<kind> in dev. Each is the
+  // ballot at one moment of the vote, over the board's proposals, without a code or a
+  // sign-in (mock-round.ts). An unknown one opens the first.
+  const mockParam = mockId ?? (import.meta.env.DEV ? sp.get("mock") : null);
+  const mockKind: MockKind | null = mockParam === null
+    ? null
+    : isMockKind(mockParam)
+    ? mockParam
+    : MOCKS[0];
+  const mock = mockKind !== null;
+  // A mock runs the page's clock from its moment in the real round (set once per mock,
+  // then it ticks on); back on the real time without one.
+  const clockFor = useRef<MockKind | null | undefined>(undefined);
+  if (clockFor.current !== mockKind) {
+    clockFor.current = mockKind;
+    setVoteClock(mockKind ? MOCK_NOW[mockKind] * 1000 : null);
+  }
+  // Again once mounted (React's dev run unmounts once first), and back on leaving.
+  useEffect(() => {
+    if (mockKind) setVoteClock(MOCK_NOW[mockKind] * 1000);
+    return () => setVoteClock(null);
+  }, [mockKind]);
+  const mockData = useMemo(
+    () => mockKind && board.data ? mockRound(mockKind, board.data.cards, 1) : undefined,
+    [mockKind, board.data],
+  );
+  /** The round on this page: a dev mock's fictional one, or the real one. */
+  const R = mockData?.round ?? ROUND;
   const found = info.data === "none" ? undefined : info.data;
   const data = mock ? { n: 1, claimed: true, owner: "0x0" } as const : found;
   const n = data && data !== "bad" ? data.n : null;
   const owner = data && data !== "bad" ? data.owner : null;
   const mine = mock || Boolean(me && owner && owner.toLowerCase() === me.toLowerCase());
-  const ballotFlow = useBallotSubmit(mine && n !== null ? BigInt(n) : null);
+  const realFlow = useBallotSubmit(mine && n !== null && !mock ? BigInt(n) : null);
+  // An example's Send goes through the same steps, signing and sending nothing; once it
+  // "lands", the example counts that ballot.
+  const [mockSent, setMockSent] = useState<Hex>();
+  const mockFlow = useMockBallotSubmit(setMockSent);
+  const ballotFlow = mock ? mockFlow : realFlow;
+  /** Who is sending the ballot in progress (or sent the last): TheDAO, or the voter. */
+  const [sendRoute, setSendRoute] = useState<SendRoute>("relay");
+  /** Editing the ballot, rather than seeing the one that counts (where a send lands). */
+  const [editing, setEditing] = useState(false);
+  const sentPhase = ballotFlow.phase.kind;
+  useEffect(() => {
+    // A send that counted lands on the ballot.
+    if (sentPhase === "counted") setEditing(false);
+  }, [sentPhase]);
+  const sentFor = useRef(mockKind);
+  if (sentFor.current !== mockKind) {
+    sentFor.current = mockKind;
+    setMockSent(undefined);
+    mockFlow.reset();
+  }
   // The quiet ending: which tiers are settling or settled, and what counts.
-  const roundQ = useVoteRound(5_000, mine && n !== null);
-  // Dev only: ?mock=spent is a round where S settled and spent part of this badge's share.
-  const mockSpent = mock && sp.get("mock") === "spent";
-  const spentMock = useMemo(
-    () => import.meta.env.DEV && mockSpent ? spentRound(ROUND.slugs, ROUND.poolUsd, 1) : undefined,
-    [mockSpent],
-  );
-  const rv = spentMock ?? roundQ.data;
+  const roundQ = useVoteRound(5_000, mine && n !== null && !mock);
+  const rv = mock
+    ? mockData &&
+      (mockSent && n !== null
+        ? { ...mockData.view, accepted: { ...mockData.view.accepted, [String(n)]: mockSent } }
+        : mockData.view)
+    : roundQ.data;
 
   // One claim at a time: the sign-in lands in several renders, and the
   // auto-claim effect can fire again before its own state updates show.
@@ -334,15 +397,48 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
   }, [showsBallot, n, mock, code]);
 
   const [tiers, setTiers] = useState<Partial<Record<string, Tier>>>({});
+  // A mock starts from nothing (or its ratings) and keeps nothing in this browser.
+  const [skipped, setSkipped] = useState<ReadonlySet<string>>(new Set());
+  const mockPrefilled = useRef<MockKind | null>(null);
   useEffect(() => {
-    if (n !== null) setTiers(loadTiers(n));
-  }, [n]);
+    if (n === null) return;
+    setTiers(mock ? {} : loadTiers(n));
+    setSkipped(mock ? new Set() : loadSkipped(n));
+    // Each visit to a mock starts it over, its prefill too.
+    mockPrefilled.current = null;
+  }, [n, mock, mockKind]);
+  const setSkip = (slug: string, skip: boolean) => {
+    setSkipped((prev) => {
+      if (prev.has(slug) === skip) return prev;
+      const next = new Set(prev);
+      if (skip) next.add(slug);
+      else next.delete(slug);
+      try {
+        if (n !== null && !mock) localStorage.setItem(skippedKey(n), JSON.stringify([...next]));
+      } catch { /* storage unavailable */ }
+      return next;
+    });
+  };
+  /** Skips from the badge's 1–2★ ratings, the first time this browser shows its ballot
+   * (sent or not); saved even when there are none, so it happens once. */
+  const prefillSkips = (slugs: string[]) => {
+    setSkipped((prev) => {
+      if (prev.size) return prev;
+      const next = new Set(slugs);
+      try {
+        if (n !== null && !mock) localStorage.setItem(skippedKey(n), JSON.stringify(slugs));
+      } catch { /* storage unavailable */ }
+      return next;
+    });
+  };
   const setTier = (slug: string, tier: Tier | undefined) => {
+    // Placed in a tier, it isn't skipped any more.
+    if (tier) setSkip(slug, false);
     setTiers((prev) => {
       const next = { ...prev, [slug]: tier };
       if (!tier) delete next[slug];
       try {
-        if (n !== null) localStorage.setItem(tiersKey(n), JSON.stringify(next));
+        if (n !== null && !mock) localStorage.setItem(tiersKey(n), JSON.stringify(next));
       } catch { /* storage unavailable */ }
       return next;
     });
@@ -355,7 +451,7 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
   useEffect(() => {
     if (!countedNow) return;
     setTiers((prev) => {
-      const counted = countedTiers(countedNow, prev, ROUND.slugs);
+      const counted = countedTiers(countedNow, prev, R.slugs);
       if (Object.keys(prev).length === 0) return counted;
       const frozen = lockedLabels(counted, settledNow);
       if (frozen.size === 0) return prev;
@@ -367,20 +463,23 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
         Object.entries(next).every(([k, t]) => prev[k] === t);
       return same ? prev : next;
     });
-  }, [countedNow, settledNow]);
+  }, [countedNow, settledNow, mockKind]);
 
   // A fresh ballot starts from this badge's own star ratings (5★ S, 4★ A, 3★ B), once
   // the round is known: never over a ballot that counts or a draft in this browser.
   const identity = useReviewIdentity();
   const fresh = Boolean(rv) && n !== null && !countedNow && !mock &&
     Object.keys(loadTiers(n)).length === 0;
+  // Skips are this browser's own: a ballot already sent (Tier-S settled, another device)
+  // still gets its 1–2★ skipped the first time it's shown here.
+  const noSkips = Boolean(rv) && n !== null && !mock && skipsUnset(n);
   const ratings = useBadgeRatings(
-    n === null ? null : ratingsToken(ROUND.kind, n, identity?.tokenIds),
-    fresh,
+    n === null ? null : ratingsToken(R.kind, n, identity?.tokenIds),
+    fresh || noSkips,
   );
   const prefilled = useRef(false);
   useEffect(() => {
-    if (!fresh || prefilled.current || !ratings.data || !board.data) return;
+    if ((!fresh && !noSkips) || prefilled.current || !ratings.data || !board.data) return;
     prefilled.current = true;
     const slugOf = new Map(board.data.cards.map((c) => [c.initiative.id, c.initiative.slug]));
     const mine = Object.fromEntries(
@@ -389,19 +488,34 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
         return slug ? [[slug, stars]] : [];
       }),
     );
-    setTiers((prev) => Object.keys(prev).length ? prev : prefillFromRatings(mine, ROUND.slugs));
-  }, [fresh, ratings.data, board.data]);
+    if (fresh) {
+      setTiers((prev) => Object.keys(prev).length ? prev : prefillFromRatings(mine, R.slugs));
+    }
+    // A skip never hides what a tier holds (the tier wins on the ballot anyway).
+    if (noSkips) prefillSkips(skipsFromRatings(mine, R.slugs));
+  }, [fresh, noSkips, ratings.data, board.data]);
+
+  // Dev mock: its skips, and a fresh ballot from its own ratings, once per visit.
+  useEffect(() => {
+    if (!mockData || mockPrefilled.current === mockKind) return;
+    mockPrefilled.current = mockKind;
+    const stars = mockData.ratings;
+    if (stars) {
+      setTiers((prev) => Object.keys(prev).length ? prev : prefillFromRatings(stars, R.slugs));
+    }
+    setSkipped(new Set(mockData.skipped ?? (stars ? skipsFromRatings(stars, R.slugs) : [])));
+  }, [mockKind, mockData, R]);
 
   const replaceTiers = (next: Partial<Record<string, Tier>>) => {
     setTiers(next);
     try {
-      if (n !== null) localStorage.setItem(tiersKey(n), JSON.stringify(next));
+      if (n !== null && !mock) localStorage.setItem(tiersKey(n), JSON.stringify(next));
     } catch { /* storage unavailable */ }
   };
 
   const items = useMemo<BallotItem[]>(() => {
     const cards = new Map(board.data?.cards.map((c) => [c.initiative.slug, c]));
-    return ROUND.slugs.map((slug) => {
+    return R.slugs.map((slug) => {
       const card = cards.get(slug);
       return { slug, title: card?.initiative.title ?? slug, card };
     });
@@ -425,9 +539,45 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
 
   const titles = useMemo(() => new Map(items.map((i) => [i.slug, i.title])), [items]);
 
+  // The ballot and the result as tier tables: the page after the close, and during the
+  // vote the page a sent ballot lands on.
+  const closedProps = n === null ? null : {
+    n,
+    round: R,
+    sent: mockData?.sent,
+    titles,
+    closeText: closeTextOf(R),
+    saved: tiers,
+    settled: rv?.tiers.flatMap((t) =>
+      t.status === "settled"
+        ? [{
+          tier: t.tier,
+          funded: t.funded,
+          awards: Object.fromEntries(
+            Object.entries(t.awards).map(([slug, v]) => [slug, microUsd(v)]),
+          ),
+        }]
+        : []
+    ),
+    poolUsd: microUsd(rv?.poolUsd ?? R.poolUsd),
+    avatar: me
+      ? <AddressAvatar address={me} size={48} />
+      : <Avatar src={avatarSrc(`badge-${n}`)} size={48} />,
+    items,
+    paid: new Map(
+      rv?.tiers.flatMap((t) =>
+        t.status === "settled"
+          ? Object.entries(t.paid?.[String(n)] ?? {}).map(([slug, v]) =>
+            [slug, microUsd(v)] as const
+          )
+          : []
+      ) ?? [],
+    ),
+    shareUsd: rv?.share ? microUsd(rv.share) : undefined,
+  };
   let body: React.ReactNode;
   let wide = false;
-  if (!myBallot && REAL()) {
+  if (!myBallot && !mock && REAL(R)) {
     body = (
       <Panel>
         <Headline>TheDAO's vote uses the voting badge.</Headline>
@@ -442,14 +592,14 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
       <Panel>
         <Headline>Sign in to see your ballot.</Headline>
         <p>
-          {REAL()
+          {REAL(R)
             ? "Use the wallet that holds your TheDAO voting badge."
             : "Use the wallet or email you claimed your badge with."}
         </p>
         <Button className="mt-4" onClick={openWalletPicker}>Sign in</Button>
       </Panel>
     );
-  } else if (myBallot && !mock && info.data === "none" && REAL()) {
+  } else if (myBallot && !mock && info.data === "none" && REAL(R)) {
     body = (
       <Panel>
         <Headline>This account has no voting badge.</Headline>
@@ -471,6 +621,9 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
   } else if (info.isPending && !mock) {
     wide = myBallot || ballotSeen(code);
     body = wide ? <BallotSkeleton /> : <IntroSkeleton />;
+  } else if (mock && !mockData) {
+    wide = true;
+    body = <BallotSkeleton />;
   } else if (info.isError && !mock) {
     body = (
       <Panel>
@@ -511,8 +664,8 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
           <Button className="mt-4" onClick={openWalletPicker}>Sign in</Button>
         </Panel>
       );
-  } else if (data && !data.claimed && closed()) {
-    body = <VoteClosed n={null} titles={titles} closeText={closeText} />;
+  } else if (data && !data.claimed && closed(R)) {
+    body = <VoteClosed n={null} titles={titles} closeText={closeTextOf(R)} />;
   } else if (data && !data.claimed) {
     const note = claim.kind === "error"
       ? claim.code === "one_per_person"
@@ -542,19 +695,23 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
         }}
       />
     );
-  } else if (data && mine && n !== null && ((closed() && !spentMock) || rv?.closed)) {
+  } else if (data && mine && n !== null && !mock && roundQ.isPending) {
+    // Which page this badge opens on (the editor, or the ballot that counts) depends on
+    // the round: hold the ballot's skeleton until it's known, rather than flash the editor.
+    wide = true;
+    body = <BallotSkeleton />;
+  } else if (data && mine && n !== null && (closed(R) || rv?.closed)) {
+    // Two tier tables side by side: this badge's ballot and the vote's result.
+    wide = true;
     body = (
       <>
         {picker}
-        <VoteClosed
-          n={n}
-          titles={titles}
-          closeText={closeText}
-          saved={tiers}
-          settled={rv?.tiers.flatMap((t) =>
-            t.status === "settled" ? [{ tier: t.tier, funded: t.funded }] : []
-          )}
-        />
+        {closedProps && (
+          <VoteClosed
+            {...closedProps}
+            roundBox={R.schedule && <RoundBox schedule={R.schedule} rv={rv} stepsOnly />}
+          />
+        )}
       </>
     );
   } else if (data && mine && n !== null) {
@@ -564,18 +721,21 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     const sendYourself = () => {
       // The contract would refuse it: never open the wallet for a ballot breaking a rule.
       if (broken) return;
-      void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(ROUND.slugs, tiers)));
+      setSendRoute("own");
+      void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(R.slugs, tiers)));
     };
     const counted = rv ? Boolean(rv.accepted[String(n)]) : true;
-    const registrationOver = rv ? Date.now() / 1000 >= rv.registrationClosesAt : false;
+    const registrationOver = rv ? voteNow() / 1000 >= rv.registrationClosesAt : false;
     const shut = !counted && registrationOver;
-    const early = notOpenYet() || shut;
+    // No ballot for it (below): a narrow page, like the other notices.
+    if (shut) wide = false;
+    const early = notOpenYet(R) || shut;
     // What the server compares is the voter's own groups of equal rank, so lock from
     // the ballot that counts.
     const settledCount = rv?.tiers.filter((t) => t.status === "settled").length ?? 0;
     const countedHex = rv?.accepted[String(n)];
     const locked = countedHex
-      ? lockedLabels(countedTiers(countedHex, tiers, ROUND.slugs), settledCount)
+      ? lockedLabels(countedTiers(countedHex, tiers, R.slugs), settledCount)
       : new Set<Tier>();
     // What this badge has paid in the settled tiers, for good, and what is left.
     const settledTiers = rv?.tiers.flatMap((t) => t.status === "settled" ? [t] : []) ?? [];
@@ -586,45 +746,35 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     const refused = rv?.rejected.find((r) =>
       r.tokenId === String(n) && ballotFlow.last && BigInt(r.nonce) === ballotFlow.last.nonce
     );
-    const sharePanel = rv && counted && settledTiers.length > 0 && (
-      <ShareSpent
-        avatar={me
-          ? <AddressAvatar address={me} size={48} />
-          : <Avatar src={avatarSrc(`badge-${n}`)} size={48} />}
-        share={microUsd(rv.share ?? "0")}
-        settled={settledTiers.map((t) => {
-          const mine = paidHere(t);
-          return {
-            tier: t.tier,
-            funded: mine.length || t.funded.length,
-            paid: mine.reduce((a, [, v]) => a + v, 0),
-          };
-        })}
-      />
-    );
-    const settling = rv?.tiers.flatMap((t) => t.status === "settling" ? [t] : []) ?? [];
-    const aside = (sharePanel || settling.length > 0) && (
-      <div className="space-y-3">
-        {sharePanel}
-        {settling.map((t) => (
-          <SettlingBox
-            key={t.tier}
-            tier={t.tier}
-            window={t.window}
-            maxWindows={ROUND.schedule.maxWindows}
-            endsAt={utc(t.windowEndsAt)}
-            quiet={t.quiet}
-          />
-        ))}
-      </div>
-    );
+    // The ballot's ask, toward the 1.5× the pool the rules want; the settled tiers' part of it.
+    const poolNow = Number(BigInt(rv?.poolUsd ?? R.poolUsd) / 1_000_000n);
+    const askOf = (slug: string) => microUsd(R.projects[R.slugs.indexOf(slug)]?.askUsd ?? "0");
+    const asked = Object.entries(tiers).reduce((a, [slug, t]) => a + (t ? askOf(slug) : 0), 0);
+    const voters = rv ? Object.keys(rv.accepted).length : 0;
+    const share = rv?.share ? microUsd(rv.share) : voters > 0 ? poolNow / voters : undefined;
+    // The ballot rules (rounds deployed with them), with the pool on-chain now. Checked
+    // from the first pick (and before it, for the ballot box's line); refusals only once
+    // something is placed.
+    const rules = R.ballotRules
+      ? checkBallot(
+        encodeBallot(R.slugs, tiers),
+        rulesRound(R, BigInt(rv?.poolUsd ?? R.poolUsd)),
+      )
+      : null;
+    // An enforced tier left empty: the bytes would read the next one in its place.
+    const empty = R.ballotRules ? emptyTierErrors(tiers, R.independentTiers) : [];
+    const allErrors = empty.length
+      ? [...empty, ...(rules?.errors.filter((e) => e.rule === "size") ?? [])]
+      : rules?.errors ?? [];
+    const errors = placed > 0 ? allErrors : [];
+    const broken = errors.length > 0;
     // A pasted ballot replaces the draft; the settled tiers stay as they were counted.
     const applyPasted = (next: Partial<Record<string, Tier>>): boolean => {
       if (!countedHex) {
         replaceTiers(next);
         return false;
       }
-      const counted = countedTiers(countedHex, tiers, ROUND.slugs);
+      const counted = countedTiers(countedHex, tiers, R.slugs);
       const frozen = lockedLabels(counted, settledCount);
       const out: Partial<Record<string, Tier>> = Object.fromEntries(
         Object.entries(next).filter(([, t]) => t && !frozen.has(t)),
@@ -634,86 +784,179 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
       return Object.keys(out).length !== Object.keys(next).length ||
         Object.entries(out).some(([k, t]) => next[k] !== t);
     };
-    // The ballot rules (rounds deployed with them), with the pool on-chain now.
-    const rules = ROUND.ballotRules && placed > 0
-      ? checkBallot(
-        encodeBallot(ROUND.slugs, tiers),
-        rulesRound(ROUND, BigInt(rv?.poolUsd ?? ROUND.poolUsd)),
-      )
-      : null;
-    // An enforced tier left empty: the bytes would read the next one in its place.
-    const empty = ROUND.ballotRules && placed > 0
-      ? emptyTierErrors(tiers, ROUND.independentTiers)
-      : [];
-    const errors = empty.length
-      ? [...empty, ...(rules?.errors.filter((e) => e.rule === "size") ?? [])]
-      : rules?.errors ?? [];
-    const broken = errors.length > 0;
-    const rulesBox = broken && (
+    const sharePanel = rv && (
+      <BallotMeter
+        avatar={me
+          ? <AddressAvatar address={me} size={48} />
+          : <Avatar src={avatarSrc(`badge-${n}`)} size={48} />}
+        asked={asked}
+        target={poolNow * 1.5}
+        pool={poolNow}
+        share={share}
+        shareFinal={registrationOver}
+        status={R.ballotRules ? ruleStatus(allErrors) : undefined}
+        settled={settledTiers.map((t) => {
+          const fromBallot = t.funded.filter((slug) => tiers[slug] === t.tier);
+          const held = Object.keys(tiers).filter((slug) => tiers[slug] === t.tier);
+          const askIn = (slugs: string[]) => slugs.reduce((a, slug) => a + askOf(slug), 0);
+          return {
+            tier: t.tier,
+            funded: fromBallot.length,
+            fundedAsk: askIn(fromBallot),
+            waitingAsk: askIn(held.filter((slug) => !t.funded.includes(slug))),
+            fundedUsd: fromBallot.reduce((a, slug) => a + microUsd(t.awards[slug] ?? "0"), 0),
+            paid: paidHere(t).reduce((a, [, v]) => a + v, 0),
+          };
+        })}
+        menu={!early && (
+          <BallotMenu
+            slugs={R.slugs}
+            titles={(slug) => titles.get(slug) ?? slug}
+            askUsd={(slug) => BigInt(R.projects[R.slugs.indexOf(slug)]?.askUsd ?? "0")}
+            tiers={tiers}
+            onApply={applyPasted}
+          />
+        )}
+      />
+    );
+    // The ballot box says what's missing; this box only explains the affiliations.
+    const below = errors.filter(explainBelow);
+    const rulesBox = below.length > 0 && (
       <BallotRules
-        messages={errors.map((e) =>
+        messages={below.map((e) =>
           ruleMessage(
             e,
-            (i) => titles.get(ROUND.slugs[i]) ?? ROUND.slugs[i],
-            (g) => ROUND.groups[g],
+            (i) => titles.get(R.slugs[i]) ?? R.slugs[i],
+            (g) => R.groups[g],
           )
         )}
       />
     );
-    const stage = rv && (
-      <div className="mx-auto mt-3 max-w-[640px] space-y-1 text-[14.5px] text-white/80">
-        {!counted && !registrationOver && (
-          <p className="font-medium text-white">
-            Vote before {utc(rv.registrationClosesAt)}, or this badge can't vote.
-          </p>
-        )}
-        {shut && (
-          <p className="font-medium text-white">Registration closed before this badge voted.</p>
-        )}
+    // Where the round is, and what this badge can still do (the stepper box).
+    const lastSettled = settledTiers.at(-1);
+    const roundProps = R.schedule && {
+      schedule: R.schedule,
+      rv,
+      badge: badgeLine({
+        phase: roundSteps({
+          schedule: R.schedule,
+          tiers: rv?.tiers,
+          now: voteNow() / 1000,
+          closed: rv?.closed,
+        }).phase,
+        counted: Boolean(rv?.accepted[String(n)]),
+        shut,
+        settled: settledTiers.map((t) => t.tier),
+      }),
+      mine: lastSettled && {
+        onBallot: lastSettled.funded.filter((slug) => tiers[slug] === lastSettled.tier).length,
+        paidUsd: paidHere(lastSettled).reduce((a, [, v]) => a + v, 0),
+        shareUsd: share,
+      },
+    };
+    const roundBox = roundProps && (
+      <div>
+        <RoundBox {...roundProps} />
       </div>
     );
-    body = (
+    // On the "your ballot" page: where the round is, without the tier settling now.
+    const roundStepsOnly = roundProps && <RoundBox {...roundProps} stepsOnly />;
+    // A badge that never sent a ballot before Tier-S settled: there is nothing it can do
+    // here, so no ballot at all. Said like an error page, then where the vote is (read
+    // only) and where to follow it.
+    const sSettled = rv?.tiers.find((t) => t.tier === "S" && t.status === "settled");
+    // The ballot on screen is the one that counts: seen as "your ballot", with Edit.
+    const upToDate = Boolean(countedHex) &&
+      countedHex!.toLowerCase() === bytesToHex(encodeBallot(R.slugs, tiers)).toLowerCase();
+    const seenPage = upToDate && !editing && closedProps && (
+      <>
+        {picker}
+        <VoteClosed
+          {...closedProps}
+          sent={tiers}
+          roundBox={roundStepsOnly}
+          live={{
+            onEdit: () => setEditing(true),
+            tally: rv && {
+              tiers: rv.live.tiers ?? {},
+              awards: Object.fromEntries(
+                Object.entries(rv.live.awards).map(([slug, v]) => [slug, microUsd(v)]),
+              ),
+            },
+          }}
+        />
+      </>
+    );
+    const missedPage = shut && (
+      <div className="space-y-8 pb-6 pt-10">
+        {picker}
+        <header className="text-center">
+          <p className="m-0 font-inter-tight text-[12px] uppercase tracking-[.18em] text-white/55">
+            Badge #{n} · Registration closed
+          </p>
+          <p
+            aria-hidden="true"
+            className="m-0 mt-2 font-inter-tight text-[clamp(72px,14vw,120px)] font-extrabold leading-none tracking-[-.04em] text-white/15"
+          >
+            404
+          </p>
+          <h1 className="mt-1 font-inter-tight text-[clamp(30px,5.5vw,44px)] font-bold leading-[1.08] tracking-[-.03em] text-white">
+            No ballot found
+          </h1>
+          <p className="mx-auto mt-4 max-w-[560px] text-[16px] leading-relaxed text-white/75">
+            This badge didn’t send a first ballot before Tier-S settled
+            {sSettled?.status === "settled" ? ` on ${shortDay(sSettled.at)}` : ""}, so it can’t vote
+            this round. The vote goes on without it.
+          </p>
+        </header>
+        {R.schedule && <RoundBox schedule={R.schedule} rv={rv} />}
+        <div className="flex justify-center">
+          <LinkButton variant="primary" to={REAL(R) ? "/" : "/vote"}>
+            Follow the results live
+          </LinkButton>
+        </div>
+      </div>
+    );
+    body = missedPage || seenPage || (
       <div className="space-y-6">
         {picker}
         <header className="pt-4 text-center">
-          <p className="kicker m-0">{badgeKicker(n)}</p>
+          <p className="kicker m-0">What should TheDAO prioritize?</p>
           <h1 className="mt-3 font-inter-tight text-[clamp(28px,5vw,40px)] font-bold leading-[1.1] tracking-[-.03em] text-white">
             Your ballot
           </h1>
+          {
+            /* Two lines at most: the rules, deadlines and what unranked means are said
+              where they apply (the ballot box, the round box, the list). */
+          }
           <p className="mx-auto mt-3 max-w-[640px] font-inter-tight text-[16px] leading-snug text-white/70">
-            Put what TheDAO must fund first. Initiatives in the same tier are equal. The {usd(POOL)}
-            {" "}
-            {REAL() ? "pool" : "demo pool"} is split equally between every badge that votes.{" "}
-            {ROUND.ballotRules &&
-              "A ballot needs at least 3 unrelated projects in Tier-S and must request at least 1.5× the pool in total. "}
-            Anything you leave unranked gets nothing from you; your share of it returns to TheDAO.
-            Put every project you'd be glad to see funded in Tier-B: it only takes money once Tier-S
-            and Tier-A are done.{" "}
-            <a
-              href={BLOSSOM}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-dao-green underline-offset-2 hover:underline"
-            >
-              How Blossom Budgeting works
-            </a>
+            The {usdShort(poolOf(R))} {REAL(R) ? "pool" : "demo pool"}{" "}
+            is split equally among the badges that vote.
           </p>
-          {notOpenYet() && (
-            <p className="mt-3 font-medium text-white">Voting opens {utc(ROUND.opensAt)}.</p>
-          )}
-          {stage}
+          <a
+            href={BLOSSOM}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm mt-4 no-underline hover:no-underline"
+          >
+            Learn how <span className="text-dao-green">Blossom Budgeting</span> works
+            <ArrowUpRight className="size-3.5 opacity-70" aria-hidden="true" />
+          </a>
         </header>
         <TierBallot
           items={items}
           tiers={tiers}
           disabled={busy || early}
           locked={locked}
-          aside={aside}
+          head={sharePanel}
           notice={rulesBox}
+          listHead={roundBox}
           funded={settledTiers.length ? funded : undefined}
           paid={paid}
           onChange={setTier}
           onReplace={replaceTiers}
+          skipped={skipped}
+          onSkip={setSkip}
           search={{ ai: board.data?.flags?.aiSearch, aiAuto: board.data?.flags?.aiSearchAuto }}
           actions={early
             ? undefined
@@ -725,45 +968,30 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
                       ? "it changed a settled tier"
                       : refused.reason === "invalid_ballot"
                       ? "it breaks the ballot rules"
-                      : "registration had closed"}. Your earlier ballot still counts.
+                      : "Tier-S had settled before this badge's first ballot"}. Your earlier ballot
+                    still counts.
+                  </p>
+                )}
+                {mock && (
+                  <p className="text-center text-[12.5px] text-white/55">
+                    An example ballot: Send goes through the steps, but nothing is signed or sent.
                   </p>
                 )}
                 <BallotStatus
                   phase={ballotFlow.phase}
+                  route={sendRoute}
+                  chain={REAL(R) ? "Ethereum" : "Sepolia"}
+                  upToDate={upToDate}
+                  onSeeBallot={() => setEditing(false)}
+                  canSend={!busy && placed > 0 && !broken}
+                  sendLabel={placed === 0 ? "Place at least one proposal" : "Send my ballot"}
+                  resultsHref={REAL(R) ? "/" : "/vote"}
+                  onSend={() => {
+                    setSendRoute("relay");
+                    void ballotFlow.submit(BigInt(n), bytesToHex(encodeBallot(R.slugs, tiers)));
+                  }}
+                  onSelfSend={sendYourself}
                   onRetry={() => void ballotFlow.retry()}
-                  selfSend={placed > 0 && !broken && (
-                    <Button onClick={sendYourself}>Send it yourself</Button>
-                  )}
-                />
-                <Button
-                  variant="primary"
-                  className="w-full"
-                  disabled={busy || placed === 0 || broken}
-                  onClick={() =>
-                    void ballotFlow.submit(
-                      BigInt(n),
-                      bytesToHex(encodeBallot(ROUND.slugs, tiers)),
-                    )}
-                >
-                  {placed === 0 ? "Place at least one proposal" : "Send my ballot"}
-                </Button>
-                {ballotFlow.phase.kind !== "failed" && (
-                  <button
-                    type="button"
-                    disabled={busy || placed === 0 || broken}
-                    onClick={sendYourself}
-                    className="w-full text-center text-[13px] text-white/55 underline underline-offset-2 disabled:opacity-40"
-                  >
-                    Send it yourself (from your wallet, on {REAL() ? "Ethereum" : "Sepolia"})
-                  </button>
-                )}
-                <PasteBallot
-                  slugs={ROUND.slugs}
-                  titles={(slug) => titles.get(slug) ?? slug}
-                  askUsd={(slug) =>
-                    BigInt(ROUND.projects[ROUND.slugs.indexOf(slug)]?.askUsd ?? "0")}
-                  tiers={tiers}
-                  onApply={applyPasted}
                 />
               </div>
             )}
@@ -775,5 +1003,30 @@ export default function VotePage({ myBallot = false }: { myBallot?: boolean } = 
     body = wide ? <BallotSkeleton /> : <IntroSkeleton />;
   }
 
-  return <PageMain narrow={!wide} className="pt-8">{body}</PageMain>;
+  // On an example: the others, in the order they happen in the vote.
+  const mockNav = mock && (
+    <nav
+      aria-label="Example ballots"
+      className="mx-auto mb-2 flex max-w-[760px] flex-wrap justify-center gap-1.5 text-[12.5px]"
+    >
+      {MOCKS.map((k) => (
+        <Link
+          key={k}
+          to={`/vote/mock/${k}`}
+          replace
+          aria-current={mockKind === k ? "page" : undefined}
+          className="rounded-full border border-white/15 px-2.5 py-1 text-white/60 hover:text-white aria-[current=page]:border-dao-green/60 aria-[current=page]:text-white"
+        >
+          {MOCK_LABELS[k]}
+        </Link>
+      ))}
+    </nav>
+  );
+
+  return (
+    <PageMain narrow={!wide} className="pt-8">
+      {mockNav}
+      {body}
+    </PageMain>
+  );
 }

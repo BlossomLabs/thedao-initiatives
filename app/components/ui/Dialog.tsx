@@ -16,6 +16,8 @@ export function Dialog({
   description,
   children,
   className,
+  focusField = true,
+  icon,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -23,6 +25,11 @@ export function Dialog({
   description?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  /** Focus the first field on open (the default). Off, the panel itself takes focus:
+   * for a dialog whose field isn't the first thing to do (a paste box at its end). */
+  focusField?: boolean;
+  /** Before the title (decorative: the title alone names the dialog). */
+  icon?: React.ReactNode;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -40,8 +47,9 @@ export function Dialog({
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    // A field first; the close button in the header is the last resort.
-    const first = panel.current?.querySelector<HTMLElement>(
+    // A field first; the close button in the header is the last resort. Or, asked not
+    // to, the panel: focus is in the dialog, nothing in it is active.
+    const first = !focusField ? panel.current : panel.current?.querySelector<HTMLElement>(
       "input:not([disabled]),textarea:not([disabled]),select:not([disabled])",
     ) ?? panel.current?.querySelector<HTMLElement>("button:not([aria-label='Close']),[tabindex]") ??
       panel.current?.querySelector<HTMLElement>("button");
@@ -65,6 +73,7 @@ export function Dialog({
       <PopBox
         from="zoom"
         ref={panel}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -75,7 +84,12 @@ export function Dialog({
         )}
       >
         <div className="flex items-start justify-between gap-3">
-          <h3 id={titleId} className="m-0 font-inter-tight text-[18px] font-medium text-white">
+          <h3
+            id={titleId}
+            className="m-0 flex items-center gap-2 font-inter-tight text-[18px] font-medium text-white"
+          >
+            {icon && <span aria-hidden="true" className="flex flex-none text-white/80">{icon}
+            </span>}
             {title}
           </h3>
           <button

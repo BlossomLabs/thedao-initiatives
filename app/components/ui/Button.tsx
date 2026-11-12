@@ -4,6 +4,11 @@ import { Link } from "react-router";
 
 type Variant = "default" | "primary" | "ghost" | "danger" | "discuss";
 
+/** A compact bordered button (about 29px), smaller than `btn-sm`: the comment cards'
+ * actions, and small actions beside a heading. A class string, for a <button> or a link. */
+export const SMALL_BUTTON =
+  "inline-flex cursor-pointer items-center gap-[7px] rounded-[9px] border border-white/[.16] bg-white/5 px-3.5 py-2 font-inter-tight text-[13px] font-semibold leading-none text-[#f2f6fa] transition-all duration-150 hover:border-white/[.28] hover:bg-white/10 hover:text-white disabled:cursor-default disabled:opacity-60";
+
 interface Common {
   variant?: Variant;
   sm?: boolean;

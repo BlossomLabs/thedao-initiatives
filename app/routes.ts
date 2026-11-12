@@ -10,6 +10,7 @@ export default [
   route("mine", "routes/mine.tsx"),
   route("sessions", "routes/sessions.tsx"),
   route("vote/ballot", "routes/vote.ballot.tsx"),
+  route("vote/mock/:id", "routes/vote.mock.tsx"),
   route("vote/:code", "routes/vote.code.tsx"),
   route("devcon/:code", "routes/code-redirect.tsx"),
   route("vote", "routes/vote.tsx"),

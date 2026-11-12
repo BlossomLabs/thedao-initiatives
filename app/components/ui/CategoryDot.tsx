@@ -7,11 +7,16 @@ import { cn } from "~/lib/utils";
 export const DOT_RING = "shadow-[inset_0_0_0_1px_rgba(0,0,0,.55),0_0_0_1px_rgba(255,255,255,.9)]";
 
 /** A category's colour as an 8px dot; unknown slugs render nothing. */
-export default function CategoryDot({ slug, className }: { slug: string; className?: string }) {
+export default function CategoryDot(
+  { slug, className, ...rest }:
+    & { slug: string; className?: string }
+    & Omit<React.HTMLAttributes<HTMLSpanElement>, "className" | "style">,
+) {
   const c = categoryOf(slug);
   if (!c) return null;
   return (
     <span
+      {...rest}
       aria-hidden="true"
       className={cn("inline-block size-2 flex-none rounded-full", DOT_RING, className)}
       style={{ background: c.base }}

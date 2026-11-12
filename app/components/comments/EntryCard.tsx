@@ -6,6 +6,7 @@ import Identity from "~/components/wallet/Identity";
 import { Avatar } from "~/components/wallet/Avatar";
 import { QaChip, RoleTags } from "~/components/ui/Badge";
 import Reveal from "~/components/ui/Reveal";
+import { SMALL_BUTTON } from "~/components/ui/Button";
 import WalletMenu from "~/components/wallet/WalletMenu";
 import type { CommentEntry } from "~/lib/api-types";
 import { errorMessage } from "~/lib/api";
@@ -58,8 +59,7 @@ const FEATURE_LEVELS = [
   { label: "Featured", action: "feature" },
 ];
 
-const linkBtn =
-  "inline-flex cursor-pointer items-center gap-[7px] rounded-[9px] border border-white/[.16] bg-white/5 px-3.5 py-2 font-inter-tight text-[13px] font-semibold leading-none text-[#f2f6fa] transition-all duration-150 hover:border-white/[.28] hover:bg-white/10 hover:text-white disabled:cursor-default disabled:opacity-60";
+const linkBtn = SMALL_BUTTON;
 
 export default function EntryCard({
   c,

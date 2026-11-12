@@ -28,6 +28,25 @@
   --animate-tier-land: tier-land 0.7s ease-out both;
   --animate-grade-bump: grade-bump 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
   --animate-chip-land: chip-land 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  /* The closed ballot's arrow to the result: the line draws in, then its head shows. */
+  --animate-ballot-arrow-draw: ballot-arrow-draw 0.45s ease-out both;
+  --animate-ballot-arrow-head: ballot-arrow-head 0.15s ease-out 0.4s both;
+  @keyframes ballot-arrow-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes ballot-arrow-head {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
   @keyframes tier-land {
     0% {
       opacity: 0;
@@ -127,6 +146,7 @@
   --color-dao-bright: #00ff88;
   /* The vote's share on the result bars. */
   --color-vote: #e9b949;
+  --color-vote-pale: #f5dc8c;
   --color-dao-red: #ff3b38;
   --color-dao-red-hover: #e63633;
   --color-dao-sky: #5ac8fa;
@@ -962,8 +982,10 @@ body {
 }
 
 /* The SPA shell skeleton (ShellSkeleton) carries both page shapes; the head
-   script in root.tsx marks the dashboard URL and this shows the matching one. */
+   script in root.tsx marks the dashboard URL and this shows the matching one.
+   The vote's pages show neither: their own skeleton comes right after. */
 html[data-shell="dashboard"] .shell-detail,
+html[data-shell="vote"] .shell-detail,
 html:not([data-shell="dashboard"]) .shell-dashboard {
   display: none;
 }
@@ -999,4 +1021,51 @@ html:not([data-board="cards"]) .board-skeleton-cards {
     var(--color-dao-blue-dark) 90.4%
   );
   background-attachment: fixed;
+}
+
+/* The ballot card's morph (app/components/vote/peek-morph.ts): the chip or tile and the
+   card share these names, so the browser morphs one into the other. */
+::view-transition-group(peek),
+::view-transition-group(peek-title),
+::view-transition-group(peek-dot) {
+  animation-duration: 0.42s;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+/* The page under the card (the dim, the dashed place's text) changes quicker and lighter. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.25s;
+}
+::view-transition-old(peek),
+::view-transition-new(peek) {
+  height: 100%;
+}
+
+/* The open card's initiative in its place (TierBallot, peek-morph.ts): a dashed box that
+   stays put. Its dot and title fade in once the card has grown out of it ("text"); as
+   the card shrinks back into it they have gone ("empty"). */
+[data-peek-slot] {
+  border-style: dashed !important;
+  border-color: rgb(255 255 255 / 0.6) !important;
+  background: transparent !important;
+}
+[data-peek-slot="empty"] > * {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-peek-slot="text"] > * {
+    animation: peek-slot-text-in 0.15s ease-out 0.25s both;
+  }
+}
+@keyframes peek-slot-text-in {
+  from {
+    opacity: 0.35;
+  }
+}
+
+/* The send panel's current step (BallotStatus): a soft pulse around it. */
+@keyframes peek-step {
+  50% {
+    box-shadow: 0 0 0 6px rgb(92 183 90 / 0.12);
+  }
 }

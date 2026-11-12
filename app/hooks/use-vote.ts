@@ -55,12 +55,13 @@ export function useVoteCode(code: string, enabled = true) {
 export type VoteBallots = { at: number; ballots: { tokenId: string; ballot: Hex }[] };
 
 /** Every badge's latest ballot sent before the close (the vote results poll it). */
-export function useVoteBallots(refetchInterval: number | false = false) {
+export function useVoteBallots(refetchInterval: number | false = false, enabled = true) {
   return useQuery({
     queryKey: ["vote-ballots"],
     queryFn: () => api<VoteBallots>("/api/vote/ballots", { passive: true }),
     refetchInterval,
     retry: false,
+    enabled,
   });
 }
 

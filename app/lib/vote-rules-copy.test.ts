@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
-import { ruleMessage } from "./vote-rules-copy";
+import type { RuleError } from "../../shared/vote/rules";
+import { explainBelow, ruleMessage, ruleStatus } from "./vote-rules-copy";
 
 const titleOf = (i: number) => ["Seal Audits", "Seal Tooling", "Gamma", "Delta"][i];
 const groupName = (g: number) => ["Seal"][g];
@@ -57,4 +58,36 @@ it("group: what the affiliation takes of the tier", () => {
 it("tiers and shape", () => {
   expect(say({ rule: "tiers" })).toBe("Use at most three tiers.");
   expect(say({ rule: "shape" })).toBe("This ballot can't be read.");
+});
+
+it("the ballot box's line: the first rule to meet, size before tiers, else valid", () => {
+  const size: RuleError = { rule: "size", requested: 1n, needed: 1_369_866_000_000n, pool: 2n };
+  const s: RuleError = { rule: "independent", tier: 0, count: 1, related: [] };
+  const a: RuleError = { rule: "independent", tier: 1, count: 2, related: [] };
+  expect(ruleStatus([a, s, size])).toEqual({
+    ok: false,
+    text: "Needs at least $1,369,866 to be valid",
+  });
+  expect(ruleStatus([a, s])).toEqual({
+    ok: false,
+    text: "Needs at least 3 independent projects in Tier-S",
+  });
+  expect(ruleStatus([a]).text).toBe("Needs at least 3 independent projects in Tier-A");
+  expect(ruleStatus([])).toEqual({ ok: true, text: "You can keep adding initiatives" });
+});
+
+it("only affiliation problems get the box under the tiers", () => {
+  expect(explainBelow({ rule: "size", requested: 1n, needed: 2n, pool: 2n })).toBe(false);
+  expect(explainBelow({ rule: "independent", tier: 0, count: 2, related: [] })).toBe(false);
+  expect(
+    explainBelow({
+      rule: "independent",
+      tier: 0,
+      count: 2,
+      related: [{ group: 0, projects: [0, 1] }],
+    }),
+  ).toBe(true);
+  expect(explainBelow({ rule: "group", tier: 1, group: 0, groupUsd: 3n, tierUsd: 4n })).toBe(
+    true,
+  );
 });

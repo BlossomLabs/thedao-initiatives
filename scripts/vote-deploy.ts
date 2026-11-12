@@ -8,8 +8,12 @@
 // TheDAO's vote, on mainnet, counting the private voting badges; every flag is required
 // and every initiative in the slugs file needs its own Safe:
 //   VOTE_RELAYER_KEY=0x… MAINNET_RPC_URL=https://… \
-//     deno task vote-deploy --real --opens 2026-12-01T12:00:00Z --s-tally 2026-12-03T12:00:00Z \
+//     deno task vote-deploy --real --opens 2026-11-17T17:00:00Z \
+//       --s-tally 2026-12-03T21:00:00Z --a-tally 2026-12-07T21:00:00Z --b-tally 2026-12-09T21:00:00Z \
 //       --pool-usd 1250000 --slugs round.txt
+// The real vote's windows are 24 h, 12 h, 6 h… nine of them (the last 5 min 37 s), so a
+// tier settles within 47 h 54 min 22 s of its first tally; each tally must leave the
+// tier above that long.
 //
 // The relayer key deploys and keeps only MINTER_ROLE; it is also the server's
 // sending key. Everything here must finish before opensAt (setup freezes then).
@@ -44,14 +48,18 @@ import type { VoteManifest } from "../shared/vote/manifest.ts";
 export const ADMIN = "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF"; // sem-the-bee.eth
 export const POOL_USD = 913_244_000_000n; // 400 ETH × $2,283.11, six decimals
 const SETUP_MINUTES = 30;
-// Slow Quiet Ending: S's first tally a day after opening, then windows of
-// 2 h, 1 h, 30 min and 15 min at most; A and B each start when the tier above
-// can no longer still be running.
+// A test vote: S's first tally a day after opening, then windows of 2 h, 1 h,
+// 30 min and 15 min at most; A and B each start when the tier above can no longer
+// still be running.
 const VOTING_HOURS = 24;
-export const INITIAL_WINDOW = 2 * 60 * 60;
-export const MAX_WINDOWS = 4;
-const TIER_MAX = Array.from({ length: MAX_WINDOWS }, (_, k) => INITIAL_WINDOW >> k)
-  .reduce((a, b) => a + b, 0);
+export const TEST_WINDOWS = { initialWindow: 2 * 60 * 60, maxWindows: 4 };
+// The real vote: 24 h, 12 h, 6 h, 3 h, 1 h 30 min, 45 min, 22 min 30 s, 11 min 15 s and
+// 5 min 37 s: 9 windows, 47 h 54 min 22 s at most.
+export const REAL_WINDOWS = { initialWindow: 24 * 60 * 60, maxWindows: 9 };
+
+/** The longest a tier can run: every window, as the contract adds them up. */
+export const tierMax = (s: { initialWindow: number; maxWindows: number }) =>
+  Array.from({ length: s.maxWindows }, (_, k) => s.initialWindow >> k).reduce((a, b) => a + b, 0);
 
 export type BoardCard = {
   slug: string;
@@ -104,18 +112,20 @@ export const groupMask = (groups: number[]): bigint =>
 /** Projects may join before opening, or later outside every tier's quiet-ending span
  * [first tally, latest end), never at or after the last end (as the contract checks). */
 export function addingOpen(s: Schedule, now: number): boolean {
+  const span = tierMax(s);
   if (now < s.opensAt) return true;
-  if (now >= s.firstTallyAt[2] + TIER_MAX) return false;
-  return s.firstTallyAt.every((t) => now < t || now >= t + TIER_MAX);
+  if (now >= s.firstTallyAt[2] + span) return false;
+  return s.firstTallyAt.every((t) => now < t || now >= t + span);
 }
 
 /** When adding opens again: the end of the span `now` is in; null once the round is over. */
 export function nextAddingOpen(s: Schedule, now: number): number | null {
+  const span = tierMax(s);
   let t = now;
   // Spans can follow each other with no gap (A starts as S's latest end passes).
   while (!addingOpen(s, t)) {
-    if (t >= s.firstTallyAt[2] + TIER_MAX) return null;
-    t = s.firstTallyAt.find((x) => t >= x && t < x + TIER_MAX)! + TIER_MAX;
+    if (t >= s.firstTallyAt[2] + span) return null;
+    t = s.firstTallyAt.find((x) => t >= x && t < x + span)! + span;
   }
   return t;
 }
@@ -158,50 +168,69 @@ export function planInitiatives(
 export function voteSchedule(now: number) {
   const opensAt = now + SETUP_MINUTES * 60;
   const s = opensAt + VOTING_HOURS * 60 * 60;
+  const span = tierMax(TEST_WINDOWS);
   return {
     opensAt,
-    initialWindow: INITIAL_WINDOW,
-    firstTallyAt: [s, s + TIER_MAX, s + 2 * TIER_MAX] as [number, number, number],
-    maxWindows: MAX_WINDOWS,
+    ...TEST_WINDOWS,
+    firstTallyAt: [s, s + span, s + 2 * span] as [number, number, number],
   };
 }
 
 export type Schedule = ReturnType<typeof voteSchedule>;
 
-/** The real vote: S's first tally where the team sets it; A and B follow once the
- * tier above can no longer be running. */
-export function realSchedule(opensAt: number, sTally: number): Schedule {
-  return {
-    opensAt,
-    initialWindow: INITIAL_WINDOW,
-    firstTallyAt: [sTally, sTally + TIER_MAX, sTally + 2 * TIER_MAX],
-    maxWindows: MAX_WINDOWS,
-  };
+/** The real vote: each tier's first tally where the team sets it. Each must leave the
+ * tier above its longest run, as the contract checks (it would revert otherwise). */
+export function realSchedule(opensAt: number, tallies: [number, number, number]): Schedule {
+  const s = { opensAt, ...REAL_WINDOWS, firstTallyAt: tallies };
+  const span = tierMax(s);
+  const names = ["--s-tally", "--a-tally", "--b-tally"];
+  if (tallies[0] < opensAt) throw new Error("--s-tally must come after --opens");
+  for (const t of [1, 2]) {
+    if (tallies[t] < tallies[t - 1] + span) {
+      throw new Error(
+        `${names[t]} must be at least ${span} s (47 h 54 min 22 s) after ${names[t - 1]}`,
+      );
+    }
+  }
+  return s;
 }
 
-export type RealArgs = { opensAt: number; sTally: number; poolUsd: bigint; slugsFile: string };
+export type RealArgs = {
+  opensAt: number;
+  tallies: [number, number, number];
+  poolUsd: bigint;
+  slugsFile: string;
+};
 
-/** `--real` takes no defaults: the opening, S's first tally (ISO dates), the pool in
- * whole dollars and a file of initiative slugs, one per line, in ballot order. */
+/** `--real` takes no defaults: the opening, each tier's first tally (ISO dates), the
+ * pool in whole dollars and a file of initiative slugs, one per line, in ballot order. */
 export function parseRealArgs(
-  a: { opens?: string; "s-tally"?: string; "pool-usd"?: string; slugs?: string },
+  a: {
+    opens?: string;
+    "s-tally"?: string;
+    "a-tally"?: string;
+    "b-tally"?: string;
+    "pool-usd"?: string;
+    slugs?: string;
+  },
 ): RealArgs {
   const need = (flag: keyof typeof a) => {
     const v = a[flag]?.trim();
     if (!v) throw new Error(`--${flag} is required with --real`);
     return v;
   };
-  const date = (flag: "opens" | "s-tally") => {
+  const date = (flag: "opens" | "s-tally" | "a-tally" | "b-tally") => {
     const t = Date.parse(need(flag));
     if (!Number.isFinite(t)) throw new Error(`--${flag} is not a date`);
     return Math.floor(t / 1000);
   };
   const opensAt = date("opens");
-  const sTally = date("s-tally");
-  if (sTally <= opensAt) throw new Error("--s-tally must come after --opens");
+  const tallies: [number, number, number] = [date("s-tally"), date("a-tally"), date("b-tally")];
+  if (tallies[0] <= opensAt) throw new Error("--s-tally must come after --opens");
+  realSchedule(opensAt, tallies); // the gaps between tiers, checked before anything is sent
   const dollars = need("pool-usd").replace(/[,_\s]/g, "");
   if (!/^\d+$/.test(dollars)) throw new Error("--pool-usd must be whole dollars");
-  return { opensAt, sTally, poolUsd: BigInt(dollars) * 1_000_000n, slugsFile: need("slugs") };
+  return { opensAt, tallies, poolUsd: BigInt(dollars) * 1_000_000n, slugsFile: need("slugs") };
 }
 
 /** What the site reads (shared/vote/manifest-data.ts). */
@@ -226,7 +255,7 @@ export function manifestFor(
     deployBlock: r.deployBlock,
     opensAt: r.schedule.opensAt,
     // The latest the round can end: B's last window. The quiet ending settles earlier.
-    closesAt: r.schedule.firstTallyAt[2] + TIER_MAX,
+    closesAt: r.schedule.firstTallyAt[2] + tierMax(r.schedule),
     schedule: r.schedule,
     poolUsd: r.poolUsd.toString(),
     ...(r.kind === "real" ? { badge: REVIEW_BADGE_CONTRACT } : { issuer: getAddress(r.issuer!) }),
@@ -394,6 +423,8 @@ async function main() {
       "out",
       "opens",
       "s-tally",
+      "a-tally",
+      "b-tally",
       "pool-usd",
       "slugs",
       "independent-tiers",
@@ -448,7 +479,7 @@ async function main() {
     ),
   ) as { bytecode: { object: Hex } };
   const block = await pub.getBlock();
-  const s = real ? realSchedule(real.opensAt, real.sTally) : voteSchedule(Number(block.timestamp));
+  const s = real ? realSchedule(real.opensAt, real.tallies) : voteSchedule(Number(block.timestamp));
   if (real && Number(block.timestamp) + SETUP_MINUTES * 60 > s.opensAt) {
     throw new Error(`--opens must leave ${SETUP_MINUTES} minutes for the setup`);
   }

@@ -9,8 +9,20 @@ import {
   planGroups,
   planInitiatives,
   realSchedule,
+  tierMax,
   voteSchedule,
 } from "./vote-deploy.ts";
+
+// The plan (vote fact sheet): opens Nov 17, Tier-S Thu Dec 3, Tier-A Mon Dec 7,
+// Tier-B Wed Dec 9, every tally at 21:00 UTC.
+const at = (iso: string) => Date.parse(iso) / 1000;
+const OPENS = at("2026-11-17T17:00:00Z");
+const PLAN: [number, number, number] = [
+  at("2026-12-03T21:00:00Z"),
+  at("2026-12-07T21:00:00Z"),
+  at("2026-12-09T21:00:00Z"),
+];
+const PLAN_SPAN = 48 * 3600 - 338; // 24 h + 12 h + … + 5 min 37 s (9 windows), as the contract adds them
 
 const SAFE = "0x2e72eE36F7575Fae93f94aAeDAA9E77db2259d59";
 
@@ -77,18 +89,22 @@ Deno.test("planInitiatives, real vote: every initiative needs its own Safe", () 
 
 Deno.test("parseRealArgs: every flag is required, and S's tally comes after the opening", () => {
   const full = {
-    opens: "2026-12-01T12:00:00Z",
-    "s-tally": "2026-12-03T12:00:00Z",
+    opens: "2026-11-17T17:00:00Z",
+    "s-tally": "2026-12-03T21:00:00Z",
+    "a-tally": "2026-12-07T21:00:00Z",
+    "b-tally": "2026-12-09T21:00:00Z",
     "pool-usd": "1250000",
     slugs: "round.txt",
   };
   assertEquals(parseRealArgs(full), {
-    opensAt: Date.parse(full.opens) / 1000,
-    sTally: Date.parse(full["s-tally"]) / 1000,
+    opensAt: OPENS,
+    tallies: PLAN,
     poolUsd: 1_250_000_000_000n,
     slugsFile: "round.txt",
   });
-  for (const flag of ["opens", "s-tally", "pool-usd", "slugs"] as const) {
+  for (
+    const flag of ["opens", "s-tally", "a-tally", "b-tally", "pool-usd", "slugs"] as const
+  ) {
     assertThrows(() => parseRealArgs({ ...full, [flag]: undefined }), Error, `--${flag}`);
   }
   assertThrows(
@@ -98,19 +114,32 @@ Deno.test("parseRealArgs: every flag is required, and S's tally comes after the 
   );
 });
 
-Deno.test("realSchedule: S at the given tally, A and B after S's and A's longest run", () => {
-  const s = realSchedule(1_000, 100_000);
-  const tier = 7200 + 3600 + 1800 + 900;
-  assertEquals(s, {
-    opensAt: 1_000,
-    initialWindow: 7200,
-    firstTallyAt: [100_000, 100_000 + tier, 100_000 + 2 * tier],
-    maxWindows: 4,
-  });
+Deno.test("realSchedule: the plan's dates, 9 windows from 24 h", () => {
+  const s = realSchedule(OPENS, PLAN);
+  assertEquals(s, { opensAt: OPENS, initialWindow: 86400, firstTallyAt: PLAN, maxWindows: 9 });
+  // The last window: 5 min 37 s.
+  assertEquals(86400 >> 8, 337);
+  assertEquals(tierMax(s), PLAN_SPAN);
+  // Tier-B's first tally comes 5 min 38 s after Tier-A's latest end: allowed.
+  assertEquals(PLAN[2] - (PLAN[1] + tierMax(s)), 338);
+});
+
+Deno.test("realSchedule: a tier can't start while the one above may still be running", () => {
+  assertThrows(
+    () => realSchedule(OPENS, [PLAN[0], PLAN[0] + PLAN_SPAN - 1, PLAN[2]]),
+    Error,
+    "--a-tally must be at least",
+  );
+  assertThrows(
+    () => realSchedule(OPENS, [PLAN[0], PLAN[1], PLAN[1] + 24 * 3600]),
+    Error,
+    "--b-tally must be at least",
+  );
+  assertThrows(() => realSchedule(PLAN[0] + 1, PLAN), Error, "--s-tally must come after");
 });
 
 Deno.test("manifestFor: the real vote names the badge on mainnet, a test vote its issuer", () => {
-  const s = realSchedule(1_000, 100_000);
+  const s = realSchedule(OPENS, PLAN);
   const base = {
     contract: SAFE2 as `0x${string}`,
     deployBlock: 5,
@@ -126,9 +155,10 @@ Deno.test("manifestFor: the real vote names the badge on mainnet, a test vote it
     chainId: 1,
     contract: SAFE2,
     deployBlock: 5,
-    opensAt: 1_000,
-    // The latest the round can end: B's last window (the quiet ending runs the rest).
-    closesAt: 100_000 + 3 * (7200 + 3600 + 1800 + 900),
+    opensAt: OPENS,
+    // The latest the round can end: B's last window (the quiet ending runs the rest),
+    // Fri Dec 11, 20:59:55 UTC.
+    closesAt: PLAN[2] + PLAN_SPAN,
     schedule: s,
     poolUsd: "7",
     badge: "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C",
@@ -189,26 +219,24 @@ Deno.test("planInitiatives carries rfp and groups; an RFP with affiliations thro
 });
 
 Deno.test("addingOpen: before opening, between tiers, never inside a span or after the end", () => {
-  const s = realSchedule(1_000, 100_000);
-  const span = 7200 + 3600 + 1800 + 900;
-  assertEquals(addingOpen(s, 500), true); // before opening
-  assertEquals(addingOpen(s, 50_000), true); // open, before S
-  assertEquals(addingOpen(s, 100_000), false); // S's first tally
-  // A starts when S can no longer be running, B likewise: no gap until the end.
-  assertEquals(addingOpen(s, 100_000 + span), false);
-  assertEquals(nextAddingOpen(s, 100_000), null);
-  assertEquals(addingOpen(s, s.firstTallyAt[2] + span), false); // the end
-  // With a gap between S and A, a project may join in it.
-  const gap = {
-    ...s,
-    firstTallyAt: [100_000, 100_000 + span + 500, 100_000 + 2 * span + 500] as [
-      number,
-      number,
-      number,
-    ],
-  };
-  assertEquals(nextAddingOpen(gap, 100_000), 100_000 + span);
-  assertEquals(addingOpen(gap, 100_000 + span), true);
+  // A test vote: A starts as S's latest end passes, B likewise, so no gap until the end.
+  const t = voteSchedule(1_000);
+  const tSpan = tierMax(t);
+  const tS = t.firstTallyAt[0];
+  assertEquals(addingOpen(t, 500), true); // before opening
+  assertEquals(addingOpen(t, tS - 1), true); // open, before S
+  assertEquals(addingOpen(t, tS), false); // S's first tally
+  assertEquals(addingOpen(t, tS + tSpan), false);
+  assertEquals(nextAddingOpen(t, tS), null);
+  assertEquals(addingOpen(t, t.firstTallyAt[2] + tSpan), false); // the end
+
+  // The plan: two days free between Tier-S's latest end and Tier-A, and 5 min 38 s before B.
+  const s = realSchedule(OPENS, PLAN);
+  assertEquals(addingOpen(s, PLAN[0] - 1), true);
+  assertEquals(addingOpen(s, PLAN[0] + 24 * 3600), false); // Tier-S settling
+  assertEquals(nextAddingOpen(s, PLAN[0]), PLAN[0] + PLAN_SPAN); // Sat Dec 5, ~21:00 UTC
+  assertEquals(addingOpen(s, PLAN[1] - 1), true);
+  assertEquals(addingOpen(s, PLAN[2] + PLAN_SPAN), false); // the end
 });
 
 Deno.test("addPlan: new groups and projects for the admin, appended without reordering", () => {
@@ -216,7 +244,7 @@ Deno.test("addPlan: new groups and projects for the admin, appended without reor
     kind: "test",
     contract: SAFE as `0x${string}`,
     deployBlock: 5,
-    schedule: realSchedule(1_000, 100_000),
+    schedule: realSchedule(OPENS, PLAN),
     poolUsd: 7n,
     issuer: SAFE as `0x${string}`,
     slugs: ["a", "b"],

@@ -12,6 +12,7 @@
       ]
     },
     "dev:web": "deno run -A npm:@react-router/dev dev",
+    "dev:prod": "API_PROXY=https://initiatives.thedao.fund deno run -A npm:@react-router/dev dev",
     "dev:api": "deno run --env-file=.env -A --watch api/main.ts",
     "build": "deno run -A npm:@react-router/dev build",
     "start": "deno run --env-file=.env --allow-net --allow-read --allow-env --allow-write server.ts",

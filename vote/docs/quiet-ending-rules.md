@@ -25,7 +25,7 @@ signatures do not authorize submissions after a transfer.
 Administrative permissions use OpenZeppelin AccessControl. DEFAULT_ADMIN_ROLE
 grants/revokes roles; ADMIN_ROLE manages setup and the USD pool budget; PLEDGE_ROLE
 records pledges; MINTER_ROLE issues internal NFTs, and burns mistaken ones, before
-registration closes. A burn revokes the token's receipt and records a revocation in
+S's first window ends (no tier can settle earlier). A burn revokes the token's receipt and records a revocation in
 the transcript, so replay voids its earlier ballots.
 BLOB_SUBMITTER_ROLE permits hash-only blob receipts because a bad blob can consume
 a signed nonce. The deployment admin initially has all these roles.
@@ -45,16 +45,19 @@ or selects checkpoint outcomes.
 | Initial quiet window, W | Duration of each tier's first quiet window. |
 | Maximum windows, N | Total windows allowed per tier, including the initial window; N must be at least one. |
 
-The registration deadline is always **first S tally + W**. There is no independently
-configurable registration deadline or minimum quiet-window duration.
+First ballots are taken until **S settles**: the contract's registration deadline is
+S's latest possible settlement (first S tally plus the maximum tier duration), and
+replay accepts a first ballot only before S's actual settlement. Minting and burning
+close at **first S tally + W**. There is no independently configurable registration
+deadline or minimum quiet-window duration.
 
 ADMIN_ROLE can call setDates(opensAt, firstTallyAt) to change dates independently.
 The same window-overlap validation runs on deployment and every update. Each changed
 date must be in the future. Opening cannot change after it starts, preventing setup
 from reopening. Once funded, a tier's first tally date cannot change at or after
 that timestamp. Unchanged dates remain untouched, including dates of started tiers.
-Window duration and maximum windows are fixed. Registration and maximum round end
-are recalculated from S and B respectively. ScheduleConfigured records every update.
+Window duration and maximum windows are fixed. Registration, minting and maximum
+round end are recalculated from S and B respectively. ScheduleConfigured records every update.
 
 The first setPoolUsd call, including an explicit zero, must be strictly before
 S's first tally; otherwise InitialFundingTooLate reverts without changing state.
@@ -67,17 +70,39 @@ Each tier starts its own window count at one. Window k lasts floor(W / 2^(k - 1)
 seconds, for k from 1 through N. Thus N = 1 allows only the initial window.
 With W = 24 hours and N = 4, the windows are 24, 12, 6 and 3 hours.
 
-At the end of each window, compare its closing tally with its opening tally.
-If they agree, settle the tier. If they differ and windows remain, the closing
-tally becomes the next window's baseline. If they differ at the end of window N,
-settle the latest tally anyway. A proposal changing twice within a window matters
-only through the two boundary tallies.
+Each window has an opening tally, a tally after every block in the window that
+holds a [tally event](#tally-events), and a closing tally at its end. The outcome
+compared is the set of funded projects in the tier being settled; changes in lower
+tiers and in who pays do not count. If every tally of the window gives the same
+outcome as the opening tally, settle the tier with the closing tally. Otherwise,
+if windows remain, the closing tally becomes the next window's baseline. If any
+tally differs during window N, settle the closing tally anyway. A project that
+becomes funded and drops out again within one window extends the tier, even when
+the closing tally matches the opening one.
 
 Configuration must ensure the final window has at least one second. The maximum
 tier duration is the sum of floor(W / 2^(k - 1)) for k = 1 through N, always less than 2W.
 The first S tally cannot precede voting start. The first A tally must not precede
 the latest possible S settlement, and the first B tally must not precede the latest
 possible A settlement. Gaps are allowed. Each tier's latest settlement is derivable.
+
+### Tally events
+
+A block holds a tally event when it contains any of these:
+
+- a ballot receipt or a burn;
+- a pledge record, including a change or cancellation;
+- a pool increase;
+- a change in a project address's balance in an allowed currency, incoming or
+  outgoing. Native transfers through internal transactions count; they emit no
+  log, so replay must find them with transaction traces or by comparing each
+  project's balance block by block, both of which need an archive node.
+
+A block with several events gets one tally, after its last event, so the order of
+transactions inside a block never matters. Each tally values currencies at its own
+block. A price change alone is not an event: it triggers no tally, but it does
+affect any tally taken for another reason. In-window tallies are comparisons only.
+They settle nothing and do not bind supporters; the scheduled checkpoints do.
 
 ## Dollar funding, projects and pledges
 
@@ -139,8 +164,14 @@ checkpoint valuation requires the historical canonical block state, including
 balances, recorded quantities, pledges and oracle state together. An old oracle
 round paired with current balances is not a historical valuation.
 
-Registration closes at the end of S's first window, fixing the accepted NFT count
-and equal initial shares of the USD budget at that cutoff. Subsequent funding
+Registration closes when S settles, fixing the accepted NFT count and equal initial
+shares of the USD budget at that cutoff. Until then every tally splits the budget
+among the NFTs with an accepted ballot, so a first ballot during S's windows shrinks
+every share and can move S like any revision: the quiet ending extends for it the same
+way. Simulated (`reference/quiet_ending_sim.py`, `main_registration`, 200 rounds): about
+5-7% more holders counted, S a few hours longer on average; a group holding first
+ballots back to drip one in per tally can push S to its last window, but loses money
+by doing so. Subsequent funding
 increases add equally to those same NFT IDs' remaining shares. Each NFT's remaining
 share is its initial share plus its share of added funding, minus settled charges.
 Settled awards and charges do not change, and transfers do not create new shares.
@@ -155,7 +186,8 @@ It is not published, approved or activated by an operator. Its data includes:
 - the configured schedule and authoritative funding, project and pledge records;
 - the NFT ownership evidence and the accepted token-ID roll;
 - every ballot receipt in order and its acceptance or rejection;
-- the tally, previously settled tiers, supporter restrictions and next window.
+- the tally, previously settled tiers, supporter restrictions and next window;
+- the tally after every block of the window that holds a tally event.
 
 Receipt order is block, transaction, then record within the transaction. The prefix
 ends at the last canonical block whose timestamp is strictly before the cutoff.
@@ -187,8 +219,8 @@ NFT roll merely because its receipt passed on-chain checks.
 Recording is a receipt, not acceptance. Replay must establish:
 
 1. **Authorization and eligibility.** The signature or account call belongs to this
-   round and the current owner of the eligible NFT ID at inclusion. After registration
-   closes, that token ID must already be on the accepted roll. A transfer changes
+   round and the current owner of the eligible NFT ID at inclusion. Once S has
+   settled, that token ID must already be on the accepted roll. A transfer changes
    the authorized owner, not the token's registration or equal voting unit.
 2. **Timely inclusion.** The receipt belongs to the canonical prefix for its window.
    A receipt exactly at a cutoff belongs to the next window, if one is open.
@@ -213,8 +245,7 @@ submission needs the next nonce even if its predecessor was rejected. The regist
 accepts only nonceOf + 1, never a skipped nonce. A transcript record with voter
 address zero is a burn: discard every earlier ballot of that NFT ID.
 
-An NFT ID enters the accepted roll only through an accepted ballot before the
-registration deadline. Rejected records do not add voting units. If no NFT has an
+An NFT ID enters the accepted roll only through an accepted ballot before S settles. Rejected records do not add voting units. If no NFT has an
 accepted ballot, there is no division by zero or voting allocation.
 
 The interface distinguishes recorded/pending validation, accepted and rejected,
@@ -241,10 +272,10 @@ coverage is outside that allocation decision. Unsettled tiers use current projec
 needs and the shares remaining after settled charges, including equal shares of
 any subsequent funding increase. These increases do not reopen settled tiers.
 
-The existing model compares funded projects and shifts in who pays. Material
-increases in project need or per-NFT payment burden must additionally prevent quiet
-agreement, even when payment proportions are unchanged. Exact thresholds and their
-implementation remain open. The maximum-window limit and forced-close rule still apply.
+The quiet comparison looks only at which projects in the settling tier are funded.
+Shifts in who pays, and changes in project need or per-NFT payment burden, matter
+only when they change that set at some tally of the window. The maximum-window
+limit and forced-close rule still apply.
 
 The draft supporter rule prevents a supporter of a provisionally funded proposal
 from stepping back until that tier settles. Derive the bound set from the preceding
@@ -281,7 +312,7 @@ checkpoint does not require a separate checkpoint-publication transaction.
 
 - Securing the USD funds, and implementing settled awards and NFT charges in replay.
 - Exact equal-NFT share accounting and rounding for initial USD funding and increases.
-- Payment-stability comparison, supporter restrictions and chain finality policy.
+- Supporter restrictions and chain finality policy.
 - Treatment of pool payouts, spent donations and pledge fulfilment to avoid double counting.
 - Production currency/feed configuration, blob schema and retention for full replay.
 
@@ -294,7 +325,7 @@ Their minute-based stopping conditions are historical; the current interface use
 
 Simulated on the 49 initiatives of TheDAO Security Fund (asks reduced by 25% and capped
 at $200,000), a $1,000,000 pool and 200 invented badge holders, 30 rounds each. Unless
-it says otherwise, a late group votes during the last day, which moves the S tier in
+it says otherwise, a late group votes during the last day, which moves Tier-S in
 every round.
 
 | | Quiet Ending | Slow Quiet Ending |
@@ -304,8 +335,9 @@ every round.
 | Time after the deadline, with the late group | about 17 hours on average, 30 at most | about 85 hours on average, 96 at most |
 | A group stepping out of funded proposals, without payment-shift checks or supporter locks | its category gains about 22% | its category gains about 21% |
 | The same, with payment-shift checks and supporter locks | no gain; about 51 ballots refused per round | no gain; about 59 ballots refused per round |
-| A group flip-flopping to reach the last window, without supporter locks | 45 tiers closed by the schedule in 30 rounds | the S tier closed by the schedule in every round |
+| A group flip-flopping to reach the last window, without supporter locks | 45 tiers closed by the schedule in 30 rounds | Tier-S closed by the schedule in every round |
 | The same, with supporter locks | no tier closed by the schedule; five tallies at most | the tier is confirmed in two or three tallies |
+| A group pushing a proposal over the line for one block in every window, then taking it off before the closing tally (in-window tallies, 11 November 2026) | 51 tiers closed by the schedule in 30 rounds, about 50 hours after the deadline on average, 72 at most; supporter locks from the checkpoints do not stop it, and locks on every open tier only bring it to 35 | not modelled |
 | A group pushing a new proposal every window | runs out after 10 tallies at most, and loses funding for its own category | runs out after 9 windows at most, and loses funding for its own category |
 | A group stepping out of A and B proposals on the last day | the crude version tried lost the group funding; it is refused in full only if supporter locks bind every open tier | cannot happen: A and B have no tally yet |
 
@@ -322,7 +354,7 @@ Alternatives that were tried and set aside:
 - **Accepting proposals one by one inside a tier.** It usually gave the plain result
   but not always, because it fixes the order of payment before the tier is settled.
 - **Letting new voters join after the deadline.** It moved the result away from the
-  plain tally and lengthened the S tier.
+  plain tally and lengthened Tier-S.
 - **Sealing the last day's ballots with a hard deadline.** A group stepping out gained
   about as much as with public ballots.
 

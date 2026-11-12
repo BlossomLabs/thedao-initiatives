@@ -119,7 +119,11 @@ export function replay(
   now: number,
 ): RoundState {
   const { schedule: s, m, poolUsd, needs } = input;
-  const regDeadline = s.firstTallyAt[0] + s.initialWindow;
+  // First ballots: until Tier-S settles (the contract takes them until its latest
+  // possible settlement). Every tally until then splits the pool among the ballots in,
+  // so a newcomer shrinks the others' shares; Tier-S's charges fix them.
+  const chainDeadline = windowEnds(s, 0).at(-1)!;
+  const rollClosesAt = () => settled.find((x) => x.tier === "S")?.at ?? chainDeadline;
   const receipts = input.receipts.filter((r) => r.timestamp < now);
   const accepted = new Map<string, number[]>();
   const roll = new Set<string>();
@@ -140,10 +144,10 @@ export function replay(
   const apply = (r: Receipt) => {
     if (r.ballot === null) {
       accepted.delete(r.tokenId);
-      if (r.timestamp < regDeadline) roll.delete(r.tokenId);
+      if (r.timestamp < rollClosesAt()) roll.delete(r.tokenId);
       return;
     }
-    if (!roll.has(r.tokenId) && r.timestamp >= regDeadline) {
+    if (!roll.has(r.tokenId) && r.timestamp >= rollClosesAt()) {
       rejected.push({ tokenId: r.tokenId, nonce: r.nonce, reason: "registration_closed" });
       return;
     }
@@ -307,7 +311,7 @@ export function replay(
     }
   }
   return {
-    registrationClosesAt: regDeadline,
+    registrationClosesAt: rollClosesAt(),
     tiers: tiers as RoundState["tiers"],
     accepted: new Map([...accepted].map(([k, v]) => [k, Uint8Array.from(v)])),
     rejected,

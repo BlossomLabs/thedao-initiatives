@@ -446,6 +446,8 @@ def run_on_time(
     payment_tolerance=None,
     lock_supporters=False,
     asks_for_day=None,
+    between=None,
+    shares_for_day=None,
 ):
     """Quiet Ending by tiers that extends only when a tier changed.
 
@@ -472,6 +474,22 @@ def run_on_time(
     binds the supporters of the first open stage, ``"all"`` those of every open stage.
     A revised ballot that breaks this is refused whole.
 
+    ``between(day, state)`` gives the states inside the window that ends at tally
+    ``day``: one ``(ballots, costs)`` pair per block with a tally event, in block
+    order (``costs`` ``None`` keeps the costs of the window's opening tally). Each is
+    tallied like the closing tally, and a stage is quiet only if every one of them
+    funds the same proposals as the opening tally too: a proposal funded for part of
+    a window and gone by its end still extends it. These tallies only compare; the
+    locks and the payments come from the opening and closing tallies. Revisions in
+    them pass the locks as at the closing tally, in order. Each day record then has
+    ``between``, the number of in-window tallies.
+
+    ``shares_for_day(ballots)``, if given, re-splits the pool before every tally while
+    the first tier is still open: it returns each holder's weight for the ballots in
+    now (the pool divided among the holders with a ballot, say), so a first ballot
+    arriving during the first tier's windows shrinks everyone's share. Once the first
+    tier is confirmed the weights are fixed, as its charges are taken from them.
+
     ``ballots_for_day(day, state)`` and the result are as in ``run_daily``, with
     ``stage`` the first stage still open. Each day record has the stage the comparison
     started at, ``confirmed`` (the stages accepted that day), ``hours`` since the
@@ -492,8 +510,9 @@ def run_on_time(
             highest = highest if level is None else max(highest, level)
         return highest
 
-    def tally_open(ballots, first):
+    def tally_open(ballots, first, costs=None):
         """The open stages' tallies, ``(order, shares)`` from stage ``first`` down."""
+        costs = current_costs if costs is None else costs
         ranks = []
         for ballot in ballots:
             if ballot is None:
@@ -517,9 +536,21 @@ def run_on_time(
         for c, now in shares.items():
             if c not in earlier:
                 continue
-            was = {i: d * costs[c] // earlier_costs[c] for i, d in earlier[c].items()}
+            was = {i: d * current_costs[c] // earlier_costs[c] for i, d in earlier[c].items()}
             total += sum(abs(now.get(i, 0) - was.get(i, 0)) for i in set(now) | set(was)) // 2
         return total
+
+    def locked(old_ballots, new_ballots):
+        """``new_ballots`` with every revision that breaks a lock refused whole."""
+        out, refused = list(new_ballots), 0
+        for i, held in locks.items():
+            old, new = old_ballots[i], out[i]
+            if old is None or new == old:
+                continue
+            if new is None or any(tier_of(new, c) > tier_of(old, c) for c in held):
+                out[i] = old
+                refused += 1
+        return out, refused
 
     def supporters(tallies):
         held = {}
@@ -548,26 +579,29 @@ def run_on_time(
             "spent": sum(sum(shares.values()) for shares in paid.values()),
         }
 
-    costs = list(asks_for_day(0)) if asks_for_day else list(costs)
+    current_costs = list(asks_for_day(0)) if asks_for_day else list(costs)
     ballots = list(ballots_for_day(0, None))
-    previous, previous_costs = tally_open(ballots, 0), costs
+    if shares_for_day:
+        weights[:] = shares_for_day(ballots)
+    previous, previous_costs = tally_open(ballots, 0), current_costs
     locks = supporters(previous) if scope else {}
     contested = set(previous[0][0])
     first, extensions, day, window = 0, 0, 0, quiet_window
     while first <= tiers:
         day += 1
+        refused, inside = 0, []
+        if between is not None:
+            for block_ballots, block_costs in between(day, state(ballots, first, contested, window)):
+                ballots, n = locked(ballots, block_ballots)
+                refused += n
+                inside.append(tally_open(ballots, first, previous_costs if block_costs is None else list(block_costs)))
         before = ballots
         if asks_for_day:
-            costs = list(asks_for_day(day))
-        ballots = list(ballots_for_day(day, state(ballots, first, contested, window)))
-        refused = 0
-        for i, held in locks.items():
-            old, new = before[i], ballots[i]
-            if old is None or new == old:
-                continue
-            if new is None or any(tier_of(new, c) > tier_of(old, c) for c in held):
-                ballots[i] = old
-                refused += 1
+            current_costs = list(asks_for_day(day))
+        ballots, n = locked(before, ballots_for_day(day, state(ballots, first, contested, window)))
+        refused += n
+        if shares_for_day and first == 0:
+            weights[:] = shares_for_day(ballots)
         current = tally_open(ballots, first)
         started, stage, confirmed, accepted, cut, shifted = first, first, [], 0, False, None
         while stage <= tiers:
@@ -576,7 +610,8 @@ def run_on_time(
                 earlier_order, earlier_shares = previous[stage - started]
                 shifted = moved(shares, earlier_shares, previous_costs)
                 steady = payment_tolerance is None or shifted <= payment_tolerance
-                if set(order) != set(earlier_order) or not steady:
+                wandered = any(set(tally[stage - started][0]) != set(earlier_order) for tally in inside)
+                if set(order) != set(earlier_order) or wandered or not steady:
                     if stage != first or extensions < len(lengths):
                         break
                     forced.append(stage)
@@ -601,6 +636,7 @@ def run_on_time(
                 "closed_by_schedule": cut,
                 "shifted": shifted,
                 "refused": refused,
+                "between": len(inside),
             }
         )
         if stage > tiers:
@@ -614,7 +650,7 @@ def run_on_time(
         contested = set(open_now[0][0])
         for (order, _), (earlier_order, _) in zip(open_now, previous[stage - started :]):
             contested |= set(order) ^ set(earlier_order)
-        previous, previous_costs = open_now, costs
+        previous, previous_costs = open_now, current_costs
         locks = supporters(previous) if scope else {}
     previous = [([], {})]
     result = state(ballots, first, set())

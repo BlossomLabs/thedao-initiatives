@@ -108,6 +108,76 @@ class Mechanics(unittest.TestCase):
         self.assertEqual((every["days"][0]["refused"], every["funded"]), (1, [A, B]))
 
 
+def inside(*windows):
+    """In-window states window by window: ``windows[d - 1]`` lists the
+    ``(ballots, costs)`` of each event block before tally ``d``; later windows have none."""
+    return lambda day, state: list(windows[day - 1]) if day <= len(windows) else []
+
+
+class InWindowTallies(unittest.TestCase):
+    """A tally after every block with an event: the tier being settled must fund the
+    same proposals at the opening tally, at every one of these and at the closing tally."""
+
+    def test_a_project_funded_for_part_of_the_window_extends_it(self):
+        # A is the first tier at both ends of the window; for one block B joins it and
+        # both are funded. Comparing the ends alone would settle the tier.
+        costs = [3, 3, 3]
+        voters = [(6, None)]
+        ballots = fixed([[1, 0, 0]])
+        plain = run_on_time(costs, voters, 0, ballots)
+        self.assertEqual(plain["days"][0]["confirmed"], [0, 1, 2, 3])
+        result = run_on_time(costs, voters, 0, ballots, between=inside([([[1, 1, 0]], None)]))
+        first, second = result["days"]
+        self.assertEqual((first["confirmed"], first["between"]), ([], 1))
+        self.assertEqual((second["confirmed"], second["hours"]), ([0, 1, 2, 3], 12))
+        self.assertEqual(result["funded"][0], A)
+
+    def test_a_change_only_in_a_lower_tier_does_not_extend_the_tier_being_settled(self):
+        costs = [3, 3, 3]
+        voters = [(6, None)]
+        result = run_on_time(costs, voters, 0, fixed([[1, 2, 0]]), between=inside([([[1, 0, 2]], None)]))
+        first, second = result["days"]
+        self.assertEqual((first["confirmed"], first["accepted"]), ([0], 1))
+        self.assertEqual((second["stage"], second["confirmed"]), (1, [1, 2, 3]))
+        self.assertEqual(result["funded"], [A, B])
+
+    def test_a_donation_that_comes_and_goes_extends_the_window(self):
+        # B asks 4 and is not funded after A; for one block a donation brings its need
+        # down to 3 and it is funded, then the project spends it and the need is back.
+        costs = [3, 4, 9]
+        voters = [(6, None)]
+        ballots = fixed([[1, 1, 0]])
+        quiet = run_on_time(costs, voters, 0, ballots, between=inside([([[1, 1, 0]], [3, 4, 9])]))
+        self.assertEqual(quiet["days"][0]["confirmed"], [0, 1, 2, 3])
+        result = run_on_time(costs, voters, 0, ballots, between=inside([([[1, 1, 0]], [3, 3, 9])]))
+        self.assertEqual(result["days"][0]["confirmed"], [])
+        self.assertEqual(result["days"][1]["confirmed"], [0, 1, 2, 3])
+        self.assertEqual(result["funded"][0], A)
+
+    def test_a_refused_revision_inside_the_window_changes_nothing(self):
+        # The voter pays for A at the opening tally and tries to drop it for a block.
+        costs = [3, 3, 3]
+        voters = [(6, None)]
+        result = run_on_time(
+            costs, voters, 0, fixed([[1, 0, 0]]), lock_supporters=True, between=inside([([[0, 1, 0]], None)])
+        )
+        self.assertEqual(result["days"][0]["confirmed"], [0, 1, 2, 3])
+        self.assertEqual(result["days"][0]["refused"], 1)
+
+    def test_blocks_that_repeat_the_window_s_ends_change_nothing(self):
+        rng = random.Random(7)
+        for _ in range(1000):
+            m, costs, voters, abstaining = small_round(rng)
+            opening = [b for _, b in voters]
+            closing = [random_ballot(rng, m) if b is not None and rng.random() < 0.3 else b for b in opening]
+            ballots = fixed(opening, closing)
+            plain = run_on_time(costs, voters, abstaining, ballots)
+            blocks = [(opening, None)] * rng.randint(0, 2) + [(closing, None)] * rng.randint(0, 2)
+            result = run_on_time(costs, voters, abstaining, ballots, between=inside(blocks))
+            self.assertEqual(result["funded"], plain["funded"])
+            self.assertEqual([d["confirmed"] for d in result["days"]], [d["confirmed"] for d in plain["days"]])
+
+
 class Properties(unittest.TestCase):
     def revised(self, rounds, seed, **options):
         """Random small rounds in which ballots change freely until the deadline and,

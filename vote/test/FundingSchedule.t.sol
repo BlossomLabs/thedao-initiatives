@@ -65,7 +65,8 @@ contract FundingScheduleTest is Fixture {
         assertEq(round.firstTallyAt(0), oldS + 1 hours);
         assertEq(round.firstTallyAt(1), next[1]);
         assertEq(round.firstTallyAt(2), next[2]);
-        assertEq(round.registrationDeadline(), next[0] + round.initialWindow());
+        assertEq(round.mintDeadline(), next[0] + round.initialWindow());
+        assertEq(round.registrationDeadline(), round.latestSettlementAt(0));
         assertEq(round.hardDeadline(), oldEnd);
         round.setPoolUsd(1_000e6);
         assertEq(round.firstTallyAt(0), next[0]);
@@ -214,7 +215,8 @@ contract FundingScheduleTest is Fixture {
         for (uint256 i; i < 3; ++i) {
             assertEq(round.firstTallyAt(i), next[i]);
         }
-        assertEq(round.registrationDeadline(), next[0] + round.initialWindow());
+        assertEq(round.mintDeadline(), next[0] + round.initialWindow());
+        assertEq(round.registrationDeadline(), round.latestSettlementAt(0));
         assertLe(round.registrationDeadline(), next[1]);
         assertLe(round.latestSettlementAt(0), next[1]);
         assertLe(round.latestSettlementAt(1), next[2]);

@@ -5,14 +5,15 @@ ask for about 4.4 times the pool.
 
 The proposals, their costs and their categories are real; the voters are invented.
 Holders belong to interest groups that match the ten categories; a holder likes a
-proposal for its category, its general quality and personal taste, and submits an S/A/B
-tier ballot with ties, leaving most proposals unplaced. The pool is split equally among
-the holders who have submitted a ballot, so every new ballot shrinks the others' shares.
+proposal for its category, its general quality and personal taste, and submits a ballot
+in Tier-S, Tier-A and Tier-B with ties, leaving most proposals unplaced. The pool is
+split equally among the holders who have submitted a ballot, so every new ballot shrinks
+the others' shares.
 
 Most holders vote before the quiet window. One group mostly waits and arrives during
 the window, which is what moves the result at the deadline. During each extension a few
 more holders arrive and some of those present move the contested proposal they like
-best into their S tier.
+best into their Tier-S.
 
 `World(seed, proposals=200)` gives the earlier, fully invented world instead: that many
 proposals in six categories, asking about seven times the pool.
@@ -133,7 +134,7 @@ class World:
         At every pause each `active` holder who has weight left revises its ballot:
 
         "promote"  moves the proposal it likes best among those that can still be
-                   funded into its S tier, if it is one of its favourites;
+                   funded into its Tier-S, if it is one of its favourites;
         "drop"     takes the funded proposals off its ballot, so the rest move up;
         "below"    moves that favourite to the top of the part of its ballot the tally
                    has not counted yet, and touches nothing above.
@@ -280,6 +281,12 @@ class World:
                    of those who never do are not spent.
         "wait"     As "units", but a first ballot is counted from the tally after the
                    one it arrives at.
+        "until S"  (with `on_time`) A first ballot is taken at any tally until the S
+                   tier settles, and none after. Until then the pool is split again at
+                   every tally among the ballots in, so each newcomer shrinks every
+                   share; S settles with the shares of that moment.
+        "until S fixed"  (with `on_time`) The same cutoff, but every badge holder has the
+                   same fixed share whether or not it votes, as in "units".
 
         `attack` makes the largest group (its members who voted before the window)
         act together at every tally from the deadline on, instead of reacting:
@@ -290,9 +297,16 @@ class World:
                      the line, add it at one tally and take it off at the next;
         "fresh"      they push a different such proposal over the line at every tally
                      and never take one off.
+        "drip"       (with an "until S" roll) they hold their first ballots back and
+                     send one per tally from the deadline on while S is open, each
+                     putting in S the proposal its group likes that is closest to
+                     passing, so that every tally has a newcomer that may move S.
 
         With `on_time` there is also "step out below": as "step out", but from the
-        provisionally funded proposals of every open tier, not only the first.
+        provisionally funded proposals of every open tier, not only the first; and
+        "blink": inside every window, from the one before the deadline on, they push
+        the proposal closest to passing over the line in one block and take it off
+        again before the window's closing tally, which then shows nothing new.
 
         The result lists them as `attackers`.
 
@@ -302,7 +316,8 @@ class World:
         closed at the deadline. With `calm` the holders who would arrive during the
         quiet window vote before it, so nothing moves on the last day.
         """
-        late = newcomers in ("units", "wait")
+        until_s = newcomers in ("until S", "until S fixed")
+        late = newcomers in ("units", "wait") or until_s
         joins = [a if a is not None and (late or a <= 1) else None for a in self.arrival]  # the day each ballot arrives
         if calm:
             joins = [0 if a == 1 else a for a in joins]
@@ -333,6 +348,14 @@ class World:
         if attack:
             largest = max(range(self.groups), key=self.group.count)
             attackers = [i for i in voting if self.group[i] == largest and joins[i] == 0]
+        drip = []
+        if attack == "drip":
+            # They hold back; each joins at its own tally from the deadline on.
+            drip = list(attackers)
+            for k, i in enumerate(drip):
+                joins[i] = 1 + k
+            attackers = []
+        dripped = set()
         plan = {"stage": None, "target": None, "added": False, "used": set()}
 
         def tiers_of(ballot):
@@ -366,6 +389,12 @@ class World:
 
             if attack == "step out below":
                 level = state["open_level"]
+            if attack == "blink":
+                plan["target"] = pushable()
+                if plan["target"] is not None:
+                    for i in attackers:
+                        ballots[i] = join_open_tier(ballots[i], lock, plan["target"])
+                return
             if attack in ("step out", "step out below"):
                 for c in state["provisional_all" if attack == "step out below" else "provisional"]:
                     theirs = backing(c, attackers)
@@ -387,10 +416,38 @@ class World:
                     ballots[i] = join_open_tier(ballots[i], lock, plan["target"])
             plan["added"] = not plan["added"]
 
+        def drip_ballot(i, state, ballots):
+            """A dripping holder's first ballot: its own, with the proposal it likes that
+            is closest to passing in Tier-S (from the ballots in now) put in its Tier-S."""
+            if state is None:
+                return self.ballot(i)
+            level = state["stage_level"]
+            held = state["weights"]
+            room = state["budget"] - state["spent"]
+            backing = [0] * self.m
+            for j, b in enumerate(ballots):
+                if b is None:
+                    continue
+                ranks = effective_ranks(b)
+                for c in range(self.m):
+                    if ranks[c] <= level:
+                        backing[c] += held[j]
+            near = [c for c in liked[i] if c not in state["provisional"] and c not in state["funded"] and self.costs[c] <= room]
+            if not near:
+                return self.ballot(i)
+            return self.ballot(i, promoted=[min(near, key=lambda c: self.costs[c] - backing[c])])
+
         def ballots_for_day(day, state):
+            roll_open = not until_s or state is None or state["stage"] == 0
             if day <= 1:
-                ballots = [self.ballot(i) if joins[i] is not None and joins[i] <= day else None for i in range(self.n)]
-                if day == 1 and attackers:
+                ballots = [
+                    (drip_ballot(i, state, state["ballots"] if state else []) if i in drip else self.ballot(i))
+                    if joins[i] is not None and joins[i] <= day
+                    else None
+                    for i in range(self.n)
+                ]
+                dripped.update(i for i in drip if ballots[i] is not None)
+                if day == 1 and attackers and attack != "blink":
                     act(day, state, ballots)
                 return ballots
             ballots = state["ballots"]
@@ -399,8 +456,9 @@ class World:
             chance = respond if state["window"] is None else respond * math.sqrt(state["window"] / 24)
             for i in voting:
                 if ballots[i] is None:
-                    if joins[i] <= day:
-                        ballots[i] = self.ballot(i)
+                    if joins[i] <= day and roll_open:
+                        ballots[i] = drip_ballot(i, state, ballots) if i in drip else self.ballot(i)
+                        dripped.add(i)
                     continue
                 if i in attackers:
                     continue
@@ -411,10 +469,33 @@ class World:
                     continue
                 lock = state["stage_level"] if payers_locked and i in payers else state["locked_level"]
                 ballots[i] = join_open_tier(ballots[i], lock, favourite)
-            if attackers:
+            if attack == "blink":
+                if plan["target"] is not None:
+                    for i in attackers:
+                        ballots[i] = dropped(ballots[i], state["locked_level"], plan["target"])
+            elif attackers:
                 act(day, state, ballots)
             return ballots
 
+        def between(day, state):
+            if attack != "blink":
+                return []
+            ballots = list(state["ballots"])
+            act(day, state, ballots)
+            return [] if plan["target"] is None else [(ballots, None)]
+
+        split = []  # the last split: the shares S settled with
+
+        def shares_for_day(ballots):
+            k = sum(b is not None for b in ballots)
+            split[:] = [POOL // k if b is not None else 0 for b in ballots] if k else [0] * self.n
+            return list(split)
+
+        if newcomers == "until S":
+            # The day-0 split is redone at every tally anyway; start from the early ballots.
+            early = sum(1 for i in range(self.n) if joins[i] == 0) or 1
+            weights = [POOL // early if joins[i] == 0 else 0 for i in range(self.n)]
+            voters = [(w, None) for w in weights]
         if on_time:
             result = run_on_time(
                 self.costs,
@@ -425,7 +506,11 @@ class World:
                 on_time,
                 payment_tolerance=payment_tolerance,
                 lock_supporters=lock_supporters,
+                between=between,
+                shares_for_day=shares_for_day if newcomers == "until S" else None,
             )
+            if newcomers == "until S":
+                weights = list(split)
         else:
             result = run_daily(
                 self.costs,
@@ -441,7 +526,7 @@ class World:
                 payment_tolerance,
                 lock_supporters,
             )
-        result["attackers"] = attackers
+        result["attackers"] = attackers or [i for i in drip if i in dripped]
         result["hours_after_deadline"] = sum(24 if d["hours"] is None else d["hours"] for d in result["days"][1:])
         result["voters"] = [(weights[i], b) for i, b in enumerate(result["ballots"])]
         return result
@@ -932,7 +1017,7 @@ def main_on_time(rounds):
 
     print("\nA group acting together against it (each tier's extensions halve from 12 hours down to a minute, 10 per tier):")
     print("  attack          defence                tallies (max)  hours after deadline (mean, max)  tiers cut off  ballots refused  group pays   group's category  exact")
-    for attack in (None, "step out", "step out below", "flip flop", "fresh"):
+    for attack in (None, "step out", "step out below", "flip flop", "fresh", "blink"):
         for label, defence in ON_TIME_DEFENCES:
             rows = []
             for seed in range(rounds):
@@ -960,6 +1045,58 @@ def main_on_time(rounds):
             )
 
 
+def main_registration(rounds, schedules=((12, 3), HALF_DAY), holders=200):
+    """First ballots until Tier-S settles, against today's roll that closes at the end of
+    S's first window: who gets to vote, how long S takes, whether the schedule has to
+    cut S off, and what a group holding first ballots back to drip them in can do."""
+    print(f"\nWhen a badge's first ballot is last taken (the roll), {holders} holders, one quiet ending per tier on time:")
+    print(
+        "  extensions          roll           attack  voters  S tallies (mean, max)  S cut off  hours after deadline (mean, max)  S as on final ballots"
+    )
+    for hours in schedules:
+        label = f"{hours[0]:g}h down to {hours[1] * 60:g}m" if hours[1] < 1 else f"{hours[0]:g}h down to {hours[1]:g}h"
+        for roll, attack in (
+            ("closed", None),
+            ("until S", None),
+            ("until S fixed", None),
+            ("until S", "drip"),
+            ("until S fixed", "drip"),
+        ):
+            rows = []
+            for seed in range(rounds):
+                world = World(seed, holders=holders)
+                result = world.play_daily(on_time=hours, newcomers=roll, payers_locked=False, attack=attack)
+                days = result["days"]
+                s_tallies = next((k for k, d in enumerate(days) if 0 in d["confirmed"]), len(days) - 1) + 1
+                voters = result["voters"]
+                plain = _ear(
+                    world.costs,
+                    [w for w, _ in voters],
+                    [None if b is None else effective_ranks(b) for _, b in voters],
+                    POOL,
+                    0,
+                    range(world.m),
+                    max_level=max(
+                        [sorted({r for r in b if r})[0] for _, b in voters if b is not None and any(b)] or [1]
+                    ),
+                )[0]
+                settled_s = days[s_tallies - 1]["tally"]
+                rows.append(
+                    (
+                        sum(b is not None for _, b in voters),
+                        s_tallies,
+                        0 in result["forced"],
+                        result["hours_after_deadline"],
+                        set(result["funded"][:settled_s]) == set(plain),
+                    )
+                )
+            print(
+                f"  {label:18}  {roll:13}  {attack or '-':6}  {mean(r[0] for r in rows):6.1f}"
+                f"  {mean(r[1] for r in rows):8.1f} {max(r[1] for r in rows):4d}         {sum(r[2] for r in rows):3d}/{rounds}"
+                f"   {mean(r[3] for r in rows):8.1f} {max(r[3] for r in rows):6.1f}                   {sum(r[4] for r in rows):3d}/{rounds}"
+            )
+
+
 if __name__ == "__main__":
     main(int(sys.argv[1]) if len(sys.argv) > 1 else 20)
     main_steps(int(sys.argv[1]) if len(sys.argv) > 1 else 20)
@@ -970,3 +1107,4 @@ if __name__ == "__main__":
     main_attacks(int(sys.argv[1]) if len(sys.argv) > 1 else 20)
     main_on_time(int(sys.argv[1]) if len(sys.argv) > 1 else 20)
     main_sealed(int(sys.argv[1]) if len(sys.argv) > 1 else 20)
+    main_registration(int(sys.argv[1]) if len(sys.argv) > 1 else 20)

@@ -78,7 +78,13 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     uint8 public immutable maxWindows;
     /// @notice Admin-configured tally dates. Started tiers cannot be rescheduled.
     uint64[3] public firstTallyAt;
+    /// @notice First ballots (registration receipts) are taken until S's latest possible
+    ///         settlement. Replay accepts one only before S actually settles: shares are
+    ///         fixed then, so a later newcomer would change charges already settled.
     uint64 public registrationDeadline;
+    /// @notice Minting and burning internal NFTs close at the end of S's first window,
+    ///         before any tier can settle, so a burn never revokes a settled charge.
+    uint64 public mintDeadline;
     uint64 public immutable maximumTierDuration;
     uint64 public hardDeadline;
     /// @notice Tiers held to the independence rules: bit 0 Tier-S (always), bit 1 Tier-A.
@@ -125,7 +131,8 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         maxWindows = schedule.maxWindows;
         firstTallyAt = schedule.firstTallyAt;
         maximumTierDuration = uint64(duration);
-        registrationDeadline = uint64(uint256(schedule.firstTallyAt[0]) + schedule.initialWindow);
+        mintDeadline = uint64(uint256(schedule.firstTallyAt[0]) + schedule.initialWindow);
+        registrationDeadline = uint64(uint256(schedule.firstTallyAt[0]) + duration);
         hardDeadline = uint64(uint256(schedule.firstTallyAt[2]) + duration);
         if (externalNFT == address(0)) {
             eligibilityNFT = address(this);
@@ -163,25 +170,26 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         _validateSchedule(Schedule(opensAt_, initialWindow, firstTallyAt_, maxWindows));
         opensAt = opensAt_;
         firstTallyAt = firstTallyAt_;
-        registrationDeadline = uint64(uint256(firstTallyAt_[0]) + initialWindow);
+        mintDeadline = uint64(uint256(firstTallyAt_[0]) + initialWindow);
+        registrationDeadline = uint64(uint256(firstTallyAt_[0]) + maximumTierDuration);
         hardDeadline = uint64(uint256(firstTallyAt_[2]) + maximumTierDuration);
         emit ScheduleConfigured(opensAt, initialWindow, firstTallyAt, maxWindows, registrationDeadline, hardDeadline);
     }
 
     function mint(address to, uint256 tokenId) external onlyRole(MINTER_ROLE) {
         if (eligibilityNFT != address(this)) revert ExternalCollection();
-        if (poolInitialized && block.timestamp >= registrationDeadline) revert RegistrationClosed();
+        if (poolInitialized && block.timestamp >= mintDeadline) revert RegistrationClosed();
         _safeMint(to, tokenId);
     }
 
     /// @notice Burn an internal NFT minted by mistake, under the same cutoff as mint.
-    /// @dev No tier can settle before registration closes, so a burn never touches
-    ///      a settled tally. A token with a receipt loses it, and a revocation record
+    /// @dev No tier can settle before the end of S's first window, so a burn never
+    ///      touches a settled tally. A token with a receipt loses it, and a revocation record
     ///      (voter zero, unchanged nonce) enters the transcript: replay must void the
     ///      token's earlier ballots. The nonce persists if the ID is minted again.
     function burn(uint256 tokenId) external onlyRole(MINTER_ROLE) {
         if (eligibilityNFT != address(this)) revert ExternalCollection();
-        if (poolInitialized && block.timestamp >= registrationDeadline) revert RegistrationClosed();
+        if (poolInitialized && block.timestamp >= mintDeadline) revert RegistrationClosed();
         _burn(tokenId);
         if (hasRegistrationReceipt[tokenId]) {
             hasRegistrationReceipt[tokenId] = false;

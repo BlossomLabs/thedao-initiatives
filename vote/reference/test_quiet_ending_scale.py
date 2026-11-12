@@ -152,9 +152,9 @@ class InSteps(unittest.TestCase):
             result = world.play_in_steps(tiers=3, watch=True)
             self.assertEqual(result["funded"], plain["funded"])
             pauses = result["pauses"]
-            # S tiers are all counted at level 1; A tiers when the level reaches one
-            # more than the largest S tier (5); B tiers one more than the largest S
-            # and A together (13).
+            # Tier-S is counted at level 1 on every ballot; Tier-A when the level reaches
+            # one more than the largest Tier-S (5); Tier-B one more than the largest
+            # Tier-S and Tier-A together (13).
             self.assertEqual([p["level"] for p in pauses], [1, 6, 14])
             self.assertLess(pauses[0]["funded"], pauses[1]["funded"])
             self.assertLess(pauses[1]["funded"], pauses[2]["funded"])

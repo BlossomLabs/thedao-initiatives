@@ -38,7 +38,8 @@ describe("quiet-ending replay", () => {
     const s = run(base(), T - 1);
     expect(s.tiers.map((t) => t.status)).toEqual(["waiting", "waiting", "waiting"]);
     expect(s.live.order).toEqual([0]);
-    expect(s.registrationClosesAt).toBe(T + W);
+    // Until Tier-S settles, first ballots run to its latest possible settlement.
+    expect(s.registrationClosesAt).toBe(T + 6300);
     expect(s.live.tiers.get(0)).toBe("S");
   });
 
@@ -106,6 +107,24 @@ describe("quiet-ending replay", () => {
     const s = run([...base(), r("c", T + W, [1, X])], T + W + 1);
     expect(s.rejected).toEqual([{ tokenId: "c", nonce: 0, reason: "registration_closed" }]);
     expect(s.accepted.has("c")).toBe(false);
+  });
+
+  it("a first ballot during Tier-S's later windows counts and shrinks the shares; after it settles it doesn't", () => {
+    const s = run([
+      ...base(),
+      // b's change empties S in window 1: S extends.
+      r("b", T + 100, [X, 1]),
+      // c's first ballot in window 2: the pool is split three ways from then on.
+      r("c", T + W + 100, [1, X]),
+      // Window 2 is quiet (still nothing funded), so S settles at its end; d is late.
+      r("d", T + 5400 + 10, [1, X]),
+    ], T + 6000);
+    expect(s.tiers[0].status).toBe("settled");
+    expect(s.tiers[0].status === "settled" && s.tiers[0].at).toBe(T + 5400);
+    expect(s.accepted.has("c")).toBe(true);
+    expect(s.share).toBe(66n);
+    expect(s.rejected).toEqual([{ tokenId: "d", nonce: 0, reason: "registration_closed" }]);
+    expect(s.registrationClosesAt).toBe(T + 5400);
   });
 
   it("each badge gets the pool divided by the voters, rounded down; the rest is never spent", () => {

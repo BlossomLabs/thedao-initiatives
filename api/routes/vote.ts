@@ -448,9 +448,11 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       }
     }
     // What the quiet ending would refuse is refused here, before anyone pays gas for it.
-    // Nothing can be refused before registration closes (no tier settles before it).
-    const regDeadline = d.manifest.schedule.firstTallyAt[0] + d.manifest.schedule.initialWindow;
-    const no = deps.now() < regDeadline ? null : refusal(
+    // Nothing can be refused before Tier-S's first window ends: no tier settles before
+    // it, and first ballots are taken until Tier-S settles.
+    const firstWindowEnds = d.manifest.schedule.firstTallyAt[0] +
+      d.manifest.schedule.initialWindow;
+    const no = deps.now() < firstWindowEnds ? null : refusal(
       await recentRound(d),
       tokenId.toString(),
       padded,
@@ -459,7 +461,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     );
     if (no?.code === "closed") throw fail(410, "closed", "Voting has closed.");
     if (no?.code === "registration_closed") {
-      throw fail(403, "registration_closed", "Registration closed before this badge voted.");
+      throw fail(403, "registration_closed", "Tier-S settled before this badge voted.");
     }
     if (no?.code === "tier_settled") {
       throw fail(

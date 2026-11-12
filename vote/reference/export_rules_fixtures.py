@@ -29,7 +29,7 @@ def named():
         ("size exactly 1.5x", [1, W, 1, 1, W, W], 200, 1),
         ("size short", [1, W, 1, 1, W, W], 201, 1),
         ("four tiers", [1, 2, 3, 4, W, W], 200, 1),
-        ("tier-a enforced, empty", [1, W, 1, 1, W, W], 200, 3),
+        ("Tier-A enforced, empty", [1, W, 1, 1, W, W], 200, 3),
         ("short ballot", [1, 4, 1, 1], 200, 1),
         ("rank gap", [1, 4, 1, W, W, W], 200, 1),
     ]

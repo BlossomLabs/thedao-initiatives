@@ -13,8 +13,9 @@ settlement, rather than freezing economic inputs at a tier's first tally (tier_l
   stays open and admins must explicitly reschedule S before setting it. Started
   opening and funded tier dates cannot change. An explicit zero initializes funding;
   the default zero does not.
-- **Shares:** registration closes at S plus the initial window, fixing the accepted
-  NFT count and equal initial shares. Later increases add equally to those NFTs'
+- **Shares:** registration closes when S settles, fixing the accepted NFT count and
+  equal initial shares; until then each tally splits the pool among the ballots in
+  (simulated in `reference/quiet_ending_sim.py`, `main_registration`). Later increases add equally to those NFTs'
   remaining shares without changing settled awards or charges. Exact rounding remains open.
 - **Provisional tallies:** at each historical cutoff, project need is
   `max(askUSD - donationsUSD - outstandingPledgesUSD, 0)`. USD pledges retain their
@@ -26,9 +27,11 @@ settlement, rather than freezing economic inputs at a tier's first tally (tier_l
   Resulting project gaps or excess coverage are outside that decision. Unsettled
   tiers use current needs and remaining shares, including added funding.
 
-Material increases in project need or per-NFT payment burden must prevent quiet
-agreement, even when payment proportions stay unchanged. Precise thresholds
-and implementation remain open; maximum windows and forced closure still apply.
+The quiet comparison is the funded set of the settling tier at every tally of a
+window: the opening tally, one after each block with a tally event and the closing
+tally ([rules](quiet-ending-rules.md#tally-events)). Changes in need or per-NFT
+payment burden count only when they change that set. Maximum windows and forced
+closure still apply.
 
 **Accepted tradeoff:** results may differ from a fresh PB-EAR tally of final inputs;
 its proportionality guarantee does not automatically extend to this process.

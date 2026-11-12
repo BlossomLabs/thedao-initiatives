@@ -47,10 +47,10 @@ The references retain byte 0 for the older optional unplaced tail.
 | Voting unit | One ballot and one nonce sequence per NFT ID; owners of multiple NFTs can vote each independently. Each record must use exactly the next nonce. |
 | Ownership | Only the current owner can authorize a revision. Token approvals do not grant voting permission. Transfers preserve the token's nonce and registration receipt. |
 | Initial date | Voting opens at the configured timestamp. |
-| First tally dates | Admin-configured S/A/B timestamps. Future dates can change independently, with overlap checks at deployment and on every update. |
+| First tally dates | Admin-configured Tier-S, Tier-A and Tier-B timestamps. Future dates can change independently, with overlap checks at deployment and on every update. |
 | Initial window | Shared first-window duration. |
 | Maximum windows | Includes the initial window; durations halve and must remain positive. |
-| Registration deadline | Always first S tally plus the initial window. |
+| Registration deadline | First ballots until S's latest possible settlement (`registrationDeadline`); replay accepts one only before S actually settles. Minting and burning close at the end of S's first window (`mintDeadline`). |
 | Pool | One admin-recorded USD budget. It can be corrected in either direction strictly before S's first tally, then only increases. Initial funding must be recorded strictly before S's first tally. Funding must be secured separately. |
 | Initiatives | Unique project addresses and dollar asks, frozen when voting opens. |
 | Donations | Actual native/ERC-20 balances at each project address, for allowed currencies only. |
@@ -61,7 +61,7 @@ Role administration uses OpenZeppelin AccessControl. The deployment admin initia
 holds DEFAULT_ADMIN_ROLE, ADMIN_ROLE, PLEDGE_ROLE, MINTER_ROLE and
 BLOB_SUBMITTER_ROLE, and can grant/revoke them independently. ADMIN_ROLE controls
 setup and the USD pool budget; PLEDGE_ROLE controls pledges; MINTER_ROLE issues internal
-NFTs and burns mistaken ones before registration closes; BLOB_SUBMITTER_ROLE permits hash-only blob receipts.
+NFTs and burns mistaken ones before S's first window ends; BLOB_SUBMITTER_ROLE permits hash-only blob receipts.
 External NFT mode disables internal minting.
 
 ## USD accounting API
@@ -94,8 +94,9 @@ All USD inputs and results use **six decimal places**: 1,000,000 means one dolla
   when it occurs. Window lengths and maximum windows remain fixed.
 - Without funding, no tally can settle and registration, receipts, minting and
   pledges remain open. If S's date passes, an admin must explicitly set a valid future
-  S date before initializing funding. Registration always closes at S plus the
-  initial window; hardDeadline is B plus the maximum tier duration. ScheduleConfigured
+  S date before initializing funding. Registration closes at S's latest possible
+  settlement (replay: when S settles) and minting at the end of S's first window;
+  hardDeadline is B plus the maximum tier duration. ScheduleConfigured
   records the initial dates and every valid update for replay.
 - setPledge(pledgeId, initiativeId, currencyId, amount) creates or replaces a pledge.
   Reusing an ID replaces its previous contribution; amount zero cancels it.
@@ -126,7 +127,8 @@ an archive RPC block tag. That recovers historical balances, pool/pledge state a
 oracle state together. An old oracle round alone cannot recover old balances.
 The configured maxPriceAge is evaluated against the selected block's timestamp.
 All tallies use the ordinary [cutoff rules](docs/quiet-ending-rules.md#checkpoints-derived-from-on-chain-data):
-the last canonical block strictly before the tally timestamp.
+the last canonical block strictly before the tally timestamp. In-window tallies
+are taken at each block that holds a [tally event](docs/quiet-ending-rules.md#tally-events).
 No funds are transferred or custody/payout mechanism supplied by these accounting views.
 
 ### Ethereum mainnet currencies
@@ -165,7 +167,7 @@ Each record must carry nonceOf + 1, so a mistyped nonce reverts instead of locki
 the NFT out of later revisions; a batch may carry consecutive revisions of one NFT.
 
 burn(tokenId) lets MINTER_ROLE remove an internal NFT minted by mistake, under the
-same cutoff as mint. No tier can settle before registration closes. If the token
+same cutoff as mint. No tier can settle before that cutoff (the end of S's first window). If the token
 already has a receipt, the burn clears it and its ballotHashOf, emits
 RegistrationRevoked and appends a revocation record to the transcript, with voter
 address zero and the unchanged nonce. Replay must void that token's earlier ballots.
@@ -231,3 +233,23 @@ dependency on that checkout.
 Oracle interface and historical-state considerations:
 [Chainlink API](https://docs.chain.link/data-feeds/api-reference) and
 [historical rounds](https://docs.chain.link/data-feeds/historical-data).
+
+## Ballot rules (rounds deployed from 11 November 2026)
+
+A ballot is valid only if (docs/superpowers/specs/2026-11-11-ballot-rules-design.md):
+
+- its ranked projects request at least 1.5× the pool (`2 × Σ askUsd ≥ 3 × poolUsd`, the pool
+  as of that receipt);
+- Tier-S (its first rank group; also Tier-A when `independentTiers` has bit 1) holds at
+  least 3 projects with no shared affiliation, and no affiliation holds more than half of the
+  tier's requested total. RFPs have no affiliations; Tier-B is never checked;
+- it has at most three rank groups.
+
+Affiliations are registered as groups (`addGroup`, a `groups` bitmask per initiative). The
+contract checks every ballot with a proof: three unrelated project indexes per enforced
+tier, sent alongside the ballot and not signed. Blob ballots can't be checked on-chain, so
+the replay refuses invalid ones (`invalid_ballot`), judging each by the projects and pool
+before it in chain order (block, log index). New projects may join during the vote outside
+every tier's quiet-ending span; a ballot shorter than the project list reads the missing
+ones as unplaced. The Python reference is `reference/ballot_rules.py`, kept equal to the
+TypeScript and Solidity versions by `shared/vote/fixtures/ballot-rules.json`.

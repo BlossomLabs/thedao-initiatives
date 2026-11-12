@@ -124,7 +124,10 @@ contract SignedBallotsTest is Fixture {
     }
 
     function test_registrationDeadlineIsDerivedAndExclusive() public {
-        assertEq(ballots.registrationDeadline(), ballots.firstTallyAt(0) + ballots.initialWindow());
+        // First ballots: until S's latest possible settlement (replay stops them at S's
+        // actual settlement). Minting: until the end of S's first window.
+        assertEq(ballots.registrationDeadline(), ballots.latestSettlementAt(0));
+        assertEq(ballots.mintDeadline(), ballots.firstTallyAt(0) + ballots.initialWindow());
         vm.warp(ballots.registrationDeadline() - 1);
         vm.prank(alice);
         ballots.vote(1, 1, ranks, proofOf(ranks));
@@ -136,6 +139,17 @@ contract SignedBallotsTest is Fixture {
         ballots.vote(2, 1, ranks, proofOf(ranks));
         vm.expectRevert(SignedBallots.RegistrationClosed.selector);
         ballots.mint(bob, 4);
+    }
+
+    function test_aFirstBallotIsTakenAfterSFirstWindowWhileSCanStillSettle() public {
+        vm.warp(ballots.mintDeadline());
+        vm.expectRevert(SignedBallots.RegistrationClosed.selector);
+        ballots.mint(bob, 4);
+        // Past S's first window, a badge that never voted still gets its first receipt.
+        vm.prank(alice);
+        ballots.vote(2, 1, ranks, proofOf(ranks));
+        assertTrue(ballots.hasRegistrationReceipt(2));
+        assertEq(ballots.registrationReceiptCount(), 1);
     }
 
     function test_replacementsUseConsecutiveNonces() public {
@@ -215,9 +229,9 @@ contract SignedBallotsTest is Fixture {
         vm.prank(bob);
         vm.expectRevert();
         ballots.burn(3);
-        vm.warp(ballots.registrationDeadline() - 1);
+        vm.warp(ballots.mintDeadline() - 1);
         ballots.burn(3);
-        vm.warp(ballots.registrationDeadline());
+        vm.warp(ballots.mintDeadline());
         vm.expectRevert(SignedBallots.RegistrationClosed.selector);
         ballots.burn(2);
         assertEq(ballots.ownerOf(2), alice);
@@ -350,7 +364,7 @@ contract SignedBallotsTest is Fixture {
         assertEq(ballots.windowDuration(1), 24 hours);
         assertEq(ballots.windowDuration(4), 3 hours);
         assertEq(ballots.maximumTierDuration(), 45 hours);
-        assertEq(ballots.windowCutoff(0, 1), ballots.registrationDeadline());
+        assertEq(ballots.windowCutoff(0, 1), ballots.mintDeadline());
         assertEq(ballots.windowCutoff(0, 4), ballots.latestSettlementAt(0));
         assertEq(ballots.latestSettlementAt(2), ballots.hardDeadline());
     }
@@ -388,7 +402,7 @@ contract SignedBallotsTest is Fixture {
         s.maxWindows = 1;
         SignedBallots round = new SignedBallots(address(this), address(0), "V", "V", s);
         assertEq(round.maximumTierDuration(), 1 days);
-        assertEq(round.windowCutoff(0, 1), round.registrationDeadline());
+        assertEq(round.windowCutoff(0, 1), round.mintDeadline());
     }
 
     function test_configurationFreezesAtStartAndRolesAreEnforced() public {

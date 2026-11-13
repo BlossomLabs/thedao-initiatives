@@ -1,6 +1,7 @@
 import { MessageSquare, PencilLine, Settings2 } from "lucide-react";
 import StickyAside from "~/components/layout/StickyAside";
 import DonateWidget from "~/components/donate/DonateWidget";
+import PledgeRequestLink from "./PledgeRequestLink";
 import { LinkButton } from "~/components/ui/Button";
 import RevisionPanel, { type ViewMode } from "~/components/initiative/RevisionBar";
 import KeyFacts from "~/components/initiative/KeyFacts";
@@ -66,7 +67,8 @@ export function PublicCards(
           You can also pledge instead of donating: you commit publicly now and pay only when the
           entire funding goal has been reached. Email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>
           {" "}
-          to add your pledge.
+          to add your pledge
+          {r.id && r.status === "approved" && <PledgeRequestLink initiativeId={r.id} />}.
         </p>
       </div>
       <div className="panel">

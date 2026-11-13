@@ -27,7 +27,9 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    watch: { ignored: ["**/*.tmp.*"] },
+    // Deno can lose native watchers when an editor replaces a file atomically,
+    // leaving old transformed modules cached. Poll to keep source edits in sync.
+    watch: { ignored: ["**/*.tmp.*"], usePolling: true, interval: 250 },
     // API and web share one origin in production; mirror that in dev.
     proxy: {
       "/api": process.env.API_PROXY || "http://localhost:8000",

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { SUPPORT_MESSAGE_MAX } from "@shared/support";
+import { SUPPORT_MESSAGE_MAX, SUPPORT_TRANSACTION_URL_MAX } from "@shared/support";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SupportWidget, { SupportPanel } from "./SupportWidget";
 
@@ -57,6 +57,7 @@ describe("SupportPanel", () => {
     expect(dialog).toHaveTextContent("How can we help?");
     expect(screen.getByRole("button", { name: "Report a problem" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Suggest an improvement" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request a receipt" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Something else" })).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -124,6 +125,102 @@ describe("SupportPanel", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(screen.getByRole("textbox", { name: "Message" })).toHaveValue("hello");
+  });
+});
+
+describe("SupportPanel receipt requests", () => {
+  const transactionUrl = `https://etherscan.io/tx/0x${"ab".repeat(32)}`;
+
+  function openReceipt() {
+    openPicker();
+    fireEvent.click(screen.getByRole("button", { name: "Request a receipt" }));
+    return {
+      email: screen.getByRole("textbox", { name: "Email" }),
+      transaction: screen.getByRole("textbox", { name: "Transaction link" }),
+      send: screen.getByRole("button", { name: "Send request" }),
+    };
+  }
+
+  it("requires an email and transaction link, with no message needed", async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(json(200, { ok: true })));
+    vi.stubGlobal("fetch", fetchMock);
+    const { email, transaction, send } = openReceipt();
+    expect(email).toHaveFocus();
+    expect(email).toBeRequired();
+    expect(transaction).toBeRequired();
+    expect(screen.getByRole("textbox", { name: "Message (optional)" })).not.toBeRequired();
+    expect(send).toBeDisabled();
+    fireEvent.change(email, { target: { value: " donor@example.com " } });
+    expect(send).toBeDisabled();
+    fireEvent.change(transaction, { target: { value: ` ${transactionUrl} ` } });
+    expect(send).toBeEnabled();
+    fireEvent.click(send);
+    await screen.findByText("Your receipt request has been sent.");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/support");
+    expect(JSON.parse(String(init.body))).toEqual({
+      category: "receipt",
+      email: "donor@example.com",
+      transactionUrl,
+      message: "",
+      page: "/",
+    });
+  });
+
+  it("shows field errors and refuses an invalid email or transaction link", () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { email, transaction, send } = openReceipt();
+    fireEvent.change(email, { target: { value: "not-an-email" } });
+    fireEvent.change(transaction, { target: { value: "javascript:alert(1)" } });
+    fireEvent.click(send);
+    expect(screen.getByText("Enter a valid email for the receipt.")).toBeInTheDocument();
+    expect(screen.getByText("Enter a valid https transaction link.")).toBeInTheDocument();
+    expect(email).toHaveAttribute("aria-invalid", "true");
+    expect(transaction).toHaveAttribute("aria-invalid", "true");
+    fireEvent.change(email, { target: { value: "donor@example.com" } });
+    fireEvent.change(transaction, {
+      target: { value: `https://etherscan.io/${"x".repeat(SUPPORT_TRANSACTION_URL_MAX)}` },
+    });
+    fireEvent.click(send);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The transaction link is too long (500 characters at most).",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps receipt details for a failed delivery, then clears them on close", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(json(502, { error: "delivery failed" }))));
+    const { email, transaction, send } = openReceipt();
+    fireEvent.change(email, { target: { value: "donor@example.com" } });
+    fireEvent.change(transaction, { target: { value: transactionUrl } });
+    fireEvent.click(send);
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    expect(screen.getByRole("textbox", { name: "Email" })).toHaveValue("donor@example.com");
+    expect(screen.getByRole("textbox", { name: "Transaction link" })).toHaveValue(transactionUrl);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: /support/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Request a receipt" }));
+    expect(screen.getByRole("textbox", { name: "Email" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Transaction link" })).toHaveValue("");
+  });
+
+  it("does not include a transaction link after switching to another support category", async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(json(200, { ok: true })));
+    vi.stubGlobal("fetch", fetchMock);
+    const { transaction } = openReceipt();
+    fireEvent.change(transaction, { target: { value: transactionUrl } });
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Something else" }));
+    expect(screen.queryByRole("textbox", { name: "Transaction link" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
+      target: { value: "Another question" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Thanks for writing. We read every message.");
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).not.toHaveProperty("transactionUrl");
   });
 });
 

@@ -1,9 +1,10 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError } from "~/lib/api";
 import { sendTransaction, signMessage, switchChain } from "wagmi/actions";
 import { TERMS } from "~/data/terms";
 import { useDonation } from "./useDonation";
+import { SupportPanel } from "~/components/layout/SupportWidget";
 
 const walletState = vi.hoisted(() => ({
   address: undefined as `0x${string}` | undefined,
@@ -17,6 +18,8 @@ vi.mock("wagmi/actions", () => ({
   readContract: vi.fn(),
 }));
 const island = vi.hoisted(() => ({ connectors: [] as unknown[], connect: vi.fn() }));
+const settings = vi.hoisted(() => ({ support: true }));
+vi.mock("~/hooks/use-site-settings", () => ({ useSiteSettings: () => ({ data: settings }) }));
 vi.mock("~/context/wallet", () => ({
   // The page's snapshot lists no connectors until the island is attached.
   useWallet: () => ({ ...walletState, connectors: [], connect: island.connect }),
@@ -40,6 +43,7 @@ beforeEach(() => {
   walletState.isConnected = false;
   island.connectors = [];
   island.connect.mockReset();
+  settings.support = true;
 });
 
 afterEach(() => vi.useRealTimers());
@@ -224,6 +228,36 @@ it("manually confirms a public hash without creating an acceptance", async () =>
   expect(api).toHaveBeenCalledWith("/api/donate/confirm", {
     json: { initiativeId: args.initiativeId, slug: args.slug, txHash: TX },
   });
+});
+
+it("opens the receipt form from a confirmed donation with its transaction link filled in", async () => {
+  vi.mocked(api).mockResolvedValue(confirmed);
+  const { result } = renderHook(() => useDonation(args));
+  await act(() => result.current.confirmTx(TX));
+  render(
+    <>
+      {result.current.status?.text}
+      <SupportPanel />
+    </>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Need a receipt?" }));
+  expect(screen.getByRole("dialog")).toHaveTextContent("Request a receipt");
+  expect(screen.getByRole("textbox", { name: "Transaction link" })).toHaveValue(
+    `https://eth.blockscout.com/tx/${TX}`,
+  );
+  expect(screen.getByRole("textbox", { name: "Email" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Send request" })).toBeDisabled();
+  // Opening the form does not submit any support request.
+  expect(api).toHaveBeenCalledTimes(1);
+});
+
+it("does not offer a receipt link when Support is not configured", async () => {
+  settings.support = false;
+  vi.mocked(api).mockResolvedValue(confirmed);
+  const { result } = renderHook(() => useDonation(args));
+  await act(() => result.current.confirmTx(TX));
+  render(<>{result.current.status?.text}</>);
+  expect(screen.queryByRole("button", { name: "Need a receipt?" })).not.toBeInTheDocument();
 });
 
 it("connects through the island's wallets when the wallet stack is still on its way", async () => {

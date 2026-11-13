@@ -315,7 +315,11 @@ export default function BoardPage(
   return (
     <>
       {hero ?? <Hero raised={data?.totals.raised} countFrom={HERO_COUNT_FROM} countEarly />}
-      <Sponsors sponsors={data?.sponsors} loading={isLoading} />
+      <Sponsors
+        sponsors={data?.sponsors}
+        loading={isLoading}
+        canPledge={Boolean(data?.flags.support)}
+      />
       <PageMain>
         <SectionHeading id="rfps" className="max-[640px]:text-center">
           {heading ?? "Security initiatives looking for funding"}

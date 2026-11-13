@@ -1,5 +1,6 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { harness, j } from "./app-helpers.ts";
+import { harness, j, SAFE_ADDR } from "./app-helpers.ts";
+import { SUPPORT_TRANSACTION_URL_MAX } from "../../shared/support.ts";
 
 const UPSTREAM = "https://support.example.test/inbox";
 
@@ -16,6 +17,118 @@ const good = {
   message: "The donate button does nothing.",
   page: "/initiative/foo",
 };
+
+const pledge = {
+  category: "pledge",
+  pledgeAmount: " $25,000.50 ",
+  pledgeOrg: " Acme ",
+  email: " donor@example.com ",
+  pledgeContact: " Alex ",
+  message: "We would like to fund this work.",
+  page: "/",
+};
+
+Deno.test("support: pledge requests forward current initiative facts and every contact field", async () => {
+  const h = await setup({ url: UPSTREAM });
+  try {
+    for (const type of ["grant", "rfp"] as const) {
+      const safeAddress = type === "grant" ? SAFE_ADDR : "0x" + "22".repeat(20);
+      const initiative = await h.db.initiatives.insert({
+        title: `Security work ${type}`,
+        type,
+        status: "approved",
+        goalUsd: 100000,
+        safeAddress,
+      });
+      await h.db.initiatives.revise(initiative.id, {
+        title: `Updated security work ${type}`,
+        summary: "",
+        details: "",
+      }, { author: "admin", source: "admin" });
+      const res = await h.req("/api/support", {
+        method: "POST",
+        json: { ...pledge, initiativeId: initiative.id },
+      });
+      assertEquals(res.status, 200);
+      const call = h.fetchLog.at(-1)!;
+      assertEquals(call.url, UPSTREAM);
+      const sent = JSON.parse(String(call.init!.body));
+      assertEquals(sent.name, "Alex");
+      assertEquals(sent.email, "donor@example.com");
+      for (
+        const line of [
+          "[TheDAO Initiatives · Pledge for a proposal]",
+          `Title: Updated security work ${type}`,
+          `Link: http://localhost:5173/initiative/${initiative.slug}`,
+          `Type: ${type === "grant" ? "Grant" : "RFP"}`,
+          "Funding Goal: $100,000.00",
+          `Safe Address: ${safeAddress}`,
+          "Pledge Amount: $25,000.50",
+          "Pledge Org: Acme",
+          "Pledge Contact Email: donor@example.com",
+          "Who are we talking with?: Alex",
+          "Message: We would like to fund this work.",
+        ]
+      ) assertStringIncludes(sent.message, line);
+      assertEquals(await h.db.pledges.list(initiative.id), []);
+    }
+    assertEquals(h.fetchLog.length, 2);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("support: invalid or unpublished pledge requests never reach the relay", async () => {
+  const h = await setup({ url: UPSTREAM });
+  try {
+    const initiative = await h.db.initiatives.insert({ title: "Published", status: "approved" });
+    for (
+      const patch of [
+        { initiativeId: undefined },
+        { initiativeId: "missing" },
+        { pledgeAmount: undefined },
+        { pledgeAmount: "0" },
+        { pledgeAmount: "-5" },
+        { pledgeAmount: "1e6" },
+        { pledgeAmount: "1.001" },
+        { pledgeAmount: 100000001 },
+        { pledgeAmount: { amount: 5000 } },
+        { pledgeOrg: " " },
+        { pledgeOrg: "x".repeat(161) },
+        { pledgeContact: undefined },
+        { pledgeContact: "x".repeat(121) },
+        { email: "" },
+        { email: "bad-email" },
+        { email: "x".repeat(200) + "@example.com" },
+        { message: " " },
+        { transactionUrl: "https://etherscan.io/tx/123" },
+        { title: "Spoofed initiative metadata" },
+      ]
+    ) {
+      const res = await h.req("/api/support", {
+        method: "POST",
+        json: { ...pledge, initiativeId: initiative.id, ...patch },
+      });
+      assertEquals(res.status, 400, JSON.stringify(patch));
+    }
+    for (const status of ["pending", "rejected", "archived"] as const) {
+      const hidden = await h.db.initiatives.insert({ title: status, status });
+      const res = await h.req("/api/support", {
+        method: "POST",
+        json: { ...pledge, initiativeId: hidden.id },
+      });
+      assertEquals(res.status, 400);
+    }
+    const other = await h.req("/api/support", {
+      method: "POST",
+      json: { ...good, initiativeId: initiative.id, pledgeAmount: 5000 },
+    });
+    assertEquals(other.status, 400);
+    assertEquals(h.fetchLog.length, 0);
+  } finally {
+    h.close();
+  }
+});
 
 Deno.test("support: 503 until SUPPORT_URL is set", async () => {
   const h = await setup();
@@ -73,6 +186,99 @@ Deno.test("support: email and screenshot are optional; an off-site page is dropp
   assertEquals("screenshot" in sent, false);
   assertEquals((sent.message as string).includes("Page:"), false);
   h.close();
+});
+
+Deno.test("support: receipt requests forward the email and transaction through the existing relay", async () => {
+  const h = await setup({ url: UPSTREAM });
+  const transactionUrl = `https://etherscan.io/tx/0x${"ab".repeat(32)}`;
+  try {
+    for (const message of [undefined, "Please use my organisation's name on the receipt."]) {
+      const res = await h.req("/api/support", {
+        method: "POST",
+        json: {
+          category: "receipt",
+          email: " donor@example.com ",
+          transactionUrl: ` ${transactionUrl} `,
+          page: "/initiative/foo",
+          ...(message ? { message } : {}),
+        },
+      });
+      assertEquals(res.status, 200);
+      assertEquals(await j(res), { ok: true });
+      const call = h.fetchLog.at(-1)!;
+      assertEquals(call.url, UPSTREAM);
+      const sent = JSON.parse(String(call.init!.body));
+      assertEquals(sent, {
+        name: "",
+        email: "donor@example.com",
+        message: "[TheDAO Initiatives · Request a receipt]\n" +
+          `Transaction: ${transactionUrl}\n` +
+          "Page: http://localhost:5173/initiative/foo\n\n" +
+          (message ?? "Please send a receipt for this donation."),
+      });
+    }
+    // Transaction links are forwarded, never fetched.
+    assertEquals(h.fetchLog.length, 2);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("support: receipt requests require a valid email and an https transaction link", async () => {
+  const h = await setup({ url: UPSTREAM });
+  const receipt = {
+    category: "receipt",
+    email: "donor@example.com",
+    transactionUrl: `https://etherscan.io/tx/0x${"ab".repeat(32)}`,
+  };
+  try {
+    for (
+      const patch of [
+        { email: undefined },
+        { email: " " },
+        { email: "not-an-email" },
+        { email: "a".repeat(200) + "@example.com" },
+        { transactionUrl: undefined },
+        { transactionUrl: " " },
+        { transactionUrl: "not-a-url" },
+        { transactionUrl: "http://etherscan.io/tx/123" },
+        { transactionUrl: "javascript:alert(1)" },
+        { transactionUrl: "https://user:password@etherscan.io/tx/123" },
+        { transactionUrl: "https://etherscan.io/tx/123\nspoofed-line" },
+        { transactionUrl: "https://etherscan.io/" + "x".repeat(SUPPORT_TRANSACTION_URL_MAX) },
+      ]
+    ) {
+      const res = await h.req("/api/support", {
+        method: "POST",
+        json: { ...receipt, ...patch },
+      });
+      assertEquals(res.status, 400, JSON.stringify(patch));
+    }
+    for (const category of ["constructor", "toString", "__proto__"]) {
+      const res = await h.req("/api/support", {
+        method: "POST",
+        json: { ...receipt, category },
+      });
+      assertEquals(res.status, 400);
+    }
+    assertEquals(h.fetchLog.length, 0);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("support: other categories reject receipt fields instead of dropping them", async () => {
+  const h = await setup({ url: UPSTREAM });
+  try {
+    const res = await h.req("/api/support", {
+      method: "POST",
+      json: { ...good, transactionUrl: "https://etherscan.io/tx/123" },
+    });
+    assertEquals(res.status, 400);
+    assertEquals(h.fetchLog.length, 0);
+  } finally {
+    h.close();
+  }
 });
 
 Deno.test("support: 502 when the upstream fails", async () => {

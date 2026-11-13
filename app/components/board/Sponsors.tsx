@@ -6,6 +6,7 @@ import Skeleton from "~/components/ui/Skeleton";
 import type { Sponsor } from "~/lib/api-types";
 import { rememberSponsorsHeight } from "~/lib/sponsors-height";
 import { cn } from "~/lib/utils";
+import { openPledgeRequest } from "~/lib/support";
 
 /** How the row is drawn at the full page width: up to four side by side at full size,
  * five at a smaller one, six to eight stacked (logo over name over amount) to fill
@@ -30,7 +31,11 @@ const MASK = `linear-gradient(to right, transparent, #000 calc(var(--edge-l, 0) 
  * page does not jump once the sponsors arrive: as tall as the panel this device
  * last drew (sponsors-height.ts), else as a stacked row (three side by side at full width). */
 export default function Sponsors(
-  { sponsors, loading }: { sponsors?: Sponsor[]; loading?: boolean },
+  { sponsors, loading, canPledge = false }: {
+    sponsors?: Sponsor[];
+    loading?: boolean;
+    canPledge?: boolean;
+  },
 ) {
   if (!loading && !sponsors?.length) return null;
   const fit = fitOf(sponsors?.length ?? 0);
@@ -113,23 +118,33 @@ export default function Sponsors(
               {edges.right && <Arrow dir={1} onClick={() => page(1)} />}
             </div>
             {
-              /* Fades out with the right arrow and does what it does; its line stays, so
-             nothing below moves. Centred on phones like the heading, else under the
-             right arrow. The arrow is the one keyboards and screen readers get. */
+              /* The pledge link shares the footer with the scroll hint, which fades
+             with the right arrow. The arrow is the one screen readers get. */
             }
-            {scrolls && (
-              <div className="mt-2 flex justify-center min-[641px]:justify-end">
-                <button
-                  type="button"
-                  aria-hidden
-                  tabIndex={-1}
-                  disabled={!edges.right}
-                  onClick={() => page(1)}
-                  style={{ opacity: "var(--edge-r, 0)" }}
-                  className="flex items-center gap-1 pr-1 text-[9px] uppercase leading-4 tracking-[.18em] text-white/35 transition-colors hover:text-white/60 disabled:cursor-default"
-                >
-                  Scroll sideways for more <ArrowRight className="size-2.5" aria-hidden />
-                </button>
+            {(scrolls || canPledge) && (
+              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2">
+                {canPledge && (
+                  <button
+                    type="button"
+                    onClick={() => openPledgeRequest()}
+                    className="col-start-2 cursor-pointer text-center text-[9px] uppercase leading-4 tracking-[.18em] text-dao-green transition-colors hover:text-dao-green/80"
+                  >
+                    Pledge for a proposal
+                  </button>
+                )}
+                {scrolls && (
+                  <button
+                    type="button"
+                    aria-hidden
+                    tabIndex={-1}
+                    disabled={!edges.right}
+                    onClick={() => page(1)}
+                    style={{ opacity: "var(--edge-r, 0)" }}
+                    className="col-start-3 flex min-w-0 max-w-full items-center justify-self-end gap-1 pr-1 text-right text-[9px] uppercase leading-4 tracking-[.18em] text-white/35 transition-colors hover:text-white/60 disabled:cursor-default"
+                  >
+                    Scroll sideways for more <ArrowRight className="size-2.5" aria-hidden />
+                  </button>
+                )}
               </div>
             )}
           </div>

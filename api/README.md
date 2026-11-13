@@ -178,8 +178,16 @@ only for its proposer and admins), `GET /api/initiatives/:slug/revisions/:n`,
 `GET /api/initiatives/:slug/comments`, `POST /api/initiatives/:slug/comments`,
 `GET /api/comments/mine?tokens=`, `POST /api/comments/:id/report`, `POST /api/support` (the floating
 Support widget: `{category,
-message, email?, page?, screenshot?}`, tagged and forwarded to
-`SUPPORT_URL`; 503 until it is set, 5 per hour per IP).
+message, email?, transactionUrl?, page?, screenshot?}`, tagged and
+forwarded to `SUPPORT_URL`; 503 until it is set, 5 per hour per IP). The `receipt` category requires
+`email` and an https `transactionUrl` (at most 500 characters); its `message` is an optional note.
+The transaction link is included in the forwarded message, so the support relay's contract stays
+unchanged. Other categories require a message and do not accept `transactionUrl`.
+The `pledge` category also requires `initiativeId`, `pledgeAmount` (USD, positive and at most
+$100,000,000, to the cent), `pledgeOrg`, `pledgeContact` and `email`. The API resolves an approved
+initiative and includes its title, canonical link, Grant/RFP type, funding goal and Safe address
+alongside the pledge details in the forwarded message. It sends an enquiry; it does not create
+a public pledge record. Other categories reject pledge fields.
 
 Signed in: `GET /api/auth/me` (includes `hasWatchlist`), `POST /api/auth/logout`,
 `POST /api/auth/logout-all`, `POST /api/nickname`, `POST /api/pfp`, `POST /api/pfp/upload`,

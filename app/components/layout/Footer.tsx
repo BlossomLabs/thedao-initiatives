@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { CONTACT_EMAIL, CONTACT_MAILTO, SOCIAL_LINKS } from "~/data/site";
+import { openPledgeRequest } from "~/lib/support";
 
 // Figma: two 12.5px muted lines (30px above, 46px below), then an 88px legal bar.
 export default function Footer() {
@@ -11,6 +12,15 @@ export default function Footer() {
         </p>
         <p className="my-1.5">
           To back an initiative, email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>
+          {" or use the "}
+          <button
+            type="button"
+            onClick={() => openPledgeRequest()}
+            aria-haspopup="dialog"
+            className="cursor-pointer text-dao-green hover:underline"
+          >
+            support form
+          </button>
           {" · "}
           <Link className="text-white/35" to="/donation-terms">Donation Terms</Link>
         </p>

@@ -19,7 +19,7 @@ export function Label({ label, htmlFor, required, privateField, hint }: LabelPro
   );
 }
 
-export function Input({ className, ...rest }: React.InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...rest }: React.ComponentProps<"input">) {
   return <input className={cn("field", className)} {...rest} />;
 }
 

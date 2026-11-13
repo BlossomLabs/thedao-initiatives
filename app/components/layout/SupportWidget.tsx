@@ -5,18 +5,22 @@ import {
   CheckCircle2,
   ChevronLeft,
   CircleAlert,
+  Handshake,
   Lightbulb,
   Loader2,
   MessageSquare,
+  ReceiptText,
   Trash2,
   TriangleAlert,
   X,
 } from "lucide-react";
 import {
+  receiptTransactionError,
   SUPPORT_CATEGORIES,
   SUPPORT_CATEGORY_KEYS,
   SUPPORT_MESSAGE_MAX,
   SUPPORT_SCREENSHOT_MAX,
+  SUPPORT_TRANSACTION_URL_MAX,
   type SupportCategory,
 } from "@shared/support";
 import { inputMax, tooLong } from "@shared/draft/caps";
@@ -26,6 +30,8 @@ import { Button } from "~/components/ui/Button";
 import { Input, Textarea } from "~/components/ui/Field";
 import Pop from "~/components/ui/Pop";
 import { cn } from "~/lib/utils";
+import { onPledgeRequest, onReceiptRequest } from "~/lib/support";
+import PledgeSupportForm from "./PledgeSupportForm";
 
 type View = "picker" | "form" | "success" | "error";
 
@@ -35,6 +41,12 @@ const CATEGORY_UI: Record<
 > = {
   problem: { placeholder: "I noticed that...", Icon: TriangleAlert, color: "text-dao-amber" },
   idea: { placeholder: "What if...", Icon: Lightbulb, color: "text-dao-sky" },
+  receipt: {
+    placeholder: "Anything else we should know? (optional)",
+    Icon: ReceiptText,
+    color: "text-dao-green",
+  },
+  pledge: { placeholder: "Tell us about your pledge.", Icon: Handshake, color: "text-dao-green" },
   other: { placeholder: "I'd like to share...", Icon: MessageSquare, color: "text-soft" },
 };
 
@@ -67,19 +79,26 @@ export function SupportPanel() {
   const [view, setView] = useState<View>("picker");
   const [category, setCategory] = useState<SupportCategory | null>(null);
   const [email, setEmail] = useState("");
+  const [transactionUrl, setTransactionUrl] = useState("");
+  const [pledgeInitiative, setPledgeInitiative] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [transactionError, setTransactionError] = useState<string | null>(null);
+  const receipt = category === "receipt";
+  const pledge = category === "pledge";
 
+  const formRef = useRef<HTMLFormElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const headingId = useId();
   const panelId = useId();
   const emailId = useId();
+  const transactionId = useId();
   const messageId = useId();
 
   useEffect(() => setMounted(true), []);
@@ -88,9 +107,13 @@ export function SupportPanel() {
     setView("picker");
     setCategory(null);
     setEmail("");
+    setTransactionUrl("");
+    setPledgeInitiative(null);
     setText("");
     setScreenshot(null);
     setError(null);
+    setEmailError(null);
+    setTransactionError(null);
   }, []);
 
   const close = useCallback(() => {
@@ -98,14 +121,43 @@ export function SupportPanel() {
     reset();
   }, [reset]);
 
+  useEffect(() =>
+    onReceiptRequest((url) => {
+      if (sending) return;
+      setCategory("receipt");
+      setTransactionUrl(url);
+      setText("");
+      setScreenshot(null);
+      setError(null);
+      setEmailError(null);
+      setTransactionError(null);
+      setView("form");
+      setOpen(true);
+      // Also focus when a receipt form is already open for another donation.
+      formRef.current?.querySelector("input")?.focus();
+    }), [sending]);
+
+  useEffect(() =>
+    onPledgeRequest((initiativeId) => {
+      if (sending) return;
+      reset();
+      setPledgeInitiative(initiativeId);
+      setCategory("pledge");
+      setView("form");
+      setOpen(true);
+    }), [sending, reset]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape" && !e.defaultPrevented) close();
     };
     const onPointerDown = (e: PointerEvent) => {
       const t = e.target as Node | null;
-      if (!t || panelRef.current?.contains(t) || triggerRef.current?.contains(t)) return;
+      if (
+        !t || panelRef.current?.contains(t) || triggerRef.current?.contains(t) ||
+        (t instanceof Element && t.closest("[data-support-widget]"))
+      ) return;
       close();
     };
     document.addEventListener("keydown", onKey);
@@ -117,8 +169,11 @@ export function SupportPanel() {
   }, [open, close]);
 
   useEffect(() => {
-    if (open && view === "form") textareaRef.current?.focus();
-  }, [open, view]);
+    if (open && view === "form") {
+      if (receipt) formRef.current?.querySelector("input")?.focus();
+      else textareaRef.current?.focus();
+    }
+  }, [open, view, receipt]);
 
   const pick = (c: SupportCategory) => {
     setCategory(c);
@@ -128,8 +183,12 @@ export function SupportPanel() {
   const back = () => {
     setView("picker");
     setText("");
+    setTransactionUrl("");
+    setPledgeInitiative(null);
     setScreenshot(null);
     setError(null);
+    setEmailError(null);
+    setTransactionError(null);
   };
 
   const capture = async () => {
@@ -168,24 +227,32 @@ export function SupportPanel() {
   };
 
   const overCap = text.trim().length > SUPPORT_MESSAGE_MAX;
-  const canSend = Boolean(category) && text.trim().length > 0 && !overCap && !sending;
+  const canSend = Boolean(category) && !overCap && !sending &&
+    (receipt ? Boolean(email.trim() && transactionUrl.trim()) : text.trim().length > 0);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSend || !category) return;
     setError(null);
     // Checked here, under the field, rather than by the browser's own bubble.
-    if (email.trim() && !EMAIL_RE.test(email.trim())) {
-      setEmailError("That email does not look right. Fix it, or leave it blank.");
-      return;
-    }
-    setEmailError(null);
+    const badEmail = email.trim().length > 200
+      ? tooLong("The email", 200)
+      : email.trim() && !EMAIL_RE.test(email.trim())
+      ? receipt
+        ? "Enter a valid email for the receipt."
+        : "That email does not look right. Fix it, or leave it blank."
+      : null;
+    const badTransaction = receipt ? receiptTransactionError(transactionUrl) : null;
+    setEmailError(badEmail);
+    setTransactionError(badTransaction);
+    if (badEmail || badTransaction) return;
     setSending(true);
     try {
       await api("/api/support", {
         json: {
           category,
           email: email.trim(),
+          ...(receipt ? { transactionUrl: transactionUrl.trim() } : {}),
           message: text.trim(),
           page: globalThis.location?.pathname ?? "",
           ...(screenshot ? { screenshot } : {}),
@@ -278,13 +345,35 @@ export function SupportPanel() {
           </div>
         )}
 
-        {view === "form" && category && (
-          <form onSubmit={submit} noValidate className="flex flex-col gap-2.5 p-3">
+        {view === "form" && pledge && (
+          <PledgeSupportForm
+            key={pledgeInitiative ?? "picker"}
+            initialInitiativeId={pledgeInitiative}
+            sending={sending}
+            onSending={setSending}
+            onSent={() => setView("success")}
+          />
+        )}
+
+        {view === "form" && category && !pledge && (
+          <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-2.5 p-3">
+            {receipt && (
+              <>
+                <p className="m-0 text-[13px] text-muted">
+                  Share your email and donation transaction link to request a receipt.
+                </p>
+                <label htmlFor={emailId} className="text-[12.5px] text-white/80">
+                  Email
+                </label>
+              </>
+            )}
             <Input
               id={emailId}
               type="email"
-              aria-label="Email (optional)"
-              placeholder="your@email.com (optional)"
+              aria-label={receipt ? "Email" : "Email (optional)"}
+              placeholder={receipt ? "your@email.com" : "your@email.com (optional)"}
+              required={receipt}
+              maxLength={inputMax(200)}
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -300,17 +389,45 @@ export function SupportPanel() {
                 {emailError}
               </p>
             )}
+            {receipt && (
+              <>
+                <label htmlFor={transactionId} className="text-[12.5px] text-white/80">
+                  Transaction link
+                </label>
+                <Input
+                  id={transactionId}
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://etherscan.io/tx/…"
+                  value={transactionUrl}
+                  onChange={(e) => {
+                    setTransactionUrl(e.target.value);
+                    setTransactionError(null);
+                  }}
+                  required
+                  maxLength={inputMax(SUPPORT_TRANSACTION_URL_MAX)}
+                  aria-invalid={Boolean(transactionError)}
+                  aria-describedby={transactionError ? transactionId + "-msg" : undefined}
+                  className={cn("py-2.5 text-[13.5px]", transactionError && "has-error")}
+                />
+                {transactionError && (
+                  <p id={transactionId + "-msg"} className="fld-msg fld-err -mt-1" role="alert">
+                    {transactionError}
+                  </p>
+                )}
+              </>
+            )}
             <Textarea
               id={messageId}
               ref={textareaRef}
-              aria-label="Message"
+              aria-label={receipt ? "Message (optional)" : "Message"}
               value={text}
               onChange={(e) =>
                 setText(e.target.value)}
               placeholder={CATEGORY_UI[category].placeholder}
-              rows={4}
+              rows={receipt ? 2 : 4}
               maxLength={inputMax(SUPPORT_MESSAGE_MAX)}
-              required
+              required={!receipt}
               className="resize-none py-2.5 text-[13.5px]"
             />
             {screenshot && (
@@ -335,18 +452,20 @@ export function SupportPanel() {
               </div>
             )}
             <div className="flex items-center gap-2">
-              <Button
-                sm
-                onClick={capture}
-                disabled={capturing || sending}
-                aria-label={screenshot ? "Recapture screenshot" : "Attach a screenshot"}
-                title={screenshot ? "Recapture screenshot" : "Attach a screenshot"}
-                className="w-[38px] shrink-0 px-0"
-              >
-                {capturing
-                  ? <Loader2 className="size-4 animate-spin" />
-                  : <Camera className="size-4" />}
-              </Button>
+              {!receipt && (
+                <Button
+                  sm
+                  onClick={capture}
+                  disabled={capturing || sending}
+                  aria-label={screenshot ? "Recapture screenshot" : "Attach a screenshot"}
+                  title={screenshot ? "Recapture screenshot" : "Attach a screenshot"}
+                  className="w-[38px] shrink-0 px-0"
+                >
+                  {capturing
+                    ? <Loader2 className="size-4 animate-spin" />
+                    : <Camera className="size-4" />}
+                </Button>
+              )}
               <Button
                 type="submit"
                 variant="primary"
@@ -355,7 +474,7 @@ export function SupportPanel() {
                 disabled={!canSend}
                 className="flex-1"
               >
-                Send
+                {receipt ? "Send request" : "Send"}
               </Button>
             </div>
             {overCap && (
@@ -371,7 +490,11 @@ export function SupportPanel() {
           <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
             <CheckCircle2 className="size-10 text-dao-green" />
             <p className="m-0 text-[13px] text-muted">
-              Thanks for writing. We read every message.
+              {receipt
+                ? "Your receipt request has been sent."
+                : pledge
+                ? "Your pledge request has been sent. We’ll be in touch."
+                : "Thanks for writing. We read every message."}
             </p>
             <Button sm onClick={close} className="w-full">Done</Button>
           </div>

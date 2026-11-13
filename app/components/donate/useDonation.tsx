@@ -20,6 +20,7 @@ import {
 import { shortAddr } from "~/lib/format";
 import { holdUpgrade } from "~/lib/app-upgrade";
 import { confettiBurst } from "./Celebration";
+import ReceiptRequestLink from "./ReceiptRequestLink";
 
 export interface DonationStatus {
   kind: "ok" | "err" | "wait";
@@ -96,6 +97,7 @@ export function useDonation(
         text: (
           <>
             🦸 <b>{amt}</b> is now backing this initiative. You're a hero.
+            <ReceiptRequestLink txHash={txHash} />
           </>
         ),
       });

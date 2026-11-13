@@ -1,5 +1,7 @@
-import { Mail } from "lucide-react";
+import { Mail, MessageSquare } from "lucide-react";
+import { Button } from "~/components/ui/Button";
 import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
+import { openPledgeRequest } from "~/lib/support";
 
 // Figma: 28px 32px band 46px below the grid, 18px title, 14px copy, 51px button with ↗.
 export default function PledgeBand() {
@@ -12,10 +14,16 @@ export default function PledgeBand() {
           initiative from day one.
         </p>
       </div>
-      <a className="btn flex-none" href={CONTACT_MAILTO}>
-        Email <span className="text-dao-green">{CONTACT_EMAIL}</span> to pledge{" "}
-        <Mail className="size-4 opacity-70" />
-      </a>
+      <div className="flex flex-wrap items-center gap-2">
+        <a className="btn flex-none" href={CONTACT_MAILTO}>
+          <Mail className="size-4 opacity-70" />
+          Email <span className="text-dao-green">{CONTACT_EMAIL}</span> to pledge
+        </a>
+        <Button className="flex-none" onClick={() => openPledgeRequest()} aria-haspopup="dialog">
+          <MessageSquare className="size-4 opacity-70" />
+          Use support form
+        </Button>
+      </div>
     </div>
   );
 }

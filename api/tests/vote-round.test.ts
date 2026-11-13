@@ -971,7 +971,13 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
     "waiting",
   ]);
   const { next: _next, ...live } = body.live as { next?: unknown };
-  assertEquals(live, { funded: ["a"], awards: { a: "150" }, tiers: { a: "S" } });
+  // Both badges rank only A: each would pay half of it, if Tier-S settled now.
+  assertEquals(live, {
+    funded: ["a"],
+    awards: { a: "150" },
+    tiers: { a: "S" },
+    paid: { "1": { a: "75" }, "2": { a: "75" } },
+  });
   assertEquals(body.registrationClosesAt, NOW + 660);
   assertEquals(body.accepted, { "1": `0x01${X}${X}`, "2": `0x01${X}${X}` });
   await h.settle();

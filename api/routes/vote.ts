@@ -272,6 +272,7 @@ function roundJson(st: RoundState & { poolUsd: bigint }, slugs: string[]) {
       funded: named(st.live.order),
       awards: money(st.live.awards),
       tiers: Object.fromEntries([...st.live.tiers].map(([c, t]) => [slugs[c], t])),
+      paid: paidBy(st.live.shares),
     },
   };
 }

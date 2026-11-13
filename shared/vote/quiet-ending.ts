@@ -65,7 +65,13 @@ export type RoundState = {
   /** Each voting badge's equal share of the pool (micro-USD), before it pays anything. */
   share: bigint;
   /** "If it settled now": the open tiers' chained tallies, from the first unsettled one. */
-  live: { order: number[]; awards: Map<number, bigint>; tiers: Map<number, Tier> };
+  live: {
+    order: number[];
+    awards: Map<number, bigint>;
+    tiers: Map<number, Tier>;
+    /** What each badge would pay for each initiative, if it settled now. */
+    shares: Map<number, Map<string, bigint>>;
+  };
   /** The live tally's inputs, to re-run it with another ballot; null once closed. */
   liveInputs: ChainInputs | null;
   /** How many tiers have settled: the live tally starts at this tier. */
@@ -298,6 +304,7 @@ export function replay(
     order: [] as number[],
     awards: new Map<number, bigint>(),
     tiers: new Map<number, Tier>(),
+    shares: new Map<number, Map<string, bigint>>(),
   };
   if (firstOpen < TIERS.length) {
     for (const [k, stage] of tally(firstOpen).entries()) {
@@ -305,6 +312,7 @@ export function replay(
         live.order.push(c);
         live.tiers.set(c, TIERS[firstOpen + k]);
         live.awards.set(c, [...stage.shares.get(c)!.values()].reduce((a, b) => a + b, 0n));
+        live.shares.set(c, new Map(stage.shares.get(c)!));
       }
     }
   }

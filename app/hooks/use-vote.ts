@@ -107,6 +107,9 @@ export type RoundView = {
     funded: string[];
     awards: Record<string, string>;
     tiers?: Record<string, Tier>;
+    /** tokenId → slug → micro-USD that badge would pay for it if the open tiers settled
+     * now (only what it would pay). */
+    paid?: Record<string, Record<string, string>>;
     /** Each unsettled initiative's gap to its next tier; absent once the round is closed. */
     next?: Record<string, NextTierEntry>;
     /** While Tier-S is open: how far ahead each of its initiatives is, micro-USD

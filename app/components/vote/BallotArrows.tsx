@@ -49,12 +49,14 @@ const chipIn = (root: HTMLElement, table: string, slug: string) =>
 export type ArrowFrom = "ballot" | "result";
 
 export default function BallotArrows(
-  { root, slug, from = "ballot", resultLabel = "TheDAO's result" }: {
+  { root, slug, from = "ballot", resultLabel = "TheDAO's result", live }: {
     root: RefObject<HTMLElement | null>;
     slug: string | undefined;
     from?: ArrowFrom;
     /** The result table's name: TheDAO's result, or during the vote the live result. */
     resultLabel?: string;
+    /** Only the live tally funds it (an open tier): green, as its chips; gold otherwise. */
+    live?: boolean;
   },
 ) {
   const [arrow, setArrow] = useState<{ slug: string; d: string; head: string }>();
@@ -91,6 +93,7 @@ export default function BallotArrows(
       aria-hidden="true"
       data-arrow={arrow.slug}
       data-from={from}
+      data-live={live || undefined}
       className="pointer-events-none absolute inset-0 z-10 size-full overflow-visible"
     >
       {/* The dashed line draws itself in: a solid stroke growing along the path masks it. */}
@@ -108,7 +111,11 @@ export default function BallotArrows(
           />
         </mask>
       </defs>
-      <g key={`${arrow.slug}-${from}`} className="stroke-vote" fill="none">
+      <g
+        key={`${arrow.slug}-${from}`}
+        className={live ? "stroke-dao-green" : "stroke-vote"}
+        fill="none"
+      >
         <path
           d={arrow.d}
           strokeWidth="1.8"

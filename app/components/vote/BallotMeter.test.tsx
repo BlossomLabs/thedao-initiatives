@@ -4,12 +4,12 @@ import BallotMeter from "./BallotMeter";
 
 afterEach(cleanup);
 
-it("before anything settles: the ring is the ask toward 1.5× the pool, and the share is an estimate", () => {
+it("before anything settles: the ring is the ask toward 3× the pool, and the share is an estimate", () => {
   render(
     <BallotMeter
       avatar={<img alt="" />}
       asked={900_000}
-      target={1_500_000}
+      target={3_000_000}
       pool={1_000_000}
       share={25_000}
       shareFinal={false}
@@ -20,7 +20,7 @@ it("before anything settles: the ring is the ask toward 1.5× the pool, and the 
   expect(screen.getByText("Your share: about $25,000")).toBeInTheDocument();
   const meter = screen.getByRole("meter", { name: "What your ballot asks for" });
   expect(meter).toHaveAttribute("aria-valuenow", "900000");
-  expect(meter).toHaveAttribute("aria-valuemax", "1500000");
+  expect(meter).toHaveAttribute("aria-valuemax", "3000000");
   expect(screen.getByRole("region", { name: "Your ballot" })).not.toHaveAttribute("title");
 });
 
@@ -83,10 +83,9 @@ it("the ring in three: gold funded, dim gold settled but not funded, green still
   };
   expect(span("stroke-vote")).toEqual([0, 0.2]);
   expect(span("stroke-vote-pale")).toEqual([0.2, 0.5]);
-  // The green's solid part stops 12px short: its end is dashed.
-  const [from, to] = span("stroke-dao-green");
-  expect(from).toBe(0.5);
-  expect(to).toBeCloseTo(0.8 - 12 / (2 * Math.PI * 30));
+  // Short of the ring's end, the green is solid all the way.
+  expect(span("stroke-dao-green")).toEqual([0.5, 0.8]);
+  expect(container.querySelector("[data-dashes]")).toBeNull();
 });
 
 const threeParts = () =>
@@ -149,7 +148,7 @@ it("each segment has its own popup: its dot, title and amount, then what it mean
   await hover(
     "rest",
     "Left to fill",
-    "$300,000The ring is full at $1,500,000, 1.5× the $1,000,000 pool.",
+    "$300,000The ring is full at $1,500,000, 3× the $1,000,000 pool. A ballot needs at least half of it.",
   );
 });
 
@@ -203,13 +202,13 @@ it("anywhere in a segment's direction picks it: over the avatar, on the ring, ju
   }
 });
 
-it("the green line ends in dashes, also on a full ring", () => {
+it("only the ring's last 24px is dashed: a ballot that reaches it, can keep growing", () => {
   const ring = (asked: number) =>
     render(
       <BallotMeter
         avatar={<img alt="" />}
         asked={asked}
-        target={1_500_000}
+        target={3_000_000}
         pool={1_000_000}
         shareFinal={false}
         settled={[]}
@@ -220,22 +219,21 @@ it("the green line ends in dashes, also on a full ring", () => {
     `${(32 + 30 * Math.cos(2 * Math.PI * turn)).toFixed(3)} ${
       (32 + 30 * Math.sin(2 * Math.PI * turn)).toFixed(3)
     }`;
-  // $900,000 of $1,500,000: green to 0.6 of the way round, its last 12px dashed.
-  let c = ring(900_000);
-  let dashes = c.querySelectorAll("[data-dashes]");
+  // $1,500,000 of $3,000,000 (the 1.5× the rules want): half way round, solid, no dashes.
+  let c = ring(1_500_000);
+  expect(c.querySelectorAll("[data-dashes]")).toHaveLength(0);
+  expect(Number(c.querySelector<SVGCircleElement>("circle.stroke-dao-green")!.dataset.to))
+    .toBe(0.5);
+  cleanup();
+  // Past 3×, a full ring: solid up to its last 24px, dashed in them.
+  c = ring(4_000_000);
+  const dashes = c.querySelectorAll("[data-dashes]");
   expect(dashes).toHaveLength(1);
   expect(dashes[0].getAttribute("class")).toContain("stroke-dao-green");
-  expect(dashes[0].getAttribute("d")).toBe(`M ${at(0.6 - 12 / C)} A 30 30 0 0 1 ${at(0.6)}`);
+  expect(dashes[0].getAttribute("d")).toBe(`M ${at(1 - 24 / C)} A 30 30 0 0 1 ${at(1)}`);
   expect(dashes[0].getAttribute("stroke-dasharray")).toBe("2 2");
-  // The solid green stops where the dashes start.
-  const solid = c.querySelector<SVGCircleElement>("circle.stroke-dao-green")!;
-  expect(Number(solid.dataset.to)).toBeCloseTo(0.6 - 12 / C);
-  cleanup();
-  // A full ring keeps them: you can still add.
-  c = ring(2_000_000);
-  dashes = c.querySelectorAll("[data-dashes]");
-  expect(dashes).toHaveLength(1);
-  expect(dashes[0].getAttribute("d")!.endsWith(at(1))).toBe(true);
+  expect(Number(c.querySelector<SVGCircleElement>("circle.stroke-dao-green")!.dataset.to))
+    .toBeCloseTo(1 - 24 / C);
   cleanup();
 });
 
@@ -258,6 +256,6 @@ it("with ballot rules, the share gives way to what the ballot still needs", () =
   expect(screen.getByRole("status")).toHaveClass("text-amber-200");
   expect(screen.queryByText(/Your share/)).toBeNull();
   cleanup();
-  show({ ok: true, text: "You can keep adding initiatives" });
+  show({ ok: true, text: "You can add as many initiatives as you want" });
   expect(screen.getByRole("status")).toHaveClass("text-dao-green");
 });

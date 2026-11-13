@@ -35,6 +35,21 @@ it("a settled tier table: each tier's amount, funded chips with theirs, the rest
     .toBeInTheDocument();
 });
 
+it("on a badge's ballot, a winner the other ballots paid for says $0, not nothing", () => {
+  render(
+    <FinalTiers
+      label="Your ballot"
+      items={items}
+      tiers={{ alpha: "S", gamma: "B" }}
+      funded={new Set(["alpha", "gamma"])}
+      amounts={new Map([["alpha", 9800]])}
+      amountWord="your share paid"
+      showZero
+    />,
+  );
+  expect(screen.getByLabelText("GAMMA, funded: your share paid $0")).toHaveTextContent("$0");
+});
+
 it("after the close: this badge's ballot and TheDAO's result, side by side, the same table", () => {
   render(
     <QueryClientProvider client={new QueryClient()}>

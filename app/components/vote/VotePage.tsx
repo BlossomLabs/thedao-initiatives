@@ -746,7 +746,8 @@ export default function VotePage(
     const refused = rv?.rejected.find((r) =>
       r.tokenId === String(n) && ballotFlow.last && BigInt(r.nonce) === ballotFlow.last.nonce
     );
-    // The ballot's ask, toward the 1.5× the pool the rules want; the settled tiers' part of it.
+    // The ballot's ask, on a ring full at 3× the pool (the 1.5× the rules want is half way);
+    // the settled tiers' part of it.
     const poolNow = Number(BigInt(rv?.poolUsd ?? R.poolUsd) / 1_000_000n);
     const askOf = (slug: string) => microUsd(R.projects[R.slugs.indexOf(slug)]?.askUsd ?? "0");
     const asked = Object.entries(tiers).reduce((a, [slug, t]) => a + (t ? askOf(slug) : 0), 0);
@@ -790,7 +791,7 @@ export default function VotePage(
           ? <AddressAvatar address={me} size={48} />
           : <Avatar src={avatarSrc(`badge-${n}`)} size={48} />}
         asked={asked}
-        target={poolNow * 1.5}
+        target={poolNow * 3}
         pool={poolNow}
         share={share}
         shareFinal={registrationOver}
@@ -881,6 +882,12 @@ export default function VotePage(
               tiers: rv.live.tiers ?? {},
               awards: Object.fromEntries(
                 Object.entries(rv.live.awards).map(([slug, v]) => [slug, microUsd(v)]),
+              ),
+              // What this badge would pay for each, if the open tiers settled now.
+              paid: Object.fromEntries(
+                Object.entries(rv.live.paid?.[String(n)] ?? {}).map((
+                  [slug, v],
+                ) => [slug, microUsd(v)]),
               ),
             },
           }}

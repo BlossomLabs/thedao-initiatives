@@ -5,6 +5,7 @@ import { Button, LinkButton, SMALL_BUTTON } from "~/components/ui/Button";
 import { Link } from "react-router";
 import { cn } from "~/lib/utils";
 import FinalTiers, { AvatarRing, CardHeader, dollars } from "~/components/vote/FinalTiers";
+import { ballotSegments, poolSegments, SegmentRing } from "~/components/vote/BallotMeter";
 import type { BallotItem } from "~/components/vote/TierBallot";
 import { useVoteBallots } from "~/hooks/use-vote";
 import { errorMessage } from "~/lib/api";
@@ -98,7 +99,12 @@ export default function VoteClosed(
     roundBox?: React.ReactNode;
     live?: {
       onEdit: () => void;
-      tally?: { tiers: Partial<Record<string, Tier>>; awards: Record<string, number> };
+      tally?: {
+        tiers: Partial<Record<string, Tier>>;
+        awards: Record<string, number>;
+        /** USD this badge would pay for each, if the open tiers settled now. */
+        paid?: Record<string, number>;
+      };
     };
   },
 ) {
@@ -171,14 +177,24 @@ export default function VoteClosed(
     ...Object.fromEntries(Object.entries(tally?.tiers ?? {})),
     ...Object.fromEntries(settled?.flatMap((t) => t.funded.map((slug) => [slug, t.tier])) ?? []),
   };
-  const result = Object.keys(resultTiers).length > 0 && (
+  // What only the live tally funds (open tiers, if they settled now): green in both
+  // tables, where what a settled tier funded is gold.
+  const settledFunded = new Set(settled?.flatMap((t) => t.funded) ?? []);
+  const provisional = new Set(
+    Object.keys(tally?.awards ?? {}).filter((slug) => !settledFunded.has(slug)),
+  );
+  const sumAwards = (which: (slug: string) => boolean) =>
+    [...awards].reduce((a, [slug, v]) => a + (which(slug) ? v : 0), 0);
+  // Always beside the ballot, even before anything would be funded.
+  const result = (
     <FinalTiers
       label={resultLabel}
       items={all}
       tiers={resultTiers}
       funded={funded}
       amounts={awards}
-      amountWord={live ? "if it ended now" : "awarded"}
+      amountWord="awarded"
+      provisional={provisional}
       mirrored
       {...link("result")}
       // Gold only for what this badge also ranked.
@@ -189,16 +205,53 @@ export default function VoteClosed(
   // Each card's header: an avatar in a ring of what went to what was funded.
   const allocated = [...(paid ?? new Map<string, number>()).values()].reduce((a, b) => a + b, 0);
   const sentSomething = Boolean(sent && Object.keys(sent).length);
+  // During the vote, the ring is the editor's: what the ballot asks for, full at 3× the
+  // pool; gold what the settled tiers funded, pale gold what they hold unfunded, green
+  // the open tiers.
+  const askOf = (slug: string) =>
+    Number(BigInt(round.projects[round.slugs.indexOf(slug)]?.askUsd ?? "0") / 10_000n) / 100;
+  const settledTier = new Map(settled?.map((t) => [t.tier, t]) ?? []);
+  const askRing = live && sent && poolUsd
+    ? (() => {
+      let fundedAsk = 0, waitingAsk = 0, asked = 0;
+      for (const [slug, t] of Object.entries(sent)) {
+        if (!t) continue;
+        const s = settledTier.get(t);
+        asked += askOf(slug);
+        if (s?.funded.includes(slug)) fundedAsk += askOf(slug);
+        else if (s) waitingAsk += askOf(slug);
+      }
+      return { asked, target: poolUsd * 3, fundedAsk, waitingAsk };
+    })()
+    : undefined;
   const mineHeader = (
     <CardHeader
-      avatar={
-        <AvatarRing
-          frac={shareUsd ? allocated / shareUsd : 0}
-          label="What your badge allocated of its share"
-        >
-          {avatar}
-        </AvatarRing>
-      }
+      avatar={askRing && poolUsd
+        ? (
+          // The editor's ring, with its popups.
+          <SegmentRing
+            segments={ballotSegments({
+              ...askRing,
+              pool: poolUsd,
+              anySettled: Boolean(settled?.length),
+            })}
+            label="What your ballot asks for, of 3× the pool"
+            max={askRing.target}
+            now={Math.min(askRing.asked, askRing.target)}
+            valueText={`${dollars(askRing.asked)} of ${dollars(askRing.target)}.`}
+            dashedEnd
+          >
+            {avatar}
+          </SegmentRing>
+        )
+        : (
+          <AvatarRing
+            frac={shareUsd ? allocated / shareUsd : 0}
+            label="What your badge allocated of its share"
+          >
+            {avatar}
+          </AvatarRing>
+        )}
       title="Your ballot"
       line={!sentSomething
         ? "No ballot from this badge"
@@ -215,16 +268,37 @@ export default function VoteClosed(
       )}
     />
   );
+  const daoLogo = (
+    <img src="/dao-logo.svg" alt="TheDAO" width={48} height={48} className="scale-[1.15]" />
+  );
   const resultHeader = (
     <CardHeader
-      avatar={
-        <AvatarRing
-          frac={poolUsd ? awarded / poolUsd : 0}
-          label="What TheDAO allocated of the pool"
-        >
-          <img src="/dao-logo.svg" alt="TheDAO" width={48} height={48} className="scale-[1.15]" />
-        </AvatarRing>
-      }
+      avatar={live && poolUsd
+        ? (
+          // During the vote: gold what the settled tiers awarded, green what the live
+          // tally would add, as the chips below; each with its popup.
+          <SegmentRing
+            segments={poolSegments({
+              settledUsd: sumAwards((slug) => !provisional.has(slug)),
+              liveUsd: sumAwards((slug) => provisional.has(slug)),
+              pool: poolUsd,
+            })}
+            label="What TheDAO allocated of the pool"
+            max={poolUsd}
+            now={Math.min(awarded, poolUsd)}
+            valueText={`${dollars(awarded)} of ${dollars(poolUsd)}.`}
+          >
+            {daoLogo}
+          </SegmentRing>
+        )
+        : (
+          <AvatarRing
+            frac={poolUsd ? awarded / poolUsd : 0}
+            label="What TheDAO allocated of the pool"
+          >
+            {daoLogo}
+          </AvatarRing>
+        )}
       title={resultLabel}
       line={`${dollars(awarded)}${poolUsd ? ` of the ${dollars(poolUsd)} pool` : ""}${
         live ? " if it ended now" : ""
@@ -259,7 +333,8 @@ export default function VoteClosed(
     ballot = <p>This badge didn't send a ballot before voting closed.</p>;
   } else {
     // The settled tier table: what this badge put where, and what it paid for each.
-    const amounts = paid ?? new Map<string, number>();
+    // What it paid in the settled tiers, and (green) what it would pay in the open ones.
+    const amounts = new Map([...(paid ?? []), ...Object.entries(tally?.paid ?? {})]);
     ballot = (
       <FinalTiers
         label="Your ballot"
@@ -268,6 +343,9 @@ export default function VoteClosed(
         funded={funded}
         amounts={amounts}
         amountWord="your share paid"
+        liveAmountWord="your share would pay"
+        showZero
+        provisional={provisional}
         {...link("ballot")}
       />
     );
@@ -277,14 +355,10 @@ export default function VoteClosed(
     <div className="space-y-6">
       {live
         ? (
-          <>
-            <Header kicker={badgeKicker(n, round)} title="Your ballot">
-              It counts. You can change it until each tier settles
-              {result
-                ? "; next to it, the live result: what the vote would fund if it ended now."
-                : "."}
-            </Header>
-          </>
+          <Header kicker={badgeKicker(n, round)} title="Your ballot">
+            It counts. You can change it until each tier settles; next to it, the live result: what
+            the vote would fund if it ended now.
+          </Header>
         )
         : (
           // The same page as during the vote, its last state: the vote is over.
@@ -293,8 +367,8 @@ export default function VoteClosed(
           </Header>
         )}
       {
-        // As wide as the cards below: both columns, or the ballot alone.
-        roundBox && <div className={cn(!result && "mx-auto max-w-[640px]")}>{roundBox}</div>
+        // As wide as the two cards below.
+        roundBox && <div>{roundBox}</div>
       }
       {
         /* One grid for both cards: each card spans four rows (header, Tier-S, Tier-A,
@@ -302,35 +376,24 @@ export default function VoteClosed(
       }
       <div
         ref={tables}
-        className={cn(
-          "relative grid grid-cols-1 gap-x-6 gap-y-6",
-          // Alone (nothing settled yet), the ballot sits in the middle.
-          result ? "sm:grid-cols-2" : "mx-auto max-w-[640px]",
-        )}
+        className="relative grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2"
       >
         <div className="card row-span-4 grid min-w-0 grid-cols-1 grid-rows-subgrid gap-y-2 text-[15px] leading-relaxed text-white/80">
           {mineHeader}
           {ballot}
         </div>
-        {result && (
-          <div className="card row-span-4 grid min-w-0 grid-cols-1 grid-rows-subgrid gap-y-2 text-[15px] leading-relaxed text-white/80">
-            {resultHeader}
-            {result}
-          </div>
-        )}
-        {result && (
-          <BallotArrows
-            root={tables}
-            slug={active?.slug}
-            from={active?.from}
-            resultLabel={resultLabel}
-          />
-        )}
+        <div className="card row-span-4 grid min-w-0 grid-cols-1 grid-rows-subgrid gap-y-2 text-[15px] leading-relaxed text-white/80">
+          {resultHeader}
+          {result}
+        </div>
+        <BallotArrows
+          root={tables}
+          slug={active?.slug}
+          from={active?.from}
+          resultLabel={resultLabel}
+          live={Boolean(active && provisional.has(active.slug))}
+        />
       </div>
-      {
-        // Without the result table, the button is the way to it (after the close).
-        !result && !live && <SeeResult />
-      }
     </div>
   );
 }

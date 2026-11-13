@@ -16,9 +16,12 @@ export default function FinalTiers(
     funded,
     amounts,
     amountWord,
+    liveAmountWord = amountWord,
+    showZero,
     footer,
     label,
     highlight,
+    provisional,
     mirrored,
     linked,
     active,
@@ -34,12 +37,20 @@ export default function FinalTiers(
     amounts: ReadonlyMap<string, number>;
     /** How a chip's amount reads aloud: "your share paid", "awarded". */
     amountWord: string;
+    /** The same for a `provisional` chip: "your share would pay". */
+    liveAmountWord?: string;
+    /** A funded chip with nothing in `amounts` says $0 (a badge's ballot: it ranked a
+     * winner the other ballots paid for), rather than no amount. */
+    showZero?: boolean;
     /** The line under the table (totals). */
     /** A line under the table; none when a header says the totals. */
     footer?: React.ReactNode;
     /** Which funded chips are gold (the result: only what was on this badge's ballot);
      * the rest stay plain, not dimmed. Without it every funded chip is gold. */
     highlight?: ReadonlySet<string>;
+    /** Of what's funded, what only the live tally funds (an open tier, if it settled now):
+     * green, where what a settled tier funded is gold. */
+    provisional?: ReadonlySet<string>;
     /** The grade boxes on the right (the result, so arrows from the ballot beside it
      * reach the chips without crossing them). */
     mirrored?: boolean;
@@ -68,6 +79,8 @@ export default function FinalTiers(
       {TIER_LABELS.map((t) => {
         const inHere = items.filter((i) => tiers[i.slug] === t.tier);
         const tierPaid = inHere.reduce((a, i) => a + (amounts.get(i.slug) ?? 0), 0);
+        // An open tier's amount is the live tally's, not settled: green.
+        const tierLive = inHere.some((i) => provisional?.has(i.slug));
         return (
           <section
             key={t.tier}
@@ -85,7 +98,12 @@ export default function FinalTiers(
                 {t.label}
               </span>
               {tierPaid > 0 && (
-                <span className="text-[11px] font-semibold leading-none text-vote tnum">
+                <span
+                  className={cn(
+                    "text-[11px] font-semibold leading-none tnum",
+                    tierLive ? "text-[#a7e3a5]" : "text-vote",
+                  )}
+                >
                   {dollars(tierPaid)}
                 </span>
               )}
@@ -100,13 +118,19 @@ export default function FinalTiers(
                 <ul className="m-0 flex min-w-0 flex-1 list-none flex-wrap content-start gap-1.5 p-0 py-0.5">
                   {inHere.map((i) => {
                     const isFunded = funded.has(i.slug);
-                    const gold = isFunded && (!highlight || highlight.has(i.slug));
-                    const youPaid = amounts.get(i.slug);
+                    const lit = isFunded && (!highlight || highlight.has(i.slug));
+                    const live = Boolean(provisional?.has(i.slug));
+                    const gold = lit && !live;
+                    const green = lit && live;
+                    const youPaid = amounts.get(i.slug) ?? (showZero && lit ? 0 : undefined);
                     const cat = i.card?.initiative.categories[0];
+                    const fundedWord = live ? "funded if it ended now" : "funded";
                     const label = isFunded
-                      ? youPaid
-                        ? `${i.title}, funded: ${amountWord} ${dollars(youPaid)}`
-                        : `${i.title}, funded`
+                      ? youPaid !== undefined
+                        ? `${i.title}, ${fundedWord}: ${live ? liveAmountWord : amountWord} ${
+                          dollars(youPaid)
+                        }`
+                        : `${i.title}, ${fundedWord}`
                       : `${i.title}, not funded`;
                     return (
                       <li
@@ -115,6 +139,7 @@ export default function FinalTiers(
                         aria-label={label}
                         data-final-chip={i.slug}
                         data-gold={gold || undefined}
+                        data-live={green || undefined}
                         data-active={active === i.slug || undefined}
                         {...(linked?.has(i.slug)
                           ? {
@@ -130,9 +155,14 @@ export default function FinalTiers(
                           : {})}
                         className={cn(
                           "flex h-8 max-w-full items-center gap-1.5 overflow-hidden rounded-lg border px-2 outline-none transition-shadow",
-                          active === i.slug && "shadow-[0_0_0_2px_rgba(233,185,73,.6)]",
+                          // The chip an arrow starts or ends at: ringed in its own colour.
+                          active === i.slug && (live
+                            ? "shadow-[0_0_0_2px_rgba(92,183,90,.6)]"
+                            : "shadow-[0_0_0_2px_rgba(233,185,73,.6)]"),
                           gold
                             ? "border-vote/50 bg-vote/[.12]"
+                            : green
+                            ? "border-dao-green/50 bg-dao-green/[.12]"
                             : isFunded
                             ? "border-white/15 bg-white/[.07]"
                             : "border-white/15 bg-white/[.07] opacity-55",
@@ -147,12 +177,12 @@ export default function FinalTiers(
                         <span className="min-w-0 truncate text-[12.5px] leading-none text-white/85">
                           {i.title}
                         </span>
-                        {youPaid
+                        {youPaid !== undefined
                           ? (
                             <span
                               className={cn(
                                 "ml-1 flex-none text-[11.5px] font-semibold leading-none tnum",
-                                gold ? "text-vote" : "text-white/70",
+                                gold ? "text-vote" : green ? "text-[#a7e3a5]" : "text-white/70",
                               )}
                             >
                               {dollars(youPaid)}

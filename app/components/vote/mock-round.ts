@@ -162,6 +162,11 @@ function settled(
   };
 }
 
+/** What badge `n` would pay for each live winner (USD), if the open tiers settled now. */
+const livePaid = (n: number, paid: [string, number][]) => ({
+  [String(n)]: Object.fromEntries(paid.map(([slug, usd]) => [slug, micro(usd)])),
+});
+
 /** Badge `n` in the fictional round, in state `kind`, over the board's `cards`. */
 export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   const share = POOL_USD / VOTERS;
@@ -200,11 +205,12 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   if (kind === "s-settling" || kind === "s-extended" || kind === "s-last") {
     const first = FIRST;
     const { round, ask } = fictionalRound(cards, OPENS, first);
-    const { ballot, s, a } = sampleBallot(round);
+    const { ballot, s, a, b } = sampleBallot(round);
     const window = kind === "s-settling" ? 1 : kind === "s-extended" ? 2 : MAX_WINDOWS;
     const endsAt = first[0] +
       Array.from({ length: window }, (_, k) => WINDOW >> k).reduce((x, y) => x + y);
-    const live = [s[0], s[1], a[0]];
+    // b[0] is in this badge's Tier-B, but other ballots put it in Tier-S: it wins there.
+    const live = [s[0], s[1], b[0], a[0]];
     const view: RoundView = {
       ...base,
       registrationClosesAt: first[0] + LONGEST,
@@ -216,7 +222,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
           windowEndsAt: endsAt,
           latestEndAt: first[0] + LONGEST,
           quiet: kind === "s-settling",
-          funded: [s[0], s[1]],
+          funded: [s[0], s[1], b[0]],
         },
         { tier: "A", status: "waiting", startsAt: first[1] },
         { tier: "B", status: "waiting", startsAt: first[2] },
@@ -225,7 +231,8 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
       live: {
         funded: live,
         awards: Object.fromEntries(live.map((x) => [x, micro(ask(x))])),
-        tiers: { [s[0]]: "S", [s[1]]: "S", [a[0]]: "A" },
+        tiers: { [s[0]]: "S", [s[1]]: "S", [b[0]]: "S", [a[0]]: "A" },
+        paid: livePaid(n, [[s[0], share * 0.28], [s[1], share * 0.14], [a[0], share * 0.2]]),
       },
     };
     return { round, view, skipped: round.slugs.filter((x) => !ballot[x]).slice(0, 6) };
@@ -243,6 +250,8 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
         settled("S", first[0] + WINDOW, [
           { slug: s[0], award: ask(s[0]), paid: share * 0.28 },
           { slug: s[1], award: ask(s[1]), paid: share * 0.14 },
+          // On this badge's ballot in Tier-B; other ballots funded it in Tier-S.
+          { slug: b[0], award: ask(b[0]), paid: 0 },
         ], n),
         settled("A", first[1] + WINDOW, [
           { slug: a[0], award: ask(a[0]), paid: share * 0.2 },
@@ -259,7 +268,12 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
         },
       ],
       accepted: { [String(n)]: bytesToHex(encodeBallot(round.slugs, ballot)) },
-      live: { funded: [b[1]], awards: { [b[1]]: micro(ask(b[1])) }, tiers: { [b[1]]: "B" } },
+      live: {
+        funded: [b[1]],
+        awards: { [b[1]]: micro(ask(b[1])) },
+        tiers: { [b[1]]: "B" },
+        paid: livePaid(n, [[b[1], share * 0.1]]),
+      },
     };
     return { round, view, skipped: round.slugs.filter((x) => !ballot[x]).slice(0, 6) };
   }
@@ -268,7 +282,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   if (kind === "missed") {
     const first = FIRST;
     const { round, ask } = fictionalRound(cards, OPENS, first);
-    const { s, a } = sampleBallot(round);
+    const { s, a, b } = sampleBallot(round);
     const view: RoundView = {
       ...base,
       registrationClosesAt: first[0] + WINDOW,
@@ -276,6 +290,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
         settled("S", first[0] + WINDOW, [
           { slug: s[0], award: ask(s[0]), paid: 0 },
           { slug: s[1], award: ask(s[1]), paid: 0 },
+          { slug: b[0], award: ask(b[0]), paid: 0 },
         ], n),
         {
           tier: "A",
@@ -299,7 +314,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     const first = FIRST;
     const aFirst = first[1];
     const { round, ask } = fictionalRound(cards, OPENS, first);
-    const { ballot, s, a } = sampleBallot(round);
+    const { ballot, s, a, b } = sampleBallot(round);
     const view: RoundView = {
       ...base,
       registrationClosesAt: first[0] + WINDOW,
@@ -307,6 +322,8 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
         settled("S", first[0] + WINDOW, [
           { slug: s[0], award: ask(s[0]), paid: share * 0.28 },
           { slug: s[1], award: ask(s[1]), paid: share * 0.14 },
+          // On this badge's ballot in Tier-B; other ballots funded it in Tier-S.
+          { slug: b[0], award: ask(b[0]), paid: 0 },
         ], n),
         {
           tier: "A",
@@ -320,7 +337,12 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
         { tier: "B", status: "waiting", startsAt: first[2] },
       ],
       accepted: { [String(n)]: bytesToHex(encodeBallot(round.slugs, ballot)) },
-      live: { funded: [a[0]], awards: { [a[0]]: micro(ask(a[0])) }, tiers: { [a[0]]: "A" } },
+      live: {
+        funded: [a[0]],
+        awards: { [a[0]]: micro(ask(a[0])) },
+        tiers: { [a[0]]: "A" },
+        paid: livePaid(n, [[a[0], share * 0.2]]),
+      },
     };
     // Like the prefilled state: six it rated 1–2★, skipped.
     return { round, view, skipped: round.slugs.filter((x) => !ballot[x]).slice(0, 6) };
@@ -332,7 +354,8 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   const { ballot, s, a, b } = sampleBallot(round);
   const funded = (slug: string, paid: number) => ({ slug, award: ask(slug), paid: share * paid });
   const mine = {
-    S: [funded(s[0], 0.28), funded(s[1], 0.14)],
+    // b[0]: this badge's Tier-B, funded in Tier-S by the other ballots.
+    S: [funded(s[0], 0.28), funded(s[1], 0.14), funded(b[0], 0)],
     A: [funded(a[0], 0.2), funded(a[2], 0.1)],
     B: [funded(b[1], 0.15)],
   };

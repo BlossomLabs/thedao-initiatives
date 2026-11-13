@@ -559,9 +559,11 @@ it("after the close, the owner sees the ballot their badge sent, not the ballot 
   show();
   expect(await screen.findByRole("heading", { level: 1, name: "Your ballot" })).toBeInTheDocument();
   expect(screen.getByText(/Voting has closed/)).toBeInTheDocument();
-  const s = await screen.findByRole("region", { name: /S · Must fund/ });
-  expect(within(s).getByText("GAMMA")).toBeInTheDocument();
-  expect(within(screen.getByRole("region", { name: /B · Nice to have/ })).getByText("ALPHA"))
+  // The ballot's table, beside the result's (which has the same tier rows).
+  const mine = await screen.findByRole("group", { name: "Your ballot" });
+  expect(within(within(mine).getByRole("region", { name: /S · Must fund/ })).getByText("GAMMA"))
+    .toBeInTheDocument();
+  expect(within(within(mine).getByRole("region", { name: /B · Nice to have/ })).getByText("ALPHA"))
     .toBeInTheDocument();
   expect(screen.queryByText("BETA")).toBeNull();
   expect(screen.queryByRole("button", { name: /send my ballot/i })).toBeNull();
@@ -596,9 +598,10 @@ it("after the close, on another device the sent ballot is read from the chain", 
         : Promise.reject(new Error("unexpected " + path))) as typeof api,
   );
   showMine();
-  const s = await screen.findByRole("region", { name: /S · Must fund/ });
-  expect(within(s).getByText("BETA")).toBeInTheDocument();
-  expect(within(screen.getByRole("region", { name: /A · Should fund/ })).getByText("ALPHA"))
+  const mine = await screen.findByRole("group", { name: "Your ballot" });
+  expect(within(within(mine).getByRole("region", { name: /S · Must fund/ })).getByText("BETA"))
+    .toBeInTheDocument();
+  expect(within(within(mine).getByRole("region", { name: /A · Should fund/ })).getByText("ALPHA"))
     .toBeInTheDocument();
 });
 
@@ -743,7 +746,13 @@ it("a ballot that counts opens on the page that shows it; Edit goes back to the 
   roundIs.body = roundBody({
     accepted: { "17": "0x01ffff" },
     // If it ended now, Tier-S would fund ALPHA: the live result, beside the ballot.
-    live: { funded: ["alpha"], awards: { alpha: "30000000000" }, tiers: { alpha: "S" } },
+    live: {
+      funded: ["alpha"],
+      awards: { alpha: "30000000000" },
+      tiers: { alpha: "S" },
+      // Badge 17 would pay $12,000 of it.
+      paid: { "17": { alpha: "12000000000" } },
+    },
   });
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
@@ -752,6 +761,31 @@ it("a ballot that counts opens on the page that shows it; Edit goes back to the 
   expect(screen.getByRole("heading", { level: 2, name: "The live result" })).toBeInTheDocument();
   expect(screen.getByText(/\$30,000 of the .* pool if it ended now · 1 initiative/))
     .toBeInTheDocument();
+  // Only the live tally funds ALPHA (Tier-S hasn't settled): green in both tables, not gold.
+  const alpha = document.querySelectorAll('[data-final-chip="alpha"]');
+  expect(alpha).toHaveLength(2);
+  for (const chip of alpha) {
+    expect(chip).toHaveAttribute("data-live");
+    expect(chip).not.toHaveAttribute("data-gold");
+  }
+  // On the ballot, ALPHA's chip says what this badge would give it.
+  expect(
+    screen.getByRole("listitem", {
+      name: /^ALPHA, funded if it ended now: your share would pay \$12,000$/,
+    }),
+  )
+    .toBeInTheDocument();
+  // TheDAO's ring too: all green, nothing settled yet.
+  const dao = screen.getByRole("meter", { name: "What TheDAO allocated of the pool" });
+  expect(dao.querySelector("circle.stroke-dao-green")).not.toBeNull();
+  expect(dao.querySelector("circle.stroke-vote")).toBeNull();
+  // Its parts say what they are, as the editor's ring does: a tap opens one.
+  // (jsdom lays nothing out: the ring's centre is at 0, 0; a tap just right of the top.)
+  fireEvent.click(dao.querySelector<HTMLElement>("[data-ring-hit]")!, {
+    clientX: 1,
+    clientY: -20,
+  });
+  expect(await screen.findByText("If it ended now")).toBeInTheDocument();
   expect(screen.getByRole("heading", { level: 1, name: "Your ballot" })).toBeInTheDocument();
   expect(screen.getByText(/It counts\. You can change it until each tier settles/))
     .toBeInTheDocument();
@@ -764,6 +798,22 @@ it("a ballot that counts opens on the page that shows it; Edit goes back to the 
   expect(screen.getByText("Your ballot counts")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "See my ballot" }));
   expect(await screen.findByRole("button", { name: "Edit my ballot" })).toBeInTheDocument();
+});
+
+it("a counted ballot is always beside the live result, even before it would fund anything", async () => {
+  // A $500 pool: ALPHA's $400 is a quarter of the ring (full at 3×, $1,500).
+  roundIs.body = roundBody({ accepted: { "17": "0x01ffff" }, poolUsd: "500000000" });
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  await screen.findByRole("button", { name: "Edit my ballot" });
+  // The avatar's ring is the editor's: the ballot's ask, toward 3× the pool, in green.
+  const ring = screen.getByRole("meter", { name: "What your ballot asks for, of 3× the pool" });
+  expect(ring).toHaveAttribute("aria-valuenow", "400");
+  expect(ring).toHaveAttribute("aria-valuemax", "1500");
+  expect(ring.querySelector("circle.stroke-dao-green")).not.toBeNull();
+  expect(screen.getByRole("heading", { level: 2, name: "The live result" })).toBeInTheDocument();
+  expect(screen.getByRole("group", { name: "The live result" })).toBeInTheDocument();
 });
 
 it("quiet ending: S settling, quiet so far", async () => {

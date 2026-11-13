@@ -45,7 +45,7 @@ export function ruleStatus(errors: RuleError[]): { ok: boolean; text: string } {
   const order = (e: RuleError) =>
     e.rule === "size" ? 0 : e.rule === "independent" ? 1 + e.tier : e.rule === "group" ? 3 : 4;
   const e = [...errors].sort((a, b) => order(a) - order(b))[0];
-  if (!e) return { ok: true, text: "You can keep adding initiatives" };
+  if (!e) return { ok: true, text: "You can add as many initiatives as you want" };
   switch (e.rule) {
     case "size":
       return { ok: false, text: `Needs at least ${dollars(e.needed)} to be valid` };

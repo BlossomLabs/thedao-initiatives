@@ -52,19 +52,16 @@ function show(tiers: Partial<Record<string, Tier>>, onChange = vi.fn(), onReplac
   return { onChange, onReplace };
 }
 
-it("the ballot warns that Tier-B may fund nothing", () => {
+it("Details on a list tile opens its card, as a tap on the tile does", async () => {
   show({});
-  expect(
-    screen.getByText(
-      "Tier-B is funded only if the pool lasts and enough voters back the same initiatives. It may fund nothing.",
-    ),
-  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Details for BETA" }));
+  expect(await screen.findByRole("dialog", { name: "BETA" })).toBeInTheDocument();
 });
 
 it("a settled tier says so, and its card locks the choices", async () => {
   const { onChange } = show({ alpha: "S" });
   expect(screen.getByText("Settled")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: /^BETA/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Details for BETA" }));
   const card = await screen.findByRole("dialog", { name: "BETA" });
   expect(card.querySelector("[data-peek-place]")).toHaveTextContent("Not ranked yet");
   const option = await optionsIn(card);
@@ -189,7 +186,7 @@ it("a tap on a chip opens its card; a choice there moves it, Details opens the p
   fireEvent.click(screen.getByRole("button", { name: "BETA" }));
   const card = await screen.findByRole("dialog", { name: "BETA" });
   expect(card.querySelector("[data-peek-place]")).toHaveTextContent("Tier-A · Should fund");
-  const details = within(card).getByRole("link", { name: /Details for BETA/ });
+  const details = within(card).getByRole("link", { name: /Open full page for BETA/ });
   expect(details).toHaveAttribute("href", "/initiative/beta");
   expect(details).toHaveAttribute("target", "_blank");
   expect(onChange).not.toHaveBeenCalled();
@@ -231,9 +228,9 @@ it("a settled chip's card says whether it was funded", async () => {
   ).toBeInTheDocument();
 });
 
-it("a tap on a list tile opens the same card; Not ranked is chosen, a tier places it", async () => {
+it("Details on a list tile opens the same card; Not ranked is chosen, a tier places it", async () => {
   const { onChange } = show({});
-  fireEvent.click(screen.getByRole("button", { name: /^GAMMA/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Details for GAMMA" }));
   const card = await screen.findByRole("dialog", { name: "GAMMA" });
   expect(card.querySelector("[data-peek-place]")).toHaveTextContent("Not ranked yet");
   await pickIn(card, "Tier-A, Should fund");
@@ -259,7 +256,7 @@ function withSkips(skipped: string[], tiers: Partial<Record<string, Tier>> = {})
 
 it("Skip on the card takes an initiative off the list (a tiered one leaves its tier too)", async () => {
   const { onChange, onSkip } = withSkips([], { alpha: "A" });
-  fireEvent.click(screen.getByRole("button", { name: /^GAMMA/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Details for GAMMA" }));
   let card = await screen.findByRole("dialog", { name: "GAMMA" });
   await pickIn(card, "Skip: hide it from the list");
   expect(onSkip).toHaveBeenCalledWith("gamma", true);
@@ -278,13 +275,13 @@ it("skipped initiatives are hidden, counted, and shown on demand; a tier brings 
   const { onChange, onSkip } = withSkips(["gamma"]);
   const list = screen.getByRole("list", { name: "Not ranked yet" });
   expect(within(list).queryByText("GAMMA")).toBeNull();
-  const toggle = screen.getByRole("button", { name: /Show 1 skipped/ });
+  const toggle = screen.getByRole("button", { name: "Show 1 skipped and low-rated" });
   expect(toggle).toHaveAttribute("aria-expanded", "false");
   expect(screen.queryByRole("list", { name: "Skipped" })).toBeNull();
   fireEvent.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "true");
   const hidden = screen.getByRole("list", { name: "Skipped" });
-  fireEvent.click(within(hidden).getByRole("button", { name: /^GAMMA/ }));
+  fireEvent.click(within(hidden).getByRole("button", { name: "Details for GAMMA" }));
   const card = await screen.findByRole("dialog", { name: "GAMMA" });
   expect(card.querySelector("[data-peek-place]")).toHaveTextContent("Skipped");
   await pickIn(card, "Tier-B, Nice to have");
@@ -294,7 +291,7 @@ it("skipped initiatives are hidden, counted, and shown on demand; a tier brings 
 
 it("without onSkip there is no Skip and no skipped list", async () => {
   show({});
-  fireEvent.click(screen.getByRole("button", { name: /^GAMMA/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Details for GAMMA" }));
   const card = await screen.findByRole("dialog", { name: "GAMMA" });
   expect(within(card).queryByRole("button", { name: /Skip/ })).toBeNull();
   expect(screen.queryByRole("button", { name: /skipped/ })).toBeNull();

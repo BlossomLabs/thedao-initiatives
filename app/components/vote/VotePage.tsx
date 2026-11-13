@@ -56,6 +56,8 @@ const closed = (m = ROUND) => voteNow() / 1000 >= m.closesAt;
 const notOpenYet = (m = ROUND) => voteNow() / 1000 < m.opensAt;
 const REAL = (m = ROUND) => m.kind === "real";
 const microUsd = (v: string) => Number(BigInt(v) / 10_000n) / 100;
+/** The shake on why a ballot can't be sent (app.css), none with reduced motion. */
+const NUDGE = "motion-safe:animate-reason-nudge";
 const closeTextOf = (m: VoteManifest) => <When at={m.closesAt} />;
 
 const tiersKey = (n: number) => `vote-tiers:${ROUND.contract}:${n}`;
@@ -330,6 +332,33 @@ export default function VotePage(
     // A send that counted lands on the ballot.
     if (sentPhase === "counted") setEditing(false);
   }, [sentPhase]);
+  /** From a Send that can't send: shake why (the ballot box's line, and the rules box when
+   * there is one); after a tap, scroll there first. */
+  const showWhyNot = (scroll: boolean) => {
+    const why = [...document.querySelectorAll<HTMLElement>("[data-ballot-reason]")];
+    if (!why.length) return;
+    const shake = () =>
+      why.forEach((el) => {
+        el.classList.remove(NUDGE);
+        void el.offsetWidth; // restart it, if it's still running
+        el.classList.add(NUDGE);
+        el.addEventListener("animationend", () => el.classList.remove(NUDGE), { once: true });
+      });
+    // Scroll only when the first reason is off screen, or covered (the phone's send panel
+    // at the bottom, the top bar): what's at its middle on screen isn't it.
+    const box = why[0].getBoundingClientRect();
+    const hit = document.elementFromPoint?.(box.left + box.width / 2, box.top + box.height / 2);
+    const seen = box.top >= 0 && box.bottom <= globalThis.innerHeight && Boolean(hit) &&
+      why[0].contains(hit);
+    if (!scroll || seen) return shake();
+    const smooth = !globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    why[0].scrollIntoView?.({ behavior: smooth ? "smooth" : "auto", block: "center" });
+    // Once the scroll has landed, so the shake is seen.
+    setTimeout(shake, smooth ? 400 : 0);
+  };
+  /** Whether the ballot on screen broke a rule, last render: a valid one that breaks one
+   * shakes why. */
+  const wasInvalid = useRef<boolean | undefined>(undefined);
   const sentFor = useRef(mockKind);
   if (sentFor.current !== mockKind) {
     sentFor.current = mockKind;
@@ -769,6 +798,10 @@ export default function VotePage(
       : rules?.errors ?? [];
     const errors = placed > 0 ? allErrors : [];
     const broken = errors.length > 0;
+    // Valid a moment ago, not now (a pick broke a rule): shake why, once it's on screen.
+    const invalid = allErrors.length > 0;
+    if (wasInvalid.current === false && invalid) setTimeout(() => showWhyNot(false));
+    wasInvalid.current = invalid;
     // A pasted ballot replaces the draft; the settled tiers stay as they were counted.
     const applyPasted = (next: Partial<Record<string, Tier>>): boolean => {
       if (!countedHex) {
@@ -857,7 +890,7 @@ export default function VotePage(
     };
     const roundBox = roundProps && (
       <div>
-        <RoundBox {...roundProps} />
+        <RoundBox {...roundProps} bare />
       </div>
     );
     // On the "your ballot" page: where the round is, without the tier settling now.
@@ -962,6 +995,8 @@ export default function VotePage(
           paid={paid}
           onChange={setTier}
           onReplace={replaceTiers}
+          // Once a ballot counts: changed since, Restore sent ballot brings it back.
+          sent={countedHex ? countedTiers(countedHex, tiers, R.slugs) : undefined}
           skipped={skipped}
           onSkip={setSkip}
           search={{ ai: board.data?.flags?.aiSearch, aiAuto: board.data?.flags?.aiSearchAuto }}
@@ -990,8 +1025,11 @@ export default function VotePage(
                   chain={REAL(R) ? "Ethereum" : "Sepolia"}
                   upToDate={upToDate}
                   onSeeBallot={() => setEditing(false)}
+                  onBlocked={showWhyNot}
                   canSend={!busy && placed > 0 && !broken}
-                  sendLabel={placed === 0 ? "Place at least one proposal" : "Send my ballot"}
+                  // Not ready, it stays as it is, disabled: the ballot box's line says what
+                  // the ballot still needs. With a ballot that counts already, it's a resend.
+                  sendLabel={countedHex ? "Resend my ballot" : "Send my ballot"}
                   resultsHref={REAL(R) ? "/" : "/vote"}
                   onSend={() => {
                     setSendRoute("relay");

@@ -184,8 +184,9 @@ async function pickIn(card: HTMLElement, name: string) {
   }
   fireEvent.keyDown(option, { key: "Enter" });
 }
-async function placeIn(title: RegExp, choice: string) {
-  fireEvent.click(await screen.findByRole("button", { name: title }));
+/** Opens a list tile's card (its Details) and picks a place on it. */
+async function placeIn(title: string, choice: string) {
+  fireEvent.click(await screen.findByRole("button", { name: `Details for ${title}` }));
   await pickIn(await screen.findByRole("dialog"), choice);
   // The card stays open after a choice: close it.
   fireEvent.keyDown(document, { key: "Escape" });
@@ -248,7 +249,7 @@ it("the badge's owner gets the ballot, and sending posts the encoded tiers", asy
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
   expect(await screen.findByText("ALPHA")).toBeInTheDocument();
-  await placeIn(/^BETA/, "Tier-S, Must fund");
+  await placeIn("BETA", "Tier-S, Must fund");
   fireEvent.click(screen.getByRole("button", { name: /send my ballot/i }));
   await waitFor(() => expect(submit).toHaveBeenCalled());
   const [tokenId, ballot] = submit.mock.calls[0];
@@ -261,7 +262,7 @@ it("offers to send it yourself next to Send, and next to Retry after a failure",
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
-  await placeIn(/^BETA/, "Tier-S, Must fund");
+  await placeIn("BETA", "Tier-S, Must fund");
   fireEvent.click(screen.getByRole("button", { name: /send it yourself/i }));
   await waitFor(() => expect(selfSend).toHaveBeenCalled());
   expect(selfSend.mock.calls[0][0]).toBe(17n);
@@ -291,7 +292,6 @@ it("accepting, then signing in, goes straight on to claiming — even if the pag
   // The sign-in modal finishes and the page comes back signed in (a fresh mount).
   cleanup();
   session.current = { address: ME };
-  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   show();
   await waitFor(() =>
     expect(vi.mocked(api)).toHaveBeenCalledWith(
@@ -300,12 +300,10 @@ it("accepting, then signing in, goes straight on to claiming — even if the pag
     )
   );
   // On to the ballot, no second "Accept the challenge".
-  expect(await screen.findByRole("button", { name: /send my ballot|place at least one/i }))
+  expect(await screen.findByRole("button", { name: /send my ballot/i }))
     .toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /claim my test badge/i })).toBeNull();
   // The ballot starts at the top, not where the claim button was.
-  expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
-  scrollTo.mockRestore();
 });
 
 it("without accepting, a signed-in visitor still sees the intro and claims only on the button", async () => {
@@ -359,7 +357,7 @@ it("the ballot: search narrows the unranked list; a tile's tier buttons place it
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
 
   // Tap it, then choose a tier on its card.
-  await placeIn(/^ALPHA/, "Tier-A, Should fund");
+  await placeIn("ALPHA", "Tier-A, Should fund");
   expect(within(screen.getByRole("list", { name: "Should fund" })).getByText("ALPHA"))
     .toBeInTheDocument();
 });
@@ -398,7 +396,7 @@ it("a skipped initiative leaves the list, is kept in this browser, and isn't sen
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
-  await placeIn(/^GAMMA/, "Skip: hide it from the list");
+  await placeIn("GAMMA", "Skip: hide it from the list");
   expect(within(screen.getByRole("list", { name: "Not ranked yet" })).queryByText("GAMMA"))
     .toBeNull();
   expect(
@@ -406,7 +404,7 @@ it("a skipped initiative leaves the list, is kept in this browser, and isn't sen
       localStorage.getItem("vote-skipped:0x1000000000000000000000000000000000000001:17")!,
     ),
   ).toEqual(["gamma"]);
-  await placeIn(/^BETA/, "Tier-S, Must fund");
+  await placeIn("BETA", "Tier-S, Must fund");
   fireEvent.click(screen.getByRole("button", { name: /send my ballot/i }));
   await waitFor(() => expect(submit).toHaveBeenCalled());
   expect(submit.mock.calls[0][1]).toBe(
@@ -418,7 +416,7 @@ it("closing a card leaves the initiative where it was", async () => {
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
-  fireEvent.click(await screen.findByRole("button", { name: /^GAMMA/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Details for GAMMA" }));
   const card = await screen.findByRole("dialog", { name: "GAMMA" });
   fireEvent.click(within(card).getByRole("button", { name: "Close" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -462,14 +460,14 @@ it("a proposal's card shows its summary and Details, and moves it only when aske
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
-  await placeIn(/^ALPHA/, "Tier-S, Must fund");
+  await placeIn("ALPHA", "Tier-S, Must fund");
   expect(screen.queryByText("Formal verification of bridges")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: /^GAMMA/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Details for GAMMA" }));
   const card = await screen.findByRole("dialog", { name: "GAMMA" });
   expect(card).toHaveTextContent("Formal verification of bridges");
   expect(screen.queryByText("Bridge researchers")).toBeNull();
   expect(screen.queryByText("Raised")).toBeNull();
-  const details = within(card).getByRole("link", { name: /Details for GAMMA/ });
+  const details = within(card).getByRole("link", { name: /Open full page for GAMMA/ });
   expect(details).toHaveAttribute("href", "/initiative/gamma");
   expect(details).toHaveAttribute("target", "_blank");
   expect(details).toHaveAttribute("rel", "noopener noreferrer");
@@ -667,7 +665,7 @@ it("real vote: before it opens, the ballot says when and offers no Send", async 
   mineIs([12]);
   showMine();
   expect(await screen.findByText(/Voting opens/)).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /send my ballot|place at least one/i })).toBeNull();
+  expect(screen.queryByRole("button", { name: /send my ballot/i })).toBeNull();
 });
 
 // ---------------------------------------------------------------- quiet ending
@@ -737,7 +735,7 @@ it("quiet ending: after registration, a badge that never voted gets no ballot at
   // Where the vote is, read only, and where to follow it: no tiers, no Send.
   expect(await roundBox()).toBeInTheDocument();
   expect(screen.queryByRole("list", { name: "Must fund" })).toBeNull();
-  expect(screen.queryByRole("button", { name: /send my ballot|place at least one/i })).toBeNull();
+  expect(screen.queryByRole("button", { name: /send my ballot/i })).toBeNull();
   expect(screen.getByRole("link", { name: "Follow the results live" })).toBeInTheDocument();
 });
 
@@ -798,6 +796,15 @@ it("a ballot that counts opens on the page that shows it; Edit goes back to the 
   expect(screen.getByText("Your ballot counts")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "See my ballot" }));
   expect(await screen.findByRole("button", { name: "Edit my ballot" })).toBeInTheDocument();
+  // Changed, a ballot that counted already goes again as a resend.
+  fireEvent.click(screen.getByRole("button", { name: "Edit my ballot" }));
+  await placeIn("BETA", "Tier-A, Should fund");
+  expect(screen.getByRole("button", { name: "Resend my ballot" })).toBeEnabled();
+  // Restore sent ballot takes it back to the one that counts: nothing to resend.
+  expect(screen.queryByRole("button", { name: "Restore sent ballot" })).not.toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Restore sent ballot" }));
+  expect(screen.getByText("Your ballot counts")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Restore sent ballot" })).toBeNull();
 });
 
 it("a counted ballot is always beside the live result, even before it would fund anything", async () => {
@@ -825,7 +832,7 @@ it("quiet ending: S settling, quiet so far", async () => {
   expect(within(box).getByRole("heading", { name: "Tier-S is settling" })).toBeInTheDocument();
   expect(within(box).getByRole("timer")).toHaveTextContent(/^in \d+d \d+h$/);
   expect(windows(box)).toEqual(["current", "maybe", "maybe"]);
-  expect(box).toHaveTextContent("No change so far: Tier-S settles when this window ends");
+  expect(box).toHaveTextContent(/If nothing changes, Tier-S settles at \d{2}:\d{2}\./);
   expect(within(box).getByRole("status")).toHaveTextContent(
     "Your ballot counts. You can still change every tier.",
   );
@@ -1004,7 +1011,14 @@ it("ballot rules: a ballot breaking a rule shows why and can't be sent", async (
       "Projects affiliated with Seal take $800 of Tier-S's $1,200. One affiliation can hold at most half.",
     ),
   ).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /send my ballot/i })).toBeDisabled();
+  // It can't send, but it answers: a hover shakes why, a tap scrolls there and shakes it.
+  const send = screen.getByRole("button", { name: /send my ballot/i });
+  expect(send).toHaveAttribute("aria-disabled", "true");
+  const why = document.querySelector<HTMLElement>("[data-ballot-reason]")!;
+  fireEvent.pointerEnter(send, { pointerType: "mouse" });
+  expect(why).toHaveClass("motion-safe:animate-reason-nudge");
+  fireEvent.click(send);
+  expect(submit).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: /send it yourself/i })).toBeDisabled();
 });
 
@@ -1014,6 +1028,19 @@ it("ballot rules: a valid ballot shows no rules box and can be sent", async () =
   await ballotWith(roundBody({ poolUsd: "500000000" }));
   expect(screen.queryByRole("region", { name: "Ballot rules" })).toBeNull();
   expect(screen.getByRole("button", { name: /send my ballot/i })).toBeEnabled();
+});
+
+it("ballot rules: a valid ballot that breaks a rule shakes why", async () => {
+  round.ballotRules = true;
+  localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "S", beta: "S", gamma: "S" }));
+  await ballotWith(roundBody({ poolUsd: "500000000" }));
+  const why = await screen.findByText("You can add as many initiatives as you want");
+  expect(why).not.toHaveClass("motion-safe:animate-reason-nudge");
+  // GAMMA down to Tier-A: two left in Tier-S, under its three.
+  fireEvent.click(screen.getByRole("button", { name: "GAMMA" }));
+  await pickIn(await screen.findByRole("dialog"), "Tier-A, Should fund");
+  const now = await screen.findByText("Needs at least 3 independent projects in Tier-S");
+  await waitFor(() => expect(now).toHaveClass("motion-safe:animate-reason-nudge"));
 });
 
 it("prefill: in a test round the signed-in reviewer's ratings fill a fresh ballot", async () => {
@@ -1122,5 +1149,8 @@ it("ballot rules: an empty Tier-S is refused, though the chain would read Tier-A
   expect(await screen.findByText("Needs at least 3 independent projects in Tier-S"))
     .toBeInTheDocument();
   expect(screen.queryByRole("region", { name: "Ballot rules" })).toBeNull();
-  expect(screen.getByRole("button", { name: /send my ballot/i })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /send my ballot/i })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
 });

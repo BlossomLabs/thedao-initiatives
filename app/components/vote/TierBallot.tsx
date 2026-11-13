@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Tooltip } from "@base-ui/react/tooltip";
-import { ChevronDown, Eye, EyeOff, GripVertical, RotateCcw } from "lucide-react";
+import { ChevronDown, Eraser, Eye, EyeOff, GripVertical, Maximize2, Undo2 } from "lucide-react";
 import CategoryDot from "~/components/ui/CategoryDot";
 import type { Card } from "~/lib/api-types";
 import type { AiSearchResult } from "../../../shared/ai-search";
@@ -34,6 +34,9 @@ type Where = Tier | "unplaced" | "skipped";
 
 const UNRANKED = "Not ranked yet";
 const SKIPPED = "Skipped";
+/** A small button on a list tile's right: Details, Skip. */
+const TILE_ACTION =
+  "inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[12px] text-white/45 no-underline hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-dao-green";
 
 /** Every tile is this one size, in a tier or in the list, still or mid-drag. */
 const TILE = "h-[72px]";
@@ -137,6 +140,7 @@ export default function TierBallot(
     paid,
     skipped,
     onSkip,
+    sent,
   }: {
     items: BallotItem[];
     /** The send bar: under the tier list on wider screens, floating at the bottom on a phone. */
@@ -167,6 +171,8 @@ export default function TierBallot(
     skipped?: ReadonlySet<string>;
     /** Skips an initiative (or brings it back); without it there's no Skip. */
     onSkip?: (slug: string, skip: boolean) => void;
+    /** The ballot that counts, once one was sent: changed since, it can be restored. */
+    sent?: Partial<Record<string, Tier>>;
   },
 ) {
   const id = useId();
@@ -217,6 +223,17 @@ export default function TierBallot(
     // A settled tier stays as it is.
     onReplace(Object.fromEntries(Object.entries(tiers).filter(([, t]) => t && isLocked(t))));
     setAnnounce("Ballot cleared. Every initiative is back in the list.");
+  };
+  /** The ballot on screen isn't the one sent: offer to go back to it. */
+  const changed = Boolean(sent) &&
+    (Object.keys(sent!).length !== placedCount ||
+      Object.entries(sent!).some(([slug, t]) => tiers[slug] !== t));
+  const restoreSent = () => {
+    if (!onReplace || !sent) return;
+    done();
+    setCleared(undefined);
+    onReplace({ ...sent });
+    setAnnounce("Back to the ballot you sent.");
   };
   const undoClear = () => {
     if (!onReplace || !cleared) return;
@@ -349,7 +366,9 @@ export default function TierBallot(
   };
 
   /** Pressing a tile or a chip: a drag once it moves (mouse) or rests (touch). */
-  const grab = (slug: string) => ({
+  /** Press and drag an initiative onto a tier; `opens`: a click opens its card too (the
+   * tier chips; a list tile has its own Details for that). */
+  const grab = (slug: string, opens = true) => ({
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
       if (disabled || isLocked(where(slug)) || (e.pointerType === "mouse" && e.button !== 0)) {
         return;
@@ -371,7 +390,7 @@ export default function TierBallot(
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
     onClick: (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (justDragged.current) return;
+      if (justDragged.current || !opens) return;
       openPeek(slug, e.currentTarget as HTMLElement);
     },
   });
@@ -574,40 +593,60 @@ export default function TierBallot(
         )}
         data-peek-slot={slotOf(i.slug)}
       >
-        <button
-          type="button"
-          aria-haspopup="dialog"
-          aria-describedby={`${id}-how`}
+        {/* Only a handle to drag: Details opens the card. */}
+        <div
           data-ballot-tile={i.slug}
-          {...grab(i.slug)}
+          {...grab(i.slug, false)}
           className={cn(
             TILE,
             "relative flex w-full select-none items-center gap-2 overflow-hidden pl-2 text-left transition-opacity duration-150 [-webkit-touch-callout:none]",
-            quick ? "pr-[76px]" : "pr-3",
-            disabled ? "cursor-pointer" : "cursor-grab hover:bg-white/[.03]",
+            quick ? "pr-[112px] sm:pr-[150px]" : "pr-[44px] sm:pr-[76px]",
+            !disabled && "cursor-grab hover:bg-white/[.03]",
             drag?.slug === i.slug && "opacity-40",
             disabled && "opacity-60",
           )}
         >
           {tileFace(i)}
-        </button>
-        {quick && (
+        </div>
+        {
+          // On the tile's right: Details (its card) and a quick Skip (or Unskip), without
+          // opening the card.
+        }
+        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
           <button
             type="button"
-            aria-label={`${isSkipped ? "Unskip" : "Skip"} ${i.title}`}
+            aria-haspopup="dialog"
+            aria-label={`Details for ${i.title}`}
+            aria-describedby={`${id}-how`}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              place(i.slug, isSkipped ? "unplaced" : "skipped");
+              openPeek(i.slug, e.currentTarget);
             }}
-            className="absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 rounded-md px-2 py-1 text-[12px] text-white/45 hover:bg-white/10 hover:text-white no-underline focus-visible:outline-2 focus-visible:outline-dao-green"
+            className={TILE_ACTION}
           >
-            {isSkipped
-              ? <Eye className="size-3.5" aria-hidden="true" />
-              : <EyeOff className="size-3.5" aria-hidden="true" />}
-            {isSkipped ? "Unskip" : "Skip"}
+            <Maximize2 className="size-3.5" aria-hidden="true" />
+            {/* On a phone, the icon alone: the tile keeps room for its title. */}
+            <span className="max-sm:hidden">Details</span>
           </button>
-        )}
+          {quick && (
+            <button
+              type="button"
+              aria-label={`${isSkipped ? "Unskip" : "Skip"} ${i.title}`}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                place(i.slug, isSkipped ? "unplaced" : "skipped");
+              }}
+              className={TILE_ACTION}
+            >
+              {isSkipped
+                ? <Eye className="size-3.5" aria-hidden="true" />
+                : <EyeOff className="size-3.5" aria-hidden="true" />}
+              {isSkipped ? "Unskip" : "Skip"}
+            </button>
+          )}
+        </div>
       </li>
     );
   };
@@ -702,7 +741,7 @@ export default function TierBallot(
   return (
     <div className={cn(drag && "cursor-grabbing")}>
       <p id={`${id}-how`} className="sr-only">
-        Open an initiative to choose its tier, or drag it onto one. Escape cancels a drag.
+        Open an initiative's details to choose its tier, or drag it onto one. Escape cancels a drag.
       </p>
 
       <div className="grid grid-cols-1 items-start gap-0 sm:grid-cols-2 sm:gap-6">
@@ -715,7 +754,26 @@ export default function TierBallot(
         <StickyAside narrow="(max-width: 639.98px)" className="contents sm:block">
           {head && <div className="order-first mb-4 sm:mb-3">{head}</div>}
           <div className="sticky top-[57px] z-20 -mx-6 mb-4 border-b border-white/10 bg-panel/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:rounded-2xl sm:border sm:bg-white/[.03] sm:p-3 sm:backdrop-blur-none">
-            <div className="space-y-1 sm:space-y-2">
+            {
+              // Its title: on a phone the tiers are a slim bar
+              // pinned under the top bar, with no room for one.
+            }
+            <h3
+              id={`${id}-t`}
+              className="mb-3 hidden min-h-7 items-center gap-2 px-1 sm:flex"
+            >
+              {/* Small capitals, as the ballot box's "Your ballot" label. */}
+              <span className="truncate text-[12px] uppercase tracking-[.08em] text-white/55">
+                Your tier list
+              </span>
+              <span className="text-[12px] text-white/40 tnum">
+                {(() => {
+                  const k = items.filter((i) => isTier(where(i.slug))).length;
+                  return `${k} ${k === 1 ? "initiative" : "initiatives"}`;
+                })()}
+              </span>
+            </h3>
+            <div className="space-y-1 sm:space-y-2" role="group" aria-labelledby={`${id}-t`}>
               {TIER_LABELS.map((t) => {
                 const inHere = items.filter((i) => where(i.slug) === t.tier);
                 const note = missedNote(t.tier);
@@ -776,21 +834,7 @@ export default function TierBallot(
                       )}
                   </div>
                 );
-                // Voters should expect Tier-B may be empty: it funds only what the pool has left.
-                const bNote = t.tier === "B" && (
-                  <p className="px-1 text-[12.5px] text-white/45">
-                    Tier-B is funded only if the pool lasts and enough voters back the same
-                    initiatives. It may fund nothing.
-                  </p>
-                );
-                if (!note) {
-                  return (
-                    <Fragment key={t.tier}>
-                      {row}
-                      {bNote}
-                    </Fragment>
-                  );
-                }
+                if (!note) return <Fragment key={t.tier}>{row}</Fragment>;
                 return (
                   <Fragment key={t.tier}>
                     <Tooltip.Root
@@ -807,7 +851,6 @@ export default function TierBallot(
                         </Tooltip.Positioner>
                       </Tooltip.Portal>
                     </Tooltip.Root>
-                    {bNote}
                   </Fragment>
                 );
               })}
@@ -817,7 +860,8 @@ export default function TierBallot(
                 className={cn(
                   "mt-1.5 flex items-center justify-end gap-2 text-[12px] sm:mt-2 sm:text-[12.5px]",
                   // On a phone the pinned strip stays short: the row only when it can clear.
-                  !(onReplace && (cleared || (placedCount > 0 && !disabled))) && "max-sm:hidden",
+                  !(onReplace && (cleared || ((placedCount > 0 || changed) && !disabled))) &&
+                    "max-sm:hidden",
                 )}
               >
                 {cleared
@@ -840,6 +884,17 @@ export default function TierBallot(
                       <span className="min-w-0 flex-1 truncate px-1 text-white/45">
                         Initiatives in the same tier are ranked equally.
                       </span>
+                      {onReplace && changed && !disabled && (
+                        <button
+                          type="button"
+                          disabled={Boolean(drag)}
+                          onClick={restoreSent}
+                          className="inline-flex flex-none items-center gap-1 rounded-md px-1.5 py-1 text-white/50 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
+                        >
+                          <Undo2 className="size-3.5" aria-hidden="true" />
+                          Restore sent ballot
+                        </button>
+                      )}
                       {onReplace && placedCount > 0 && !disabled && (
                         <button
                           type="button"
@@ -847,7 +902,7 @@ export default function TierBallot(
                           onClick={clearAll}
                           className="inline-flex flex-none items-center gap-1 rounded-md px-1.5 py-1 text-white/50 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
                         >
-                          <RotateCcw className="size-3.5" aria-hidden="true" />
+                          <Eraser className="size-3.5" aria-hidden="true" />
                           Clear ballot
                         </button>
                       )}
@@ -880,11 +935,13 @@ export default function TierBallot(
           >
             <div className="mb-3 flex min-h-7 items-center gap-2 px-1">
               <h3 id={`${id}-u`} className="flex min-w-0 items-center gap-2">
-                <span className="truncate font-inter-tight text-[14px] font-medium text-white">
+                {/* As the tier list's title: small capitals, and a count in words. */}
+                <span className="truncate text-[12px] uppercase tracking-[.08em] text-white/55">
                   {UNRANKED}
                 </span>
-                <span className="text-[12px] text-white/40 tnum">
-                  {filtered || ai ? `${shown.length} of ${unranked.length}` : unranked.length}
+                <span className="whitespace-nowrap text-[12px] text-white/40 tnum">
+                  {filtered || ai ? `${shown.length} of ` : ""}
+                  {unranked.length} {unranked.length === 1 ? "initiative" : "initiatives"}
                 </span>
               </h3>
               <div className="ml-auto shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -936,7 +993,10 @@ export default function TierBallot(
                   className="mx-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] text-white/55 underline-offset-4 hover:bg-white/[.05] hover:text-white hover:underline tnum"
                 >
                   <EyeOff className="size-3.5" aria-hidden="true" />
-                  {showSkipped ? "Hide" : "Show"} {skippedItems.length} skipped
+                  {
+                    // Low-rated: a 1–2★ rating skips an initiative the first time (prefill).
+                  }
+                  {showSkipped ? "Hide" : "Show"} {skippedItems.length} skipped and low-rated
                   <ChevronDown
                     className={cn(
                       "size-3.5 transition-transform motion-reduce:transition-none",

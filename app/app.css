@@ -28,6 +28,8 @@
   --animate-tier-land: tier-land 0.7s ease-out both;
   --animate-grade-bump: grade-bump 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
   --animate-chip-land: chip-land 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  /* Why a ballot can't be sent, pointed at from its disabled Send: a short shake. */
+  --animate-reason-nudge: reason-nudge 0.6s ease-out;
   /* The closed ballot's arrow to the result: the line draws in, then its head shows. */
   --animate-ballot-arrow-draw: ballot-arrow-draw 0.45s ease-out both;
   --animate-ballot-arrow-head: ballot-arrow-head 0.15s ease-out 0.4s both;
@@ -61,6 +63,23 @@
   @keyframes grade-bump {
     40% {
       scale: 1.35;
+    }
+  }
+  @keyframes reason-nudge {
+    0%,
+    100% {
+      translate: 0;
+    }
+    15%,
+    45% {
+      translate: -5px;
+    }
+    30%,
+    60% {
+      translate: 5px;
+    }
+    80% {
+      translate: -2px;
     }
   }
   @keyframes chip-land {

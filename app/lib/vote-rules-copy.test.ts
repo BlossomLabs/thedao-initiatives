@@ -73,7 +73,7 @@ it("the ballot box's line: the first rule to meet, size before tiers, else valid
     text: "Needs at least 3 independent projects in Tier-S",
   });
   expect(ruleStatus([a]).text).toBe("Needs at least 3 independent projects in Tier-A");
-  expect(ruleStatus([])).toEqual({ ok: true, text: "You can keep adding initiatives" });
+  expect(ruleStatus([])).toEqual({ ok: true, text: "You can add as many initiatives as you want" });
 });
 
 it("only affiliation problems get the box under the tiers", () => {

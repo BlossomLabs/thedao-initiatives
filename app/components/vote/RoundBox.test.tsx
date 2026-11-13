@@ -41,6 +41,24 @@ const settlingS = (quiet: boolean): RoundTier => ({
 const later = [waiting("A", T + 48 * H), waiting("B", T + 96 * H)];
 
 describe("RoundBox", () => {
+  it("bare, on the ballot editor: a light green box, the countdown says what it counts to", () => {
+    render(
+      <RoundBox
+        schedule={schedule}
+        rv={view([settlingS(true), ...later])}
+        badge={{ tone: "ok", text: "Your ballot counts." }}
+        bare
+      />,
+    );
+    const box = screen.getByRole("region", { name: "Where the round is" });
+    expect(box).toHaveClass("bg-dao-green/[.09]");
+    expect(within(box).getByRole("heading", { name: "Tier-S is settling" })).toBeInTheDocument();
+    expect(box).toHaveTextContent(/This window ends at \d{2}:\d{2}\s*in (5h 59m|6h 00m)/);
+    expect(within(box).getAllByRole("listitem")).toHaveLength(5);
+    expect(box.querySelectorAll("[data-window]")).toHaveLength(4);
+    expect(within(box).getByRole("status")).toHaveTextContent("Your ballot counts.");
+  });
+
   it("a settling tier: the stepper on it, its countdown, and a bar of its windows", () => {
     render(<RoundBox schedule={schedule} rv={view([settlingS(true), ...later])} />);
     const box = screen.getByRole("region", { name: "Where the round is" });
@@ -56,7 +74,7 @@ describe("RoundBox", () => {
     ]);
     expect([...box.querySelectorAll("[data-window]")].map((b) => b.getAttribute("data-window")))
       .toEqual(["past", "current", "maybe", "maybe"]);
-    expect(box).toHaveTextContent("No change so far: Tier-S settles when this window ends");
+    expect(box).toHaveTextContent(/If nothing changes, Tier-S settles at \d{2}:\d{2}\./);
   });
 
   it("each window has its own popup: its length, times and what it means", async () => {
@@ -97,6 +115,17 @@ describe("RoundBox", () => {
     expect([...box.querySelectorAll("[data-window]")].map((b) => b.getAttribute("data-window")))
       .toEqual(["past", "past", "past", "current"]);
     expect(box).toHaveTextContent(/3h…5m/);
+    // In the block, the window running now (and the one to follow) keep a visible width,
+    // however short: the green mark that moves along the bar.
+    const fills = box.querySelectorAll('[data-window="current"] > span:first-child > span');
+    expect([...fills].map((f) => f.className.includes("min-w-2"))).toEqual([
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
     fireEvent.click(
       screen.getByRole("button", { name: /Tier-S Windows 4–9, now: window 5/ }),
     );

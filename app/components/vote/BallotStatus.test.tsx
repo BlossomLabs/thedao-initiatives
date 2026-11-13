@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import type { BallotPhase } from "~/lib/vote-flow";
@@ -27,16 +27,13 @@ function panel(
       />
     </MemoryRouter>,
   );
-  const steps = () =>
-    within(screen.getByRole("list", { name: "Sending your ballot" })).getAllByRole("listitem")
-      .map((li) => li.textContent);
   const button = (name: string | RegExp) => screen.getByRole("button", { name });
-  return { ...on, steps, button };
+  return { ...on, button };
 }
 
-it("ready: three steps to come, and Send", () => {
+it("ready: no stepper, just Send", () => {
   const p = panel({ kind: "idle" });
-  expect(p.steps()).toEqual(["1Sign", "2Send", "3Review"]);
+  expect(screen.queryByRole("list")).toBeNull();
   fireEvent.click(p.button("Send my ballot"));
   expect(p.onSend).toHaveBeenCalled();
   fireEvent.click(p.button(/send it yourself/i));
@@ -47,26 +44,26 @@ it("each wait keeps the button, disabled, saying what it waits for", () => {
   let p = panel({ kind: "signing" });
   expect(p.button("Waiting for your signature…")).toBeDisabled();
   cleanup();
+  // TheDAO's send is too quick to read: it shows as the wait for the chain, no link yet.
   p = panel({ kind: "relaying" });
-  expect(p.steps()).toEqual(["Signed", "2Send", "3Review"]);
-  expect(p.button("Sending…")).toBeDisabled();
-  expect(screen.getByText("TheDAO is sending it")).toBeInTheDocument();
+  expect(p.button("Waiting for Sepolia…")).toBeDisabled();
+  expect(screen.getByText("Waiting for Sepolia to record it")).toBeInTheDocument();
+  expect(screen.queryByText(/Already sent/)).toBeNull();
   cleanup();
   p = panel({ kind: "relaying" }, { route: "own" });
   expect(screen.getByText("Confirm the transaction in your wallet")).toBeInTheDocument();
   expect(p.button("Waiting for you to confirm…")).toBeDisabled();
   cleanup();
   p = panel({ kind: "waiting", hash: HASH }, { chain: "Ethereum" });
-  expect(p.steps()).toEqual(["Signed", "Sent", "3Review"]);
   expect(p.button("Waiting for Ethereum…")).toBeDisabled();
   expect(screen.getByText(/counts once mined, even if you close this page/)).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /on Etherscan/ }))
     .toHaveAttribute("href", `https://etherscan.io/tx/${HASH}`);
 });
 
-it("counted: all three done, the button says Counted; a changed ballot can be sent again", () => {
+it("counted: the button says Counted; a changed ballot can be sent again", () => {
   let p = panel({ kind: "counted", hash: HASH }, { upToDate: true });
-  expect(p.steps()).toEqual(["Signed", "Sent", "Reviewed"]);
+  expect(screen.getByText("Your ballot counts")).toBeInTheDocument();
   expect(p.button("Counted")).toBeDisabled();
   expect(screen.getByRole("link", { name: "See the live results" })).toHaveAttribute("href", "/");
   cleanup();
@@ -82,15 +79,14 @@ it("a ballot that already counts, on a fresh page, shows as counted (no transact
 
 it("not signed: nothing was sent, Send again", () => {
   const p = panel({ kind: "idle", note: "You didn't sign, so nothing was sent." });
-  expect(p.steps()[0]).toBe("Not signed");
   expect(screen.getByText("Nothing was sent")).toBeInTheDocument();
   expect(p.button("Send my ballot")).toBeEnabled();
 });
 
-it("failures say which step and what next, with the transaction when there is one", () => {
+it("failures say what went wrong and what next, with the transaction when there is one", () => {
   // Mined but refused: × at Review, Retry, and the transaction.
   let p = panel({ kind: "failed", reason: "The transaction failed on-chain.", hash: HASH });
-  expect(p.steps()).toEqual(["Signed", "Sent", "Not counted"]);
+  expect(screen.getByText("Sepolia refused it")).toBeInTheDocument();
   fireEvent.click(p.button("Retry"));
   expect(p.onRetry).toHaveBeenCalled();
   expect(screen.getByRole("link", { name: /Etherscan/ })).toBeInTheDocument();
@@ -98,7 +94,7 @@ it("failures say which step and what next, with the transaction when there is on
 
   // Too slow: it may still land, so Check again (Retry reads the chain first).
   p = panel({ kind: "failed", reason: "It's taking too long to be mined.", hash: HASH });
-  expect(p.steps()[2]).toBe("?Not mined yet");
+  expect(screen.getByText("Sepolia is taking long")).toBeInTheDocument();
   expect(p.button("Check again")).toBeEnabled();
   cleanup();
 

@@ -2,16 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { Tooltip } from "@base-ui/react/tooltip";
-import {
-  ArrowRight,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  Lock,
-  Pencil,
-  X,
-} from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Lock, Pencil, X } from "lucide-react";
 import { LinkButton } from "~/components/ui/Button";
 import { Select, SelectContent, SelectItem } from "~/components/ui/Select";
 import CategoryDot from "~/components/ui/CategoryDot";
@@ -21,12 +12,12 @@ import { cn } from "~/lib/utils";
 import type { BallotItem } from "./TierBallot";
 
 /** A ballot initiative's card: a little about it, where it goes on this ballot (a tier, the
- * list, or skipped) and Details. It opens and closes with the browser's own morph
+ * list, or skipped) and a link to its full page. It opens and closes with the browser's own morph
  * (`peek-morph.ts`): the chip or tile becomes the card, its title and dot travelling into
  * the card's. The page dims behind it; the initiative stays in its place as a dashed outline (TierBallot).
  * Escape, a click outside or the x close it. */
 
-/** A ‹ or › in the card's bottom row, the size of Details beside it. */
+/** A ‹ or › in the card's bottom row, the size of "Open full page" beside it. */
 const STEP =
   "grid size-8 place-items-center rounded-lg border border-white/15 text-white/75 transition-colors hover:border-white/35 hover:bg-white/[.06] hover:text-white focus-visible:outline-2 focus-visible:outline-dao-green disabled:pointer-events-none disabled:opacity-30";
 
@@ -361,9 +352,9 @@ export default function InitiativePeek<W extends string>(
                 to={`/initiative/${item.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`Details for ${item.title} (opens in a new tab)`}
+                aria-label={`Open full page for ${item.title} (opens in a new tab)`}
               >
-                Details <ArrowRight className="size-3.5" aria-hidden="true" />
+                Open full page
               </LinkButton>
             </div>
           </div>

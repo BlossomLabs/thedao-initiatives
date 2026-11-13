@@ -170,7 +170,13 @@ const TAG_ON = (kind: Win["kind"]) =>
 
 /** A settling tier's windows, each sized by its length, with its own popup (hover, focus
  * or tap). Windows 4 and on share one block: alone they'd be slivers. */
-function WindowBar({ phase }: { phase: Extract<Phase, { kind: "settling" }> }) {
+function WindowBar(
+  { phase, titled }: {
+    phase: Extract<Phase, { kind: "settling" }>;
+    /** A small title over the bar (the ballot editor's round box). */
+    titled?: boolean;
+  },
+) {
   const [open, setOpen] = useState<number>();
   const bar = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -196,6 +202,12 @@ function WindowBar({ phase }: { phase: Extract<Phase, { kind: "settling" }> }) {
   };
   return (
     <div ref={bar} data-window-bar="">
+      {titled && (
+        // Small capitals, as the ballot box's "Your ballot" label.
+        <p className="m-0 mb-1 text-[12px] uppercase tracking-[.08em] text-white/55">
+          {tierName(phase.tier)}’s settling windows
+        </p>
+      )}
       <div className="flex gap-1">
         {segs.map((seg, j) => {
           const { title, tag, note } = segText(phase, seg);
@@ -233,7 +245,14 @@ function WindowBar({ phase }: { phase: Extract<Phase, { kind: "settling" }> }) {
                   {ws.map((w, k) => (
                     <span
                       key={k}
-                      className={cn("block h-full min-w-px", FILL[w.kind])}
+                      className={cn(
+                        "block h-full min-w-px",
+                        FILL[w.kind],
+                        // The last windows are minutes long: too thin to see in proportion.
+                        // The one running now (or about to) keeps a visible width, so a green
+                        // mark advances along the bar from window to window.
+                        (w.kind === "current" || w.kind === "coming") && "min-w-2",
+                      )}
                       style={{ flex: `${w.to - w.from} 1 0` }}
                     />
                   ))}
@@ -404,7 +423,7 @@ function Stepper({ steps, at, large }: { steps: Step[]; at: number; large?: bool
 }
 
 export default function RoundBox(
-  { schedule, rv, badge, mine, large, stepsOnly }: {
+  { schedule, rv, badge, mine, large, stepsOnly, bare }: {
     schedule: Schedule;
     rv?: RoundView;
     /** On the ballot: what this badge can still do. */
@@ -416,6 +435,9 @@ export default function RoundBox(
     /** The "your ballot" page: a title (where the round is, with its countdown) over the
      * stepper and what this badge can still do, without the tier settling now. */
     stepsOnly?: boolean;
+    /** On the ballot editor: a light green box, apart from the cards around it. A heading,
+     * the stepper, what the current step means, then this badge. */
+    bare?: boolean;
   },
 ) {
   const now = Math.floor(useNow(30_000) / 1000);
@@ -427,6 +449,8 @@ export default function RoundBox(
   });
   let title: React.ReactNode;
   let to: number | undefined;
+  // What the countdown counts down to, said beside it on the ballot editor.
+  let toWhat = "";
   let when: React.ReactNode = null;
   let status: React.ReactNode = null;
   switch (phase.kind) {
@@ -437,6 +461,7 @@ export default function RoundBox(
         </>
       );
       to = phase.opensAt;
+      toWhat = "Opens";
       when = (
         <>
           Tier-S starts settling <When at={phase.sStarts} />.
@@ -446,6 +471,7 @@ export default function RoundBox(
     case "open":
       title = "Voting is open";
       to = phase.sStarts;
+      toWhat = "Tier-S starts settling";
       when = (
         <>
           Tier-S starts settling <When at={phase.sStarts} />.
@@ -458,11 +484,12 @@ export default function RoundBox(
       const name = tierName(phase.tier);
       title = `${name} is settling`;
       to = phase.endsAt;
+      toWhat = phase.last ? `${name} settles` : "This window ends";
       const ends = <When at={phase.endsAt} withDay={false} />;
       status = phase.last
         ? <>The last window: {name} settles at {ends} whatever happens.</>
         : phase.quiet
-        ? <>No change so far: {name} settles when this window ends, at {ends}.</>
+        ? <>If nothing changes, {name} settles at {ends}.</>
         : <>{name} changed in this window: a shorter window follows at {ends}.</>;
       break;
     }
@@ -471,6 +498,7 @@ export default function RoundBox(
         phase.funded.length === 1 ? "initiative" : "initiatives"
       }, ${usdShort(phase.fundedUsd)}`;
       to = phase.nextStarts;
+      toWhat = `${tierName(phase.next)} starts settling`;
       when = (
         <>
           {tierName(phase.next)} starts settling <When at={phase.nextStarts} />.
@@ -512,16 +540,26 @@ export default function RoundBox(
     </p>
   );
   const titleRow = (
-    <div className="flex items-baseline justify-between gap-3">
+    // On a narrow screen the chip goes under the title rather than squeeze it.
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2">
       <h2 className="m-0 font-inter-tight text-[16px] font-semibold tracking-[-.01em] text-white">
         {title}
       </h2>
-      {to !== undefined && (
-        <Countdown
-          to={to}
-          className="flex-none rounded-full border border-white/20 px-2.5 py-0.5 text-[12px] text-white/80 tnum"
-        />
-      )}
+      {to !== undefined && (stepsOnly
+        ? (
+          // Alone over the stepper, the chip says what it counts to, as the editor's does.
+          <span className="flex-none rounded-full border border-white/20 px-2.5 py-0.5 text-[12px] text-white/70 tnum">
+            {toWhat} {phase.kind === "settling" && "at "}
+            <When at={to} withDay={phase.kind !== "settling"} />
+            <Countdown to={to} className="ml-1.5 font-semibold text-white tnum" />
+          </span>
+        )
+        : (
+          <Countdown
+            to={to}
+            className="flex-none rounded-full border border-white/20 px-2.5 py-0.5 text-[12px] text-white/80 tnum"
+          />
+        ))}
     </div>
   );
   const nowBox = () => (
@@ -532,6 +570,56 @@ export default function RoundBox(
       {status && <p className="m-0 text-[13.5px] leading-snug text-white/65">{status}</p>}
     </div>
   );
+  if (bare) {
+    return (
+      <section
+        aria-label="Where the round is"
+        className="space-y-4 rounded-xl border border-dao-green/35 bg-dao-green/[.09] p-4 text-left"
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h2 className="m-0 font-inter-tight text-[19px] font-bold tracking-[-.02em] text-white">
+            {title}
+          </h2>
+          {to !== undefined && (
+            <span className="text-[13px] text-white/70 tnum">
+              {
+                // A time alone takes "at" ("This window ends at 14:30"); a day doesn't.
+              }
+              {toWhat} {phase.kind === "settling" && "at "}
+              <When at={to} withDay={phase.kind !== "settling"} />
+              <Countdown to={to} className="ml-2 font-semibold text-white tnum" />
+            </span>
+          )}
+        </div>
+        <Stepper steps={steps} at={at} />
+        {
+          // The countdown line already says when the next step comes; only before the vote
+          // opens is there a second date to give (Tier-S's).
+        }
+        {(phase.kind === "before" || status || phase.kind === "settling") && (
+          <div className="space-y-2">
+            {phase.kind === "before" && (
+              <p className="m-0 text-[13.5px] text-white/75 tnum">{when}</p>
+            )}
+            {phase.kind === "settling" && <WindowBar phase={phase} titled />}
+            {status && <p className="m-0 text-[13.5px] leading-snug text-white/65">{status}</p>}
+          </div>
+        )}
+        {badge && tone && (
+          <p
+            role="status"
+            className={cn(
+              "m-0 flex w-fit max-w-full items-start gap-2.5 rounded-xl px-3 py-2 text-[13.5px] leading-snug",
+              tone.box,
+            )}
+          >
+            <span className={cn("mt-[6px] size-[7px] flex-none rounded-full", tone.dot)} />
+            <span>{badge.text}</span>
+          </p>
+        )}
+      </section>
+    );
+  }
   return (
     <section aria-label="Where the round is" className={BOX}>
       {stepsOnly && <div className="border-b border-white/10 px-4 pb-3 pt-3.5">{titleRow}</div>}

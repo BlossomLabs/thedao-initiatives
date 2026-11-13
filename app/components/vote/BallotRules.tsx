@@ -3,6 +3,7 @@ export default function BallotRules({ messages }: { messages: string[] }) {
   return (
     <section
       aria-label="Ballot rules"
+      data-ballot-reason=""
       className="rounded-xl border border-amber-300/40 bg-amber-300/[.08] p-4"
     >
       <p className="font-inter-tight text-[14px] font-semibold text-white">

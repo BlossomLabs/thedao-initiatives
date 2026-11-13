@@ -115,6 +115,9 @@ export type RoundView = {
     /** While S-Tier is open: how far ahead each of its initiatives is, micro-USD
      * (only leads of at least $1K). */
     lead?: Record<string, string>;
+    /** The donation that gets each initiative into the tier settling now (its gap; who
+     * comes into or drops out of that tier), for those not in it; absent once closed. */
+    give?: Record<string, NextTierEntry>;
   };
   /** Once closed: each initiative's gap to the tier above where it finished, judged at
    * that tier's settlement (comesIn/dropsOut name only the target tier), and S-Tier's

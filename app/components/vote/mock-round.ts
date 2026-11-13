@@ -243,20 +243,29 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     const first = FIRST;
     const { round, ask } = fictionalRound(cards, OPENS, first);
     const { ballot, s, a, b } = sampleBallot(round);
+    const sTier = [
+      { slug: s[0], award: ask(s[0]), paid: share * 0.28 },
+      { slug: s[1], award: ask(s[1]), paid: share * 0.14 },
+      // On this badge's ballot in B-Tier; other ballots funded it in S-Tier.
+      { slug: b[0], award: ask(b[0]), paid: 0 },
+    ];
+    const aTier = [
+      { slug: a[0], award: ask(a[0]), paid: share * 0.2 },
+      { slug: a[2], award: ask(a[2]), paid: share * 0.1 },
+    ];
+    // Not on this badge's ballot: the other ballots fund it in B-Tier, if it settled now.
+    // The cheapest one left that the pool still pays for.
+    const left = POOL_USD - [...sTier, ...aTier].reduce((x, f) => x + f.award, 0) - ask(b[1]);
+    const theirs = round.slugs
+      .filter((x) => !ballot[x] && ask(x) <= left)
+      .sort((x, y) => ask(x) - ask(y))[0];
+    const liveB = theirs ? [b[1], theirs] : [b[1]];
     const view: RoundView = {
       ...base,
       registrationClosesAt: first[0] + WINDOW,
       tiers: [
-        settled("S", first[0] + WINDOW, [
-          { slug: s[0], award: ask(s[0]), paid: share * 0.28 },
-          { slug: s[1], award: ask(s[1]), paid: share * 0.14 },
-          // On this badge's ballot in B-Tier; other ballots funded it in S-Tier.
-          { slug: b[0], award: ask(b[0]), paid: 0 },
-        ], n),
-        settled("A", first[1] + WINDOW, [
-          { slug: a[0], award: ask(a[0]), paid: share * 0.2 },
-          { slug: a[2], award: ask(a[2]), paid: share * 0.1 },
-        ], n),
+        settled("S", first[0] + WINDOW, sTier, n),
+        settled("A", first[1] + WINDOW, aTier, n),
         {
           tier: "B",
           status: "settling",
@@ -264,14 +273,14 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
           windowEndsAt: first[2] + WINDOW,
           latestEndAt: first[2] + LONGEST,
           quiet: true,
-          funded: [b[1]],
+          funded: liveB,
         },
       ],
       accepted: { [String(n)]: bytesToHex(encodeBallot(round.slugs, ballot)) },
       live: {
-        funded: [b[1]],
-        awards: { [b[1]]: micro(ask(b[1])) },
-        tiers: { [b[1]]: "B" },
+        funded: liveB,
+        awards: Object.fromEntries(liveB.map((x) => [x, micro(ask(x))])),
+        tiers: Object.fromEntries(liveB.map((x) => [x, "B" as const])),
         paid: livePaid(n, [[b[1], share * 0.1]]),
       },
     };
@@ -395,4 +404,82 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     },
   };
   return { round: { ...round, closesAt: first[2] + WINDOW }, view, sent: ballot };
+}
+
+/** Examples of the vote results, public at `/vote/results/<id>`: the round at each moment
+ * the ballot's examples show (a variant, prefilled or never voted, shows the same round).
+ * `s-settled` is the first name of `spent`'s, kept so links to it still work. */
+export const RESULT_MOCKS = {
+  started: "started",
+  "s-settling": "s-settling",
+  "s-extended": "s-extended",
+  "s-last": "s-last",
+  spent: "spent",
+  "s-settled": "spent",
+  "b-settling": "b-settling",
+  finished: "finished",
+} as const satisfies Record<string, MockKind>;
+export type ResultMockId = keyof typeof RESULT_MOCKS;
+export const isResultMockId = (s: string | undefined): s is ResultMockId =>
+  Object.hasOwn(RESULT_MOCKS, s ?? "");
+
+/** The moments of the round the examples show, in order, each in a step of the round
+ * (0 Voting, 1 S-Tier, 2 A-Tier, 3 B-Tier, 4 Result), and the ballot's variants at it. */
+export const MOMENTS: { kind: MockKind; step: number; variants?: MockKind[] }[] = [
+  { kind: "started", step: 0, variants: ["prefilled"] },
+  { kind: "s-settling", step: 1 },
+  { kind: "s-extended", step: 1 },
+  { kind: "s-last", step: 1 },
+  { kind: "spent", step: 2, variants: ["missed"] },
+  { kind: "b-settling", step: 3 },
+  { kind: "finished", step: 4 },
+];
+/** The moment a ballot example shows: a variant's is the one it varies. */
+export const momentOf = (k: MockKind): MockKind =>
+  MOMENTS.find((m) => m.kind === k || m.variants?.includes(k))?.kind ?? k;
+
+/** `view` as the results page shows it: every voter's ballot counted, and made-up donation
+ * figures (`live.give`): for each initiative neither settled
+ * nor in the tier settling now, a donation that would bring it in, in $1K steps, smaller
+ * than what it needs; those needing more than $150K are out of reach. Some knock one of
+ * the tier's live winners out, so the preview has something to show. */
+export function withGive(view: RoundView, round: VoteManifest, cards: Card[]): RoundView {
+  const settling = view.tiers.find((t) => t.status !== "settled")?.tier ?? "S";
+  const done = new Set(view.tiers.flatMap((t) => (t.status === "settled" ? t.funded : [])));
+  const inTier = Object.entries(view.live.tiers ?? {})
+    .filter(([, t]) => t === settling)
+    .map(([slug]) => slug);
+  const bySlug = new Map(cards.map((c) => [c.initiative.slug, c]));
+  const give: NonNullable<RoundView["live"]["give"]> = {};
+  round.slugs.forEach((slug, i) => {
+    if (done.has(slug) || inTier.includes(slug)) return;
+    const c = bySlug.get(slug);
+    if (!c) return;
+    const need = Math.max(0, c.initiative.goalUsd - c.summary.total);
+    const far = need > 150_000;
+    // Each tier its own figures: later tiers have less of the pool left, so they cost more.
+    const shift = ["S", "A", "B"].indexOf(settling) * 11;
+    const k = Math.min(Math.floor(need / 1000), 3 + shift + ((i * 7 + shift) % 29));
+    give[slug] = {
+      tier: settling,
+      gap: far || k < 1 ? null : micro(k * 1000),
+      comesIn: [],
+      dropsOut: !far && i % 4 === 2 && inTier.length
+        ? [{ slug: inTier[inTier.length - 1], tier: settling }]
+        : [],
+      moves: [],
+    };
+  });
+  // Once ballots count, the example's 40 voters have all sent one (only badge 1's is
+  // known: the rest count too). Before, none has.
+  const sent = Object.values(view.accepted)[0];
+  const accepted = sent
+    ? Object.fromEntries(
+      Array.from(
+        { length: VOTERS },
+        (_, i) => [String(i + 1), view.accepted[String(i + 1)] ?? sent],
+      ),
+    )
+    : view.accepted;
+  return { ...view, accepted, live: { ...view.live, give } };
 }

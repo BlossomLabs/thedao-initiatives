@@ -12,6 +12,7 @@ import type { VoteRound } from "../services/vote-chain.ts";
 import { type BoardCache, createBoardCache, readBoard } from "./board.ts";
 import {
   finalWhatIfsAsync,
+  giftGapsAsync,
   liveLeadsAsync,
   type NextTier,
   nextTiersAsync,
@@ -179,7 +180,7 @@ const inputsParts = (inp: ChainInputs) => [
 /** The what-if search's own version, part of every cache digest: when the way gaps, leads or
  * final figures are computed changes, bump it, and figures cached under the old code are
  * computed again instead of being served. */
-export const WHAT_IFS_VERSION = 2;
+export const WHAT_IFS_VERSION = 3;
 
 async function digest(parts: unknown[]) {
   const text = JSON.stringify(
@@ -223,6 +224,8 @@ type KnownNext = {
   at: number;
   next: NextJson;
   lead?: Record<string, string>;
+  /** The donation that gets each initiative into the tier settling now. */
+  give?: NextJson;
 };
 type FinalJson = { next: NextJson; lead: Record<string, string> };
 /** A closed round's final what-ifs, with the digest of what they were judged from. */
@@ -420,7 +423,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
   let lastNext: (KnownNext & { contract: string }) | null = null;
   let searching = false;
   const nextKey = (d: VoteRound) => [...round(d), "next"];
-  type Ahead = Pick<KnownNext, "next" | "lead">;
+  type Ahead = Pick<KnownNext, "next" | "lead" | "give">;
   /** The newest search known (this isolate's or the stored one) for the open tier
    * `firstOpen`, whichever inputs it ran on; none once no tier is open. */
   const knownNext = async (d: VoteRound, firstOpen: number | null, stored?: KnownNext | null) => {
@@ -462,12 +465,20 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
             deps.log(`vote lead: ${e instanceof Error ? e.message : e}`);
           }
         }
+        // The donations to the tier settling now; a failed search still keeps the gaps.
+        let give: NextJson | undefined;
+        try {
+          give = nextJson(await giftGapsAsync(liveInputs, firstOpen), slugs);
+        } catch (e) {
+          deps.log(`vote give: ${e instanceof Error ? e.message : e}`);
+        }
         const known: KnownNext = {
           key,
           firstOpen,
           at: deps.now(),
           next,
           ...(lead ? { lead } : {}),
+          ...(give ? { give } : {}),
         };
         lastNext = { ...known, contract };
         await cacheSet(deps.db.kv, nextKey(d), known, undefined, deps.log);
@@ -819,6 +830,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
         ...body.live,
         ...(ahead ? { next: ahead.next } : {}),
         ...(ahead?.lead ? { lead: ahead.lead } : {}),
+        ...(ahead?.give ? { give: ahead.give } : {}),
       },
       ...(final ? { final } : {}),
     });

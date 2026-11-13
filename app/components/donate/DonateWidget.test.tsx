@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, expect, it, vi } from "vitest";
-import DonateWidget from "./DonateWidget";
+import DonateWidget, { EXAMPLE_NOTE } from "./DonateWidget";
 
 const mock = vi.hoisted(() => ({
   recordAcceptance: vi.fn(),
@@ -83,4 +83,48 @@ it("keeps the address hidden after a recording failure and sends optional detail
   expect(mock.recordAcceptance).toHaveBeenCalledWith("exchange", { name: "Donor" });
   expect(screen.queryByText(SAFE)).toBeNull();
   expect(mock.setStatus).toHaveBeenCalledWith({ kind: "err", text: "Offline." });
+});
+
+it("starts from a suggested amount, first among the chips, and reports the amount", () => {
+  const onAmount = vi.fn();
+  render(
+    <MemoryRouter>
+      <DonateWidget
+        initiativeId="id"
+        slug="test"
+        safeAddress={SAFE}
+        suggested={{ usd: 8412, note: "gets it into S-Tier" }}
+        onAmount={onAmount}
+        accent="red"
+      />
+    </MemoryRouter>,
+  );
+  // No wallet in the test browser: the exchange tab leads.
+  fireEvent.click(screen.getByText("Wallet"));
+  expect(screen.getByLabelText("Amount in US dollars")).toHaveValue("8412");
+  const chip = screen.getByRole("button", { name: "$8,412, gets it into S-Tier" });
+  // Red, like the vote results' red numbers and buttons.
+  expect(chip.className).toContain("bg-dao-red");
+  expect(screen.queryByRole("button", { name: "$50" })).toBeNull();
+  expect(onAmount).toHaveBeenLastCalledWith(8412);
+  fireEvent.click(screen.getByRole("button", { name: "$500" }));
+  expect(onAmount).toHaveBeenLastCalledWith(500);
+});
+
+it("on an example page, Donate and the address only say nothing is donated", () => {
+  render(
+    <MemoryRouter>
+      <DonateWidget initiativeId="id" slug="test" safeAddress={SAFE} example />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole("checkbox"));
+  // The exchange tab leads without a wallet: its button records nothing.
+  fireEvent.click(screen.getByRole("button", { name: "Show donation address" }));
+  expect(mock.recordAcceptance).not.toHaveBeenCalled();
+  expect(mock.setStatus).toHaveBeenLastCalledWith({ kind: "wait", text: EXAMPLE_NOTE });
+  expect(screen.queryByText(SAFE)).toBeNull();
+  mock.setStatus.mockClear();
+  fireEvent.click(screen.getByText("Wallet"));
+  fireEvent.click(screen.getByRole("button", { name: "Donate" }));
+  expect(mock.setStatus).toHaveBeenLastCalledWith({ kind: "wait", text: EXAMPLE_NOTE });
 });

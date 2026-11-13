@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import FinalTiers from "./FinalTiers";
 import VoteClosed from "./VoteClosed";
 
@@ -183,4 +183,28 @@ it("hovering or tapping a winner on the ballot draws its arrow to the result, an
   const result = screen.getByRole("group", { name: "TheDAO's result" });
   expect(within(result).getByLabelText(/^GAMMA/)).not.toHaveAttribute("tabindex");
   spy.mockRestore();
+});
+
+describe("a donation's preview", () => {
+  it("marks what comes in with the donation and strikes what drops out", () => {
+    render(
+      <FinalTiers
+        label="TheDAO's ballot"
+        items={[{ slug: "a", title: "Alpha" }, { slug: "b", title: "Beta" }]}
+        tiers={{ a: "S", b: "S" }}
+        funded={new Set(["b"])}
+        amounts={new Map([["b", 40_000]])}
+        amountWord="awarded"
+        provisional={new Set(["b"])}
+        joining={new Map([["a", 8412]])}
+        leaving={new Set(["b"])}
+      />,
+    );
+    expect(screen.getByLabelText("Alpha, comes in with your $8,412")).toHaveTextContent(
+      "+$8,412 yours",
+    );
+    expect(screen.getByLabelText("Beta, drops out")).toBeInTheDocument();
+    // What drops out no longer counts in its tier's amount: only its own chip says it.
+    expect(screen.getAllByText("$40,000")).toHaveLength(1);
+  });
 });

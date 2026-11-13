@@ -255,10 +255,20 @@ export function ballotSegments(
 }
 
 /** TheDAO's ring during the vote: gold what the settled tiers awarded, green what the live
- * tally would add if the vote ended now, then what's left of the pool. */
+ * tally would add if the vote ended now, then (green) what a previewed donation would
+ * bring in, then what's left of the pool. */
 export function poolSegments(
-  { settledUsd, liveUsd, pool }: { settledUsd: number; liveUsd: number; pool: number },
+  { settledUsd, liveUsd, previewUsd = 0, pool, liveTone = "green" }: {
+    settledUsd: number;
+    liveUsd: number;
+    /** What the pool would pay for what comes in with a previewed donation. */
+    previewUsd?: number;
+    pool: number;
+    /** The open tiers' share: green, or neutral (the vote results). */
+    liveTone?: "green" | "neutral";
+  },
 ): Segment[] {
+  const neutral = liveTone === "neutral";
   const f = (usd: number) => (pool > 0 ? usd / pool : 0);
   return fit([
     {
@@ -275,20 +285,31 @@ export function poolSegments(
       key: "live",
       from: f(settledUsd),
       to: f(settledUsd + liveUsd),
-      className: "stroke-dao-green",
-      swatch: "bg-dao-green",
+      className: neutral ? "stroke-white/55" : "stroke-dao-green",
+      swatch: neutral ? "bg-white/55" : "bg-dao-green",
       title: "If it ended now",
       amount: liveUsd,
       text: "What the open tiers would award if they settled now. It can still change.",
     },
     {
-      key: "rest",
+      key: "preview",
       from: f(settledUsd + liveUsd),
+      to: f(settledUsd + liveUsd + previewUsd),
+      className: "stroke-dao-green",
+      swatch: "bg-dao-green",
+      title: "With your donation",
+      amount: previewUsd,
+      text:
+        "What the pool would pay for what comes in with your donation, if its tier settled now.",
+    },
+    {
+      key: "rest",
+      from: f(settledUsd + liveUsd + previewUsd),
       to: 1,
       className: "",
       swatch: "border-2 border-white/30",
       title: "Not allocated",
-      amount: Math.max(0, pool - settledUsd - liveUsd),
+      amount: Math.max(0, pool - settledUsd - liveUsd - previewUsd),
       text: `What's left of the ${dollars(pool)} pool.`,
     },
   ]);

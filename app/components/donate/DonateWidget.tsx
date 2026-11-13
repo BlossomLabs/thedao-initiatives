@@ -24,6 +24,8 @@ import Reveal from "~/components/ui/Reveal";
 import { WALLETCONNECT_PROJECT_ID } from "~/lib/wallet-env";
 
 const CHIPS = ["50", "500", "5000", "50000"];
+/** What the buttons say on an example page, where nothing is donated. */
+export const EXAMPLE_NOTE = "An example page: nothing is donated from it.";
 type Method = "wallet" | "exchange";
 
 /** The donate widget: chips, $ amount, token, wallet / exchange tabs. */
@@ -32,12 +34,29 @@ export default function DonateWidget({
   slug,
   safeAddress,
   onConfirmed,
+  suggested,
+  onAmount,
+  example,
+  accent = "green",
 }: {
   initiativeId: string;
   slug: string;
   safeAddress: string;
   onConfirmed?: (r: DonateResult) => void;
+  /** An amount to start from, in whole dollars: the first chip, picked already (the vote
+   * results: what gets the initiative into the tier settling now). `note` says what it
+   * does, for screen readers. */
+  suggested?: { usd: number; note: string };
+  /** The amount as it changes, in dollars (0 when blank or not a number). */
+  onAmount?: (usd: number) => void;
+  /** An example page (the vote results' examples): the form works as usual, but Donate and
+   * Show donation address only say nothing is donated. */
+  example?: boolean;
+  /** The picked amount and the focused field: green, or red like the page's red numbers
+   * and its buttons (the vote results). */
+  accent?: "green" | "red";
 }) {
+  const red = accent === "red";
   const { data: params } = useDonateParams();
   const { address, connector } = useWallet();
   const wallet = useWalletStore();
@@ -64,6 +83,7 @@ export default function DonateWidget({
   }, [initiativeId, safeAddress]);
   const revealAddress = async () => {
     if (!accepted || recordingRef.current) return;
+    if (example) return d.setStatus({ kind: "wait", text: EXAMPLE_NOTE });
     recordingRef.current = true;
     setRecording(true);
     try {
@@ -81,7 +101,19 @@ export default function DonateWidget({
       setRecording(false);
     }
   };
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(suggested ? String(suggested.usd) : "");
+  // Another initiative or another suggestion: start from its amount again.
+  useEffect(() => {
+    if (suggested) setAmount(String(suggested.usd));
+  }, [suggested?.usd, initiativeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const onAmountRef = useRef(onAmount);
+  onAmountRef.current = onAmount;
+  useEffect(() => onAmountRef.current?.(parseUsd(amount)), [amount]);
+  /** The suggestion first, then the usual amounts after the smallest. */
+  const chips = suggested
+    ? [String(suggested.usd), ...CHIPS.slice(1).filter((c) => c !== String(suggested.usd))]
+      .slice(0, CHIPS.length)
+    : CHIPS;
   const [symbol, setSymbol] = useState("");
   const [method, setMethod] = useState<Method>("wallet");
   const [balances, setBalances] = useState<Record<string, number | null>>({});
@@ -166,14 +198,21 @@ export default function DonateWidget({
         <div className="flex flex-col gap-2.5 pb-2.5">
           {/* The four amounts share one row, in equal columns. */}
           <div className="grid grid-cols-4 gap-1.5">
-            {CHIPS.map((c) => (
+            {chips.map((c) => (
               <button
                 key={c}
                 type="button"
+                aria-label={suggested && c === String(suggested.usd)
+                  ? `$${Number(c).toLocaleString("en-US")}, ${suggested.note}`
+                  : undefined}
                 className={cn(
                   "cursor-pointer whitespace-nowrap rounded-full border px-1 py-2 text-center font-inter-tight text-[13px] transition-all duration-150 max-[760px]:py-[11px]",
                   amount === c
-                    ? "border-dao-green bg-dao-green font-medium text-white"
+                    ? red
+                      ? "border-dao-red bg-dao-red font-medium text-white"
+                      : "border-dao-green bg-dao-green font-medium text-white"
+                    : red
+                    ? "border-edge2 bg-white/5 text-soft hover:border-dao-red/60 hover:text-[#ff8a88]"
                     : "border-edge2 bg-white/5 text-soft hover:border-[rgba(92,183,90,.6)] hover:text-dao-green",
                 )}
                 onClick={() => setAmount(c)}
@@ -183,7 +222,12 @@ export default function DonateWidget({
             ))}
           </div>
           <div className="flex gap-2">
-            <label className="flex min-w-0 flex-1 items-center gap-0.5 rounded-xl border border-edge2 bg-card pl-3.5 focus-within:border-[rgba(92,183,90,.6)]">
+            <label
+              className={cn(
+                "flex min-w-0 flex-1 items-center gap-0.5 rounded-xl border border-edge2 bg-card pl-3.5",
+                red ? "focus-within:border-dao-red/60" : "focus-within:border-[rgba(92,183,90,.6)]",
+              )}
+            >
               <span className="flex-none font-inter-tight text-[14px] font-light text-muted">
                 $
               </span>
@@ -269,9 +313,9 @@ export default function DonateWidget({
           <Button
             variant="primary"
             onClick={async () => {
-              if (gated()) {
-                if (await d.donate(symbol, amount, balances)) setAccepted(false);
-              }
+              if (!gated()) return;
+              if (example) return d.setStatus({ kind: "wait", text: EXAMPLE_NOTE });
+              if (await d.donate(symbol, amount, balances)) setAccepted(false);
             }}
             disabled={Boolean(d.busy) || !accepted}
           >

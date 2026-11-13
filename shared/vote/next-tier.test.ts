@@ -6,6 +6,8 @@ import {
   finalWhatIfs,
   finalWhatIfsAsync,
   gapTo,
+  giftGaps,
+  giftGapsAsync,
   leadIn,
   liveLeads,
   liveLeadsAsync,
@@ -391,5 +393,68 @@ describe("the final what-ifs", () => {
   it("the async variant gives the same result", async () => {
     const { at, finalTier } = round();
     expect(await finalWhatIfsAsync(at, finalTier, 4)).toEqual(finalWhatIfs(at, finalTier, 4));
+  });
+});
+
+/** Tier index of `c` in tier `first` alone when `k` steps are given to it, as giftGaps
+ * runs it. */
+function tierGiven(inp: ChainInputs, c: number, k: bigint, first = 0): number | undefined {
+  const costs = [...inp.costs];
+  costs[c] = costs[c] > k * K ? costs[c] - k * K : 0n;
+  const run = chainTally({ ...inp, costs }, first, first + 1);
+  return run[0].order.includes(c) ? first : undefined;
+}
+
+describe("the donation to the tier settling now", () => {
+  it("is the least $1K step that funds it in that tier", () => {
+    // The voter's $40K can't pay initiative 0's $70K in S-Tier: $30K donated can.
+    const inp = knockOn();
+    const got = giftGaps(inp, 0).get(0)!;
+    expect(got.tier).toBe("S");
+    expect(got.gap).toBe(30n * K);
+    expect(tierGiven(inp, 0, 30n)).toBe(0);
+    expect(tierGiven(inp, 0, 29n)).toBeUndefined();
+  });
+
+  it("rounds up to the next $1K", () => {
+    const inp = inputs([70.4, 40], [40], [[1, 2]]);
+    expect(giftGaps(inp, 0).get(0)!.gap).toBe(31n * K);
+  });
+
+  it("targets the tier settling now, not the one above", () => {
+    // S-Tier settled with initiative 0; A-Tier settles now.
+    const inp = inputs([30, 50, 60], [40], [[1, 2, 2]], 100, [0]);
+    const gifts = giftGaps({ ...inp, spent: 30n * K, weights: [10n * K] }, 1);
+    expect(gifts.has(0)).toBe(false);
+    for (const g of gifts.values()) expect(g.tier).toBe("A");
+  });
+
+  it("has no entry for what the tier already funds", () => {
+    // Initiative 1 ($40K) is funded in S-Tier by the voter.
+    const inp = inputs([70, 40], [40], [[2, 1]]);
+    expect(giftGaps(inp, 0).has(1)).toBe(false);
+  });
+
+  it("is null when even its whole need doesn't get it into the tier", () => {
+    // Nobody ranks initiative 1 at all, so it isn't counted whatever it costs.
+    const inp = inputs([30, 40], [40], [[1, 0]]);
+    const got = giftGaps(inp, 0).get(1);
+    if (got) expect(got.gap === null || tierGiven(inp, 1, got.gap / K) === 0).toBe(true);
+  });
+
+  it("names who drops out of the tier when it comes in", () => {
+    // Two at $40K in S-Tier with $50K between two voters: one is funded, the other waits.
+    const inp = inputs([40, 40], [25, 25], [[1, 1], [1, 1]], 50);
+    const gifts = giftGaps(inp, 0);
+    for (const [c, g] of gifts) {
+      if (g.gap === null) continue;
+      expect(tierGiven(inp, c, g.gap / K)).toBe(0);
+      for (const [o] of g.dropsOut) expect(o).not.toBe(c);
+    }
+  });
+
+  it("gives the same answer async", async () => {
+    const inp = knockOn();
+    expect(await giftGapsAsync(inp, 0)).toEqual(giftGaps(inp, 0));
   });
 });

@@ -1,10 +1,10 @@
 import { hexToBytes } from "viem";
 import type { Card } from "~/lib/api-types";
 import { prefillFromRatings } from "~/lib/vote-prefill";
-import { encodeBallot } from "../../../shared/vote/ballot";
+import { decodeBallot, encodeBallot } from "../../../shared/vote/ballot";
 import { rulesRound } from "../../../shared/vote/manifest";
 import { checkBallot } from "../../../shared/vote/rules";
-import { MOCK_NOW, mockRound, MOCKS } from "./mock-round";
+import { MOCK_NOW, mockRound, MOCKS, RESULT_MOCKS, withGive } from "./mock-round";
 
 const NOW = 1_800_000_000;
 const cards = Array.from({ length: 30 }, (_, i) => ({
@@ -95,4 +95,45 @@ describe("dev mocks", () => {
     );
     expect(total).toBeLessThanOrEqual(1_000_000);
   });
+});
+
+describe("example vote results", () => {
+  // Every open moment (the finished vote has no tier settling).
+  it.each(Object.entries(RESULT_MOCKS).filter(([, k]) => k !== "finished"))(
+    "%s: figures to the tier settling now, for what is neither settled nor in it",
+    (_, kind) => {
+      const { round, view } = mockRound(kind, cards, 1);
+      const live = withGive(view, round, cards).live;
+      const settling = view.tiers.find((t) => t.status !== "settled")!.tier;
+      const settled = new Set(view.tiers.flatMap((t) => (t.status === "settled" ? t.funded : [])));
+      const entries = Object.entries(live.give!);
+      expect(entries.length).toBeGreaterThan(0);
+      for (const [slug, g] of entries) {
+        expect(g.tier).toBe(settling);
+        expect(settled.has(slug)).toBe(false);
+        expect(view.live.tiers?.[slug]).not.toBe(settling);
+        // A figure in $1K steps, never more than what it needs.
+        if (g.gap !== null) {
+          const usd = Number(BigInt(g.gap) / 1_000_000n);
+          expect(usd % 1000).toBe(0);
+          const c = cards.find((x) => x.initiative.slug === slug)!;
+          expect(usd).toBeLessThanOrEqual(c.initiative.goalUsd - c.summary.total);
+        }
+      }
+    },
+  );
+});
+
+it("b-settling: TheDAO's ballot funds one this badge didn't put on its ballot", () => {
+  const m = mockRound("b-settling", cards, 1);
+  const mine = decodeBallot(hexToBytes(m.view.accepted["1"] as `0x${string}`), m.round.slugs);
+  const theirs = m.view.live.funded.filter((slug) => !mine[slug]);
+  expect(theirs).toHaveLength(1);
+  expect(m.view.live.tiers?.[theirs[0]]).toBe("B");
+  // Within the pool, with what the settled tiers took.
+  const total = [
+    ...m.view.tiers.flatMap((t) => (t.status === "settled" ? Object.values(t.awards) : [])),
+    ...Object.values(m.view.live.awards),
+  ].reduce((a, v) => a + BigInt(v), 0n);
+  expect(total).toBeLessThanOrEqual(BigInt(m.round.poolUsd));
 });

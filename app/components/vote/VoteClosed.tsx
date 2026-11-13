@@ -5,7 +5,8 @@ import { Button, LinkButton, SMALL_BUTTON } from "~/components/ui/Button";
 import { Link } from "react-router";
 import { cn } from "~/lib/utils";
 import FinalTiers, { AvatarRing, CardHeader, dollars } from "~/components/vote/FinalTiers";
-import { ballotSegments, poolSegments, SegmentRing } from "~/components/vote/BallotMeter";
+import { ballotSegments, SegmentRing } from "~/components/vote/BallotMeter";
+import DaoBallot, { daoResult } from "~/components/vote/DaoBallot";
 import type { BallotItem } from "~/components/vote/TierBallot";
 import { useVoteBallots } from "~/hooks/use-vote";
 import { errorMessage } from "~/lib/api";
@@ -125,10 +126,8 @@ export default function VoteClosed(
   const tally = live?.tally;
   /** The result table's name, for its card, its table and the arrows between them. */
   const resultLabel = live ? "The live result" : "TheDAO's result";
-  const funded = new Set([
-    ...(settled?.flatMap((t) => t.funded) ?? []),
-    ...Object.keys(tally?.awards ?? {}),
-  ]);
+  const result = daoResult(settled, tally);
+  const { funded, provisional } = result;
   // An arrow between a winner on this ballot and the same initiative in the result, while
   // either chip is hovered or focused, or after a tap (until a tap elsewhere). It points
   // away from the chip picked: ballot → result, or result → ballot.
@@ -166,41 +165,6 @@ export default function VoteClosed(
   }
 
   const all = items ?? round.slugs.map((slug) => ({ slug, title: titles.get(slug) ?? slug }));
-  // The vote's result as the same table: each tier with what it funded and each award.
-  // During the vote, the live result: the settled tiers and the live tally together.
-  const awards = new Map([
-    ...(settled?.flatMap((t) => Object.entries(t.awards)) ?? []),
-    ...Object.entries(tally?.awards ?? {}),
-  ]);
-  const awarded = [...awards.values()].reduce((a, b) => a + b, 0);
-  const resultTiers: Partial<Record<string, Tier>> = {
-    ...Object.fromEntries(Object.entries(tally?.tiers ?? {})),
-    ...Object.fromEntries(settled?.flatMap((t) => t.funded.map((slug) => [slug, t.tier])) ?? []),
-  };
-  // What only the live tally funds (open tiers, if they settled now): green in both
-  // tables, where what a settled tier funded is gold.
-  const settledFunded = new Set(settled?.flatMap((t) => t.funded) ?? []);
-  const provisional = new Set(
-    Object.keys(tally?.awards ?? {}).filter((slug) => !settledFunded.has(slug)),
-  );
-  const sumAwards = (which: (slug: string) => boolean) =>
-    [...awards].reduce((a, [slug, v]) => a + (which(slug) ? v : 0), 0);
-  // Always beside the ballot, even before anything would be funded.
-  const result = (
-    <FinalTiers
-      label={resultLabel}
-      items={all}
-      tiers={resultTiers}
-      funded={funded}
-      amounts={awards}
-      amountWord="awarded"
-      provisional={provisional}
-      mirrored
-      {...link("result")}
-      // Gold only for what this badge also ranked.
-      highlight={new Set(Object.keys(sent ?? {}))}
-    />
-  );
 
   // Each card's header: an avatar in a ring of what went to what was funded.
   const allocated = [...(paid ?? new Map<string, number>()).values()].reduce((a, b) => a + b, 0);
@@ -268,41 +232,16 @@ export default function VoteClosed(
       )}
     />
   );
-  const daoLogo = (
-    <img src="/dao-logo.svg" alt="TheDAO" width={48} height={48} className="scale-[1.15]" />
-  );
-  const resultHeader = (
-    <CardHeader
-      avatar={live && poolUsd
-        ? (
-          // During the vote: gold what the settled tiers awarded, green what the live
-          // tally would add, as the chips below; each with its popup.
-          <SegmentRing
-            segments={poolSegments({
-              settledUsd: sumAwards((slug) => !provisional.has(slug)),
-              liveUsd: sumAwards((slug) => provisional.has(slug)),
-              pool: poolUsd,
-            })}
-            label="What TheDAO allocated of the pool"
-            max={poolUsd}
-            now={Math.min(awarded, poolUsd)}
-            valueText={`${dollars(awarded)} of ${dollars(poolUsd)}.`}
-          >
-            {daoLogo}
-          </SegmentRing>
-        )
-        : (
-          <AvatarRing
-            frac={poolUsd ? awarded / poolUsd : 0}
-            label="What TheDAO allocated of the pool"
-          >
-            {daoLogo}
-          </AvatarRing>
-        )}
-      title={resultLabel}
-      line={`${dollars(awarded)}${poolUsd ? ` of the ${dollars(poolUsd)} pool` : ""}${
-        live ? " if it ended now" : ""
-      } · ${funded.size} ${funded.size === 1 ? "initiative" : "initiatives"}`}
+  // The vote's result as the same table: each tier with what it funded and each award.
+  // During the vote, the live result: the settled tiers and the live tally together.
+  // Always beside the ballot, even before anything would be funded.
+  const resultCard = (
+    <DaoBallot
+      items={all}
+      result={result}
+      poolUsd={poolUsd}
+      live={Boolean(live)}
+      label={resultLabel}
       action={
         // The tables are the result already; the board shows each initiative with its
         // funding bar and its page.
@@ -316,6 +255,11 @@ export default function VoteClosed(
           </Link>
 
       }
+      table={{
+        ...link("result"),
+        // Gold only for what this badge also ranked.
+        highlight: new Set(Object.keys(sent ?? {})),
+      }}
     />
   );
 
@@ -383,8 +327,7 @@ export default function VoteClosed(
           {ballot}
         </div>
         <div className="card row-span-4 grid min-w-0 grid-cols-1 grid-rows-subgrid gap-y-2 text-[15px] leading-relaxed text-white/80">
-          {resultHeader}
-          {result}
+          {resultCard}
         </div>
         <BallotArrows
           root={tables}

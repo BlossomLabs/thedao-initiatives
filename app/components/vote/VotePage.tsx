@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { bytesToHex, type Hex } from "viem";
 import PageMain from "~/components/layout/PageMain";
@@ -15,12 +15,12 @@ import { AddressAvatar, Avatar } from "~/components/wallet/Avatar";
 import { avatarSrc } from "~/lib/avatar";
 import {
   isMockKind,
-  MOCK_LABELS,
   MOCK_NOW,
   type MockKind,
   mockRound,
   MOCKS,
 } from "~/components/vote/mock-round";
+import MockNav from "./MockNav";
 import VoteClosed from "~/components/vote/VoteClosed";
 import { ArrowUpRight } from "lucide-react";
 import { useSession } from "~/context/session";
@@ -1068,35 +1068,8 @@ export default function VotePage(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toEditor]);
 
-  // On an example: the others, in the order they happen in the vote. Each opens on its
-  // editor, but for the badge that never voted and the finished vote, which have none.
-  // B-Tier settling is there twice: its editor, then its "your ballot" page.
-  const mockLinks = MOCKS.flatMap((k) => {
-    const view = { k, edit: false, label: MOCK_LABELS[k] };
-    if (k === "missed" || k === "finished") return [view];
-    const edit = { ...view, edit: true };
-    return k === "b-settling" ? [edit, { ...view, label: `${view.label}, your ballot` }] : [edit];
-  });
-  const mockNav = mock && (
-    <nav
-      aria-label="Example ballots"
-      className="mx-auto mb-2 flex max-w-[760px] flex-wrap justify-center gap-1.5 text-[12.5px]"
-    >
-      {mockLinks.map(({ k, edit, label }) => (
-        <Link
-          key={`${k}${edit ? "/edit" : ""}`}
-          to={`/vote/mock/${k}${edit ? "/edit" : ""}`}
-          replace
-          aria-current={mockKind === k && (k !== "b-settling" || edit === editing)
-            ? "page"
-            : undefined}
-          className="rounded-full border border-white/15 px-2.5 py-1 text-white/60 hover:text-white aria-[current=page]:border-dao-green/60 aria-[current=page]:text-white"
-        >
-          {label}
-        </Link>
-      ))}
-    </nav>
-  );
+  // On an example: links to the others (the ballot's and the vote results').
+  const mockNav = mock && <MockNav className="mb-2" />;
 
   return (
     <PageMain narrow={!wide} className="pt-8">

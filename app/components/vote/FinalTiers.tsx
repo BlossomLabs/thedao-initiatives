@@ -27,6 +27,9 @@ export default function FinalTiers(
     active,
     onHover,
     onTap,
+    joining,
+    leaving,
+    liveTone = "green",
   }: {
     items: BallotItem[];
     /** slug → tier: the ballot that counted, or the tier that funded it. */
@@ -63,6 +66,13 @@ export default function FinalTiers(
     onTap?: (slug: string) => void;
     /** Names the table for screen readers: "Your ballot", "TheDAO's result". */
     label: string;
+    /** A donation's preview (the vote results): what comes into a tier with it, with the
+     * dollars given (dashed red, "+$X yours"), and what drops out (struck through). */
+    joining?: ReadonlyMap<string, number>;
+    leaving?: ReadonlySet<string>;
+    /** How a `provisional` chip looks: green (a ballot's own page), or neutral (the vote
+     * results, where green is kept for a donation's preview). */
+    liveTone?: "green" | "neutral";
   },
 ) {
   return (
@@ -78,7 +88,10 @@ export default function FinalTiers(
     >
       {TIER_LABELS.map((t) => {
         const inHere = items.filter((i) => tiers[i.slug] === t.tier);
-        const tierPaid = inHere.reduce((a, i) => a + (amounts.get(i.slug) ?? 0), 0);
+        const tierPaid = inHere.reduce(
+          (a, i) => a + (leaving?.has(i.slug) ? 0 : amounts.get(i.slug) ?? 0),
+          0,
+        );
         // An open tier's amount is the live tally's, not settled: green.
         const tierLive = inHere.some((i) => provisional?.has(i.slug));
         return (
@@ -101,7 +114,9 @@ export default function FinalTiers(
                 <span
                   className={cn(
                     "text-[11px] font-semibold leading-none tnum",
-                    tierLive ? "text-[#a7e3a5]" : "text-vote",
+                    tierLive
+                      ? liveTone === "neutral" ? "text-white/70" : "text-[#a7e3a5]"
+                      : "text-vote",
                   )}
                 >
                   {dollars(tierPaid)}
@@ -121,11 +136,17 @@ export default function FinalTiers(
                     const lit = isFunded && (!highlight || highlight.has(i.slug));
                     const live = Boolean(provisional?.has(i.slug));
                     const gold = lit && !live;
-                    const green = lit && live;
+                    const green = lit && live && liveTone === "green";
                     const youPaid = amounts.get(i.slug) ?? (showZero && lit ? 0 : undefined);
                     const cat = i.card?.initiative.categories[0];
                     const fundedWord = live ? "funded if it ended now" : "funded";
-                    const label = isFunded
+                    const given = joining?.get(i.slug);
+                    const gone = Boolean(leaving?.has(i.slug));
+                    const label = given !== undefined
+                      ? `${i.title}, comes in with your ${dollars(given)}`
+                      : gone
+                      ? `${i.title}, drops out`
+                      : isFunded
                       ? youPaid !== undefined
                         ? `${i.title}, ${fundedWord}: ${live ? liveAmountWord : amountWord} ${
                           dollars(youPaid)
@@ -159,7 +180,11 @@ export default function FinalTiers(
                           active === i.slug && (live
                             ? "shadow-[0_0_0_2px_rgba(92,183,90,.6)]"
                             : "shadow-[0_0_0_2px_rgba(233,185,73,.6)]"),
-                          gold
+                          given !== undefined
+                            ? "border-dashed border-dao-green bg-dao-green/[.14]"
+                            : gone
+                            ? "border-dashed border-white/30 bg-transparent opacity-45"
+                            : gold
                             ? "border-vote/50 bg-vote/[.12]"
                             : green
                             ? "border-dao-green/50 bg-dao-green/[.12]"
@@ -174,10 +199,21 @@ export default function FinalTiers(
                             aria-hidden="true"
                           />
                         )}
-                        <span className="min-w-0 truncate text-[12.5px] leading-none text-white/85">
+                        <span
+                          className={cn(
+                            "min-w-0 truncate text-[12.5px] leading-none text-white/85",
+                            gone && "line-through",
+                          )}
+                        >
                           {i.title}
                         </span>
-                        {youPaid !== undefined
+                        {given !== undefined
+                          ? (
+                            <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-[#a7e3a5] tnum">
+                              +{dollars(given)} yours
+                            </span>
+                          )
+                          : youPaid !== undefined
                           ? (
                             <span
                               className={cn(

@@ -131,74 +131,6 @@ function roundOf(
   };
 }
 
-it("says what is going on and what the vote would fund right now", async () => {
-  vi.mocked(api).mockResolvedValue(
-    roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] }),
-  );
-  render(
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter>
-        <VoteResults />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-  expect(await screen.findByText(/Test vote/i)).toBeInTheDocument();
-  expect(await screen.findByText(/would be funded by 1 ballot/)).toBeInTheDocument();
-  // Where the round is: the stepper box in the header, without a badge's line.
-  const box = await screen.findByRole("region", { name: "Where the round is" });
-  expect(within(box).getByRole("heading", { name: "Voting is open" })).toBeInTheDocument();
-  expect(within(box).queryByRole("status")).toBeNull();
-  expect(await screen.findByText("Alpha fuzzing")).toBeInTheDocument();
-  // The front page's board: its search box, only the round's initiatives, gold shares.
-  expect(screen.getByRole("searchbox")).toBeInTheDocument();
-  expect(screen.queryByText("Gamma outside")).toBeNull();
-  // The list's title is the vote's, not the board's.
-  expect(screen.getByText("If the vote ended now")).toBeInTheDocument();
-  expect(screen.queryByText("Security initiatives looking for funding")).toBeNull();
-  // Nothing has settled: it is all "if it settled now".
-  await waitFor(() => expect(document.querySelector("[data-vote-pending]")).not.toBeNull());
-});
-
-it.each(["/vote", "/vote?view=cards"])(
-  "orders the funded group by result tier in %s",
-  async (url) => {
-    vi.mocked(api).mockResolvedValue(
-      roundOf({ "1": ballot({ alpha: "A", beta: "S" }) }, {
-        beta: [30_000, "S"],
-        alpha: [50_000, "A"],
-      }),
-    );
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={[url]}>
-          <VoteResults />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-    // The result chips, not the round box's stepper (which names every tier too).
-    const board = (els: HTMLElement[]) =>
-      els.filter((e) => !e.closest('[aria-label="Where the round is"]'));
-    const chip = (name: string) =>
-      waitFor(() => {
-        const found = board(screen.getAllByText(name))[0];
-        expect(found).toBeDefined();
-        return found;
-      });
-    const s = await chip("S-Tier");
-    const a = await chip("A-Tier");
-    const funded = (element: HTMLElement) => element.closest("li, [data-initiative-id]")!;
-    expect(within(funded(s) as HTMLElement).getByText("Beta audits")).toBeInTheDocument();
-    expect(within(funded(a) as HTMLElement).getByText("Alpha fuzzing")).toBeInTheDocument();
-    // List rows have separate desktop and mobile status slots.
-    const rows = [...new Set(board(screen.getAllByText(/^[SAB]-Tier$/)).map(funded))];
-    expect(
-      rows.map((row) => within(row as HTMLElement).getAllByText(/^[SAB]-Tier$/)[0].textContent),
-    )
-      .toEqual(["S-Tier", "A-Tier"]);
-    expect(board(screen.queryAllByText("B-Tier"))).toEqual([]);
-  },
-);
-
 it("an RPC hiccup keeps the last result", async () => {
   const qc = new QueryClient();
   vi.mocked(api).mockResolvedValue(
@@ -259,50 +191,6 @@ it("links a signed-in badge holder to their ballot, even without the code in thi
   signedIn.badge = null;
 });
 
-it("S settled is solid gold; A settling is lighter, with its window and B's start", async () => {
-  vi.mocked(api).mockResolvedValue(
-    roundOf({ "1": ballot({ alpha: "A", beta: "S" }) }, { alpha: [50_000, "A"] }, {
-      tiers: [
-        {
-          tier: "S",
-          status: "settled",
-          at: 1,
-          forced: false,
-          funded: ["beta"],
-          awards: { beta: usdMicro(30_000) },
-        },
-        {
-          tier: "A",
-          status: "settling",
-          window: 2,
-          windowEndsAt: 4_000_000_000,
-          latestEndAt: 4_000_000_100,
-          quiet: false,
-          funded: ["alpha"],
-        },
-        waiting("B"),
-      ],
-    }),
-  );
-  render(
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter>
-        <VoteResults />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-  // The round box: S-Tier done with what it funded, A-Tier settling with its windows.
-  const box = await screen.findByRole("region", { name: "Where the round is" });
-  expect(within(box).getByRole("heading", { name: "A-Tier is settling" })).toBeInTheDocument();
-  expect(box).toHaveTextContent("1 funded · $30k");
-  expect([...box.querySelectorAll("[data-window]")].map((w) => w.getAttribute("data-window")))
-    .toEqual(["past", "current", "coming"]);
-  const row = (title: string) => screen.getAllByText(title)[0].closest("li, [data-initiative-id]")!;
-  expect(row("Beta audits").querySelector("[data-vote-fill]")).not.toBeNull();
-  expect(row("Alpha fuzzing").querySelector("[data-vote-pending]")).not.toBeNull();
-  expect(screen.getByText("if it settled now")).toBeInTheDocument();
-});
-
 const settled = (tier: string, funded: string[], awards: Record<string, string>) => ({
   tier,
   status: "settled",
@@ -334,6 +222,8 @@ async function showClosed(over: Record<string, unknown> = {}, url = "/") {
   await screen.findByText((_, el) =>
     el?.tagName === "P" && /pool spent/.test(el.textContent ?? "")
   );
+  // The board's list mounts with the closed round: wait for its cards.
+  await screen.findAllByText("Beta audits");
 }
 /** The hero line: its words are split by the coloured "pool". */
 const hero = (re: RegExp) =>
@@ -448,88 +338,6 @@ function plainFigures(el: HTMLElement) {
   expect(el.querySelector(".cursor-help, .underline, .decoration-dotted")).toBeNull();
 }
 
-it.each(["/", "/?view=cards"])("an open round shows each initiative's gap in %s", async (url) => {
-  const view = roundOf({ "1": ballot({ alpha: "A" }) }, { alpha: [50_000, "A"] });
-  vi.mocked(api).mockResolvedValue({
-    ...view,
-    live: { ...view.live, next: { alpha: gap(), beta: gap({ gap: null, tier: "B" }) } },
-  });
-  render(
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={[url]}>
-        <VoteResults />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-  await screen.findAllByText("Alpha fuzzing");
-  const alpha = rowOf("Alpha fuzzing");
-  // Alpha raised $10k of $60k and is $41.2k from S-Tier (the figure rounds it up to $42k,
-  // the tick does not): the tick at 51.2/60.
-  await waitFor(() => expect(tickAt(alpha)).toBeCloseTo((51_200 / 60_000) * 100, 5));
-  const callout = hover(alpha);
-  expect(callout).toHaveTextContent("$42k to S-Tier");
-  expect(callout).toHaveTextContent("Comes in: Beta audits (A-Tier)");
-  // Out of reach: no tick, the callout at the bar's end.
-  const beta = rowOf("Beta audits");
-  expect(tickAt(beta)).toBeNull();
-  const reach = hover(beta);
-  expect(reach).toHaveTextContent("Out of reach for B-Tier");
-  expect(reach.style.right).toBe("calc(0% - 14px)");
-  plainFigures(document.body);
-});
-
-it("the open vote's list has no Funded column; its tier sits after the title", async () => {
-  const view = roundOf({ "1": ballot({ alpha: "A" }) }, { alpha: [50_000, "A"] });
-  vi.mocked(api).mockResolvedValue({ ...view, live: { ...view.live, next: { alpha: gap() } } });
-  render(
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter>
-        <VoteResults />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-  await screen.findAllByText("Alpha fuzzing");
-  expect(screen.queryByText("Funded")).toBeNull();
-  expect(screen.getAllByText("Backers").length).toBeGreaterThan(0);
-  expect(within(rowOf("Alpha fuzzing")).getAllByText("A-Tier").length).toBeGreaterThan(0);
-});
-
-it("a funded card keeps its tier next to the gap", async () => {
-  const view = roundOf({ "1": ballot({ alpha: "A" }) }, { alpha: [50_000, "A"] });
-  vi.mocked(api).mockResolvedValue({
-    ...view,
-    live: { ...view.live, next: { alpha: gap(), beta: gap({ tier: "B" }) } },
-  });
-  render(
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={["/?view=cards"]}>
-        <VoteResults />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-  await screen.findAllByText("Alpha fuzzing");
-  // The figure stays in the amount row, plain: the value big, the words small.
-  const alpha = await waitFor(() => {
-    const el = rowOf("Alpha fuzzing");
-    expect(el.querySelector("[data-what-if-figure]")).toHaveTextContent("$42k to S-Tier");
-    return el;
-  });
-  expect(within(alpha).getByText("A-Tier")).toBeInTheDocument();
-  // Beta isn't funded: the gap alone.
-  const beta = rowOf("Beta audits");
-  const figure = beta.querySelector("[data-what-if-figure]")!;
-  expect(figure).toHaveTextContent("$42k to B-Tier");
-  // The gap names its tier too ("to B-Tier"); no chip outside it.
-  expect(
-    within(beta).queryAllByText(/^[SAB]-Tier$/).filter((e) => !figure.contains(e)),
-  ).toEqual([]);
-  // Its details are in the bar's callout, on hover.
-  const details = hover(beta);
-  expect(details).toHaveTextContent("$42k to B-Tier");
-  expect(details).toHaveTextContent("Comes in: Beta audits (A-Tier)");
-  plainFigures(document.body);
-});
-
 it("a result card funded from $0 shows its final amount in green", async () => {
   await showClosed({
     tiers: [
@@ -608,30 +416,6 @@ it.each(["/", "/?view=cards"])(
   },
 );
 
-it("an open round shows S-Tier leads", async () => {
-  const view = roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] });
-  vi.mocked(api).mockResolvedValue({
-    ...view,
-    live: { ...view.live, lead: { alpha: "12000000000" } },
-  });
-  render(
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={["/?view=cards"]}>
-        <VoteResults />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  );
-  await screen.findAllByText("Alpha fuzzing");
-  const card = await waitFor(() => {
-    const el = rowOf("Alpha fuzzing");
-    expect(el.querySelector("[data-what-if-figure]")).toHaveTextContent("$12k ahead");
-    return el;
-  });
-  // Beside its tier chip.
-  expect(within(card).getByText("S-Tier")).toBeInTheDocument();
-  plainFigures(document.body);
-});
-
 async function showOpen(round: Record<string, unknown>) {
   vi.mocked(api).mockResolvedValue(round);
   render(
@@ -668,4 +452,153 @@ it("the hero says when B-Tier funds nothing yet", async () => {
 it("no warning while B-Tier funds something", async () => {
   await showOpen(roundOf({ "1": ballot({ alpha: "B" }) }, { alpha: [50_000, "B"] }));
   expect(screen.queryByText(/B-Tier: nothing funded yet/)).toBeNull();
+});
+
+/** The donation that brings an initiative into the tier settling now, as the server sends it. */
+const give = (over: Record<string, unknown> = {}) => ({
+  tier: "S",
+  gap: "9000000000",
+  comesIn: [],
+  dropsOut: [],
+  moves: [],
+  ...over,
+});
+/** An open round with `give` figures. */
+function openWith(
+  figures: Record<string, unknown> | undefined,
+  live: Record<string, [number, "S" | "A" | "B"]> = { alpha: [50_000, "S"] },
+  over: Record<string, unknown> = {},
+) {
+  const view = roundOf({ "1": ballot({ alpha: "S" }) }, live, over);
+  return { ...view, live: { ...view.live, ...(figures ? { give: figures } : {}) } };
+}
+const daoBallot = () => screen.getByRole("group", { name: /^TheDAO's ballot/ });
+/** The list of what it takes to get in (the box above it names the closest ones too). */
+const list = () => within(screen.getByRole("region", { name: /^What it takes to get into/ }));
+
+it("while open: TheDAO's ballot beside what it takes to get into the tier settling now", async () => {
+  await showOpen(openWith({ beta: give() }));
+  expect(await screen.findByText(/would be funded by 1 ballot/)).toBeInTheDocument();
+  // Where the round is: the stepper box in the header.
+  const box = await screen.findByRole("region", { name: "Where the round is" });
+  expect(within(box).getByRole("heading", { name: "Voting is open" })).toBeInTheDocument();
+  // TheDAO's ballot: Alpha in S-Tier, if it settled now: neutral, not green (green is a
+  // donation's preview here).
+  const alpha = within(daoBallot()).getByLabelText(/^Alpha fuzzing, funded if it ended now/);
+  expect(alpha).not.toHaveAttribute("data-live");
+  expect(alpha.className).not.toContain("dao-green");
+  // The call to action: Beta needs $9k donated to come into S-Tier.
+  expect(screen.getByRole("heading", { name: "What it takes to get into S-Tier" }))
+    .toBeInTheDocument();
+  const row = list().getByRole("button", { name: /Beta audits/ });
+  expect(row).toHaveTextContent("−$9k");
+  expect(row).toHaveTextContent("to S-Tier");
+  expect(row).toHaveTextContent("not in TheDAO's ballot");
+  // Only the round's initiatives.
+  expect(screen.queryByText("Gamma outside")).toBeNull();
+});
+
+it("opening an initiative previews its donation on TheDAO's ballot", async () => {
+  await showOpen(openWith({ beta: give({ dropsOut: [{ slug: "alpha", tier: "S" }] }) }));
+  const ring = () => screen.getByRole("meter", { name: "What TheDAO allocated of the pool" });
+  expect(ring().querySelector(".stroke-dao-green")).toBeNull();
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  const ballotNow = daoBallot();
+  const joining = within(ballotNow).getByLabelText("Beta audits, comes in with your $9,000");
+  expect(joining).toHaveTextContent("+$9,000 yours");
+  // TheDAO's ring shows it too: a green stretch.
+  expect(ring().querySelector(".stroke-dao-green")).not.toBeNull();
+  // Dashed green: what your money brings in.
+  expect(joining.className).toContain("border-dashed");
+  expect(joining.className).toContain("border-dao-green");
+  expect(within(ballotNow).getByLabelText("Alpha fuzzing, drops out")).toBeInTheDocument();
+  expect(screen.getByRole("group", { name: "TheDAO's ballot, with your donation" }))
+    .toBeInTheDocument();
+  // The sentence, with the names set apart from the words in italics: green the one your
+  // money brings in.
+  const said = screen.getAllByText((_, el) =>
+    el?.tagName === "P" &&
+    /With your \$9,000, the initiative Beta audits comes into S-Tier\. Drops out: Alpha fuzzing\./
+      .test(
+        el.textContent ?? "",
+      )
+  );
+  expect(said.length).toBeGreaterThan(0);
+  expect(within(said[0]).getByText("Beta audits")).toHaveClass("text-[#a7e3a5]");
+  expect(within(said[0]).getByText("Beta audits").tagName).toBe("I");
+  expect(within(said[0]).getByText("Alpha fuzzing").tagName).toBe("I");
+  // Clearing the preview closes it.
+  fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+  expect(screen.queryByLabelText("Beta audits, comes in with your $9,000")).toBeNull();
+});
+
+it("once S-Tier settles, the figures are to A-Tier and S-Tier's chips are gold", async () => {
+  await showOpen(openWith({ alpha: give({ tier: "A", gap: "4000000000" }) }, {}, {
+    tiers: [
+      settled("S", ["beta"], { beta: usdMicro(30_000) }),
+      {
+        tier: "A",
+        status: "settling",
+        window: 1,
+        windowEndsAt: 4_000_000_000,
+        latestEndAt: 4_000_000_100,
+        quiet: true,
+        funded: [],
+      },
+      waiting("B"),
+    ],
+  }));
+  expect(await screen.findByRole("heading", { name: "What it takes to get into A-Tier" }))
+    .toBeInTheDocument();
+  expect(list().getByRole("button", { name: /Alpha fuzzing/ })).toHaveTextContent("−$4k");
+  const beta = within(daoBallot()).getByLabelText(/^Beta audits, funded/);
+  expect(beta).toHaveAttribute("data-gold", "true");
+});
+
+it("what no donation alone brings in is counted at the end, shown on demand", async () => {
+  await showOpen(openWith({ beta: give({ gap: null }) }));
+  const more = await screen.findByRole("button", { name: "+ 1 more out of reach for S-Tier" });
+  expect(list().queryByRole("button", { name: /Beta audits/ })).toBeNull();
+  fireEvent.click(more);
+  expect(list().getByRole("button", { name: /Beta audits/ })).toHaveTextContent(
+    "Out of reach for S-Tier",
+  );
+});
+
+it("says so while the figures are worked out", async () => {
+  await showOpen(openWith(undefined));
+  expect(await screen.findByText("Working out what each initiative needs…")).toBeInTheDocument();
+});
+
+it("the ballot editor's search box filters the list", async () => {
+  await showOpen(openWith({ alpha: give({ gap: "2000000000" }), beta: give() }, {}));
+  expect(await list().findByRole("button", { name: /Alpha fuzzing/ })).toBeInTheDocument();
+  expect(screen.getByText("Not in S-Tier yet")).toBeInTheDocument();
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "beta" } });
+  // The box filters a moment after typing.
+  await waitFor(() => expect(list().queryByRole("button", { name: /Alpha fuzzing/ })).toBeNull());
+  expect(screen.getByText(/^1 of 2 initiatives/)).toBeInTheDocument();
+  expect(list().getByRole("button", { name: /Beta audits/ })).toBeInTheDocument();
+});
+
+it("beside the round box: the three closest to the tier settling now", async () => {
+  // Four initiatives in the round: three close, one out of reach.
+  await showOpen(openWith({
+    alpha: give({ gap: "12000000000" }),
+    beta: give({ gap: "3000000000" }),
+  }, {}));
+  const box = await screen.findByRole("region", { name: "Closest to S-Tier" });
+  const picks = within(box).getAllByRole("button");
+  // Closest first, each with what it misses.
+  expect(picks.map((b) => b.textContent)).toEqual(["Beta audits−$3k", "Alpha fuzzing−$12k"]);
+  expect(box).toHaveTextContent("1 initiative is within $10k of S-Tier.");
+  expect(within(box).getByRole("link", { name: "See all 2 ↓" })).toHaveAttribute(
+    "href",
+    "#give-heading",
+  );
+  // Picking one opens it in the list, with its preview on TheDAO's ballot.
+  fireEvent.click(picks[0]);
+  expect(list().getByRole("button", { name: /Beta audits/, expanded: true })).toBeInTheDocument();
+  expect(within(daoBallot()).getByLabelText("Beta audits, comes in with your $3,000"))
+    .toBeInTheDocument();
 });

@@ -763,6 +763,28 @@ Deno.test("round next: who it knocks out is named by slug", async () => {
   h.close();
 });
 
+Deno.test("the round lists the donation that gets each initiative into the tier settling now", async () => {
+  // As above: b is funded in A-Tier, c (S-Tier on both ballots) costs far more than the pool.
+  const { h, state } = await setup({ ...qe, poolUsd: "100000000000" });
+  const huge = 1n << 60n;
+  h.deps.vote!.needs = () => Promise.resolve([70_000_000_000n, 40_000_000_000n, huge]);
+  const backsB = bytesToHex(encodeBallot(qe.slugs, { c: "S", b: "B" })).slice(2);
+  state.logs = [logOf("1", backsB, NOW - 100, 1), logOf("2", backsB, NOW - 90, 2)];
+  await h.req("/api/vote/round");
+  await h.settle();
+  type Give = { tier: string; gap: string | null };
+  const body = await j(await h.req("/api/vote/round")) as { live: { give: Record<string, Give> } };
+  const give = body.live.give;
+  // S-Tier settles first: every figure is to S-Tier.
+  for (const g of Object.values(give)) assertEquals(g.tier, "S");
+  // Given all but what the two ballots hold ($100K), c is funded in S-Tier.
+  const step = 1_000_000_000n;
+  const want = ((huge - 100_000_000_000n + step - 1n) / step) * step;
+  assertEquals(give.c.gap, want.toString());
+  await h.settle();
+  h.close();
+});
+
 Deno.test("round next: the same tally inputs are searched once", async () => {
   const { h, state } = await setup({ ...qe, poolUsd: "6000000000" });
   h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 3_000_000_000n]);

@@ -13,6 +13,8 @@ export default [
   // One route each, so going between them keeps the page (and an example's send).
   route("vote/ballot/edit?", "routes/vote.ballot.tsx"),
   route("vote/mock/:id/edit?", "routes/vote.mock.tsx"),
+  // Examples of the vote results at three moments of the vote.
+  route("vote/results/:id", "routes/vote.results.tsx"),
   route("vote/:code/edit?", "routes/vote.code.tsx"),
   route("devcon/:code", "routes/code-redirect.tsx"),
   route("vote", "routes/vote.tsx"),

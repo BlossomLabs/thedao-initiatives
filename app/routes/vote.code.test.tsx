@@ -790,9 +790,11 @@ it("a ballot that counts opens on the page that shows it; Edit goes back to the 
     }),
   )
     .toBeInTheDocument();
-  // TheDAO's ring too: all green, nothing settled yet.
+  // TheDAO's ring too: all live, nothing settled yet. Neutral, not green: green on this
+  // page is the badge's own vote.
   const dao = screen.getByRole("meter", { name: "What TheDAO allocated of the pool" });
-  expect(dao.querySelector("circle.stroke-dao-green")).not.toBeNull();
+  expect(dao.querySelector("circle.stroke-white\\/55")).not.toBeNull();
+  expect(dao.querySelector("circle.stroke-dao-green")).toBeNull();
   expect(dao.querySelector("circle.stroke-vote")).toBeNull();
   // Its parts say what they are, as the editor's ring does: a tap opens one.
   // (jsdom lays nothing out: the ring's centre is at 0, 0; a tap just right of the top.)

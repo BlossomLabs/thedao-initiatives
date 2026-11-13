@@ -2,7 +2,8 @@
  * and who would come in or drop out if it were. The tally is re-run with a made-up
  * voter ("phantom") who backs only that initiative. Also how far ahead an S-Tier
  * initiative is, and the same figures judged at each settlement once the round has
- * closed. Pure; browser and Deno. */
+ * closed. And the donation that would get each initiative into the tier settling now.
+ * Pure; browser and Deno. */
 import { type Tier, TIERS } from "./ballot.ts";
 import { type ChainInputs, chainTally } from "./chain.ts";
 import { cumulativeDeductions, stageBound } from "./stage.ts";
@@ -118,6 +119,76 @@ function* gapSearch(
     }
   }
   return entry;
+}
+
+/** `inp` with `c`'s need lowered by `given`: a donation (or pledge) pays that much of it,
+ * so the pool is asked for less. */
+function withGift(inp: ChainInputs, c: number, given: bigint): ChainInputs {
+  const costs = [...inp.costs];
+  costs[c] = costs[c] > given ? costs[c] - given : 0n;
+  return { ...inp, costs };
+}
+
+/** The donation search for one initiative: the least $1K step that, given to it, gets it
+ * funded in tier `first` (the tier settling now), judged on that tier alone. Its whole
+ * need is the most anyone can give it; when even that doesn't get it there, the gap is
+ * null. The knock-on lists who comes into or drops out of that tier. */
+function* giftSearch(
+  inp: ChainInputs,
+  first: number,
+  c: number,
+  live: Map<number, number>,
+  tally: Tally,
+): Generator<void, NextTier> {
+  const entry: NextTier = {
+    tier: TIERS[first],
+    gap: null,
+    comesIn: [],
+    dropsOut: [],
+    moves: [],
+  };
+  const need = (inp.costs[c] + STEP - 1n) / STEP;
+  if (need < 1n) return entry;
+  const run = (k: bigint) => tiersOf(tally, withGift(inp, c, k * STEP), first, first + 1);
+  const reaches = (r: Map<number, number>) => r.get(c) === first;
+  let hi = need, after = run(need);
+  yield;
+  if (!reaches(after)) return entry;
+  // As in gapSearch, reaching is not assumed monotone: only a step whose run reached is kept.
+  let lo = 1n;
+  while (lo < hi) {
+    const mid = (lo + hi) / 2n;
+    const r = run(mid);
+    yield;
+    if (reaches(r)) [hi, after] = [mid, r];
+    else lo = mid + 1n;
+  }
+  entry.gap = hi * STEP;
+  for (let o = 0; o < inp.m; o++) {
+    if (o === c) continue;
+    const was = live.get(o) === first, is = after.get(o) === first;
+    if (!was && is) entry.comesIn.push([o, TIERS[first]]);
+    else if (was && !is) entry.dropsOut.push([o, TIERS[first]]);
+  }
+  return entry;
+}
+
+/** Every open initiative not in the tier settling now (`firstOpen`, if it settled now):
+ * the donation that would get it there. */
+function* giftsSearch(
+  inp: ChainInputs,
+  firstOpen: number,
+  tally: Tally,
+): Generator<void, Map<number, NextTier>> {
+  const out = new Map<number, NextTier>();
+  if (firstOpen < 0 || firstOpen >= TIERS.length) return out;
+  const live = tiersOf(tally, inp, firstOpen, firstOpen + 1);
+  yield;
+  for (let c = 0; c < inp.m; c++) {
+    if (inp.done.has(c) || live.get(c) === firstOpen) continue;
+    out.set(c, yield* giftSearch(inp, firstOpen, c, live, tally));
+  }
+  return out;
 }
 
 /** Every open initiative's gap to the tier above where the live tally puts it. */
@@ -283,6 +354,27 @@ export function nextTiersAsync(
   tally: Tally = chainTally,
 ): Promise<Map<number, NextTier>> {
   return driveAsync(search(inp, firstOpen, tally));
+}
+
+/** Keyed by initiative index: for each open initiative not in the tier settling now, the
+ * donation (a $1K step, rounded up; null when even its whole need isn't enough) that gets
+ * it funded there if that tier settled now. Settled initiatives and those already in it
+ * have no entry. */
+export function giftGaps(
+  inp: ChainInputs,
+  firstOpen: number,
+  tally: Tally = chainTally,
+): Map<number, NextTier> {
+  return drive(giftsSearch(inp, firstOpen, tally));
+}
+
+/** `giftGaps`, yielding between tallies. */
+export function giftGapsAsync(
+  inp: ChainInputs,
+  firstOpen: number,
+  tally: Tally = chainTally,
+): Promise<Map<number, NextTier>> {
+  return driveAsync(giftsSearch(inp, firstOpen, tally));
 }
 
 /** Gap for one initiative to reach `target` (tier index), judged with `inp` from tier `first`.

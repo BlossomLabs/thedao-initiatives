@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -133,14 +133,28 @@ function mockApi(code: () => Promise<unknown>, claim?: () => Promise<unknown>) {
   );
 }
 
-function show() {
+/** Where the router is: the ballot's page, or its editor (/edit). */
+function Where() {
+  return <output data-testid="where">{useLocation().pathname}</output>;
+}
+const where = () => screen.getByTestId("where").textContent;
+
+function show(path = `/vote/${CODE}`) {
   render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter initialEntries={[`/vote/${CODE}`]}>
+      <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/vote/:code" element={<VoteCode />} />
+          <Route
+            path="/vote/:code/edit?"
+            element={
+              <>
+                <VoteCode />
+                <Where />
+              </>
+            }
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -292,6 +306,7 @@ it("accepting, then signing in, goes straight on to claiming — even if the pag
   // The sign-in modal finishes and the page comes back signed in (a fresh mount).
   cleanup();
   session.current = { address: ME };
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   show();
   await waitFor(() =>
     expect(vi.mocked(api)).toHaveBeenCalledWith(
@@ -304,6 +319,8 @@ it("accepting, then signing in, goes straight on to claiming — even if the pag
     .toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /claim my test badge/i })).toBeNull();
   // The ballot starts at the top, not where the claim button was.
+  expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
+  scrollTo.mockRestore();
 });
 
 it("without accepting, a signed-in visitor still sees the intro and claims only on the button", async () => {
@@ -329,7 +346,7 @@ it("the automatic claim after sign-in is sent once, even when effects run twice 
       >
         <MemoryRouter initialEntries={[`/vote/${CODE}`]}>
           <Routes>
-            <Route path="/vote/:code" element={<VoteCode />} />
+            <Route path="/vote/:code/edit?" element={<VoteCode />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>
@@ -486,7 +503,7 @@ function showMine(path = "/vote/ballot") {
     >
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/vote/ballot" element={<MyBallot />} />
+          <Route path="/vote/ballot/edit?" element={<MyBallot />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -790,12 +807,17 @@ it("a ballot that counts opens on the page that shows it; Edit goes back to the 
   // No editor here: no tiers to drop into, no Send.
   expect(document.querySelector('[data-drop="S"]')).toBeNull();
   expect(screen.queryByRole("button", { name: /send my ballot/i })).toBeNull();
+  // Each way between the two pages starts at the top.
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   fireEvent.click(edit);
+  expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
   expect(document.querySelector('[data-drop="S"]')).not.toBeNull();
   // Unchanged, it still counts: the send panel says so, and its button leads back.
   expect(screen.getByText("Your ballot counts")).toBeInTheDocument();
+  scrollTo.mockClear();
   fireEvent.click(screen.getByRole("button", { name: "See my ballot" }));
   expect(await screen.findByRole("button", { name: "Edit my ballot" })).toBeInTheDocument();
+  expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
   // Changed, a ballot that counted already goes again as a resend.
   fireEvent.click(screen.getByRole("button", { name: "Edit my ballot" }));
   await placeIn("BETA", "Tier-A, Should fund");
@@ -805,6 +827,31 @@ it("a ballot that counts opens on the page that shows it; Edit goes back to the 
   fireEvent.click(screen.getByRole("button", { name: "Restore sent ballot" }));
   expect(screen.getByText("Your ballot counts")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Restore sent ballot" })).toBeNull();
+  scrollTo.mockRestore();
+});
+
+it("two pages: the ballot that counts at its URL, the editor at /edit", async () => {
+  roundIs.body = roundBody({ accepted: { "17": "0x01ffff" } });
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show(`/vote/${CODE}/edit`);
+  // Straight to the editor, though the ballot counts as it is.
+  expect(await screen.findByText("Your ballot counts")).toBeInTheDocument();
+  expect(document.querySelector('[data-drop="S"]')).not.toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "See my ballot" }));
+  expect(await screen.findByRole("button", { name: "Edit my ballot" })).toBeInTheDocument();
+  expect(where()).toBe(`/vote/${CODE}`);
+  fireEvent.click(screen.getByRole("button", { name: "Edit my ballot" }));
+  expect(where()).toBe(`/vote/${CODE}/edit`);
+});
+
+it("the ballot's page without a ballot that counts moves on to the editor", async () => {
+  roundIs.body = roundBody({ accepted: {} });
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  await waitFor(() => expect(where()).toBe(`/vote/${CODE}/edit`));
+  expect(document.querySelector('[data-drop="S"]')).not.toBeNull();
 });
 
 it("a counted ballot is always beside the live result, even before it would fund anything", async () => {

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { bytesToHex, type Hex } from "viem";
 import PageMain from "~/components/layout/PageMain";
 import { Button, LinkButton } from "~/components/ui/Button";
 import TierBallot, { type BallotItem } from "~/components/vote/TierBallot";
-import { BallotSkeleton, IntroSkeleton } from "~/components/vote/VoteSkeleton";
+import { BallotSkeleton, IntroSkeleton, SeenSkeleton } from "~/components/vote/VoteSkeleton";
 import { rememberMyCode } from "~/lib/vote-local";
 import BallotStatus, { type SendRoute } from "~/components/vote/BallotStatus";
 import BallotMeter from "~/components/vote/BallotMeter";
@@ -325,13 +325,25 @@ export default function VotePage(
   const ballotFlow = mock ? mockFlow : realFlow;
   /** Who is sending the ballot in progress (or sent the last): TheDAO, or the voter. */
   const [sendRoute, setSendRoute] = useState<SendRoute>("relay");
-  /** Editing the ballot, rather than seeing the one that counts (where a send lands). */
-  const [editing, setEditing] = useState(false);
-  const sentPhase = ballotFlow.phase.kind;
-  useEffect(() => {
-    // A send that counted lands on the ballot.
-    if (sentPhase === "counted") setEditing(false);
-  }, [sentPhase]);
+  /** Two pages, one route: the ballot that counts (its path), and its editor (/edit).
+   * A send stays in the editor; once it counts, the send panel's button leads back. */
+  const location = useLocation();
+  const navigate = useNavigate();
+  const editing = /\/edit\/?$/.test(location.pathname);
+  const pageOf = (edit: boolean) => ({
+    pathname: location.pathname.replace(/\/edit\/?$/, "").replace(/\/$/, "") +
+      (edit ? "/edit" : ""),
+    search: location.search,
+  });
+  /** Between the editor and the ballot that counts: each starts at the top. */
+  const showEditor = (on: boolean) => {
+    navigate(pageOf(on));
+    globalThis.scrollTo({ top: 0 });
+  };
+  /** The skeleton of the page this URL opens: the editor's, or the ballot that counts. */
+  const ballotSkeleton = editing ? <BallotSkeleton /> : <SeenSkeleton />;
+  /** Set below when this is the ballot's page but it has none that counts yet. */
+  let toEditor = false;
   /** From a Send that can't send: shake why (the ballot box's line, and the rules box when
    * there is one); after a tap, scroll there first. */
   const showWhyNot = (scroll: boolean) => {
@@ -648,11 +660,11 @@ export default function VotePage(
       </Panel>
     );
   } else if (info.isPending && !mock) {
-    wide = myBallot || ballotSeen(code);
-    body = wide ? <BallotSkeleton /> : <IntroSkeleton />;
+    wide = myBallot || ballotSeen(code) || editing;
+    body = wide ? ballotSkeleton : <IntroSkeleton />;
   } else if (mock && !mockData) {
     wide = true;
-    body = <BallotSkeleton />;
+    body = ballotSkeleton;
   } else if (info.isError && !mock) {
     body = (
       <Panel>
@@ -725,10 +737,9 @@ export default function VotePage(
       />
     );
   } else if (data && mine && n !== null && !mock && roundQ.isPending) {
-    // Which page this badge opens on (the editor, or the ballot that counts) depends on
-    // the round: hold the ballot's skeleton until it's known, rather than flash the editor.
+    // Whether there is a ballot that counts depends on the round: hold this URL's skeleton.
     wide = true;
-    body = <BallotSkeleton />;
+    body = ballotSkeleton;
   } else if (data && mine && n !== null && (closed(R) || rv?.closed)) {
     // Two tier tables side by side: this badge's ballot and the vote's result.
     wide = true;
@@ -902,15 +913,16 @@ export default function VotePage(
     // The ballot on screen is the one that counts: seen as "your ballot", with Edit.
     const upToDate = Boolean(countedHex) &&
       countedHex!.toLowerCase() === bytesToHex(encodeBallot(R.slugs, tiers)).toLowerCase();
-    const seenPage = upToDate && !editing && closedProps && (
+    const seenPage = countedHex && !editing && closedProps && (
       <>
         {picker}
         <VoteClosed
           {...closedProps}
-          sent={tiers}
+          // What counts, whatever this browser's draft has since.
+          sent={countedTiers(countedHex, tiers, R.slugs)}
           roundBox={roundStepsOnly}
           live={{
-            onEdit: () => setEditing(true),
+            onEdit: () => showEditor(true),
             tally: rv && {
               tiers: rv.live.tiers ?? {},
               awards: Object.fromEntries(
@@ -957,6 +969,8 @@ export default function VotePage(
         </div>
       </div>
     );
+    // No ballot that counts on the ballot's page: it's the editor's (moved there below).
+    if (!missedPage && !seenPage && !editing) toEditor = true;
     body = missedPage || seenPage || (
       <div className="space-y-6">
         {picker}
@@ -1024,7 +1038,7 @@ export default function VotePage(
                   route={sendRoute}
                   chain={REAL(R) ? "Ethereum" : "Sepolia"}
                   upToDate={upToDate}
-                  onSeeBallot={() => setEditing(false)}
+                  onSeeBallot={() => showEditor(false)}
                   onBlocked={showWhyNot}
                   canSend={!busy && placed > 0 && !broken}
                   // Not ready, it stays as it is, disabled: the ballot box's line says what
@@ -1044,25 +1058,41 @@ export default function VotePage(
       </div>
     );
   } else {
-    wide = myBallot || ballotSeen(code);
-    body = wide ? <BallotSkeleton /> : <IntroSkeleton />;
+    wide = myBallot || ballotSeen(code) || editing;
+    body = wide ? ballotSkeleton : <IntroSkeleton />;
   }
+  // The ballot's page without a ballot that counts: on to the editor, in place.
+  useEffect(() => {
+    if (toEditor) navigate(pageOf(true), { replace: true });
+    // pageOf follows the location, which this effect runs after.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toEditor]);
 
-  // On an example: the others, in the order they happen in the vote.
+  // On an example: the others, in the order they happen in the vote. Each opens on its
+  // editor, but for the badge that never voted and the finished vote, which have none.
+  // Tier-B settling is there twice: its editor, then its "your ballot" page.
+  const mockLinks = MOCKS.flatMap((k) => {
+    const view = { k, edit: false, label: MOCK_LABELS[k] };
+    if (k === "missed" || k === "finished") return [view];
+    const edit = { ...view, edit: true };
+    return k === "b-settling" ? [edit, { ...view, label: `${view.label}, your ballot` }] : [edit];
+  });
   const mockNav = mock && (
     <nav
       aria-label="Example ballots"
       className="mx-auto mb-2 flex max-w-[760px] flex-wrap justify-center gap-1.5 text-[12.5px]"
     >
-      {MOCKS.map((k) => (
+      {mockLinks.map(({ k, edit, label }) => (
         <Link
-          key={k}
-          to={`/vote/mock/${k}`}
+          key={`${k}${edit ? "/edit" : ""}`}
+          to={`/vote/mock/${k}${edit ? "/edit" : ""}`}
           replace
-          aria-current={mockKind === k ? "page" : undefined}
+          aria-current={mockKind === k && (k !== "b-settling" || edit === editing)
+            ? "page"
+            : undefined}
           className="rounded-full border border-white/15 px-2.5 py-1 text-white/60 hover:text-white aria-[current=page]:border-dao-green/60 aria-[current=page]:text-white"
         >
-          {MOCK_LABELS[k]}
+          {label}
         </Link>
       ))}
     </nav>

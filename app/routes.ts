@@ -9,9 +9,11 @@ export default [
   route("submit/thanks", "routes/submitted.tsx"),
   route("mine", "routes/mine.tsx"),
   route("sessions", "routes/sessions.tsx"),
-  route("vote/ballot", "routes/vote.ballot.tsx"),
-  route("vote/mock/:id", "routes/vote.mock.tsx"),
-  route("vote/:code", "routes/vote.code.tsx"),
+  // Each ballot has two pages: the one that counts (its path), and the editor (/edit).
+  // One route each, so going between them keeps the page (and an example's send).
+  route("vote/ballot/edit?", "routes/vote.ballot.tsx"),
+  route("vote/mock/:id/edit?", "routes/vote.mock.tsx"),
+  route("vote/:code/edit?", "routes/vote.code.tsx"),
   route("devcon/:code", "routes/code-redirect.tsx"),
   route("vote", "routes/vote.tsx"),
   route("donation-terms", "routes/terms.tsx"),

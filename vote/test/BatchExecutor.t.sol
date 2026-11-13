@@ -30,7 +30,7 @@ contract BatchExecutorTest is Test {
     }
 
     function setupCalls(uint256 initiatives) internal view returns (BatchExecutor.Call[] memory calls) {
-        calls = new BatchExecutor.Call[](initiatives + 8);
+        calls = new BatchExecutor.Call[](initiatives + 7);
         uint256 k;
         for (uint256 i; i < initiatives; ++i) {
             calls[k++] = BatchExecutor.Call(
@@ -44,8 +44,8 @@ contract BatchExecutorTest is Test {
         for (uint256 i; i < 3; ++i) {
             calls[k++] = BatchExecutor.Call(address(round), 0, abi.encodeCall(round.grantRole, (handed[i], ADMIN)));
         }
-        bytes32[4] memory dropped = [handed[1], handed[2], round.BLOB_SUBMITTER_ROLE(), handed[0]];
-        for (uint256 i; i < 4; ++i) {
+        bytes32[3] memory dropped = [handed[1], handed[2], handed[0]];
+        for (uint256 i; i < 3; ++i) {
             calls[k++] =
                 BatchExecutor.Call(address(round), 0, abi.encodeCall(round.renounceRole, (dropped[i], relayer)));
         }
@@ -63,7 +63,6 @@ contract BatchExecutorTest is Test {
         assertTrue(round.hasRole(round.PLEDGE_ROLE(), ADMIN));
         assertFalse(round.hasRole(round.DEFAULT_ADMIN_ROLE(), relayer));
         assertFalse(round.hasRole(round.ADMIN_ROLE(), relayer));
-        assertFalse(round.hasRole(round.BLOB_SUBMITTER_ROLE(), relayer));
         assertTrue(round.hasRole(round.MINTER_ROLE(), relayer));
     }
 

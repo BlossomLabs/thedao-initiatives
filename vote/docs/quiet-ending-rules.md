@@ -27,8 +27,7 @@ grants/revokes roles; ADMIN_ROLE manages setup and the USD pool budget; PLEDGE_R
 records pledges; MINTER_ROLE issues internal NFTs, and burns mistaken ones, before
 S's first window ends (no tier can settle earlier). A burn revokes the token's receipt and records a revocation in
 the transcript, so replay voids its earlier ballots.
-BLOB_SUBMITTER_ROLE permits hash-only blob receipts because a bad blob can consume
-a signed nonce. The deployment admin initially has all these roles.
+The deployment admin initially has all these roles.
 
 External NFT mode disables internal minting. Currency definitions, project order,
 addresses and dollar asks freeze when voting opens. No role publishes, approves
@@ -210,11 +209,11 @@ defined, but it creates no checkpoint publisher or discretionary activation step
 ## How a recorded ballot becomes an accepted ballot
 
 The registry checks current NFT ownership, signatures, per-token nonces, valid
-calldata ranks, opening, registration receipts and the latest possible ending.
-It does not compute actual early settlement or acceptance of blob contents.
+calldata ranks and the ballot rules, opening, registration receipts and the latest
+possible ending. Every ballot reaches the registry as calldata; there is no
+hash-only path. It does not compute actual early settlement.
 Its hasRegistrationReceipt flag and registrationReceiptCount are candidate receipt
-state, not an accepted-ballot roll. A malformed blob cannot enlarge the accepted
-NFT roll merely because its receipt passed on-chain checks.
+state, not an accepted-ballot roll.
 
 Recording is a receipt, not acceptance. Replay must establish:
 
@@ -224,15 +223,13 @@ Recording is a receipt, not acceptance. Replay must establish:
    the authorized owner, not the token's registration or equal voting unit.
 2. **Timely inclusion.** The receipt belongs to the canonical prefix for its window.
    A receipt exactly at a cutoff belongs to the next window, if one is open.
-3. **Committed bytes.** A blob ballot must be recovered and match both its blob
-   commitment and the receipt's ballot hash.
-4. **A valid ballot.** The ballot has one byte per project in the fixed project
+3. **A valid ballot.** The ballot has one byte per project in the fixed project
    order. Positive ranks form a competition ranking; 255 means withheld. The
    low-level reference also supports 0 as unplaced but open to leftover support.
    The current calldata registry rejects 0 and requires proposals outside the
    voter's tiers to be explicitly withheld with 255.
    Withheld proposals do not count when validating ranks; the project limit is 254.
-5. **An allowed revision.** Settled tier membership cannot change. A supporter
+4. **An allowed revision.** Settled tier membership cannot change. A supporter
    bound by the governing checkpoint cannot remove a bound proposal or move it
    below its tier. Withholding it also withdraws support. Compare tier membership,
    not raw rank numbers, which can change when an open tier is rearranged.
@@ -294,18 +291,11 @@ Keep [pbear.py](../reference/pbear.py) as the readable integer-exact core and
 window models in [quiet_ending_steps.py](../reference/quiet_ending_steps.py) need
 fixed first tally dates, a maximum-window limit and time-varying currency valuations.
 
-The proposed blob payload is a versioned UTF-8 .pb batch using a Blossom extension
-of the [Pabulib format](https://pabulib.org/format). Ties, withholding and revisions
-need an explicit extension; compatibility with ordinary parsers cannot be assumed.
+Ballot bytes come from BallotRecorded events. Receipt order controls replay. Use all
+revisions, including rejected ones, and the on-chain history needed to derive every
+checkpoint. A final accepted-ballot snapshot is insufficient.
 
-Each batch identifies its version, round, fixed project order and dollar precision.
-Each revision preserves voter, nonce and the exact signed rank bytes. Batch metadata
-cannot override on-chain funding, asks, pledges or timing. Receipt order controls
-replay. Retain all revisions, including rejected ones, and the on-chain history
-needed to derive every checkpoint. A final accepted-ballot snapshot is insufficient.
-
-The blob codec, availability/retention policy and complete Python/browser replay
-remain to be implemented. They must agree on shared examples. A chain-derived
+The complete Python/browser replay remains to be implemented. They must agree on shared examples. A chain-derived
 checkpoint does not require a separate checkpoint-publication transaction.
 
 ## Remaining decisions
@@ -314,7 +304,7 @@ checkpoint does not require a separate checkpoint-publication transaction.
 - Exact equal-NFT share accounting and rounding for initial USD funding and increases.
 - Supporter restrictions and chain finality policy.
 - Treatment of pool payouts, spent donations and pledge fulfilment to avoid double counting.
-- Production currency/feed configuration, blob schema and retention for full replay.
+- Production currency/feed configuration.
 
 ## Historical simulation evidence
 

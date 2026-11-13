@@ -68,19 +68,6 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
-    "name": "BLOB_SUBMITTER_ROLE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32",
-      },
-    ],
-    "stateMutability": "view",
-  },
-  {
-    "type": "function",
     "name": "DEFAULT_ADMIN_ROLE",
     "inputs": [],
     "outputs": [
@@ -1100,51 +1087,6 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
-    "name": "recordBlob",
-    "inputs": [
-      {
-        "name": "blobIndex",
-        "type": "uint256",
-        "internalType": "uint256",
-      },
-      {
-        "name": "votes",
-        "type": "tuple[]",
-        "internalType": "struct SignedBallots.BlobVote[]",
-        "components": [
-          {
-            "name": "tokenId",
-            "type": "uint256",
-            "internalType": "uint256",
-          },
-          {
-            "name": "nonce",
-            "type": "uint64",
-            "internalType": "uint64",
-          },
-          {
-            "name": "r",
-            "type": "bytes32",
-            "internalType": "bytes32",
-          },
-          {
-            "name": "vs",
-            "type": "bytes32",
-            "internalType": "bytes32",
-          },
-          {
-            "name": "ballotHash",
-            "type": "bytes32",
-            "internalType": "bytes32",
-          },
-        ],
-      },
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable",
-  },
-  {
-    "type": "function",
     "name": "recordCount",
     "inputs": [],
     "outputs": [
@@ -1721,43 +1663,6 @@ export const SIGNED_BALLOTS_ABI = [
         "type": "bytes",
         "indexed": false,
         "internalType": "bytes",
-      },
-    ],
-    "anonymous": false,
-  },
-  {
-    "type": "event",
-    "name": "BlobBallotRecorded",
-    "inputs": [
-      {
-        "name": "tokenId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256",
-      },
-      {
-        "name": "voter",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address",
-      },
-      {
-        "name": "nonce",
-        "type": "uint64",
-        "indexed": false,
-        "internalType": "uint64",
-      },
-      {
-        "name": "ballotHash",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32",
-      },
-      {
-        "name": "blobHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32",
       },
     ],
     "anonymous": false,
@@ -2373,11 +2278,6 @@ export const SIGNED_BALLOTS_ABI = [
   {
     "type": "error",
     "name": "InvalidTiers",
-    "inputs": [],
-  },
-  {
-    "type": "error",
-    "name": "NoBlob",
     "inputs": [],
   },
   {

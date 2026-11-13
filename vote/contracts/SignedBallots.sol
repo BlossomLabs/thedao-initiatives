@@ -11,13 +11,12 @@ import {RoundAccounting} from "./RoundAccounting.sol";
 
 /// @notice NFT-keyed ballot receipts, an explicitly configured Slow Quiet Ending schedule,
 ///         and an increase-only USD pool. Each token ID has one voting unit.
-/// @dev DRAFT. Checkpoints, actual tier settlement, and accepted blob ballots are
+/// @dev DRAFT. Checkpoints and actual tier settlement are
 ///      derived by replay, not asserted by an admin or by this receipt registry.
 ///      Records can be submitted until the last possible scheduled end. Replay
 ///      must reject revisions after actual early settlement or violating locks.
 contract SignedBallots is ERC721, EIP712, RoundAccounting {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant BLOB_SUBMITTER_ROLE = keccak256("BLOB_SUBMITTER_ROLE");
     bytes32 public constant VOTE_TYPEHASH = keccak256("Vote(uint256 tokenId,address voter,uint64 nonce,bytes ballot)");
 
     error InvalidSchedule();
@@ -35,7 +34,6 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     error NoProjects();
     error WrongLength();
     error InvalidBallot();
-    error NoBlob();
     error InvalidNonce(uint256 tokenId, uint64 nonce);
     error InvalidSignature();
     error AddingClosed();
@@ -64,14 +62,6 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         uint8[] proof;
     }
 
-    struct BlobVote {
-        uint256 tokenId;
-        uint64 nonce;
-        bytes32 r;
-        bytes32 vs;
-        bytes32 ballotHash;
-    }
-
     address public immutable eligibilityNFT;
     uint64 public opensAt;
     uint64 public immutable initialWindow;
@@ -93,8 +83,8 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
 
     mapping(uint256 tokenId => uint64 nonce) public nonceOf;
     mapping(uint256 tokenId => bytes32 ballotHash) public ballotHashOf;
-    /// @notice A candidate roll from timely receipts. Blob contents and acceptance
-    ///         still need replay; this is not an assertion of an accepted ballot.
+    /// @notice A candidate roll from timely receipts. Acceptance still needs replay
+    ///         (settlement, burns); this is not an assertion of an accepted ballot.
     mapping(uint256 tokenId => bool) public hasRegistrationReceipt;
     uint256 public registrationReceiptCount;
     bytes32 public transcript;
@@ -112,9 +102,6 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     event RegistrationReceipt(uint256 indexed tokenId);
     event RegistrationRevoked(uint256 indexed tokenId);
     event BallotRecorded(uint256 indexed tokenId, address indexed voter, uint64 nonce, bytes ballot);
-    event BlobBallotRecorded(
-        uint256 indexed tokenId, address indexed voter, uint64 nonce, bytes32 ballotHash, bytes32 indexed blobHash
-    );
     event MetadataBaseURISet(string baseURI);
 
     constructor(
@@ -143,7 +130,6 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
             eligibilityNFT = externalNFT;
         }
         _grantRole(MINTER_ROLE, admin);
-        _grantRole(BLOB_SUBMITTER_ROLE, admin);
         emit EligibilityConfigured(eligibilityNFT);
         emit ScheduleConfigured(opensAt, initialWindow, firstTallyAt, maxWindows, registrationDeadline, hardDeadline);
     }
@@ -195,8 +181,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
             hasRegistrationReceipt[tokenId] = false;
             --registrationReceiptCount;
             delete ballotHashOf[tokenId];
-            transcript =
-                keccak256(abi.encode(transcript, tokenId, address(0), nonceOf[tokenId], bytes32(0), bytes32(0)));
+            transcript = keccak256(abi.encode(transcript, tokenId, address(0), nonceOf[tokenId], bytes32(0)));
             ++recordCount;
             emit RegistrationRevoked(tokenId);
         }
@@ -260,7 +245,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
             (address signer, ECDSA.RecoverError err,) =
                 ECDSA.tryRecover(_voteDigest(v.tokenId, voter, v.nonce, ballotHash), v.r, v.vs);
             if (err != ECDSA.RecoverError.NoError || signer != voter) revert InvalidSignature();
-            _append(v.tokenId, voter, v.nonce, ballotHash, bytes32(0));
+            _append(v.tokenId, voter, v.nonce, ballotHash);
             emit BallotRecorded(v.tokenId, voter, v.nonce, v.ballot);
         }
     }
@@ -270,7 +255,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         address voter = voterOwner(tokenId);
         if (msg.sender != voter) revert NotNFTOwner(tokenId);
         _validateBallot(ballot, proof);
-        _append(tokenId, voter, nonce, keccak256(ballot), bytes32(0));
+        _append(tokenId, voter, nonce, keccak256(ballot));
         emit BallotRecorded(tokenId, voter, nonce, ballot);
     }
 
@@ -290,25 +275,8 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
             )) {
             revert InvalidSignature();
         }
-        _append(tokenId, voter, nonce, keccak256(ballot), bytes32(0));
+        _append(tokenId, voter, nonce, keccak256(ballot));
         emit BallotRecorded(tokenId, voter, nonce, ballot);
-    }
-
-    /// @notice Hash-only receipts. Only authorized submitters may attach the blob
-    ///         because bad/missing bytes can consume an NFT's signed nonce.
-    function recordBlob(uint256 blobIndex, BlobVote[] calldata votes) external onlyRole(BLOB_SUBMITTER_ROLE) {
-        _open(votes.length);
-        bytes32 blobHash = blobhash(blobIndex);
-        if (blobHash == bytes32(0)) revert NoBlob();
-        for (uint256 i; i < votes.length; ++i) {
-            BlobVote calldata v = votes[i];
-            address voter = voterOwner(v.tokenId);
-            (address signer, ECDSA.RecoverError err,) =
-                ECDSA.tryRecover(_voteDigest(v.tokenId, voter, v.nonce, v.ballotHash), v.r, v.vs);
-            if (err != ECDSA.RecoverError.NoError || signer != voter) revert InvalidSignature();
-            _append(v.tokenId, voter, v.nonce, v.ballotHash, blobHash);
-            emit BlobBallotRecorded(v.tokenId, voter, v.nonce, v.ballotHash, blobHash);
-        }
     }
 
     /// @notice Digest binds the NFT ID, its current owner, nonce and ballot to
@@ -326,7 +294,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         return _hashTypedDataV4(keccak256(abi.encode(VOTE_TYPEHASH, tokenId, voter, nonce, ballotHash)));
     }
 
-    function _append(uint256 tokenId, address voter, uint64 nonce, bytes32 ballotHash, bytes32 blobHash) private {
+    function _append(uint256 tokenId, address voter, uint64 nonce, bytes32 ballotHash) private {
         // Exactly the next nonce: a mistyped huge nonce would otherwise lock the
         // NFT out of every later revision.
         if (nonce != nonceOf[tokenId] + 1) revert InvalidNonce(tokenId, nonce);
@@ -338,7 +306,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         }
         nonceOf[tokenId] = nonce;
         ballotHashOf[tokenId] = ballotHash;
-        transcript = keccak256(abi.encode(transcript, tokenId, voter, nonce, ballotHash, blobHash));
+        transcript = keccak256(abi.encode(transcript, tokenId, voter, nonce, ballotHash));
         ++recordCount;
     }
 

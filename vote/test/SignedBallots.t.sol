@@ -56,8 +56,7 @@ contract SignedBallotsTest is Fixture {
         ballots.record(votes);
         assertEq(ballots.recordCount(), 1);
         assertEq(
-            ballots.transcript(),
-            keccak256(abi.encode(bytes32(0), uint256(1), alice, uint64(1), keccak256(ranks), bytes32(0)))
+            ballots.transcript(), keccak256(abi.encode(bytes32(0), uint256(1), alice, uint64(1), keccak256(ranks)))
         );
     }
 
@@ -210,10 +209,7 @@ contract SignedBallotsTest is Fixture {
         assertEq(ballots.registrationReceiptCount(), 0);
         assertEq(ballots.ballotHashOf(1), bytes32(0));
         assertEq(ballots.recordCount(), 2);
-        assertEq(
-            ballots.transcript(),
-            keccak256(abi.encode(before, uint256(1), address(0), uint64(1), bytes32(0), bytes32(0)))
-        );
+        assertEq(ballots.transcript(), keccak256(abi.encode(before, uint256(1), address(0), uint64(1), bytes32(0))));
         // Re-minting keeps the nonce, so no earlier signature can be replayed.
         ballots.mint(bob, 1);
         assertEq(ballots.nonceOf(1), 1);
@@ -235,45 +231,6 @@ contract SignedBallotsTest is Fixture {
         vm.expectRevert(SignedBallots.RegistrationClosed.selector);
         ballots.burn(2);
         assertEq(ballots.ownerOf(2), alice);
-    }
-
-    function test_blobSignatureUsesSameNFTNonceAndTranscript() public {
-        vm.warp(start);
-        SignedBallots.Vote[] memory votes = signedVote(1000, 1, 1, ranks);
-        bytes32 hash = attachBlob();
-        ballots.recordBlob(0, blobVotes(votes));
-        assertEq(
-            ballots.transcript(),
-            keccak256(abi.encode(bytes32(0), uint256(1), alice, uint64(1), keccak256(ranks), hash))
-        );
-        vm.expectRevert(abi.encodeWithSelector(SignedBallots.InvalidNonce.selector, 1, uint64(1)));
-        ballots.record(votes);
-    }
-
-    function test_blobRequiresRoleAndAttachedBlob() public {
-        vm.warp(start);
-        SignedBallots.BlobVote[] memory votes = blobVotes(signedVote(1000, 1, 1, ranks));
-        vm.prank(bob);
-        vm.expectRevert();
-        ballots.recordBlob(0, votes);
-        vm.expectRevert(SignedBallots.NoBlob.selector);
-        ballots.recordBlob(0, votes);
-        ballots.grantRole(ballots.BLOB_SUBMITTER_ROLE(), bob);
-        attachBlob();
-        vm.prank(bob);
-        ballots.recordBlob(0, votes);
-        assertEq(ballots.nonceOf(1), 1);
-    }
-
-    function test_blobReceiptIsOnlyCandidateRegistration() public {
-        vm.warp(start);
-        // The registry cannot inspect this invalid ballot inside a blob. Replay
-        // must reject it and exclude it from the accepted roll.
-        bytes memory malformed = hex"ff";
-        attachBlob();
-        ballots.recordBlob(0, blobVotes(signedVote(1000, 1, 1, malformed)));
-        assertTrue(ballots.hasRegistrationReceipt(1));
-        assertEq(ballots.recordCount(), 1);
     }
 
     /// Ties, a ballot shorter than the projects, and explicit withholding are valid;
@@ -442,9 +399,6 @@ contract SignedBallotsTest is Fixture {
         ballots.vote(1, 1, ranks, proofOf(ranks));
         vm.expectRevert(SignedBallots.VotingClosed.selector);
         ballots.recordFor(1, 1, ranks, "", proofOf(ranks));
-        attachBlob();
-        vm.expectRevert(SignedBallots.VotingClosed.selector);
-        ballots.recordBlob(0, blobVotes(votes));
     }
 
     function testFuzz_windowDurationBound(uint32 initial, uint8 count) public {

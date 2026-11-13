@@ -39,7 +39,6 @@ contract DevconScheduleTest is Test {
         for (uint256 i; i < 3; ++i) {
             round.renounceRole(handed[i], relayer);
         }
-        round.renounceRole(round.BLOB_SUBMITTER_ROLE(), relayer);
         vm.stopPrank();
     }
 
@@ -112,7 +111,6 @@ contract DevconScheduleTest is Test {
         assertFalse(round.hasRole(round.ADMIN_ROLE(), relayer));
         assertFalse(round.hasRole(round.DEFAULT_ADMIN_ROLE(), relayer));
         assertFalse(round.hasRole(round.PLEDGE_ROLE(), relayer));
-        assertFalse(round.hasRole(round.BLOB_SUBMITTER_ROLE(), relayer));
         assertTrue(round.hasRole(round.DEFAULT_ADMIN_ROLE(), ADMIN));
         assertTrue(round.hasRole(round.ADMIN_ROLE(), ADMIN));
         vm.startPrank(relayer);

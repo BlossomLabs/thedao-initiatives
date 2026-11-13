@@ -58,10 +58,10 @@ The references retain byte 0 for the older optional unplaced tail.
 | Checkpoints | Derived from canonical on-chain history; no checkpoint publication or approval. |
 
 Role administration uses OpenZeppelin AccessControl. The deployment admin initially
-holds DEFAULT_ADMIN_ROLE, ADMIN_ROLE, PLEDGE_ROLE, MINTER_ROLE and
-BLOB_SUBMITTER_ROLE, and can grant/revoke them independently. ADMIN_ROLE controls
+holds DEFAULT_ADMIN_ROLE, ADMIN_ROLE, PLEDGE_ROLE and MINTER_ROLE, and can
+grant/revoke them independently. ADMIN_ROLE controls
 setup and the USD pool budget; PLEDGE_ROLE controls pledges; MINTER_ROLE issues internal
-NFTs and burns mistaken ones before S's first window ends; BLOB_SUBMITTER_ROLE permits hash-only blob receipts.
+NFTs and burns mistaken ones before S's first window ends.
 External NFT mode disables internal minting.
 
 ## USD accounting API
@@ -159,10 +159,12 @@ addresses and must not be used for Sepolia.
 ## Receipts, replay and settlement policy
 
 The EIP-712 domain is BlossomBallots version 2. The signed vote binds the NFT ID,
-its current owner, nonce and rank bytes to the chain and this contract. Calldata,
-relayed EOA/ERC-1271 signatures and authorized blob submissions are supported.
+its current owner, nonce and rank bytes to the chain and this contract. Direct
+calls, batched signatures and relayed EOA/ERC-1271 signatures are supported, and
+every one carries the ballot bytes in calldata, so the contract checks each ballot
+against the ballot rules before recording it.
 The ordered transcript includes NFT ID and submitting owner. Ballot bytes live in
-events or blobs; ballotHashOf and nonceOf identify the latest recorded revision.
+BallotRecorded events; ballotHashOf and nonceOf identify the latest recorded revision.
 Each record must carry nonceOf + 1, so a mistyped nonce reverts instead of locking
 the NFT out of later revisions; a batch may carry consecutive revisions of one NFT.
 
@@ -173,10 +175,10 @@ RegistrationRevoked and appends a revocation record to the transcript, with vote
 address zero and the unchanged nonce. Replay must void that token's earlier ballots.
 The nonce persists, so a re-minted ID continues its sequence.
 
-hasRegistrationReceipt and registrationReceiptCount describe timely receipts,
-including unvalidated blobs. They are **not** an accepted-ballot roll. Full replay
-must validate blob contents and account for every receipt before determining the
-accepted NFT roll and tally.
+hasRegistrationReceipt and registrationReceiptCount describe timely receipts.
+They are **not** an accepted-ballot roll. Full replay must account for every
+receipt (settlement, burns, revisions) before determining the accepted NFT roll
+and tally.
 
 The registry enforces opening, the registration receipt cutoff and the latest possible
 scheduled ending. windowDuration, windowCutoff and latestSettlementAt expose the
@@ -193,9 +195,8 @@ nonoverlapping date updates. Settlement awards, NFT
 charges and remaining shares belong to deterministic replay, not contract storage;
 that replay and precise quiet-comparison thresholds remain to be implemented.
 
-The complete replay checker, versioned .pb blob codec, retention policy, deployment
-tooling, payout integration and frontend are still subsequent
-work. The contract tests mock price feeds and blob hashes; they are not live Sepolia tests.
+The complete replay checker, payout integration and frontend are still subsequent
+work. The contract tests mock price feeds; they are not live Sepolia tests.
 
 ## Run the checks
 
@@ -247,9 +248,9 @@ A ballot is valid only if (docs/superpowers/specs/2026-11-11-ballot-rules-design
 
 Affiliations are registered as groups (`addGroup`, a `groups` bitmask per initiative). The
 contract checks every ballot with a proof: three unrelated project indexes per enforced
-tier, sent alongside the ballot and not signed. Blob ballots can't be checked on-chain, so
-the replay refuses invalid ones (`invalid_ballot`), judging each by the projects and pool
-before it in chain order (block, log index). New projects may join during the vote outside
+tier, sent alongside the ballot and not signed. The replay checks every ballot again
+(`invalid_ballot`) as a backstop, judging each by the projects and pool before it in
+chain order (block, log index). New projects may join during the vote outside
 every tier's quiet-ending span; a ballot shorter than the project list reads the missing
 ones as unplaced. The Python reference is `reference/ballot_rules.py`, kept equal to the
 TypeScript and Solidity versions by `shared/vote/fixtures/ballot-rules.json`.

@@ -159,24 +159,4 @@ contract MockFeed is IPriceFeed {
                 if (uint8(ballot[i]) == 1) proof[k++] = uint8(i);
             }
         }
-
-        function blobVotes(SignedBallots.Vote[] memory votes)
-            internal
-            pure
-            returns (SignedBallots.BlobVote[] memory hashes)
-        {
-            hashes = new SignedBallots.BlobVote[](votes.length);
-            for (uint256 i; i < votes.length; ++i) {
-                hashes[i] = SignedBallots.BlobVote(
-                    votes[i].tokenId, votes[i].nonce, votes[i].r, votes[i].vs, keccak256(votes[i].ballot)
-                );
-            }
-        }
-
-        function attachBlob() internal returns (bytes32 hash) {
-            bytes32[] memory hashes = new bytes32[](1);
-            hash = bytes32(uint256(0x01) << 248 | 0xb10b);
-            hashes[0] = hash;
-            vm.blobhashes(hashes);
-        }
     }

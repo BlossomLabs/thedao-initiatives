@@ -527,7 +527,6 @@ async function main() {
       functionName: name as never,
     }) as Promise<Hex>;
   const handed = await Promise.all(["DEFAULT_ADMIN_ROLE", "ADMIN_ROLE", "PLEDGE_ROLE"].map(role));
-  const blob = await role("BLOB_SUBMITTER_ROLE");
   const step = (functionName: string, fnArgs: readonly unknown[]) => ({
     to: contract,
     value: 0n,
@@ -544,7 +543,7 @@ async function main() {
     step("setPoolUsd", [poolUsd]),
     ...handed.map((r) => step("grantRole", [r, ADMIN])),
     // The default admin goes last.
-    ...[...handed.slice(1), blob, handed[0]].map((r) => step("renounceRole", [r, account.address])),
+    ...[...handed.slice(1), handed[0]].map((r) => step("renounceRole", [r, account.address])),
   ];
 
   const executorArtifact = JSON.parse(

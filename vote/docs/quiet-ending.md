@@ -90,8 +90,7 @@ when a checkpoint takes effect.
 
 Every receipt must be accounted for. A recorded revision counts only after its
 contents and revision pass the [acceptance rules](quiet-ending-rules.md#how-a-recorded-ballot-becomes-an-accepted-ballot).
-A rejected revision leaves the previous accepted ballot in place. Missing committed
-blob data leaves replay incomplete; it cannot be a reason to skip a vote.
+A rejected revision leaves the previous accepted ballot in place.
 
 The comparison does not track who pays. The draft supporter rule prevents stepping
 back from a project funded at the preceding checkpoint; in-window tallies bind no
@@ -107,7 +106,7 @@ round end. These are funding assertions, not custody or proof of conversion.
 
 Receipt collection stops at the latest possible scheduled end. Actual early tier
 settlement, supporter restrictions and the accepted NFT roll still require full
-deterministic replay, including decoding and validating all committed blob ballots.
+deterministic replay.
 Final USD awards, NFT charges and remaining shares also belong to that replay,
 not additional contract storage.
 

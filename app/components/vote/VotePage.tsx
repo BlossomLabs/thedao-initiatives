@@ -972,7 +972,7 @@ export default function VotePage(
     // No ballot that counts on the ballot's page: it's the editor's (moved there below).
     if (!missedPage && !seenPage && !editing) toEditor = true;
     body = missedPage || seenPage || (
-      <div className="space-y-6">
+      <div className="space-y-6 select-none [&_input]:select-text [&_textarea]:select-text [&_[contenteditable=true]]:select-text">
         {picker}
         <header className="pt-4 text-center">
           <p className="kicker m-0">What should TheDAO prioritize?</p>

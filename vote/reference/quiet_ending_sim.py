@@ -6,14 +6,14 @@ ask for about 4.4 times the pool.
 The proposals, their costs and their categories are real; the voters are invented.
 Holders belong to interest groups that match the ten categories; a holder likes a
 proposal for its category, its general quality and personal taste, and submits a ballot
-in Tier-S, Tier-A and Tier-B with ties, leaving most proposals unplaced. The pool is
+in S-Tier, A-Tier and B-Tier with ties, leaving most proposals unplaced. The pool is
 split equally among the holders who have submitted a ballot, so every new ballot shrinks
 the others' shares.
 
 Most holders vote before the quiet window. One group mostly waits and arrives during
 the window, which is what moves the result at the deadline. During each extension a few
 more holders arrive and some of those present move the contested proposal they like
-best into their Tier-S.
+best into their S-Tier.
 
 `World(seed, proposals=200)` gives the earlier, fully invented world instead: that many
 proposals in six categories, asking about seven times the pool.
@@ -134,7 +134,7 @@ class World:
         At every pause each `active` holder who has weight left revises its ballot:
 
         "promote"  moves the proposal it likes best among those that can still be
-                   funded into its Tier-S, if it is one of its favourites;
+                   funded into its S-Tier, if it is one of its favourites;
         "drop"     takes the funded proposals off its ballot, so the rest move up;
         "below"    moves that favourite to the top of the part of its ballot the tally
                    has not counted yet, and touches nothing above.
@@ -418,7 +418,7 @@ class World:
 
         def drip_ballot(i, state, ballots):
             """A dripping holder's first ballot: its own, with the proposal it likes that
-            is closest to passing in Tier-S (from the ballots in now) put in its Tier-S."""
+            is closest to passing in S-Tier (from the ballots in now) put in its S-Tier."""
             if state is None:
                 return self.ballot(i)
             level = state["stage_level"]
@@ -1046,7 +1046,7 @@ def main_on_time(rounds):
 
 
 def main_registration(rounds, schedules=((12, 3), HALF_DAY), holders=200):
-    """First ballots until Tier-S settles, against today's roll that closes at the end of
+    """First ballots until S-Tier settles, against today's roll that closes at the end of
     S's first window: who gets to vote, how long S takes, whether the schedule has to
     cut S off, and what a group holding first ballots back to drip them in can do."""
     print(f"\nWhen a badge's first ballot is last taken (the roll), {holders} holders, one quiet ending per tier on time:")

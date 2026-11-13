@@ -54,7 +54,7 @@ describe("pabutools ballots (Blossom ties)", () => {
     });
     expect(text).toContain("vote_type;ordinal\nblossom_ties;1");
     expect(text).toContain("evm;2;EVM"); // whole dollars, rounded
-    // An empty Tier-A is an empty group: the ballot reads back exactly.
+    // An empty A-Tier is an empty group: the ballot reads back exactly.
     expect(text).toContain("1;evm=vyper=fuzz,,wallets");
     expect(parseBallotText(text, slugs)).toEqual({ tiers });
   });

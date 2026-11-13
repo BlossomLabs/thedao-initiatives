@@ -1,6 +1,6 @@
 /** For each initiative, how much more backing it needs to be funded one tier higher,
  * and who would come in or drop out if it were. The tally is re-run with a made-up
- * voter ("phantom") who backs only that initiative. Also how far ahead a Tier-S
+ * voter ("phantom") who backs only that initiative. Also how far ahead an S-Tier
  * initiative is, and the same figures judged at each settlement once the round has
  * closed. Pure; browser and Deno. */
 import { type Tier, TIERS } from "./ballot.ts";
@@ -39,7 +39,7 @@ function tiersOf(
  * and `ballots` stays as it is, so the stage bounds do not move.
  *
  * The phantom backs `c` at the first level, so `c` is counted as early as it can be and
- * the gap is the best case. For Tier-B with a tight pool that is optimistic: backers who
+ * the gap is the best case. For B-Tier with a tight pool that is optimistic: backers who
  * rank it lower are counted later, after others may already have taken the pool. */
 function withPhantom(inp: ChainInputs, c: number, weight: bigint): ChainInputs {
   const ranks = Array.from({ length: inp.m }, (_, i) => (i === c ? 1 : inp.m + 2));
@@ -312,7 +312,7 @@ export function leadIn(
   return drive(leadSearch(inp, first, c, tally));
 }
 
-/** Open round: leads for initiatives funded in Tier-S by the live tally (only while firstOpen = 0). */
+/** Open round: leads for initiatives funded in S-Tier by the live tally (only while firstOpen = 0). */
 export function liveLeads(
   inp: ChainInputs,
   firstOpen: number,
@@ -331,7 +331,7 @@ export function liveLeadsAsync(
 }
 
 /** Closed round: tier k's initiatives (k ≥ 1) → gapTo tier k−1 judged at settleInputs[k−1];
- * Tier-S's → leadIn at settleInputs[0]; not funded → gapTo Tier-B at settleInputs[2].
+ * S-Tier's → leadIn at settleInputs[0]; not funded → gapTo B-Tier at settleInputs[2].
  * Knock-on: onlyTarget. Missing settle inputs → no figure. */
 export function finalWhatIfs(
   settleInputs: (ChainInputs | null)[],

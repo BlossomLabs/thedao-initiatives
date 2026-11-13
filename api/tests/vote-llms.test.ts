@@ -62,9 +62,9 @@ Deno.test("vote llms: lists every round project with type, amounts and affiliati
 
 Deno.test("vote llms: states the rules with the pool's 1.5× in dollars", () => {
   assertStringIncludes(text, "at least $1,500,000 in total (1.5× the $1,000,000 pool)");
-  assertStringIncludes(text, "Tier-S needs at least 3 independent projects");
+  assertStringIncludes(text, "S-Tier needs at least 3 independent projects");
   assertStringIncludes(text, "Anything you leave unranked gets nothing from you");
-  assert(!text.includes("Tier-A needs at least 3"));
+  assert(!text.includes("A-Tier needs at least 3"));
 });
 
 Deno.test("vote llms: the format example parses", () => {

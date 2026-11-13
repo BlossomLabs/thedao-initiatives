@@ -325,7 +325,7 @@ Their minute-based stopping conditions are historical; the current interface use
 
 Simulated on the 49 initiatives of TheDAO Security Fund (asks reduced by 25% and capped
 at $200,000), a $1,000,000 pool and 200 invented badge holders, 30 rounds each. Unless
-it says otherwise, a late group votes during the last day, which moves Tier-S in
+it says otherwise, a late group votes during the last day, which moves S-Tier in
 every round.
 
 | | Quiet Ending | Slow Quiet Ending |
@@ -335,7 +335,7 @@ every round.
 | Time after the deadline, with the late group | about 17 hours on average, 30 at most | about 85 hours on average, 96 at most |
 | A group stepping out of funded proposals, without payment-shift checks or supporter locks | its category gains about 22% | its category gains about 21% |
 | The same, with payment-shift checks and supporter locks | no gain; about 51 ballots refused per round | no gain; about 59 ballots refused per round |
-| A group flip-flopping to reach the last window, without supporter locks | 45 tiers closed by the schedule in 30 rounds | Tier-S closed by the schedule in every round |
+| A group flip-flopping to reach the last window, without supporter locks | 45 tiers closed by the schedule in 30 rounds | S-Tier closed by the schedule in every round |
 | The same, with supporter locks | no tier closed by the schedule; five tallies at most | the tier is confirmed in two or three tallies |
 | A group pushing a proposal over the line for one block in every window, then taking it off before the closing tally (in-window tallies, 11 November 2026) | 51 tiers closed by the schedule in 30 rounds, about 50 hours after the deadline on average, 72 at most; supporter locks from the checkpoints do not stop it, and locks on every open tier only bring it to 35 | not modelled |
 | A group pushing a new proposal every window | runs out after 10 tallies at most, and loses funding for its own category | runs out after 9 windows at most, and loses funding for its own category |
@@ -354,7 +354,7 @@ Alternatives that were tried and set aside:
 - **Accepting proposals one by one inside a tier.** It usually gave the plain result
   but not always, because it fixes the order of payment before the tier is settled.
 - **Letting new voters join after the deadline.** It moved the result away from the
-  plain tally and lengthened Tier-S.
+  plain tally and lengthened S-Tier.
 - **Sealing the last day's ballots with a hard deadline.** A group stepping out gained
   about as much as with public ballots.
 

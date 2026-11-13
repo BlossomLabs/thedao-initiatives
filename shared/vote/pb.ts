@@ -1,7 +1,7 @@
 /** Ballots as pabutools/Pabulib `.pb` text with the Blossom tie extension
  * (docs/superpowers/specs/2026-11-11-ballot-rules-design.md): `vote_type;ordinal`,
  * project ids are slugs, and in the `vote` cell projects of equal rank are joined with
- * `=` and groups follow in order with `,`: Tier-S first. An empty group (`,,`) is an
+ * `=` and groups follow in order with `,`: S-Tier first. An empty group (`,,`) is an
  * empty tier. Ordinary ordinal parsers don't read `=`: only this profile does. */
 import type { Tier } from "./ballot.ts";
 

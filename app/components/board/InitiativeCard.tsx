@@ -130,7 +130,7 @@ export default function InitiativeCard({
   titles,
 }: {
   card: Card;
-  /** Tier-S's lead, micro-USD. */
+  /** S-Tier's lead, micro-USD. */
   lead?: string;
   /** The open vote's gap to this initiative's next tier, drawn in place of the %. */
   next?: NextTierEntry;
@@ -168,7 +168,7 @@ export default function InitiativeCard({
   const pctOn = vote?.show
     ? voteStanding(summary.total, r.goalUsd, vote).kind === "eligible"
     : !zero;
-  // The vote results' what-if: Tier-S's lead, or the gap to the next tier (to Tier-B for
+  // The vote results' what-if: S-Tier's lead, or the gap to the next tier (to B-Tier for
   // one the vote didn't fund). Its tick and callout sit on the bar; the figure stays in
   // the amount row.
   const w = whatIf({ tier: voteTier, next, lead });

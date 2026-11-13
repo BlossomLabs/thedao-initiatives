@@ -22,11 +22,11 @@ export type MockKind = (typeof MOCKS)[number];
 export const MOCK_LABELS: Record<MockKind, string> = {
   started: "Just opened",
   prefilled: "Prefilled from ratings",
-  "s-settling": "Tier-S settling",
-  "s-extended": "Tier-S extended",
-  "s-last": "Tier-S last window",
-  spent: "Tier-S settled",
-  "b-settling": "Tier-B settling",
+  "s-settling": "S-Tier settling",
+  "s-extended": "S-Tier extended",
+  "s-last": "S-Tier last window",
+  spent: "S-Tier settled",
+  "b-settling": "B-Tier settling",
   missed: "Badge that never voted",
   finished: "Finished",
 };
@@ -49,7 +49,7 @@ const D = 24 * H;
 const VOTERS = 40;
 const POOL_USD = 1_000_000;
 /* The real round's dates (docs/factsheet.md): voting opens Tue Nov 17 (its hour is still
- * to be set), Tier-S first tallies Thu Dec 3, Tier-A Mon Dec 7, Tier-B Wed Dec 9, each at
+ * to be set), S-Tier first tallies Thu Dec 3, A-Tier Mon Dec 7, B-Tier Wed Dec 9, each at
  * 21:00 UTC; 9 windows of 24h, 12h, 6h… halving (the last 5m 37s), as deployed. */
 const at = (iso: string) => Date.parse(iso) / 1000;
 const OPENS = at("2026-11-17T17:00:00Z");
@@ -69,20 +69,20 @@ export const MOCK_NOW: Record<MockKind, number> = {
   // Voting opened five hours ago.
   started: OPENS + 5 * H,
   prefilled: OPENS + 5 * H,
-  // Tier-S 12h into its first window, nothing changed yet.
+  // S-Tier 12h into its first window, nothing changed yet.
   "s-settling": FIRST[0] + 12 * H,
-  // Tier-S changed in its first window: 6h into the 12h second one (Sat Dec 5, 03:00 UTC).
+  // S-Tier changed in its first window: 6h into the 12h second one (Sat Dec 5, 03:00 UTC).
   "s-extended": FIRST[0] + WINDOW + 6 * H,
-  // Tier-S changed in every window: three minutes left of its last one.
+  // S-Tier changed in every window: three minutes left of its last one.
   "s-last": FIRST[0] + Array.from({ length: 9 }, (_, k) => D >> k).reduce((a, b) => a + b) -
     3 * 60,
-  // Tier-A and Tier-S settled; Tier-B 10h into its first window.
+  // A-Tier and S-Tier settled; B-Tier 10h into its first window.
   "b-settling": FIRST[2] + 10 * H,
-  // Tier-S settled (Fri Dec 4) before this badge sent a first ballot.
+  // S-Tier settled (Fri Dec 4) before this badge sent a first ballot.
   missed: FIRST[1] + 20 * H,
-  // Tier-S settled in its first window (Fri Dec 4); Tier-A is 20h into its first.
+  // S-Tier settled in its first window (Fri Dec 4); A-Tier is 20h into its first.
   spent: FIRST[1] + 20 * H,
-  // Every tier settled in its first window; Tier-B on Thu Dec 10. Now: Sat Dec 12.
+  // Every tier settled in its first window; B-Tier on Thu Dec 10. Now: Sat Dec 12.
   finished: FIRST[2] + 2 * D + 15 * H,
 };
 
@@ -119,7 +119,7 @@ function fictionalRound(cards: Card[], opensAt: number, firstTally: [number, num
   };
 }
 
-/** The badge's ballot in every state: 3 in Tier-S, 4 in Tier-A, and Tier-B from 6 on
+/** The badge's ballot in every state: 3 in S-Tier, 4 in A-Tier, and B-Tier from 6 on
  * until the ballot asks for 1.5× the pool (the ballot rules). */
 function sampleBallot(round: VoteManifest) {
   const { slugs } = round;
@@ -189,7 +189,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
       live: empty,
     };
     if (kind === "started") return { round, view };
-    // What this badge rated on the board: 5★ Tier-S, 4★ Tier-A, 3★ Tier-B, the rest stay out.
+    // What this badge rated on the board: 5★ S-Tier, 4★ A-Tier, 3★ B-Tier, the rest stay out.
     const ratings: Record<string, number> = {};
     for (const x of s) ratings[x] = 5;
     for (const x of a) ratings[x] = 4;
@@ -200,7 +200,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     return { round, view, ratings };
   }
 
-  // Tier-S settling: in its first window, quiet; changed, in its second; or in its last,
+  // S-Tier settling: in its first window, quiet; changed, in its second; or in its last,
   // where it settles whatever happens. The badge has voted.
   if (kind === "s-settling" || kind === "s-extended" || kind === "s-last") {
     const first = FIRST;
@@ -209,7 +209,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     const window = kind === "s-settling" ? 1 : kind === "s-extended" ? 2 : MAX_WINDOWS;
     const endsAt = first[0] +
       Array.from({ length: window }, (_, k) => WINDOW >> k).reduce((x, y) => x + y);
-    // b[0] is in this badge's Tier-B, but other ballots put it in Tier-S: it wins there.
+    // b[0] is in this badge's B-Tier, but other ballots put it in S-Tier: it wins there.
     const live = [s[0], s[1], b[0], a[0]];
     const view: RoundView = {
       ...base,
@@ -238,7 +238,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     return { round, view, skipped: round.slugs.filter((x) => !ballot[x]).slice(0, 6) };
   }
 
-  // Tier-S and Tier-A settled in their first windows; Tier-B in its first, quiet.
+  // S-Tier and A-Tier settled in their first windows; B-Tier in its first, quiet.
   if (kind === "b-settling") {
     const first = FIRST;
     const { round, ask } = fictionalRound(cards, OPENS, first);
@@ -250,7 +250,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
         settled("S", first[0] + WINDOW, [
           { slug: s[0], award: ask(s[0]), paid: share * 0.28 },
           { slug: s[1], award: ask(s[1]), paid: share * 0.14 },
-          // On this badge's ballot in Tier-B; other ballots funded it in Tier-S.
+          // On this badge's ballot in B-Tier; other ballots funded it in S-Tier.
           { slug: b[0], award: ask(b[0]), paid: 0 },
         ], n),
         settled("A", first[1] + WINDOW, [
@@ -278,7 +278,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     return { round, view, skipped: round.slugs.filter((x) => !ballot[x]).slice(0, 6) };
   }
 
-  // A badge that never sent a ballot: Tier-S settled without it, so it can't vote now.
+  // A badge that never sent a ballot: S-Tier settled without it, so it can't vote now.
   if (kind === "missed") {
     const first = FIRST;
     const { round, ask } = fictionalRound(cards, OPENS, first);
@@ -310,7 +310,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   }
 
   if (kind === "spent") {
-    // Tier-S settled quietly after its first window; Tier-A is in its first window now.
+    // S-Tier settled quietly after its first window; A-Tier is in its first window now.
     const first = FIRST;
     const aFirst = first[1];
     const { round, ask } = fictionalRound(cards, OPENS, first);
@@ -322,7 +322,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
         settled("S", first[0] + WINDOW, [
           { slug: s[0], award: ask(s[0]), paid: share * 0.28 },
           { slug: s[1], award: ask(s[1]), paid: share * 0.14 },
-          // On this badge's ballot in Tier-B; other ballots funded it in Tier-S.
+          // On this badge's ballot in B-Tier; other ballots funded it in S-Tier.
           { slug: b[0], award: ask(b[0]), paid: 0 },
         ], n),
         {
@@ -354,7 +354,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   const { ballot, s, a, b } = sampleBallot(round);
   const funded = (slug: string, paid: number) => ({ slug, award: ask(slug), paid: share * paid });
   const mine = {
-    // b[0]: this badge's Tier-B, funded in Tier-S by the other ballots.
+    // b[0]: this badge's B-Tier, funded in S-Tier by the other ballots.
     S: [funded(s[0], 0.28), funded(s[1], 0.14), funded(b[0], 0)],
     A: [funded(a[0], 0.2), funded(a[2], 0.1)],
     B: [funded(b[1], 0.15)],

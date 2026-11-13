@@ -102,7 +102,7 @@ export default function SettingsForm({ r, run }: { r: AdminInitiative; run: Run 
         <Field
           label="Affiliations"
           htmlFor="s-affiliations"
-          hint="Comma-separated, e.g. Seal. Projects that share one count as one for the vote's Tier-S rules. Never shown on the site."
+          hint="Comma-separated, e.g. Seal. Projects that share one count as one for the vote's S-Tier rules. Never shown on the site."
         >
           <Input
             id="s-affiliations"

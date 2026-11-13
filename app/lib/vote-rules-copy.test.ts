@@ -16,7 +16,7 @@ it("size: what it requests, what it must, and where to add", () => {
     }),
   )
     .toBe(
-      "Your ballot requests $1,100,000. It must request at least $1,369,866 (1.5× the $913,244 pool). Add more projects; Tier-B is a good place for them.",
+      "Your ballot requests $1,100,000. It must request at least $1,369,866 (1.5× the $913,244 pool). Add more projects; B-Tier is a good place for them.",
     );
 });
 
@@ -27,10 +27,10 @@ it("independent: names the affiliated projects that count as one", () => {
     count: 2,
     related: [{ group: 0, projects: [0, 1] }],
   })).toBe(
-    "Tier-S needs at least 3 independent projects. Seal Audits and Seal Tooling are affiliated with Seal, so they count as one.",
+    "S-Tier needs at least 3 independent projects. Seal Audits and Seal Tooling are affiliated with Seal, so they count as one.",
   );
   expect(say({ rule: "independent", tier: 1, count: 0, related: [] })).toBe(
-    "Tier-A needs at least 3 independent projects.",
+    "A-Tier needs at least 3 independent projects.",
   );
   expect(say({
     rule: "independent",
@@ -51,7 +51,7 @@ it("group: what the affiliation takes of the tier", () => {
     }),
   )
     .toBe(
-      "Projects affiliated with Seal take $310,000 of Tier-S's $500,000. One affiliation can hold at most half.",
+      "Projects affiliated with Seal take $310,000 of S-Tier's $500,000. One affiliation can hold at most half.",
     );
 });
 
@@ -70,9 +70,9 @@ it("the ballot box's line: the first rule to meet, size before tiers, else valid
   });
   expect(ruleStatus([a, s])).toEqual({
     ok: false,
-    text: "Needs at least 3 independent projects in Tier-S",
+    text: "Needs at least 3 independent projects in S-Tier",
   });
-  expect(ruleStatus([a]).text).toBe("Needs at least 3 independent projects in Tier-A");
+  expect(ruleStatus([a]).text).toBe("Needs at least 3 independent projects in A-Tier");
   expect(ruleStatus([])).toEqual({ ok: true, text: "You can add as many initiatives as you want" });
 });
 

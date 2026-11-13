@@ -203,6 +203,6 @@ fixtures before those land; it does not ship to a real round until they do.
 
 ## Ballot rules
 
-Prefill from star ratings, the minimum ballot size, Tier-S independence by affiliation, the
+Prefill from star ratings, the minimum ballot size, S-Tier independence by affiliation, the
 contract's proof, adding projects during the vote, pabutools paste and `/vote/llms.txt`:
 see [the ballot rules design](2026-11-11-ballot-rules-design.md).

@@ -691,7 +691,7 @@
     }
   },
   {
-    "name": "Tier-A enforced, empty",
+    "name": "A-Tier enforced, empty",
     "projects": [
       {
         "askUsd": "100",

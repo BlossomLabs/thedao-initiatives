@@ -277,7 +277,7 @@ contract SignedBallotsTest is Fixture {
     }
 
     /// Ties, a ballot shorter than the projects, and explicit withholding are valid;
-    /// a ballot that withholds everything has no Tier-S and is refused.
+    /// a ballot that withholds everything has no S-Tier and is refused.
     function test_validTiesAndExplicitWithholding() public {
         vm.warp(start);
         vm.startPrank(alice);

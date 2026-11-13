@@ -59,7 +59,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         bytes32 r;
         bytes32 vs;
         bytes ballot;
-        /// @dev Three pairwise-unrelated projects per enforced tier, Tier-S first. Not
+        /// @dev Three pairwise-unrelated projects per enforced tier, S-Tier first. Not
         ///      signed: it only shows the ballot is valid, so any correct proof works.
         uint8[] proof;
     }
@@ -87,7 +87,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     uint64 public mintDeadline;
     uint64 public immutable maximumTierDuration;
     uint64 public hardDeadline;
-    /// @notice Tiers held to the independence rules: bit 0 Tier-S (always), bit 1 Tier-A.
+    /// @notice Tiers held to the independence rules: bit 0 S-Tier (always), bit 1 A-Tier.
     uint8 public independentTiers = 1;
     string private _metadataBaseURI;
 
@@ -202,8 +202,8 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         }
     }
 
-    /// @notice Whether Tier-A is held to the independence rules too. Tier-S always is,
-    ///         Tier-B never. Fixed when voting opens.
+    /// @notice Whether A-Tier is held to the independence rules too. S-Tier always is,
+    ///         B-Tier never. Fixed when voting opens.
     function setIndependentTiers(uint8 mask) external onlyRole(ADMIN_ROLE) {
         _requireSetup();
         if (mask & 1 == 0 || mask > 3) revert InvalidTiers();
@@ -379,7 +379,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         }
     }
 
-    /// @dev The rank of each group of equal rank (Tier-S, Tier-A, Tier-B): competition
+    /// @dev The rank of each group of equal rank (S-Tier, A-Tier, B-Tier): competition
     ///      ranks without gaps, at most three groups.
     function _tierRanks(uint256[] memory counts) private pure returns (uint8[3] memory tierRank, uint256 tiers) {
         uint256 seen;

@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Tiers are written **Tier-S**, **Tier-A**, **Tier-B** in prose, comments, copy and test names (`AGENTS.md`). In running text from code use `tierName()` from `shared/vote/ballot.ts`.
+- Tiers are written **S-Tier**, **A-Tier**, **B-Tier** in prose, comments, copy and test names (`AGENTS.md`). In running text from code use `tierName()` from `shared/vote/ballot.ts`.
 - Dates in copy use the helpers in `app/lib/format.ts`.
 - Amounts are six-decimal USD (`bigint` micro-USD), rounded down, as in `RoundAccounting._convert`.
 - `stageTally` (`shared/vote/stage.ts`), the supporter locks, the window schedule and the ballot rules do not change.
@@ -69,13 +69,13 @@ Rules (spec, "Fully covered projects"):
 
 ```python
 def test_a_donation_before_tier_s_settles_extends_the_window(self):
-    # costs [62,12,42,32] fund [3,2] in Tier-S; a donation taking project 0 to 40 funds [3,0]
+    # costs [62,12,42,32] fund [3,2] in S-Tier; a donation taking project 0 to 40 funds [3,0]
     costs = [62, 12, 42, 32]
     voters = [(76, [2, 2, 3, 1]), (76, [1, 2, 1, 2])]
     quiet = run_on_time(costs, voters, 0, lambda day, state: {}, tiers=3)
     moved = run_on_time(costs, voters, 0, lambda day, state: {}, tiers=3,
                         asks_for_day=lambda day, state: [40, 12, 42, 32] if day >= 1 else None)
-    self.assertEqual(quiet["days"][1]["confirmed"][:1], [0])   # Tier-S confirmed at the deadline
+    self.assertEqual(quiet["days"][1]["confirmed"][:1], [0])   # S-Tier confirmed at the deadline
     self.assertNotIn(0, moved["days"][1]["confirmed"])          # not quiet: the window extends
 
 def test_a_covered_project_is_not_funded_and_is_recorded_as_covered(self):
@@ -86,7 +86,7 @@ def test_a_covered_project_is_not_funded_and_is_recorded_as_covered(self):
     self.assertEqual(result["covered"][0], [2])
 
 def test_crossing_zero_alone_does_not_extend(self):
-    # project 1 is funded in Tier-S at cost 5 and covered at cost 0; nothing else moves
+    # project 1 is funded in S-Tier at cost 5 and covered at cost 0; nothing else moves
     costs = [100, 5]
     voters = [(100, [1, 1]), (100, [1, 1])]
     result = run_on_time(costs, voters, 0, lambda day, state: {}, tiers=3,
@@ -197,7 +197,7 @@ export type ChainState = {
 };
 export type Settled = { /* as today, plus */ covered: number[] };
 // replay input: `needs`, `poolUsd` and `settleNeeds` are removed; add
-//   states: ChainState[]   // ascending by block; at least one at or before the first Tier-S tally
+//   states: ChainState[]   // ascending by block; at least one at or before the first S-Tier tally
 // `snapshots` stays as an optional cache.
 // RoundState tiers in "settling" gain `covered: number[]` (the latest tally's).
 // RoundState.live gains `covered: number[]`.
@@ -215,15 +215,15 @@ Rules:
 - [ ] **Step 1: Write the failing tests.** Rewrite the file's helpers so a round is built from `states`; a helper `flat(needs, poolUsd)` returning one state at block 0 keeps the existing cases short. Add:
 
 ```ts
-it("a donation inside the Tier-S window is a tally event and extends it", …);
+it("a donation inside the S-Tier window is a tally event and extends it", …);
 //   states: block 0 asks [62,12,42,32]; block 50 (inside window 1) asks [40,12,42,32], event true
-//   ballots [[2,2,3,1],[1,2,1,2]], pool 152 → after window 1: Tier-S status "settling", window 2
-it("the same donation after Tier-S settled changes nothing", …);
-//   block after the cutoff → Tier-S funded [3,2], identical awards with and without the state
+//   ballots [[2,2,3,1],[1,2,1,2]], pool 152 → after window 1: S-Tier status "settling", window 2
+it("the same donation after S-Tier settled changes nothing", …);
+//   block after the cutoff → S-Tier funded [3,2], identical awards with and without the state
 it("a tally uses the pool at its own block", …);                 // pool raise mid-window
 it("a covered project is not funded and is recorded as covered", …);  // asks [100,100,0] → covered [2]
 it("crossing $0 alone does not extend the window", …);           // ask 5 → 0 mid-window, still settles at window 1
-it("a project covered at settlement never returns", …);          // ask back to 10 in Tier-A: not funded
+it("a project covered at settlement never returns", …);          // ask back to 10 in A-Tier: not funded
 it("a project covered mid-window but not at the cutoff is an ordinary candidate", …);
 it("a project missing from an early state is not a candidate there", …);   // asks shorter than m
 it("is the same with and without snapshots", …);
@@ -370,7 +370,7 @@ Changes:
 - Keep the `settled` KV record as a cache, written only after `FINAL_AFTER_SECS` as today. Add `covered` to `storeSettled`/`loadSettled`; a stored record without it loads as `[]`.
 - A failure in `chainStates` is `fail(503, "asks_unavailable", "The vote results can't be read from the chain right now.")`.
 
-- [ ] **Step 1: Write the failing tests**: `the round's asks come from the chain states, not the board` (board says raised, states say not: the result follows the states); `a donation inside the Tier-S window shows the tier still settling`; `a settled tier is the same before and after its record is stored`; `an RPC without past state is a 503, not a result` (Review Focus 2: the hook throws); `a covered project is listed as covered`. Port every existing test from `needs:` to `states:` with a one-state helper.
+- [ ] **Step 1: Write the failing tests**: `the round's asks come from the chain states, not the board` (board says raised, states say not: the result follows the states); `a donation inside the S-Tier window shows the tier still settling`; `a settled tier is the same before and after its record is stored`; `an RPC without past state is a 503, not a result` (Review Focus 2: the hook throws); `a covered project is listed as covered`. Port every existing test from `needs:` to `states:` with a one-state helper.
 - [ ] **Step 2: Run** `deno test -A api/` — expected: the new tests fail, ported ones fail to compile until Step 3.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run** `deno test -A api/ && deno task check:api && deno task typecheck` — expected: pass (the app may need the `covered` field typed where it reads `/round`; add the type only, the screen is Task 9).

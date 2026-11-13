@@ -5,7 +5,7 @@ import { usdShort, usdShortUp } from "~/lib/format";
 import { dollars } from "~/lib/vote-results";
 
 /**
- * What the vote results say about one initiative: a Tier-S initiative how far ahead
+ * What the vote results say about one initiative: an S-Tier initiative how far ahead
  * it is (`amount`, dollars), any other how much more backing takes it to the next tier
  * (`next`, whose gap is null when no amount alone gets it there).
  */
@@ -13,8 +13,8 @@ export type WhatIf =
   | { kind: "lead"; amount: number }
   | { kind: "gap"; next: NextTierEntry };
 
-/** The initiative's what-if, or null when the round has nothing for it. A Tier-S lead
- * under one $1K step says nothing, and Tier-S has no tier above to reach. */
+/** The initiative's what-if, or null when the round has nothing for it. An S-Tier lead
+ * under one $1K step says nothing, and S-Tier has no tier above to reach. */
 export function whatIf(
   { tier, next, lead }: { tier?: Tier; next?: NextTierEntry; lead?: string },
 ): WhatIf | null {
@@ -33,12 +33,12 @@ export function whatIfTick(w: WhatIf | null, raised: number, goal: number): numb
   return Math.min(100, ((raised + dollars(w.next.gap)) / goal) * 100);
 }
 
-/** The value and its words: "$23k" and "to Tier-S", "$46k" and "ahead", or no value and
- * "Out of reach for Tier-B". Gaps round up, so they never read as less than they are. */
+/** The value and its words: "$23k" and "to S-Tier", "$46k" and "ahead", or no value and
+ * "Out of reach for B-Tier". Gaps round up, so they never read as less than they are. */
 function parts(w: WhatIf): { value?: string; words: React.ReactNode; text: string } {
   if (w.kind === "lead") return { value: usdShort(w.amount), words: "ahead", text: "ahead" };
   const name = tierName(w.next.tier);
-  // A tier's name never breaks inside "Tier-S".
+  // A tier's name never breaks inside "S-Tier".
   const tier = <span className="whitespace-nowrap">{name}</span>;
   if (w.next.gap === null) {
     return { words: <>Out of reach for {tier}</>, text: `Out of reach for ${name}` };
@@ -72,8 +72,8 @@ const LEAD_NOTE =
   "Its backers could give this much less between them and it would still be funded in";
 
 /**
- * The figure as plain text, the value big and the words small: "$23k to Tier-S",
- * "$46k ahead", "Out of reach for Tier-B". On a card it sits in the amount row; the
+ * The figure as plain text, the value big and the words small: "$23k to S-Tier",
+ * "$46k ahead", "Out of reach for B-Tier". On a card it sits in the amount row; the
  * details are in the bar's callout.
  */
 export function WhatIfFigure({ w }: { w: WhatIf }) {
@@ -95,7 +95,7 @@ export function whatIfText(
 ): string {
   const { value, text } = parts(w);
   const head = value ? `${value} ${text}.` : `${text}.`;
-  if (w.kind === "lead") return `${head} ${LEAD_NOTE} Tier-S.`;
+  if (w.kind === "lead") return `${head} ${LEAD_NOTE} S-Tier.`;
   if (w.next.gap === null) return head;
   const lines = knockOn(w.next, titles, final);
   return lines.length
@@ -105,9 +105,9 @@ export function whatIfText(
 
 /**
  * The bar's callout for a what-if, in the look of the "qualify" callout: its arrow on
- * the tick, or at the bar's end when there is no tick (Tier-S, out of reach). The value
+ * the tick, or at the bar's end when there is no tick (S-Tier, out of reach). The value
  * big, the words small, then the knock-on lines (or "Nothing else changes."), or for
- * Tier-S what the lead means. A tick past the bar's middle anchors it on the right, so
+ * S-Tier what the lead means. A tick past the bar's middle anchors it on the right, so
  * it opens towards the bar and stays in the row.
  */
 export function WhatIfCallout(
@@ -137,7 +137,7 @@ export function WhatIfCallout(
       </span>
       {w.kind === "lead" && (
         <span className="mt-1 block">
-          {LEAD_NOTE} <span className="whitespace-nowrap">Tier-S</span>.
+          {LEAD_NOTE} <span className="whitespace-nowrap">S-Tier</span>.
         </span>
       )}
       {lines && lines.length === 0 && <span className="mt-1 block">Nothing else changes.</span>}

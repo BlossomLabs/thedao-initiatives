@@ -65,8 +65,8 @@ it("a settled tier says so, and its card locks the choices", async () => {
   const card = await screen.findByRole("dialog", { name: "BETA" });
   expect(card.querySelector("[data-peek-place]")).toHaveTextContent("Not ranked yet");
   const option = await optionsIn(card);
-  expect(option("Tier-S, Must fund")).toHaveAttribute("aria-disabled", "true");
-  expect(option("Tier-A, Should fund")).not.toHaveAttribute("aria-disabled", "true");
+  expect(option("S-Tier, Must fund")).toHaveAttribute("aria-disabled", "true");
+  expect(option("A-Tier, Should fund")).not.toHaveAttribute("aria-disabled", "true");
   expect(onChange).not.toHaveBeenCalled();
 });
 
@@ -79,8 +79,8 @@ it("an initiative in a settled tier opens its card, but nothing in it moves it",
   expect(within(card).queryByRole("combobox", { name: /^Change where/ })).toBeNull();
   // Why, in a popover on the selector, not in the card's text.
   expect(card).not.toHaveTextContent("has settled");
-  fireEvent.click(within(card).getByLabelText("Tier-S has settled."));
-  expect(await screen.findByText("Tier-S has settled.", { selector: "[data-peek-note]" }))
+  fireEvent.click(within(card).getByLabelText("S-Tier has settled."));
+  expect(await screen.findByText("S-Tier has settled.", { selector: "[data-peek-note]" }))
     .toBeInTheDocument();
   expect(onChange).not.toHaveBeenCalled();
 });
@@ -111,7 +111,7 @@ it("a settled chip says what this badge paid for it", () => {
   expect(list.getByRole("button", { name: "BETA, not funded" })).toBeInTheDocument();
 });
 
-const NOTE = "Your Tier-S picks that weren't funded stay first in line for what you have left.";
+const NOTE = "Your S-Tier picks that weren't funded stay first in line for what you have left.";
 
 function settled(tiers: Partial<Record<string, Tier>>) {
   render(
@@ -154,7 +154,7 @@ it("a tap on the settled tier shows the note too (phones can't hover); a tap els
   await waitFor(() => expect(screen.queryByText(NOTE)).toBeNull());
 });
 
-it("a settled Tier-A with picks that weren't funded has its own note", async () => {
+it("a settled A-Tier with picks that weren't funded has its own note", async () => {
   render(
     <TierBallot
       items={items}
@@ -168,7 +168,7 @@ it("a settled Tier-A with picks that weren't funded has its own note", async () 
   fireEvent.click(screen.getByRole("list", { name: "Should fund" }).parentElement!);
   expect(
     await screen.findByText(
-      "Your Tier-A picks that weren't funded stay ahead of Tier-B for what you have left.",
+      "Your A-Tier picks that weren't funded stay ahead of B-Tier for what you have left.",
     ),
   ).toBeInTheDocument();
 });
@@ -185,12 +185,12 @@ it("a tap on a chip opens its card; a choice there moves it, Details opens the p
   const { onChange } = show({ alpha: "S", beta: "A" });
   fireEvent.click(screen.getByRole("button", { name: "BETA" }));
   const card = await screen.findByRole("dialog", { name: "BETA" });
-  expect(card.querySelector("[data-peek-place]")).toHaveTextContent("Tier-A · Should fund");
+  expect(card.querySelector("[data-peek-place]")).toHaveTextContent("A-Tier · Should fund");
   const details = within(card).getByRole("link", { name: /Open full page for BETA/ });
   expect(details).toHaveAttribute("href", "/initiative/beta");
   expect(details).toHaveAttribute("target", "_blank");
   expect(onChange).not.toHaveBeenCalled();
-  await pickIn(card, "Tier-B, Nice to have");
+  await pickIn(card, "B-Tier, Nice to have");
   expect(onChange).toHaveBeenCalledWith("beta", "B");
   // The card stays open; Escape closes it.
   expect(screen.getByRole("dialog", { name: "BETA" })).toBeInTheDocument();
@@ -222,9 +222,9 @@ it("a settled chip's card says whether it was funded", async () => {
   );
   fireEvent.click(screen.getByRole("button", { name: /^ALPHA/ }));
   const card = await screen.findByRole("dialog", { name: "ALPHA" });
-  fireEvent.click(within(card).getByLabelText("Tier-S has settled. You paid $900."));
+  fireEvent.click(within(card).getByLabelText("S-Tier has settled. You paid $900."));
   expect(
-    await screen.findByText("Tier-S has settled. You paid $900.", { selector: "[data-peek-note]" }),
+    await screen.findByText("S-Tier has settled. You paid $900.", { selector: "[data-peek-note]" }),
   ).toBeInTheDocument();
 });
 
@@ -233,7 +233,7 @@ it("Details on a list tile opens the same card; Not ranked is chosen, a tier pla
   fireEvent.click(screen.getByRole("button", { name: "Details for GAMMA" }));
   const card = await screen.findByRole("dialog", { name: "GAMMA" });
   expect(card.querySelector("[data-peek-place]")).toHaveTextContent("Not ranked yet");
-  await pickIn(card, "Tier-A, Should fund");
+  await pickIn(card, "A-Tier, Should fund");
   expect(onChange).toHaveBeenCalledWith("gamma", "A");
   expect(screen.queryByRole("button", { name: /preview for|Info on/ })).toBeNull();
 });
@@ -284,7 +284,7 @@ it("skipped initiatives are hidden, counted, and shown on demand; a tier brings 
   fireEvent.click(within(hidden).getByRole("button", { name: "Details for GAMMA" }));
   const card = await screen.findByRole("dialog", { name: "GAMMA" });
   expect(card.querySelector("[data-peek-place]")).toHaveTextContent("Skipped");
-  await pickIn(card, "Tier-B, Nice to have");
+  await pickIn(card, "B-Tier, Nice to have");
   expect(onSkip).toHaveBeenCalledWith("gamma", false);
   expect(onChange).toHaveBeenCalledWith("gamma", "B");
 });
@@ -310,7 +310,7 @@ it("every tile in the list has a quick Skip; a skipped one has Unskip", () => {
   expect(onChange).toHaveBeenCalledWith("beta", undefined);
 });
 
-it("‹ › step through the ballot in order: Tier-S, Tier-A, Tier-B, then the list (no counter)", async () => {
+it("‹ › step through the ballot in order: S-Tier, A-Tier, B-Tier, then the list (no counter)", async () => {
   const { onChange } = show({ gamma: "S", alpha: "B" });
   fireEvent.click(screen.getByRole("button", { name: "GAMMA" }));
   let card = await screen.findByRole("dialog", { name: "GAMMA" });
@@ -318,7 +318,7 @@ it("‹ › step through the ballot in order: Tier-S, Tier-A, Tier-B, then the l
   expect(within(card).getByRole("button", { name: "Previous initiative" })).toBeDisabled();
   fireEvent.click(within(card).getByRole("button", { name: "Next initiative" }));
   card = await screen.findByRole("dialog", { name: "ALPHA" });
-  expect(card.querySelector("[data-peek-place]")).toHaveTextContent("Tier-B · Nice to have");
+  expect(card.querySelector("[data-peek-place]")).toHaveTextContent("B-Tier · Nice to have");
   // The arrow keys too; the list comes last.
   fireEvent.keyDown(document, { key: "ArrowRight" });
   card = await screen.findByRole("dialog", { name: "BETA" });
@@ -350,11 +350,11 @@ it("a choice on the card moves the initiative but keeps the card open, and ‹ �
   inRouter(<Live start={{ alpha: "S", beta: "A" }} />);
   fireEvent.click(screen.getByRole("button", { name: "ALPHA" }));
   let card = await screen.findByRole("dialog", { name: "ALPHA" });
-  // Tier-S to Tier-B: on the page ALPHA now comes after BETA, but the card's order holds.
-  await pickIn(card, "Tier-B, Nice to have");
+  // S-Tier to B-Tier: on the page ALPHA now comes after BETA, but the card's order holds.
+  await pickIn(card, "B-Tier, Nice to have");
   card = screen.getByRole("dialog", { name: "ALPHA" });
   await waitFor(() =>
-    expect(card.querySelector("[data-peek-place]")).toHaveTextContent("Tier-B · Nice to have")
+    expect(card.querySelector("[data-peek-place]")).toHaveTextContent("B-Tier · Nice to have")
   );
   expect(within(screen.getByRole("list", { name: "Nice to have" })).getByText("ALPHA"))
     .toBeInTheDocument();

@@ -4,7 +4,7 @@ import { tierName } from "../../../shared/vote/ballot";
 import type { Tier } from "../../../shared/vote/ballot";
 import { type Schedule, windowEnds } from "../../../shared/vote/quiet-ending";
 
-/** Where the round is, for the round box's stepper (Voting → Tier-S → Tier-A → Tier-B →
+/** Where the round is, for the round box's stepper (Voting → S-Tier → A-Tier → B-Tier →
  * Result) and its detail. Times are unix seconds. */
 
 export type StepKind = "done" | "current" | "next" | "up";

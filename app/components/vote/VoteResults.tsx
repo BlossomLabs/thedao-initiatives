@@ -20,11 +20,11 @@ const IN_ROUND: ReadonlySet<string> = new Set(ROUND.slugs);
 const REAL = ROUND.kind === "real";
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
-/** Voters should expect Tier-B may be empty: it only funds what the pool has left. */
+/** Voters should expect B-Tier may be empty: it only funds what the pool has left. */
 const tierBEmpty = (rv: RoundView) =>
   rv.tiers.find((t) => t.tier === "B")?.status !== "settled" &&
   !Object.values(rv.live.tiers ?? {}).includes("B");
-const TIER_B_NOTE = " · Tier-B: nothing funded yet, the pool may not reach it.";
+const TIER_B_NOTE = " · B-Tier: nothing funded yet, the pool may not reach it.";
 const POOL_NAME = REAL ? "pool" : "demo pool";
 
 /** The vote results: the front page, limited to the round's initiatives, with what the
@@ -86,7 +86,7 @@ export default function VoteResults() {
     return { votePct: total, votePendingPct: pend, voteTiers: tiers };
   }, [money, cards]);
 
-  // The gaps and Tier-S leads by initiative id (live while the round is open, frozen at
+  // The gaps and S-Tier leads by initiative id (live while the round is open, frozen at
   // each settlement once it is closed), and the titles the hover names.
   const { next, lead, titles } = useMemo(() => {
     const next = new Map<string, NextTierEntry>();

@@ -13,8 +13,8 @@ import {
   voteSchedule,
 } from "./vote-deploy.ts";
 
-// The plan (vote fact sheet): opens Nov 17, Tier-S Thu Dec 3, Tier-A Mon Dec 7,
-// Tier-B Wed Dec 9, every tally at 21:00 UTC.
+// The plan (vote fact sheet): opens Nov 17, S-Tier Thu Dec 3, A-Tier Mon Dec 7,
+// B-Tier Wed Dec 9, every tally at 21:00 UTC.
 const at = (iso: string) => Date.parse(iso) / 1000;
 const OPENS = at("2026-11-17T17:00:00Z");
 const PLAN: [number, number, number] = [
@@ -120,7 +120,7 @@ Deno.test("realSchedule: the plan's dates, 9 windows from 24 h", () => {
   // The last window: 5 min 37 s.
   assertEquals(86400 >> 8, 337);
   assertEquals(tierMax(s), PLAN_SPAN);
-  // Tier-B's first tally comes 5 min 38 s after Tier-A's latest end: allowed.
+  // B-Tier's first tally comes 5 min 38 s after A-Tier's latest end: allowed.
   assertEquals(PLAN[2] - (PLAN[1] + tierMax(s)), 338);
 });
 
@@ -230,10 +230,10 @@ Deno.test("addingOpen: before opening, between tiers, never inside a span or aft
   assertEquals(nextAddingOpen(t, tS), null);
   assertEquals(addingOpen(t, t.firstTallyAt[2] + tSpan), false); // the end
 
-  // The plan: two days free between Tier-S's latest end and Tier-A, and 5 min 38 s before B.
+  // The plan: two days free between S-Tier's latest end and A-Tier, and 5 min 38 s before B.
   const s = realSchedule(OPENS, PLAN);
   assertEquals(addingOpen(s, PLAN[0] - 1), true);
-  assertEquals(addingOpen(s, PLAN[0] + 24 * 3600), false); // Tier-S settling
+  assertEquals(addingOpen(s, PLAN[0] + 24 * 3600), false); // S-Tier settling
   assertEquals(nextAddingOpen(s, PLAN[0]), PLAN[0] + PLAN_SPAN); // Sat Dec 5, ~21:00 UTC
   assertEquals(addingOpen(s, PLAN[1] - 1), true);
   assertEquals(addingOpen(s, PLAN[2] + PLAN_SPAN), false); // the end

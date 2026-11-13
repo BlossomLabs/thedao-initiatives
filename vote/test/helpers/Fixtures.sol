@@ -146,8 +146,8 @@ contract MockFeed is IPriceFeed {
             votes[0] = SignedBallots.Vote(tokenId, nonce, r, vs, ballot, proofOf(ballot));
         }
 
-        /// The first three projects of Tier-S (rank 1): a proof when they are unrelated,
-        /// as every fixture project is. Shorter when Tier-S has fewer.
+        /// The first three projects of S-Tier (rank 1): a proof when they are unrelated,
+        /// as every fixture project is. Shorter when S-Tier has fewer.
         function proofOf(bytes memory ballot) internal pure returns (uint8[] memory proof) {
             uint256 n;
             for (uint256 i; i < ballot.length; ++i) {

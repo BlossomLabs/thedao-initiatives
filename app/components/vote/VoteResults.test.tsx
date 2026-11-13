@@ -184,18 +184,18 @@ it.each(["/vote", "/vote?view=cards"])(
         expect(found).toBeDefined();
         return found;
       });
-    const s = await chip("Tier-S");
-    const a = await chip("Tier-A");
+    const s = await chip("S-Tier");
+    const a = await chip("A-Tier");
     const funded = (element: HTMLElement) => element.closest("li, [data-initiative-id]")!;
     expect(within(funded(s) as HTMLElement).getByText("Beta audits")).toBeInTheDocument();
     expect(within(funded(a) as HTMLElement).getByText("Alpha fuzzing")).toBeInTheDocument();
     // List rows have separate desktop and mobile status slots.
-    const rows = [...new Set(board(screen.getAllByText(/^Tier-[SAB]$/)).map(funded))];
+    const rows = [...new Set(board(screen.getAllByText(/^[SAB]-Tier$/)).map(funded))];
     expect(
-      rows.map((row) => within(row as HTMLElement).getAllByText(/^Tier-[SAB]$/)[0].textContent),
+      rows.map((row) => within(row as HTMLElement).getAllByText(/^[SAB]-Tier$/)[0].textContent),
     )
-      .toEqual(["Tier-S", "Tier-A"]);
-    expect(board(screen.queryAllByText("Tier-B"))).toEqual([]);
+      .toEqual(["S-Tier", "A-Tier"]);
+    expect(board(screen.queryAllByText("B-Tier"))).toEqual([]);
   },
 );
 
@@ -291,9 +291,9 @@ it("S settled is solid gold; A settling is lighter, with its window and B's star
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  // The round box: Tier-S done with what it funded, Tier-A settling with its windows.
+  // The round box: S-Tier done with what it funded, A-Tier settling with its windows.
   const box = await screen.findByRole("region", { name: "Where the round is" });
-  expect(within(box).getByRole("heading", { name: "Tier-A is settling" })).toBeInTheDocument();
+  expect(within(box).getByRole("heading", { name: "A-Tier is settling" })).toBeInTheDocument();
   expect(box).toHaveTextContent("1 funded · $30k");
   expect([...box.querySelectorAll("[data-window]")].map((w) => w.getAttribute("data-window")))
     .toEqual(["past", "current", "coming"]);
@@ -350,18 +350,18 @@ it("once B settles, the final result: spent of the pool, a section per tier", as
   });
   expect(hero(/\$80k of \$100k demo pool spent/)).toBeInTheDocument();
   // Each tier heads its own section, with its count and what the vote gave it.
-  expect(heading("Tier-S")).toHaveTextContent("Tier-S$30,000 allocated to 1 initiative");
-  expect(heading("Tier-A")).toHaveTextContent("Tier-A$50,000 allocated to 1 initiative");
-  // Tier-B funded nothing: no section, the hero says so.
-  expect(heading("Tier-B")).toBeNull();
-  expect(screen.getByText("Tier-B: no initiatives funded")).toBeInTheDocument();
-  expect(screen.queryByText(/^Tier-[SA]: /)).toBeNull();
+  expect(heading("S-Tier")).toHaveTextContent("S-Tier$30,000 allocated to 1 initiative");
+  expect(heading("A-Tier")).toHaveTextContent("A-Tier$50,000 allocated to 1 initiative");
+  // B-Tier funded nothing: no section, the hero says so.
+  expect(heading("B-Tier")).toBeNull();
+  expect(screen.getByText("B-Tier: no initiatives funded")).toBeInTheDocument();
+  expect(screen.queryByText(/^[SA]-Tier: /)).toBeNull();
 });
 
 it("the final result: tier sections, then not funded", async () => {
   await showClosed();
   expect(screen.getByText("The vote's final result")).toBeInTheDocument();
-  expect(heading("Tier-S")).toHaveTextContent("Tier-S$60,000 allocated to 1 initiative");
+  expect(heading("S-Tier")).toHaveTextContent("S-Tier$60,000 allocated to 1 initiative");
   expect(heading("Not funded")).toHaveTextContent("Not funded1 initiative");
   // Beta wasn't funded: no "needed $X" (its bar's what-if says how close it came).
   expect(screen.getAllByText("Beta audits")[0].closest("li, [data-initiative-id]"))
@@ -400,7 +400,7 @@ it("an empty list draws no heading", async () => {
       settled("B", [], {}),
     ],
   });
-  expect(heading("Tier-S")).not.toBeNull();
+  expect(heading("S-Tier")).not.toBeNull();
   expect(heading("Not funded")).toBeNull();
 });
 
@@ -411,7 +411,7 @@ it("spent of the pool uses the pool on-chain", async () => {
 
 it("a tier that funded nothing says so", async () => {
   await showClosed();
-  expect(screen.getByText("Tier-B: no initiatives funded")).toBeInTheDocument();
+  expect(screen.getByText("B-Tier: no initiatives funded")).toBeInTheDocument();
 });
 
 it("no search or filters on the final result", async () => {
@@ -444,7 +444,7 @@ const tickAt = (el: HTMLElement) => {
 };
 /** No figure looks like a link: no button, underline or help cursor. */
 function plainFigures(el: HTMLElement) {
-  expect(within(el).queryByRole("button", { name: /to Tier-|ahead|Out of reach/ })).toBeNull();
+  expect(within(el).queryByRole("button", { name: /to [SAB]-Tier|ahead|Out of reach/ })).toBeNull();
   expect(el.querySelector(".cursor-help, .underline, .decoration-dotted")).toBeNull();
 }
 
@@ -463,17 +463,17 @@ it.each(["/", "/?view=cards"])("an open round shows each initiative's gap in %s"
   );
   await screen.findAllByText("Alpha fuzzing");
   const alpha = rowOf("Alpha fuzzing");
-  // Alpha raised $10k of $60k and is $41.2k from Tier-S (the figure rounds it up to $42k,
+  // Alpha raised $10k of $60k and is $41.2k from S-Tier (the figure rounds it up to $42k,
   // the tick does not): the tick at 51.2/60.
   await waitFor(() => expect(tickAt(alpha)).toBeCloseTo((51_200 / 60_000) * 100, 5));
   const callout = hover(alpha);
-  expect(callout).toHaveTextContent("$42k to Tier-S");
-  expect(callout).toHaveTextContent("Comes in: Beta audits (Tier-A)");
+  expect(callout).toHaveTextContent("$42k to S-Tier");
+  expect(callout).toHaveTextContent("Comes in: Beta audits (A-Tier)");
   // Out of reach: no tick, the callout at the bar's end.
   const beta = rowOf("Beta audits");
   expect(tickAt(beta)).toBeNull();
   const reach = hover(beta);
-  expect(reach).toHaveTextContent("Out of reach for Tier-B");
+  expect(reach).toHaveTextContent("Out of reach for B-Tier");
   expect(reach.style.right).toBe("calc(0% - 14px)");
   plainFigures(document.body);
 });
@@ -491,7 +491,7 @@ it("the open vote's list has no Funded column; its tier sits after the title", a
   await screen.findAllByText("Alpha fuzzing");
   expect(screen.queryByText("Funded")).toBeNull();
   expect(screen.getAllByText("Backers").length).toBeGreaterThan(0);
-  expect(within(rowOf("Alpha fuzzing")).getAllByText("Tier-A").length).toBeGreaterThan(0);
+  expect(within(rowOf("Alpha fuzzing")).getAllByText("A-Tier").length).toBeGreaterThan(0);
 });
 
 it("a funded card keeps its tier next to the gap", async () => {
@@ -511,22 +511,22 @@ it("a funded card keeps its tier next to the gap", async () => {
   // The figure stays in the amount row, plain: the value big, the words small.
   const alpha = await waitFor(() => {
     const el = rowOf("Alpha fuzzing");
-    expect(el.querySelector("[data-what-if-figure]")).toHaveTextContent("$42k to Tier-S");
+    expect(el.querySelector("[data-what-if-figure]")).toHaveTextContent("$42k to S-Tier");
     return el;
   });
-  expect(within(alpha).getByText("Tier-A")).toBeInTheDocument();
+  expect(within(alpha).getByText("A-Tier")).toBeInTheDocument();
   // Beta isn't funded: the gap alone.
   const beta = rowOf("Beta audits");
   const figure = beta.querySelector("[data-what-if-figure]")!;
-  expect(figure).toHaveTextContent("$42k to Tier-B");
-  // The gap names its tier too ("to Tier-B"); no chip outside it.
+  expect(figure).toHaveTextContent("$42k to B-Tier");
+  // The gap names its tier too ("to B-Tier"); no chip outside it.
   expect(
-    within(beta).queryAllByText(/^Tier-[SAB]$/).filter((e) => !figure.contains(e)),
+    within(beta).queryAllByText(/^[SAB]-Tier$/).filter((e) => !figure.contains(e)),
   ).toEqual([]);
   // Its details are in the bar's callout, on hover.
   const details = hover(beta);
-  expect(details).toHaveTextContent("$42k to Tier-B");
-  expect(details).toHaveTextContent("Comes in: Beta audits (Tier-A)");
+  expect(details).toHaveTextContent("$42k to B-Tier");
+  expect(details).toHaveTextContent("Comes in: Beta audits (A-Tier)");
   plainFigures(document.body);
 });
 
@@ -549,12 +549,12 @@ it("a closed round shows no gap", async () => {
   await showClosed({
     live: { funded: [], awards: {}, next: { alpha: gap(), beta: gap({ gap: null, tier: "B" }) } },
   });
-  expect(screen.queryByText(/to Tier-/)).toBeNull();
+  expect(screen.queryByText(/to [SAB]-Tier/)).toBeNull();
   expect(screen.queryByText(/Out of reach/)).toBeNull();
   expect(document.querySelector("[data-what-if]")).toBeNull();
 });
 
-it.each(["/", "/?view=cards"])("not funded: its gap to Tier-B, no needed, in %s", async (url) => {
+it.each(["/", "/?view=cards"])("not funded: its gap to B-Tier, no needed, in %s", async (url) => {
   await showClosed({
     final: {
       next: {
@@ -570,11 +570,11 @@ it.each(["/", "/?view=cards"])("not funded: its gap to Tier-B, no needed, in %s"
   }, url);
   const row = rowOf("Beta audits");
   expect(row).not.toHaveTextContent(/needed/i);
-  // Raised $0 of a $30k ask, $12k to Tier-B: the tick at (0 + 12k) / 30k.
+  // Raised $0 of a $30k ask, $12k to B-Tier: the tick at (0 + 12k) / 30k.
   expect(tickAt(row)).toBeCloseTo(40, 5);
   const callout = hover(row);
-  expect(callout).toHaveTextContent("$12k to Tier-B");
-  expect(callout).toHaveTextContent("Drops out of Tier-B: Alpha fuzzing");
+  expect(callout).toHaveTextContent("$12k to B-Tier");
+  expect(callout).toHaveTextContent("Drops out of B-Tier: Alpha fuzzing");
   plainFigures(document.body);
 });
 
@@ -586,29 +586,29 @@ it("not funded and out of reach: no tick, the callout at the bar's end", async (
   expect(row).not.toHaveTextContent(/needed/i);
   expect(tickAt(row)).toBeNull();
   const callout = hover(row);
-  expect(callout).toHaveTextContent("Out of reach for Tier-B");
+  expect(callout).toHaveTextContent("Out of reach for B-Tier");
   expect(callout.style.right).toBe("calc(0% - 14px)");
 });
 
 it.each(["/", "/?view=cards"])(
-  "closed Tier-S shows its lead in place of the chip in %s",
+  "closed S-Tier shows its lead in place of the chip in %s",
   async (url) => {
     await showClosed({ final: { next: {}, lead: { alpha: "46000000000" } } }, url);
     const row = rowOf("Alpha fuzzing");
-    expect(within(row).queryByText("Tier-S")).toBeNull();
-    // No tick for Tier-S: the callout sits at the bar's end.
+    expect(within(row).queryByText("S-Tier")).toBeNull();
+    // No tick for S-Tier: the callout sits at the bar's end.
     expect(tickAt(row)).toBeNull();
     const callout = hover(row);
     expect(callout).toHaveTextContent("$46k ahead");
     expect(callout).toHaveTextContent(
-      "Its backers could give this much less between them and it would still be funded in Tier-S.",
+      "Its backers could give this much less between them and it would still be funded in S-Tier.",
     );
     expect(callout.style.right).toBe("calc(0% - 14px)");
     plainFigures(document.body);
   },
 );
 
-it("an open round shows Tier-S leads", async () => {
+it("an open round shows S-Tier leads", async () => {
   const view = roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] });
   vi.mocked(api).mockResolvedValue({
     ...view,
@@ -628,7 +628,7 @@ it("an open round shows Tier-S leads", async () => {
     return el;
   });
   // Beside its tier chip.
-  expect(within(card).getByText("Tier-S")).toBeInTheDocument();
+  expect(within(card).getByText("S-Tier")).toBeInTheDocument();
   plainFigures(document.body);
 });
 
@@ -644,9 +644,9 @@ async function showOpen(round: Record<string, unknown>) {
   await screen.findByText(/Test vote/i);
 }
 
-it("the hero says when Tier-B funds nothing yet", async () => {
+it("the hero says when B-Tier funds nothing yet", async () => {
   await showOpen(roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] }));
-  expect(await screen.findByText(/Tier-B: nothing funded yet, the pool may not reach it\./))
+  expect(await screen.findByText(/B-Tier: nothing funded yet, the pool may not reach it\./))
     .toBeInTheDocument();
   cleanup();
   // Once a tier has started, the hero still says so; the round box says where it is.
@@ -659,13 +659,13 @@ it("the hero says when Tier-B funds nothing yet", async () => {
       ],
     }),
   );
-  expect(await screen.findByText(/Tier-B: nothing funded yet/)).toBeInTheDocument();
+  expect(await screen.findByText(/B-Tier: nothing funded yet/)).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Where the round is" })).toHaveTextContent(
-    "Tier-S is settling",
+    "S-Tier is settling",
   );
 });
 
-it("no warning while Tier-B funds something", async () => {
+it("no warning while B-Tier funds something", async () => {
   await showOpen(roundOf({ "1": ballot({ alpha: "B" }) }, { alpha: [50_000, "B"] }));
-  expect(screen.queryByText(/Tier-B: nothing funded yet/)).toBeNull();
+  expect(screen.queryByText(/B-Tier: nothing funded yet/)).toBeNull();
 });

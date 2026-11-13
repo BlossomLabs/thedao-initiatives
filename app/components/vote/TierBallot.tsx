@@ -16,7 +16,7 @@ import InitiativePeek, { type PeekChoice } from "./InitiativePeek";
 import { morph } from "./peek-morph";
 
 /** Ported from blossomlabs.eth's budgeting TierList.
- * A tier list (Tier-S, Tier-A and Tier-B rows of small chips) beside the initiatives not ranked yet;
+ * A tier list (S-Tier, A-Tier and B-Tier rows of small chips) beside the initiatives not ranked yet;
  * on a phone it is pinned at the top, over the full-width list.
  * Drag a tile (press and hold on a phone) onto a tier, or tap it: its card says where it
  * goes. Dragging it back on the list (or choosing so) unranks it. Same tier = equal priority. */
@@ -460,8 +460,8 @@ export default function TierBallot(
     // The card grows out of a copy of the chip; the chip stays, dashed.
     void morph(box, () => setPeek({ slug, order: navOrder }), cardEl, { ghost: "from" });
   };
-  /** The card's ‹ › order, taken when it opens: as the page shows them, Tier-S, Tier-A,
-   * Tier-B, then the list (as searched and filtered), then the skipped ones while their
+  /** The card's ‹ › order, taken when it opens: as the page shows them, S-Tier, A-Tier,
+   * B-Tier, then the list (as searched and filtered), then the skipped ones while their
    * list is open. */
   const navOrder = [
     ...TIER_LABELS.flatMap((t) => items.filter((i) => tiers[i.slug] === t.tier)),
@@ -727,15 +727,15 @@ export default function TierBallot(
 
   /** A settled tier's hover when it holds picks it didn't fund: they stay in play, ahead
    * of the open tiers, for what this badge has left (the later stages still tally them).
-   * Nothing for Tier-B: once it settles the vote is over. */
+   * Nothing for B-Tier: once it settles the vote is over. */
   const missedNote = (tier: Tier): string | undefined => {
     if (!funded || !isLocked(tier) || tier === "B") return undefined;
     if (!Object.entries(tiers).some(([slug, t]) => t === tier && !funded.has(slug))) {
       return undefined;
     }
     return tier === "S"
-      ? "Your Tier-S picks that weren't funded stay first in line for what you have left."
-      : "Your Tier-A picks that weren't funded stay ahead of Tier-B for what you have left.";
+      ? "Your S-Tier picks that weren't funded stay first in line for what you have left."
+      : "Your A-Tier picks that weren't funded stay ahead of B-Tier for what you have left.";
   };
 
   return (

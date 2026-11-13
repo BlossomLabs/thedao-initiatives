@@ -9,7 +9,7 @@ badge vote, the quiet ending replayed tier by tier).
 
 The vote must fund a spread of work that badge holders actually rated well, not a
 handful of related projects, and not projects nobody chose. Today a ballot can put one
-family of projects alone in Tier-S, can be so short that it barely spreads money, and
+family of projects alone in S-Tier, can be so short that it barely spreads money, and
 starts empty although every badge holder has already rated the initiatives with stars.
 
 Three things follow:
@@ -17,7 +17,7 @@ Three things follow:
 1. **Start from what the voter already said.** Their own badge's star ratings prefill the
    ballot.
 2. **Rules that make a ballot valid.** A minimum ballot size, and independence rules for
-   Tier-S. A ballot that breaks them is **invalid**: the page will not send it, the relayer
+   S-Tier. A ballot that breaks them is **invalid**: the page will not send it, the relayer
    refuses it, the contract reverts it, and the tally never counts it.
 3. **Help building it.** Paste a ballot in the pabutools (Pabulib) format, and a
    `/vote/llms.txt` so a voter can have an LLM draft it.
@@ -28,20 +28,20 @@ Affiliations must not appear in the UI as decoration or labels.
 
 ## Decisions (the user's)
 
-- **Prefill** from the voting badge's own star ratings: 5★ → Tier-S, 4★ → Tier-A,
-  3★ → Tier-B. Projects rated 1–2★, or not rated by this badge, start unplaced.
+- **Prefill** from the voting badge's own star ratings: 5★ → S-Tier, 4★ → A-Tier,
+  3★ → B-Tier. Projects rated 1–2★, or not rated by this badge, start unplaced.
 - The voter can **add or remove any project**, whatever its rating.
 - **Unplaced projects get nothing.** The share they would have taken returns to the DAO.
   This is how the contract already works (unplaced = withheld, byte 255).
 - **No C tier, no hidden checkbox.** Only S, A, B and unplaced.
 - **Minimum ballot size:** the total requested by the placed projects must be at least
   1.5× the budget being distributed (the pool).
-- **Tier-S independence:**
+- **S-Tier independence:**
   - At least 3 independent projects. Related projects count as one.
   - RFPs are wildcards: each RFP counts as independent.
   - No single related group can hold more than half of the tier's funds.
-  - These rules never apply to Tier-B. Whether they apply to Tier-A is undecided, so it is
-    a per-round setting (default: Tier-S only).
+  - These rules never apply to B-Tier. Whether they apply to A-Tier is undecided, so it is
+    a per-round setting (default: S-Tier only).
 - **Relatedness is affiliations** (first called tags; renamed at the user's request). Projects get a new `affiliations` field (e.g. `Seal`). Projects sharing
   an affiliation are related. The affiliation is its own display name. A project may have several affiliations.
   **No chains:** relatedness is only a direct shared affiliation (if a–b share one affiliation and b–c
@@ -56,26 +56,26 @@ Affiliations must not appear in the UI as decoration or labels.
 - **New projects can be added after the vote opens**, but not while a tier's quiet ending
   is running.
 - **Paste format:** pabutools/Pabulib `.pb`, with the Blossom extension for ties.
-- In the voter instructions, **encourage adding many projects to Tier-B.**
-- In running text a tier is always written **Tier-S / Tier-A / Tier-B**; the bare letter
+- In the voter instructions, **encourage adding many projects to B-Tier.**
+- In running text a tier is always written **S-Tier, A-Tier and B-Tier**; the bare letter
   appears only in the tier table (already done on `vote`, b359cc1).
 
 ## The rules, exactly
 
 Definitions, for one ballot, at the block that records it:
 
-- **Placed projects:** those in Tier-S, Tier-A or Tier-B.
+- **Placed projects:** those in S-Tier, A-Tier or B-Tier.
 - **Requested amount** of a project: its `askUsd` registered in the contract (micro-USD),
   i.e. the initiative's requested total. Not the remaining need, which moves with
   donations: a ballot's validity must not change after it is recorded. *(My call; the
   tally itself still uses remaining needs.)*
 - **Pool:** `poolUsd` in the contract at that block.
 - **Tiers as the contract sees them:** the ballot's groups of equal rank, in order. The
-  first group is Tier-S, the second Tier-A, the third Tier-B. A valid ballot has at most
-  three groups. Because Tier-S must hold at least 3 projects, the first group is always
-  the voter's Tier-S. When Tier-A is enforced, the second group must likewise hold at
-  least 3 projects, so it is always the voter's Tier-A: an empty Tier-A is then invalid
-  ("Tier-A needs at least 3 independent projects"), and the page blocks it like any rule.
+  first group is S-Tier, the second A-Tier, the third B-Tier. A valid ballot has at most
+  three groups. Because S-Tier must hold at least 3 projects, the first group is always
+  the voter's S-Tier. When A-Tier is enforced, the second group must likewise hold at
+  least 3 projects, so it is always the voter's A-Tier: an empty A-Tier is then invalid
+  ("A-Tier needs at least 3 independent projects"), and the page blocks it like any rule.
   *(My call: the rule read literally. The proof is then always 6 indexes.)*
 - **Related:** two projects share at least one affiliation (group). RFPs have no groups.
 
@@ -84,7 +84,7 @@ A ballot is **valid** when all of these hold:
 1. **Shape** (existing): every byte is 255 (unplaced) or a competition rank in `1..m`
    with no gaps; plus **at most three rank groups** (new).
 2. **Minimum size:** `2 × Σ requested(placed) ≥ 3 × pool`.
-3. For each tier the round enforces (Tier-S always; Tier-A if switched on):
+3. For each tier the round enforces (S-Tier always; A-Tier if switched on):
    - **Independence:** the tier holds at least 3 projects no two of which are related.
      Checked against the proof: three project indexes, all in that tier, pairwise
      unrelated.
@@ -126,8 +126,8 @@ are signed by the issuer, not tied to a contract). *(My call.)*
 - **Frozen when voting opens:** an existing project's account, ask, `rfp` and `groups`
   (`setInitiative` stays setup-only), group names, and the enforced-tiers setting. So a
   later addition can never change an earlier ballot's validity.
-- **Enforced tiers.** `setIndependentTiers(uint8 mask)` (bit 0 = Tier-S, bit 1 = Tier-A;
-  Tier-B is never enforced), setup-only. Default Tier-S.
+- **Enforced tiers.** `setIndependentTiers(uint8 mask)` (bit 0 = S-Tier, bit 1 = A-Tier;
+  B-Tier is never enforced), setup-only. Default S-Tier.
 - **Ballot length.** A ballot may be shorter than the current project count; the missing
   trailing projects read as unplaced (255). Length must be at least 1 and at most `m`.
   This way a ballot signed just before a project is added still records, and old ballots
@@ -138,7 +138,7 @@ are signed by the issuer, not tied to a contract). *(My call.)*
   and wallet sends can say what is wrong.
 - **Entry points** gain the proof: `vote(tokenId, nonce, ballot, proof)`,
   `recordFor(…, proof)`, and the `Vote` struct gets a `proof` field. Proof type:
-  `uint8[]`, three indexes per enforced tier, Tier-S first. The EIP-712 digest is
+  `uint8[]`, three indexes per enforced tier, S-Tier first. The EIP-712 digest is
   unchanged (it binds the ballot hash only).
 - **Blob ballots** (`recordBlob`) carry only a ballot hash, so the contract cannot check
   them. The replay checks every ballot (next section), which covers blobs.
@@ -203,17 +203,17 @@ prefill. *(The user's decision.)* *(My call: no "reset to my ratings" button.)*
 - **Send my ballot** and **Send it yourself** are disabled.
 - A rules box in the tier column, above the send box (above the tiers on a phone,
   like "Your share"), lists each problem in plain words, for example:
-  - "Tier-S needs at least 3 independent projects. Seal Audits and Seal Tooling are
+  - "S-Tier needs at least 3 independent projects. Seal Audits and Seal Tooling are
     affiliated with Seal, so they count as one."
-  - "Projects affiliated with Seal take $310,000 of Tier-S's $500,000. One affiliation can
+  - "Projects affiliated with Seal take $310,000 of S-Tier's $500,000. One affiliation can
     hold at most half."
   - "Your ballot requests $1,100,000. It must request at least $1,369,866 (1.5× the
-    $913,244 pool). Add more projects; Tier-B is a good place for them."
+    $913,244 pool). Add more projects; B-Tier is a good place for them."
 - When it passes, no box (no "valid ✓" noise).
 
 **Instructions** (the header copy): what each tier means, that anything unplaced gets
 nothing and its share returns to the DAO, and an explicit nudge: "Put every project you'd
-be glad to see funded in Tier-B: it only takes money once Tier-S and Tier-A are done."
+be glad to see funded in B-Tier: it only takes money once S-Tier and A-Tier are done."
 The copy must describe the algorithm exactly as implemented (no tail, no checkbox).
 
 **Relayer** (`POST /api/vote/ballot`) runs `checkBallot` and refuses an invalid ballot
@@ -224,7 +224,7 @@ from the wallet uses the page's proof.
 
 **Format.** A Pabulib `.pb` text with one vote, project ids = slugs, `vote_type ordinal`,
 plus the Blossom tie extension: in the `vote` cell, projects of equal rank are joined
-with `=`, and groups are separated by `,` in order — Tier-S first.
+with `=`, and groups are separated by `,` in order — S-Tier first.
 
 ```
 META
@@ -242,7 +242,7 @@ voter_id;vote
 1;formally-verified-evm=vyper-verified-compilation=community-fuzzing,forensiq,dappfence=wallet-security
 ```
 
-That reads: Tier-S = three projects, Tier-A = `forensiq`, Tier-B = `dappfence`,
+That reads: S-Tier = three projects, A-Tier = `forensiq`, B-Tier = `dappfence`,
 `wallet-security`. Everything not listed is unplaced.
 
 - The page also accepts just the vote string on its own line.
@@ -268,7 +268,7 @@ sections), served by the API with the same caching. For the deployed round:
 - Every project in the round: slug, title, type (RFP/grant), requested amount, remaining
   need, affiliations, and a link to its `.md` page.
 - An instruction for the LLM: ask the voter for their ratings or priorities (it can't
-  see them), produce one vote line that satisfies the rules, and list which three Tier-S
+  see them), produce one vote line that satisfies the rules, and list which three S-Tier
   projects make it independent.
 
 The ballot page links to it ("Build your ballot with an LLM") next to Paste and Copy.
@@ -290,9 +290,9 @@ The ballot page links to it ("Build your ballot with an LLM") next to Paste and 
 - Re-judging recorded ballots when a project is added (validity is fixed when recorded).
 - Showing affiliations anywhere else, or letting voters see/suggest affiliations.
 - Changing the stage tally math, the quiet ending, or per-badge share accounting.
-- Fixing the empty-Tier-A lossiness of the on-chain encoding (with Tier-A enforced it
-  can't arise; with Tier-S only, an empty Tier-A just shifts Tier-B up, as today).
+- Fixing the empty-A-Tier lossiness of the on-chain encoding (with A-Tier enforced it
+  can't arise; with S-Tier only, an empty A-Tier just shifts B-Tier up, as today).
 
 ## Open
 
-- Whether Tier-A is enforced: decided per round before deploy (`independentTiers`).
+- Whether A-Tier is enforced: decided per round before deploy (`independentTiers`).

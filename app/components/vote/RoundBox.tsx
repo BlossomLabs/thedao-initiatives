@@ -8,7 +8,7 @@ import type { Schedule } from "../../../shared/vote/quiet-ending";
 import { type Phase, roundSteps, type Step, type Win } from "./round-steps";
 import { Countdown, useNow, When } from "./When";
 
-/** Where the round is: a stepper (Voting → Tier-S → Tier-A → Tier-B → Result), the
+/** Where the round is: a stepper (Voting → S-Tier → A-Tier → B-Tier → Result), the
  * current step in detail (a settling tier's windows in a bar, each with its own popup),
  * and on the ballot one line about what this badge can still do. */
 
@@ -21,7 +21,7 @@ export function badgeLine(
     phase: Phase;
     /** This badge has a ballot that counts. */
     counted: boolean;
-    /** The round no longer takes this badge's first ballot (Tier-S settled first). */
+    /** The round no longer takes this badge's first ballot (S-Tier settled first). */
     shut?: boolean;
     /** The tiers settled so far, in order. */
     settled: Tier[];
@@ -35,14 +35,14 @@ export function badgeLine(
       return {
         tone: "muted",
         text:
-          "Tier-S settled before this badge voted, so it can’t vote this round. You can still follow the result.",
+          "S-Tier settled before this badge voted, so it can’t vote this round. You can still follow the result.",
       };
     }
     return {
       tone: "todo",
       text: phase.kind === "settling"
-        ? "This badge hasn’t voted yet. There is still time: send a first ballot before Tier-S settles."
-        : "This badge hasn’t voted yet. Send a first ballot before Tier-S settles, or it won’t be able to vote.",
+        ? "This badge hasn’t voted yet. There is still time: send a first ballot before S-Tier settles."
+        : "This badge hasn’t voted yet. Send a first ballot before S-Tier settles, or it won’t be able to vote.",
     };
   }
   if (settled.length === 0) {
@@ -464,21 +464,21 @@ export default function RoundBox(
       toWhat = "Opens";
       when = (
         <>
-          Tier-S starts settling <When at={phase.sStarts} />.
+          S-Tier starts settling <When at={phase.sStarts} />.
         </>
       );
       break;
     case "open":
       title = "Voting is open";
       to = phase.sStarts;
-      toWhat = "Tier-S starts settling";
+      toWhat = "S-Tier starts settling";
       when = (
         <>
-          Tier-S starts settling <When at={phase.sStarts} />.
+          S-Tier starts settling <When at={phase.sStarts} />.
         </>
       );
       status =
-        "Every tier can change until it settles. Tier-S settles first, then Tier-A, then Tier-B.";
+        "Every tier can change until it settles. S-Tier settles first, then A-Tier, then B-Tier.";
       break;
     case "settling": {
       const name = tierName(phase.tier);
@@ -594,7 +594,7 @@ export default function RoundBox(
         <Stepper steps={steps} at={at} />
         {
           // The countdown line already says when the next step comes; only before the vote
-          // opens is there a second date to give (Tier-S's).
+          // opens is there a second date to give (S-Tier's).
         }
         {(phase.kind === "before" || status || phase.kind === "settling") && (
           <div className="space-y-2">

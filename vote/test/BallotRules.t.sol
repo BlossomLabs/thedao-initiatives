@@ -159,7 +159,7 @@ contract BallotRulesTest is Test {
         vm.expectRevert(abi.encodeWithSelector(SignedBallots.BadProof.selector, uint8(0)));
         round.vote(1, 1, hex"01010101", proof3(0, 1, 2)); // 0 and 1 share Seal
         vm.expectRevert(abi.encodeWithSelector(SignedBallots.BadProof.selector, uint8(0)));
-        round.vote(1, 1, hex"01010104", proof3(0, 2, 3)); // 3 is not in Tier-S
+        round.vote(1, 1, hex"01010104", proof3(0, 2, 3)); // 3 is not in S-Tier
         round.vote(1, 1, hex"01010101", proof3(0, 2, 3));
         vm.stopPrank();
     }

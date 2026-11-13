@@ -17,7 +17,7 @@ export function ruleMessage(
     case "size":
       return `Your ballot requests ${dollars(e.requested)}. It must request at least ${
         dollars(e.needed)
-      } (1.5× the ${dollars(e.pool)} pool). Add more projects; Tier-B is a good place for them.`;
+      } (1.5× the ${dollars(e.pool)} pool). Add more projects; B-Tier is a good place for them.`;
     case "independent":
       return [
         `${tierName(TIERS[e.tier])} needs at least 3 independent projects.`,

@@ -511,7 +511,7 @@ export default function VotePage(
   const identity = useReviewIdentity();
   const fresh = Boolean(rv) && n !== null && !countedNow && !mock &&
     Object.keys(loadTiers(n)).length === 0;
-  // Skips are this browser's own: a ballot already sent (Tier-S settled, another device)
+  // Skips are this browser's own: a ballot already sent (S-Tier settled, another device)
   // still gets its 1–2★ skipped the first time it's shown here.
   const noSkips = Boolean(rv) && n !== null && !mock && skipsUnset(n);
   const ratings = useBadgeRatings(
@@ -906,7 +906,7 @@ export default function VotePage(
     );
     // On the "your ballot" page: where the round is, without the tier settling now.
     const roundStepsOnly = roundProps && <RoundBox {...roundProps} stepsOnly />;
-    // A badge that never sent a ballot before Tier-S settled: there is nothing it can do
+    // A badge that never sent a ballot before S-Tier settled: there is nothing it can do
     // here, so no ballot at all. Said like an error page, then where the vote is (read
     // only) and where to follow it.
     const sSettled = rv?.tiers.find((t) => t.tier === "S" && t.status === "settled");
@@ -956,7 +956,7 @@ export default function VotePage(
             No ballot found
           </h1>
           <p className="mx-auto mt-4 max-w-[560px] text-[16px] leading-relaxed text-white/75">
-            This badge didn’t send a first ballot before Tier-S settled
+            This badge didn’t send a first ballot before S-Tier settled
             {sSettled?.status === "settled" ? ` on ${shortDay(sSettled.at)}` : ""}, so it can’t vote
             this round. The vote goes on without it.
           </p>
@@ -1024,7 +1024,7 @@ export default function VotePage(
                       ? "it changed a settled tier"
                       : refused.reason === "invalid_ballot"
                       ? "it breaks the ballot rules"
-                      : "Tier-S had settled before this badge's first ballot"}. Your earlier ballot
+                      : "S-Tier had settled before this badge's first ballot"}. Your earlier ballot
                     still counts.
                   </p>
                 )}
@@ -1070,7 +1070,7 @@ export default function VotePage(
 
   // On an example: the others, in the order they happen in the vote. Each opens on its
   // editor, but for the badge that never voted and the finished vote, which have none.
-  // Tier-B settling is there twice: its editor, then its "your ballot" page.
+  // B-Tier settling is there twice: its editor, then its "your ballot" page.
   const mockLinks = MOCKS.flatMap((k) => {
     const view = { k, edit: false, label: MOCK_LABELS[k] };
     if (k === "missed" || k === "finished") return [view];

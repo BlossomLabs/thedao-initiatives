@@ -59,7 +59,7 @@ it("uses the funding-status slot for a DAO tier or existing-support Funded chip"
       <InitiativeCard card={funded} tokensOk={false} voteTier="S" />
     </MemoryRouter>,
   );
-  expect(screen.queryByText("Tier-S")).toBeNull();
+  expect(screen.queryByText("S-Tier")).toBeNull();
   expect(screen.getByTitle("Fully funded from existing support")).toBeInTheDocument();
   expect(screen.getByText("FUNDED")).toBeInTheDocument();
   rerender(
@@ -68,7 +68,7 @@ it("uses the funding-status slot for a DAO tier or existing-support Funded chip"
     </MemoryRouter>,
   );
   expect(screen.queryByText("FUNDED")).toBeNull();
-  expect(screen.getByText("Tier-B")).toBeInTheDocument();
+  expect(screen.getByText("B-Tier")).toBeInTheDocument();
 });
 
 it("counts donors as backers, but only pledgers go in the Pledged by strip", () => {
@@ -442,22 +442,22 @@ describe("the vote results' what-ifs", () => {
       </MemoryRouter>,
     );
     const figure = container.querySelector("[data-what-if-figure]")!;
-    expect(figure).toHaveTextContent("$23k to Tier-S");
+    expect(figure).toHaveTextContent("$23k to S-Tier");
     expect(screen.getByText("$23k").tagName).toBe("B");
-    expect(screen.getByText("Tier-A")).toBeInTheDocument();
+    expect(screen.getByText("A-Tier")).toBeInTheDocument();
     const tick = container.querySelector<HTMLElement>("[data-vote-tick][data-what-if]")!;
     expect(parseFloat(tick.style.left)).toBeCloseTo(52.3, 1);
     const el = container.querySelector<HTMLElement>("[data-initiative-id]")!;
     expect(container.querySelector("[data-vote-callout]")).toBeNull();
     fireEvent.pointerEnter(el, { pointerType: "mouse" });
     const callout = container.querySelector("[data-vote-callout]")!;
-    expect(callout).toHaveTextContent("$23k to Tier-S");
-    expect(callout).toHaveTextContent("Comes in: Beta audits (Tier-S)");
-    expect(screen.queryByRole("button", { name: /to Tier-/ })).toBeNull();
+    expect(callout).toHaveTextContent("$23k to S-Tier");
+    expect(callout).toHaveTextContent("Comes in: Beta audits (S-Tier)");
+    expect(screen.queryByRole("button", { name: /to [SAB]-Tier/ })).toBeNull();
     expect(container.querySelector(".cursor-help, .underline, .decoration-dotted")).toBeNull();
   });
 
-  it("not funded after the vote: its gap to Tier-B, no needed", () => {
+  it("not funded after the vote: its gap to B-Tier, no needed", () => {
     const { container } = render(
       <MemoryRouter>
         <InitiativeCard
@@ -470,7 +470,7 @@ describe("the vote results' what-ifs", () => {
       </MemoryRouter>,
     );
     expect(container).not.toHaveTextContent(/needed/i);
-    expect(container.querySelector("[data-what-if-figure]")).toHaveTextContent("$23k to Tier-B");
+    expect(container.querySelector("[data-what-if-figure]")).toHaveTextContent("$23k to B-Tier");
     fireEvent.pointerEnter(container.querySelector<HTMLElement>("[data-initiative-id]")!, {
       pointerType: "mouse",
     });
@@ -479,7 +479,7 @@ describe("the vote results' what-ifs", () => {
     );
   });
 
-  it("Tier-S: its lead, no tick", () => {
+  it("S-Tier: its lead, no tick", () => {
     const { container } = render(
       <MemoryRouter>
         <InitiativeCard

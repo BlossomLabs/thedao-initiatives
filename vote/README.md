@@ -47,7 +47,7 @@ The references retain byte 0 for the older optional unplaced tail.
 | Voting unit | One ballot and one nonce sequence per NFT ID; owners of multiple NFTs can vote each independently. Each record must use exactly the next nonce. |
 | Ownership | Only the current owner can authorize a revision. Token approvals do not grant voting permission. Transfers preserve the token's nonce and registration receipt. |
 | Initial date | Voting opens at the configured timestamp. |
-| First tally dates | Admin-configured Tier-S, Tier-A and Tier-B timestamps. Future dates can change independently, with overlap checks at deployment and on every update. |
+| First tally dates | Admin-configured S-Tier, A-Tier and B-Tier timestamps. Future dates can change independently, with overlap checks at deployment and on every update. |
 | Initial window | Shared first-window duration. |
 | Maximum windows | Includes the initial window; durations halve and must remain positive. |
 | Registration deadline | First ballots until S's latest possible settlement (`registrationDeadline`); replay accepts one only before S actually settles. Minting and burning close at the end of S's first window (`mintDeadline`). |
@@ -240,9 +240,9 @@ A ballot is valid only if (docs/superpowers/specs/2026-11-11-ballot-rules-design
 
 - its ranked projects request at least 1.5× the pool (`2 × Σ askUsd ≥ 3 × poolUsd`, the pool
   as of that receipt);
-- Tier-S (its first rank group; also Tier-A when `independentTiers` has bit 1) holds at
+- S-Tier (its first rank group; also A-Tier when `independentTiers` has bit 1) holds at
   least 3 projects with no shared affiliation, and no affiliation holds more than half of the
-  tier's requested total. RFPs have no affiliations; Tier-B is never checked;
+  tier's requested total. RFPs have no affiliations; B-Tier is never checked;
 - it has at most three rank groups.
 
 Affiliations are registered as groups (`addGroup`, a `groups` bitmask per initiative). The

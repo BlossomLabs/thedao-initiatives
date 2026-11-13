@@ -46,8 +46,8 @@ it("once a tier settles: what it funded from the ballot, and what is left of the
       ]}
     />,
   );
-  expect(screen.getByText("Tier-S funded 2 · $220,000")).toBeInTheDocument();
-  expect(screen.getByText("Tier-A funded nothing from your ballot")).toBeInTheDocument();
+  expect(screen.getByText("S-Tier funded 2 · $220,000")).toBeInTheDocument();
+  expect(screen.getByText("A-Tier funded nothing from your ballot")).toBeInTheDocument();
   expect(screen.getByText("$14,500 of your $25,000 share left")).toBeInTheDocument();
   // A full ring caps at the target.
   expect(screen.getByRole("meter")).toHaveAttribute("aria-valuenow", "1500000");

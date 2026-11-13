@@ -28,7 +28,7 @@ export type VoteManifest = {
   projects: { askUsd: string; rfp: boolean; groups: number[] }[];
   /** Group (affiliation) names; a project's `groups` index into this. */
   groups: string[];
-  /** Tiers held to the independence rules: bit 0 Tier-S (always), bit 1 Tier-A. */
+  /** Tiers held to the independence rules: bit 0 S-Tier (always), bit 1 A-Tier. */
   independentTiers: number;
   /** Deployed with the ballot rules: the contract checks them, and so must the replay,
    * the relayer and the page. Absent for rounds from before them (the Devcon round). */

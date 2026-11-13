@@ -39,7 +39,7 @@ describe("quiet-ending replay", () => {
     const s = run(base(), T - 1);
     expect(s.tiers.map((t) => t.status)).toEqual(["waiting", "waiting", "waiting"]);
     expect(s.live.order).toEqual([0]);
-    // Until Tier-S settles, first ballots run to its latest possible settlement.
+    // Until S-Tier settles, first ballots run to its latest possible settlement.
     expect(s.registrationClosesAt).toBe(T + 6300);
     expect(s.live.tiers.get(0)).toBe("S");
   });
@@ -110,7 +110,7 @@ describe("quiet-ending replay", () => {
     expect(s.accepted.has("c")).toBe(false);
   });
 
-  it("a first ballot during Tier-S's later windows counts and shrinks the shares; after it settles it doesn't", () => {
+  it("a first ballot during S-Tier's later windows counts and shrinks the shares; after it settles it doesn't", () => {
     const s = run([
       ...base(),
       // b's change empties S in window 1: S extends.

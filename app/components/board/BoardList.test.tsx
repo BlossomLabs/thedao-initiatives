@@ -221,8 +221,8 @@ it("shows result tiers only for initiatives funded by the DAO vote", () => {
     voteTiers: new Map([["a", "A"], ["b", "B"]]),
   });
   const first = screen.getByText("Echidna fuzzing").closest("li")!;
-  expect(within(first).getAllByText("Tier-A").length).toBeGreaterThan(0);
-  expect(screen.queryByText("Tier-B")).toBeNull();
+  expect(within(first).getAllByText("A-Tier").length).toBeGreaterThan(0);
+  expect(screen.queryByText("B-Tier")).toBeNull();
 });
 
 it("shows a Funded chip for existing support, without a DAO tier", () => {
@@ -230,14 +230,14 @@ it("shows a Funded chip for existing support, without a DAO tier", () => {
   const row = screen.getByText("Already funded").closest("li")!;
   expect(within(row).getAllByTitle("Fully funded from existing support").length).toBeGreaterThan(0);
   expect(within(row).getAllByText("FUNDED").length).toBeGreaterThan(0);
-  expect(within(row).queryByText(/^Tier-[SAB]$/)).toBeNull();
+  expect(within(row).queryByText(/^[SAB]-Tier$/)).toBeNull();
   expect(within(row).queryByText("100.0%")).toBeNull();
 });
 
-// The vote results: a row raised $0 of a $44k ask, $23k from Tier-S, and a Tier-S row.
+// The vote results: a row raised $0 of a $44k ask, $23k from S-Tier, and an S-Tier row.
 const voteCards = [
-  card("x", "Tier-A row", { goalUsd: 44_000, slug: "x" }),
-  card("y", "Tier-S row", { goalUsd: 44_000, slug: "y" }),
+  card("x", "A-Tier row", { goalUsd: 44_000, slug: "x" }),
+  card("y", "S-Tier row", { goalUsd: 44_000, slug: "y" }),
 ];
 const toS = {
   tier: "S" as const,
@@ -253,34 +253,34 @@ const mountVote = () =>
     votePct: new Map([["x", 100], ["y", 100]]),
     next: new Map([["x", toS]]),
     lead: new Map([["y", "46000000000"]]),
-    titles: new Map([["x", "Tier-A row"], ["y", "Tier-S row"]]),
+    titles: new Map([["x", "A-Tier row"], ["y", "S-Tier row"]]),
   });
 const rowOf = (title: string) => screen.getByText(title).closest("li")!;
 
 it("the vote results: a tick where the next tier is reached, its callout on hover", () => {
   mountVote();
-  const row = rowOf("Tier-A row");
+  const row = rowOf("A-Tier row");
   const tick = row.querySelector<HTMLElement>("[data-vote-tick][data-what-if]")!;
   // (0 + $23k) / $44k
   expect(parseFloat(tick.style.left)).toBeCloseTo(52.3, 1);
   expect(row.querySelector("[data-vote-callout]")).toBeNull();
   fireEvent.pointerEnter(row, { pointerType: "mouse" });
   const callout = row.querySelector("[data-vote-callout]")!;
-  expect(callout).toHaveTextContent("$23k to Tier-S");
-  expect(callout).toHaveTextContent("Drops out: Tier-S row (Tier-S)");
+  expect(callout).toHaveTextContent("$23k to S-Tier");
+  expect(callout).toHaveTextContent("Drops out: S-Tier row (S-Tier)");
   fireEvent.pointerLeave(row, { pointerType: "mouse" });
   expect(row.querySelector("[data-vote-callout]")).toBeNull();
 });
 
-it("the vote results: Tier-S has no tick, its lead at the bar's end", () => {
+it("the vote results: S-Tier has no tick, its lead at the bar's end", () => {
   mountVote();
-  const row = rowOf("Tier-S row");
+  const row = rowOf("S-Tier row");
   expect(row.querySelector("[data-vote-tick]")).toBeNull();
   fireEvent.pointerEnter(row, { pointerType: "mouse" });
   const callout = row.querySelector<HTMLElement>("[data-vote-callout]")!;
   expect(callout).toHaveTextContent("$46k ahead");
   expect(callout).toHaveTextContent(
-    "Its backers could give this much less between them and it would still be funded in Tier-S.",
+    "Its backers could give this much less between them and it would still be funded in S-Tier.",
   );
   expect(callout.style.right).toBe("calc(0% - 14px)");
 });
@@ -300,7 +300,7 @@ it("the vote results' list has no Funded column, and no figure looks like a link
   for (const row of screen.getAllByRole("listitem")) {
     fireEvent.pointerEnter(row, { pointerType: "mouse" });
   }
-  expect(screen.queryByRole("button", { name: /to Tier-|ahead/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /to [SAB]-Tier|ahead/ })).toBeNull();
   expect(container.querySelector(".cursor-help, .underline, .decoration-dotted")).toBeNull();
 });
 

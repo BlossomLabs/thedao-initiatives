@@ -112,12 +112,12 @@ export type RoundView = {
     paid?: Record<string, Record<string, string>>;
     /** Each unsettled initiative's gap to its next tier; absent once the round is closed. */
     next?: Record<string, NextTierEntry>;
-    /** While Tier-S is open: how far ahead each of its initiatives is, micro-USD
+    /** While S-Tier is open: how far ahead each of its initiatives is, micro-USD
      * (only leads of at least $1K). */
     lead?: Record<string, string>;
   };
   /** Once closed: each initiative's gap to the tier above where it finished, judged at
-   * that tier's settlement (comesIn/dropsOut name only the target tier), and Tier-S's
+   * that tier's settlement (comesIn/dropsOut name only the target tier), and S-Tier's
    * leads (micro-USD, at least $1K). Absent until computed. */
   final?: { next: Record<string, NextTierEntry>; lead: Record<string, string> };
 };

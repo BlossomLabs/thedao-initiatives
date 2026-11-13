@@ -1,5 +1,5 @@
 /** The ballot rules (docs/superpowers/specs/2026-11-11-ballot-rules-design.md): a valid
- * ballot requests at least 1.5× the pool, and each enforced tier (Tier-S always, Tier-A
+ * ballot requests at least 1.5× the pool, and each enforced tier (S-Tier always, A-Tier
  * when the round says so) holds at least 3 pairwise-unrelated projects with no related
  * group over half its funds. Related = sharing a group (an affiliation); RFPs have none. Mirrored by
  * vote/reference/ballot_rules.py and the contract; shared fixtures keep them equal.
@@ -10,7 +10,7 @@ export type RulesRound = {
   projects: RulesProject[];
   groupNames: string[];
   poolUsd: bigint;
-  /** Bit 0 Tier-S, bit 1 Tier-A. Tier-B is never checked. */
+  /** Bit 0 S-Tier, bit 1 A-Tier. B-Tier is never checked. */
   independentTiers: number;
 };
 export type RuleError =
@@ -122,7 +122,7 @@ export function checkBallot(ballot: Uint8Array, round: RulesRound): RulesResult 
 }
 
 /** The proof the contract wants for this ballot (three unrelated projects per enforced
- * tier, Tier-S first), whatever the pool; null when a tier has no unrelated triple or the
+ * tier, S-Tier first), whatever the pool; null when a tier has no unrelated triple or the
  * ballot can't be read. */
 export function findProof(ballot: Uint8Array, round: RulesRound): number[] | null {
   if (!readable(ballot, round.projects.length)) return null;
@@ -151,7 +151,7 @@ export function checkProof(ballot: Uint8Array, round: RulesRound, proof: number[
 }
 
 /** What the bytes can't show: an enforced tier the voter left empty. On-chain ranks only
- * keep groups, so an empty Tier-S makes Tier-A the first group (read as Tier-S); the
+ * keep groups, so an empty S-Tier makes A-Tier the first group (read as S-Tier); the
  * spec makes such a ballot invalid, so the page refuses it by label. */
 export function emptyTierErrors(
   tiers: Partial<Record<string, "S" | "A" | "B">>,

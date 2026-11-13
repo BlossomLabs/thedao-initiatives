@@ -16,12 +16,12 @@ export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: str
     `- The projects you rank must request at least ${dollars(needed)} in total (1.5× the ${
       dollars(pool)
     } pool).`,
-    "- Tier-S needs at least 3 independent projects. Projects that share an affiliation count " +
+    "- S-Tier needs at least 3 independent projects. Projects that share an affiliation count " +
     "as one. RFPs have no affiliations, so each RFP counts as independent.",
-    "- In Tier-S, the projects of one affiliation can hold at most half of the tier's " +
+    "- In S-Tier, the projects of one affiliation can hold at most half of the tier's " +
     "requested total.",
-    ...(tierA ? ["- Tier-A follows the same two rules."] : []),
-    "- Tier-B has no such rules. A ballot that breaks a rule is invalid: it can't be sent.",
+    ...(tierA ? ["- A-Tier follows the same two rules."] : []),
+    "- B-Tier has no such rules. A ballot that breaks a rule is invalid: it can't be sent.",
     "",
   ];
   const pool = BigInt(m.poolUsd);
@@ -49,18 +49,18 @@ export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: str
       m.kind === "real" ? "TheDAO's vote" : "A test vote"
     } of the private voting badge holders on which initiatives TheDAO funds from a ${
       dollars(pool)
-    } pool. Voting opens ${utc(m.opensAt)}; Tier-S starts settling ${
+    } pool. Voting opens ${utc(m.opensAt)}; S-Tier starts settling ${
       utc(m.schedule.firstTallyAt[0])
     }.`,
     "",
     "## How the tally spends your share",
     "",
     "The pool is split equally between every badge that votes. Put what TheDAO must fund first: " +
-    "Tier-S (must fund), then Tier-A (should fund), then Tier-B (nice to have). Initiatives in " +
-    "the same tier are equal. Tier-S settles first, then Tier-A, then Tier-B; each funds what it " +
+    "S-Tier (must fund), then A-Tier (should fund), then B-Tier (nice to have). Initiatives in " +
+    "the same tier are equal. S-Tier settles first, then A-Tier, then B-Tier; each funds what it " +
     "can from what is left of your share. Anything you leave unranked gets nothing from you; " +
     "your share of it returns to TheDAO. Put every project you'd be glad to see funded in " +
-    "Tier-B: it only takes money once Tier-S and Tier-A are done.",
+    "B-Tier: it only takes money once S-Tier and A-Tier are done.",
     "",
     "## Ballot rules",
     "",
@@ -69,7 +69,7 @@ export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: str
     "",
     "A pabutools (Pabulib) ordinal vote with the Blossom tie extension: project ids are the " +
     "slugs below; projects of equal rank are joined with `=`; tiers follow in order with `,`, " +
-    "Tier-S first (an empty tier is `,,`). Anything not listed is unranked. The voter pastes " +
+    "S-Tier first (an empty tier is `,,`). Anything not listed is unranked. The voter pastes " +
     "the line (or a whole .pb file) into the ballot page. Example (not advice):",
     "",
     "```",
@@ -86,7 +86,7 @@ export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: str
     "",
     "Ask the voter for their star ratings or their priorities: you can't see them. Then " +
     "write the vote as one bare line (just the slugs, `=` and `,`, no voter id) that passes " +
-    "the rules, and name the three Tier-S projects with no " +
+    "the rules, and name the three S-Tier projects with no " +
     "shared affiliation that make it independent.",
     "",
   ].join("\n");

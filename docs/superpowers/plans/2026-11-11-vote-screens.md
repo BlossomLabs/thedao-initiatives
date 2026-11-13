@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** The closed vote shows funded / not funded lists with final amounts; the open vote shows each initiative's gap to the next tier, with a hover of who comes in and who drops out, and warns that Tier-B may fund nothing.
+**Goal:** The closed vote shows funded / not funded lists with final amounts; the open vote shows each initiative's gap to the next tier, with a hover of who comes in and who drops out, and warns that B-Tier may fund nothing.
 
 **Architecture:** The replay's chained tally moves into a pure function (`shared/vote/chain.ts`) so a second module (`shared/vote/next-tier.ts`) can re-run it with a phantom ballot and binary-search the gap. The server computes the gaps once per replay and adds them to `GET /api/vote/round` as `live.next` (the browser lacks the needs and weights, which the spec allows: "otherwise move it to `/api/vote/round`"). The results split is a pure helper in `app/lib/vote-results.ts`; `BoardPage`, `InitiativeCard` and `BoardList` get small optional props.
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Tier names in copy: always "Tier-S", "Tier-A", "Tier-B" (`tierName` in `shared/vote/ballot.ts`); the bare letter only in the tier table.
+- Tier names in copy: always "S-Tier", "A-Tier", "B-Tier" (`tierName` in `shared/vote/ballot.ts`); the bare letter only in the tier table.
 - Say "vote results", never "projector".
 - Copy says "initiatives", as the rest of the page does (the spec's "projects" copy becomes "initiatives").
 - Gap precision: $1K steps, rounded **up**; `STEP = 1_000_000_000n` micro-USD.
@@ -23,8 +23,8 @@
 ## Review Focus
 
 1. **No ballots yet** (round open, zero accepted): every unfunded initiative still gets a gap (the phantom alone funds it if it fits); no crash on empty `weights`. → Task 2 test `no ballots: the gap is the need`.
-2. **Target tier already settled** (S settled, initiative funded in A): no figure, not "to Tier-S". → Task 2 test `a settled target tier gives no entry`.
-3. **Gap under $1K** shows "$1K to Tier-S", never "$0". → Task 2 test `gaps round up to the next $1K`.
+2. **Target tier already settled** (S settled, initiative funded in A): no figure, not "to S-Tier". → Task 2 test `a settled target tier gives no entry`.
+3. **Gap under $1K** shows "$1K to S-Tier", never "$0". → Task 2 test `gaps round up to the next $1K`.
 4. **A results list that is empty** (nobody funded, or everybody funded): its heading is not drawn. → Task 5 test `an empty list draws no heading`.
 5. **Pool increased during the vote:** the results hero's "of" uses the pool on-chain (`rv.poolUsd`), not the manifest's. → Task 5 test `spent of the pool uses the pool on-chain`.
 
@@ -84,16 +84,16 @@
 
 **Rules (from the spec):**
 - Live result = `chainTally(inp, firstOpen)` as candidate → tier.
-- Target: funded at tier index k → k−1, omitted when k = 0 or k−1 < `firstOpen`; not funded → Tier-B (index 2), omitted when `firstOpen > 2`.
+- Target: funded at tier index k → k−1, omitted when k = 0 or k−1 < `firstOpen`; not funded → B-Tier (index 2), omitted when `firstOpen > 2`.
 - Phantom: a voter `"phantom"` with weight `w`, ranks `1` for the candidate and `m + 2` (never opens) for every other; appended to `voters`/`weights`/`ranks` only, **not** to `ballots`, so stage bounds are unchanged. Budget unchanged.
 - "Reaches" = the candidate's tier index in the phantom result ≤ target.
 - Search: `hi = poolUsd − spent` rounded down to STEP; if `hi` doesn't reach → `gap: null`, empty lists. Else smallest `k·STEP` in `[STEP, hi]` that reaches (binary search). Knock-on = diff of the phantom result at that gap vs. live, excluding the candidate itself.
 
 - [ ] **Step 1: Write the failing tests** (small hand-built `ChainInputs`: 3–4 candidates, 2–3 voters, pool $100K):
-  - `funded in A: the gap is the least $1K step that funds it in Tier-S` — gap `g` reaches; `g − STEP` doesn't (re-run `chainTally` with the phantom at both to assert).
+  - `funded in A: the gap is the least $1K step that funds it in S-Tier` — gap `g` reaches; `g − STEP` doesn't (re-run `chainTally` with the phantom at both to assert).
   - `gaps round up to the next $1K` — need short by $300: gap === STEP.
-  - `not funded: the target is Tier-B`.
-  - `funded in Tier-S: no entry`.
+  - `not funded: the target is B-Tier`.
+  - `funded in S-Tier: no entry`.
   - `a settled target tier gives no entry` — `firstOpen = 1`, candidate in A → absent.
   - `out of reach: null gap and no knock-on` — need > pool − spent.
   - `the knock-on lists who comes in, drops out and moves` — fixture where funding X knocks Y out of A: `dropsOut` contains `[Y, "A"]`.
@@ -163,14 +163,14 @@
   - `BoardPage` prop `results?: { funded: ResultRow[]; notFunded: ResultRow[] }`. When set: no `BoardSearch`, no `FilterBar`; groups = `Funded` and `Not funded` headings with the count (as the `closest` groups draw theirs), a group with no rows draws nothing; cards get `final`, `voteTier`, and **no** `vote` prop (so no "Qualified" callout or tick).
   - `InitiativeCard` prop `final?: number`: amount line is `usdShort(final)` alone (no "of $…"), and `TypeBadge` is not drawn. Backers stay.
   - `BoardList` prop `finals?: ReadonlyMap<string /* initiative id */, number>`: same in rows (both desktop and phone amount spans; the phone `TypeBadge` hidden).
-  - Hero when closed: `{usdShort(spent)} of {usdShort(pool)} pool spent`, pool = `rv.poolUsd ?? ROUND.poolUsd`; under it one line per tier `Tier-S: $X to N initiatives`, and for a tier with nothing funded `Tier-B: no initiatives funded`.
+  - Hero when closed: `{usdShort(spent)} of {usdShort(pool)} pool spent`, pool = `rv.poolUsd ?? ROUND.poolUsd`; under it one line per tier `S-Tier: $X to N initiatives`, and for a tier with nothing funded `B-Tier: no initiatives funded`.
 
 - [ ] **Step 1: Write the failing tests:**
   - `the final result: funded and not funded lists` — headings "Funded" with 1 and "Not funded" with 1 (fixture: alpha funded in S, beta not).
   - `cards show the final amount only` — alpha's card text contains "60K"-style short amount, no card contains "of $", "Qualified", or the type label text.
   - `an empty list draws no heading` — everyone funded → no "Not funded".
   - `spent of the pool uses the pool on-chain` — `rv.poolUsd` larger than the manifest's → hero shows the larger.
-  - `a tier that funded nothing says so` — "Tier-B: no initiatives funded".
+  - `a tier that funded nothing says so` — "B-Tier: no initiatives funded".
   - `no search or filters on the final result`.
 - [ ] **Step 2: Run** `deno task test app/components/vote/VoteResults.test.tsx` — FAIL.
 - [ ] **Step 3: Implement** the props above; `VoteResults` passes `results` only when `rv.closed`.
@@ -188,12 +188,12 @@
 - Produces:
   - `export function NextTierFigure({ next, titles }: { next: NonNullable<RoundView["live"]["next"]>[string]; titles: ReadonlyMap<string, string> /* slug → title */ })`
   - `BoardPage` prop `next?: ReadonlyMap<string /* initiative id */, NextTierEntry>` passed to cards (`next` prop) and `BoardList` (`next` map); drawn on the right of the amount row in place of the % / `FundingStatus`, both layouts.
-  - Copy: button `"{usdShortUp(gap)} to {tierName(tier)}"`; null gap → `"Out of reach for {tierName(tier)}"` (plain text, no button). Popover (`role="tooltip"`, id wired by `aria-describedby`; opens on hover, focus, and tap): heading `"With {usdShortUp(gap)} more at {tierName(tier)}:"`, then `Comes in: Title (Tier-A), …`, `Drops out: Title (Tier-B), …`, `Moves: Title Tier-A → Tier-S` (each line only if non-empty), or `Nothing else changes.`
+  - Copy: button `"{usdShortUp(gap)} to {tierName(tier)}"`; null gap → `"Out of reach for {tierName(tier)}"` (plain text, no button). Popover (`role="tooltip"`, id wired by `aria-describedby`; opens on hover, focus, and tap): heading `"With {usdShortUp(gap)} more at {tierName(tier)}:"`, then `Comes in: Title (A-Tier), …`, `Drops out: Title (B-Tier), …`, `Moves: Title A-Tier → S-Tier` (each line only if non-empty), or `Nothing else changes.`
 
 - [ ] **Step 1: Write the failing tests** (`NextTier.test.tsx`):
-  - `shows the gap to the next tier, rounded up` — gap `"41200000000"` → "$42K to Tier-S".
-  - `out of reach` → "Out of reach for Tier-B", no button.
-  - `the hover lists who comes in and who drops out` — focus the button → tooltip has "Comes in: Beta audits (Tier-A)" and "Drops out: …".
+  - `shows the gap to the next tier, rounded up` — gap `"41200000000"` → "$42K to S-Tier".
+  - `out of reach` → "Out of reach for B-Tier", no button.
+  - `the hover lists who comes in and who drops out` — focus the button → tooltip has "Comes in: Beta audits (A-Tier)" and "Drops out: …".
   - `nothing else changes` — empty lists.
   - and in `VoteResults.test.tsx`: `an open round shows each initiative's gap` (mock `live.next`), and `a closed round shows no gap`.
 - [ ] **Step 2: Run** `deno task test app/components/vote` — FAIL.
@@ -201,19 +201,19 @@
 - [ ] **Step 4: Run** `deno task test app/components` and `deno task typecheck` — PASS (`VoteMark` tests unchanged after the move).
 - [ ] **Step 5: Commit** `Vote: each initiative's gap to the next tier, with what it would change`
 
-### Task 7: Tier-B may fund nothing
+### Task 7: B-Tier may fund nothing
 
 **Files:**
-- Modify: `app/components/vote/TierBallot.tsx` (by the Tier-B column's heading), `app/components/vote/VoteResults.tsx` (`stageLine` / the open-round hero)
+- Modify: `app/components/vote/TierBallot.tsx` (by the B-Tier column's heading), `app/components/vote/VoteResults.tsx` (`stageLine` / the open-round hero)
 - Test: `app/components/vote/TierBallot.test.tsx`, `app/components/vote/VoteResults.test.tsx`
 
 **Copy (exact):**
-- Ballot, by Tier-B: `Tier-B is funded only if the pool lasts and enough voters back the same initiatives. It may fund nothing.`
-- Results hero, round open, Tier-B not settled and no slug in `rv.live.tiers` has `"B"`: append ` · Tier-B: nothing funded yet, the pool may not reach it.`
-- (Closed round: Task 5's `Tier-B: no initiatives funded`.)
+- Ballot, by B-Tier: `B-Tier is funded only if the pool lasts and enough voters back the same initiatives. It may fund nothing.`
+- Results hero, round open, B-Tier not settled and no slug in `rv.live.tiers` has `"B"`: append ` · B-Tier: nothing funded yet, the pool may not reach it.`
+- (Closed round: Task 5's `B-Tier: no initiatives funded`.)
 
-- [ ] **Step 1: Write the failing tests** — `the ballot warns that Tier-B may fund nothing`; `the hero says when Tier-B funds nothing yet`; and its negative: `no warning while Tier-B funds something`.
+- [ ] **Step 1: Write the failing tests** — `the ballot warns that B-Tier may fund nothing`; `the hero says when B-Tier funds nothing yet`; and its negative: `no warning while B-Tier funds something`.
 - [ ] **Step 2: Run** `deno task test app/components/vote` — FAIL.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run** `deno task test` and `deno task typecheck` — all PASS.
-- [ ] **Step 5: Commit** `Vote: say Tier-B may fund nothing`
+- [ ] **Step 5: Commit** `Vote: say B-Tier may fund nothing`

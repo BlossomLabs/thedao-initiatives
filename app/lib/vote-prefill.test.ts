@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { prefillFromRatings, ratingsToken, skipsFromRatings } from "./vote-prefill";
 
-it("5★ Tier-S, 4★ Tier-A, 3★ Tier-B; 1–2★, unrated and outside the round left out", () => {
+it("5★ S-Tier, 4★ A-Tier, 3★ B-Tier; 1–2★, unrated and outside the round left out", () => {
   expect(
     prefillFromRatings({ a: 5, b: 4, c: 3, d: 2, e: 1, outside: 5 }, [
       "a",

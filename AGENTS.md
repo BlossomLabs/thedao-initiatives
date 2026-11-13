@@ -3,11 +3,11 @@
 ## Writing the vote tiers
 
 In prose, comments, docs, UI copy and test names, a tier is always written
-**Tier-S**, **Tier-A** or **Tier-B**: capital T, a hyphen, a capital letter.
-Several at once are spelled out in full: "Tier-S, Tier-A and Tier-B".
+**S-Tier**, **A-Tier** or **B-Tier**: a capital tier letter, a hyphen, then "Tier".
+Several at once are spelled out in full: "S-Tier, A-Tier and B-Tier".
 
-Never write "S tier", "S-tier", "s-tier", "tier S", "S-TIER", "S/A/B" or
-"S, A and B tiers".
+Never write "S tier", "S-tier", "s-tier", "tier S", "S-TIER", "Tier-S", "Tier-A",
+"Tier-B", "S/A/B" or "S, A and B tiers".
 
 The bare letter stands alone only where it is data or the tier table itself:
 the `Tier` type (`"S" | "A" | "B"`), ballot bytes and fixtures, and the row

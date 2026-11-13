@@ -133,9 +133,9 @@ export function replay(
   now: number,
 ): RoundState {
   const { schedule: s, m, poolUsd, needs } = input;
-  // First ballots: until Tier-S settles (the contract takes them until its latest
+  // First ballots: until S-Tier settles (the contract takes them until its latest
   // possible settlement). Every tally until then splits the pool among the ballots in,
-  // so a newcomer shrinks the others' shares; Tier-S's charges fix them.
+  // so a newcomer shrinks the others' shares; S-Tier's charges fix them.
   const chainDeadline = windowEnds(s, 0).at(-1)!;
   const rollClosesAt = () => settled.find((x) => x.tier === "S")?.at ?? chainDeadline;
   const receipts = input.receipts.filter((r) => r.timestamp < now);

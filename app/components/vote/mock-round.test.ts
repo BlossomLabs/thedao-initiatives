@@ -10,7 +10,7 @@ const NOW = 1_800_000_000;
 const cards = Array.from({ length: 30 }, (_, i) => ({
   initiative: {
     slug: `p${i}`,
-    goalUsd: 100_000 + i * 1_000, // small asks: Tier-B grows until the ballot asks 1.5× the pool
+    goalUsd: 100_000 + i * 1_000, // small asks: B-Tier grows until the ballot asks 1.5× the pool
     createdAt: NOW - 1000 + i,
     type: "grant",
   },
@@ -45,7 +45,7 @@ describe("dev mocks", () => {
     expect(MOCK_NOW.started).toBeGreaterThan(at("started").round.opensAt);
     expect(MOCK_NOW.started).toBeLessThan(at("started").round.schedule.firstTallyAt[0]);
     expect(at("spent").view.tiers.map((t) => t.status)).toEqual(["settled", "settling", "waiting"]);
-    // Tier-S settled, the ballot already sent: its 1–2★ are skipped, none of them ranked.
+    // S-Tier settled, the ballot already sent: its 1–2★ are skipped, none of them ranked.
     const spent = at("spent");
     expect(spent.skipped).toHaveLength(6);
     const counted = new Set(
@@ -56,7 +56,7 @@ describe("dev mocks", () => {
     expect(spent.skipped!.some((x) => counted.has(x))).toBe(false);
     expect(at("finished").view.closed).toBe(true);
     expect(MOCK_NOW.finished).toBeGreaterThan(at("finished").round.closesAt);
-    // Tier-A in its first window at the spent mock's moment.
+    // A-Tier in its first window at the spent mock's moment.
     const a = at("spent").view.tiers[1];
     expect(a.status === "settling" && MOCK_NOW.spent < a.windowEndsAt).toBe(true);
     expect(MOCK_NOW.spent).toBeGreaterThan(at("spent").round.schedule.firstTallyAt[1]);

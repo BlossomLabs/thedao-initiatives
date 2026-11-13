@@ -97,7 +97,7 @@ export default function BoardPage(
     /** The open vote's gap to each initiative's next tier, by id, drawn on the right of the
      * amount row; `titles` (slug → title) names the initiatives in its hover. */
     next?: ReadonlyMap<string, NextTierEntry>;
-    /** Tier-S's lead (micro-USD), by id: how far ahead of falling out of Tier-S it is. */
+    /** S-Tier's lead (micro-USD), by id: how far ahead of falling out of S-Tier it is. */
     lead?: ReadonlyMap<string, string>;
     titles?: ReadonlyMap<string, string>;
     hero?: React.ReactNode;

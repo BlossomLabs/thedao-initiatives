@@ -16,7 +16,7 @@ import {
 
 const K = STEP; // $1K in micro-USD
 
-/** Inputs from raw ballots (one rank per initiative, 1 = Tier-S, 2 = Tier-A, ...). */
+/** Inputs from raw ballots (one rank per initiative, 1 = S-Tier, 2 = A-Tier, ...). */
 function inputs(
   costsK: number[],
   weightsK: number[],
@@ -51,12 +51,12 @@ function tierWith(inp: ChainInputs, c: number, k: bigint, first = 0): number | u
   return at < 0 ? undefined : first + at;
 }
 
-// One voter with $40K: initiative 1 ($40K) is funded in Tier-A. Initiative 0 ($70K) is
+// One voter with $40K: initiative 1 ($40K) is funded in A-Tier. Initiative 0 ($70K) is
 // out of their reach alone.
 const knockOn = () => inputs([70, 40], [40], [[1, 2]]);
 
 describe("the gap to the next tier", () => {
-  it("funded in A: the gap is the least $1K step that funds it in Tier-S", () => {
+  it("funded in A: the gap is the least $1K step that funds it in S-Tier", () => {
     const inp = knockOn();
     const got = nextTiers(inp, 0).get(1)!;
     expect(got.tier).toBe("S");
@@ -73,13 +73,13 @@ describe("the gap to the next tier", () => {
     expect(got.gap).toBe(STEP);
   });
 
-  it("not funded: the target is Tier-B", () => {
+  it("not funded: the target is B-Tier", () => {
     const got = nextTiers(knockOn(), 0).get(0)!;
     expect(got.tier).toBe("B");
     expect(got.gap).toBe(30n * K);
   });
 
-  it("funded in Tier-S: no entry", () => {
+  it("funded in S-Tier: no entry", () => {
     const inp = inputs([10, 40], [49.7], [[1, 2]]);
     expect(nextTiers(inp, 0).has(0)).toBe(false);
   });
@@ -109,8 +109,8 @@ describe("the gap to the next tier", () => {
   });
 
   it("the knock-on lists who comes in", () => {
-    // The phantom funds initiative 0 in Tier-S; the voters' leftover money then funds
-    // initiative 2 in Tier-A.
+    // The phantom funds initiative 0 in S-Tier; the voters' leftover money then funds
+    // initiative 2 in A-Tier.
     const inp = inputs([10, 10, 10, 10], [10, 10, 10], [[3, 3, 3, 1], [2, 1, 3, 3], [3, 3, 3, 1]]);
     const got = nextTiers(inp, 0).get(0)!;
     expect(got.gap).toBe(10n * K);
@@ -182,7 +182,7 @@ describe("the gap to the next tier", () => {
 });
 
 /** Whether `c` is funded in tier `first` with its cost and the pool both raised by `l` steps. */
-/** Whether `c` is still funded in tier `first` (Tier-S or Tier-A) when its backers there
+/** Whether `c` is still funded in tier `first` (S-Tier or A-Tier) when its backers there
  * give `l` steps less, spread over them by weight (the remainder on the last backer). */
 function fundedWithLead(inp: ChainInputs, first: number, c: number, l: bigint): boolean {
   const bound = Math.min(inp.m, stageBound(inp.ballots, first, 3, inp.m));
@@ -222,7 +222,7 @@ function settlements(inp: ChainInputs): { at: ChainInputs[]; finalTier: Map<numb
 
 describe("the gap to a chosen tier", () => {
   it("gapTo reaches a chosen tier and lists only that tier's changes", () => {
-    // Initiative 2 reaching Tier-S moves initiative 0 from Tier-S to Tier-A.
+    // Initiative 2 reaching S-Tier moves initiative 0 from S-Tier to A-Tier.
     const inp = inputs([10, 10, 10, 10], [10, 10, 10], [[3, 1, 2, 3], [1, 3, 1, 3], [2, 1, 3, 3]]);
     const full = gapTo(inp, 0, 2, 0);
     expect(full).toEqual(nextTiers(inp, 0).get(2));
@@ -237,7 +237,7 @@ describe("the gap to a chosen tier", () => {
   });
 
   it("gapTo ignores changes outside the target tier", () => {
-    // Funding initiative 0 in Tier-S pushes initiative 1 out of Tier-A, not Tier-S.
+    // Funding initiative 0 in S-Tier pushes initiative 1 out of A-Tier, not S-Tier.
     const inp = knockOn();
     expect(gapTo(inp, 0, 0, 0).dropsOut).toEqual([[1, "A"]]);
     const only = gapTo(inp, 0, 0, 0, { onlyTarget: true });
@@ -261,8 +261,8 @@ describe("the gap to a chosen tier", () => {
   });
 
   it("gapTo lists who comes into the target tier", () => {
-    // Initiatives 0 and 1 are in Tier-S, 2 in Tier-A, 3 not funded. With $3K more behind
-    // initiative 2, Tier-S takes 0, 2 and 3: initiative 1 drops out and 3 comes in.
+    // Initiatives 0 and 1 are in S-Tier, 2 in A-Tier, 3 not funded. With $3K more behind
+    // initiative 2, S-Tier takes 0, 2 and 3: initiative 1 drops out and 3 comes in.
     const inp = inputs([5, 5, 5, 5], [5, 5, 5], [[1, 1, 1, 3], [1, 3, 3, 1], [3, 2, 3, 2]], 40);
     expect(tierWith(inp, 2, 0n)).toBe(1);
     const only = gapTo(inp, 0, 2, 0, { onlyTarget: true });
@@ -276,8 +276,8 @@ describe("the gap to a chosen tier", () => {
   });
 });
 
-describe("the Tier-S lead", () => {
-  it("a lead is the backing it could lose and stay in Tier-S", () => {
+describe("the S-Tier lead", () => {
+  it("a lead is the backing it could lose and stay in S-Tier", () => {
     // Initiative 0 ($10K) has $49.7K behind it.
     const inp = inputs([10, 40], [49.7], [[1, 2]]);
     const lead = leadIn(inp, 0, 0)!;
@@ -312,7 +312,7 @@ describe("the Tier-S lead", () => {
     // fits one. Each $3K A and B give less costs 0 $3K of support but 1 only $2K, so at
     // $30K the two tie and the cheaper rival goes first: the lead is $29K, not the $30K
     // a rival with backers of its own would leave. F leaves 0 unplaced, which ranks it
-    // past Tier-S: F is no backer of 0 there, and giving F part of the loss would make
+    // past S-Tier: F is no backer of 0 there, and giving F part of the loss would make
     // the lead $35K.
     const inp = inputs([30, 25], [40, 20, 10], [[1, 1], [1, 0], [0, 1]], 40);
     expect(chainTally(inp, 0, 1)[0].order).toEqual([0]);
@@ -328,13 +328,13 @@ describe("the Tier-S lead", () => {
     expect(leadIn(inp, 0, 0)).toBe(0n);
   });
 
-  it("leadIn is null when not funded in Tier-S", () => {
+  it("leadIn is null when not funded in S-Tier", () => {
     const inp = knockOn();
     expect(leadIn(inp, 0, 0)).toBe(null);
     expect(leadIn(inp, 0, 1)).toBe(null);
   });
 
-  it("live leads: only while Tier-S is open, only for Tier-S initiatives", async () => {
+  it("live leads: only while S-Tier is open, only for S-Tier initiatives", async () => {
     const inp = inputs([10, 40], [49.7], [[1, 2]]);
     expect(liveLeads(inp, 0)).toEqual(new Map([[0, 39n * K]]));
     expect(liveLeads(inp, 1).size).toBe(0);
@@ -343,7 +343,7 @@ describe("the Tier-S lead", () => {
 });
 
 describe("the final what-ifs", () => {
-  // Initiative 0 is funded in Tier-S, 3 in Tier-A, 1 in Tier-B; 2 is not funded.
+  // Initiative 0 is funded in S-Tier, 3 in A-Tier, 1 in B-Tier; 2 is not funded.
   const round = () =>
     settlements(inputs([5, 5, 5, 5], [5, 5, 5], [[1, 3, 3, 2], [1, 2, 2, 3], [1, 1, 2, 1]], 40));
 
@@ -378,7 +378,7 @@ describe("the final what-ifs", () => {
   });
 
   it("already in the target tier at its settlement: no figure", () => {
-    // A stored snapshot put initiative 0 in Tier-A, yet Tier-S's inputs fund it in Tier-S.
+    // A stored snapshot put initiative 0 in A-Tier, yet S-Tier's inputs fund it in S-Tier.
     const { at, finalTier } = round();
     expect(chainTally(at[0], 0, 1)[0].order).toContain(0);
     const forced = new Map([...finalTier, [0, 1]]);

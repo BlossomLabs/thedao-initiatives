@@ -26,7 +26,7 @@ const m: VoteManifest = {
   independentTiers: 1,
 };
 const VOTER: Hex = "0x3000000000000000000000000000000000000003";
-/** Tier-S = a, b, c (unrelated): its proof is [0, 1, 2]. */
+/** S-Tier = a, b, c (unrelated): its proof is [0, 1, 2]. */
 const BALLOT: Hex = "0x010101ff";
 const PROOF = [0, 1, 2];
 const SIG: Hex = `0x${"ab".repeat(65)}`;

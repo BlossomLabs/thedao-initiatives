@@ -41,9 +41,9 @@ export type PeekChoice<W extends string> = {
   value: W;
   grade: React.ReactNode;
   label: string;
-  /** Read out: "Tier-S, Must fund". */
+  /** Read out: "S-Tier, Must fund". */
   name: string;
-  /** In the closed selector: "Tier-S · Must fund". */
+  /** In the closed selector: "S-Tier · Must fund". */
   display: string;
   disabled: boolean;
 };
@@ -66,7 +66,7 @@ export default function InitiativePeek<W extends string>(
   },
 ) {
   const titleId = useId();
-  /** Where it is now: "Tier-S · Must fund", "Not ranked yet", "Skipped". */
+  /** Where it is now: "S-Tier · Must fund", "Not ranked yet", "Skipped". */
   const now = choices.find((c) => c.value === current);
   const canChange = choices.some((c) => !c.disabled);
   /** The settled tier's popover, open by a hover, a focus or a tap. */

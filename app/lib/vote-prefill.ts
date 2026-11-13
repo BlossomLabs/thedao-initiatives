@@ -2,7 +2,7 @@ import type { Tier } from "../../shared/vote/ballot";
 
 const BY_STARS: Partial<Record<number, Tier>> = { 5: "S", 4: "A", 3: "B" };
 
-/** A fresh ballot from the badge's own star ratings: 5★ Tier-S, 4★ Tier-A, 3★ Tier-B.
+/** A fresh ballot from the badge's own star ratings: 5★ S-Tier, 4★ A-Tier, 3★ B-Tier.
  * 1–2★ are skipped (`skipsFromRatings`); unrated and anything outside the round stay
  * unplaced. */
 export function prefillFromRatings(

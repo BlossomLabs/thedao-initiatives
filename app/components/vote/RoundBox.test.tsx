@@ -8,7 +8,7 @@ afterEach(cleanup);
 
 const H = 3600;
 const now = Math.floor(Date.now() / 1000);
-// Tier-S started 30h ago: window 1 (24h) is over, window 2 (12h) ends in 6h.
+// S-Tier started 30h ago: window 1 (24h) is over, window 2 (12h) ends in 6h.
 const T = now - 30 * H;
 const schedule = {
   opensAt: T - 72 * H,
@@ -52,7 +52,7 @@ describe("RoundBox", () => {
     );
     const box = screen.getByRole("region", { name: "Where the round is" });
     expect(box).toHaveClass("bg-dao-green/[.09]");
-    expect(within(box).getByRole("heading", { name: "Tier-S is settling" })).toBeInTheDocument();
+    expect(within(box).getByRole("heading", { name: "S-Tier is settling" })).toBeInTheDocument();
     expect(box).toHaveTextContent(/This window ends at \d{2}:\d{2}\s*in (5h 59m|6h 00m)/);
     expect(within(box).getAllByRole("listitem")).toHaveLength(5);
     expect(box.querySelectorAll("[data-window]")).toHaveLength(4);
@@ -62,7 +62,7 @@ describe("RoundBox", () => {
   it("a settling tier: the stepper on it, its countdown, and a bar of its windows", () => {
     render(<RoundBox schedule={schedule} rv={view([settlingS(true), ...later])} />);
     const box = screen.getByRole("region", { name: "Where the round is" });
-    expect(within(box).getByRole("heading", { name: "Tier-S is settling" })).toBeInTheDocument();
+    expect(within(box).getByRole("heading", { name: "S-Tier is settling" })).toBeInTheDocument();
     expect(within(box).getByRole("timer")).toHaveTextContent(/^in 5h 59m|^in 6h 00m/);
     const steps = within(box).getAllByRole("listitem");
     expect(steps.map((s) => s.getAttribute("aria-current"))).toEqual([
@@ -74,14 +74,14 @@ describe("RoundBox", () => {
     ]);
     expect([...box.querySelectorAll("[data-window]")].map((b) => b.getAttribute("data-window")))
       .toEqual(["past", "current", "maybe", "maybe"]);
-    expect(box).toHaveTextContent(/If nothing changes, Tier-S settles at \d{2}:\d{2}\./);
+    expect(box).toHaveTextContent(/If nothing changes, S-Tier settles at \d{2}:\d{2}\./);
   });
 
   it("each window has its own popup: its length, times and what it means", async () => {
     render(<RoundBox schedule={schedule} rv={view([settlingS(false), ...later])} />);
-    const coming = screen.getByRole("button", { name: /Tier-S Window 3 · 6h, will follow/ });
+    const coming = screen.getByRole("button", { name: /S-Tier Window 3 · 6h, will follow/ });
     fireEvent.click(coming);
-    const pop = await screen.findByText("Will run: Tier-S changed in window 2.");
+    const pop = await screen.findByText("Will run: S-Tier changed in window 2.");
     const card = pop.closest("[data-window-popup]")!;
     expect(card).toHaveTextContent("Window 3 · 6h");
     expect(card).toHaveTextContent("will follow");
@@ -90,15 +90,15 @@ describe("RoundBox", () => {
     expect(document.querySelectorAll("[data-window-popup]")).toHaveLength(1);
     fireEvent.pointerDown(document.body);
     await waitFor(() =>
-      expect(screen.queryByText("Will run: Tier-S changed in window 2.")).toBeNull()
+      expect(screen.queryByText("Will run: S-Tier changed in window 2.")).toBeNull()
     );
     fireEvent.click(screen.getByRole("button", { name: /Window 1 · 24h, done/ }));
-    expect(await screen.findByText("Tier-S changed in it, so window 2 followed."))
+    expect(await screen.findByText("S-Tier changed in it, so window 2 followed."))
       .toBeInTheDocument();
   });
 
   it("the real schedule's short windows (4 to 9) are one block, with every window in its popup", async () => {
-    // 9 windows from 24h, Tier-S in window 5 (1h 30m), which has changed.
+    // 9 windows from 24h, S-Tier in window 5 (1h 30m), which has changed.
     const real = { ...schedule, maxWindows: 9 };
     const w5 = T + (24 + 12 + 6 + 3) * H;
     const s5: RoundTier = {
@@ -127,7 +127,7 @@ describe("RoundBox", () => {
       false,
     ]);
     fireEvent.click(
-      screen.getByRole("button", { name: /Tier-S Windows 4–9, now: window 5/ }),
+      screen.getByRole("button", { name: /S-Tier Windows 4–9, now: window 5/ }),
     );
     const pop = (await screen.findByText(/Windows 4–9/)).closest("[data-window-popup]")!;
     const rows = [...pop.querySelectorAll("[data-window-row]")];
@@ -136,7 +136,7 @@ describe("RoundBox", () => {
       .toEqual(["past", "current", "coming", "maybe"]);
     expect(rows[1]).toHaveTextContent("1h 30m");
     expect(rows[5]).toHaveTextContent(/^Window 9\s*5m 37s\s*ends \d{2}:\d{2}$/);
-    expect(pop).toHaveTextContent("Tier-S changed in it, so window 6 will follow.");
+    expect(pop).toHaveTextContent("S-Tier changed in it, so window 6 will follow.");
   });
 
   it("window lengths read in at most two units; a short schedule keeps every window alone", () => {
@@ -169,17 +169,17 @@ describe("RoundBox", () => {
         mine={{ onBallot: 2, paidUsd: 9800, shareUsd: 25000 }}
         badge={{
           tone: "ok",
-          text: "Tier-S is locked. Tier-A and Tier-B are still yours to change.",
+          text: "S-Tier is locked. A-Tier and B-Tier are still yours to change.",
         }}
       />,
     );
-    expect(screen.getByRole("heading")).toHaveTextContent("Tier-S settled: 4 initiatives, $520k");
-    expect(screen.getByText(/^Tier-A starts settling/)).toBeInTheDocument();
+    expect(screen.getByRole("heading")).toHaveTextContent("S-Tier settled: 4 initiatives, $520k");
+    expect(screen.getByText(/^A-Tier starts settling/)).toBeInTheDocument();
     expect(
       screen.getByText("2 of the 4 were on your ballot. You paid $9,800 of your $25,000 share."),
     )
       .toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Tier-S is locked.");
+    expect(screen.getByRole("status")).toHaveTextContent("S-Tier is locked.");
   });
 
   it("without a badge line (the results page) there is no status about a badge", () => {
@@ -190,15 +190,15 @@ describe("RoundBox", () => {
 
 describe("badgeLine", () => {
   const phase = (tiers: RoundTier[]) => roundSteps({ schedule, tiers, now }).phase;
-  it("a badge that hasn't voted: still time while Tier-S settles", () => {
+  it("a badge that hasn't voted: still time while S-Tier settles", () => {
     expect(badgeLine({ phase: phase([settlingS(true), ...later]), counted: false, settled: [] }))
       .toEqual({
         tone: "todo",
         text:
-          "This badge hasn’t voted yet. There is still time: send a first ballot before Tier-S settles.",
+          "This badge hasn’t voted yet. There is still time: send a first ballot before S-Tier settles.",
       });
   });
-  it("after Tier-S settled, a badge that never voted is out", () => {
+  it("after S-Tier settled, a badge that never voted is out", () => {
     expect(
       badgeLine({ phase: phase([settlingS(true), ...later]), counted: false, settled: ["S"] }).tone,
     ).toBe("muted");
@@ -211,7 +211,7 @@ describe("badgeLine", () => {
     expect(
       badgeLine({ phase: phase([settlingS(true), ...later]), counted: true, settled: ["S", "A"] })
         .text,
-    ).toBe("Tier-S and Tier-A are locked. Tier-B is still yours to change.");
+    ).toBe("S-Tier and A-Tier are locked. B-Tier is still yours to change.");
   });
 });
 
@@ -229,7 +229,7 @@ describe("RoundBox, steps only", () => {
     expect(within(where).getAllByRole("listitem")).toHaveLength(5);
     expect(within(where).getByRole("status")).toHaveTextContent("Your ballot counts.");
     // Its title says where the round is; the windows aren't there.
-    expect(within(where).getByRole("heading", { name: "Tier-S is settling" })).toBeInTheDocument();
+    expect(within(where).getByRole("heading", { name: "S-Tier is settling" })).toBeInTheDocument();
     expect(where.querySelector("[data-window]")).toBeNull();
   });
 });

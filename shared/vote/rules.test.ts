@@ -9,7 +9,7 @@ import {
 } from "./rules";
 import fixtures from "./fixtures/ballot-rules.json";
 
-/** Six projects: 0 and 1 related to Seal, 5 an RFP. Pool 200. Tier-S enforced. */
+/** Six projects: 0 and 1 related to Seal, 5 an RFP. Pool 200. S-Tier enforced. */
 const round = (over: Partial<RulesRound> = {}): RulesRound => ({
   projects: [100n, 100n, 100n, 100n, 50n, 50n].map((askUsd, i) => ({
     askUsd,
@@ -33,7 +33,7 @@ function ballot(tiers: { S?: number[]; A?: number[]; B?: number[] }, len = 6): U
 }
 
 describe("ballot rules", () => {
-  it("a valid ballot: three unrelated in Tier-S, 1.5× the pool requested", () => {
+  it("a valid ballot: three unrelated in S-Tier, 1.5× the pool requested", () => {
     expect(checkBallot(ballot({ S: [0, 2, 3] }), round())).toEqual({
       ok: true,
       errors: [],
@@ -47,7 +47,7 @@ describe("ballot rules", () => {
     expect(r.proof).toEqual([]);
     expect(r.errors).toEqual([
       { rule: "independent", tier: 0, count: 2, related: [{ group: 0, projects: [0, 1] }] },
-      // Seal also holds 200 of Tier-S's 300.
+      // Seal also holds 200 of S-Tier's 300.
       { rule: "group", tier: 0, group: 0, groupUsd: 200n, tierUsd: 300n },
     ]);
   });
@@ -77,7 +77,7 @@ describe("ballot rules", () => {
       .toContainEqual({ rule: "tiers" });
   });
 
-  it("Tier-A is checked only when enforced, and must then exist", () => {
+  it("A-Tier is checked only when enforced, and must then exist", () => {
     const b = ballot({ S: [0, 2, 3] });
     expect(checkBallot(b, round({ independentTiers: 1 })).ok).toBe(true);
     expect(checkBallot(b, round({ independentTiers: 3 })).errors).toEqual([
@@ -103,7 +103,7 @@ describe("ballot rules", () => {
     const b = ballot({ S: [0, 1, 2, 3], B: [4] });
     expect(checkProof(b, round(), [1, 2, 3])).toBe(true);
     expect(checkProof(b, round(), [0, 1, 2])).toBe(false); // 0 and 1 share Seal
-    expect(checkProof(b, round(), [2, 3, 4])).toBe(false); // 4 is in Tier-B
+    expect(checkProof(b, round(), [2, 3, 4])).toBe(false); // 4 is in B-Tier
     expect(checkProof(b, round(), [2, 3])).toBe(false);
   });
 

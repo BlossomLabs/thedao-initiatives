@@ -16,11 +16,11 @@ the request. Three things follow, all wrong:
   a window. A donation changes every earlier tally of the open tier after the
   fact and is never compared.
 - **A donation can decide a tier unseen.** The tally is not monotone in costs: a
-  donation to one project can push another out of Tier-S. Measured on the real
-  `stageTally`: in 59,344 random small rounds a donation before Tier-S settled
-  dropped 1,532 projects from Tier-S, and 874 of them ended funded in no tier.
+  donation to one project can push another out of S-Tier. Measured on the real
+  `stageTally`: in 59,344 random small rounds a donation before S-Tier settled
+  dropped 1,532 projects from S-Tier, and 874 of them ended funded in no tier.
   Example: costs `[62,12,42,32]`, ballots `[[2,2,3,1],[1,2,1,2]]`, pool 152 funds
-  `[3,2]` in Tier-S; lower project 0 to 40 and it funds `[3,0]`.
+  `[3,2]` in S-Tier; lower project 0 to 40 and it funds `[3,0]`.
 
 What already holds and must keep holding (checked in the same test):
 
@@ -133,7 +133,7 @@ existing wait for finality (`FINAL_AFTER_SECS`) before caching is fine.
 
 - A project whose ask is $0 at a tally's block is not a candidate in that
   tally: it is not funded, takes no money and is not part of any funded set
-  that the quiet comparison looks at. (Today it enters Tier-S with no votes,
+  that the quiet comparison looks at. (Today it enters S-Tier with no votes,
   because 0 support ≥ 0 cost.)
 - A project whose ask is $0 at the block a tier settles with is recorded as
   **covered** at that settlement, with a $0 award. That is final, like any
@@ -200,7 +200,7 @@ gap can settle the tier without the project. Goes in
    "if it settled now" live view uses the asks at the head block.
 5. **Python reference** (`vote/reference/`): `run_on_time` already takes costs
    per in-window tally (`between`, `asks_for_day`). Add the $0 rule, and tests:
-   the Tier-S example above extends the window; a donation after settlement
+   the S-Tier example above extends the window; a donation after settlement
    changes nothing; chained equals plain when nothing changes. Regenerate the
    shared fixtures the TypeScript tests read.
 6. **Docs**: `vote/docs/quiet-ending-rules.md` and

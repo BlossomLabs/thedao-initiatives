@@ -56,7 +56,7 @@ on-chain, and sees the projector move.
   bytes it signed, succeeded). Then it tells the user: counted / failed. On failure: **Retry**.
 - **Self-send:** always offered as a secondary option, both when sending and when retrying: the
   user submits the same signed ballot to the contract from their own wallet.
-- **Ballot UI:** the Tier-S/Tier-A/Tier-B widget from `../blossomlabs.eth/src/components/budgeting/voting/tier-list.tsx`
+- **Ballot UI:** the S-Tier, A-Tier and B-Tier widget from `../blossomlabs.eth/src/components/budgeting/voting/tier-list.tsx`
   (`TierList`, `lib/ballot-tiers.ts` `tierRanks`), restyled to this site.
 - **Ballot contents:** every current initiative, not only those that qualify for the vote.
 - **Projector:** at `/devcon`, the same information and layout as the homepage list
@@ -145,7 +145,7 @@ sending key with MINTER_ROLE and Sepolia ETH).
 
 ### Results tally
 
-Initiatives receiving a positive vote allocation show a Tier-S, Tier-A or Tier-B chip in
+Initiatives receiving a positive vote allocation show an S-Tier, A-Tier or B-Tier chip in
 both list and card layouts. The tier is the stage in which the existing PB-EAR transcript
 funds the initiative: S ends at rank level 1; A ends once every ballot's second nonempty
 tier has opened; B covers the remaining levels. These are the result-stage boundaries

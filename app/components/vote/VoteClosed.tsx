@@ -371,8 +371,8 @@ export default function VoteClosed(
         roundBox && <div>{roundBox}</div>
       }
       {
-        /* One grid for both cards: each card spans four rows (header, Tier-S, Tier-A,
-          Tier-B) as a subgrid, so each row is as tall as the taller of the two. */
+        /* One grid for both cards: each card spans four rows (header, S-Tier, A-Tier,
+          B-Tier) as a subgrid, so each row is as tall as the taller of the two. */
       }
       <div
         ref={tables}

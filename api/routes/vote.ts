@@ -216,7 +216,7 @@ const leadJson = (lead: Map<number, bigint>, slugs: string[]): Record<string, st
     [...lead].filter(([, v]) => v >= STEP).map(([c, v]) => [slugs[c], v.toString()]),
   );
 /** A finished search: the digest of its inputs, the open tier it looked from, and when.
- * Tier-S's leads come with it while Tier-S is open. */
+ * S-Tier's leads come with it while S-Tier is open. */
 type KnownNext = {
   key: string;
   firstOpen: number;
@@ -452,7 +452,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       const work = (async () => {
         const slugs = d.manifest.slugs;
         const next = nextJson(await nextTiersAsync(liveInputs, firstOpen), slugs);
-        // A lead only means something while Tier-S can still change. A failed lead search
+        // A lead only means something while S-Tier can still change. A failed lead search
         // still keeps the gaps.
         let lead: Record<string, string> | undefined;
         if (firstOpen === 0) {
@@ -672,8 +672,8 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       }
     }
     // What the quiet ending would refuse is refused here, before anyone pays gas for it.
-    // Nothing can be refused before Tier-S's first window ends: no tier settles before
-    // it, and first ballots are taken until Tier-S settles.
+    // Nothing can be refused before S-Tier's first window ends: no tier settles before
+    // it, and first ballots are taken until S-Tier settles.
     const firstWindowEnds = d.manifest.schedule.firstTallyAt[0] +
       d.manifest.schedule.initialWindow;
     const no = deps.now() < firstWindowEnds ? null : refusal(
@@ -685,7 +685,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     );
     if (no?.code === "closed") throw fail(410, "closed", "Voting has closed.");
     if (no?.code === "registration_closed") {
-      throw fail(403, "registration_closed", "Tier-S settled before this badge voted.");
+      throw fail(403, "registration_closed", "S-Tier settled before this badge voted.");
     }
     if (no?.code === "tier_settled") {
       throw fail(

@@ -17,7 +17,7 @@
 //
 // The relayer key deploys and keeps only MINTER_ROLE; it is also the server's
 // sending key. Everything here must finish before opensAt (setup freezes then).
-// `--independent-tiers 3` holds Tier-A to the independence rules too (default: Tier-S).
+// `--independent-tiers 3` holds A-Tier to the independence rules too (default: S-Tier).
 //
 // Adding projects to a deployed round (outside every quiet-ending span; the admin
 // holds the role, so the admin's wallet sends the calls):
@@ -435,7 +435,7 @@ async function main() {
   if (args.add || args.added) return await addMain(args);
   const independentTiers = Number(args["independent-tiers"] ?? 1);
   if (independentTiers !== 1 && independentTiers !== 3) {
-    throw new Error("--independent-tiers is 1 (Tier-S) or 3 (Tier-S and Tier-A)");
+    throw new Error("--independent-tiers is 1 (S-Tier) or 3 (S-Tier and A-Tier)");
   }
   const real = args.real ? parseRealArgs(args) : null;
   const chain = real ? mainnet : sepolia;

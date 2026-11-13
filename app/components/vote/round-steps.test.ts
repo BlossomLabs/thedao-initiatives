@@ -39,7 +39,7 @@ describe("roundSteps", () => {
     expect(r.at).toBe(0);
   });
 
-  it("open, before Tier-S's first tally: still the vote step", () => {
+  it("open, before S-Tier's first tally: still the vote step", () => {
     const r = roundSteps({ schedule, tiers: allWaiting, now: T - H });
     expect(r.phase).toEqual({ kind: "open", sStarts: T });
     expect(kinds(r)).toEqual(["current", "up", "up", "up", "up"]);
@@ -49,7 +49,7 @@ describe("roundSteps", () => {
     expect(roundSteps({ schedule, tiers: undefined, now: T - H }).phase.kind).toBe("open");
   });
 
-  it("Tier-S settling in window 2, quiet: window 1 done, 2 now, 3 and 4 only if it changes", () => {
+  it("S-Tier settling in window 2, quiet: window 1 done, 2 now, 3 and 4 only if it changes", () => {
     const r = roundSteps({
       schedule,
       tiers: [

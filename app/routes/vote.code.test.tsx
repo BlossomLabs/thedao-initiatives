@@ -263,7 +263,7 @@ it("the badge's owner gets the ballot, and sending posts the encoded tiers", asy
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
   expect(await screen.findByText("ALPHA")).toBeInTheDocument();
-  await placeIn("BETA", "Tier-S, Must fund");
+  await placeIn("BETA", "S-Tier, Must fund");
   fireEvent.click(screen.getByRole("button", { name: /send my ballot/i }));
   await waitFor(() => expect(submit).toHaveBeenCalled());
   const [tokenId, ballot] = submit.mock.calls[0];
@@ -276,7 +276,7 @@ it("offers to send it yourself next to Send, and next to Retry after a failure",
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
-  await placeIn("BETA", "Tier-S, Must fund");
+  await placeIn("BETA", "S-Tier, Must fund");
   fireEvent.click(screen.getByRole("button", { name: /send it yourself/i }));
   await waitFor(() => expect(selfSend).toHaveBeenCalled());
   expect(selfSend.mock.calls[0][0]).toBe(17n);
@@ -374,7 +374,7 @@ it("the ballot: search narrows the unranked list; a tile's tier buttons place it
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
 
   // Tap it, then choose a tier on its card.
-  await placeIn("ALPHA", "Tier-A, Should fund");
+  await placeIn("ALPHA", "A-Tier, Should fund");
   expect(within(screen.getByRole("list", { name: "Should fund" })).getByText("ALPHA"))
     .toBeInTheDocument();
 });
@@ -421,7 +421,7 @@ it("a skipped initiative leaves the list, is kept in this browser, and isn't sen
       localStorage.getItem("vote-skipped:0x1000000000000000000000000000000000000001:17")!,
     ),
   ).toEqual(["gamma"]);
-  await placeIn("BETA", "Tier-S, Must fund");
+  await placeIn("BETA", "S-Tier, Must fund");
   fireEvent.click(screen.getByRole("button", { name: /send my ballot/i }));
   await waitFor(() => expect(submit).toHaveBeenCalled());
   expect(submit.mock.calls[0][1]).toBe(
@@ -477,7 +477,7 @@ it("a proposal's card shows its summary and Details, and moves it only when aske
   session.current = { address: ME };
   mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
   show();
-  await placeIn("ALPHA", "Tier-S, Must fund");
+  await placeIn("ALPHA", "S-Tier, Must fund");
   expect(screen.queryByText("Formal verification of bridges")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Details for GAMMA" }));
   const card = await screen.findByRole("dialog", { name: "GAMMA" });
@@ -731,11 +731,11 @@ const settlingS = (window: number, quiet: boolean, last = false) => ({
   funded: [],
 });
 
-it("quiet ending: before Tier-S settles, a badge that hasn't voted is told so in the round box", async () => {
+it("quiet ending: before S-Tier settles, a badge that hasn't voted is told so in the round box", async () => {
   await ballotWith(roundBody());
   const box = await roundBox();
   expect(within(box).getByRole("status")).toHaveTextContent(
-    "This badge hasn’t voted yet. Send a first ballot before Tier-S settles, or it won’t be able to vote.",
+    "This badge hasn’t voted yet. Send a first ballot before S-Tier settles, or it won’t be able to vote.",
   );
   // Dates in local time, UTC only in their titles.
   expect(box.querySelector("time")!.title).toMatch(/ UTC$/);
@@ -757,10 +757,10 @@ it("quiet ending: after registration, a badge that never voted gets no ballot at
 });
 
 it("a ballot that counts opens on the page that shows it; Edit goes back to the ballot", async () => {
-  // Badge 17's counted ballot: alpha alone in its group, read as Tier-S.
+  // Badge 17's counted ballot: alpha alone in its group, read as S-Tier.
   roundIs.body = roundBody({
     accepted: { "17": "0x01ffff" },
-    // If it ended now, Tier-S would fund ALPHA: the live result, beside the ballot.
+    // If it ended now, S-Tier would fund ALPHA: the live result, beside the ballot.
     live: {
       funded: ["alpha"],
       awards: { alpha: "30000000000" },
@@ -776,7 +776,7 @@ it("a ballot that counts opens on the page that shows it; Edit goes back to the 
   expect(screen.getByRole("heading", { level: 2, name: "The live result" })).toBeInTheDocument();
   expect(screen.getByText(/\$30,000 of the .* pool if it ended now · 1 initiative/))
     .toBeInTheDocument();
-  // Only the live tally funds ALPHA (Tier-S hasn't settled): green in both tables, not gold.
+  // Only the live tally funds ALPHA (S-Tier hasn't settled): green in both tables, not gold.
   const alpha = document.querySelectorAll('[data-final-chip="alpha"]');
   expect(alpha).toHaveLength(2);
   for (const chip of alpha) {
@@ -820,7 +820,7 @@ it("a ballot that counts opens on the page that shows it; Edit goes back to the 
   expect(scrollTo).toHaveBeenCalledWith({ top: 0 });
   // Changed, a ballot that counted already goes again as a resend.
   fireEvent.click(screen.getByRole("button", { name: "Edit my ballot" }));
-  await placeIn("BETA", "Tier-A, Should fund");
+  await placeIn("BETA", "A-Tier, Should fund");
   expect(screen.getByRole("button", { name: "Resend my ballot" })).toBeEnabled();
   // Restore sent ballot takes it back to the one that counts: nothing to resend.
   expect(screen.queryByRole("button", { name: "Restore sent ballot" })).not.toBeNull();
@@ -876,10 +876,10 @@ it("quiet ending: S settling, quiet so far", async () => {
     tiers: [{ ...settlingS(1, true), funded: ["alpha"] }, waiting("A"), waiting("B")],
   }));
   const box = await roundBox();
-  expect(within(box).getByRole("heading", { name: "Tier-S is settling" })).toBeInTheDocument();
+  expect(within(box).getByRole("heading", { name: "S-Tier is settling" })).toBeInTheDocument();
   expect(within(box).getByRole("timer")).toHaveTextContent(/^in \d+d \d+h$/);
   expect(windows(box)).toEqual(["current", "maybe", "maybe"]);
-  expect(box).toHaveTextContent(/If nothing changes, Tier-S settles at \d{2}:\d{2}\./);
+  expect(box).toHaveTextContent(/If nothing changes, S-Tier settles at \d{2}:\d{2}\./);
   expect(within(box).getByRole("status")).toHaveTextContent(
     "Your ballot counts. You can still change every tier.",
   );
@@ -891,7 +891,7 @@ it("quiet ending: S changed in this window: the next one will follow", async () 
     tiers: [settlingS(2, false), waiting("A"), waiting("B")],
   }));
   const box = await roundBox();
-  expect(box).toHaveTextContent("Tier-S changed in this window: a shorter window follows at");
+  expect(box).toHaveTextContent("S-Tier changed in this window: a shorter window follows at");
   expect(windows(box)).toEqual(["past", "current", "coming"]);
 });
 
@@ -913,7 +913,7 @@ it("quiet ending: a settled S is named and locked; the badge sees what it paid a
       waiting("B"),
     ],
   }));
-  // What's left of the share heads the ballot; the round box says what Tier-S took.
+  // What's left of the share heads the ballot; the round box says what S-Tier took.
   expect(await screen.findByText("$1,100 of your $2,000 share left")).toBeInTheDocument();
   expect(await roundBox()).toHaveTextContent("1 of the 1 was on your ballot. You paid $900.00");
   // Settled: the tier says so, and its chip opens a card that can't move it.
@@ -1008,7 +1008,7 @@ it("quiet ending: in the last window, a change can't buy another one", async () 
     tiers: [settlingS(3, false, true), waiting("A"), waiting("B")],
   }));
   const box = await roundBox();
-  expect(box).toHaveTextContent("The last window: Tier-S settles at");
+  expect(box).toHaveTextContent("The last window: S-Tier settles at");
   expect(windows(box)).toEqual(["past", "past", "current"]);
 });
 
@@ -1045,17 +1045,17 @@ it("ballot rules: a ballot breaking a rule shows why and can't be sent", async (
   round.ballotRules = true;
   round.seal = true;
   localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "S", beta: "S", gamma: "S" }));
-  // $500 pool: $1,200 requested clears 1.5×; Seal holds $800 of Tier-S's $1,200.
+  // $500 pool: $1,200 requested clears 1.5×; Seal holds $800 of S-Tier's $1,200.
   await ballotWith(roundBody({ poolUsd: "500000000" }));
   const box = await screen.findByRole("region", { name: "Ballot rules" });
   expect(
     within(box).getByText(
-      "Tier-S needs at least 3 independent projects. ALPHA and BETA are affiliated with Seal, so they count as one.",
+      "S-Tier needs at least 3 independent projects. ALPHA and BETA are affiliated with Seal, so they count as one.",
     ),
   ).toBeInTheDocument();
   expect(
     within(box).getByText(
-      "Projects affiliated with Seal take $800 of Tier-S's $1,200. One affiliation can hold at most half.",
+      "Projects affiliated with Seal take $800 of S-Tier's $1,200. One affiliation can hold at most half.",
     ),
   ).toBeInTheDocument();
   // It can't send, but it answers: a hover shakes why, a tap scrolls there and shakes it.
@@ -1083,10 +1083,10 @@ it("ballot rules: a valid ballot that breaks a rule shakes why", async () => {
   await ballotWith(roundBody({ poolUsd: "500000000" }));
   const why = await screen.findByText("You can add as many initiatives as you want");
   expect(why).not.toHaveClass("motion-safe:animate-reason-nudge");
-  // GAMMA down to Tier-A: two left in Tier-S, under its three.
+  // GAMMA down to A-Tier: two left in S-Tier, under its three.
   fireEvent.click(screen.getByRole("button", { name: "GAMMA" }));
-  await pickIn(await screen.findByRole("dialog"), "Tier-A, Should fund");
-  const now = await screen.findByText("Needs at least 3 independent projects in Tier-S");
+  await pickIn(await screen.findByRole("dialog"), "A-Tier, Should fund");
+  const now = await screen.findByText("Needs at least 3 independent projects in S-Tier");
   await waitFor(() => expect(now).toHaveClass("motion-safe:animate-reason-nudge"));
 });
 
@@ -1131,7 +1131,7 @@ it("prefill: a counted ballot or a saved draft wins over ratings", async () => {
     .toBeInTheDocument();
 });
 
-it("prefill: a ballot already counted (Tier-S settled) still gets its 1–2★ skipped, once", async () => {
+it("prefill: a ballot already counted (S-Tier settled) still gets its 1–2★ skipped, once", async () => {
   extra.paths = {
     "/api/reviews/identity": { tokenIds: ["5"], canReview: true },
     "/api/reviews/ratings?tokenId=5": {
@@ -1146,7 +1146,7 @@ it("prefill: a ballot already counted (Tier-S settled) still gets its 1–2★ s
       waiting("B"),
     ],
   }));
-  // The counted ballot stays as it is (BETA in Tier-S, 2★ or not); ALPHA is skipped.
+  // The counted ballot stays as it is (BETA in S-Tier, 2★ or not); ALPHA is skipped.
   expect(
     within(await screen.findByRole("list", { name: "Must fund" })).getByRole("button", {
       name: /^BETA/,
@@ -1188,12 +1188,12 @@ it("ballot rules: after a failure, Send it yourself stays off while a rule is br
   expect(screen.queryByRole("button", { name: "Send it yourself" })).toBeNull();
 });
 
-it("ballot rules: an empty Tier-S is refused, though the chain would read Tier-A as Tier-S", async () => {
+it("ballot rules: an empty S-Tier is refused, though the chain would read A-Tier as S-Tier", async () => {
   round.ballotRules = true;
   localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "A", beta: "A", gamma: "A" }));
   await ballotWith(roundBody({ poolUsd: "500000000" }));
   // The ballot box says what's missing; with no affiliations to explain, no box below.
-  expect(await screen.findByText("Needs at least 3 independent projects in Tier-S"))
+  expect(await screen.findByText("Needs at least 3 independent projects in S-Tier"))
     .toBeInTheDocument();
   expect(screen.queryByRole("region", { name: "Ballot rules" })).toBeNull();
   expect(screen.getByRole("button", { name: /send my ballot/i })).toHaveAttribute(

@@ -130,7 +130,7 @@ function Row(
     /** On the vote results page: no Funded cell, the tier after the title. */
     voteResults?: boolean;
     next?: NextTierEntry;
-    /** Tier-S's lead, micro-USD. */
+    /** S-Tier's lead, micro-USD. */
     lead?: string;
     titles?: ReadonlyMap<string, string>;
     final?: number;
@@ -161,7 +161,7 @@ function Row(
       <span className="sr-only">funded</span>
     </>
   );
-  // The vote results' what-if: Tier-S's lead, or the gap to the next tier (to Tier-B for
+  // The vote results' what-if: S-Tier's lead, or the gap to the next tier (to B-Tier for
   // one the vote didn't fund), as a tick on the bar and its callout.
   const w = whatIf({ tier: voteTier, next, lead });
   const wTick = whatIfTick(w, summary.total, r.goalUsd);
@@ -464,7 +464,7 @@ export default function BoardList(
     titles,
   }: {
     cards: Card[];
-    /** Tier-S's lead (micro-USD), by initiative id. */
+    /** S-Tier's lead (micro-USD), by initiative id. */
     lead?: ReadonlyMap<string, string>;
     /** The vote's gap to each initiative's next tier, by initiative id (live while it is
      * open, frozen at each settlement once closed). */

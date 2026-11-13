@@ -722,7 +722,7 @@ Deno.test("the round lists each initiative's gap to the next tier", async () => 
   // Once it is done, the cached round carries it.
   const open = await j(await h.req("/api/vote/round")) as Body;
   const next = open.live.next!;
-  assertEquals(next.a, undefined, "funded in Tier-S: no next tier");
+  assertEquals(next.a, undefined, "funded in S-Tier: no next tier");
   assertEquals(next.b.tier, "B");
   assertEquals(next.b.gap, "3000000000");
   // Once the round closes there is no live tally, so nothing to look ahead at.
@@ -739,7 +739,7 @@ Deno.test("the round lists each initiative's gap to the next tier", async () => 
 
 Deno.test("round next: who it knocks out is named by slug", async () => {
   // $100K pool. Two voters back b ($40K) below c (out of anyone's reach), so b is funded
-  // after the first tier. Backing a ($70K) to Tier-B's gap funds it first and leaves
+  // after the first tier. Backing a ($70K) to B-Tier's gap funds it first and leaves
   // too little for b.
   const { h, state } = await setup({ ...qe, poolUsd: "100000000000" });
   h.deps.vote!.needs = () => Promise.resolve([70_000_000_000n, 40_000_000_000n, 1n << 60n]);
@@ -792,7 +792,7 @@ Deno.test("round next: the same tally inputs are searched once", async () => {
   h.close();
 });
 
-/** $6K pool, $3K needs; both voters back a alone, so the live tally funds a in Tier-S. */
+/** $6K pool, $3K needs; both voters back a alone, so the live tally funds a in S-Tier. */
 async function leadSetup() {
   const { h, state } = await setup({ ...qe, poolUsd: "6000000000" });
   h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 3_000_000_000n]);
@@ -801,7 +801,7 @@ async function leadSetup() {
 }
 type LiveBody = { live: { next?: unknown; lead?: Record<string, string> } };
 
-Deno.test("an open round serves Tier-S leads", async () => {
+Deno.test("an open round serves S-Tier leads", async () => {
   const { h } = await leadSetup();
   // Like the gaps: the first read starts the work and doesn't wait for it.
   const first = await j(await h.req("/api/vote/round")) as LiveBody;
@@ -815,7 +815,7 @@ Deno.test("an open round serves Tier-S leads", async () => {
   h.close();
 });
 
-Deno.test("no leads once Tier-S has settled", async () => {
+Deno.test("no leads once S-Tier has settled", async () => {
   const { h } = await leadSetup();
   h.clock.now = NOW + 700; // S settled at NOW + 660; A is open
   await h.req("/api/vote/round");
@@ -829,7 +829,7 @@ Deno.test("no leads once Tier-S has settled", async () => {
 });
 
 /** A closed round. $10K pool. Both voters back a first, then b and c: a is funded in
- * Tier-S, b in Tier-A, and c needs more than what's left once a and b are paid, so it
+ * S-Tier, b in A-Tier, and c needs more than what's left once a and b are paid, so it
  * never is. */
 async function closedSetup() {
   const got = await setup({ ...qe, poolUsd: "10000000000" });
@@ -924,7 +924,7 @@ Deno.test("a closed round serves the final what-ifs", async () => {
   assertEquals([body.live.next, body.live.lead], [undefined, undefined]);
   assertEquals(final.next.b.tier, "S");
   assertEquals(final.next.c.tier, "B");
-  assertEquals(final.next.a, undefined, "Tier-S has a lead, not a next tier");
+  assertEquals(final.next.a, undefined, "S-Tier has a lead, not a next tier");
   assertEquals(final.lead.a !== undefined && BigInt(final.lead.a) >= 1_000_000_000n, true);
   assertEquals(
     ((await h.kv.get(["vote", qe.contract.toLowerCase(), "final"])).value as { final: Final })
@@ -971,7 +971,7 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
     "waiting",
   ]);
   const { next: _next, ...live } = body.live as { next?: unknown };
-  // Both badges rank only A: each would pay half of it, if Tier-S settled now.
+  // Both badges rank only A: each would pay half of it, if S-Tier settled now.
   assertEquals(live, {
     funded: ["a"],
     awards: { a: "150" },
@@ -1061,7 +1061,7 @@ Deno.test("round ballot: a settled tier can't change; registration closes; B set
   assertEquals([moved.status, refusedBody.code], [409, "tier_settled"]);
   assertEquals(
     refusedBody.error ?? refusedBody.message,
-    "Tier-S has settled: its initiatives can't move.",
+    "S-Tier has settled: its initiatives can't move.",
   );
   const late = await h.req("/api/vote/ballot", {
     method: "POST",
@@ -1141,8 +1141,8 @@ const ruled: VoteManifest = {
 Deno.test("round: an invalid ballot shows as refused with invalid_ballot", async () => {
   const { h, state } = await setup(ruled);
   state.logs = [
-    logOf("1", "01010101", NOW - 100, 1), // Tier-S = a, b, c, d: valid
-    logOf("2", `01${X}${X}${X}`, NOW - 90, 2), // Tier-S = a alone: invalid
+    logOf("1", "01010101", NOW - 100, 1), // S-Tier = a, b, c, d: valid
+    logOf("2", `01${X}${X}${X}`, NOW - 90, 2), // S-Tier = a alone: invalid
   ];
   const body = await j(await h.req("/api/vote/round")) as {
     accepted: Record<string, string>;

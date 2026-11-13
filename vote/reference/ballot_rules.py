@@ -1,7 +1,7 @@
 """The ballot rules (docs/superpowers/specs/2026-11-11-ballot-rules-design.md).
 
-A valid ballot requests at least 1.5x the pool, and each enforced tier (Tier-S always,
-Tier-A when the round says so) holds at least 3 pairwise-unrelated projects with no
+A valid ballot requests at least 1.5x the pool, and each enforced tier (S-Tier always,
+A-Tier when the round says so) holds at least 3 pairwise-unrelated projects with no
 related group over half its funds. Related = sharing a group (an affiliation); RFPs have none.
 
 Ballots are in on-chain form: competition ranks, 255 = unplaced; a ballot shorter than
@@ -9,7 +9,7 @@ the projects reads the missing ones as unplaced. Mirrors shared/vote/rules.ts an
 contract; shared/vote/fixtures/ballot-rules.json keeps them equal.
 
 `projects[i]` = {"askUsd": int, "rfp": bool, "groups": [int]}; amounts in micro-USD.
-`independent_tiers`: bit 0 Tier-S, bit 1 Tier-A.
+`independent_tiers`: bit 0 S-Tier, bit 1 A-Tier.
 """
 
 WITHHELD = 255

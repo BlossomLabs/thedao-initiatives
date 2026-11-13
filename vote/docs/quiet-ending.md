@@ -8,7 +8,7 @@ provides an introduction and an interactive example.
 
 The contract can issue its own voter NFTs or use an existing NFT collection.
 Each NFT ID with an accepted ballot is one equal voting unit, independent of owner address.
-A voter places projects in Tier-S, Tier-A and Tier-B, with projects in the same tier tied.
+A voter places projects in S-Tier, A-Tier and B-Tier, with projects in the same tier tied.
 By default, projects left outside those tiers receive none of that voter's share.
 
 Admins use roles to configure the round and record funding, projects and pledges.

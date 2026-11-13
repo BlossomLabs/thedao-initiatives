@@ -48,13 +48,18 @@ export function parseBallotText(
   return { tiers };
 }
 
+/** A paste-ready vote line, keeping empty tiers between ranked ones. */
+export function formatBallotLine(tiers: Partial<Record<string, Tier>>, slugs: string[]): string {
+  const groups = TIER_ORDER.map((t) => slugs.filter((s) => tiers[s] === t).join("="));
+  while (groups.length && !groups[groups.length - 1]) groups.pop();
+  return groups.join(",");
+}
+
 /** This ballot as a one-vote `.pb`, every round project listed (cost in whole dollars). */
 export function formatBallotPb(
   tiers: Partial<Record<string, Tier>>,
   round: { slugs: string[]; titles: (slug: string) => string; askUsd: (slug: string) => bigint },
 ): string {
-  const groups = TIER_ORDER.map((t) => round.slugs.filter((s) => tiers[s] === t).join("="));
-  while (groups.length && !groups[groups.length - 1]) groups.pop();
   const clean = (x: string) => x.replace(/[;\r\n]/g, " ");
   return [
     "META",
@@ -69,7 +74,7 @@ export function formatBallotPb(
     ),
     "VOTES",
     "voter_id;vote",
-    `1;${groups.join(",")}`,
+    `1;${formatBallotLine(tiers, round.slugs)}`,
     "",
   ].join("\n");
 }

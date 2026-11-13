@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { parseBallotText } from "../../../shared/vote/pb";
 import BallotMenu from "./BallotMenu";
 
 afterEach(cleanup);
@@ -25,34 +26,47 @@ it("one button opens it: what to give the LLM, and where to paste its answer", (
   const { dialog } = show();
   expect(screen.queryByRole("menu")).toBeNull();
   expect(within(dialog).getByRole("region", { name: "Give the LLM" })).toHaveTextContent(
-    "The guide",
+    "A prompt to start",
   );
-  expect(within(dialog).getByText("1 initiative in 1 tier: to start from it")).toBeInTheDocument();
-  expect(within(dialog).getByRole("link", { name: "open it" })).toHaveAttribute(
+  expect(within(dialog).getByText("1 initiative in 1 tier: copy separately")).toBeInTheDocument();
+  expect(within(dialog).getByRole("link", { name: "open guide" })).toHaveAttribute(
     "href",
     "/vote/llms.txt",
   );
   expect(within(dialog).getByLabelText("Paste its ballot")).toBeInTheDocument();
 });
 
-it("copies the guide's link and this ballot, each saying so on its own button", async () => {
+it("copies a prompt with the guide and current ballot, keeping its ties and empty tiers", async () => {
   const writeText = vi.fn(() => Promise.resolve());
   Object.assign(navigator, { clipboard: { writeText } });
-  const { dialog } = show();
-  fireEvent.click(within(dialog).getByRole("button", { name: "Copy the guide's link" }));
-  await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${location.origin}/vote/llms.txt`));
+  const tiers = { alpha: "S", beta: "S", gamma: "B" } as const;
+  const { dialog } = show(vi.fn(() => false), tiers);
+  fireEvent.click(within(dialog).getByRole("button", { name: "Copy prompt" }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+  const prompt = String((writeText.mock.calls[0] as unknown[])[0]);
+  expect(prompt).toContain(`${location.origin}/vote/llms.txt`);
+  expect(prompt).toContain("Start from my ballot below.");
+  expect(prompt).toContain("once I approve.");
+  expect(parseBallotText(prompt.split("\n\n").at(-1)!, slugs)).toEqual({ tiers });
   expect(
-    await within(dialog).findByRole("button", { name: "Copy the guide's link" }),
+    within(dialog).getByRole("button", { name: "Copy prompt" }),
   ).toHaveTextContent("Copied");
   fireEvent.click(within(dialog).getByRole("button", { name: "Copy your ballot" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
-  expect(String((writeText.mock.calls[1] as unknown[])[0])).toContain("1;alpha");
+  expect(String((writeText.mock.calls[1] as unknown[])[0])).toContain("1;alpha=beta,,gamma");
 });
 
-it("an empty ballot can't be copied, and says so", () => {
+it("an empty ballot still gets a starter prompt, while copying it separately stays disabled", async () => {
+  const writeText = vi.fn(() => Promise.resolve());
+  Object.assign(navigator, { clipboard: { writeText } });
   const { dialog } = show(vi.fn(() => false), {});
   expect(within(dialog).getByRole("button", { name: "Copy your ballot" })).toBeDisabled();
   expect(within(dialog).getByText("Empty so far")).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Copy prompt" }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+  expect(String((writeText.mock.calls[0] as unknown[])[0])).toContain(
+    "(No initiatives ranked yet.)",
+  );
 });
 
 it("a pasted ballot replaces the draft, and nothing is sent", () => {

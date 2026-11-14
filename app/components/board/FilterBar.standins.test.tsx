@@ -18,7 +18,6 @@ it("stand-ins wear the real controls' faces, then hand focus to them", async () 
       onChange={vi.fn()}
       counts={counts}
       shown={3}
-      total={12}
       ai={false}
       onSort={vi.fn()}
       sheet={null}

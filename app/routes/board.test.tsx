@@ -98,7 +98,9 @@ it("the phone Filters button is there from the first render, before the sheet co
 
 it("restores filters from the URL: count, pills and cards", async () => {
   at("/?cat=opsec&sort=newest");
-  expect(screen.getAllByText("2 of 3 initiatives").length).toBeGreaterThan(0);
+  expect(screen.getByRole("heading", { name: /looking for funding/i })).toHaveTextContent(
+    "2 of 3 initiatives",
+  );
   expect(await screen.findByRole("combobox", { name: /Category/ })).toHaveTextContent("OpSec");
   expect(screen.queryByText("Alpha fuzzing")).toBeNull();
 });

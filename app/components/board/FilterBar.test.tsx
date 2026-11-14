@@ -24,7 +24,6 @@ const bar = (
       onChange={onChange}
       counts={counts}
       shown={view.cats?.length || view.status ? 3 : 12}
-      total={12}
       ai={false}
       onSort={onSort}
       sheet={null}
@@ -77,11 +76,6 @@ it("the Category dropdown lists dot, name and count; a pick adds to the filter a
   await waitFor(() => expect(screen.getByRole("listbox")).toBeInTheDocument());
 });
 
-it("says N of M when filtered", () => {
-  bar({ cats: ["opsec"] });
-  expect(screen.getAllByText("3 of 12 initiatives").length).toBeGreaterThan(0);
-});
-
 it("the pills say what they filter by: one category by name, several as Categories", () => {
   bar({ cats: ["opsec"] });
   expect(screen.getByRole("combobox", { name: /Category/ })).toHaveTextContent("OpSec");
@@ -116,10 +110,9 @@ it("Clear filters shows only while something is filtered, and resets it all but 
   });
 });
 
-it("no Clear filters with nothing filtered, and the count reads N initiatives", () => {
+it("no Clear filters with nothing filtered", () => {
   bar();
   expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
-  expect(screen.getAllByText("12 initiatives").length).toBeGreaterThan(0);
   expect(screen.getByText("Filters:")).toBeInTheDocument();
 });
 

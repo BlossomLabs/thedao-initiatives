@@ -6,7 +6,6 @@ import {
   type BoardViewMode,
   CLEARED,
   isFiltered,
-  resultLabel,
 } from "~/lib/board-view";
 import { Suspense } from "react";
 import { lazyPart } from "~/lib/lazy-part";
@@ -195,7 +194,6 @@ export default function FilterBar({
   onChange,
   counts,
   shown,
-  total,
   ai,
   featured = true,
   onSort,
@@ -209,7 +207,6 @@ export default function FilterBar({
   onChange: (next: Partial<BoardView>) => void;
   counts: { type: Record<BoardType, number>; cats: Record<string, number> };
   shown: number;
-  total: number;
   ai: boolean;
   /** Whether anything is featured (the Featured sort is offered only then). */
   featured?: boolean;
@@ -225,7 +222,6 @@ export default function FilterBar({
   /** This viewer can rate: My rating is offered too. */
   canRate?: boolean;
 }) {
-  const label = resultLabel(shown, total, isFiltered(view));
   const filtered = isFiltered(view);
   const watchlist = (compact?: boolean) =>
     (watchlistCount > 0 || view.watchlist) && (
@@ -286,7 +282,6 @@ export default function FilterBar({
         </div>
         <span className="max-[641px]:hidden">{clear}</span>
         <span className="ml-auto flex items-center gap-3">
-          <span className="small dim tnum max-[641px]:hidden" aria-live="polite">{label}</span>
           <Suspense
             fallback={<SortSelectStandIn sort={view.sort} ai={ai} className={SORT_PILL} />}
           >
@@ -303,13 +298,7 @@ export default function FilterBar({
           <LayoutToggle value={view.view} onChange={(v) => onChange({ view: v })} />
         </span>
       </div>
-      <p
-        className="m-0 mt-3 hidden items-center gap-2 small dim tnum max-[641px]:flex"
-        aria-live="polite"
-      >
-        {label}
-        {clear}
-      </p>
+      {clear && <p className="m-0 mt-3 hidden small max-[641px]:block">{clear}</p>}
     </div>
   );
 }

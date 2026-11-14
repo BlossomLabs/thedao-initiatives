@@ -43,6 +43,7 @@ import {
   isFiltered,
   LAYOUT_KEY,
   readView,
+  resultLabel,
   sortFor,
   STATUS_LABELS,
   writeView,
@@ -323,6 +324,11 @@ export default function BoardPage(
       <PageMain>
         <SectionHeading id="rfps" className="max-[640px]:text-center">
           {heading ?? "Security initiatives looking for funding"}
+          {data && all.length > 0 && !results && (
+            <span className="n tnum" aria-live="polite">
+              {resultLabel(cards.length, all.length, isFiltered(shownView))}
+            </span>
+          )}
         </SectionHeading>
         {data && all.length > 0 && !results && (
           <BoardSearch
@@ -344,7 +350,6 @@ export default function BoardPage(
               onChange={setView}
               counts={counts}
               shown={cards.length}
-              total={all.length}
               ai={ai}
               voteFilter={Boolean(data.flags.vote?.show)}
               rated={Boolean(ratings)}

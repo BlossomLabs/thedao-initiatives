@@ -62,20 +62,26 @@ export function PublicCards(
           </a>
         </div>
       )}
-      <div className="panel">
-        <span className="k">Back this initiative</span>
-        <p className="m-0 small dim">
-          You can also pledge instead of donating: you commit publicly now and pay only when the
-          entire funding goal has been reached. Email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>
-          {" "}
-          to add your pledge
-          {r.id && r.status === "approved" && <PledgeRequestLink initiativeId={r.id} />}.
-        </p>
-      </div>
-      <div className="panel">
-        <span className="k">What happens next</span>
-        <p className="m-0 small dim">{WHAT_NEXT[r.type]}</p>
-      </div>
+      {
+        // An archived initiative takes no pledges and has no next step (#87).
+        r.status !== "archived" && (
+          <>
+            <div className="panel">
+              <span className="k">Back this initiative</span>
+              <p className="m-0 small dim">
+                You can also pledge instead of donating: you commit publicly now and pay only when
+                the entire funding goal has been reached. Email{" "}
+                <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a> to add your pledge
+                {r.id && r.status === "approved" && <PledgeRequestLink initiativeId={r.id} />}.
+              </p>
+            </div>
+            <div className="panel">
+              <span className="k">What happens next</span>
+              <p className="m-0 small dim">{WHAT_NEXT[r.type]}</p>
+            </div>
+          </>
+        )
+      }
     </>
   );
 }

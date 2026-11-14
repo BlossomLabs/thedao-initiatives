@@ -201,7 +201,8 @@ export function initiativeRoutes(deps: Deps) {
     const summary = await deps.funding.summaryFrom(initiative, pledges, donations, refresh);
     if (paused) summary.refreshDue = false;
     const privateFields = canReadPrivateFields(initiative, user, deps.now());
-    if (!isPublished(initiative)) c.header("X-Robots-Tag", "noindex");
+    // Only approved pages are for search engines: pending and archived ones are not (#87).
+    if (initiative.status !== "approved") c.header("X-Robots-Tag", "noindex");
     return c.json({
       refreshDue: !paused && !chainStateFresh(chainState, deps.now()),
       initiative: user?.isAdmin || privateFields

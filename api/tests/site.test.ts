@@ -153,7 +153,7 @@ Deno.test("site: Hono serves pages, assets and SPA fallbacks without swallowing 
   }
 });
 
-Deno.test("site: an initiative's page is noindex until the initiative is published", async () => {
+Deno.test("site: only an approved initiative's page is for search engines", async () => {
   const h = await siteHarness();
   try {
     const rows = {
@@ -174,8 +174,21 @@ Deno.test("site: an initiative's page is noindex until the initiative is publish
     assertEquals(await robots(`/initiative/${rows.rejected.slug}`), "noindex");
     assertEquals(await robots("/initiative/no-such-initiative"), "noindex");
     assertEquals(await robots(`/initiative/${rows.approved.slug}`), null);
-    assertEquals(await robots(`/initiative/${rows.archived.slug}`), null);
+    // Archived pages stay readable as a record, out of search (#87).
+    assertEquals(await robots(`/initiative/${rows.archived.slug}`), "noindex");
     assertEquals(await robots(`/initiative/${rows.approved.slug}/edit`), null);
+    // The page's data and its Markdown copy say the same.
+    for (const row of [rows.archived, rows.approved]) {
+      const want = row.status === "approved" ? null : "noindex";
+      const api = await h.req(`/api/initiatives/${row.slug}`);
+      assertEquals(api.status, 200);
+      assertEquals(api.headers.get("X-Robots-Tag"), want, `api ${row.status}`);
+      await api.body?.cancel();
+      const md = await h.req(`/initiative/${row.slug}.md`);
+      assertEquals(md.status, 200);
+      assertEquals(md.headers.get("X-Robots-Tag"), want, `md ${row.status}`);
+      await md.body?.cancel();
+    }
   } finally {
     await h.close();
   }

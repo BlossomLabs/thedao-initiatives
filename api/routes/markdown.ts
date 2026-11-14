@@ -47,6 +47,8 @@ export function markdownRoutes({ db, now }: Deps, feeds?: FeedCache) {
     });
     const res = await feedResponse(c, md, "text/markdown; charset=utf-8");
     res.headers.set("Content-Disposition", `inline; filename="${slug}.md"`);
+    // An archived initiative's file stays readable, out of search (#87).
+    if (initiative.status !== "approved") res.headers.set("X-Robots-Tag", "noindex");
     return res;
   });
   return r;

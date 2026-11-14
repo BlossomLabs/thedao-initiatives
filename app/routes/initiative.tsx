@@ -123,10 +123,8 @@ export default function Initiative() {
   const showBar = revisions.length > 1 || viewing !== current;
   return (
     <PageMain detail>
-      {/* The link works before approval (#73); search engines are told to skip it. */}
-      {r.status !== "approved" && r.status !== "archived" && (
-        <meta name="robots" content="noindex" />
-      )}
+      {/* Only approved pages are for search engines: pending ones open by link (#73), archived ones stay as a record (#87). */}
+      {r.status !== "approved" && <meta name="robots" content="noindex" />}
       <Crumbs items={[{ label: "Initiatives", to: "/" }]} />
       {r.status === "pending" && (
         <div className="review-banner" role="note" aria-label="In review">

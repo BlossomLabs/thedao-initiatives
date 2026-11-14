@@ -263,8 +263,11 @@ export function ballotSegments(
  * tally would add if the vote ended now, then (green) what a previewed donation would
  * bring in, then what's left of the pool. */
 export function poolSegments(
-  { settledUsd, liveUsd, previewUsd = 0, pool, liveTone = "green" }: {
+  { settledUsd, mineUsd = 0, liveUsd, previewUsd = 0, pool, liveTone = "green" }: {
     settledUsd: number;
+    /** On a ballot's page: what the live tally would award to initiatives on that ballot
+     * (green), ahead of the rest of the live tally. */
+    mineUsd?: number;
     liveUsd: number;
     /** What the pool would pay for what comes in with a previewed donation. */
     previewUsd?: number;
@@ -287,9 +290,20 @@ export function poolSegments(
       text: "What the settled tiers awarded, for good.",
     },
     {
-      key: "live",
+      key: "mine",
       from: f(settledUsd),
-      to: f(settledUsd + liveUsd),
+      to: f(settledUsd + mineUsd),
+      className: "stroke-dao-green",
+      swatch: "bg-dao-green",
+      title: "From your ballot",
+      amount: mineUsd,
+      text:
+        "What the open tiers would award to initiatives on your ballot if they settled now. It can still change.",
+    },
+    {
+      key: "live",
+      from: f(settledUsd + mineUsd),
+      to: f(settledUsd + mineUsd + liveUsd),
       className: neutral ? "stroke-white/55" : "stroke-dao-green",
       swatch: neutral ? "bg-white/55" : "bg-dao-green",
       title: "If it ended now",
@@ -298,8 +312,8 @@ export function poolSegments(
     },
     {
       key: "preview",
-      from: f(settledUsd + liveUsd),
-      to: f(settledUsd + liveUsd + previewUsd),
+      from: f(settledUsd + mineUsd + liveUsd),
+      to: f(settledUsd + mineUsd + liveUsd + previewUsd),
       className: "stroke-dao-green",
       swatch: "bg-dao-green",
       title: "With your donation",
@@ -309,12 +323,12 @@ export function poolSegments(
     },
     {
       key: "rest",
-      from: f(settledUsd + liveUsd + previewUsd),
+      from: f(settledUsd + mineUsd + liveUsd + previewUsd),
       to: 1,
       className: "",
       swatch: "border-2 border-white/30",
       title: "Not allocated",
-      amount: Math.max(0, pool - settledUsd - liveUsd - previewUsd),
+      amount: Math.max(0, pool - settledUsd - mineUsd - liveUsd - previewUsd),
       text: `What's left of the ${dollars(pool)} pool.`,
     },
   ]);

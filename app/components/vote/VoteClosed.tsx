@@ -242,6 +242,8 @@ export default function VoteClosed(
       poolUsd={poolUsd}
       live={Boolean(live)}
       label={resultLabel}
+      // Green on its ring: what the live tally would give the initiatives on this ballot.
+      mine={live && sent ? new Set(Object.keys(sent).filter((slug) => sent[slug])) : undefined}
       action={
         // The tables are the result already; the board shows each initiative with its
         // funding bar and its page.

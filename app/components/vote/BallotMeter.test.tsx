@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
-import BallotMeter from "./BallotMeter";
+import BallotMeter, { poolSegments } from "./BallotMeter";
 
 afterEach(cleanup);
 
@@ -258,4 +258,23 @@ it("with ballot rules, the share gives way to what the ballot still needs", () =
   cleanup();
   show({ ok: true, text: "You can add as many initiatives as you want" });
   expect(screen.getByRole("status")).toHaveClass("text-dao-green");
+});
+
+it("TheDAO's ring on a ballot's page: green what the live tally gives that ballot's picks", () => {
+  const segs = poolSegments({
+    settledUsd: 100_000,
+    mineUsd: 200_000,
+    liveUsd: 300_000,
+    pool: 1_000_000,
+    liveTone: "neutral",
+  });
+  expect(segs.map((s) => [s.key, s.from, s.to, s.className])).toEqual([
+    ["settled", 0, 0.1, "stroke-vote"],
+    ["mine", 0.1, 0.3, "stroke-dao-green"],
+    ["live", 0.3, 0.6, "stroke-white/55"],
+    ["rest", 0.6, 1, ""],
+  ]);
+  // Without a ballot, no green stretch.
+  expect(poolSegments({ settledUsd: 0, liveUsd: 500_000, pool: 1_000_000 }).map((s) => s.key))
+    .toEqual(["live", "rest"]);
 });

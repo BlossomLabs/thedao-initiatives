@@ -39,7 +39,7 @@ export function daoResult(settled: SettledTier[] | undefined, tally: LiveTally |
  * allocated of the pool, then the tiers with what each funds.
  *
  * During the vote (`live`) the ring is gold for the settled tiers and neutral for what the
- * live tally would add. On the vote results a donation can be previewed: `joining` and
+ * live tally would add, green for the part of it going to the initiatives on `mine`. On the vote results a donation can be previewed: `joining` and
  * `leaving` as FinalTiers draws them, and the amounts (`awards`) as they would be with it.
  */
 export default function DaoBallot(
@@ -53,6 +53,7 @@ export default function DaoBallot(
     note,
     table,
     liveTone = "green",
+    mine,
   }: {
     items: BallotItem[];
     result: ReturnType<typeof daoResult>;
@@ -68,6 +69,9 @@ export default function DaoBallot(
     table?: Partial<React.ComponentProps<typeof FinalTiers>>;
     /** The live tally's chips: green (a ballot's page) or neutral (the vote results). */
     liveTone?: "green" | "neutral";
+    /** On a ballot's page: the initiatives on that ballot. What the live tally would give
+     * them is green on the ring; the rest of it stays neutral. */
+    mine?: ReadonlySet<string>;
   },
 ) {
   const { awards, funded, tiers, provisional } = result;
@@ -92,12 +96,17 @@ export default function DaoBallot(
               <SegmentRing
                 segments={poolSegments({
                   settledUsd: sum((slug) => !provisional.has(slug)),
-                  liveUsd: sum((slug) => provisional.has(slug) && !joining?.has(slug)),
+                  mineUsd: sum((slug) =>
+                    provisional.has(slug) && !joining?.has(slug) && Boolean(mine?.has(slug))
+                  ),
+                  liveUsd: sum((slug) =>
+                    provisional.has(slug) && !joining?.has(slug) && !mine?.has(slug)
+                  ),
                   // What comes in with a previewed donation: a solid green stretch.
                   previewUsd: sum((slug) => Boolean(joining?.has(slug))),
                   pool: poolUsd,
-                  // TheDAO's own ring: what the live tally adds is neutral on every page
-                  // (green on a ballot's page is that badge's own vote).
+                  // TheDAO's own ring: what the live tally adds is neutral, except (green,
+                  // on a ballot's page) what goes to initiatives on that ballot.
                   liveTone: "neutral",
                 })}
                 label="What TheDAO allocated of the pool"

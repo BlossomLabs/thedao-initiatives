@@ -790,11 +790,11 @@ it("a ballot that counts opens on the page that shows it; Edit goes back to the 
     }),
   )
     .toBeInTheDocument();
-  // TheDAO's ring too: all live, nothing settled yet. Neutral, not green: green on this
-  // page is the badge's own vote.
+  // TheDAO's ring too: all live, nothing settled yet. Green, as ALPHA is on this ballot:
+  // what the live tally gives this badge's picks; the rest of it would be neutral.
   const dao = screen.getByRole("meter", { name: "What TheDAO allocated of the pool" });
-  expect(dao.querySelector("circle.stroke-white\\/55")).not.toBeNull();
-  expect(dao.querySelector("circle.stroke-dao-green")).toBeNull();
+  expect(dao.querySelector("circle.stroke-dao-green")).not.toBeNull();
+  expect(dao.querySelector("circle.stroke-white\\/55")).toBeNull();
   expect(dao.querySelector("circle.stroke-vote")).toBeNull();
   // Its parts say what they are, as the editor's ring does: a tap opens one.
   // (jsdom lays nothing out: the ring's centre is at 0, 0; a tap just right of the top.)
@@ -802,7 +802,7 @@ it("a ballot that counts opens on the page that shows it; Edit goes back to the 
     clientX: 1,
     clientY: -20,
   });
-  expect(await screen.findByText("If it ended now")).toBeInTheDocument();
+  expect(await screen.findByText("From your ballot")).toBeInTheDocument();
   expect(screen.getByRole("heading", { level: 1, name: "Your ballot" })).toBeInTheDocument();
   expect(screen.getByText(/It counts\. You can change it until each tier settles/))
     .toBeInTheDocument();

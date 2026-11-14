@@ -4,7 +4,11 @@ import { ADMIN, harness, PLAIN } from "./app-helpers.ts";
 import { REVIEW_BADGE_CONTRACT } from "../config.ts";
 import { BACKUP_PREFIXES } from "../services/backup.ts";
 import { averageWith, type RatingSummary } from "../../shared/ratings.ts";
-import { IDENTITY_HOLDER_TTL_SECS, IDENTITY_NONE_TTL_SECS } from "../routes/reviews.ts";
+import {
+  IDENTITY_HOLDER_TTL_SECS,
+  IDENTITY_KEEP_SECS,
+  IDENTITY_NONE_TTL_SECS,
+} from "../routes/reviews.ts";
 
 interface ReviewJson {
   id: string;
@@ -385,5 +389,19 @@ Deno.test("identity: a failed lookup is not cached", async () => {
   fail.now = false;
   assertEquals((await identity(h, admin)).tokenIds, ["1"]);
   assertEquals(lookups.n, 2, "the retry looked up again");
+  h.close();
+});
+
+Deno.test("identity: while the index is down, the last lookup answers", async () => {
+  const { h, admin } = await setup();
+  const fail = { now: false };
+  const lookups = countLookups(h, fail);
+  assertEquals(await identity(h, admin), { tokenIds: ["1"], canReview: true });
+  fail.now = true;
+  h.clock.now += IDENTITY_HOLDER_TTL_SECS;
+  assertEquals(await identity(h, admin), { tokenIds: ["1"], canReview: true });
+  assertEquals(lookups.n, 2, "it did try the index again");
+  // Kept for a day (Deno KV's own expireIn), not for the five minutes it is fresh.
+  assert(IDENTITY_KEEP_SECS > IDENTITY_HOLDER_TTL_SECS);
   h.close();
 });

@@ -14,6 +14,8 @@ const WRITES_PER_MINUTE = 30;
 /** How long GET /identity reuses a lookup: a holder's for 5 minutes, a non-holder's for 1. */
 export const IDENTITY_HOLDER_TTL_SECS = 5 * 60;
 export const IDENTITY_NONE_TTL_SECS = 60;
+/** How long a lookup is kept to stand in while the NFT index is down. */
+export const IDENTITY_KEEP_SECS = 24 * 3600;
 interface CachedIdentity {
   ids: string[];
   at: number;
@@ -39,14 +41,22 @@ export function reviewRoutes(deps: Deps) {
   // The identity only decides what the page offers, and every signed-in tab polls
   // it each minute: a lookup is reused for a few minutes across instances. A new
   // holder waits at most a minute; writes (requireHolder) always check fresh.
+  // While the NFT index fails or times out (it did, 10 s at a time, #82), the last
+  // lookup (up to a day old) answers instead of an error.
   const cachedTokenIds = async (address: string) => {
     const key = K.reviewIdentity(address);
     const hit = (await db.kv.get<CachedIdentity>(key, db.read)).value;
     const ttl = (ids: string[]) => ids.length ? IDENTITY_HOLDER_TTL_SECS : IDENTITY_NONE_TTL_SECS;
     if (hit && deps.now() - hit.at < ttl(hit.ids)) return hit.ids;
-    const ids = await tokenIdsFor(address);
+    let ids: string[];
+    try {
+      ids = await tokenIdsFor(address);
+    } catch (e) {
+      if (hit) return hit.ids;
+      throw e;
+    }
     await db.kv.set(key, { ids, at: deps.now() } satisfies CachedIdentity, {
-      expireIn: ttl(ids) * 1000,
+      expireIn: IDENTITY_KEEP_SECS * 1000,
     });
     return ids;
   };

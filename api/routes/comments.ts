@@ -19,6 +19,7 @@ import {
 } from "../services/roles.ts";
 import type { Comment } from "../db/types.ts";
 import { COMMENT_BODY_MAX } from "../config.ts";
+import { screenFields } from "../services/ai.ts";
 import { COMMENT_NAME_MAX } from "../../shared/comments.ts";
 
 /** Two tiers exactly: featured first (newest featured first), then votes desc, newest breaking ties. */
@@ -39,6 +40,12 @@ export function commentRoutes(deps: Deps) {
     commentRoles(deps, address, rfpId, withBadge).then((roles) =>
       isAdmin && !roles.includes("ADMIN") ? ["ADMIN", ...roles] : roles
     );
+  /** The AI screen, with a log line when it gave no answer. */
+  const screen = async (ctype: Comment["type"], topic: string, text: string, name: string) => {
+    const out = await deps.ai.screenComment(ctype, topic, text, name, () => db.meta.aiBudgetOk());
+    if (out.error) deps.log(`AI screen failed, comment held: ${out.error}`);
+    return out;
+  };
   const listed = async (slug: string) => {
     const initiative = await db.initiatives.bySlug(slug);
     if (!initiative || !["approved", "archived"].includes(initiative.status)) {
@@ -142,19 +149,13 @@ export function commentRoutes(deps: Deps) {
       throw new HttpError(429, "too many posts from your address, try again in an hour");
     }
     const roles = await rolesFor(address, initiative.id, Boolean(user?.isAdmin));
-    let status: "published" | "held" | "discarded";
-    let summary: string;
-    if (roles.some((x) => ROLE_FAST_LANE.has(x))) {
-      [status, summary] = ["published", "role fast-lane"];
-    } else {[status, summary] = await deps.ai.screenComment(
-        "other",
-        "",
-        text,
-        name,
-        () => db.meta.aiBudgetOk(),
-      );}
-    if (status === "discarded") {
-      deps.log(`comment discarded by AI screen (initiative ${initiative.id}): ${summary}`);
+    const fastLane = roles.some((x) => ROLE_FAST_LANE.has(x));
+    const screened = fastLane ? null : await screen("other", "", text, name);
+    const status = screened?.status ?? "published";
+    if (screened && status === "discarded") {
+      deps.log(
+        `comment discarded by AI screen (initiative ${initiative.id}): ${screened.summary}`,
+      );
       // The author sees the same "waiting" note as held; a spammer learns nothing.
       return c.json({ status: "held", id: "", claimToken: "" });
     }
@@ -170,7 +171,7 @@ export function commentRoutes(deps: Deps) {
       address,
       roles: storedRoles(roles),
       status,
-      aiSummary: summary,
+      ...(screened ? screenFields(screened, deps.now()) : { aiSummary: "role fast-lane" }),
     }, startVote);
     return c.json({
       status,
@@ -287,19 +288,10 @@ export function commentRoutes(deps: Deps) {
     }
     const roles = user ? await rolesFor(user.address, parent.rfpId, user.isAdmin) : [];
     const fastLane = roles.some((x) => ROLE_FAST_LANE.has(x));
-    let status: "published" | "held" | "discarded" = "published";
-    let summary = "role fast-lane";
-    if (!fastLane) {
-      [status, summary] = await deps.ai.screenComment(
-        parent.type,
-        parent.topic,
-        text,
-        name,
-        () => db.meta.aiBudgetOk(),
-      );
-    }
-    if (status === "discarded") {
-      deps.log(`reply discarded by AI screen (comment ${parent.id}): ${summary}`);
+    const screened = fastLane ? null : await screen(parent.type, parent.topic, text, name);
+    const status = screened?.status ?? "published";
+    if (screened && status === "discarded") {
+      deps.log(`reply discarded by AI screen (comment ${parent.id}): ${screened.summary}`);
       // Same answer as held: a spammer learns nothing.
       return c.json({
         ok: true,
@@ -320,7 +312,7 @@ export function commentRoutes(deps: Deps) {
       address,
       roles: storedRoles(roles),
       status,
-      aiSummary: summary,
+      ...(screened ? screenFields(screened, deps.now()) : { aiSummary: "role fast-lane" }),
     });
     let answered = parent.answered;
     if (fastLane && parent.type === "question" && !parent.answered) {

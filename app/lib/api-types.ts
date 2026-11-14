@@ -379,14 +379,55 @@ export interface AdminComment extends CommentEntry {
   email: string;
   reports: number;
   aiSummary: string;
+  /** What the AI screen said; null on rows from before it and fast-lane posts. */
+  aiScreen: AiScreen | null;
   initiative: { slug: string; title: string } | null;
+}
+
+export interface AiScreen {
+  verdict: "constructive" | "unclear" | "spam" | null;
+  nameFlag: string | null;
+  /** Why it was held ("" when published). */
+  reason: string;
+  /** Why the screen gave no answer ("" when it answered). */
+  error: string;
+  at: number;
+}
+
+type InitiativeRef = { slug: string; title: string };
+
+/** What the board knows about the wallet behind a held comment. */
+export interface HeldAuthor {
+  address: string;
+  admin: boolean;
+  proposerOf: (InitiativeRef & { status: InitiativeStatus; here: boolean })[];
+  backed: (InitiativeRef & { usd: number; here: boolean })[];
+  /** null: the badge lookup failed. */
+  badge: boolean | null;
+  /** Every comment from this wallet, this one included. */
+  comments: { published: number; held: number; discarded: number };
+  firstSeen: number;
+}
+
+export interface HeldComment extends AdminComment {
+  context: {
+    parent: {
+      id: string;
+      body: string;
+      displayName: string;
+      address: string;
+      status: "published" | "held" | "discarded";
+    } | null;
+    /** null: posted with a name only, no wallet. */
+    author: HeldAuthor | null;
+  };
 }
 
 export interface AdminDashboard {
   rows: { initiative: AdminInitiative; summary: Summary; safeSync: SafeSyncState | null }[];
   pendingCount: number;
   chain: { detail: string; checkedAt: number };
-  held: AdminComment[];
+  held: HeldComment[];
   unanswered: AdminComment[];
   reported: AdminComment[];
   weekAgo: number;

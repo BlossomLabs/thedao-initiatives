@@ -108,6 +108,7 @@ export function commentsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions =
     "featured",
     "featuredAt",
     "aiSummary",
+    "aiScreen",
     "reports",
   ]);
   async function set(id: string, patch: Partial<Comment>): Promise<Comment | null> {
@@ -182,6 +183,20 @@ export function commentsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions =
     return (await all()).filter((c) => c.status === "held")
       .sort((a, b) => b.reports - a.reports || a.createdAt - b.createdAt);
   }
+  /** Every comment (any status) by these wallets, keyed lowercase: one scan. */
+  async function byAuthors(addresses: string[]): Promise<Map<string, Comment[]>> {
+    const want = new Set(addresses.filter(Boolean).map((a) => a.toLowerCase()));
+    const out = new Map<string, Comment[]>();
+    if (!want.size) return out;
+    for (const c of await all()) {
+      const low = c.address.toLowerCase();
+      if (!want.has(low)) continue;
+      const list = out.get(low) ?? [];
+      list.push(c);
+      out.set(low, list);
+    }
+    return out;
+  }
   async function unansweredQuestions(): Promise<Comment[]> {
     return (await all()).filter((c) =>
       c.status === "published" && c.type === "question" && !c.answered &&
@@ -204,6 +219,7 @@ export function commentsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions =
     votesByAddress,
     addReport,
     held,
+    byAuthors,
     unansweredQuestions,
     reported,
   };

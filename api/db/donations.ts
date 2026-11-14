@@ -88,5 +88,20 @@ export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions 
       .reduce((s, d) => s + d.amountUsd, 0);
   }
 
-  return { get, record, list, byHash, pending, confirmedTotal, totalFor };
+  /** Confirmed donations from these wallets, any initiative, keyed lowercase: one scan. */
+  async function byDonors(addresses: string[]): Promise<Map<string, Donation[]>> {
+    const want = new Set(addresses.filter(Boolean).map((a) => a.toLowerCase()));
+    const out = new Map<string, Donation[]>();
+    if (!want.size) return out;
+    for (const d of await collect(kv.list<Donation>({ prefix: ["donation"] }))) {
+      const low = d.donor.toLowerCase();
+      if (d.status !== "confirmed" || !want.has(low)) continue;
+      const list = out.get(low) ?? [];
+      list.push(d);
+      out.set(low, list);
+    }
+    return out;
+  }
+
+  return { get, record, list, byHash, pending, confirmedTotal, totalFor, byDonors };
 }

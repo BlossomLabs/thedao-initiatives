@@ -24,8 +24,9 @@ import { parseAdminQuery, setQualifier, UNTAGGED } from "~/lib/admin-query";
 import AdminFilters from "~/components/admin/AdminFilters";
 import SafeSyncIcon from "~/components/admin/SafeSyncIcon";
 import TypeGlyph from "~/components/board/filters/TypeGlyph";
-import { dt, plural, shortAddr, truncate, usd } from "~/lib/format";
+import { dt, plural, truncate, usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
+import { HeldEntryCell, HeldScreenCell, HeldWhoCell } from "~/components/admin/HeldCells";
 
 const dashKey = ["admin", "dashboard"] as const;
 
@@ -65,6 +66,23 @@ export default function Dashboard() {
     } catch (e) {
       setRowError({ id, text: errorMessage(e, "That did not work.") });
     }
+    void qc.invalidateQueries({ queryKey: dashKey });
+  };
+  // Re-runs of the AI screen in flight, by comment id: each is a model call.
+  const [rerunning, setRerunning] = useState<Set<string>>(() => new Set());
+  const rerun = async (id: string) => {
+    setRowError(null);
+    setRerunning((s) => new Set(s).add(id));
+    try {
+      await api(`/api/admin/comments/${id}/rescreen`, { method: "POST" });
+    } catch (e) {
+      setRowError({ id, text: errorMessage(e, "The AI screen did not run.") });
+    }
+    setRerunning((s) => {
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
     void qc.invalidateQueries({ queryKey: dashKey });
   };
   const rowSaid = (id: string) =>
@@ -283,6 +301,7 @@ export default function Dashboard() {
                       variant: "ghost",
                       confirm: "Discard {n} {noun}?",
                     },
+                    { key: "rescreen", label: "Re-run AI screen", variant: "ghost" },
                   ]}
                   onAct={bulkComments}
                 />
@@ -293,8 +312,8 @@ export default function Dashboard() {
                         <HeadCheck selection={heldSel} label="Select every held entry" />
                       </th>
                       <th>Entry</th>
-                      <th>AI summary</th>
-                      <th>Identity</th>
+                      <th>AI screen</th>
+                      <th>Who</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -311,18 +330,13 @@ export default function Dashboard() {
                             label={`Select ${c.type} on ${c.initiative?.title ?? "?"}`}
                           />
                         </td>
-                        <CommentCell c={c} />
-                        <td className="small dim">{c.aiSummary}</td>
-                        <td className="small">
-                          {c.displayName || "(no name)"}
-                          {c.email && ` · ${c.email}`}
-                          {c.address && (
-                            <>
-                              <br />
-                              {shortAddr(c.address)}
-                            </>
-                          )}
-                        </td>
+                        <HeldEntryCell c={c} />
+                        <HeldScreenCell
+                          c={c}
+                          busy={rerunning.has(c.id)}
+                          onRerun={() => rerun(c.id)}
+                        />
+                        <HeldWhoCell c={c} />
                         <td className="whitespace-nowrap">
                           <Button
                             sm

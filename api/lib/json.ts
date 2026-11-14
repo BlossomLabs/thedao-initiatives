@@ -226,6 +226,7 @@ export function adminCommentJson(
     email: c.email,
     reports: c.reports,
     aiSummary: c.aiSummary,
+    aiScreen: c.aiScreen ?? null,
     initiative: initiative ? { slug: initiative.slug, title: initiative.title } : null,
   };
 }

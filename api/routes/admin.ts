@@ -30,6 +30,7 @@ import { LOGO_NAME_RE, syncContent } from "../services/content.ts";
 import { refreshLedger } from "../services/ledger.ts";
 import { exportBackup, restoreBackup, validateBackup } from "../services/backup.ts";
 import { liveRoles } from "../services/roles.ts";
+import { heldContext, rescreen } from "../services/moderation.ts";
 import type { AdminEntry } from "../services/admins.ts";
 import type { Comment, Initiative, Pledge, PledgeStatus } from "../db/types.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
@@ -116,11 +117,15 @@ export function adminRoutes(deps: Deps) {
     const weekAgo = deps.now() - 7 * 86400;
     const stale = unanswered.filter((q) => q.createdAt < weekAgo);
     const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
+    const context = await heldContext(deps, held, [...pending, ...approved, ...other]);
     return c.json({
       rows,
       pendingCount: pending.length,
       chain: await chain.state(),
-      held: await withInitiative(held),
+      held: (await withInitiative(held)).map((row, i) => ({
+        ...row,
+        context: context.get(held[i].id) ?? { parent: null, author: null },
+      })),
       unanswered: await withInitiative(unanswered),
       reported: await withInitiative(await db.comments.reported()),
       weekAgo,
@@ -620,15 +625,22 @@ export function adminRoutes(deps: Deps) {
     publish: true,
     discard: true,
     unreport: true,
+    rescreen: true,
   };
+  /** Each re-run is a model call of up to 25 s, twice: a few at a time, 20 at most. */
+  const RESCREEN_MAX = 20;
+  const RESCREEN_PARALLEL = 5;
 
   r.post("/comments/bulk", async (c) => {
     const body = await jsonBody(c, ["ids", "action"]);
     const { ids, action } = readBulk(body, BULK_COMMENT_ACTIONS);
+    if (action === "rescreen" && ids.length > RESCREEN_MAX) {
+      throw new HttpError(400, `Re-run the AI screen on at most ${RESCREEN_MAX} rows at once.`);
+    }
     auditContext(c, { detail: action });
     const failed: { id: string; error: string }[] = [];
     let done = 0;
-    for (const id of ids) {
+    const one = async (id: string) => {
       try {
         await auditedItem(deps, c, {
           action: "comment.moderate",
@@ -636,6 +648,10 @@ export function adminRoutes(deps: Deps) {
           target: id,
           detail: action,
         }, async () => {
+          if (action === "rescreen") {
+            await rescreen(deps, id);
+            return;
+          }
           const row = await db.comments.get(id);
           if (!row) throw new HttpError(404, "not found");
           await db.comments.set(row.id, commentPatch(row, action));
@@ -644,9 +660,28 @@ export function adminRoutes(deps: Deps) {
       } catch (e) {
         failed.push({ id, error: e instanceof Error ? e.message : "failed" });
       }
+    };
+    const step = action === "rescreen" ? RESCREEN_PARALLEL : 1;
+    for (let i = 0; i < ids.length; i += step) {
+      await Promise.all(ids.slice(i, i + step).map(one));
     }
     auditContext(c, { outcome: failed.length ? done ? "partial" : "failure" : "success" });
     return c.json({ done, failed });
+  });
+
+  /** Ask the AI screen again about one held comment; it stays held. */
+  r.post("/comments/:id/rescreen", async (c) => {
+    await jsonBody(c, []);
+    auditContext(c, { detail: "rescreen" });
+    const next = await rescreen(deps, c.req.param("id"));
+    const initiative = await db.initiatives.get(next.rfpId);
+    return c.json({
+      comment: adminCommentJson(
+        next,
+        liveRoles(await deps.admins.set(), next.address, initiative, false),
+        initiative,
+      ),
+    });
   });
 
   r.post("/comments/:id/:action", async (c) => {

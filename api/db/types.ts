@@ -147,6 +147,18 @@ export interface Donation {
 export type CommentType = "suggestion" | "question" | "other";
 export type CommentStatus = "published" | "held" | "discarded";
 
+/** What the AI screen said about a comment, for the moderation queue. Rows
+ * from before it (and fast-lane posts) have none. */
+export interface AiScreen {
+  verdict: "constructive" | "unclear" | "spam" | null;
+  nameFlag: string | null;
+  /** Why it was held ("" when published). */
+  reason: string;
+  /** Why the screen gave no answer ("" when it answered). */
+  error: string;
+  at: number;
+}
+
 export interface Comment {
   id: string;
   rfpId: string;
@@ -169,6 +181,7 @@ export interface Comment {
   votes: number;
   reports: number;
   aiSummary: string;
+  aiScreen?: AiScreen;
   claimToken: string;
   /** Legacy claims use createdAt + the claim lifetime. */
   claimExpiresAt?: number;

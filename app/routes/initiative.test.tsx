@@ -223,6 +223,34 @@ it("says when comments open on an unpublished page instead of loading them", () 
   expect(document.querySelector('meta[name="robots"]')).toBeNull();
 });
 
+it("an archived page says so first, with the same stamp a counted ballot gets (#87)", () => {
+  const show = (status: "archived" | "approved", safeAddress = "0xabc") => {
+    vi.mocked(useInitiative).mockReturnValue({
+      data: { ...page(), initiative: { ...page().initiative, status, safeAddress } },
+      isLoading: false,
+      isPlaceholderData: false,
+      error: null,
+      isUpdatingLedger: false,
+    } as unknown as ReturnType<typeof useInitiative>);
+    return render(tree(new QueryClient()));
+  };
+  const archived = show("archived");
+  const note = screen.getByRole("note", { name: "Archived" });
+  expect(note).toHaveTextContent(/Archived.*This initiative is archived.*funding below is final/);
+  // Above the title: the first thing on the page.
+  expect(
+    note.compareDocumentPosition(screen.getByRole("heading", { level: 1 })) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(screen.getByText("This initiative is archived: it no longer takes donations."))
+    .toBeInTheDocument();
+  expect(screen.queryByText("Donations are temporarily unavailable.")).toBeNull();
+  archived.unmount();
+  show("approved");
+  expect(screen.queryByRole("note", { name: "Archived" })).toBeNull();
+  expect(screen.getByText("Donations are temporarily unavailable.")).toBeInTheDocument();
+});
+
 afterEach(() => {
   who.session = null;
 });

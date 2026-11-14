@@ -125,6 +125,8 @@ export default function SideCards(
               />
             </Suspense>
           )
+          : r.status === "archived"
+          ? "This initiative is archived: it no longer takes donations."
           : !r.safeAddress
           ? noDonations(r)
           : "Donations are temporarily unavailable."}

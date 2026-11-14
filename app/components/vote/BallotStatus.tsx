@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import Stamp from "~/components/ui/Stamp";
 import { Check } from "lucide-react";
 import { Link } from "react-router";
 import type { BallotPhase } from "~/lib/vote-flow";
@@ -253,11 +254,7 @@ export default function BallotStatus(
               tone === "wait" && "rounded-xl border border-vote/40 bg-vote/[.07] p-3",
             )}
           >
-            {tone === "good" && (
-              <span className="mt-0.5 flex-none -rotate-[4deg] rounded-lg border-2 border-dao-green bg-dao-green/[.12] px-2 py-0.5 font-inter-tight text-[13px] font-extrabold uppercase tracking-[.14em] text-[#a7e3a5]">
-                Counted
-              </span>
-            )}
+            {tone === "good" && <Stamp tone="good">Counted</Stamp>}
             <div className="min-w-0 space-y-1">
               <p className="m-0 font-inter-tight text-[16px] font-semibold text-white">{title}</p>
               <p className="m-0 text-[13.5px] leading-relaxed text-white/72">{body}</p>

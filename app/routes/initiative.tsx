@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Stamp from "~/components/ui/Stamp";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { TriangleAlert } from "lucide-react";
@@ -140,6 +141,25 @@ export default function Initiative() {
           </div>
         </div>
       )}
+      {r.status === "archived" && (
+        // The first thing a visitor sees (#87): the same stamp a counted ballot gets.
+        <div
+          role="note"
+          aria-label="Archived"
+          className="mb-4 mt-2 flex items-start gap-3 rounded-xl border border-[#f08a5d]/40 bg-[#f08a5d]/[.07] p-3"
+        >
+          <Stamp tone="ended">Archived</Stamp>
+          <div className="min-w-0 space-y-1">
+            <p className="m-0 font-inter-tight text-[16px] font-semibold text-white">
+              This initiative is archived.
+            </p>
+            <p className="m-0 text-[13.5px] leading-relaxed text-white/72">
+              It is no longer raising funds and is not on the board. The page stays as a record: the
+              funding below is final.
+            </p>
+          </div>
+        </div>
+      )}
       <h1 className="m-0 mb-3 mt-1.5 font-inter-tight text-[clamp(28px,4vw,44px)] font-bold leading-[1.1] tracking-[-.02em]">
         {diff ? <DiffBlock chunks={diff.title} /> : text.title}
       </h1>
@@ -164,7 +184,6 @@ export default function Initiative() {
             )}
           </span>
         )}
-        {r.status === "archived" && <span className="chip chip-badge st-archived">archived</span>}
         {r.status === "pending" && (
           <span
             className="chip chip-badge st-pending"

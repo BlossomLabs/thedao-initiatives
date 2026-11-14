@@ -84,7 +84,7 @@ function Dashes({ from, to, className, dim }: {
  * in line for what is left), green for the open tiers, the part still yours to change.
  * Beside it, the ask, this badge's share and what each settled tier took. */
 export default function BallotMeter(
-  { avatar, asked, target, pool, share, shareFinal, settled, menu, status }: {
+  { avatar, asked, target, pool, share, shareFinal, settled, menu, status, compact }: {
     /** The voter's avatar, drawn inside the ring. */
     avatar: React.ReactNode;
     /** What the ballot's placed initiatives ask for in all, in USD. */
@@ -113,6 +113,8 @@ export default function BallotMeter(
     /** In a round with ballot rules, in place of the share: the first rule still to meet,
      * or that the ballot is valid and can take more. */
     status?: { ok: boolean; text: string };
+    /** On a phone, pinned over the editor: no box of its own, tighter lines. */
+    compact?: boolean;
   },
 ) {
   const spent = settled.reduce((a, t) => a + t.paid, 0);
@@ -129,7 +131,10 @@ export default function BallotMeter(
   return (
     <section
       aria-label="Your ballot"
-      className="relative flex items-center gap-4 rounded-xl border border-vote/30 bg-vote/[.06] p-4"
+      className={cn(
+        "relative flex items-center",
+        compact ? "gap-3" : "gap-4 rounded-xl border border-vote/30 bg-vote/[.06] p-4",
+      )}
     >
       <SegmentRing
         segments={segments}

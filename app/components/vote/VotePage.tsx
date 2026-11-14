@@ -4,12 +4,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { bytesToHex, type Hex } from "viem";
 import PageMain from "~/components/layout/PageMain";
 import { Button, LinkButton } from "~/components/ui/Button";
-import TierBallot, { type BallotItem } from "~/components/vote/TierBallot";
+import TierBallot, { type BallotItem, TIER_LABELS } from "~/components/vote/TierBallot";
 import { BallotSkeleton, IntroSkeleton, SeenSkeleton } from "~/components/vote/VoteSkeleton";
 import { rememberMyCode } from "~/lib/vote-local";
 import BallotStatus, { type SendRoute } from "~/components/vote/BallotStatus";
 import BallotMeter from "~/components/vote/BallotMeter";
-import RoundBox, { badgeLine } from "~/components/vote/RoundBox";
+import RoundBox, { badgeLine, RoundDeadline } from "~/components/vote/RoundBox";
 import { roundSteps } from "~/components/vote/round-steps";
 import { AddressAvatar, Avatar } from "~/components/wallet/Avatar";
 import { avatarSrc } from "~/lib/avatar";
@@ -47,7 +47,7 @@ import { Deadline, setVoteClock, voteNow, When } from "~/components/vote/When";
 import { useMockBallotSubmit } from "~/components/vote/mock-send";
 import { checkBallot, emptyTierErrors } from "../../../shared/vote/rules";
 import { shortDay, usd, usdShort } from "~/lib/format";
-import { encodeBallot, type Tier } from "../../../shared/vote/ballot";
+import { encodeBallot, type Tier, tierName } from "../../../shared/vote/ballot";
 import { ROUND, rulesRound, type VoteManifest } from "../../../shared/vote/manifest";
 
 const poolOf = (m: VoteManifest) => Number(BigInt(m.poolUsd) / 1_000_000n);
@@ -829,41 +829,44 @@ export default function VotePage(
       return Object.keys(out).length !== Object.keys(next).length ||
         Object.entries(out).some(([k, t]) => next[k] !== t);
     };
-    const sharePanel = rv && (
-      <BallotMeter
-        avatar={me
-          ? <AddressAvatar address={me} size={48} />
-          : <Avatar src={avatarSrc(`badge-${n}`)} size={48} />}
-        asked={asked}
-        target={poolNow * 3}
-        pool={poolNow}
-        share={share}
-        shareFinal={registrationOver}
-        status={R.ballotRules ? ruleStatus(allErrors) : undefined}
-        settled={settledTiers.map((t) => {
-          const fromBallot = t.funded.filter((slug) => tiers[slug] === t.tier);
-          const held = Object.keys(tiers).filter((slug) => tiers[slug] === t.tier);
-          const askIn = (slugs: string[]) => slugs.reduce((a, slug) => a + askOf(slug), 0);
-          return {
-            tier: t.tier,
-            funded: fromBallot.length,
-            fundedAsk: askIn(fromBallot),
-            waitingAsk: askIn(held.filter((slug) => !t.funded.includes(slug))),
-            fundedUsd: fromBallot.reduce((a, slug) => a + microUsd(t.awards[slug] ?? "0"), 0),
-            paid: paidHere(t).reduce((a, [, v]) => a + v, 0),
-          };
-        })}
-        menu={!early && (
-          <BallotMenu
-            slugs={R.slugs}
-            titles={(slug) => titles.get(slug) ?? slug}
-            askUsd={(slug) => BigInt(R.projects[R.slugs.indexOf(slug)]?.askUsd ?? "0")}
-            tiers={tiers}
-            onApply={applyPasted}
-          />
-        )}
-      />
-    );
+    const meter = (compact: boolean) =>
+      rv && (
+        <BallotMeter
+          compact={compact}
+          avatar={me
+            ? <AddressAvatar address={me} size={48} />
+            : <Avatar src={avatarSrc(`badge-${n}`)} size={48} />}
+          asked={asked}
+          target={poolNow * 3}
+          pool={poolNow}
+          share={share}
+          shareFinal={registrationOver}
+          status={R.ballotRules ? ruleStatus(allErrors) : undefined}
+          settled={settledTiers.map((t) => {
+            const fromBallot = t.funded.filter((slug) => tiers[slug] === t.tier);
+            const held = Object.keys(tiers).filter((slug) => tiers[slug] === t.tier);
+            const askIn = (slugs: string[]) => slugs.reduce((a, slug) => a + askOf(slug), 0);
+            return {
+              tier: t.tier,
+              funded: fromBallot.length,
+              fundedAsk: askIn(fromBallot),
+              waitingAsk: askIn(held.filter((slug) => !t.funded.includes(slug))),
+              fundedUsd: fromBallot.reduce((a, slug) => a + microUsd(t.awards[slug] ?? "0"), 0),
+              paid: paidHere(t).reduce((a, [, v]) => a + v, 0),
+            };
+          })}
+          menu={!early && (
+            <BallotMenu
+              slugs={R.slugs}
+              titles={(slug) => titles.get(slug) ?? slug}
+              askUsd={(slug) => BigInt(R.projects[R.slugs.indexOf(slug)]?.askUsd ?? "0")}
+              tiers={tiers}
+              onApply={applyPasted}
+            />
+          )}
+        />
+      );
+    const sharePanel = meter(false);
     // The ballot box says what's missing; this box only explains the affiliations.
     const below = errors.filter(explainBelow);
     const rulesBox = below.length > 0 && (
@@ -904,6 +907,89 @@ export default function VotePage(
         <RoundBox {...roundProps} bare />
       </div>
     );
+    // On a phone: the round box and how the vote works open from the deadline in the
+    // bottom bar; Send opens a sheet with the ballot about to go and the send panel.
+    const howItWorks = (
+      <div className="space-y-3 text-[14px] leading-snug text-white/70">
+        <p className="m-0">
+          The {usdShort(poolOf(R))} {REAL(R) ? "pool" : "demo pool"}{" "}
+          is split equally among the badges that vote.
+        </p>
+        <a
+          href={BLOSSOM}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-sm no-underline hover:no-underline"
+        >
+          Learn how <span className="text-dao-green">Blossom Budgeting</span> works
+          <ArrowUpRight className="size-3.5 opacity-70" aria-hidden="true" />
+        </a>
+      </div>
+    );
+    const phaseKind = ballotFlow.phase.kind;
+    const upToDateNow = Boolean(countedHex) &&
+      countedHex!.toLowerCase() === bytesToHex(encodeBallot(R.slugs, tiers)).toLowerCase();
+    // The sheet has something to say whatever the ballot: a send running, its outcome.
+    const sheetNews = busy || upToDateNow || phaseKind === "failed" || phaseKind === "late" ||
+      (phaseKind === "idle" && Boolean(ballotFlow.phase.note));
+    const canSend = !busy && placed > 0 && !broken;
+    const summary = !sheetNews && (
+      <div>
+        <ul className="m-0 list-none divide-y divide-white/[.08] rounded-[14px] border border-white/10 bg-white/[.04] p-0">
+          {TIER_LABELS.map((t) => {
+            const inTier = Object.keys(tiers).filter((slug) => tiers[slug] === t.tier);
+            return (
+              <li key={t.tier} className="flex items-baseline gap-2 px-3.5 py-3 text-[13px]">
+                <b className="w-14 font-inter-tight text-[14px] text-[#8fd18d]">
+                  {tierName(t.tier)}
+                </b>
+                <span className="flex-1 text-white/65">
+                  {inTier.length
+                    ? `${inTier.length} ${inTier.length === 1 ? "initiative" : "initiatives"}`
+                    : "Empty"}
+                </span>
+                <span className="text-[14px] text-white tnum">
+                  {usd(inTier.reduce((a, slug) => a + askOf(slug), 0))}
+                </span>
+              </li>
+            );
+          })}
+          <li className="flex items-baseline gap-2 px-3.5 py-3">
+            <span className="flex-1 text-[13px] text-white/65">Asked in all</span>
+            <b className="text-[15px] text-white tnum">{usd(asked)}</b>
+          </li>
+        </ul>
+        <p className="m-0 mt-3 px-0.5 text-[13.5px] leading-relaxed text-white/72">
+          It’s a signature, not a payment. TheDAO sends it to {REAL(R) ? "Ethereum" : "Sepolia"}
+          {" "}
+          for you. You can change it and send again until each tier settles.
+        </p>
+      </div>
+    );
+    const phone = {
+      head: meter(true),
+      round: R.schedule
+        ? <RoundDeadline schedule={R.schedule} rv={rv} badge={roundProps?.badge} />
+        : <span className="text-[13px] text-white/70">How the vote works</span>,
+      roundSheet: (
+        <>
+          {roundBox}
+          {howItWorks}
+        </>
+      ),
+      send: early ? undefined : {
+        label: busy
+          ? "Sending…"
+          : upToDateNow
+          ? "Counted"
+          : countedHex
+          ? "Resend my ballot"
+          : "Send my ballot",
+        ready: canSend || sheetNews,
+        summary,
+      },
+      onBlocked: () => showWhyNot(true),
+    };
     // On the "your ballot" page: where the round is, without the tier settling now.
     const roundStepsOnly = roundProps && <RoundBox {...roundProps} stepsOnly />;
     // A badge that never sent a ballot before S-Tier settled: there is nothing it can do
@@ -974,7 +1060,8 @@ export default function VotePage(
     body = missedPage || seenPage || (
       <div className="space-y-6 select-none [&_input]:select-text [&_textarea]:select-text [&_[contenteditable=true]]:select-text">
         {picker}
-        <header className="pt-4 text-center">
+        {/* On a phone it's in the sheet the round's deadline opens (TierBallot). */}
+        <header className="pt-4 text-center max-sm:hidden">
           <p className="kicker m-0">What should TheDAO prioritize?</p>
           <h1 className="mt-3 font-inter-tight text-[clamp(28px,5vw,40px)] font-bold leading-[1.1] tracking-[-.03em] text-white">
             Your ballot
@@ -1005,6 +1092,7 @@ export default function VotePage(
           head={sharePanel}
           notice={rulesBox}
           listHead={roundBox}
+          phone={phone}
           funded={settledTiers.length ? funded : undefined}
           paid={paid}
           onChange={setTier}
@@ -1014,46 +1102,45 @@ export default function VotePage(
           skipped={skipped}
           onSkip={setSkip}
           search={{ ai: board.data?.flags?.aiSearch, aiAuto: board.data?.flags?.aiSearchAuto }}
-          actions={early
-            ? undefined
-            : (
-              <div className="space-y-3 rounded-t-2xl border-t border-white/10 bg-panel/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[0_-10px_30px_rgba(0,0,0,.35)] backdrop-blur sm:rounded-2xl sm:border sm:bg-white/[.03] sm:p-4 sm:shadow-none sm:backdrop-blur-none">
-                {refused && (
-                  <p className="text-[13.5px] text-amber-200">
-                    Not counted: {refused.reason === "tier_settled"
-                      ? "it changed a settled tier"
-                      : refused.reason === "invalid_ballot"
-                      ? "it breaks the ballot rules"
-                      : "S-Tier had settled before this badge's first ballot"}. Your earlier ballot
-                    still counts.
-                  </p>
-                )}
-                {mock && (
-                  <p className="text-center text-[12.5px] text-white/55">
-                    An example ballot: Send goes through the steps, but nothing is signed or sent.
-                  </p>
-                )}
-                <BallotStatus
-                  phase={ballotFlow.phase}
-                  route={sendRoute}
-                  chain={REAL(R) ? "Ethereum" : "Sepolia"}
-                  upToDate={upToDate}
-                  onSeeBallot={() => showEditor(false)}
-                  onBlocked={showWhyNot}
-                  canSend={!busy && placed > 0 && !broken}
-                  // Not ready, it stays as it is, disabled: the ballot box's line says what
-                  // the ballot still needs. With a ballot that counts already, it's a resend.
-                  sendLabel={countedHex ? "Resend my ballot" : "Send my ballot"}
-                  resultsHref={REAL(R) ? "/" : "/vote"}
-                  onSend={() => {
-                    setSendRoute("relay");
-                    void ballotFlow.submit(BigInt(n), bytesToHex(encodeBallot(R.slugs, tiers)));
-                  }}
-                  onSelfSend={sendYourself}
-                  onRetry={() => void ballotFlow.retry()}
-                />
-              </div>
-            )}
+          actions={early ? undefined : (
+            // On a phone it's in the send sheet (PhoneEditor), which is its box.
+            <div className="space-y-3 sm:rounded-2xl sm:border sm:border-white/10 sm:bg-white/[.03] sm:p-4">
+              {refused && (
+                <p className="text-[13.5px] text-amber-200">
+                  Not counted: {refused.reason === "tier_settled"
+                    ? "it changed a settled tier"
+                    : refused.reason === "invalid_ballot"
+                    ? "it breaks the ballot rules"
+                    : "S-Tier had settled before this badge's first ballot"}. Your earlier ballot
+                  still counts.
+                </p>
+              )}
+              {mock && (
+                <p className="text-center text-[12.5px] text-white/55">
+                  An example ballot: Send goes through the steps, but nothing is signed or sent.
+                </p>
+              )}
+              <BallotStatus
+                phase={ballotFlow.phase}
+                route={sendRoute}
+                chain={REAL(R) ? "Ethereum" : "Sepolia"}
+                upToDate={upToDate}
+                onSeeBallot={() => showEditor(false)}
+                onBlocked={showWhyNot}
+                canSend={!busy && placed > 0 && !broken}
+                // Not ready, it stays as it is, disabled: the ballot box's line says what
+                // the ballot still needs. With a ballot that counts already, it's a resend.
+                sendLabel={countedHex ? "Resend my ballot" : "Send my ballot"}
+                resultsHref={REAL(R) ? "/" : "/vote"}
+                onSend={() => {
+                  setSendRoute("relay");
+                  void ballotFlow.submit(BigInt(n), bytesToHex(encodeBallot(R.slugs, tiers)));
+                }}
+                onSelfSend={sendYourself}
+                onRetry={() => void ballotFlow.retry()}
+              />
+            </div>
+          )}
         />
       </div>
     );

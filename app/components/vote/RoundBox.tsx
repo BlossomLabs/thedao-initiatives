@@ -629,3 +629,63 @@ export default function RoundBox(
     </section>
   );
 }
+
+/** On a phone, in the ballot editor's bottom bar: the round's next deadline and its
+ * countdown, then its date and (amber) when this badge still has to send a first ballot.
+ * A tap on it opens the round box. */
+export function RoundDeadline(
+  { schedule, rv, badge }: { schedule: Schedule; rv?: RoundView; badge?: BadgeLine },
+) {
+  const now = Math.floor(useNow(30_000) / 1000);
+  const { phase } = roundSteps({ schedule, tiers: rv?.tiers, now, closed: rv?.closed });
+  let what: string;
+  let to: number | undefined;
+  switch (phase.kind) {
+    case "before":
+      what = "Voting opens";
+      to = phase.opensAt;
+      break;
+    case "open":
+      what = "S-Tier starts settling";
+      to = phase.sStarts;
+      break;
+    case "settling":
+      what = phase.last ? `${tierName(phase.tier)} settles` : "This window ends";
+      to = phase.endsAt;
+      break;
+    case "between":
+      what = `${tierName(phase.next)} starts settling`;
+      to = phase.nextStarts;
+      break;
+    case "closed":
+      what = "The vote has ended";
+      break;
+  }
+  const todo = badge?.tone === "todo";
+  const tone = TONE[badge?.tone ?? "ok"];
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className={cn("size-2.5 flex-none rounded-full ring-4 ring-white/10", tone.dot)}
+      />
+      <span className="min-w-0 leading-[1.3]">
+        <span className="block truncate font-inter-tight text-[13.5px] font-semibold text-white">
+          {what}
+        </span>
+        {to !== undefined && (
+          <span
+            className={cn(
+              "block truncate text-[12px] tnum",
+              todo ? "text-amber-200" : "text-white/60",
+            )}
+          >
+            <When at={to} withDay={phase.kind !== "settling"} />
+            <Countdown to={to} className="ml-1 tnum before:content-['·_']" />
+          </span>
+        )}
+        {todo && <span className="sr-only">This badge hasn’t voted yet.</span>}
+      </span>
+    </>
+  );
+}

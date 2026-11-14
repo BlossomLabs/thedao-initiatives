@@ -1088,3 +1088,9 @@ html:not([data-board="cards"]) .board-skeleton-cards {
     box-shadow: 0 0 0 6px rgb(92 183 90 / 0.12);
   }
 }
+
+/* The ballot editor's bottom bar on a phone (PhoneEditor): the support button rises
+   above it, off the Send button. */
+body:has([data-phone-send-bar]) [data-support-widget] > button {
+  bottom: calc(5.5rem + env(safe-area-inset-bottom));
+}

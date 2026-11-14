@@ -1,6 +1,15 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Tooltip } from "@base-ui/react/tooltip";
-import { ChevronDown, Eraser, Eye, EyeOff, GripVertical, Maximize2, Undo2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Eraser,
+  Eye,
+  EyeOff,
+  GripVertical,
+  Maximize2,
+  Undo2,
+} from "lucide-react";
 import CategoryDot from "~/components/ui/CategoryDot";
 import type { Card } from "~/lib/api-types";
 import type { AiSearchResult } from "../../../shared/ai-search";
@@ -13,6 +22,9 @@ import { usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import { type Tier, tierName } from "../../../shared/vote/ballot";
 import InitiativePeek, { type PeekChoice } from "./InitiativePeek";
+import PhoneCard from "./PhoneCard";
+import PhoneEditor from "./PhoneEditor";
+import { useMedia } from "~/hooks/use-media";
 import { morph } from "./peek-morph";
 
 /** Ported from blossomlabs.eth's budgeting TierList.
@@ -25,6 +37,28 @@ export const TIER_LABELS: { tier: Tier; grade: string; label: string }[] = [
   { tier: "A", grade: "A", label: "Should fund" },
   { tier: "B", grade: "B", label: "Nice to have" },
 ];
+
+/** The phone layout's own parts, from the vote page. */
+export type PhoneParts = {
+  /** Pinned at the top: the ballot box, compact. */
+  head: React.ReactNode;
+  /** In the bottom bar, beside Send: the round's next deadline. */
+  round: React.ReactNode;
+  /** What the deadline opens: where the round is, and how the vote works. */
+  roundSheet: React.ReactNode;
+  /** The bottom bar's button; none before sending opens. */
+  send?: {
+    label: string;
+    /** It opens the send sheet; false: the ballot can't be sent yet (`onBlocked` says why). */
+    ready: boolean;
+    /** Over the send panel in the sheet: the ballot about to be sent. */
+    summary?: React.ReactNode;
+  };
+  onBlocked?: () => void;
+};
+
+/** Below this width the editor is the phone's (sm in Tailwind). */
+export const PHONE = "(max-width: 639.98px)";
 
 export type BallotItem = { slug: string; title: string; card?: Card };
 
@@ -141,6 +175,7 @@ export default function TierBallot(
     skipped,
     onSkip,
     sent,
+    phone: phoneParts,
   }: {
     items: BallotItem[];
     /** The send bar: under the tier list on wider screens, floating at the bottom on a phone. */
@@ -173,8 +208,12 @@ export default function TierBallot(
     onSkip?: (slug: string, skip: boolean) => void;
     /** The ballot that counts, once one was sent: changed since, it can be restored. */
     sent?: Partial<Record<string, Tier>>;
+    /** On a phone, the editor is one list (S-Tier, A-Tier, B-Tier, then the rest) under the
+     * ballot box, and an initiative's card fills the screen. These are its parts. */
+    phone?: PhoneParts;
   },
 ) {
+  const isPhone = useMedia(PHONE);
   const id = useId();
   /** The initiative being dragged. */
   const [picked, setPicked] = useState<string>();
@@ -456,6 +495,7 @@ export default function TierBallot(
   const slotOf = (slug: string): "text" | "empty" | undefined =>
     peek?.slug === slug ? "text" : closing === slug ? "empty" : undefined;
   const openPeek = (slug: string, from: HTMLElement) => {
+    if (isPhone) return setPeek({ slug, order: navOrder });
     const box = from.closest<HTMLElement>("[data-ballot-box]");
     // The card grows out of a copy of the chip; the chip stays, dashed.
     void morph(box, () => setPeek({ slug, order: navOrder }), cardEl, { ghost: "from" });
@@ -474,6 +514,7 @@ export default function TierBallot(
     const { order } = peek;
     const next = order[order.indexOf(peek.slug) + dir];
     if (!next) return;
+    if (isPhone) return setPeek({ slug: next, order });
     const box = document.querySelector<HTMLElement>(`[data-ballot-box="${next}"]`);
     box?.scrollIntoView?.({ block: "nearest" });
     void morph(cardEl(), () => setPeek({ slug: next, order }), cardEl);
@@ -486,6 +527,11 @@ export default function TierBallot(
   const closePeek = (dest?: Where) => {
     if (!peek) return;
     const { slug } = peek;
+    if (isPhone) {
+      if (dest !== undefined) place(slug, dest);
+      setPeek(undefined);
+      return;
+    }
     // The card shrinks into a copy of the chip laid over its dashed self, which turns
     // solid as the copy goes.
     void morph(
@@ -651,6 +697,56 @@ export default function TierBallot(
     );
   };
 
+  /** Phone: an initiative in the list, a tier's or the rest's; a tap opens its card. */
+  const phoneRow = (i: BallotItem) => {
+    const r = i.card?.initiative;
+    const cat = r?.categories[0];
+    const settledHere = isLocked(where(i.slug));
+    const isFunded = settledHere && Boolean(funded?.has(i.slug));
+    const paidText = paidOf(i.slug);
+    return (
+      <li key={i.slug} data-ballot-box={i.slug}>
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          onClick={() => setPeek({ slug: i.slug, order: navOrder })}
+          className={cn(
+            "flex w-full items-center gap-2.5 rounded-[14px] border bg-white/5 py-3 pl-3.5 pr-3 text-left transition-colors active:bg-white/[.09]",
+            isFunded
+              ? "border-vote/50 bg-vote/[.08]"
+              : landed?.slug === i.slug
+              ? "border-dao-green/60"
+              : "border-white/10",
+            settledHere && funded && !isFunded && "opacity-55",
+            skipped?.has(i.slug) && !tiers[i.slug] && "opacity-60",
+          )}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="line-clamp-2 font-inter-tight text-[14px] font-medium leading-[1.3] text-white">
+              {i.title}
+            </span>
+            {r && (
+              <span className="mt-1 flex items-center gap-1.5 truncate text-[12px] text-white/60">
+                {cat && <CategoryDot slug={cat} className="size-[7px] flex-none" />}
+                {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
+                <span className="whitespace-nowrap tnum">
+                  {cat && "· "}
+                  {usd(r.goalUsd)}
+                </span>
+                {paidText && (
+                  <span className="whitespace-nowrap font-semibold text-vote tnum">
+                    · You paid {paidText}
+                  </span>
+                )}
+              </span>
+            )}
+          </span>
+          <ChevronRight className="size-[18px] flex-none text-white/45" aria-hidden="true" />
+        </button>
+      </li>
+    );
+  };
+
   /** Phone: a small chip in the mini tier list: the category dot and the title's start. */
   const chip = (i: BallotItem) => {
     const cat = i.card?.initiative.categories[0];
@@ -737,6 +833,168 @@ export default function TierBallot(
       ? "Your S-Tier picks that weren't funded stay first in line for what you have left."
       : "Your A-Tier picks that weren't funded stay ahead of B-Tier for what you have left.";
   };
+
+  /** The list's search and category filter, on every screen. */
+  const catFilter = (
+    <div className="ml-auto shrink-0" onClick={(e) => e.stopPropagation()}>
+      <CategoryFilter
+        value={view.cats}
+        counts={counts.cats}
+        onChange={(cats) => setView((v) => ({ ...v, cats }))}
+        align="end"
+        className="max-[641px]:h-7 max-[641px]:gap-1.5 max-[641px]:pl-2 max-[641px]:pr-1.5 max-[641px]:text-[12px]"
+      />
+    </div>
+  );
+  const searchBox = (
+    <div onClick={(e) => e.stopPropagation()}>
+      <BoardSearch
+        compact
+        view={view}
+        onFilter={(next) => setView((v) => ({ ...v, ...next }))}
+        aiEnabled={Boolean(search.ai)}
+        aiAuto={Boolean(search.aiAuto)}
+        active={ai}
+        onResults={setAiResult}
+        onAsking={setAsking}
+      />
+    </div>
+  );
+  const listEmpty = unranked.length === 0
+    ? skippedItems.length ? "All ranked or skipped." : "All ranked. Nice."
+    : asking
+    ? "Asking AI for the best matches…"
+    : "No initiatives match";
+  /** At the end of the list: the skipped ones, hidden until asked for. */
+  const skippedBlock = (row: (i: BallotItem) => React.ReactNode) =>
+    onSkip && skippedItems.length > 0 && (
+      <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          data-skipped-toggle=""
+          aria-expanded={showSkipped}
+          aria-controls={`${id}-skipped`}
+          onClick={() => setShowSkipped((v) => !v)}
+          className="mx-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] text-white/55 underline-offset-4 hover:bg-white/[.05] hover:text-white hover:underline tnum"
+        >
+          <EyeOff className="size-3.5" aria-hidden="true" />
+          {
+            // Low-rated: a 1–2★ rating skips an initiative the first time (prefill).
+          }
+          {showSkipped ? "Hide" : "Show"} {skippedItems.length} skipped and low-rated
+          <ChevronDown
+            className={cn(
+              "size-3.5 transition-transform motion-reduce:transition-none",
+              showSkipped && "rotate-180",
+            )}
+            aria-hidden="true"
+          />
+        </button>
+        {showSkipped && (
+          <div
+            id={`${id}-skipped`}
+            data-drop="skipped"
+            className="mt-2 rounded-xl border border-dashed border-white/15 p-2"
+          >
+            <p className="mb-2 px-1 text-[12px] text-white/45">
+              Hidden from the list, and like it they get none of your share.
+            </p>
+            <ul className="space-y-2" aria-label={SKIPPED}>{skippedItems.map(row)}</ul>
+          </div>
+        )}
+      </div>
+    );
+  /** Clear ballot (and its Undo), Restore sent ballot. */
+  const ballotTools = (
+    <>
+      {cleared
+        ? (
+          <>
+            <span className="min-w-0 flex-1 truncate text-white/60">Ballot cleared.</span>
+            <button
+              type="button"
+              onClick={undoClear}
+              className="rounded-md border border-white/20 px-2 py-1 text-white/75 hover:bg-white/10"
+            >
+              Undo
+            </button>
+          </>
+        )
+        : (
+          <>
+            <span className="min-w-0 flex-1 truncate px-1 text-white/45">
+              Initiatives in the same tier are ranked equally.
+            </span>
+            {onReplace && changed && !disabled && (
+              <button
+                type="button"
+                disabled={Boolean(drag)}
+                onClick={restoreSent}
+                className="inline-flex flex-none items-center gap-1 rounded-md px-1.5 py-1 text-white/50 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
+              >
+                <Undo2 className="size-3.5" aria-hidden="true" />
+                Restore sent ballot
+              </button>
+            )}
+            {onReplace && placedCount > 0 && !disabled && (
+              <button
+                type="button"
+                disabled={Boolean(drag)}
+                onClick={clearAll}
+                className="inline-flex flex-none items-center gap-1 rounded-md px-1.5 py-1 text-white/50 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
+              >
+                <Eraser className="size-3.5" aria-hidden="true" />
+                Clear ballot
+              </button>
+            )}
+          </>
+        )}
+    </>
+  );
+
+  if (isPhone && phoneParts) {
+    return (
+      <PhoneEditor
+        id={id}
+        parts={phoneParts}
+        notice={notice}
+        aside={aside}
+        actions={actions}
+        tierRows={TIER_LABELS.map((t) => ({
+          ...t,
+          locked: isLocked(t.tier),
+          items: items.filter((i) => where(i.slug) === t.tier),
+          note: missedNote(t.tier),
+        }))}
+        row={(i) => phoneRow(i)}
+        unranked={{ shown, total: unranked.length, filtered: filtered || ai, empty: listEmpty }}
+        catFilter={catFilter}
+        searchBox={searchBox}
+        skippedBlock={skippedBlock(phoneRow)}
+        tools={ballotTools}
+        announce={announce}
+        card={peek && (() => {
+          const i = items.find((it) => it.slug === peek.slug);
+          return i && (
+            <PhoneCard
+              item={i}
+              nav={{
+                index: Math.max(0, peek.order.indexOf(peek.slug)),
+                count: peek.order.length,
+                onStep: stepPeek,
+              }}
+              choices={choicesFor(peek.slug)}
+              current={where(peek.slug)}
+              onChoose={movePeek}
+              note={noteOf(peek.slug)}
+              paid={paidOf(peek.slug)}
+              onClose={() => closePeek()}
+            />
+          );
+        })()}
+      />
+    );
+  }
 
   return (
     <div className={cn(drag && "cursor-grabbing")}>
@@ -864,50 +1122,7 @@ export default function TierBallot(
                     "max-sm:hidden",
                 )}
               >
-                {cleared
-                  ? (
-                    <>
-                      <span className="min-w-0 flex-1 truncate text-white/60">
-                        Ballot cleared.
-                      </span>
-                      <button
-                        type="button"
-                        onClick={undoClear}
-                        className="rounded-md border border-white/20 px-2 py-1 text-white/75 hover:bg-white/10"
-                      >
-                        Undo
-                      </button>
-                    </>
-                  )
-                  : (
-                    <>
-                      <span className="min-w-0 flex-1 truncate px-1 text-white/45">
-                        Initiatives in the same tier are ranked equally.
-                      </span>
-                      {onReplace && changed && !disabled && (
-                        <button
-                          type="button"
-                          disabled={Boolean(drag)}
-                          onClick={restoreSent}
-                          className="inline-flex flex-none items-center gap-1 rounded-md px-1.5 py-1 text-white/50 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
-                        >
-                          <Undo2 className="size-3.5" aria-hidden="true" />
-                          Restore sent ballot
-                        </button>
-                      )}
-                      {onReplace && placedCount > 0 && !disabled && (
-                        <button
-                          type="button"
-                          disabled={Boolean(drag)}
-                          onClick={clearAll}
-                          className="inline-flex flex-none items-center gap-1 rounded-md px-1.5 py-1 text-white/50 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
-                        >
-                          <Eraser className="size-3.5" aria-hidden="true" />
-                          Clear ballot
-                        </button>
-                      )}
-                    </>
-                  )}
+                {ballotTools}
               </div>
             }
           </div>
@@ -944,28 +1159,9 @@ export default function TierBallot(
                   {unranked.length} {unranked.length === 1 ? "initiative" : "initiatives"}
                 </span>
               </h3>
-              <div className="ml-auto shrink-0" onClick={(e) => e.stopPropagation()}>
-                <CategoryFilter
-                  value={view.cats}
-                  counts={counts.cats}
-                  onChange={(cats) => setView((v) => ({ ...v, cats }))}
-                  align="end"
-                  className="max-[641px]:h-7 max-[641px]:gap-1.5 max-[641px]:pl-2 max-[641px]:pr-1.5 max-[641px]:text-[12px]"
-                />
-              </div>
+              {catFilter}
             </div>
-            <div onClick={(e) => e.stopPropagation()}>
-              <BoardSearch
-                compact
-                view={view}
-                onFilter={(next) => setView((v) => ({ ...v, ...next }))}
-                aiEnabled={Boolean(search.ai)}
-                aiAuto={Boolean(search.aiAuto)}
-                active={ai}
-                onResults={setAiResult}
-                onAsking={setAsking}
-              />
-            </div>
+            {searchBox}
             {shown.length > 0
               ? (
                 <ul className="space-y-2" aria-label={UNRANKED}>
@@ -974,51 +1170,10 @@ export default function TierBallot(
               )
               : (
                 <p className="px-1 py-6 text-center text-[13px] text-white/45">
-                  {unranked.length === 0
-                    ? skippedItems.length ? "All ranked or skipped." : "All ranked. Nice."
-                    : asking
-                    ? "Asking AI for the best matches…"
-                    : "No initiatives match"}
+                  {listEmpty}
                 </p>
               )}
-            {onSkip && skippedItems.length > 0 && (
-              // At the end of the list: the skipped ones, hidden until asked for.
-              <div className="mt-3" onClick={(e) => e.stopPropagation()}>
-                <button
-                  type="button"
-                  data-skipped-toggle=""
-                  aria-expanded={showSkipped}
-                  aria-controls={`${id}-skipped`}
-                  onClick={() => setShowSkipped((v) => !v)}
-                  className="mx-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] text-white/55 underline-offset-4 hover:bg-white/[.05] hover:text-white hover:underline tnum"
-                >
-                  <EyeOff className="size-3.5" aria-hidden="true" />
-                  {
-                    // Low-rated: a 1–2★ rating skips an initiative the first time (prefill).
-                  }
-                  {showSkipped ? "Hide" : "Show"} {skippedItems.length} skipped and low-rated
-                  <ChevronDown
-                    className={cn(
-                      "size-3.5 transition-transform motion-reduce:transition-none",
-                      showSkipped && "rotate-180",
-                    )}
-                    aria-hidden="true"
-                  />
-                </button>
-                {showSkipped && (
-                  <div
-                    id={`${id}-skipped`}
-                    data-drop="skipped"
-                    className="mt-2 rounded-xl border border-dashed border-white/15 p-2"
-                  >
-                    <p className="mb-2 px-1 text-[12px] text-white/45">
-                      Hidden from the list, and like it they get none of your share.
-                    </p>
-                    <ul className="space-y-2" aria-label={SKIPPED}>{skippedItems.map(tile)}</ul>
-                  </div>
-                )}
-              </div>
-            )}
+            {skippedBlock(tile)}
           </section>
         </div>
       </div>

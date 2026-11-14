@@ -88,14 +88,14 @@ ask_i(b)     = max(askUsd_i − support_i(b), 0)
 - `usd()` is the contract's conversion exactly (`RoundAccounting._convert`):
   six-decimal USD, rounded down, donations and pledges converted separately per
   currency before adding. Currency 0 (virtual USD) has pledges only.
-- A feed-priced currency uses the feed's `latestRoundData()` answer at block
-  `b`. **Replay does not apply the age limit** *(my call)*: a stale price is
-  used as it stands, so a tally is never undefined. The contract's
-  `initiativeUsd()` view keeps its `StalePrice` revert; replay must therefore
-  compute the ask itself rather than call that view. A non-positive answer or a
-  changed decimals value still makes derivation incomplete (not zero).
-- The result must equal `initiativeUsd(i).remainingAskUsd` at `b` whenever that
-  view does not revert. Test this.
+- *(Updated Nov 15 by `2026-11-15-ballot-rules-on-asks-design.md`.)* A
+  feed-priced currency uses the price rule of that design: the feed's
+  `latestRoundData()` answer at block `b` with no age limit; if the answer is
+  not good (reverting call, round 0, answer ≤ 0, future timestamp, changed feed
+  decimals), the contract's `lastPrice` at `b` (followed via `PriceStored`).
+  A token whose `balanceOf` reverts counts as a $0 balance.
+- The result must equal `initiativeUsd(i).askUsd` at `b`, which no longer
+  reverts on age. Test this.
 
 ### Tally events
 

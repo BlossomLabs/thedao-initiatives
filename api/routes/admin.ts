@@ -179,8 +179,8 @@ export function adminRoutes(deps: Deps) {
   });
 
   /**
-   * Every initiative for the dashboard's full table, loaded only when it is
-   * opened. Funding comes from the card summaries and the Safe balance
+   * Every initiative for the dashboard's full table, its own request so the
+   * to-do list never waits for it. Funding comes from the card summaries and the Safe balance
    * snapshots, never a refresh: the table is a list, the initiative page is
    * where a balance is refreshed.
    */

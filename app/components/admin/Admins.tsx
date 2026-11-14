@@ -109,7 +109,7 @@ export default function Admins() {
         })}
       </ul>
       <form
-        className="mt-3 flex flex-wrap items-center gap-2"
+        className="mt-3 flex items-center gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           add();
@@ -117,7 +117,7 @@ export default function Admins() {
       >
         <Input
           aria-label="Wallet address"
-          className="mono h-[38px] min-w-[200px] flex-1 py-0 text-[12.5px]"
+          className="mono h-[38px] min-w-0 flex-1 py-0 text-[12.5px]"
           placeholder="0x… wallet to make admin"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
@@ -129,8 +129,9 @@ export default function Admins() {
           sm
           loading={busy === "add"}
           disabled={Boolean(busy) || !address.trim()}
+          className="flex-none"
         >
-          <UserPlus className="size-4" /> Add admin
+          <UserPlus className="size-4" /> Add
         </Button>
       </form>
       {msg && <Status kind={msg.kind} className="mt-2">{msg.text}</Status>}

@@ -18,13 +18,13 @@ export function useAdminTodo() {
   });
 }
 
-/** The full table, fetched only once it is opened. */
-export function useAdminList(enabled: boolean) {
+/** The full table: its own request, so the to-do list never waits for it. */
+export function useAdminList() {
   const { session } = useSession();
   return useQuery({
     queryKey: [...listKey, sessionKey(session)],
     queryFn: ({ signal }) => api<{ rows: AdminListRow[] }>("/api/admin/initiatives", { signal }),
-    enabled: Boolean(session?.isAdmin) && enabled,
+    enabled: Boolean(session?.isAdmin),
   });
 }
 

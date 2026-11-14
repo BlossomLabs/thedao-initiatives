@@ -27,3 +27,15 @@ it("keeps private fields hidden when the signature is refused", async () => {
   await screen.findByRole("alert");
   expect(reload).not.toHaveBeenCalled();
 });
+
+it("inline: the hidden value is the button, its title says why; same signature on a click", async () => {
+  signIn.mockResolvedValue({});
+  const reload = vi.fn().mockResolvedValue({});
+  render(<ConfirmPrivateFields inline onConfirm={reload} />);
+  expect(screen.queryByText(/Private contacts require/)).toBeNull();
+  const hidden = screen.getByRole("button", { name: "Hidden" });
+  expect(hidden).toHaveAttribute("title", expect.stringMatching(/sign with your wallet/));
+  fireEvent.click(hidden);
+  await waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+  expect(signIn).toHaveBeenCalledTimes(1);
+});

@@ -14,8 +14,7 @@ vi.mock("~/lib/api", async (original) => ({
   api: vi.fn(),
 }));
 vi.mock("~/hooks/use-site-settings", () => ({ useSiteSettings: () => ({ data: undefined }) }));
-vi.mock("~/components/admin/SyncContent", () => ({ default: () => null }));
-vi.mock("~/components/admin/Admins", () => ({ default: () => null }));
+vi.mock("~/components/admin/Admins", () => ({ default: () => <p>Admins box</p> }));
 vi.mock("~/context/wallet", () => ({ useWallet: () => ({ isConnected: false }) }));
 vi.mock("~/components/admin/initiative/SafeCard", () => ({
   useSafeDeploy: () => ({ ensureDeployed: vi.fn(), status: null, busy: false }),
@@ -104,9 +103,11 @@ beforeEach(() => {
   vi.mocked(api).mockReset().mockImplementation(answer());
 });
 
-const where = { search: "" };
+const where = { search: "", pathname: "" };
 function Location() {
-  where.search = useLocation().search;
+  const loc = useLocation();
+  where.search = loc.search;
+  where.pathname = loc.pathname;
   return null;
 }
 const mount = (url = "/admin") =>
@@ -119,18 +120,16 @@ const mount = (url = "/admin") =>
     </QueryClientProvider>,
   );
 const box = () => screen.findByRole("searchbox", { name: "Search by project or contact" });
-/** The table is behind "Show all": its rows load only once it opens. */
-const openTable = async () =>
-  fireEvent.click(await screen.findByRole("button", { name: "Show all" }));
+/** The table loads on its own, after the to-do list: wait for its search box. */
+const openTable = async () => {
+  await screen.findByRole("searchbox", { name: "Search by project or contact" });
+};
 
-it("the header counts the initiatives without loading the table", async () => {
+it("the header counts the initiatives", async () => {
   mount();
   expect(await screen.findByText("4 initiatives")).toBeInTheDocument();
   expect(screen.getByText("3 approved")).toBeInTheDocument();
   expect(screen.getByText("This week: 1 approved")).toBeInTheDocument();
-  expect(vi.mocked(api).mock.calls.map(([p]) => String(p))).not.toContain(
-    "/api/admin/initiatives",
-  );
 });
 
 it("submissions come first, oldest first, approved from the row; untagged ones say why not", async () => {
@@ -158,22 +157,37 @@ it("there is nothing to rate here: ratings are for badge holders", async () => {
   expect(screen.queryByText(/rated/i)).toBeNull();
 });
 
-it("the search finds an initiative by title and links to its admin page", async () => {
+it("the admin list is always in view: it is a security fact, not a tool behind a menu", async () => {
   mount();
-  fireEvent.change(await screen.findByRole("searchbox", { name: "Search initiatives by title" }), {
-    target: { value: "lockdown" },
-  });
-  expect(screen.getByRole("link", { name: "Safe Lockdown Guard" })).toHaveAttribute(
-    "href",
-    "/admin/initiatives/slug-2",
-  );
+  expect(await screen.findByText("Admins box")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "More" }));
+  expect(screen.queryByRole("button", { name: "Admins" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Sync content" })).toBeNull();
 });
 
-it("Show all loads the table", async () => {
+it("a hidden contact is its own button, not a banner above the table", async () => {
+  vi.mocked(api).mockImplementation(answer(
+    rows.map((r) => ({ ...r, initiative: { ...r.initiative, contact: undefined } })),
+  ));
   mount();
   await openTable();
+  const table = await screen.findByRole("table");
+  expect(within(table).getAllByRole("button", { name: "Hidden" })).toHaveLength(4);
+  expect(screen.queryByText(/Private contacts require/)).toBeNull();
+});
+
+it("the table loads on its own after the to-do list, with a skeleton until then", async () => {
+  let release: (v: unknown) => void = () => {};
+  vi.mocked(api).mockImplementation((path) =>
+    String(path) === "/api/admin/initiatives"
+      ? new Promise((r) => (release = () => r({ rows })))
+      : answer()(path)
+  );
+  mount();
+  expect(await screen.findByLabelText("Loading initiatives")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Show all|Hide/ })).toBeNull();
+  release(undefined);
   expect(await box()).toBeInTheDocument();
-  expect(vi.mocked(api).mock.calls.map(([p]) => String(p))).toContain("/api/admin/initiatives");
 });
 
 it("the search filters the table by project or contact as you type", async () => {

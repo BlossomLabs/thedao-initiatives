@@ -1,25 +1,27 @@
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { PledgeForm } from "~/components/admin/initiative/Pledges";
-import { Input } from "~/components/ui/Field";
+import { StatusChip } from "~/components/ui/Badge";
+import InitiativeCombobox from "~/components/ui/InitiativeCombobox";
 import type { AdminTodo } from "~/lib/api-types";
 import { useRun } from "./run";
 
-const MAX = 6;
+type Item = AdminTodo["index"][number];
 
-/** Add a pledge without opening the initiative: pick it by title, then the usual pledge form. */
+/** Add a pledge without opening the initiative: pick it by name, then the usual pledge form. */
 export default function QuickPledge({ index }: { index: AdminTodo["index"] }) {
   const id = useId();
-  const [q, setQ] = useState("");
-  const [picked, setPicked] = useState<AdminTodo["index"][number] | null>(null);
+  const [picked, setPicked] = useState<Item | null>(null);
+  const [search, setSearch] = useState("");
   const { run, said, setMsg } = useRun();
-  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  // Pledges are for approved initiatives first; the rest still match a search.
-  const ordered = [...index].sort((a, b) =>
-    Number(b.status === "approved") - Number(a.status === "approved")
+  // Approved initiatives first: pledges are for them; the rest still match a search.
+  const items = useMemo(
+    () =>
+      [...index].sort((a, b) =>
+        Number(b.status === "approved") - Number(a.status === "approved") ||
+        a.title.localeCompare(b.title)
+      ),
+    [index],
   );
-  const hits = words.length
-    ? ordered.filter((x) => words.every((w) => x.title.toLowerCase().includes(w))).slice(0, MAX)
-    : [];
   return (
     <section
       aria-labelledby={`${id}-h`}
@@ -28,68 +30,30 @@ export default function QuickPledge({ index }: { index: AdminTodo["index"] }) {
       <h2 id={`${id}-h`} className="m-0 font-inter-tight text-[15px] font-semibold">
         Record a pledge
       </h2>
-      {picked
-        ? (
-          <>
-            <p className="m-0 flex flex-wrap items-center gap-2 text-[13.5px]">
-              <span className="dim">To</span> <b className="font-medium">{picked.title}</b>
-              <button
-                type="button"
-                className="cursor-pointer border-0 bg-transparent p-0 small text-white/80 underline decoration-white/25 underline-offset-2 hover:text-white"
-                onClick={() => {
-                  setPicked(null);
-                  setMsg(null);
-                }}
-              >
-                Change
-              </button>
-            </p>
-            <PledgeForm
-              key={picked.id}
-              base={`/api/admin/initiatives/${picked.id}`}
-              run={(fn, ok) => run(fn, typeof ok === "string" ? `${ok} (${picked.title})` : ok)}
-              editing={null}
-              onDone={() => {}}
-              stacked
-            />
-          </>
-        )
-        : (
-          <>
-            <label htmlFor={id} className="small">Initiative</label>
-            <Input
-              id={id}
-              type="search"
-              placeholder="Search by title"
-              autoComplete="off"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-            {words.length > 0 && (
-              <ul className="m-0 list-none p-0" aria-label="Pick the initiative">
-                {hits.length
-                  ? hits.map((x) => (
-                    <li key={x.id}>
-                      <button
-                        type="button"
-                        className="block w-full cursor-pointer border-0 border-b border-solid border-white/[.07] bg-transparent py-2 text-left text-[13.5px] text-white last:border-0 hover:text-dao-green"
-                        onClick={() => {
-                          setPicked(x);
-                          setQ("");
-                        }}
-                      >
-                        {x.title}
-                        {x.status !== "approved" && (
-                          <span className="small dim">{` · ${x.status}`}</span>
-                        )}
-                      </button>
-                    </li>
-                  ))
-                  : <li className="small dim">No initiative has that in its title.</li>}
-              </ul>
-            )}
-          </>
-        )}
+      <label htmlFor={id} className="text-[12.5px] text-white/80">Initiative</label>
+      <InitiativeCombobox<Item>
+        id={id}
+        items={items}
+        value={picked}
+        onValueChange={(x) => {
+          setPicked(x);
+          setMsg(null);
+        }}
+        inputValue={search}
+        onInputValueChange={setSearch}
+        popupZ="z-50"
+        itemExtra={(x) => x.status !== "approved" && <StatusChip status={x.status} />}
+      />
+      {picked && search === picked.title && (
+        <PledgeForm
+          key={picked.id}
+          base={`/api/admin/initiatives/${picked.id}`}
+          run={(fn, ok) => run(fn, typeof ok === "string" ? `${ok} (${picked.title})` : ok)}
+          editing={null}
+          onDone={() => {}}
+          stacked
+        />
+      )}
       {said}
     </section>
   );

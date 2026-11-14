@@ -1,5 +1,3 @@
-import { Combobox } from "@base-ui/react/combobox";
-import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   parsePledgeAmount,
@@ -12,6 +10,7 @@ import { useBoard } from "~/hooks/use-board";
 import { api, errorMessage } from "~/lib/api";
 import type { CardInitiative } from "~/lib/api-types";
 import { Button } from "~/components/ui/Button";
+import InitiativeCombobox from "~/components/ui/InitiativeCombobox";
 import { Input, Textarea } from "~/components/ui/Field";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -129,63 +128,24 @@ export default function PledgeSupportForm({ initialInitiativeId, sending, onSend
         <label htmlFor={id + "-initiative"} className="text-[12.5px] text-white/80">
           Initiative
         </label>
-        <Combobox.Root
+        <InitiativeCombobox
+          id={id + "-initiative"}
           items={initiatives}
           value={initiative}
           onValueChange={setInitiative}
           inputValue={search}
           onInputValueChange={setSearch}
-          itemToStringLabel={(i) => i.title}
-          itemToStringValue={(i) => i.id}
-          isItemEqualToValue={(a, b) => a.id === b.id}
+          inputRef={inputRef}
+          required
           disabled={sending || isPending || isError}
-          autoHighlight
-        >
-          <div className="relative">
-            <Combobox.Input
-              id={id + "-initiative"}
-              ref={inputRef}
-              required
-              placeholder={isPending ? "Loading initiatives…" : "Search by initiative name…"}
-              className="field w-full py-2.5 pr-9 text-[13.5px]"
-            />
-            <Combobox.Trigger
-              aria-label="Show initiatives"
-              className="absolute inset-y-0 right-0 flex w-9 cursor-pointer items-center justify-center text-white/50"
-            >
-              <ChevronDown className="size-4" aria-hidden />
-            </Combobox.Trigger>
-          </div>
-          <Combobox.Portal>
-            <Combobox.Positioner sideOffset={6} className="z-[210]">
-              <Combobox.Popup
-                data-support-widget
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") e.stopPropagation();
-                }}
-                className="w-[var(--anchor-width)] max-w-[calc(100vw-2rem)] rounded-[14px] border border-edge2 bg-panel shadow-menu outline-none"
-              >
-                <Combobox.Empty className="empty:hidden px-3 py-2.5 text-[13px] text-muted">
-                  No initiatives found.
-                </Combobox.Empty>
-                <Combobox.List className="max-h-[min(var(--available-height),240px)] overflow-y-auto p-1.5">
-                  {(i: CardInitiative) => (
-                    <Combobox.Item
-                      key={i.id}
-                      value={i}
-                      className="flex cursor-pointer items-center gap-2 rounded-[9px] px-2.5 py-2 text-[13px] text-soft outline-none data-[highlighted]:bg-white/[.06] data-[highlighted]:text-white"
-                    >
-                      <span className="min-w-0 flex-1">{i.title}</span>
-                      <Combobox.ItemIndicator>
-                        <Check className="size-4 text-dao-green" aria-hidden />
-                      </Combobox.ItemIndicator>
-                    </Combobox.Item>
-                  )}
-                </Combobox.List>
-              </Combobox.Popup>
-            </Combobox.Positioner>
-          </Combobox.Portal>
-        </Combobox.Root>
+          placeholder={isPending ? "Loading initiatives…" : "Search by initiative name…"}
+          popupProps={{
+            "data-support-widget": true,
+            onKeyDown: (e) => {
+              if (e.key === "Escape") e.stopPropagation();
+            },
+          } as React.ComponentProps<typeof InitiativeCombobox>["popupProps"]}
+        />
         {isError && (
           <p className="m-0 text-[12.5px] text-dao-red" role="alert">
             Couldn’t load initiatives.{" "}

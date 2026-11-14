@@ -63,14 +63,14 @@ test("adding an address posts it and shows the new row; errors show inline", asy
   await screen.findByText("0x19E7…ff2A");
   const input = screen.getByLabelText("Wallet address");
   fireEvent.change(input, { target: { value: NEW } });
-  fireEvent.click(screen.getByRole("button", { name: /Add admin/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^Add$/ }));
   expect(await screen.findByText("0x8393…0780")).toBeInTheDocument();
   expect(api).toHaveBeenCalledWith("/api/admin/admins", { json: { address: NEW } });
   expect(screen.getByRole("status")).toHaveTextContent("0x8393…0780 is an admin now.");
   expect(input).toHaveValue("");
 
   fireEvent.change(input, { target: { value: "0xbad" } });
-  fireEvent.click(screen.getByRole("button", { name: /Add admin/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^Add$/ }));
   expect(await screen.findByRole("alert")).toHaveTextContent("That is not an Ethereum address.");
 });
 

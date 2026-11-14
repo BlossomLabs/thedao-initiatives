@@ -6,12 +6,10 @@ import DashboardSkeleton from "~/components/layout/DashboardSkeleton";
 import Crumbs from "~/components/layout/Crumbs";
 import Pop from "~/components/ui/Pop";
 import { Button } from "~/components/ui/Button";
-import SyncContent from "~/components/admin/SyncContent";
 import Admins from "~/components/admin/Admins";
 import Submissions from "~/components/admin/dashboard/Submissions";
 import Edits from "~/components/admin/dashboard/Edits";
 import Comments from "~/components/admin/dashboard/Comments";
-import OpenInitiative from "~/components/admin/dashboard/OpenInitiative";
 import QuickPledge from "~/components/admin/dashboard/QuickPledge";
 import AllInitiatives from "~/components/admin/dashboard/AllInitiatives";
 import Services, { servicesOk } from "~/components/admin/dashboard/Services";
@@ -23,7 +21,7 @@ import { plural } from "~/lib/format";
 import { cn } from "~/lib/utils";
 
 /** The tools an admin uses now and then, shown on this page when picked from More. */
-const PANELS = { services: "Services", admins: "Admins", sync: "Sync content" } as const;
+const PANELS = { services: "Services" } as const;
 type Panel = keyof typeof PANELS;
 
 function Dot({ on, color }: { on: boolean; color: "green" | "red" | "gold" | "amber" }) {
@@ -44,10 +42,11 @@ function Dot({ on, color }: { on: boolean; color: "green" | "red" | "gold" | "am
 
 /**
  * The admin dashboard (#89): what is waiting for an admin first, in the order
- * admins do it (approve submissions, accept edits, moderate), with the two
- * shortcuts they use most beside it (open an initiative, record a pledge).
- * The first paint is one KV-only request; the full table, the services and the
- * rare tools load only when asked for.
+ * admins do it (approve submissions, accept edits, moderate), beside the admin
+ * list (always in view, for security) and the pledge shortcut, with every
+ * initiative in the table below. The first paint is one KV-only request; the
+ * table and the services follow with their own requests, a skeleton holding
+ * the table's place.
  */
 export default function Dashboard() {
   const { signOut } = useSession();
@@ -56,7 +55,6 @@ export default function Dashboard() {
   const [params, setParams] = useSearchParams();
   const panel = (params.get("panel") ?? "") as Panel | "";
   const status = useAdminStatus(true);
-  const [tableOpen, setTableOpen] = useState(() => params.has("q"));
   const [menu, setMenu] = useState(false);
   const buttonRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -193,8 +191,6 @@ export default function Dashboard() {
             </Button>
           </div>
           {panel === "services" && <Services {...status} />}
-          {panel === "admins" && <Admins />}
-          {panel === "sync" && <SyncContent />}
         </section>
       )}
 
@@ -205,17 +201,14 @@ export default function Dashboard() {
           <Comments data={data} />
         </div>
         <aside className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
-          <OpenInitiative index={data.index} />
+          {/* Always in view, first: who can sign in here is a security fact, checked at a glance. */}
+          <Admins />
           <QuickPledge index={data.index} />
         </aside>
       </div>
 
       <div className="mt-5">
-        <AllInitiatives
-          total={data.counts.total}
-          open={tableOpen}
-          onToggle={() => setTableOpen(!tableOpen)}
-        />
+        <AllInitiatives total={data.counts.total} />
       </div>
     </PageMain>
   );

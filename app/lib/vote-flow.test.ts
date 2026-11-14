@@ -21,7 +21,7 @@ const m: VoteManifest = {
   poolUsd: "913244000000",
   issuer: "0x2000000000000000000000000000000000000002",
   slugs: ["a", "b", "c", "d"],
-  projects: ["a", "b", "c", "d"].map(() => ({ askUsd: "1", rfp: false, groups: [] })),
+  projects: ["a", "b", "c", "d"].map(() => ({ goalUsd: "1", rfp: false, groups: [] })),
   groups: [],
   independentTiers: 1,
 };

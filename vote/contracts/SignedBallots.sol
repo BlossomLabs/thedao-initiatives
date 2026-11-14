@@ -342,8 +342,8 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
             // The default is explicit withholding, not implicit tail approval.
             if (rank == 0 || rank > m) revert InvalidBallot();
             ++counts[rank];
-            (uint256 ask,) = _askAndGroups(i);
-            requested += ask;
+            (uint256 goal,) = _goalAndGroups(i);
+            requested += goal;
         }
     }
 
@@ -366,30 +366,30 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         (uint8 a, uint8 b, uint8 c) = (p[0], p[1], p[2]);
         if (a >= n || b >= n || c >= n || a == b || a == c || b == c) revert BadProof(t);
         if (uint8(ballot[a]) != rank || uint8(ballot[b]) != rank || uint8(ballot[c]) != rank) revert BadProof(t);
-        (, uint256 ga) = _askAndGroups(a);
-        (, uint256 gb) = _askAndGroups(b);
-        (, uint256 gc) = _askAndGroups(c);
+        (, uint256 ga) = _goalAndGroups(a);
+        (, uint256 gb) = _goalAndGroups(b);
+        (, uint256 gc) = _goalAndGroups(c);
         if (ga & gb != 0 || ga & gc != 0 || gb & gc != 0) revert BadProof(t);
     }
 
     /// @dev No group holds more than half of the tier's requested total (half passes).
     function _checkGroups(bytes calldata ballot, uint8 rank, uint8 t) private view {
         uint256 n = ballot.length;
-        uint256[] memory asks = new uint256[](n);
+        uint256[] memory goals = new uint256[](n);
         uint256[] memory masks = new uint256[](n);
         uint256 tierUsd;
         uint256 union;
         for (uint256 i; i < n; ++i) {
             if (uint8(ballot[i]) != rank) continue;
-            (asks[i], masks[i]) = _askAndGroups(i);
-            tierUsd += asks[i];
+            (goals[i], masks[i]) = _goalAndGroups(i);
+            tierUsd += goals[i];
             union |= masks[i];
         }
         for (uint256 g; union >> g != 0; ++g) {
             if ((union >> g) & 1 == 0) continue;
             uint256 groupUsd;
             for (uint256 i; i < n; ++i) {
-                if ((masks[i] >> g) & 1 == 1) groupUsd += asks[i];
+                if ((masks[i] >> g) & 1 == 1) groupUsd += goals[i];
             }
             if (2 * groupUsd > tierUsd) revert GroupOverHalf(t, uint8(g));
         }

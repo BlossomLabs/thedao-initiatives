@@ -63,7 +63,7 @@ Deno.test("a real round reads ownerOf from the voting badge, not the ballots con
       schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
       poolUsd: "1",
       slugs: ["a"],
-      projects: [{ askUsd: "1", rfp: false, groups: [] }],
+      projects: [{ goalUsd: "1", rfp: false, groups: [] }],
       groups: [],
       independentTiers: 1,
     },

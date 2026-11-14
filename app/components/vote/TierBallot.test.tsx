@@ -58,6 +58,24 @@ it("Details on a list tile opens its card, as a tap on the tile does", async () 
   expect(await screen.findByRole("dialog", { name: "BETA" })).toBeInTheDocument();
 });
 
+it("each initiative shows what the round asks for it, on its tile and its card, never the goal", async () => {
+  inRouter(
+    <TierBallot
+      items={[{ slug: "alpha", title: "ALPHA", askUsd: 50_000 }]}
+      tiers={{}}
+      disabled={false}
+      locked={new Set<Tier>()}
+      onChange={vi.fn()}
+      onReplace={vi.fn()}
+    />,
+  );
+  expect(screen.getAllByText(/\$50,000 ask/).length).toBeGreaterThan(0);
+  fireEvent.click(screen.getByRole("button", { name: "Details for ALPHA" }));
+  const card = await screen.findByRole("dialog", { name: "ALPHA" });
+  expect(card).toHaveTextContent("$50,000 ask");
+  expect(screen.queryByText(/goal/)).toBeNull();
+});
+
 it("a settled tier says so, and its card locks the choices", async () => {
   const { onChange } = show({ alpha: "S" });
   expect(screen.getByText("Settled")).toBeInTheDocument();

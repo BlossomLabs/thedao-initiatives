@@ -9,7 +9,7 @@ W = 255
 
 def round_(pool=200, tiers=1):
     projects = [
-        {"askUsd": ask, "rfp": i == 5, "groups": [0] if i < 2 else []}
+        {"goalUsd": ask, "rfp": i == 5, "groups": [0] if i < 2 else []}
         for i, ask in enumerate([100, 100, 100, 100, 50, 50])
     ]
     return projects, pool, tiers

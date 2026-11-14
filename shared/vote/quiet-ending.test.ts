@@ -279,7 +279,7 @@ describe("ballot rules in the replay", () => {
     over: { addedAt?: (Pos | null)[]; pool?: (Pos & { poolUsd: bigint })[] } = {},
   ) => ({
     round: {
-      projects: [100n, 100n, 100n, 100n].map((askUsd) => ({ askUsd, rfp: false, groups: [] })),
+      projects: [100n, 100n, 100n, 100n].map((goalUsd) => ({ goalUsd, rfp: false, groups: [] })),
       groupNames: [],
       poolUsd: 200n,
       independentTiers: 1,

@@ -91,7 +91,7 @@ const BALLOT_RECORDED = parseAbiItem(
 );
 const REGISTRATION_REVOKED = parseAbiItem("event RegistrationRevoked(uint256 indexed tokenId)");
 const INITIATIVE_CONFIGURED = parseAbiItem(
-  "event InitiativeConfigured(uint256 indexed initiativeId, address indexed account, uint256 askUsd, bool rfp, uint256 groups)",
+  "event InitiativeConfigured(uint256 indexed initiativeId, address indexed account, uint256 goalUsd, bool rfp, uint256 groups)",
 );
 const POOL_USD_SET = parseAbiItem("event PoolUsdSet(uint256 previousAmountUsd, uint256 amountUsd)");
 const TRANSFER = parseAbiItem(

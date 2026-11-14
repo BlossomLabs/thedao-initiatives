@@ -43,6 +43,7 @@ import { checkBallot, emptyTierErrors } from "../../../shared/vote/rules";
 import { shortDay, usd, usdShort } from "~/lib/format";
 import { encodeBallot, type Tier, tierName } from "../../../shared/vote/ballot";
 import { ROUND, rulesRound, type VoteManifest } from "../../../shared/vote/manifest";
+import { askOf } from "~/lib/vote-results";
 
 const poolOf = (m: VoteManifest) => Number(BigInt(m.poolUsd) / 1_000_000n);
 const POOL = poolOf(ROUND);
@@ -553,7 +554,7 @@ export default function VotePage(
     const cards = new Map(board.data?.cards.map((c) => [c.initiative.slug, c]));
     return R.slugs.map((slug) => {
       const card = cards.get(slug);
-      return { slug, title: card?.initiative.title ?? slug, card };
+      return { slug, title: card?.initiative.title ?? slug, card, askUsd: card && askOf(card) };
     });
   }, [board.data]);
 
@@ -784,8 +785,8 @@ export default function VotePage(
     // The ballot's ask, on a ring full at 3× the pool (the 1.5× the rules want is half way);
     // the settled tiers' part of it.
     const poolNow = Number(BigInt(rv?.poolUsd ?? R.poolUsd) / 1_000_000n);
-    const askOf = (slug: string) => microUsd(R.projects[R.slugs.indexOf(slug)]?.askUsd ?? "0");
-    const asked = Object.entries(tiers).reduce((a, [slug, t]) => a + (t ? askOf(slug) : 0), 0);
+    const goalOf = (slug: string) => microUsd(R.projects[R.slugs.indexOf(slug)]?.goalUsd ?? "0");
+    const asked = Object.entries(tiers).reduce((a, [slug, t]) => a + (t ? goalOf(slug) : 0), 0);
     const voters = rv ? Object.keys(rv.accepted).length : 0;
     const share = rv?.share ? microUsd(rv.share) : voters > 0 ? poolNow / voters : undefined;
     // The ballot rules (rounds deployed with them), with the pool on-chain now. Checked
@@ -840,7 +841,7 @@ export default function VotePage(
           settled={settledTiers.map((t) => {
             const fromBallot = t.funded.filter((slug) => tiers[slug] === t.tier);
             const held = Object.keys(tiers).filter((slug) => tiers[slug] === t.tier);
-            const askIn = (slugs: string[]) => slugs.reduce((a, slug) => a + askOf(slug), 0);
+            const askIn = (slugs: string[]) => slugs.reduce((a, slug) => a + goalOf(slug), 0);
             return {
               tier: t.tier,
               funded: fromBallot.length,
@@ -942,7 +943,7 @@ export default function VotePage(
                     : "Empty"}
                 </span>
                 <span className="text-[14px] text-white tnum">
-                  {usd(inTier.reduce((a, slug) => a + askOf(slug), 0))}
+                  {usd(inTier.reduce((a, slug) => a + goalOf(slug), 0))}
                 </span>
               </li>
             );

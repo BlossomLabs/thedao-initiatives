@@ -190,10 +190,10 @@ export default function PhoneCard<W extends string>(
           >
             {item.title}
           </h2>
-          {r && (
+          {item.askUsd !== undefined && (
             <p className="m-0 mt-2.5 text-[15px] tnum">
-              <b className="font-semibold text-white">{usd(r.goalUsd)}</b>{" "}
-              <span className="text-white/60">goal</span>
+              <b className="font-semibold text-white">{usd(item.askUsd)}</b>{" "}
+              <span className="text-white/60">ask</span>
               {paid && <span className="ml-2 text-vote">You paid {paid}</span>}
             </p>
           )}

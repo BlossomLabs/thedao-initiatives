@@ -33,8 +33,8 @@ Deno.test("planInitiatives: board order, Safe as account, goal in six decimals",
   ]);
   assertEquals(plan.map((p) => p.slug), ["b", "a"]);
   assertEquals(plan[0].account, SAFE);
-  assertEquals(plan[0].askUsd, 279_000_000_000n);
-  assertEquals(plan[1].askUsd, 12_500_000n);
+  assertEquals(plan[0].goalUsd, 279_000_000_000n);
+  assertEquals(plan[1].goalUsd, 12_500_000n);
   assertEquals(
     plan[1].account,
     getAddress(slice(keccak256(toBytes("test-round:a")), 12)),
@@ -146,7 +146,7 @@ Deno.test("manifestFor: the real vote names the badge on mainnet, a test vote it
     schedule: s,
     poolUsd: 7n,
     slugs: ["x"],
-    projects: [{ askUsd: "5", rfp: false, groups: [] }],
+    projects: [{ goalUsd: "5", rfp: false, groups: [] }],
     groups: [],
     independentTiers: 1,
   };
@@ -163,7 +163,7 @@ Deno.test("manifestFor: the real vote names the badge on mainnet, a test vote it
     poolUsd: "7",
     badge: "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C",
     slugs: ["x"],
-    projects: [{ askUsd: "5", rfp: false, groups: [] }],
+    projects: [{ goalUsd: "5", rfp: false, groups: [] }],
     groups: [],
     independentTiers: 1,
     ballotRules: true,
@@ -249,8 +249,8 @@ Deno.test("addPlan: new groups and projects for the admin, appended without reor
     issuer: SAFE as `0x${string}`,
     slugs: ["a", "b"],
     projects: [
-      { askUsd: "1", rfp: false, groups: [0] },
-      { askUsd: "1", rfp: false, groups: [] },
+      { goalUsd: "1", rfp: false, groups: [0] },
+      { goalUsd: "1", rfp: false, groups: [] },
     ],
     groups: ["Seal"],
     independentTiers: 1,
@@ -262,6 +262,6 @@ Deno.test("addPlan: new groups and projects for the admin, appended without reor
   assertEquals(calls[1].args.slice(1), [2_000_000n, false, 0b11n]);
   assertEquals(manifest.slugs, ["a", "b", "c"]);
   assertEquals(manifest.groups, ["Seal", "Keys"]);
-  assertEquals(manifest.projects[2], { askUsd: "2000000", rfp: false, groups: [0, 1] });
+  assertEquals(manifest.projects[2], { goalUsd: "2000000", rfp: false, groups: [0, 1] });
   assertThrows(() => addPlan(base, [{ slug: "a", goalUsd: 1, safeAddress: "" }]), Error, "already");
 });

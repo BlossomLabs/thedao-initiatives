@@ -145,7 +145,7 @@ contract RoundAccountingTest is Fixture {
         assertEq(ask, 17_500e6);
     }
 
-    function test_supportAboveAskFloorsRemainingAskAtZero() public {
+    function test_supportAboveGoalFloorsAskAtZero() public {
         ballots.setPledge(keccak256("large"), 0, ballots.USD(), 100_000e6);
         (,, uint256 total, uint256 ask) = ballots.initiativeUsd(0);
         assertEq(total, 100_000e6);
@@ -399,6 +399,6 @@ contract RoundAccountingTest is Fixture {
         ballots.addInitiative(INITIATIVE_A, 1e6, false, 0); // Old address is available again.
         RoundAccounting.Initiative memory p = ballots.initiative(0);
         assertEq(p.account, address(0xA05));
-        assertEq(p.askUsd, 123e6);
+        assertEq(p.goalUsd, 123e6);
     }
 }

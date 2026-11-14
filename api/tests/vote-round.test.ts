@@ -35,7 +35,7 @@ const manifest: VoteManifest = {
   poolUsd: "913244000000",
   issuer: ISSUER.address,
   slugs: ["a", "b", "c"],
-  projects: ["a", "b", "c"].map(() => ({ askUsd: "1", rfp: false, groups: [] })),
+  projects: ["a", "b", "c"].map(() => ({ goalUsd: "1", rfp: false, groups: [] })),
   groups: [],
   independentTiers: 1,
 };
@@ -53,7 +53,7 @@ const real: VoteManifest = {
   schedule: manifest.schedule,
   poolUsd: "913244000000",
   slugs: ["a", "b", "c"],
-  projects: ["a", "b", "c"].map(() => ({ askUsd: "1", rfp: false, groups: [] })),
+  projects: ["a", "b", "c"].map(() => ({ goalUsd: "1", rfp: false, groups: [] })),
   groups: [],
   independentTiers: 1,
 };
@@ -1162,7 +1162,7 @@ const ruled: VoteManifest = {
   ...manifest,
   poolUsd: "200",
   slugs: ["a", "b", "c", "d"],
-  projects: ["a", "b", "c", "d"].map(() => ({ askUsd: "100", rfp: false, groups: [] })),
+  projects: ["a", "b", "c", "d"].map(() => ({ goalUsd: "100", rfp: false, groups: [] })),
   ballotRules: true,
 };
 

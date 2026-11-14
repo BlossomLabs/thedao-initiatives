@@ -68,7 +68,7 @@ vi.mock("../../shared/vote/manifest", async (original) => ({
     slugs: ["alpha", "beta", "gamma"],
     get projects() {
       return ["alpha", "beta", "gamma"].map((_, i) => ({
-        askUsd: "400000000",
+        goalUsd: "400000000",
         rfp: false,
         groups: round.seal && i < 2 ? [0] : [],
       }));

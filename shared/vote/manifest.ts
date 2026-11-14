@@ -25,7 +25,7 @@ export type VoteManifest = {
   badge?: `0x${string}`;
   slugs: string[];
   /** Per slug, in the same order: what the contract registered (the ballot rules). */
-  projects: { askUsd: string; rfp: boolean; groups: number[] }[];
+  projects: { goalUsd: string; rfp: boolean; groups: number[] }[];
   /** Group (affiliation) names; a project's `groups` index into this. */
   groups: string[];
   /** Tiers held to the independence rules: bit 0 S-Tier (always), bit 1 A-Tier. */
@@ -65,7 +65,7 @@ export const ROUND = checkManifest(manifest as unknown as VoteManifest);
 
 /** The ballot rules' view of the round; `poolUsd` defaults to the manifest's. */
 export const rulesRound = (m: VoteManifest, poolUsd?: bigint): RulesRound => ({
-  projects: m.projects.map((p) => ({ askUsd: BigInt(p.askUsd), rfp: p.rfp, groups: p.groups })),
+  projects: m.projects.map((p) => ({ goalUsd: BigInt(p.goalUsd), rfp: p.rfp, groups: p.groups })),
   groupNames: m.groups,
   poolUsd: poolUsd ?? BigInt(m.poolUsd),
   independentTiers: m.independentTiers,

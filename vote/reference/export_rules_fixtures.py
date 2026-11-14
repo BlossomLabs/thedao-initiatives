@@ -16,7 +16,7 @@ from ballot_rules import WITHHELD, check_ballot  # noqa: E402
 def named():
     """The hand-written cases (test_ballot_rules.py) on the six-project round."""
     projects = [
-        {"askUsd": ask, "rfp": i == 5, "groups": [0] if i < 2 else []}
+        {"goalUsd": ask, "rfp": i == 5, "groups": [0] if i < 2 else []}
         for i, ask in enumerate([100, 100, 100, 100, 50, 50])
     ]
     W = WITHHELD
@@ -43,7 +43,7 @@ def random_case(rng, k):
     for _ in range(m):
         rfp = rng.random() < 0.2
         groups = [] if rfp or not n_groups else sorted(rng.sample(range(n_groups), rng.randint(0, min(2, n_groups))))
-        projects.append({"askUsd": rng.randint(1, 50) * 10_000, "rfp": rfp, "groups": groups})
+        projects.append({"goalUsd": rng.randint(1, 50) * 10_000, "rfp": rfp, "groups": groups})
     order = list(range(m))
     rng.shuffle(order)
     placed = order[: rng.randint(1, m)]
@@ -58,7 +58,7 @@ def random_case(rng, k):
     if rng.random() < 0.15:  # recorded before the last projects were added
         while len(ballot) > 1 and ballot[-1] == WITHHELD:
             ballot.pop()
-    requested = sum(projects[i]["askUsd"] for i in placed)
+    requested = sum(projects[i]["goalUsd"] for i in placed)
     pool = max(1, int(requested * rng.uniform(0.4, 0.9)))
     return (f"random {k}", projects, [f"G{g}" for g in range(n_groups)], pool, rng.choice([1, 1, 3]), ballot)
 
@@ -71,7 +71,7 @@ def main():
         r = check_ballot(ballot, projects, pool, tiers)
         out.append({
             "name": name,
-            "projects": [{**p, "askUsd": str(p["askUsd"])} for p in projects],
+            "projects": [{**p, "goalUsd": str(p["goalUsd"])} for p in projects],
             "groupNames": names,
             "poolUsd": str(pool),
             "independentTiers": tiers,
@@ -81,7 +81,7 @@ def main():
             "proof": r["proof"],
             # Flat, numbers only: what the Solidity test reads with vm.parseJson*.
             "sol": {
-                "asks": [p["askUsd"] for p in projects],
+                "asks": [p["goalUsd"] for p in projects],
                 "rfp": [p["rfp"] for p in projects],
                 "masks": [sum(1 << g for g in p["groups"]) for p in projects],
                 "groupCount": len(names),

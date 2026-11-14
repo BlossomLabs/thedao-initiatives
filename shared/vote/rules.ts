@@ -5,7 +5,7 @@
  * vote/reference/ballot_rules.py and the contract; shared fixtures keep them equal.
  * Amounts are micro-USD bigints. Browser and Deno. */
 
-export type RulesProject = { askUsd: bigint; rfp: boolean; groups: number[] };
+export type RulesProject = { goalUsd: bigint; rfp: boolean; groups: number[] };
 export type RulesRound = {
   projects: RulesProject[];
   groupNames: string[];
@@ -80,7 +80,7 @@ export function checkBallot(ballot: Uint8Array, round: RulesRound): RulesResult 
   const errors: RuleError[] = [];
   const groups = tiersOf(ballot);
   if (groups.length > 3) errors.push({ rule: "tiers" });
-  const ask = (i: number) => round.projects[i].askUsd;
+  const ask = (i: number) => round.projects[i].goalUsd;
   const sum = (xs: number[]) => xs.reduce((a, i) => a + ask(i), 0n);
   const requested = sum(groups.flat());
   if (2n * requested < 3n * round.poolUsd) {

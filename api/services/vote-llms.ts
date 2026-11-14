@@ -54,7 +54,7 @@ export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: str
     const e = bySlug.get(slug);
     const affiliations = p.groups.map((g) => m.groups[g]).join(", ") || "none";
     return `- ${slug} — ${e?.title ?? slug} · ${p.rfp ? "RFP" : "Grant"} · requests ${
-      dollars(BigInt(p.askUsd))
+      dollars(BigInt(p.goalUsd))
     } · still needs ${
       e ? usd(e.goalUsd - e.raisedUsd) : "unknown"
     } · affiliations: ${affiliations} · [details](${

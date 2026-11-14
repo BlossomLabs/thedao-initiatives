@@ -8,6 +8,7 @@ import { liveInputsFrom, liveInputsJson } from "../../../shared/vote/live-inputs
 import { giftGapsAsync, liveLeadsAsync } from "../../../shared/vote/next-tier";
 import { effectiveRanks } from "../../../vote/shared/ranks";
 import type { VoteManifest } from "../../../shared/vote/manifest";
+import { askOf } from "~/lib/vote-results";
 
 /** Examples of the ballot through the vote, public at `/vote/mock/<kind>` (and in dev at
  * `?mock=<kind>`): the real round's dates and the board's real proposals, with a made-up
@@ -93,7 +94,9 @@ export const MOCK_NOW: Record<MockKind, number> = {
 
 const micro = (usd: number) => String(Math.round(usd * 1_000_000));
 
-/** The fictional round: the board's proposals, oldest first, each asking what it still needs. */
+/** The fictional round: the board's proposals, oldest first. As on chain, each project's
+ * `goalUsd` is its goal; what the tally charges is its need (`needs`): the goal less the
+ * donations and open pledges, as the server counts it. */
 function fictionalRound(cards: Card[], opensAt: number, firstTally: [number, number, number]) {
   const list = [...cards]
     .filter((c) => c.initiative.goalUsd > 0)
@@ -110,7 +113,7 @@ function fictionalRound(cards: Card[], opensAt: number, firstTally: [number, num
     badge: "0x00000000000000000000000000000000000ba06e",
     slugs: list.map((c) => c.initiative.slug),
     projects: list.map((c) => ({
-      askUsd: micro(Math.max(1, c.initiative.goalUsd - (c.summary?.total ?? 0))),
+      goalUsd: micro(c.initiative.goalUsd),
       rfp: c.initiative.type === "rfp",
       groups: [],
     })),
@@ -118,17 +121,16 @@ function fictionalRound(cards: Card[], opensAt: number, firstTally: [number, num
     independentTiers: 1,
     ballotRules: true,
   };
-  return {
-    round,
-    ask: (slug: string) => Number(BigInt(round.projects[round.slugs.indexOf(slug)].askUsd)) / 1e6,
-  };
+  // Never $0: that would fund it at the first level that opens it.
+  const needs = list.map((c) => BigInt(micro(Math.max(1, askOf(c)))));
+  return { round, needs };
 }
 
 /** The badge's ballot in every state: 3 in S-Tier, 4 in A-Tier, and B-Tier from 6 on
  * until the ballot asks for 1.5× the pool (the ballot rules). */
 function sampleBallot(round: VoteManifest) {
   const { slugs } = round;
-  const ask = (i: number) => BigInt(round.projects[i].askUsd);
+  const ask = (i: number) => BigInt(round.projects[i].goalUsd);
   const needed = (BigInt(round.poolUsd) * 3n) / 2n;
   let total = 0n;
   for (let i = 0; i < 13 && i < slugs.length; i++) total += ask(i);
@@ -196,7 +198,12 @@ function crowd(
 /** The example's tally at a moment: the ballots counted tier by tier, `settledCount`
  * tiers settled (each as it would have in its first window), then the live tally of the
  * open ones, with its inputs. As the server's replay does, with the made-up ballots. */
-function tallied(round: VoteManifest, ballots: Map<string, Uint8Array>, settledCount: number) {
+function tallied(
+  round: VoteManifest,
+  needs: bigint[],
+  ballots: Map<string, Uint8Array>,
+  settledCount: number,
+) {
   const { slugs } = round;
   const m = slugs.length;
   const voters = [...ballots.keys()].sort();
@@ -205,7 +212,7 @@ function tallied(round: VoteManifest, ballots: Map<string, Uint8Array>, settledC
   const each = voters.length ? pool / BigInt(voters.length) : 0n;
   const inp: ChainInputs = {
     m,
-    costs: round.projects.map((p) => BigInt(p.askUsd)),
+    costs: needs,
     voters,
     weights: voters.map(() => each),
     ranks: rows.map((b) => effectiveRanks(b, m)),
@@ -279,7 +286,7 @@ function liveJson(
 
 /** The board's cards as they first came, for a mock to be built from. The board polls,
  * and its totals are Safe balances priced live, so they move by cents every few minutes:
- * each move changed every ask and rebuilt the whole made-up tally, and the example
+ * each move changed every need and rebuilt the whole made-up tally, and the example
  * re-rendered under the reader. A reload picks up the board as it is then. */
 export function useMockCards(cards: Card[] | undefined): Card[] | undefined {
   const first = useRef<Card[]>(undefined);
@@ -293,7 +300,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   const share = POOL_USD / VOTERS;
   const base = { closed: false, share: micro(share), rejected: [], poolUsd: micro(POOL_USD) };
   const first = FIRST;
-  const { round } = fictionalRound(cards, OPENS, first);
+  const { round, needs } = fictionalRound(cards, OPENS, first);
   const sample = sampleBallot(round);
   const skipped = round.slugs.filter((x) => !sample.ballot[x]).slice(0, 6);
 
@@ -330,7 +337,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     : kind === "spent" || kind === "missed"
     ? 1
     : 0;
-  const t = tallied(round, crowd(round, sample, n, kind !== "missed"), settledCount);
+  const t = tallied(round, needs, crowd(round, sample, n, kind !== "missed"), settledCount);
   const settledTiers = t.settledTiers.map(({ tier, stage }, i) =>
     settledTier(round.slugs, tier, first[i] + WINDOW, stage)
   );

@@ -184,10 +184,10 @@ export default function InitiativePeek<W extends string>(
                   />
                 )}
                 {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
-                {r && (
+                {item.askUsd !== undefined && (
                   <span className="whitespace-nowrap tnum">
                     {cat && "· "}
-                    {usd(r.goalUsd)} goal
+                    {usd(item.askUsd)} ask
                   </span>
                 )}
               </p>

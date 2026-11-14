@@ -16,7 +16,7 @@ const m: VoteManifest = {
   poolUsd: "913244000000",
   issuer: "0x2000000000000000000000000000000000000002",
   slugs: ["a", "b"],
-  projects: [{ askUsd: "1", rfp: false, groups: [] }, { askUsd: "1", rfp: false, groups: [] }],
+  projects: [{ goalUsd: "1", rfp: false, groups: [] }, { goalUsd: "1", rfp: false, groups: [] }],
   groups: [],
   independentTiers: 1,
 };

@@ -13,7 +13,7 @@ import StickyAside from "~/components/layout/StickyAside";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { boardKey, useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/vote-local";
-import { dollars, splitResults } from "~/lib/vote-results";
+import { askOf, dollars, splitResults } from "~/lib/vote-results";
 import { useSession } from "~/context/session";
 import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd, usdShort } from "~/lib/format";
@@ -116,13 +116,18 @@ export default function VoteResults(
     const bySlug = new Map(cards.map((c) => [c.initiative.slug, c]));
     const below = Object.entries(give).flatMap(([slug, entry]) => {
       const card = bySlug.get(slug);
-      return card ? [{ card, entry, now: result.tiers[slug] }] : [];
+      return card ? [{ card, askUsd: askOf(card), entry, now: result.tiers[slug] }] : [];
     });
     const ahead = [...result.provisional].flatMap((slug) => {
       const card = bySlug.get(slug);
       if (!card || give[slug] || result.tiers[slug] !== tier) return [];
       const l = lead?.[slug];
-      return [{ card, lead: l ? dollars(l) : 0, now: tier }];
+      return [{
+        card,
+        askUsd: askOf(card),
+        lead: l ? dollars(l) : 0,
+        now: tier,
+      }];
     });
     return [...ahead, ...below];
   }, [give, lead, cards, result, tier]);
@@ -140,9 +145,9 @@ export default function VoteResults(
   const entry: NextTierEntry | undefined = open ? give?.[open] : undefined;
   const gap = entry ? gapUsd(entry) : null;
   const given = amount;
-  const needOf = (slug: string) => {
+  const needFor = (slug: string) => {
     const c = cards.find((x) => x.initiative.slug === slug);
-    return c ? Math.max(0, c.initiative.goalUsd - c.summary.total) : 0;
+    return c ? askOf(c) : 0;
   };
   const titleOf = (slug: string) =>
     cards.find((x) => x.initiative.slug === slug)?.initiative.title ?? slug;
@@ -211,7 +216,7 @@ export default function VoteResults(
         funded.add(open);
         provisional.add(open);
         // The donation pays that much of its need: the pool is asked for the rest.
-        awards.set(open, Math.max(0, needOf(open) - given));
+        awards.set(open, Math.max(0, needFor(open) - given));
       }
       // Others it moves to another tier, and those it brings in.
       for (const o of change.moves) tiers[o.slug] = o.to;
@@ -219,7 +224,7 @@ export default function VoteResults(
         tiers[o.slug] = o.tier;
         funded.add(o.slug);
         provisional.add(o.slug);
-        awards.set(o.slug, needOf(o.slug));
+        awards.set(o.slug, needFor(o.slug));
       }
       return {
         result: { tiers, funded, provisional, awards },
@@ -273,7 +278,7 @@ export default function VoteResults(
       )
       : (
         <p className="m-0 rounded-lg bg-white/[.07] px-3 py-2 text-[13px] leading-snug text-white/80">
-          It asks the pool for {usd(Math.min(given, needOf(open)))} less. Nothing else changes.
+          It asks the pool for {usd(Math.min(given, needFor(open)))} less. Nothing else changes.
         </p>
       )
   );
@@ -295,7 +300,13 @@ export default function VoteResults(
   };
 
   const items = useMemo<BallotItem[]>(
-    () => cards.map((card) => ({ slug: card.initiative.slug, title: card.initiative.title, card })),
+    () =>
+      cards.map((card) => ({
+        slug: card.initiative.slug,
+        title: card.initiative.title,
+        card,
+        askUsd: askOf(card),
+      })),
     [cards],
   );
 
@@ -360,8 +371,10 @@ export default function VoteResults(
       {hero}
       <PageMain className="pt-8">
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-          {/* Stays in view beside the long list, so a donation's preview shows by its form.
-              Taller than the screen, it scrolls with the page until its bottom shows. */}
+          {
+            /* Stays in view beside the long list, so a donation's preview shows by its form.
+              Taller than the screen, it scrolls with the page until its bottom shows. */
+          }
           <StickyAside
             narrow="(max-width: 1023.98px)"
             className="card grid min-w-0 grid-cols-1 gap-y-2 text-[15px] leading-relaxed text-white/80 max-lg:static"

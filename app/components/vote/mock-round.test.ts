@@ -153,6 +153,13 @@ describe("example vote results: the real tally over made-up ballots", () => {
     },
   );
 
+  it("as on chain, the round's goalUsd is the goal; the tally charges the goal less what was raised", () => {
+    const { round, view } = mockRound("s-settling", cards, 1);
+    expect(round.projects[1].goalUsd).toBe("101000000000");
+    const { inp } = liveInputsFrom(view.live.inputs!);
+    expect(inp.costs[1]).toBe(81_000_000_000n);
+  });
+
   it("a round with nothing counted, or closed, has no figures to work out", async () => {
     for (const k of ["started", "finished"] as const) {
       const { round, view } = mockRound(k, cards, 1);

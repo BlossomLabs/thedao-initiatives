@@ -22,6 +22,8 @@ const { Component: DonateWidget } = lazyPart(
 
 export type GiveRow = {
   card: Card;
+  /** What the round asks the pool for it, in dollars (its cost in the tally). */
+  askUsd: number;
   /** Below the tier settling now: the donation that moves it up a tier. */
   entry?: NextTierEntry;
   /** In the tier settling now: how far ahead it is, in whole dollars (0: barely). */
@@ -247,7 +249,7 @@ export default function GiveList(
               // moves them (yellow).
               const knockKind = r.entry ? knockOnVerb(r.entry) : undefined;
               const cat = i.categories[0];
-              const need = Math.max(0, i.goalUsd - r.card.summary.total);
+              const need = r.askUsd;
               return (
                 <li
                   key={i.slug}

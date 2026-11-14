@@ -22,6 +22,11 @@ vi.mock("../../../shared/vote/manifest", async (original) => ({
     poolUsd: "100000000000",
     issuer: "0x2000000000000000000000000000000000000002",
     slugs: ["alpha", "beta"],
+    // As on chain, each project's goalUsd is its goal.
+    projects: [
+      { goalUsd: "60000000000", rfp: false, groups: [] },
+      { goalUsd: "30000000000", rfp: false, groups: [] },
+    ],
   },
 }));
 const signedIn = vi.hoisted(() => ({

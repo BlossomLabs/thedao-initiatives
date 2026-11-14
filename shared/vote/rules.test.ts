@@ -11,8 +11,8 @@ import fixtures from "./fixtures/ballot-rules.json";
 
 /** Six projects: 0 and 1 related to Seal, 5 an RFP. Pool 200. S-Tier enforced. */
 const round = (over: Partial<RulesRound> = {}): RulesRound => ({
-  projects: [100n, 100n, 100n, 100n, 50n, 50n].map((askUsd, i) => ({
-    askUsd,
+  projects: [100n, 100n, 100n, 100n, 50n, 50n].map((goalUsd, i) => ({
+    goalUsd,
     rfp: i === 5,
     groups: i < 2 ? [0] : [],
   })),
@@ -123,7 +123,7 @@ describe("parity with the Python reference", () => {
   it("matches the Python reference on every fixture", () => {
     for (const c of fixtures) {
       const r = checkBallot(Uint8Array.from(c.ballot), {
-        projects: c.projects.map((p) => ({ ...p, askUsd: BigInt(p.askUsd) })),
+        projects: c.projects.map((p) => ({ ...p, goalUsd: BigInt(p.goalUsd) })),
         groupNames: c.groupNames,
         poolUsd: BigInt(c.poolUsd),
         independentTiers: c.independentTiers,

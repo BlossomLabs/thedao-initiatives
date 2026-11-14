@@ -60,7 +60,13 @@ export type PhoneParts = {
 /** Below this width the editor is the phone's (sm in Tailwind). */
 export const PHONE = "(max-width: 639.98px)";
 
-export type BallotItem = { slug: string; title: string; card?: Card };
+export type BallotItem = {
+  slug: string;
+  title: string;
+  card?: Card;
+  /** What the round asks the pool for it, in dollars (its cost in the tally). */
+  askUsd?: number;
+};
 
 /** Where an initiative is: a tier, the list, or skipped (off the list, out of sight;
  * on the ballot it is as unranked as the list). */
@@ -560,13 +566,13 @@ export default function TierBallot(
           >
             {i.title}
           </span>
-          {r && (
+          {i.askUsd !== undefined && (
             <span className="flex h-[18px] items-center gap-1.5 truncate text-[12px] text-white/45">
               {cat && <CategoryDot slug={cat} className="size-[7px]" data-peek-dot="" />}
               {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
               <span className="tnum whitespace-nowrap">
                 {cat && "· "}
-                {usd(r.goalUsd)} goal
+                {usd(i.askUsd)} ask
               </span>
             </span>
           )}
@@ -725,13 +731,13 @@ export default function TierBallot(
             <span className="line-clamp-2 font-inter-tight text-[14px] font-medium leading-[1.3] text-white">
               {i.title}
             </span>
-            {r && (
+            {i.askUsd !== undefined && (
               <span className="mt-1 flex items-center gap-1.5 truncate text-[12px] text-white/60">
                 {cat && <CategoryDot slug={cat} className="size-[7px] flex-none" />}
                 {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
                 <span className="whitespace-nowrap tnum">
                   {cat && "· "}
-                  {usd(r.goalUsd)}
+                  {usd(i.askUsd)} ask
                 </span>
                 {paidText && (
                   <span className="whitespace-nowrap font-semibold text-vote tnum">

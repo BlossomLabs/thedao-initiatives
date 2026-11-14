@@ -8,7 +8,7 @@ Ballots are in on-chain form: competition ranks, 255 = unplaced; a ballot shorte
 the projects reads the missing ones as unplaced. Mirrors shared/vote/rules.ts and the
 contract; shared/vote/fixtures/ballot-rules.json keeps them equal.
 
-`projects[i]` = {"askUsd": int, "rfp": bool, "groups": [int]}; amounts in micro-USD.
+`projects[i]` = {"goalUsd": int, "rfp": bool, "groups": [int]}; amounts in micro-USD.
 `independent_tiers`: bit 0 S-Tier, bit 1 A-Tier.
 """
 
@@ -69,7 +69,7 @@ def check_ballot(ballot, projects, pool, independent_tiers):
         errors.append({"rule": "tiers"})
 
     def total(xs):
-        return sum(projects[i]["askUsd"] for i in xs)
+        return sum(projects[i]["goalUsd"] for i in xs)
 
     requested = total([i for g in groups for i in g])
     if 2 * requested < 3 * pool:

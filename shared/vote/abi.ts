@@ -212,7 +212,7 @@ export const SIGNED_BALLOTS_ABI = [
         "internalType": "address",
       },
       {
-        "name": "askUsd",
+        "name": "goalUsd",
         "type": "uint256",
         "internalType": "uint256",
       },
@@ -665,7 +665,7 @@ export const SIGNED_BALLOTS_ABI = [
             "internalType": "bool",
           },
           {
-            "name": "askUsd",
+            "name": "goalUsd",
             "type": "uint256",
             "internalType": "uint256",
           },
@@ -748,7 +748,7 @@ export const SIGNED_BALLOTS_ABI = [
         "internalType": "uint256",
       },
       {
-        "name": "remainingAskUsd",
+        "name": "askUsd",
         "type": "uint256",
         "internalType": "uint256",
       },
@@ -1350,7 +1350,7 @@ export const SIGNED_BALLOTS_ABI = [
         "internalType": "address",
       },
       {
-        "name": "askUsd",
+        "name": "goalUsd",
         "type": "uint256",
         "internalType": "uint256",
       },
@@ -1765,7 +1765,7 @@ export const SIGNED_BALLOTS_ABI = [
         "internalType": "address",
       },
       {
-        "name": "askUsd",
+        "name": "goalUsd",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256",

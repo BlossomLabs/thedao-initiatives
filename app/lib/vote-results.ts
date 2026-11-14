@@ -5,6 +5,12 @@ import { type Tier, TIERS } from "../../shared/vote/ballot";
 /** Micro-USD (a decimal string) as dollars, to the cent. */
 export const dollars = (micro: string) => Number(BigInt(micro) / 10_000n) / 100;
 
+/** What an initiative asks the pool for, in dollars: its goal less the donations and open
+ * pledges (the contract's `initiativeUsd().askUsd`). The tally charges this (the server's
+ * needs), so it moves with each donation until its tier settles. */
+export const askOf = (card: Card): number =>
+  Math.max(0, card.initiative.goalUsd - card.summary.total);
+
 export type ResultRow = { card: Card; finalUsd: number; tier?: Tier };
 
 /** Funded = an award in a settled tier: tier order, then the order the tally funded them. */

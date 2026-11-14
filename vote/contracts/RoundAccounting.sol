@@ -46,7 +46,7 @@ abstract contract RoundAccounting is AccessControl {
     struct Initiative {
         address account;
         bool rfp;
-        uint256 askUsd; // Six decimal places.
+        uint256 goalUsd; // Six decimal places.
         uint256 groups;
     }
 
@@ -80,7 +80,7 @@ abstract contract RoundAccounting is AccessControl {
         uint32 maxPriceAge
     );
     event InitiativeConfigured(
-        uint256 indexed initiativeId, address indexed account, uint256 askUsd, bool rfp, uint256 groups
+        uint256 indexed initiativeId, address indexed account, uint256 goalUsd, bool rfp, uint256 groups
     );
     event GroupAdded(uint8 indexed id, bytes32 name);
     event PoolUsdSet(uint256 previousAmountUsd, uint256 amountUsd);
@@ -91,7 +91,7 @@ abstract contract RoundAccounting is AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ADMIN_ROLE, admin);
         _grantRole(PLEDGE_ROLE, admin);
-        // A dollar accounting unit for USD asks and pledges. It
+        // A dollar accounting unit for USD goals and pledges. It
         // does not represent a stablecoin and never reads a wallet balance.
         _currencies.push(Currency(address(0), address(0), 6, 6, 0));
         emit CurrencyRegistered(USD, address(0), address(0), 6, 6, 0);
@@ -163,7 +163,7 @@ abstract contract RoundAccounting is AccessControl {
     /// @notice Before voting opens, or during the vote outside every tier's quiet-ending
     ///         span. Existing projects never change once voting opens, so an addition
     ///         cannot change whether an earlier ballot was valid.
-    function addInitiative(address account, uint256 askUsd, bool rfp, uint256 groups)
+    function addInitiative(address account, uint256 goalUsd, bool rfp, uint256 groups)
         external
         onlyRole(ADMIN_ROLE)
         returns (uint256 id)
@@ -173,12 +173,12 @@ abstract contract RoundAccounting is AccessControl {
         _checkInitiativeAccount(account);
         _checkGroups(rfp, groups);
         id = _initiatives.length;
-        _initiatives.push(Initiative(account, rfp, askUsd, groups));
+        _initiatives.push(Initiative(account, rfp, goalUsd, groups));
         _initiativeRegistered[account] = true;
-        emit InitiativeConfigured(id, account, askUsd, rfp, groups);
+        emit InitiativeConfigured(id, account, goalUsd, rfp, groups);
     }
 
-    function setInitiative(uint256 id, address account, uint256 askUsd, bool rfp, uint256 groups)
+    function setInitiative(uint256 id, address account, uint256 goalUsd, bool rfp, uint256 groups)
         external
         onlyRole(ADMIN_ROLE)
     {
@@ -191,8 +191,8 @@ abstract contract RoundAccounting is AccessControl {
             _initiativeRegistered[previous] = false;
             _initiativeRegistered[account] = true;
         }
-        _initiatives[id] = Initiative(account, rfp, askUsd, groups);
-        emit InitiativeConfigured(id, account, askUsd, rfp, groups);
+        _initiatives[id] = Initiative(account, rfp, goalUsd, groups);
+        emit InitiativeConfigured(id, account, goalUsd, rfp, groups);
     }
 
     /// @notice Initialize, correct or increase net USD funding while the round is open.
@@ -258,14 +258,15 @@ abstract contract RoundAccounting is AccessControl {
     }
 
     /// @notice USD support at the current block: actual initiative balances plus
-    ///         outstanding admin-recorded pledges, then the remaining dollar ask.
+    ///         outstanding admin-recorded pledges, then the ask: the dollar goal less
+    ///         that support, never below zero.
     /// @dev Use an archive RPC block tag to evaluate this view at a historical
     ///      checkpoint. Supplying an old oracle price alone would NOT recover old
     ///      wallet balances or pledge state. Stale/unavailable nonzero prices revert.
     function initiativeUsd(uint256 initiativeId)
         public
         view
-        returns (uint256 donatedUsd, uint256 pledgedUsd, uint256 totalUsd, uint256 remainingAskUsd)
+        returns (uint256 donatedUsd, uint256 pledgedUsd, uint256 totalUsd, uint256 askUsd)
     {
         _requireInitiative(initiativeId);
         for (uint256 i; i < _currencies.length; ++i) {
@@ -280,8 +281,8 @@ abstract contract RoundAccounting is AccessControl {
             }
         }
         totalUsd = donatedUsd + pledgedUsd;
-        uint256 ask = _initiatives[initiativeId].askUsd;
-        remainingAskUsd = totalUsd >= ask ? 0 : ask - totalUsd;
+        uint256 goal = _initiatives[initiativeId].goalUsd;
+        askUsd = totalUsd >= goal ? 0 : goal - totalUsd;
     }
 
     function _price(uint256 id, Currency memory c) private view returns (uint256) {
@@ -324,10 +325,10 @@ abstract contract RoundAccounting is AccessControl {
         if (n < MAX_GROUPS && groups >> n != 0) revert UnknownGroup();
     }
 
-    /// @dev Ask and groups of project `id`, for ballot validation (two storage reads).
-    function _askAndGroups(uint256 id) internal view returns (uint256 askUsd, uint256 groups) {
+    /// @dev Goal and groups of project `id`, for ballot validation (two storage reads).
+    function _goalAndGroups(uint256 id) internal view returns (uint256 goalUsd, uint256 groups) {
         Initiative storage x = _initiatives[id];
-        return (x.askUsd, x.groups);
+        return (x.goalUsd, x.groups);
     }
 
     function _requireSetup() internal view virtual;

@@ -67,7 +67,7 @@ appear in the UI as decoration or labels.
 Definitions, for one ballot, at the block that records it:
 
 - **Placed projects:** those in S-Tier, A-Tier or B-Tier.
-- **Requested amount** of a project: its `askUsd` registered in the contract (micro-USD), i.e. the
+- **Requested amount** of a project: its `goalUsd` registered in the contract (micro-USD), i.e. the
   initiative's requested total. Not the remaining need, which moves with donations: a ballot's
   validity must not change after it is recorded. _(My call; the tally itself still uses remaining
   needs.)_
@@ -118,7 +118,7 @@ a contract). _(My call.)_
   `groupsA & groupsB != 0`. This is the "pre-grouping": the deploy script turns affiliations into
   groups once, so Solidity only ANDs masks.
 - **Projects.** `Initiative` gains `bool rfp` and `uint256 groups`.
-  `addInitiative(account, askUsd, rfp, groups)`; `rfp && groups != 0` reverts.
+  `addInitiative(account, goalUsd, rfp, groups)`; `rfp && groups != 0` reverts.
   `InitiativeConfigured` carries the new fields.
 - **Adding during the vote.** `addInitiative` and `addGroup` are allowed before voting opens, and
   after it opens only when no tier is inside its quiet-ending span: for every tier t, not
@@ -147,7 +147,7 @@ a contract). _(My call.)_
 - `shared/vote/rules.ts`:
   `checkBallot(ballot, projects, poolUsd, enforced) → { ok, errors,
   proof }` where
-  `projects[i] = { askUsd, rfp, groups: string[] }`. Errors are structured (rule, tier, the projects
+  `projects[i] = { goalUsd, rfp, groups: string[] }`. Errors are structured (rule, tier, the projects
   and group involved) so the page can write messages. `proof` is a valid proof when one exists.
   Pure, browser and Deno.
 - Python reference `vote/reference/ballot_rules.py`, with parity fixtures generated like
@@ -165,7 +165,7 @@ a contract). _(My call.)_
 
 ## Round file and deploy
 
-- The manifest's project list becomes objects: `{ slug, askUsd, rfp, affiliations }`, plus
+- The manifest's project list becomes objects: `{ slug, goalUsd, rfp, affiliations }`, plus
   `independentTiers`. The list is **append-only**; a project's index never changes.
 - `deno task vote-deploy` builds groups from the initiatives' affiliations (one group per distinct
   affiliation, named by the affiliation) and registers them with the projects.

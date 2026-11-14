@@ -72,7 +72,7 @@ export type BoardCard = {
 export type PlannedInitiative = {
   slug: string;
   account: `0x${string}`;
-  askUsd: bigint;
+  goalUsd: bigint;
   rfp: boolean;
   /** Indexes into the round's group names (one group per affiliation). */
   groups: number[];
@@ -158,7 +158,7 @@ export function planInitiatives(
     return {
       slug: c.slug,
       account,
-      askUsd: BigInt(Math.round(c.goalUsd * 1e6)),
+      goalUsd: BigInt(Math.round(c.goalUsd * 1e6)),
       rfp: c.type === "rfp",
       groups: groups.groupsOf(c.slug),
     };
@@ -288,7 +288,7 @@ export function addPlan(
     })),
     ...plan.map((p) => ({
       fn: "addInitiative" as const,
-      args: [p.account, p.askUsd, p.rfp, groupMask(p.groups)] as const,
+      args: [p.account, p.goalUsd, p.rfp, groupMask(p.groups)] as const,
     })),
   ];
   return {
@@ -298,7 +298,7 @@ export function addPlan(
       slugs: [...m.slugs, ...plan.map((p) => p.slug)],
       projects: [
         ...m.projects,
-        ...plan.map((p) => ({ askUsd: p.askUsd.toString(), rfp: p.rfp, groups: p.groups })),
+        ...plan.map((p) => ({ goalUsd: p.goalUsd.toString(), rfp: p.rfp, groups: p.groups })),
       ],
       groups: groups.names,
     },
@@ -394,12 +394,12 @@ async function addMain(
   for (const [k, p] of plan.entries()) {
     const x = await read("initiative", [BigInt(m.slugs.length + k)]) as {
       account: string;
-      askUsd: bigint;
+      goalUsd: bigint;
       rfp: boolean;
       groups: bigint;
     };
     if (
-      x.account.toLowerCase() !== p.account.toLowerCase() || x.askUsd !== p.askUsd ||
+      x.account.toLowerCase() !== p.account.toLowerCase() || x.goalUsd !== p.goalUsd ||
       x.rfp !== p.rfp || x.groups !== groupMask(p.groups)
     ) throw new Error(`initiative ${m.slugs.length + k} on-chain doesn't match ${p.slug}`);
   }
@@ -538,7 +538,7 @@ async function main() {
   });
   const calls = [
     ...groups.names.map((n) => step("addGroup", [stringToHex(n, { size: 32 })])),
-    ...plan.map((p) => step("addInitiative", [p.account, p.askUsd, p.rfp, groupMask(p.groups)])),
+    ...plan.map((p) => step("addInitiative", [p.account, p.goalUsd, p.rfp, groupMask(p.groups)])),
     ...(independentTiers === 1 ? [] : [step("setIndependentTiers", [independentTiers])]),
     step("setPoolUsd", [poolUsd]),
     ...handed.map((r) => step("grantRole", [r, ADMIN])),
@@ -656,7 +656,7 @@ async function main() {
     poolUsd,
     issuer: issuer as `0x${string}` | undefined,
     slugs: plan.map((p) => p.slug),
-    projects: plan.map((p) => ({ askUsd: p.askUsd.toString(), rfp: p.rfp, groups: p.groups })),
+    projects: plan.map((p) => ({ goalUsd: p.goalUsd.toString(), rfp: p.rfp, groups: p.groups })),
     groups: groups.names,
     independentTiers,
   });

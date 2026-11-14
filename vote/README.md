@@ -77,7 +77,7 @@ All USD inputs and results use **six decimal places**: 1,000,000 means one dolla
 - Currency ID 0 is the virtual USD accounting unit, not a stablecoin or native ETH.
   It supports dollar pledges but never reads account balances. The pool uses the
   same USD precision and is recorded separately.
-- addInitiative(account, askUsd) and setInitiative(...) configure up to 254 unique
+- addInitiative(account, goalUsd) and setInitiative(...) configure up to 254 unique
   initiative addresses before opening. There are at most 32 currencies including USD.
 - setPoolUsd(amountUsd) initializes, corrects or increases the total USD pool budget.
   Strictly before firstTallyAt(0) any value is accepted, so a mistyped total can be
@@ -239,7 +239,7 @@ Oracle interface and historical-state considerations:
 
 A ballot is valid only if (docs/superpowers/specs/2026-11-11-ballot-rules-design.md):
 
-- its ranked projects request at least 1.5× the pool (`2 × Σ askUsd ≥ 3 × poolUsd`, the pool
+- its ranked projects request at least 1.5× the pool (`2 × Σ goalUsd ≥ 3 × poolUsd`, the pool
   as of that receipt);
 - S-Tier (its first rank group; also A-Tier when `independentTiers` has bit 1) holds at
   least 3 projects with no shared affiliation, and no affiliation holds more than half of the

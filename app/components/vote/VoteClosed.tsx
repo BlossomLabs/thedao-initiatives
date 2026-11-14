@@ -172,8 +172,8 @@ export default function VoteClosed(
   // During the vote, the ring is the editor's: what the ballot asks for, full at 3× the
   // pool; gold what the settled tiers funded, pale gold what they hold unfunded, green
   // the open tiers.
-  const askOf = (slug: string) =>
-    Number(BigInt(round.projects[round.slugs.indexOf(slug)]?.askUsd ?? "0") / 10_000n) / 100;
+  const goalOf = (slug: string) =>
+    Number(BigInt(round.projects[round.slugs.indexOf(slug)]?.goalUsd ?? "0") / 10_000n) / 100;
   const settledTier = new Map(settled?.map((t) => [t.tier, t]) ?? []);
   const askRing = live && sent && poolUsd
     ? (() => {
@@ -181,9 +181,9 @@ export default function VoteClosed(
       for (const [slug, t] of Object.entries(sent)) {
         if (!t) continue;
         const s = settledTier.get(t);
-        asked += askOf(slug);
-        if (s?.funded.includes(slug)) fundedAsk += askOf(slug);
-        else if (s) waitingAsk += askOf(slug);
+        asked += goalOf(slug);
+        if (s?.funded.includes(slug)) fundedAsk += goalOf(slug);
+        else if (s) waitingAsk += goalOf(slug);
       }
       return { asked, target: poolUsd * 3, fundedAsk, waitingAsk };
     })()

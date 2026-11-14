@@ -15,7 +15,7 @@ const base: VoteManifest = {
   poolUsd: "1",
   issuer: "0x2000000000000000000000000000000000000002",
   slugs: ["a"],
-  projects: [{ askUsd: "5", rfp: false, groups: [0] }],
+  projects: [{ goalUsd: "5", rfp: false, groups: [0] }],
   groups: ["Seal"],
   independentTiers: 1,
 };
@@ -38,14 +38,14 @@ describe("round manifest", () => {
   });
   it("checkManifest refuses misaligned projects, tagged RFPs and unknown groups", () => {
     expect(() => checkManifest({ ...base, projects: [] })).toThrow(/projects/);
-    expect(() => checkManifest({ ...base, projects: [{ askUsd: "5", rfp: true, groups: [0] }] }))
+    expect(() => checkManifest({ ...base, projects: [{ goalUsd: "5", rfp: true, groups: [0] }] }))
       .toThrow(/RFP/);
-    expect(() => checkManifest({ ...base, projects: [{ askUsd: "5", rfp: false, groups: [1] }] }))
+    expect(() => checkManifest({ ...base, projects: [{ goalUsd: "5", rfp: false, groups: [1] }] }))
       .toThrow(/group/);
   });
   it("rulesRound maps the manifest", () => {
     expect(rulesRound(base)).toEqual({
-      projects: [{ askUsd: 5n, rfp: false, groups: [0] }],
+      projects: [{ goalUsd: 5n, rfp: false, groups: [0] }],
       groupNames: ["Seal"],
       poolUsd: 1n,
       independentTiers: 1,

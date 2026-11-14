@@ -3,36 +3,36 @@
     "name": "valid",
     "projects": [
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": true,
         "groups": []
       }
@@ -90,36 +90,36 @@
     "name": "related count as one",
     "projects": [
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": true,
         "groups": []
       }
@@ -176,36 +176,36 @@
     "name": "rfp is independent",
     "projects": [
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": true,
         "groups": []
       }
@@ -263,36 +263,36 @@
     "name": "exactly half",
     "projects": [
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": true,
         "groups": []
       }
@@ -350,36 +350,36 @@
     "name": "over half",
     "projects": [
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": true,
         "groups": []
       }
@@ -435,36 +435,36 @@
     "name": "size exactly 1.5x",
     "projects": [
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": true,
         "groups": []
       }
@@ -522,36 +522,36 @@
     "name": "size short",
     "projects": [
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": true,
         "groups": []
       }
@@ -607,36 +607,36 @@
     "name": "four tiers",
     "projects": [
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": true,
         "groups": []
       }
@@ -694,36 +694,36 @@
     "name": "A-Tier enforced, empty",
     "projects": [
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": true,
         "groups": []
       }
@@ -779,36 +779,36 @@
     "name": "short ballot",
     "projects": [
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": true,
         "groups": []
       }
@@ -864,36 +864,36 @@
     "name": "rank gap",
     "projects": [
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100",
+        "goalUsd": "100",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50",
+        "goalUsd": "50",
         "rfp": true,
         "groups": []
       }
@@ -949,7 +949,7 @@
     "name": "random 0",
     "projects": [
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": [
           0,
@@ -957,52 +957,52 @@
         ]
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": [
           0,
@@ -1077,29 +1077,21 @@
     "name": "random 1",
     "projects": [
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "40000",
-        "rfp": false,
-        "groups": [
-          0,
-          2
-        ]
-      },
-      {
-        "askUsd": "460000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": [
           0,
@@ -1107,19 +1099,27 @@
         ]
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "460000",
+        "rfp": false,
+        "groups": [
+          0,
+          2
+        ]
+      },
+      {
+        "goalUsd": "310000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           1,
@@ -1127,33 +1127,33 @@
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           1,
@@ -1161,31 +1161,31 @@
         ]
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": [
           1,
@@ -1193,7 +1193,7 @@
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": [
           0,
@@ -1201,19 +1201,19 @@
         ]
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": true,
         "groups": []
       }
@@ -1332,26 +1332,26 @@
     "name": "random 2",
     "projects": [
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": [
           0,
@@ -1359,19 +1359,19 @@
         ]
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": [
           0,
@@ -1379,14 +1379,14 @@
         ]
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           0,
@@ -1394,22 +1394,22 @@
         ]
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": [
           0,
@@ -1417,27 +1417,27 @@
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": [
           0,
@@ -1445,38 +1445,38 @@
         ]
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": []
       }
@@ -1607,12 +1607,12 @@
     "name": "random 3",
     "projects": [
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": [
           0,
@@ -1620,31 +1620,31 @@
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": true,
         "groups": []
       }
@@ -1705,97 +1705,97 @@
     "name": "random 4",
     "projects": [
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": []
       }
@@ -1901,12 +1901,12 @@
     "name": "random 5",
     "projects": [
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": [
           1,
@@ -1914,7 +1914,7 @@
         ]
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": [
           0,
@@ -1922,7 +1922,7 @@
         ]
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": [
           1,
@@ -1930,7 +1930,7 @@
         ]
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           1,
@@ -1938,21 +1938,21 @@
         ]
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": [
           2,
@@ -1960,7 +1960,7 @@
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": [
           0,
@@ -1968,24 +1968,24 @@
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": [
           0,
@@ -1993,12 +1993,12 @@
         ]
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           2,
@@ -2006,53 +2006,53 @@
         ]
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": [
           1,
@@ -2060,7 +2060,7 @@
         ]
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": [
           1,
@@ -2068,7 +2068,7 @@
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": true,
         "groups": []
       }
@@ -2207,31 +2207,31 @@
     "name": "random 6",
     "projects": [
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": [
           1,
@@ -2239,19 +2239,19 @@
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": [
           1,
@@ -2259,7 +2259,7 @@
         ]
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": [
           0,
@@ -2267,7 +2267,7 @@
         ]
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": [
           1,
@@ -2275,26 +2275,26 @@
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": [
           0,
@@ -2302,7 +2302,7 @@
         ]
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": [
           1,
@@ -2310,19 +2310,19 @@
         ]
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": [
           1,
@@ -2330,24 +2330,24 @@
         ]
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": [
           1,
@@ -2355,7 +2355,7 @@
         ]
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       }
@@ -2482,19 +2482,19 @@
     "name": "random 7",
     "projects": [
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": [
           1,
@@ -2502,38 +2502,38 @@
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": [
           1,
@@ -2541,14 +2541,14 @@
         ]
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": [
           1,
@@ -2556,12 +2556,12 @@
         ]
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           1,
@@ -2569,19 +2569,19 @@
         ]
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": [
           2,
@@ -2589,17 +2589,17 @@
         ]
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": [
           1,
@@ -2607,21 +2607,21 @@
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": [
           0,
@@ -2747,32 +2747,32 @@
     "name": "random 8",
     "projects": [
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": [
           1,
@@ -2780,24 +2780,24 @@
         ]
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": [
           0,
@@ -2805,41 +2805,41 @@
         ]
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": [
           0,
@@ -2945,7 +2945,7 @@
     "name": "random 9",
     "projects": [
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": [
           0,
@@ -2953,7 +2953,7 @@
         ]
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": [
           0,
@@ -2961,7 +2961,7 @@
         ]
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": [
           0,
@@ -2969,17 +2969,17 @@
         ]
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": [
           0,
@@ -2987,65 +2987,65 @@
         ]
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           1,
@@ -3053,7 +3053,7 @@
         ]
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           0,
@@ -3061,7 +3061,7 @@
         ]
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": [
           1,
@@ -3069,7 +3069,7 @@
         ]
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": [
           0
@@ -3185,17 +3185,17 @@
     "name": "random 10",
     "projects": [
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": [
           1,
@@ -3203,12 +3203,12 @@
         ]
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": [
           0,
@@ -3216,12 +3216,12 @@
         ]
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           0,
@@ -3229,36 +3229,36 @@
         ]
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           0,
@@ -3266,7 +3266,7 @@
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": [
           0,
@@ -3274,7 +3274,7 @@
         ]
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": [
           0,
@@ -3282,22 +3282,22 @@
         ]
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       }
@@ -3410,19 +3410,19 @@
     "name": "random 11",
     "projects": [
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           0,
@@ -3430,12 +3430,12 @@
         ]
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           0,
@@ -3443,30 +3443,12 @@
         ]
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "380000",
-        "rfp": false,
-        "groups": [
-          0,
-          1
-        ]
-      },
-      {
-        "askUsd": "430000",
-        "rfp": true,
-        "groups": []
-      },
-      {
-        "askUsd": "390000",
-        "rfp": false,
-        "groups": []
-      },
-      {
-        "askUsd": "50000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": [
           0,
@@ -3474,65 +3456,83 @@
         ]
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "430000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "50000",
+        "rfp": false,
+        "groups": [
+          0,
+          1
+        ]
+      },
+      {
+        "goalUsd": "400000",
+        "rfp": true,
+        "groups": []
+      },
+      {
+        "goalUsd": "270000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "150000",
+        "rfp": false,
+        "groups": []
+      },
+      {
+        "goalUsd": "250000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": []
       }
@@ -3652,7 +3652,7 @@
     "name": "random 12",
     "projects": [
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": [
           0,
@@ -3660,22 +3660,22 @@
         ]
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": [
           0,
@@ -3683,12 +3683,12 @@
         ]
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": [
           1,
@@ -3696,7 +3696,7 @@
         ]
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": [
           1,
@@ -3704,7 +3704,7 @@
         ]
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": [
           1,
@@ -3712,7 +3712,7 @@
         ]
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": [
           0,
@@ -3720,41 +3720,41 @@
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": [
           0
@@ -3860,68 +3860,68 @@
     "name": "random 13",
     "projects": [
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": []
       }
@@ -4005,14 +4005,14 @@
     "name": "random 14",
     "projects": [
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": [
           1,
@@ -4020,7 +4020,7 @@
         ]
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": [
           2,
@@ -4028,7 +4028,7 @@
         ]
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": [
           0,
@@ -4036,7 +4036,7 @@
         ]
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": [
           0,
@@ -4044,24 +4044,24 @@
         ]
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": [
           2,
@@ -4069,60 +4069,60 @@
         ]
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": false,
         "groups": [
           0,
@@ -4130,14 +4130,14 @@
         ]
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": [
           0,
@@ -4145,17 +4145,17 @@
         ]
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": false,
         "groups": [
           0,
@@ -4163,7 +4163,7 @@
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": [
           0,
@@ -4171,12 +4171,12 @@
         ]
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": [
           0,
@@ -4184,7 +4184,7 @@
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": [
           0,
@@ -4192,7 +4192,7 @@
         ]
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": [
           0,
@@ -4200,7 +4200,7 @@
         ]
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": [
           0,
@@ -4360,12 +4360,12 @@
     "name": "random 15",
     "projects": [
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           0,
@@ -4373,22 +4373,14 @@
         ]
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "450000",
-        "rfp": false,
-        "groups": [
-          0,
-          1
-        ]
-      },
-      {
-        "askUsd": "110000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": [
           0,
@@ -4396,17 +4388,25 @@
         ]
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "110000",
+        "rfp": false,
+        "groups": [
+          0,
+          1
+        ]
+      },
+      {
+        "goalUsd": "360000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           0,
@@ -4478,17 +4478,17 @@
     "name": "random 16",
     "projects": [
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           0,
@@ -4496,36 +4496,36 @@
         ]
       },
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           0,
@@ -4533,7 +4533,7 @@
         ]
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           0,
@@ -4541,7 +4541,7 @@
         ]
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": [
           1,
@@ -4549,12 +4549,12 @@
         ]
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": false,
         "groups": [
           1,
@@ -4562,7 +4562,7 @@
         ]
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": [
           0
@@ -4656,46 +4656,46 @@
     "name": "random 17",
     "projects": [
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": [
           0,
@@ -4703,31 +4703,31 @@
         ]
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           1,
@@ -4735,7 +4735,7 @@
         ]
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           0,
@@ -4743,36 +4743,36 @@
         ]
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": [
           0,
@@ -4780,7 +4780,7 @@
         ]
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": true,
         "groups": []
       }
@@ -4903,7 +4903,7 @@
     "name": "random 18",
     "projects": [
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": false,
         "groups": [
           0,
@@ -4911,19 +4911,19 @@
         ]
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": [
           1,
@@ -4931,17 +4931,17 @@
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": [
           0,
@@ -4949,24 +4949,24 @@
         ]
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           0,
@@ -4974,17 +4974,17 @@
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": [
           1,
@@ -5078,77 +5078,77 @@
     "name": "random 19",
     "projects": [
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": []
       }
@@ -5238,51 +5238,51 @@
     "name": "random 20",
     "projects": [
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": []
       }
@@ -5352,12 +5352,12 @@
     "name": "random 21",
     "projects": [
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": [
           1,
@@ -5365,7 +5365,7 @@
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": [
           0,
@@ -5373,21 +5373,21 @@
         ]
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": [
           0,
@@ -5395,17 +5395,17 @@
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           0,
@@ -5413,12 +5413,12 @@
         ]
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": [
           0,
@@ -5426,7 +5426,7 @@
         ]
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": [
           1,
@@ -5434,14 +5434,14 @@
         ]
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": [
           2,
@@ -5449,48 +5449,48 @@
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "120000",
-        "rfp": false,
-        "groups": [
-          0
-        ]
-      },
-      {
-        "askUsd": "340000",
-        "rfp": true,
-        "groups": []
-      },
-      {
-        "askUsd": "300000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "340000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "300000",
+        "rfp": false,
+        "groups": [
+          0
+        ]
+      },
+      {
+        "goalUsd": "110000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "350000",
+        "rfp": true,
+        "groups": []
+      },
+      {
+        "goalUsd": "220000",
         "rfp": false,
         "groups": [
           2,
@@ -5498,24 +5498,24 @@
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": [
           0,
@@ -5523,7 +5523,7 @@
         ]
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": []
       }
@@ -5663,56 +5663,56 @@
     "name": "random 22",
     "projects": [
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "370000",
-        "rfp": false,
-        "groups": [
-          0
-        ]
-      },
-      {
-        "askUsd": "340000",
-        "rfp": true,
-        "groups": []
-      },
-      {
-        "askUsd": "140000",
-        "rfp": true,
-        "groups": []
-      },
-      {
-        "askUsd": "150000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "340000",
+        "rfp": true,
+        "groups": []
+      },
+      {
+        "goalUsd": "140000",
+        "rfp": true,
+        "groups": []
+      },
+      {
+        "goalUsd": "150000",
+        "rfp": false,
+        "groups": [
+          0
+        ]
+      },
+      {
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       }
@@ -5784,7 +5784,7 @@
     "name": "random 23",
     "projects": [
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": false,
         "groups": [
           0,
@@ -5792,24 +5792,24 @@
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           0,
@@ -5817,24 +5817,24 @@
         ]
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": [
           0,
@@ -5842,12 +5842,12 @@
         ]
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": [
           0
@@ -5928,38 +5928,38 @@
     "name": "random 24",
     "projects": [
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": [
           1,
@@ -5967,29 +5967,29 @@
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": [
           1,
@@ -5997,7 +5997,7 @@
         ]
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           0,
@@ -6005,12 +6005,12 @@
         ]
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": [
           1,
@@ -6018,67 +6018,67 @@
         ]
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": true,
         "groups": []
       }
@@ -6214,63 +6214,63 @@
     "name": "random 25",
     "projects": [
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": [
           0,
@@ -6278,21 +6278,21 @@
         ]
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": [
           1,
@@ -6300,12 +6300,12 @@
         ]
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           1,
@@ -6313,7 +6313,7 @@
         ]
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": [
           1,
@@ -6321,19 +6321,19 @@
         ]
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           1,
@@ -6341,7 +6341,7 @@
         ]
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           0,
@@ -6349,7 +6349,7 @@
         ]
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": []
       }
@@ -6472,27 +6472,27 @@
     "name": "random 26",
     "projects": [
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": [
           0,
@@ -6500,7 +6500,7 @@
         ]
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": [
           0,
@@ -6508,22 +6508,22 @@
         ]
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": [
           0,
@@ -6531,28 +6531,28 @@
         ]
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": [
           0,
@@ -6560,19 +6560,19 @@
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": false,
         "groups": [
           0,
@@ -6580,7 +6580,7 @@
         ]
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           0,
@@ -6588,17 +6588,17 @@
         ]
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": [
           0
@@ -6718,17 +6718,17 @@
     "name": "random 27",
     "projects": [
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": [
           0,
@@ -6736,12 +6736,12 @@
         ]
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": [
           0,
@@ -6749,89 +6749,89 @@
         ]
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": [
           1,
@@ -6839,12 +6839,12 @@
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": [
           1,
@@ -6852,28 +6852,28 @@
         ]
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": [
           1,
@@ -7014,122 +7014,122 @@
     "name": "random 28",
     "projects": [
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": []
       }
@@ -7255,132 +7255,132 @@
     "name": "random 29",
     "projects": [
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": true,
         "groups": []
       }
@@ -7500,19 +7500,19 @@
     "name": "random 30",
     "projects": [
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": [
           0,
@@ -7520,24 +7520,24 @@
         ]
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": [
           2,
@@ -7545,17 +7545,17 @@
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           0,
@@ -7563,12 +7563,12 @@
         ]
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           1,
@@ -7576,7 +7576,7 @@
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": []
       }
@@ -7665,12 +7665,12 @@
     "name": "random 31",
     "projects": [
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": [
           0,
@@ -7678,7 +7678,7 @@
         ]
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           0,
@@ -7686,14 +7686,14 @@
         ]
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": [
           0,
@@ -7701,44 +7701,44 @@
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": [
           0,
@@ -7746,17 +7746,17 @@
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           1,
@@ -7764,19 +7764,19 @@
         ]
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": [
           0,
@@ -7784,12 +7784,12 @@
         ]
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": []
       }
@@ -7909,30 +7909,12 @@
     "name": "random 32",
     "projects": [
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "40000",
-        "rfp": false,
-        "groups": [
-          2,
-          3
-        ]
-      },
-      {
-        "askUsd": "190000",
-        "rfp": true,
-        "groups": []
-      },
-      {
-        "askUsd": "250000",
-        "rfp": false,
-        "groups": []
-      },
-      {
-        "askUsd": "250000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": [
           2,
@@ -7940,17 +7922,35 @@
         ]
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "190000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "250000",
+        "rfp": false,
+        "groups": [
+          2,
+          3
+        ]
+      },
+      {
+        "goalUsd": "280000",
+        "rfp": true,
+        "groups": []
+      },
+      {
+        "goalUsd": "290000",
+        "rfp": false,
+        "groups": []
+      },
+      {
+        "goalUsd": "70000",
         "rfp": false,
         "groups": [
           1,
@@ -7958,73 +7958,73 @@
         ]
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           2,
@@ -8032,7 +8032,7 @@
         ]
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": []
       }
@@ -8155,82 +8155,82 @@
     "name": "random 33",
     "projects": [
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": []
       }
@@ -8323,55 +8323,55 @@
     "name": "random 34",
     "projects": [
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": [
           0,
@@ -8379,24 +8379,24 @@
         ]
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": [
           2,
@@ -8404,24 +8404,24 @@
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           0,
@@ -8429,7 +8429,7 @@
         ]
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": [
           1,
@@ -8437,7 +8437,7 @@
         ]
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": [
           1,
@@ -8445,29 +8445,29 @@
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           1,
@@ -8475,14 +8475,14 @@
         ]
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": true,
         "groups": []
       }
@@ -8623,7 +8623,7 @@
     "name": "random 35",
     "projects": [
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": [
           1,
@@ -8631,7 +8631,7 @@
         ]
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": [
           2,
@@ -8639,51 +8639,51 @@
         ]
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": [
           0,
@@ -8691,59 +8691,59 @@
         ]
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": [
           1,
@@ -8751,34 +8751,34 @@
         ]
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": true,
         "groups": []
       }
@@ -8927,47 +8927,47 @@
     "name": "random 36",
     "projects": [
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": true,
         "groups": []
       }
@@ -9034,152 +9034,152 @@
     "name": "random 37",
     "projects": [
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       }
@@ -9327,98 +9327,98 @@
     "name": "random 38",
     "projects": [
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": [
           1,
@@ -9426,12 +9426,12 @@
         ]
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": [
           0,
@@ -9439,34 +9439,34 @@
         ]
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": [
           1,
@@ -9474,22 +9474,22 @@
         ]
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": [
           2
@@ -9645,144 +9645,144 @@
     "name": "random 39",
     "projects": [
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": []
       }
@@ -9912,7 +9912,7 @@
     "name": "random 40",
     "projects": [
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": [
           0,
@@ -9920,7 +9920,7 @@
         ]
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": false,
         "groups": [
           0,
@@ -9928,12 +9928,12 @@
         ]
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": [
           0,
@@ -9941,7 +9941,7 @@
         ]
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": [
           0,
@@ -9949,32 +9949,32 @@
         ]
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       }
@@ -10053,7 +10053,7 @@
     "name": "random 41",
     "projects": [
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": [
           1,
@@ -10061,12 +10061,12 @@
         ]
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": [
           0,
@@ -10074,19 +10074,19 @@
         ]
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": [
           0,
@@ -10094,12 +10094,12 @@
         ]
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": [
           2,
@@ -10107,7 +10107,7 @@
         ]
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           0,
@@ -10115,31 +10115,31 @@
         ]
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": false,
         "groups": [
           0,
@@ -10233,17 +10233,17 @@
     "name": "random 42",
     "projects": [
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": [
           0,
@@ -10251,24 +10251,24 @@
         ]
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": [
           0,
@@ -10333,67 +10333,67 @@
     "name": "random 43",
     "projects": [
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": []
       }
@@ -10477,19 +10477,19 @@
     "name": "random 44",
     "projects": [
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": [
           1,
@@ -10497,7 +10497,7 @@
         ]
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": [
           0,
@@ -10505,12 +10505,12 @@
         ]
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": false,
         "groups": [
           0,
@@ -10518,33 +10518,33 @@
         ]
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": [
           0,
@@ -10552,34 +10552,34 @@
         ]
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": [
           1,
@@ -10587,7 +10587,7 @@
         ]
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           0,
@@ -10696,171 +10696,171 @@
     "name": "random 45",
     "projects": [
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": [
           0
@@ -11012,54 +11012,54 @@
     "name": "random 46",
     "projects": [
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           0
@@ -11133,87 +11133,87 @@
     "name": "random 47",
     "projects": [
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": []
       }
@@ -11313,19 +11313,19 @@
     "name": "random 48",
     "projects": [
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": [
           0,
@@ -11333,33 +11333,33 @@
         ]
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": true,
         "groups": []
       }
@@ -11427,66 +11427,66 @@
     "name": "random 49",
     "projects": [
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": []
       }
@@ -11566,7 +11566,7 @@
     "name": "random 50",
     "projects": [
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           0,
@@ -11574,12 +11574,12 @@
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           1,
@@ -11587,45 +11587,45 @@
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": false,
         "groups": [
           0,
@@ -11633,31 +11633,31 @@
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": [
           0,
@@ -11665,36 +11665,36 @@
         ]
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "250000",
+        "goalUsd": "250000",
         "rfp": false,
         "groups": []
       }
@@ -11812,57 +11812,57 @@
     "name": "random 51",
     "projects": [
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       }
@@ -11937,27 +11937,27 @@
     "name": "random 52",
     "projects": [
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": [
           2,
@@ -11965,7 +11965,7 @@
         ]
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": [
           0,
@@ -11973,14 +11973,14 @@
         ]
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           0,
@@ -11988,19 +11988,19 @@
         ]
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": [
           0,
@@ -12008,28 +12008,28 @@
         ]
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           1
@@ -12128,135 +12128,135 @@
     "name": "random 53",
     "projects": [
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "110000",
+        "goalUsd": "110000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "450000",
+        "goalUsd": "450000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "270000",
+        "goalUsd": "270000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "170000",
+        "goalUsd": "170000",
         "rfp": false,
         "groups": [
           0
@@ -12382,43 +12382,43 @@
     "name": "random 54",
     "projects": [
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           3
         ]
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": [
           0,
@@ -12426,7 +12426,7 @@
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": [
           1,
@@ -12434,19 +12434,19 @@
         ]
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": false,
         "groups": [
           2,
@@ -12454,17 +12454,17 @@
         ]
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "500000",
+        "goalUsd": "500000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": false,
         "groups": [
           1,
@@ -12472,7 +12472,7 @@
         ]
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": [
           2
@@ -12569,47 +12569,47 @@
     "name": "random 55",
     "projects": [
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": []
       }
@@ -12675,12 +12675,12 @@
     "name": "random 56",
     "projects": [
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": [
           1,
@@ -12688,7 +12688,7 @@
         ]
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": [
           0,
@@ -12696,7 +12696,7 @@
         ]
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": [
           1,
@@ -12704,7 +12704,7 @@
         ]
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": [
           1,
@@ -12712,34 +12712,34 @@
         ]
       },
       {
-        "askUsd": "280000",
+        "goalUsd": "280000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "320000",
+        "goalUsd": "320000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "120000",
+        "goalUsd": "120000",
         "rfp": false,
         "groups": [
           1,
@@ -12747,106 +12747,106 @@
         ]
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": [
           1
         ]
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "180000",
+        "goalUsd": "180000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "100000",
+        "goalUsd": "100000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "150000",
+        "goalUsd": "150000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "200000",
+        "goalUsd": "200000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "460000",
+        "goalUsd": "460000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "400000",
+        "goalUsd": "400000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "370000",
+        "goalUsd": "370000",
         "rfp": true,
         "groups": []
       }
@@ -12997,68 +12997,68 @@
     "name": "random 57",
     "projects": [
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "380000",
+        "goalUsd": "380000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "470000",
+        "goalUsd": "470000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "60000",
+        "goalUsd": "60000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "70000",
+        "goalUsd": "70000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "30000",
+        "goalUsd": "30000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": [
           0
@@ -13139,178 +13139,178 @@
     "name": "random 58",
     "projects": [
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "90000",
+        "goalUsd": "90000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "340000",
+        "goalUsd": "340000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "330000",
+        "goalUsd": "330000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "140000",
+        "goalUsd": "140000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "50000",
+        "goalUsd": "50000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "480000",
+        "goalUsd": "480000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "290000",
+        "goalUsd": "290000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "260000",
+        "goalUsd": "260000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "350000",
+        "goalUsd": "350000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "40000",
+        "goalUsd": "40000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "390000",
+        "goalUsd": "390000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "490000",
+        "goalUsd": "490000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "420000",
+        "goalUsd": "420000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "230000",
+        "goalUsd": "230000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "210000",
+        "goalUsd": "210000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "80000",
+        "goalUsd": "80000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "190000",
+        "goalUsd": "190000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "300000",
+        "goalUsd": "300000",
         "rfp": false,
         "groups": [
           0
         ]
       },
       {
-        "askUsd": "310000",
+        "goalUsd": "310000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "360000",
+        "goalUsd": "360000",
         "rfp": false,
         "groups": []
       }
@@ -13461,44 +13461,44 @@
     "name": "random 59",
     "projects": [
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "220000",
+        "goalUsd": "220000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "430000",
+        "goalUsd": "430000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "130000",
+        "goalUsd": "130000",
         "rfp": true,
         "groups": []
       },
       {
-        "askUsd": "160000",
+        "goalUsd": "160000",
         "rfp": false,
         "groups": [
           2
         ]
       },
       {
-        "askUsd": "20000",
+        "goalUsd": "20000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "410000",
+        "goalUsd": "410000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "240000",
+        "goalUsd": "240000",
         "rfp": false,
         "groups": [
           0,
@@ -13506,12 +13506,12 @@
         ]
       },
       {
-        "askUsd": "10000",
+        "goalUsd": "10000",
         "rfp": false,
         "groups": []
       },
       {
-        "askUsd": "440000",
+        "goalUsd": "440000",
         "rfp": false,
         "groups": [
           0

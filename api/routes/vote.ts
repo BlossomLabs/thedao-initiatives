@@ -180,7 +180,7 @@ const inputsParts = (inp: ChainInputs) => [
 /** The what-if search's own version, part of every cache digest: when the way gaps, leads or
  * final figures are computed changes, bump it, and figures cached under the old code are
  * computed again instead of being served. */
-export const WHAT_IFS_VERSION = 3;
+export const WHAT_IFS_VERSION = 4;
 
 async function digest(parts: unknown[]) {
   const text = JSON.stringify(
@@ -216,15 +216,15 @@ const leadJson = (lead: Map<number, bigint>, slugs: string[]): Record<string, st
   Object.fromEntries(
     [...lead].filter(([, v]) => v >= STEP).map(([c, v]) => [slugs[c], v.toString()]),
   );
-/** A finished search: the digest of its inputs, the open tier it looked from, and when.
- * S-Tier's leads come with it while S-Tier is open. */
+/** A finished search: the digest of its inputs, the open tier it looked from, and when,
+ * with the leads of the initiatives in the tier settling now. */
 type KnownNext = {
   key: string;
   firstOpen: number;
   at: number;
   next: NextJson;
   lead?: Record<string, string>;
-  /** The donation that gets each initiative into the tier settling now. */
+  /** The donation that gets each initiative one tier higher. */
   give?: NextJson;
 };
 type FinalJson = { next: NextJson; lead: Record<string, string> };
@@ -455,17 +455,16 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       const work = (async () => {
         const slugs = d.manifest.slugs;
         const next = nextJson(await nextTiersAsync(liveInputs, firstOpen), slugs);
-        // A lead only means something while S-Tier can still change. A failed lead search
+        // How far ahead each initiative in the tier settling now is. A failed lead search
         // still keeps the gaps.
         let lead: Record<string, string> | undefined;
-        if (firstOpen === 0) {
-          try {
-            lead = leadJson(await liveLeadsAsync(liveInputs, firstOpen), slugs);
-          } catch (e) {
-            deps.log(`vote lead: ${e instanceof Error ? e.message : e}`);
-          }
+        try {
+          lead = leadJson(await liveLeadsAsync(liveInputs, firstOpen), slugs);
+        } catch (e) {
+          deps.log(`vote lead: ${e instanceof Error ? e.message : e}`);
         }
-        // The donations to the tier settling now; a failed search still keeps the gaps.
+        // The donation that gets each initiative one tier higher; a failed search still
+        // keeps the gaps.
         let give: NextJson | undefined;
         try {
           give = nextJson(await giftGapsAsync(liveInputs, firstOpen), slugs);

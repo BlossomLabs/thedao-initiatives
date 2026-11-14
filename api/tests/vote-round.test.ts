@@ -763,7 +763,7 @@ Deno.test("round next: who it knocks out is named by slug", async () => {
   h.close();
 });
 
-Deno.test("the round lists the donation that gets each initiative into the tier settling now", async () => {
+Deno.test("the round lists the donation that moves each initiative up a tier", async () => {
   // As above: b is funded in A-Tier, c (S-Tier on both ballots) costs far more than the pool.
   const { h, state } = await setup({ ...qe, poolUsd: "100000000000" });
   const huge = 1n << 60n;
@@ -775,9 +775,9 @@ Deno.test("the round lists the donation that gets each initiative into the tier 
   type Give = { tier: string; gap: string | null };
   const body = await j(await h.req("/api/vote/round")) as { live: { give: Record<string, Give> } };
   const give = body.live.give;
-  // S-Tier settles first: every figure is to S-Tier.
-  for (const g of Object.values(give)) assertEquals(g.tier, "S");
-  // Given all but what the two ballots hold ($100K), c is funded in S-Tier.
+  // c isn't funded: its figure is to B-Tier, the first tier up.
+  assertEquals(give.c.tier, "B");
+  // Given all but what the two ballots hold ($100K), c is funded.
   const step = 1_000_000_000n;
   const want = ((huge - 100_000_000_000n + step - 1n) / step) * step;
   assertEquals(give.c.gap, want.toString());
@@ -837,7 +837,7 @@ Deno.test("an open round serves S-Tier leads", async () => {
   h.close();
 });
 
-Deno.test("no leads once S-Tier has settled", async () => {
+Deno.test("once S-Tier has settled, the leads are A-Tier's", async () => {
   const { h } = await leadSetup();
   h.clock.now = NOW + 700; // S settled at NOW + 660; A is open
   await h.req("/api/vote/round");
@@ -845,7 +845,8 @@ Deno.test("no leads once S-Tier has settled", async () => {
   h.clock.now += 10;
   const body = await j(await h.req("/api/vote/round")) as LiveBody;
   assertEquals(body.live.next !== undefined, true, "the search ran");
-  assertEquals(body.live.lead, undefined);
+  // a was S-Tier's; the ballots rank nothing else, so A-Tier funds nothing to lead.
+  assertEquals(body.live.lead, {});
   await h.settle();
   h.close();
 });

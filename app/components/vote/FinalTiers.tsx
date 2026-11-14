@@ -1,6 +1,6 @@
 import CategoryDot from "~/components/ui/CategoryDot";
 import { cn } from "~/lib/utils";
-import type { Tier } from "../../../shared/vote/ballot";
+import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
 import { type BallotItem, TIER_LABELS } from "./TierBallot";
 
 export const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
@@ -29,6 +29,7 @@ export default function FinalTiers(
     onTap,
     joining,
     leaving,
+    moved,
     liveTone = "green",
   }: {
     items: BallotItem[];
@@ -67,9 +68,12 @@ export default function FinalTiers(
     /** Names the table for screen readers: "Your ballot", "TheDAO's result". */
     label: string;
     /** A donation's preview (the vote results): what comes into a tier with it, with the
-     * dollars given (dashed red, "+$X yours"), and what drops out (struck through). */
+     * dollars given (dashed green, "+$X yours"), what drops out (red, struck through,
+     * "dropped out"), and what it moves to another tier (`moved`: the tier it came from;
+     * yellow, an arrow and "from S-Tier"). */
     joining?: ReadonlyMap<string, number>;
     leaving?: ReadonlySet<string>;
+    moved?: ReadonlyMap<string, Tier>;
     /** How a `provisional` chip looks: green (a ballot's own page), or neutral (the vote
      * results, where green is kept for a donation's preview). */
     liveTone?: "green" | "neutral";
@@ -142,10 +146,15 @@ export default function FinalTiers(
                     const fundedWord = live ? "funded if it ended now" : "funded";
                     const given = joining?.get(i.slug);
                     const gone = Boolean(leaving?.has(i.slug));
+                    const from = moved?.get(i.slug);
+                    const up = from !== undefined &&
+                      TIERS.indexOf(t.tier) < TIERS.indexOf(from);
                     const label = given !== undefined
                       ? `${i.title}, comes in with your ${dollars(given)}`
                       : gone
                       ? `${i.title}, drops out`
+                      : from
+                      ? `${i.title}, moves ${up ? "up" : "down"} from ${tierName(from)}`
                       : isFunded
                       ? youPaid !== undefined
                         ? `${i.title}, ${fundedWord}: ${live ? liveAmountWord : amountWord} ${
@@ -183,7 +192,9 @@ export default function FinalTiers(
                           given !== undefined
                             ? "border-dashed border-dao-green bg-dao-green/[.14]"
                             : gone
-                            ? "border-dashed border-white/30 bg-transparent opacity-45"
+                            ? "border-dashed border-[#ff8a88] bg-[#c22d2b]/[.22]"
+                            : from
+                            ? "border-dashed border-vote-pale/70 bg-vote/[.12]"
                             : gold
                             ? "border-vote/50 bg-vote/[.12]"
                             : green
@@ -199,6 +210,17 @@ export default function FinalTiers(
                             aria-hidden="true"
                           />
                         )}
+                        {(gone || from) && (
+                          <b
+                            aria-hidden="true"
+                            className={cn(
+                              "flex-none text-[13px] leading-none",
+                              gone ? "text-[#ff8a88]" : "text-vote-pale",
+                            )}
+                          >
+                            {gone || !up ? "↓" : "↑"}
+                          </b>
+                        )}
                         <span
                           className={cn(
                             "min-w-0 truncate text-[12.5px] leading-none text-white/85",
@@ -207,7 +229,19 @@ export default function FinalTiers(
                         >
                           {i.title}
                         </span>
-                        {given !== undefined
+                        {gone
+                          ? (
+                            <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-[#ff8a88]">
+                              dropped out
+                            </span>
+                          )
+                          : from
+                          ? (
+                            <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-vote-pale">
+                              from {tierName(from)}
+                            </span>
+                          )
+                          : given !== undefined
                           ? (
                             <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-[#a7e3a5] tnum">
                               +{dollars(given)} yours

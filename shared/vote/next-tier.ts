@@ -1,8 +1,8 @@
 /** For each initiative, how much more backing it needs to be funded one tier higher,
  * and who would come in or drop out if it were. The tally is re-run with a made-up
- * voter ("phantom") who backs only that initiative. Also how far ahead an S-Tier
- * initiative is, and the same figures judged at each settlement once the round has
- * closed. And the donation that would get each initiative into the tier settling now.
+ * voter ("phantom") who backs only that initiative. Also how far ahead an initiative in
+ * the tier settling now is, and the same figures judged at each settlement once the round
+ * has closed. And the donation that would get each initiative one tier higher.
  * Pure; browser and Deno. */
 import { type Tier, TIERS } from "./ballot.ts";
 import { type ChainInputs, chainTally } from "./chain.ts";
@@ -130,18 +130,19 @@ function withGift(inp: ChainInputs, c: number, given: bigint): ChainInputs {
 }
 
 /** The donation search for one initiative: the least $1K step that, given to it, gets it
- * funded in tier `first` (the tier settling now), judged on that tier alone. Its whole
- * need is the most anyone can give it; when even that doesn't get it there, the gap is
- * null. The knock-on lists who comes into or drops out of that tier. */
+ * funded in tier `target` or higher if the open tiers (from `first`) settled now. Its
+ * whole need is the most anyone can give it; when even that doesn't get it there, the gap
+ * is null. The knock-on, over every open tier: who comes in, drops out or moves. */
 function* giftSearch(
   inp: ChainInputs,
   first: number,
   c: number,
+  target: number,
   live: Map<number, number>,
   tally: Tally,
 ): Generator<void, NextTier> {
   const entry: NextTier = {
-    tier: TIERS[first],
+    tier: TIERS[target],
     gap: null,
     comesIn: [],
     dropsOut: [],
@@ -149,8 +150,8 @@ function* giftSearch(
   };
   const need = (inp.costs[c] + STEP - 1n) / STEP;
   if (need < 1n) return entry;
-  const run = (k: bigint) => tiersOf(tally, withGift(inp, c, k * STEP), first, first + 1);
-  const reaches = (r: Map<number, number>) => r.get(c) === first;
+  const run = (k: bigint) => tiersOf(tally, withGift(inp, c, k * STEP), first);
+  const reaches = (r: Map<number, number>) => r.has(c) && r.get(c)! <= target;
   let hi = need, after = run(need);
   yield;
   if (!reaches(after)) return entry;
@@ -166,15 +167,19 @@ function* giftSearch(
   entry.gap = hi * STEP;
   for (let o = 0; o < inp.m; o++) {
     if (o === c) continue;
-    const was = live.get(o) === first, is = after.get(o) === first;
-    if (!was && is) entry.comesIn.push([o, TIERS[first]]);
-    else if (was && !is) entry.dropsOut.push([o, TIERS[first]]);
+    const was = live.get(o), is = after.get(o);
+    if (was === undefined && is !== undefined) entry.comesIn.push([o, TIERS[is]]);
+    else if (was !== undefined && is === undefined) entry.dropsOut.push([o, TIERS[was]]);
+    else if (was !== undefined && is !== undefined && was !== is) {
+      entry.moves.push([o, TIERS[was], TIERS[is]]);
+    }
   }
   return entry;
 }
 
-/** Every open initiative not in the tier settling now (`firstOpen`, if it settled now):
- * the donation that would get it there. */
+/** Every open initiative below the tier settling now (`firstOpen`), as the live tally has
+ * it: the donation that gets it one tier higher (into B-Tier when it isn't funded). Those
+ * in the tier settling now have their lead instead (liveLeads). */
 function* giftsSearch(
   inp: ChainInputs,
   firstOpen: number,
@@ -182,11 +187,14 @@ function* giftsSearch(
 ): Generator<void, Map<number, NextTier>> {
   const out = new Map<number, NextTier>();
   if (firstOpen < 0 || firstOpen >= TIERS.length) return out;
-  const live = tiersOf(tally, inp, firstOpen, firstOpen + 1);
+  const live = tiersOf(tally, inp, firstOpen);
   yield;
   for (let c = 0; c < inp.m; c++) {
-    if (inp.done.has(c) || live.get(c) === firstOpen) continue;
-    out.set(c, yield* giftSearch(inp, firstOpen, c, live, tally));
+    if (inp.done.has(c)) continue;
+    const now = live.get(c);
+    if (now === firstOpen) continue;
+    const target = now === undefined ? TIERS.length - 1 : now - 1;
+    out.set(c, yield* giftSearch(inp, firstOpen, c, target, live, tally));
   }
   return out;
 }
@@ -263,11 +271,11 @@ function* liveLeadsSearch(
   tally: Tally,
 ): Generator<void, Map<number, bigint>> {
   const out = new Map<number, bigint>();
-  if (firstOpen !== 0) return out;
-  const inS = tally(inp, 0, 1)[0].order;
+  if (firstOpen < 0 || firstOpen >= TIERS.length) return out;
+  const inTier = tally(inp, firstOpen, firstOpen + 1)[0].order;
   yield;
-  for (const c of inS) {
-    const lead = yield* leadSearch(inp, 0, c, tally);
+  for (const c of inTier) {
+    const lead = yield* leadSearch(inp, firstOpen, c, tally);
     if (lead !== null) out.set(c, lead);
   }
   return out;
@@ -358,8 +366,8 @@ export function nextTiersAsync(
 
 /** Keyed by initiative index: for each open initiative not in the tier settling now, the
  * donation (a $1K step, rounded up; null when even its whole need isn't enough) that gets
- * it funded there if that tier settled now. Settled initiatives and those already in it
- * have no entry. */
+ * it one tier higher than the live tally has it (B-Tier when unfunded), if the open tiers
+ * settled now. Settled initiatives and those in the tier settling now have no entry. */
 export function giftGaps(
   inp: ChainInputs,
   firstOpen: number,
@@ -404,7 +412,8 @@ export function leadIn(
   return drive(leadSearch(inp, first, c, tally));
 }
 
-/** Open round: leads for initiatives funded in S-Tier by the live tally (only while firstOpen = 0). */
+/** Open round: leads for the initiatives the live tally funds in the tier settling now
+ * (`firstOpen`), judged on that tier: how much less backing they could have and stay. */
 export function liveLeads(
   inp: ChainInputs,
   firstOpen: number,

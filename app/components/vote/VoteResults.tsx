@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import RoundBox from "./RoundBox";
 import DaoBallot, { daoResult, type SettledTier } from "./DaoBallot";
@@ -33,8 +33,9 @@ const TIER_B_NOTE = " · B-Tier: nothing funded yet, the pool may not reach it."
  * round at one moment, nothing donated from it).
  *
  * While the vote is open: TheDAO's ballot (what the vote would fund if it ended now) beside
- * what it takes to get each initiative into the tier settling now, with the donate form,
- * whose donation is previewed on TheDAO's ballot. Once closed: the board, limited to the
+ * every open initiative: what a donation takes to move it up a tier (or, in the tier
+ * settling now, how far ahead it is), with the donate form, whose donation is previewed on
+ * TheDAO's ballot. Once closed: the board, limited to the
  * round's initiatives, as the final result. */
 export default function VoteResults(
   { example }: { example?: { round: VoteManifest; view: RoundView } } = {},
@@ -94,20 +95,32 @@ export default function VoteResults(
   const tier: Tier = rv?.tiers.find((t) => t.status !== "settled")?.tier ?? "S";
   const name = tierName(tier);
   const give = rv?.live.give;
+  const lead = rv?.live.lead;
+  // Every open initiative: below the tier settling now, the donation that moves it up a
+  // tier; in it, how far ahead it is.
   const rows = useMemo<GiveRow[] | undefined>(() => {
     if (!give) return undefined;
     const bySlug = new Map(cards.map((c) => [c.initiative.slug, c]));
-    return Object.entries(give).flatMap(([slug, entry]) => {
+    const below = Object.entries(give).flatMap(([slug, entry]) => {
       const card = bySlug.get(slug);
       return card ? [{ card, entry, now: result.tiers[slug] }] : [];
     });
-  }, [give, cards, result]);
+    const ahead = [...result.provisional].flatMap((slug) => {
+      const card = bySlug.get(slug);
+      if (!card || give[slug] || result.tiers[slug] !== tier) return [];
+      const l = lead?.[slug];
+      return [{ card, lead: l ? dollars(l) : 0, now: tier }];
+    });
+    return [...ahead, ...below];
+  }, [give, lead, cards, result, tier]);
 
   // The initiative open in the list, and the amount in its donate form.
   const [open, setOpen] = useState<string>();
   const [amount, setAmount] = useState(0);
   const entry: NextTierEntry | undefined = open ? give?.[open] : undefined;
   const gap = entry ? gapUsd(entry) : null;
+  /** The tier the open initiative's donation would get it into. */
+  const toName = entry ? tierName(entry.tier) : name;
   const given = amount;
   const needOf = (slug: string) => {
     const c = cards.find((x) => x.initiative.slug === slug);
@@ -120,17 +133,12 @@ export default function VoteResults(
   const named = (slug: string) => (
     <i className={slug === open ? "text-[#a7e3a5]" : "text-white"}>{titleOf(slug)}</i>
   );
-  const names = (xs: { slug: string }[]) =>
-    xs.map((o, k) => (
-      <Fragment key={o.slug}>
-        {k > 0 && ", "}
-        {named(o.slug)}
-      </Fragment>
-    ));
   /** With the donation, if it is enough: TheDAO's ballot as the tally would have it. */
   const preview = open && entry && gap !== null && given >= gap
     ? (() => {
       const tiers = { ...result.tiers, [open]: entry.tier };
+      // Others it moves to another tier.
+      for (const o of entry.moves) tiers[o.slug] = o.to;
       const funded = new Set(result.funded).add(open);
       const provisional = new Set(result.provisional).add(open);
       // The donation pays that much of its need: the pool is asked for the rest.
@@ -145,27 +153,36 @@ export default function VoteResults(
         result: { tiers, funded, provisional, awards },
         joining: new Map([[open, given]]),
         leaving: new Set(entry.dropsOut.map((o) => o.slug)),
+        moved: new Map(entry.moves.map((o) => [o.slug, o.from] as const)),
       };
     })()
     : undefined;
-  const knockOn = entry && preview && (
+  // Who else it moves is on TheDAO's ballot and in the row's "What else changes": here,
+  // only how many.
+  const others = entry
+    ? new Set([...entry.comesIn, ...entry.moves, ...entry.dropsOut].map((o) => o.slug)).size
+    : 0;
+  const knockOn = preview && others > 0 && (
     <>
-      {entry.comesIn.length > 0 && <>{" "}Also in: {names(entry.comesIn)}.</>}
-      {entry.dropsOut.length > 0 && <>{" "}Drops out: {names(entry.dropsOut)}.</>}
+      {" "}
+      {others === 1
+        ? "1 other initiative changes place."
+        : `${others} other initiatives change places.`}
     </>
   );
   const effect = open && entry && gap !== null && (
     preview
       ? (
         <p className="m-0 rounded-lg border border-dashed border-dao-green/70 bg-dao-green/[.12] px-3 py-2 text-[13px] leading-snug text-white">
-          With your {usd(given)}, the initiative {named(open)} comes into {name} if it settled now.
+          With your {usd(given)}, the initiative {named(open)} comes into {toName}{" "}
+          if it settled now.
           {knockOn}
         </p>
       )
       : given > 0
       ? (
         <p className="m-0 rounded-lg bg-white/[.07] px-3 py-2 text-[13px] leading-snug text-white/80">
-          Not enough alone for {name}: {usd(gap - given)}{" "}
+          Not enough alone for {toName}: {usd(gap - given)}{" "}
           would still be missing. It still counts, and others can add the rest.
         </p>
       )
@@ -267,14 +284,20 @@ export default function VoteResults(
               note={preview && open && (
                 <div className="mt-2 flex items-center gap-3 rounded-lg border border-dashed border-dao-green/70 bg-dao-green/[.12] px-3 py-2">
                   <p className="m-0 flex-1 text-[13.5px] leading-snug text-white">
-                    With your {usd(given)}, the initiative {named(open)} comes into {name}.{knockOn}
+                    With your {usd(given)}, the initiative {named(open)} comes into{" "}
+                    {toName}.{knockOn}
                   </p>
                   <Button sm className="flex-none" onClick={() => setOpen(undefined)}>
                     Clear
                   </Button>
                 </div>
               )}
-              table={{ mirrored: false, joining: preview?.joining, leaving: preview?.leaving }}
+              table={{
+                mirrored: false,
+                joining: preview?.joining,
+                leaving: preview?.leaving,
+                moved: preview?.moved,
+              }}
             />
             <Legend preview={Boolean(preview)} />
           </div>
@@ -313,6 +336,16 @@ function Legend({ preview }: { preview: boolean }) {
       {item("bg-white/55", "funded if its tier settled now")}
       {preview &&
         item("border border-dashed border-dao-green bg-dao-green/30", "with your donation")}
+      {preview && (
+        <span className="flex items-center gap-1.5">
+          <b className="text-vote-pale" aria-hidden="true">↑↓</b>moves with it
+        </span>
+      )}
+      {preview && (
+        <span className="flex items-center gap-1.5 text-[#ff8a88]">
+          <b aria-hidden="true">↓</b>dropped out
+        </span>
+      )}
     </div>
   );
 }

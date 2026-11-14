@@ -454,7 +454,7 @@ it("no warning while B-Tier funds something", async () => {
   expect(screen.queryByText(/B-Tier: nothing funded yet/)).toBeNull();
 });
 
-/** The donation that brings an initiative into the tier settling now, as the server sends it. */
+/** The donation that moves an initiative up a tier, as the server sends it. */
 const give = (over: Record<string, unknown> = {}) => ({
   tier: "S",
   gap: "9000000000",
@@ -463,21 +463,25 @@ const give = (over: Record<string, unknown> = {}) => ({
   moves: [],
   ...over,
 });
-/** An open round with `give` figures. */
+/** An open round with `give` figures, and the leads of what the tier settling now funds. */
 function openWith(
   figures: Record<string, unknown> | undefined,
   live: Record<string, [number, "S" | "A" | "B"]> = { alpha: [50_000, "S"] },
   over: Record<string, unknown> = {},
+  lead?: Record<string, string>,
 ) {
   const view = roundOf({ "1": ballot({ alpha: "S" }) }, live, over);
-  return { ...view, live: { ...view.live, ...(figures ? { give: figures } : {}) } };
+  return {
+    ...view,
+    live: { ...view.live, ...(figures ? { give: figures } : {}), ...(lead ? { lead } : {}) },
+  };
 }
 const daoBallot = () => screen.getByRole("group", { name: /^TheDAO's ballot/ });
-/** The list of what it takes to get in (the box above it names the closest ones too). */
-const list = () => within(screen.getByRole("region", { name: /^What it takes to get into/ }));
+/** The list of what it takes to move up (the box above it names the closest ones too). */
+const list = () => within(screen.getByRole("region", { name: /^What it takes to move up/ }));
 
-it("while open: TheDAO's ballot beside what it takes to get into the tier settling now", async () => {
-  await showOpen(openWith({ beta: give() }));
+it("while open: TheDAO's ballot beside what it takes each initiative to move up", async () => {
+  await showOpen(openWith({ beta: give() }, undefined, {}, { alpha: usdMicro(4_000) }));
   expect(await screen.findByText(/would be funded by 1 ballot/)).toBeInTheDocument();
   // Where the round is: the stepper box in the header.
   const box = await screen.findByRole("region", { name: "Where the round is" });
@@ -488,12 +492,18 @@ it("while open: TheDAO's ballot beside what it takes to get into the tier settli
   expect(alpha).not.toHaveAttribute("data-live");
   expect(alpha.className).not.toContain("dao-green");
   // The call to action: Beta needs $9k donated to come into S-Tier.
-  expect(screen.getByRole("heading", { name: "What it takes to get into S-Tier" }))
-    .toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "What it takes to move up" })).toBeInTheDocument();
   const row = list().getByRole("button", { name: /Beta audits/ });
   expect(row).toHaveTextContent("−$9k");
   expect(row).toHaveTextContent("to S-Tier");
   expect(row).toHaveTextContent("not in TheDAO's ballot");
+  // Alpha, in S-Tier if it settled now, is in the list too, first: $4k ahead there.
+  const ahead = list().getByRole("button", { name: /Alpha fuzzing/ });
+  expect(ahead).toHaveTextContent("$4k");
+  expect(ahead).toHaveTextContent("$4kahead");
+  expect(ahead).not.toHaveTextContent("−");
+  const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits/ });
+  expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta "]);
   // Only the round's initiatives.
   expect(screen.queryByText("Gamma outside")).toBeNull();
 });
@@ -518,7 +528,7 @@ it("opening an initiative previews its donation on TheDAO's ballot", async () =>
   // money brings in.
   const said = screen.getAllByText((_, el) =>
     el?.tagName === "P" &&
-    /With your \$9,000, the initiative Beta audits comes into S-Tier\. Drops out: Alpha fuzzing\./
+    /With your \$9,000, the initiative Beta audits comes into S-Tier\. 1 other initiative changes place\./
       .test(
         el.textContent ?? "",
       )
@@ -526,7 +536,8 @@ it("opening an initiative previews its donation on TheDAO's ballot", async () =>
   expect(said.length).toBeGreaterThan(0);
   expect(within(said[0]).getByText("Beta audits")).toHaveClass("text-[#a7e3a5]");
   expect(within(said[0]).getByText("Beta audits").tagName).toBe("I");
-  expect(within(said[0]).getByText("Alpha fuzzing").tagName).toBe("I");
+  // Who it is shows on TheDAO's ballot (struck through) and in the row: not here.
+  expect(within(said[0]).queryByText("Alpha fuzzing")).toBeNull();
   // Clearing the preview closes it.
   fireEvent.click(screen.getByRole("button", { name: "Clear" }));
   expect(screen.queryByLabelText("Beta audits, comes in with your $9,000")).toBeNull();
@@ -548,16 +559,17 @@ it("once S-Tier settles, the figures are to A-Tier and S-Tier's chips are gold",
       waiting("B"),
     ],
   }));
-  expect(await screen.findByRole("heading", { name: "What it takes to get into A-Tier" }))
+  expect(await screen.findByRole("heading", { name: "What it takes to move up" }))
     .toBeInTheDocument();
   expect(list().getByRole("button", { name: /Alpha fuzzing/ })).toHaveTextContent("−$4k");
+  expect(list().getByRole("button", { name: /Alpha fuzzing/ })).toHaveTextContent("to A-Tier");
   const beta = within(daoBallot()).getByLabelText(/^Beta audits, funded/);
   expect(beta).toHaveAttribute("data-gold", "true");
 });
 
 it("what no donation alone brings in is counted at the end, shown on demand", async () => {
   await showOpen(openWith({ beta: give({ gap: null }) }));
-  const more = await screen.findByRole("button", { name: "+ 1 more out of reach for S-Tier" });
+  const more = await screen.findByRole("button", { name: "+ 1 more out of reach" });
   expect(list().queryByRole("button", { name: /Beta audits/ })).toBeNull();
   fireEvent.click(more);
   expect(list().getByRole("button", { name: /Beta audits/ })).toHaveTextContent(
@@ -573,7 +585,7 @@ it("says so while the figures are worked out", async () => {
 it("the ballot editor's search box filters the list", async () => {
   await showOpen(openWith({ alpha: give({ gap: "2000000000" }), beta: give() }, {}));
   expect(await list().findByRole("button", { name: /Alpha fuzzing/ })).toBeInTheDocument();
-  expect(screen.getByText("Not in S-Tier yet")).toBeInTheDocument();
+  expect(screen.getByText("Open initiatives")).toBeInTheDocument();
   fireEvent.change(screen.getByRole("searchbox"), { target: { value: "beta" } });
   // The box filters a moment after typing.
   await waitFor(() => expect(list().queryByRole("button", { name: /Alpha fuzzing/ })).toBeNull());
@@ -601,4 +613,73 @@ it("beside the round box: the three closest to the tier settling now", async () 
   expect(list().getByRole("button", { name: /Beta audits/, expanded: true })).toBeInTheDocument();
   expect(within(daoBallot()).getByLabelText("Beta audits, comes in with your $3,000"))
     .toBeInTheDocument();
+});
+
+it("a donation that moves another initiative says so, and shows it in its new tier", async () => {
+  // Beta, not funded, comes into B-Tier with $9k; Alpha moves from S-Tier to A-Tier.
+  await showOpen(openWith({
+    beta: give({ tier: "B", moves: [{ slug: "alpha", from: "S", to: "A" }] }),
+  }));
+  const row = await list().findByRole("button", { name: /Beta audits/ });
+  expect(row).toHaveTextContent("to B-Tier");
+  fireEvent.click(row);
+  const said = screen.getAllByText((_, el) =>
+    el?.tagName === "P" &&
+    /comes into B-Tier\. 1 other initiative changes place\./.test(el.textContent ?? "")
+  );
+  expect(said.length).toBeGreaterThan(0);
+});
+
+it("each row says what else its donation changes, in short and, opened, in full", async () => {
+  await showOpen(openWith({
+    beta: give({
+      moves: [{ slug: "alpha", from: "S", to: "A" }],
+      dropsOut: [{ slug: "gamma", tier: "B" }],
+    }),
+  }));
+  const row = await list().findByRole("button", { name: /Beta audits/ });
+  expect(row).toHaveTextContent("1 moves · 1 drops out");
+  fireEvent.click(row);
+  // The row's sentence says how many; the link opens who.
+  const link = screen.getByRole("button", { name: "moves 2 other initiatives" });
+  expect(link.parentElement).toHaveTextContent(
+    "$9,000 more brings it into S-Tier if the vote ended now, and moves 2 other initiatives.",
+  );
+  expect(link).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(link);
+  expect(link).toHaveAttribute("aria-expanded", "true");
+  const lines = (await screen.findAllByText(/S-Tier → A-Tier|drops out of B-Tier/)).map((el) =>
+    el.closest("li")!.textContent
+  );
+  expect(lines).toEqual(["↓Alpha fuzzingS-Tier → A-Tier", "↓gammadrops out of B-Tier"]);
+  // On TheDAO's ballot: Alpha in A-Tier, from S-Tier.
+  expect(within(daoBallot()).getByLabelText("Alpha fuzzing, moves down from S-Tier"))
+    .toBeInTheDocument();
+});
+
+it("a donation that changes nothing else has no link to who", async () => {
+  await showOpen(openWith({ beta: give() }));
+  const row = await list().findByRole("button", { name: /Beta audits/ });
+  expect(row).not.toHaveTextContent("moves");
+  fireEvent.click(row);
+  expect(
+    screen.getAllByText((_, el) =>
+      el?.tagName === "P" &&
+      el.textContent === "$9,000 more brings it into S-Tier if the vote ended now."
+    ),
+  ).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: /other initiative/ })).toBeNull();
+});
+
+it("those ahead in the tier settling now come first, furthest ahead first", async () => {
+  await showOpen(
+    openWith({ gamma: give() }, { alpha: [50_000, "S"], beta: [30_000, "S"] }, {}, {
+      alpha: usdMicro(1_000),
+      beta: usdMicro(12_000),
+    }),
+  );
+  await list().findByRole("button", { name: /Beta audits/ });
+  const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits/ });
+  expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Beta ", "Alpha"]);
+  expect(order[0]).toHaveTextContent("$12k");
 });

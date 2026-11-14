@@ -203,8 +203,29 @@ describe("a donation's preview", () => {
     expect(screen.getByLabelText("Alpha, comes in with your $8,412")).toHaveTextContent(
       "+$8,412 yours",
     );
-    expect(screen.getByLabelText("Beta, drops out")).toBeInTheDocument();
-    // What drops out no longer counts in its tier's amount: only its own chip says it.
-    expect(screen.getAllByText("$40,000")).toHaveLength(1);
+    // What drops out says so in place of its amount, which no longer counts in its tier's.
+    expect(screen.getByLabelText("Beta, drops out")).toHaveTextContent("dropped out");
+    expect(screen.queryByText("$40,000")).toBeNull();
+  });
+
+  it("shows what the donation moves to another tier, with where it came from", () => {
+    render(
+      <FinalTiers
+        label="TheDAO's ballot"
+        items={[{ slug: "a", title: "Alpha" }, { slug: "b", title: "Beta" }]}
+        tiers={{ a: "A", b: "B" }}
+        funded={new Set(["a", "b"])}
+        amounts={new Map([["a", 10_000], ["b", 20_000]])}
+        amountWord="awarded"
+        provisional={new Set(["a", "b"])}
+        moved={new Map([["a", "S"], ["b", "A"]])}
+      />,
+    );
+    expect(screen.getByLabelText("Alpha, moves down from S-Tier")).toHaveTextContent(
+      "↓Alphafrom S-Tier",
+    );
+    expect(screen.getByLabelText("Beta, moves down from A-Tier")).toHaveTextContent(
+      "from A-Tier",
+    );
   });
 });

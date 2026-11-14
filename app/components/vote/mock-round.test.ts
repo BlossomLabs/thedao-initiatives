@@ -100,18 +100,21 @@ describe("dev mocks", () => {
 describe("example vote results", () => {
   // Every open moment (the finished vote has no tier settling).
   it.each(Object.entries(RESULT_MOCKS).filter(([, k]) => k !== "finished"))(
-    "%s: figures to the tier settling now, for what is neither settled nor in it",
+    "%s: below the tier settling now, figures one tier up; in it, leads",
     (_, kind) => {
       const { round, view } = mockRound(kind, cards, 1);
       const live = withGive(view, round, cards).live;
       const settling = view.tiers.find((t) => t.status !== "settled")!.tier;
       const settled = new Set(view.tiers.flatMap((t) => (t.status === "settled" ? t.funded : [])));
+      const order = ["S", "A", "B"];
       const entries = Object.entries(live.give!);
       expect(entries.length).toBeGreaterThan(0);
       for (const [slug, g] of entries) {
-        expect(g.tier).toBe(settling);
         expect(settled.has(slug)).toBe(false);
-        expect(view.live.tiers?.[slug]).not.toBe(settling);
+        const now = view.live.tiers?.[slug];
+        expect(now).not.toBe(settling);
+        // One tier above where the live tally has it; B-Tier when it isn't funded.
+        expect(g.tier).toBe(now ? order[order.indexOf(now) - 1] : "B");
         // A figure in $1K steps, never more than what it needs.
         if (g.gap !== null) {
           const usd = Number(BigInt(g.gap) / 1_000_000n);
@@ -119,6 +122,12 @@ describe("example vote results", () => {
           const c = cards.find((x) => x.initiative.slug === slug)!;
           expect(usd).toBeLessThanOrEqual(c.initiative.goalUsd - c.summary.total);
         }
+      }
+      // Leads only for what the tier settling now funds, in $1K steps.
+      for (const [slug, l] of Object.entries(live.lead ?? {})) {
+        expect(view.live.tiers?.[slug]).toBe(settling);
+        expect(settled.has(slug)).toBe(false);
+        expect(Number(BigInt(l) / 1_000_000n) % 1000).toBe(0);
       }
     },
   );
@@ -136,4 +145,39 @@ it("b-settling: TheDAO's ballot funds one this badge didn't put on its ballot", 
     ...Object.values(m.view.live.awards),
   ].reduce((a, v) => a + BigInt(v), 0n);
   expect(total).toBeLessThanOrEqual(BigInt(m.round.poolUsd));
+});
+
+describe("example knock-ons follow the money", () => {
+  it.each(Object.entries(RESULT_MOCKS).filter(([, k]) => k !== "finished"))(
+    "%s: moving up drops nobody; coming in drops only what the pool can't also pay",
+    (_, kind) => {
+      const { round, view } = mockRound(kind, cards, 1);
+      const live = withGive(view, round, cards).live;
+      const usd = (v: string) => Number(BigInt(v) / 1_000_000n);
+      const settledUsd = view.tiers
+        .flatMap((t) => (t.status === "settled" ? Object.values(t.awards) : []))
+        .reduce((a, v) => a + usd(v), 0);
+      const left = 1_000_000 - settledUsd -
+        Object.values(view.live.awards).reduce((a, v) => a + usd(v), 0);
+      for (const [slug, g] of Object.entries(live.give!)) {
+        if (g.gap === null) continue;
+        if (view.live.tiers?.[slug]) {
+          // Funded already: it frees money, so nobody drops out.
+          expect(g.dropsOut).toEqual([]);
+          continue;
+        }
+        expect(g.moves).toEqual([]);
+        const c = cards.find((x) => x.initiative.slug === slug)!;
+        const asks = c.initiative.goalUsd - c.summary.total - usd(g.gap);
+        const freed = g.dropsOut.reduce((a, o) => a + usd(view.live.awards[o.slug]), 0);
+        // What drops out makes room for it, and no more than needed: without the last
+        // one out, it wouldn't fit.
+        expect(asks).toBeLessThanOrEqual(left + freed);
+        if (g.dropsOut.length) {
+          const lastOut = usd(view.live.awards[g.dropsOut.at(-1)!.slug]);
+          expect(asks).toBeGreaterThan(left + freed - lastOut);
+        }
+      }
+    },
+  );
 });

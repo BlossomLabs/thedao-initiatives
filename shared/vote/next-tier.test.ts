@@ -336,11 +336,15 @@ describe("the S-Tier lead", () => {
     expect(leadIn(inp, 0, 1)).toBe(null);
   });
 
-  it("live leads: only while S-Tier is open, only for S-Tier initiatives", async () => {
+  it("live leads: for the initiatives in the tier settling now", async () => {
     const inp = inputs([10, 40], [49.7], [[1, 2]]);
     expect(liveLeads(inp, 0)).toEqual(new Map([[0, 39n * K]]));
-    expect(liveLeads(inp, 1).size).toBe(0);
     expect(await liveLeadsAsync(inp, 0)).toEqual(liveLeads(inp, 0));
+    // S-Tier settled with initiative 0: A-Tier settles now, and 1 leads there.
+    const later = { ...inp, done: new Set([0]), spent: 10n * K };
+    const inA = chainTally(later, 1, 2)[0].order;
+    expect([...liveLeads(later, 1).keys()]).toEqual(inA);
+    expect(liveLeads(later, 3).size).toBe(0);
   });
 });
 
@@ -396,60 +400,89 @@ describe("the final what-ifs", () => {
   });
 });
 
-/** Tier index of `c` in tier `first` alone when `k` steps are given to it, as giftGaps
- * runs it. */
+/** Where `c` lands (tier index) in the open tiers from `first` when `k` steps are given
+ * to it, as giftGaps runs it; undefined when it isn't funded. */
 function tierGiven(inp: ChainInputs, c: number, k: bigint, first = 0): number | undefined {
   const costs = [...inp.costs];
   costs[c] = costs[c] > k * K ? costs[c] - k * K : 0n;
-  const run = chainTally({ ...inp, costs }, first, first + 1);
-  return run[0].order.includes(c) ? first : undefined;
+  const run = chainTally({ ...inp, costs }, first, 3);
+  const at = run.findIndex((stage) => stage.order.includes(c));
+  return at < 0 ? undefined : first + at;
 }
+/** Where the live tally has `c`, from `first`. */
+const liveTier = (inp: ChainInputs, c: number, first = 0) => tierGiven(inp, c, 0n, first);
+const TIER_INDEX = { S: 0, A: 1, B: 2 } as const;
 
-describe("the donation to the tier settling now", () => {
-  it("is the least $1K step that funds it in that tier", () => {
-    // The voter's $40K can't pay initiative 0's $70K in S-Tier: $30K donated can.
+describe("the donation to the next tier", () => {
+  it("targets the tier just above where the live tally has it: B-Tier when unfunded", () => {
+    // Initiative 0 ($70K) is unfunded; initiative 1 ($40K) is funded in A-Tier.
     const inp = knockOn();
-    const got = giftGaps(inp, 0).get(0)!;
-    expect(got.tier).toBe("S");
-    expect(got.gap).toBe(30n * K);
-    expect(tierGiven(inp, 0, 30n)).toBe(0);
-    expect(tierGiven(inp, 0, 29n)).toBeUndefined();
+    expect(liveTier(inp, 0)).toBeUndefined();
+    expect(liveTier(inp, 1)).toBe(1);
+    const gifts = giftGaps(inp, 0);
+    expect(gifts.get(0)!.tier).toBe("B");
+    expect(gifts.get(1)!.tier).toBe("S");
   });
 
-  it("rounds up to the next $1K", () => {
-    const inp = inputs([70.4, 40], [40], [[1, 2]]);
-    expect(giftGaps(inp, 0).get(0)!.gap).toBe(31n * K);
+  it("is the least $1K step that gets it there or higher", () => {
+    for (
+      const inp of [
+        knockOn(),
+        inputs([70.4, 40], [40], [[1, 2]]),
+        inputs([40, 40, 30], [25, 25], [[1, 2, 3], [2, 1, 3]], 60),
+        inputs([50, 20, 35, 15], [30, 20, 10], [[1, 0, 2, 3], [0, 1, 1, 2], [3, 0, 1, 2]], 80),
+      ]
+    ) {
+      for (const [c, g] of giftGaps(inp, 0)) {
+        if (g.gap === null) continue;
+        expect(g.gap % K).toBe(0n);
+        const target = TIER_INDEX[g.tier];
+        expect(tierGiven(inp, c, g.gap / K)! <= target).toBe(true);
+        if (g.gap > K) {
+          const short = tierGiven(inp, c, g.gap / K - 1n);
+          expect(short === undefined || short > target).toBe(true);
+        }
+      }
+    }
   });
 
-  it("targets the tier settling now, not the one above", () => {
-    // S-Tier settled with initiative 0; A-Tier settles now.
-    const inp = inputs([30, 50, 60], [40], [[1, 2, 2]], 100, [0]);
-    const gifts = giftGaps({ ...inp, spent: 30n * K, weights: [10n * K] }, 1);
-    expect(gifts.has(0)).toBe(false);
-    for (const g of gifts.values()) expect(g.tier).toBe("A");
-  });
-
-  it("has no entry for what the tier already funds", () => {
+  it("has no entry for what the tier settling now funds: those have a lead", () => {
     // Initiative 1 ($40K) is funded in S-Tier by the voter.
     const inp = inputs([70, 40], [40], [[2, 1]]);
     expect(giftGaps(inp, 0).has(1)).toBe(false);
+    expect(liveLeads(inp, 0).has(1)).toBe(true);
   });
 
-  it("is null when even its whole need doesn't get it into the tier", () => {
+  it("once S-Tier has settled, the tier settling now is the top one", () => {
+    // S-Tier settled with initiative 0; A-Tier settles now.
+    const inp = { ...inputs([30, 50, 60], [40], [[1, 2, 3]], 100, [0]) };
+    const settledInp = { ...inp, spent: 30n * K, weights: [10n * K] };
+    const gifts = giftGaps(settledInp, 1);
+    expect(gifts.has(0)).toBe(false);
+    for (const [c, g] of gifts) {
+      expect(g.tier).not.toBe("S");
+      const now = liveTier(settledInp, c, 1);
+      expect(TIER_INDEX[g.tier]).toBe(now === undefined ? 2 : now - 1);
+    }
+  });
+
+  it("is null when even its whole need doesn't get it there", () => {
     // Nobody ranks initiative 1 at all, so it isn't counted whatever it costs.
     const inp = inputs([30, 40], [40], [[1, 0]]);
     const got = giftGaps(inp, 0).get(1);
-    if (got) expect(got.gap === null || tierGiven(inp, 1, got.gap / K) === 0).toBe(true);
+    if (got?.gap) expect(tierGiven(inp, 1, got.gap / K)).not.toBeUndefined();
   });
 
-  it("names who drops out of the tier when it comes in", () => {
-    // Two at $40K in S-Tier with $50K between two voters: one is funded, the other waits.
-    const inp = inputs([40, 40], [25, 25], [[1, 1], [1, 1]], 50);
-    const gifts = giftGaps(inp, 0);
-    for (const [c, g] of gifts) {
+  it("names who comes in, drops out or moves when it does", () => {
+    const inp = inputs([40, 40, 30], [25, 25], [[1, 2, 3], [2, 1, 3]], 60);
+    for (const [c, g] of giftGaps(inp, 0)) {
       if (g.gap === null) continue;
-      expect(tierGiven(inp, c, g.gap / K)).toBe(0);
-      for (const [o] of g.dropsOut) expect(o).not.toBe(c);
+      const others = [...g.comesIn, ...g.dropsOut].map(([o]) => o);
+      expect(others).not.toContain(c);
+      for (const [o, from, to] of g.moves) {
+        expect(o).not.toBe(c);
+        expect(from).not.toBe(to);
+      }
     }
   });
 

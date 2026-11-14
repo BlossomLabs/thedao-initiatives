@@ -8,12 +8,12 @@ import CategoryDot from "~/components/ui/CategoryDot";
 import Reveal from "~/components/ui/Reveal";
 import type { NextTierEntry } from "~/hooks/use-vote";
 import type { Card } from "~/lib/api-types";
-import { usd, usdShortUp } from "~/lib/format";
+import { usd, usdShort, usdShortUp } from "~/lib/format";
 import { lazyPart } from "~/lib/lazy-part";
 import { cn } from "~/lib/utils";
 import { dollars } from "~/lib/vote-results";
 import type { AiSearchResult } from "../../../shared/ai-search";
-import { type Tier, tierName } from "../../../shared/vote/ballot";
+import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
 
 const { Component: DonateWidget } = lazyPart(
   () => import("~/components/donate/DonateWidget"),
@@ -22,21 +22,83 @@ const { Component: DonateWidget } = lazyPart(
 
 export type GiveRow = {
   card: Card;
-  /** The donation that gets it into the tier settling now. */
-  entry: NextTierEntry;
+  /** Below the tier settling now: the donation that moves it up a tier. */
+  entry?: NextTierEntry;
+  /** In the tier settling now: how far ahead it is, in whole dollars (0 under $1K). */
+  lead?: number;
   /** Where TheDAO's ballot has it now, if anywhere. */
   now?: Tier;
 };
 
 /** The gap in whole dollars; null when no donation alone gets it there. */
 export const gapUsd = (e: NextTierEntry) => (e.gap === null ? null : dollars(e.gap));
+/** A row's gap in whole dollars; null for a row ahead in its tier, or out of reach. */
+const rowGap = (r: GiveRow) => (r.entry ? gapUsd(r.entry) : null);
+
+/** What else a donation that moves it up changes, in short: "2 move · 1 drops out". */
+export function knockOnHint(e: NextTierEntry): string {
+  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  return [
+    e.comesIn.length && n(e.comesIn.length, "comes in", "come in"),
+    e.moves.length && n(e.moves.length, "moves", "move"),
+    e.dropsOut.length && n(e.dropsOut.length, "drops out", "drop out"),
+  ].filter(Boolean).join(" · ");
+}
+
+/** Who else a donation moves: who comes in (green), moves to another tier (yellow, up or
+ * down) or drops out (red). */
+function knockOnLines(entry: NextTierEntry) {
+  return [
+    ...entry.comesIn.map((o) => ({
+      slug: o.slug,
+      mark: "+",
+      tone: "text-[#a7e3a5]",
+      what: `comes into ${tierName(o.tier)}`,
+    })),
+    ...entry.moves.map((o) => ({
+      slug: o.slug,
+      mark: TIERS.indexOf(o.to) < TIERS.indexOf(o.from) ? "↑" : "↓",
+      tone: "text-vote-pale",
+      what: `${tierName(o.from)} → ${tierName(o.to)}`,
+    })),
+    ...entry.dropsOut.map((o) => ({
+      slug: o.slug,
+      mark: "↓",
+      tone: "text-[#ff8a88]",
+      what: `drops out of ${tierName(o.tier)}`,
+    })),
+  ];
+}
+
+/** The list the row's "moves N other initiatives" opens. */
+function KnockOnList(
+  { lines, titleOf }: {
+    lines: ReturnType<typeof knockOnLines>;
+    titleOf: (slug: string) => string;
+  },
+) {
+  return (
+    <ul className="m-0 flex list-none flex-col gap-1.5 rounded-[10px] bg-black/[.16] px-3 py-2.5">
+      {lines.map((l) => (
+        <li key={l.slug} className="flex items-center gap-2 text-[13px] leading-snug">
+          <b aria-hidden="true" className={cn("w-4 flex-none text-center", l.tone)}>
+            {l.mark}
+          </b>
+          <i className="min-w-0 flex-1 truncate text-white">{titleOf(l.slug)}</i>
+          <span className="flex-none text-white/65">{l.what}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /**
- * The vote results' call to action: every initiative not in the tier settling now, closest
- * first, with what a donation would take to bring it in (a red number: money missing).
- * Opening one shows the donate form, starting from that amount; what it would change is
- * previewed on TheDAO's ballot beside it. Those no donation alone gets in are counted at
- * the end, and can still be opened.
+ * The vote results' call to action: every open initiative. Those in the tier settling now
+ * first, furthest ahead first, with how far ahead they are (green); then the rest,
+ * closest first, with what a donation would take to move each up a tier, into B-Tier
+ * when it isn't funded (a red number: money missing). Opening one shows the donate form, starting from that amount;
+ * what it would change is previewed on TheDAO's ballot beside it. Those no donation alone
+ * moves up are counted at the end, and can still be opened.
  */
 export default function GiveList(
   {
@@ -71,6 +133,8 @@ export default function GiveList(
 ) {
   const name = tierName(tier);
   const [showFar, setShowFar] = useState(false);
+  /** The row whose "moves N other initiatives" list is open. */
+  const [knock, setKnock] = useState<string>();
   // The ballot editor's search (keywords, or AI) and category filter, over the list.
   const [view, setView] = useState<BoardView>({ ...DEFAULT_VIEW });
   const [aiResult, setAiResult] = useState<AiSearchResult | null>(null);
@@ -82,21 +146,30 @@ export default function GiveList(
     [view, ai, asking, search.aiAuto],
   );
   const all = useMemo(() => rows ?? [], [rows]);
+  const titles = useMemo(
+    () => new Map(all.map((r) => [r.card.initiative.slug, r.card.initiative.title])),
+    [all],
+  );
+  const titleOf = (slug: string) => titles.get(slug) ?? slug;
   const counts = useMemo(() => facetCounts(all.map((r) => r.card), shownView), [all, shownView]);
   const filtered = isFiltered(shownView);
   const found = all.filter((r) => matches(r.card, shownView));
   // Closest first; with the AI order on, the best matches first.
   const score = new Map(aiResult?.scores.map(({ id, score }) => [id, score]) ?? []);
   const of = (r: GiveRow) => score.get(r.card.initiative.id) ?? -1;
-  const near = found.filter((r) => r.entry.gap !== null)
-    .sort((a, b) => ai ? of(b) - of(a) : gapUsd(a.entry)! - gapUsd(b.entry)!);
-  const far = found.filter((r) => r.entry.gap === null)
+  // In the tier settling now: the furthest ahead first, down to the closest to dropping
+  // out, then (below them) those closest to coming in.
+  const ahead = found.filter((r) => !r.entry)
+    .sort((a, b) => ai ? of(b) - of(a) : (b.lead ?? 0) - (a.lead ?? 0));
+  const near = found.filter((r) => rowGap(r) !== null)
+    .sort((a, b) => ai ? of(b) - of(a) : rowGap(a)! - rowGap(b)!);
+  const far = found.filter((r) => r.entry && r.entry.gap === null)
     .sort((a, b) =>
       ai ? of(b) - of(a) : a.card.initiative.title.localeCompare(b.card.initiative.title)
     );
   const shown = showFar || far.some((r) => r.card.initiative.slug === open)
-    ? [...near, ...far]
-    : near;
+    ? [...ahead, ...near, ...far]
+    : [...ahead, ...near];
 
   return (
     <section aria-labelledby="give-heading" className="min-w-0">
@@ -104,18 +177,19 @@ export default function GiveList(
         id="give-heading"
         className="m-0 font-inter-tight text-[20px] font-semibold leading-tight tracking-[-.01em] text-white"
       >
-        What it takes to get into {name}
+        What it takes to move up
       </h2>
       <p className="m-0 mt-1.5 text-[14px] leading-snug text-white/65">
         {name}{" "}
         is the tier settling now. Donations count in the next tally: the red number is what each
-        initiative still misses to come in if it settled now.
+        initiative still misses to move up a tier if the vote ended now; the green one, how far
+        ahead those in {name} are.
       </p>
       {rows !== undefined && rows.length > 0 && (
         <div className="mt-4">
           <div className="mb-3 flex min-h-7 items-center gap-2 px-1">
             <span className="text-[12px] uppercase tracking-[.08em] text-white/55">
-              Not in {name} yet
+              Open initiatives
             </span>
             <span className="whitespace-nowrap text-[12px] text-white/40 tnum">
               {filtered || ai ? `${found.length} of ` : ""}
@@ -146,7 +220,7 @@ export default function GiveList(
       {rows === undefined
         ? <p className="mt-5 text-[14px] text-white/55">Working out what each initiative needs…</p>
         : rows.length === 0
-        ? <p className="mt-5 text-[14px] text-white/55">Every initiative left is in {name}.</p>
+        ? <p className="mt-5 text-[14px] text-white/55">No initiative is left open.</p>
         : found.length === 0
         ? (
           <p className="px-1 py-6 text-center text-[13px] text-white/45">
@@ -158,7 +232,11 @@ export default function GiveList(
             {shown.map((r) => {
               const i = r.card.initiative;
               const isOpen = open === i.slug;
-              const gap = gapUsd(r.entry);
+              const gap = rowGap(r);
+              const to = r.entry && tierName(r.entry.tier);
+              const hint = r.entry && gap !== null ? knockOnHint(r.entry) : "";
+              const lines = r.entry && gap !== null ? knockOnLines(r.entry) : [];
+              const knockOpen = knock === i.slug && isOpen;
               const cat = i.categories[0];
               const need = Math.max(0, i.goalUsd - r.card.summary.total);
               return (
@@ -168,7 +246,7 @@ export default function GiveList(
                   className={cn(
                     "scroll-mt-6 rounded-xl border transition-colors",
                     isOpen ? "border-white/25 bg-white/[.07]" : "border-white/[.08] bg-white/[.04]",
-                    gap === null && !isOpen && "opacity-70",
+                    r.entry && gap === null && !isOpen && "opacity-70",
                   )}
                 >
                   <button
@@ -186,15 +264,34 @@ export default function GiveList(
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[14px] text-white">{i.title}</span>
-                      <span className="mt-0.5 block text-[12px] text-white/55 tnum">
+                      <span className="mt-0.5 block truncate text-[12px] text-white/55 tnum">
                         Needs {usd(need)} ·{" "}
                         {r.now ? `now in ${tierName(r.now)}` : "not in TheDAO's ballot"}
+                        {hint && <span className="text-vote-pale">{` · ${hint}`}</span>}
                       </span>
                     </span>
-                    {gap === null
+                    {!r.entry
+                      ? (
+                        <span className="flex flex-none items-center gap-1.5 whitespace-nowrap">
+                          {r.lead
+                            ? (
+                              <b className="rounded-md bg-dao-green px-2 py-[3px] font-inter-tight text-[15px] font-bold text-[#0f2a17] tnum">
+                                {usdShort(r.lead)}
+                              </b>
+                            )
+                            : null}
+                          {
+                            // The words after the pill keep one width, so every pill lines up.
+                          }
+                          <small className="w-[46px] text-[12px] text-[#a7e3a5]">
+                            {r.lead ? "ahead" : `In ${name}`}
+                          </small>
+                        </span>
+                      )
+                      : gap === null
                       ? (
                         <span className="flex-none text-[12.5px] text-white/60">
-                          Out of reach for <span className="whitespace-nowrap">{name}</span>
+                          Out of reach for <span className="whitespace-nowrap">{to}</span>
                         </span>
                       )
                       : (
@@ -202,7 +299,7 @@ export default function GiveList(
                           <b className="rounded-md bg-[#c22d2b] px-2 py-[3px] font-inter-tight text-[15px] font-bold text-white tnum">
                             −{usdShortUp(gap)}
                           </b>
-                          <small className="text-[12px] text-white/65">to {name}</small>
+                          <small className="w-[46px] text-[12px] text-white/65">to {to}</small>
                         </span>
                       )}
                     <ChevronDown
@@ -216,22 +313,59 @@ export default function GiveList(
                   <Reveal show={isOpen} id={`give-${i.slug}`}>
                     <div className="flex flex-col gap-3 px-3.5 pb-4">
                       <p className="m-0 text-[13.5px] leading-snug text-white/75">
-                        {gap === null
+                        {!r.entry
                           ? (
                             <>
-                              No donation alone brings it into {name}{" "}
+                              {r.lead
+                                ? (
+                                  <>
+                                    <b className="font-semibold text-white">{usd(r.lead)}</b>{" "}
+                                    ahead in{" "}
+                                    <span className="whitespace-nowrap">{name}</span>: it would stay
+                                    funded there if it settled now, even with that much less
+                                    backing.
+                                  </>
+                                )
+                                : <>In {name} if it settled now, with little to spare.</>}{" "}
+                              A donation lowers what it asks of the pool.
+                            </>
+                          )
+                          : gap === null
+                          ? (
+                            <>
+                              No donation alone brings it into {to}{" "}
                               now. It still counts toward its goal.
                             </>
                           )
                           : (
                             <>
                               <b className="font-semibold text-white">{usd(gap)}</b>{" "}
-                              more brings it into <span className="whitespace-nowrap">{name}</span>
+                              more brings it into <span className="whitespace-nowrap">{to}</span>
                               {" "}
-                              if it settled now.
+                              if the vote ended now{lines.length === 0 ? "." : (
+                                <>
+                                  , and{" "}
+                                  <button
+                                    type="button"
+                                    aria-expanded={knockOpen}
+                                    aria-controls={`knock-${i.slug}`}
+                                    onClick={() => setKnock(knockOpen ? undefined : i.slug)}
+                                    className="cursor-pointer text-vote-pale underline decoration-dotted underline-offset-2 hover:text-white"
+                                  >
+                                    moves {lines.length === 1
+                                      ? "another initiative"
+                                      : `${lines.length} other initiatives`}
+                                  </button>.
+                                </>
+                              )}
                             </>
                           )}
                       </p>
+                      {lines.length > 0 && (
+                        <Reveal show={knockOpen} id={`knock-${i.slug}`}>
+                          <KnockOnList lines={lines} titleOf={titleOf} />
+                        </Reveal>
+                      )}
                       {canDonate || example
                         ? (
                           isOpen && (
@@ -243,10 +377,10 @@ export default function GiveList(
                                 onConfirmed={onDonated}
                                 suggested={gap === null
                                   ? undefined
-                                  : { usd: gap, note: `brings it into ${name}` }}
+                                  : { usd: gap, note: `brings it into ${to}` }}
                                 onAmount={onAmount}
                                 example={example}
-                                accent="red"
+                                accent={r.entry ? "red" : "green"}
                               />
                             </Suspense>
                           )
@@ -270,7 +404,7 @@ export default function GiveList(
           onClick={() => setShowFar(true)}
           className="mt-2 cursor-pointer text-[13px] text-white/55 underline-offset-2 hover:text-white hover:underline"
         >
-          + {far.length} more out of reach for {name}
+          + {far.length} more out of reach
         </button>
       )}
     </section>
@@ -294,9 +428,10 @@ export function ClosestBox(
   },
 ) {
   const name = tierName(tier);
-  const near = (rows ?? []).filter((r) => r.entry.gap !== null)
-    .sort((a, b) => gapUsd(a.entry)! - gapUsd(b.entry)!);
-  const within = near.filter((r) => gapUsd(r.entry)! <= NEAR_USD).length;
+  // Only those one step below it: a donation moves the others up to a lower tier first.
+  const near = (rows ?? []).filter((r) => r.entry?.tier === tier && rowGap(r) !== null)
+    .sort((a, b) => rowGap(a)! - rowGap(b)!);
+  const within = near.filter((r) => rowGap(r)! <= NEAR_USD).length;
   return (
     <section
       aria-labelledby="closest-heading"
@@ -339,7 +474,7 @@ export function ClosestBox(
                         {i.title}
                       </span>
                       <b className="flex-none rounded-md bg-[#c22d2b] px-1.5 py-[2px] font-inter-tight text-[13.5px] font-bold text-white tnum">
-                        −{usdShortUp(gapUsd(r.entry)!)}
+                        −{usdShortUp(rowGap(r)!)}
                       </b>
                     </button>
                   </li>

@@ -21,7 +21,7 @@ Deno.test("private fields: stale admin reads and harmless edits cannot bypass th
     const readers = [
       `/api/admin/initiatives/${row.id}`,
       `/api/initiatives/${row.slug}`,
-      "/api/admin/dashboard",
+      "/api/admin/initiatives",
     ];
     for (const path of readers) {
       const res = await h.req(path, { token: stale });
@@ -66,7 +66,7 @@ Deno.test("private fields: stale admin reads and harmless edits cannot bypass th
       assertStringIncludes(body, CONTACT, path);
       assertStringIncludes(body, FUNDERS, path);
     }
-    const dashboard = await j(await h.req("/api/admin/dashboard", { token: fresh })) as {
+    const dashboard = await j(await h.req("/api/admin/initiatives", { token: fresh })) as {
       rows: { initiative: { contact?: string } }[];
     };
     assertEquals(dashboard.rows[0].initiative.contact, CONTACT);

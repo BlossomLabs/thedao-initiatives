@@ -53,9 +53,9 @@ Deno.test("admin promotion requires fresh authentication; demotion removes acces
   const h = await harness();
   try {
     const token = await h.mint(PLAIN, false);
-    assertEquals((await h.req("/api/admin/dashboard", { token })).status, 403);
+    assertEquals((await h.req("/api/admin/todo", { token })).status, 403);
     h.deps.config.adminAddresses.push(PLAIN);
-    assertEquals((await h.req("/api/admin/dashboard", { token })).status, 403);
+    assertEquals((await h.req("/api/admin/todo", { token })).status, 403);
     assertEquals((await (await h.req("/api/auth/me", { token })).json()).isAdmin, false);
 
     const signer = wallet("0x" + "22".repeat(32));
@@ -72,12 +72,12 @@ Deno.test("admin promotion requires fresh authentication; demotion removes acces
     assertEquals(login.status, 200);
     const fresh = await login.json() as { token: string; isAdmin: boolean };
     assertEquals(fresh.isAdmin, true);
-    assertEquals((await h.req("/api/admin/dashboard", { token: fresh.token })).status, 200);
+    assertEquals((await h.req("/api/admin/todo", { token: fresh.token })).status, 200);
     assertEquals((await h.req("/api/auth/me", { token })).status, 401);
 
     // No clock advance: authorization must not wait for a cached role snapshot.
     h.deps.config.adminAddresses.splice(h.deps.config.adminAddresses.indexOf(PLAIN), 1);
-    assertEquals((await h.req("/api/admin/dashboard", { token: fresh.token })).status, 403);
+    assertEquals((await h.req("/api/admin/todo", { token: fresh.token })).status, 403);
     assertEquals(
       (await (await h.req("/api/auth/me", { token: fresh.token })).json()).isAdmin,
       false,

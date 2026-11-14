@@ -30,6 +30,7 @@ import { api, ApiError, apiText, errorMessage } from "~/lib/api";
 import type { AdminInitiativePage } from "~/lib/api-types";
 import { walletErrorMessage } from "~/lib/donate";
 import { dt } from "~/lib/format";
+import { rememberInitiative } from "~/lib/admin-recent";
 import { discussionKind } from "~/lib/discussion";
 import { withReauthentication } from "~/lib/reauthenticate";
 
@@ -59,6 +60,11 @@ export default function ManageInitiative() {
   });
   // Once resolved, keep the editor on this ID even if its public URL is reused.
   const initiativeId = data?.initiative.id;
+  // The dashboard lists the initiatives this browser opened lately.
+  const loaded = data?.initiative;
+  useEffect(() => {
+    if (loaded) rememberInitiative(loaded.slug, loaded.title);
+  }, [loaded?.slug, loaded?.title]);
   useEffect(() => {
     if (initiativeId && slug !== initiativeId) {
       navigate(`/admin/initiatives/${initiativeId}`, { replace: true });

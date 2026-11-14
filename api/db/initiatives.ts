@@ -53,7 +53,7 @@ export type RevisionInput = InitiativeTextInput & { categories?: string[]; goalU
 const sameList = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && a.every((x, i) => x === b[i]);
 
-/** The fields a board card, the funding summary and the ledger status read from a row. */
+/** The fields a board card, the funding summary, the ledger status and the admin to-do list read from a row. */
 export const CARD_FIELDS = [
   "id",
   "slug",
@@ -70,6 +70,7 @@ export const CARD_FIELDS = [
   "affiliations",
   "createdAt",
   "approvedAt",
+  "pendingRevision",
 ] as const;
 export type CardRow = Pick<Initiative, typeof CARD_FIELDS[number]>;
 export function cardRow(r: Initiative): CardRow {
@@ -81,7 +82,7 @@ export function cardRow(r: Initiative): CardRow {
 /** Under meta: the status index (#47) is complete at this shape. Missing (a database from
  * before it, or one restored from a backup) means the next cards() read rebuilds it. */
 export const STATUS_INDEX_MARK = "rfp_by_status";
-const STATUS_INDEX_VERSION = 3; // 2: cards carry recipientTeam; 3: and vote affiliations
+const STATUS_INDEX_VERSION = 4; // 2: cards carry recipientTeam; 3: and vote affiliations; 4: and pendingRevision
 
 export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
   /** Every row write also writes its card under its status, off the old status when it moved. */
@@ -604,8 +605,9 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
             .set(held.key, { ...held.value, state: "superseded" });
         }
         op.set(K.revision(id, m), revision);
-        indexRow(op, initiative, next);
       }
+      // Both verdicts clear pendingRevision, which the card carries for the to-do list.
+      indexRow(op, initiative, next);
       const res = await op.set(K.initiative(id), next).commit();
       if (res.ok) return { initiative: next, revision };
     }

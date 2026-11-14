@@ -293,9 +293,9 @@ Deno.test("comments: author starting vote, toggle, switch, ordering data, claim 
     held.id,
   ]);
   assertEquals((await db.comments.byClaimTokens([c.claimToken])).length, 0); // published: never via token
-  assertEquals((await db.comments.held()).length, 1);
+  assertEquals((await db.comments.queues()).held.length, 1);
   await db.comments.addReport(c.id);
-  assertEquals((await db.comments.reported())[0].reports, 1);
+  assertEquals((await db.comments.queues()).reported[0].reports, 1);
   kv.close();
 });
 

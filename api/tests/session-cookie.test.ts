@@ -57,7 +57,7 @@ Deno.test("verify with cookie: true sets an HttpOnly cookie and omits the token"
     const me = await h.req("/api/auth/me", { headers: { Cookie: cookie } });
     assertEquals(me.status, 200);
     assertEquals((await j(me)).address, ADMIN);
-    const admin = await h.req("/api/admin/dashboard", { headers: { Cookie: cookie } });
+    const admin = await h.req("/api/admin/todo", { headers: { Cookie: cookie } });
     assertEquals(admin.status, 200);
     assertEquals((await h.req("/api/auth/me")).status, 401);
     // The admin flag is still re-read per request.

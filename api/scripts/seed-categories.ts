@@ -40,8 +40,8 @@ const headers = {
 };
 
 type Row = { initiative: { id: string; slug: string; status: string; categories?: string[] } };
-const dash = await fetch(apiUrl + "/api/admin/dashboard", { headers });
-if (!dash.ok) throw new Error(`dashboard ${dash.status}: ${await dash.text()}`);
+const dash = await fetch(apiUrl + "/api/admin/initiatives", { headers });
+if (!dash.ok) throw new Error(`initiatives ${dash.status}: ${await dash.text()}`);
 const rows = (await dash.json() as { rows: Row[] }).rows.map((r) => r.initiative);
 const bySlug = new Map(rows.map((r) => [r.slug, r]));
 

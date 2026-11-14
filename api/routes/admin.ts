@@ -16,6 +16,7 @@ import {
   adminCardInitiative,
   adminCommentJson,
   adminInitiative,
+  cardInitiative,
   donationJson,
   ipfsUrl,
   pledgeJson,
@@ -33,6 +34,8 @@ import { liveRoles } from "../services/roles.ts";
 import { heldContext, rescreen } from "../services/moderation.ts";
 import type { AdminEntry } from "../services/admins.ts";
 import type { Comment, Initiative, Pledge, PledgeStatus } from "../db/types.ts";
+import type { CardRow } from "../db/initiatives.ts";
+import { sharedChainState } from "../services/chain-state.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
 
 export function adminRoutes(deps: Deps) {
@@ -73,17 +76,6 @@ export function adminRoutes(deps: Deps) {
     if (!initiative) throw new HttpError(404, "not found");
     return initiative;
   };
-  const withInitiative = async (rows: Comment[]) => {
-    const out = [];
-    const admins = await deps.admins.set();
-    for (const cm of rows) {
-      const initiative = await db.initiatives.get(cm.rfpId);
-      // The admin tables show no role tags, so the badge is not looked up here.
-      out.push(adminCommentJson(cm, liveRoles(admins, cm.address, initiative, false), initiative));
-    }
-    return out;
-  };
-
   /** Vote-eligibility display settings (flag, floor, cap): no deploy needed to change them. */
   r.get("/vote-settings", async (c) => c.json(await voteSettings(deps)));
   r.post("/vote-settings", async (c) => {
@@ -93,46 +85,66 @@ export function adminRoutes(deps: Deps) {
     return c.json(v);
   });
 
-  r.get("/dashboard", async (c) => {
-    const [pending, approved, other] = await Promise.all([
-      db.initiatives.list(["pending"]),
-      db.initiatives.list(["approved"]),
-      db.initiatives.list(["rejected", "archived"]),
+  /**
+   * The dashboard's first paint (#89): what is waiting for an admin, from the
+   * status index and one pass over the comments. No funding, chain or Safe
+   * calls, so it answers in one KV wave however many initiatives there are.
+   */
+  r.get("/todo", async (c) => {
+    const [pending, approved, rejected, archived, queues, admins] = await Promise.all([
+      db.initiatives.cards("pending"),
+      db.initiatives.cards("approved"),
+      db.initiatives.cards("rejected"),
+      db.initiatives.cards("archived"),
+      db.comments.queues(),
+      deps.admins.set(),
     ]);
-    const rows = [];
-    // Maintenance pauses the balance refresh the dashboard would trigger.
-    const revalidate = !(await deps.maintenance.on());
-    for (const initiative of [...pending, ...approved, ...other]) {
-      rows.push({
-        initiative: adminCardInitiative(
-          initiative,
-          canReadPrivateFields(initiative, c.var.user, deps.now()),
-        ),
-        summary: await deps.funding.summary(initiative, revalidate),
-        safeSync: initiative.safeAddress ? await db.meta.safeSync(initiative.id) : null,
-      });
-    }
-    const held = await db.comments.held();
-    const unanswered = await db.comments.unansweredQuestions();
+    const all = [...pending, ...approved, ...rejected, ...archived];
+    const byId = new Map(all.map((x) => [x.id, x]));
+    // The admin tables show no role tags, so neither the proposer nor the badge is looked up.
+    const comment = (cm: Comment) =>
+      adminCommentJson(cm, liveRoles(admins, cm.address, null, false), byId.get(cm.rfpId));
+    const todoRow = (x: CardRow) => ({
+      ...cardInitiative(x),
+      pendingRevision: x.pendingRevision ?? null,
+    });
     const weekAgo = deps.now() - 7 * 86400;
-    const stale = unanswered.filter((q) => q.createdAt < weekAgo);
-    const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
-    const context = await heldContext(deps, held, [...pending, ...approved, ...other]);
     return c.json({
-      rows,
-      pendingCount: pending.length,
-      chain: await chain.state(),
-      held: (await withInitiative(held)).map((row, i) => ({
-        ...row,
-        context: context.get(held[i].id) ?? { parent: null, author: null },
-      })),
-      unanswered: await withInitiative(unanswered),
-      reported: await withInitiative(await db.comments.reported()),
+      // Oldest first: the one that has waited longest is the next to review.
+      submissions: [...pending].reverse().map(todoRow),
+      edits: approved.filter((x) => x.pendingRevision).map(todoRow),
+      held: queues.held.map(comment),
+      unanswered: queues.unanswered.map(comment),
+      reported: queues.reported.map(comment),
       weekAgo,
-      bell: held.length + stale.length,
+      // For the "Open an initiative" search: every row, newest first within each status.
+      index: all.map((x) => ({
+        id: x.id,
+        slug: x.slug,
+        title: x.title,
+        status: x.status,
+        type: x.type,
+      })),
+      counts: {
+        total: all.length,
+        approved: approved.length,
+        approvedThisWeek: approved.filter((x) => (x.approvedAt ?? 0) >= weekAgo).length,
+      },
+    });
+  });
+
+  /** The services an admin checks now and then: snapshots only, never a chain call. */
+  r.get("/status", async (c) => {
+    const [state, quota] = await Promise.all([
+      sharedChainState(deps, false),
+      db.meta.get("safe_api_quota"),
+    ]);
+    const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
+    return c.json({
+      chain: { detail: state.detail, checkedAt: state.checkedAt },
       safeApi: {
         configured: Boolean(config.safeApiKey),
-        quota: await db.meta.get("safe_api_quota"),
+        quota,
         refreshMinutes: config.safeSyncTtlSecs / 60,
       },
       signers: {
@@ -141,6 +153,65 @@ export function adminRoutes(deps: Deps) {
         list: config.operationalSigners,
         threshold: SAFE_THRESHOLD,
       },
+    });
+  });
+
+  /**
+   * The held comments with what an admin needs to publish or discard them
+   * (#88): the parent of a reply and what the board knows about the author.
+   * Its own request: the author facts read every initiative and ask the chain
+   * for badges, which the to-do list's first paint must not wait for.
+   */
+  r.get("/held", async (c) => {
+    const [{ held }, initiatives, admins] = await Promise.all([
+      db.comments.queues(),
+      db.initiatives.list(["pending", "approved", "rejected", "archived"]),
+      deps.admins.set(),
+    ]);
+    const byId = new Map(initiatives.map((x) => [x.id, x]));
+    const context = await heldContext(deps, held, initiatives);
+    return c.json({
+      held: held.map((cm) => ({
+        ...adminCommentJson(cm, liveRoles(admins, cm.address, null, false), byId.get(cm.rfpId)),
+        context: context.get(cm.id) ?? { parent: null, author: null },
+      })),
+    });
+  });
+
+  /**
+   * Every initiative for the dashboard's full table, loaded only when it is
+   * opened. Funding comes from the card summaries and the Safe balance
+   * snapshots, never a refresh: the table is a list, the initiative page is
+   * where a balance is refreshed.
+   */
+  r.get("/initiatives", async (c) => {
+    const rows = await db.initiatives.list(["pending", "approved", "rejected", "archived"]);
+    const rank = { pending: 0, approved: 1, rejected: 2, archived: 2 } as const;
+    rows.sort((a, b) => rank[a.status] - rank[b.status]);
+    const ids = rows.map((x) => x.id);
+    const [summaries, syncs] = await Promise.all([
+      db.cards.summaries(ids),
+      db.meta.safeSyncs(ids),
+    ]);
+    const now = deps.now();
+    return c.json({
+      rows: await Promise.all(rows.map(async (initiative, i) => {
+        const s = summaries[i];
+        const sumOf = (status: Pledge["status"]) =>
+          s.pledges.filter((p) => p.status === status).reduce((n, p) => n + p.amountUsd, 0);
+        return {
+          initiative: adminCardInitiative(
+            initiative,
+            canReadPrivateFields(initiative, c.var.user, now),
+          ),
+          summary: await deps.funding.summaryOf(initiative, {
+            pledged: sumOf("pledged"),
+            received: sumOf("received"),
+            ledger: s.donatedUsd,
+          }),
+          safeSync: initiative.safeAddress ? syncs[i] : null,
+        };
+      })),
     });
   });
 

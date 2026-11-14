@@ -404,7 +404,7 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
   // The sign-in already carried what /me says, so the page needn't ask.
   assertEquals(body.me, me);
   assertEquals((await h.req("/api/auth/me")).status, 401);
-  assertEquals((await h.req("/api/admin/dashboard", { token: body.token })).status, 200);
+  assertEquals((await h.req("/api/admin/todo", { token: body.token })).status, 200);
   await h.req("/api/auth/logout", { method: "POST", token: body.token });
   assertEquals((await h.req("/api/auth/me", { token: body.token })).status, 401);
   // a non-admin wallet gets a plain session (past the per-IP login window)
@@ -419,7 +419,7 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
     }),
   ) as { token: string; isAdmin: boolean };
   assertEquals(r2.isAdmin, false);
-  assertEquals((await h.req("/api/admin/dashboard", { token: r2.token })).status, 403);
+  assertEquals((await h.req("/api/admin/todo", { token: r2.token })).status, 403);
   h.close();
 });
 
@@ -672,13 +672,15 @@ Deno.test("admin: settings, status, pledges with logo, safe deploy params + conf
     }),
   ) as { slug: string };
   const id = (await h.db.initiatives.bySlug(sub.slug))!.id;
-  assertEquals((await h.req("/api/admin/dashboard")).status, 401);
-  const dash = await j(await h.req("/api/admin/dashboard", { token: admin })) as {
-    pendingCount: number;
+  assertEquals((await h.req("/api/admin/todo")).status, 401);
+  const todo = await j(await h.req("/api/admin/todo", { token: admin })) as {
+    submissions: { id: string }[];
+  };
+  assertEquals(todo.submissions.map((x) => x.id), [id]);
+  const status = await j(await h.req("/api/admin/status", { token: admin })) as {
     signers: { ok: boolean };
   };
-  assertEquals(dash.pendingCount, 1);
-  assert(dash.signers.ok);
+  assert(status.signers.ok);
   const patched = await j(
     await h.req("/api/admin/initiatives/" + id, {
       method: "PATCH",

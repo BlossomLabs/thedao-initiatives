@@ -143,12 +143,10 @@ Deno.test("comments: anonymous needs a name; without AI, anon posts are held wit
   };
   assertEquals(mine.held.map((x) => x.id), [held.id]);
   const admin = await h.mint(ADMIN, true);
-  const dash = await j(await h.req("/api/admin/dashboard", { token: admin })) as {
+  const todo = await j(await h.req("/api/admin/todo", { token: admin })) as {
     held: unknown[];
-    bell: number;
   };
-  assertEquals(dash.held.length, 1);
-  assertEquals(dash.bell, 1);
+  assertEquals(todo.held.length, 1);
   await h.req(`/api/admin/comments/${held.id}/publish`, { method: "POST", token: admin });
   const list2 = await j(await h.req(`/api/initiatives/${initiative.slug}/comments`)) as {
     entries: { displayName: string; roles: string[]; votes: number }[];
@@ -212,7 +210,7 @@ Deno.test("AI screen: constructive publishes, unclear holds, spam discards but l
   verdict = "spam";
   const spam = await j(await post(undefined, { name: "C" }));
   assertEquals(spam, { status: "held", id: "", claimToken: "" });
-  assertEquals((await h.db.comments.held()).length, 1); // the spam one was never stored
+  assertEquals((await h.db.comments.queues()).held.length, 1); // the spam one was never stored
   fail = true;
   h.clock.now += 3601; // anonymous posts are capped at 3/hour/IP
   assertEquals((await j(await post(undefined, { name: "D" }))).status, "held");
@@ -402,7 +400,7 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
   assertEquals(plainReply.claimToken.length, 32);
   assertEquals(plainReply.answered, false);
   assertEquals((await h.db.comments.get(c1.id))!.answered, false);
-  const heldReply = (await h.db.comments.held()).find((x) => x.address === PLAIN)!;
+  const heldReply = (await h.db.comments.queues()).held.find((x) => x.address === PLAIN)!;
   assertEquals(heldReply.parentId, c1.id);
   const rep = await j(
     await h.req(`/api/comments/${c1.id}/reply`, {
@@ -448,7 +446,7 @@ Deno.test("roles: fast lane, starting vote, eligibility, replies, ordering, feat
     200,
   );
   assertEquals((await h.db.comments.get(c1.id))!.reports, 0);
-  assertEquals((await h.db.comments.reported()).length, 0);
+  assertEquals((await h.db.comments.queues()).reported.length, 0);
 
   // Acceptance was removed even for historical suggestions; review still works.
   assertEquals(

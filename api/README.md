@@ -207,7 +207,10 @@ The account watchlist: `GET /api/watchlist` (the account's `{ids}`, 404 when it 
 `PUT /api/watchlist/:id` and `DELETE /api/watchlist/:id` (add or remove one; 404 when the account
 has no list). The writes share a limit of 60 per minute per account.
 
-Admin (`/api/admin/...`): `GET dashboard`, `GET initiatives/:id`, `PATCH initiatives/:id` (the admin
+Admin (`/api/admin/...`): `GET todo` (the dashboard's first paint: pending submissions, waiting
+edits, moderation queues and an index of every initiative, from KV only), `GET status` (Safe API,
+chain and signer snapshots, no live chain call), `GET initiatives` (the full table, card summaries
+and balance snapshots, never a refresh), `GET initiatives/:id`, `PATCH initiatives/:id` (the admin
 settings only: `sortRank`, `paidOutUsd`, `proposer`; the last two need recent authentication),
 `POST initiatives/:id/status`, `POST initiatives/:id/revisions/:n` (archive / unarchive),
 `POST|PATCH|DELETE initiatives/:id/pledges[/:pid]`, `POST initiatives/:id/donations/recheck`,

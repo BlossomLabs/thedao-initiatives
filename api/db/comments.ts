@@ -179,10 +179,6 @@ export function commentsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions =
 
   const all = () => collect(kv.list<Comment>({ prefix: ["comment"] }));
 
-  async function held(): Promise<Comment[]> {
-    return (await all()).filter((c) => c.status === "held")
-      .sort((a, b) => b.reports - a.reports || a.createdAt - b.createdAt);
-  }
   /** Every comment (any status) by these wallets, keyed lowercase: one scan. */
   async function byAuthors(addresses: string[]): Promise<Map<string, Comment[]>> {
     const want = new Set(addresses.filter(Boolean).map((a) => a.toLowerCase()));
@@ -197,15 +193,22 @@ export function commentsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions =
     }
     return out;
   }
-  async function unansweredQuestions(): Promise<Comment[]> {
-    return (await all()).filter((c) =>
-      c.status === "published" && c.type === "question" && !c.answered &&
-      c.parentId === null
-    ).sort((a, b) => a.createdAt - b.createdAt);
-  }
-  async function reported(): Promise<Comment[]> {
-    return (await all()).filter((c) => c.status === "published" && c.reports > 0)
-      .sort((a, b) => b.reports - a.reports || a.createdAt - b.createdAt);
+  const isUnanswered = (c: Comment) =>
+    c.status === "published" && c.type === "question" && !c.answered && c.parentId === null;
+
+  /** The three moderation queues from one pass over the comments: held (most
+   * reported first), unanswered questions (oldest first) and reported entries. */
+  async function queues(): Promise<
+    { held: Comment[]; unanswered: Comment[]; reported: Comment[] }
+  > {
+    const rows = await all();
+    const byReports = (a: Comment, b: Comment) =>
+      b.reports - a.reports || a.createdAt - b.createdAt;
+    return {
+      held: rows.filter((c) => c.status === "held").sort(byReports),
+      unanswered: rows.filter(isUnanswered).sort((a, b) => a.createdAt - b.createdAt),
+      reported: rows.filter((c) => c.status === "published" && c.reports > 0).sort(byReports),
+    };
   }
 
   return {
@@ -218,9 +221,7 @@ export function commentsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions =
     setVote,
     votesByAddress,
     addReport,
-    held,
+    queues,
     byAuthors,
-    unansweredQuestions,
-    reported,
   };
 }

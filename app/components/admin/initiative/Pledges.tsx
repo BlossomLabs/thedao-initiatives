@@ -17,12 +17,14 @@ import { cn } from "~/lib/utils";
 import type { Run } from "./run";
 
 /** Add or edit a pledge: the same fields either way; a new logo replaces the old one. */
-function PledgeForm(
-  { base, run, editing, onDone }: {
+export function PledgeForm(
+  { base, run, editing, onDone, stacked = false }: {
     base: string;
     run: Run;
     editing: Pledge | null;
     onDone: () => void;
+    /** One field per line, no panel of its own: for a narrow column (the dashboard). */
+    stacked?: boolean;
   },
 ) {
   const ref = useRef<HTMLFormElement>(null);
@@ -38,7 +40,7 @@ function PledgeForm(
   return (
     <form
       ref={ref}
-      className="panel"
+      className={stacked ? undefined : "panel"}
       // The server's answer renders under the form; the browser's own bubble would not match the site.
       noValidate
       onSubmit={(e) => {
@@ -60,10 +62,17 @@ function PledgeForm(
           .finally(() => setBusy(false));
       }}
     >
-      <span className="k">
-        {editing ? `Edit the pledge from ${editing.company}` : "Add a pledge"}
-      </span>
-      <div className="grid grid-cols-[1fr_140px_130px] gap-2.5 max-[640px]:grid-cols-1">
+      {!stacked && (
+        <span className="k">
+          {editing ? `Edit the pledge from ${editing.company}` : "Add a pledge"}
+        </span>
+      )}
+      <div
+        className={cn(
+          "grid gap-2.5",
+          stacked ? "grid-cols-1" : "grid-cols-[1fr_140px_130px] max-[640px]:grid-cols-1",
+        )}
+      >
         <Input
           name="company"
           placeholder="Company *"
@@ -91,7 +100,12 @@ function PledgeForm(
           </SelectContent>
         </Select>
       </div>
-      <div className="mt-2.5 grid grid-cols-2 gap-2.5 max-[640px]:grid-cols-1">
+      <div
+        className={cn(
+          "mt-2.5 grid gap-2.5",
+          stacked ? "grid-cols-1" : "grid-cols-2 max-[640px]:grid-cols-1",
+        )}
+      >
         <Input
           name="url"
           placeholder="Link (optional)"
@@ -122,7 +136,7 @@ function PledgeForm(
         {editing?.logoUrl && !logoName && (
           <img src={editing.logoUrl} alt="" className="h-6 rounded bg-white p-0.5" />
         )}
-        <span className="small dim">PNG, JPG or WEBP; shown on the public page.</span>
+        {!stacked && <span className="small dim">PNG, JPG or WEBP; shown on the public page.</span>}
       </div>
     </form>
   );

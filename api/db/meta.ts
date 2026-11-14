@@ -55,6 +55,15 @@ export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = und
 
   const safeSync = async (rfpId: string) =>
     (await kv.get<SafeSyncState>(K.safeSync(rfpId), read)).value;
+  /** The sync state of many initiatives, in the order asked: ten keys per getMany. */
+  async function safeSyncs(rfpIds: string[]): Promise<(SafeSyncState | null)[]> {
+    const groups: string[][] = [];
+    for (let i = 0; i < rfpIds.length; i += 10) groups.push(rfpIds.slice(i, i + 10));
+    const entries = await Promise.all(
+      groups.map((g) => kv.getMany<SafeSyncState[]>(g.map((id) => K.safeSync(id)), read)),
+    );
+    return entries.flat().map((e) => e.value);
+  }
   const setSafeSync = (rfpId: string, s: SafeSyncState) => kv.set(K.safeSync(rfpId), s);
 
   return {
@@ -67,6 +76,7 @@ export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = und
     aiBudgetOk,
     aiSupportBudgetOk,
     safeSync,
+    safeSyncs,
     setSafeSync,
   };
 }

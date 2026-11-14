@@ -147,7 +147,7 @@ Deno.test("safe sync: groups rows per tx, verifies over RPC, sends bearer, incre
     })).status,
     429,
   );
-  const dash = await j(await h.req("/api/admin/dashboard", { token: admin })) as {
+  const dash = await j(await h.req("/api/admin/status", { token: admin })) as {
     safeApi: { configured: boolean; quota: { remaining: number } };
   };
   assert(dash.safeApi.configured);

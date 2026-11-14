@@ -273,7 +273,7 @@ Deno.test("maintenance: background refreshes reachable from reads and the cron s
     assertEquals(h.script.calls, [], "no verification RPC while on");
 
     // The admin views do not take balance leases either.
-    assertEquals((await h.req("/api/admin/dashboard", { token: admin })).status, 200);
+    assertEquals((await h.req("/api/admin/todo", { token: admin })).status, 200);
     assertEquals(
       (await h.req(`/api/admin/initiatives/${initiative.id}`, { token: admin })).status,
       200,

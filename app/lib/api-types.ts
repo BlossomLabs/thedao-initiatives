@@ -423,21 +423,40 @@ export interface HeldComment extends AdminComment {
   };
 }
 
-export interface AdminDashboard {
-  rows: { initiative: AdminInitiative; summary: Summary; safeSync: SafeSyncState | null }[];
-  pendingCount: number;
-  chain: { detail: string; checkedAt: number };
-  held: HeldComment[];
+/** A to-do row: the card plus the proposer's edit waiting for an admin, if any. */
+export type AdminTodoRow = CardInitiative & { pendingRevision: number | null };
+
+/** GET /api/admin/todo: the dashboard's first paint, KV only. */
+export interface AdminTodo {
+  /** Pending submissions, oldest first. */
+  submissions: AdminTodoRow[];
+  /** Approved initiatives with a proposer edit waiting. */
+  edits: AdminTodoRow[];
+  held: AdminComment[];
   unanswered: AdminComment[];
   reported: AdminComment[];
   weekAgo: number;
-  bell: number;
+  /** Every initiative, for the "Open an initiative" search. */
+  index: Pick<CardInitiative, "id" | "slug" | "title" | "status" | "type">[];
+  counts: { total: number; approved: number; approvedThisWeek: number };
+}
+
+/** GET /api/admin/status: snapshots of the services, never a live chain call. */
+export interface AdminStatus {
+  chain: { detail: string; checkedAt: number };
   safeApi: {
     configured: boolean;
     quota: { remaining: number; at: number } | null;
     refreshMinutes: number;
   };
   signers: { ok: boolean; detail: string; list: string[]; threshold: number };
+}
+
+/** A row of GET /api/admin/initiatives, the full table loaded on demand. */
+export interface AdminListRow {
+  initiative: AdminInitiative;
+  summary: Summary;
+  safeSync: SafeSyncState | null;
 }
 
 export interface AdminInitiativePage {

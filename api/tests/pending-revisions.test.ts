@@ -124,12 +124,12 @@ Deno.test("a held or rejected edit is for its proposer and the admins only", asy
     assertEquals(page.revisions.map((r) => r.n), [1]);
   }
   const waiting = async () =>
-    (await j(await h.req("/api/admin/dashboard", { token: admin })) as unknown as {
-      rows: { initiative: { pendingRevision: number | null } }[];
-    }).rows.map((r) => r.initiative.pendingRevision);
+    (await j(await h.req("/api/admin/todo", { token: admin })) as unknown as {
+      edits: { pendingRevision: number | null }[];
+    }).edits.map((r) => r.pendingRevision);
   assertEquals(await waiting(), [2]);
   assertEquals((await review(2, "reject", { note: "Out of scope." })).status, 200);
-  assertEquals(await waiting(), [null]);
+  assertEquals(await waiting(), []);
   assertEquals(await each(), [404, 404, 200, 200]);
   const mine = await j(await see(2, token)) as { revision: Meta };
   assertEquals([mine.revision.state, mine.revision.note], ["rejected", "Out of scope."]);

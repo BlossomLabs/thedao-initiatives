@@ -7,6 +7,7 @@ import {
   MOCK_NOW,
   mockRound,
   RESULT_MOCKS,
+  useMockCards,
   withFigures,
 } from "~/components/vote/mock-round";
 import { useBoard } from "~/hooks/use-board";
@@ -34,10 +35,11 @@ export default function ExampleResults() {
     if (kind) setVoteClock(MOCK_NOW[kind] * 1000);
     return () => setVoteClock(null);
   }, [kind]);
+  const cards = useMockCards(board.data?.cards);
   const base = useMemo(() => {
-    if (!kind || !board.data) return undefined;
-    return mockRound(kind, board.data.cards, 1);
-  }, [kind, board.data]);
+    if (!kind || !cards) return undefined;
+    return mockRound(kind, cards, 1);
+  }, [kind, cards]);
   // The gaps and leads, as the server would work them out: the same searches over the
   // example's tally, a moment after it shows (until then, the list says it's working).
   const [figures, setFigures] = useState<{ for: typeof base; view: RoundView }>();

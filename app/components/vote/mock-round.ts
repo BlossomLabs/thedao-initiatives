@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { bytesToHex } from "viem";
 import type { RoundTier, RoundView } from "~/hooks/use-vote";
 import type { Card } from "~/lib/api-types";
@@ -274,6 +275,16 @@ function liveJson(
   });
   if (first < TIERS.length) out.inputs = liveInputsJson(t.inp, first);
   return out;
+}
+
+/** The board's cards as they first came, for a mock to be built from. The board polls,
+ * and its totals are Safe balances priced live, so they move by cents every few minutes:
+ * each move changed every ask and rebuilt the whole made-up tally, and the example
+ * re-rendered under the reader. A reload picks up the board as it is then. */
+export function useMockCards(cards: Card[] | undefined): Card[] | undefined {
+  const first = useRef<Card[]>(undefined);
+  if (!first.current && cards) first.current = cards;
+  return first.current;
 }
 
 /** Badge `n` in the fictional round, in state `kind`, over the board's `cards`. The

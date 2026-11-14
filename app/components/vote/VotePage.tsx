@@ -19,6 +19,7 @@ import {
   type MockKind,
   mockRound,
   MOCKS,
+  useMockCards,
 } from "~/components/vote/mock-round";
 import MockNav from "./MockNav";
 import VoteClosed from "~/components/vote/VoteClosed";
@@ -306,9 +307,10 @@ export default function VotePage(
     if (mockKind) setVoteClock(MOCK_NOW[mockKind] * 1000);
     return () => setVoteClock(null);
   }, [mockKind]);
+  const mockCards = useMockCards(mock ? board.data?.cards : undefined);
   const mockData = useMemo(
-    () => mockKind && board.data ? mockRound(mockKind, board.data.cards, 1) : undefined,
-    [mockKind, board.data],
+    () => mockKind && mockCards ? mockRound(mockKind, mockCards, 1) : undefined,
+    [mockKind, mockCards],
   );
   /** The round on this page: a dev mock's fictional one, or the real one. */
   const R = mockData?.round ?? ROUND;

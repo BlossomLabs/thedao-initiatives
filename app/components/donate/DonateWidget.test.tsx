@@ -85,7 +85,7 @@ it("keeps the address hidden after a recording failure and sends optional detail
   expect(mock.setStatus).toHaveBeenCalledWith({ kind: "err", text: "Offline." });
 });
 
-it("starts from a suggested amount, first among the chips, and reports the amount", () => {
+it("starts from a suggested amount, in order among the chips, and reports the amount", () => {
   const onAmount = vi.fn();
   render(
     <MemoryRouter>
@@ -103,12 +103,47 @@ it("starts from a suggested amount, first among the chips, and reports the amoun
   fireEvent.click(screen.getByText("Wallet"));
   expect(screen.getByLabelText("Amount in US dollars")).toHaveValue("8412");
   const chip = screen.getByRole("button", { name: "$8,412, gets it into S-Tier" });
+  // Among the usual amounts, in order.
+  expect(screen.getAllByRole("button", { name: /^\$[\d,]+/ }).map((b) => b.textContent))
+    .toEqual(["$500", "$5,000", "$8,412", "$50,000"]);
   // Red, like the vote results' red numbers and buttons.
   expect(chip.className).toContain("bg-dao-red");
   expect(screen.queryByRole("button", { name: "$50" })).toBeNull();
   expect(onAmount).toHaveBeenLastCalledWith(8412);
   fireEvent.click(screen.getByRole("button", { name: "$500" }));
   expect(onAmount).toHaveBeenLastCalledWith(500);
+});
+
+it("suggests several amounts, each labelled, the first picked", () => {
+  render(
+    <MemoryRouter>
+      <DonateWidget
+        initiativeId="id"
+        slug="test"
+        safeAddress={SAFE}
+        suggested={[
+          { usd: 3000, note: "brings it into B-Tier", label: "to B-Tier" },
+          { usd: 12000, note: "brings it into A-Tier", label: "to A-Tier" },
+          { usd: 41000, note: "brings it into S-Tier", label: "to S-Tier" },
+        ]}
+      />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByText("Wallet"));
+  expect(screen.getByLabelText("Amount in US dollars")).toHaveValue("3000");
+  // The three, then the usual amounts after the smallest, four in all.
+  const chips = [
+    "$3,000, brings it into B-Tier",
+    "$12,000, brings it into A-Tier",
+    "$41,000, brings it into S-Tier",
+  ]
+    .map((name) => screen.getByRole("button", { name }));
+  expect(chips[1]).toHaveTextContent("$12,000to A-Tier");
+  expect(screen.queryByRole("button", { name: "$5,000" })).toBeNull();
+  // Smallest first, whatever they are; the first suggestion stays picked.
+  const order = screen.getAllByRole("button", { name: /^\$[\d,]+/ }).map((b) => b.textContent);
+  expect(order).toEqual(["$500", "$3,000to B-Tier", "$12,000to A-Tier", "$41,000to S-Tier"]);
+  expect(chips[0].className).toContain("bg-dao-green");
 });
 
 it("on an example page, Donate and the address only say nothing is donated", () => {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import RoundBox from "./RoundBox";
 import DaoBallot, { daoResult, type SettledTier } from "./DaoBallot";
-import GiveList, { ClosestBox, gapUsd, type GiveRow } from "./GiveList";
+import GiveList, { ClosestBox, gapUsd, type GiveRow, knockOnVerb } from "./GiveList";
 import MockNav from "./MockNav";
 import type { BallotItem } from "./TierBallot";
 import BoardPage from "~/components/board/BoardPage";
@@ -17,7 +17,10 @@ import { useSession } from "~/context/session";
 import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd, usdShort } from "~/lib/format";
 import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
-import { type Tier, tierName } from "../../../shared/vote/ballot";
+import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
+import { chainTally } from "../../../shared/vote/chain";
+import { liveInputsFrom } from "../../../shared/vote/live-inputs";
+import { giftEffect, giftGapTo, liveTiers } from "../../../shared/vote/next-tier";
 
 const POLL_MS = 5_000;
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
@@ -37,6 +40,16 @@ const TIER_B_NOTE = " · B-Tier: nothing funded yet, the pool may not reach it."
  * settling now, how far ahead it is), with the donate form, whose donation is previewed on
  * TheDAO's ballot. Once closed: the board, limited to the
  * round's initiatives, as the final result. */
+/** What a donation does to the open tiers, if the vote ended now: where the initiative
+ * lands (null: not funded), and who else comes in, drops out or moves. */
+type Change = {
+  was: Tier | null;
+  tier: Tier | null;
+  comesIn: { slug: string; tier: Tier }[];
+  dropsOut: { slug: string; tier: Tier }[];
+  moves: { slug: string; from: Tier; to: Tier }[];
+};
+
 export default function VoteResults(
   { example }: { example?: { round: VoteManifest; view: RoundView } } = {},
 ) {
@@ -93,7 +106,6 @@ export default function VoteResults(
 
   /** The tier settling now (or next to): the first one not settled. */
   const tier: Tier = rv?.tiers.find((t) => t.status !== "settled")?.tier ?? "S";
-  const name = tierName(tier);
   const give = rv?.live.give;
   const lead = rv?.live.lead;
   // Every open initiative: below the tier settling now, the donation that moves it up a
@@ -117,10 +129,15 @@ export default function VoteResults(
   // The initiative open in the list, and the amount in its donate form.
   const [open, setOpen] = useState<string>();
   const [amount, setAmount] = useState(0);
+  // The live tally's inputs, read once per round: a donation's preview re-runs it.
+  const liveInputs = rv?.live.inputs;
+  const liveRun = useMemo(() => {
+    if (!liveInputs) return undefined;
+    const { inp, first } = liveInputsFrom(liveInputs);
+    return { inp, first, base: liveTiers(inp, first) };
+  }, [liveInputs]);
   const entry: NextTierEntry | undefined = open ? give?.[open] : undefined;
   const gap = entry ? gapUsd(entry) : null;
-  /** The tier the open initiative's donation would get it into. */
-  const toName = entry ? tierName(entry.tier) : name;
   const given = amount;
   const needOf = (slug: string) => {
     const c = cards.find((x) => x.initiative.slug === slug);
@@ -133,17 +150,69 @@ export default function VoteResults(
   const named = (slug: string) => (
     <i className={slug === open ? "text-[#a7e3a5]" : "text-white"}>{titleOf(slug)}</i>
   );
-  /** With the donation, if it is enough: TheDAO's ballot as the tally would have it. */
-  const preview = open && entry && gap !== null && given >= gap
+  /** With the tally's inputs: the donation that gets the open initiative into each open
+   * tier above where it is now, lowest first (a few tallies each, worked out as it opens).
+   * Two tiers one amount reaches show once, as the higher. */
+  const steps = useMemo(() => {
+    if (!liveRun || !open) return undefined;
+    const c = R.slugs.indexOf(open);
+    if (c < 0) return undefined;
+    const now = liveRun.base.get(c) ?? TIERS.length;
+    const out: { usd: number; tier: Tier }[] = [];
+    for (let t = now - 1; t >= liveRun.first; t--) {
+      const g = giftGapTo(liveRun.inp, liveRun.first, c, t, chainTally, liveRun.base);
+      if (g === null) continue;
+      const usd = dollars(g.toString());
+      if (out.at(-1)?.usd === usd) out.pop();
+      out.push({ usd, tier: TIERS[t] });
+    }
+    return out;
+  }, [liveRun, open, R]);
+  /** What the amount typed does, if the vote ended now: with the tally's inputs, re-run
+   * here at every amount (a part of the gap can still free money that brings others
+   * in); without them (the examples, an older server), only at the gap, as the server
+   * worked it out. */
+  const change = useMemo((): Change | undefined => {
+    if (!open || given <= 0) return undefined;
+    if (liveRun) {
+      const c = R.slugs.indexOf(open);
+      if (c < 0) return undefined;
+      const micro = BigInt(Math.round(given)) * 1_000_000n;
+      const e = giftEffect(liveRun.inp, liveRun.first, c, micro, chainTally, liveRun.base);
+      return {
+        was: e.was,
+        tier: e.tier,
+        comesIn: e.comesIn.map(([o, tier]) => ({ slug: R.slugs[o], tier })),
+        dropsOut: e.dropsOut.map(([o, tier]) => ({ slug: R.slugs[o], tier })),
+        moves: e.moves.map(([o, from, to]) => ({ slug: R.slugs[o], from, to })),
+      };
+    }
+    if (!entry || gap === null || given < gap) return undefined;
+    return { was: result.tiers[open] ?? null, ...entry };
+  }, [open, given, liveRun, R, entry, gap, result]);
+  // Who else it moves is on TheDAO's ballot and in the row's "What else changes": here,
+  // only how many.
+  const others = change
+    ? new Set([...change.comesIn, ...change.moves, ...change.dropsOut].map((o) => o.slug)).size
+    : 0;
+  const movesUp = Boolean(change?.tier && change.tier !== change.was);
+  /** With the donation, if it changes anything: TheDAO's ballot as the tally would have it. */
+  const preview = open && change && (movesUp || others > 0)
     ? (() => {
-      const tiers = { ...result.tiers, [open]: entry.tier };
-      // Others it moves to another tier.
-      for (const o of entry.moves) tiers[o.slug] = o.to;
-      const funded = new Set(result.funded).add(open);
-      const provisional = new Set(result.provisional).add(open);
-      // The donation pays that much of its need: the pool is asked for the rest.
-      const awards = new Map(result.awards).set(open, Math.max(0, needOf(open) - given));
-      for (const o of entry.comesIn) {
+      const tiers = { ...result.tiers };
+      const funded = new Set(result.funded);
+      const provisional = new Set(result.provisional);
+      const awards = new Map(result.awards);
+      if (change.tier) {
+        tiers[open] = change.tier;
+        funded.add(open);
+        provisional.add(open);
+        // The donation pays that much of its need: the pool is asked for the rest.
+        awards.set(open, Math.max(0, needOf(open) - given));
+      }
+      // Others it moves to another tier, and those it brings in.
+      for (const o of change.moves) tiers[o.slug] = o.to;
+      for (const o of change.comesIn) {
         tiers[o.slug] = o.tier;
         funded.add(o.slug);
         provisional.add(o.slug);
@@ -151,42 +220,58 @@ export default function VoteResults(
       }
       return {
         result: { tiers, funded, provisional, awards },
-        joining: new Map([[open, given]]),
-        leaving: new Set(entry.dropsOut.map((o) => o.slug)),
-        moved: new Map(entry.moves.map((o) => [o.slug, o.from] as const)),
+        joining: change.tier ? new Map([[open, given]]) : undefined,
+        leaving: new Set(change.dropsOut.map((o) => o.slug)),
+        moved: new Map(change.moves.map((o) => [o.slug, o.from] as const)),
       };
     })()
     : undefined;
-  // Who else it moves is on TheDAO's ballot and in the row's "What else changes": here,
-  // only how many.
-  const others = entry
-    ? new Set([...entry.comesIn, ...entry.moves, ...entry.dropsOut].map((o) => o.slug)).size
-    : 0;
   const knockOn = preview && others > 0 && (
     <>
       {" "}
-      {others === 1
-        ? "1 other initiative changes place."
-        : `${others} other initiatives change places.`}
+      {
+        // All pushed out: they drop out; all brought in: they come in; else they change places.
+        (() => {
+          const verb = change ? knockOnVerb(change).verb : "moves";
+          const one = others === 1;
+          const who = one ? "1 other initiative" : `${others} other initiatives`;
+          return verb === "drops"
+            ? `${who} ${one ? "drops" : "drop"} out.`
+            : verb === "brings in"
+            ? `${who} ${one ? "comes" : "come"} in.`
+            : `${who} ${one ? "changes place" : "change places"}.`;
+        })()
+      }
     </>
   );
-  const effect = open && entry && gap !== null && (
-    preview
+  /** The donation's effect in a few words: it comes in, or (already in) it frees money. */
+  const said = open && change && (
+    movesUp
       ? (
-        <p className="m-0 rounded-lg border border-dashed border-dao-green/70 bg-dao-green/[.12] px-3 py-2 text-[13px] leading-snug text-white">
-          With your {usd(given)}, the initiative {named(open)} comes into {toName}{" "}
-          if it settled now.
-          {knockOn}
-        </p>
+        <>
+          With your {usd(given)}, the initiative {named(open)} comes into{" "}
+          <span className="whitespace-nowrap">{tierName(change.tier!)}</span>
+        </>
       )
-      : given > 0
+      : <>With your {usd(given)}, {named(open)} asks the pool for less</>
+  );
+  // Under the form only when the amount changes nothing on TheDAO's ballot: what it does
+  // is said above the tier table, beside its preview.
+  const effect = open && given > 0 && (
+    preview
+      ? null
+      : entry && gap !== null && given < gap
       ? (
         <p className="m-0 rounded-lg bg-white/[.07] px-3 py-2 text-[13px] leading-snug text-white/80">
-          Not enough alone for {toName}: {usd(gap - given)}{" "}
+          Not enough alone for {tierName(entry.tier)}: {usd(gap - given)}{" "}
           would still be missing. It still counts, and others can add the rest.
         </p>
       )
-      : null
+      : (
+        <p className="m-0 rounded-lg bg-white/[.07] px-3 py-2 text-[13px] leading-snug text-white/80">
+          It asks the pool for {usd(Math.min(given, needOf(open)))} less. Nothing else changes.
+        </p>
+      )
   );
 
   /** Opens an initiative in the list, its form starting at what brings it in. */
@@ -272,7 +357,7 @@ export default function VoteResults(
       <PageMain className="pt-8">
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
           {/* Stays in view beside the long list, so a donation's preview shows by its form. */}
-          <div className="card grid min-w-0 grid-cols-1 gap-y-2 text-[15px] leading-relaxed text-white/80 lg:sticky lg:top-6">
+          <div className="card grid min-w-0 grid-cols-1 gap-y-2 text-[15px] leading-relaxed text-white/80 lg:sticky lg:top-[86px]">
             <DaoBallot
               items={items}
               result={preview?.result ?? result}
@@ -284,8 +369,7 @@ export default function VoteResults(
               note={preview && open && (
                 <div className="mt-2 flex items-center gap-3 rounded-lg border border-dashed border-dao-green/70 bg-dao-green/[.12] px-3 py-2">
                   <p className="m-0 flex-1 text-[13.5px] leading-snug text-white">
-                    With your {usd(given)}, the initiative {named(open)} comes into{" "}
-                    {toName}.{knockOn}
+                    {said}.{knockOn}
                   </p>
                   <Button sm className="flex-none" onClick={() => setOpen(undefined)}>
                     Clear
@@ -315,6 +399,7 @@ export default function VoteResults(
               ai: board.data?.flags.aiSearch,
               aiAuto: board.data?.flags.aiSearchAuto,
             }}
+            steps={steps}
           />
         </div>
         <PledgeBand />

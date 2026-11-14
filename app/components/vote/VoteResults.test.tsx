@@ -6,6 +6,8 @@ import { bytesToHex } from "viem";
 import { api } from "~/lib/api";
 import { encodeBallot } from "../../../shared/vote/ballot";
 import VoteResults from "./VoteResults";
+import { liveInputsJson } from "../../../shared/vote/live-inputs";
+import { effectiveRanks } from "../../../vote/shared/ranks";
 
 vi.mock("../../../shared/vote/manifest", async (original) => ({
   ...await original<typeof import("../../../shared/vote/manifest")>(),
@@ -57,7 +59,12 @@ const boardCards = [
 vi.mock("~/hooks/use-board", () => ({
   boardKey: ["board"],
   useBoard: () => ({
-    data: { cards: boardCards, totals: { raised: 10_000 }, flags: {}, sponsors: [] },
+    data: {
+      cards: boardCards,
+      totals: { raised: 10_000 },
+      flags: { tokensOk: true },
+      sponsors: [],
+    },
     isLoading: false,
     isError: false,
   }),
@@ -69,7 +76,26 @@ vi.mock("~/context/session", () => ({
   }),
 }));
 vi.mock("~/components/board/PledgeBand", () => ({ default: () => null }));
-vi.mock("~/components/donate/DonateWidget", () => ({ default: () => null }));
+// The donate form, down to its amount: what's typed goes to the page, as the real one's.
+vi.mock("~/components/donate/DonateWidget", () => ({
+  default: (
+    { onAmount, suggested }: {
+      onAmount?: (usd: number) => void;
+      suggested?: { usd: number; label?: string } | { usd: number; label?: string }[];
+    },
+  ) => (
+    <>
+      <ul aria-label="Suggested amounts">
+        {[suggested ?? []].flat().map((x) => <li key={x.usd}>${x.usd} {x.label}</li>)}
+      </ul>
+      <input
+        aria-label="Amount"
+        type="number"
+        onChange={(e) => onAmount?.(Number(e.currentTarget.value))}
+      />
+    </>
+  ),
+}));
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
 vi.mock("~/lib/api", async (original) => {
   const api = vi.fn();
@@ -496,7 +522,7 @@ it("while open: TheDAO's ballot beside what it takes each initiative to move up"
   const row = list().getByRole("button", { name: /Beta audits/ });
   expect(row).toHaveTextContent("−$9k");
   expect(row).toHaveTextContent("to S-Tier");
-  expect(row).toHaveTextContent("not in TheDAO's ballot");
+  expect(row).toHaveTextContent("not included");
   // Alpha, in S-Tier if it settled now, is in the list too, first: $4k ahead there.
   const ahead = list().getByRole("button", { name: /Alpha fuzzing/ });
   expect(ahead).toHaveTextContent("$4k");
@@ -528,7 +554,7 @@ it("opening an initiative previews its donation on TheDAO's ballot", async () =>
   // money brings in.
   const said = screen.getAllByText((_, el) =>
     el?.tagName === "P" &&
-    /With your \$9,000, the initiative Beta audits comes into S-Tier\. 1 other initiative changes place\./
+    /With your \$9,000, the initiative Beta audits comes into S-Tier\. 1 other initiative drops out\./
       .test(
         el.textContent ?? "",
       )
@@ -642,7 +668,7 @@ it("each row says what else its donation changes, in short and, opened, in full"
   fireEvent.click(row);
   // The row's sentence says how many; the link opens who.
   const link = screen.getByRole("button", { name: "moves 2 other initiatives" });
-  expect(link.parentElement).toHaveTextContent(
+  expect(link.closest("p")).toHaveTextContent(
     "$9,000 more brings it into S-Tier if the vote ended now, and moves 2 other initiatives.",
   );
   expect(link).toHaveAttribute("aria-expanded", "false");
@@ -682,4 +708,93 @@ it("those ahead in the tier settling now come first, furthest ahead first", asyn
   const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits/ });
   expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Beta ", "Alpha"]);
   expect(order[0]).toHaveTextContent("$12k");
+});
+
+/** The live tally's inputs for the test round: Alpha ($50K) and Beta ($30K), one voter
+ * with the $60K pool ranking Alpha first, Beta second. */
+function inputsFor(costsK: [number, number]) {
+  const ballots = [[1, 2]];
+  return liveInputsJson({
+    m: 2,
+    costs: costsK.map((k) => BigInt(k) * 1_000_000_000n),
+    voters: ["1"],
+    weights: [60_000_000_000n],
+    ranks: ballots.map((b) => effectiveRanks(b, 2)),
+    ballots,
+    poolUsd: 60_000_000_000n,
+    spent: 0n,
+    done: new Set(),
+  }, 0);
+}
+
+it("with the tally's inputs, any amount is previewed: money freed brings another in", async () => {
+  // Alpha is in S-Tier; Beta doesn't fit in the $10K left.
+  const view = openWith({ beta: give({ tier: "B", gap: "20000000000" }) });
+  await showOpen({ ...view, live: { ...view.live, inputs: inputsFor([50, 30]) } });
+  fireEvent.click(await list().findByRole("button", { name: /Alpha fuzzing/ }));
+  const amount = await screen.findByRole("spinbutton", { name: "Amount" });
+  // $5K frees too little: it only asks the pool for less.
+  fireEvent.change(amount, { target: { value: "5000" } });
+  expect(await screen.findByText("It asks the pool for $5,000 less. Nothing else changes."))
+    .toBeInTheDocument();
+  // $20K frees enough for Beta ($30K) to come in.
+  fireEvent.change(amount, { target: { value: "20000" } });
+  // Said once, above TheDAO's ballot, beside its preview (not again under the form).
+  const said = await screen.findAllByText((_, el) =>
+    el?.tagName === "P" &&
+    /^With your \$20,000, Alpha fuzzing asks the pool for less\. 1 other initiative comes in\.$/
+      .test(el.textContent ?? "")
+  );
+  expect(said).toHaveLength(1);
+  expect(screen.queryByText(/if the vote ended now\. 1 other/)).toBeNull();
+  expect(screen.getByRole("group", { name: "TheDAO's ballot, with your donation" }))
+    .toBeInTheDocument();
+  expect(within(daoBallot()).getByLabelText(/^Beta audits, funded if it ended now/))
+    .toBeInTheDocument();
+});
+
+it("with the tally's inputs, the form suggests the donation to each tier above", async () => {
+  // Beta ($30K) isn't funded: the pool has $10K left after Alpha.
+  const view = openWith({ beta: give({ tier: "B", gap: "20000000000" }) });
+  await showOpen({ ...view, live: { ...view.live, inputs: inputsFor([50, 30]) } });
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  const chips = within(await screen.findByRole("list", { name: "Suggested amounts" }))
+    .getAllByRole("listitem").map((li) => li.textContent);
+  // The lowest first; each one tier up, and every tier it can reach.
+  expect(chips.length).toBeGreaterThan(0);
+  expect(chips[0]).toMatch(/^\$\d+ to [SAB]-Tier$/);
+  const usds = chips.map((t) => Number(t!.slice(1).split(" ")[0]));
+  expect([...usds].sort((a, b) => a - b)).toEqual(usds);
+});
+
+it("a donation that only pushes others out says it drops them", async () => {
+  await showOpen(openWith({
+    beta: give({
+      tier: "B",
+      dropsOut: [{ slug: "alpha", tier: "S" }, { slug: "gamma", tier: "B" }],
+    }),
+  }));
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  // Red, as what drops out is.
+  expect(screen.getByRole("button", { name: "drops 2 other initiatives" }).className)
+    .toContain("text-[#ff8a88]");
+  expect(screen.queryByRole("button", { name: /^moves/ })).toBeNull();
+  // Above TheDAO's ballot too.
+  expect(
+    screen.getAllByText((_, el) =>
+      el?.tagName === "P" && /2 other initiatives drop out\.$/.test(el.textContent ?? "")
+    ),
+  ).toHaveLength(1);
+});
+
+it("a donation that only brings others in says it brings them in, in green", async () => {
+  await showOpen(openWith({ beta: give({ tier: "B", comesIn: [{ slug: "gamma", tier: "B" }] }) }));
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  const link = screen.getByRole("button", { name: "brings in another initiative" });
+  expect(link.className).toContain("text-[#a7e3a5]");
+  expect(
+    screen.getAllByText((_, el) =>
+      el?.tagName === "P" && /1 other initiative comes in\.$/.test(el.textContent ?? "")
+    ),
+  ).toHaveLength(1);
 });

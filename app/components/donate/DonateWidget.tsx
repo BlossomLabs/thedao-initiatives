@@ -28,6 +28,9 @@ const CHIPS = ["50", "500", "5000", "50000"];
 export const EXAMPLE_NOTE = "An example page: nothing is donated from it.";
 type Method = "wallet" | "exchange";
 
+/** A suggested amount: whole dollars, what it does, and (on the chip) a short label. */
+export type Suggestion = { usd: number; note: string; label?: string };
+
 /** The donate widget: chips, $ amount, token, wallet / exchange tabs. */
 export default function DonateWidget({
   initiativeId,
@@ -43,10 +46,10 @@ export default function DonateWidget({
   slug: string;
   safeAddress: string;
   onConfirmed?: (r: DonateResult) => void;
-  /** An amount to start from, in whole dollars: the first chip, picked already (the vote
-   * results: what gets the initiative into the tier settling now). `note` says what it
-   * does, for screen readers. */
-  suggested?: { usd: number; note: string };
+  /** Amounts to start from, in whole dollars: the first chips, the first picked already
+   * (the vote results: what gets the initiative into each tier above it). `note` says what
+   * one does, for screen readers; `label`, under the amount, says it in a word or two. */
+  suggested?: Suggestion | Suggestion[];
   /** The amount as it changes, in dollars (0 when blank or not a number). */
   onAmount?: (usd: number) => void;
   /** An example page (the vote results' examples): the form works as usual, but Donate and
@@ -101,18 +104,27 @@ export default function DonateWidget({
       setRecording(false);
     }
   };
-  const [amount, setAmount] = useState(suggested ? String(suggested.usd) : "");
+  const suggestions = suggested === undefined
+    ? []
+    : Array.isArray(suggested)
+    ? suggested
+    : [suggested];
+  const first = suggestions[0];
+  const [amount, setAmount] = useState(first ? String(first.usd) : "");
   // Another initiative or another suggestion: start from its amount again.
   useEffect(() => {
-    if (suggested) setAmount(String(suggested.usd));
-  }, [suggested?.usd, initiativeId]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (first) setAmount(String(first.usd));
+  }, [first?.usd, initiativeId]); // eslint-disable-line react-hooks/exhaustive-deps
   const onAmountRef = useRef(onAmount);
   onAmountRef.current = onAmount;
   useEffect(() => onAmountRef.current?.(parseUsd(amount)), [amount]);
-  /** The suggestion first, then the usual amounts after the smallest. */
-  const chips = suggested
-    ? [String(suggested.usd), ...CHIPS.slice(1).filter((c) => c !== String(suggested.usd))]
+  /** The suggestions (four at most), then the usual amounts after the smallest, four in
+   * all, smallest first. The first suggestion stays the one picked, wherever it sits. */
+  const suggestedAt = new Map(suggestions.map((x) => [String(x.usd), x]));
+  const chips = suggestions.length
+    ? [...suggestedAt.keys(), ...CHIPS.slice(1).filter((c) => !suggestedAt.has(c))]
       .slice(0, CHIPS.length)
+      .sort((a, b) => Number(a) - Number(b))
     : CHIPS;
   const [symbol, setSymbol] = useState("");
   const [method, setMethod] = useState<Method>("wallet");
@@ -202,11 +214,13 @@ export default function DonateWidget({
               <button
                 key={c}
                 type="button"
-                aria-label={suggested && c === String(suggested.usd)
-                  ? `$${Number(c).toLocaleString("en-US")}, ${suggested.note}`
+                aria-label={suggestedAt.has(c)
+                  ? `$${Number(c).toLocaleString("en-US")}, ${suggestedAt.get(c)!.note}`
                   : undefined}
                 className={cn(
                   "cursor-pointer whitespace-nowrap rounded-full border px-1 py-2 text-center font-inter-tight text-[13px] transition-all duration-150 max-[760px]:py-[11px]",
+                  // A chip with a label under its amount is two lines: less round.
+                  suggestions.some((x) => x.label) && "rounded-xl py-1.5 max-[760px]:py-2",
                   amount === c
                     ? red
                       ? "border-dao-red bg-dao-red font-medium text-white"
@@ -218,6 +232,11 @@ export default function DonateWidget({
                 onClick={() => setAmount(c)}
               >
                 ${Number(c).toLocaleString("en-US")}
+                {suggestedAt.get(c)?.label && (
+                  <small className="block text-[11px] font-normal leading-tight opacity-80">
+                    {suggestedAt.get(c)!.label}
+                  </small>
+                )}
               </button>
             ))}
           </div>

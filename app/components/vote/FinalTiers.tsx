@@ -91,7 +91,12 @@ export default function FinalTiers(
       aria-label={label}
     >
       {TIER_LABELS.map((t) => {
-        const inHere = items.filter((i) => tiers[i.slug] === t.tier);
+        // In a donation's preview: those that stay first, then yours, those moved in, and
+        // last, together, those dropping out. Otherwise as listed.
+        const rank = (slug: string) =>
+          leaving?.has(slug) ? 3 : joining?.has(slug) ? 1 : moved?.has(slug) ? 2 : 0;
+        const inHere = items.filter((i) => tiers[i.slug] === t.tier)
+          .sort((a, b) => rank(a.slug) - rank(b.slug));
         const tierPaid = inHere.reduce(
           (a, i) => a + (leaving?.has(i.slug) ? 0 : amounts.get(i.slug) ?? 0),
           0,

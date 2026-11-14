@@ -17,6 +17,7 @@ import {
 } from "~/lib/vote-flow";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi";
 import type { Tier } from "../../shared/vote/ballot";
+import type { LiveInputsJson } from "../../shared/vote/live-inputs";
 import { MAINNET_CHAIN_ID, ROUND, voteChain } from "../../shared/vote/manifest";
 import { checkBallotTx } from "../../shared/vote/receipt";
 import { recordVote } from "../../shared/vote/record";
@@ -115,6 +116,9 @@ export type RoundView = {
     /** How far ahead each initiative in the tier settling now is, micro-USD: how much
      * less backing it could have and stay (only leads of at least $1K). */
     lead?: Record<string, string>;
+    /** The live tally's inputs: the browser re-runs it for a donation's preview. Absent
+     * once closed, and from servers before it. */
+    inputs?: LiveInputsJson;
     /** The donation that gets each initiative one tier higher than the live tally has
      * it (into B-Tier when unfunded): its gap, and who comes in, drops out or moves. For
      * every open initiative not in the tier settling now; absent once closed. */

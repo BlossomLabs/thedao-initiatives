@@ -6,6 +6,7 @@ import { jsonBody } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
 import { verifyCode } from "../../shared/vote/code.ts";
 import { isValidOnchainBallot, tierName } from "../../shared/vote/ballot.ts";
+import { liveInputsJson } from "../../shared/vote/live-inputs.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { recordVote } from "../../shared/vote/record.ts";
 import type { VoteRound } from "../services/vote-chain.ts";
@@ -276,6 +277,8 @@ function roundJson(st: RoundState & { poolUsd: bigint }, slugs: string[]) {
       awards: money(st.live.awards),
       tiers: Object.fromEntries([...st.live.tiers].map(([c, t]) => [slugs[c], t])),
       paid: paidBy(st.live.shares),
+      // The live tally's inputs, so a donation's preview re-runs it in the browser.
+      ...(st.liveInputs ? { inputs: liveInputsJson(st.liveInputs, st.firstOpen) } : {}),
     },
   };
 }

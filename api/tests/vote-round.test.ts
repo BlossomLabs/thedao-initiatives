@@ -8,6 +8,8 @@ import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import type { VoteChain } from "../services/vote-chain.ts";
 import { cacheSet } from "../routes/vote.ts";
+import { chainTally } from "../../shared/vote/chain.ts";
+import { liveInputsFrom, type LiveInputsJson } from "../../shared/vote/live-inputs.ts";
 
 const ISSUER = privateKeyToAccount(
   "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
@@ -993,7 +995,9 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
     "waiting",
     "waiting",
   ]);
-  const { next: _next, ...live } = body.live as { next?: unknown };
+  const { next: _next, inputs, ...live } = body.live as { next?: unknown; inputs?: unknown };
+  // The tally's inputs come along (a donation's preview re-runs it): its first open tier.
+  assertEquals((inputs as { first: number }).first, 0);
   // Both badges rank only A: each would pay half of it, if S-Tier settled now.
   assertEquals(live, {
     funded: ["a"],
@@ -1266,5 +1270,18 @@ Deno.test("round: held while the chain has a project this site doesn't know yet"
   const res = await h.req("/api/vote/round");
   assertEquals(res.status, 503);
   assertEquals((await j(res)).code, "round_out_of_date");
+  h.close();
+});
+
+Deno.test("the round carries the live tally's inputs, which re-run to its result", async () => {
+  const { h } = await leadSetup();
+  const body = await j(await h.req("/api/vote/round")) as {
+    live: { funded: string[]; inputs?: LiveInputsJson };
+  };
+  const { inp, first } = liveInputsFrom(body.live.inputs!);
+  assertEquals(first, 0);
+  const funded = chainTally(inp, first).flatMap((s) => s.order).map((c) => qe.slugs[c]);
+  assertEquals(funded.sort(), [...body.live.funded].sort());
+  await h.settle();
   h.close();
 });

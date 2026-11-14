@@ -208,6 +208,26 @@ describe("a donation's preview", () => {
     expect(screen.queryByText("$40,000")).toBeNull();
   });
 
+  it("lists, in a tier, those that stay, then yours, those moved in, and those dropping out", () => {
+    render(
+      <FinalTiers
+        label="TheDAO's ballot"
+        items={["a", "b", "c", "d", "e"].map((slug) => ({ slug, title: slug.toUpperCase() }))}
+        tiers={{ a: "B", b: "B", c: "B", d: "B", e: "B" }}
+        funded={new Set(["a", "b", "d", "e"])}
+        amounts={new Map()}
+        amountWord="awarded"
+        joining={new Map([["c", 3000]])}
+        leaving={new Set(["a", "d"])}
+        moved={new Map([["b", "A"]])}
+      />,
+    );
+    const order = [...document.querySelectorAll("[data-final-chip]")].map((el) =>
+      el.getAttribute("data-final-chip")
+    );
+    expect(order).toEqual(["e", "c", "b", "a", "d"]);
+  });
+
   it("shows what the donation moves to another tier, with where it came from", () => {
     render(
       <FinalTiers

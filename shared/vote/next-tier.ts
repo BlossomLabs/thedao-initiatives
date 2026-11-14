@@ -452,3 +452,63 @@ export function finalWhatIfsAsync(
 ): Promise<FinalWhatIfs> {
   return driveAsync(finalSearch(settleInputs, finalTier, m, tally));
 }
+
+/** What a donation of `given` (micro-USD) to `c` does if the open tiers (from `first`)
+ * settled now: the tier it lands in before and after (null: not funded), and who else
+ * comes in, drops out or moves. One tally with the gift, one without; cheap enough to
+ * run as an amount is typed. */
+export type GiftEffect = {
+  was: Tier | null;
+  tier: Tier | null;
+  comesIn: [number, Tier][];
+  dropsOut: [number, Tier][];
+  moves: [number, Tier, Tier][];
+};
+export function giftEffect(
+  inp: ChainInputs,
+  first: number,
+  c: number,
+  given: bigint,
+  tally: Tally = chainTally,
+  live: Map<number, number> = tiersOf(tally, inp, first),
+): GiftEffect {
+  const after = tiersOf(tally, withGift(inp, c, given), first);
+  const name = (t: number | undefined) => (t === undefined ? null : TIERS[t]);
+  const out: GiftEffect = {
+    was: name(live.get(c)),
+    tier: name(after.get(c)),
+    comesIn: [],
+    dropsOut: [],
+    moves: [],
+  };
+  for (let o = 0; o < inp.m; o++) {
+    if (o === c) continue;
+    const was = live.get(o), is = after.get(o);
+    if (was === undefined && is !== undefined) out.comesIn.push([o, TIERS[is]]);
+    else if (was !== undefined && is === undefined) out.dropsOut.push([o, TIERS[was]]);
+    else if (was !== undefined && is !== undefined && was !== is) {
+      out.moves.push([o, TIERS[was], TIERS[is]]);
+    }
+  }
+  return out;
+}
+
+/** The live tally from `first`, as giftEffect compares against: candidate → tier index.
+ * Computed once for a round, then reused for every amount typed. */
+export const liveTiers = (inp: ChainInputs, first: number, tally: Tally = chainTally) =>
+  tiersOf(tally, inp, first);
+
+/** The least $1K step that, given to `c`, gets it funded in tier `target` (index) or
+ * higher if the open tiers (from `first`) settled now; null when even its whole need
+ * doesn't. The donation search for any tier, not only the next one up. */
+export function giftGapTo(
+  inp: ChainInputs,
+  first: number,
+  c: number,
+  target: number,
+  tally: Tally = chainTally,
+  live: Map<number, number> = tiersOf(tally, inp, first),
+): bigint | null {
+  if (target < first) return null;
+  return drive(giftSearch(inp, first, c, target, live, tally)).gap;
+}

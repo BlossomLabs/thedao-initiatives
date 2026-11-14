@@ -45,6 +45,19 @@ export function knockOnHint(e: NextTierEntry): string {
   ].filter(Boolean).join(" · ");
 }
 
+/** What a donation does to the others, in one word, when it does one thing to all of
+ * them: only pushes them out ("drops", red), only brings them in ("brings in", green);
+ * otherwise, any moved or a mix, it "moves" them (yellow). */
+export function knockOnVerb(
+  e: { comesIn: unknown[]; moves: unknown[]; dropsOut: unknown[] },
+): { verb: string; tone: string } {
+  if (!e.moves.length && !e.comesIn.length) return { verb: "drops", tone: "text-[#ff8a88]" };
+  if (!e.moves.length && !e.dropsOut.length) {
+    return { verb: "brings in", tone: "text-[#a7e3a5]" };
+  }
+  return { verb: "moves", tone: "text-vote-pale" };
+}
+
 /** Who else a donation moves: who comes in (green), moves to another tier (yellow, up or
  * down) or drops out (red). */
 function knockOnLines(entry: NextTierEntry) {
@@ -112,6 +125,7 @@ export default function GiveList(
     example,
     onDonated,
     search = {},
+    steps,
   }: {
     /** The tier settling now. */
     tier: Tier;
@@ -129,6 +143,9 @@ export default function GiveList(
     onDonated?: () => void;
     /** The board's AI search flags: the box offers AI only while it is on. */
     search?: { ai?: boolean; aiAuto?: boolean };
+    /** For the open row, when the page could work them out: the donation that gets it
+     * into each tier above it, lowest first. The donate form suggests them all. */
+    steps?: { usd: number; tier: Tier }[];
   },
 ) {
   const name = tierName(tier);
@@ -237,6 +254,9 @@ export default function GiveList(
               const hint = r.entry && gap !== null ? knockOnHint(r.entry) : "";
               const lines = r.entry && gap !== null ? knockOnLines(r.entry) : [];
               const knockOpen = knock === i.slug && isOpen;
+              // What it does to the others: drops them (red), brings them in (green) or
+              // moves them (yellow).
+              const knockKind = r.entry ? knockOnVerb(r.entry) : undefined;
               const cat = i.categories[0];
               const need = Math.max(0, i.goalUsd - r.card.summary.total);
               return (
@@ -266,8 +286,12 @@ export default function GiveList(
                       <span className="block truncate text-[14px] text-white">{i.title}</span>
                       <span className="mt-0.5 block truncate text-[12px] text-white/55 tnum">
                         Needs {usd(need)} ·{" "}
-                        {r.now ? `now in ${tierName(r.now)}` : "not in TheDAO's ballot"}
-                        {hint && <span className="text-vote-pale">{` · ${hint}`}</span>}
+                        {r.now ? `now in ${tierName(r.now)}` : "not included"}
+                        {hint && (
+                          <span className={knockKind?.tone}>
+                            {` · ${hint}`}
+                          </span>
+                        )}
                       </span>
                     </span>
                     {!r.entry
@@ -345,17 +369,22 @@ export default function GiveList(
                               if the vote ended now{lines.length === 0 ? "." : (
                                 <>
                                   , and{" "}
-                                  <button
-                                    type="button"
-                                    aria-expanded={knockOpen}
-                                    aria-controls={`knock-${i.slug}`}
-                                    onClick={() => setKnock(knockOpen ? undefined : i.slug)}
-                                    className="cursor-pointer text-vote-pale underline decoration-dotted underline-offset-2 hover:text-white"
-                                  >
-                                    moves {lines.length === 1
-                                      ? "another initiative"
-                                      : `${lines.length} other initiatives`}
-                                  </button>.
+                                  <span className="whitespace-nowrap">
+                                    <button
+                                      type="button"
+                                      aria-expanded={knockOpen}
+                                      aria-controls={`knock-${i.slug}`}
+                                      onClick={() => setKnock(knockOpen ? undefined : i.slug)}
+                                      className={cn(
+                                        "cursor-pointer underline decoration-dotted underline-offset-2 hover:text-white",
+                                        knockKind?.tone,
+                                      )}
+                                    >
+                                      {knockKind?.verb} {lines.length === 1
+                                        ? "another initiative"
+                                        : `${lines.length} other initiatives`}
+                                    </button>.
+                                  </span>
                                 </>
                               )}
                             </>
@@ -375,9 +404,15 @@ export default function GiveList(
                                 slug={i.slug}
                                 safeAddress={i.safeAddress}
                                 onConfirmed={onDonated}
-                                suggested={gap === null
+                                suggested={steps?.length
+                                  ? steps.map((x) => ({
+                                    usd: x.usd,
+                                    note: `brings it into ${tierName(x.tier)}`,
+                                    label: `to ${tierName(x.tier)}`,
+                                  }))
+                                  : gap === null
                                   ? undefined
-                                  : { usd: gap, note: `brings it into ${to}` }}
+                                  : { usd: gap, note: `brings it into ${to}`, label: `to ${to}` }}
                                 onAmount={onAmount}
                                 example={example}
                                 accent={r.entry ? "red" : "green"}

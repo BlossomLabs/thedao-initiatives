@@ -21,8 +21,18 @@ import {
   SUPPORT_SCREENSHOT_MAX,
   SUPPORT_TRANSACTION_URL_MAX,
 } from "../../shared/support.ts";
+import { commentLinks } from "../../shared/comment-links.ts";
+import type { SupportScreen } from "../services/ai.ts";
 
 const SITE_TAG = "TheDAO Initiatives";
+
+const VERDICT_WORD = { genuine: "Genuine", unclear: "Unclear", spam: "SPAM" } as const;
+
+/** "AI screen: SPAM: <summary>", or why the screen gave no answer. */
+export function supportScreenLine(s: SupportScreen): string {
+  if (!s.verdict) return `AI screen failed: ${s.error}`;
+  return `AI screen: ${VERDICT_WORD[s.verdict]}${s.summary ? `: ${s.summary}` : ""}`;
+}
 const SCREENSHOT_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
 export function supportRoutes(deps: Deps) {
@@ -115,8 +125,25 @@ export function supportRoutes(deps: Deps) {
     ) {
       throw new HttpError(429, "too many messages, try again in an hour");
     }
+    // The comment screen's model, as a tag only: every message is still sent.
+    // Its own share of the daily AI budget, so comment moderation keeps the rest.
+    const screen = message
+      ? await deps.ai.screenSupport(
+        SUPPORT_CATEGORIES[category],
+        message,
+        () => db.meta.aiSupportBudgetOk(),
+      )
+      : null;
+    if (screen?.error) deps.log(`AI screen failed on a support message: ${screen.error}`);
+    const unknownDomains = [
+      ...new Set(commentLinks(message).filter((l) => !l.known).map((l) => l.domain || "?")),
+    ];
     const header = [
-      `[${SITE_TAG} · ${SUPPORT_CATEGORIES[category]}]`,
+      `[${SITE_TAG} · ${SUPPORT_CATEGORIES[category]}${
+        screen?.verdict === "spam" ? " · SPAM" : ""
+      }]`,
+      ...(screen ? [supportScreenLine(screen)] : []),
+      ...(unknownDomains.length ? [`Unknown link domains: ${unknownDomains.join(", ")}`] : []),
       ...(receipt ? [`Transaction: ${transactionUrl}`] : []),
       ...pledgeInfo,
       ...(pageUrl ? [`Page: ${pageUrl}`] : []),

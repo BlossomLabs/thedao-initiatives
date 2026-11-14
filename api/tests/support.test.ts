@@ -1,6 +1,7 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { harness, j, SAFE_ADDR } from "./app-helpers.ts";
 import { SUPPORT_TRANSACTION_URL_MAX } from "../../shared/support.ts";
+import { AI_SUPPORT_DAILY_CALL_CAP } from "../config.ts";
 
 const UPSTREAM = "https://support.example.test/inbox";
 
@@ -321,5 +322,69 @@ Deno.test("support: a message past its cap is refused as too long, never cut", a
     "The message is too long (4,000 characters at most)",
   );
   assertEquals(h.fetchLog.length, 0);
+  h.close();
+});
+
+/** A board with an AI key whose screen answers `reply`, and the support relay. */
+function screened(reply: () => Response) {
+  return harness({
+    env: { SUPPORT_URL: UPSTREAM, AI_SEARCH_API_KEY: "k" },
+    fetch: (url) => url.includes("/chat/completions") ? reply() : new Response("ok"),
+  });
+}
+const verdict = (v: string, summary: string) => () =>
+  Response.json({ choices: [{ message: { content: JSON.stringify({ verdict: v, summary }) } }] });
+const sentMessage = (h: { fetchLog: { url: string; init?: RequestInit }[] }) =>
+  JSON.parse(String(h.fetchLog.find((x) => x.url === UPSTREAM)!.init!.body)).message as string;
+
+Deno.test("support: spam is tagged SPAM and still sent, with unknown link domains named", async () => {
+  const h = await screened(verdict("spam", "Crypto airdrop advert."));
+  const res = await h.req("/api/support", {
+    method: "POST",
+    json: { ...good, message: "Claim now https://airdrop.example/x and https://github.com/a/b" },
+  });
+  assertEquals(res.status, 200);
+  const msg = sentMessage(h);
+  assertStringIncludes(msg, "[TheDAO Initiatives · Report a problem · SPAM]\n");
+  assertStringIncludes(msg, "AI screen: SPAM: Crypto airdrop advert.");
+  assertStringIncludes(msg, "Unknown link domains: airdrop.example\n");
+  assertStringIncludes(msg, "Claim now https://airdrop.example/x");
+  h.close();
+});
+
+Deno.test("support: a genuine message gets its line and no SPAM tag", async () => {
+  const h = await screened(verdict("genuine", "Donate button bug."));
+  assertEquals((await h.req("/api/support", { method: "POST", json: good })).status, 200);
+  const msg = sentMessage(h);
+  assertStringIncludes(
+    msg,
+    "[TheDAO Initiatives · Report a problem]\nAI screen: Genuine: Donate button bug.",
+  );
+  assertEquals(msg.includes("SPAM"), false);
+  assertEquals(msg.includes("Unknown link domains"), false);
+  h.close();
+});
+
+Deno.test("support: a failed screen still sends the message, with the reason", async () => {
+  const h = await screened(() => new Response("down", { status: 503 }));
+  assertEquals((await h.req("/api/support", { method: "POST", json: good })).status, 200);
+  const msg = sentMessage(h);
+  assertStringIncludes(msg, "AI screen failed: provider HTTP 503");
+  assertStringIncludes(msg, "The donate button does nothing.");
+  // One call, no retry: anyone can send these.
+  assertEquals(h.fetchLog.filter((x) => x.url.includes("/chat/completions")).length, 1);
+  h.close();
+});
+
+Deno.test("support: its own share of the AI budget, so comment moderation keeps the rest", async () => {
+  const h = await screened(verdict("genuine", "ok"));
+  for (let i = 0; i < AI_SUPPORT_DAILY_CALL_CAP; i++) {
+    assertEquals(await h.db.meta.aiSupportBudgetOk(), true);
+  }
+  assertEquals(await h.db.meta.aiSupportBudgetOk(), false);
+  // Each support call also counted against the shared cap, which still has room.
+  assertEquals(await h.db.meta.aiBudgetOk(), true);
+  assertEquals((await h.req("/api/support", { method: "POST", json: good })).status, 200);
+  assertStringIncludes(sentMessage(h), "AI screen failed: daily budget used up");
   h.close();
 });

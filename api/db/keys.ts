@@ -49,6 +49,7 @@ export const K = {
   reviewIdentity: (address: string) => ["review_identity", address.toLowerCase()] as const,
   contentLogo: (name: string) => ["content_logo", name] as const,
   aiBudget: (day: string) => ["ai_budget", day] as const,
+  aiSupportBudget: (day: string) => ["ai_budget_support", day] as const,
   safeSync: (rfpId: string) => ["safe_sync", rfpId] as const,
   safeBalances: (safe: string) => ["safe_balances", safe.toLowerCase()] as const,
   lock: (name: string) => ["lock", name] as const,

@@ -115,6 +115,8 @@ export const MAX_DETAILS = 20000;
 export const LOGO_MAX_BYTES = 1024 * 1024;
 export const AI_QUERY_MAX_CHARS = 300;
 export const AI_DAILY_CALL_CAP = 500;
+/** Of those, what the support screen may use: the rest stays for comment moderation. */
+export const AI_SUPPORT_DAILY_CALL_CAP = 100;
 export const SESSION_TTL_SECS = 7 * 86400;
 /** Inactivity is enforced server-side independently of the absolute lifetime.
  * A day: daily use never signs out midweek, a weekend away does. */

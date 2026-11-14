@@ -1,6 +1,6 @@
 import { K, type ReadOptions } from "./keys.ts";
 import type { SafeSyncState } from "./types.ts";
-import { AI_DAILY_CALL_CAP } from "../config.ts";
+import { AI_DAILY_CALL_CAP, AI_SUPPORT_DAILY_CALL_CAP } from "../config.ts";
 import { bumpCounter } from "./ratelimit.ts";
 
 export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
@@ -41,9 +41,32 @@ export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = und
     return true;
   }
 
+  /** The support screen's share of today's cap: its own smaller counter first,
+   * so anonymous support messages cannot use up what comment moderation needs. */
+  async function aiSupportBudgetOk(): Promise<boolean> {
+    const day = new Date(now() * 1000).toISOString().slice(0, 10);
+    const key = K.aiSupportBudget(day);
+    const cur = (await kv.get<number>(key)).value ?? 0;
+    if (cur >= AI_SUPPORT_DAILY_CALL_CAP) return false;
+    if (!(await aiBudgetOk())) return false;
+    await bumpCounter(kv, key, 2 * 86400 * 1000);
+    return true;
+  }
+
   const safeSync = async (rfpId: string) =>
     (await kv.get<SafeSyncState>(K.safeSync(rfpId), read)).value;
   const setSafeSync = (rfpId: string, s: SafeSyncState) => kv.set(K.safeSync(rfpId), s);
 
-  return { get, getPublic, set, update, lock, unlock, aiBudgetOk, safeSync, setSafeSync };
+  return {
+    get,
+    getPublic,
+    set,
+    update,
+    lock,
+    unlock,
+    aiBudgetOk,
+    aiSupportBudgetOk,
+    safeSync,
+    setSafeSync,
+  };
 }

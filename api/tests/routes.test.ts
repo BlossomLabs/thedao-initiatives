@@ -385,7 +385,12 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
     json: { message: msg(nonce), signature: await w.sign(msg(nonce)) },
   });
   assertEquals(res.status, 200);
-  const body = await j(res) as { token: string; address: string; isAdmin: boolean };
+  const body = await j(res) as {
+    token: string;
+    address: string;
+    isAdmin: boolean;
+    me: Record<string, unknown>;
+  };
   assertEquals(body.address, ADMIN);
   assertEquals(body.isAdmin, true);
   const reuse = await h.req("/api/auth/verify", {
@@ -396,6 +401,8 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
   assertStringIncludes(String((await j(reuse)).error), "nonce");
   const me = await j(await h.req("/api/auth/me", { token: body.token }));
   assertEquals(me.address, ADMIN);
+  // The sign-in already carried what /me says, so the page needn't ask.
+  assertEquals(body.me, me);
   assertEquals((await h.req("/api/auth/me")).status, 401);
   assertEquals((await h.req("/api/admin/dashboard", { token: body.token })).status, 200);
   await h.req("/api/auth/logout", { method: "POST", token: body.token });

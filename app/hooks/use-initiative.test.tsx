@@ -5,10 +5,12 @@ import { useInitiative } from "./use-initiative";
 import DonationsTable from "~/components/initiative/DonationsTable";
 import type { Donation, InitiativePage } from "~/lib/api-types";
 import { structuredRow } from "../../test/fixtures";
+import { clearPrivateQueries } from "~/lib/browser-privacy";
 
+const viewer = vi.hoisted(() => ({ who: "anon" as string | null }));
 vi.mock(
   "~/context/session",
-  () => ({ useSession: () => ({ session: null }), sessionKey: () => "anon" }),
+  () => ({ useSession: () => ({ session: null }), sessionKey: () => viewer.who }),
 );
 vi.mock("~/components/wallet/Identity", () => ({ default: () => null }));
 
@@ -72,6 +74,7 @@ function mount() {
   );
 }
 afterEach(() => {
+  viewer.who = "anon";
   cleanup();
   clients.splice(0).forEach((qc) => qc.clear());
   vi.unstubAllGlobals();
@@ -187,4 +190,30 @@ it("paints the card's identity as a placeholder with an empty body until the pag
     .toBeInTheDocument();
   act(() => fresh.resolve(Response.json(page(false))));
   await screen.findByText("page: Audit tooling for rollups / 1 milestones / rev 2 / structured");
+});
+
+it("after a sign-in on the page, the public page stands in whole until the viewer's arrives", async () => {
+  const fresh = deferred<Response>();
+  vi.stubGlobal("fetch", vi.fn(() => fresh.promise));
+  viewer.who = "0xabc:false";
+  function Signed() {
+    const { data, isPlaceholderData } = useInitiative("audit-tooling");
+    if (!data) return <p>Loading</p>;
+    return <p>{isPlaceholderData ? "skeletons" : "text"}: {data.donations.length} donations</p>;
+  }
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  clients.push(qc);
+  // What the page read signed out, then cleared of private queries by the sign-in.
+  qc.setQueryData(["initiative", "audit-tooling", null], page(false, 2));
+  qc.setQueryData(["initiative", "audit-tooling", "0xold:false"], page(false, 9));
+  clearPrivateQueries(qc);
+  expect(qc.getQueryData(["initiative", "audit-tooling", "0xold:false"])).toBeUndefined();
+  render(
+    <QueryClientProvider client={qc}>
+      <Signed />
+    </QueryClientProvider>,
+  );
+  expect(screen.getByText("text: 2 donations")).toBeInTheDocument();
+  act(() => fresh.resolve(Response.json(page(false, 3))));
+  await screen.findByText("text: 3 donations");
 });

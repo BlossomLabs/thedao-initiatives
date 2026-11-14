@@ -28,6 +28,23 @@ export function authRoutes(deps: Deps) {
     return c.json({ nonce: await db.sessions.issueNonce() });
   });
 
+  /** What /me tells about an account beyond its session (also sent by /verify). */
+  async function accountOf(address: string) {
+    const [p, hasWatchlist, isBadgeHolder] = await Promise.all([
+      db.profiles.get(address),
+      db.watchlists.has(address),
+      // The same check that tags comments EXPERT (cached an hour); a chain error reads as "no badge".
+      deps.chain.hasBadge(address).catch(() => false),
+    ]);
+    return {
+      isBadgeHolder,
+      nickname: p.nickname || null,
+      pfp: p.pfp,
+      pfpUrl: pfpUrl(config, p.pfp),
+      hasWatchlist,
+    };
+  }
+
   r.post("/verify", async (c) => {
     if (
       !(await db.rateLimit("login:" + requireClientIp(c), LOGIN_ATTEMPTS_PER_MINUTE_PER_IP, 60))
@@ -63,13 +80,23 @@ export function authRoutes(deps: Deps) {
       throw new HttpError(401, "nonce invalid or already used");
     }
     const isAdmin = await deps.admins.isAdmin(m.address);
-    const { token, session } = await db.sessions.create(m.address, isAdmin, c.var.token);
+    // The account's details come back with the session, read alongside its write, so
+    // the page needn't ask /me right after (#82: one round trip less after the signature).
+    const [{ token, session }, account] = await Promise.all([
+      db.sessions.create(m.address, isAdmin, c.var.token),
+      accountOf(m.address),
+    ]);
     auditContext(c, {
       actor: session.address,
       target: session.address,
       detail: c.var.user ? "reauthenticate" : "login",
     });
-    const info = { address: session.address, isAdmin, expiresAt: session.expiresAt };
+    const info = {
+      address: session.address,
+      isAdmin,
+      expiresAt: session.expiresAt,
+      me: { address: session.address, isAdmin, expiresAt: session.expiresAt, ...account },
+    };
     // The browser asks for the cookie and never sees the token; scripts get
     // it in the body and send it back as a bearer.
     if (body.cookie === true) {
@@ -84,21 +111,11 @@ export function authRoutes(deps: Deps) {
 
   r.get("/me", requireAuth, async (c) => {
     const u = c.var.user!;
-    const [p, hasWatchlist, isBadgeHolder] = await Promise.all([
-      db.profiles.get(u.address),
-      db.watchlists.has(u.address),
-      // The same check that tags comments EXPERT (cached an hour); a chain error reads as "no badge".
-      deps.chain.hasBadge(u.address).catch(() => false),
-    ]);
     return c.json({
       address: u.address,
       isAdmin: u.isAdmin,
-      isBadgeHolder,
       expiresAt: u.expiresAt,
-      nickname: p.nickname || null,
-      pfp: p.pfp,
-      pfpUrl: pfpUrl(config, p.pfp),
-      hasWatchlist,
+      ...await accountOf(u.address),
     });
   });
 

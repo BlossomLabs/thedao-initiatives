@@ -26,7 +26,7 @@ const fetchPage = (slug: string, qc: QueryClient, signal: AbortSignal, who: stri
 function fromBoard(board: Board | undefined, slug: string): InitiativePage | undefined {
   const card = board?.cards.find((c) => c.initiative.slug === slug);
   if (!card) return undefined;
-  return {
+  const page: InitiativePage = {
     initiative: {
       ...card.initiative,
       details: "",
@@ -53,7 +53,12 @@ function fromBoard(board: Board | undefined, slug: string): InitiativePage | und
     donations: [],
     ledger: null,
   };
+  partial.add(page);
+  return page;
 }
+
+/** The pages made from a board card: only these lack the text and the facts. */
+const partial = new WeakSet<InitiativePage>();
 
 export function useInitiative(slug: string) {
   const qc = useQueryClient();
@@ -67,10 +72,16 @@ export function useInitiative(slug: string) {
     // A different visitor may own the refresh. Read KV more often until its
     // result arrives; these snapshot polls never duplicate the upstream work.
     refetchInterval: (q) => q.state.data?.ledger?.updating ? 2_000 : PAGE_POLL_MS,
-    placeholderData: () => fromBoard(qc.getQueryData<Board>(boardKey), slug),
+    // Signed in, the public page read before (a sign-in on this page) stands in whole
+    // until the viewer's own arrives; else the board card's head of the page.
+    placeholderData: () =>
+      (who ? qc.getQueryData<InitiativePage>([...initiativeKey(slug), null]) : undefined) ??
+        fromBoard(qc.getQueryData<Board>(boardKey), slug),
   });
   return {
     ...query,
+    /** The page on screen is the board card's: the text and the facts are still missing. */
+    isPlaceholderData: Boolean(query.data && partial.has(query.data)),
     isUpdatingLedger: Boolean(
       query.data?.ledger?.updating ||
         (query.isFetching && query.data?.ledger?.refreshDue),

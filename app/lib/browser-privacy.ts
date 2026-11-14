@@ -46,7 +46,11 @@ export function clearPrivateQueries(qc: QueryClient) {
     "watchlist",
   ]);
   const filters = {
-    predicate: (q: { queryKey: readonly unknown[] }) => roots.has(String(q.queryKey[0])),
+    predicate: (q: { queryKey: readonly unknown[] }) =>
+      roots.has(String(q.queryKey[0])) &&
+      // An initiative's page read signed out (["initiative", slug, null]) went without the
+      // cookie: it is the public page, kept so a sign-in on it doesn't blank it (#82).
+      !(q.queryKey[0] === "initiative" && q.queryKey.length === 3 && q.queryKey[2] === null),
   };
   void qc.cancelQueries(filters);
   qc.removeQueries(filters);

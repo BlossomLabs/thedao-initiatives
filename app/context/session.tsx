@@ -215,6 +215,25 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     clear();
   }, [clear]);
 
+  /** The account the API reports for session `s` (from /me, or with the sign-in). */
+  const applyMe = (s: SessionInfo, m: Me) => {
+    if (sessionRef.current !== s) return;
+    if (m.address.toLowerCase() !== s.address.toLowerCase()) {
+      clear();
+      return;
+    }
+    if (legacyDraftOwner.current === s.address.toLowerCase()) preserveLegacyDraft(s.address);
+    setMe(m);
+    // The API may remove privileges; newly granted privileges need another sign-in.
+    if (m.isAdmin !== s.isAdmin && sessionKey(sessionRef.current) === sessionKey(s)) {
+      const next = { ...s, isAdmin: m.isAdmin };
+      clearPrivateQueries(qc);
+      sessionRef.current = next;
+      setSession(next);
+      save(next);
+    }
+  };
+
   const refreshMe = useCallback(async () => {
     const s = sessionRef.current;
     if (!s) {
@@ -222,22 +241,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const m = await api<Me>("/api/auth/me", { passive: true });
-      if (sessionRef.current !== s) return;
-      if (m.address.toLowerCase() !== s.address.toLowerCase()) {
-        clear();
-        return;
-      }
-      if (legacyDraftOwner.current === s.address.toLowerCase()) preserveLegacyDraft(s.address);
-      setMe(m);
-      // The API may remove privileges; newly granted privileges need another sign-in.
-      if (m.isAdmin !== s.isAdmin && sessionKey(sessionRef.current) === sessionKey(s)) {
-        const next = { ...s, isAdmin: m.isAdmin };
-        clearPrivateQueries(qc);
-        sessionRef.current = next;
-        setSession(next);
-        save(next);
-      }
+      applyMe(s, await api<Me>("/api/auth/me", { passive: true }));
     } catch (e) {
       if (sessionRef.current === s && e instanceof ApiError && e.status === 401) clear(true);
     }
@@ -408,12 +412,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         });
         stillActive();
         // cookie: true -> the token comes back as an HttpOnly cookie, not in the body.
-        return await api<SessionInfo>("/api/auth/verify", {
+        return await api<SessionInfo & { me?: Me }>("/api/auth/verify", {
           json: { message, signature, cookie: true },
         });
       };
       const work = Promise.resolve().then(async () => {
-        let s: SessionInfo;
+        let s: SessionInfo & { me?: Me };
         try {
           s = await attempt();
         } catch (e) {
@@ -430,10 +434,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         ) clearPrivateQueries(qc);
         flushPrivateDrafts();
         if (legacyDraftOwner.current) preserveLegacyDraft(legacyDraftOwner.current);
+        // The account comes with the sign-in; an older API without it is asked.
+        const { me: account, ...info } = s;
+        s = info;
         setSession(s);
         save(s);
         sessionRef.current = s;
-        await refreshMe();
+        if (account) applyMe(s, account);
+        else await refreshMe();
         return s;
       });
       const walletConnect = signingConnector?.id === "walletConnect";

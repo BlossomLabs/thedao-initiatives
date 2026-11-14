@@ -1010,6 +1010,26 @@ it("retries once with a fresh nonce when the signed message aged out of the serv
   expect(result.current.signingIn).toBe(false);
 });
 
+it("takes the account that comes with the sign-in, without asking /me", async () => {
+  const { result, config, request } = setup();
+  const originalRequest = request.getMockImplementation()!;
+  request.mockImplementation((args) =>
+    args.method === "personal_sign" ? Promise.resolve("0x1234") : originalRequest(args)
+  );
+  const originalApi = vi.mocked(api).getMockImplementation()!;
+  const account = { ...SESSION, nickname: "kim", pfp: "", pfpUrl: "", isBadgeHolder: true };
+  vi.mocked(api).mockImplementation((path, options) =>
+    path === "/api/auth/verify"
+      ? Promise.resolve({ ...SESSION, me: account })
+      : originalApi(path, options)
+  );
+  vi.mocked(api).mockClear();
+  await act(() => result.current.connect(config.connectors[0]));
+  expect(result.current.session).toEqual(SESSION);
+  expect(result.current.me).toEqual(account);
+  expect(api).not.toHaveBeenCalledWith("/api/auth/me", expect.anything());
+});
+
 it("gives up after one retry when the message is still out of the server window", async () => {
   const { result, config, request } = setup();
   const originalRequest = request.getMockImplementation()!;

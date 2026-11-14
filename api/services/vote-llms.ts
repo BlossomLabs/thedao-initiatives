@@ -1,8 +1,9 @@
 /** /vote/llms.txt: what an LLM needs to draft a ballot for the deployed round, in the
  * same words as the ballot page (docs/superpowers/specs/2026-11-11-ballot-rules-design.md):
  * who can vote and revise, how tiers settle, how the tally spends a share, the ballot
- * rules, the pabutools format, every project with its affiliations, and what to do. */
+ * rules, the ballot format, every project with its affiliations, and what to do. */
 import { tierName, TIERS } from "../../shared/vote/ballot.ts";
+import { formatBallotText } from "../../shared/vote/ballot-text.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import { windowEnds } from "../../shared/vote/quiet-ending.ts";
 import type { FeedInitiative } from "./feed.ts";
@@ -44,8 +45,10 @@ export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: str
     "",
   ];
   const bySlug = new Map(entries.map((e) => [e.slug, e]));
-  const example = [m.slugs.slice(0, 3).join("="), m.slugs[3], m.slugs.slice(4, 6).join("=")]
-    .filter(Boolean).join(",");
+  const example = formatBallotText(
+    Object.fromEntries(m.slugs.slice(0, 4).map((s, i) => [s, TIERS[Math.max(0, i - 1)]])),
+    m.slugs,
+  );
   const projects = m.slugs.map((slug, i) => {
     const p = m.projects[i];
     const e = bySlug.get(slug);
@@ -119,17 +122,14 @@ export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: str
     ...(m.ballotRules ? rules() : ["This round has no ballot rules.", ""]),
     "## Ballot format",
     "",
-    "A pabutools (Pabulib) ordinal vote with the Blossom tie extension: project ids are the " +
-    "slugs below; projects of equal rank are joined with `=`; tiers follow in order with `,`, " +
-    `${sTier} first (an empty middle tier is \`,,\`). Use at most three tiers, only the exact ` +
-    "project slugs below, and list each project at most once. Anything not listed is unranked. " +
-    "The voter pastes the line (or a whole .pb file) into the ballot page. Syntax example only; " +
-    "it may not meet the ballot rules or reflect the voter's priorities:",
+    `YAML with one key per tier, \`${sTier}\`, \`${aTier}\` and \`${bTier}\`, each a list of ` +
+    "project slugs from the list below; an empty tier is `[]`. No voter id, no names, no " +
+    "costs. Use only the exact project slugs below and list each project at most once. " +
+    "Anything not listed is unranked. The voter pastes it into the ballot page. Syntax " +
+    "example only; it may not meet the ballot rules or reflect the voter's priorities:",
     "",
-    "```",
-    "VOTES",
-    "voter_id;vote",
-    `1;${example}`,
+    "```yaml",
+    example,
     "```",
     "",
     "## Projects",
@@ -139,7 +139,7 @@ export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: str
     "## What to do",
     "",
     "Ask the voter for their star ratings or their priorities: you can't see them. Then " +
-    "write the vote as one bare line (just the slugs, `=` and `,`, no voter id).",
+    "write the vote in the YAML format above, all three tiers, in a ```yaml code block.",
     ...(m.ballotRules
       ? [
         "Before returning it, check the total original requests against 1.5× the live pool, " +

@@ -858,8 +858,6 @@ export default function VotePage(
           menu={!early && (
             <BallotMenu
               slugs={R.slugs}
-              titles={(slug) => titles.get(slug) ?? slug}
-              askUsd={(slug) => BigInt(R.projects[R.slugs.indexOf(slug)]?.askUsd ?? "0")}
               tiers={tiers}
               onApply={applyPasted}
             />

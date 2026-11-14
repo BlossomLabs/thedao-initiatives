@@ -1170,7 +1170,9 @@ it("paste: settled tiers stay as counted, and the page says so", async () => {
     ],
   }));
   fireEvent.click(await screen.findByRole("button", { name: "Use an LLM…" }));
-  fireEvent.change(screen.getByLabelText("Paste its ballot"), { target: { value: "beta,gamma" } });
+  fireEvent.change(screen.getByLabelText("Paste its ballot"), {
+    target: { value: "S-Tier: [beta]\nA-Tier: [gamma]" },
+  });
   fireEvent.click(screen.getByRole("button", { name: "Use this ballot" }));
   expect(await screen.findByText("Pasted. Settled tiers stay as they were counted."))
     .toBeInTheDocument();

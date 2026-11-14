@@ -4,9 +4,10 @@ import { Button } from "~/components/ui/Button";
 import { Dialog } from "~/components/ui/Dialog";
 import { cn } from "~/lib/utils";
 import type { Tier } from "../../../shared/vote/ballot";
-import { formatBallotLine, formatBallotPb, parseBallotText } from "../../../shared/vote/pb";
+import { formatBallotText, parseBallotText } from "../../../shared/vote/ballot-text";
 
 const LLMS = "/vote/llms.txt";
+const PLACEHOLDER = "S-Tier:\n  - slug-a\n  - slug-b\nA-Tier: [slug-c]\nB-Tier: [slug-d]";
 
 /** A short "Copied." that clears itself, or why the copy failed. */
 function useFlash(): [string | undefined, (s: string) => void] {
@@ -67,12 +68,10 @@ function GiveRow(
 
 /** "Use an LLM…": a button by the ballot that opens what an LLM needs to draft this
  * ballot (a prompt with the /vote/llms.txt guide and this ballot to start from) and
- * where to paste its answer back (pabutools, Blossom ties). Pasting only replaces the
- * draft; nothing is sent. */
-export default function BallotMenu({ slugs, titles, askUsd, tiers, onApply }: {
+ * where to paste its answer back (YAML, a list of slugs per tier). Pasting only replaces
+ * the draft; nothing is sent. */
+export default function BallotMenu({ slugs, tiers, onApply }: {
   slugs: string[];
-  titles: (slug: string) => string;
-  askUsd: (slug: string) => bigint;
   tiers: Partial<Record<string, Tier>>;
   /** Replaces the draft; true when settled tiers were kept as counted. */
   onApply: (tiers: Partial<Record<string, Tier>>) => boolean;
@@ -92,9 +91,11 @@ export default function BallotMenu({ slugs, titles, askUsd, tiers, onApply }: {
     `Help me review or build my TheDAO ballot using ${llmsUrl}.`,
     "",
     "Start from my ballot below. Ask only what you need, suggest changes with brief reasons, " +
-    "and return a valid, paste-ready ballot line once I approve.",
+    "and return a valid, paste-ready ballot once I approve.",
     "",
-    formatBallotLine(tiers, slugs) || "(No initiatives ranked yet.)",
+    placed
+      ? ["```yaml", formatBallotText(tiers, slugs), "```"].join("\n")
+      : "(No initiatives ranked yet.)",
   ].join("\n");
 
   const show = () => {
@@ -103,8 +104,8 @@ export default function BallotMenu({ slugs, titles, askUsd, tiers, onApply }: {
     setKept(false);
     setOpen(true);
   };
-  const apply = () => {
-    const got = parseBallotText(text, slugs);
+  const apply = async () => {
+    const got = await parseBallotText(text, slugs);
     if ("error" in got) return setError(got.error);
     setError(undefined);
     setText("");
@@ -185,7 +186,7 @@ export default function BallotMenu({ slugs, titles, askUsd, tiers, onApply }: {
               flash={ballotCopied}
               onCopy={() =>
                 void copy(
-                  formatBallotPb(tiers, { slugs, titles, askUsd }),
+                  formatBallotText(tiers, slugs),
                   flashBallot,
                   "Couldn't copy: your browser blocked it.",
                 )}
@@ -218,10 +219,10 @@ export default function BallotMenu({ slugs, titles, askUsd, tiers, onApply }: {
               <>
                 <textarea
                   id="paste-ballot"
-                  rows={3}
+                  rows={5}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  placeholder="slug-a=slug-b=slug-c,slug-d,slug-e"
+                  placeholder={PLACEHOLDER}
                   className="mono block w-full resize-none rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 leading-normal text-white placeholder:text-white/35"
                 />
                 {error && <p role="alert" className="m-0 text-[13px] text-amber-200">{error}</p>}
@@ -229,7 +230,7 @@ export default function BallotMenu({ slugs, titles, askUsd, tiers, onApply }: {
                   sm
                   variant="primary"
                   disabled={!text.trim()}
-                  onClick={apply}
+                  onClick={() => void apply()}
                   className="w-full max-sm:h-11"
                 >
                   Use this ballot

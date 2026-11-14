@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { parseBallotText } from "../../../shared/vote/pb";
+import { parseBallotText } from "../../../shared/vote/ballot-text";
 import BallotMenu from "./BallotMenu";
 
 afterEach(cleanup);
@@ -12,8 +12,6 @@ const show = (
   render(
     <BallotMenu
       slugs={slugs}
-      titles={(s) => s.toUpperCase()}
-      askUsd={() => 1_000_000n}
       tiers={tiers}
       onApply={onApply}
     />,
@@ -36,7 +34,7 @@ it("one button opens it: what to give the LLM, and where to paste its answer", (
   expect(within(dialog).getByLabelText("Paste its ballot")).toBeInTheDocument();
 });
 
-it("copies a prompt with the guide and current ballot, keeping its ties and empty tiers", async () => {
+it("copies a prompt with the guide and current ballot as YAML", async () => {
   const writeText = vi.fn(() => Promise.resolve());
   Object.assign(navigator, { clipboard: { writeText } });
   const tiers = { alpha: "S", beta: "S", gamma: "B" } as const;
@@ -47,13 +45,18 @@ it("copies a prompt with the guide and current ballot, keeping its ties and empt
   expect(prompt).toContain(`${location.origin}/vote/llms.txt`);
   expect(prompt).toContain("Start from my ballot below.");
   expect(prompt).toContain("once I approve.");
-  expect(parseBallotText(prompt.split("\n\n").at(-1)!, slugs)).toEqual({ tiers });
+  expect(await parseBallotText(prompt.split("\n\n").at(-1)!, slugs)).toEqual({ tiers });
+  expect(prompt).toContain(
+    "```yaml\nS-Tier:\n  - alpha\n  - beta\nA-Tier: []\nB-Tier:\n  - gamma\n```",
+  );
   expect(
     within(dialog).getByRole("button", { name: "Copy prompt" }),
   ).toHaveTextContent("Copied");
   fireEvent.click(within(dialog).getByRole("button", { name: "Copy your ballot" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
-  expect(String((writeText.mock.calls[1] as unknown[])[0])).toContain("1;alpha=beta,,gamma");
+  expect(String((writeText.mock.calls[1] as unknown[])[0])).toBe(
+    "S-Tier:\n  - alpha\n  - beta\nA-Tier: []\nB-Tier:\n  - gamma",
+  );
 });
 
 it("an empty ballot still gets a starter prompt, while copying it separately stays disabled", async () => {
@@ -69,30 +72,35 @@ it("an empty ballot still gets a starter prompt, while copying it separately sta
   );
 });
 
-it("a pasted ballot replaces the draft, and nothing is sent", () => {
+it("a pasted ballot replaces the draft, and nothing is sent", async () => {
   const { onApply } = show();
   expect(screen.getByRole("button", { name: "Use this ballot" })).toBeDisabled();
   fireEvent.change(screen.getByLabelText("Paste its ballot"), {
-    target: { value: "beta=gamma,alpha" },
+    target: { value: "S-Tier: [beta, gamma]\nA-Tier: [alpha]" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Use this ballot" }));
-  expect(onApply).toHaveBeenCalledWith({ beta: "S", gamma: "S", alpha: "A" });
+  await waitFor(() => expect(onApply).toHaveBeenCalledWith({ beta: "S", gamma: "S", alpha: "A" }));
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-it("a paste that can't be read says why and changes nothing", () => {
+it("a paste that can't be read says why and changes nothing", async () => {
   const { onApply } = show();
-  fireEvent.change(screen.getByLabelText("Paste its ballot"), { target: { value: "nope" } });
+  fireEvent.change(screen.getByLabelText("Paste its ballot"), {
+    target: { value: "S-Tier: [nope]" },
+  });
   fireEvent.click(screen.getByRole("button", { name: "Use this ballot" }));
-  expect(screen.getByRole("alert")).toHaveTextContent("Unknown project: nope");
+  expect(await screen.findByRole("alert")).toHaveTextContent("Unknown project: nope");
   expect(onApply).not.toHaveBeenCalled();
 });
 
-it("says so when settled tiers stayed as counted", () => {
+it("says so when settled tiers stayed as counted", async () => {
   show(vi.fn(() => true));
-  fireEvent.change(screen.getByLabelText("Paste its ballot"), { target: { value: "beta" } });
+  fireEvent.change(screen.getByLabelText("Paste its ballot"), {
+    target: { value: "S-Tier: [beta]" },
+  });
   fireEvent.click(screen.getByRole("button", { name: "Use this ballot" }));
-  expect(screen.getByText("Pasted. Settled tiers stay as they were counted.")).toBeInTheDocument();
+  expect(await screen.findByText("Pasted. Settled tiers stay as they were counted."))
+    .toBeInTheDocument();
 });
 
 it("opening it doesn't put the cursor in the paste box: the dialog itself has focus", () => {

@@ -3,7 +3,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { voteLlms } from "../services/vote-llms.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import type { FeedInitiative } from "../services/feed.ts";
-import { parseBallotText } from "../../shared/vote/pb.ts";
+import { parseBallotText } from "../../shared/vote/ballot-text.ts";
 import { harness } from "./app-helpers.ts";
 
 const m: VoteManifest = {
@@ -120,17 +120,23 @@ Deno.test("vote llms: the minimum never rounds below the required micro-USD", ()
 });
 
 Deno.test("vote llms: a draft must use unique known slugs and pass validation", () => {
-  assertStringIncludes(text, "Use at most three tiers, only the exact project slugs below");
+  assertStringIncludes(text, "Use only the exact project slugs below");
   assertStringIncludes(text, "list each project at most once");
   assertStringIncludes(text, "Syntax example only; it may not meet the ballot rules");
   assertStringIncludes(text, "Before returning it, check the total original requests");
   assertStringIncludes(text, "do not invent preferences or return an invalid ballot");
 });
 
-Deno.test("vote llms: the format example parses", () => {
-  const example = text.split("\n").find((l) => l.startsWith("1;"))!;
-  const got = parseBallotText(example.slice(2), m.slugs);
-  assert("tiers" in got, JSON.stringify(got));
+Deno.test("vote llms: the format example parses", async () => {
+  const block = text.split("## Ballot format")[1].split("```")[1];
+  assertEquals(await parseBallotText(block, m.slugs), {
+    tiers: { "seal-audits": "S", "seal-tooling": "S", fuzzing: "A", wallets: "B" },
+  });
+  assertStringIncludes(
+    text,
+    "```yaml\nS-Tier:\n  - seal-audits\n  - seal-tooling\nA-Tier:\n  - fuzzing\nB-Tier:\n  - wallets\n```",
+  );
+  assert(!text.includes("pabutools"));
 });
 
 Deno.test("vote llms: 404 without a round", async () => {

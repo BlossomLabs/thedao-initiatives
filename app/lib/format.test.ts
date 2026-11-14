@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { clock, dayTime, dt, pct, shortAddr, shortDay, usd, usdShort, usdShortUp } from "./format";
+import {
+  clock,
+  dayTime,
+  dt,
+  pct,
+  shortAddr,
+  shortDay,
+  usd,
+  usd2,
+  usdShort,
+  usdShortUp,
+} from "./format";
 import { parseUsd, toBaseUnits, tokenQty, transferCalldata } from "./donate";
 import { avatarSrc, pfpDefaultIndex, presetUri } from "./avatar";
 
@@ -93,5 +104,24 @@ describe("usdShortUp (a missing amount, never read as less)", () => {
     expect(usdShortUp(950.2)).toBe("$951");
     expect(usdShortUp(1_234_500)).toBe("$1.3M");
     expect(usdShortUp(1_200_000)).toBe("$1.2M");
+  });
+});
+
+describe("usd2", () => {
+  it("says money to two digits, always in thousands or millions", () => {
+    expect(usd2(290, true)).toBe("$0.3k");
+    expect(usd2(1_523, true)).toBe("$1.6k");
+    expect(usd2(9_000, true)).toBe("$9k");
+    expect(usd2(11_210, true)).toBe("$12k");
+    expect(usd2(123_456, true)).toBe("$130k");
+    expect(usd2(1_234_567, true)).toBe("$1.3M");
+  });
+
+  it("rounds a missing amount up and a lead down, whole amounts as they are", () => {
+    expect(usd2(9_950, true)).toBe("$10k");
+    expect(usd2(4_000, false)).toBe("$4k");
+    expect(usd2(12_345, false)).toBe("$12k");
+    expect(usd2(736_999, false)).toBe("$730k");
+    expect(usd2(0, true)).toBe("$0k");
   });
 });

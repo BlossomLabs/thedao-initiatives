@@ -278,3 +278,38 @@ it("TheDAO's ring on a ballot's page: green what the live tally gives that ballo
   expect(poolSegments({ settledUsd: 0, liveUsd: 500_000, pool: 1_000_000 }).map((s) => s.key))
     .toEqual(["live", "rest"]);
 });
+
+it("TheDAO's ring with the tier settling now apart: two neutrals, the later tiers dimmer", () => {
+  const segs = poolSegments({
+    settledUsd: 100_000,
+    mineUsd: 50_000,
+    nextUsd: 200_000,
+    liveUsd: 150_000,
+    pool: 1_000_000,
+    liveTone: "neutral",
+  });
+  expect(segs.map((s) => [s.key, s.from, s.to, s.className])).toEqual([
+    ["settled", 0, 0.1, "stroke-vote"],
+    ["mine", 0.1, 0.15, "stroke-dao-green"],
+    ["next", 0.15, 0.35, "stroke-white/75"],
+    ["live", 0.35, 0.5, "stroke-white/30"],
+    ["rest", 0.5, 1, ""],
+  ]);
+});
+
+it("a previewed donation takes at least a visible stretch of TheDAO's ring", () => {
+  const segs = poolSegments({
+    settledUsd: 0,
+    nextUsd: 400_000,
+    liveUsd: 300_000,
+    previewUsd: 5_000,
+    pool: 1_000_000,
+    liveTone: "neutral",
+  });
+  const donation = segs.find((s) => s.key === "preview")!;
+  expect(donation.from).toBeCloseTo(0.7);
+  expect(donation.to).toBeCloseTo(0.75);
+  // Its popup keeps the real amount.
+  expect(donation.amount).toBe(5_000);
+  expect(segs.find((s) => s.key === "rest")!.from).toBeCloseTo(0.75);
+});

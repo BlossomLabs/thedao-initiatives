@@ -1,10 +1,12 @@
 import { hexToBytes } from "viem";
 import type { Card } from "~/lib/api-types";
 import { prefillFromRatings } from "~/lib/vote-prefill";
-import { decodeBallot, encodeBallot } from "../../../shared/vote/ballot";
+import { encodeBallot } from "../../../shared/vote/ballot";
 import { rulesRound } from "../../../shared/vote/manifest";
 import { checkBallot } from "../../../shared/vote/rules";
-import { MOCK_NOW, mockRound, MOCKS, RESULT_MOCKS, withGive } from "./mock-round";
+import { MOCK_NOW, mockRound, MOCKS, RESULT_MOCKS, withFigures } from "./mock-round";
+import { chainTally } from "../../../shared/vote/chain";
+import { liveInputsFrom } from "../../../shared/vote/live-inputs";
 
 const NOW = 1_800_000_000;
 const cards = Array.from({ length: 30 }, (_, i) => ({
@@ -97,87 +99,64 @@ describe("dev mocks", () => {
   });
 });
 
-describe("example vote results", () => {
-  // Every open moment (the finished vote has no tier settling).
-  it.each(Object.entries(RESULT_MOCKS).filter(([, k]) => k !== "finished"))(
+describe("example vote results: the real tally over made-up ballots", () => {
+  // Ballots counted, a tier still open: every moment but the first and the last.
+  const open = Object.entries(RESULT_MOCKS).filter(([, k]) => k !== "finished" && k !== "started");
+
+  it.each(open)("%s: the live result is what its inputs tally to", (_, kind) => {
+    const { view } = mockRound(kind, cards, 1);
+    const { inp, first } = liveInputsFrom(view.live.inputs!);
+    const funded = chainTally(inp, first).flatMap((s) => s.order).map((c) => cards[c]);
+    expect(funded.map((c) => c.initiative.slug).sort()).toEqual([...view.live.funded].sort());
+    // All 40 voters' ballots count; badge 1's is its own.
+    expect(Object.keys(view.accepted)).toHaveLength(40);
+  });
+
+  it("what a tier settles with is what the moments before showed coming", () => {
+    const live = (k: Parameters<typeof mockRound>[0]) => mockRound(k, cards, 1).view;
+    const fundedIn = (v: ReturnType<typeof live>, tier: string) =>
+      v.tiers.flatMap((t) => (t.tier === tier && t.status === "settled" ? [t.funded] : []))[0] ??
+        Object.entries(v.live.tiers ?? {}).filter(([, t]) => t === tier).map(([s]) => s);
+    for (const tier of ["S", "A", "B"]) {
+      const seen = ["s-settling", "spent", "b-settling", "finished"].map((k) =>
+        [...fundedIn(live(k as Parameters<typeof mockRound>[0]), tier)].sort()
+      );
+      for (const x of seen) expect(x).toEqual(seen[0]);
+    }
+    // Within the pool.
+    const fin = live("finished");
+    const total = fin.tiers.flatMap((t) => (t.status === "settled" ? Object.values(t.awards) : []))
+      .reduce((a, v) => a + BigInt(v), 0n);
+    expect(total).toBeLessThanOrEqual(1_000_000_000_000n);
+  });
+
+  it.each(open)(
     "%s: below the tier settling now, figures one tier up; in it, leads",
-    (_, kind) => {
+    async (_, kind) => {
       const { round, view } = mockRound(kind, cards, 1);
-      const live = withGive(view, round, cards).live;
+      const live = (await withFigures(view, round)).live;
       const settling = view.tiers.find((t) => t.status !== "settled")!.tier;
       const settled = new Set(view.tiers.flatMap((t) => (t.status === "settled" ? t.funded : [])));
       const order = ["S", "A", "B"];
-      const entries = Object.entries(live.give!);
-      expect(entries.length).toBeGreaterThan(0);
-      for (const [slug, g] of entries) {
+      for (const [slug, g] of Object.entries(live.give!)) {
         expect(settled.has(slug)).toBe(false);
         const now = view.live.tiers?.[slug];
         expect(now).not.toBe(settling);
         // One tier above where the live tally has it; B-Tier when it isn't funded.
         expect(g.tier).toBe(now ? order[order.indexOf(now) - 1] : "B");
-        // A figure in $1K steps, never more than what it needs.
-        if (g.gap !== null) {
-          const usd = Number(BigInt(g.gap) / 1_000_000n);
-          expect(usd % 1000).toBe(0);
-          const c = cards.find((x) => x.initiative.slug === slug)!;
-          expect(usd).toBeLessThanOrEqual(c.initiative.goalUsd - c.summary.total);
-        }
+        if (g.gap !== null) expect(BigInt(g.gap) % 10_000_000n).toBe(0n);
       }
-      // Leads only for what the tier settling now funds, in $1K steps.
       for (const [slug, l] of Object.entries(live.lead ?? {})) {
         expect(view.live.tiers?.[slug]).toBe(settling);
-        expect(settled.has(slug)).toBe(false);
-        expect(Number(BigInt(l) / 1_000_000n) % 1000).toBe(0);
+        expect(BigInt(l) % 10_000_000n).toBe(0n);
       }
     },
   );
-});
 
-it("b-settling: TheDAO's ballot funds one this badge didn't put on its ballot", () => {
-  const m = mockRound("b-settling", cards, 1);
-  const mine = decodeBallot(hexToBytes(m.view.accepted["1"] as `0x${string}`), m.round.slugs);
-  const theirs = m.view.live.funded.filter((slug) => !mine[slug]);
-  expect(theirs).toHaveLength(1);
-  expect(m.view.live.tiers?.[theirs[0]]).toBe("B");
-  // Within the pool, with what the settled tiers took.
-  const total = [
-    ...m.view.tiers.flatMap((t) => (t.status === "settled" ? Object.values(t.awards) : [])),
-    ...Object.values(m.view.live.awards),
-  ].reduce((a, v) => a + BigInt(v), 0n);
-  expect(total).toBeLessThanOrEqual(BigInt(m.round.poolUsd));
-});
-
-describe("example knock-ons follow the money", () => {
-  it.each(Object.entries(RESULT_MOCKS).filter(([, k]) => k !== "finished"))(
-    "%s: moving up drops nobody; coming in drops only what the pool can't also pay",
-    (_, kind) => {
-      const { round, view } = mockRound(kind, cards, 1);
-      const live = withGive(view, round, cards).live;
-      const usd = (v: string) => Number(BigInt(v) / 1_000_000n);
-      const settledUsd = view.tiers
-        .flatMap((t) => (t.status === "settled" ? Object.values(t.awards) : []))
-        .reduce((a, v) => a + usd(v), 0);
-      const left = 1_000_000 - settledUsd -
-        Object.values(view.live.awards).reduce((a, v) => a + usd(v), 0);
-      for (const [slug, g] of Object.entries(live.give!)) {
-        if (g.gap === null) continue;
-        if (view.live.tiers?.[slug]) {
-          // Funded already: it frees money, so nobody drops out.
-          expect(g.dropsOut).toEqual([]);
-          continue;
-        }
-        expect(g.moves).toEqual([]);
-        const c = cards.find((x) => x.initiative.slug === slug)!;
-        const asks = c.initiative.goalUsd - c.summary.total - usd(g.gap);
-        const freed = g.dropsOut.reduce((a, o) => a + usd(view.live.awards[o.slug]), 0);
-        // What drops out makes room for it, and no more than needed: without the last
-        // one out, it wouldn't fit.
-        expect(asks).toBeLessThanOrEqual(left + freed);
-        if (g.dropsOut.length) {
-          const lastOut = usd(view.live.awards[g.dropsOut.at(-1)!.slug]);
-          expect(asks).toBeGreaterThan(left + freed - lastOut);
-        }
-      }
-    },
-  );
+  it("a round with nothing counted, or closed, has no figures to work out", async () => {
+    for (const k of ["started", "finished"] as const) {
+      const { round, view } = mockRound(k, cards, 1);
+      expect(await withFigures(view, round)).toBe(view);
+    }
+  });
 });

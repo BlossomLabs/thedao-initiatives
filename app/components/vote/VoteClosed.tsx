@@ -10,7 +10,7 @@ import DaoBallot, { daoResult } from "~/components/vote/DaoBallot";
 import type { BallotItem } from "~/components/vote/TierBallot";
 import { useVoteBallots } from "~/hooks/use-vote";
 import { errorMessage } from "~/lib/api";
-import { decodeBallot, encodeBallot, type Tier } from "../../../shared/vote/ballot";
+import { decodeBallot, encodeBallot, type Tier, TIERS } from "../../../shared/vote/ballot";
 import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
 
 function Header(
@@ -244,6 +244,7 @@ export default function VoteClosed(
       label={resultLabel}
       // Green on its ring: what the live tally would give the initiatives on this ballot.
       mine={live && sent ? new Set(Object.keys(sent).filter((slug) => sent[slug])) : undefined}
+      settling={live ? TIERS.find((t) => !settled?.some((x) => x.tier === t)) : undefined}
       action={
         // The tables are the result already; the board shows each initiative with its
         // funding bar and its page.

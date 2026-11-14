@@ -262,14 +262,21 @@ export function ballotSegments(
 /** TheDAO's ring during the vote: gold what the settled tiers awarded, green what the live
  * tally would add if the vote ended now, then (green) what a previewed donation would
  * bring in, then what's left of the pool. */
+/** The least a previewed donation's stretch takes of TheDAO's ring. */
+const MIN_DONATION = 0.05;
+
 export function poolSegments(
-  { settledUsd, mineUsd = 0, liveUsd, previewUsd = 0, pool, liveTone = "green" }: {
+  { settledUsd, mineUsd = 0, nextUsd, liveUsd, previewUsd = 0, pool, liveTone = "green" }: {
     settledUsd: number;
+    /** What the tier settling now would award (the rest of the live tally, its later
+     * tiers, is `liveUsd`), each without `mineUsd`: two neutrals, this one lighter. */
+    nextUsd?: number;
     /** On a ballot's page: what the live tally would award to initiatives on that ballot
      * (green), ahead of the rest of the live tally. */
     mineUsd?: number;
     liveUsd: number;
-    /** What the pool would pay for what comes in with a previewed donation. */
+    /** A previewed donation: what the pool would pay for the initiative given to, its ask
+     * less the donation (green). */
     previewUsd?: number;
     pool: number;
     /** The open tiers' share: green, or neutral (the vote results). */
@@ -277,7 +284,20 @@ export function poolSegments(
   },
 ): Segment[] {
   const neutral = liveTone === "neutral";
+  // The live tally in two neutrals once the tier settling now is told apart.
+  const split = nextUsd !== undefined;
+  const next = nextUsd ?? 0;
   const f = (usd: number) => (pool > 0 ? usd / pool : 0);
+  // What a donation brings in can be small next to the pool ($10K is 1% of $1M): its
+  // stretch is drawn at least MIN_DONATION of the way round, so opening an initiative
+  // visibly changes the ring; its popup keeps the real amount.
+  const before = f(settledUsd + mineUsd + next + liveUsd);
+  const donationTo = previewUsd > 0
+    ? Math.min(
+      1,
+      Math.max(before + MIN_DONATION, f(settledUsd + mineUsd + next + liveUsd + previewUsd)),
+    )
+    : before;
   return fit([
     {
       key: "settled",
@@ -301,34 +321,45 @@ export function poolSegments(
         "What the open tiers would award to initiatives on your ballot if they settled now. It can still change.",
     },
     {
-      key: "live",
+      key: "next",
       from: f(settledUsd + mineUsd),
-      to: f(settledUsd + mineUsd + liveUsd),
-      className: neutral ? "stroke-white/55" : "stroke-dao-green",
-      swatch: neutral ? "bg-white/55" : "bg-dao-green",
-      title: "If it ended now",
+      to: f(settledUsd + mineUsd + next),
+      className: "stroke-white/75",
+      swatch: "bg-white/75",
+      title: "Settling now",
+      amount: next,
+      text: "What the tier settling now would award if it settled now. It can still change.",
+    },
+    {
+      key: "live",
+      from: f(settledUsd + mineUsd + next),
+      to: f(settledUsd + mineUsd + next + liveUsd),
+      className: neutral ? (split ? "stroke-white/30" : "stroke-white/55") : "stroke-dao-green",
+      swatch: neutral ? (split ? "bg-white/30" : "bg-white/55") : "bg-dao-green",
+      title: split ? "Later tiers, as they stand" : "If it ended now",
       amount: liveUsd,
-      text: "What the open tiers would award if they settled now. It can still change.",
+      text: split
+        ? "What the tiers after it would award if the vote ended now. It can still change."
+        : "What the open tiers would award if they settled now. It can still change.",
     },
     {
       key: "preview",
-      from: f(settledUsd + mineUsd + liveUsd),
-      to: f(settledUsd + mineUsd + liveUsd + previewUsd),
+      from: before,
+      to: donationTo,
       className: "stroke-dao-green",
       swatch: "bg-dao-green",
       title: "With your donation",
       amount: previewUsd,
-      text:
-        "What the pool would pay for what comes in with your donation, if its tier settled now.",
+      text: "What the pool would pay for the initiative you give to: its ask less your donation.",
     },
     {
       key: "rest",
-      from: f(settledUsd + mineUsd + liveUsd + previewUsd),
+      from: donationTo,
       to: 1,
       className: "",
       swatch: "border-2 border-white/30",
       title: "Not allocated",
-      amount: Math.max(0, pool - settledUsd - mineUsd - liveUsd - previewUsd),
+      amount: Math.max(0, pool - settledUsd - mineUsd - next - liveUsd - previewUsd),
       text: `What's left of the ${dollars(pool)} pool.`,
     },
   ]);

@@ -88,3 +88,25 @@ describe("the donation to any tier", () => {
     }
   });
 });
+
+describe("the donation to a tier, to a finer step", () => {
+  it("is never more than the $1K one, and one step less doesn't get there", () => {
+    const inp = inputs([50, 20.37, 45], [30, 30], [[1, 2, 3], [3, 1, 2]], 100);
+    const order = (t: string | null) => (t === null ? 3 : ["S", "A", "B"].indexOf(t));
+    const hundred = 100_000_000n;
+    for (let c = 0; c < 3; c++) {
+      for (const target of [2, 1, 0]) {
+        const k = giftGapTo(inp, 0, c, target);
+        const h = giftGapTo(inp, 0, c, target, undefined, undefined, hundred);
+        if (k === null) continue;
+        expect(h).not.toBeNull();
+        expect(h! <= k).toBe(true);
+        expect(h! % hundred).toBe(0n);
+        expect(order(giftEffect(inp, 0, c, h!).tier)).toBeLessThanOrEqual(target);
+        if (h! > hundred) {
+          expect(order(giftEffect(inp, 0, c, h! - hundred).tier)).toBeGreaterThan(target);
+        }
+      }
+    }
+  });
+});

@@ -8,7 +8,7 @@ import CategoryDot from "~/components/ui/CategoryDot";
 import Reveal from "~/components/ui/Reveal";
 import type { NextTierEntry } from "~/hooks/use-vote";
 import type { Card } from "~/lib/api-types";
-import { usd, usdShort, usdShortUp } from "~/lib/format";
+import { usd, usd2, usdShortUp } from "~/lib/format";
 import { lazyPart } from "~/lib/lazy-part";
 import { cn } from "~/lib/utils";
 import { dollars } from "~/lib/vote-results";
@@ -24,7 +24,7 @@ export type GiveRow = {
   card: Card;
   /** Below the tier settling now: the donation that moves it up a tier. */
   entry?: NextTierEntry;
-  /** In the tier settling now: how far ahead it is, in whole dollars (0 under $1K). */
+  /** In the tier settling now: how far ahead it is, in whole dollars (0: barely). */
   lead?: number;
   /** Where TheDAO's ballot has it now, if anywhere. */
   now?: Tier;
@@ -34,16 +34,6 @@ export type GiveRow = {
 export const gapUsd = (e: NextTierEntry) => (e.gap === null ? null : dollars(e.gap));
 /** A row's gap in whole dollars; null for a row ahead in its tier, or out of reach. */
 const rowGap = (r: GiveRow) => (r.entry ? gapUsd(r.entry) : null);
-
-/** What else a donation that moves it up changes, in short: "2 move · 1 drops out". */
-export function knockOnHint(e: NextTierEntry): string {
-  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
-  return [
-    e.comesIn.length && n(e.comesIn.length, "comes in", "come in"),
-    e.moves.length && n(e.moves.length, "moves", "move"),
-    e.dropsOut.length && n(e.dropsOut.length, "drops out", "drop out"),
-  ].filter(Boolean).join(" · ");
-}
 
 /** What a donation does to the others, in one word, when it does one thing to all of
  * them: only pushes them out ("drops", red), only brings them in ("brings in", green);
@@ -251,7 +241,6 @@ export default function GiveList(
               const isOpen = open === i.slug;
               const gap = rowGap(r);
               const to = r.entry && tierName(r.entry.tier);
-              const hint = r.entry && gap !== null ? knockOnHint(r.entry) : "";
               const lines = r.entry && gap !== null ? knockOnLines(r.entry) : [];
               const knockOpen = knock === i.slug && isOpen;
               // What it does to the others: drops them (red), brings them in (green) or
@@ -285,13 +274,7 @@ export default function GiveList(
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[14px] text-white">{i.title}</span>
                       <span className="mt-0.5 block truncate text-[12px] text-white/55 tnum">
-                        Needs {usd(need)} ·{" "}
-                        {r.now ? `now in ${tierName(r.now)}` : "not included"}
-                        {hint && (
-                          <span className={knockKind?.tone}>
-                            {` · ${hint}`}
-                          </span>
-                        )}
+                        Needs {usd(need)} · {r.now ? `now in ${tierName(r.now)}` : "not included"}
                       </span>
                     </span>
                     {!r.entry
@@ -300,7 +283,7 @@ export default function GiveList(
                           {r.lead
                             ? (
                               <b className="rounded-md bg-dao-green px-2 py-[3px] font-inter-tight text-[15px] font-bold text-[#0f2a17] tnum">
-                                {usdShort(r.lead)}
+                                {usd2(r.lead, false)}
                               </b>
                             )
                             : null}
@@ -321,7 +304,7 @@ export default function GiveList(
                       : (
                         <span className="flex flex-none items-center gap-1.5 whitespace-nowrap">
                           <b className="rounded-md bg-[#c22d2b] px-2 py-[3px] font-inter-tight text-[15px] font-bold text-white tnum">
-                            −{usdShortUp(gap)}
+                            −{usd2(gap, true)}
                           </b>
                           <small className="w-[46px] text-[12px] text-white/65">to {to}</small>
                         </span>
@@ -363,9 +346,13 @@ export default function GiveList(
                           )
                           : (
                             <>
-                              <b className="font-semibold text-white">{usd(gap)}</b>{" "}
-                              more brings it into <span className="whitespace-nowrap">{to}</span>
-                              {" "}
+                              <b className="font-semibold text-white">
+                                {usd(steps?.length ? steps[0].usd : gap)}
+                              </b>{" "}
+                              more brings it into{" "}
+                              <span className="whitespace-nowrap">
+                                {steps?.length ? tierName(steps[0].tier) : to}
+                              </span>{" "}
                               if the vote ended now{lines.length === 0 ? "." : (
                                 <>
                                   , and{" "}
@@ -509,7 +496,7 @@ export function ClosestBox(
                         {i.title}
                       </span>
                       <b className="flex-none rounded-md bg-[#c22d2b] px-1.5 py-[2px] font-inter-tight text-[13.5px] font-bold text-white tnum">
-                        −{usdShortUp(rowGap(r)!)}
+                        −{usd2(rowGap(r)!, true)}
                       </b>
                     </button>
                   </li>

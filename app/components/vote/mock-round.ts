@@ -2,6 +2,10 @@ import { bytesToHex } from "viem";
 import type { RoundTier, RoundView } from "~/hooks/use-vote";
 import type { Card } from "~/lib/api-types";
 import { encodeBallot, type Tier, TIERS } from "../../../shared/vote/ballot";
+import { type ChainInputs, type ChainStage, chainTally } from "../../../shared/vote/chain";
+import { liveInputsFrom, liveInputsJson } from "../../../shared/vote/live-inputs";
+import { giftGapsAsync, liveLeadsAsync } from "../../../shared/vote/next-tier";
+import { effectiveRanks } from "../../../vote/shared/ranks";
 import type { VoteManifest } from "../../../shared/vote/manifest";
 
 /** Examples of the ballot through the vote, public at `/vote/mock/<kind>` (and in dev at
@@ -139,124 +143,151 @@ function sampleBallot(round: VoteManifest) {
   return { ballot, s, a, b };
 }
 
-/** A tier settled in its first window, funding `funded` (what the badge paid for each). */
-function settled(
-  tier: Tier,
-  at: number,
-  funded: { slug: string; award: number; paid: number }[],
-  n: number,
-): RoundTier {
-  return {
-    tier,
-    status: "settled",
-    at,
-    forced: false,
-    funded: funded.map((f) => f.slug),
-    awards: Object.fromEntries(funded.map((f) => [f.slug, micro(f.award)])),
-    // Only what this badge paid: the other winners were funded by other ballots.
-    paid: {
-      [String(n)]: Object.fromEntries(
-        funded.filter((f) => f.paid > 0).map((f) => [f.slug, micro(f.paid)]),
-      ),
-    },
+/** A small seeded random generator: the same made-up ballots on every page load. */
+function seeded(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 2 ** 32;
   };
 }
 
-/** What badge `n` would pay for each live winner (USD), if the open tiers settled now. */
-const livePaid = (n: number, paid: [string, number][]) => ({
-  [String(n)]: Object.fromEntries(paid.map(([slug, usd]) => [slug, micro(usd)])),
-});
-
-/** The example's one outcome, the same at every moment: what each tier funds (for good
- * once settled; before, as the live tally, which counts every open tier at once), and
- * what this badge pays for each (a part of its share). The final result is what each
- * moment showed coming. */
-function outcome(
+/** The example's 40 ballots, by badge: badge `n`'s is its sample ballot; the other 39
+ * lean the same way (a few favourites per tier, as the sample ballot's own S-Tier and
+ * A-Tier picks and one of its B-Tier picks), each with picks of its own. `withOwn`
+ * false: badge `n` never voted. */
+function crowd(
   round: VoteManifest,
-  ask: (slug: string) => number,
-  { ballot, s, a, b }: ReturnType<typeof sampleBallot>,
+  sample: ReturnType<typeof sampleBallot>,
+  n: number,
+  withOwn = true,
 ) {
-  // b[0] is in this badge's B-Tier, but other ballots put it in S-Tier: it wins there.
-  const S = [s[0], s[1], b[0]];
-  const A = [a[0], a[2]];
-  // B-Tier: b[1] from this ballot, and one it didn't rank that the other ballots fund,
-  // the cheapest the pool still pays for.
-  const left = POOL_USD - [...S, ...A, b[1]].reduce((x, slug) => x + ask(slug), 0);
-  const theirs = round.slugs
-    .filter((x) => !ballot[x] && ask(x) <= left)
-    .sort((x, y) => ask(x) - ask(y))[0];
-  const B = theirs ? [b[1], theirs] : [b[1]];
-  const paid: Record<string, number> = {
-    [s[0]]: 0.28,
-    [s[1]]: 0.14,
-    [a[0]]: 0.2,
-    [a[2]]: 0.1,
-    [b[1]]: 0.15,
+  const { slugs } = round;
+  const { s, a, b } = sample;
+  const rand = seeded(1729);
+  const pick = <T>(xs: T[], k: number) => [...xs].sort(() => rand() - 0.5).slice(0, k);
+  // The favourites: in S-Tier the first two of the sample's and its first B-Tier pick;
+  // in A-Tier its first and third; in B-Tier its second B-Tier pick.
+  const favS = [s[0], s[1], b[0]];
+  const favA = [a[0], a[2]];
+  const favB = [b[1]];
+  const ballots = new Map<string, Uint8Array>();
+  if (withOwn) ballots.set(String(n), encodeBallot(slugs, sample.ballot));
+  for (let v = 1; v <= VOTERS; v++) {
+    const id = String(v);
+    if (id === String(n)) continue;
+    const tiers: Partial<Record<string, Tier>> = {};
+    const put = (x: string | undefined, t: Tier, p: number) => {
+      if (x && !tiers[x] && rand() < p) tiers[x] = t;
+    };
+    for (const x of favS) put(x, "S", 0.8);
+    for (const x of favA) put(x, "A", 0.7);
+    for (const x of favB) put(x, "B", 0.7);
+    const rest = slugs.filter((x) => !tiers[x]);
+    for (const x of pick(rest, 1)) put(x, "S", 1);
+    for (const x of pick(rest, 3)) put(x, "A", 1);
+    for (const x of pick(rest, 6)) put(x, "B", 1);
+    ballots.set(id, encodeBallot(slugs, tiers));
+  }
+  return ballots;
+}
+
+/** The example's tally at a moment: the ballots counted tier by tier, `settledCount`
+ * tiers settled (each as it would have in its first window), then the live tally of the
+ * open ones, with its inputs. As the server's replay does, with the made-up ballots. */
+function tallied(round: VoteManifest, ballots: Map<string, Uint8Array>, settledCount: number) {
+  const { slugs } = round;
+  const m = slugs.length;
+  const voters = [...ballots.keys()].sort();
+  const rows = voters.map((v) => [...ballots.get(v)!]);
+  const pool = BigInt(round.poolUsd);
+  const each = voters.length ? pool / BigInt(voters.length) : 0n;
+  const inp: ChainInputs = {
+    m,
+    costs: round.projects.map((p) => BigInt(p.askUsd)),
+    voters,
+    weights: voters.map(() => each),
+    ranks: rows.map((b) => effectiveRanks(b, m)),
+    ballots: rows,
+    poolUsd: pool,
+    spent: 0n,
+    done: new Set(),
   };
-  return { S, A, B, paid };
-}
-type Outcome = ReturnType<typeof outcome>;
-
-/** Tier `tier` of the outcome, settled in its first window at `at`; `voted`: whether
- * badge `n` paid its part. */
-function settledAs(
-  o: Outcome,
-  tier: Tier,
-  at: number,
-  ask: (slug: string) => number,
-  n: number,
-  voted = true,
-): RoundTier {
-  const share = POOL_USD / VOTERS;
-  return settled(
-    tier,
-    at,
-    o[tier].map((slug) => ({
-      slug,
-      award: ask(slug),
-      paid: voted ? share * (o.paid[slug] ?? 0) : 0,
-    })),
-    n,
-  );
-}
-
-/** The live tally from tier `from` on: the outcome's winners in every open tier, and
- * (`voted`) what badge `n` would pay for each. */
-function liveFrom(
-  o: Outcome,
-  from: Tier,
-  ask: (slug: string) => number,
-  n: number,
-  voted = true,
-): RoundView["live"] {
-  const share = POOL_USD / VOTERS;
-  const open = TIERS.slice(TIERS.indexOf(from));
-  const funded = open.flatMap((t) => o[t]);
-  return {
-    funded,
-    awards: Object.fromEntries(funded.map((x) => [x, micro(ask(x))])),
-    tiers: Object.fromEntries(open.flatMap((t) => o[t].map((x) => [x, t]))),
-    ...(voted
-      ? {
-        paid: livePaid(
-          n,
-          funded.filter((x) => o.paid[x]).map((x) => [x, share * o.paid[x]] as [string, number]),
-        ),
+  const settledTiers: { tier: Tier; stage: ChainStage }[] = [];
+  for (let t = 0; t < settledCount; t++) {
+    const stage = chainTally(inp, t, t + 1)[0];
+    settledTiers.push({ tier: TIERS[t], stage });
+    const done = new Set(inp.done);
+    for (const c of stage.order) {
+      done.add(c);
+      for (const [v, paid] of stage.shares.get(c)!) {
+        const i = voters.indexOf(v);
+        inp.weights[i] -= paid;
+        inp.spent += paid;
       }
-      : {}),
+    }
+    inp.done = done;
+  }
+  const live = settledCount < TIERS.length ? chainTally(inp, settledCount) : [];
+  return {
+    inp,
+    settledTiers,
+    live,
+    voters,
+    accepted: Object.fromEntries(voters.map((v) => [v, bytesToHex(ballots.get(v)!)])),
   };
 }
 
-/** Badge `n` in the fictional round, in state `kind`, over the board's `cards`. */
+/** A stage's awards (micro-USD strings, by slug) and what each badge paid (by token). */
+function stageJson(slugs: string[], stage: ChainStage) {
+  const awards: Record<string, string> = {};
+  const paid: Record<string, Record<string, string>> = {};
+  for (const c of stage.order) {
+    let sum = 0n;
+    for (const [v, p] of stage.shares.get(c)!) {
+      sum += p;
+      if (p > 0n) (paid[v] ??= {})[slugs[c]] = String(p);
+    }
+    awards[slugs[c]] = String(sum);
+  }
+  return { funded: stage.order.map((c) => slugs[c]), awards, paid };
+}
+
+/** A tier the example's tally settled in its first window. */
+function settledTier(slugs: string[], tier: Tier, at: number, stage: ChainStage): RoundTier {
+  return { tier, status: "settled", at, forced: false, ...stageJson(slugs, stage) };
+}
+
+/** The live tally as the round's JSON has it, with its inputs (the preview re-runs it). */
+function liveJson(
+  round: VoteManifest,
+  t: ReturnType<typeof tallied>,
+  first: number,
+): RoundView["live"] {
+  const out: RoundView["live"] = { funded: [], awards: {}, tiers: {}, paid: {} };
+  t.live.forEach((stage, k) => {
+    const j = stageJson(round.slugs, stage);
+    out.funded.push(...j.funded);
+    Object.assign(out.awards, j.awards);
+    for (const x of j.funded) out.tiers![x] = TIERS[first + k];
+    for (const [v, p] of Object.entries(j.paid)) Object.assign(out.paid![v] ??= {}, p);
+  });
+  if (first < TIERS.length) out.inputs = liveInputsJson(t.inp, first);
+  return out;
+}
+
+/** Badge `n` in the fictional round, in state `kind`, over the board's `cards`. The
+ * tiers and the live result come from the real tally over 40 made-up ballots. */
 export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   const share = POOL_USD / VOTERS;
   const base = { closed: false, share: micro(share), rejected: [], poolUsd: micro(POOL_USD) };
-  const empty = { funded: [], awards: {} };
+  const first = FIRST;
+  const { round } = fictionalRound(cards, OPENS, first);
+  const sample = sampleBallot(round);
+  const skipped = round.slugs.filter((x) => !sample.ballot[x]).slice(0, 6);
 
   if (kind === "started" || kind === "prefilled") {
-    const first = FIRST;
-    const { round } = fictionalRound(cards, OPENS, first);
-    const { s, a, b } = sampleBallot(round);
+    const { s, a, b } = sample;
     const view: RoundView = {
       ...base,
       registrationClosesAt: first[0] + WINDOW,
@@ -266,7 +297,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
         startsAt: first[i],
       })),
       accepted: {},
-      live: empty,
+      live: { funded: [], awards: {} },
     };
     if (kind === "started") return { round, view };
     // What this badge rated on the board: 5★ S-Tier, 4★ A-Tier, 3★ B-Tier, the rest stay out.
@@ -280,155 +311,71 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     return { round, view, ratings };
   }
 
-  // S-Tier settling: in its first window, quiet; changed, in its second; or in its last,
-  // where it settles whatever happens. The badge has voted.
-  if (kind === "s-settling" || kind === "s-extended" || kind === "s-last") {
-    const first = FIRST;
-    const { round, ask } = fictionalRound(cards, OPENS, first);
-    const sample = sampleBallot(round);
-    const o = outcome(round, ask, sample);
-    const window = kind === "s-settling" ? 1 : kind === "s-extended" ? 2 : MAX_WINDOWS;
-    const endsAt = first[0] +
+  // How many tiers have settled at this moment, and whether badge n voted.
+  const settledCount = kind === "finished"
+    ? 3
+    : kind === "b-settling"
+    ? 2
+    : kind === "spent" || kind === "missed"
+    ? 1
+    : 0;
+  const t = tallied(round, crowd(round, sample, n, kind !== "missed"), settledCount);
+  const settledTiers = t.settledTiers.map(({ tier, stage }, i) =>
+    settledTier(round.slugs, tier, first[i] + WINDOW, stage)
+  );
+  const live = liveJson(round, t, settledCount);
+  // The tier settling now: in its first window, quiet; or, while S-Tier settles, changed
+  // in its first (in its second now), or in its last, where it settles whatever happens.
+  const settlingNow = (tier: Tier): RoundTier => {
+    const i = TIERS.indexOf(tier);
+    const window = kind === "s-extended" ? 2 : kind === "s-last" ? MAX_WINDOWS : 1;
+    const endsAt = first[i] +
       Array.from({ length: window }, (_, k) => WINDOW >> k).reduce((x, y) => x + y);
-    const view: RoundView = {
-      ...base,
-      registrationClosesAt: first[0] + LONGEST,
-      tiers: [
-        {
-          tier: "S",
-          status: "settling",
-          window,
-          windowEndsAt: endsAt,
-          latestEndAt: first[0] + LONGEST,
-          quiet: kind === "s-settling",
-          funded: o.S,
-        },
-        { tier: "A", status: "waiting", startsAt: first[1] },
-        { tier: "B", status: "waiting", startsAt: first[2] },
-      ],
-      accepted: { [String(n)]: bytesToHex(encodeBallot(round.slugs, sample.ballot)) },
-      live: liveFrom(o, "S", ask, n),
-    };
     return {
-      round,
-      view,
-      skipped: round.slugs.filter((x) => !sample.ballot[x]).slice(0, 6),
+      tier,
+      status: "settling",
+      window,
+      windowEndsAt: endsAt,
+      latestEndAt: first[i] + LONGEST,
+      quiet: kind !== "s-extended" && kind !== "s-last",
+      funded: Object.entries(live.tiers ?? {}).filter(([, x]) => x === tier).map(([slug]) => slug),
     };
-  }
-
-  // S-Tier and A-Tier settled in their first windows; B-Tier in its first, quiet.
-  if (kind === "b-settling") {
-    const first = FIRST;
-    const { round, ask } = fictionalRound(cards, OPENS, first);
-    const sample = sampleBallot(round);
-    const o = outcome(round, ask, sample);
-    const view: RoundView = {
-      ...base,
-      registrationClosesAt: first[0] + WINDOW,
-      tiers: [
-        settledAs(o, "S", first[0] + WINDOW, ask, n),
-        settledAs(o, "A", first[1] + WINDOW, ask, n),
-        {
-          tier: "B",
-          status: "settling",
-          window: 1,
-          windowEndsAt: first[2] + WINDOW,
-          latestEndAt: first[2] + LONGEST,
-          quiet: true,
-          funded: o.B,
-        },
-      ],
-      accepted: { [String(n)]: bytesToHex(encodeBallot(round.slugs, sample.ballot)) },
-      live: liveFrom(o, "B", ask, n),
-    };
-    return {
-      round,
-      view,
-      skipped: round.slugs.filter((x) => !sample.ballot[x]).slice(0, 6),
-    };
-  }
-
-  // A badge that never sent a ballot: S-Tier settled without it, so it can't vote now.
-  if (kind === "missed") {
-    const first = FIRST;
-    const { round, ask } = fictionalRound(cards, OPENS, first);
-    const o = outcome(round, ask, sampleBallot(round));
-    const view: RoundView = {
-      ...base,
-      registrationClosesAt: first[0] + WINDOW,
-      tiers: [
-        settledAs(o, "S", first[0] + WINDOW, ask, n, false),
-        {
-          tier: "A",
-          status: "settling",
-          window: 1,
-          windowEndsAt: first[1] + WINDOW,
-          latestEndAt: first[1] + LONGEST,
-          quiet: true,
-          funded: o.A,
-        },
-        { tier: "B", status: "waiting", startsAt: first[2] },
-      ],
-      accepted: {},
-      live: liveFrom(o, "A", ask, n, false),
-    };
-    return { round, view };
-  }
-
-  if (kind === "spent") {
-    // S-Tier settled quietly after its first window; A-Tier is in its first window now.
-    const first = FIRST;
-    const aFirst = first[1];
-    const { round, ask } = fictionalRound(cards, OPENS, first);
-    const sample = sampleBallot(round);
-    const o = outcome(round, ask, sample);
-    const view: RoundView = {
-      ...base,
-      registrationClosesAt: first[0] + WINDOW,
-      tiers: [
-        settledAs(o, "S", first[0] + WINDOW, ask, n),
-        {
-          tier: "A",
-          status: "settling",
-          window: 1,
-          windowEndsAt: aFirst + WINDOW,
-          latestEndAt: aFirst + LONGEST,
-          quiet: true,
-          funded: o.A,
-        },
-        { tier: "B", status: "waiting", startsAt: first[2] },
-      ],
-      accepted: { [String(n)]: bytesToHex(encodeBallot(round.slugs, sample.ballot)) },
-      live: liveFrom(o, "A", ask, n),
-    };
-    // Like the prefilled state: six it rated 1–2★, skipped.
-    return {
-      round,
-      view,
-      skipped: round.slugs.filter((x) => !sample.ballot[x]).slice(0, 6),
-    };
-  }
-
-  // Finished: every tier settled in its first window, as each moment before showed.
-  const first = FIRST;
-  const { round, ask } = fictionalRound(cards, OPENS, first);
-  const sample = sampleBallot(round);
-  const o = outcome(round, ask, sample);
-  const tiers = TIERS.map((t, i) => settledAs(o, t, first[i] + WINDOW, ask, n));
-  const all = TIERS.flatMap((t) => o[t]);
+  };
+  const waiting = (tier: Tier): RoundTier => ({
+    tier,
+    status: "waiting",
+    startsAt: first[TIERS.indexOf(tier)],
+  });
+  const tiers: RoundTier[] = TIERS.map((tier, i) =>
+    i < settledCount ? settledTiers[i] : i === settledCount ? settlingNow(tier) : waiting(tier)
+  );
   const view: RoundView = {
     ...base,
-    closed: true,
-    registrationClosesAt: first[0] + WINDOW,
+    closed: kind === "finished",
+    registrationClosesAt: settledCount ? first[0] + WINDOW : first[0] + LONGEST,
     tiers,
-    accepted: { [String(n)]: bytesToHex(encodeBallot(round.slugs, sample.ballot)) },
-    live: {
-      funded: all,
-      awards: Object.fromEntries(all.map((x) => [x, micro(ask(x))])),
-      tiers: Object.fromEntries(TIERS.flatMap((t) => o[t].map((x) => [x, t]))),
-    },
+    accepted: t.accepted,
+    live: kind === "finished"
+      ? (() => {
+        const all = settledTiers.flatMap((x) => (x.status === "settled" ? x.funded : []));
+        const awards = Object.assign(
+          {},
+          ...settledTiers.map((x) => (x.status === "settled" ? x.awards : {})),
+        );
+        const tierOf = Object.fromEntries(
+          settledTiers.flatMap((x) =>
+            x.status === "settled" ? x.funded.map((s) => [s, x.tier]) : []
+          ),
+        );
+        return { funded: all, awards, tiers: tierOf };
+      })()
+      : live,
   };
-  return { round: { ...round, closesAt: first[2] + WINDOW }, view, sent: sample.ballot };
+  if (kind === "missed") return { round, view };
+  if (kind === "finished") {
+    return { round: { ...round, closesAt: first[2] + WINDOW }, view, sent: sample.ballot };
+  }
+  return { round, view, skipped };
 }
 
 /** Examples of the vote results, public at `/vote/results/<id>`: the round at each moment
@@ -463,83 +410,31 @@ export const MOMENTS: { kind: MockKind; step: number; variants?: MockKind[] }[] 
 export const momentOf = (k: MockKind): MockKind =>
   MOMENTS.find((m) => m.kind === k || m.variants?.includes(k))?.kind ?? k;
 
-/** `view` as the results page shows it: every voter's ballot counted, and made-up donation
- * figures. For each open initiative below the tier settling now (`live.give`), a donation
- * that moves it up a tier (into B-Tier when it isn't funded), in $1K steps, smaller than
- * what it needs; those needing more than $150K are out of reach. Some moving into the tier
- * settling now knock one of its live winners out, so the preview has something to show.
- * For those in the tier settling now (`live.lead`), how far ahead they are. */
-export function withGive(view: RoundView, round: VoteManifest, cards: Card[]): RoundView {
-  const settling = view.tiers.find((t) => t.status !== "settled")?.tier ?? "S";
-  const done = new Set(view.tiers.flatMap((t) => (t.status === "settled" ? t.funded : [])));
-  const liveTier = (slug: string) => (done.has(slug) ? undefined : view.live.tiers?.[slug]);
-  const bySlug = new Map(cards.map((c) => [c.initiative.slug, c]));
-  const give: NonNullable<RoundView["live"]["give"]> = {};
-  const lead: NonNullable<RoundView["live"]["lead"]> = {};
-  // What's left of the pool, if the vote ended now: what the settled tiers awarded and the
-  // live tally would award taken out.
-  const usdOf = (v: string) => Number(BigInt(v) / 1_000_000n);
-  const left = POOL_USD -
-    view.tiers.flatMap((t) => (t.status === "settled" ? Object.values(t.awards) : []))
-      .reduce((a, v) => a + usdOf(v), 0) -
-    Object.entries(view.live.awards)
-      .filter(([x]) => !done.has(x))
-      .reduce((a, [, v]) => a + usdOf(v), 0);
-  round.slugs.forEach((slug, i) => {
-    if (done.has(slug)) return;
-    const now = liveTier(slug);
-    if (now === settling) {
-      // Ahead by $1K–$12K; one barely in (under $1K: no figure).
-      if (i % 5 !== 3) lead[slug] = micro((1 + ((i * 5) % 12)) * 1000);
-      return;
-    }
-    const c = bySlug.get(slug);
-    if (!c) return;
-    const target = now ? TIERS[TIERS.indexOf(now) - 1] : "B";
-    const need = Math.max(0, c.initiative.goalUsd - c.summary.total);
-    const far = need > 150_000;
-    // Each tier its own figures: higher tiers are harder to reach.
-    const shift = (2 - TIERS.indexOf(target)) * 11;
-    const k = Math.min(Math.floor(need / 1000), 3 + shift + ((i * 7 + shift) % 29));
-    // Made-up knock-ons that follow the money. One already funded that moves up uses less
-    // of the pool (the donation pays part of it), so it only pushes one of the target
-    // tier's winners down a tier, still funded with the same money; nobody drops out. One
-    // not funded that comes into B-Tier adds what it still asks of the pool: B-Tier's last
-    // winners drop out only as far as that doesn't fit in what is left.
-    const gift = far || k < 1 ? 0 : k * 1000;
-    const winners = (t: Tier) => round.slugs.filter((x) => x !== slug && liveTier(x) === t);
-    const below = TIERS[TIERS.indexOf(target) + 1];
-    const pushed = now ? winners(target).at(-1) : undefined;
-    const moves = gift && i % 3 === 0 && pushed && below
-      ? [{ slug: pushed, from: target, to: below }]
-      : [];
-    const dropsOut: { slug: string; tier: Tier }[] = [];
-    if (gift && !now) {
-      let short = need - gift - left;
-      for (const x of winners("B").reverse()) {
-        if (short <= 0) break;
-        dropsOut.push({ slug: x, tier: "B" });
-        short -= usdOf(view.live.awards[x] ?? "0");
-      }
-    }
-    give[slug] = {
-      tier: target,
-      gap: far || k < 1 ? null : micro(k * 1000),
-      comesIn: [],
-      dropsOut,
-      moves,
-    };
-  });
-  // Once ballots count, the example's 40 voters have all sent one (only badge 1's is
-  // known: the rest count too). Before, none has.
-  const sent = Object.values(view.accepted)[0];
-  const accepted = sent
-    ? Object.fromEntries(
-      Array.from(
-        { length: VOTERS },
-        (_, i) => [String(i + 1), view.accepted[String(i + 1)] ?? sent],
-      ),
-    )
-    : view.accepted;
-  return { ...view, accepted, live: { ...view.live, give, lead } };
+/** `view` as the results page shows it: the figures the server works out, worked out
+ * here by the same searches over the example's tally inputs: for each open initiative
+ * below the tier settling now, the donation that moves it up a tier (`live.give`), and
+ * how far ahead those in it are (`live.lead`). Yields between tallies. A round with no
+ * inputs (nothing counted yet, or closed) comes back as it is. */
+export async function withFigures(view: RoundView, round: VoteManifest): Promise<RoundView> {
+  const json = view.live.inputs;
+  if (!json) return view;
+  const { inp, first } = liveInputsFrom(json);
+  const { slugs } = round;
+  // In slices of 10 ms: the page stays responsive, the search doesn't crawl.
+  const gifts = await giftGapsAsync(inp, first, chainTally, 10);
+  const leads = await liveLeadsAsync(inp, first, chainTally, 10);
+  const give: NonNullable<RoundView["live"]["give"]> = Object.fromEntries(
+    [...gifts].map(([c, g]) => [slugs[c], {
+      tier: g.tier,
+      gap: g.gap === null ? null : String(g.gap),
+      comesIn: g.comesIn.map(([o, tier]) => ({ slug: slugs[o], tier })),
+      dropsOut: g.dropsOut.map(([o, tier]) => ({ slug: slugs[o], tier })),
+      moves: g.moves.map(([o, from, to]) => ({ slug: slugs[o], from, to })),
+    }]),
+  );
+  // As the server sends them: any lead above nothing.
+  const lead = Object.fromEntries(
+    [...leads].filter(([, v]) => v > 0n).map(([c, v]) => [slugs[c], String(v)]),
+  );
+  return { ...view, live: { ...view.live, give, lead } };
 }

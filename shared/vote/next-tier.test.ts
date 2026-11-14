@@ -5,6 +5,7 @@ import { stageBound } from "./stage";
 import {
   finalWhatIfs,
   finalWhatIfsAsync,
+  FINE,
   gapTo,
   giftGaps,
   giftGapsAsync,
@@ -338,7 +339,8 @@ describe("the S-Tier lead", () => {
 
   it("live leads: for the initiatives in the tier settling now", async () => {
     const inp = inputs([10, 40], [49.7], [[1, 2]]);
-    expect(liveLeads(inp, 0)).toEqual(new Map([[0, 39n * K]]));
+    // To $10: its backer could give $39,700 less and still fund its $10K.
+    expect(liveLeads(inp, 0)).toEqual(new Map([[0, 39_700n * 1_000_000n]]));
     expect(await liveLeadsAsync(inp, 0)).toEqual(liveLeads(inp, 0));
     // S-Tier settled with initiative 0: A-Tier settles now, and 1 leads there.
     const later = { ...inp, done: new Set([0]), spent: 10n * K };
@@ -402,9 +404,15 @@ describe("the final what-ifs", () => {
 
 /** Where `c` lands (tier index) in the open tiers from `first` when `k` steps are given
  * to it, as giftGaps runs it; undefined when it isn't funded. */
-function tierGiven(inp: ChainInputs, c: number, k: bigint, first = 0): number | undefined {
+function tierGiven(
+  inp: ChainInputs,
+  c: number,
+  k: bigint,
+  first = 0,
+  unit = K,
+): number | undefined {
   const costs = [...inp.costs];
-  costs[c] = costs[c] > k * K ? costs[c] - k * K : 0n;
+  costs[c] = costs[c] > k * unit ? costs[c] - k * unit : 0n;
   const run = chainTally({ ...inp, costs }, first, 3);
   const at = run.findIndex((stage) => stage.order.includes(c));
   return at < 0 ? undefined : first + at;
@@ -424,7 +432,7 @@ describe("the donation to the next tier", () => {
     expect(gifts.get(1)!.tier).toBe("S");
   });
 
-  it("is the least $1K step that gets it there or higher", () => {
+  it("is the least $10 step that gets it there or higher", () => {
     for (
       const inp of [
         knockOn(),
@@ -435,11 +443,11 @@ describe("the donation to the next tier", () => {
     ) {
       for (const [c, g] of giftGaps(inp, 0)) {
         if (g.gap === null) continue;
-        expect(g.gap % K).toBe(0n);
+        expect(g.gap % FINE).toBe(0n);
         const target = TIER_INDEX[g.tier];
-        expect(tierGiven(inp, c, g.gap / K)! <= target).toBe(true);
-        if (g.gap > K) {
-          const short = tierGiven(inp, c, g.gap / K - 1n);
+        expect(tierGiven(inp, c, g.gap / FINE, 0, FINE)! <= target).toBe(true);
+        if (g.gap > FINE) {
+          const short = tierGiven(inp, c, g.gap / FINE - 1n, 0, FINE);
           expect(short === undefined || short > target).toBe(true);
         }
       }

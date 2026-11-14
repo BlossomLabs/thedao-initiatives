@@ -10,6 +10,9 @@ import { cumulativeDeductions, stageBound } from "./stage.ts";
 
 /** Gaps are whole $1K steps, rounded up; leads are rounded down. */
 export const STEP = 1_000_000_000n;
+/** The live donation figures and leads, finer: whole $10 steps, so a page can say them to
+ * three digits ("$300", "$1.53k", "$11.3k"). */
+export const FINE = 10_000_000n;
 
 export type NextTier = {
   tier: Tier; // the target
@@ -140,6 +143,7 @@ function* giftSearch(
   target: number,
   live: Map<number, number>,
   tally: Tally,
+  step: bigint = STEP,
 ): Generator<void, NextTier> {
   const entry: NextTier = {
     tier: TIERS[target],
@@ -148,9 +152,9 @@ function* giftSearch(
     dropsOut: [],
     moves: [],
   };
-  const need = (inp.costs[c] + STEP - 1n) / STEP;
+  const need = (inp.costs[c] + step - 1n) / step;
   if (need < 1n) return entry;
-  const run = (k: bigint) => tiersOf(tally, withGift(inp, c, k * STEP), first);
+  const run = (k: bigint) => tiersOf(tally, withGift(inp, c, k * step), first);
   const reaches = (r: Map<number, number>) => r.has(c) && r.get(c)! <= target;
   let hi = need, after = run(need);
   yield;
@@ -164,7 +168,7 @@ function* giftSearch(
     if (reaches(r)) [hi, after] = [mid, r];
     else lo = mid + 1n;
   }
-  entry.gap = hi * STEP;
+  entry.gap = hi * step;
   for (let o = 0; o < inp.m; o++) {
     if (o === c) continue;
     const was = live.get(o), is = after.get(o);
@@ -194,7 +198,7 @@ function* giftsSearch(
     const now = live.get(c);
     if (now === firstOpen) continue;
     const target = now === undefined ? TIERS.length - 1 : now - 1;
-    out.set(c, yield* giftSearch(inp, firstOpen, c, target, live, tally));
+    out.set(c, yield* giftSearch(inp, firstOpen, c, target, live, tally, FINE));
   }
   return out;
 }
@@ -226,6 +230,7 @@ function* leadSearch(
   first: number,
   c: number,
   tally: Tally,
+  step: bigint = STEP,
 ): Generator<void, bigint | null> {
   // A backer is a voter whose rank for `c` opens within the stage, as chainTally bounds
   // it. An unplaced initiative gets a real rank too, but one past the stage's bound
@@ -239,7 +244,7 @@ function* leadSearch(
     const weights = [...inp.weights];
     if (l > 0n) {
       // Exact integer shares; the remainder falls on the last backer.
-      const less = cumulativeDeductions(backing, l * STEP);
+      const less = cumulativeDeductions(backing, l * step);
       backers.forEach((i, k) => (weights[i] -= less[k]));
     }
     return tally({ ...inp, weights }, first, first + 1)[0].order.includes(c);
@@ -248,11 +253,11 @@ function* leadSearch(
   yield;
   if (!now) return null;
   // Its backers can't give less than everything they hold.
-  const hiSteps = backing.reduce((a, b) => a + b, 0n) / STEP;
+  const hiSteps = backing.reduce((a, b) => a + b, 0n) / step;
   if (hiSteps < 1n) return 0n;
   const top = funded(hiSteps);
   yield;
-  if (top) return hiSteps * STEP;
+  if (top) return hiSteps * step;
   // Not assumed monotone: `lo` is always a step that was funded, `hi` one that wasn't.
   let lo = 0n, hi = hiSteps;
   while (hi - lo > 1n) {
@@ -262,7 +267,7 @@ function* leadSearch(
     if (ok) lo = mid;
     else hi = mid;
   }
-  return lo * STEP;
+  return lo * step;
 }
 
 function* liveLeadsSearch(
@@ -275,7 +280,7 @@ function* liveLeadsSearch(
   const inTier = tally(inp, firstOpen, firstOpen + 1)[0].order;
   yield;
   for (const c of inTier) {
-    const lead = yield* leadSearch(inp, firstOpen, c, tally);
+    const lead = yield* leadSearch(inp, firstOpen, c, tally, FINE);
     if (lead !== null) out.set(c, lead);
   }
   return out;
@@ -336,12 +341,18 @@ function drive<T>(it: Generator<void, T>): T {
 }
 
 /** `drive`, handing the event loop back after every tally: a server isolate keeps
- * answering (ballot relays among them) while a large round is searched. */
-async function driveAsync<T>(it: Generator<void, T>): Promise<T> {
+ * answering (ballot relays among them) while a large round is searched. With `sliceMs`
+ * (a page), after that many milliseconds of tallies instead: a timer costs a few ms
+ * itself, so handing back after each one made a page's search many times slower. */
+async function driveAsync<T>(it: Generator<void, T>, sliceMs = 0): Promise<T> {
+  let since = performance.now();
   for (;;) {
     const step = it.next();
     if (step.done) return step.value;
-    await new Promise((r) => setTimeout(r, 0));
+    if (performance.now() - since >= sliceMs) {
+      await new Promise((r) => setTimeout(r, 0));
+      since = performance.now();
+    }
   }
 }
 
@@ -365,7 +376,7 @@ export function nextTiersAsync(
 }
 
 /** Keyed by initiative index: for each open initiative not in the tier settling now, the
- * donation (a $1K step, rounded up; null when even its whole need isn't enough) that gets
+ * donation (a $10 step, rounded up; null when even its whole need isn't enough) that gets
  * it one tier higher than the live tally has it (B-Tier when unfunded), if the open tiers
  * settled now. Settled initiatives and those in the tier settling now have no entry. */
 export function giftGaps(
@@ -381,8 +392,9 @@ export function giftGapsAsync(
   inp: ChainInputs,
   firstOpen: number,
   tally: Tally = chainTally,
+  sliceMs = 0,
 ): Promise<Map<number, NextTier>> {
-  return driveAsync(giftsSearch(inp, firstOpen, tally));
+  return driveAsync(giftsSearch(inp, firstOpen, tally), sliceMs);
 }
 
 /** Gap for one initiative to reach `target` (tier index), judged with `inp` from tier `first`.
@@ -413,7 +425,8 @@ export function leadIn(
 }
 
 /** Open round: leads for the initiatives the live tally funds in the tier settling now
- * (`firstOpen`), judged on that tier: how much less backing they could have and stay. */
+ * (`firstOpen`), judged on that tier: how much less backing they could have and stay
+ * ($10 steps, rounded down). */
 export function liveLeads(
   inp: ChainInputs,
   firstOpen: number,
@@ -427,8 +440,9 @@ export function liveLeadsAsync(
   inp: ChainInputs,
   firstOpen: number,
   tally: Tally = chainTally,
+  sliceMs = 0,
 ): Promise<Map<number, bigint>> {
-  return driveAsync(liveLeadsSearch(inp, firstOpen, tally));
+  return driveAsync(liveLeadsSearch(inp, firstOpen, tally), sliceMs);
 }
 
 /** Closed round: tier k's initiatives (k ≥ 1) → gapTo tier k−1 judged at settleInputs[k−1];
@@ -498,9 +512,11 @@ export function giftEffect(
 export const liveTiers = (inp: ChainInputs, first: number, tally: Tally = chainTally) =>
   tiersOf(tally, inp, first);
 
-/** The least $1K step that, given to `c`, gets it funded in tier `target` (index) or
- * higher if the open tiers (from `first`) settled now; null when even its whole need
- * doesn't. The donation search for any tier, not only the next one up. */
+/** The least `step` (a $1K one by default) that, given to `c`, gets it funded in tier
+ * `target` (index) or higher if the open tiers (from `first`) settled now; null when
+ * even its whole need doesn't. The donation search for any tier, not only the next one
+ * up; a donate form's suggestions take a finer step, so an amount below one really
+ * doesn't get there. */
 export function giftGapTo(
   inp: ChainInputs,
   first: number,
@@ -508,7 +524,8 @@ export function giftGapTo(
   target: number,
   tally: Tally = chainTally,
   live: Map<number, number> = tiersOf(tally, inp, first),
+  step: bigint = STEP,
 ): bigint | null {
   if (target < first) return null;
-  return drive(giftSearch(inp, first, c, target, live, tally)).gap;
+  return drive(giftSearch(inp, first, c, target, live, tally, step)).gap;
 }

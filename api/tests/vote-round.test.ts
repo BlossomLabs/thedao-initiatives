@@ -780,7 +780,8 @@ Deno.test("the round lists the donation that moves each initiative up a tier", a
   // c isn't funded: its figure is to B-Tier, the first tier up.
   assertEquals(give.c.tier, "B");
   // Given all but what the two ballots hold ($100K), c is funded.
-  const step = 1_000_000_000n;
+  // In $10 steps, rounded up.
+  const step = 10_000_000n;
   const want = ((huge - 100_000_000_000n + step - 1n) / step) * step;
   assertEquals(give.c.gap, want.toString());
   await h.settle();

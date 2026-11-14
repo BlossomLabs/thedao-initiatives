@@ -20,7 +20,7 @@ import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
 import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
 import { chainTally } from "../../../shared/vote/chain";
 import { liveInputsFrom } from "../../../shared/vote/live-inputs";
-import { giftEffect, giftGapTo, liveTiers } from "../../../shared/vote/next-tier";
+import { FINE, giftEffect, giftGapTo, liveTiers } from "../../../shared/vote/next-tier";
 
 const POLL_MS = 5_000;
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
@@ -160,7 +160,9 @@ export default function VoteResults(
     const now = liveRun.base.get(c) ?? TIERS.length;
     const out: { usd: number; tier: Tier }[] = [];
     for (let t = now - 1; t >= liveRun.first; t--) {
-      const g = giftGapTo(liveRun.inp, liveRun.first, c, t, chainTally, liveRun.base);
+      // In $10 steps, as the server's figures: an amount below a suggestion really
+      // doesn't get it there.
+      const g = giftGapTo(liveRun.inp, liveRun.first, c, t, chainTally, liveRun.base, FINE);
       if (g === null) continue;
       const usd = dollars(g.toString());
       if (out.at(-1)?.usd === usd) out.pop();
@@ -223,6 +225,7 @@ export default function VoteResults(
         joining: change.tier ? new Map([[open, given]]) : undefined,
         leaving: new Set(change.dropsOut.map((o) => o.slug)),
         moved: new Map(change.moves.map((o) => [o.slug, o.from] as const)),
+        arrived: new Set(change.comesIn.map((o) => o.slug)),
       };
     })()
     : undefined;
@@ -366,8 +369,21 @@ export default function VoteResults(
               // Green is a donation's preview here: what the live tally adds stays neutral.
               liveTone="neutral"
               label={preview ? "TheDAO's ballot, with your donation" : "TheDAO's ballot"}
-              note={preview && open && (
-                <div className="mt-2 flex items-center gap-3 rounded-lg border border-dashed border-dao-green/70 bg-dao-green/[.12] px-3 py-2">
+              // Its ring: the tier settling now and the later ones in two neutrals; green is
+              // only a donation's preview here (a ballot's picks are green on its own page).
+              settling={tier}
+              table={{
+                mirrored: false,
+                joining: preview?.joining,
+                leaving: preview?.leaving,
+                moved: preview?.moved,
+                arrived: preview?.arrived,
+              }}
+            />
+            {
+              // What the donation does, under the tier table it previews on.
+              preview && open && (
+                <div className="flex items-center gap-3 rounded-lg border border-dashed border-dao-green/70 bg-dao-green/[.12] px-3 py-2">
                   <p className="m-0 flex-1 text-[13.5px] leading-snug text-white">
                     {said}.{knockOn}
                   </p>
@@ -375,14 +391,8 @@ export default function VoteResults(
                     Clear
                   </Button>
                 </div>
-              )}
-              table={{
-                mirrored: false,
-                joining: preview?.joining,
-                leaving: preview?.leaving,
-                moved: preview?.moved,
-              }}
-            />
+              )
+            }
             <Legend preview={Boolean(preview)} />
           </div>
           <GiveList
@@ -418,12 +428,18 @@ function Legend({ preview }: { preview: boolean }) {
   return (
     <div className="flex flex-wrap gap-x-5 gap-y-1.5 pt-1 text-[13px] text-white/60">
       {item("bg-vote", "settled: funded")}
-      {item("bg-white/55", "funded if its tier settled now")}
+      {item("bg-white/75", "settling now")}
+      {item("bg-white/30", "later tiers, as they stand")}
       {preview &&
         item("border border-dashed border-dao-green bg-dao-green/30", "with your donation")}
       {preview && (
         <span className="flex items-center gap-1.5">
           <b className="text-vote-pale" aria-hidden="true">↑↓</b>moves with it
+        </span>
+      )}
+      {preview && (
+        <span className="flex items-center gap-1.5 text-[#a7e3a5]">
+          <b aria-hidden="true">↑</b>came in
         </span>
       )}
       {preview && (

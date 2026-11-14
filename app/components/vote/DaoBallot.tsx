@@ -54,6 +54,7 @@ export default function DaoBallot(
     table,
     liveTone = "green",
     mine,
+    settling,
   }: {
     items: BallotItem[];
     result: ReturnType<typeof daoResult>;
@@ -72,6 +73,9 @@ export default function DaoBallot(
     /** On a ballot's page: the initiatives on that ballot. What the live tally would give
      * them is green on the ring; the rest of it stays neutral. */
     mine?: ReadonlySet<string>;
+    /** The tier settling now: on the ring, what it would award is one neutral, lighter
+     * than the rest of the live tally (the later tiers). */
+    settling?: Tier;
   },
 ) {
   const { awards, funded, tiers, provisional } = result;
@@ -91,18 +95,26 @@ export default function DaoBallot(
         <CardHeader
           avatar={live && poolUsd
             ? (
-              // Gold what the settled tiers awarded, green what the live tally would add,
-              // as the chips below; each with its popup.
+              // Gold what the settled tiers awarded; the live tally in neutrals (the tier
+              // settling now lighter), green a ballot's own picks (its page) or a previewed
+              // donation (the vote results); each with its popup.
               <SegmentRing
                 segments={poolSegments({
                   settledUsd: sum((slug) => !provisional.has(slug)),
                   mineUsd: sum((slug) =>
                     provisional.has(slug) && !joining?.has(slug) && Boolean(mine?.has(slug))
                   ),
+                  nextUsd: settling &&
+                    sum((slug) =>
+                      provisional.has(slug) && !joining?.has(slug) && !mine?.has(slug) &&
+                      tiers[slug] === settling
+                    ),
                   liveUsd: sum((slug) =>
-                    provisional.has(slug) && !joining?.has(slug) && !mine?.has(slug)
+                    provisional.has(slug) && !joining?.has(slug) && !mine?.has(slug) &&
+                    (!settling || tiers[slug] !== settling)
                   ),
-                  // What comes in with a previewed donation: a solid green stretch.
+                  // Green: what the pool pays, with your donation, for the initiative you
+                  // give to: its ask less what you give.
                   previewUsd: sum((slug) => Boolean(joining?.has(slug))),
                   pool: poolUsd,
                   // TheDAO's own ring: what the live tally adds is neutral, except (green,

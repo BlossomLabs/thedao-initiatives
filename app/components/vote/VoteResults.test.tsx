@@ -656,7 +656,7 @@ it("a donation that moves another initiative says so, and shows it in its new ti
   expect(said.length).toBeGreaterThan(0);
 });
 
-it("each row says what else its donation changes, in short and, opened, in full", async () => {
+it("an opened row says what else its donation changes, a link opens who", async () => {
   await showOpen(openWith({
     beta: give({
       moves: [{ slug: "alpha", from: "S", to: "A" }],
@@ -664,7 +664,8 @@ it("each row says what else its donation changes, in short and, opened, in full"
     }),
   }));
   const row = await list().findByRole("button", { name: /Beta audits/ });
-  expect(row).toHaveTextContent("1 moves · 1 drops out");
+  // Not under its title (the opened row says it).
+  expect(row).not.toHaveTextContent("drops out");
   fireEvent.click(row);
   // The row's sentence says how many; the link opens who.
   const link = screen.getByRole("button", { name: "moves 2 other initiatives" });
@@ -749,8 +750,10 @@ it("with the tally's inputs, any amount is previewed: money freed brings another
   expect(screen.queryByText(/if the vote ended now\. 1 other/)).toBeNull();
   expect(screen.getByRole("group", { name: "TheDAO's ballot, with your donation" }))
     .toBeInTheDocument();
-  expect(within(daoBallot()).getByLabelText(/^Beta audits, funded if it ended now/))
-    .toBeInTheDocument();
+  // Beta, brought in by the money freed: green, ↑ and "came in".
+  const beta = within(daoBallot()).getByLabelText("Beta audits, comes in with your donation");
+  expect(beta).toHaveTextContent("↑Beta auditscame in");
+  expect(beta.className).toContain("border-dao-green/70");
 });
 
 it("with the tally's inputs, the form suggests the donation to each tier above", async () => {
@@ -797,4 +800,45 @@ it("a donation that only brings others in says it brings them in, in green", asy
       el?.tagName === "P" && /1 other initiative comes in\.$/.test(el.textContent ?? "")
     ),
   ).toHaveLength(1);
+});
+
+it("TheDAO's ring: the tier settling now and the later tiers in two neutrals, no ballot green", async () => {
+  // Signed in with badge 1, whose ballot has Alpha: still no green here (green is a
+  // donation's preview on this page).
+  signedIn.address = "0x00000000000000000000000000000000000000aa";
+  signedIn.badge = 1;
+  await showOpen(roundOf({ "1": ballot({ alpha: "S" }) }, {
+    alpha: [50_000, "S"],
+    beta: [30_000, "A"],
+  }));
+  const ring = await screen.findByRole("meter", { name: "What TheDAO allocated of the pool" });
+  expect(ring.querySelector(".stroke-dao-green")).toBeNull();
+  // Alpha, S-Tier's, settling now (the lighter neutral); Beta, a later tier (dimmer).
+  expect(ring.querySelector(".stroke-white\\/75")).not.toBeNull();
+  expect(ring.querySelector(".stroke-white\\/30")).not.toBeNull();
+  signedIn.address = null;
+  signedIn.badge = null;
+});
+
+it("the donation's sentence sits under the tier table, above the legend", async () => {
+  await showOpen(openWith({ beta: give() }));
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  const said = await screen.findByText((_, el) =>
+    el?.tagName === "P" && /^With your \$9,000, the initiative Beta audits comes into S-Tier\./
+      .test(el.textContent ?? "")
+  );
+  const table = daoBallot();
+  const legend = screen.getByText("settling now");
+  // After the table, before the legend, in the page's order.
+  expect(table.compareDocumentPosition(said) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(said.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it("TheDAO's ring, with a donation: green what the pool pays for it, its ask less the gift", async () => {
+  // Beta needs $30K; $9K donated: the pool pays the other $21K.
+  await showOpen(openWith({ beta: give() }));
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  const ring = screen.getByRole("meter", { name: "What TheDAO allocated of the pool" });
+  expect(ring.getAttribute("aria-valuetext")).toContain("With your donation: $21,000.");
+  expect(ring.querySelector(".stroke-dao-green")).not.toBeNull();
 });

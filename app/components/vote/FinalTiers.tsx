@@ -30,6 +30,7 @@ export default function FinalTiers(
     joining,
     leaving,
     moved,
+    arrived,
     liveTone = "green",
   }: {
     items: BallotItem[];
@@ -74,6 +75,8 @@ export default function FinalTiers(
     joining?: ReadonlyMap<string, number>;
     leaving?: ReadonlySet<string>;
     moved?: ReadonlyMap<string, Tier>;
+    /** Brought in by the donation (it frees money for them): green, ↑ and "came in". */
+    arrived?: ReadonlySet<string>;
     /** How a `provisional` chip looks: green (a ballot's own page), or neutral (the vote
      * results, where green is kept for a donation's preview). */
     liveTone?: "green" | "neutral";
@@ -94,7 +97,13 @@ export default function FinalTiers(
         // In a donation's preview: those that stay first, then yours, those moved in, and
         // last, together, those dropping out. Otherwise as listed.
         const rank = (slug: string) =>
-          leaving?.has(slug) ? 3 : joining?.has(slug) ? 1 : moved?.has(slug) ? 2 : 0;
+          leaving?.has(slug)
+            ? 3
+            : joining?.has(slug)
+            ? 1
+            : moved?.has(slug) || arrived?.has(slug)
+            ? 2
+            : 0;
         const inHere = items.filter((i) => tiers[i.slug] === t.tier)
           .sort((a, b) => rank(a.slug) - rank(b.slug));
         const tierPaid = inHere.reduce(
@@ -152,6 +161,8 @@ export default function FinalTiers(
                     const given = joining?.get(i.slug);
                     const gone = Boolean(leaving?.has(i.slug));
                     const from = moved?.get(i.slug);
+                    const came = !gone && from === undefined && given === undefined &&
+                      Boolean(arrived?.has(i.slug));
                     const up = from !== undefined &&
                       TIERS.indexOf(t.tier) < TIERS.indexOf(from);
                     const label = given !== undefined
@@ -160,6 +171,8 @@ export default function FinalTiers(
                       ? `${i.title}, drops out`
                       : from
                       ? `${i.title}, moves ${up ? "up" : "down"} from ${tierName(from)}`
+                      : came
+                      ? `${i.title}, comes in with your donation`
                       : isFunded
                       ? youPaid !== undefined
                         ? `${i.title}, ${fundedWord}: ${live ? liveAmountWord : amountWord} ${
@@ -200,6 +213,8 @@ export default function FinalTiers(
                             ? "border-dashed border-[#ff8a88] bg-[#c22d2b]/[.22]"
                             : from
                             ? "border-dashed border-vote-pale/70 bg-vote/[.12]"
+                            : came
+                            ? "border-dashed border-dao-green/70 bg-dao-green/[.12]"
                             : gold
                             ? "border-vote/50 bg-vote/[.12]"
                             : green
@@ -215,15 +230,15 @@ export default function FinalTiers(
                             aria-hidden="true"
                           />
                         )}
-                        {(gone || from) && (
+                        {(gone || from || came) && (
                           <b
                             aria-hidden="true"
                             className={cn(
                               "flex-none text-[13px] leading-none",
-                              gone ? "text-[#ff8a88]" : "text-vote-pale",
+                              gone ? "text-[#ff8a88]" : came ? "text-[#a7e3a5]" : "text-vote-pale",
                             )}
                           >
-                            {gone || !up ? "↓" : "↑"}
+                            {gone || (from && !up) ? "↓" : "↑"}
                           </b>
                         )}
                         <span
@@ -244,6 +259,12 @@ export default function FinalTiers(
                           ? (
                             <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-vote-pale">
                               from {tierName(from)}
+                            </span>
+                          )
+                          : came
+                          ? (
+                            <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-[#a7e3a5]">
+                              came in
                             </span>
                           )
                           : given !== undefined

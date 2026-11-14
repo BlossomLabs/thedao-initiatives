@@ -17,7 +17,6 @@ import {
   liveLeadsAsync,
   type NextTier,
   nextTiersAsync,
-  STEP,
 } from "../../shared/vote/next-tier.ts";
 import type { ChainInputs } from "../../shared/vote/chain.ts";
 import {
@@ -181,7 +180,7 @@ const inputsParts = (inp: ChainInputs) => [
 /** The what-if search's own version, part of every cache digest: when the way gaps, leads or
  * final figures are computed changes, bump it, and figures cached under the old code are
  * computed again instead of being served. */
-export const WHAT_IFS_VERSION = 4;
+export const WHAT_IFS_VERSION = 5;
 
 async function digest(parts: unknown[]) {
   const text = JSON.stringify(
@@ -212,10 +211,10 @@ function nextJson(next: Map<number, NextTier>, slugs: string[]) {
   }]));
 }
 type NextJson = ReturnType<typeof nextJson>;
-/** How far ahead each initiative is, as JSON. Under one step there's nothing to tell. */
+/** How far ahead each initiative is, as JSON. Nothing ahead: nothing to tell. */
 const leadJson = (lead: Map<number, bigint>, slugs: string[]): Record<string, string> =>
   Object.fromEntries(
-    [...lead].filter(([, v]) => v >= STEP).map(([c, v]) => [slugs[c], v.toString()]),
+    [...lead].filter(([, v]) => v > 0n).map(([c, v]) => [slugs[c], v.toString()]),
   );
 /** A finished search: the digest of its inputs, the open tier it looked from, and when,
  * with the leads of the initiatives in the tier settling now. */

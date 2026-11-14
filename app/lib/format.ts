@@ -18,6 +18,28 @@ export function usdShort(v: unknown): string {
   return `$${trim(n / 1_000_000, 1)}M`;
 }
 
+/** Money to two significant digits, always in thousands (or millions), so a list reads
+ * at a glance: "$0.3k", "$1.5k", "$11k", "$120k", "$1.2M". `up` rounds a missing amount
+ * up, so it never reads as less than it is; otherwise it rounds down (a lead never reads
+ * as more). */
+export function usd2(n: number, up: boolean): string {
+  if (!Number.isFinite(n) || n <= 0) return "$0k";
+  const unit = n < 100
+    ? 10
+    : n < 10_000
+    ? 100
+    : n < 100_000
+    ? 1000
+    : n < 1_000_000
+    ? 10_000
+    : 100_000;
+  // A hair of slack against float noise ($4,000 / 100 is not quite 40).
+  const steps = up ? Math.ceil(n / unit - 1e-9) : Math.floor(n / unit + 1e-9);
+  const v = (steps || 1) * unit;
+  const short = (x: number) => String(Number(x.toFixed(2)));
+  return v < 1_000_000 ? `$${short(v / 1000)}k` : `$${short(v / 1_000_000)}M`;
+}
+
 /** A missing amount, short and rounded up so it never reads as less than it is. */
 export const usdShortUp = (n: number): string =>
   usdShort(

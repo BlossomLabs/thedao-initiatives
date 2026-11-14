@@ -9,6 +9,7 @@ import BoardPage from "~/components/board/BoardPage";
 import Hero from "~/components/board/Hero";
 import PledgeBand from "~/components/board/PledgeBand";
 import PageMain from "~/components/layout/PageMain";
+import StickyAside from "~/components/layout/StickyAside";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { boardKey, useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/vote-local";
@@ -359,8 +360,12 @@ export default function VoteResults(
       {hero}
       <PageMain className="pt-8">
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-          {/* Stays in view beside the long list, so a donation's preview shows by its form. */}
-          <div className="card grid min-w-0 grid-cols-1 gap-y-2 text-[15px] leading-relaxed text-white/80 lg:sticky lg:top-[86px]">
+          {/* Stays in view beside the long list, so a donation's preview shows by its form.
+              Taller than the screen, it scrolls with the page until its bottom shows. */}
+          <StickyAside
+            narrow="(max-width: 1023.98px)"
+            className="card grid min-w-0 grid-cols-1 gap-y-2 text-[15px] leading-relaxed text-white/80 max-lg:static"
+          >
             <DaoBallot
               items={items}
               result={preview?.result ?? result}
@@ -394,7 +399,7 @@ export default function VoteResults(
               )
             }
             <Legend preview={Boolean(preview)} />
-          </div>
+          </StickyAside>
           <GiveList
             tier={tier}
             rows={rows}

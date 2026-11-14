@@ -28,15 +28,8 @@ import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
 import { useWalletPicker } from "~/context/wallet-picker";
 import { useBoard } from "~/hooks/use-board";
-import {
-  apiCode,
-  useBadgeRatings,
-  useBallotSubmit,
-  useMintWait,
-  useMyBadges,
-  useVoteCode,
-  useVoteRound,
-} from "~/hooks/use-vote";
+import { apiCode, useBadgeRatings, useMyBadges, useVoteCode, useVoteRound } from "~/hooks/use-vote";
+import { useBallotSubmit, useMintWait } from "~/hooks/use-vote-send";
 import { api, errorMessage } from "~/lib/api";
 import { countedTiers, lockedLabels } from "~/lib/vote-locks";
 import { prefillFromRatings, ratingsToken, skipsFromRatings } from "~/lib/vote-prefill";

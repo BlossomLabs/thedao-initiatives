@@ -1,7 +1,8 @@
 import { renderHook } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { ROUND } from "../../shared/vote/manifest";
-import { roundPollInterval, type RoundView, useBallotSubmit } from "./use-vote";
+import { roundPollInterval, type RoundView } from "./use-vote";
+import { useBallotSubmit } from "./use-vote-send";
 
 vi.mock("~/context/wallet", () => ({ useWallet: () => ({ address: undefined }) }));
 vi.mock("~/hooks/use-vote-chain", () => ({ useEnsureVoteChain: () => () => Promise.resolve() }));

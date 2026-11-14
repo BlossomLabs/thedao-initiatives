@@ -109,8 +109,8 @@ vi.mock("~/hooks/use-board", () => ({
     },
   }),
 }));
-vi.mock("~/hooks/use-vote", async (original) => ({
-  ...await original<typeof import("~/hooks/use-vote")>(),
+vi.mock("~/hooks/use-vote-send", async (original) => ({
+  ...await original<typeof import("~/hooks/use-vote-send")>(),
   useBallotSubmit: () => ({ phase: flow.phase, submit, retry, selfSend, last: flow.last }),
   useMintWait: () => ({ wait: () => Promise.resolve() }),
 }));

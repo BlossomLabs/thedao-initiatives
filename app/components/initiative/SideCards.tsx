@@ -1,6 +1,7 @@
+import { Suspense, useEffect } from "react";
 import { MessageSquare, PencilLine, Settings2 } from "lucide-react";
 import StickyAside from "~/components/layout/StickyAside";
-import DonateWidget from "~/components/donate/DonateWidget";
+import { DonateStandIn, DonateWidget, preloadDonate } from "~/components/donate/LazyDonate";
 import PledgeRequestLink from "./PledgeRequestLink";
 import { LinkButton } from "~/components/ui/Button";
 import RevisionPanel, { type ViewMode } from "~/components/initiative/RevisionBar";
@@ -97,6 +98,11 @@ export default function SideCards(
     session && r.proposer && session.address.toLowerCase() === r.proposer.toLowerCase(),
   );
   const editable = r.status === "pending" || r.status === "approved";
+  // The donate panel carries the wallet stack: it comes in right after the page shows,
+  // not with the page's own code.
+  useEffect(() => {
+    if (page.donationsEnabled) void preloadDonate();
+  }, [page.donationsEnabled]);
   return (
     <StickyAside className="flex flex-col gap-3.5 max-[960px]:static">
       <PublicCards
@@ -109,13 +115,15 @@ export default function SideCards(
         )}
         donate={page.donationsEnabled
           ? (
-            <DonateWidget
-              key={r.id}
-              initiativeId={r.id}
-              slug={r.slug}
-              safeAddress={r.safeAddress}
-              onConfirmed={onDonated}
-            />
+            <Suspense fallback={<DonateStandIn />}>
+              <DonateWidget
+                key={r.id}
+                initiativeId={r.id}
+                slug={r.slug}
+                safeAddress={r.safeAddress}
+                onConfirmed={onDonated}
+              />
+            </Suspense>
           )
           : !r.safeAddress
           ? noDonations(r)

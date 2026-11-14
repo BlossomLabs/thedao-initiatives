@@ -134,7 +134,7 @@ Deno.test("AI screen: spam on a link-only comment is held for a person, other sp
     assertStringIncludes(row.aiScreen!.reason, "it is a link");
     const words = await post({ body: "buy cheap tokens now, best prices in the whole world" });
     assertEquals(words, { status: "held", id: "", claimToken: "" } as never);
-    assertEquals((await h.db.comments.held()).length, 1);
+    assertEquals((await h.db.comments.queues()).held.length, 1);
   } finally {
     h.close();
   }
@@ -258,7 +258,7 @@ Deno.test("dashboard: a held reply shows its parent and what the board knows abo
       status: "discarded",
       aiSummary: "",
     });
-    const dash = await j(await h.req("/api/admin/dashboard", { token: admin })) as {
+    const dash = await j(await h.req("/api/admin/held", { token: admin })) as {
       held: {
         id: string;
         context: {

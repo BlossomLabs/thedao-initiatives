@@ -6,6 +6,7 @@ import type { AdminComment, AdminTodo } from "~/lib/api-types";
 import { dayTime, plural, shortAddr, truncate } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import TodoSection, { TodoRow } from "./TodoSection";
+import HeldQueue from "./HeldQueue";
 
 /** Unanswered questions shown before "Show all". */
 const FIRST = 3;
@@ -80,19 +81,7 @@ export default function Comments({ data }: { data: AdminTodo }) {
       ].filter(Boolean).join(" · ")}
       empty="Nothing held, nothing reported, every question has a reply."
     >
-      {data.held.map((c) => (
-        <TodoRow key={c.id} className={cn(c.reports > 0 && "bg-[rgba(255,59,56,.06)]")}>
-          <Entry
-            c={c}
-            extra={c.reports > 0 ? ` · ${plural(c.reports, "report")}` : undefined}
-          />
-          <span className="flex flex-wrap gap-1.5">
-            {btn(c, "publish", "Publish", true)}
-            {btn(c, "discard", "Discard")}
-          </span>
-          {said(c.id)}
-        </TodoRow>
-      ))}
+      <HeldQueue count={data.held.length} />
       {data.reported.map((c) => (
         <TodoRow key={c.id}>
           <Entry c={c} extra={` · ${plural(c.reports, "report")}`} />

@@ -1,12 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { sessionKey, useSession } from "~/context/session";
 import { api } from "~/lib/api";
-import type { AdminInitiativePage, AdminListRow, AdminStatus, AdminTodo } from "~/lib/api-types";
+import type {
+  AdminInitiativePage,
+  AdminListRow,
+  AdminStatus,
+  AdminTodo,
+  HeldComment,
+} from "~/lib/api-types";
 
 /** Under ["admin"], so the initiative page's refresh (it invalidates ["admin"]) reaches them. */
 export const todoKey = ["admin", "todo"] as const;
 export const listKey = ["admin", "list"] as const;
 export const statusKey = ["admin", "status"] as const;
+export const heldKey = ["admin", "held"] as const;
 
 /** The dashboard's first paint: what waits for an admin (KV only on the server). */
 export function useAdminTodo() {
@@ -46,6 +53,16 @@ export function useAdminPage(slug: string, enabled: boolean) {
   return useQuery({
     queryKey: ["admin", "initiative", slug, sessionKey(session)],
     queryFn: ({ signal }) => api<AdminInitiativePage>(`/api/admin/initiatives/${slug}`, { signal }),
+    enabled: Boolean(session?.isAdmin) && enabled,
+  });
+}
+
+/** The held comments with their thread and author facts (#88), after the first paint. */
+export function useAdminHeld(enabled: boolean) {
+  const { session } = useSession();
+  return useQuery({
+    queryKey: [...heldKey, sessionKey(session)],
+    queryFn: ({ signal }) => api<{ held: HeldComment[] }>("/api/admin/held", { signal }),
     enabled: Boolean(session?.isAdmin) && enabled,
   });
 }

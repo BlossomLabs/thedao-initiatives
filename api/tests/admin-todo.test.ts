@@ -99,7 +99,14 @@ Deno.test("todo: admins only", async () => {
   try {
     assertEquals((await h.req("/api/admin/todo")).status, 401);
     const plain = await h.mint(PLAIN);
-    for (const path of ["/api/admin/todo", "/api/admin/status", "/api/admin/initiatives"]) {
+    for (
+      const path of [
+        "/api/admin/todo",
+        "/api/admin/status",
+        "/api/admin/initiatives",
+        "/api/admin/held",
+      ]
+    ) {
       assertEquals((await h.req(path, { token: plain })).status, 403, path);
     }
   } finally {

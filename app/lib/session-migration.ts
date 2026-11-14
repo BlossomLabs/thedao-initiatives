@@ -13,8 +13,9 @@
  */
 import { API_URL } from "~/lib/api";
 import type { SessionInfo } from "~/lib/api-types";
+import { SESSION_KEY } from "~/lib/session-key";
 
-export const SESSION_KEY = "thedao:session";
+export { SESSION_KEY };
 
 /** The legacy bearer in the stored record, or "" when there is none. */
 export function legacyToken(raw: string | null): string {

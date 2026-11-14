@@ -144,7 +144,9 @@ it("refreshes stale donation counts even when balances are fresh", async () => {
 it("paints from the request the page started before the app loaded, without a second one", async () => {
   const fetchMock = vi.fn(() => Promise.resolve(Response.json(board(100, false))));
   vi.stubGlobal("fetch", fetchMock);
-  globalThis.__early = { "/api/board": Promise.resolve(Response.json(board(300, false))) };
+  globalThis.__early = {
+    "/api/board": { p: Promise.resolve(Response.json(board(300, false))), anonymous: false },
+  };
   render(
     <QueryClientProvider client={client()}>
       <View />
@@ -160,7 +162,7 @@ it("sends its own request when the early one failed", async () => {
   vi.stubGlobal("fetch", fetchMock);
   const failed = Promise.reject(new TypeError("offline"));
   failed.catch(() => {});
-  globalThis.__early = { "/api/board": failed };
+  globalThis.__early = { "/api/board": { p: failed, anonymous: false } };
   render(
     <QueryClientProvider client={client()}>
       <View />

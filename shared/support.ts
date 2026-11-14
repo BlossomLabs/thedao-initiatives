@@ -4,8 +4,8 @@ import { tooLong } from "./draft/caps.ts";
 export const SUPPORT_CATEGORIES = {
   problem: "Report a problem",
   idea: "Suggest an improvement",
-  receipt: "Request a receipt",
-  pledge: "Pledge for a proposal",
+  receipt: "Request a donation receipt",
+  pledge: "Pledge to an Initiative",
   other: "Something else",
 } as const;
 

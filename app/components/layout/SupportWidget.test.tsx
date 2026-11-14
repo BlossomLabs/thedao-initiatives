@@ -57,7 +57,7 @@ describe("SupportPanel", () => {
     expect(dialog).toHaveTextContent("How can we help?");
     expect(screen.getByRole("button", { name: "Report a problem" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Suggest an improvement" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Request a receipt" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request a donation receipt" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Something else" })).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -133,7 +133,7 @@ describe("SupportPanel receipt requests", () => {
 
   function openReceipt() {
     openPicker();
-    fireEvent.click(screen.getByRole("button", { name: "Request a receipt" }));
+    fireEvent.click(screen.getByRole("button", { name: "Request a donation receipt" }));
     return {
       email: screen.getByRole("textbox", { name: "Email" }),
       transaction: screen.getByRole("textbox", { name: "Transaction link" }),
@@ -155,7 +155,7 @@ describe("SupportPanel receipt requests", () => {
     fireEvent.change(transaction, { target: { value: ` ${transactionUrl} ` } });
     expect(send).toBeEnabled();
     fireEvent.click(send);
-    await screen.findByText("Your receipt request has been sent.");
+    await screen.findByText("Your donation receipt request has been sent.");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/support");
@@ -201,7 +201,7 @@ describe("SupportPanel receipt requests", () => {
     expect(screen.getByRole("textbox", { name: "Transaction link" })).toHaveValue(transactionUrl);
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(screen.getByRole("button", { name: /support/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Request a receipt" }));
+    fireEvent.click(screen.getByRole("button", { name: "Request a donation receipt" }));
     expect(screen.getByRole("textbox", { name: "Email" })).toHaveValue("");
     expect(screen.getByRole("textbox", { name: "Transaction link" })).toHaveValue("");
   });

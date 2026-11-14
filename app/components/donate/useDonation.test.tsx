@@ -241,7 +241,7 @@ it("opens the receipt form from a confirmed donation with its transaction link f
     </>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Need a receipt?" }));
-  expect(screen.getByRole("dialog")).toHaveTextContent("Request a receipt");
+  expect(screen.getByRole("dialog")).toHaveTextContent("Request a donation receipt");
   expect(screen.getByRole("textbox", { name: "Transaction link" })).toHaveValue(
     `https://eth.blockscout.com/tx/${TX}`,
   );

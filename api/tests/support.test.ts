@@ -57,7 +57,7 @@ Deno.test("support: pledge requests forward current initiative facts and every c
       assertEquals(sent.email, "donor@example.com");
       for (
         const line of [
-          "[TheDAO Initiatives · Pledge for a proposal]",
+          "[TheDAO Initiatives · Pledge to an Initiative]",
           `Title: Updated security work ${type}`,
           `Link: http://localhost:5173/initiative/${initiative.slug}`,
           `Type: ${type === "grant" ? "Grant" : "RFP"}`,
@@ -211,7 +211,7 @@ Deno.test("support: receipt requests forward the email and transaction through t
       assertEquals(sent, {
         name: "",
         email: "donor@example.com",
-        message: "[TheDAO Initiatives · Request a receipt]\n" +
+        message: "[TheDAO Initiatives · Request a donation receipt]\n" +
           `Transaction: ${transactionUrl}\n` +
           "Page: http://localhost:5173/initiative/foo\n\n" +
           (message ?? "Please send a receipt for this donation."),

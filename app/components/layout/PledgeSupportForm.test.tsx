@@ -30,8 +30,8 @@ function openForm() {
       <SupportPanel />
     </>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Pledge for a proposal" }));
-  expect(screen.getByRole("dialog")).toHaveTextContent("Pledge for a proposal");
+  fireEvent.click(screen.getByRole("button", { name: "Pledge to an Initiative" }));
+  expect(screen.getByRole("dialog")).toHaveTextContent("Pledge to an Initiative");
 }
 
 async function fillForm() {
@@ -113,7 +113,7 @@ it("validates amount and email, and preserves pledge details after failed delive
   expect(screen.getByRole("textbox", { name: "Who are we talking with?" })).toHaveValue(" Alex ");
   expect(screen.getByRole("button", { name: "Send pledge request" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
-  fireEvent.click(screen.getByRole("button", { name: "Pledge for a proposal" }));
+  fireEvent.click(screen.getByRole("button", { name: "Pledge to an Initiative" }));
   expect(screen.getByRole("textbox", { name: "Pledge Organization" })).toHaveValue("");
 });
 

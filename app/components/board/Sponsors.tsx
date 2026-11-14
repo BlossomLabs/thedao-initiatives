@@ -129,7 +129,7 @@ export default function Sponsors(
                     onClick={() => openPledgeRequest()}
                     className="col-start-2 cursor-pointer text-center text-[9px] uppercase leading-4 tracking-[.18em] text-dao-green transition-colors hover:text-dao-green/80"
                   >
-                    Pledge for a proposal
+                    Pledge to an Initiative
                   </button>
                 )}
                 {scrolls && (

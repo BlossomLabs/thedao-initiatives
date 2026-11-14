@@ -360,7 +360,7 @@ export function SupportPanel() {
             {receipt && (
               <>
                 <p className="m-0 text-[13px] text-muted">
-                  Share your email and donation transaction link to request a receipt.
+                  Share your email and donation transaction link to request a donation receipt.
                 </p>
                 <label htmlFor={emailId} className="text-[12.5px] text-white/80">
                   Email
@@ -491,7 +491,7 @@ export function SupportPanel() {
             <CheckCircle2 className="size-10 text-dao-green" />
             <p className="m-0 text-[13px] text-muted">
               {receipt
-                ? "Your receipt request has been sent."
+                ? "Your donation receipt request has been sent."
                 : pledge
                 ? "Your pledge request has been sent. We’ll be in touch."
                 : "Thanks for writing. We read every message."}

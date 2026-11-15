@@ -195,7 +195,8 @@ function* giftsSearch(
   const live = tiersOf(tally, inp, firstOpen);
   yield;
   for (let c = 0; c < inp.m; c++) {
-    if (inp.done.has(c)) continue;
+    // Settled, or covered by donations (asking $0): nothing more to give it.
+    if (inp.done.has(c) || inp.costs[c] === 0n) continue;
     const now = live.get(c);
     if (now === firstOpen) continue;
     const target = now === undefined ? TIERS.length - 1 : now - 1;
@@ -214,7 +215,8 @@ function* search(
   yield;
   const out = new Map<number, NextTier>();
   for (let c = 0; c < inp.m; c++) {
-    if (inp.done.has(c)) continue;
+    // Settled, or covered (asking $0: in no tier, and no gap to one).
+    if (inp.done.has(c) || inp.costs[c] === 0n) continue;
     const now = live.get(c);
     const target = now === undefined ? TIERS.length - 1 : now - 1;
     if (target < firstOpen || target < 0) continue;
@@ -307,7 +309,8 @@ function* finalSearch(
   // Each tier is judged where it would have had to win: at its own settlement.
   function* gap(t: number, c: number): Generator<void, void> {
     const inp = at(t);
-    if (!inp) return;
+    // Covered at that settlement (or before it): no tier to have reached.
+    if (!inp || inp.done.has(c) || inp.costs[c] === 0n) return;
     let live = lives.get(t);
     if (!live) {
       // Every figure here targets tier t itself: the later stages aren't looked at.
@@ -358,7 +361,8 @@ async function driveAsync<T>(it: Generator<void, T>, sliceMs = 0): Promise<T> {
 }
 
 /** Keyed by initiative index; an initiative with no higher tier to reach has no entry.
- * Settled initiatives are already funded, so they have none either. */
+ * Settled initiatives are already funded, so they have none either, nor do covered ones
+ * (asking $0). */
 export function nextTiers(
   inp: ChainInputs,
   firstOpen: number,
@@ -379,7 +383,8 @@ export function nextTiersAsync(
 /** Keyed by initiative index: for each open initiative not in the tier settling now, the
  * donation (a $10 step, rounded up; null when even its whole need isn't enough) that gets
  * it one tier higher than the live tally has it (B-Tier when unfunded), if the open tiers
- * settled now. Settled initiatives and those in the tier settling now have no entry. */
+ * settled now. Settled initiatives, covered ones (asking $0) and those in the tier
+ * settling now have no entry. */
 export function giftGaps(
   inp: ChainInputs,
   firstOpen: number,

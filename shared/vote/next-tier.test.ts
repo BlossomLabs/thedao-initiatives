@@ -371,6 +371,13 @@ describe("the final what-ifs", () => {
     for (const c of [1, 2, 3]) expect(got.next.get(c)!.gap).not.toBe(null);
   });
 
+  it("a project covered at its settlement has no figure", () => {
+    // Initiative 0 asked $0 at the settlement: covered, not out of reach.
+    const inp = inputs([0, 40], [40], [[1, 2]]);
+    const got = finalWhatIfs([inp, inp, inp], new Map([[1, 0]]), 2);
+    expect(got.next.has(0)).toBe(false);
+  });
+
   it("no ballots at a settlement: no figures", () => {
     const { at, finalTier } = round();
     const empty = { ...at[1], voters: [], weights: [], ranks: [], ballots: [] };
@@ -492,6 +499,14 @@ describe("the donation to the next tier", () => {
         expect(from).not.toBe(to);
       }
     }
+  });
+
+  it("has no entry for a project covered by donations (asking $0), nor does its gap", () => {
+    // Initiative 0 asks $0: covered, in no tier, with nothing left to give.
+    const inp = inputs([0, 40, 30], [40], [[1, 2, 3]]);
+    expect(giftGaps(inp, 0).has(0)).toBe(false);
+    expect(nextTiers(inp, 0).has(0)).toBe(false);
+    expect(giftGaps(inp, 0).has(2)).toBe(true);
   });
 
   it("gives the same answer async", async () => {

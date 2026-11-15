@@ -16,7 +16,8 @@ export interface StateSource {
   /** Blocks in [from, to] holding a PledgeSet or PoolUsdSet log from the round's contract. */
   accountingEventBlocks(from: number, to: number): Promise<number[]>;
   /** Blocks in [from, to] where any account's balance in any registered currency changed:
-   * ERC-20 Transfer logs to or from an account, and native balances read block by block. */
+   * ERC-20 Transfer logs to or from an account, and native balances read block by block
+   * (a source may keep blocks it has scanned deep enough, and read only the rest again). */
   balanceChangeBlocks(from: number, to: number): Promise<number[]>;
 }
 /** Optional; only reads of blocks older than the finality margin go in. Values are plain
@@ -34,6 +35,11 @@ const READS = 8;
 /** The balance cache's finality line moves in steps of this many seconds, so finding it
  * costs one block search per step (cached), not one per call. */
 const FINAL_STEP = 300;
+/** How long after a cutoff the node's head may still be older than it: a block lands
+ * every 12 s and takes a few seconds to arrive. Within this the head stands in for the
+ * last block before the cutoff (a reorg-like change, never kept: a settlement is stored
+ * only well past it); later, a head older than the cutoff is a lagging node. */
+export const CUTOFF_GRACE_SECS = 30;
 
 type Block = { block: number; timestamp: number };
 type StoredState = { timestamp: number; asks: string[]; poolUsd: string };
@@ -76,7 +82,9 @@ function merge(ranges: [number, number][]): [number, number][] {
  * waits one more margin, for the block after its answer. Balance scans run one chunk at a
  * time. Any read error rejects
  * the whole call: no zeros, and no head values for a past block. A receipt block past
- * the node's head (a lagging archive node) rejects too. */
+ * the node's head (a lagging archive node) rejects too, and so does a head older than a
+ * passed tally start or cutoff (beyond CUTOFF_GRACE_SECS): the blocks between the head
+ * and that time are not seen, so the state "before" it would be partial. */
 export async function chainStates(
   m: VoteManifest,
   src: StateSource,
@@ -136,6 +144,16 @@ export async function chainStates(
     const ends = windowEnds(s, t);
     points.push(start, ...ends.filter((e) => e <= now));
     spans.push([start, Math.min(now, ends.at(-1)!)]);
+  }
+  // A node behind a passed point would give its head as the state before it, missing any
+  // pledge, pool change or donation since. Refuse rather than settle from that.
+  const missed = points.filter((p) => head.timestamp < p && now - p > CUTOFF_GRACE_SECS);
+  if (missed.length) {
+    throw new Error(
+      `chain states: the node's head at ${head.timestamp} is behind the tally time ${
+        Math.max(...missed)
+      }`,
+    );
   }
   const [pointBlocks, nowBlock, ranges] = await Promise.all([
     Promise.all(points.map((p) => lastBefore(p))),

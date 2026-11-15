@@ -19,7 +19,7 @@
     "typecheck": "deno run -A npm:@react-router/dev typegen && deno run -A npm:typescript/tsc",
     "test": "deno run -A npm:vitest run",
     "test:api": "deno test -A api/",
-    "check:api": "deno check api/main.ts server.ts api/scripts/*.ts shared/draft/mod.ts",
+    "check:api": "deno check api/main.ts server.ts api/scripts/*.ts shared/draft/mod.ts scripts/vote-replay.ts",
     "lint": "deno lint",
     "fmt": "deno fmt",
     "sync-wallets": "deno run --env-file=.env --allow-env --allow-net=explorer-api.walletconnect.com --allow-write=public/wallets.json scripts/sync-wallets.ts",
@@ -28,6 +28,7 @@
     "seed-categories": "deno run --env-file=.env -A api/scripts/seed-categories.ts",
     "bench": "deno run --allow-net api/scripts/bench.ts",
     "vote-codes": "deno run --allow-env=VOTE_ISSUER_KEY,DEVCON_ISSUER_KEY --allow-read --allow-write=vote-codes scripts/vote-codes.ts",
+    "vote:replay": "deno run --allow-net --allow-read scripts/vote-replay.ts",
     "vote-deploy": "deno run --allow-env=VOTE_RELAYER_KEY,DEVCON_RELAYER_KEY,SEPOLIA_RPC_URL,MAINNET_RPC_URL,ADMIN_ADDRESSES --allow-net --allow-read --allow-write=shared/vote/manifest-data.ts scripts/vote-deploy.ts"
   },
   "imports": {

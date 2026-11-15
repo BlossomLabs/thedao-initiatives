@@ -209,6 +209,31 @@ Deno.test("native balances: a block where an account's ETH balance changed, one 
   assertEquals(calls.filter((c) => c.method === "eth_call").length, 12);
 });
 
+Deno.test("native balances: a second scan reads only new blocks and the last few again", async () => {
+  // A change at 950, and one at 995 that a reorg moves to 996 before the second scan.
+  let moved = false;
+  const at = { head: 1000 };
+  const { transport, calls } = node({
+    get head() {
+      return at.head;
+    },
+    ethOf: (b) => (b >= 950 ? 2n : 1n) + (b >= (moved ? 996 : 995) ? 5n : 0n),
+  });
+  const src = createStateSource(manifest([{ asset: ZERO }]), "http://unused", transport);
+  const ethCalls = () => calls.filter((c) => c.method === "eth_call").length;
+  assertEquals(await src.balanceChangeBlocks(900, 1000), [950, 995]);
+  assertEquals(ethCalls(), 102); // 899..1000
+  moved = true;
+  at.head = 1005;
+  assertEquals(await src.balanceChangeBlocks(900, 1005), [950, 996]);
+  // Blocks to 988 were 12 deep at the first scan: kept. 989..1005 again, against 988.
+  assertEquals(ethCalls() - 102, 18);
+  // Nothing new: only the shallow tail again.
+  const before = ethCalls();
+  assertEquals(await src.balanceChangeBlocks(900, 1005), [950, 996]);
+  assertEquals(ethCalls() - before, 13); // 994..1005, against 993
+});
+
 Deno.test("ERC-20 balances: a Transfer to or from an account; others are not seen", async () => {
   const transfer = parseAbiItem(
     "event Transfer(address indexed from, address indexed to, uint256 value)",

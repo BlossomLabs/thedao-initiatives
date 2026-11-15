@@ -101,6 +101,26 @@ describe("chainStates", () => {
     );
   });
 
+  it("a head older than a passed cutoff is refused: the blocks before it are unseen", async () => {
+    // S-Tier's first window ended at 1400; the node's head is at 1350, long after.
+    const { src } = fakeChain({ head: 1350, accounting: [1300] });
+    await expect(chainStates(manifest(), src, opts(1450, [1200]))).rejects.toThrow(
+      /head at 1350 is behind the tally time 1400/,
+    );
+    // Likewise a tier's first tally.
+    const early = fakeChain({ head: 950 });
+    await expect(chainStates(manifest(), early.src, opts(1100))).rejects.toThrow(
+      /behind the tally time 1000/,
+    );
+  });
+
+  it("just after a cutoff, a head not yet past it stands in for the block before it", async () => {
+    // 10 s after the cutoff at 1400 the next block may not be there yet.
+    const { src } = fakeChain({ head: 1395 });
+    const out = await chainStates(manifest(), src, opts(1410));
+    expect(blocks(out)).toEqual([999, 1395]);
+  });
+
   it("before the first tally, only the head", async () => {
     const { src } = fakeChain({ head: 500, accounting: [400] });
     const out = await chainStates(manifest(), src, opts(501, [450]));

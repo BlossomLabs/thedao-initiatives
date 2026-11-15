@@ -110,6 +110,8 @@ function fakeChain(chainManifest: VoteManifest = manifest) {
     /** The chain states the round reads, when a test sets them; else one state with
      * `asks` and the pool. */
     states: null as ChainState[] | null,
+    /** The node's head time, when a test has it lag; else a second before now. */
+    headAt: null as number | null,
     stateReads: 0,
     ballotReads: 0,
     txStatus: new Map<string, "pending" | "success" | "reverted" | "unknown">(),
@@ -194,16 +196,22 @@ function fakeChain(chainManifest: VoteManifest = manifest) {
         ? Promise.reject(new Error("rpc down"))
         : Promise.resolve(state.asks ?? chainManifest.projects.map((p) => BigInt(p.goalUsd))),
   };
-  /** The round's chain states: the test's own, or one state for the whole round. */
-  const states = (): Promise<ChainState[]> => {
+  /** The round's chain states: the test's own, or one state for the whole round, up to
+   * the node's head (`headAt`, default a second before `now`); then the head itself, as
+   * chainStates() always reads it: the last state's values again. */
+  const states = (now: number): Promise<ChainState[]> => {
     state.stateReads++;
     if (state.asks === "fail") return Promise.reject(new Error("missing trie node"));
-    return Promise.resolve(
-      state.states ?? oneState(
-        state.asks ?? chainManifest.projects.map((p) => BigInt(p.goalUsd)),
-        state.history.pool.at(-1)?.poolUsd ?? BigInt(chainManifest.poolUsd),
-      ),
-    );
+    const headAt = state.headAt ?? now - 1;
+    const xs = (state.states ?? oneState(
+      state.asks ?? chainManifest.projects.map((p) => BigInt(p.goalUsd)),
+      state.history.pool.at(-1)?.poolUsd ?? BigInt(chainManifest.poolUsd),
+    )).filter((x) => x.timestamp <= headAt);
+    const last = xs.at(-1);
+    if (last && last.timestamp < headAt) {
+      xs.push({ ...last, block: last.block + 1_000_000, timestamp: headAt, event: false });
+    }
+    return Promise.resolve(xs);
   };
   return { state, chain, states };
 }
@@ -1276,6 +1284,23 @@ Deno.test("round: a settled tier is the same before and after its record is stor
   h.clock.now += 10;
   const again = (await j(await h.req("/api/vote/round")) as { tiers: unknown[] }).tiers[0];
   assertEquals(again, before);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: a settlement isn't stored from states whose head is older than its cutoff", async () => {
+  const { h, state } = await qeSetup([150n, 0n, 150n]);
+  const key = ["vote", qe.contract.toLowerCase(), "settled", "S"];
+  h.clock.now = NOW + 660 + 30 * 60;
+  // The states node stopped before the cutoff at NOW + 660: what came after is unseen.
+  state.headAt = NOW + 600;
+  await h.req("/api/vote/round");
+  assertEquals((await h.kv.get(key)).value, null);
+  // Once it has caught up, the settlement is kept.
+  state.headAt = null;
+  h.clock.now += 10;
+  await h.req("/api/vote/round");
+  assertEquals((await h.kv.get<{ covered: number[] }>(key)).value?.covered, [1]);
   await h.settle();
   h.close();
 });

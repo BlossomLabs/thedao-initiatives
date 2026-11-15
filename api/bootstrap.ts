@@ -91,8 +91,8 @@ export async function createServer(siteOptions?: SiteOptions) {
         undefined,
         (a) => reviewTokenIds(chain.rpc, a, fetch),
       ),
-      // Past blocks need an archive node; without one configured, the round's own RPC.
-      source: createStateSource(ROUND, config.voteArchiveRpcUrl || voteRpcUrl),
+      // Past blocks need an archive node: the round's RPC (RPC_URL / SEPOLIA_RPC_URL) must be one.
+      source: createStateSource(ROUND, voteRpcUrl),
     },
   };
   // Load the image decoder before the first upload asks for it.

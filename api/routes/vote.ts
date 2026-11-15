@@ -6,11 +6,10 @@ import { jsonBody } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
 import { verifyCode } from "../../shared/vote/code.ts";
 import { isValidOnchainBallot, tierName } from "../../shared/vote/ballot.ts";
-import { liveInputsJson } from "../../shared/vote/live-inputs.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { recordVote } from "../../shared/vote/record.ts";
 import { kvStateCache, type VoteRound } from "../services/vote-chain.ts";
-import { chainStates } from "../../shared/vote/chain-states.ts";
+import { chainStates, type StateSource } from "../../shared/vote/chain-states.ts";
 import {
   finalWhatIfsAsync,
   giftGapsAsync,
@@ -21,15 +20,20 @@ import {
 import type { ChainInputs } from "../../shared/vote/chain.ts";
 import {
   type ChainState,
-  type Receipt,
   refusal,
-  replay,
   type RoundState,
   type Settled,
-  type TierState,
 } from "../../shared/vote/quiet-ending.ts";
+import {
+  errorText,
+  FINAL_AFTER_SECS,
+  ReplayError,
+  replayRound,
+  type Round,
+  roundJson,
+  type RoundSource,
+} from "../../shared/vote/replay-round.ts";
 import { rulesRound } from "../../shared/vote/manifest.ts";
-import { transcriptOf } from "../../shared/vote/transcript.ts";
 import { checkBallot, findProof } from "../../shared/vote/rules.ts";
 import type { Tier } from "../../shared/vote/ballot.ts";
 
@@ -50,8 +54,6 @@ const RELAY_FLOOR_WEI = 10_000_000_000_000_000n; // 0.01 ETH
 /** Long enough for any mint to land; the chain is the record after that. */
 const MINTING_MS = 60 * 60_000;
 const BALLOTS_CACHE_SECS = 5;
-/** Blocks before the close are final well within this, so ballots can't change after. */
-const FINAL_AFTER_SECS = 30 * 60;
 /** How long a request waits for the round's chain states. A cold read (a long window's
  * balance scan on an archive node) can take longer: it goes on in the background, fills
  * the cache, and the request is a 503 meanwhile. */
@@ -63,10 +65,17 @@ const KV_VALUE_MAX = 60_000;
  * are tried again after this long. */
 const FINAL_RETRY_SECS = 60;
 
-/** An error for the log, with URLs cut out: viem's messages name the RPC's URL, and an
- * archive RPC's URL may carry its API key. */
-export const errorText = (e: unknown): string =>
-  String(e instanceof Error ? e.message : e).replace(/\b(?:https?|wss?):\/\/\S+/g, "<rpc>");
+export { errorText };
+
+/** The states half of a round's source when the round has none (tests set `states`):
+ * the route reads states through `statesFor`, never through this. */
+const noStateSource: StateSource = {
+  head: () => Promise.reject(new Error("no chain state source")),
+  blockBefore: () => Promise.reject(new Error("no chain state source")),
+  stateAt: () => Promise.reject(new Error("no chain state source")),
+  accountingEventBlocks: () => Promise.reject(new Error("no chain state source")),
+  balanceChangeBlocks: () => Promise.reject(new Error("no chain state source")),
+};
 
 const fail = (status: number, code: string, message: string, extra?: Record<string, unknown>) =>
   new HttpError(status, message, { code, ...extra });
@@ -245,68 +254,6 @@ type FinalJson = { next: NextJson; lead: Record<string, string> };
 /** A closed round's final what-ifs, with the digest of what they were judged from. */
 type KnownFinal = { key: string; at: number; final: FinalJson };
 
-/** The replay with what the rules judge by now: the pool and each project's ask at the
- * head state (asks absent when the head has fewer projects than the manifest). */
-type Round = RoundState & { poolUsd: bigint; asks?: bigint[] };
-
-/** The round state as JSON: slugs for initiatives, decimal strings for micro-USD. */
-function roundJson(st: Round, slugs: string[]) {
-  const named = (cs: number[]) => cs.map((c) => slugs[c]);
-  const money = (m: Map<number, bigint>) =>
-    Object.fromEntries([...m].map(([c, v]) => [slugs[c], v.toString()]));
-  /** tokenId → slug → what that badge paid for it (only what it paid). */
-  const paidBy = (shares: Map<number, Map<string, bigint>>) => {
-    const out: Record<string, Record<string, string>> = {};
-    for (const [c, byBadge] of shares) {
-      for (const [t, v] of byBadge) if (v > 0n) (out[t] ??= {})[slugs[c]] = v.toString();
-    }
-    return out;
-  };
-  const tier = (t: TierState) =>
-    t.status === "settled"
-      ? {
-        tier: t.tier,
-        status: t.status,
-        at: t.at,
-        forced: t.forced,
-        funded: named(t.funded),
-        covered: named(t.covered),
-        awards: money(t.awards),
-        paid: paidBy(t.shares),
-      }
-      : t.status === "settling"
-      ? { ...t, funded: named(t.funded), covered: named(t.covered) }
-      : t;
-  return {
-    registrationClosesAt: st.registrationClosesAt,
-    closed: st.closed,
-    share: st.share.toString(),
-    /** The pool on-chain now (micro-USD): what a new ballot's size is judged against. */
-    poolUsd: st.poolUsd.toString(),
-    /** Each initiative's ask on-chain now (micro-USD, manifest order): the head state's,
-     * the same the live tally and the relay use; absent when the head has fewer projects
-     * than the manifest. */
-    ...(st.asks ? { asks: st.asks.map(String) } : {}),
-    tiers: st.tiers.map(tier),
-    accepted: Object.fromEntries(
-      [...st.accepted].map((
-        [t, b],
-      ) => [t, `0x${[...b].map((x) => x.toString(16).padStart(2, "0")).join("")}`]),
-    ),
-    rejected: st.rejected,
-    live: {
-      funded: named(st.live.order),
-      awards: money(st.live.awards),
-      tiers: Object.fromEntries([...st.live.tiers].map(([c, t]) => [slugs[c], t])),
-      paid: paidBy(st.live.shares),
-      /** Asking $0 now: covered by donations, in no tier. */
-      covered: named(st.live.covered),
-      // The live tally's inputs, so a donation's preview re-runs it in the browser.
-      ...(st.liveInputs ? { inputs: liveInputsJson(st.liveInputs, st.firstOpen) } : {}),
-    },
-  };
-}
-
 export function voteRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const dc = (): VoteRound => {
@@ -402,85 +349,53 @@ export function voteRoutes(deps: Deps) {
       tiers.map((t) => kv.get<StoredSettled>([...round(d), "settled", t])),
     );
     const snapshots = stored.flatMap((x) => (x.value ? [loadSettled(x.value)] : []));
-    const { events, block: readAt } = await d.chain.ballots();
-    // The replay counts only what the contract committed to: the events read must hash
-    // to its transcript, and each token's last ballot to its stored hash, at that block.
-    const read = events.map((b) =>
-      "revoked" in b
-        ? { tokenId: b.tokenId, revoked: true as const }
-        : { tokenId: b.tokenId, voter: b.voter, nonce: BigInt(b.nonce), ballot: b.ballot }
-    );
-    let proof = transcriptOf(read);
-    const tokenIds = [...proof.lastHash.keys()];
-    const onChain = await d.chain.committed(readAt, tokenIds.map(BigInt));
-    // A round deployed before Nov 14 hashes a sixth, zero word into each entry.
-    if (onChain.transcript !== proof.transcript) {
-      const legacy = transcriptOf(read, true);
-      if (onChain.transcript === legacy.transcript) proof = legacy;
-    }
-    if (
-      onChain.transcript !== proof.transcript ||
-      onChain.recordCount !== BigInt(proof.count) ||
-      tokenIds.some((id, i) => onChain.hashes[i] !== proof.lastHash.get(id))
-    ) {
-      throw fail(
-        503,
-        "transcript_mismatch",
-        "The ballots read don't match the contract; the results are back once they do.",
-      );
-    }
-    const receipts: Receipt[] = events.map((b, i) => ({
-      tokenId: b.tokenId,
-      nonce: "revoked" in b ? 0 : b.nonce,
-      ballot: "revoked" in b ? null : hexToBytes(b.ballot),
-      block: b.block ?? i + 1,
-      ...("logIndex" in b && b.logIndex !== undefined ? { logIndex: b.logIndex } : {}),
-      timestamp: b.timestamp,
-    }));
-    const m = d.manifest;
-    // Rounds deployed with the ballot rules: the projects added on-chain since the deploy.
-    const history = m.ballotRules ? await d.chain.rulesHistory() : null;
-    // A project the admin added on-chain that this site's manifest doesn't have yet
-    // (before `vote-deploy --added` and a redeploy): its ballots can't be read, so hold
-    // the round rather than refuse them (or settle without them).
-    if (history && history.addedAt.length > m.slugs.length) {
-      throw fail(
-        503,
-        "round_out_of_date",
-        "A project was just added to the vote; the results are back once this site knows it.",
-      );
-    }
     const now = deps.now();
-    const states = await statesFor(
-      d,
-      now,
-      events.flatMap((b) => (b.block === undefined ? [] : [b.block])),
-    );
-    // The head: what the live tally, the page and the relay judge by.
-    const head = states.filter((x) => x.timestamp < now).at(-1);
-    if (!head) throw asksUnavailable();
-    let asks: bigint[] | undefined = head.asks;
-    if (asks.length !== m.slugs.length) {
-      deps.log(`vote asks: ${asks.length} at the head for ${m.slugs.length} projects`);
-      asks = undefined;
+    // Ballots through the VoteChain, states through the bounded, shared read below.
+    const { ballots, committed, rulesHistory } = d.chain;
+    const src: RoundSource = {
+      ...(d.source ?? noStateSource),
+      ballots: () => ballots(),
+      committed: (block, tokenIds) => committed(block, tokenIds),
+      rulesHistory: () => rulesHistory(),
+    };
+    let st: Round;
+    try {
+      st = await replayRound(d.manifest, src, {
+        now,
+        snapshots,
+        finalAfterSecs: FINAL_AFTER_SECS,
+        states: (receiptBlocks) => statesFor(d, now, receiptBlocks),
+        log: deps.log,
+      });
+    } catch (e) {
+      if (!(e instanceof ReplayError)) throw e;
+      if (e.code === "transcript_mismatch") {
+        throw fail(
+          503,
+          "transcript_mismatch",
+          "The ballots read don't match the contract; the results are back once they do.",
+        );
+      }
+      if (e.code === "round_out_of_date") {
+        throw fail(
+          503,
+          "round_out_of_date",
+          "A project was just added to the vote; the results are back once this site knows it.",
+        );
+      }
+      throw asksUnavailable();
     }
-    const st = replay({
-      schedule: m.schedule,
-      m: m.slugs.length,
-      states,
-      receipts,
-      snapshots,
-    }, now);
     for (const [i, t] of st.tiers.entries()) {
       // Kept only once the blocks before the settlement are final: until then a
-      // lagging RPC may still be missing a ballot that changes it.
+      // lagging RPC may still be missing a ballot that changes it. And only from states
+      // read past it: a head older than the cutoff hasn't seen the blocks before it.
       if (t.status !== "settled" || stored[i].value) continue;
-      if (now < t.at + FINAL_AFTER_SECS) continue;
+      if (now < t.at + FINAL_AFTER_SECS || st.head.timestamp < t.at) continue;
       const { status: _, ...x } = t;
       await kv.atomic().check(stored[i]).set([...round(d), "settled", t.tier], storeSettled(x))
         .commit();
     }
-    return Object.assign(st, { poolUsd: head.poolUsd, ...(asks ? { asks } : {}) });
+    return st;
   };
 
   /** The replay, reused for a few seconds in this isolate: every relayed ballot asks. */

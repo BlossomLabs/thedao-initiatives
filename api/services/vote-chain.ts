@@ -13,6 +13,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
 import type { StateCache, StateSource } from "../../shared/vote/chain-states.ts";
 import type { ChainState } from "../../shared/vote/quiet-ending.ts";
+import type { BallotEvent, RoundSource, RulesHistory } from "../../shared/vote/replay-round.ts";
 import { voteChain, type VoteManifest, voterNft } from "../../shared/vote/manifest.ts";
 
 /** What the vote routes need from the chain. Injected so tests run without a chain. */
@@ -74,23 +75,7 @@ export interface VoteChain {
   asks(): Promise<bigint[]>;
 }
 
-export type RulesHistory = {
-  addedAt: ({ block: number; logIndex: number } | null)[];
-  pool: { block: number; logIndex: number; poolUsd: bigint }[];
-};
-
-/** In chain order; `block` and `nonce` let the quiet ending group a block's receipts. */
-export type BallotEvent =
-  | {
-    tokenId: string;
-    ballot: Hex;
-    voter: Hex;
-    nonce: number;
-    timestamp: number;
-    block?: number;
-    logIndex?: number;
-  }
-  | { tokenId: string; revoked: true; timestamp: number; block?: number };
+export type { BallotEvent, RulesHistory };
 
 export interface VoteRound {
   chain: VoteChain;
@@ -375,6 +360,12 @@ const MULTICALL3: Hex = "0xcA11bde05977b3631167028862bE2a173976CA11";
 const NATIVE = /^0x0{40}$/i;
 /** Native balance multicalls in flight at once (one per block). */
 const BALANCE_READS = 8;
+/** A native balance scan of a block is kept in memory once the block is this deep under
+ * the newest block of the scan that read it; shallower ones are read again next time, as
+ * a reorg may still replace them. */
+const REORG_DEPTH = 12;
+/** Most blocks whose native scan is kept in memory (the oldest go first). */
+const NATIVE_MEMO = 20_000;
 
 /** The round's chain states read from an RPC (an archive node, for past blocks):
  * shared/vote/chain-states.ts turns them into the replay's states. Every read names its
@@ -386,6 +377,11 @@ export function createStateSource(
 ): StateSource {
   const pub = createPublicClient({ chain: voteChain(m), transport }) as PublicClient;
   const contract = { address: m.contract, abi: SIGNED_BALLOTS_ABI } as const;
+  /** Whether a block changed a native balance, for blocks already REORG_DEPTH deep when
+   * scanned: kept for this source's life (one per isolate on the site). The KV cache keeps
+   * final scans across isolates (chain-states.ts) but never the newer tail, which every
+   * read would otherwise scan again block by block. */
+  const nativeSeen = new Map<number, boolean>();
   const blockAt = async (n: number) => {
     const b = await pub.getBlock({ blockNumber: BigInt(n) });
     return { block: n, timestamp: Number(b.timestamp) };
@@ -508,21 +504,49 @@ export function createStateSource(
               args: [a],
             })),
           }) as Promise<bigint[]>;
-        let before = await ethAt(from - 1);
-        for (let a = from; a <= to; a += BALANCE_READS) {
+        // The blocks scanned before and deep enough are known; the scan goes on after them.
+        let start = from;
+        for (; start <= to && nativeSeen.has(start); start++) {
+          if (nativeSeen.get(start)) out.add(start);
+        }
+        let before = start <= to ? await ethAt(start - 1) : [];
+        for (let a = start; a <= to; a += BALANCE_READS) {
           const batch = Array.from(
             { length: Math.min(BALANCE_READS, to - a + 1) },
             (_, i) => a + i,
           );
           const reads = await Promise.all(batch.map(ethAt));
           for (const [i, now] of reads.entries()) {
-            if (now.some((x, j) => x !== before[j])) out.add(batch[i]);
+            const changed = now.some((x, j) => x !== before[j]);
+            if (changed) out.add(batch[i]);
+            if (batch[i] <= to - REORG_DEPTH) nativeSeen.set(batch[i], changed);
             before = now;
           }
+        }
+        for (const b of nativeSeen.keys()) {
+          if (nativeSeen.size <= NATIVE_MEMO) break;
+          nativeSeen.delete(b);
         }
       }
       return [...out].sort((x, y) => x - y);
     },
+  };
+}
+
+/** Everything a replay reads (shared/vote/replay-round.ts), from an RPC URL alone: the
+ * ballot reads of a VoteChain without a relayer, and the chain states. For the site's
+ * own source and for scripts/vote-replay.ts. */
+export function createRoundSource(
+  m: VoteManifest,
+  rpcUrl: string,
+  transport: Transport = http(rpcUrl),
+): RoundSource {
+  const chain = createVoteChain(m, rpcUrl, null, transport);
+  return {
+    ...createStateSource(m, rpcUrl, transport),
+    ballots: () => chain.ballots(),
+    committed: (block, tokenIds) => chain.committed(block, tokenIds),
+    rulesHistory: () => chain.rulesHistory(),
   };
 }
 

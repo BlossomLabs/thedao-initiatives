@@ -12,11 +12,3 @@ Deno.test("the vote relayer key: VOTE_RELAYER_KEY, else the old DEVCON_RELAYER_K
   assertEquals(loadConfig({ VOTE_RELAYER_KEY: KEY, DEVCON_RELAYER_KEY: OLD }).voteRelayerKey, KEY);
   assertEquals(loadConfig({}).voteRelayerKey, "");
 });
-
-Deno.test("the vote's archive RPC: VOTE_ARCHIVE_RPC_URL, else none (the round's RPC is used)", () => {
-  assertEquals(
-    loadConfig({ VOTE_ARCHIVE_RPC_URL: " https://archive.example " }).voteArchiveRpcUrl,
-    "https://archive.example",
-  );
-  assertEquals(loadConfig({}).voteArchiveRpcUrl, "");
-});

@@ -209,6 +209,24 @@ that replay and precise quiet-comparison thresholds remain to be implemented.
 The complete replay checker, payout integration and frontend are still subsequent
 work. The contract tests mock price feeds; they are not live Sepolia tests.
 
+### Replay the round yourself
+
+Anyone with an archive RPC gets the site's results from the chain alone: no site
+database, no keys. From the repository root, with Deno:
+
+    deno task vote:replay --rpc <archive RPC URL>
+
+It runs the same replayer as the site (`shared/vote/replay-round.ts`): it reads every
+ballot, checks them against the contract's `transcript`, `recordCount` and
+`ballotHashOf`, reads each project's ask and the pool at every tally block, and
+replays the quiet ending. It prints each tier's status, window, funded projects with
+their awards and covered projects, then the transcript check and the head block.
+`--manifest <file>` replays another round (a manifest JSON or `manifest-data.ts`;
+the default is the site's `shared/vote/manifest-data.ts`), `--at <unix seconds>`
+replays it as of that time, and `--json` prints the round as `/api/vote/round`
+serves it. A read the node can't serve (a pruned node, no past state) or a
+transcript mismatch exits 1 with the error.
+
 ## Run the checks
 
 From this folder with Node.js/npm, Python 3, Bun and Foundry installed:

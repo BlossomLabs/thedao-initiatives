@@ -15,7 +15,9 @@ import {
   planGroups,
   planInitiatives,
   realSchedule,
+  regroupPlan,
   roleChecks,
+  testCurrencies,
   tierMax,
   USD_CURRENCY,
   voteSchedule,
@@ -58,17 +60,19 @@ Deno.test("planInitiatives: a Safe used twice gets a placeholder the second time
   assertNotEquals(plan[1].account.toLowerCase(), SAFE.toLowerCase());
 });
 
-Deno.test("voteSchedule: S a day after opening, quiet windows 2 h down to 15 min", () => {
+Deno.test("voteSchedule: S 30 min after opening, the three tiers 30 min at most", () => {
   const s = voteSchedule(1793800000);
   const open = 1793800000 + 30 * 60;
-  const S = open + 24 * 3600;
-  const tier = 7200 + 3600 + 1800 + 900;
+  const S = open + 30 * 60;
+  const tier = 320 + 160 + 80 + 40; // 5 min 20 s down to 40 s
+  assertEquals(tier, 10 * 60);
   assertEquals(s, {
     opensAt: open,
-    initialWindow: 7200,
+    initialWindow: 320,
     firstTallyAt: [S, S + tier, S + 2 * tier],
     maxWindows: 4,
   });
+  assertEquals(s.firstTallyAt[2] + tierMax(s) - S, 30 * 60);
 });
 
 const SAFE2 = "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063";
@@ -274,6 +278,50 @@ Deno.test("addPlan: new groups and projects for the admin, appended without reor
   assertThrows(() => addPlan(base, [{ slug: "a", goalUsd: 1, safeAddress: "" }]), Error, "already");
 });
 
+Deno.test("regroupPlan: new groups, then only the projects whose groups changed", () => {
+  const base = manifestFor({
+    kind: "test",
+    contract: SAFE as `0x${string}`,
+    deployBlock: 5,
+    schedule: voteSchedule(1_000),
+    poolUsd: 7n,
+    issuer: SAFE as `0x${string}`,
+    slugs: ["a", "b", "c", "gone", "r"],
+    projects: [
+      { goalUsd: "1", rfp: false, groups: [0] },
+      { goalUsd: "1", rfp: false, groups: [] },
+      { goalUsd: "1", rfp: false, groups: [0] },
+      { goalUsd: "1", rfp: false, groups: [0] },
+      { goalUsd: "1", rfp: true, groups: [] },
+    ],
+    groups: ["Seal"],
+    independentTiers: 1,
+  });
+  const card = (slug: string, affiliations: string[], type?: "rfp") => ({
+    slug,
+    goalUsd: 1,
+    safeAddress: "",
+    affiliations,
+    ...(type ? { type } : {}),
+  });
+  const { calls, manifest, changed } = regroupPlan(base, [
+    card("a", ["seal"]), // unchanged (case ignored)
+    card("b", ["Keys", "Seal"]), // joins two
+    card("c", []), // leaves Seal
+    card("r", [], "rfp"),
+    card("new", ["Other"]), // not in the round: ignored
+  ]);
+  assertEquals(changed, ["b", "c"]);
+  assertEquals(calls.map((c) => c.fn), ["addGroup", "setInitiativeGroups", "setInitiativeGroups"]);
+  assertEquals(calls[1].args, [1n, 0b11n]);
+  assertEquals(calls[2].args, [2n, 0n]);
+  assertEquals(manifest.groups, ["Seal", "Keys"]);
+  assertEquals(manifest.projects.map((p) => p.groups), [[0], [1, 0], [], [0], []]);
+  // Nothing to do: no calls.
+  assertEquals(regroupPlan(manifest, [card("b", ["Keys", "Seal"])]).calls, []);
+  assertThrows(() => regroupPlan(base, [card("r", ["Seal"])]), Error, "RFP");
+});
+
 // ------------------------------------------------------- currencies and pledges
 const ROLE = keccak256(toBytes("PLEDGE_ROLE"));
 const ADMIN_A = "0x1000000000000000000000000000000000000001";
@@ -296,10 +344,11 @@ const pledgeCards = [
     pledges: [{ id: "p4", amountUsd: 12.5, status: "pledged" as const }],
   },
 ];
+const TEST_USD = "0x3000000000000000000000000000000000000003";
 const setup = (real: boolean) =>
   planDonationSetup({
     real,
-    currencies: MAINNET_CURRENCIES,
+    currencies: real ? MAINNET_CURRENCIES : testCurrencies(TEST_USD),
     admins: [ADMIN_A, ADMIN_B, ADMIN_A.toLowerCase()],
     pledgeRole: ROLE,
     cards: pledgeCards,
@@ -327,8 +376,16 @@ Deno.test("seeds the board's open pledges and skips received and withdrawn ones"
   ]);
 });
 
-Deno.test("a test round registers nothing", () => {
-  assertEquals(setup(false), []);
+Deno.test("a test round registers its test dollar and the same pledges, no pledge signers", () => {
+  const calls = setup(false);
+  assertEquals(calls.map((c) => c.fn), ["registerCurrency", "setPledge", "setPledge"]);
+  // Valued at $1: no feed.
+  assertEquals(calls[0].args, [TEST_USD, "0x0000000000000000000000000000000000000000"]);
+  assertEquals(
+    calls.slice(1).map((c) => c.args),
+    setup(true).filter((c) => c.fn === "setPledge").map((c) => c.args),
+  );
+  assertEquals(testCurrencies(TEST_USD)[0].symbol, "tUSD");
 });
 
 Deno.test("manifestFor records currencies and accounts when given", () => {

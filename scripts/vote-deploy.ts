@@ -3,7 +3,11 @@
 //
 // A test vote, on Sepolia, with paper codes and the board's initiatives:
 //   VOTE_RELAYER_KEY=0x… SEPOLIA_RPC_URL=https://… \
-//     deno task vote-deploy --issuer 0x… [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
+//     deno task vote-deploy --issuer 0x… [--test-usd 0x…] [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
+// It opens 30 min after the deploy; S-Tier's first tally is 30 min later, and the three
+// tiers then take 30 min at most (10 min each). Donations are in a test dollar (TestUSD,
+// anyone can mint it; deployed here unless --test-usd names one), and the board's open
+// pledges are copied in, as the real vote does.
 //
 // TheDAO's vote, on mainnet, counting the private voting badges; every flag is required
 // and every initiative in the slugs file needs its own Safe:
@@ -24,6 +28,12 @@
 //   deno task vote-deploy --add slug-a,slug-b [--rpc …] > add.json   (Safe Transaction Builder batch)
 //   … the admin executes it …
 //   deno task vote-deploy --added slug-a,slug-b [--rpc …]            (checks on-chain, appends to the manifest)
+//
+// Bringing the round's affiliations up to the board's (same windows as adding; add new
+// projects first, with --add):
+//   deno task vote-deploy --affiliations [--rpc …] > groups.json     (the admin's batch)
+//   … the admin executes it …
+//   deno task vote-deploy --affiliated [--rpc …]                     (checks on-chain, rewrites the manifest)
 import { parseArgs } from "jsr:@std/cli@1.0.24/parse-args";
 import {
   type Abi,
@@ -32,6 +42,7 @@ import {
   encodeFunctionData,
   getAddress,
   type Hex,
+  hexToString,
   http,
   isAddress,
   keccak256,
@@ -50,11 +61,11 @@ import mainnetConfig from "../vote/config/mainnet.json" with { type: "json" };
 export const ADMIN = "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF"; // sem-the-bee.eth
 export const POOL_USD = 913_244_000_000n; // 400 ETH × $2,283.11, six decimals
 const SETUP_MINUTES = 30;
-// A test vote: S's first tally a day after opening, then windows of 2 h, 1 h,
-// 30 min and 15 min at most; A and B each start when the tier above can no longer
-// still be running.
-const VOTING_HOURS = 24;
-export const TEST_WINDOWS = { initialWindow: 2 * 60 * 60, maxWindows: 4 };
+// A test vote: S's first tally 30 min after opening, then windows of 5 min 20 s,
+// 2 min 40 s, 1 min 20 s and 40 s at most (10 min); A and B each start when the tier
+// above can no longer still be running, so the three tiers take 30 min at most.
+const VOTING_MINUTES = 30;
+export const TEST_WINDOWS = { initialWindow: 320, maxWindows: 4 };
 // The real vote: 24 h, 12 h, 6 h, 3 h, 1 h 30 min, 45 min, 22 min 30 s, 11 min 15 s and
 // 5 min 37 s: 9 windows, 47 h 54 min 22 s at most.
 export const REAL_WINDOWS = { initialWindow: 24 * 60 * 60, maxWindows: 9 };
@@ -79,6 +90,10 @@ const ZERO = "0x0000000000000000000000000000000000000000" as const;
 export const USD_CURRENCY: Currency = { symbol: "USD", asset: ZERO, usdFeed: ZERO };
 /** The real vote's donation currencies, from vote/config/mainnet.json, in id order after 0. */
 export const MAINNET_CURRENCIES = mainnetConfig.currencies as Currency[];
+/** A test round's one donation currency: its TestUSD token, valued at $1 (no feed). */
+export const testCurrencies = (testUsd: `0x${string}`): Currency[] => [
+  { symbol: "tUSD", asset: getAddress(testUsd), usdFeed: ZERO },
+];
 export type PlannedInitiative = {
   slug: string;
   account: `0x${string}`;
@@ -228,10 +243,11 @@ export function currencyMismatch(
   return null;
 }
 
-/** The real vote's calls between the setup and the hand-over (a test round has none):
- * its currencies in file order (they freeze at opening), PLEDGE_ROLE for each site admin
- * so they can sign pledges, then each open board pledge as a currency-0 (virtual USD)
- * pledge on its project. `cards` are in the same order as `plan`. */
+/** The calls between the setup and the hand-over: the currencies in order (they freeze
+ * at opening), PLEDGE_ROLE for each site admin so they can sign pledges (the real vote
+ * only: a test round's pledges stay the site's after the deploy), then each open board
+ * pledge as a currency-0 (virtual USD) pledge on its project. `cards` are in the same
+ * order as `plan`. */
 export function planDonationSetup(o: {
   real: boolean;
   currencies: Currency[];
@@ -240,8 +256,9 @@ export function planDonationSetup(o: {
   cards: BoardCard[];
   plan: PlannedInitiative[];
 }): { fn: "registerCurrency" | "grantRole" | "setPledge"; args: readonly unknown[] }[] {
-  if (!o.real) return [];
-  const admins = [...new Map(o.admins.map((a) => [a.toLowerCase(), getAddress(a)])).values()];
+  const admins = o.real
+    ? [...new Map(o.admins.map((a) => [a.toLowerCase(), getAddress(a)])).values()]
+    : [];
   return [
     ...o.currencies.map((c) => ({
       fn: "registerCurrency" as const,
@@ -259,7 +276,7 @@ export function planDonationSetup(o: {
 
 export function voteSchedule(now: number) {
   const opensAt = now + SETUP_MINUTES * 60;
-  const s = opensAt + VOTING_HOURS * 60 * 60;
+  const s = opensAt + VOTING_MINUTES * 60;
   const span = tierMax(TEST_WINDOWS);
   return {
     opensAt,
@@ -402,6 +419,95 @@ export function addPlan(
   };
 }
 
+/** Bringing a deployed round's affiliations up to the board's: the admin's calls (new
+ * groups, then each project whose groups changed) and the manifest with them. Group
+ * names never move or go away (an emptied one stays, unused); a project the board no
+ * longer lists keeps its groups. `cards` may hold any board initiatives: those not in
+ * the round are ignored (add them first). */
+export function regroupPlan(
+  m: VoteManifest,
+  cards: BoardCard[],
+): {
+  calls: { fn: "addGroup" | "setInitiativeGroups"; args: readonly unknown[] }[];
+  manifest: VoteManifest;
+  changed: string[];
+} {
+  const bySlug = new Map(cards.map((c) => [c.slug, c]));
+  const inRound = m.slugs.flatMap((slug) => bySlug.get(slug) ?? []);
+  for (const c of inRound) {
+    const i = m.slugs.indexOf(c.slug);
+    if (m.projects[i].rfp && c.affiliations?.length) {
+      throw new Error(`${c.slug}: an RFP can't have affiliations`);
+    }
+  }
+  const groups = planGroups(inRound, m.groups);
+  const projects = m.projects.map((p, i) =>
+    bySlug.has(m.slugs[i]) ? { ...p, groups: groups.groupsOf(m.slugs[i]) } : p
+  );
+  const changed = m.slugs.filter((_, i) =>
+    groupMask(projects[i].groups) !== groupMask(m.projects[i].groups)
+  );
+  return {
+    calls: [
+      ...groups.names.slice(m.groups.length).map((n) => ({
+        fn: "addGroup" as const,
+        args: [stringToHex(n, { size: 32 })] as const,
+      })),
+      ...changed.map((slug) => {
+        const i = m.slugs.indexOf(slug);
+        return {
+          fn: "setInitiativeGroups" as const,
+          args: [BigInt(i), groupMask(projects[i].groups)] as const,
+        };
+      }),
+    ],
+    manifest: { ...m, groups: groups.names, projects },
+    changed,
+  };
+}
+
+/** The admin's calls as a Safe Transaction Builder batch. */
+const adminBatch = (
+  m: VoteManifest,
+  name: string,
+  calls: { fn: string; args: readonly unknown[] }[],
+) => ({
+  version: "1.0",
+  chainId: String(m.chainId),
+  meta: { name },
+  transactions: calls.map((c) => ({
+    to: m.contract,
+    value: "0",
+    data: encodeFunctionData({
+      abi: SIGNED_BALLOTS_ABI,
+      functionName: c.fn as never,
+      args: c.args as never,
+    }),
+  })),
+});
+
+const writeManifest = async (m: VoteManifest, out?: string) => {
+  const path = out ?? new URL("../shared/vote/manifest-data.ts", import.meta.url).pathname;
+  await Deno.writeTextFile(
+    path,
+    `// Written by scripts/vote-deploy.ts. Do not edit by hand.\nexport default ${
+      JSON.stringify(m, null, 2)
+    };\n`,
+  );
+  return path;
+};
+
+/** Refuses when the contract won't take projects or group changes now. */
+function requireAddingOpen(m: VoteManifest, now: number) {
+  if (addingOpen(m.schedule, now)) return;
+  const next = nextAddingOpen(m.schedule, now);
+  throw new Error(
+    next === null
+      ? "Adding is closed until the round ends: a tier is settling, and the next starts as it may still end."
+      : `Adding is closed until ${new Date(next * 1000).toISOString()}`,
+  );
+}
+
 /** The board's initiatives with their affiliations (the board itself doesn't carry them). */
 async function boardCards(board = "https://initiatives.thedao.fund"): Promise<BoardCard[]> {
   const base = board.replace(/\/+$/, "");
@@ -440,30 +546,10 @@ async function addMain(
   });
   const { calls, manifest } = addPlan(m, cards);
   if (args.add) {
-    const now = Number((await pub.getBlock()).timestamp);
-    if (!addingOpen(m.schedule, now)) {
-      const next = nextAddingOpen(m.schedule, now);
-      throw new Error(
-        next === null
-          ? "Adding is closed: the round is over."
-          : `Adding is closed until ${new Date(next * 1000).toISOString()}`,
-      );
-    }
-    const batch = {
-      version: "1.0",
-      chainId: String(chain.id),
-      meta: { name: `Add ${slugs.join(", ")} to the vote` },
-      transactions: calls.map((c) => ({
-        to: m.contract,
-        value: "0",
-        data: encodeFunctionData({
-          abi: SIGNED_BALLOTS_ABI,
-          functionName: c.fn,
-          args: c.args as never,
-        }),
-      })),
-    };
-    console.log(JSON.stringify(batch, null, 2));
+    requireAddingOpen(m, Number((await pub.getBlock()).timestamp));
+    console.log(
+      JSON.stringify(adminBatch(m, `Add ${slugs.join(", ")} to the vote`, calls), null, 2),
+    );
     return;
   }
   const read = (functionName: string, a: readonly unknown[] = []) =>
@@ -500,19 +586,75 @@ async function addMain(
       x.rfp !== p.rfp || x.groups !== groupMask(p.groups)
     ) throw new Error(`initiative ${m.slugs.length + k} on-chain doesn't match ${p.slug}`);
   }
-  const out = args.out ?? new URL("../shared/vote/manifest-data.ts", import.meta.url).pathname;
-  await Deno.writeTextFile(
-    out,
-    `// Written by scripts/vote-deploy.ts. Do not edit by hand.\nexport default ${
-      JSON.stringify(manifest, null, 2)
-    };\n`,
-  );
+  const out = await writeManifest(manifest, args.out);
   console.log(`Appended ${slugs.join(", ")}; manifest written to ${out}`);
+}
+
+/** --affiliations: the admin's calls that bring the round's affiliations up to the
+ * board's, if adding is open now. --affiliated: after the admin ran them, checks every
+ * group and project on-chain and rewrites the manifest. */
+async function regroupMain(
+  args: { affiliations?: boolean; board?: string; rpc?: string; out?: string },
+) {
+  const m = (await import("../shared/vote/manifest-data.ts")).default as unknown as VoteManifest;
+  const chain = m.chainId === mainnet.id ? mainnet : sepolia;
+  const rpc = args.rpc ??
+    Deno.env.get(chain.id === mainnet.id ? "MAINNET_RPC_URL" : "SEPOLIA_RPC_URL");
+  if (!rpc) throw new Error("--rpc or the chain's RPC env var is required");
+  const pub = createPublicClient({
+    chain,
+    transport: http(rpc, { timeout: 60_000, retryCount: 6 }),
+  });
+  const read = (functionName: string, a: readonly unknown[] = []) =>
+    pub.readContract({
+      address: m.contract,
+      abi: SIGNED_BALLOTS_ABI,
+      functionName: functionName as never,
+      args: a as never,
+    });
+  if (args.affiliations) {
+    const { calls, changed } = regroupPlan(m, await boardCards(args.board));
+    if (!calls.length) {
+      console.error("The round's affiliations already match the board's.");
+      return;
+    }
+    requireAddingOpen(m, Number((await pub.getBlock()).timestamp));
+    console.error(`${changed.length} projects change groups: ${changed.join(", ")}`);
+    console.log(JSON.stringify(adminBatch(m, "Update the vote's affiliations", calls), null, 2));
+    return;
+  }
+  // What the chain has now, whatever the board says meanwhile.
+  const groupCount = Number(await read("groupCount"));
+  const names: string[] = [];
+  for (let i = 0; i < groupCount; i++) {
+    const raw = await read("groupName", [BigInt(i)]) as Hex;
+    names.push(hexToString(raw, { size: 32 }));
+  }
+  for (const [i, name] of m.groups.entries()) {
+    if (names[i] !== name) throw new Error(`group ${i} on-chain is "${names[i]}", not "${name}"`);
+  }
+  const projects: VoteManifest["projects"] = [];
+  for (const [i, p] of m.projects.entries()) {
+    const x = await read("initiative", [BigInt(i)]) as { groups: bigint };
+    const groups = Array.from({ length: groupCount }, (_, g) => g).filter((g) =>
+      (x.groups >> BigInt(g)) & 1n
+    );
+    projects.push({ ...p, groups });
+  }
+  const changed = m.slugs.filter((_, i) =>
+    groupMask(projects[i].groups) !== groupMask(m.projects[i].groups)
+  );
+  const out = await writeManifest({ ...m, groups: names, projects }, args.out);
+  console.log(
+    `${names.length - m.groups.length} new groups, ${changed.length} projects regrouped${
+      changed.length ? ` (${changed.join(", ")})` : ""
+    }; manifest written to ${out}`,
+  );
 }
 
 async function main() {
   const args = parseArgs(Deno.args, {
-    boolean: ["real"],
+    boolean: ["real", "affiliations", "affiliated"],
     string: [
       "issuer",
       "board",
@@ -528,9 +670,11 @@ async function main() {
       "add",
       "added",
       "admins",
+      "test-usd",
     ],
   });
   if (args.add || args.added) return await addMain(args);
+  if (args.affiliations || args.affiliated) return await regroupMain(args);
   const independentTiers = Number(args["independent-tiers"] ?? 1);
   if (independentTiers !== 1 && independentTiers !== 3) {
     throw new Error("--independent-tiers is 1 (S-Tier) or 3 (S-Tier and A-Tier)");
@@ -545,6 +689,9 @@ async function main() {
   const issuer = args.issuer;
   if (!real && (!issuer || !isAddress(issuer))) {
     throw new Error("--issuer <address> is required");
+  }
+  if (args["test-usd"] && (real || !isAddress(args["test-usd"]))) {
+    throw new Error("--test-usd takes a TestUSD address, and only for a test vote");
   }
   const rpcEnv = real ? "MAINNET_RPC_URL" : "SEPOLIA_RPC_URL";
   const rpc = args.rpc ?? Deno.env.get(rpcEnv);
@@ -571,14 +718,13 @@ async function main() {
   }
   const groups = planGroups(cards);
   const plan = planInitiatives(cards, { real: Boolean(real), groups });
-  if (real) {
-    // The open pledges (the board lists only totals; each page has its records).
-    const base = (args.board ?? "https://initiatives.thedao.fund").replace(/\/+$/, "");
-    for (const c of cards) {
-      const r = await fetch(`${base}/api/initiatives/${encodeURIComponent(c.slug)}`);
-      if (!r.ok) throw new Error(`${c.slug}: pledges unreadable (${r.status})`);
-      c.pledges = ((await r.json()) as { pledges: NonNullable<BoardCard["pledges"]> }).pledges;
-    }
+  // The open pledges (the board lists only totals; each page has its records). A test
+  // round copies them too, so its asks are the board's.
+  const base = (args.board ?? "https://initiatives.thedao.fund").replace(/\/+$/, "");
+  for (const c of cards) {
+    const r = await fetch(`${base}/api/initiatives/${encodeURIComponent(c.slug)}`);
+    if (!r.ok) throw new Error(`${c.slug}: pledges unreadable (${r.status})`);
+    c.pledges = ((await r.json()) as { pledges: NonNullable<BoardCard["pledges"]> }).pledges;
   }
   // The site's admins sign pledges: --admins, else ADMIN_ADDRESSES, else the site's default list.
   const admins = (args.admins ?? Deno.env.get("ADMIN_ADDRESSES") ?? "").split(",").map((x) =>
@@ -587,7 +733,10 @@ async function main() {
   if (!admins.length) admins.push(...DEFAULT_ADMIN_ADDRESSES);
   for (const a of admins) if (!isAddress(a)) throw new Error(`admin is not an address: ${a}`);
   const poolUsd = real ? real.poolUsd : POOL_USD;
-  console.log(`${plan.length} initiatives, ${groups.names.length} affiliations`);
+  const openPledges = cards.flatMap((c) => c.pledges ?? []).filter((p) => p.status === "pledged");
+  console.log(
+    `${plan.length} initiatives, ${groups.names.length} affiliations, ${openPledges.length} open pledges`,
+  );
 
   const artifact = JSON.parse(
     await Deno.readTextFile(
@@ -596,8 +745,7 @@ async function main() {
   ) as { bytecode: { object: Hex }; deployedBytecode: { object: Hex } };
   checkCodeSize("SignedBallots", artifact.deployedBytecode.object);
   const block = await pub.getBlock();
-  const s = real ? realSchedule(real.opensAt, real.tallies) : voteSchedule(Number(block.timestamp));
-  if (real && Number(block.timestamp) + SETUP_MINUTES * 60 > s.opensAt) {
+  if (real && Number(block.timestamp) + SETUP_MINUTES * 60 > real.opensAt) {
     throw new Error(`--opens must leave ${SETUP_MINUTES} minutes for the setup`);
   }
   const wait = async (hash: Hex, what: string) => {
@@ -605,6 +753,25 @@ async function main() {
     if (r.status !== "success") throw new Error(`${what} reverted: ${hash}`);
     return r;
   };
+
+  // A test round's donations: its own dollar, deployed before the round so it doesn't
+  // eat into the setup's 30 minutes (or one deployed earlier, reused).
+  let testUsd = args["test-usd"] ? getAddress(args["test-usd"]) : null;
+  if (!real && !testUsd) {
+    const t = JSON.parse(
+      await Deno.readTextFile(new URL("../vote/out/TestUSD.sol/TestUSD.json", import.meta.url)),
+    ) as { abi: Abi; bytecode: { object: Hex } };
+    testUsd = (await wait(
+      await wallet.deployContract({ abi: t.abi, bytecode: t.bytecode.object }),
+      "TestUSD deploy",
+    )).contractAddress!;
+    console.log(`TestUSD ${testUsd}`);
+  }
+  const currencies = real ? MAINNET_CURRENCIES : testCurrencies(testUsd!);
+  // Opening is 30 minutes after the round's deploy, not after the script started.
+  const s = real ? realSchedule(real.opensAt, real.tallies) : voteSchedule(
+    Number((await pub.getBlock()).timestamp),
+  );
 
   const deployHash = await wallet.deployContract({
     abi: SIGNED_BALLOTS_ABI,
@@ -652,7 +819,7 @@ async function main() {
   });
   const donation = planDonationSetup({
     real: Boolean(real),
-    currencies: MAINNET_CURRENCIES,
+    currencies,
     admins,
     pledgeRole: handed[2],
     cards,
@@ -770,13 +937,13 @@ async function main() {
   });
   if (pool !== poolUsd) throw new Error(`poolUsd ${pool} != ${poolUsd}`);
 
-  if (real) {
+  {
     const n = await pub.readContract({
       address: contract,
       abi: SIGNED_BALLOTS_ABI,
       functionName: "currencyCount",
     });
-    if (n !== BigInt(MAINNET_CURRENCIES.length + 1)) throw new Error(`currencyCount ${n}`);
+    if (n !== BigInt(currencies.length + 1)) throw new Error(`currencyCount ${n}`);
     // Each one as registered: the asset and feed the manifest (and the replay) will name.
     const got = await Promise.all(
       Array.from({ length: Number(n) }, (_, i) =>
@@ -787,7 +954,7 @@ async function main() {
           args: [BigInt(i)],
         })),
     );
-    const wrong = currencyMismatch([USD_CURRENCY, ...MAINNET_CURRENCIES], got);
+    const wrong = currencyMismatch([USD_CURRENCY, ...currencies], got);
     if (wrong) throw new Error(`currencies: ${wrong}`);
   }
   const now = Number((await pub.getBlock()).timestamp);
@@ -811,15 +978,9 @@ async function main() {
     groups: groups.names,
     independentTiers,
     accounts: plan.map((p) => p.account),
-    ...(real ? { currencies: [USD_CURRENCY, ...MAINNET_CURRENCIES] } : {}),
+    currencies: [USD_CURRENCY, ...currencies],
   });
-  const out = args.out ?? new URL("../shared/vote/manifest-data.ts", import.meta.url).pathname;
-  await Deno.writeTextFile(
-    out,
-    `// Written by scripts/vote-deploy.ts. Do not edit by hand.\nexport default ${
-      JSON.stringify(manifest, null, 2)
-    };\n`,
-  );
+  const out = await writeManifest(manifest, args.out);
   console.log(`Manifest written to ${out}`);
 }
 

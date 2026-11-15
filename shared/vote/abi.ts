@@ -146,6 +146,19 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "PLEDGE_TYPEHASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "USD",
     "inputs": [],
     "outputs": [
@@ -940,6 +953,25 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "pledgeNonceOf",
+    "inputs": [
+      {
+        "name": "signer",
+        "type": "address",
+        "internalType": "address",
+      },
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "pledgedAmount",
     "inputs": [
       {
@@ -1424,6 +1456,54 @@ export const SIGNED_BALLOTS_ABI = [
         "name": "amount",
         "type": "uint256",
         "internalType": "uint256",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable",
+  },
+  {
+    "type": "function",
+    "name": "setPledgeBySig",
+    "inputs": [
+      {
+        "name": "pledgeId",
+        "type": "bytes32",
+        "internalType": "bytes32",
+      },
+      {
+        "name": "initiativeId",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+      {
+        "name": "currencyId",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+      {
+        "name": "signer",
+        "type": "address",
+        "internalType": "address",
+      },
+      {
+        "name": "nonce",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+      {
+        "name": "deadline",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+      {
+        "name": "signature",
+        "type": "bytes",
+        "internalType": "bytes",
       },
     ],
     "outputs": [],
@@ -2303,6 +2383,22 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "error",
+    "name": "InvalidPledgeNonce",
+    "inputs": [
+      {
+        "name": "signer",
+        "type": "address",
+        "internalType": "address",
+      },
+      {
+        "name": "nonce",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+  },
+  {
+    "type": "error",
     "name": "InvalidPrice",
     "inputs": [
       {
@@ -2363,6 +2459,11 @@ export const SIGNED_BALLOTS_ABI = [
         "internalType": "uint256",
       },
     ],
+  },
+  {
+    "type": "error",
+    "name": "PledgeExpired",
+    "inputs": [],
   },
   {
     "type": "error",

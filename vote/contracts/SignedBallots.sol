@@ -19,6 +19,9 @@ import {RoundAccounting} from "./RoundAccounting.sol";
 contract SignedBallots is ERC721, EIP712, RoundAccounting {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant VOTE_TYPEHASH = keccak256("Vote(uint256 tokenId,address voter,uint64 nonce,bytes ballot)");
+    bytes32 public constant PLEDGE_TYPEHASH = keccak256(
+        "Pledge(bytes32 pledgeId,uint256 initiativeId,uint256 currencyId,uint256 amount,uint256 nonce,uint256 deadline)"
+    );
 
     error InvalidSchedule();
     error ConfigurationFrozen();
@@ -37,6 +40,8 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     error InvalidBallot();
     error InvalidNonce(uint256 tokenId, uint64 nonce);
     error InvalidSignature();
+    error PledgeExpired();
+    error InvalidPledgeNonce(address signer, uint256 nonce);
     error AddingClosed();
     error InvalidTiers();
     error TooManyTiers();
@@ -84,6 +89,8 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
 
     mapping(uint256 tokenId => uint64 nonce) public nonceOf;
     mapping(uint256 tokenId => bytes32 ballotHash) public ballotHashOf;
+    /// @notice The next nonce each pledge signer must use.
+    mapping(address signer => uint256) public pledgeNonceOf;
     /// @notice A candidate roll from timely receipts. Acceptance still needs replay
     ///         (settlement, burns); this is not an assertion of an accepted ballot.
     mapping(uint256 tokenId => bool) public hasRegistrationReceipt;
@@ -278,6 +285,29 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         }
         _append(tokenId, voter, nonce, keccak256(ballot));
         emit BallotRecorded(tokenId, voter, nonce, ballot);
+    }
+
+    /// @notice A pledge signed by a PLEDGE_ROLE holder (an EOA or an ERC-1271 wallet), submitted by
+    ///         anyone, so a relayer without the role can carry it. Nonces are consecutive per signer.
+    function setPledgeBySig(
+        bytes32 pledgeId,
+        uint256 initiativeId,
+        uint256 currencyId,
+        uint256 amount,
+        address signer,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external {
+        if (block.timestamp > deadline) revert PledgeExpired();
+        if (nonce != pledgeNonceOf[signer]) revert InvalidPledgeNonce(signer, nonce);
+        bytes32 digest = _hashTypedDataV4(
+            keccak256(abi.encode(PLEDGE_TYPEHASH, pledgeId, initiativeId, currencyId, amount, nonce, deadline))
+        );
+        if (!SignatureChecker.isValidSignatureNow(signer, digest, signature)) revert InvalidSignature();
+        _checkRole(PLEDGE_ROLE, signer);
+        ++pledgeNonceOf[signer];
+        _setPledge(pledgeId, initiativeId, currencyId, amount);
     }
 
     /// @notice Digest binds the NFT ID, its current owner, nonce and ballot to

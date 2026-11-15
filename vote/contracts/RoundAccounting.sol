@@ -228,6 +228,10 @@ abstract contract RoundAccounting is AccessControl {
         external
         onlyRole(PLEDGE_ROLE)
     {
+        _setPledge(pledgeId, initiativeId, currencyId, amount);
+    }
+
+    function _setPledge(bytes32 pledgeId, uint256 initiativeId, uint256 currencyId, uint256 amount) internal {
         _requireAccountingOpen();
         if (pledgeId == bytes32(0)) revert InvalidPledgeId();
         _requireInitiative(initiativeId);

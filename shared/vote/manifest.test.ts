@@ -43,6 +43,33 @@ describe("round manifest", () => {
     expect(() => checkManifest({ ...base, projects: [{ goalUsd: "5", rfp: false, groups: [1] }] }))
       .toThrow(/group/);
   });
+  it("a real round needs its currencies and accounts", () => {
+    const Z = "0x0000000000000000000000000000000000000000";
+    const real: VoteManifest = {
+      ...base,
+      kind: "real",
+      chainId: 1,
+      issuer: undefined,
+      badge: B,
+      currencies: [{ symbol: "USD", asset: Z, usdFeed: Z }, {
+        symbol: "ETH",
+        asset: Z,
+        usdFeed: B,
+      }],
+      accounts: [C],
+    };
+    expect(() => checkManifest(real)).not.toThrow();
+    expect(() => checkManifest({ ...real, currencies: undefined })).toThrow(/currencies/);
+    expect(() => checkManifest({ ...real, currencies: real.currencies!.slice(0, 1) })).toThrow(
+      /currencies/,
+    );
+    expect(() => checkManifest({ ...real, accounts: undefined })).toThrow(/accounts/);
+    expect(() => checkManifest({ ...real, accounts: [C, B] })).toThrow(/accounts/);
+  });
+  it("a round without currencies counts pledges only", () => {
+    expect(base.currencies).toBeUndefined();
+    expect(() => checkManifest(base)).not.toThrow();
+  });
   it("rulesRound maps the manifest", () => {
     expect(rulesRound(base, [5n])).toEqual({
       projects: [{ goalUsd: 5n, rfp: false, groups: [0] }],

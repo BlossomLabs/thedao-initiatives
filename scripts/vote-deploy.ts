@@ -41,9 +41,11 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { mainnet, sepolia } from "viem/chains";
-import { REVIEW_BADGE_CONTRACT } from "../api/config.ts";
+import { DEFAULT_ADMIN_ADDRESSES, REVIEW_BADGE_CONTRACT } from "../api/config.ts";
 import { SIGNED_BALLOTS_ABI } from "../shared/vote/abi.ts";
 import type { VoteManifest } from "../shared/vote/manifest.ts";
+import { pledgeChainId } from "../shared/vote/typed-data.ts";
+import mainnetConfig from "../vote/config/mainnet.json" with { type: "json" };
 
 export const ADMIN = "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF"; // sem-the-bee.eth
 export const POOL_USD = 913_244_000_000n; // 400 ETH × $2,283.11, six decimals
@@ -68,7 +70,15 @@ export type BoardCard = {
   type?: "rfp" | "grant";
   /** From /api/initiatives/affiliations (the board doesn't carry them). */
   affiliations?: string[];
+  /** From /api/initiatives/:slug (the board doesn't carry them): the pledge records. */
+  pledges?: { id: string; amountUsd: number; status: "pledged" | "received" | "withdrawn" }[];
 };
+export type Currency = { symbol: string; asset: `0x${string}`; usdFeed: `0x${string}` };
+const ZERO = "0x0000000000000000000000000000000000000000" as const;
+/** The contract's currency 0: the virtual USD unit its constructor registers. */
+export const USD_CURRENCY: Currency = { symbol: "USD", asset: ZERO, usdFeed: ZERO };
+/** The real vote's donation currencies, from vote/config/mainnet.json, in id order after 0. */
+export const MAINNET_CURRENCIES = mainnetConfig.currencies as Currency[];
 export type PlannedInitiative = {
   slug: string;
   account: `0x${string}`;
@@ -165,6 +175,88 @@ export function planInitiatives(
   });
 }
 
+/** EIP-170: the most deployed code a contract may have. */
+export const CODE_SIZE_LIMIT = 24_576;
+
+/** Refuses a contract whose deployed code is over EIP-170's limit before it is sent: its
+ * deploy would only revert. vote/test/Size.t.sol checks the same, but forge isn't in CI. */
+export function checkCodeSize(name: string, deployedBytecode: Hex): void {
+  const size = (deployedBytecode.length - 2) / 2;
+  if (size > CODE_SIZE_LIMIT) {
+    throw new Error(
+      `${name} deploys ${size} bytes of code, over the ${CODE_SIZE_LIMIT}-byte limit: rebuild it (forge build) via IR`,
+    );
+  }
+}
+
+/** The roles the round must end the setup with: [role, account, held]. The site's admin
+ * holds the three handed-over roles and the relayer none of them; with the real vote each
+ * site admin can sign pledges, and a test vote's relayer mints its paper-code badges. */
+export function roleChecks(o: {
+  real: boolean;
+  /** DEFAULT_ADMIN_ROLE, ADMIN_ROLE, PLEDGE_ROLE. */
+  handed: Hex[];
+  minter: Hex;
+  admin: Hex;
+  relayer: Hex;
+  admins: string[];
+}): [Hex, Hex, boolean][] {
+  return [
+    ...o.handed.map((r): [Hex, Hex, boolean] => [r, o.admin, true]),
+    ...o.handed.map((r): [Hex, Hex, boolean] => [r, o.relayer, false]),
+    ...(o.real ? o.admins.map((a): [Hex, Hex, boolean] => [o.handed[2], a as Hex, true]) : []),
+    ...(o.real ? [] : [[o.minter, o.relayer, true] as [Hex, Hex, boolean]]),
+  ];
+}
+
+/** What differs between the currencies the round registered (`currency(i)`, read back)
+ * and the ones it should have, in order; null when they match. */
+export function currencyMismatch(
+  want: Currency[],
+  got: { asset: string; usdFeed: string }[],
+): string | null {
+  if (got.length !== want.length) return `${got.length} currencies, expected ${want.length}`;
+  for (const [i, w] of want.entries()) {
+    const g = got[i];
+    if (g.asset.toLowerCase() !== w.asset.toLowerCase()) {
+      return `currency ${i} (${w.symbol}) has asset ${g.asset}, expected ${w.asset}`;
+    }
+    if (g.usdFeed.toLowerCase() !== w.usdFeed.toLowerCase()) {
+      return `currency ${i} (${w.symbol}) has feed ${g.usdFeed}, expected ${w.usdFeed}`;
+    }
+  }
+  return null;
+}
+
+/** The real vote's calls between the setup and the hand-over (a test round has none):
+ * its currencies in file order (they freeze at opening), PLEDGE_ROLE for each site admin
+ * so they can sign pledges, then each open board pledge as a currency-0 (virtual USD)
+ * pledge on its project. `cards` are in the same order as `plan`. */
+export function planDonationSetup(o: {
+  real: boolean;
+  currencies: Currency[];
+  admins: string[];
+  pledgeRole: Hex;
+  cards: BoardCard[];
+  plan: PlannedInitiative[];
+}): { fn: "registerCurrency" | "grantRole" | "setPledge"; args: readonly unknown[] }[] {
+  if (!o.real) return [];
+  const admins = [...new Map(o.admins.map((a) => [a.toLowerCase(), getAddress(a)])).values()];
+  return [
+    ...o.currencies.map((c) => ({
+      fn: "registerCurrency" as const,
+      args: [c.asset, c.usdFeed] as const,
+    })),
+    ...admins.map((a) => ({ fn: "grantRole" as const, args: [o.pledgeRole, a] as const })),
+    ...o.cards.flatMap((c, i) =>
+      (c.pledges ?? []).filter((p) => p.status === "pledged").map((p) => ({
+        fn: "setPledge" as const,
+        args: [pledgeChainId(p.id), BigInt(i), 0n, BigInt(Math.round(p.amountUsd * 1e6))] as const,
+      }))
+    ),
+  ];
+}
+
 export function voteSchedule(now: number) {
   const opensAt = now + SETUP_MINUTES * 60;
   const s = opensAt + VOTING_HOURS * 60 * 60;
@@ -246,6 +338,8 @@ export function manifestFor(
     projects: VoteManifest["projects"];
     groups: string[];
     independentTiers: number;
+    currencies?: Currency[];
+    accounts?: `0x${string}`[];
   },
 ): VoteManifest {
   return {
@@ -262,6 +356,8 @@ export function manifestFor(
     slugs: r.slugs,
     projects: r.projects,
     groups: r.groups,
+    ...(r.currencies ? { currencies: r.currencies } : {}),
+    ...(r.accounts ? { accounts: r.accounts } : {}),
     independentTiers: r.independentTiers,
     ballotRules: true,
   };
@@ -301,6 +397,7 @@ export function addPlan(
         ...plan.map((p) => ({ goalUsd: p.goalUsd.toString(), rfp: p.rfp, groups: p.groups })),
       ],
       groups: groups.names,
+      ...(m.accounts ? { accounts: [...m.accounts, ...plan.map((p) => p.account)] } : {}),
     },
   };
 }
@@ -430,6 +527,7 @@ async function main() {
       "independent-tiers",
       "add",
       "added",
+      "admins",
     ],
   });
   if (args.add || args.added) return await addMain(args);
@@ -473,6 +571,21 @@ async function main() {
   }
   const groups = planGroups(cards);
   const plan = planInitiatives(cards, { real: Boolean(real), groups });
+  if (real) {
+    // The open pledges (the board lists only totals; each page has its records).
+    const base = (args.board ?? "https://initiatives.thedao.fund").replace(/\/+$/, "");
+    for (const c of cards) {
+      const r = await fetch(`${base}/api/initiatives/${encodeURIComponent(c.slug)}`);
+      if (!r.ok) throw new Error(`${c.slug}: pledges unreadable (${r.status})`);
+      c.pledges = ((await r.json()) as { pledges: NonNullable<BoardCard["pledges"]> }).pledges;
+    }
+  }
+  // The site's admins sign pledges: --admins, else ADMIN_ADDRESSES, else the site's default list.
+  const admins = (args.admins ?? Deno.env.get("ADMIN_ADDRESSES") ?? "").split(",").map((x) =>
+    x.trim()
+  ).filter(Boolean);
+  if (!admins.length) admins.push(...DEFAULT_ADMIN_ADDRESSES);
+  for (const a of admins) if (!isAddress(a)) throw new Error(`admin is not an address: ${a}`);
   const poolUsd = real ? real.poolUsd : POOL_USD;
   console.log(`${plan.length} initiatives, ${groups.names.length} affiliations`);
 
@@ -480,7 +593,8 @@ async function main() {
     await Deno.readTextFile(
       new URL("../vote/out/SignedBallots.sol/SignedBallots.json", import.meta.url),
     ),
-  ) as { bytecode: { object: Hex } };
+  ) as { bytecode: { object: Hex }; deployedBytecode: { object: Hex } };
+  checkCodeSize("SignedBallots", artifact.deployedBytecode.object);
   const block = await pub.getBlock();
   const s = real ? realSchedule(real.opensAt, real.tallies) : voteSchedule(Number(block.timestamp));
   if (real && Number(block.timestamp) + SETUP_MINUTES * 60 > s.opensAt) {
@@ -536,11 +650,22 @@ async function main() {
       args: fnArgs as never,
     }),
   });
+  const donation = planDonationSetup({
+    real: Boolean(real),
+    currencies: MAINNET_CURRENCIES,
+    admins,
+    pledgeRole: handed[2],
+    cards,
+    plan,
+  }).map((c) => step(c.fn, c.args));
   const calls = [
     ...groups.names.map((n) => step("addGroup", [stringToHex(n, { size: 32 })])),
     ...plan.map((p) => step("addInitiative", [p.account, p.goalUsd, p.rfp, groupMask(p.groups)])),
     ...(independentTiers === 1 ? [] : [step("setIndependentTiers", [independentTiers])]),
     step("setPoolUsd", [poolUsd]),
+    // Currencies, the pledge role and the pledges go before the hand-over, while the relayer
+    // still holds the roles; currencies freeze at opening.
+    ...donation,
     ...handed.map((r) => step("grantRole", [r, ADMIN])),
     // The default admin goes last.
     ...[...handed.slice(1), handed[0]].map((r) => step("renounceRole", [r, account.address])),
@@ -558,15 +683,19 @@ async function main() {
     }),
     "BatchExecutor deploy",
   )).contractAddress!;
-  console.log(`BatchExecutor ${executor}; setting up ${calls.length} steps in two batches`);
+  console.log(`BatchExecutor ${executor}; setting up ${calls.length} steps in batches`);
 
-  // Two batches: Sepolia's gas schedule puts the whole setup near 28M gas, over
-  // the ~16.7M per-transaction cap (EIP-7825). Batch 1 also delegates the account
-  // (EIP-7702); batch 2 finds the delegation in place. Each batch is estimated
-  // against live state and refused before sending if it can't fit.
+  // Batches: Sepolia's gas schedule puts the whole setup near 28M gas, over the ~16.7M
+  // per-transaction cap (EIP-7825), so it goes in half-project-count steps at a time (at
+  // least 25; a currency, role grant or pledge costs less than a project). Batch 1 also
+  // delegates the account (EIP-7702); the rest find the delegation in place. Each batch is
+  // estimated against live state and refused before sending if it can't fit.
   const TX_GAS_CAP = 16_700_000n;
-  const half = Math.ceil(plan.length / 2);
-  const batches = [calls.slice(0, half), calls.slice(half)];
+  const per = Math.max(25, Math.ceil(plan.length / 2));
+  const batches = Array.from(
+    { length: Math.ceil(calls.length / per) },
+    (_, i) => calls.slice(i * per, (i + 1) * per),
+  );
   for (const [i, batch] of batches.entries()) {
     const authorizationList = i === 0
       ? [await wallet.signAuthorization({ contractAddress: executor, executor: "self" })]
@@ -586,7 +715,9 @@ async function main() {
     if (estimate > gas * 95n / 100n) {
       throw new Error(`batch ${i + 1} needs ${estimate} gas, too close to the ${TX_GAS_CAP} cap`);
     }
-    console.log(`Batch ${i + 1}/2: ${batch.length} steps, estimate ${estimate}, limit ${gas}`);
+    console.log(
+      `Batch ${i + 1}/${batches.length}: ${batch.length} steps, estimate ${estimate}, limit ${gas}`,
+    );
     const hash = await wallet.sendTransaction({
       to: account.address,
       data,
@@ -615,14 +746,14 @@ async function main() {
 
   const minter = await role("MINTER_ROLE");
   for (
-    const [r, who, want] of [
-      [handed[0], ADMIN, true],
-      [handed[1], ADMIN, true],
-      [handed[0], account.address, false],
-      [handed[1], account.address, false],
-      // A test vote's relayer mints the paper-code badges.
-      ...(real ? [] : [[minter, account.address, true] as const]),
-    ] as const
+    const [r, who, want] of roleChecks({
+      real: Boolean(real),
+      handed,
+      minter,
+      admin: ADMIN,
+      relayer: account.address,
+      admins,
+    })
   ) {
     const has = await pub.readContract({
       address: contract,
@@ -639,6 +770,26 @@ async function main() {
   });
   if (pool !== poolUsd) throw new Error(`poolUsd ${pool} != ${poolUsd}`);
 
+  if (real) {
+    const n = await pub.readContract({
+      address: contract,
+      abi: SIGNED_BALLOTS_ABI,
+      functionName: "currencyCount",
+    });
+    if (n !== BigInt(MAINNET_CURRENCIES.length + 1)) throw new Error(`currencyCount ${n}`);
+    // Each one as registered: the asset and feed the manifest (and the replay) will name.
+    const got = await Promise.all(
+      Array.from({ length: Number(n) }, (_, i) =>
+        pub.readContract({
+          address: contract,
+          abi: SIGNED_BALLOTS_ABI,
+          functionName: "currency",
+          args: [BigInt(i)],
+        })),
+    );
+    const wrong = currencyMismatch([USD_CURRENCY, ...MAINNET_CURRENCIES], got);
+    if (wrong) throw new Error(`currencies: ${wrong}`);
+  }
   const now = Number((await pub.getBlock()).timestamp);
   if (now >= s.opensAt) throw new Error("Setup ran past opensAt: redeploy (the round is frozen).");
   const count = await pub.readContract({
@@ -659,6 +810,8 @@ async function main() {
     projects: plan.map((p) => ({ goalUsd: p.goalUsd.toString(), rfp: p.rfp, groups: p.groups })),
     groups: groups.names,
     independentTiers,
+    accounts: plan.map((p) => p.account),
+    ...(real ? { currencies: [USD_CURRENCY, ...MAINNET_CURRENCIES] } : {}),
   });
   const out = args.out ?? new URL("../shared/vote/manifest-data.ts", import.meta.url).pathname;
   await Deno.writeTextFile(

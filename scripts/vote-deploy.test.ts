@@ -1,15 +1,23 @@
 import { assertEquals, assertNotEquals, assertThrows } from "@std/assert";
 import { getAddress, keccak256, slice, toBytes } from "viem";
+import { pledgeChainId } from "../shared/vote/typed-data.ts";
 import {
   addingOpen,
   addPlan,
+  checkCodeSize,
+  CODE_SIZE_LIMIT,
+  currencyMismatch,
+  MAINNET_CURRENCIES,
   manifestFor,
   nextAddingOpen,
   parseRealArgs,
+  planDonationSetup,
   planGroups,
   planInitiatives,
   realSchedule,
+  roleChecks,
   tierMax,
+  USD_CURRENCY,
   voteSchedule,
 } from "./vote-deploy.ts";
 
@@ -265,3 +273,142 @@ Deno.test("addPlan: new groups and projects for the admin, appended without reor
   assertEquals(manifest.projects[2], { goalUsd: "2000000", rfp: false, groups: [0, 1] });
   assertThrows(() => addPlan(base, [{ slug: "a", goalUsd: 1, safeAddress: "" }]), Error, "already");
 });
+
+// ------------------------------------------------------- currencies and pledges
+const ROLE = keccak256(toBytes("PLEDGE_ROLE"));
+const ADMIN_A = "0x1000000000000000000000000000000000000001";
+const ADMIN_B = "0x2000000000000000000000000000000000000002";
+const pledgeCards = [
+  {
+    slug: "x",
+    goalUsd: 1,
+    safeAddress: SAFE,
+    pledges: [
+      { id: "p1", amountUsd: 5000, status: "pledged" as const },
+      { id: "p2", amountUsd: 100, status: "received" as const },
+      { id: "p3", amountUsd: 7, status: "withdrawn" as const },
+    ],
+  },
+  {
+    slug: "y",
+    goalUsd: 2,
+    safeAddress: SAFE2,
+    pledges: [{ id: "p4", amountUsd: 12.5, status: "pledged" as const }],
+  },
+];
+const setup = (real: boolean) =>
+  planDonationSetup({
+    real,
+    currencies: MAINNET_CURRENCIES,
+    admins: [ADMIN_A, ADMIN_B, ADMIN_A.toLowerCase()],
+    pledgeRole: ROLE,
+    cards: pledgeCards,
+    plan: planInitiatives(pledgeCards, { real: true }),
+  });
+
+Deno.test("registers the configured currencies before opening", () => {
+  const regs = setup(true).filter((c) => c.fn === "registerCurrency");
+  assertEquals(regs.map((c) => c.args), MAINNET_CURRENCIES.map((c) => [c.asset, c.usdFeed]));
+  assertEquals(MAINNET_CURRENCIES.map((c) => c.symbol), ["ETH", "USDC", "EURC"]);
+  // Currencies come first: they freeze at opening.
+  assertEquals(setup(true).slice(0, 3).map((c) => c.fn), Array(3).fill("registerCurrency"));
+});
+
+Deno.test("grants the pledge role to each admin", () => {
+  const grants = setup(true).filter((c) => c.fn === "grantRole");
+  assertEquals(grants.map((c) => c.args), [[ROLE, ADMIN_A], [ROLE, ADMIN_B]]);
+});
+
+Deno.test("seeds the board's open pledges and skips received and withdrawn ones", () => {
+  const pledges = setup(true).filter((c) => c.fn === "setPledge");
+  assertEquals(pledges.map((c) => c.args), [
+    [pledgeChainId("p1"), 0n, 0n, 5_000_000_000n],
+    [pledgeChainId("p4"), 1n, 0n, 12_500_000n],
+  ]);
+});
+
+Deno.test("a test round registers nothing", () => {
+  assertEquals(setup(false), []);
+});
+
+Deno.test("manifestFor records currencies and accounts when given", () => {
+  const m = manifestFor({
+    kind: "real",
+    contract: SAFE2 as `0x${string}`,
+    deployBlock: 5,
+    schedule: realSchedule(OPENS, PLAN),
+    poolUsd: 7n,
+    slugs: ["x"],
+    projects: [{ goalUsd: "5", rfp: false, groups: [] }],
+    groups: [],
+    independentTiers: 1,
+    currencies: MAINNET_CURRENCIES,
+    accounts: [SAFE as `0x${string}`],
+  });
+  assertEquals(m.currencies, MAINNET_CURRENCIES);
+  assertEquals(m.accounts, [SAFE]);
+});
+
+Deno.test("addPlan appends the new project's account when the manifest records them", () => {
+  const base = manifestFor({
+    kind: "real",
+    contract: SAFE2 as `0x${string}`,
+    deployBlock: 5,
+    schedule: realSchedule(OPENS, PLAN),
+    poolUsd: 7n,
+    slugs: ["a"],
+    projects: [{ goalUsd: "1", rfp: false, groups: [] }],
+    groups: [],
+    independentTiers: 1,
+    currencies: MAINNET_CURRENCIES,
+    accounts: [SAFE as `0x${string}`],
+  });
+  const { manifest } = addPlan(base, [{ slug: "b", goalUsd: 1, safeAddress: SAFE2 }]);
+  assertEquals(manifest.accounts, [SAFE, SAFE2]);
+});
+
+Deno.test("deploy: code over EIP-170's limit is refused before it is sent", async () => {
+  const code = (bytes: number) => `0x${"00".repeat(bytes)}` as const;
+  checkCodeSize("X", code(CODE_SIZE_LIMIT));
+  assertThrows(() => checkCodeSize("X", code(CODE_SIZE_LIMIT + 1)), Error, "24577 bytes");
+  // The built round fits (when it has been built).
+  const built = await Deno.readTextFile(
+    new URL("../vote/out/SignedBallots.sol/SignedBallots.json", import.meta.url),
+  ).catch(() => null);
+  if (built) checkCodeSize("SignedBallots", JSON.parse(built).deployedBytecode.object);
+});
+
+Deno.test("deploy: the relayer ends the setup with none of the handed-over roles, PLEDGE_ROLE included", () => {
+  const [d, a, p, m] = ["0xd0", "0xa0", "0x90", "0x30"] as const;
+  const admin = "0x0000000000000000000000000000000000000001" as const;
+  const relayer = "0x0000000000000000000000000000000000000002" as const;
+  const signer = "0x0000000000000000000000000000000000000003";
+  const base = { handed: [d, a, p], minter: m, admin, relayer, admins: [signer] };
+  const real = roleChecks({ ...base, real: true });
+  for (const r of [d, a, p]) {
+    assertEquals(real.filter(([x, who]) => x === r && who === relayer), [[r, relayer, false]]);
+    assertEquals(real.filter(([x, who]) => x === r && who === admin), [[r, admin, true]]);
+  }
+  assertEquals(real.filter(([, who]) => who === signer), [[p, signer, true]]);
+  assertEquals(real.some(([x]) => x === m), false);
+  const test = roleChecks({ ...base, real: false });
+  assertEquals(test.filter(([x]) => x === m), [[m, relayer, true]]);
+  assertEquals(test.some(([, who]) => who === signer), false);
+});
+
+Deno.test("deploy: the currencies read back must be the manifest's, in order", () => {
+  const want = [USD_CURRENCY, ...MAINNET_CURRENCIES];
+  // Addresses compare in any case: the chain reads them checksummed.
+  const got = want.map((c) => ({ asset: c.asset.toLowerCase(), usdFeed: c.usdFeed.toLowerCase() }));
+  assertEquals(currencyMismatch(want, got), null);
+  assertEquals(
+    currencyMismatch(want, got.slice(1)),
+    `${want.length - 1} currencies, expected ${want.length}`,
+  );
+  const swapped = [got[0], got[2], got[1], ...got.slice(3)];
+  assertNotEquals(currencyMismatch(want, swapped), null);
+  const feed = got.map((c, i) => (i === 1 ? { ...c, usdFeed: ZERO_ADDR } : c));
+  assertEquals(currencyMismatch(want, feed)?.includes("has feed"), true);
+});
+
+const ZERO_ADDR = "0x0000000000000000000000000000000000000000";

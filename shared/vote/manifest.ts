@@ -28,6 +28,11 @@ export type VoteManifest = {
   projects: { goalUsd: string; rfp: boolean; groups: number[] }[];
   /** Group (affiliation) names; a project's `groups` index into this. */
   groups: string[];
+  /** The contract's registered currencies, in id order; [0] is the virtual USD unit.
+   * Absent for rounds from before them (or test rounds): currency 0 only. */
+  currencies?: { symbol: string; asset: `0x${string}`; usdFeed: `0x${string}` }[];
+  /** Per slug, in the same order: the project's account on the round's chain (its Safe). */
+  accounts?: `0x${string}`[];
   /** Tiers held to the independence rules: bit 0 S-Tier (always), bit 1 A-Tier. */
   independentTiers: number;
   /** Deployed with the ballot rules: the contract checks them, and so must the replay,
@@ -51,6 +56,14 @@ export function checkManifest(m: VoteManifest): VoteManifest {
   }
   if (m.projects?.length !== m.slugs.length) {
     throw new Error("vote manifest: projects must match slugs one to one");
+  }
+  if (m.kind === "real") {
+    if ((m.currencies?.length ?? 0) < 2) {
+      throw new Error("vote manifest: a real round needs its currencies");
+    }
+    if (m.accounts?.length !== m.slugs.length) {
+      throw new Error("vote manifest: accounts must match slugs one to one");
+    }
   }
   for (const p of m.projects) {
     if (p.rfp && p.groups.length) throw new Error("vote manifest: an RFP can't have affiliations");

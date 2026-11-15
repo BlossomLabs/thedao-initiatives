@@ -76,6 +76,9 @@ export type RoundView = {
   }[];
   /** The pool on-chain now (micro-USD): what a new ballot's size is judged against. */
   poolUsd?: string;
+  /** Each initiative's ask on-chain now (goal less donations and open pledges), micro-USD:
+   * what the ballot rules count. In manifest order; absent when the chain couldn't be read. */
+  asks?: string[];
   live: {
     funded: string[];
     awards: Record<string, string>;

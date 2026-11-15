@@ -9,6 +9,7 @@ import { ballotSegments, SegmentRing } from "~/components/vote/BallotMeter";
 import DaoBallot, { daoResult } from "~/components/vote/DaoBallot";
 import type { BallotItem } from "~/components/vote/TierBallot";
 import { useVoteBallots } from "~/hooks/use-vote";
+import { askOf } from "~/lib/vote-results";
 import { errorMessage } from "~/lib/api";
 import { decodeBallot, encodeBallot, type Tier, TIERS } from "../../../shared/vote/ballot";
 import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
@@ -100,6 +101,9 @@ export default function VoteClosed(
     roundBox?: React.ReactNode;
     live?: {
       onEdit: () => void;
+      /** The chain's asks (micro-USD, manifest order), for the ring; absent while they're
+       * being worked out, when the ring shows what the badge allocated instead. */
+      asks?: string[];
       tally?: {
         tiers: Partial<Record<string, Tier>>;
         awards: Record<string, number>;
@@ -169,21 +173,21 @@ export default function VoteClosed(
   // Each card's header: an avatar in a ring of what went to what was funded.
   const allocated = [...(paid ?? new Map<string, number>()).values()].reduce((a, b) => a + b, 0);
   const sentSomething = Boolean(sent && Object.keys(sent).length);
-  // During the vote, the ring is the editor's: what the ballot asks for, full at 3× the
-  // pool; gold what the settled tiers funded, pale gold what they hold unfunded, green
-  // the open tiers.
-  const goalOf = (slug: string) =>
-    Number(BigInt(round.projects[round.slugs.indexOf(slug)]?.goalUsd ?? "0") / 10_000n) / 100;
+  // During the vote, the ring is the editor's: what the ballot asks for (the chain's
+  // asks), full at 3× the pool; gold what the settled tiers funded, pale gold what they
+  // hold unfunded, green the open tiers.
+  const asks = live?.asks;
+  const askFor = (slug: string) => askOf(round, asks, slug) ?? 0;
   const settledTier = new Map(settled?.map((t) => [t.tier, t]) ?? []);
-  const askRing = live && sent && poolUsd
+  const askRing = live && asks && sent && poolUsd
     ? (() => {
       let fundedAsk = 0, waitingAsk = 0, asked = 0;
       for (const [slug, t] of Object.entries(sent)) {
         if (!t) continue;
         const s = settledTier.get(t);
-        asked += goalOf(slug);
-        if (s?.funded.includes(slug)) fundedAsk += goalOf(slug);
-        else if (s) waitingAsk += goalOf(slug);
+        asked += askFor(slug);
+        if (s?.funded.includes(slug)) fundedAsk += askFor(slug);
+        else if (s) waitingAsk += askFor(slug);
       }
       return { asked, target: poolUsd * 3, fundedAsk, waitingAsk };
     })()

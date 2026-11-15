@@ -5,11 +5,19 @@ import { type Tier, TIERS } from "../../shared/vote/ballot";
 /** Micro-USD (a decimal string) as dollars, to the cent. */
 export const dollars = (micro: string) => Number(BigInt(micro) / 10_000n) / 100;
 
-/** What an initiative asks the pool for, in dollars: its goal less the donations and open
- * pledges (the contract's `initiativeUsd().askUsd`). The tally charges this (the server's
- * needs), so it moves with each donation until its tier settles. */
-export const askOf = (card: Card): number =>
-  Math.max(0, card.initiative.goalUsd - card.summary.total);
+/** What an initiative asks the pool for, in dollars: its ask on-chain (goal less the
+ * donations and open pledges, the contract's `initiativeUsd().askUsd`), as the round
+ * serves it in manifest order. The ballot rules count it, and it moves with each donation.
+ * Undefined while the asks are being worked out (the round came without them). */
+export const askOf = (
+  round: { slugs: string[] },
+  asks: string[] | undefined,
+  slug: string,
+): number | undefined => {
+  const i = round.slugs.indexOf(slug);
+  const ask = i < 0 ? undefined : asks?.[i];
+  return ask === undefined ? undefined : dollars(ask);
+};
 
 export type ResultRow = { card: Card; finalUsd: number; tier?: Tier };
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Hex } from "viem";
 import type { BallotPhase } from "~/lib/vote-flow";
+import type { RulesRound } from "../../../shared/vote/rules";
 
 /** How long each step lasts in an example, in ms: long enough to read. */
 const STEP_MS: Partial<Record<BallotPhase["kind"], number>> = {
@@ -46,7 +47,7 @@ export function useMockBallotSubmit(counted: (ballot: Hex) => void) {
     return Promise.resolve();
   }, [run]);
   /** From the voter's own wallet: sign, confirm the transaction, record. */
-  const selfSend = useCallback((_id: bigint, ballot: Hex) => {
+  const selfSend = useCallback((_id: bigint, ballot: Hex, _rules?: RulesRound) => {
     run(ballot, [{ kind: "signing" }, { kind: "relaying" }, { kind: "waiting", hash: NO_TX }]);
     return Promise.resolve();
   }, [run]);

@@ -18,6 +18,13 @@ const HIT_MARGIN = 8;
 const TAIL = 24;
 const DASH = "2 2";
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
+/** The least a ballot must ask for, as a multiple of the pool (the ballot rules). */
+const MIN_ASK = 1.5;
+/** Within this much above the minimum, a donation landing before the ballot is recorded
+ * could take it under: the asks are counted at the block that records it. */
+const NEAR = 1.05;
+const NEAR_MINIMUM =
+  "Close to the minimum: a donation landing first could make this ballot too small.";
 
 /** One segment of the ring: from `from` to `to`, as fractions of the way round from the
  * top (clamped to the ring). Segments lie end to end, so each shows its own colour on the track,
@@ -82,13 +89,15 @@ function Dashes({ from, to, className, dim }: {
  * (3× the pool: the 1.5× the ballot rules want is half way round), in three parts from the top: gold for what the
  * settled tiers funded, pale gold for what they hold but didn't fund (locked, still first
  * in line for what is left), green for the open tiers, the part still yours to change.
- * Beside it, the ask, this badge's share and what each settled tier took. */
+ * Beside it, the ask, this badge's share and what each settled tier took. Without `asked`
+ * (the asks are being worked out) the ring is empty and says no amount. */
 export default function BallotMeter(
   { avatar, asked, target, pool, share, shareFinal, settled, menu, status, compact }: {
     /** The voter's avatar, drawn inside the ring. */
     avatar: React.ReactNode;
-    /** What the ballot's placed initiatives ask for in all, in USD. */
-    asked: number;
+    /** What the ballot's placed initiatives ask for in all, in USD; absent while the
+     * chain's asks are being worked out. */
+    asked?: number;
     /** Where the ring is full, in USD: 3× the pool, twice what a ballot must ask for. */
     target: number;
     /** The pool, in USD (for the tooltip). */
@@ -120,7 +129,11 @@ export default function BallotMeter(
   const spent = settled.reduce((a, t) => a + t.paid, 0);
   const fundedAsk = settled.reduce((a, t) => a + t.fundedAsk, 0);
   const waitingAsk = settled.reduce((a, t) => a + t.waitingAsk, 0);
-  const segments = ballotSegments({
+  const known = asked !== undefined;
+  // A valid ballot only just over the minimum: the asks can move before it's recorded.
+  const near = known && status?.ok === true && asked >= MIN_ASK * pool &&
+    asked < MIN_ASK * NEAR * pool;
+  const segments = !known ? [] : ballotSegments({
     asked,
     target,
     pool,
@@ -140,8 +153,10 @@ export default function BallotMeter(
         segments={segments}
         label="What your ballot asks for"
         max={target}
-        now={Math.min(asked, target)}
-        valueText={`${dollars(asked)} of ${dollars(target)}.`}
+        now={known ? Math.min(asked, target) : 0}
+        valueText={known
+          ? `${dollars(asked)} of ${dollars(target)}.`
+          : "The asks are being worked out."}
         dashedEnd
       >
         {avatar}
@@ -151,9 +166,11 @@ export default function BallotMeter(
           <p className="text-[12px] uppercase tracking-[.08em] text-white/55">Your ballot</p>
           {menu}
         </div>
-        <p className="font-inter-tight text-[16px] font-semibold text-white tnum">
-          {dollars(asked)} asked
-        </p>
+        {known && (
+          <p className="font-inter-tight text-[16px] font-semibold text-white tnum">
+            {dollars(asked)} asked
+          </p>
+        )}
         {settled.map((t) => (
           <p key={t.tier} className="text-[13px] text-white/65 tnum">
             {t.funded > 0
@@ -178,6 +195,7 @@ export default function BallotMeter(
                 : `Your share: ${shareFinal ? "" : "about "}${dollars(share)}`}
             </p>
           )}
+        {near && <p className="text-[13px] leading-snug text-amber-200">{NEAR_MINIMUM}</p>}
       </div>
     </section>
   );

@@ -129,7 +129,7 @@ Each project's original ask is denominated in dollars. At a tally's block, compu
 
 - pool funding = the recorded USD budget at the applicable historical cutoff;
 - project support = allowed-currency balances plus outstanding pledges, valued in USD;
-- project funding need = max(original dollar ask minus project support, zero).
+- project funding need = max(dollar goal minus project support, zero).
 
 Project support reduces that project's need; it is not added to the fungible pool.
 Withdrawals, spending, pledge corrections and changing prices can raise or lower
@@ -140,22 +140,22 @@ The accounting implementation uses USD with six decimal places and rounds down.
 Currency ID zero is a virtual USD unit, suitable for dollar-denominated commitments
 or pledges. It is not a stablecoin, and its project donation balance is always zero.
 Other currencies are a native asset or ERC-20 with a registered pricing rule. Native ETH
-requires a Chainlink USD feed, decimal precision and maximum price age. An ERC-20
+requires a Chainlink USD feed and its decimal precision. An ERC-20
 can use a feed or explicitly select fixed $1-per-token accounting by registering
-both the feed address and maximum price age as zero. Fixed-dollar pricing respects
+a zero feed address. Fixed-dollar pricing respects
 token decimals but ignores depegs; the mainnet preset selects it for USDC.
 Currency definitions, including pricing rules, freeze when voting opens.
 
-Nonzero amounts in feed-priced currencies require a positive price with a valid
-timestamp and the configured freshness bound. Unavailable, stale or
-precision-changing data makes valuation incomplete by reverting; it is never
-silently valued at zero. Zero holdings in an
-unused currency do not require a price. A failed configured feed never falls back
-to $1. Token precision changes also revert for fixed-dollar currencies.
+Prices never block valuation. A feed answer is good when the read succeeds, the round is
+not 0, the answer is positive and fits a uint192, `updatedAt` is not 0 and not in the future,
+and the feed's decimals are unchanged; its age never matters. A feed that is not good falls
+back to the last good price the contract stored (`PriceStored`, seeded at registration), never
+to $1. A token whose balance read fails counts as $0.
 Donations and pledges are converted as separate components before their USD totals
 are added.
 
-initiativeUsd returns donated, pledged and total USD plus the remaining dollar ask.
+initiativeUsd returns donated, pledged and total USD plus the ask (the dollar goal less that
+total, never below zero).
 poolUsd returns the recorded USD budget separately, without consulting feeds or
 project balances; it can only increase during the active round. The initiative views
 remain live block-state views. Historical

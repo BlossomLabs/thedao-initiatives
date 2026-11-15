@@ -5,8 +5,7 @@
  * stage tally (./stage.ts). Amounts are micro-USD bigints.
  * Browser and Deno. */
 import { effectiveRanks } from "../../vote/shared/ranks.ts";
-import type { Tier } from "./ballot.ts";
-import { checkBallot, type RulesRound } from "./rules.ts";
+import { isValidOnchainBallot, type Tier } from "./ballot.ts";
 import { type ChainInputs, chainTally } from "./chain.ts";
 import { tierOf } from "./stage.ts";
 
@@ -26,8 +25,6 @@ export type Receipt = {
   logIndex?: number;
   timestamp: number;
 };
-/** Where a log sits in the chain. */
-export type ChainPos = { block: number; logIndex: number };
 export type Settled = {
   tier: Tier;
   at: number;
@@ -120,15 +117,6 @@ export function replay(
     /** The needs each tier settled with, kept when it first settled: a later donation
      * never moves a settled tier, even before its settlement is stored for good. */
     settleNeeds?: Partial<Record<Tier, SettleNeeds>>;
-    /** The ballot rules, judged as the contract did: with the projects registered and
-     * the pool set before that receipt in chain order (block, then log index), not by
-     * time. `addedAt[i]` is where project i joined (null: at deploy); `pool` is every
-     * change in chain order, else `round.poolUsd`. Without it, nothing is checked. */
-    rules?: {
-      round: RulesRound;
-      addedAt: (ChainPos | null)[];
-      pool: (ChainPos & { poolUsd: bigint })[];
-    };
   },
   now: number,
 ): RoundState {
@@ -145,20 +133,11 @@ export function replay(
   const settled: Settled[] = [];
   let next = 0; // the next receipt to apply
 
-  const valid = (r: Receipt): boolean => {
-    const { round, addedAt, pool } = input.rules!;
-    const before = (p: ChainPos) =>
-      p.block < r.block || (p.block === r.block && p.logIndex < (r.logIndex ?? 0));
-    const count = addedAt.filter((p) => p === null || before(p)).length;
-    const poolUsd = pool.filter(before).at(-1)?.poolUsd ?? round.poolUsd;
-    return checkBallot(r.ballot!, {
-      ...round,
-      projects: round.projects.slice(0, count),
-      asks: round.asks.slice(0, count),
-      poolUsd,
-    })
-      .ok;
-  };
+  /** The contract judged the rules (size, groups) when it recorded the ballot, and the
+   * transcript proves it did; only a ballot this replay can't read is refused. */
+  const readable = (ballot: Uint8Array): boolean =>
+    ballot.length >= 1 && ballot.length <= m &&
+    isValidOnchainBallot(Uint8Array.from([...ballot, ...Array(m - ballot.length).fill(255)]), m);
 
   const apply = (r: Receipt) => {
     if (r.ballot === null) {
@@ -170,7 +149,7 @@ export function replay(
       rejected.push({ tokenId: r.tokenId, nonce: r.nonce, reason: "registration_closed" });
       return;
     }
-    if (input.rules && !valid(r)) {
+    if (!readable(r.ballot)) {
       rejected.push({ tokenId: r.tokenId, nonce: r.nonce, reason: "invalid_ballot" });
       return;
     }

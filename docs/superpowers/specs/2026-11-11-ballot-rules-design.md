@@ -67,10 +67,10 @@ appear in the UI as decoration or labels.
 Definitions, for one ballot, at the block that records it:
 
 - **Placed projects:** those in S-Tier, A-Tier or B-Tier.
-- **Requested amount** of a project: its `goalUsd` registered in the contract (micro-USD), i.e. the
-  initiative's requested total. Not the remaining need, which moves with donations: a ballot's
-  validity must not change after it is recorded. _(My call; the tally itself still uses remaining
-  needs.)_
+- **Requested amount** of a project: *(Superseded Nov 15 by `2026-11-15-ballot-rules-on-asks-design.md`:
+  rules now count each project's **ask**, its goal less donations and open pledges, computed
+  on-chain at the block that records the ballot.)* Originally its `goalUsd` registered in the
+  contract (micro-USD), not the remaining need. _(My call.)_
 - **Pool:** `poolUsd` in the contract at that block.
 - **Tiers as the contract sees them:** the ballot's groups of equal rank, in order. The first group
   is S-Tier, the second A-Tier, the third B-Tier. A valid ballot has at most three groups. Because

@@ -109,6 +109,8 @@ export default function VoteResults(
   const tier: Tier = rv?.tiers.find((t) => t.status !== "settled")?.tier ?? "S";
   const give = rv?.live.give;
   const lead = rv?.live.lead;
+  // Each initiative's ask is the chain's, served with the round (none while it's unknown).
+  const asks = rv?.asks;
   // Every open initiative: below the tier settling now, the donation that moves it up a
   // tier; in it, how far ahead it is.
   const rows = useMemo<GiveRow[] | undefined>(() => {
@@ -116,7 +118,7 @@ export default function VoteResults(
     const bySlug = new Map(cards.map((c) => [c.initiative.slug, c]));
     const below = Object.entries(give).flatMap(([slug, entry]) => {
       const card = bySlug.get(slug);
-      return card ? [{ card, askUsd: askOf(card), entry, now: result.tiers[slug] }] : [];
+      return card ? [{ card, askUsd: askOf(R, asks, slug), entry, now: result.tiers[slug] }] : [];
     });
     const ahead = [...result.provisional].flatMap((slug) => {
       const card = bySlug.get(slug);
@@ -124,13 +126,13 @@ export default function VoteResults(
       const l = lead?.[slug];
       return [{
         card,
-        askUsd: askOf(card),
+        askUsd: askOf(R, asks, slug),
         lead: l ? dollars(l) : 0,
         now: tier,
       }];
     });
     return [...ahead, ...below];
-  }, [give, lead, cards, result, tier]);
+  }, [give, lead, cards, result, tier, R, asks]);
 
   // The initiative open in the list, and the amount in its donate form.
   const [open, setOpen] = useState<string>();
@@ -145,10 +147,7 @@ export default function VoteResults(
   const entry: NextTierEntry | undefined = open ? give?.[open] : undefined;
   const gap = entry ? gapUsd(entry) : null;
   const given = amount;
-  const needFor = (slug: string) => {
-    const c = cards.find((x) => x.initiative.slug === slug);
-    return c ? askOf(c) : 0;
-  };
+  const needFor = (slug: string) => askOf(R, asks, slug) ?? 0;
   const titleOf = (slug: string) =>
     cards.find((x) => x.initiative.slug === slug)?.initiative.title ?? slug;
   /** An initiative named in running text: set apart from the words around it. The one your
@@ -305,9 +304,9 @@ export default function VoteResults(
         slug: card.initiative.slug,
         title: card.initiative.title,
         card,
-        askUsd: askOf(card),
+        askUsd: askOf(R, asks, card.initiative.slug),
       })),
-    [cards],
+    [cards, R, asks],
   );
 
   if (isClosed && rv) {

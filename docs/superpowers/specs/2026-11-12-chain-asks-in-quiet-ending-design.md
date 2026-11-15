@@ -91,8 +91,9 @@ ask_i(b)     = max(askUsd_i − support_i(b), 0)
 - *(Updated Nov 15 by `2026-11-15-ballot-rules-on-asks-design.md`.)* A
   feed-priced currency uses the price rule of that design: the feed's
   `latestRoundData()` answer at block `b` with no age limit; if the answer is
-  not good (reverting call, round 0, answer ≤ 0, future timestamp, changed feed
-  decimals), the contract's `lastPrice` at `b` (followed via `PriceStored`).
+  not good (reverting call, round 0, answer ≤ 0 or above `uint192`'s maximum,
+  zero or future timestamp, `decimals()` failing or changed), the contract's
+  `lastPrice` at `b` (followed via `PriceStored`).
   A token whose `balanceOf` reverts counts as a $0 balance.
 - The result must equal `initiativeUsd(i).askUsd` at `b`, which no longer
   reverts on age. Test this.

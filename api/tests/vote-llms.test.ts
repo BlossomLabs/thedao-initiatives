@@ -52,11 +52,11 @@ const text = voteLlms(m, entries, "https://x.test");
 Deno.test("vote llms: lists every round project with type, amounts and affiliations", () => {
   assertStringIncludes(
     text,
-    "- seal-audits — Seal audits · Grant · requests $300,000 · still needs $250,000 · affiliations: Seal · [details](https://x.test/initiative/seal-audits.md)",
+    "- seal-audits — Seal audits · Grant · goal $300,000 · asks unknown · affiliations: Seal · [details](https://x.test/initiative/seal-audits.md)",
   );
   assertStringIncludes(
     text,
-    "- fuzzing — Community fuzzing · RFP · requests $250,000 · still needs $0 · affiliations: none",
+    "- fuzzing — Community fuzzing · RFP · goal $250,000 · asks unknown · affiliations: none",
   );
 });
 
@@ -64,11 +64,10 @@ Deno.test("vote llms: states the rules with the pool's 1.5× in dollars", () => 
   assertStringIncludes(text, "at least $1,500,000 in total (1.5× the $1,000,000 configured pool)");
   assertStringIncludes(text, "S-Tier needs at least 3 independent projects");
   assertStringIncludes(text, "Anything you leave unranked gets nothing from you");
-  assertStringIncludes(text, 'not the smaller "still needs" amounts after donations or pledges');
   assertStringIncludes(text, "no pair shares any listed affiliation");
   assertStringIncludes(
     text,
-    "a project with several affiliations counts its full requested amount",
+    "a project with several affiliations counts its full ask",
   );
   assertStringIncludes(text, "Exactly half is allowed");
   assertStringIncludes(
@@ -123,7 +122,7 @@ Deno.test("vote llms: a draft must use unique known slugs and pass validation", 
   assertStringIncludes(text, "Use only the exact project slugs below");
   assertStringIncludes(text, "list each project at most once");
   assertStringIncludes(text, "Syntax example only; it may not meet the ballot rules");
-  assertStringIncludes(text, "Before returning it, check the total original requests");
+  assertStringIncludes(text, "Before returning it, check the total asks");
   assertStringIncludes(text, "do not invent preferences or return an invalid ballot");
 });
 
@@ -156,9 +155,20 @@ Deno.test("vote llms: served as plain text, cached like the other feeds", async 
   assertEquals(res.headers.get("Content-Type"), "text/plain; charset=utf-8");
   assertStringIncludes(res.headers.get("Cache-Control") ?? "", "max-age=300");
   const body = await res.text();
-  assertStringIncludes(body, "- wallets — wallets · Grant · requests $400,000");
+  assertStringIncludes(body, "- wallets — wallets · Grant · goal $400,000 · asks unknown");
   assertStringIncludes(body, "## Voting and revisions");
   assertStringIncludes(body, "## Schedule and quiet ending");
+  h.close();
+});
+
+Deno.test("vote llms: the route passes the chain asks", async () => {
+  const h = await harness();
+  h.deps.vote = {
+    chain: { asks: () => Promise.resolve([1n, 2n, 3n, 4_000_000n]) } as never,
+    manifest: m,
+  };
+  const body = await (await h.req("/vote/llms.txt")).text();
+  assertStringIncludes(body, "asks $4 · affiliations");
   h.close();
 });
 
@@ -168,4 +178,30 @@ Deno.test("vote llms: a round from before the ballot rules states none", () => {
   assert(!old.includes("needs at least 3 independent projects"));
   assert(!old.includes("three pairwise-independent projects"));
   assertStringIncludes(old, "This round has no ballot rules.");
+});
+
+Deno.test("vote llms: the rules count asks at the recording block", () => {
+  assertStringIncludes(text, "must ask for at least $1,500,000 in total");
+  assertStringIncludes(
+    text,
+    "A project's ask is its goal less its donations and open pledges, on-chain at the block that records your ballot, so it can change before then",
+  );
+  assert(!text.includes("original requested amounts"));
+});
+
+Deno.test("vote llms: each project lists its chain ask", () => {
+  const asked = voteLlms(m, entries, "https://x.test", [
+    250_000_000_000n,
+    200_000_000_000n,
+    0n,
+    400_000_000_000n,
+  ]);
+  assertStringIncludes(asked, "· goal $300,000 · asks $250,000 ·");
+  assertStringIncludes(asked, "· goal $250,000 · asks $0 ·");
+  assertStringIncludes(text, "asks unknown");
+  assertStringIncludes(
+    text,
+    "Where a project's ask is unknown, the ballot's size can't be checked here: say so to the voter rather than estimating it.",
+  );
+  assert(!text.includes("still needs"));
 });

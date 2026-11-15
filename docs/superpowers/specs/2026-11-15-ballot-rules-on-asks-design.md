@@ -68,9 +68,12 @@ balances can't fail.
 `price(c)` for a feed-priced currency:
 
 1. Call `latestRoundData()` on the feed (with `try`, so a reverting feed is caught).
-2. The answer is **good** when the call succeeds, `roundId != 0`, `answer > 0`,
-   `updatedAt != 0`, `updatedAt <= block.timestamp`, and the feed's `decimals()` still equals
-   the registered `feedDecimals`. Its age does not matter.
+2. The answer is **good** when the call succeeds, `roundId != 0`, `answer > 0` and
+   `answer <= type(uint192).max` (the stored price is a `uint192`, so a larger answer is not
+   good), `updatedAt != 0`, `updatedAt <= block.timestamp`, and the feed's `decimals()` call
+   succeeds and still equals the registered `feedDecimals`. Its age does not matter. (The
+   contract also refuses a `roundId` above `uint80`'s maximum, which no real feed reaches; a
+   replay uses the same checks.)
 3. Good: use it. Otherwise: use `lastPrice[c]`, the last good answer the contract stored.
 
 `lastPrice[c] = { price, updatedAt }` is stored:

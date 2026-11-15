@@ -120,7 +120,16 @@ export function feedRoutes(feeds: FeedCache, deps?: Pick<Deps, "vote">) {
     const round = deps?.vote;
     if (!round) return c.text("No vote is deployed right now.", 404);
     const o = feeds.origin(c);
-    const body = voteLlms(round.manifest, (await feeds.get(o)).initiatives, o);
+    // One multicall beside the feed read; only the HTTP response is cached. Asks that
+    // can't be read are said to be unknown rather than guessed.
+    const [asks, feed] = await Promise.all([
+      (async () => {
+        const a = await round.chain.asks();
+        return a.length === round.manifest.slugs.length ? a : undefined;
+      })().catch(() => undefined),
+      feeds.get(o),
+    ]);
+    const body = voteLlms(round.manifest, feed.initiatives, o, asks);
     return feedResponse(c, body, "text/plain; charset=utf-8");
   });
   r.get("/llms.txt", async (c) => {

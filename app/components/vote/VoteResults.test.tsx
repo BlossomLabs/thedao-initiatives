@@ -153,6 +153,8 @@ function roundOf(
     tiers: [waiting("S"), waiting("A"), waiting("B")],
     accepted,
     rejected: [],
+    // The chain's asks: here goal less board raised (alpha $60K − $10K, beta $30K).
+    asks: [usdMicro(50_000), usdMicro(30_000)],
     live: {
       funded: Object.keys(live),
       awards: Object.fromEntries(Object.entries(live).map(([k, [v]]) => [k, usdMicro(v)])),
@@ -606,6 +608,23 @@ it("what no donation alone brings in is counted at the end, shown on demand", as
   expect(list().getByRole("button", { name: /Beta audits/ })).toHaveTextContent(
     "Out of reach for S-Tier",
   );
+});
+
+it("rows show the chain ask, not goal less board raised", async () => {
+  // On chain, a pledge the board hasn't shown yet: Beta asks $25K, not $30K − $0.
+  await showOpen(
+    openWith({ beta: give() }, undefined, { asks: [usdMicro(50_000), usdMicro(25_000)] }),
+  );
+  const row = await list().findByRole("button", { name: /Beta audits/ });
+  expect(row).toHaveTextContent("Needs $25,000");
+  expect(row).not.toHaveTextContent("$30,000");
+});
+
+it("without the chain's asks, rows show no ask", async () => {
+  await showOpen(openWith({ beta: give() }, undefined, { asks: undefined }));
+  const row = await list().findByRole("button", { name: /Beta audits/ });
+  expect(row).not.toHaveTextContent("Needs");
+  expect(row).toHaveTextContent("not included");
 });
 
 it("says so while the figures are worked out", async () => {

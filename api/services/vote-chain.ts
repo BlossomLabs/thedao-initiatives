@@ -66,6 +66,9 @@ export interface VoteChain {
   /** What the ballot rules judge by: when each project joined (`addedAt[id]`, its first
    * InitiativeConfigured) and every PoolUsdSet, stamped like ballots. */
   rulesHistory(): Promise<RulesHistory>;
+  /** Each project's ask on-chain at the head block (`initiativeUsd`'s fourth value: goal
+   * less donations and open pledges), micro-USD, in manifest order, in one multicall. */
+  asks(): Promise<bigint[]>;
 }
 
 export type RulesHistory = {
@@ -292,6 +295,18 @@ export function createVoteChain(
         }
       }
       return { events: out, block: head };
+    },
+    async asks() {
+      const contract = { address: m.contract, abi: SIGNED_BALLOTS_ABI } as const;
+      const r = (await pub.multicall({
+        allowFailure: false,
+        contracts: m.slugs.map((_, i) => ({
+          ...contract,
+          functionName: "initiativeUsd",
+          args: [BigInt(i)],
+        })),
+      } as never)) as unknown as (readonly bigint[])[];
+      return r.map((x) => BigInt(x[3]));
     },
     async rulesHistory() {
       // Positions, not times: the replay orders these against ballots exactly as the

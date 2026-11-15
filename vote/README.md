@@ -68,10 +68,11 @@ External NFT mode disables internal minting.
 
 All USD inputs and results use **six decimal places**: 1,000,000 means one dollar.
 
-- registerCurrency(asset, usdFeed, maxPriceAge) registers a native/ERC-20 asset before
+- registerCurrency(asset, usdFeed) registers a native/ERC-20 asset before
   voting opens. Asset address zero means native ETH. Asset and feed decimals are
-  read and checked; each must be at most 18. Currency definitions freeze at opening.
-- For an ERC-20, explicitly setting both usdFeed and maxPriceAge to zero selects
+  read and checked; each must be at most 18. A feed must answer a good price when it is
+  registered: that answer seeds the stored last price. Currency definitions freeze at opening.
+- For an ERC-20, explicitly setting usdFeed to zero selects
   fixed $1 pricing per whole token. Token decimals still apply. Native ETH requires
   a feed. Missing or failed configured feeds never fall back to fixed pricing.
 - Currency ID 0 is the virtual USD accounting unit, not a stablecoin or native ETH.
@@ -101,19 +102,28 @@ All USD inputs and results use **six decimal places**: 1,000,000 means one dolla
 - setPledge(pledgeId, initiativeId, currencyId, amount) creates or replaces a pledge.
   Reusing an ID replaces its previous contribution; amount zero cancels it.
 - quoteUsd(currencyId, amount) converts a quantity using its fixed-dollar rule or
-  latest valid Chainlink USD price. Fixed-dollar accounting ignores depegs; an asset
+  latest good Chainlink USD price (see "Prices never block" below). Fixed-dollar accounting
+  ignores depegs; an asset
   with its own market-price feed can reflect them.
 - poolUsd() returns the recorded USD budget, independently of prices, project
   support or feed availability. After registration, replay adds each increase equally
   to accepted registered NFTs' remaining shares without changing settled charges.
-- initiativeUsd(initiativeId) returns donated USD, pledged USD, their total, and
-  max(dollar ask minus total support, zero).
+- priceUsd(currencyId) returns the price a conversion would use now.
+- initiativeUsd(initiativeId) returns (donatedUsd, pledgedUsd, totalUsd, askUsd): donated USD,
+  pledged USD, their total, and the ask, max(dollar goal minus total support, zero). It never
+  reverts on a price or a balance.
 - initiativeCurrencyAmounts(...) exposes the underlying donated and pledged quantities.
 
-Nonzero amounts in feed-priced currencies require a positive, timely oracle answer. Missing,
-future-dated, stale or precision-changing data reverts instead of excluding an asset
-silently. Token precision changes also revert for fixed-dollar currencies.
-Conversions round down; donation and pledge components are valued separately.
+**Prices never block.** A feed answer is good when the read succeeds, the round is not 0, the
+answer is positive and fits a uint192, `updatedAt` is not 0 and not after the block's time, and
+the feed's decimals are unchanged. Its age never matters: Chainlink's latest answer is used as
+it stands. A feed that is not good (reverting, malformed, codeless, zero or negative answer,
+changed decimals) falls back to the stored last price: the last good answer the contract saw,
+written when a recorded ballot reads a newer good answer (event `PriceStored`) and seeded at
+registration. Feed and token reads are staticcalls capped at 100k gas, so a malformed,
+reverting or codeless feed or token never reverts a ballot or a view; a token whose balance
+read fails counts as $0. Conversions round down; donation and pledge components are valued
+separately; sums saturate instead of overflowing.
 
 Donations mean the entire allowed-currency balance at a project address. Withdrawals
 or spending lower that balance. The admin must cancel/reduce a pledge when it becomes
@@ -125,7 +135,7 @@ These are **live block-state views**, not final results or arbitrary timestamp l
 To reproduce a historical checkpoint, call them at the canonical prefix block using
 an archive RPC block tag. That recovers historical balances, pool/pledge state and
 oracle state together. An old oracle round alone cannot recover old balances.
-The configured maxPriceAge is evaluated against the selected block's timestamp.
+A fallback uses the stored last price as of the selected block.
 All tallies use the ordinary [cutoff rules](docs/quiet-ending-rules.md#checkpoints-derived-from-on-chain-data):
 the last canonical block strictly before the tally timestamp. In-window tallies
 are taken at each block that holds a [tally event](docs/quiet-ending-rules.md#tally-events).
@@ -133,27 +143,27 @@ No funds are transferred or custody/payout mechanism supplied by these accountin
 
 ### Ethereum mainnet currencies
 
-[config/mainnet.json](config/mainnet.json) supplies the asset, usdFeed and maxPriceAge
+[config/mainnet.json](config/mainnet.json) supplies the asset and usdFeed
 arguments for registerCurrency on chain ID 1. Register each entry before opening;
 the file itself does not submit transactions or configure the existing application API.
 Native ETH uses asset address zero; virtual USD remains the separate currency ID 0.
 
-| Currency | Chainlink USD feed | Maximum price age |
-| --- | --- | --- |
-| ETH | 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419 | 2 hours |
-| USDC | None: explicitly fixed at $1 per token | Not applicable |
-| EURC | 0x04F84020Fdf10d9ee64D1dcC2986EDF2F556DA11 | 25 hours |
+| Currency | Chainlink USD feed |
+| --- | --- |
+| ETH | 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419 |
+| USDC | None: explicitly fixed at $1 per token |
+| EURC | 0x04F84020Fdf10d9ee64D1dcC2986EDF2F556DA11 |
 
-USDC uses a zero feed address and zero maxPriceAge, matching the existing app's
+USDC uses a zero feed address, matching the existing app's
 fixed-dollar policy for donations and pledges. The pool is recorded directly in USD.
 Other USD stablecoins can be registered the same way; this preset currently includes
 only ETH, USDC and EURC. Virtual USD remains separate from every token balance.
 
 Both configured feeds report eight decimals. Their published heartbeats are
-1 hour for ETH and 24 hours for EURC; age limits include a delay margin.
+1 hour for ETH and 24 hours for EURC; a late answer is still used.
 Addresses, decimals and descriptions were checked against mainnet and the
 [Chainlink feed directory](https://reference-data-directory.vercel.app/feeds-mainnet.json).
-Recheck feed availability and freshness limits before deployment. These are mainnet
+Recheck feed availability before deployment. These are mainnet
 addresses and must not be used for Sepolia.
 
 ## Receipts, replay and settlement policy
@@ -239,18 +249,24 @@ Oracle interface and historical-state considerations:
 
 A ballot is valid only if (docs/superpowers/specs/2026-11-11-ballot-rules-design.md):
 
-- its ranked projects request at least 1.5× the pool (`2 × Σ goalUsd ≥ 3 × poolUsd`, the pool
-  as of that receipt);
+- its ranked projects ask for at least 1.5× the pool (`2 × Σ askUsd ≥ 3 × poolUsd`; a project's
+  ask is its goal less its donations and open pledges, `initiativeUsd(i).askUsd`, and the pool
+  is `poolUsd`, both on-chain at the block that records the ballot);
 - S-Tier (its first rank group; also A-Tier when `independentTiers` has bit 1) holds at
   least 3 projects with no shared affiliation, and no affiliation holds more than half of the
-  tier's requested total. RFPs have no affiliations; B-Tier is never checked;
+  tier's asked total (a $0-ask project still counts toward S-Tier independence). RFPs have no
+  affiliations; B-Tier is never checked;
 - it has at most three rank groups.
 
 Affiliations are registered as groups (`addGroup`, a `groups` bitmask per initiative). The
 contract checks every ballot with a proof: three unrelated project indexes per enforced
-tier, sent alongside the ballot and not signed. The replay checks every ballot again
-(`invalid_ballot`) as a backstop, judging each by the projects and pool before it in
-chain order (block, log index). New projects may join during the vote outside
+tier, sent alongside the ballot and not signed. The contract is the only judge: the replay
+does not re-judge the rules but checks the contract's `transcript`, `recordCount` and
+`ballotHashOf` at each block it uses, and counts only the ballots the contract committed
+to (rounds deployed before 14 November 2026 are checked with the earlier transcript
+formula). A project's ask can move between a ballot's checks and its recording block, so
+the round's `asks` (read from `initiativeUsd`) are what the page and the relay pre-check
+with; only the recording block decides. New projects may join during the vote outside
 every tier's quiet-ending span; a ballot shorter than the project list reads the missing
 ones as unplaced. The Python reference is `reference/ballot_rules.py`, kept equal to the
 TypeScript and Solidity versions by `shared/vote/fixtures/ballot-rules.json`.

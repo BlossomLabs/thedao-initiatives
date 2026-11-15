@@ -272,61 +272,31 @@ describe("quiet-ending replay", () => {
   });
 });
 
-describe("ballot rules in the replay", () => {
-  /** Four unrelated projects asking 100 each; pool 200 unless the chain raised it. */
-  type Pos = { block: number; logIndex: number };
-  const rules = (
-    over: { addedAt?: (Pos | null)[]; pool?: (Pos & { poolUsd: bigint })[] } = {},
-  ) => ({
-    round: {
-      projects: [100n, 100n, 100n, 100n].map((goalUsd) => ({ goalUsd, rfp: false, groups: [] })),
-      asks: [100n, 100n, 100n, 100n],
-      groupNames: [],
-      poolUsd: 200n,
-      independentTiers: 1,
-    },
-    addedAt: over.addedAt ?? [null, null, null, null],
-    pool: over.pool ?? [],
-  });
-  const run4 = (receipts: Receipt[], r = rules()) =>
-    replay(
-      { schedule, m: 4, poolUsd: 200n, needs: [150n, 150n, 150n, 150n], receipts, rules: r },
-      T - 1,
-    );
+describe("ballot shape in the replay", () => {
+  const run4 = (receipts: Receipt[]) =>
+    replay({ schedule, m: 4, poolUsd: 200n, needs: [150n, 150n, 150n, 150n], receipts }, T - 1);
 
-  it("an invalid ballot is refused; the earlier one still counts", () => {
-    const s = run4([r("a", 1, [1, 1, 1, X]), r("a", 2, [1, X, X, X])]);
+  it("a ballot the replay can't read is refused; the earlier one still counts", () => {
+    const s = run4([r("a", 1, [1, 1, 1, X]), r("a", 2, [1, 3, X, X])]);
     expect(s.rejected).toEqual([{ tokenId: "a", nonce: 0, reason: "invalid_ballot" }]);
     expect([...s.accepted.get("a")!]).toEqual([1, 1, 1, X]);
   });
 
-  it("a first ballot that breaks a rule leaves the badge unvoted", () => {
-    const s = run4([r("b", 1, [1, 1, X, X])]);
+  it("a ballot longer than the projects is refused", () => {
+    const s = run4([r("b", 1, [1, 1, 1, 1, 1])]);
     expect(s.accepted.has("b")).toBe(false);
     expect(s.rejected).toEqual([{ tokenId: "b", nonce: 0, reason: "invalid_ballot" }]);
   });
 
-  it("validity uses the pool at that receipt, by chain position (not time)", () => {
-    const a = r("a", 3, [1, 1, 1, X]);
-    const b = { ...r("b", 3, [1, 1, 1, X], true), logIndex: 2 }; // same block, a later log
-    // The pool was raised between them, in the same block (log 1).
-    const s = run4(
-      [{ ...a, logIndex: 0 }, b],
-      rules({ pool: [{ block: a.block, logIndex: 1, poolUsd: 1_000n }] }),
-    );
-    expect(s.accepted.has("a")).toBe(true); // 300 ≥ 1.5 × 200 when it landed
-    expect(s.accepted.has("b")).toBe(false); // 300 < 1.5 × 1,000
+  it("a recorded ballot is not re-judged on size", () => {
+    // Two projects needing 150, under 1.5 × the pool of 200: the contract recorded it.
+    const s = run4([r("c", 1, [1, 1, X, X])]);
+    expect(s.rejected).toEqual([]);
+    expect([...s.accepted.get("c")!]).toEqual([1, 1, X, X]);
   });
 
-  it("a ballot recorded before a project was added reads it as unplaced", () => {
-    const a = r("a", 5, [1, 1, 1]);
-    const b = r("b", 5, [1, 1, 1, 1]);
-    const s = run4(
-      [a, b],
-      rules({ addedAt: [null, null, null, { block: b.block + 1, logIndex: 0 }] }),
-    );
-    expect([...s.accepted.get("a")!]).toEqual([1, 1, 1, X]);
-    // Four bytes when only three projects existed: unreadable.
-    expect(s.rejected).toEqual([{ tokenId: "b", nonce: 0, reason: "invalid_ballot" }]);
+  it("a ballot signed before a project was added reads it as unplaced", () => {
+    const s = run4([r("d", 1, [1, 1, 1])]);
+    expect([...s.accepted.get("d")!]).toEqual([1, 1, 1, X]);
   });
 });

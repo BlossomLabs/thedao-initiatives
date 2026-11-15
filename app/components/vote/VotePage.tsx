@@ -53,6 +53,8 @@ const REAL = (m = ROUND) => m.kind === "real";
 const microUsd = (v: string) => Number(BigInt(v) / 10_000n) / 100;
 /** The shake on why a ballot can't be sent (app.css), none with reduced motion. */
 const NUDGE = "motion-safe:animate-reason-nudge";
+/** Why Send waits while the round came without the chain's asks. */
+const ASKS_PENDING = "The asks are being worked out; try again in a minute.";
 const closeTextOf = (m: VoteManifest) => <When at={m.closesAt} />;
 
 const tiersKey = (n: number) => `vote-tiers:${ROUND.contract}:${n}`;
@@ -550,13 +552,15 @@ export default function VotePage(
     } catch { /* storage unavailable */ }
   };
 
+  // Each initiative's ask is the chain's, served with the round: none while it's unknown.
+  const asks = rv?.asks;
   const items = useMemo<BallotItem[]>(() => {
     const cards = new Map(board.data?.cards.map((c) => [c.initiative.slug, c]));
     return R.slugs.map((slug) => {
       const card = cards.get(slug);
-      return { slug, title: card?.initiative.title ?? slug, card, askUsd: card && askOf(card) };
+      return { slug, title: card?.initiative.title ?? slug, card, askUsd: askOf(R, asks, slug) };
     });
-  }, [board.data]);
+  }, [board.data, R, asks]);
 
   // A holder of several voting badges votes once per badge: pick which one.
   const picker = myBallot && ids.length > 1 && (
@@ -758,7 +762,7 @@ export default function VotePage(
       // The contract would refuse it: never open the wallet for a ballot breaking a rule.
       if (broken) return;
       setSendRoute("own");
-      void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(R.slugs, tiers)));
+      void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(R.slugs, tiers)), rulesFor);
     };
     const counted = rv ? Boolean(rv.accepted[String(n)]) : true;
     const registrationOver = rv ? voteNow() / 1000 >= rv.registrationClosesAt : false;
@@ -783,29 +787,32 @@ export default function VotePage(
       r.tokenId === String(n) && ballotFlow.last && BigInt(r.nonce) === ballotFlow.last.nonce
     );
     // The ballot's ask, on a ring full at 3× the pool (the 1.5× the rules want is half way);
-    // the settled tiers' part of it.
+    // the settled tiers' part of it. Counted on the chain's asks, as the contract judges it;
+    // while they're being worked out, no amount at all.
     const poolNow = Number(BigInt(rv?.poolUsd ?? R.poolUsd) / 1_000_000n);
-    const goalOf = (slug: string) => microUsd(R.projects[R.slugs.indexOf(slug)]?.goalUsd ?? "0");
-    const asked = Object.entries(tiers).reduce((a, [slug, t]) => a + (t ? goalOf(slug) : 0), 0);
+    const askIn = asks &&
+      ((slugs: string[]) => slugs.reduce((a, slug) => a + (askOf(R, asks, slug) ?? 0), 0));
+    const asked = askIn?.(Object.keys(tiers).filter((slug) => tiers[slug]));
     const voters = rv ? Object.keys(rv.accepted).length : 0;
     const share = rv?.share ? microUsd(rv.share) : voters > 0 ? poolNow / voters : undefined;
     // The ballot rules (rounds deployed with them), with the pool on-chain now. Checked
     // from the first pick (and before it, for the ballot box's line); refusals only once
     // something is placed.
-    const rules = R.ballotRules
-      ? checkBallot(
-        encodeBallot(R.slugs, tiers),
-        // asks: Task 6/7
-        rulesRound(R, R.projects.map((p) => BigInt(p.goalUsd)), BigInt(rv?.poolUsd ?? R.poolUsd)),
-      )
+    // A ballot sent from the wallet carries its proof, found on the same round.
+    const rulesFor = asks && rulesRound(R, asks.map(BigInt), BigInt(rv?.poolUsd ?? R.poolUsd));
+    const rules = rulesFor && R.ballotRules
+      ? checkBallot(encodeBallot(R.slugs, tiers), rulesFor)
       : null;
+    // The rules count the chain's asks: without them nothing can be judged, or sent (the
+    // relayer refuses too).
+    const asksPending = Boolean(R.ballotRules && rv && !asks);
     // An enforced tier left empty: the bytes would read the next one in its place.
     const empty = R.ballotRules ? emptyTierErrors(tiers, R.independentTiers) : [];
     const allErrors = empty.length
       ? [...empty, ...(rules?.errors.filter((e) => e.rule === "size") ?? [])]
       : rules?.errors ?? [];
     const errors = placed > 0 ? allErrors : [];
-    const broken = errors.length > 0;
+    const broken = errors.length > 0 || asksPending;
     // Valid a moment ago, not now (a pick broke a rule): shake why, once it's on screen.
     const invalid = allErrors.length > 0;
     if (wasInvalid.current === false && invalid) setTimeout(() => showWhyNot(false));
@@ -838,16 +845,19 @@ export default function VotePage(
           pool={poolNow}
           share={share}
           shareFinal={registrationOver}
-          status={R.ballotRules ? ruleStatus(allErrors) : undefined}
+          status={asksPending
+            ? { ok: false, text: ASKS_PENDING }
+            : R.ballotRules
+            ? ruleStatus(allErrors)
+            : undefined}
           settled={settledTiers.map((t) => {
             const fromBallot = t.funded.filter((slug) => tiers[slug] === t.tier);
             const held = Object.keys(tiers).filter((slug) => tiers[slug] === t.tier);
-            const askIn = (slugs: string[]) => slugs.reduce((a, slug) => a + goalOf(slug), 0);
             return {
               tier: t.tier,
               funded: fromBallot.length,
-              fundedAsk: askIn(fromBallot),
-              waitingAsk: askIn(held.filter((slug) => !t.funded.includes(slug))),
+              fundedAsk: askIn?.(fromBallot) ?? 0,
+              waitingAsk: askIn?.(held.filter((slug) => !t.funded.includes(slug))) ?? 0,
               fundedUsd: fromBallot.reduce((a, slug) => a + microUsd(t.awards[slug] ?? "0"), 0),
               paid: paidHere(t).reduce((a, [, v]) => a + v, 0),
             };
@@ -943,15 +953,13 @@ export default function VotePage(
                     ? `${inTier.length} ${inTier.length === 1 ? "initiative" : "initiatives"}`
                     : "Empty"}
                 </span>
-                <span className="text-[14px] text-white tnum">
-                  {usd(inTier.reduce((a, slug) => a + goalOf(slug), 0))}
-                </span>
+                {askIn && <span className="text-[14px] text-white tnum">{usd(askIn(inTier))}</span>}
               </li>
             );
           })}
           <li className="flex items-baseline gap-2 px-3.5 py-3">
             <span className="flex-1 text-[13px] text-white/65">Asked in all</span>
-            <b className="text-[15px] text-white tnum">{usd(asked)}</b>
+            {asked !== undefined && <b className="text-[15px] text-white tnum">{usd(asked)}</b>}
           </li>
         </ul>
         <p className="m-0 mt-3 px-0.5 text-[13.5px] leading-relaxed text-white/72">
@@ -1004,6 +1012,7 @@ export default function VotePage(
           roundBox={roundStepsOnly}
           live={{
             onEdit: () => showEditor(true),
+            asks,
             tally: rv && {
               tiers: rv.live.tiers ?? {},
               awards: Object.fromEntries(

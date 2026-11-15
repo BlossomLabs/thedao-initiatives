@@ -61,7 +61,7 @@ const real: VoteManifest = {
 
 type Sent = Parameters<VoteChain["send"]>[0];
 
-function fakeChain() {
+function fakeChain(chainManifest: VoteManifest = manifest) {
   const state = {
     /** What the next send throws (a contract revert the RPC reports). */
     sendError: null as Error | null,
@@ -104,6 +104,8 @@ function fakeChain() {
     /** Likewise for the record count and one token's ballot hash. */
     countOverride: null as bigint | null,
     hashOverride: null as { tokenId: string; hash: Hex } | null,
+    /** What each project asks on-chain; null: the read fails. Default: its goal. */
+    asks: null as bigint[] | null | "fail",
     ballotReads: 0,
     txStatus: new Map<string, "pending" | "success" | "reverted" | "unknown">(),
     /** What the RPC says the relayer's pending nonce is (may lag). */
@@ -182,13 +184,17 @@ function fakeChain() {
       });
     },
     rulesHistory: () => Promise.resolve(state.history),
+    asks: () =>
+      state.asks === "fail"
+        ? Promise.reject(new Error("rpc down"))
+        : Promise.resolve(state.asks ?? chainManifest.projects.map((p) => BigInt(p.goalUsd))),
   };
   return { state, chain };
 }
 
 async function setup(m: VoteManifest = manifest) {
   const h = await harness();
-  const fake = fakeChain();
+  const fake = fakeChain(m);
   // The relayer has gas unless a test says otherwise.
   fake.state.balances.set(RELAYER, 10n ** 18n);
   // Every initiative needs $100 unless a test says otherwise (the board isn't seeded).
@@ -1218,7 +1224,7 @@ Deno.test("round: an invalid ballot shows as refused with invalid_ballot", async
   const { h, state } = await setup(ruled);
   state.logs = [
     logOf("1", "01010101", NOW - 100, 1), // S-Tier = a, b, c, d: valid
-    logOf("2", `01${X}${X}${X}`, NOW - 90, 2), // S-Tier = a alone: invalid
+    logOf("2", `01030303`, NOW - 90, 2), // a rank gap: unreadable
   ];
   const body = await j(await h.req("/api/vote/round")) as {
     accepted: Record<string, string>;
@@ -1271,19 +1277,19 @@ Deno.test("round: a round from before Nov 14 is read with its legacy transcript"
   h.close();
 });
 
-Deno.test("round: the pool the chain raised judges later ballots", async () => {
+Deno.test("round: the pool the chain raised shows, but recorded ballots aren't re-judged", async () => {
   const { h, state } = await setup(ruled);
   // Raised after ballot 1 (block 1) and before ballot 2 (block 2).
   state.history = { addedAt: [], pool: [{ block: 1, logIndex: 5, poolUsd: 1_000n }] };
   state.logs = [
-    logOf("1", "01010101", NOW - 100, 1), // 400 ≥ 1.5 × 200
-    logOf("2", "01010101", NOW - 90, 2), // 400 < 1.5 × 1,000
+    logOf("1", "01010101", NOW - 100, 1),
+    logOf("2", "01010101", NOW - 90, 2), // the contract recorded it: the transcript proves it
   ];
   const body = await j(await h.req("/api/vote/round")) as {
     accepted: Record<string, string>;
     poolUsd: string;
   };
-  assertEquals(Object.keys(body.accepted), ["1"]);
+  assertEquals(Object.keys(body.accepted), ["1", "2"]);
   assertEquals(body.poolUsd, "1000");
   await h.settle();
   h.close();
@@ -1348,6 +1354,59 @@ Deno.test("ballot: a rule the contract enforced after a pool change is a 422, no
   const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
   assertEquals(res.status, 422);
   assertEquals((await j(res)).code, "invalid_ballot");
+  h.close();
+});
+
+Deno.test("the round carries the chain asks", async () => {
+  const { h, state } = await setup(ruled);
+  state.asks = [10n, 20n, 30n, 40n];
+  const body = await j(await h.req("/api/vote/round")) as { asks?: string[] };
+  assertEquals(body.asks, ["10", "20", "30", "40"]);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("a round without ballot rules still carries the chain asks", async () => {
+  const { h, state } = await setup();
+  state.asks = [1n, 2n, 3n];
+  const body = await j(await h.req("/api/vote/round")) as { asks?: string[] };
+  assertEquals(body.asks, ["1", "2", "3"]);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("the relayer judges with chain asks", async () => {
+  const { h, state } = await setup(ruled);
+  state.owners.set(17n, VOTER.address);
+  // The goals ($100 each) clear 1.5 × the pool of $200; what is still asked does not.
+  state.asks = [50n, 50n, 50n, 50n];
+  const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
+  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  assertEquals(res.status, 422);
+  const out = await j(res) as { code: string; errors: Record<string, unknown>[] };
+  assertEquals(out.code, "invalid_ballot");
+  assertEquals(out.errors, [{ rule: "size", requested: "200", needed: "300", pool: "200" }]);
+  assertEquals(state.sent, []);
+  h.close();
+});
+
+Deno.test("asks unavailable: round served without asks, relay 503", async () => {
+  const { h, state } = await setup(ruled);
+  state.owners.set(17n, VOTER.address);
+  state.asks = "fail";
+  const round = await h.req("/api/vote/round");
+  assertEquals(round.status, 200);
+  assertEquals("asks" in await j(round), false);
+  const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
+  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  assertEquals(res.status, 503);
+  assertEquals((await j(res)).code, "asks_unavailable");
+  assertEquals(state.sent, []);
+  // A read of the wrong length is as good as none.
+  state.asks = [1n];
+  h.clock.now += 60;
+  assertEquals("asks" in await j(await h.req("/api/vote/round")), false);
+  await h.settle();
   h.close();
 });
 

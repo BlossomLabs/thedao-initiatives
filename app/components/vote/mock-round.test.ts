@@ -33,11 +33,9 @@ describe("dev mocks", () => {
         : encodeBallot(m.round.slugs, tiers ?? {});
       // No ballot yet, or never one (the badge that missed registration).
       if (kind === "started" || kind === "missed") return expect(hex).toBeUndefined();
-      // asks: Task 6/7
-      expect(
-        checkBallot(bytes, rulesRound(m.round, m.round.projects.map((p) => BigInt(p.goalUsd))))
-          .errors,
-      ).toEqual([]);
+      // Judged as the contract does: on the asks the round serves.
+      const asks = m.view.asks!.map(BigInt);
+      expect(checkBallot(bytes, rulesRound(m.round, asks)).errors).toEqual([]);
     },
   );
 
@@ -162,6 +160,32 @@ describe("example vote results: the real tally over made-up ballots", () => {
     expect(round.projects[1].goalUsd).toBe("101000000000");
     const { inp } = liveInputsFrom(view.live.inputs!);
     expect(inp.costs[1]).toBe(81_000_000_000n);
+  });
+
+  it("the sample ballot asks at least 1.5× the pool by asks", () => {
+    for (const kind of MOCKS) {
+      const m = mockRound(kind, cards, 1);
+      const asks = m.view.asks!.map(BigInt);
+      expect(asks).toHaveLength(m.round.slugs.length);
+      const hex = m.view.accepted["1"];
+      const placed = hex
+        ? m.round.slugs.filter((_, i) => hexToBytes(hex as `0x${string}`)[i] !== 255)
+        : m.ratings
+        ? Object.keys(prefillFromRatings(m.ratings, m.round.slugs))
+        : [];
+      // No ballot yet, or never one.
+      if (!placed.length) continue;
+      const asked = placed.reduce((a, slug) => a + asks[m.round.slugs.indexOf(slug)], 0n);
+      expect(asked).toBeGreaterThanOrEqual(BigInt(m.round.poolUsd) * 3n / 2n);
+    }
+  });
+
+  it("the round's asks are the tally's costs", () => {
+    for (const kind of ["s-settling", "spent", "b-settling"] as const) {
+      const { view } = mockRound(kind, cards, 1);
+      const { inp } = liveInputsFrom(view.live.inputs!);
+      expect(view.asks!.map(BigInt)).toEqual(inp.costs);
+    }
   });
 
   it("a round with nothing counted, or closed, has no figures to work out", async () => {

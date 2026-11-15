@@ -22,8 +22,9 @@ const { Component: DonateWidget } = lazyPart(
 
 export type GiveRow = {
   card: Card;
-  /** What the round asks the pool for it, in dollars (its cost in the tally). */
-  askUsd: number;
+  /** What it asks the pool for on-chain, in dollars (its cost in the tally); absent while
+   * the asks are being worked out. */
+  askUsd?: number;
   /** Below the tier settling now: the donation that moves it up a tier. */
   entry?: NextTierEntry;
   /** In the tier settling now: how far ahead it is, in whole dollars (0: barely). */
@@ -276,7 +277,8 @@ export default function GiveList(
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[14px] text-white">{i.title}</span>
                       <span className="mt-0.5 block truncate text-[12px] text-white/55 tnum">
-                        Needs {usd(need)} · {r.now ? `now in ${tierName(r.now)}` : "not included"}
+                        {need !== undefined && `Needs ${usd(need)} · `}
+                        {r.now ? `now in ${tierName(r.now)}` : "not included"}
                       </span>
                     </span>
                     {!r.entry

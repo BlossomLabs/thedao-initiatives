@@ -76,6 +76,23 @@ it("each initiative shows what the round asks for it, on its tile and its card, 
   expect(screen.queryByText(/goal/)).toBeNull();
 });
 
+it("while the asks are being worked out, a tile and its card show no amount, not $0", async () => {
+  inRouter(
+    <TierBallot
+      items={[{ slug: "alpha", title: "ALPHA", askUsd: undefined }]}
+      tiers={{}}
+      disabled={false}
+      locked={new Set<Tier>()}
+      onChange={vi.fn()}
+      onReplace={vi.fn()}
+    />,
+  );
+  expect(screen.queryByText(/ ask$/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Details for ALPHA" }));
+  const card = await screen.findByRole("dialog", { name: "ALPHA" });
+  expect(card).not.toHaveTextContent(/\$\d/);
+});
+
 it("a settled tier says so, and its card locks the choices", async () => {
   const { onChange } = show({ alpha: "S" });
   expect(screen.getByText("Settled")).toBeInTheDocument();

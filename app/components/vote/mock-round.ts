@@ -8,7 +8,6 @@ import { liveInputsFrom, liveInputsJson } from "../../../shared/vote/live-inputs
 import { giftGapsAsync, liveLeadsAsync } from "../../../shared/vote/next-tier";
 import { effectiveRanks } from "../../../vote/shared/ranks";
 import type { VoteManifest } from "../../../shared/vote/manifest";
-import { askOf } from "~/lib/vote-results";
 
 /** Examples of the ballot through the vote, public at `/vote/mock/<kind>` (and in dev at
  * `?mock=<kind>`): the real round's dates and the board's real proposals, with a made-up
@@ -94,9 +93,14 @@ export const MOCK_NOW: Record<MockKind, number> = {
 
 const micro = (usd: number) => String(Math.round(usd * 1_000_000));
 
+/** The example's ask for an initiative, in dollars: there is no chain, so its goal less the
+ * board's donations and pledges, as the contract would count them. Never $0: that would
+ * fund it at the first level that opens it. */
+const mockAsk = (c: Card) => Math.max(1, c.initiative.goalUsd - c.summary.total);
+
 /** The fictional round: the board's proposals, oldest first. As on chain, each project's
- * `goalUsd` is its goal; what the tally charges is its need (`needs`): the goal less the
- * donations and open pledges, as the server counts it. */
+ * `goalUsd` is its goal; what the tally charges is its ask (`needs`, `mockAsk`), which the
+ * round's view serves as its `asks`, as the server does the chain's. */
 function fictionalRound(cards: Card[], opensAt: number, firstTally: [number, number, number]) {
   const list = [...cards]
     .filter((c) => c.initiative.goalUsd > 0)
@@ -121,16 +125,15 @@ function fictionalRound(cards: Card[], opensAt: number, firstTally: [number, num
     independentTiers: 1,
     ballotRules: true,
   };
-  // Never $0: that would fund it at the first level that opens it.
-  const needs = list.map((c) => BigInt(micro(Math.max(1, askOf(c)))));
+  const needs = list.map((c) => BigInt(micro(mockAsk(c))));
   return { round, needs };
 }
 
 /** The badge's ballot in every state: 3 in S-Tier, 4 in A-Tier, and B-Tier from 6 on
- * until the ballot asks for 1.5× the pool (the ballot rules). */
-function sampleBallot(round: VoteManifest) {
+ * until the ballot asks for 1.5× the pool by its asks (the ballot rules). */
+function sampleBallot(round: VoteManifest, asks: bigint[]) {
   const { slugs } = round;
-  const ask = (i: number) => BigInt(round.projects[i].goalUsd);
+  const ask = (i: number) => asks[i];
   const needed = (BigInt(round.poolUsd) * 3n) / 2n;
   let total = 0n;
   for (let i = 0; i < 13 && i < slugs.length; i++) total += ask(i);
@@ -298,10 +301,16 @@ export function useMockCards(cards: Card[] | undefined): Card[] | undefined {
  * tiers and the live result come from the real tally over 40 made-up ballots. */
 export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   const share = POOL_USD / VOTERS;
-  const base = { closed: false, share: micro(share), rejected: [], poolUsd: micro(POOL_USD) };
   const first = FIRST;
   const { round, needs } = fictionalRound(cards, OPENS, first);
-  const sample = sampleBallot(round);
+  const base = {
+    closed: false,
+    share: micro(share),
+    rejected: [],
+    poolUsd: micro(POOL_USD),
+    asks: needs.map(String),
+  };
+  const sample = sampleBallot(round, needs);
   const skipped = round.slugs.filter((x) => !sample.ballot[x]).slice(0, 6);
 
   if (kind === "started" || kind === "prefilled") {

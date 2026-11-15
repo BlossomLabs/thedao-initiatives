@@ -74,3 +74,62 @@ Deno.test("a real round reads ownerOf from the voting badge, not the ballots con
   assertEquals((await chain.ownerOf(7n))?.toLowerCase(), "0x" + "11".repeat(20));
   assertEquals(calls, [BADGE]);
 });
+
+Deno.test("asks: every project's initiativeUsd ask, in manifest order, in one multicall", async () => {
+  const { createVoteChain } = await import("../services/vote-chain.ts");
+  const { custom, encodeFunctionResult, parseAbi } = await import("viem");
+  const { SIGNED_BALLOTS_ABI } = await import("../../shared/vote/abi.ts");
+  const usd = (a: bigint, b: bigint, c: bigint, d: bigint) =>
+    encodeFunctionResult({
+      abi: SIGNED_BALLOTS_ABI,
+      functionName: "initiativeUsd",
+      result: [a, b, c, d],
+    });
+  const multicall3 = parseAbi([
+    "function aggregate3((address target, bool allowFailure, bytes callData)[]) returns ((bool success, bytes returnData)[])",
+  ]);
+  let calls = 0;
+  const transport = custom({
+    request: ({ method }: { method: string }) => {
+      if (method === "eth_chainId") return Promise.resolve("0x1");
+      if (method === "eth_call") {
+        calls++;
+        return Promise.resolve(encodeFunctionResult({
+          abi: multicall3,
+          functionName: "aggregate3",
+          result: [
+            { success: true, returnData: usd(5n, 6n, 11n, 100n) },
+            { success: true, returnData: usd(0n, 0n, 0n, 250n) },
+          ],
+        }));
+      }
+      return Promise.reject(new Error("unexpected " + method));
+    },
+  });
+  const chain = createVoteChain(
+    {
+      kind: "test",
+      chainId: 1,
+      contract: "0x1000000000000000000000000000000000000001",
+      deployBlock: 1,
+      opensAt: 0,
+      closesAt: 1,
+      schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
+      poolUsd: "1",
+      issuer: "0x1000000000000000000000000000000000000002",
+      slugs: ["a", "b"],
+      projects: [{ goalUsd: "1", rfp: false, groups: [] }, {
+        goalUsd: "1",
+        rfp: false,
+        groups: [],
+      }],
+      groups: [],
+      independentTiers: 1,
+    },
+    "http://unused",
+    null,
+    transport,
+  );
+  assertEquals(await chain.asks(), [100n, 250n]);
+  assertEquals(calls, 1);
+});

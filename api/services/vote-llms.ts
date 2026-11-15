@@ -12,33 +12,42 @@ const dollars = (micro: bigint) => {
   const fraction = (micro % 1_000_000n).toString().padStart(6, "0").replace(/0+$/, "");
   return `$${(micro / 1_000_000n).toLocaleString("en-US")}${fraction ? `.${fraction}` : ""}`;
 };
-const usd = (n: number) => `$${Math.round(Math.max(0, n)).toLocaleString("en-US")}`;
 const utc = (secs: number) =>
   `${new Date(secs * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 
-export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: string): string {
+export function voteLlms(
+  m: VoteManifest,
+  entries: FeedInitiative[],
+  origin: string,
+  asks?: bigint[],
+): string {
   const [sTier, aTier, bTier] = TIERS.map(tierName);
   const pool = BigInt(m.poolUsd);
   const needed = (3n * pool + 1n) / 2n;
   const tierA = (m.independentTiers & 2) !== 0;
   const enforced = tierA ? `${sTier} and ${aTier}` : sTier;
   const rules = () => [
-    `- The projects you rank must request at least ${dollars(needed)} in total (1.5× the ${
+    `- The projects you rank must ask for at least ${dollars(needed)} in total (1.5× the ${
       dollars(pool)
-    } configured pool). If the live pool differs, recompute this minimum from its poolUsd.`,
-    "- Use the original requested amounts below for the minimum and affiliation limits, " +
-    'not the smaller "still needs" amounts after donations or pledges.',
+    } configured pool). A project's ask is its goal less its donations and open pledges, ` +
+    "on-chain at the block that records your ballot, so it can change before then. If the " +
+    "live pool differs, recompute this minimum from its poolUsd.",
+    "- Where a project's ask is unknown, the ballot's size can't be checked here: say so to the " +
+    "voter rather than estimating it.",
+    "- The asks listed below are the chain's current ones: use them for the minimum and the " +
+    "affiliation limits, and leave room for them to shrink. A project already fully funded " +
+    "asks $0: it counts toward S-Tier independence but adds nothing to a total or a share.",
     `- ${sTier} needs at least 3 independent projects: choose three such that no pair shares ` +
     "any listed affiliation. RFPs have no affiliations, so each RFP counts as independent. " +
     "Additional related projects may be included if the affiliation limit below is kept.",
     `- In ${sTier}, the projects of one affiliation can hold at most half of the tier's ` +
-    "requested total. Check each affiliation separately; a project with several affiliations " +
-    "counts its full requested amount toward each. Exactly half is allowed.",
+    "asked total. Check each affiliation separately; a project with several affiliations " +
+    "counts its full ask toward each. Exactly half is allowed.",
     ...(tierA
       ? [`- ${aTier} follows the same two independence and affiliation rules.`]
       : [`- ${aTier} has no independence minimum or affiliation limit in this round.`]),
     `- ${enforced} must not be empty. ${bTier} has no independence minimum or affiliation ` +
-    "limit; the whole ballot must still meet the total-request minimum.",
+    "limit; the whole ballot must still meet the total-ask minimum.",
     "- A ballot that breaks a rule is invalid: it can't be sent. Adding projects or increasing " +
     "the pool later does not invalidate an earlier accepted ballot; a new revision must meet " +
     "the rules in force when it is recorded.",
@@ -53,10 +62,10 @@ export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: str
     const p = m.projects[i];
     const e = bySlug.get(slug);
     const affiliations = p.groups.map((g) => m.groups[g]).join(", ") || "none";
-    return `- ${slug} — ${e?.title ?? slug} · ${p.rfp ? "RFP" : "Grant"} · requests ${
+    return `- ${slug} — ${e?.title ?? slug} · ${p.rfp ? "RFP" : "Grant"} · goal ${
       dollars(BigInt(p.goalUsd))
-    } · still needs ${
-      e ? usd(e.goalUsd - e.raisedUsd) : "unknown"
+    } · asks ${
+      asks?.[i] === undefined ? "unknown" : dollars(asks[i])
     } · affiliations: ${affiliations} · [details](${
       e?.markdownUrl ?? `${origin}/initiative/${slug}.md`
     })`;
@@ -142,9 +151,9 @@ export function voteLlms(m: VoteManifest, entries: FeedInitiative[], origin: str
     "write the vote in the YAML format above, all three tiers, in a ```yaml code block.",
     ...(m.ballotRules
       ? [
-        "Before returning it, check the total original requests against 1.5× the live pool, " +
+        "Before returning it, check the total asks against 1.5× the live pool, " +
         `name three pairwise-independent projects in each of ${enforced}, and check every ` +
-        "affiliation's share of each enforced tier's requests is at most 50%. If the voter's " +
+        "affiliation's share of each enforced tier's asks is at most 50%. If the voter's " +
         "choices cannot satisfy the rules, explain what is missing and ask which projects " +
         "they want to add; do not invent preferences or return an invalid ballot.",
       ]

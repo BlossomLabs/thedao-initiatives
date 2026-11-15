@@ -694,6 +694,8 @@ function roundBody(over: Record<string, unknown> = {}) {
     tiers: [waiting("S"), waiting("A"), waiting("B")],
     accepted: {},
     rejected: [],
+    // The chain's asks, in manifest order: here each initiative's goal.
+    asks: ["400000000", "400000000", "400000000"],
     live: { funded: [], awards: {} },
     ...over,
   };
@@ -1204,4 +1206,58 @@ it("ballot rules: an empty S-Tier is refused, though the chain would read A-Tier
     "aria-disabled",
     "true",
   );
+});
+
+// ---------------------------------------------------------------- asks
+it("the ring and tier totals add up the rows' asks", async () => {
+  // The chain's asks, not the goals ($400 each): what donations and pledges left.
+  const asks = ["1000000000", "2000000000", "3000000000"];
+  localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "S", beta: "A" }));
+  await ballotWith(roundBody({ asks, poolUsd: "10000000000" }));
+  // GAMMA, unranked, on its tile; ALPHA, in S-Tier, on its card.
+  expect(screen.getAllByText(/\$3,000 ask/).length).toBeGreaterThan(0);
+  fireEvent.click(screen.getByRole("button", { name: "ALPHA" }));
+  expect(await screen.findByRole("dialog")).toHaveTextContent("$1,000 ask");
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  const ring = screen.getByRole("meter", { name: "What your ballot asks for" });
+  expect(ring).toHaveAttribute("aria-valuenow", "3000");
+  expect(screen.getByText("$3,000 asked")).toBeInTheDocument();
+  cleanup();
+
+  // On a phone, the send sheet sums each tier the same way.
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: true,
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+  try {
+    roundIs.body = roundBody({ asks, poolUsd: "10000000000" });
+    show(`/vote/${CODE}/edit`);
+    fireEvent.click(await screen.findByRole("button", { name: "Send my ballot" }));
+    const sheet = await screen.findByRole("dialog", { name: "Send my ballot" });
+    const row = (label: string) => within(sheet).getByText(label).closest("li")!;
+    expect(row("S-Tier")).toHaveTextContent("$1,000");
+    expect(row("A-Tier")).toHaveTextContent("$2,000");
+    expect(row("Asked in all")).toHaveTextContent("$3,000");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it("without chain asks the page says the figures are being worked out", async () => {
+  round.ballotRules = true;
+  localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "S", beta: "S", gamma: "S" }));
+  await ballotWith(roundBody({ asks: undefined, poolUsd: "500000000" }));
+  // No amounts on the rows, none in the ring.
+  expect(screen.queryByText(/ ask$/)).toBeNull();
+  expect(screen.queryByText(/asked$/)).toBeNull();
+  const why = document.querySelector<HTMLElement>("[data-ballot-reason]")!;
+  expect(why).toHaveTextContent("The asks are being worked out; try again in a minute.");
+  const send = screen.getByRole("button", { name: /send my ballot/i });
+  expect(send).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(send);
+  expect(submit).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: /send it yourself/i })).toBeDisabled();
 });

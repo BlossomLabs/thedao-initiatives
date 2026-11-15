@@ -313,3 +313,48 @@ it("a previewed donation takes at least a visible stretch of TheDAO's ring", () 
   expect(donation.amount).toBe(5_000);
   expect(segs.find((s) => s.key === "rest")!.from).toBeCloseTo(0.75);
 });
+
+it("within 5% above 1.5× the pool, it warns a donation could make the ballot too small", () => {
+  const meter = (asked: number) =>
+    render(
+      <BallotMeter
+        avatar={<img alt="" />}
+        asked={asked}
+        target={3_000_000}
+        pool={1_000_000}
+        shareFinal={false}
+        settled={[]}
+        status={{ ok: true, text: "You can add as many initiatives as you want" }}
+      />,
+    );
+  const WARNING =
+    "Close to the minimum: a donation landing first could make this ballot too small.";
+  meter(1_520_000);
+  expect(screen.getByText(WARNING)).toBeInTheDocument();
+  cleanup();
+  meter(1_600_000);
+  expect(screen.queryByText(WARNING)).toBeNull();
+  cleanup();
+  // Under the minimum, the rules line says what it needs instead.
+  meter(1_400_000);
+  expect(screen.queryByText(WARNING)).toBeNull();
+});
+
+it("while the asks are being worked out, the ring shows no amount", () => {
+  render(
+    <BallotMeter
+      avatar={<img alt="" />}
+      target={3_000_000}
+      pool={1_000_000}
+      shareFinal={false}
+      settled={[]}
+      status={{ ok: false, text: "The asks are being worked out; try again in a minute." }}
+    />,
+  );
+  expect(screen.queryByText(/asked$/)).toBeNull();
+  expect(screen.getByText("The asks are being worked out; try again in a minute."))
+    .toBeInTheDocument();
+  const ring = screen.getByRole("meter", { name: "What your ballot asks for" });
+  expect(ring.getAttribute("aria-valuetext")).not.toMatch(/\$/);
+  expect(ring.querySelector("circle.stroke-dao-green")).toBeNull();
+});

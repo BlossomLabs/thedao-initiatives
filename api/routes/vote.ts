@@ -232,8 +232,12 @@ type FinalJson = { next: NextJson; lead: Record<string, string> };
 /** A closed round's final what-ifs, with the digest of what they were judged from. */
 type KnownFinal = { key: string; at: number; final: FinalJson };
 
+/** The replay with what the rules judge by now: the pool and each project's ask on-chain
+ * (absent when the chain's asks couldn't be read). */
+type Round = RoundState & { poolUsd: bigint; asks?: bigint[] };
+
 /** The round state as JSON: slugs for initiatives, decimal strings for micro-USD. */
-function roundJson(st: RoundState & { poolUsd: bigint }, slugs: string[]) {
+function roundJson(st: Round, slugs: string[]) {
   const named = (cs: number[]) => cs.map((c) => slugs[c]);
   const money = (m: Map<number, bigint>) =>
     Object.fromEntries([...m].map(([c, v]) => [slugs[c], v.toString()]));
@@ -265,6 +269,9 @@ function roundJson(st: RoundState & { poolUsd: bigint }, slugs: string[]) {
     share: st.share.toString(),
     /** The pool on-chain now (micro-USD): what a new ballot's size is judged against. */
     poolUsd: st.poolUsd.toString(),
+    /** Each initiative's ask on-chain now (micro-USD, manifest order); absent when the
+     * chain's asks couldn't be read. */
+    ...(st.asks ? { asks: st.asks.map(String) } : {}),
     tiers: st.tiers.map(tier),
     accepted: Object.fromEntries(
       [...st.accepted].map((
@@ -311,9 +318,23 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       return BigInt(Math.max(0, Math.round((c.initiative.goalUsd - c.summary.total) * 1e6)));
     });
   };
+  /** Each project's ask on-chain, or undefined when the read fails or comes back the wrong
+   * length (logged): a ballot can't be judged without them. */
+  const readAsks = async (d: VoteRound): Promise<bigint[] | undefined> => {
+    try {
+      const asks = await d.chain.asks();
+      if (asks.length !== d.manifest.slugs.length) {
+        throw new Error(`${asks.length} asks for ${d.manifest.slugs.length} projects`);
+      }
+      return asks;
+    } catch (e) {
+      deps.log(`vote asks: read failed (${e instanceof Error ? e.message : e})`);
+      return undefined;
+    }
+  };
   /** The quiet ending replayed now. A tier's settlement is written once and reused, so
    * later donations (needs) never move it. */
-  const roundState = async (d: VoteRound): Promise<RoundState & { poolUsd: bigint }> => {
+  const roundState = async (d: VoteRound): Promise<Round> => {
     const kv = deps.db.kv;
     const tiers: Tier[] = ["S", "A", "B"];
     const stored = await Promise.all(
@@ -334,6 +355,8 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
         return [[t, { at: k.at, forced: k.forced, needs: k.needs.map(BigInt), final }]];
       }),
     );
+    // Every round shows the chain's asks; started now, it runs alongside the reads below.
+    const asksRead = readAsks(d);
     const needs = await needsOf(d);
     const { events, block: readAt } = await d.chain.ballots();
     // The replay counts only what the contract committed to: the events read must hash
@@ -385,6 +408,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       );
     }
     const poolUsd = history?.pool.at(-1)?.poolUsd ?? BigInt(m.poolUsd);
+    const asks = await asksRead;
     const st = replay({
       schedule: m.schedule,
       m: m.slugs.length,
@@ -393,15 +417,6 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       receipts,
       snapshots,
       settleNeeds,
-      ...(history
-        ? {
-          rules: {
-            round: rulesRound(m, m.projects.map((p) => BigInt(p.goalUsd))), // asks: Task 6/7
-            addedAt: m.slugs.map((_, i) => history.addedAt[i] ?? null),
-            pool: history.pool,
-          },
-        }
-        : {}),
     }, deps.now());
     for (const [i, t] of st.tiers.entries()) {
       const k = kept[i].value;
@@ -428,14 +443,14 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       await kv.atomic().check(stored[i]).set([...round(d), "settled", t.tier], storeSettled(x))
         .commit();
     }
-    return Object.assign(st, { poolUsd });
+    return Object.assign(st, { poolUsd, ...(asks ? { asks } : {}) });
   };
 
   /** The replay, reused for a few seconds in this isolate: every relayed ballot asks. */
   let recent:
-    | { at: number; contract: string; state: Promise<RoundState & { poolUsd: bigint }> }
+    | { at: number; contract: string; state: Promise<Round> }
     | null = null;
-  const recentRound = (d: VoteRound): Promise<RoundState & { poolUsd: bigint }> => {
+  const recentRound = (d: VoteRound): Promise<Round> => {
     if (
       !recent || recent.contract !== d.manifest.contract ||
       deps.now() - recent.at >= BALLOTS_CACHE_SECS
@@ -698,13 +713,18 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     }).catch(() => false);
     if (!valid) throw fail(401, "bad_signature", "The signature doesn't match the badge's owner.");
     // The ballot rules, judged with the pool on-chain now: the contract would refuse it.
+    let asks: bigint[] | undefined;
     if (d.manifest.ballotRules) {
-      const { poolUsd } = await recentRound(d);
-      // asks: Task 6/7
-      const checked = checkBallot(
-        hexToBytes(ballot),
-        rulesRound(d.manifest, d.manifest.projects.map((p) => BigInt(p.goalUsd)), poolUsd),
-      );
+      const now = await recentRound(d);
+      asks = now.asks;
+      if (!asks) {
+        throw fail(
+          503,
+          "asks_unavailable",
+          "The asks on-chain can't be read right now; try again in a minute.",
+        );
+      }
+      const checked = checkBallot(hexToBytes(ballot), rulesRound(d.manifest, asks, now.poolUsd));
       if (!checked.ok) {
         throw fail(422, "invalid_ballot", "This ballot breaks the ballot rules.", {
           errors: checked.errors.map((e) =>
@@ -785,13 +805,10 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
             nonce,
             ballot: ballot as Hex,
             signature: signature as Hex,
-            // asks: Task 6/7
+            // The proof is about groups only; rounds before the rules have no asks to read.
             proof: findProof(
               hexToBytes(ballot as Hex),
-              rulesRound(
-                d.manifest,
-                d.manifest.projects.map((p) => BigInt(p.goalUsd)),
-              ),
+              rulesRound(d.manifest, asks ?? d.manifest.projects.map((p) => BigInt(p.goalUsd))),
             ) ?? [],
           }),
         ]],
@@ -874,7 +891,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       },
       ...(final ? { final } : {}),
     });
-    let replayed: (RoundState & { poolUsd: bigint }) | undefined;
+    let replayed: (Round) | undefined;
     if (
       cached &&
       (isFinal(cached.body, cached.at) || deps.now() - cached.at < BALLOTS_CACHE_SECS)

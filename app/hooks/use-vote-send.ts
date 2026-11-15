@@ -20,6 +20,7 @@ import {
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi";
 import { MAINNET_CHAIN_ID, ROUND, voteChain } from "../../shared/vote/manifest";
 import { checkBallotTx } from "../../shared/vote/receipt";
+import type { RulesRound } from "../../shared/vote/rules";
 import { recordVote } from "../../shared/vote/record";
 
 const SEPOLIA_RPC = (import.meta.env?.VITE_SEPOLIA_RPC_URL as string | undefined) ||
@@ -186,9 +187,10 @@ export function useBallotSubmit(tokenId: bigint | null) {
     await check(deps, signed, hash, setPhase);
   }, [deps, keep]);
 
-  const selfSend = useCallback(async (id: bigint, ballot: Hex) => {
+  /** `rules`: the round the page judged the ballot on (the chain's asks), for its proof. */
+  const selfSend = useCallback(async (id: bigint, ballot: Hex, rules?: RulesRound) => {
     if (!wallet.address) return;
-    keep(await selfSendBallot(deps, ROUND, id, wallet.address, ballot, last, setPhase));
+    keep(await selfSendBallot(deps, ROUND, id, wallet.address, ballot, rules, last, setPhase));
   }, [deps, keep, last, wallet.address]);
 
   return { phase, submit, retry, selfSend, track, last, deps };

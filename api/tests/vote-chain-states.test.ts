@@ -35,7 +35,6 @@ const manifest = (currencies: { asset: Hex }[] = []): VoteManifest => ({
   closesAt: 99_999,
   schedule: { opensAt: 0, firstTallyAt: [1200, 5000, 6000], initialWindow: 600, maxWindows: 2 },
   poolUsd: "1",
-  issuer: "0x1000000000000000000000000000000000000002",
   slugs: ["a", "b"],
   projects: [0, 1].map(() => ({ goalUsd: "1", rfp: false, groups: [] })),
   groups: [],

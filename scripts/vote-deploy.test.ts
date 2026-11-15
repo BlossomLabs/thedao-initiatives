@@ -150,7 +150,7 @@ Deno.test("realSchedule: a tier can't start while the one above may still be run
   assertThrows(() => realSchedule(PLAN[0] + 1, PLAN), Error, "--s-tally must come after");
 });
 
-Deno.test("manifestFor: the real vote names the badge on mainnet, a test vote its issuer", () => {
+Deno.test("manifestFor: the real vote names the badge on mainnet; a test vote runs on Sepolia", () => {
   const s = realSchedule(OPENS, PLAN);
   const base = {
     contract: SAFE2 as `0x${string}`,
@@ -180,11 +180,8 @@ Deno.test("manifestFor: the real vote names the badge on mainnet, a test vote it
     independentTiers: 1,
     ballotRules: true,
   });
-  assertEquals(manifestFor({ ...base, kind: "test", issuer: SAFE as `0x${string}` }).issuer, SAFE);
-  assertEquals(
-    manifestFor({ ...base, kind: "test", issuer: SAFE as `0x${string}` }).chainId,
-    11155111,
-  );
+  const test = manifestFor({ ...base, kind: "test" });
+  assertEquals([test.chainId, test.badge], [11155111, undefined]);
 });
 
 // ------------------------------------------------------------ ballot rules
@@ -258,7 +255,6 @@ Deno.test("addPlan: new groups and projects for the admin, appended without reor
     deployBlock: 5,
     schedule: realSchedule(OPENS, PLAN),
     poolUsd: 7n,
-    issuer: SAFE as `0x${string}`,
     slugs: ["a", "b"],
     projects: [
       { goalUsd: "1", rfp: false, groups: [0] },
@@ -285,7 +281,6 @@ Deno.test("regroupPlan: new groups, then only the projects whose groups changed"
     deployBlock: 5,
     schedule: voteSchedule(1_000),
     poolUsd: 7n,
-    issuer: SAFE as `0x${string}`,
     slugs: ["a", "b", "c", "gone", "r"],
     projects: [
       { goalUsd: "1", rfp: false, groups: [0] },

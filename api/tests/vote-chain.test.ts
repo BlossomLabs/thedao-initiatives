@@ -116,7 +116,6 @@ Deno.test("asks: every project's initiativeUsd ask, in manifest order, in one mu
       closesAt: 1,
       schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
       poolUsd: "1",
-      issuer: "0x1000000000000000000000000000000000000002",
       slugs: ["a", "b"],
       projects: [{ goalUsd: "1", rfp: false, groups: [] }, {
         goalUsd: "1",

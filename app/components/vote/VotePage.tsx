@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { bytesToHex, type Hex } from "viem";
 import PageMain from "~/components/layout/PageMain";
 import { Button, LinkButton } from "~/components/ui/Button";
 import TierBallot, { type BallotItem, TIER_LABELS } from "~/components/vote/TierBallot";
-import { BallotSkeleton, IntroSkeleton, SeenSkeleton } from "~/components/vote/VoteSkeleton";
-import { rememberMyCode } from "~/lib/vote-local";
+import { BallotSkeleton, SeenSkeleton } from "~/components/vote/VoteSkeleton";
 import BallotStatus, { type SendRoute } from "~/components/vote/BallotStatus";
 import BallotMeter from "~/components/vote/BallotMeter";
 import RoundBox, { badgeLine, RoundDeadline } from "~/components/vote/RoundBox";
@@ -28,16 +26,16 @@ import { useSession } from "~/context/session";
 import { useWallet } from "~/context/wallet";
 import { useWalletPicker } from "~/context/wallet-picker";
 import { useBoard } from "~/hooks/use-board";
-import { apiCode, useBadgeRatings, useMyBadges, useVoteCode, useVoteRound } from "~/hooks/use-vote";
-import { useBallotSubmit, useMintWait } from "~/hooks/use-vote-send";
-import { api, errorMessage } from "~/lib/api";
+import { useBadgeRatings, useMyBadges, useVoteRound } from "~/hooks/use-vote";
+import { useBallotSubmit } from "~/hooks/use-vote-send";
+import { errorMessage } from "~/lib/api";
 import { countedTiers, lockedLabels } from "~/lib/vote-locks";
 import { prefillFromRatings, ratingsToken, skipsFromRatings } from "~/lib/vote-prefill";
 import { explainBelow, ruleMessage, ruleStatus } from "~/lib/vote-rules-copy";
 import { useReviewIdentity } from "~/hooks/use-admin-ratings";
 import BallotRules from "~/components/vote/BallotRules";
 import BallotMenu from "~/components/vote/BallotMenu";
-import { Deadline, setVoteClock, voteNow, When } from "~/components/vote/When";
+import { setVoteClock, voteNow, When } from "~/components/vote/When";
 import { useMockBallotSubmit } from "~/components/vote/mock-send";
 import { checkBallot, emptyTierErrors } from "../../../shared/vote/rules";
 import { shortDay, usd } from "~/lib/format";
@@ -46,7 +44,6 @@ import { ROUND, rulesRound, type VoteManifest } from "../../../shared/vote/manif
 import { poolName, PoolNote } from "~/components/vote/pool";
 import { askOf, servedAsks } from "~/lib/vote-results";
 
-const poolOf = (m: VoteManifest) => Number(BigInt(m.poolUsd) / 1_000_000n);
 const closed = (m = ROUND) => voteNow() / 1000 >= m.closesAt;
 const notOpenYet = (m = ROUND) => voteNow() / 1000 < m.opensAt;
 const REAL = (m = ROUND) => m.kind === "real";
@@ -86,33 +83,6 @@ function loadSkipped(n: number): Set<string> {
   }
 }
 
-/** Set once this browser has shown badge n's ballot: its loading skeleton is the ballot's. */
-const ballotSeenKey = (n: number) => `vote-ballot-seen:${ROUND.contract}:${n}`;
-function ballotSeen(code: string): boolean {
-  const n = Number(code.split(".")[0]);
-  if (!Number.isInteger(n)) return false;
-  try {
-    return localStorage.getItem(ballotSeenKey(n)) === "1";
-  } catch {
-    return false;
-  }
-}
-
-const acceptedKey = (code: string) => `vote-accepted:${ROUND.contract}:${code}`;
-function loadAccepted(code: string): boolean {
-  try {
-    return sessionStorage.getItem(acceptedKey(code)) === "1";
-  } catch {
-    return false;
-  }
-}
-function saveAccepted(code: string, v: boolean) {
-  try {
-    if (v) sessionStorage.setItem(acceptedKey(code), "1");
-    else sessionStorage.removeItem(acceptedKey(code));
-  } catch { /* storage unavailable */ }
-}
-
 function Panel({ children }: { children: React.ReactNode }) {
   return <div className="card text-[15px] leading-relaxed text-white/80">{children}</div>;
 }
@@ -125,131 +95,22 @@ function Headline({ children }: { children: React.ReactNode }) {
   );
 }
 
-const SECURITY_HUB = "https://securityhub.thedao.fund/";
 const BLOSSOM = "https://blossom.software/budgeting";
 
-function Out(
-  { href, title, children }: { href: string; title: string; children: React.ReactNode },
-) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group flex items-baseline gap-2 text-white hover:text-dao-green"
-    >
-      <span aria-hidden="true" className="text-dao-green">→</span>
-      <span>
-        <b className="font-medium">{title}</b>{" "}
-        <span className="text-white/60 group-hover:text-dao-green/80">{children}</span>
-      </span>
-    </a>
-  );
-}
-
-function Step({ n, children }: { n: number; children: React.ReactNode }) {
-  return (
-    <li className="flex gap-3">
-      <span className="grid size-6 flex-none place-items-center rounded-full border border-[rgba(92,183,90,.5)] font-inter-tight text-[12px] text-dao-green tnum">
-        {n}
-      </span>
-      <span>{children}</span>
-    </li>
-  );
-}
-
-function Intro(
-  { onAccept, busy, note }: { onAccept: () => void; busy: boolean; note?: React.ReactNode },
-) {
-  return (
-    <div className="space-y-5">
-      <header className="pt-4 text-center">
-        <p className="kicker m-0">Test vote · Demo on Sepolia</p>
-        <h1 className="mt-3 font-inter-tight text-[clamp(36px,9vw,56px)] font-bold leading-[1.05] tracking-[-.03em] text-white">
-          Congrats!
-        </h1>
-        <p className="mx-auto mt-3 max-w-[540px] font-inter-tight text-[clamp(18px,3vw,22px)] leading-snug text-white/80">
-          You'll be a TheDAO <span className="text-dao-green">Badge Holder</span>{" "}
-          for this test vote.
-        </p>
-      </header>
-      <div className="shimmer shimmer-soft !my-6" />
-      <Panel>
-        <h2 className="k">What you'll do</h2>
-        <p className="mb-4">
-          TheDAO Security Fund backs initiatives that keep{" "}
-          <span className="text-dao-green">Ethereum safe</span>. Its badge holders decide where the
-          money goes, and for this test you're one of them.
-        </p>
-        <ol className="space-y-3">
-          <Step n={1}>
-            <b className="font-medium text-white">Claim your test badge.</b>{" "}
-            Sign in with a wallet or an email, and we will mint an NFT on Sepolia for you.
-          </Step>
-          <Step n={2}>
-            <b className="font-medium text-white">Sort the security initiatives into tiers:</b>{" "}
-            <span className="text-dao-green">S</span> Must fund ·{" "}
-            <span className="text-dao-green">A</span> Should fund ·{" "}
-            <span className="text-dao-green">B</span> Nice to have.
-          </Step>
-          <Step n={3}>
-            <b className="font-medium text-white">Send your ballot.</b>{" "}
-            It moves the live result as soon as it lands.
-          </Step>
-        </ol>
-      </Panel>
-      <Panel>
-        <h2 className="k">How the money is split</h2>
-        <p>
-          The <b className="font-medium text-white">{poolName(ROUND, poolOf(ROUND), usd)}</b>{" "}
-          is split equally among voters. The ballots fund whole initiatives, highest tiers first,
-          using Blossom Budgeting.
-        </p>
-        <p className="mt-2 text-white/60">
-          It's a demo: no real funds move. Voting closes <Deadline at={ROUND.closesAt} />.
-        </p>
-      </Panel>
-      <Panel>
-        <h2 className="k">Learn more</h2>
-        <div className="space-y-2">
-          <Out href={SECURITY_HUB} title="Security Hub">
-            Come to discuss and learn about security initiatives around Ethereum
-          </Out>
-          <Out href={BLOSSOM} title="Blossom Budgeting">
-            Learn how this participatory budgeting works
-          </Out>
-        </div>
-      </Panel>
-      <div className="pt-1 text-center">
-        <Button variant="primary" className="w-full" disabled={busy} onClick={onAccept}>
-          {busy ? "One moment…" : "Claim my test badge"}
-        </Button>
-        {note && <div className="mt-4 text-left">{note}</div>}
-      </div>
-    </div>
-  );
-}
-
-/** The page behind /vote/:code and /vote/ballot (both routes render it: a
- * route module's own default export only gets the router's props). The ballot of a
- * paper code, or with `myBallot`, of the signed-in
- * account's badge (/vote/ballot: the way back from /vote, no code needed). */
+/** The page behind /vote/ballot and /vote/mock/:id (both routes render it: a route
+ * module's own default export only gets the router's props): the ballot of the signed-in
+ * account's badge, or an example's. */
 export default function VotePage(
-  { myBallot = false, mockId }: {
-    myBallot?: boolean;
+  { mockId }: {
     /** An example ballot (/vote/mock/:id): one of the mocks, nothing sent. */
     mockId?: string;
   } = {},
 ) {
-  const params = useParams();
-  const code = myBallot || mockId !== undefined ? "" : params.code ?? "";
-  const qc = useQueryClient();
-  const byCode = useVoteCode(code, !myBallot && mockId === undefined && !REAL());
+  const myBallot = mockId === undefined;
   const { session, signOut, restoring } = useSession();
   const { address } = useWallet();
   const { openWalletPicker } = useWalletPicker();
   const board = useBoard();
-  const mint = useMintWait();
   // Ballots are signed by the connected wallet, so it has to be the signed-in one.
   const me = session && address && session.address.toLowerCase() === address.toLowerCase()
     ? session.address
@@ -268,18 +129,7 @@ export default function VotePage(
       ? "none" as const
       : { n: chosen, claimed: true, owner: me },
   };
-  const info = myBallot ? byAccount : byCode;
-
-  // Accepting survives the sign-in (the modal can remount or reload the page):
-  // once signed in, the claim goes ahead without a second click.
-  const [accepted, setAcceptedState] = useState(() => loadAccepted(code));
-  const setAccepted = (v: boolean) => {
-    setAcceptedState(v);
-    saveAccepted(code, v);
-  };
-  const [claim, setClaim] = useState<
-    { kind: "idle" } | { kind: "busy" } | { kind: "error"; code?: string; message: string }
-  >({ kind: "idle" });
+  const info = byAccount;
 
   // An example ballot: /vote/mock/<kind> for everyone, or ?mock=<kind> in dev. Each is the
   // ballot at one moment of the vote, over the board's proposals, without a code or a
@@ -312,8 +162,8 @@ export default function VotePage(
   const R = mockData?.round ?? ROUND;
   const found = info.data === "none" ? undefined : info.data;
   const data = mock ? { n: 1, claimed: true, owner: "0x0" } as const : found;
-  const n = data && data !== "bad" ? data.n : null;
-  const owner = data && data !== "bad" ? data.owner : null;
+  const n = data ? data.n : null;
+  const owner = data ? data.owner : null;
   const mine = mock || Boolean(me && owner && owner.toLowerCase() === me.toLowerCase());
   const realFlow = useBallotSubmit(mine && n !== null && !mock ? BigInt(n) : null);
   // An example's Send goes through the same steps, signing and sending nothing; once it
@@ -383,57 +233,6 @@ export default function VotePage(
         ? { ...mockData.view, accepted: { ...mockData.view.accepted, [String(n)]: mockSent } }
         : mockData.view)
     : roundQ.data;
-
-  // One claim at a time: the sign-in lands in several renders, and the
-  // auto-claim effect can fire again before its own state updates show.
-  const claiming = useRef(false);
-  const doClaim = async () => {
-    if (claiming.current) return;
-    claiming.current = true;
-    setClaim({ kind: "busy" });
-    try {
-      const { hash } = await api<{ hash: Hex }>("/api/vote/claim", {
-        method: "POST",
-        json: { code },
-      });
-      await mint.wait(hash);
-      await qc.invalidateQueries({ queryKey: ["vote-code", code] });
-      setClaim({ kind: "idle" });
-    } catch (e) {
-      setClaim({ kind: "error", code: apiCode(e), message: errorMessage(e) });
-    } finally {
-      claiming.current = false;
-    }
-  };
-
-  // Accepted while signed out: claim as soon as the sign-in lands.
-  useEffect(() => {
-    if (accepted && me && data && data !== "bad" && !data.claimed && claim.kind === "idle") {
-      setAccepted(false);
-      void doClaim();
-    }
-    // doClaim is stable enough for this one-shot trigger.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accepted, me, data, claim.kind]);
-
-  const showsBallot = Boolean(data && data !== "bad" && mine && n !== null);
-  // From the claim page (minting) to the ballot: start the ballot at the top.
-  const showsIntro = Boolean(data && data !== "bad" && !data.claimed);
-  const wasIntro = useRef(false);
-  useEffect(() => {
-    if (showsIntro) wasIntro.current = true;
-    else if (showsBallot && wasIntro.current) {
-      wasIntro.current = false;
-      globalThis.scrollTo({ top: 0 });
-    }
-  }, [showsIntro, showsBallot]);
-  useEffect(() => {
-    if (!showsBallot || n === null || mock) return;
-    try {
-      localStorage.setItem(ballotSeenKey(n), "1");
-    } catch { /* storage unavailable */ }
-    if (code) rememberMyCode(code);
-  }, [showsBallot, n, mock, code]);
 
   const [tiers, setTiers] = useState<Partial<Record<string, Tier>>>({});
   // A mock starts from nothing (or its ratings) and keeps nothing in this browser.
@@ -619,24 +418,14 @@ export default function VotePage(
   };
   let body: React.ReactNode;
   let wide = false;
-  if (!myBallot && !mock && REAL(R)) {
-    body = (
-      <Panel>
-        <Headline>TheDAO's vote uses the voting badge.</Headline>
-        <p>Paper codes were for test votes. Sign in with the wallet that holds your badge.</p>
-        <LinkButton className="mt-4" variant="primary" to="/vote/ballot">
-          Open your ballot
-        </LinkButton>
-      </Panel>
-    );
-  } else if (myBallot && !mock && !me && !restoring) {
+  if (myBallot && !mock && !me && !restoring) {
     body = (
       <Panel>
         <Headline>Sign in to see your ballot.</Headline>
         <p>
           {REAL(R)
             ? "Use the wallet that holds your TheDAO voting badge."
-            : "Use the wallet or email you claimed your badge with."}
+            : "Use the wallet an admin gave your test badge to."}
         </p>
         <Button className="mt-4" onClick={openWalletPicker}>Sign in</Button>
       </Panel>
@@ -654,15 +443,15 @@ export default function VotePage(
       <Panel>
         <Headline>No badge on this account.</Headline>
         <p>
-          Scan the QR code on your badge to claim it, or sign in with the account you claimed it
-          with.
+          Test badges are given by an admin. Ask for one, or sign in with the account that has
+          yours.
         </p>
         <Button className="mt-4" onClick={() => void signOut()}>Sign out</Button>
       </Panel>
     );
   } else if (info.isPending && !mock) {
-    wide = myBallot || ballotSeen(code) || editing;
-    body = wide ? ballotSkeleton : <IntroSkeleton />;
+    wide = true;
+    body = ballotSkeleton;
   } else if (mock && !mockData) {
     wide = true;
     body = ballotSkeleton;
@@ -670,72 +459,10 @@ export default function VotePage(
     body = (
       <Panel>
         <p>
-          {myBallot
-            ? "We couldn't find your badge right now."
-            : "We couldn't check this code right now."} {errorMessage(info.error)}
+          We couldn't find your badge right now. {errorMessage(info.error)}
         </p>
         <Button className="mt-4" onClick={() => info.refetch()}>Try again</Button>
       </Panel>
-    );
-  } else if (data === "bad") {
-    body = (
-      <Panel>
-        <Headline>This code doesn't look right.</Headline>
-        <p>
-          Try scanning it again, slowly. If it still fails, ask whoever gave it to you for a new
-          one.
-        </p>
-      </Panel>
-    );
-  } else if (data && data.claimed && !mine) {
-    body = me
-      ? (
-        <Panel>
-          <Headline>This badge belongs to another account.</Headline>
-          <p>
-            You're signed in with a different one. Sign out, then sign in with the account you
-            claimed it with.
-          </p>
-          <Button className="mt-4" onClick={() => void signOut()}>Sign out</Button>
-        </Panel>
-      )
-      : (
-        <Panel>
-          <Headline>This badge is already taken.</Headline>
-          <p>Already yours? Sign in with the account you claimed it with.</p>
-          <Button className="mt-4" onClick={openWalletPicker}>Sign in</Button>
-        </Panel>
-      );
-  } else if (data && !data.claimed && closed(R)) {
-    body = <VoteClosed n={null} titles={titles} closeText={closeTextOf(R)} />;
-  } else if (data && !data.claimed) {
-    const note = claim.kind === "error"
-      ? claim.code === "one_per_person"
-        ? (
-          <p className="rounded-xl border border-amber-300/30 bg-amber-300/10 p-3 text-white">
-            <b>Nice try, bad kid 😏</b> One badge per person.
-          </p>
-        )
-        : claim.code === "smart_wallet"
-        ? <p className="text-amber-200">Use email or a regular wallet for this one.</p>
-        : claim.code === "closed"
-        ? <p className="text-white/70">Voting has closed. Thanks for stopping by!</p>
-        : <p className="text-red-300">{claim.message}</p>
-      : claim.kind === "busy"
-      ? <p className="text-white/60">Minting your test badge on Sepolia…</p>
-      : null;
-    body = (
-      <Intro
-        busy={claim.kind === "busy"}
-        note={note}
-        onAccept={() => {
-          if (me) void doClaim();
-          else {
-            setAccepted(true);
-            openWalletPicker();
-          }
-        }}
-      />
     );
   } else if (data && mine && n !== null && !mock && roundQ.isPending) {
     // Whether there is a ballot that counts depends on the round: hold this URL's skeleton.
@@ -1154,8 +881,8 @@ export default function VotePage(
       </div>
     );
   } else {
-    wide = myBallot || ballotSeen(code) || editing;
-    body = wide ? ballotSkeleton : <IntroSkeleton />;
+    wide = true;
+    body = ballotSkeleton;
   }
   // The ballot's page without a ballot that counts: on to the editor, in place.
   useEffect(() => {

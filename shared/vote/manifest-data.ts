@@ -13,7 +13,6 @@ export default {
     "maxWindows": 1,
   },
   "poolUsd": "913244000000",
-  "issuer": "0xD30fb0bA65C696e271ffA2e8b80F8c74B9d0998B",
   "slugs": [
     "source-level-debugging-for-solidity-ethdebug-in-solc-2",
     "vyper-verified-compilation-and-secure-language-upgrades",

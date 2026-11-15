@@ -21,7 +21,6 @@ const manifest: VoteManifest = {
   closesAt: 3100,
   schedule: { opensAt: 0, firstTallyAt: [1000, 2000, 3000], initialWindow: 100, maxWindows: 1 },
   poolUsd: "300",
-  issuer: "0x00000000000000000000000000000000000000C1",
   slugs: ["a", "b", "c"],
   projects: [0, 1, 2].map(() => ({ goalUsd: "100", rfp: false, groups: [] })),
   groups: [],

@@ -20,7 +20,6 @@ vi.mock("../../../shared/vote/manifest", async (original) => ({
     closesAt: 4_000_000_000,
     schedule: { opensAt: 0, firstTallyAt: [100, 200, 300], initialWindow: 60, maxWindows: 3 },
     poolUsd: "100000000000",
-    issuer: "0x2000000000000000000000000000000000000002",
     slugs: ["alpha", "beta"],
     // As on chain, each project's goalUsd is its goal.
     projects: [
@@ -191,30 +190,7 @@ it("an RPC hiccup keeps the last result", async () => {
   expect(screen.queryByText(/updated .* ago/i)).toBeNull();
 });
 
-it("links back to this browser's ballot, once it has opened one", async () => {
-  vi.mocked(api).mockResolvedValue(roundOf({}, {}));
-  const show = () =>
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter>
-          <VoteResults />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-  localStorage.clear();
-  show();
-  expect(await screen.findByText(/Test vote/i)).toBeInTheDocument();
-  expect(screen.queryByRole("link", { name: /your ballot/i })).toBeNull();
-  cleanup();
-
-  localStorage.setItem("vote-my-code:0x1000000000000000000000000000000000000001", "7.sig");
-  show();
-  expect(await screen.findByRole("link", { name: /see or change your ballot/i }))
-    .toHaveAttribute("href", "/vote/7.sig");
-  localStorage.clear();
-});
-
-it("links a signed-in badge holder to their ballot, even without the code in this browser", async () => {
+it("links a signed-in badge holder to their ballot", async () => {
   localStorage.clear();
   signedIn.address = "0x1111111111111111111111111111111111111111";
   signedIn.badge = 7;

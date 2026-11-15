@@ -5,8 +5,8 @@ import type { RulesRound } from "./rules.ts";
 
 /** The current vote round, written by scripts/vote-deploy.ts. `slugs[i]` is
  * on-chain initiative `i`, so ballot byte `i` ranks that initiative. A test round
- * (Sepolia) mints its own badges from paper codes; the real round (mainnet) votes
- * with TheDAO's private voting badge. */
+ * (Sepolia) mints its own badges (admins give them, or scripts/vote-sim.ts); the real
+ * round (mainnet) votes with TheDAO's private voting badge. */
 export type VoteManifest = {
   kind: "test" | "real";
   chainId: 1 | 11155111;
@@ -22,8 +22,6 @@ export type VoteManifest = {
   /** Set by admins on the Vote page, not by the deploy: the pool is this much ETH, and
    * until it's `sold` the on-chain poolUsd is only an estimate of it. */
   pool?: { eth: number; sold: boolean };
-  /** Test rounds: the address that signs the paper codes; the site only ever knows this. */
-  issuer?: `0x${string}`;
   /** The real round: the voting badge (the contract's eligibility NFT). */
   badge?: `0x${string}`;
   slugs: string[];
@@ -47,13 +45,10 @@ export const SEPOLIA_CHAIN_ID = 11155111;
 export const MAINNET_CHAIN_ID = 1;
 
 /** Throws on a manifest the site can't run: a real round without its badge, a test
- * round without its code issuer or off Sepolia (its badges and gas drip are free). */
+ * round off Sepolia (its badges and gas drip are free). */
 export function checkManifest(m: VoteManifest): VoteManifest {
   if (!m.schedule) throw new Error("vote manifest: the round needs its schedule");
   if (m.kind === "real" && !m.badge) throw new Error("vote manifest: a real round needs a badge");
-  if (m.kind === "test" && !m.issuer) {
-    throw new Error("vote manifest: a test round needs an issuer");
-  }
   if (m.kind === "test" && m.chainId !== SEPOLIA_CHAIN_ID) {
     throw new Error("vote manifest: a test round runs on Sepolia");
   }

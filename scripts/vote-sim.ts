@@ -1,0 +1,380 @@
+// Simulated voters for a Sepolia test vote, all run from here: badges, first ballots and
+// revisions through the quiet endings. The voters' keys come from one seed and are never
+// stored; their ballots go out in record() batches sent by the relayer, so the voters
+// need no ETH.
+//
+//   VOTE_RELAYER_KEY=0x… SEPOLIA_RPC_URL=https://… VOTE_SIM_SEED=any-phrase \
+//     deno task vote-sim [--voters 100] [--revise 40x2,10x3,3x5] [--site https://…]
+//                        [--first-id 1000001] [--rpc http://…] [--dry-run]
+//
+// The round is the one the site runs (its /api/vote/manifest). Each voter mints badge
+// first-id + i (if no one holds it yet), sends a first ballot between the opening and the
+// S-Tier first tally, and the voters named by --revise change it that many times (40x2:
+// 40 voters, twice each), spread from the S-Tier first tally to the close. A revision
+// never moves what a settled tier holds for that voter (the site's /api/vote/round says
+// which tiers settled and which ballot counts). Every ballot passes the ballot rules at
+// the chain's asks and pool when it's built. Run it again with the same seed to go on:
+// it reads each badge's nonce from the chain, and what was already sent stays sent.
+//
+// Writes vote-sim/<contract>.jsonl (one line per send) and vote-sim/<contract>-voters.csv.
+
+import { parseArgs } from "jsr:@std/cli@1.0.24/parse-args";
+import { bytesToHex, type Hex, hexToBytes, keccak256, toBytes } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { createVoteChain } from "../api/services/vote-chain.ts";
+import { decodeBallot, encodeBallot, type Tier, TIERS } from "../shared/vote/ballot.ts";
+import { rulesRound, type VoteManifest } from "../shared/vote/manifest.ts";
+import { checkBallot, findProof } from "../shared/vote/rules.ts";
+import { recordVote } from "../shared/vote/record.ts";
+import { voteTypedData } from "../shared/vote/typed-data.ts";
+import { tierSpan } from "../shared/vote/round-from-chain.ts";
+import { lockedLabels } from "../shared/vote/locks.ts";
+
+type Ballot = Partial<Record<string, Tier>>;
+
+/** A small seeded random source (mulberry32): the same seed, the same run. */
+export function rng(seed: string) {
+  let a = Number.parseInt(keccak256(toBytes(seed)).slice(2, 10), 16) >>> 0;
+  const next = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  return {
+    next,
+    int: (lo: number, hi: number) => lo + Math.floor(next() * (hi - lo + 1)),
+    shuffle: <T>(xs: T[]) => {
+      const out = [...xs];
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(next() * (i + 1));
+        [out[i], out[j]] = [out[j], out[i]];
+      }
+      return out;
+    },
+  };
+}
+export type Rng = ReturnType<typeof rng>;
+
+/** Voter i's key: from the seed, so nothing secret is written down. */
+export const voterKey = (seed: string, i: number): Hex =>
+  keccak256(toBytes(`vote-sim:${seed}:${i}`));
+
+/** "40x2,10x3,3x5" → how many revisions each voter makes, voter by voter (the rest: 0). */
+export function revisionsPlan(spec: string, voters: number): number[] {
+  const out = Array<number>(voters).fill(0);
+  let i = 0;
+  for (const part of spec.split(",").map((x) => x.trim()).filter(Boolean)) {
+    const m = /^(\d+)x(\d+)$/.exec(part);
+    if (!m) throw new Error(`--revise: "${part}" isn't <voters>x<times>`);
+    for (let k = 0; k < Number(m[1]); k++, i++) {
+      if (i >= voters) throw new Error(`--revise names more than the ${voters} voters`);
+      out[i] = Number(m[2]);
+    }
+  }
+  return out;
+}
+
+export type SimEvent = { at: number; voter: number; kind: "first" | "revise" };
+
+/** When each voter sends: a first ballot between `firstFrom` and the S-Tier first tally
+ * (a minute before it), then its revisions at random times from the S-Tier first tally to
+ * the close (stopping 30 s short). Sorted by time. */
+export function timeline(
+  m: Pick<VoteManifest, "schedule" | "closesAt">,
+  revisions: number[],
+  r: Rng,
+  firstFrom: number,
+): SimEvent[] {
+  const s = m.schedule;
+  const firstTo = Math.max(firstFrom, s.firstTallyAt[0] - 60);
+  const lastAt = Math.min(m.closesAt, s.firstTallyAt[2] + tierSpan(s)) - 30;
+  const events: SimEvent[] = [];
+  revisions.forEach((n, voter) => {
+    events.push({ at: r.int(firstFrom, firstTo), voter, kind: "first" });
+    for (let k = 0; k < n; k++) {
+      events.push({ at: r.int(s.firstTallyAt[0], lastAt), voter, kind: "revise" });
+    }
+  });
+  return events.sort((a, b) => a.at - b.at || a.voter - b.voter);
+}
+
+/**
+ * A ballot that passes the rules at these asks and pool: the `kept` projects stay where
+ * they are (settled tiers), the rest is drawn at random into the open tiers until the
+ * ballot asks for enough. Null when no draw passes in `tries`.
+ */
+export function drawBallot(
+  m: VoteManifest,
+  asks: bigint[],
+  poolUsd: bigint,
+  r: Rng,
+  kept: Ballot = {},
+  tries = 200,
+): Ballot | null {
+  const round = rulesRound(m, asks, poolUsd);
+  const locked = new Set(Object.values(kept));
+  const open = TIERS.filter((t) => !locked.has(t));
+  if (!open.length) return null;
+  const free = m.slugs.filter((slug) => !kept[slug]);
+  for (let k = 0; k < tries; k++) {
+    const b: Ballot = { ...kept };
+    const order = r.shuffle(free);
+    // A handful in each open tier, then B-Tier (or the last open one) takes what it
+    // needs to reach the size the rules want.
+    let at = 0;
+    for (const t of open.slice(0, -1)) {
+      const n = Math.min(r.int(3, 6), order.length - at);
+      for (const slug of order.slice(at, at + n)) b[slug] = t;
+      at += n;
+    }
+    const last = open[open.length - 1];
+    const n = Math.min(r.int(2, 5), order.length - at);
+    for (const slug of order.slice(at, at + n)) b[slug] = last;
+    at += n;
+    let res = checkBallot(encodeBallot(m.slugs, b), round);
+    for (const slug of order.slice(at)) {
+      if (res.ok || !res.errors.some((e) => e.rule === "size")) break;
+      b[slug] = last;
+      res = checkBallot(encodeBallot(m.slugs, b), round);
+    }
+    if (res.ok) return b;
+  }
+  return null;
+}
+
+/** What a revision must keep: the projects of the tiers locked for this voter, from the
+ * ballot that counts (`counted`, as bytes) and how many tiers settled. */
+export function keptFor(m: VoteManifest, counted: Hex | undefined, settled: number): Ballot {
+  if (!counted || settled === 0) return {};
+  const tiers = decodeBallot(hexToBytes(counted), m.slugs);
+  const locked = lockedLabels(tiers, settled);
+  return Object.fromEntries(Object.entries(tiers).filter(([, t]) => t && locked.has(t)));
+}
+
+type RoundView = {
+  head: { timestamp: number };
+  closed: boolean;
+  poolUsd: string;
+  asks?: string[];
+  accepted: Record<string, Hex>;
+  tiers: { tier: Tier; status: string }[];
+};
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const log = (msg: string) => console.log(`[${new Date().toISOString().slice(11, 19)}] ${msg}`);
+
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { headers: { accept: "application/json" } });
+  if (!res.ok) throw new Error(`${url}: ${res.status}`);
+  return await res.json() as T;
+}
+
+async function main() {
+  const args = parseArgs(Deno.args, {
+    boolean: ["dry-run"],
+    string: ["voters", "revise", "site", "first-id", "rpc"],
+    default: {
+      voters: "100",
+      revise: "40x2,10x3,3x5",
+      site: "https://initiatives.thedao.fund",
+      "first-id": "1000001",
+    },
+  });
+  const seed = Deno.env.get("VOTE_SIM_SEED")?.trim();
+  if (!seed) throw new Error("Set VOTE_SIM_SEED: the voters' keys come from it.");
+  const key = Deno.env.get("VOTE_RELAYER_KEY")?.trim() as Hex | undefined;
+  const keyOk = Boolean(key && /^0x[0-9a-fA-F]{64}$/.test(key));
+  // A dry run sends nothing, so it needs no key.
+  if (!keyOk && !args["dry-run"]) throw new Error("VOTE_RELAYER_KEY is required");
+  const rpc = args.rpc ?? Deno.env.get("SEPOLIA_RPC_URL")?.trim() ?? "";
+  if (!rpc && !args["dry-run"]) throw new Error("Set SEPOLIA_RPC_URL (or --rpc).");
+  const site = args.site.replace(/\/$/, "");
+  const voters = Number(args.voters);
+  const firstId = BigInt(args["first-id"]);
+
+  const { manifest: m } = await getJson<{ manifest: VoteManifest | null }>(
+    `${site}/api/vote/manifest`,
+  );
+  if (!m) throw new Error(`${site} runs no vote right now.`);
+  if (m.kind !== "test") {
+    throw new Error("The site runs the real vote: vote-sim is for test rounds.");
+  }
+  if (!m.ballotRules) {
+    throw new Error("This round is from before the ballot rules: deploy a new one.");
+  }
+  if (Date.now() / 1000 > m.schedule.firstTallyAt[0] - 120) {
+    throw new Error(
+      "Too late: first ballots go in before the S-Tier first tally. Deploy a new round (vote-deploy).",
+    );
+  }
+  const chain = createVoteChain(m, rpc, keyOk ? key! : null);
+  const r = rng(`${seed}:${m.contract}`);
+  const plan = revisionsPlan(args.revise, voters);
+  const people = Array.from({ length: voters }, (_, i) => {
+    const account = privateKeyToAccount(voterKey(seed, i));
+    return { i, account, tokenId: firstId + BigInt(i), nonce: 0n };
+  });
+  const now = () => Math.floor(Date.now() / 1000);
+  const events = timeline(m, plan, r, Math.max(now() + 60, m.opensAt + 5));
+  log(
+    `${m.contract}: ${voters} voters (badges #${firstId}–#${firstId + BigInt(voters - 1)}), ` +
+      `${events.length} ballots; S-Tier first tally ${
+        new Date(m.schedule.firstTallyAt[0] * 1000).toISOString()
+      }`,
+  );
+  const out = `vote-sim/${m.contract.toLowerCase()}`;
+  await Deno.mkdir("vote-sim", { recursive: true });
+  await Deno.writeTextFile(
+    `${out}-voters.csv`,
+    "voter,address,tokenId,revisions\n" +
+      people.map((p) => `${p.i},${p.account.address},${p.tokenId},${plan[p.i]}`).join("\n") + "\n",
+  );
+  if (args["dry-run"]) {
+    for (const e of events) {
+      console.log(`${new Date(e.at * 1000).toISOString()}  voter ${e.voter}  ${e.kind}`);
+    }
+    return;
+  }
+  const record = (line: unknown) =>
+    Deno.writeTextFile(`${out}.jsonl`, JSON.stringify(line) + "\n", { append: true });
+
+  // One transaction at a time from the relayer, each waited for (the site relays with
+  // the same key and takes the chain's pending count as its floor).
+  const sendWait = async (call: Parameters<typeof chain.send>[0]) => {
+    const hash = await chain.send(call, await chain.relayerNonce());
+    for (;;) {
+      const s = await chain.txStatus(hash);
+      if (s === "success") return hash;
+      if (s === "reverted") throw new Error(`reverted: ${hash}`);
+      await sleep(3000);
+    }
+  };
+
+  // Badges: each voter's, unless it's already minted.
+  for (const p of people) {
+    const owner = await chain.ownerOf(p.tokenId);
+    if (owner && owner.toLowerCase() !== p.account.address.toLowerCase()) {
+      throw new Error(`badge #${p.tokenId} belongs to someone else: use another --first-id`);
+    }
+    if (!owner) {
+      const hash = await sendWait({ fn: "mint", args: [p.account.address, p.tokenId] });
+      log(`minted #${p.tokenId} to voter ${p.i}`);
+      await record({ at: now(), kind: "mint", voter: p.i, tokenId: String(p.tokenId), hash });
+    }
+    p.nonce = await chain.nonceOf(p.tokenId);
+  }
+
+  let view: { at: number; v: RoundView } | null = null;
+  const roundNow = async () => {
+    if (!view || Date.now() - view.at > 5_000) {
+      view = { at: Date.now(), v: await getJson<RoundView>(`${site}/api/vote/round`) };
+    }
+    return view.v;
+  };
+
+  const queue = [...events];
+  while (queue.length) {
+    const wait = queue[0].at - now();
+    if (wait > 0) await sleep(Math.min(wait, 30) * 1000);
+    if (queue[0].at > now()) continue;
+    const later = queue.findIndex((e) => e.at > now());
+    const due = queue.splice(0, later === -1 ? queue.length : later);
+    let v: RoundView;
+    try {
+      v = await roundNow();
+    } catch (e) {
+      log(`round unreadable (${e instanceof Error ? e.message : e}); trying again in 10 s`);
+      queue.unshift(...due.map((x) => ({ ...x, at: now() + 10 })));
+      await sleep(10_000);
+      continue;
+    }
+    if (v.closed) {
+      log(`the round has closed; ${due.length + queue.length} ballots not sent`);
+      break;
+    }
+    const settled = v.tiers.filter((t) => t.status === "settled").length;
+    const asks = (v.asks ?? []).map(BigInt);
+    const pool = BigInt(v.poolUsd);
+    if (asks.length !== m.slugs.length) {
+      log("the round has no asks yet; trying again in 10 s");
+      queue.unshift(...due.map((x) => ({ ...x, at: now() + 10 })));
+      continue;
+    }
+    const votes = [];
+    for (const e of due) {
+      const p = people[e.voter];
+      const counted = v.accepted[String(p.tokenId)];
+      // S-Tier has settled without this badge: registration is closed for it.
+      if (!counted && settled > 0) {
+        log(`voter ${p.i}: no counted ballot and S-Tier settled; skipped`);
+        continue;
+      }
+      const b = drawBallot(m, asks, pool, r, keptFor(m, counted, settled));
+      if (!b) {
+        log(`voter ${p.i}: every tier it holds has settled; nothing left to change`);
+        continue;
+      }
+      const ballot = bytesToHex(encodeBallot(m.slugs, b));
+      const nonce = p.nonce + 1n;
+      const signature = await p.account.signTypedData(
+        voteTypedData(m, p.tokenId, p.account.address, nonce, ballot),
+      );
+      const proof = findProof(hexToBytes(ballot), rulesRound(m, asks, pool)) ?? [];
+      votes.push({
+        p,
+        e,
+        ballot,
+        nonce,
+        v: recordVote({ tokenId: p.tokenId, nonce, ballot, signature, proof }),
+      });
+    }
+    // Several per transaction; a refused batch goes again one by one, so one bad
+    // ballot (a pool or ask that moved meanwhile) doesn't hold the rest back.
+    for (let k = 0; k < votes.length; k += 20) {
+      const batch = votes.slice(k, k + 20);
+      const send = async (xs: typeof batch) => {
+        const hash = await sendWait({ fn: "record", args: [xs.map((x) => x.v)] });
+        for (const x of xs) {
+          x.p.nonce = x.nonce;
+          await record({
+            at: now(),
+            kind: x.e.kind,
+            voter: x.p.i,
+            tokenId: String(x.p.tokenId),
+            nonce: String(x.nonce),
+            ballot: x.ballot,
+            hash,
+          });
+        }
+        log(
+          `sent ${xs.map((x) => `${x.e.kind === "first" ? "" : "↻"}${x.p.i}`).join(" ")} (${hash})`,
+        );
+      };
+      try {
+        await send(batch);
+      } catch (e) {
+        if (batch.length === 1) {
+          log(
+            `voter ${batch[0].p.i}: refused (${e instanceof Error ? e.message.split("\n")[0] : e})`,
+          );
+          continue;
+        }
+        for (const x of batch) {
+          await send([x]).catch((err) =>
+            log(
+              `voter ${x.p.i}: refused (${
+                err instanceof Error ? err.message.split("\n")[0] : err
+              })`,
+            )
+          );
+        }
+      }
+    }
+    view = null;
+  }
+  log(`done; log in ${out}.jsonl`);
+}
+
+if (import.meta.main) await main();

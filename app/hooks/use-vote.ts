@@ -7,24 +7,6 @@ import type { LiveInputsJson } from "../../shared/vote/live-inputs";
 /* The vote's reads and types. Sending a ballot (wallet, signing, the chain client)
  * is in use-vote-send.ts, so a page that only shows the vote doesn't load it. */
 
-export type CodeInfo = { n: number; claimed: boolean; owner: string | null };
-
-/** The paper code's number and whether it is claimed; `bad` for a code the issuer never signed. */
-export function useVoteCode(code: string, enabled = true) {
-  return useQuery({
-    queryKey: ["vote-code", code],
-    enabled,
-    queryFn: async (): Promise<CodeInfo | "bad"> => {
-      try {
-        return await api<CodeInfo>(`/api/vote/code/${encodeURIComponent(code)}`);
-      } catch (e) {
-        if (e instanceof ApiError && e.status === 400) return "bad";
-        throw e;
-      }
-    },
-  });
-}
-
 export type VoteBallots = { at: number; ballots: { tokenId: string; ballot: Hex }[] };
 
 /** Every badge's latest ballot sent before the close (the vote results poll it). */

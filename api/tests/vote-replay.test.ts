@@ -30,7 +30,6 @@ const manifest: VoteManifest = {
     maxWindows: 2,
   },
   poolUsd: "300",
-  issuer: "0x1000000000000000000000000000000000000002",
   slugs: ["a", "b", "c"],
   projects: ["a", "b", "c"].map(() => ({ goalUsd: "150", rfp: false, groups: [] })),
   groups: [],

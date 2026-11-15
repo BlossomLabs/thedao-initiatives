@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import RoundBox from "./RoundBox";
 import DaoBallot, { daoResult, type SettledTier } from "./DaoBallot";
@@ -12,7 +12,6 @@ import PageMain from "~/components/layout/PageMain";
 import StickyAside from "~/components/layout/StickyAside";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { boardKey, useBoard } from "~/hooks/use-board";
-import { myCode } from "~/lib/vote-local";
 import { askOf, coveredProjects, dollars, servedAsks, splitResults } from "~/lib/vote-results";
 import { useSession } from "~/context/session";
 import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
@@ -21,7 +20,6 @@ import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
 import { poolEstimated, poolNoteText } from "~/components/vote/pool";
 import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
 import { chainTally } from "../../../shared/vote/chain";
-import { parseCode } from "../../../shared/vote/code";
 import { liveInputsFrom } from "../../../shared/vote/live-inputs";
 import { FINE, giftEffect, giftGapTo, liveTiers } from "../../../shared/vote/next-tier";
 
@@ -86,21 +84,13 @@ export default function VoteResults(
   const qc = useQueryClient();
   const round = useVoteRound(POLL_MS, !example);
   const rv = example?.view ?? round.data;
-  // The way back to your ballot: by the code this browser opened it with, else by the
-  // signed-in account's badge (found on-chain). Not on an example.
-  const [code, setCode] = useState<string | null>(null);
-  useEffect(() => setCode(myCode()), []);
+  // The way back to your ballot: by the signed-in account's badge (found on-chain). Not
+  // on an example.
   const { session } = useSession();
-  const badges = useMyBadges(session?.address ?? null, !code && !example);
+  const badges = useMyBadges(session?.address ?? null, !example);
   // A test round's gas top-up for donating goes by the voter's badge.
-  const myBadge = code ? parseCode(code)?.n : badges.data?.[0];
-  const mine = example
-    ? null
-    : code
-    ? `/vote/${code}`
-    : badges.data?.length
-    ? "/vote/ballot"
-    : null;
+  const myBadge = badges.data?.[0];
+  const mine = example ? null : badges.data?.length ? "/vote/ballot" : null;
 
   const inRound = useMemo(() => new Set(R.slugs), [R]);
   const cards = useMemo(

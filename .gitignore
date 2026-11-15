@@ -13,4 +13,7 @@ build
 # editor swap files
 *.swp
 .superpowers/
+# The old paper codes printed for test votes (kept locally, never committed)
 vote-codes/
+# vote-sim's per-round logs and voter lists (addresses only; keys come from the seed)
+vote-sim/

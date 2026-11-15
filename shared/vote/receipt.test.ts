@@ -14,7 +14,6 @@ const m: VoteManifest = {
 
   schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
   poolUsd: "913244000000",
-  issuer: "0x2000000000000000000000000000000000000002",
   slugs: ["a", "b"],
   projects: [{ goalUsd: "1", rfp: false, groups: [] }, { goalUsd: "1", rfp: false, groups: [] }],
   groups: [],
@@ -77,7 +76,7 @@ describe("checkBallotTx", () => {
     const mint = encodeFunctionData({
       abi: SIGNED_BALLOTS_ABI,
       functionName: "mint",
-      args: [m.issuer!, 7n],
+      args: [m.contract, 7n],
     });
     expect(other({ tx: { to: m.contract, input: mint } })).toBe("mismatch");
     expect(other({ tx: { to: m.contract, input: "0xdeadbeef" } })).toBe("mismatch");

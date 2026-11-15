@@ -4,7 +4,6 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { requireAdmin, requireAuth } from "../middleware/auth.ts";
 import { jsonBody } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
-import { verifyCode } from "../../shared/vote/code.ts";
 import { isValidOnchainBallot, tierName } from "../../shared/vote/ballot.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { recordVote } from "../../shared/vote/record.ts";
@@ -55,8 +54,6 @@ const RULE_REVERT = /\b(BallotTooSmall|TooFewIndependent|BadProof|GroupOverHalf|
 
 /** Below this the real round's relayer stops and voters send it themselves. */
 const RELAY_FLOOR_WEI = 10_000_000_000_000_000n; // 0.01 ETH
-/** Long enough for any mint to land; the chain is the record after that. */
-const MINTING_MS = 60 * 60_000;
 const BALLOTS_CACHE_SECS = 5;
 /** How long a request waits for the round's chain states. A cold read (a long window's
  * balance scan on an archive node) can take longer: it goes on in the background, fills
@@ -266,9 +263,9 @@ export function voteRoutes(deps: Deps) {
     if (!d) throw fail(503, "off", "No vote is deployed right now.");
     return d;
   };
-  /** Paper codes, claims and the gas drip belong to test rounds only. */
+  /** The gas drip belongs to test rounds only. */
   const testOnly = (d: VoteRound) => {
-    if (d.manifest.kind !== "test") throw fail(404, "off", "This vote doesn't use paper codes.");
+    if (d.manifest.kind !== "test") throw fail(404, "off", "This is the real vote.");
   };
   const asksUnavailable = () =>
     fail(503, "asks_unavailable", "The vote results can't be read from the chain right now.");
@@ -557,25 +554,11 @@ export function voteRoutes(deps: Deps) {
       throw new HttpError(429, "slow down");
     }
   };
-  const codeNumber = async (d: VoteRound, code: unknown) => {
-    const n = typeof code === "string" ? await verifyCode(code, d.manifest.issuer ?? "") : null;
-    if (n === null) throw fail(400, "bad_code", "This code doesn't look right.");
-    return BigInt(n);
-  };
-
   /** The round the site runs now: the pages load it before they show the vote. */
   r.get("/manifest", async (c) => {
     const d = await currentVote(deps);
     c.header("Cache-Control", "no-store");
     return c.json({ manifest: d?.manifest ?? null });
-  });
-
-  r.get("/code/:code", async (c) => {
-    const d = await dc();
-    testOnly(d);
-    const n = await codeNumber(d, c.req.param("code"));
-    const owner = await d.chain.ownerOf(n);
-    return c.json({ n: Number(n), claimed: owner !== null, owner });
   });
 
   /** The badges the signed-in account votes with, so the menu and /vote lead to its ballot. */
@@ -592,60 +575,6 @@ export function voteRoutes(deps: Deps) {
     const address = d.chain.relayerAddress();
     const balanceWei = address ? (await d.chain.balance(address)).toString() : null;
     return c.json({ address, balanceWei, chainId: d.manifest.chainId });
-  });
-
-  r.post("/claim", requireAuth, async (c) => {
-    const d = await dc();
-    testOnly(d);
-    await limit("claim", c.var.ip);
-    open(d);
-    const body = await jsonBody(c, ["code"]);
-    const n = await codeNumber(d, body.code);
-    const to = c.var.user!.address as Hex;
-    // An EIP-7702 account (code 0xef0100 + delegate) is still a key-held wallet:
-    // its ECDSA signatures verify (the relay uses record()). Other code is a
-    // contract wallet, which can't sign on Sepolia like the voter's key does.
-    const code = (await d.chain.codeOf(to)).toLowerCase();
-    const delegated = code.startsWith("0xef0100") && code.length === 2 + 2 * 23;
-    if (code !== "0x" && !delegated) {
-      throw fail(422, "smart_wallet", "Use email or a regular wallet for this one.");
-    }
-    const kv = deps.db.kv;
-    const tokenKey = [...round(d), "minting", "token", n.toString()];
-    const addrKey = [...round(d), "minting", "address", to.toLowerCase()];
-    // A mint just sent is not on-chain yet: its markers hold the token and the
-    // address until it lands, and are dropped if it reverted or was dropped.
-    const stillMinting = async (key: Deno.KvKey) => {
-      const m = await kv.get<string>(key);
-      if (!m.value) return false;
-      const status = await d.chain.txStatus(m.value as Hex);
-      if (status === "pending" || status === "success") return true;
-      await kv.delete(key);
-      return false;
-    };
-    const hash = await withRelayer(kv, async () => {
-      if ((await d.chain.ownerOf(n)) !== null || (await stillMinting(tokenKey))) {
-        throw fail(409, "claimed", "This badge is already taken.");
-      }
-      if ((await d.chain.balanceOf(to)) > 0n || (await stillMinting(addrKey))) {
-        throw fail(409, "one_per_person", "One badge per person.");
-      }
-      // _safeMint asks a delegated wallet's code to accept the badge; check first.
-      if (delegated && !(await d.chain.canMint(to, n))) {
-        throw fail(
-          422,
-          "cannot_receive",
-          "This wallet can't receive the badge. Use email or another wallet.",
-        );
-      }
-      const h = await sendNext(kv, d, deps.now(), { fn: "mint", args: [to, n] });
-      await kv.atomic()
-        .set(tokenKey, h, { expireIn: MINTING_MS })
-        .set(addrKey, h, { expireIn: MINTING_MS })
-        .commit();
-      return h;
-    });
-    return c.json({ hash });
   });
 
   r.post("/ballot", async (c) => {

@@ -55,7 +55,6 @@ const bitsOf = (mask: bigint) => {
  */
 export function manifestFromChain(
   contract: `0x${string}`,
-  issuer: `0x${string}`,
   c: RoundOnChain,
   slugOf: (account: string) => string | undefined,
 ): VoteManifest {
@@ -84,7 +83,6 @@ export function manifestFromChain(
     closesAt: s.firstTallyAt[2] + tierSpan(s),
     schedule: s,
     poolUsd: c.poolUsd.toString(),
-    issuer: getAddress(issuer),
     slugs,
     projects: c.initiatives.map((x) => ({
       goalUsd: x.goalUsd.toString(),

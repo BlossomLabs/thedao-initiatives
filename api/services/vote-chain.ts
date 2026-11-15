@@ -10,6 +10,7 @@ import {
   type Transport,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { TEST_USD_ABI } from "../../shared/vote/test-usd.ts";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
 import type { StateCache, StateSource } from "../../shared/vote/chain-states.ts";
 import type { ChainState } from "../../shared/vote/quiet-ending.ts";
@@ -56,6 +57,8 @@ export interface VoteChain {
         ];
       }
       | { fn: "drip"; to: Hex; value: bigint }
+      /** A test round's TestUSD minted to `to` (six decimals). */
+      | { fn: "testUsd"; token: Hex; to: Hex; amount: bigint }
       | {
         fn: "setPledgeBySig";
         args: readonly [Hex, bigint, bigint, bigint, Hex, bigint, bigint, Hex];
@@ -203,6 +206,15 @@ export function createVoteChain(
       if (!wallet || !account) throw new Error("VOTE_RELAYER_KEY is not configured");
       if (call.fn === "drip") {
         return await wallet.sendTransaction({ to: call.to, value: call.value, nonce });
+      }
+      if (call.fn === "testUsd") {
+        return await wallet.writeContract({
+          address: call.token,
+          abi: TEST_USD_ABI,
+          functionName: "mint",
+          args: [call.to, call.amount],
+          nonce,
+        });
       }
       return await wallet.writeContract({
         address: m.contract,

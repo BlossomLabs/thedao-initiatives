@@ -42,7 +42,6 @@ const M = vi.hoisted(() =>
     closesAt: 2315,
     schedule: { opensAt: 1000, firstTallyAt: [2000, 2105, 2210], initialWindow: 60, maxWindows: 3 },
     poolUsd: "1200000000",
-    issuer: "0x2000000000000000000000000000000000000002",
     slugs: ["alpha", "beta", "gamma"],
     projects: [0, 1, 2].map(() => ({ goalUsd: "400000000", rfp: false, groups: [] })),
     groups: [],

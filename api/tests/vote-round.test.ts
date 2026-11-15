@@ -2,7 +2,6 @@ import { assertEquals } from "@std/assert";
 import { privateKeyToAccount } from "viem/accounts";
 import { bytesToHex, type Hex, parseSignature, signatureToCompactSignature, zeroHash } from "viem";
 import { ADMIN, harness, j, PLAIN } from "./app-helpers.ts";
-import { codeMessage, formatCode } from "../../shared/vote/code.ts";
 import { encodeBallot } from "../../shared/vote/ballot.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
@@ -13,9 +12,6 @@ import { chainTally } from "../../shared/vote/chain.ts";
 import { liveInputsFrom, type LiveInputsJson } from "../../shared/vote/live-inputs.ts";
 import type { ChainState } from "../../shared/vote/quiet-ending.ts";
 
-const ISSUER = privateKeyToAccount(
-  "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
-);
 // PLAIN's key (app-helpers: wallet("0x22..22")).
 const VOTER = privateKeyToAccount(`0x${"22".repeat(32)}`);
 const OTHER = privateKeyToAccount(`0x${"33".repeat(32)}`);
@@ -35,7 +31,6 @@ const manifest: VoteManifest = {
     maxWindows: 1,
   },
   poolUsd: "913244000000",
-  issuer: ISSUER.address,
   slugs: ["a", "b", "c"],
   projects: ["a", "b", "c"].map(() => ({ goalUsd: "1", rfp: false, groups: [] })),
   groups: [],
@@ -248,8 +243,14 @@ async function setup(m: VoteManifest = manifest) {
   return { h, ...fake };
 }
 
-const code = async (n: number) =>
-  formatCode(n, await ISSUER.signMessage({ message: codeMessage(n) }));
+/** Admin → Vote's "give a badge", by an admin with a recent sign-in. */
+async function give(h: Awaited<ReturnType<typeof harness>>, to: string) {
+  return await h.req("/api/admin/vote-round/badge", {
+    method: "POST",
+    token: await h.mint(ADMIN, true),
+    json: { address: to },
+  });
+}
 
 async function signedBallot(
   signer: typeof VOTER,
@@ -265,36 +266,6 @@ async function signedBallot(
 }
 
 const BALLOT = bytesToHex(encodeBallot(manifest.slugs, { a: "S", c: "A" }));
-
-Deno.test("vote round code: valid, unclaimed", async () => {
-  const { h } = await setup();
-  const res = await h.req(`/api/vote/code/${await code(17)}`);
-  assertEquals(res.status, 200);
-  assertEquals(await j(res), { n: 17, claimed: false, owner: null });
-  h.close();
-});
-
-Deno.test("vote round code: claimed shows the owner", async () => {
-  const { h, state } = await setup();
-  state.owners.set(17n, PLAIN);
-  assertEquals(await j(await h.req(`/api/vote/code/${await code(17)}`)), {
-    n: 17,
-    claimed: true,
-    owner: PLAIN,
-  });
-  h.close();
-});
-
-Deno.test("vote round code: mangled or foreign codes are a 400 bad_code, never a 500", async () => {
-  const { h } = await setup();
-  const foreign = formatCode(17, await OTHER.signMessage({ message: codeMessage(17) }));
-  for (const bad of ["17", "abc", "0.xyz", foreign, (await code(17)).slice(0, -2)]) {
-    const res = await h.req(`/api/vote/code/${encodeURIComponent(bad)}`);
-    assertEquals(res.status, 400, bad);
-    assertEquals((await j(res)).code, "bad_code");
-  }
-  h.close();
-});
 
 Deno.test("vote round mine: the signed-in account's badges, or none; needs a session", async () => {
   const { h, state } = await setup();
@@ -314,18 +285,26 @@ Deno.test("real round mine: every voting badge the account holds, in order", asy
   h.close();
 });
 
-Deno.test("real round: no paper codes, no claims, no gas drip", async () => {
+Deno.test("real round: no test badges, ETH or TestUSD from admins, no gas drip", async () => {
   const { h, state } = await setup(real);
   const token = await h.mint(PLAIN);
   state.owners.set(17n, PLAIN);
-  const c = await code(1);
+  const gas = await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } });
+  assertEquals([gas.status, (await j(gas)).code], [404, "off"]);
   for (
-    const res of [
-      await h.req(`/api/vote/code/${c}`),
-      await h.req("/api/vote/claim", { method: "POST", token, json: { code: c } }),
-      await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } }),
-    ]
-  ) assertEquals([res.status, (await j(res)).code], [404, "off"]);
+    const [path, json] of [
+      ["badge", { address: OTHER.address }],
+      ["eth", { address: OTHER.address, eth: 0.01 }],
+      ["test-usd", { address: OTHER.address, usd: 100 }],
+    ] as const
+  ) {
+    const res = await h.req(`/api/admin/vote-round/${path}`, {
+      method: "POST",
+      token: await h.mint(ADMIN, true),
+      json,
+    });
+    assertEquals(res.status, 409, path);
+  }
   assertEquals(state.sent.length, 0);
   h.close();
 });
@@ -386,61 +365,38 @@ Deno.test("vote relayer: admins see its address and balance; nobody else", async
   h.close();
 });
 
-Deno.test("vote round claim: mints token n to the session address", async () => {
+Deno.test("admin badge: mints the next free badge to the address; admins only", async () => {
   const { h, state } = await setup();
-  const token = await h.mint(PLAIN);
-  const res = await h.req("/api/vote/claim", {
-    method: "POST",
-    token,
-    json: { code: await code(17) },
-  });
+  assertEquals(
+    (await h.req("/api/admin/vote-round/badge", {
+      method: "POST",
+      token: await h.mint(PLAIN),
+      json: { address: PLAIN },
+    })).status,
+    403,
+  );
+  state.owners.set(1n, OTHER.address);
+  const res = await give(h, PLAIN);
   assertEquals(res.status, 200);
-  assertEquals(typeof (await j(res)).hash, "string");
-  assertEquals(state.sent, [{ fn: "mint", args: [PLAIN, 17n] }]);
+  const body = await j(res);
+  assertEquals([typeof body.hash, body.tokenId], ["string", 2]);
+  assertEquals(state.sent, [{ fn: "mint", args: [PLAIN, 2n] }]);
   h.close();
 });
 
-Deno.test("vote round claim: needs a session", async () => {
-  const { h } = await setup();
-  const res = await h.req("/api/vote/claim", { method: "POST", json: { code: await code(17) } });
-  assertEquals(res.status, 401);
-  h.close();
-});
-
-Deno.test("vote round claim: refusals", async () => {
+Deno.test("admin badge: refusals", async () => {
   const { h, state } = await setup();
-  const token = await h.mint(PLAIN);
-  const claim = async (c: string) => {
-    const res = await h.req("/api/vote/claim", { method: "POST", token, json: { code: c } });
-    return [res.status, (await j(res)).code];
-  };
-  assertEquals(await claim("nope"), [400, "bad_code"]);
-  state.owners.set(17n, OTHER.address);
-  assertEquals(await claim(await code(17)), [409, "claimed"]);
+  const status = async (to: string) => (await give(h, to)).status;
+  assertEquals(await status("nope"), 400);
   state.owners.set(18n, PLAIN);
-  assertEquals(await claim(await code(19)), [409, "one_per_person"]);
+  assertEquals(await status(PLAIN), 409);
   state.owners.delete(18n);
   state.code.set(PLAIN.toLowerCase(), "0x6080604052");
-  assertEquals(await claim(await code(19)), [422, "smart_wallet"]);
+  assertEquals(await status(PLAIN), 422);
   state.code.clear();
   h.clock.now = manifest.closesAt;
-  assertEquals(await claim(await code(19)), [410, "closed"]);
+  assertEquals(await status(PLAIN), 410);
   assertEquals(state.sent, []);
-  h.close();
-});
-
-Deno.test("vote round claim: two codes at once by one address mint once", async () => {
-  const { h, state } = await setup();
-  const token = await h.mint(PLAIN);
-  let release!: () => void;
-  state.slowSend = new Promise((r) => (release = r));
-  const a = h.req("/api/vote/claim", { method: "POST", token, json: { code: await code(1) } });
-  const b = h.req("/api/vote/claim", { method: "POST", token, json: { code: await code(2) } });
-  await new Promise((r) => setTimeout(r, 20));
-  release();
-  const statuses = (await Promise.all([a, b])).map((r) => r.status).sort();
-  assertEquals(statuses, [200, 409]);
-  assertEquals(state.sent.length, 1);
   h.close();
 });
 
@@ -458,40 +414,44 @@ Deno.test("vote round ballot: relays record() with the signature as r and vs (pl
   h.close();
 });
 
-Deno.test("vote round claim: an EIP-7702 wallet is a wallet; a contract wallet is not", async () => {
+Deno.test("admin badge: an EIP-7702 wallet gets one; one whose delegate can't take it doesn't", async () => {
   const { h, state } = await setup();
-  const token = await h.mint(PLAIN);
   state.code.set(PLAIN.toLowerCase(), `0xef0100${"ab".repeat(20)}`);
-  const ok = await h.req("/api/vote/claim", {
-    method: "POST",
-    token,
-    json: { code: await code(5) },
-  });
-  assertEquals(ok.status, 200);
-
-  const other = await h.mint(OTHER.address);
-  state.code.set(OTHER.address.toLowerCase(), "0x6080604052");
-  const no = await h.req("/api/vote/claim", {
-    method: "POST",
-    token: other,
-    json: { code: await code(6) },
-  });
-  assertEquals([no.status, (await j(no)).code], [422, "smart_wallet"]);
+  assertEquals((await give(h, PLAIN)).status, 200);
+  state.code.set(OTHER.address.toLowerCase(), `0xef0100${"ab".repeat(20)}`);
+  state.unmintable.add(OTHER.address.toLowerCase());
+  assertEquals((await give(h, OTHER.address)).status, 422);
+  assertEquals(state.sent.length, 1);
   h.close();
 });
 
-Deno.test("vote round claim: a 7702 wallet whose delegate can't take the badge is told so, nothing sent", async () => {
-  const { h, state } = await setup();
-  const token = await h.mint(PLAIN);
-  state.code.set(PLAIN.toLowerCase(), `0xef0100${"ab".repeat(20)}`);
-  state.unmintable.add(PLAIN.toLowerCase());
-  const res = await h.req("/api/vote/claim", {
-    method: "POST",
-    token,
-    json: { code: await code(5) },
+Deno.test("admin ETH and TestUSD: sent by the relayer to the address, within limits", async () => {
+  const tusd = "0x5000000000000000000000000000000000000005" as const;
+  const zero = "0x0000000000000000000000000000000000000000" as const;
+  const { h, state } = await setup({
+    ...manifest,
+    currencies: [
+      { symbol: "USD", asset: zero, usdFeed: zero },
+      { symbol: "tUSD", asset: tusd, usdFeed: zero },
+    ],
   });
-  assertEquals([res.status, (await j(res)).code], [422, "cannot_receive"]);
-  assertEquals(state.sent, []);
+  const send = async (path: string, json: unknown) =>
+    (await h.req(`/api/admin/vote-round/${path}`, {
+      method: "POST",
+      token: await h.mint(ADMIN, true),
+      json,
+    })).status;
+  assertEquals(await send("eth", { address: PLAIN, eth: 0.02 }), 200);
+  assertEquals(await send("eth", { address: PLAIN, eth: 5 }), 400);
+  assertEquals(await send("test-usd", { address: PLAIN, usd: 2500 }), 200);
+  assertEquals(await send("test-usd", { address: PLAIN, usd: 2_000_000 }), 400);
+  assertEquals(await send("test-usd", { address: PLAIN, usd: 1.5 }), 400);
+  assertEquals(state.sent, [
+    { fn: "drip", to: PLAIN, value: 20_000_000_000_000_000n },
+    { fn: "testUsd", token: tusd, to: PLAIN, amount: 2_500_000_000n },
+  ]);
+  state.balances.set(RELAYER, 0n);
+  assertEquals(await send("eth", { address: PLAIN, eth: 0.02 }), 409);
   h.close();
 });
 
@@ -528,44 +488,6 @@ Deno.test("vote round ballot: a second relay of the same nonce returns the pendi
   const out = await j(again);
   assertEquals([out.code, out.hash], ["pending", first.hash]);
   assertEquals(state.sent.length, 1);
-  h.close();
-});
-
-Deno.test("vote round claim: a pending mint still blocks a second code and a second claimer", async () => {
-  const { h, state } = await setup();
-  state.mintsMine = false;
-  const token = await h.mint(PLAIN);
-  const other = await h.mint(OTHER.address);
-  const claim = async (t: string, n: number) => {
-    const res = await h.req("/api/vote/claim", {
-      method: "POST",
-      token: t,
-      json: { code: await code(n) },
-    });
-    return [res.status, (await j(res)).code];
-  };
-  assertEquals((await claim(token, 1))[0], 200);
-  assertEquals(await claim(token, 2), [409, "one_per_person"]);
-  assertEquals(await claim(other, 1), [409, "claimed"]);
-  assertEquals(state.sent.length, 1);
-  h.close();
-});
-
-Deno.test("vote round claim: a reverted or dropped mint frees the code and the address", async () => {
-  const { h, state } = await setup();
-  state.mintsMine = false;
-  const token = await h.mint(PLAIN);
-  const first = await j(
-    await h.req("/api/vote/claim", { method: "POST", token, json: { code: await code(1) } }),
-  );
-  state.txStatus.set(first.hash as string, "reverted");
-  const retry = await h.req("/api/vote/claim", {
-    method: "POST",
-    token,
-    json: { code: await code(1) },
-  });
-  assertEquals(retry.status, 200);
-  assertEquals(state.sent.length, 2);
   h.close();
 });
 
@@ -664,20 +586,10 @@ Deno.test("vote round ballots: a revoked (burned) badge's earlier ballot no long
 
 Deno.test("vote round relayer: nonces stay consecutive while the RPC's pending count lags", async () => {
   const { h, state } = await setup();
-  for (const [i, who] of [PLAIN, OTHER.address].entries()) {
-    const token = await h.mint(who);
-    const res = await h.req("/api/vote/claim", {
-      method: "POST",
-      token,
-      json: { code: await code(i + 1) },
-    });
-    assertEquals(res.status, 200);
-  }
+  for (const who of [PLAIN, OTHER.address]) assertEquals((await give(h, who)).status, 200);
   assertEquals(state.nonces_used, [0, 1]);
   state.chainNonce = 5; // the chain moved on (e.g. a manual tx): follow it
-  const third = privateKeyToAccount(`0x${"44".repeat(32)}`).address;
-  const token = await h.mint(third);
-  await h.req("/api/vote/claim", { method: "POST", token, json: { code: await code(9) } });
+  await give(h, privateKeyToAccount(`0x${"44".repeat(32)}`).address);
   assertEquals(state.nonces_used, [0, 1, 5]);
   h.close();
 });
@@ -728,58 +640,39 @@ Deno.test("vote round ballot: the relay pays for at most 20 ballots per badge", 
 
 Deno.test("vote round relayer: a dropped relay's nonce is reused, so later sends don't queue behind a gap", async () => {
   const { h, state } = await setup();
-  const claim = async (who: string, n: number) => {
-    const token = await h.mint(who);
-    return await h.req("/api/vote/claim", {
-      method: "POST",
-      token,
-      json: { code: await code(n) },
-    });
-  };
-  const first = await j(await claim(PLAIN, 1));
+  const first = await j(await give(h, PLAIN));
   // The node never saw it, and its pending count stays at 0.
   state.txStatus.set(first.hash as string, "unknown");
-  await claim(OTHER.address, 2);
+  await give(h, OTHER.address);
   assertEquals(state.nonces_used, [0, 1], "within a minute it may still arrive");
   state.txStatus.set(`0x${(2).toString(16).padStart(64, "0")}`, "unknown");
   h.clock.now += 61;
-  await claim(privateKeyToAccount(`0x${"44".repeat(32)}`).address, 3);
+  await give(h, privateKeyToAccount(`0x${"44".repeat(32)}`).address);
   assertEquals(state.nonces_used, [0, 1, 0]);
   h.close();
 });
 
-Deno.test("vote round: a new round starts clean (gas, relay count and mint markers are per contract)", async () => {
+Deno.test("vote round: a new round starts clean (gas and badge numbers are per contract)", async () => {
   const { h, state } = await setup();
-  state.mintsMine = false;
   state.owners.set(17n, PLAIN);
   const token = await h.mint(PLAIN);
-  // Team test round: a mint of code 1 still pending, and badge 17's gas drip.
-  const other = await h.mint(OTHER.address);
-  const first = await h.req("/api/vote/claim", {
-    method: "POST",
-    token: other,
-    json: { code: await code(1) },
-  });
-  assertEquals(first.status, 200);
+  // Team test round: badge 1 given, and badge 17's gas drip.
+  assertEquals((await j(await give(h, OTHER.address))).tokenId, 1);
   assertEquals(
     (await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } })).status,
     200,
   );
 
-  // The public round: same codes and badge numbers, a new contract.
+  // The public round: same badge numbers, a new contract.
   const next = fakeChain();
   next.state.owners.set(17n, PLAIN);
+  next.state.balances.set(RELAYER, 10n ** 18n);
   h.deps.vote = {
     chain: next.chain,
     manifest: { ...manifest, contract: "0x2000000000000000000000000000000000000002" },
   };
-  const third = await h.mint(privateKeyToAccount(`0x${"44".repeat(32)}`).address);
-  const claim = await h.req("/api/vote/claim", {
-    method: "POST",
-    token: third,
-    json: { code: await code(1) },
-  });
-  assertEquals(claim.status, 200, "code 1 is unclaimed in the new round");
+  const third = privateKeyToAccount(`0x${"44".repeat(32)}`).address;
+  assertEquals((await j(await give(h, third))).tokenId, 1, "badge 1 is free in the new round");
   const gas = await h.req("/api/vote/gas", { method: "POST", token, json: { tokenId: "17" } });
   assertEquals(gas.status, 200, "the badge's one drip is per round");
   h.close();

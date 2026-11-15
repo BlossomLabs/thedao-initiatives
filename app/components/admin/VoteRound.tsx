@@ -12,7 +12,6 @@ type Brief = {
   kind: "test" | "real";
   chainId: number;
   contract: string;
-  issuer: string | null;
   opensAt: number;
   closesAt: number;
   firstTallyAt: number;
@@ -61,7 +60,6 @@ export default function VoteRound() {
     queryFn: ({ signal }) => api<VoteRoundJson>("/api/admin/vote-round", { signal }),
   });
   const [contract, setContract] = useState("");
-  const [issuer, setIssuer] = useState("");
   const [eth, setEth] = useState("");
   const [sold, setSold] = useState(false);
   const [busy, setBusy] = useState<"add" | "remove" | "pool" | null>(null);
@@ -71,14 +69,12 @@ export default function VoteRound() {
   useEffect(() => {
     if (!data) return;
     setContract((c) => c || data.test?.contract || "");
-    setIssuer((i) => i || data.test?.issuer || data.built?.issuer || "");
     setEth(data.pool ? String(data.pool.eth) : "");
     setSold(data.pool?.sold ?? false);
   }, [data]);
 
   const contractBad = contract.trim() !== "" && !ADDRESS.test(contract.trim());
-  const issuerBad = issuer.trim() !== "" && !ADDRESS.test(issuer.trim());
-  const canAdd = ADDRESS.test(contract.trim()) && ADDRESS.test(issuer.trim());
+  const canAdd = ADDRESS.test(contract.trim());
   const ethNum = Number(eth.replace(/[\s,]/g, ""));
   const ethBad = eth.trim() !== "" && !(Number.isFinite(ethNum) && ethNum > 0);
   const poolDirty = Boolean(data) &&
@@ -108,7 +104,7 @@ export default function VoteRound() {
   const add = () =>
     run("add", () =>
       adminApi<VoteRoundJson>("/api/admin/vote-round/test", {
-        json: { contract: contract.trim(), issuer: issuer.trim() },
+        json: { contract: contract.trim() },
       }), (r) => {
       setWarnings(r.warnings ?? []);
       setRoundMsg({ ok: true, text: "The site runs this round within a few seconds." });
@@ -161,7 +157,7 @@ export default function VoteRound() {
           )
           : <small className={HINT}>None: no vote is deployed.</small>)}
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4">
           <label className="block">
             <span className={cn(HINT, "mb-1")}>Test round contract on Sepolia</span>
             <input
@@ -173,19 +169,6 @@ export default function VoteRound() {
               aria-invalid={contractBad}
               value={contract}
               onChange={(e) => setContract(e.target.value)}
-            />
-          </label>
-          <label className="block">
-            <span className={cn(HINT, "mb-1")}>Paper-code issuer</span>
-            <input
-              id={`${ids}-issuer`}
-              className={FIELD}
-              placeholder="0x…"
-              spellCheck={false}
-              autoComplete="off"
-              aria-invalid={issuerBad}
-              value={issuer}
-              onChange={(e) => setIssuer(e.target.value)}
             />
           </label>
         </div>
@@ -218,6 +201,8 @@ export default function VoteRound() {
           <small key={w} className="mt-2 block text-[12px] text-[#ffb4b1]">{w}</small>
         ))}
       </form>
+
+      {(test ?? data?.built)?.kind === "test" && <TestVoters />}
 
       {/* The pool: ETH until it's sold, its dollars an estimate until then. */}
       <form
@@ -291,5 +276,138 @@ export default function VoteRound() {
         </div>
       </form>
     </div>
+  );
+}
+
+type Sent = { hash: string; tokenId?: number };
+
+/** A test round's people: a badge for their wallet (their ballot is at /vote/ballot once
+ * they sign in with it), Sepolia ETH to send it themselves or donate, and TestUSD to
+ * donate. The relayer sends each. */
+function TestVoters() {
+  const adminApi = useAdminApi();
+  const ids = useId();
+  const [address, setAddress] = useState("");
+  const [eth, setEth] = useState("0.02");
+  const [usd, setUsd] = useState("1000");
+  const [busy, setBusy] = useState<"badge" | "eth" | "usd" | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string; hash?: string } | null>(null);
+  const to = address.trim();
+  const bad = to !== "" && !ADDRESS.test(to);
+  const ready = ADDRESS.test(to) && busy === null;
+  const send = async (
+    what: "badge" | "eth" | "usd",
+    path: string,
+    json: unknown,
+    done: (r: Sent) => string,
+  ) => {
+    setBusy(what);
+    setMsg(null);
+    try {
+      const r = await adminApi<Sent>(`/api/admin/vote-round/${path}`, { json });
+      setMsg({ ok: true, text: done(r), hash: r.hash });
+    } catch (e) {
+      setMsg({ ok: false, text: errorMessage(e, "Not sent. Try again.") });
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <section className={CARD} aria-labelledby={`${ids}-title`}>
+      <b id={`${ids}-title`} className={TITLE}>Test voters</b>
+      <small className={HINT}>
+        Give a person's wallet a test badge, Sepolia ETH or TestUSD. Simulated voters come from the
+        CLI (deno task vote-sim) and need none of these.
+      </small>
+      <label className="mt-3 block">
+        <span className={cn(HINT, "mb-1")}>Wallet address</span>
+        <input
+          className={FIELD}
+          placeholder="0x…"
+          spellCheck={false}
+          autoComplete="off"
+          aria-invalid={bad}
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+        />
+      </label>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button
+          sm
+          type="button"
+          loading={busy === "badge"}
+          disabled={!ready}
+          onClick={() =>
+            void send(
+              "badge",
+              "badge",
+              { address: to },
+              (r) => `Badge #${r.tokenId} is on its way.`,
+            )}
+        >
+          Give a badge
+        </Button>
+        <span className="flex items-center gap-1.5">
+          <input
+            aria-label="ETH to send"
+            className={cn(FIELD, "w-[84px] text-right font-inter-tight")}
+            inputMode="decimal"
+            value={eth}
+            onChange={(e) => setEth(e.target.value)}
+          />
+          <Button
+            sm
+            type="button"
+            variant="ghost"
+            loading={busy === "eth"}
+            disabled={!ready}
+            onClick={() =>
+              void send("eth", "eth", { address: to, eth: Number(eth) }, () => `${eth} ETH sent.`)}
+          >
+            Send Sepolia ETH
+          </Button>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <input
+            aria-label="TestUSD to mint"
+            className={cn(FIELD, "w-[96px] text-right font-inter-tight")}
+            inputMode="numeric"
+            value={usd}
+            onChange={(e) => setUsd(e.target.value)}
+          />
+          <Button
+            sm
+            type="button"
+            variant="ghost"
+            loading={busy === "usd"}
+            disabled={!ready}
+            onClick={() =>
+              void send(
+                "usd",
+                "test-usd",
+                { address: to, usd: Number(usd.replace(/[\s,]/g, "")) },
+                () => `${usd} TestUSD minted.`,
+              )}
+          >
+            Mint TestUSD
+          </Button>
+        </span>
+      </div>
+      {msg && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Status kind={msg.ok ? "ok" : "err"}>{msg.text}</Status>
+          {msg.hash && (
+            <a
+              className="text-[12px] text-muted underline"
+              href={`https://sepolia.etherscan.io/tx/${msg.hash}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Sepolia Etherscan
+            </a>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

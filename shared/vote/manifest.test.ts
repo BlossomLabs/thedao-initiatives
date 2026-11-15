@@ -13,7 +13,6 @@ const base: VoteManifest = {
 
   schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
   poolUsd: "1",
-  issuer: "0x2000000000000000000000000000000000000002",
   slugs: ["a"],
   projects: [{ goalUsd: "5", rfp: false, groups: [0] }],
   groups: ["Seal"],
@@ -22,18 +21,16 @@ const base: VoteManifest = {
 
 describe("round manifest", () => {
   it("a real round votes with the badge; a test round with its own NFT", () => {
-    expect(voterNft({ ...base, kind: "real", chainId: 1, issuer: undefined, badge: B })).toBe(B);
+    expect(voterNft({ ...base, kind: "real", chainId: 1, badge: B })).toBe(B);
     expect(voterNft(base)).toBe(C);
   });
   it("an all-zero contract means no round", () => {
     expect(roundDeployed({ ...base, contract: `0x${"0".repeat(40)}` })).toBe(false);
     expect(roundDeployed(base)).toBe(true);
   });
-  it("a real round needs a badge; a test round needs an issuer", () => {
-    expect(() => checkManifest({ ...base, kind: "real", chainId: 1, issuer: undefined })).toThrow(
-      /badge/,
-    );
-    expect(() => checkManifest({ ...base, issuer: undefined })).toThrow(/issuer/);
+  it("a real round needs a badge; a test round runs on Sepolia", () => {
+    expect(() => checkManifest({ ...base, kind: "real", chainId: 1 })).toThrow(/badge/);
+    expect(() => checkManifest({ ...base, chainId: 1 })).toThrow(/Sepolia/);
     expect(() => checkManifest(base)).not.toThrow();
   });
   it("checkManifest refuses misaligned projects, tagged RFPs and unknown groups", () => {
@@ -49,7 +46,6 @@ describe("round manifest", () => {
       ...base,
       kind: "real",
       chainId: 1,
-      issuer: undefined,
       badge: B,
       currencies: [{ symbol: "USD", asset: Z, usdFeed: Z }, {
         symbol: "ETH",

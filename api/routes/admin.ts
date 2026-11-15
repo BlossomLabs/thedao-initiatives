@@ -42,6 +42,12 @@ import { pledgeChainId, pledgeTypedData } from "../../shared/vote/typed-data.ts"
 import { newId } from "../lib/ids.ts";
 import { currentVote, VOTE_ROUND_KEY, type VoteRoundSetting } from "../services/vote-active.ts";
 import { readRoundOnChain } from "../services/vote-round-read.ts";
+import { sendNext, withRelayer } from "./vote.ts";
+import { TEST_USD_MAX_MINT } from "../../shared/vote/test-usd.ts";
+import { parseEther } from "viem";
+
+/** The most Sepolia ETH one admin send gives a tester. */
+const MAX_TEST_ETH = 0.1;
 import {
   manifestFromChain,
   RoundReadError,
@@ -123,7 +129,6 @@ export function adminRoutes(deps: Deps) {
       kind: m.kind,
       chainId: m.chainId,
       contract: m.contract,
-      issuer: m.issuer ?? null,
       opensAt: m.opensAt,
       closesAt: m.closesAt,
       firstTallyAt: m.schedule.firstTallyAt[0],
@@ -145,11 +150,9 @@ export function adminRoutes(deps: Deps) {
     if (roundDeployed(BUILT_ROUND) && BUILT_ROUND.kind === "real") {
       throw new HttpError(409, "The site runs the real vote: a test round can't replace it.");
     }
-    const body = await jsonBody(c, ["contract", "issuer"]);
+    const body = await jsonBody(c, ["contract"]);
     const contract = s(body.contract, 60).trim();
-    const issuer = s(body.issuer, 60).trim();
     if (!isAddress(contract)) throw new HttpError(400, "The contract isn't an address.");
-    if (!isAddress(issuer)) throw new HttpError(400, "The issuer isn't an address.");
     if (!deps.config.sepoliaRpcUrl) throw new HttpError(503, "No Sepolia RPC is configured.");
     const rows = await db.initiatives.list(["approved", "archived", "pending", "rejected"]);
     let manifest: VoteManifest;
@@ -157,13 +160,13 @@ export function adminRoutes(deps: Deps) {
     try {
       const chain = await readRoundOnChain(contract as Hex, deps.config.sepoliaRpcUrl);
       manifest = checkManifest(
-        manifestFromChain(contract as Hex, issuer as Hex, chain, slugsByAccount(rows)),
+        manifestFromChain(contract as Hex, chain, slugsByAccount(rows)),
       );
       const relayer = (await currentVote(deps))?.chain.relayerAddress();
       if (!relayer) warnings.push("No relayer key is configured: ballots can't be relayed.");
       else if (!(await chain.minters(relayer))) {
         warnings.push(
-          `The relayer ${relayer} can't mint badges on this contract: codes can't be claimed.`,
+          `The relayer ${relayer} can't mint badges on this contract: no badges can be given.`,
         );
       }
     } catch (e) {
@@ -203,6 +206,95 @@ export function adminRoutes(deps: Deps) {
     });
     changedRound();
     return c.json(await roundJson());
+  });
+
+  /** A test round's helpers for people joining it (badges, Sepolia ETH, TestUSD), sent
+   * by the relayer. Never in the real vote. */
+  const testRoundNow = async () => {
+    const d = await currentVote(deps);
+    if (!d) throw new HttpError(503, "No vote is deployed right now.");
+    if (d.manifest.kind !== "test") throw new HttpError(409, "Only a test round gives these.");
+    if (!d.chain.relayerAddress()) throw new HttpError(503, "No relayer key is configured.");
+    return d;
+  };
+  const addressIn = (v: unknown) => {
+    const a = s(v, 60).trim();
+    if (!isAddress(a)) throw new HttpError(400, "That isn't an address.");
+    return toChecksum(a) as Hex;
+  };
+  /** A test badge, minted to the address: its ballot is at /vote/ballot once it signs in. */
+  r.post("/vote-round/badge", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["address"]);
+    const to = addressIn(body.address);
+    const d = await testRoundNow();
+    if (deps.now() >= d.manifest.closesAt) throw new HttpError(410, "Voting has closed.");
+    // An EIP-7702 account (code 0xef0100 + delegate) still signs with its key; other code
+    // is a contract wallet, which can't sign the ballot the way record() checks.
+    const code = (await d.chain.codeOf(to)).toLowerCase();
+    const delegated = code.startsWith("0xef0100") && code.length === 2 + 2 * 23;
+    if (code !== "0x" && !delegated) {
+      throw new HttpError(422, "That's a contract wallet: it can't sign ballots here.");
+    }
+    const kv = db.kv;
+    const nextKey = ["vote", d.manifest.contract.toLowerCase(), "admin-badge-next"];
+    const sent = await withRelayer(kv, async () => {
+      if ((await d.chain.balanceOf(to)) > 0n) {
+        throw new HttpError(409, "That address already has a badge.");
+      }
+      // The next id nobody holds (vote-sim mints far above these).
+      let n = BigInt((await kv.get<number>(nextKey)).value ?? 1);
+      while ((await d.chain.ownerOf(n)) !== null) n++;
+      if (delegated && !(await d.chain.canMint(to, n))) {
+        throw new HttpError(422, "That wallet can't receive the badge.");
+      }
+      const hash = await sendNext(kv, d, deps.now(), { fn: "mint", args: [to, n] });
+      await kv.set(nextKey, Number(n) + 1);
+      return { hash, tokenId: Number(n) };
+    });
+    return c.json(sent);
+  });
+  /** Sepolia ETH from the relayer, so a tester can send their own ballot or donate. */
+  r.post("/vote-round/eth", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["address", "eth"]);
+    const to = addressIn(body.address);
+    const eth = Number(body.eth);
+    if (!(Number.isFinite(eth) && eth > 0 && eth <= MAX_TEST_ETH)) {
+      throw new HttpError(400, `Send more than 0 and at most ${MAX_TEST_ETH} ETH.`);
+    }
+    const d = await testRoundNow();
+    const value = parseEther(String(eth));
+    const hash = await withRelayer(db.kv, async () => {
+      const left = await d.chain.balance(d.chain.relayerAddress()!);
+      if (left < value) throw new HttpError(409, "The relayer doesn't have that much ETH.");
+      return await sendNext(db.kv, d, deps.now(), { fn: "drip", to, value });
+    });
+    return c.json({ hash });
+  });
+  /** Test dollars to donate with (the round's TestUSD, worth nothing). */
+  r.post("/vote-round/test-usd", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["address", "usd"]);
+    const to = addressIn(body.address);
+    const usd = Number(body.usd);
+    if (!(Number.isInteger(usd) && usd > 0 && usd <= TEST_USD_MAX_MINT)) {
+      throw new HttpError(
+        400,
+        `Mint whole test dollars, up to ${TEST_USD_MAX_MINT.toLocaleString("en-US")}.`,
+      );
+    }
+    const d = await testRoundNow();
+    const token = d.manifest.currencies?.find((x) => x.symbol === "tUSD")?.asset;
+    if (!token) throw new HttpError(409, "This round has no TestUSD.");
+    const hash = await withRelayer(
+      db.kv,
+      () =>
+        sendNext(db.kv, d, deps.now(), {
+          fn: "testUsd",
+          token,
+          to,
+          amount: BigInt(usd) * 1_000_000n,
+        }),
+    );
+    return c.json({ hash });
   });
 
   /**

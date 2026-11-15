@@ -15,8 +15,6 @@ export default [
   route("vote/mock/:id/edit?", "routes/vote.mock.tsx"),
   // Examples of the vote results at three moments of the vote.
   route("vote/results/:id", "routes/vote.results.tsx"),
-  route("vote/:code/edit?", "routes/vote.code.tsx"),
-  route("devcon/:code", "routes/code-redirect.tsx"),
   route("vote", "routes/vote.tsx"),
   route("donation-terms", "routes/terms.tsx"),
   route("donation-terms/v/:id", "routes/terms.version.tsx"),

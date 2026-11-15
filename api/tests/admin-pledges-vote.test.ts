@@ -19,9 +19,7 @@ const roundOf = (slugs: string[], kind: "real" | "test" = "real"): VoteManifest 
   kind,
   chainId: kind === "real" ? 1 : 11155111,
   contract: "0x1000000000000000000000000000000000000001",
-  ...(kind === "real"
-    ? { badge: "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C" as const }
-    : { issuer: OTHER.address }),
+  ...(kind === "real" ? { badge: "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C" as const } : {}),
   deployBlock: 1,
   opensAt: NOW - 3600,
   closesAt: NOW + 3600,

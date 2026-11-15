@@ -1,9 +1,10 @@
 // Deploys a SignedBallots round, sets it up, hands the admin roles to
 // sem-the-bee.eth and writes shared/vote/manifest-data.ts.
 //
-// A test vote, on Sepolia, with paper codes and the board's initiatives:
+// A test vote, on Sepolia, with the board's initiatives (badges: Admin → Vote, or
+// scripts/vote-sim.ts):
 //   VOTE_RELAYER_KEY=0x… SEPOLIA_RPC_URL=https://… \
-//     deno task vote-deploy --issuer 0x… [--test-usd 0x…] [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
+//     deno task vote-deploy [--test-usd 0x…] [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
 // It opens 30 min after the deploy; S-Tier's first tally is 30 min later, and the three
 // tiers then take 30 min at most (10 min each). Donations are in a test dollar (TestUSD,
 // anyone can mint it; deployed here unless --test-usd names one), and the board's open
@@ -203,7 +204,7 @@ export function checkCodeSize(name: string, deployedBytecode: Hex): void {
 
 /** The roles the round must end the setup with: [role, account, held]. The site's admin
  * holds the three handed-over roles and the relayer none of them; with the real vote each
- * site admin can sign pledges, and a test vote's relayer mints its paper-code badges. */
+ * site admin can sign pledges, and a test vote's relayer mints its badges. */
 export function roleChecks(o: {
   real: boolean;
   /** DEFAULT_ADMIN_ROLE, ADMIN_ROLE, PLEDGE_ROLE. */
@@ -347,7 +348,6 @@ export function manifestFor(
     deployBlock: number;
     schedule: Schedule;
     poolUsd: bigint;
-    issuer?: `0x${string}`;
     slugs: string[];
     projects: VoteManifest["projects"];
     groups: string[];
@@ -366,7 +366,7 @@ export function manifestFor(
     closesAt: r.schedule.firstTallyAt[2] + tierMax(r.schedule),
     schedule: r.schedule,
     poolUsd: r.poolUsd.toString(),
-    ...(r.kind === "real" ? { badge: REVIEW_BADGE_CONTRACT } : { issuer: getAddress(r.issuer!) }),
+    ...(r.kind === "real" ? { badge: REVIEW_BADGE_CONTRACT } : {}),
     slugs: r.slugs,
     projects: r.projects,
     groups: r.groups,
@@ -653,7 +653,6 @@ async function main() {
   const args = parseArgs(Deno.args, {
     boolean: ["real", "affiliations", "affiliated"],
     string: [
-      "issuer",
       "board",
       "rpc",
       "out",
@@ -683,10 +682,6 @@ async function main() {
     | Hex
     | undefined;
   if (!key || !/^0x[0-9a-fA-F]{64}$/.test(key)) throw new Error("VOTE_RELAYER_KEY is required");
-  const issuer = args.issuer;
-  if (!real && (!issuer || !isAddress(issuer))) {
-    throw new Error("--issuer <address> is required");
-  }
   if (args["test-usd"] && (real || !isAddress(args["test-usd"]))) {
     throw new Error("--test-usd takes a TestUSD address, and only for a test vote");
   }
@@ -969,7 +964,6 @@ async function main() {
     deployBlock: Number(deployed.blockNumber),
     schedule: s,
     poolUsd,
-    issuer: issuer as `0x${string}` | undefined,
     slugs: plan.map((p) => p.slug),
     projects: plan.map((p) => ({ goalUsd: p.goalUsd.toString(), rfp: p.rfp, groups: p.groups })),
     groups: groups.names,

@@ -43,16 +43,6 @@ export const voteClient = (): PublicClient => {
   return client.pub;
 };
 
-/** Waits for a mint to land so the ballot can be shown. */
-export function useMintWait() {
-  return {
-    wait: async (hash: Hex) => {
-      const r = await voteClient().waitForTransactionReceipt({ hash, timeout: WAIT_MS });
-      if (r.status !== "success") throw new Error("The mint failed on-chain. Try again.");
-    },
-  };
-}
-
 const read = <T>(functionName: string, args: readonly unknown[]) =>
   voteClient().readContract({
     address: ROUND.contract,

@@ -15,7 +15,6 @@ const m: VoteManifest = {
 
   schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
   poolUsd: "1",
-  issuer: "0x2000000000000000000000000000000000000002",
   slugs: ["a", "b"],
   projects: [{ goalUsd: "1", rfp: false, groups: [] }, { goalUsd: "1", rfp: false, groups: [] }],
   groups: [],

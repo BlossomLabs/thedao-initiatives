@@ -1,50 +1,9 @@
 import Skeleton from "~/components/ui/Skeleton";
 
 /**
- * Placeholders for /vote/:code while the code is checked, each in the shape
- * of the page that follows: the welcome (claim) page, the ballot that counts, or
- * the ballot's editor (/edit).
+ * Placeholders for the ballot pages while the badge is found, each in the shape of the
+ * page that follows: the ballot that counts, or the ballot's editor (/edit).
  */
-
-/** The welcome page: the headline, three cards and the claim button. */
-export function IntroSkeleton() {
-  return (
-    <div className="space-y-5" aria-busy="true" aria-label="Loading">
-      <div className="flex flex-col items-center pt-4">
-        <Skeleton className="h-3 w-56" />
-        <Skeleton className="mt-4 h-[clamp(36px,9vw,56px)] w-[min(60%,280px)]" />
-        <Skeleton className="mt-4 h-6 w-[min(85%,420px)]" />
-      </div>
-      <div className="!my-6 h-px bg-white/10" />
-      <div className="card space-y-3">
-        <Skeleton className="h-3.5 w-28" />
-        <Skeleton className="h-4" />
-        <Skeleton className="h-4 w-4/5" />
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="flex items-start gap-3 pt-1">
-            <Skeleton className="size-6 flex-none rounded-full" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-4" />
-              <Skeleton className="h-4 w-2/3" />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="card space-y-3">
-        <Skeleton className="h-3.5 w-40" />
-        <Skeleton className="h-4" />
-        <Skeleton className="h-4 w-11/12" />
-        <Skeleton className="h-4 w-3/5" />
-      </div>
-      <div className="card space-y-3">
-        <Skeleton className="h-3.5 w-24" />
-        <Skeleton className="h-14 rounded-xl" />
-        <Skeleton className="h-14 rounded-xl" />
-      </div>
-      <Skeleton className="h-12 rounded-full" />
-    </div>
-  );
-}
 
 const TIERS = [0, 1, 2];
 

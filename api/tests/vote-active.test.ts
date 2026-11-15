@@ -15,7 +15,6 @@ const manifest = (contract: `0x${string}`): VoteManifest => ({
   closesAt: 10,
   schedule: { opensAt: 0, firstTallyAt: [5, 6, 7], initialWindow: 1, maxWindows: 1 },
   poolUsd: "1",
-  issuer: "0x1000000000000000000000000000000000000002",
   slugs: ["a"],
   projects: [{ goalUsd: "1", rfp: false, groups: [] }],
   groups: [],
@@ -79,11 +78,11 @@ Deno.test("admin vote round: the pool note is admins' only, checked, and can be 
   });
   const cleared = await pool({ eth: null, sold: false });
   assertEquals(((await j(cleared)) as { pool: unknown }).pool, null);
-  // A test round needs two addresses before anything is read from the chain.
+  // A test round needs an address before anything is read from the chain.
   const test = await h.req("/api/admin/vote-round/test", {
     method: "POST",
     token: admin,
-    json: { contract: "nope", issuer: TEST.issuer },
+    json: { contract: "nope" },
   });
   assertEquals(test.status, 400);
   h.close();
@@ -96,7 +95,7 @@ Deno.test("admin vote round: changes need a recent sign-in", async () => {
   for (
     const [method, path, json] of [
       ["POST", "/api/admin/vote-round/pool", { eth: 400, sold: false }],
-      ["POST", "/api/admin/vote-round/test", { contract: TEST.contract, issuer: TEST.issuer }],
+      ["POST", "/api/admin/vote-round/test", { contract: TEST.contract }],
       ["DELETE", "/api/admin/vote-round/test", {}],
     ] as const
   ) {
@@ -117,7 +116,7 @@ Deno.test("admin vote round: a failed chain read doesn't show the RPC's URL", as
   const res = await h.req("/api/admin/vote-round/test", {
     method: "POST",
     token: admin,
-    json: { contract: TEST.contract, issuer: TEST.issuer },
+    json: { contract: TEST.contract },
   });
   const text = await res.text();
   assertEquals(res.status, 502);

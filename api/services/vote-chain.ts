@@ -55,9 +55,24 @@ export interface VoteChain {
           }[],
         ];
       }
-      | { fn: "drip"; to: Hex; value: bigint },
+      | { fn: "drip"; to: Hex; value: bigint }
+      | {
+        fn: "setPledgeBySig";
+        args: readonly [Hex, bigint, bigint, bigint, Hex, bigint, bigint, Hex];
+      },
     nonce: number,
   ): Promise<Hex>;
+  /** The next nonce `signer` must sign a pledge with (setPledgeBySig; consecutive), at
+   * `block` (default the head). */
+  pledgeNonceOf(signer: Hex, block?: bigint): Promise<bigint>;
+  /** The contract's record of a pledge id (`pledges(bytes32)`) at `block` (default the
+   * head); `exists` false when never set. */
+  pledgeOf(
+    pledgeId: Hex,
+    block?: bigint,
+  ): Promise<{ initiativeId: bigint; currencyId: bigint; amount: bigint; exists: boolean }>;
+  /** The head block's number: for reads that must agree with each other. */
+  blockNumber(): Promise<bigint>;
   /** Every BallotRecorded and RegistrationRevoked since the deploy block, in chain order,
    * up to the pinned `block` (what `committed` must be read at). */
   ballots(): Promise<{ events: BallotEvent[]; block: bigint }>;
@@ -117,12 +132,13 @@ export function createVoteChain(
   const pub = createPublicClient({ chain, transport }) as PublicClient;
   const account = relayerKey ? privateKeyToAccount(relayerKey) : null;
   const wallet = account ? createWalletClient({ account, chain, transport }) : null;
-  const read = <T>(functionName: string, args: readonly unknown[]) =>
+  const read = <T>(functionName: string, args: readonly unknown[], blockNumber?: bigint) =>
     pub.readContract({
       address: m.contract,
       abi: SIGNED_BALLOTS_ABI,
       functionName: functionName as never,
       args: args as never,
+      ...(blockNumber === undefined ? {} : { blockNumber }),
     }) as Promise<T>;
   const blockTimes = new Map<bigint, number>();
 
@@ -160,6 +176,14 @@ export function createVoteChain(
       }
     },
     nonceOf: async (n) => BigInt(await read<bigint>("nonceOf", [n])),
+    pledgeNonceOf: async (a, block) => BigInt(await read<bigint>("pledgeNonceOf", [a], block)),
+    async pledgeOf(id, block) {
+      const [initiativeId, currencyId, amount, exists] = await read<
+        readonly [bigint, bigint, bigint, boolean]
+      >("pledges", [id], block);
+      return { initiativeId, currencyId, amount, exists };
+    },
+    blockNumber: () => pub.getBlockNumber(),
     balance: (a) => pub.getBalance({ address: a }),
     async txStatus(hash) {
       const r = await pub.getTransactionReceipt({ hash }).catch(() => null);

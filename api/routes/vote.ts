@@ -87,7 +87,7 @@ type Call = Parameters<VoteRound["chain"]["send"]>[0];
  * If the last send was dropped (the node still hasn't seen it a minute later and
  * the chain is behind), fall back to the chain's count so nothing queues behind
  * the gap. */
-async function sendNext(kv: Deno.Kv, d: VoteRound, now: number, call: Call): Promise<Hex> {
+export async function sendNext(kv: Deno.Kv, d: VoteRound, now: number, call: Call): Promise<Hex> {
   const key = ["vote", "relayer-nonce"];
   const stored = (await kv.get<{ next: number; hash: Hex; at: number }>(key)).value;
   const pending = await d.chain.relayerNonce();
@@ -108,7 +108,7 @@ async function sendNext(kv: Deno.Kv, d: VoteRound, now: number, call: Call): Pro
 
 /** One relayer send at a time across isolates, so account nonces and the
  * one-per-person check never race. */
-async function withRelayer<T>(kv: Deno.Kv, fn: () => Promise<T>): Promise<T> {
+export async function withRelayer<T>(kv: Deno.Kv, fn: () => Promise<T>): Promise<T> {
   const key = ["vote", "relayer"];
   const id = crypto.randomUUID();
   for (let tries = 0; tries < 200; tries++) {

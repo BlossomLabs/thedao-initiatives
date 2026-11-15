@@ -37,10 +37,26 @@ import type { Comment, Initiative, Pledge, PledgeStatus } from "../db/types.ts";
 import type { CardRow } from "../db/initiatives.ts";
 import { sharedChainState } from "../services/chain-state.ts";
 import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "../config.ts";
+import type { Hex } from "viem";
+import { pledgeChainId, pledgeTypedData } from "../../shared/vote/typed-data.ts";
+import { newId } from "../lib/ids.ts";
+import {
+  adminPledges,
+  amountAfter,
+  PLEDGE_DEADLINE_SECS,
+  PLEDGE_ID_RE,
+  type PledgeChange,
+  pledgeFail,
+  SIGNED_FIELDS,
+  signedPledgeOf,
+} from "../services/admin-pledges.ts";
+
+export { pledgeOnChain } from "../services/admin-pledges.ts";
 
 export function adminRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const { db, config, chain, ens } = deps;
+  const pledges = adminPledges(deps);
   r.use("*", requireAdmin);
 
   r.post("/sessions/revoke", requireRecentAuth(deps.now), async (c) => {
@@ -295,6 +311,8 @@ export function adminRoutes(deps: Deps) {
   r.get("/initiatives/:id", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"));
     const [signersOk, signersDetail] = signersConfigured(config.operationalSigners);
+    // Pledge changes that landed on-chain since are applied before the list is read.
+    const pendingPledges = await pledges.settleAll(initiative.id);
     return c.json({
       initiative: adminInitiative(
         initiative,
@@ -303,6 +321,7 @@ export function adminRoutes(deps: Deps) {
       revisions: (await db.revisions.list(initiative.id, true, true)).map(revisionMeta),
       summary: await deps.funding.summary(initiative, !(await deps.maintenance.on())),
       pledges: (await db.pledges.list(initiative.id, true)).map((p) => pledgeJson(config, p)),
+      pendingPledges,
       donations: (await db.donations.list(initiative.id, false)).map((d) =>
         donationJson(d, decimalsOf)
       ),
@@ -503,12 +522,26 @@ export function adminRoutes(deps: Deps) {
    * reader serves adding (everything required) and editing (a subset).
    */
   const PLEDGE_NOTE_CHARS = 300;
-  async function readPledge(c: Context<Vars>, initiative: Initiative) {
+  async function readPledge(
+    c: Context<Vars>,
+    initiative: Initiative,
+    /** "signed": the pledge goes on-chain, so the signature fields are required (checked
+     * before any upload); "prepare": the body of a request for the typed data. */
+    mode: "plain" | "signed" | "prepare" = "plain",
+  ) {
     const ct = c.req.header("content-type") ?? "";
     let fields: Record<string, unknown> = {};
     let logoCid: string | undefined;
     let logo: FormDataEntryValue | null = null;
-    const allowed = ["company", "amount", "url", "note", "status"];
+    const allowed = [
+      "company",
+      "amount",
+      "url",
+      "note",
+      "status",
+      ...SIGNED_FIELDS,
+      ...(mode === "prepare" ? ["remove"] : []),
+    ];
     if (ct.startsWith("multipart/form-data")) {
       const form = await formBody(c, [...allowed, "logo"]);
       for (const [k, v] of form.entries()) if (typeof v === "string") fields[k] = v;
@@ -534,6 +567,7 @@ export function adminRoutes(deps: Deps) {
     if (fields.note !== undefined) {
       patch.note = capped(fields.note, PLEDGE_NOTE_CHARS, "The note");
     }
+    const signed = mode === "signed" ? signedPledgeOf(fields) : null;
     // Validate fields before uploading anything to the external provider.
     if (logo instanceof File && logo.size) {
       if (logo.size > LOGO_MAX_BYTES) throw new HttpError(400, "Logo must be under 1 MB.");
@@ -547,22 +581,123 @@ export function adminRoutes(deps: Deps) {
     }
     if (logoCid !== undefined) patch.logoCid = logoCid;
     const status = typeof fields.status === "string" ? s(fields.status, 20) : undefined;
-    return { patch, status };
+    return { patch, status, signed, fields };
   }
+
+  /**
+   * During the real vote a pledge to an initiative in the round is signed and put
+   * on-chain before it is saved (services/admin-pledges.ts); otherwise it is saved as is.
+   */
+  /** Write a change on-chain: the saved row when no transaction was needed, otherwise
+   * the hash right after the broadcast (answered 202 `{ hash, pid }`; the form waits for
+   * the receipt, then calls `settle`). */
+  async function writeOnChain(
+    c: Context<Vars>,
+    chainAt: NonNullable<ReturnType<typeof pledges.onChainFor>>,
+    rfpId: string,
+    signed: ReturnType<typeof signedPledgeOf>,
+    change: PledgeChange,
+  ) {
+    return await pledges.write({
+      d: chainAt.d,
+      initiativeId: chainAt.at.initiativeId,
+      rfpId,
+      admin: c.var.user!.address as Hex,
+      signed,
+      change,
+    });
+  }
+  const sent = (r: { hash: Hex | null; pid: string }) => ({ hash: r.hash, pid: r.pid });
+
+  /**
+   * What an admin signs for a pledge during the real vote: the same body as adding or
+   * editing (plus `pid` for an existing pledge, or `remove: true`), answered with the
+   * pledge's id and the EIP-712 typed data to sign, nonce read fresh from the chain.
+   */
+  r.post("/initiatives/:id/pledges/prepare", async (c) => {
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    const chainAt = pledges.onChainFor(initiative);
+    if (!chainAt) {
+      throw pledgeFail(
+        409,
+        "not_on_chain",
+        "Pledges to this initiative are saved without signing.",
+      );
+    }
+    const { patch, status, fields } = await readPledge(c, initiative, "prepare");
+    if (
+      fields.pid !== undefined && (typeof fields.pid !== "string" || !PLEDGE_ID_RE.test(fields.pid))
+    ) {
+      throw new HttpError(400, "bad pledge id");
+    }
+    if (status !== undefined && !["pledged", "received", "withdrawn"].includes(status)) {
+      throw new HttpError(400, "bad status");
+    }
+    const pid = (fields.pid as string | undefined) ?? newId();
+    // The change in flight first: the amount is the one after it.
+    await pledges.settle(chainAt.d, initiative.id, pid);
+    const stored = fields.pid === undefined ? null : await db.pledges.get(initiative.id, pid);
+    let change: PledgeChange;
+    if (fields.remove === true) {
+      if (!stored) throw new HttpError(404, "not found");
+      change = { kind: "remove" };
+    } else if (stored) {
+      change = { kind: "edit", patch, status: status as PledgeStatus | undefined };
+    } else {
+      // A new pledge (its id kept by the form until it is saved).
+      if (!patch.company) throw new HttpError(400, "Company name is required.");
+      if (patch.amountUsd === undefined) throw new HttpError(400, "Amount is required.");
+      change = {
+        kind: "add",
+        row: {
+          company: patch.company,
+          amountUsd: patch.amountUsd,
+          status: status === "received" ? "received" : "pledged",
+          note: "",
+          url: "",
+          logoCid: "",
+        },
+      };
+    }
+    const typed = pledgeTypedData(chainAt.d.manifest, {
+      pledgeId: pledgeChainId(pid),
+      initiativeId: BigInt(chainAt.at.initiativeId),
+      currencyId: 0n,
+      amount: amountAfter(change, stored),
+      nonce: await chainAt.d.chain.pledgeNonceOf(c.var.user!.address as Hex),
+      deadline: BigInt(deps.now() + PLEDGE_DEADLINE_SECS),
+    });
+    return c.json({
+      pid,
+      typedData: {
+        ...typed,
+        message: Object.fromEntries(
+          Object.entries(typed.message).map(([k, v]) => [k, v.toString()]),
+        ),
+      },
+    });
+  });
 
   r.post("/initiatives/:id/pledges", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"), true);
-    const { patch, status } = await readPledge(c, initiative);
+    const chainAt = pledges.onChainFor(initiative);
+    const { patch, status, signed } = await readPledge(c, initiative, chainAt ? "signed" : "plain");
     if (!patch.company) throw new HttpError(400, "Company name is required.");
     if (patch.amountUsd === undefined) throw new HttpError(400, "Amount is required.");
-    const p = await db.pledges.add(initiative.id, {
+    const row = {
       company: patch.company,
       amountUsd: patch.amountUsd,
-      status: status === "received" ? "received" : "pledged",
+      status: status === "received" ? "received" as const : "pledged" as const,
       note: patch.note ?? "",
       url: patch.url ?? "",
       logoCid: patch.logoCid ?? "",
-    });
+    };
+    if (chainAt && signed) {
+      const r = await writeOnChain(c, chainAt, initiative.id, signed, { kind: "add", row });
+      if (r.pending) return c.json(sent(r), 202);
+      return c.json({ pledge: pledgeJson(config, r.pledge!) }, 201);
+    }
+    const p = await db.pledges.add(initiative.id, row);
     return c.json({ pledge: pledgeJson(config, p) }, 201);
   });
 
@@ -570,10 +705,23 @@ export function adminRoutes(deps: Deps) {
   r.patch("/initiatives/:id/pledges/:pid", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"), true);
     const pid = c.req.param("pid");
-    const { patch, status } = await readPledge(c, initiative);
+    const chainAt = pledges.onChainFor(initiative);
+    const { patch, status, signed } = await readPledge(c, initiative, chainAt ? "signed" : "plain");
     if (status !== undefined && !["pledged", "received", "withdrawn"].includes(status)) {
       throw new HttpError(400, "bad status");
     }
+    if (chainAt && signed) {
+      if (signed.pid !== pid) throw new HttpError(400, "bad pledge id");
+      const r = await writeOnChain(c, chainAt, initiative.id, signed, {
+        kind: "edit",
+        patch,
+        status: status as PledgeStatus | undefined,
+      });
+      if (r.pending) return c.json(sent(r), 202);
+      if (!r.pledge) throw new HttpError(404, "not found");
+      return c.json({ ok: true, pledge: pledgeJson(config, r.pledge) });
+    }
+    await pledges.settleLeftover(initiative.id, pid);
     let next = await db.pledges.get(initiative.id, pid);
     if (!next) throw new HttpError(404, "not found");
     if (Object.keys(patch).length) next = await db.pledges.update(initiative.id, pid, patch);
@@ -585,10 +733,38 @@ export function adminRoutes(deps: Deps) {
   });
 
   r.delete("/initiatives/:id/pledges/:pid", async (c) => {
-    await jsonBody(c, []);
+    const body = await jsonBody(c, SIGNED_FIELDS);
     const initiative = await initiativeOr404(c.req.param("id"), true);
-    await db.pledges.remove(initiative.id, c.req.param("pid"));
+    const pid = c.req.param("pid");
+    const chainAt = pledges.onChainFor(initiative);
+    if (chainAt) {
+      const signed = signedPledgeOf(body);
+      if (signed.pid !== pid) throw new HttpError(400, "bad pledge id");
+      const r = await writeOnChain(c, chainAt, initiative.id, signed, { kind: "remove" });
+      if (r.pending) return c.json(sent(r), 202);
+      return c.json({ ok: true });
+    }
+    await pledges.settleLeftover(initiative.id, pid);
+    await db.pledges.remove(initiative.id, pid);
     return c.json({ ok: true });
+  });
+
+  /**
+   * The form's look after its own wait for a pledge's receipt: settles that change (the
+   * chain is the truth) and says `saved` (with the row; null after a removal), `pending`
+   * or `failed`.
+   */
+  r.post("/initiatives/:id/pledges/:pid/settle", async (c) => {
+    const body = await jsonBody(c, ["hash"]);
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    const pid = c.req.param("pid");
+    if (!PLEDGE_ID_RE.test(pid)) throw new HttpError(400, "bad pledge id");
+    const hash = body.hash ?? null;
+    if (hash !== null && (typeof hash !== "string" || !TX_HASH_RE.test(hash.toLowerCase()))) {
+      throw new HttpError(400, "malformed tx hash");
+    }
+    const r = await pledges.settleSent(initiative.id, pid, hash as Hex | null);
+    return c.json({ state: r.state, pledge: r.pledge && pledgeJson(config, r.pledge) });
   });
 
   r.post("/initiatives/:id/donations/recheck", async (c) => {

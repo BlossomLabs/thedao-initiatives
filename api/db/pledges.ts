@@ -5,11 +5,13 @@ import { newId } from "../lib/ids.ts";
 export function pledgesRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
   /** Every write also bumps the initiative's card version (db/cards.ts). */
   const write = (rfpId: string) => kv.atomic().set(K.cardVersion(rfpId), crypto.randomUUID());
+  /** `id`: one the caller chose (a pledge signed on-chain before it is saved). */
   async function add(
     rfpId: string,
     p: Omit<Pledge, "id" | "rfpId" | "createdAt">,
+    id: string = newId(),
   ): Promise<Pledge> {
-    const pledge: Pledge = { ...p, id: newId(), rfpId, createdAt: now() };
+    const pledge: Pledge = { ...p, id, rfpId, createdAt: now() };
     await write(rfpId).set(K.pledge(rfpId, pledge.id), pledge).commit();
     return pledge;
   }
@@ -53,5 +55,12 @@ export function pledgesRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = 
     return (await list(rfpId)).filter((p) => p.status === "pledged")
       .reduce((s, p) => s + p.amountUsd, 0);
   }
-  return { add, get, list, setStatus, update, remove, totalActive };
+  /** The initiative holding a pledge id, if any (a scan: admin writes only). */
+  async function initiativeOf(id: string): Promise<string | null> {
+    for await (const e of kv.list<Pledge>({ prefix: ["pledge"] })) {
+      if (e.value.id === id) return e.value.rfpId;
+    }
+    return null;
+  }
+  return { add, get, list, setStatus, update, remove, totalActive, initiativeOf };
 }

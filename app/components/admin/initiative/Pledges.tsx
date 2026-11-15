@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PencilLine, Trash2, Upload } from "lucide-react";
+import type { Hex } from "viem";
+import { signTypedData } from "wagmi/actions";
 import { Button } from "~/components/ui/Button";
 import { Input } from "~/components/ui/Field";
 import {
@@ -10,11 +12,206 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/Select";
-import { api } from "~/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { api, ApiError, type ApiOptions } from "~/lib/api";
+import { apiCode } from "~/hooks/use-vote";
+import { voteClient } from "~/hooks/use-vote-send";
+import { etherscanTx, type VoteChain } from "~/components/vote/BallotStatus";
+import {
+  type Busy,
+  type PledgeFlowDeps,
+  type PledgePhase,
+  sendPledge,
+  type SettleState,
+  TOO_LONG,
+} from "~/lib/pledge-flow";
+import { MAINNET_CHAIN_ID, ROUND } from "../../../../shared/vote/manifest";
 import type { AdminInitiativePage, Pledge } from "~/lib/api-types";
 import { usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
+import { useWallet } from "~/context/wallet";
+import { liveConnector } from "~/lib/wallet-store";
+import { useEnsureVoteChain } from "~/hooks/use-vote-chain";
+import type { pledgeTypedData } from "../../../../shared/vote/typed-data";
 import type { Run } from "./run";
+
+type PledgeTyped = ReturnType<typeof pledgeTypedData>;
+/** The API's typed data: the message's numbers as decimal strings. */
+type PreparedPledge = {
+  pid: string;
+  typedData: Omit<PledgeTyped, "message"> & { message: Record<string, string> };
+};
+
+/** A table row whose change was sent on-chain and hasn't landed yet. */
+const RECORDING_ROW = "Recording on-chain…";
+/** How long the browser waits for a pledge's receipt, like a ballot's. */
+const RECEIPT_WAIT_MS = 3 * 60_000;
+const CHAIN: VoteChain = ROUND.chainId === MAINNET_CHAIN_ID ? "Ethereum" : "Sepolia";
+
+const busyOf = (e: unknown): Busy | null => {
+  if (apiCode(e) !== "pledge_pending" || !(e instanceof ApiError)) return null;
+  const b = e.body as { hash?: Hex | null; pid?: string };
+  return typeof b.pid === "string" ? { pending: { hash: b.hash ?? null, pid: b.pid } } : null;
+};
+
+/**
+ * Sends a pledge write. During the real vote the API answers 428 until the pledge is
+ * signed: then it asks the API for the typed data, has the wallet sign it, and sends the
+ * same write again with the signature. The API answers with the hash right after the
+ * broadcast; the browser waits for the receipt and has the API settle it (pledge-flow.ts),
+ * like a ballot. `send` resolves once saved, and throws the reason otherwise.
+ */
+function usePledgeSend(base: string) {
+  const wallet = useWallet();
+  const ensureChain = useEnsureVoteChain();
+  const qc = useQueryClient();
+  const [phase, setPhase] = useState<PledgePhase>({ kind: "idle" });
+  const send = useCallback(
+    async (
+      path: string,
+      opts: ApiOptions,
+      prepare: Record<string, unknown>,
+      /** Told the id the pledge is signed under (a new pledge gets one here). */
+      onPid?: (pid: string) => void,
+    ) => {
+      setPhase({ kind: "idle" });
+      const deps: PledgeFlowDeps<PreparedPledge> = {
+        chain: CHAIN,
+        plain: async () => {
+          try {
+            await api(path, opts);
+            return "saved";
+          } catch (e) {
+            if (apiCode(e) === "signature_required") return "sign";
+            throw e;
+          }
+        },
+        prepare: async () => {
+          try {
+            return await api<PreparedPledge>(`${base}/pledges/prepare`, { json: prepare });
+          } catch (e) {
+            const busy = busyOf(e);
+            if (busy) return busy;
+            throw e;
+          }
+        },
+        sign: async ({ typedData }) => {
+          if (!wallet.config || !wallet.address) throw new Error("Connect your wallet first.");
+          await ensureChain();
+          const m = typedData.message;
+          return await signTypedData(wallet.config, {
+            ...typedData,
+            message: {
+              pledgeId: m.pledgeId as Hex,
+              initiativeId: BigInt(m.initiativeId),
+              currencyId: BigInt(m.currencyId),
+              amount: BigInt(m.amount),
+              nonce: BigInt(m.nonce),
+              deadline: BigInt(m.deadline),
+            },
+            account: wallet.address,
+            connector: liveConnector(wallet),
+          } as never);
+        },
+        send: async ({ pid, typedData }, signature) => {
+          const m = typedData.message;
+          const signed = { pid, nonce: m.nonce, deadline: m.deadline, signature };
+          let again: ApiOptions;
+          if (opts.form) {
+            const form = new FormData();
+            for (const [k, v] of opts.form.entries()) form.append(k, v);
+            for (const [k, v] of Object.entries(signed)) form.append(k, v);
+            again = { ...opts, form };
+          } else {
+            again = { ...opts, json: { ...(opts.json as object | undefined), ...signed } };
+          }
+          try {
+            const r = await api<{ hash?: Hex | null; pid?: string }>(path, again);
+            // 202 `{ hash, pid }`: broadcast. Anything else: saved, no transaction needed.
+            return r && "hash" in r && typeof r.pid === "string"
+              ? { hash: r.hash ?? null, pid: r.pid }
+              : { saved: true as const };
+          } catch (e) {
+            const busy = busyOf(e);
+            if (busy) return busy;
+            throw e;
+          }
+        },
+        waitReceipt: async (hash) =>
+          (await voteClient().waitForTransactionReceipt({ hash, timeout: RECEIPT_WAIT_MS }))
+            .status,
+        settle: async (pid, hash) =>
+          (await api<{ state: SettleState }>(`${base}/pledges/${pid}/settle`, {
+            json: { hash },
+          })).state,
+        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+      };
+      const end = await sendPledge(deps, setPhase, onPid);
+      // A transaction went out: the table shows where it stands, whatever came of it.
+      if ("hash" in end && end.hash) void qc.invalidateQueries({ queryKey: ["admin"] });
+      if (end.kind === "failed") throw new Error(end.reason);
+      return end;
+    },
+    [base, wallet, ensureChain, qc],
+  );
+  return { send, phase };
+}
+
+/** What the form says once a send is done, and whether it clears: a saved change that was
+ * an earlier one (the API's 409) isn't the one typed, so the form keeps it, unless it was
+ * this same new pledge sent again. */
+export function outcomeOf(end: PledgePhase, done: string, retryOfNew: boolean) {
+  if ("earlier" in end && end.earlier && !retryOfNew) {
+    return {
+      text:
+        "An earlier change to this pledge was just recorded. Check the table and send yours again if it’s still needed.",
+      clear: false,
+    };
+  }
+  return { text: end.kind === "recorded" ? end.reason : done, clear: true };
+}
+
+/** Where an on-chain pledge's send stands, in the ballot's words: one line, and the
+ * transaction once there is one. Nothing outside the vote. */
+export function PledgeSendStatus({ phase }: { phase: PledgePhase }) {
+  const tx = "hash" in phase && phase.hash ? phase.hash : undefined;
+  let text: string | null = null;
+  if (phase.kind === "signing") {
+    text = "Sign the pledge in your wallet. It’s a signature, not a payment.";
+  } else if (phase.kind === "waiting" && phase.earlier) {
+    text =
+      `An earlier change to this pledge is on its way: waiting for ${CHAIN} to record it. Yours wasn’t sent.`;
+  } else if (phase.kind === "relaying" || phase.kind === "waiting") {
+    text = `Waiting for ${CHAIN} to record it. Usually under a minute.`;
+  } else if (phase.kind === "failed" && tx && phase.reason === TOO_LONG) {
+    text =
+      `${CHAIN} is taking long. It was sent and may still land; the table shows it once it does.`;
+  } else if (phase.kind === "failed" && tx && phase.earlier) {
+    text = `The earlier change to this pledge, not yours.`;
+  } else if ((phase.kind === "saved" || phase.kind === "recorded") && tx) {
+    text = phase.earlier
+      ? `The earlier change to this pledge was recorded on ${CHAIN}.`
+      : `Recorded on ${CHAIN}.`;
+  }
+  if (!text && !tx) return null;
+  return (
+    <p className="small dim m-0 flex flex-wrap items-center gap-x-3 gap-y-1" role="status">
+      {text && <span>{text}</span>}
+      {tx && (
+        <a href={etherscanTx(tx, CHAIN)} target="_blank" rel="noreferrer" className="tnum">
+          {tx.slice(0, 6)}…{tx.slice(-4)} on{" "}
+          {CHAIN === "Ethereum" ? "Etherscan" : "Sepolia Etherscan"}
+        </a>
+      )}
+    </p>
+  );
+}
+
+/** The form's text fields, for the typed data (the logo never goes on-chain). */
+const fieldsOf = (form: FormData) =>
+  Object.fromEntries(
+    [...form.entries()].filter(([k, v]) => k !== "logo" && typeof v === "string"),
+  );
 
 /** Add or edit a pledge: the same fields either way; a new logo replaces the old one. */
 export function PledgeForm(
@@ -29,6 +226,13 @@ export function PledgeForm(
 ) {
   const ref = useRef<HTMLFormElement>(null);
   const [busy, setBusy] = useState(false);
+  const { send, phase } = usePledgeSend(base);
+  // A new pledge keeps the id it was signed under until it is saved: sent again after
+  // a failure, it sets the same pledge on-chain, never a second one.
+  const newPid = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    newPid.current = undefined;
+  }, [base]);
   const [logoName, setLogoName] = useState("");
   // Controlled: form.reset() does not reach the custom select.
   const [status, setStatus] = useState(editing?.status ?? "pledged");
@@ -47,13 +251,29 @@ export function PledgeForm(
         e.preventDefault();
         const form = new FormData(e.currentTarget);
         setBusy(true);
+        // Sent again after a failure: a 409's earlier change is this same new pledge.
+        const retryOfNew = !editing && newPid.current !== undefined;
+        let clear = true;
         const req = editing
-          ? api(`${base}/pledges/${editing.id}`, { method: "PATCH", form })
-          : api(`${base}/pledges`, { form });
-        run(() => req, editing ? "Pledge updated." : "Pledge added.")
+          ? send(`${base}/pledges/${editing.id}`, { method: "PATCH", form }, {
+            ...fieldsOf(form),
+            pid: editing.id,
+          })
+          : send(
+            `${base}/pledges`,
+            { form },
+            { ...fieldsOf(form), pid: newPid.current },
+            (pid) => (newPid.current = pid),
+          );
+        run(async () => {
+          const o = outcomeOf(await req, editing ? "Pledge updated." : "Pledge added.", retryOfNew);
+          clear = o.clear;
+          return o.text;
+        }, (text) => text)
           .then((saved) => {
             // A refused pledge keeps what was typed.
-            if (!saved) return;
+            if (!saved || !clear) return;
+            newPid.current = undefined;
             ref.current?.reset();
             setLogoName("");
             setStatus("pledged");
@@ -136,7 +356,12 @@ export function PledgeForm(
         {editing?.logoUrl && !logoName && (
           <img src={editing.logoUrl} alt="" className="h-6 rounded bg-white p-0.5" />
         )}
-        {!stacked && <span className="small dim">PNG, JPG or WEBP; shown on the public page.</span>}
+        {phase.kind === "idle" && !stacked && (
+          <span className="small dim">PNG, JPG or WEBP; shown on the public page.</span>
+        )}
+      </div>
+      <div className="mt-2.5 empty:hidden">
+        <PledgeSendStatus phase={phase} />
       </div>
     </form>
   );
@@ -146,9 +371,15 @@ export default function Pledges(
   { page, base, run }: { page: AdminInitiativePage; base: string; run: Run },
 ) {
   const [editing, setEditing] = useState<Pledge | null>(null);
+  const { send, phase } = usePledgeSend(base);
+  const pending = page.pendingPledges ?? [];
+  const inFlight = new Set(pending.map((x) => x.pid));
+  const added = pending.filter((x) =>
+    x.kind === "add" && !page.pledges.some((p) => p.id === x.pid)
+  );
   return (
     <>
-      {page.pledges.length > 0 && (
+      {page.pledges.length + added.length > 0 && (
         <div className="tblbox mb-3.5">
           <table className="tbl">
             <thead>
@@ -180,58 +411,91 @@ export default function Pledges(
                   </td>
                   <td className="amt">{usd(p.amountUsd)}</td>
                   <td>
-                    <Select
-                      value={p.status}
-                      onValueChange={(status) =>
-                        run(() =>
-                          api(`${base}/pledges/${p.id}`, {
-                            method: "PATCH",
-                            json: { status },
-                          })
-                        )}
-                    >
-                      <SelectTrigger size="sm" aria-label={`Status of ${p.company}'s pledge`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {["pledged", "received", "withdrawn"].map((s) => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    {inFlight.has(p.id)
+                      ? <span className="small dim">{RECORDING_ROW}</span>
+                      : (
+                        <Select
+                          value={p.status}
+                          onValueChange={(status) =>
+                            run(async () =>
+                              outcomeOf(
+                                await send(`${base}/pledges/${p.id}`, {
+                                  method: "PATCH",
+                                  json: { status },
+                                }, { pid: p.id, status }),
+                                "",
+                                false,
+                              ).text, (text) => text)}
+                        >
+                          <SelectTrigger size="sm" aria-label={`Status of ${p.company}'s pledge`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {["pledged", "received", "withdrawn"].map((s) => (
+                                <SelectItem key={s} value={s}>{s}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
                   </td>
                   <td className="small dim">{p.note}</td>
                   <td className="whitespace-nowrap text-right">
-                    <button
-                      type="button"
-                      className="cursor-pointer rounded-[9px] border border-transparent bg-transparent p-1.5 text-muted hover:border-[rgba(92,183,90,.5)] hover:text-dao-green"
-                      title="Edit pledge"
-                      onClick={() => setEditing(p)}
-                    >
-                      <PencilLine className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      className="cursor-pointer rounded-[9px] border border-transparent bg-transparent p-1.5 text-[#ffb3b1] hover:border-[rgba(255,59,56,.6)]"
-                      title="Delete pledge"
-                      onClick={() =>
-                        confirm(`Delete the pledge from ${p.company}?`) &&
-                        run(
-                          () => api(`${base}/pledges/${p.id}`, { method: "DELETE" }),
-                          "Pledge deleted.",
-                        )}
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
+                    {!inFlight.has(p.id) && (
+                      <>
+                        <button
+                          type="button"
+                          className="cursor-pointer rounded-[9px] border border-transparent bg-transparent p-1.5 text-muted hover:border-[rgba(92,183,90,.5)] hover:text-dao-green"
+                          title="Edit pledge"
+                          onClick={() => setEditing(p)}
+                        >
+                          <PencilLine className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="cursor-pointer rounded-[9px] border border-transparent bg-transparent p-1.5 text-[#ffb3b1] hover:border-[rgba(255,59,56,.6)]"
+                          title="Delete pledge"
+                          onClick={() =>
+                            confirm(`Delete the pledge from ${p.company}?`) &&
+                            run(
+                              async () =>
+                                outcomeOf(
+                                  await send(`${base}/pledges/${p.id}`, { method: "DELETE" }, {
+                                    pid: p.id,
+                                    remove: true,
+                                  }),
+                                  "Pledge deleted.",
+                                  false,
+                                ).text,
+                              (text) => text,
+                            )}
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </>
+                    )}
                   </td>
+                </tr>
+              ))}
+              {added.map((x) => (
+                <tr key={x.pid}>
+                  <td>{x.company}</td>
+                  <td className="amt">{x.amountUsd === null ? "" : usd(x.amountUsd)}</td>
+                  <td>
+                    <span className="small dim">{RECORDING_ROW}</span>
+                  </td>
+                  <td></td>
+                  <td></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      <div className="mb-3.5 empty:hidden">
+        <PledgeSendStatus phase={phase} />
+      </div>
       <PledgeForm base={base} run={run} editing={editing} onDone={() => setEditing(null)} />
     </>
   );

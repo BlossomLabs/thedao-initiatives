@@ -152,6 +152,10 @@ function fakeChain(chainManifest: VoteManifest = manifest) {
     codeOf: (a) => Promise.resolve(state.code.get(a.toLowerCase()) ?? "0x"),
     canMint: (to) => Promise.resolve(!state.unmintable.has(to.toLowerCase())),
     nonceOf: (n) => Promise.resolve(state.nonces.get(n) ?? 0n),
+    pledgeNonceOf: () => Promise.resolve(0n),
+    blockNumber: () => Promise.resolve(100n),
+    pledgeOf: () =>
+      Promise.resolve({ initiativeId: 0n, currencyId: 0n, amount: 0n, exists: false }),
     balance: (a) => Promise.resolve(state.balances.get(a.toLowerCase()) ?? 0n),
     txStatus: (hash) => Promise.resolve(state.txStatus.get(hash) ?? "pending"),
     estimateRecordFor: () => Promise.resolve(100_000n * 2_000_000_000n),

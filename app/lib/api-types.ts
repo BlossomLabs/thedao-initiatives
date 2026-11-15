@@ -459,11 +459,22 @@ export interface AdminListRow {
   safeSync: SafeSyncState | null;
 }
 
+export interface PendingPledge {
+  pid: string;
+  kind: "add" | "edit" | "remove";
+  /** A new pledge's company and amount (an edit or removal shows on its own row). */
+  company: string | null;
+  amountUsd: number | null;
+  hash: string | null;
+}
+
 export interface AdminInitiativePage {
   initiative: AdminInitiative;
   revisions: RevisionMeta[];
   summary: Summary;
   pledges: Pledge[];
+  /** During the real vote: pledge changes sent on-chain whose transaction hasn't settled. */
+  pendingPledges?: PendingPledge[];
   donations: Donation[];
   safeSync: SafeSyncState | null;
   signers: { ok: boolean; detail: string; list: string[]; threshold: number };

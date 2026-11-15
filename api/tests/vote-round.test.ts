@@ -1580,6 +1580,32 @@ Deno.test("ballot: a rule the contract enforced after a pool change is a 422, no
   h.close();
 });
 
+Deno.test("ballot: before voting opens it is a 409 not_open, not a 500", async () => {
+  const { h, state } = await setup(ruled);
+  state.owners.set(17n, VOTER.address);
+  h.clock.now = ruled.opensAt - 1;
+  const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
+  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  assertEquals(res.status, 409);
+  assertEquals((await j(res)).code, "not_open");
+  assertEquals(state.sent.length, 0);
+  h.close();
+});
+
+Deno.test("ballot: opened by the clock but not yet on-chain is a 409 not_open", async () => {
+  const { h, state } = await setup(ruled);
+  state.owners.set(17n, VOTER.address);
+  // The newest block is still older than opensAt: the contract refuses it.
+  state.sendError = new Error(
+    'The contract function "record" reverted.\n\nError: VotingNotStarted()',
+  );
+  const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
+  const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
+  assertEquals(res.status, 409);
+  assertEquals((await j(res)).code, "not_open");
+  h.close();
+});
+
 Deno.test("the round carries the chain asks", async () => {
   const { h, state } = await setup(ruled);
   state.asks = [10n, 20n, 30n, 40n];

@@ -82,25 +82,33 @@ vi.mock("~/context/session", () => ({
 }));
 vi.mock("~/components/board/PledgeBand", () => ({ default: () => null }));
 // The donate form, down to its amount: what's typed goes to the page, as the real one's.
-vi.mock("~/components/donate/DonateWidget", () => ({
-  default: (
-    { onAmount, suggested }: {
-      onAmount?: (usd: number) => void;
-      suggested?: { usd: number; label?: string } | { usd: number; label?: string }[];
-    },
-  ) => (
-    <>
-      <ul aria-label="Suggested amounts">
-        {[suggested ?? []].flat().map((x) => <li key={x.usd}>${x.usd} {x.label}</li>)}
-      </ul>
-      <input
-        aria-label="Amount"
-        type="number"
-        onChange={(e) => onAmount?.(Number(e.currentTarget.value))}
-      />
-    </>
-  ),
+// A test round's form (test dollars) and the real one take the same amounts.
+vi.mock("~/components/vote/TestDonate", async () => ({
+  default: (await import("~/components/donate/DonateWidget")).default,
 }));
+vi.mock("~/components/donate/DonateWidget", async () => {
+  const { parseUsd } = await import("~/lib/donate");
+  return {
+    default: (
+      { onAmount, suggested }: {
+        onAmount?: (usd: number) => void;
+        suggested?: { usd: number; label?: string } | { usd: number; label?: string }[];
+      },
+    ) => (
+      <>
+        <ul aria-label="Suggested amounts">
+          {[suggested ?? []].flat().map((x) => <li key={x.usd}>${x.usd} {x.label}</li>)}
+        </ul>
+        <input
+          aria-label="Amount"
+          type="number"
+          // As the real form does: parseUsd, so a blank field is NaN.
+          onChange={(e) => onAmount?.(parseUsd(e.currentTarget.value))}
+        />
+      </>
+    ),
+  };
+});
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
 vi.mock("~/lib/api", async (original) => {
   const api = vi.fn();
@@ -482,6 +490,18 @@ it("the hero says when B-Tier funds nothing yet", async () => {
   );
 });
 
+it("no B-Tier warning before anything is funded: no ballots yet", async () => {
+  await showOpen(roundOf({}, {}));
+  expect(await screen.findByText(/would be funded by 0 ballots/)).toBeInTheDocument();
+  expect(screen.queryByText(/B-Tier: nothing funded yet/)).toBeNull();
+});
+
+it("TheDAO's ballot on a test round names the demo pool, as the hero does", async () => {
+  await showOpen(roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] }));
+  expect(await screen.findByText(/ of the \$\d[\d,]* demo pool if it ended now/))
+    .toBeInTheDocument();
+});
+
 it("no warning while B-Tier funds something", async () => {
   await showOpen(roundOf({ "1": ballot({ alpha: "B" }) }, { alpha: [50_000, "B"] }));
   expect(screen.queryByText(/B-Tier: nothing funded yet/)).toBeNull();
@@ -799,6 +819,18 @@ it("without the chain's asks, the preview gives no amount, it says the figures a
   fireEvent.change(amount, { target: { value: "5000" } });
   expect(await screen.findByText("What it saves the pool is being worked out."))
     .toBeInTheDocument();
+  expect(screen.queryByText(/asks the pool for \$/)).toBeNull();
+});
+
+it("a cleared amount previews nothing, and doesn't break the page", async () => {
+  const view = openWith({ beta: give({ tier: "B", gap: "20000000000" }) });
+  await showOpen({ ...view, live: { ...view.live, inputs: inputsFor([50, 30]) } });
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  const amount = await screen.findByRole("spinbutton", { name: "Amount" });
+  fireEvent.change(amount, { target: { value: "5000" } });
+  // What the form says for a blank field (parseUsd("") is NaN).
+  fireEvent.change(amount, { target: { value: "" } });
+  expect(screen.getByRole("heading", { name: "What it takes to move up" })).toBeInTheDocument();
   expect(screen.queryByText(/asks the pool for \$/)).toBeNull();
 });
 

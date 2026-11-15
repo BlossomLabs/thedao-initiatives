@@ -1,0 +1,109 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, expect, it, vi } from "vitest";
+import { writeContract } from "wagmi/actions";
+import { api } from "~/lib/api";
+import TestDonate from "./TestDonate";
+
+const { TOKEN, BETA, ME, ZERO } = vi.hoisted(() => ({
+  TOKEN: "0x3000000000000000000000000000000000000003",
+  BETA: "0x2000000000000000000000000000000000000002",
+  ME: "0x9000000000000000000000000000000000000009",
+  ZERO: "0x0000000000000000000000000000000000000000",
+}));
+
+vi.mock("../../../shared/vote/manifest", async (original) => ({
+  ...await original<typeof import("../../../shared/vote/manifest")>(),
+  ROUND: {
+    kind: "test",
+    chainId: 11155111,
+    slugs: ["alpha", "beta"],
+    accounts: ["0x1000000000000000000000000000000000000001", BETA],
+    currencies: [
+      { symbol: "USD", asset: ZERO, usdFeed: ZERO },
+      { symbol: "tUSD", asset: TOKEN, usdFeed: ZERO },
+    ],
+  },
+}));
+vi.mock("wagmi/actions", () => ({ writeContract: vi.fn() }));
+const chain = vi.hoisted(() => ({
+  balance: 0n,
+  getBalance: vi.fn(),
+  waitForTransactionReceipt: vi.fn(),
+}));
+vi.mock("~/hooks/use-vote-send", () => ({
+  voteClient: () => ({
+    getBalance: chain.getBalance,
+    waitForTransactionReceipt: chain.waitForTransactionReceipt,
+  }),
+}));
+vi.mock("~/hooks/use-vote-chain", () => ({ useEnsureVoteChain: () => async () => {} }));
+vi.mock("~/context/wallet", () => ({
+  useWallet: () => ({ address: ME, config: {}, connector: null }),
+}));
+vi.mock("~/lib/wallet-store", () => ({ liveConnector: () => undefined }));
+vi.mock("~/lib/api", async (original) => ({
+  ...await original<typeof import("~/lib/api")>(),
+  api: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.mocked(writeContract).mockReset().mockResolvedValue("0xabc" as never);
+  vi.mocked(api).mockReset().mockResolvedValue({ hash: "0xgas" });
+  chain.getBalance.mockReset().mockImplementation(() => Promise.resolve(chain.balance));
+  chain.waitForTransactionReceipt.mockReset().mockResolvedValue({ status: "success" });
+  chain.balance = 10n ** 15n;
+});
+
+it("mints the amount in test dollars straight to the initiative's account", async () => {
+  const onDonated = vi.fn();
+  render(
+    <TestDonate
+      slug="beta"
+      suggested={[{ usd: 9000, note: "brings it into S-Tier", label: "to S-Tier" }]}
+      onDonated={onDonated}
+    />,
+  );
+  expect(screen.getByText(/No real money moves/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Donate test dollars" }));
+  expect(await screen.findByText(/\$9,000 in test dollars is on its account/)).toBeInTheDocument();
+  const call = vi.mocked(writeContract).mock.calls[0][1] as unknown as Record<string, unknown>;
+  expect(call).toMatchObject({
+    address: TOKEN,
+    functionName: "mint",
+    args: [BETA, 9_000_000_000n],
+    chainId: 11155111,
+  });
+  expect(onDonated).toHaveBeenCalled();
+  // The wallet had gas: no top-up.
+  expect(api).not.toHaveBeenCalled();
+});
+
+it("a wallet with no Sepolia ETH asks for its badge's gas first", async () => {
+  chain.balance = 0n;
+  render(<TestDonate slug="beta" badge={7} />);
+  fireEvent.change(screen.getByRole("textbox", { name: "Amount in US dollars" }), {
+    target: { value: "25" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Donate test dollars" }));
+  expect(await screen.findByText(/\$25 in test dollars/)).toBeInTheDocument();
+  expect(api).toHaveBeenCalledWith("/api/vote/gas", {
+    method: "POST",
+    json: { tokenId: "7" },
+  });
+});
+
+it("refuses a blank amount and one over a million", async () => {
+  render(<TestDonate slug="beta" />);
+  const input = screen.getByRole("textbox", { name: "Amount in US dollars" });
+  fireEvent.click(screen.getByRole("button", { name: "Donate test dollars" }));
+  expect(await screen.findByText("Enter an amount in dollars.")).toBeInTheDocument();
+  fireEvent.change(input, { target: { value: "1000001" } });
+  fireEvent.click(screen.getByRole("button", { name: "Donate test dollars" }));
+  expect(await screen.findByText(/A million test dollars at most/)).toBeInTheDocument();
+  expect(writeContract).not.toHaveBeenCalled();
+});
+
+it("an initiative the round doesn't have can't be given to", () => {
+  render(<TestDonate slug="nope" />);
+  expect(screen.getByRole("button", { name: "Donate test dollars" })).toBeDisabled();
+});

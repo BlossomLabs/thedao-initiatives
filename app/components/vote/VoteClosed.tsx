@@ -244,6 +244,7 @@ export default function VoteClosed(
       items={all}
       result={result}
       poolUsd={poolUsd}
+      poolName={round.kind === "real" ? "pool" : "demo pool"}
       live={Boolean(live)}
       label={resultLabel}
       // Green on its ring: what the live tally would give the initiatives on this ballot.

@@ -19,6 +19,10 @@ const { Component: DonateWidget } = lazyPart(
   () => import("~/components/donate/DonateWidget"),
   DonateStandIn,
 );
+const { Component: TestDonate } = lazyPart(
+  () => import("~/components/vote/TestDonate"),
+  DonateStandIn,
+);
 
 export type GiveRow = {
   card: Card;
@@ -116,6 +120,7 @@ export default function GiveList(
     effect,
     canDonate,
     example,
+    test,
     onDonated,
     search = {},
     steps,
@@ -133,6 +138,11 @@ export default function GiveList(
     canDonate: boolean;
     /** An example page: the donate form shows, but nothing is donated from it. */
     example?: boolean;
+    /** A test round: donations are test dollars on Sepolia, minted to the initiative's
+     * account (`badge`: the voter's, for a gas top-up), never real money. */
+    test?: { badge?: number };
+    /** The figures are from before the latest change on-chain, being worked out again. */
+    stale?: boolean;
     onDonated?: () => void;
     /** The board's AI search flags: the box offers AI only while it is on. */
     search?: { ai?: boolean; aiAuto?: boolean };
@@ -386,7 +396,30 @@ export default function GiveList(
                           <KnockOnList lines={lines} titleOf={titleOf} />
                         </Reveal>
                       )}
-                      {canDonate || example
+                      {test && !example
+                        ? (
+                          isOpen && (
+                            <Suspense fallback={<DonateStandIn />}>
+                              <TestDonate
+                                slug={i.slug}
+                                suggested={steps?.length
+                                  ? steps.map((x) => ({
+                                    usd: x.usd,
+                                    note: `brings it into ${tierName(x.tier)}`,
+                                    label: `to ${tierName(x.tier)}`,
+                                  }))
+                                  : gap === null
+                                  ? undefined
+                                  : [{ usd: gap, note: `brings it into ${to}`, label: `to ${to}` }]}
+                                onAmount={onAmount}
+                                onDonated={onDonated}
+                                badge={test.badge}
+                                accent={r.entry ? "red" : "green"}
+                              />
+                            </Suspense>
+                          )
+                        )
+                        : canDonate || example
                         ? (
                           isOpen && (
                             <Suspense fallback={<DonateStandIn />}>

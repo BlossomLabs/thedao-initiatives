@@ -46,6 +46,9 @@ const UNSEEN_SECS = 60;
 /** The relay pays for this many ballots per badge; after that, "send it yourself".
  * Mainnet gas is real money, so the real round gets fewer. */
 const relaysPerBadge = (d: VoteRound) => d.manifest.kind === "real" ? 5 : 20;
+/** A ballot sent before the contract opens: before `opensAt`, or in its first seconds,
+ * while the chain's latest block is still older than it. */
+const NOT_OPEN = "Voting hasn't opened yet. Send your ballot again in a moment.";
 /** The contract's ballot-rule reverts (vote/contracts/SignedBallots.sol). */
 const RULE_REVERT = /\b(BallotTooSmall|TooFewIndependent|BadProof|GroupOverHalf|TooManyTiers)\b/;
 
@@ -639,6 +642,7 @@ export function voteRoutes(deps: Deps) {
     const d = dc();
     await limit("ballot", c.var.ip);
     open(d);
+    if (deps.now() < d.manifest.opensAt) throw fail(409, "not_open", NOT_OPEN);
     const body = await jsonBody(c, ["tokenId", "nonce", "ballot", "signature"]);
     const tokenId = uint(body.tokenId);
     const nonce = uint(body.nonce);
@@ -767,6 +771,8 @@ export function voteRoutes(deps: Deps) {
       }).catch((e) => {
         // The contract enforced a rule this check passed: the pool rose meanwhile (the
         // check uses a replay up to a few seconds old). Say so, not "internal error".
+        // The server's clock is a few seconds ahead of the chain's at the opening.
+        if (/\bVotingNotStarted\b/.test(String(e))) throw fail(409, "not_open", NOT_OPEN);
         if (RULE_REVERT.test(String(e))) {
           throw fail(
             422,

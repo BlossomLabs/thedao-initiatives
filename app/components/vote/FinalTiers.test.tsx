@@ -103,7 +103,8 @@ it("after the close: this badge's ballot and TheDAO's result, side by side, the 
     "Nothing in this tier",
   );
   expect(screen.getByRole("heading", { name: "TheDAO's result" })).toBeInTheDocument();
-  expect(screen.getByText("$420,000 of the $1,000,000 pool · 2 initiatives")).toBeInTheDocument();
+  expect(screen.getByText("$420,000 of the $1,000,000 demo pool · 2 initiatives"))
+    .toBeInTheDocument();
   expect(screen.getByRole("meter", { name: "What TheDAO allocated of the pool" }))
     .toHaveAttribute("aria-valuenow", "42");
   expect(screen.getByRole("img", { name: "TheDAO" })).toHaveAttribute("src", "/dao-logo.svg");

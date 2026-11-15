@@ -20,16 +20,22 @@ import { usd, usdShort } from "~/lib/format";
 import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
 import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
 import { chainTally } from "../../../shared/vote/chain";
+import { parseCode } from "../../../shared/vote/code";
 import { liveInputsFrom } from "../../../shared/vote/live-inputs";
 import { FINE, giftEffect, giftGapTo, liveTiers } from "../../../shared/vote/next-tier";
 
 const POLL_MS = 5_000;
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
-/** Voters should expect B-Tier may be empty: it only funds what the pool has left. */
-const tierBEmpty = (rv: RoundView) =>
-  rv.tiers.find((t) => t.tier === "B")?.status !== "settled" &&
-  !Object.values(rv.live.tiers ?? {}).includes("B");
+/** Voters should expect B-Tier may be empty: it only funds what the pool has left. Said
+ * once something above it is funded: before that, nothing anywhere is. */
+export const tierBEmpty = (rv: RoundView) => {
+  const live = Object.values(rv.live.tiers ?? {});
+  const fundedAbove = live.length > 0 ||
+    rv.tiers.some((t) => t.status === "settled" && t.funded.length > 0);
+  return fundedAbove && rv.tiers.find((t) => t.tier === "B")?.status !== "settled" &&
+    !live.includes("B");
+};
 const TIER_B_NOTE = " · B-Tier: nothing funded yet, the pool may not reach it.";
 
 /** The vote results. The real vote's are the front page, a test vote's are on `/vote`
@@ -85,6 +91,8 @@ export default function VoteResults(
   useEffect(() => setCode(myCode()), []);
   const { session } = useSession();
   const badges = useMyBadges(session?.address ?? null, !code && !example);
+  // A test round's gas top-up for donating goes by the voter's badge.
+  const myBadge = code ? parseCode(code)?.n : badges.data?.[0];
   const mine = example
     ? null
     : code
@@ -166,7 +174,8 @@ export default function VoteResults(
   }, [liveInputs]);
   const entry: NextTierEntry | undefined = open ? give?.[open] : undefined;
   const gap = entry ? gapUsd(entry) : null;
-  const given = amount;
+  // A cleared or mistyped amount (NaN from the form) gives nothing.
+  const given = Number.isFinite(amount) ? amount : 0;
   const needFor = (slug: string) => askOf(R, asks, slug) ?? 0;
   const titleOf = (slug: string) =>
     cards.find((x) => x.initiative.slug === slug)?.initiative.title ?? slug;
@@ -416,6 +425,7 @@ export default function VoteResults(
               items={items}
               result={preview?.result ?? result}
               poolUsd={pool}
+              poolName={POOL_NAME}
               live
               // Green is a donation's preview here: what the live tally adds stays neutral.
               liveTone="neutral"
@@ -461,6 +471,7 @@ export default function VoteResults(
             effect={effect}
             canDonate={Boolean(board.data?.flags.tokensOk)}
             example={Boolean(example)}
+            test={REAL ? undefined : { badge: myBadge }}
             onDonated={() => void qc.invalidateQueries({ queryKey: boardKey })}
             search={{
               ai: board.data?.flags.aiSearch,

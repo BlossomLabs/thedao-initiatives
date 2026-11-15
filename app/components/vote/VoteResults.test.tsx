@@ -984,3 +984,21 @@ it("a donation that covers the whole ask reads as covered, not as dropping out",
   expect(within(now).getByText("Alpha fuzzing")).toBeInTheDocument();
   expect(within(daoBallot()).queryByLabelText(/Alpha fuzzing, drops out/)).toBeNull();
 });
+
+it("gaps from before the latest change say they are being updated; a project covered since leaves the list", async () => {
+  // Beta's gap was searched before a donation covered it; the round view already has it
+  // covered, and the gaps are a search behind.
+  const view = openWith({ beta: give() });
+  await showOpen({
+    ...view,
+    live: { ...view.live, covered: ["beta"], aheadStale: true },
+  });
+  expect(await screen.findByText(/Something changed on-chain: these figures are being updated/))
+    .toBeInTheDocument();
+  expect(list().queryByRole("button", { name: /Beta audits/ })).toBeNull();
+  cleanup();
+  // Searched again: no note.
+  await showOpen(openWith({ beta: give() }));
+  await list().findByRole("button", { name: /Beta audits/ });
+  expect(screen.queryByText(/these figures are being updated/)).toBeNull();
+});

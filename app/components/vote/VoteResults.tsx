@@ -144,13 +144,17 @@ export default function VoteResults(
   const rows = useMemo<GiveRow[] | undefined>(() => {
     if (!give) return undefined;
     const bySlug = new Map(cards.map((c) => [c.initiative.slug, c]));
+    // Covered by donations now: asking nothing, it's in no tier, whatever older gaps say.
+    const coveredNow = new Set(covered.now);
     const below = Object.entries(give).flatMap(([slug, entry]) => {
       const card = bySlug.get(slug);
-      return card ? [{ card, askUsd: askOf(R, asks, slug), entry, now: result.tiers[slug] }] : [];
+      return card && !coveredNow.has(slug)
+        ? [{ card, askUsd: askOf(R, asks, slug), entry, now: result.tiers[slug] }]
+        : [];
     });
     const ahead = [...result.provisional].flatMap((slug) => {
       const card = bySlug.get(slug);
-      if (!card || give[slug] || result.tiers[slug] !== tier) return [];
+      if (!card || give[slug] || coveredNow.has(slug) || result.tiers[slug] !== tier) return [];
       const l = lead?.[slug];
       return [{
         card,
@@ -160,7 +164,7 @@ export default function VoteResults(
       }];
     });
     return [...ahead, ...below];
-  }, [give, lead, cards, result, tier, R, asks]);
+  }, [give, lead, cards, result, tier, R, asks, covered]);
 
   // The initiative open in the list, and the amount in its donate form.
   const [open, setOpen] = useState<string>();
@@ -472,6 +476,7 @@ export default function VoteResults(
             canDonate={Boolean(board.data?.flags.tokensOk)}
             example={Boolean(example)}
             test={REAL ? undefined : { badge: myBadge }}
+            stale={Boolean(rv?.live.aheadStale)}
             onDonated={() => void qc.invalidateQueries({ queryKey: boardKey })}
             search={{
               ai: board.data?.flags.aiSearch,

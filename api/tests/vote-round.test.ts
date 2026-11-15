@@ -833,6 +833,29 @@ Deno.test("the round lists each initiative's gap to the next tier", async () => 
   h.close();
 });
 
+Deno.test("round: after a new ballot the gaps from before it are marked stale until searched again", async () => {
+  const { h, state } = await setup({ ...qe, poolUsd: "6000000000" });
+  state.asks = [3_000_000_000n, 3_000_000_000n, 3_000_000_000n];
+  state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
+  type Body = { accepted: object; live: { next?: object; aheadStale?: boolean } };
+  await h.req("/api/vote/round");
+  await h.settle();
+  const before = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals([Boolean(before.live.next), before.live.aheadStale], [true, undefined]);
+  // Somebody else's ballot: the live tally changes at once; the gaps are a search behind.
+  state.logs.push(logOf("3", `${X}01${X}`, NOW - 5, 3));
+  h.clock.now += 10;
+  const after = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(Object.keys(after.accepted), ["1", "2", "3"]);
+  assertEquals([Boolean(after.live.next), after.live.aheadStale], [true, true]);
+  await h.settle();
+  h.clock.now += 10;
+  const searched = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(searched.live.aheadStale, undefined);
+  await h.settle();
+  h.close();
+});
+
 Deno.test("round next: who it knocks out is named by slug", async () => {
   // $100K pool. Two voters back b ($40K) below c (out of anyone's reach), so b is funded
   // after the first tier. Backing a ($70K) to B-Tier's gap funds it first and leaves

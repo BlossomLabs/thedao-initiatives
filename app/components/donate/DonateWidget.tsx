@@ -111,9 +111,18 @@ export default function DonateWidget({
     : [suggested];
   const first = suggestions[0];
   const [amount, setAmount] = useState(first ? String(first.usd) : "");
-  // Another initiative or another suggestion: start from its amount again.
+  // Another initiative: start from its suggestion. A new suggestion for the same one (the
+  // round changed on-chain) replaces the amount only if it was the last suggestion: an
+  // amount the visitor typed or picked stays.
+  const suggestedFor = useRef({ initiativeId, usd: first?.usd });
   useEffect(() => {
-    if (first) setAmount(String(first.usd));
+    const was = suggestedFor.current;
+    suggestedFor.current = { initiativeId, usd: first?.usd };
+    if (!first) return;
+    if (was.initiativeId !== initiativeId) return setAmount(String(first.usd));
+    setAmount((
+      cur,
+    ) => (was.usd === undefined || cur === String(was.usd) ? String(first.usd) : cur));
   }, [first?.usd, initiativeId]); // eslint-disable-line react-hooks/exhaustive-deps
   const onAmountRef = useRef(onAmount);
   onAmountRef.current = onAmount;

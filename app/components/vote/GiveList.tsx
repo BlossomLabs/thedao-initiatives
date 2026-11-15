@@ -121,6 +121,7 @@ export default function GiveList(
     canDonate,
     example,
     test,
+    stale,
     onDonated,
     search = {},
     steps,
@@ -237,6 +238,11 @@ export default function GiveList(
           />
         </div>
       )}
+      {stale && rows !== undefined && rows.length > 0 && (
+        <p role="status" className="m-0 mt-3 text-[13px] text-white/60" data-figures-stale="">
+          Something changed on-chain: these figures are being updated.
+        </p>
+      )}
       {rows === undefined
         ? <p className="mt-5 text-[14px] text-white/55">Working out what each initiative needs…</p>
         : rows.length === 0
@@ -248,7 +254,13 @@ export default function GiveList(
           </p>
         )
         : (
-          <ul className="m-0 mt-3 flex list-none flex-col gap-1.5 p-0">
+          <ul
+            aria-busy={stale || undefined}
+            className={cn(
+              "m-0 mt-3 flex list-none flex-col gap-1.5 p-0 transition-opacity",
+              stale && "opacity-70",
+            )}
+          >
             {shown.map((r) => {
               const i = r.card.initiative;
               const isOpen = open === i.slug;

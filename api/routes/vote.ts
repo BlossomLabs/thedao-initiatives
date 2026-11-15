@@ -423,7 +423,7 @@ export function voteRoutes(deps: Deps) {
   let lastNext: (KnownNext & { contract: string }) | null = null;
   let searching = false;
   const nextKey = (d: VoteRound) => [...round(d), "next"];
-  type Ahead = Pick<KnownNext, "next" | "lead" | "give">;
+  type Ahead = Pick<KnownNext, "key" | "next" | "lead" | "give">;
   /** The newest search known (this isolate's or the stored one) for the open tier
    * `firstOpen`, whichever inputs it ran on; none once no tier is open. */
   const knownNext = async (d: VoteRound, firstOpen: number | null, stored?: KnownNext | null) => {
@@ -833,12 +833,18 @@ export function voteRoutes(deps: Deps) {
       body: ReturnType<typeof roundJson>;
       firstOpen?: number | null;
       finalKey?: string;
+      /** The digest of the live tally's inputs: what the gaps served with it must match. */
+      inputsKey?: string;
     };
     const cached = (await kv.get<Cached>(key)).value;
+    /** The round with the gaps known for its open tier. Gaps searched on earlier inputs
+     * (before the latest ballot, donation, pledge or pool change) are still served while
+     * the new search runs, marked `aheadStale`: the page says they are being updated. */
     const withAhead = (
       body: Cached["body"],
       ahead: Ahead | undefined,
       final: FinalJson | undefined,
+      inputs: string | undefined,
     ) => ({
       ...body,
       live: {
@@ -846,6 +852,7 @@ export function voteRoutes(deps: Deps) {
         ...(ahead ? { next: ahead.next } : {}),
         ...(ahead?.lead ? { lead: ahead.lead } : {}),
         ...(ahead?.give ? { give: ahead.give } : {}),
+        ...(ahead && inputs && ahead.key !== inputs ? { aheadStale: true } : {}),
       },
       ...(final ? { final } : {}),
     });
@@ -856,7 +863,14 @@ export function voteRoutes(deps: Deps) {
     ) {
       const final = await knownFinal(d, cached.finalKey);
       const fromCache = async () =>
-        c.json(withAhead(cached.body, await knownNext(d, cached.firstOpen ?? null), final));
+        c.json(
+          withAhead(
+            cached.body,
+            await knownNext(d, cached.firstOpen ?? null),
+            final,
+            cached.inputsKey,
+          ),
+        );
       // A closed round whose what-ifs nobody here has, or is searching for, is replayed
       // once more below: the cached round has no inputs to start the search from.
       // (An entry cached before it carried a digest is tried under "".)
@@ -879,14 +893,17 @@ export function voteRoutes(deps: Deps) {
     const at = deps.now();
     const firstOpen = st.liveInputs ? st.firstOpen : null;
     const fk = await finalDigest(d, st);
+    const ik = st.liveInputs
+      ? await inputsKey(d.manifest.contract, st.liveInputs, st.firstOpen)
+      : undefined;
     await cacheSet(
       kv,
       key,
-      { at, body, firstOpen, ...(fk ? { finalKey: fk } : {}) },
+      { at, body, firstOpen, ...(fk ? { finalKey: fk } : {}), ...(ik ? { inputsKey: ik } : {}) },
       isFinal(body, at) ? undefined : { expireIn: 60_000 },
       deps.log,
     );
-    return c.json(withAhead(body, await nextFor(d, st), await finalFor(d, st, fk)));
+    return c.json(withAhead(body, await nextFor(d, st), await finalFor(d, st, fk), ik));
   });
 
   // The ballots that count (the quiet ending's accepted ones), for the vote results.

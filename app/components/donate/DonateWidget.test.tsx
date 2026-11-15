@@ -163,3 +163,31 @@ it("on an example page, Donate and the address only say nothing is donated", () 
   fireEvent.click(screen.getByRole("button", { name: "Donate" }));
   expect(mock.setStatus).toHaveBeenLastCalledWith({ kind: "wait", text: EXAMPLE_NOTE });
 });
+
+it("a new suggestion (the round changed on-chain) follows the suggested amount, never a typed one", () => {
+  const at = (usd: number, initiativeId = "id") => (
+    <MemoryRouter>
+      <DonateWidget
+        initiativeId={initiativeId}
+        slug="test"
+        safeAddress={SAFE}
+        suggested={{ usd, note: "gets it into S-Tier" }}
+      />
+    </MemoryRouter>
+  );
+  const { rerender } = render(at(9000));
+  // No wallet in the test browser: the exchange tab leads.
+  fireEvent.click(screen.getByText("Wallet"));
+  const amount = () => (screen.getByLabelText("Amount in US dollars") as HTMLInputElement).value;
+  expect(amount()).toBe("9000");
+  // Somebody else voted: the gap is smaller now. Untouched, the amount follows it.
+  rerender(at(8000));
+  expect(amount()).toBe("8000");
+  // Typed: it stays, whatever the next poll suggests.
+  fireEvent.change(screen.getByLabelText("Amount in US dollars"), { target: { value: "5000" } });
+  rerender(at(7000));
+  expect(amount()).toBe("5000");
+  // Another initiative starts from its own suggestion.
+  rerender(at(3000, "other"));
+  expect(amount()).toBe("3000");
+});

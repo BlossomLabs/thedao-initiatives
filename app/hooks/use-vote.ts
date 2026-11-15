@@ -108,6 +108,9 @@ export type RoundView = {
      * it (into B-Tier when unfunded): its gap, and who comes in, drops out or moves. For
      * every open initiative not in the tier settling now; absent once closed. */
     give?: Record<string, NextTierEntry>;
+    /** `next`, `lead` and `give` are from before the latest change (a ballot, a donation,
+     * a pledge, the pool): served while they are worked out again. */
+    aheadStale?: boolean;
   };
   /** Once closed: each initiative's gap to the tier above where it finished, judged at
    * that tier's settlement (comesIn/dropsOut name only the target tier), and S-Tier's

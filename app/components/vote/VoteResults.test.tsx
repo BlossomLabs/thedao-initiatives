@@ -888,3 +888,67 @@ it("TheDAO's ring, with a donation: green what the pool pays for it, its ask les
   expect(ring.getAttribute("aria-valuetext")).toContain("With your donation: $21,000.");
   expect(ring.querySelector(".stroke-dao-green")).not.toBeNull();
 });
+
+it("a covered project is listed as covered by donations, not under a tier", async () => {
+  // Beta's ask is $0: covered when S-Tier settled, so it funded nothing and isn't "not funded".
+  await showClosed({
+    tiers: [
+      { ...settled("S", ["alpha"], { alpha: usdMicro(60_000) }), covered: ["beta"] },
+      settled("A", [], {}),
+      settled("B", [], {}),
+    ],
+  });
+  const box = screen.getByRole("region", { name: "Covered by donations" });
+  expect(within(box).getByText("Beta audits")).toBeInTheDocument();
+  expect(heading("Not funded")).toBeNull();
+  expect(heading("S-Tier")).toHaveTextContent("S-Tier$60,000 allocated to 1 initiative");
+});
+
+it("covered projects are not counted as funded by the pool", async () => {
+  await showClosed({
+    tiers: [
+      { ...settled("S", ["alpha"], { alpha: usdMicro(60_000) }), covered: ["beta"] },
+      settled("A", [], {}),
+      settled("B", [], {}),
+    ],
+  });
+  expect(hero(/\$60k of \$100k demo pool spent/)).toBeInTheDocument();
+  expect(heading("S-Tier")).toHaveTextContent("1 initiative");
+});
+
+it("while open, a project covered now is covered for now, one covered at a settlement is final", async () => {
+  const view = openWith({ beta: give() });
+  await showOpen({
+    ...view,
+    tiers: [
+      { ...settled("S", ["alpha"], { alpha: usdMicro(50_000) }), covered: ["beta"] },
+      waiting("A"),
+      waiting("B"),
+    ],
+    live: { ...view.live, covered: ["beta", "gamma"] },
+  });
+  const box = await screen.findByRole("region", { name: "Covered by donations" });
+  expect(within(box).getByText("Beta audits")).toBeInTheDocument();
+  const now = screen.getByRole("region", { name: "Covered by donations for now" });
+  expect(within(now).getByText("gamma")).toBeInTheDocument();
+  expect(within(now).queryByText("Beta audits")).toBeNull();
+});
+
+it("a donation that covers the whole ask reads as covered, not as dropping out", async () => {
+  const view = openWith({ beta: give({ tier: "B", gap: "20000000000" }) });
+  await showOpen({ ...view, live: { ...view.live, inputs: inputsFor([50, 30]) } });
+  fireEvent.click(await list().findByRole("button", { name: /Alpha fuzzing/ }));
+  fireEvent.change(await screen.findByRole("spinbutton", { name: "Amount" }), {
+    target: { value: "50000" },
+  });
+  expect(
+    await screen.findByText((_, el) =>
+      el?.tagName === "P" &&
+      /^With your \$50,000, Alpha fuzzing is covered by donations\. 1 other initiative comes in\.$/
+        .test(el.textContent ?? "")
+    ),
+  ).toBeInTheDocument();
+  const now = screen.getByRole("region", { name: "Covered by donations for now" });
+  expect(within(now).getByText("Alpha fuzzing")).toBeInTheDocument();
+  expect(within(daoBallot()).queryByLabelText(/Alpha fuzzing, drops out/)).toBeNull();
+});

@@ -480,6 +480,8 @@ export function finalWhatIfsAsync(
 export type GiftEffect = {
   was: Tier | null;
   tier: Tier | null;
+  /** The gift is its whole ask: covered by donations, in no tier (not a drop out). */
+  covered: boolean;
   comesIn: [number, Tier][];
   dropsOut: [number, Tier][];
   moves: [number, Tier, Tier][];
@@ -497,6 +499,7 @@ export function giftEffect(
   const out: GiftEffect = {
     was: name(live.get(c)),
     tier: name(after.get(c)),
+    covered: inp.costs[c] > 0n && given >= inp.costs[c],
     comesIn: [],
     dropsOut: [],
     moves: [],

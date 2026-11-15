@@ -13,7 +13,7 @@ import StickyAside from "~/components/layout/StickyAside";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { boardKey, useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/vote-local";
-import { askOf, dollars, servedAsks, splitResults } from "~/lib/vote-results";
+import { askOf, coveredProjects, dollars, servedAsks, splitResults } from "~/lib/vote-results";
 import { useSession } from "~/context/session";
 import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd, usdShort } from "~/lib/format";
@@ -46,10 +46,28 @@ const TIER_B_NOTE = " · B-Tier: nothing funded yet, the pool may not reach it."
 type Change = {
   was: Tier | null;
   tier: Tier | null;
+  /** It gives the initiative its whole ask: covered by donations, in no tier. */
+  covered?: boolean;
   comesIn: { slug: string; tier: Tier }[];
   dropsOut: { slug: string; tier: Tier }[];
   moves: { slug: string; from: Tier; to: Tier }[];
 };
+
+/** Projects covered by donations, apart from the tiers: nothing from the pool, in no tier. */
+function Covered({ label, titles }: { label: string; titles: string[] }) {
+  if (!titles.length) return null;
+  return (
+    <section
+      aria-label={label}
+      className="rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-[13.5px] leading-snug"
+    >
+      <b className="text-[12px] font-semibold uppercase tracking-wide text-white/60">{label}</b>
+      <ul className="m-0 mt-1 list-none space-y-0.5 p-0 text-white/80">
+        {titles.map((t) => <li key={t}>{t}</li>)}
+      </ul>
+    </section>
+  );
+}
 
 export default function VoteResults(
   { example }: { example?: { round: VoteManifest; view: RoundView } } = {},
@@ -108,6 +126,7 @@ export default function VoteResults(
   /** The tier settling now (or next to): the first one not settled. */
   const tier: Tier = rv?.tiers.find((t) => t.status !== "settled")?.tier ?? "S";
   const give = rv?.live.give;
+  const covered = useMemo(() => coveredProjects(rv?.tiers ?? [], rv?.live.covered), [rv]);
   const lead = rv?.live.lead;
   // Each initiative's ask is the chain's, served with the round (none while it's unknown,
   // or served short).
@@ -190,6 +209,7 @@ export default function VoteResults(
       return {
         was: e.was,
         tier: e.tier,
+        covered: e.covered,
         comesIn: e.comesIn.map(([o, tier]) => ({ slug: R.slugs[o], tier })),
         dropsOut: e.dropsOut.map(([o, tier]) => ({ slug: R.slugs[o], tier })),
         moves: e.moves.map(([o, from, to]) => ({ slug: R.slugs[o], from, to })),
@@ -205,7 +225,7 @@ export default function VoteResults(
     : 0;
   const movesUp = Boolean(change?.tier && change.tier !== change.was);
   /** With the donation, if it changes anything: TheDAO's ballot as the tally would have it. */
-  const preview = open && change && (movesUp || others > 0)
+  const preview = open && change && (movesUp || others > 0 || change.covered)
     ? (() => {
       const tiers = { ...result.tiers };
       const funded = new Set(result.funded);
@@ -217,6 +237,12 @@ export default function VoteResults(
         provisional.add(open);
         // The donation pays that much of its need: the pool is asked for the rest.
         awards.set(open, Math.max(0, needFor(open) - given));
+      } else if (change.covered) {
+        // Its whole ask given: covered by donations, in no tier, nothing from the pool.
+        delete tiers[open];
+        funded.delete(open);
+        provisional.delete(open);
+        awards.delete(open);
       }
       // Others it moves to another tier, and those it brings in.
       for (const o of change.moves) tiers[o.slug] = o.to;
@@ -255,7 +281,9 @@ export default function VoteResults(
   );
   /** The donation's effect in a few words: it comes in, or (already in) it frees money. */
   const said = open && change && (
-    movesUp
+    change.covered
+      ? <>With your {usd(given)}, {named(open)} is covered by donations</>
+      : movesUp
       ? (
         <>
           With your {usd(given)}, the initiative {named(open)} comes into{" "}
@@ -416,6 +444,12 @@ export default function VoteResults(
                 </div>
               )
             }
+            <Covered label="Covered by donations" titles={covered.final.map(titleOf)} />
+            <Covered
+              label="Covered by donations for now"
+              titles={[...covered.now, ...(change?.covered && open && preview ? [open] : [])]
+                .filter((s, i, all) => all.indexOf(s) === i).map(titleOf)}
+            />
             <Legend preview={Boolean(preview)} />
           </StickyAside>
           <GiveList
@@ -488,7 +522,6 @@ function ClosedResults(
   },
 ) {
   const REAL = R.kind === "real";
-  const inRound = useMemo(() => new Set(R.slugs), [R]);
   const pool = dollars(rv.poolUsd ?? R.poolUsd);
 
   const { votePct, voteTiers } = useMemo(() => {
@@ -523,7 +556,13 @@ function ClosedResults(
     return { next, lead, titles };
   }, [rv, cards]);
 
-  const results = useMemo(() => splitResults(cards, rv.tiers), [rv, cards]);
+  // Covered by donations when a tier settled: not funded, and not "not funded" either.
+  const covered = useMemo(() => coveredProjects(rv.tiers, undefined).final, [rv]);
+  const listed = useMemo(() => new Set(R.slugs.filter((s) => !covered.includes(s))), [R, covered]);
+  const results = useMemo(
+    () => splitResults(cards.filter((c) => listed.has(c.initiative.slug)), rv.tiers),
+    [rv, cards, listed],
+  );
   /** The list has a section per tier with what it funded; a tier that funded nothing has
    * no section, so the hero says so. */
   const tierLines = rv.tiers.filter((t) => t.status === "waiting" || !t.funded.length).map((t) => (
@@ -554,6 +593,14 @@ function ClosedResults(
           from the vote
         </span>
       </div>
+      {covered.length > 0 && (
+        <div className="mx-auto mt-4 max-w-md text-left">
+          <Covered
+            label="Covered by donations"
+            titles={covered.map((s) => titles.get(s) ?? s)}
+          />
+        </div>
+      )}
       {mine && (
         <div className="mt-5 flex justify-center">
           <LinkButton variant="primary" to={mine}>See your ballot</LinkButton>
@@ -564,7 +611,7 @@ function ClosedResults(
 
   return (
     <BoardPage
-      only={inRound}
+      only={listed}
       votePct={votePct}
       voteTiers={voteTiers}
       results={results}

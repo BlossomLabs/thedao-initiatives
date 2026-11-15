@@ -9,6 +9,7 @@ import { chainTally } from "../../../shared/vote/chain";
 import { liveInputsFrom } from "../../../shared/vote/live-inputs";
 
 const NOW = 1_800_000_000;
+const RESULT_MOCKS_KINDS = ["s-settling", "spent", "b-settling", "finished"] as const;
 const cards = Array.from({ length: 30 }, (_, i) => ({
   initiative: {
     slug: `p${i}`,
@@ -185,6 +186,19 @@ describe("example vote results: the real tally over made-up ballots", () => {
       const { view } = mockRound(kind, cards, 1);
       const { inp } = liveInputsFrom(view.live.inputs!);
       expect(view.asks!.map(BigInt)).toEqual(inp.costs);
+    }
+  });
+
+  it("one project is covered by donations: asking $0, in no tier, final once a tier settled", () => {
+    const last = cards[cards.length - 1].initiative.slug;
+    for (const kind of RESULT_MOCKS_KINDS) {
+      const { view } = mockRound(kind, cards, 1);
+      expect(view.asks!.at(-1)).toBe("0");
+      expect(view.live.covered).toEqual([last]);
+      expect(view.live.tiers?.[last]).toBeUndefined();
+      const tiers = view.tiers.flatMap((t) => t.status === "waiting" ? [] : [t]);
+      expect(tiers.flatMap((t) => t.covered ?? [])).toEqual([last]);
+      for (const t of tiers) expect(t.funded).not.toContain(last);
     }
   });
 

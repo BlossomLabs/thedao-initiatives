@@ -53,3 +53,15 @@ export function splitResults(
     .map((card) => ({ card, finalUsd: card.summary.total }));
   return { funded, notFunded };
 }
+
+/** Projects whose ask is $0: covered by donations, in no tier and funded by no one. `final`
+ * were covered when a tier settled (settled tiers' `covered`); `now` are covered at the
+ * latest tally only (the live view's), and could still change. */
+export function coveredProjects(
+  tiers: RoundTier[],
+  liveCovered: string[] | undefined,
+): { final: string[]; now: string[] } {
+  const final = tiers.flatMap((t) => t.status === "settled" ? t.covered ?? [] : []);
+  const done = new Set(final);
+  return { final, now: (liveCovered ?? []).filter((s) => !done.has(s)) };
+}

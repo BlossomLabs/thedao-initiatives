@@ -94,8 +94,9 @@ export const MOCK_NOW: Record<MockKind, number> = {
 const micro = (usd: number) => String(Math.round(usd * 1_000_000));
 
 /** The example's ask for an initiative, in dollars: there is no chain, so its goal less the
- * board's donations and pledges, as the contract would count them. Never $0: that would
- * fund it at the first level that opens it. */
+ * board's donations and pledges, as the contract would count them. Not $0 (that is covered
+ * by donations, no candidate): the example's one covered project is set apart in
+ * `fictionalRound`. */
 const mockAsk = (c: Card) => Math.max(1, c.initiative.goalUsd - c.summary.total);
 
 /** The fictional round: the board's proposals, oldest first. As on chain, each project's
@@ -126,6 +127,9 @@ function fictionalRound(cards: Card[], opensAt: number, firstTally: [number, num
     ballotRules: true,
   };
   const needs = list.map((c) => BigInt(micro(mockAsk(c))));
+  // The newest project is covered by donations: its ask is $0, so it is no candidate and
+  // sits in no tier.
+  if (needs.length > 1) needs[needs.length - 1] = 0n;
   return { round, needs };
 }
 
@@ -324,7 +328,11 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
         startsAt: first[i],
       })),
       accepted: {},
-      live: { funded: [], awards: {} },
+      live: {
+        funded: [],
+        awards: {},
+        covered: round.slugs.filter((_, i) => needs[i] === 0n),
+      },
     };
     if (kind === "started") return { round, view };
     // What this badge rated on the board: 5★ S-Tier, 4★ A-Tier, 3★ B-Tier, the rest stay out.
@@ -347,10 +355,15 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     ? 1
     : 0;
   const t = tallied(round, needs, crowd(round, sample, n, kind !== "missed"), settledCount);
-  const settledTiers = t.settledTiers.map(({ tier, stage }, i) =>
-    settledTier(round.slugs, tier, first[i] + WINDOW, stage)
-  );
+  // Covered by donations: the project asking $0. It is final from the first tier that
+  // settled it, in the live tally until then.
+  const covered = round.slugs.filter((_, i) => needs[i] === 0n);
+  const settledTiers = t.settledTiers.map(({ tier, stage }, i) => ({
+    ...settledTier(round.slugs, tier, first[i] + WINDOW, stage),
+    ...(i === 0 ? { covered } : {}),
+  }));
   const live = liveJson(round, t, settledCount);
+  live.covered = covered;
   // The tier settling now: in its first window, quiet; or, while S-Tier settles, changed
   // in its first (in its second now), or in its last, where it settles whatever happens.
   const settlingNow = (tier: Tier): RoundTier => {
@@ -366,6 +379,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
       latestEndAt: first[i] + LONGEST,
       quiet: kind !== "s-extended" && kind !== "s-last",
       funded: Object.entries(live.tiers ?? {}).filter(([, x]) => x === tier).map(([slug]) => slug),
+      ...(settledCount === 0 ? { covered } : {}),
     };
   };
   const waiting = (tier: Tier): RoundTier => ({
@@ -394,7 +408,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
             x.status === "settled" ? x.funded.map((s) => [s, x.tier]) : []
           ),
         );
-        return { funded: all, awards, tiers: tierOf };
+        return { funded: all, awards, tiers: tierOf, covered };
       })()
       : live,
   };

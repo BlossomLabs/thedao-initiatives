@@ -68,6 +68,21 @@ describe("what a donation does, at any amount", () => {
     // Less than that frees too little.
     expect(giftEffect(inp, 0, 0, 9n * K).comesIn).toEqual([]);
   });
+
+  it("a gift of the whole ask covers it: no tier, and not a drop out", () => {
+    const inp = inputs([50, 20], [60], [[1, 2]], 60);
+    const part = giftEffect(inp, 0, 0, 49n * K);
+    expect(part.covered).toBe(false);
+    expect(part.tier).toBe("S");
+    for (const given of [50n * K, 80n * K]) {
+      const e = giftEffect(inp, 0, 0, given);
+      expect(e.covered).toBe(true);
+      expect(e.was).toBe("S");
+      expect(e.tier).toBeNull();
+      // Its own leaving its tier is not listed among the others dropping out.
+      expect(e.dropsOut.map(([o]) => o)).not.toContain(0);
+    }
+  });
 });
 
 describe("the donation to any tier", () => {

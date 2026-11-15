@@ -169,8 +169,8 @@ abstract contract RoundAccounting is AccessControl {
     }
 
     /// @notice Before voting opens, or during the vote outside every tier's quiet-ending
-    ///         span. Existing projects never change once voting opens, so an addition
-    ///         cannot change whether an earlier ballot was valid.
+    ///         span. Ballots are judged when recorded, so an addition cannot change
+    ///         whether an earlier ballot was valid.
     function addInitiative(address account, uint256 goalUsd, bool rfp, uint256 groups)
         external
         onlyRole(ADMIN_ROLE)
@@ -201,6 +201,19 @@ abstract contract RoundAccounting is AccessControl {
         }
         _initiatives[id] = Initiative(account, rfp, goalUsd, groups);
         emit InitiativeConfigured(id, account, goalUsd, rfp, groups);
+    }
+
+    /// @notice Change which groups (affiliations) a project belongs to, whenever projects
+    ///         may be added: before voting opens, or outside every tier's quiet-ending span.
+    /// @dev Ballots are judged when recorded and the replay trusts that judgment, so a
+    ///      change never touches a recorded ballot: it applies to ballots sent after it.
+    function setInitiativeGroups(uint256 id, uint256 groups) external onlyRole(ADMIN_ROLE) {
+        _requireAdding();
+        _requireInitiative(id);
+        Initiative storage x = _initiatives[id];
+        _checkGroups(x.rfp, groups);
+        x.groups = groups;
+        emit InitiativeConfigured(id, x.account, x.goalUsd, x.rfp, groups);
     }
 
     /// @notice Initialize, correct or increase net USD funding while the round is open.

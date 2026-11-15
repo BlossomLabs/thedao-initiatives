@@ -80,6 +80,11 @@ All USD inputs and results use **six decimal places**: 1,000,000 means one dolla
   same USD precision and is recorded separately.
 - addInitiative(account, goalUsd) and setInitiative(...) configure up to 254 unique
   initiative addresses before opening. There are at most 32 currencies including USD.
+- setInitiativeGroups(id, groups) changes a project's groups (affiliations) whenever
+  projects may be added: before opening, or outside every tier's quiet-ending span.
+  Ballots are judged when recorded, so a change only applies to ballots sent after it.
+- TestUSD (test votes on Sepolia only) is a six-decimal dollar anyone may mint, up to a
+  million at a time, to any account; a test round registers it at a fixed $1.
 - setPoolUsd(amountUsd) initializes, corrects or increases the total USD pool budget.
   Strictly before firstTallyAt(0) any value is accepted, so a mistyped total can be
   lowered; from that tally on, decreases revert with PoolCannotDecrease. The first call sets

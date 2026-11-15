@@ -1435,6 +1435,24 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "setInitiativeGroups",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+      {
+        "name": "groups",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable",
+  },
+  {
+    "type": "function",
     "name": "setPledge",
     "inputs": [
       {

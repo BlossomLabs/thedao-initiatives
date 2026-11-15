@@ -127,9 +127,12 @@ a contract). _(My call.)_
   after it opens only when no tier is inside its quiet-ending span: for every tier t, not
   `firstTallyAt[t] ≤ now < latestSettlementAt(t)`; and never at or after `hardDeadline`.
   `MAX_PROJECTS` (254) still applies.
-- **Frozen when voting opens:** an existing project's account, ask, `rfp` and `groups`
+- **Frozen when voting opens:** an existing project's account, ask and `rfp`
   (`setInitiative` stays setup-only), group names, and the enforced-tiers setting. So a later
   addition can never change an earlier ballot's validity.
+- **Groups stay editable** (added 2026-11-15, as new projects join): `setInitiativeGroups`
+  in the same windows as adding. Ballots are judged when recorded and the replay trusts
+  that judgment, so a change applies only to ballots sent after it.
 - **Enforced tiers.** `setIndependentTiers(uint8 mask)` (bit 0 = S-Tier, bit 1 = A-Tier; B-Tier is
   never enforced), setup-only. Default S-Tier.
 - **Ballot length.** A ballot may be shorter than the current project count; the missing trailing

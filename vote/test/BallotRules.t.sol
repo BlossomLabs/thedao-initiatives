@@ -171,6 +171,60 @@ contract BallotRulesTest is Test {
         assertEq(round.initiative(4).groups, 1);
     }
 
+    function test_groupsEditableWhenAddingIsOpen() public {
+        SignedBallots round = simple();
+        round.addGroup("Seal");
+        // After opening, outside every quiet-ending span: a project joins a group.
+        round.setInitiativeGroups(0, 1);
+        round.setInitiativeGroups(1, 1);
+        assertEq(round.initiative(0).groups, 1);
+        assertEq(round.initiative(0).goalUsd, 100);
+        assertEq(round.initiative(0).account, address(0x1000));
+        // The rules apply to ballots sent from then on: 0 and 1 are related now.
+        vm.prank(voter);
+        vm.expectRevert(abi.encodeWithSelector(SignedBallots.BadProof.selector, uint8(0)));
+        round.vote(1, 1, hex"010101ff", proof3(0, 1, 2));
+        vm.prank(voter);
+        round.vote(1, 1, hex"01ff0101", proof3(0, 2, 3));
+        // And leaves it again.
+        round.setInitiativeGroups(1, 0);
+        assertEq(round.initiative(1).groups, 0);
+    }
+
+    function test_groupsEditClosedInsideQuietEnding() public {
+        SignedBallots round = simple();
+        round.addGroup("Seal");
+        vm.warp(round.firstTallyAt(0));
+        vm.expectRevert(SignedBallots.AddingClosed.selector);
+        round.setInitiativeGroups(0, 1);
+        vm.warp(round.latestSettlementAt(0));
+        round.setInitiativeGroups(0, 1);
+        vm.warp(round.hardDeadline());
+        vm.expectRevert(SignedBallots.AddingClosed.selector);
+        round.setInitiativeGroups(0, 0);
+    }
+
+    function test_groupsEditChecksTheGroups() public {
+        SignedBallots round = fresh();
+        round.addGroup("Seal");
+        round.addInitiative(address(0x1000), 100, false, 0);
+        round.addInitiative(address(0x1001), 100, true, 0);
+        vm.expectRevert(RoundAccounting.UnknownGroup.selector);
+        round.setInitiativeGroups(0, 2);
+        vm.expectRevert(RoundAccounting.RfpWithGroups.selector);
+        round.setInitiativeGroups(1, 1);
+        vm.expectRevert(RoundAccounting.UnknownInitiative.selector);
+        round.setInitiativeGroups(2, 1);
+    }
+
+    function test_groupsEditNeedsTheAdmin() public {
+        SignedBallots round = simple();
+        round.addGroup("Seal");
+        vm.prank(voter);
+        vm.expectRevert();
+        round.setInitiativeGroups(0, 1);
+    }
+
     function test_rfpCannotHaveGroups() public {
         SignedBallots round = fresh();
         round.addGroup("Seal");

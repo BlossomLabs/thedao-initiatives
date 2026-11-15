@@ -36,6 +36,15 @@ const run = (receipts: Receipt[], now: number, extra: Partial<Parameters<typeof 
   replay({ schedule, m: 2, states: flat([150n, 150n], 200n), receipts, ...extra }, now);
 
 describe("quiet-ending replay", () => {
+  it("chain states out of block order, or two for one block, are refused", () => {
+    const states = [at(0, [150n, 150n], 200n, false), at(5, [150n, 150n], 200n)];
+    expect(() => run(base(), T, { states: [states[1], states[0]] })).toThrow(/ascending/);
+    const later = { ...states[1], block: 4 };
+    expect(() => run(base(), T, { states: [states[0], states[1], later] })).toThrow(/ascending/);
+    const twice = { ...states[1], timestamp: 6 };
+    expect(() => run(base(), T, { states: [states[0], states[1], twice] })).toThrow(/ascending/);
+  });
+
   it("window ends halve from the tier's first tally", () => {
     expect(windowEnds(schedule, 0)).toEqual([T + 3600, T + 5400, T + 6300]);
     expect(windowEnds(schedule, 1)).toEqual([T + 9900, T + 11700, T + 12600]);

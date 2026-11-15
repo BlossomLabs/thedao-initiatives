@@ -3,6 +3,7 @@ import {
   createWalletClient,
   type Hex,
   http,
+  multicall3Abi,
   parseAbi,
   parseAbiItem,
   type PublicClient,
@@ -10,6 +11,8 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
+import type { StateCache, StateSource } from "../../shared/vote/chain-states.ts";
+import type { ChainState } from "../../shared/vote/quiet-ending.ts";
 import { voteChain, type VoteManifest, voterNft } from "../../shared/vote/manifest.ts";
 
 /** What the vote routes need from the chain. Injected so tests run without a chain. */
@@ -92,9 +95,12 @@ export type BallotEvent =
 export interface VoteRound {
   chain: VoteChain;
   manifest: VoteManifest;
-  /** Each initiative's need (goal − raised, micro-USD) in manifest order; the API
-   * reads the board when absent. */
-  needs?: () => Promise<bigint[]>;
+  /** Where the round's chain states are read (an archive node for past blocks). */
+  source?: StateSource;
+  /** Tests: the chain states the replay reads at `now`, in place of `source`. */
+  states?: (now: number) => Promise<ChainState[]>;
+  /** Tests: how long a request waits for the chain states (ms) before a 503. */
+  statesWaitMs?: number;
 }
 
 const BALLOT_RECORDED = parseAbiItem(
@@ -357,4 +363,176 @@ export async function stampLogs(
     await Promise.all(blocks.map(async (b) => [b, await timeOf(b)] as const)),
   );
   return logs.map((l) => times.get(l.blockNumber!)!);
+}
+
+const PLEDGE_SET = parseAbiItem(
+  "event PledgeSet(bytes32 indexed pledgeId, uint256 indexed initiativeId, uint256 indexed currencyId, uint256 amount)",
+);
+const ERC20_TRANSFER = parseAbiItem(
+  "event Transfer(address indexed from, address indexed to, uint256 value)",
+);
+const MULTICALL3: Hex = "0xcA11bde05977b3631167028862bE2a173976CA11";
+const NATIVE = /^0x0{40}$/i;
+/** Native balance multicalls in flight at once (one per block). */
+const BALANCE_READS = 8;
+
+/** The round's chain states read from an RPC (an archive node, for past blocks):
+ * shared/vote/chain-states.ts turns them into the replay's states. Every read names its
+ * block; a node that can't serve it fails the read. */
+export function createStateSource(
+  m: VoteManifest,
+  rpcUrl: string,
+  transport: Transport = http(rpcUrl),
+): StateSource {
+  const pub = createPublicClient({ chain: voteChain(m), transport }) as PublicClient;
+  const contract = { address: m.contract, abi: SIGNED_BALLOTS_ABI } as const;
+  const blockAt = async (n: number) => {
+    const b = await pub.getBlock({ blockNumber: BigInt(n) });
+    return { block: n, timestamp: Number(b.timestamp) };
+  };
+  const head = async () => {
+    const b = await pub.getBlock();
+    return { block: Number(b.number), timestamp: Number(b.timestamp) };
+  };
+  /** Blocks in [from, to] holding a log `get` returns (read in chunks), ascending, once each. */
+  const logBlocks = async (
+    from: number,
+    to: number,
+    get: (fromBlock: bigint, toBlock: bigint) => Promise<{ blockNumber: bigint | null }[]>,
+  ) => {
+    const out = new Set<number>();
+    for (let a = BigInt(from); a <= BigInt(to); a += LOG_CHUNK) {
+      const b = a + LOG_CHUNK - 1n < BigInt(to) ? a + LOG_CHUNK - 1n : BigInt(to);
+      for (const l of await get(a, b)) out.add(Number(l.blockNumber));
+    }
+    return [...out].sort((x, y) => x - y);
+  };
+
+  return {
+    head,
+    async blockBefore(time) {
+      const top = await head();
+      if (top.timestamp < time) return top;
+      // Invariant: lo's time < time <= hi's time. Interpolation steps alternate with
+      // halving, so uneven block times still finish in about 2·log2(head) reads.
+      let lo = await blockAt(0);
+      if (lo.timestamp >= time) throw new Error(`no block before ${time}`);
+      let hi = top;
+      for (let step = 0; hi.block - lo.block > 1; step++) {
+        const guess = step % 2 ? Math.floor((lo.block + hi.block) / 2) : lo.block + Math.floor(
+          ((time - lo.timestamp) * (hi.block - lo.block)) / (hi.timestamp - lo.timestamp),
+        );
+        const mid = await blockAt(Math.min(hi.block - 1, Math.max(lo.block + 1, guess)));
+        if (mid.timestamp < time) lo = mid;
+        else hi = mid;
+      }
+      return lo;
+    },
+    async stateAt(block) {
+      // One eth_call at the block: the count, the pool and an ask for every manifest
+      // project (one the contract doesn't have yet reverts, and is left out).
+      const [b, r] = await Promise.all([
+        blockAt(block),
+        pub.multicall({
+          blockNumber: BigInt(block),
+          batchSize: 0,
+          multicallAddress: MULTICALL3,
+          allowFailure: true,
+          contracts: [
+            { ...contract, functionName: "initiativeCount" },
+            { ...contract, functionName: "poolUsd" },
+            ...m.slugs.map((_, i) => ({
+              ...contract,
+              functionName: "initiativeUsd",
+              args: [BigInt(i)],
+            })),
+          ],
+        } as never) as Promise<{ status: string; result?: unknown; error?: Error }[]>,
+      ]);
+      // allowFailure turns a failed eth_call into failed results: the read failed.
+      for (const x of r.slice(0, 2)) if (x.status !== "success") throw x.error;
+      const count = Number(r[0].result as bigint);
+      if (count > m.slugs.length) {
+        throw new Error(
+          `vote manifest: the contract has ${count} projects at block ${block}, the manifest ${m.slugs.length}`,
+        );
+      }
+      const asks = r.slice(2, 2 + count).map((x) => {
+        if (x.status !== "success") throw x.error;
+        return BigInt((x.result as readonly bigint[])[3]);
+      });
+      return { timestamp: b.timestamp, asks, poolUsd: BigInt(r[1].result as bigint) };
+    },
+    accountingEventBlocks: (from, to) =>
+      logBlocks(from, to, (fromBlock, toBlock) =>
+        pub.getLogs({
+          address: m.contract,
+          events: [PLEDGE_SET, POOL_USD_SET],
+          fromBlock,
+          toBlock,
+        })),
+    async balanceChangeBlocks(from, to) {
+      const currencies = (m.currencies ?? []).slice(1);
+      if (!currencies.length) return [];
+      const accounts = m.accounts;
+      if (accounts?.length !== m.slugs.length) {
+        throw new Error("vote manifest: currencies need one account per project");
+      }
+      const tokens = currencies.map((c) => c.asset).filter((a) => !NATIVE.test(a));
+      const out = new Set<number>();
+      if (tokens.length) {
+        for (const side of ["from", "to"] as const) {
+          const blocks = await logBlocks(from, to, (fromBlock, toBlock) =>
+            pub.getLogs({
+              address: tokens,
+              event: ERC20_TRANSFER,
+              args: { [side]: accounts },
+              fromBlock,
+              toBlock,
+            }));
+          for (const b of blocks) out.add(b);
+        }
+      }
+      if (currencies.some((c) => NATIVE.test(c.asset))) {
+        // No log for an internal transfer: each block's balances against the block before.
+        const ethAt = (block: number) =>
+          pub.multicall({
+            blockNumber: BigInt(block),
+            batchSize: 0,
+            multicallAddress: MULTICALL3,
+            allowFailure: false,
+            contracts: accounts.map((a) => ({
+              address: MULTICALL3,
+              abi: multicall3Abi,
+              functionName: "getEthBalance",
+              args: [a],
+            })),
+          }) as Promise<bigint[]>;
+        let before = await ethAt(from - 1);
+        for (let a = from; a <= to; a += BALANCE_READS) {
+          const batch = Array.from(
+            { length: Math.min(BALANCE_READS, to - a + 1) },
+            (_, i) => a + i,
+          );
+          const reads = await Promise.all(batch.map(ethAt));
+          for (const [i, now] of reads.entries()) {
+            if (now.some((x, j) => x !== before[j])) out.add(batch[i]);
+            before = now;
+          }
+        }
+      }
+      return [...out].sort((x, y) => x - y);
+    },
+  };
+}
+
+/** Chain reads that are final, kept in KV under the round's prefix. */
+export function kvStateCache(kv: Deno.Kv, m: VoteManifest): StateCache {
+  const prefix = ["vote", m.contract.toLowerCase(), "chain"];
+  return {
+    get: async (key) => (await kv.get([...prefix, key])).value ?? undefined,
+    set: async (key, value) => {
+      await kv.set([...prefix, key], value);
+    },
+  };
 }

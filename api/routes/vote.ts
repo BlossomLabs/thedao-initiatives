@@ -9,8 +9,8 @@ import { isValidOnchainBallot, tierName } from "../../shared/vote/ballot.ts";
 import { liveInputsJson } from "../../shared/vote/live-inputs.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { recordVote } from "../../shared/vote/record.ts";
-import type { VoteRound } from "../services/vote-chain.ts";
-import { type BoardCache, createBoardCache, readBoard } from "./board.ts";
+import { kvStateCache, type VoteRound } from "../services/vote-chain.ts";
+import { chainStates } from "../../shared/vote/chain-states.ts";
 import {
   finalWhatIfsAsync,
   giftGapsAsync,
@@ -52,12 +52,21 @@ const MINTING_MS = 60 * 60_000;
 const BALLOTS_CACHE_SECS = 5;
 /** Blocks before the close are final well within this, so ballots can't change after. */
 const FINAL_AFTER_SECS = 30 * 60;
+/** How long a request waits for the round's chain states. A cold read (a long window's
+ * balance scan on an archive node) can take longer: it goes on in the background, fills
+ * the cache, and the request is a 503 meanwhile. */
+const STATES_WAIT_MS = 20_000;
 const DRIP_WEI = 5_000_000_000_000_000n; // 0.005 Sepolia ETH
 /** Deno KV refuses values over 64 KiB; JSON longer than this is kept out with room to spare. */
 const KV_VALUE_MAX = 60_000;
 /** A closed round's final what-ifs that failed (the search, or the replay to start it)
  * are tried again after this long. */
 const FINAL_RETRY_SECS = 60;
+
+/** An error for the log, with URLs cut out: viem's messages name the RPC's URL, and an
+ * archive RPC's URL may carry its API key. */
+export const errorText = (e: unknown): string =>
+  String(e instanceof Error ? e.message : e).replace(/\b(?:https?|wss?):\/\/\S+/g, "<rpc>");
 
 const fail = (status: number, code: string, message: string, extra?: Record<string, unknown>) =>
   new HttpError(status, message, { code, ...extra });
@@ -164,7 +173,7 @@ export async function cacheSet(
     await kv.set(key, value, opts);
     return true;
   } catch (e) {
-    log(`vote cache: ${key.join("/")} not cached (${e instanceof Error ? e.message : e})`);
+    log(`vote cache: ${key.join("/")} not cached (${errorText(e)})`);
     return false;
   }
 }
@@ -236,8 +245,8 @@ type FinalJson = { next: NextJson; lead: Record<string, string> };
 /** A closed round's final what-ifs, with the digest of what they were judged from. */
 type KnownFinal = { key: string; at: number; final: FinalJson };
 
-/** The replay with what the rules judge by now: the pool and each project's ask on-chain
- * (absent when the chain's asks couldn't be read). */
+/** The replay with what the rules judge by now: the pool and each project's ask at the
+ * head state (asks absent when the head has fewer projects than the manifest). */
 type Round = RoundState & { poolUsd: bigint; asks?: bigint[] };
 
 /** The round state as JSON: slugs for initiatives, decimal strings for micro-USD. */
@@ -261,11 +270,12 @@ function roundJson(st: Round, slugs: string[]) {
         at: t.at,
         forced: t.forced,
         funded: named(t.funded),
+        covered: named(t.covered),
         awards: money(t.awards),
         paid: paidBy(t.shares),
       }
       : t.status === "settling"
-      ? { ...t, funded: named(t.funded) }
+      ? { ...t, funded: named(t.funded), covered: named(t.covered) }
       : t;
   return {
     registrationClosesAt: st.registrationClosesAt,
@@ -273,8 +283,9 @@ function roundJson(st: Round, slugs: string[]) {
     share: st.share.toString(),
     /** The pool on-chain now (micro-USD): what a new ballot's size is judged against. */
     poolUsd: st.poolUsd.toString(),
-    /** Each initiative's ask on-chain now (micro-USD, manifest order); absent when the
-     * chain's asks couldn't be read. */
+    /** Each initiative's ask on-chain now (micro-USD, manifest order): the head state's,
+     * the same the live tally and the relay use; absent when the head has fewer projects
+     * than the manifest. */
     ...(st.asks ? { asks: st.asks.map(String) } : {}),
     tiers: st.tiers.map(tier),
     accepted: Object.fromEntries(
@@ -288,13 +299,15 @@ function roundJson(st: Round, slugs: string[]) {
       awards: money(st.live.awards),
       tiers: Object.fromEntries([...st.live.tiers].map(([c, t]) => [slugs[c], t])),
       paid: paidBy(st.live.shares),
+      /** Asking $0 now: covered by donations, in no tier. */
+      covered: named(st.live.covered),
       // The live tally's inputs, so a donation's preview re-runs it in the browser.
       ...(st.liveInputs ? { inputs: liveInputsJson(st.liveInputs, st.firstOpen) } : {}),
     },
   };
 }
 
-export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
+export function voteRoutes(deps: Deps) {
   const r = new Hono<Vars>();
   const dc = (): VoteRound => {
     if (!deps.vote) throw fail(503, "off", "No vote is deployed right now.");
@@ -304,40 +317,84 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
   const testOnly = (d: VoteRound) => {
     if (d.manifest.kind !== "test") throw fail(404, "off", "This vote doesn't use paper codes.");
   };
-  const board = boardCache ?? createBoardCache(deps);
-  /** Each initiative's need, micro-USD, as the vote results count it: goal − raised. */
-  const needsOf = async (d: VoteRound): Promise<bigint[]> => {
-    if (d.needs) return await d.needs();
-    const cards = new Map((await readBoard(deps, board)).cards.map((c) => [c.initiative.slug, c]));
-    return d.manifest.slugs.map((slug) => {
-      const c = cards.get(slug);
-      // Never $0: that would fund it at the first level that opens it, maybe for good.
-      if (!c) {
-        throw fail(
-          503,
-          "needs_unavailable",
-          "An initiative in the vote isn't on the board right now.",
-        );
-      }
-      return BigInt(Math.max(0, Math.round((c.initiative.goalUsd - c.summary.total) * 1e6)));
-    });
+  const asksUnavailable = () =>
+    fail(503, "asks_unavailable", "The vote results can't be read from the chain right now.");
+  /** The chain read in flight per round (contract): the time it reads at, the receipt
+   * blocks it has states for, and `done`, which settles with it and never rejects (handed
+   * to the background once a request stops waiting for it). */
+  type Reading = {
+    at: number;
+    receipts: Set<number>;
+    states: Promise<ChainState[]>;
+    done: Promise<void>;
+    inBackground: boolean;
   };
-  /** Each project's ask on-chain, or undefined when the read fails or comes back the wrong
-   * length (logged): a ballot can't be judged without them. */
-  const readAsks = async (d: VoteRound): Promise<bigint[] | undefined> => {
+  const reading = new Map<string, Reading>();
+  /** The round's chain states at `now`, waited for at most STATES_WAIT_MS. One read per
+   * round at a time: a request joins one started within the last few seconds that has a
+   * state for each of its receipts; otherwise it waits for it (it warms the cache) and
+   * starts its own. A read that outlasts
+   * the wait goes on in the background; the request is a 503. */
+  const statesFor = async (d: VoteRound, now: number, receiptBlocks: number[]) => {
+    const contract = d.manifest.contract.toLowerCase();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let waited: Reading | undefined;
+    const late = new Promise<never>((_, no) => {
+      timer = setTimeout(() => no(asksUnavailable()), d.statesWaitMs ?? STATES_WAIT_MS);
+    });
     try {
-      const asks = await d.chain.asks();
-      if (asks.length !== d.manifest.slugs.length) {
-        throw new Error(`${asks.length} asks for ${d.manifest.slugs.length} projects`);
+      for (;;) {
+        const cur = reading.get(contract);
+        waited = cur;
+        if (
+          cur && now - cur.at < BALLOTS_CACHE_SECS &&
+          receiptBlocks.every((b) => cur.receipts.has(b))
+        ) return await Promise.race([cur.states, late]);
+        if (cur) {
+          await Promise.race([cur.done, late]);
+          continue;
+        }
+        const m = d.manifest;
+        const states = (async () => {
+          if (d.states) return await d.states(now);
+          if (!d.source) throw new Error("no chain state source");
+          return await chainStates(m, d.source, {
+            now,
+            receiptBlocks,
+            cache: kvStateCache(deps.db.kv, m),
+            finalAfterSecs: FINAL_AFTER_SECS,
+          });
+        })();
+        const entry: Reading = {
+          at: now,
+          receipts: new Set(receiptBlocks),
+          states,
+          done: states.then(
+            () => {},
+            (e) => deps.log(`vote states: read failed (${errorText(e)})`),
+          ).finally(() => {
+            if (reading.get(contract) === entry) reading.delete(contract);
+          }),
+          inBackground: false,
+        };
+        reading.set(contract, entry);
+        waited = entry;
+        return await Promise.race([states, late]);
       }
-      return asks;
     } catch (e) {
-      deps.log(`vote asks: read failed (${e instanceof Error ? e.message : e})`);
-      return undefined;
+      // Out of time: the read goes on and fills the cache for the next request.
+      if (waited && !waited.inBackground) {
+        waited.inBackground = true;
+        deps.background?.(waited.done);
+      }
+      if (e instanceof HttpError) throw e;
+      throw asksUnavailable();
+    } finally {
+      clearTimeout(timer);
     }
   };
-  /** The quiet ending replayed now. A tier's settlement is written once and reused, so
-   * later donations (needs) never move it. */
+  /** The quiet ending replayed now from the chain states. A tier's settlement is stored
+   * once final and reused: a cache of what the chain states give again. */
   const roundState = async (d: VoteRound): Promise<Round> => {
     const kv = deps.db.kv;
     const tiers: Tier[] = ["S", "A", "B"];
@@ -345,15 +402,6 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       tiers.map((t) => kv.get<StoredSettled>([...round(d), "settled", t])),
     );
     const snapshots = stored.flatMap((x) => (x.value ? [loadSettled(x.value)] : []));
-    // When each tier settled and the needs it settled with, kept the first time it
-    // was seen settled: later replays don't re-judge its windows.
-    type Kept = { at: number; forced: boolean; needs: string[] };
-    const kept = await Promise.all(
-      tiers.map((t) => kv.get<Kept>([...round(d), "settle-needs", t])),
-    );
-    // Every round shows the chain's asks; started now, it runs alongside the reads below.
-    const asksRead = readAsks(d);
-    const needs = await needsOf(d);
     const { events, block: readAt } = await d.chain.ballots();
     // The replay counts only what the contract committed to: the events read must hash
     // to its transcript, and each token's last ballot to its stored hash, at that block.
@@ -390,8 +438,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       timestamp: b.timestamp,
     }));
     const m = d.manifest;
-    // Rounds deployed with the ballot rules: judge each ballot by the projects and pool
-    // on-chain when it landed (projects missing from the history were there at deploy).
+    // Rounds deployed with the ballot rules: the projects added on-chain since the deploy.
     const history = m.ballotRules ? await d.chain.rulesHistory() : null;
     // A project the admin added on-chain that this site's manifest doesn't have yet
     // (before `vote-deploy --added` and a redeploy): its ballots can't be read, so hold
@@ -403,24 +450,19 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
         "A project was just added to the vote; the results are back once this site knows it.",
       );
     }
-    const poolUsd = history?.pool.at(-1)?.poolUsd ?? BigInt(m.poolUsd);
-    const asks = await asksRead;
-    // Until the chain's asks reach the replay: the needs as chain states, each tier seen
-    // settled keeping the needs it settled with up to its cutoff, today's after the last.
-    const blockAt = (time: number) =>
-      receipts.find((r) => r.timestamp >= time)?.block ?? (receipts.at(-1)?.block ?? 0) + 1;
-    const states: ChainState[] = [];
-    let from = 0;
-    for (const k of [...kept.map((x) => x.value), null]) {
-      states.push({
-        block: from ? blockAt(from) : 0,
-        timestamp: from,
-        asks: k ? k.needs.map(BigInt) : needs,
-        poolUsd: BigInt(m.poolUsd),
-        event: false,
-      });
-      if (!k) break;
-      from = k.at;
+    const now = deps.now();
+    const states = await statesFor(
+      d,
+      now,
+      events.flatMap((b) => (b.block === undefined ? [] : [b.block])),
+    );
+    // The head: what the live tally, the page and the relay judge by.
+    const head = states.filter((x) => x.timestamp < now).at(-1);
+    if (!head) throw asksUnavailable();
+    let asks: bigint[] | undefined = head.asks;
+    if (asks.length !== m.slugs.length) {
+      deps.log(`vote asks: ${asks.length} at the head for ${m.slugs.length} projects`);
+      asks = undefined;
     }
     const st = replay({
       schedule: m.schedule,
@@ -428,33 +470,17 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       states,
       receipts,
       snapshots,
-    }, deps.now());
+    }, now);
     for (const [i, t] of st.tiers.entries()) {
-      const k = kept[i].value;
-      const keyT = [...round(d), "settle-needs", tiers[i]];
-      if (!k && t.status === "settled") {
-        // First seen settled: keep its needs (a donation can't move it from here on).
-        await kv.atomic().check(kept[i]).set(keyT, {
-          at: t.at,
-          forced: t.forced,
-          needs: needs.map(String),
-        }).commit();
-      } else if (k && deps.now() < k.at + FINAL_AFTER_SECS) {
-        // Not final yet: follow the replay (a late ballot may move or undo it), same needs.
-        if (t.status !== "settled") await kv.atomic().check(kept[i]).delete(keyT).commit();
-        else if (t.at !== k.at || t.forced !== k.forced) {
-          await kv.atomic().check(kept[i]).set(keyT, { ...k, at: t.at, forced: t.forced }).commit();
-        }
-      }
       // Kept only once the blocks before the settlement are final: until then a
       // lagging RPC may still be missing a ballot that changes it.
       if (t.status !== "settled" || stored[i].value) continue;
-      if (deps.now() < t.at + FINAL_AFTER_SECS) continue;
+      if (now < t.at + FINAL_AFTER_SECS) continue;
       const { status: _, ...x } = t;
       await kv.atomic().check(stored[i]).set([...round(d), "settled", t.tier], storeSettled(x))
         .commit();
     }
-    return Object.assign(st, { poolUsd, ...(asks ? { asks } : {}) });
+    return Object.assign(st, { poolUsd: head.poolUsd, ...(asks ? { asks } : {}) });
   };
 
   /** The replay, reused for a few seconds in this isolate: every relayed ballot asks. */
@@ -517,7 +543,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
         try {
           lead = leadJson(await liveLeadsAsync(liveInputs, firstOpen), slugs);
         } catch (e) {
-          deps.log(`vote lead: ${e instanceof Error ? e.message : e}`);
+          deps.log(`vote lead: ${errorText(e)}`);
         }
         // The donation that gets each initiative one tier higher; a failed search still
         // keeps the gaps.
@@ -525,7 +551,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
         try {
           give = nextJson(await giftGapsAsync(liveInputs, firstOpen), slugs);
         } catch (e) {
-          deps.log(`vote give: ${e instanceof Error ? e.message : e}`);
+          deps.log(`vote give: ${errorText(e)}`);
         }
         const known: KnownNext = {
           key,
@@ -537,7 +563,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
         };
         lastNext = { ...known, contract };
         await cacheSet(deps.db.kv, nextKey(d), known, undefined, deps.log);
-      })().catch((e) => deps.log(`vote next: ${e instanceof Error ? e.message : e}`))
+      })().catch((e) => deps.log(`vote next: ${errorText(e)}`))
         .finally(() => (searching = false));
       deps.background?.(work);
     }
@@ -596,7 +622,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       const known = { key, at: deps.now(), final };
       lastFinal = { ...known, contract };
       await cacheSet(deps.db.kv, finalStoreKey(d), known, undefined, deps.log);
-    })().catch((e) => deps.log(`vote final: ${e instanceof Error ? e.message : e}`))
+    })().catch((e) => deps.log(`vote final: ${errorText(e)}`))
       .finally(() => (searching = false));
     deps.background?.(work);
     return undefined;
@@ -917,12 +943,12 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       if (!cached.body.closed || final || searching || triedRecently(tried)) {
         return await fromCache();
       }
-      // That replay is only for the what-ifs: if it fails (RPC or board down), the
+      // That replay is only for the what-ifs: if it fails (the chain unreadable), the
       // cached round is still served, and the replay waits a minute before trying again.
       try {
         replayed = await roundState(d);
       } catch (e) {
-        deps.log(`vote final: replay failed (${e instanceof Error ? e.message : e})`);
+        deps.log(`vote final: replay failed (${errorText(e)})`);
         finalTried = { key: tried, at: deps.now() };
         return await fromCache();
       }

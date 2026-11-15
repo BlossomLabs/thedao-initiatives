@@ -8,9 +8,10 @@ import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import { type TranscriptEvent, transcriptOf } from "../../shared/vote/transcript.ts";
 import type { BallotEvent, VoteChain } from "../services/vote-chain.ts";
-import { cacheSet } from "../routes/vote.ts";
+import { cacheSet, errorText } from "../routes/vote.ts";
 import { chainTally } from "../../shared/vote/chain.ts";
 import { liveInputsFrom, type LiveInputsJson } from "../../shared/vote/live-inputs.ts";
+import type { ChainState } from "../../shared/vote/quiet-ending.ts";
 
 const ISSUER = privateKeyToAccount(
   "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
@@ -104,8 +105,12 @@ function fakeChain(chainManifest: VoteManifest = manifest) {
     /** Likewise for the record count and one token's ballot hash. */
     countOverride: null as bigint | null,
     hashOverride: null as { tokenId: string; hash: Hex } | null,
-    /** What each project asks on-chain; null: the read fails. Default: its goal. */
+    /** What each project asks on-chain; "fail": the read fails. Default: its goal. */
     asks: null as bigint[] | null | "fail",
+    /** The chain states the round reads, when a test sets them; else one state with
+     * `asks` and the pool. */
+    states: null as ChainState[] | null,
+    stateReads: 0,
     ballotReads: 0,
     txStatus: new Map<string, "pending" | "success" | "reverted" | "unknown">(),
     /** What the RPC says the relayer's pending nonce is (may lag). */
@@ -189,20 +194,38 @@ function fakeChain(chainManifest: VoteManifest = manifest) {
         ? Promise.reject(new Error("rpc down"))
         : Promise.resolve(state.asks ?? chainManifest.projects.map((p) => BigInt(p.goalUsd))),
   };
-  return { state, chain };
+  /** The round's chain states: the test's own, or one state for the whole round. */
+  const states = (): Promise<ChainState[]> => {
+    state.stateReads++;
+    if (state.asks === "fail") return Promise.reject(new Error("missing trie node"));
+    return Promise.resolve(
+      state.states ?? oneState(
+        state.asks ?? chainManifest.projects.map((p) => BigInt(p.goalUsd)),
+        state.history.pool.at(-1)?.poolUsd ?? BigInt(chainManifest.poolUsd),
+      ),
+    );
+  };
+  return { state, chain, states };
 }
+
+/** The asks and pool at one block. */
+const stateAt = (
+  block: number,
+  timestamp: number,
+  asks: bigint[],
+  poolUsd: bigint,
+  event = true,
+): ChainState => ({ block, timestamp, asks, poolUsd, event });
+/** One chain state for the whole round, as at block 0. */
+const oneState = (asks: bigint[], poolUsd: bigint) => [stateAt(0, 0, asks, poolUsd, false)];
 
 async function setup(m: VoteManifest = manifest) {
   const h = await harness();
   const fake = fakeChain(m);
   // The relayer has gas unless a test says otherwise.
   fake.state.balances.set(RELAYER, 10n ** 18n);
-  // Every initiative needs $100 unless a test says otherwise (the board isn't seeded).
-  h.deps.vote = {
-    chain: fake.chain,
-    manifest: m,
-    needs: () => Promise.resolve(m.slugs.map(() => 100_000_000n)),
-  };
+  // Every initiative asks its goal unless a test says otherwise (the board isn't seeded).
+  h.deps.vote = { chain: fake.chain, manifest: m, states: fake.states };
   h.clock.now = NOW;
   return { h, ...fake };
 }
@@ -756,18 +779,17 @@ const logOf = (tokenId: string, ballot: string, timestamp: number, block: number
   nonce: 1,
 });
 
-async function qeSetup(needs = [150n, 150n, 150n]) {
-  const { h, state } = await setup(qe);
-  const n = { needs };
-  h.deps.vote!.needs = () => Promise.resolve(n.needs);
+async function qeSetup(asks = [150n, 150n, 150n]) {
+  const { h, state, chain } = await setup(qe);
+  state.asks = asks;
   state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
-  return { h, state, n };
+  return { h, state, chain };
 }
 
 Deno.test("the round lists each initiative's gap to the next tier", async () => {
   // Real-sized money: gaps are whole $1K steps, so a $200 pool could never reach one.
   const { h, state } = await setup({ ...qe, poolUsd: "6000000000" });
-  h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 3_000_000_000n]);
+  state.asks = [3_000_000_000n, 3_000_000_000n, 3_000_000_000n];
   state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
   type Next = { tier: string; gap: string | null };
   type Body = { live: { next?: Record<string, Next> } };
@@ -798,7 +820,7 @@ Deno.test("round next: who it knocks out is named by slug", async () => {
   // after the first tier. Backing a ($70K) to B-Tier's gap funds it first and leaves
   // too little for b.
   const { h, state } = await setup({ ...qe, poolUsd: "100000000000" });
-  h.deps.vote!.needs = () => Promise.resolve([70_000_000_000n, 40_000_000_000n, 1n << 60n]);
+  state.asks = [70_000_000_000n, 40_000_000_000n, 1n << 60n];
   const backsB = bytesToHex(encodeBallot(qe.slugs, { c: "S", b: "B" })).slice(2);
   state.logs = [logOf("1", backsB, NOW - 100, 1), logOf("2", backsB, NOW - 90, 2)];
   await h.req("/api/vote/round");
@@ -823,7 +845,7 @@ Deno.test("the round lists the donation that moves each initiative up a tier", a
   // As above: b is funded in A-Tier, c (S-Tier on both ballots) costs far more than the pool.
   const { h, state } = await setup({ ...qe, poolUsd: "100000000000" });
   const huge = 1n << 60n;
-  h.deps.vote!.needs = () => Promise.resolve([70_000_000_000n, 40_000_000_000n, huge]);
+  state.asks = [70_000_000_000n, 40_000_000_000n, huge];
   const backsB = bytesToHex(encodeBallot(qe.slugs, { c: "S", b: "B" })).slice(2);
   state.logs = [logOf("1", backsB, NOW - 100, 1), logOf("2", backsB, NOW - 90, 2)];
   await h.req("/api/vote/round");
@@ -844,7 +866,7 @@ Deno.test("the round lists the donation that moves each initiative up a tier", a
 
 Deno.test("round next: the same tally inputs are searched once", async () => {
   const { h, state } = await setup({ ...qe, poolUsd: "6000000000" });
-  h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 3_000_000_000n]);
+  state.asks = [3_000_000_000n, 3_000_000_000n, 3_000_000_000n];
   state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
   let searches = 0;
   const collect = h.deps.background!;
@@ -871,10 +893,10 @@ Deno.test("round next: the same tally inputs are searched once", async () => {
   h.close();
 });
 
-/** $6K pool, $3K needs; both voters back a alone, so the live tally funds a in S-Tier. */
+/** $6K pool, $3K asks; both voters back a alone, so the live tally funds a in S-Tier. */
 async function leadSetup() {
   const { h, state } = await setup({ ...qe, poolUsd: "6000000000" });
-  h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 3_000_000_000n]);
+  state.asks = [3_000_000_000n, 3_000_000_000n, 3_000_000_000n];
   state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
   return { h, state };
 }
@@ -914,7 +936,7 @@ Deno.test("once S-Tier has settled, the leads are A-Tier's", async () => {
 async function closedSetup() {
   const got = await setup({ ...qe, poolUsd: "10000000000" });
   const { h, state } = got;
-  h.deps.vote!.needs = () => Promise.resolve([3_000_000_000n, 3_000_000_000n, 5_000_000_000n]);
+  state.asks = [3_000_000_000n, 3_000_000_000n, 5_000_000_000n];
   const ballot = bytesToHex(encodeBallot(qe.slugs, { a: "S", b: "B", c: "B" })).slice(2);
   state.logs = [logOf("1", ballot, NOW - 100, 1), logOf("2", ballot, NOW - 90, 2)];
   h.clock.now = NOW + 7200;
@@ -1031,6 +1053,15 @@ Deno.test("round: a round too large for one KV value is served, just not cached"
   h.close();
 });
 
+Deno.test("errorText: URLs are cut from logged errors (an RPC URL may carry its key)", () => {
+  const e = new Error(
+    "HTTP request failed.\n\nURL: https://eth.archive.example/v2/SECRETKEY\nRequest body: {}",
+  );
+  assertEquals(errorText(e), "HTTP request failed.\n\nURL: <rpc>\nRequest body: {}");
+  assertEquals(errorText("wss://node.example/ws/KEY down"), "<rpc> down");
+  assertEquals(errorText(new Error("missing trie node")), "missing trie node");
+});
+
 Deno.test("cacheSet: a value over the KV limit is skipped, never thrown", async () => {
   const kv = await Deno.openKv(":memory:");
   assertEquals(await cacheSet(kv, ["big"], { stub: "x".repeat(70_000) }), false);
@@ -1059,6 +1090,7 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
     awards: { a: "150" },
     tiers: { a: "S" },
     paid: { "1": { a: "75" }, "2": { a: "75" } },
+    covered: [],
   });
   assertEquals(body.registrationClosesAt, NOW + 660);
   assertEquals(body.accepted, { "1": `0x01${X}${X}`, "2": `0x01${X}${X}` });
@@ -1067,15 +1099,18 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
 });
 
 Deno.test("round: S's settlement is kept only once the blocks before it are final", async () => {
-  const { h, n } = await qeSetup();
+  const { h, state } = await qeSetup();
   h.clock.now = NOW + 700; // settled at NOW + 660, but logs before it may still arrive
   await h.req("/api/vote/round");
   assertEquals(
     (await h.deps.db.kv.get(["vote", qe.contract.toLowerCase(), "settled", "S"])).value,
     null,
   );
-  // A donation meanwhile doesn't move it: the needs it settled with are kept at once.
-  n.needs = [10n, 10n, 10n];
+  // A donation after the cutoff doesn't move it: it settled with the asks before it.
+  state.states = [
+    ...oneState([150n, 150n, 150n], 200n),
+    stateAt(5, NOW + 690, [10n, 10n, 10n], 200n),
+  ];
   h.clock.now += 10;
   const fresh = await j(await h.req("/api/vote/round")) as { tiers: { awards: unknown }[] };
   assertEquals(fresh.tiers[0].awards, { a: "150" });
@@ -1108,8 +1143,8 @@ Deno.test("ballots: only what the quiet ending counts (a refused revision isn't 
   h.close();
 });
 
-Deno.test("round: a quiet window settles S; later need changes never move it", async () => {
-  const { h, n } = await qeSetup();
+Deno.test("round: a quiet window settles S-Tier; later ask changes never move it", async () => {
+  const { h, state } = await qeSetup();
   h.clock.now = NOW + 660 + 30 * 60;
   const first = await j(await h.req("/api/vote/round")) as { tiers: unknown[] };
   assertEquals(first.tiers[0], {
@@ -1118,10 +1153,14 @@ Deno.test("round: a quiet window settles S; later need changes never move it", a
     at: NOW + 660,
     forced: false,
     funded: ["a"],
+    covered: [],
     awards: { a: "150" },
     paid: { "1": { a: "75" }, "2": { a: "75" } },
   });
-  n.needs = [10n, 10n, 10n];
+  state.states = [
+    ...oneState([150n, 150n, 150n], 200n),
+    stateAt(5, NOW + 690, [10n, 10n, 10n], 200n),
+  ];
   h.clock.now += 10;
   const later = await j(await h.req("/api/vote/round")) as { tiers: { awards: unknown }[] };
   assertEquals(later.tiers[0].awards, { a: "150" });
@@ -1159,11 +1198,165 @@ Deno.test("round ballot: a settled tier can't change; registration closes; B set
   h.close();
 });
 
-Deno.test("round: an initiative missing from the board holds the round instead of costing $0", async () => {
-  const { h } = await qeSetup();
-  h.deps.vote!.needs = undefined; // read the board, which has none of a, b, c
+Deno.test("round: an RPC without past state is a 503, not a result", async () => {
+  const { h, state } = await qeSetup();
+  state.asks = "fail"; // the node pruned the blocks the replay reads
   const res = await h.req("/api/vote/round");
-  assertEquals([res.status, (await j(res)).code], [503, "needs_unavailable"]);
+  const body = await j(res);
+  assertEquals([res.status, body.code], [503, "asks_unavailable"]);
+  assertEquals(body.error, "The vote results can't be read from the chain right now.");
+  assertEquals((await h.kv.get(["vote", qe.contract.toLowerCase(), "round"])).value, null);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: the round's asks come from the chain states, not the board", async () => {
+  // The board has none of a, b, c; the chain asks are what the tally and the page use.
+  const { h, state, chain } = await qeSetup([10n, 20n, 30n]);
+  chain.asks = () => Promise.reject(new Error("the head read is the states' own"));
+  const res = await h.req("/api/vote/round");
+  assertEquals(res.status, 200);
+  const body = await j(res) as { asks: string[]; live: { inputs: LiveInputsJson } };
+  assertEquals(body.asks, ["10", "20", "30"]);
+  assertEquals(body.live.inputs.costs, ["10", "20", "30"]);
+  assertEquals(state.stateReads, 1);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: a donation inside the S-Tier window shows the tier still settling", async () => {
+  // Two windows: S-Tier's first ends at NOW + 660, its second at NOW + 690.
+  const { h, state } = await setup({ ...qe, schedule: { ...qe.schedule, maxWindows: 2 } });
+  // Both voters rank a and b in S-Tier; at $150 each only one fits the $200 pool.
+  state.logs = [logOf("1", `0101${X}`, NOW - 100, 1), logOf("2", `0101${X}`, NOW - 90, 2)];
+  state.states = oneState([150n, 150n, 150n], 200n);
+  h.clock.now = NOW + 670;
+  type Body = { tiers: { status: string; window?: number; funded?: string[] }[] };
+  const quiet = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(quiet.tiers[0].status, "settled", "no change: the first window settles it");
+  // A donation at NOW + 630 brings b's ask to $50: both fit, so the window wasn't quiet.
+  state.states = [
+    ...oneState([150n, 150n, 150n], 200n),
+    stateAt(5, NOW + 630, [150n, 50n, 150n], 200n),
+  ];
+  h.clock.now += 10;
+  const moved = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(moved.tiers[0].status, "settling");
+  assertEquals(moved.tiers[0].window, 2);
+  assertEquals(moved.tiers[0].funded!.sort(), ["a", "b"]);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: a covered project is listed as covered", async () => {
+  // b asks $0: covered by donations, in no tier.
+  const { h } = await qeSetup([150n, 0n, 150n]);
+  type Body = { tiers: { status: string; covered?: string[] }[]; live: { covered: string[] } };
+  const open = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(open.live.covered, ["b"]);
+  h.clock.now = NOW + 700;
+  const settled = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals([settled.tiers[0].status, settled.tiers[0].covered], ["settled", ["b"]]);
+  assertEquals(settled.live.covered, [], "covered at S-Tier's settlement: final");
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: a settled tier is the same before and after its record is stored", async () => {
+  const { h } = await qeSetup([150n, 0n, 150n]);
+  const key = ["vote", qe.contract.toLowerCase(), "settled", "S"];
+  h.clock.now = NOW + 700;
+  const before = (await j(await h.req("/api/vote/round")) as { tiers: unknown[] }).tiers[0];
+  assertEquals((await h.kv.get(key)).value, null);
+  h.clock.now = NOW + 660 + 30 * 60;
+  const stored = (await j(await h.req("/api/vote/round")) as { tiers: unknown[] }).tiers[0];
+  assertEquals((await h.kv.get<{ covered: number[] }>(key)).value?.covered, [1]);
+  assertEquals(stored, before);
+  // Read back from the record: the same again.
+  h.clock.now += 10;
+  const again = (await j(await h.req("/api/vote/round")) as { tiers: unknown[] }).tiers[0];
+  assertEquals(again, before);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: a settlement stored before covered projects loads as none covered", async () => {
+  const { h } = await qeSetup();
+  h.clock.now = NOW + 660 + 30 * 60;
+  await h.req("/api/vote/round");
+  const key = ["vote", qe.contract.toLowerCase(), "settled", "S"];
+  const { covered: _, ...old } = (await h.kv.get<Record<string, unknown>>(key)).value!;
+  await h.kv.set(key, old);
+  h.clock.now += 10;
+  const body = await j(await h.req("/api/vote/round")) as { tiers: { covered: string[] }[] };
+  assertEquals(body.tiers[0].covered, []);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: a cold chain read answers 503 in time and fills in the background, one at a time", async () => {
+  const { h, state } = await qeSetup();
+  let finish = () => {};
+  const slow = new Promise<ChainState[]>((ok) => {
+    finish = () => ok(oneState([150n, 150n, 150n], 200n));
+  });
+  const reads = { n: 0 };
+  h.deps.vote!.states = () => (reads.n++, slow);
+  h.deps.vote!.statesWaitMs = 20;
+  const first = await h.req("/api/vote/round");
+  assertEquals([first.status, (await j(first)).code], [503, "asks_unavailable"]);
+  // A second request joins the read in flight instead of starting another.
+  const second = await h.req("/api/vote/round");
+  assertEquals([second.status, (await j(second)).code], [503, "asks_unavailable"]);
+  assertEquals(reads.n, 1);
+  finish();
+  await h.settle();
+  assertEquals((await h.req("/api/vote/round")).status, 200);
+  assertEquals(state.ballotReads, 3);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: a request with a newer ballot doesn't join a read that lacks its block", async () => {
+  const { h, state } = await qeSetup();
+  let finish = () => {};
+  const first = new Promise<ChainState[]>((ok) => {
+    finish = () => ok(oneState([150n, 150n, 150n], 200n));
+  });
+  const reads = { n: 0 };
+  h.deps.vote!.states = () =>
+    ++reads.n === 1 ? first : Promise.resolve(oneState([150n, 150n, 150n], 200n));
+  const a = h.req("/api/vote/round");
+  await new Promise((r) => setTimeout(r, 5));
+  // A ballot at block 3 the first read has no state for.
+  state.logs.push(logOf("3", `01${X}${X}`, NOW - 5, 3));
+  const b = h.req("/api/vote/round");
+  await new Promise((r) => setTimeout(r, 5));
+  assertEquals(reads.n, 1, "waits for the read in flight before starting its own");
+  finish();
+  const [ra, rb] = await Promise.all([a, b]);
+  assertEquals([ra.status, rb.status], [200, 200]);
+  assertEquals(reads.n, 2);
+  assertEquals(Object.keys((await j(rb) as { accepted: object }).accepted), ["1", "2", "3"]);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: a request whose ballots a read in flight covers joins it", async () => {
+  const { h } = await qeSetup();
+  let finish = () => {};
+  const slow = new Promise<ChainState[]>((ok) => {
+    finish = () => ok(oneState([150n, 150n, 150n], 200n));
+  });
+  const reads = { n: 0 };
+  h.deps.vote!.states = () => (reads.n++, slow);
+  const a = h.req("/api/vote/round");
+  await new Promise((r) => setTimeout(r, 5));
+  const b = h.req("/api/vote/round");
+  await new Promise((r) => setTimeout(r, 5));
+  finish();
+  const [ra, rb] = await Promise.all([a, b]);
+  assertEquals([ra.status, rb.status, reads.n], [200, 200, 1]);
   await h.settle();
   h.close();
 });
@@ -1191,18 +1384,18 @@ Deno.test("round ballot: relayed ballots reuse one replay for a few seconds; non
 Deno.test("round: a ballot the RPC returned late can still unsettle S before it is final", async () => {
   const { h, state } = await qeSetup();
   h.clock.now = NOW + 700;
-  const key = ["vote", qe.contract.toLowerCase(), "settle-needs", "S"];
-  assertEquals(
-    (await j(await h.req("/api/vote/round")) as { tiers: { status: string }[] }).tiers[0].status,
-    "settled",
-  );
-  assertEquals((await h.deps.db.kv.get<{ at: number }>(key)).value?.at, NOW + 660);
+  const key = ["vote", qe.contract.toLowerCase(), "settled", "S"];
+  type Body = { tiers: { status: string; forced?: boolean }[] };
+  const first = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals([first.tiers[0].status, first.tiers[0].forced], ["settled", false]);
+  assertEquals((await h.deps.db.kv.get(key)).value, null);
   // A ballot inside S's window that the RPC hadn't returned: S changed after all.
   state.logs.push(logOf("2", `${X}01${X}`, NOW + 610, 3));
   h.clock.now += 10;
-  const again = await j(await h.req("/api/vote/round")) as { tiers: { status: string }[] };
-  assertEquals(again.tiers[0].status, "settled"); // maxWindows 1: forced at the same cutoff
-  // Pinned for good only once final: then today's needs and late logs can't move it.
+  const again = await j(await h.req("/api/vote/round")) as Body;
+  // maxWindows 1: forced at the same cutoff.
+  assertEquals([again.tiers[0].status, again.tiers[0].forced], ["settled", true]);
+  // Stored only once final: then late logs can't move it.
   h.clock.now = NOW + 660 + 30 * 60;
   await h.req("/api/vote/round");
   assertEquals((await h.deps.db.kv.get<{ at: number; forced: boolean }>(key)).value?.forced, true);
@@ -1392,19 +1585,19 @@ Deno.test("the relayer judges with chain asks", async () => {
   h.close();
 });
 
-Deno.test("asks unavailable: round served without asks, relay 503", async () => {
+Deno.test("asks unavailable: the round and the relay are a 503", async () => {
   const { h, state } = await setup(ruled);
   state.owners.set(17n, VOTER.address);
   state.asks = "fail";
   const round = await h.req("/api/vote/round");
-  assertEquals(round.status, 200);
-  assertEquals("asks" in await j(round), false);
+  assertEquals([round.status, (await j(round)).code], [503, "asks_unavailable"]);
   const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
   const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
   assertEquals(res.status, 503);
   assertEquals((await j(res)).code, "asks_unavailable");
   assertEquals(state.sent, []);
-  // A read of the wrong length is as good as none.
+  // A head with fewer projects than the site knows (not added on-chain yet): the round is
+  // served, without asks, since a ballot can't be judged against them.
   state.asks = [1n];
   h.clock.now += 60;
   assertEquals("asks" in await j(await h.req("/api/vote/round")), false);

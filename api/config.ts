@@ -150,6 +150,9 @@ export interface Config {
   alchemyApiKey: string;
   /** Vote: Sepolia RPC (SEPOLIA_RPC_URL, else publicnode). */
   sepoliaRpcUrl: string;
+  /** Vote: an archive RPC (VOTE_ARCHIVE_RPC_URL) for the chain states at past blocks; "" =
+   * the round's own RPC. */
+  voteArchiveRpcUrl: string;
   /** Vote: the relayer's private key (MINTER_ROLE + Sepolia ETH); "" = relay off. */
   voteRelayerKey: string;
   pinataJwt: string;
@@ -256,6 +259,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     // Not the Alchemy key: that app may not have Sepolia enabled (every vote route would fail).
     sepoliaRpcUrl: (env.SEPOLIA_RPC_URL ?? "").trim() ||
       "https://ethereum-sepolia-rpc.publicnode.com",
+    voteArchiveRpcUrl: (env.VOTE_ARCHIVE_RPC_URL ?? "").trim(),
     // DEVCON_RELAYER_KEY is the secret's name from before the rename; still accepted so a
     // deploy doesn't need the secret renamed in the same release.
     voteRelayerKey: (env.VOTE_RELAYER_KEY ?? "").trim() || (env.DEVCON_RELAYER_KEY ?? "").trim(),

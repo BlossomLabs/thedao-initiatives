@@ -14,7 +14,7 @@ import { toChecksum } from "./chain/address.ts";
 import { ALWAYS_ENFORCED_RATE_LIMITS, BADGE_CONTRACT, CURATOR_ADDRESSES } from "./config.ts";
 import type { Deps } from "./middleware/context.ts";
 import { createAdmins } from "./services/admins.ts";
-import { createVoteChain } from "./services/vote-chain.ts";
+import { createStateSource, createVoteChain } from "./services/vote-chain.ts";
 import { reviewTokenIds } from "./chain/reviewer.ts";
 import { MAINNET_CHAIN_ID, ROUND, roundDeployed } from "../shared/vote/manifest.ts";
 import { createStaticSite, type SiteOptions } from "./site.ts";
@@ -63,6 +63,9 @@ export async function createServer(siteOptions?: SiteOptions) {
     );
   }
   const chain = createChain({ endpoints: config.rpcEndpoints, now });
+  const voteRpcUrl = ROUND.chainId === MAINNET_CHAIN_ID
+    ? config.rpcEndpoints[0]
+    : config.sepoliaRpcUrl;
   const deps: Deps = {
     db,
     chain,
@@ -81,13 +84,15 @@ export async function createServer(siteOptions?: SiteOptions) {
       manifest: ROUND,
       chain: createVoteChain(
         ROUND,
-        ROUND.chainId === MAINNET_CHAIN_ID ? config.rpcEndpoints[0] : config.sepoliaRpcUrl,
+        voteRpcUrl,
         /^0x[0-9a-fA-F]{64}$/.test(config.voteRelayerKey)
           ? config.voteRelayerKey as `0x${string}`
           : null,
         undefined,
         (a) => reviewTokenIds(chain.rpc, a, fetch),
       ),
+      // Past blocks need an archive node; without one configured, the round's own RPC.
+      source: createStateSource(ROUND, config.voteArchiveRpcUrl || voteRpcUrl),
     },
   };
   // Load the image decoder before the first upload asks for it.

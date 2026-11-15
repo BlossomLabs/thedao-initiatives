@@ -48,6 +48,8 @@ export type RoundTier =
     latestEndAt: number;
     quiet: boolean;
     funded: string[];
+    /** Asking $0 at the latest tally: covered by donations. Absent from servers before it. */
+    covered?: string[];
   }
   | {
     tier: Tier;
@@ -55,6 +57,8 @@ export type RoundTier =
     at: number;
     forced: boolean;
     funded: string[];
+    /** Asking $0 when it settled: covered by donations, final. Absent from servers before it. */
+    covered?: string[];
     /** Micro-USD per initiative, as decimal strings. */
     awards: Record<string, string>;
     /** tokenId → slug → micro-USD that badge paid for it (only what it paid). */
@@ -77,7 +81,8 @@ export type RoundView = {
   /** The pool on-chain now (micro-USD): what a new ballot's size is judged against. */
   poolUsd?: string;
   /** Each initiative's ask on-chain now (goal less donations and open pledges), micro-USD:
-   * what the ballot rules count. In manifest order; absent when the chain couldn't be read. */
+   * what the ballot rules and the live tally count. In manifest order; absent when the
+   * chain has fewer projects than the site. */
   asks?: string[];
   live: {
     funded: string[];
@@ -86,6 +91,8 @@ export type RoundView = {
     /** tokenId → slug → micro-USD that badge would pay for it if the open tiers settled
      * now (only what it would pay). */
     paid?: Record<string, Record<string, string>>;
+    /** Asking $0 now: covered by donations, in no tier. Absent from servers before it. */
+    covered?: string[];
     /** Each unsettled initiative's gap to its next tier; absent once the round is closed. */
     next?: Record<string, NextTierEntry>;
     /** How far ahead each initiative in the tier settling now is, micro-USD: how much

@@ -135,7 +135,8 @@ export function replay(
   input: {
     schedule: Schedule;
     m: number;
-    /** Ascending by block; at least one before the first S-Tier tally. */
+    /** Strictly ascending by block (one state per block); at least one before the first
+     * S-Tier tally. */
     states: ChainState[];
     receipts: Receipt[];
     /** Settlements already made: used as they are (a cache; the result is the same
@@ -145,6 +146,13 @@ export function replay(
   now: number,
 ): RoundState {
   const { schedule: s, m, states } = input;
+  // The lookups below search by block and by time (lastWhere): one state per block, and
+  // time never goes down.
+  for (let i = 1; i < states.length; i++) {
+    if (states[i].block <= states[i - 1].block || states[i].timestamp < states[i - 1].timestamp) {
+      throw new Error("chain states must be strictly ascending by block");
+    }
+  }
   // First ballots: until S-Tier settles (the contract takes them until its latest
   // possible settlement). Every tally until then splits the pool among the ballots in,
   // so a newcomer shrinks the others' shares; S-Tier's charges fix them.

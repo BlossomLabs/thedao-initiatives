@@ -19,7 +19,8 @@ contract MockNFT is ERC721 {
 
 contract MockToken {
     uint8 public decimals;
-    mapping(address => uint256) public balanceOf;
+    bool public broken;
+    mapping(address => uint256) private _balanceOf;
 
     constructor(uint8 decimals_) {
         decimals = decimals_;
@@ -29,13 +30,22 @@ contract MockToken {
         decimals = value;
     }
 
+    function setBroken(bool value) external {
+        broken = value;
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        require(!broken, "broken");
+        return _balanceOf[account];
+    }
+
     function mint(address to, uint256 amount) external {
-        balanceOf[to] += amount;
+        _balanceOf[to] += amount;
     }
 
     function transfer(address to, uint256 amount) external returns (bool) {
-        balanceOf[msg.sender] -= amount;
-        balanceOf[to] += amount;
+        _balanceOf[msg.sender] -= amount;
+        _balanceOf[to] += amount;
         return true;
     }
 }

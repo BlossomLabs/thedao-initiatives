@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {Fixture, MockToken, MockFeed} from "./helpers/Fixtures.sol";
 import {SignedBallots} from "../contracts/SignedBallots.sol";
 import {RoundAccounting} from "../contracts/RoundAccounting.sol";
+import {IPriceFeed} from "../contracts/IPriceFeed.sol";
 
 contract RoundAccountingTest is Fixture {
     event PoolUsdSet(uint256 previousAmountUsd, uint256 amountUsd);
@@ -19,8 +20,8 @@ contract RoundAccountingTest is Fixture {
         ethFeed = new MockFeed(8, 2_000e8);
         usdcFeed = new MockFeed(8, 1e8);
         usdc = new MockToken(6);
-        eth = ballots.registerCurrency(address(0), address(ethFeed), 3600);
-        dollarToken = ballots.registerCurrency(address(usdc), address(usdcFeed), 3600);
+        eth = ballots.registerCurrency(address(0), address(ethFeed));
+        dollarToken = ballots.registerCurrency(address(usdc), address(usdcFeed));
     }
 
     function test_mixedDonationsAndPledgesProduceNetAsk() public {
@@ -161,12 +162,11 @@ contract RoundAccountingTest is Fixture {
 
     function test_fixedUsdTokenValuesDonationsAndPledgesAtPar() public {
         MockToken token = new MockToken(6);
-        uint256 id = ballots.registerCurrency(address(token), address(0), 0);
+        uint256 id = ballots.registerCurrency(address(token), address(0));
         RoundAccounting.Currency memory c = ballots.currency(id);
         assertEq(c.usdFeed, address(0));
         assertEq(c.amountDecimals, 6);
         assertEq(c.feedDecimals, 0);
-        assertEq(c.maxPriceAge, 0);
         token.mint(INITIATIVE_A, 400e6);
         ballots.setPledge(keccak256("fixed dollar pledge"), 0, id, 50e6);
         ballots.setPoolUsd(300e6);
@@ -187,35 +187,22 @@ contract RoundAccountingTest is Fixture {
     function testFuzz_fixedUsdPricingScalesTokenDecimals(uint128 amount, uint8 decimals) public {
         decimals = uint8(bound(decimals, 0, 18));
         MockToken token = new MockToken(decimals);
-        uint256 id = ballots.registerCurrency(address(token), address(0), 0);
+        uint256 id = ballots.registerCurrency(address(token), address(0));
         uint256 expected = uint256(amount) * 1e6 / 10 ** uint256(decimals);
         assertEq(ballots.quoteUsd(id, amount), expected);
         assertEq(ballots.quoteUsd(id, 10 ** uint256(decimals)), 1e6);
         assertEq(ballots.quoteUsd(id, 0), 0);
     }
 
-    function test_fixedUsdTokenDecimalsCannotSilentlyChange() public {
-        MockToken token = new MockToken(6);
-        uint256 id = ballots.registerCurrency(address(token), address(0), 0);
-        token.setDecimals(18);
-        vm.expectRevert(RoundAccounting.InvalidCurrency.selector);
-        ballots.quoteUsd(id, 1e6);
-    }
-
     function test_fixedUsdPricingRequiresExplicitValidTokenConfiguration() public {
-        MockToken token = new MockToken(6);
         vm.expectRevert(RoundAccounting.InvalidCurrency.selector);
-        ballots.registerCurrency(address(token), address(0), 3600);
-        vm.expectRevert(RoundAccounting.InvalidCurrency.selector);
-        ballots.registerCurrency(address(token), address(usdcFeed), 0);
-        vm.expectRevert(RoundAccounting.InvalidCurrency.selector);
-        ballots.registerCurrency(bob, address(0), 0);
+        ballots.registerCurrency(bob, address(0));
         MockToken excessiveDecimals = new MockToken(19);
         vm.expectRevert(RoundAccounting.InvalidCurrency.selector);
-        ballots.registerCurrency(address(excessiveDecimals), address(0), 0);
+        ballots.registerCurrency(address(excessiveDecimals), address(0));
         SignedBallots fresh = new SignedBallots(address(this), address(0), "Voter", "VOTE", schedule());
         vm.expectRevert(RoundAccounting.InvalidCurrency.selector);
-        fresh.registerCurrency(address(0), address(0), 0);
+        fresh.registerCurrency(address(0), address(0));
     }
 
     function test_USDUnitIsNotANativeBalanceOrATokenBalance() public {
@@ -232,12 +219,12 @@ contract RoundAccountingTest is Fixture {
     function test_precisionAndRoundingDown() public {
         MockToken token = new MockToken(2);
         MockFeed feed = new MockFeed(2, 321); // $3.21.
-        uint256 id = ballots.registerCurrency(address(token), address(feed), 3600);
+        uint256 id = ballots.registerCurrency(address(token), address(feed));
         assertEq(ballots.quoteUsd(id, 123), 3_948_300); // 1.23 * 3.21 dollars.
         assertEq(ballots.quoteUsd(eth, 1), 0); // One wei is less than one microdollar.
         MockToken btc = new MockToken(8);
         MockFeed btcFeed = new MockFeed(8, 60_000e8);
-        uint256 btcId = ballots.registerCurrency(address(btc), address(btcFeed), 3600);
+        uint256 btcId = ballots.registerCurrency(address(btc), address(btcFeed));
         assertEq(ballots.quoteUsd(btcId, 2e8), 120_000e6);
     }
 
@@ -249,60 +236,18 @@ contract RoundAccountingTest is Fixture {
         assertEq(ballots.quoteUsd(eth, amount), expected);
     }
 
-    function test_zeroNegativeIncompleteAndFutureOraclePricesRevert() public {
-        ethFeed.set(0, block.timestamp);
-        vm.expectRevert(abi.encodeWithSelector(RoundAccounting.InvalidPrice.selector, eth));
-        ballots.quoteUsd(eth, 1 ether);
-        ethFeed.set(-1, block.timestamp);
-        vm.expectRevert(abi.encodeWithSelector(RoundAccounting.InvalidPrice.selector, eth));
-        ballots.quoteUsd(eth, 1 ether);
-        ethFeed.set(2_000e8, 0);
-        vm.expectRevert(abi.encodeWithSelector(RoundAccounting.InvalidPrice.selector, eth));
-        ballots.quoteUsd(eth, 1 ether);
-        ethFeed.set(2_000e8, block.timestamp + 1);
-        vm.expectRevert(abi.encodeWithSelector(RoundAccounting.InvalidPrice.selector, eth));
-        ballots.quoteUsd(eth, 1 ether);
-        ethFeed.set(2_000e8, block.timestamp);
-        ethFeed.setRound(0);
-        vm.expectRevert(abi.encodeWithSelector(RoundAccounting.InvalidPrice.selector, eth));
-        ballots.quoteUsd(eth, 1 ether);
-    }
-
-    function test_stalenessIsCheckedAtTheViewBlock() public {
-        uint256 timestamp = block.timestamp;
-        vm.warp(timestamp + 3600);
-        assertEq(ballots.quoteUsd(eth, 1 ether), 2_000e6);
-        vm.warp(timestamp + 3601);
-        vm.expectRevert(abi.encodeWithSelector(RoundAccounting.StalePrice.selector, eth));
-        ballots.quoteUsd(eth, 1 ether);
-        ethFeed.set(2_100e8, block.timestamp);
-        assertEq(ballots.quoteUsd(eth, 1 ether), 2_100e6);
-    }
-
-    function test_oracleDecimalsCannotSilentlyChange() public {
-        ethFeed.setDecimals(18);
-        vm.expectRevert(abi.encodeWithSelector(RoundAccounting.InvalidPrice.selector, eth));
-        ballots.quoteUsd(eth, 1 ether);
-    }
-
-    function test_assetDecimalsCannotSilentlyChange() public {
-        usdc.setDecimals(18);
-        vm.expectRevert(RoundAccounting.InvalidCurrency.selector);
-        ballots.quoteUsd(dollarToken, 1e6);
-    }
-
     function test_currencyLimitBoundsValuationLoops() public {
         MockToken extra;
         for (uint256 i = ballots.currencyCount(); i < ballots.MAX_CURRENCIES(); ++i) {
             extra = new MockToken(6);
-            ballots.registerCurrency(address(extra), address(usdcFeed), 3600);
+            ballots.registerCurrency(address(extra), address(usdcFeed));
         }
         extra = new MockToken(6);
         vm.expectRevert(RoundAccounting.TooManyCurrencies.selector);
-        ballots.registerCurrency(address(extra), address(usdcFeed), 3600);
+        ballots.registerCurrency(address(extra), address(usdcFeed));
     }
 
-    function test_unusedCurrencyDoesNotRequireAPriceButNonzeroSupportDoes() public {
+    function test_unusedCurrencyDoesNotNeedAPriceAndABrokenFeedFallsBack() public {
         ballots.setPoolUsd(100e6);
         ethFeed.setUnavailable(true);
         usdc.mint(INITIATIVE_A, 10e6);
@@ -310,15 +255,9 @@ contract RoundAccountingTest is Fixture {
         assertEq(donated, 10e6);
         assertEq(ballots.poolUsd(), 100e6);
         vm.deal(INITIATIVE_A, 1 ether);
-        vm.expectRevert();
-        ballots.initiativeUsd(0);
+        (donated,,,) = ballots.initiativeUsd(0); // ETH now falls back to the stored price.
+        assertEq(donated, 2_010e6);
         assertEq(ballots.poolUsd(), 100e6);
-    }
-
-    function test_enormousOracleAnswerRevertsWithoutOverflowingConversion() public {
-        ethFeed.set(type(int256).max, block.timestamp);
-        vm.expectRevert(abi.encodeWithSelector(RoundAccounting.InvalidPrice.selector, eth));
-        ballots.quoteUsd(eth, 1 ether);
     }
 
     function test_rolesCanBeGrantedAndRevokedIndependently() public {
@@ -356,7 +295,7 @@ contract RoundAccountingTest is Fixture {
         ballots.setPoolUsd(800_000e6);
         vm.warp(start);
         vm.expectRevert(SignedBallots.ConfigurationFrozen.selector);
-        ballots.registerCurrency(address(other), address(ethFeed), 3600);
+        ballots.registerCurrency(address(other), address(ethFeed));
         vm.warp(ballots.registrationDeadline());
         ballots.setPoolUsd(900_000e6);
         ballots.setPledge(keccak256("late"), 0, eth, 1 ether);
@@ -372,14 +311,11 @@ contract RoundAccountingTest is Fixture {
     }
 
     function test_duplicateUnknownAndInvalidRecordsReject() public {
-        MockToken other = new MockToken(6);
         MockToken excessiveDecimals = new MockToken(19);
         vm.expectRevert(RoundAccounting.DuplicateCurrency.selector);
-        ballots.registerCurrency(address(0), address(ethFeed), 3600);
+        ballots.registerCurrency(address(0), address(ethFeed));
         vm.expectRevert(RoundAccounting.InvalidCurrency.selector);
-        ballots.registerCurrency(address(other), address(0), 3600);
-        vm.expectRevert(RoundAccounting.InvalidCurrency.selector);
-        ballots.registerCurrency(address(excessiveDecimals), address(ethFeed), 3600);
+        ballots.registerCurrency(address(excessiveDecimals), address(ethFeed));
         vm.expectRevert(RoundAccounting.DuplicateInitiative.selector);
         ballots.addInitiative(INITIATIVE_A, 1e6, false, 0);
         vm.expectRevert(RoundAccounting.InvalidAddress.selector);
@@ -400,5 +336,173 @@ contract RoundAccountingTest is Fixture {
         RoundAccounting.Initiative memory p = ballots.initiative(0);
         assertEq(p.account, address(0xA05));
         assertEq(p.goalUsd, 123e6);
+    }
+
+    event PriceStored(uint256 indexed currencyId, uint256 price, uint256 updatedAt);
+
+    function test_registerSeedsLastPrice() public {
+        (uint192 price, uint64 updatedAt) = ballots.lastPrice(eth);
+        assertEq(price, 2_000e8);
+        assertEq(updatedAt, block.timestamp);
+        MockFeed feed = new MockFeed(8, 3_000e8);
+        MockToken token = new MockToken(6);
+        vm.expectEmit(true, false, false, true, address(ballots));
+        emit PriceStored(ballots.currencyCount(), 3_000e8, block.timestamp);
+        uint256 id = ballots.registerCurrency(address(token), address(feed));
+        (price, updatedAt) = ballots.lastPrice(id);
+        assertEq(price, 3_000e8);
+        assertEq(updatedAt, block.timestamp);
+    }
+
+    function test_registerRequiresGoodAnswer() public {
+        MockFeed feed = new MockFeed(8, 1e8);
+        MockToken token = new MockToken(6);
+        feed.setUnavailable(true);
+        vm.expectRevert(abi.encodeWithSelector(RoundAccounting.InvalidPrice.selector, ballots.currencyCount()));
+        ballots.registerCurrency(address(token), address(feed));
+    }
+
+    function test_staleAnswerIsUsed() public {
+        vm.deal(INITIATIVE_A, 1 ether);
+        vm.warp(block.timestamp + 30 days);
+        (uint256 donated,,,) = ballots.initiativeUsd(0);
+        assertEq(donated, 2_000e6);
+        assertEq(ballots.quoteUsd(eth, 1 ether), 2_000e6);
+    }
+
+    function test_brokenFeedFallsBack() public {
+        uint256 snapshot = vm.snapshotState();
+        ethFeed.setUnavailable(true);
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        vm.revertToState(snapshot);
+        ethFeed.set(0, block.timestamp);
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        ethFeed.set(-1, block.timestamp);
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        ethFeed.set(2_000e8, 0);
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        ethFeed.set(3_000e8, block.timestamp);
+        ethFeed.setRound(0);
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        ethFeed.setRound(1);
+        ethFeed.set(3_000e8, block.timestamp + 1 days);
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        ethFeed.set(3_000e8, block.timestamp);
+        assertEq(ballots.priceUsd(eth), 3_000e8);
+        ethFeed.setDecimals(18);
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        ethFeed.setDecimals(8);
+        ethFeed.set(type(int256).max, block.timestamp);
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        assertEq(ballots.quoteUsd(eth, 1 ether), 2_000e6);
+    }
+
+    function test_tokenDecimalsChangeIgnored() public {
+        usdc.mint(INITIATIVE_A, 1_000e6);
+        usdc.setDecimals(18);
+        (uint256 donated,,,) = ballots.initiativeUsd(0);
+        assertEq(donated, 1_000e6);
+        assertEq(ballots.quoteUsd(dollarToken, 1e6), 1e6);
+    }
+
+    function test_revertingBalanceCountsZero() public {
+        usdc.mint(INITIATIVE_A, 1_000e6);
+        vm.deal(INITIATIVE_A, 1 ether);
+        usdc.setBroken(true);
+        (uint256 donated,,,) = ballots.initiativeUsd(0);
+        assertEq(donated, 2_000e6);
+        (uint256 tokens,) = ballots.initiativeCurrencyAmounts(0, dollarToken);
+        assertEq(tokens, 0);
+    }
+
+    function test_olderGoodAnswerUsedNotStored() public {
+        PriceHarness h = new PriceHarness(address(this), schedule());
+        MockFeed feed = new MockFeed(8, 2_000e8);
+        feed.set(2_500e8, 50);
+        vm.warp(100);
+        uint256 id = h.registerCurrency(address(new MockToken(6)), address(feed));
+        h.exposed_storePrice(id, 3_000e8, 100);
+        feed.set(2_100e8, 50);
+        assertEq(h.priceUsd(id), 2_100e8);
+        (uint192 price, uint64 updatedAt) = h.lastPrice(id);
+        assertEq(price, 3_000e8);
+        assertEq(updatedAt, 100);
+        // An equal or older good price is not stored, and emits nothing.
+        vm.recordLogs();
+        h.exposed_storePrice(id, 1e8, 100);
+        h.exposed_storePrice(id, 1e8, 99);
+        assertEq(vm.getRecordedLogs().length, 0);
+        (price,) = h.lastPrice(id);
+        assertEq(price, 3_000e8);
+    }
+
+    function test_malformedFeedReturnsFallBack() public {
+        bytes4 dec = IPriceFeed.decimals.selector;
+        bytes4 rd = IPriceFeed.latestRoundData.selector;
+        uint256 snapshot = vm.snapshotState();
+        vm.mockCall(address(ethFeed), abi.encodeWithSelector(rd), hex""); // empty
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        vm.mockCall(address(ethFeed), abi.encodeWithSelector(rd), abi.encode(uint256(1), int256(3_000e8))); // short
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        vm.mockCall(
+            address(ethFeed),
+            abi.encodeWithSelector(rd),
+            abi.encode(uint256(1) << 80 | 1, int256(3_000e8), block.timestamp, block.timestamp, uint256(1))
+        ); // round above uint80
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        vm.revertToState(snapshot);
+        vm.mockCall(address(ethFeed), abi.encodeWithSelector(dec), hex""); // empty decimals
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        vm.mockCall(address(ethFeed), abi.encodeWithSelector(dec), abi.encode(uint256(256 + 8))); // above 255
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        vm.mockCallRevert(address(ethFeed), abi.encodeWithSelector(dec), "no");
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        vm.deal(INITIATIVE_A, 1 ether);
+        (uint256 donated,,,) = ballots.initiativeUsd(0);
+        assertEq(donated, 2_000e6);
+    }
+
+    function test_feedWithoutCodeFallsBack() public {
+        vm.etch(address(ethFeed), "");
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        vm.deal(INITIATIVE_A, 1 ether);
+        (uint256 donated,,,) = ballots.initiativeUsd(0);
+        assertEq(donated, 2_000e6);
+    }
+
+    function test_gasHogFeedAndTokenDoNotBlockReads() public {
+        vm.etch(address(ethFeed), address(new GasHog()).code);
+        vm.deal(INITIATIVE_A, 1 ether);
+        usdc.mint(INITIATIVE_A, 5e6);
+        vm.etch(address(usdc), address(new GasHog()).code);
+        (uint256 donated,,,) = ballots.initiativeUsd(0);
+        assertEq(donated, 2_000e6); // ETH at the stored price, starved USDC balance as zero
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+    }
+
+    function test_malformedBalanceCountsZero() public {
+        usdc.mint(INITIATIVE_A, 5e6);
+        vm.mockCall(address(usdc), abi.encodeWithSelector(MockToken.balanceOf.selector), hex"");
+        (uint256 tokens,) = ballots.initiativeCurrencyAmounts(0, dollarToken);
+        assertEq(tokens, 0);
+        vm.etch(address(usdc), "");
+        (tokens,) = ballots.initiativeCurrencyAmounts(0, dollarToken);
+        assertEq(tokens, 0);
+    }
+}
+
+/// A ballot path stand-in: stores prices the way ballot validation will.
+contract PriceHarness is SignedBallots {
+    constructor(address admin, Schedule memory s) SignedBallots(admin, address(0), "Harness", "HARN", s) {}
+
+    function exposed_storePrice(uint256 id, uint256 price, uint64 updatedAt) external {
+        _storePrice(id, price, updatedAt);
+    }
+}
+
+/// Burns all forwarded gas on any call.
+contract GasHog {
+    fallback() external {
+        while (true) {}
     }
 }

@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {SignedBallots} from "../contracts/SignedBallots.sol";
 import {RoundAccounting} from "../contracts/RoundAccounting.sol";
+import {MockToken, MockFeed} from "./helpers/Fixtures.sol";
 
 /// @notice The ballot rules (docs/superpowers/specs/2026-11-11-ballot-rules-design.md):
 ///         the contract agrees with vote/reference/ballot_rules.py on every shared
@@ -40,6 +41,40 @@ contract BallotRulesTest is Test {
         round.setPoolUsd(200);
         vm.warp(round.opensAt());
     }
+
+    MockFeed internal ethFeed;
+    MockToken internal usdc; // currency 2, fixed $1, six decimals
+    MockToken internal dai; // currency 3, fixed $1, eighteen decimals
+    MockToken internal whole; // currency 4, fixed $1, no decimals: one token is $1
+
+    /// Four projects with the given goals and group masks (group 0 added when any mask is
+    /// set), ETH at $3000 and a fixed-dollar token registered, the pool set, voting open.
+    function priced(uint256[4] memory goals, uint256[4] memory masks, uint256 pool)
+        internal
+        returns (SignedBallots round)
+    {
+        round = fresh();
+        round.addGroup("Seal");
+        ethFeed = new MockFeed(8, 3_000e8);
+        usdc = new MockToken(6);
+        round.registerCurrency(address(0), address(ethFeed));
+        round.registerCurrency(address(usdc), address(0));
+        dai = new MockToken(18);
+        whole = new MockToken(0);
+        round.registerCurrency(address(dai), address(0));
+        round.registerCurrency(address(whole), address(0));
+        for (uint160 i; i < 4; ++i) {
+            round.addInitiative(address(0x1000 + i), goals[i], false, masks[i]);
+        }
+        round.setPoolUsd(pool);
+        vm.warp(round.opensAt());
+    }
+
+    function hundreds() internal pure returns (uint256[4] memory goals) {
+        goals = [uint256(100e6), 100e6, 100e6, 100e6];
+    }
+
+    function unrelated() internal pure returns (uint256[4] memory masks) {}
 
     function test_fixtures() public {
         string memory json = vm.readFile(string.concat(vm.projectRoot(), "/../shared/vote/fixtures/ballot-rules.json"));
@@ -224,5 +259,188 @@ contract BallotRulesTest is Test {
         round.setIndependentTiers(7);
         round.setIndependentTiers(3);
         assertEq(round.independentTiers(), 3);
+    }
+
+    function test_donationMakesBallotTooSmall() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 200e6);
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2)); // asks 400 of 300 needed
+        vm.deal(address(0x1000), 0.04 ether); // $120 covers project 0's $100
+        vm.deal(address(0x1001), 0.04 ether);
+        vm.prank(voter);
+        vm.expectRevert(SignedBallots.BallotTooSmall.selector);
+        round.vote(1, 2, hex"01010101", proof3(0, 1, 2)); // asks 200 < 300
+    }
+
+    function test_pledgeCountsAgainstAsk() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 200e6);
+        round.setPledge(bytes32(uint256(1)), 0, 0, 100e6);
+        round.setPledge(bytes32(uint256(2)), 1, 0, 100e6);
+        vm.prank(voter);
+        vm.expectRevert(SignedBallots.BallotTooSmall.selector);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2)); // asks 200 < 300
+        round.setPledge(bytes32(uint256(2)), 1, 0, 0); // cancelled: asks 300, half of 1.5x passes
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2));
+    }
+
+    function test_groupRuleCountsAsks() public {
+        // Projects 0 and 1 share a group: 200 of 350 by goal, over half.
+        uint256[4] memory goals = [uint256(100e6), 100e6, 100e6, 50e6];
+        uint256[4] memory masks = [uint256(1), 1, 0, 0];
+        SignedBallots round = priced(goals, masks, 150e6);
+        vm.prank(voter);
+        vm.expectRevert(abi.encodeWithSelector(SignedBallots.GroupOverHalf.selector, uint8(0), uint8(0)));
+        round.vote(1, 1, hex"01010101", proof3(0, 2, 3));
+        round.setPledge(bytes32(uint256(1)), 0, 0, 60e6); // asks 40 + 100 + 100 + 50: group 140 of 290
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 2, 3));
+    }
+
+    function test_groupOverHalfByAskNotByGoal() public {
+        // Goals put the group at exactly half (200 of 400), which passes.
+        uint256[4] memory masks = [uint256(1), 1, 0, 0];
+        SignedBallots round = priced(hundreds(), masks, 150e6);
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 2, 3));
+        round.setPledge(bytes32(uint256(1)), 2, 0, 60e6);
+        round.setPledge(bytes32(uint256(2)), 3, 0, 60e6); // asks 100 + 100 + 40 + 40: group 200 of 280
+        vm.prank(voter);
+        vm.expectRevert(abi.encodeWithSelector(SignedBallots.GroupOverHalf.selector, uint8(0), uint8(0)));
+        round.vote(1, 2, hex"01010101", proof3(0, 2, 3));
+    }
+
+    function test_coveredProjectCountsAsIndependent() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 200e6);
+        round.setPledge(bytes32(uint256(1)), 0, 0, 100e6); // project 0 is fully pledged: ask $0
+        vm.prank(voter);
+        // S-Tier is projects 0, 1 and 2; project 3 in A-Tier. Asks 0 + 100 + 100 + 100 = 300 = 1.5x of 200.
+        round.vote(1, 1, hex"01010104", proof3(0, 1, 2));
+    }
+
+    function test_shortBallotReadsOnlyItsProjects() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 200e6);
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2)); // the registration receipt, before S's deadline
+        vm.warp(round.latestSettlementAt(0));
+        round.addInitiative(address(0x2000), 100e6, false, 0);
+        vm.expectCall(address(usdc), abi.encodeCall(MockToken.balanceOf, (address(0x2000))), 0);
+        vm.prank(voter);
+        round.vote(1, 2, hex"01010101", proof3(0, 1, 2));
+    }
+
+    function test_longBallotReadsItsProjects() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 200e6);
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2));
+        vm.warp(round.latestSettlementAt(0));
+        round.addInitiative(address(0x2000), 100e6, false, 0);
+        vm.expectCall(address(usdc), abi.encodeCall(MockToken.balanceOf, (address(0x2000))), 1);
+        vm.prank(voter);
+        round.vote(1, 2, hex"0101010101", proof3(0, 1, 2));
+    }
+
+    function test_unplacedProjectIsNotRead() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 200e6);
+        vm.expectCall(address(usdc), abi.encodeCall(MockToken.balanceOf, (address(0x1003))), 0);
+        vm.prank(voter);
+        round.vote(1, 1, hex"010101ff", proof3(0, 1, 2));
+    }
+
+    function test_brokenFeedDoesNotBlockVoting() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 200e6);
+        vm.deal(address(0x1000), 0.04 ether);
+        vm.deal(address(0x1001), 0.04 ether);
+        ethFeed.setUnavailable(true);
+        // The stored price ($3000) still counts the donations: asks 200 < 300. A zero price
+        // would have left asks at 400 and passed.
+        vm.prank(voter);
+        vm.expectRevert(SignedBallots.BallotTooSmall.selector);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2));
+        vm.deal(address(0x1001), 0);
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2)); // asks 300: recorded
+        assertEq(round.nonceOf(1), 1);
+    }
+
+    function test_olderGoodAnswerUsedNotStoredByBallot() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 150e6);
+        (uint192 storedPrice, uint64 storedAt) = round.lastPrice(1);
+        vm.deal(address(0x1000), 0.04 ether);
+        vm.deal(address(0x1001), 0.04 ether);
+        // Needs asks >= 225. At $3000 each donation covers its project (asks 200: too small);
+        // at the older $2000 answer each covers $80 (asks 240).
+        ethFeed.set(2_000e8, storedAt - 1);
+        vm.recordLogs();
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2));
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; ++i) {
+            assertTrue(logs[i].topics[0] != RoundAccounting.PriceStored.selector);
+        }
+        (uint192 price, uint64 at) = round.lastPrice(1);
+        assertEq(price, storedPrice);
+        assertEq(at, storedAt);
+    }
+
+    function test_newerGoodAnswerStoredByBallot() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 200e6);
+        ethFeed.set(4_000e8, block.timestamp);
+        vm.expectEmit(true, false, false, true, address(round));
+        emit RoundAccounting.PriceStored(1, 4_000e8, block.timestamp);
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2));
+        (uint192 price, uint64 at) = round.lastPrice(1);
+        assertEq(price, 4_000e8);
+        assertEq(at, block.timestamp);
+    }
+
+    function test_eachPartRoundsDownOnItsOwn() public {
+        // Project 0 holds 1.5e12 dai-wei and has a pledge of 1.5e12: each part is $0.000001
+        // (rounded down), $0.000002 in all. Converted together they would be $0.000003.
+        // Asks total 400e6 - 2; 3 x 266_666_665 = 799_999_995 sits between 2 x that and 2 x (400e6 - 3).
+        SignedBallots round = priced(hundreds(), unrelated(), 266_666_665);
+        dai.mint(address(0x1000), 1.5e12);
+        round.setPledge(bytes32(uint256(1)), 0, 3, 1.5e12);
+        (uint256 donated, uint256 pledged,, uint256 ask) = round.initiativeUsd(0);
+        assertEq(donated, 1);
+        assertEq(pledged, 1);
+        assertEq(ask, 100e6 - 2);
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2));
+    }
+
+    function test_hugeBalanceDoesNotBlockBallot() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 60e6);
+        // One balance would overflow the sum with a pledge; one overflows its own conversion.
+        usdc.mint(address(0x1000), type(uint256).max);
+        round.setPledge(bytes32(uint256(1)), 0, 2, 5);
+        whole.mint(address(0x1001), type(uint256).max);
+        dai.mint(address(0x1002), type(uint256).max);
+        round.setPledge(bytes32(uint256(2)), 2, 3, type(uint256).max);
+        for (uint256 i; i < 3; ++i) {
+            (,, uint256 total, uint256 ask) = round.initiativeUsd(i);
+            assertEq(ask, 0);
+            assertGt(total, 100e6);
+        }
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2)); // asks 0 + 0 + 0 + 100e6 against 1.5 x 60e6
+    }
+
+    function test_brokenOrMissingTokenCountsAsZero() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 200e6);
+        vm.deal(address(0x1000), 0.02 ether); // $60: project 0 asks $40
+        usdc.mint(address(0x1002), 100e6);
+        usdc.setBroken(true);
+        (,,, uint256 ask) = round.initiativeUsd(2);
+        assertEq(ask, 100e6);
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2)); // asks 40 + 100 + 100 + 100 = 340e6
+        vm.etch(address(usdc), "");
+        (,,, ask) = round.initiativeUsd(2);
+        assertEq(ask, 100e6);
+        vm.prank(voter);
+        round.vote(1, 2, hex"01010101", proof3(0, 1, 2));
+        assertEq(round.nonceOf(1), 2);
     }
 }

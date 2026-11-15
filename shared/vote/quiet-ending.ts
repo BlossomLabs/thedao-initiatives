@@ -151,7 +151,12 @@ export function replay(
       p.block < r.block || (p.block === r.block && p.logIndex < (r.logIndex ?? 0));
     const count = addedAt.filter((p) => p === null || before(p)).length;
     const poolUsd = pool.filter(before).at(-1)?.poolUsd ?? round.poolUsd;
-    return checkBallot(r.ballot!, { ...round, projects: round.projects.slice(0, count), poolUsd })
+    return checkBallot(r.ballot!, {
+      ...round,
+      projects: round.projects.slice(0, count),
+      asks: round.asks.slice(0, count),
+      poolUsd,
+    })
       .ok;
   };
 

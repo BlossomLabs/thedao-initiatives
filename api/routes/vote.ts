@@ -368,7 +368,7 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       ...(history
         ? {
           rules: {
-            round: rulesRound(m),
+            round: rulesRound(m, m.projects.map((p) => BigInt(p.goalUsd))), // asks: Task 6/7
             addedAt: m.slugs.map((_, i) => history.addedAt[i] ?? null),
             pool: history.pool,
           },
@@ -672,7 +672,11 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     // The ballot rules, judged with the pool on-chain now: the contract would refuse it.
     if (d.manifest.ballotRules) {
       const { poolUsd } = await recentRound(d);
-      const checked = checkBallot(hexToBytes(ballot), rulesRound(d.manifest, poolUsd));
+      // asks: Task 6/7
+      const checked = checkBallot(
+        hexToBytes(ballot),
+        rulesRound(d.manifest, d.manifest.projects.map((p) => BigInt(p.goalUsd)), poolUsd),
+      );
       if (!checked.ok) {
         throw fail(422, "invalid_ballot", "This ballot breaks the ballot rules.", {
           errors: checked.errors.map((e) =>
@@ -753,7 +757,14 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
             nonce,
             ballot: ballot as Hex,
             signature: signature as Hex,
-            proof: findProof(hexToBytes(ballot as Hex), rulesRound(d.manifest)) ?? [],
+            // asks: Task 6/7
+            proof: findProof(
+              hexToBytes(ballot as Hex),
+              rulesRound(
+                d.manifest,
+                d.manifest.projects.map((p) => BigInt(p.goalUsd)),
+              ),
+            ) ?? [],
           }),
         ]],
       }).catch((e) => {

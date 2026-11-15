@@ -178,7 +178,11 @@ export async function selfSendBallot(
   try {
     // The page only offers this for a ballot that passes the rules; without a proof the
     // contract refuses it and the failure says so.
-    hash = await d.sendOwn(signed, findProof(hexToBytes(ballot), rulesRound(m)) ?? []);
+    // asks: Task 6/7
+    hash = await d.sendOwn(
+      signed,
+      findProof(hexToBytes(ballot), rulesRound(m, m.projects.map((p) => BigInt(p.goalUsd)))) ?? [],
+    );
   } catch (e) {
     if (declined(e)) set({ kind: "idle", note: "You didn't confirm, so nothing was sent." });
     else set({ kind: "failed", reason: message(e) });

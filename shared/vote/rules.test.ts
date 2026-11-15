@@ -16,6 +16,7 @@ const round = (over: Partial<RulesRound> = {}): RulesRound => ({
     rfp: i === 5,
     groups: i < 2 ? [0] : [],
   })),
+  asks: [100n, 100n, 100n, 100n, 50n, 50n],
   groupNames: ["Seal"],
   poolUsd: 200n,
   independentTiers: 1,
@@ -114,6 +115,38 @@ describe("ballot rules", () => {
       .toEqual([0, 2, 3, 1, 4, 5]);
   });
 
+  it("size counts asks, not goals", () => {
+    const funded = round({
+      projects: round().projects.map((p) => ({ ...p, goalUsd: 100n })),
+      asks: [10n, 10n, 10n, 10n, 10n, 10n],
+      poolUsd: 20n,
+    });
+    const b = ballot({ S: [0, 2, 3, 4] });
+    expect(checkBallot(b, funded).ok).toBe(true);
+    expect(checkBallot(b, { ...funded, poolUsd: 30n }).errors).toEqual([
+      { rule: "size", requested: 40n, needed: 45n, pool: 30n },
+    ]);
+  });
+
+  it("the group rule counts asks", () => {
+    // Seal's goals are the smaller half, but its asks are over half of S-Tier's.
+    const r = round({ asks: [90n, 90n, 10n, 10n, 10n, 10n], poolUsd: 100n });
+    expect(checkBallot(ballot({ S: [0, 1, 2, 3] }), r).errors).toEqual([
+      { rule: "group", tier: 0, group: 0, groupUsd: 180n, tierUsd: 200n },
+    ]);
+    const even = round({ asks: [10n, 10n, 90n, 90n, 10n, 10n], poolUsd: 100n });
+    expect(checkBallot(ballot({ S: [0, 1, 2, 3] }), even).ok).toBe(true);
+  });
+
+  it("a $0 ask counts toward independence", () => {
+    const zero = round({ asks: [0n, 0n, 0n, 0n, 0n, 0n], poolUsd: 0n });
+    expect(checkBallot(ballot({ S: [0, 2, 3] }), zero)).toEqual({
+      ok: true,
+      errors: [],
+      proof: [0, 2, 3],
+    });
+  });
+
   it("tiersOf groups by competition rank", () => {
     expect(tiersOf(Uint8Array.from([1, 1, 3, 255, 3, 1]))).toEqual([[0, 1, 5], [2, 4]]);
   });
@@ -124,6 +157,7 @@ describe("parity with the Python reference", () => {
     for (const c of fixtures) {
       const r = checkBallot(Uint8Array.from(c.ballot), {
         projects: c.projects.map((p) => ({ ...p, goalUsd: BigInt(p.goalUsd) })),
+        asks: c.asks.map(BigInt),
         groupNames: c.groupNames,
         poolUsd: BigInt(c.poolUsd),
         independentTiers: c.independentTiers,

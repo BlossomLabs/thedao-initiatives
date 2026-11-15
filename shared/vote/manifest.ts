@@ -63,9 +63,11 @@ export function checkManifest(m: VoteManifest): VoteManifest {
 
 export const ROUND = checkManifest(manifest as unknown as VoteManifest);
 
-/** The ballot rules' view of the round; `poolUsd` defaults to the manifest's. */
-export const rulesRound = (m: VoteManifest, poolUsd?: bigint): RulesRound => ({
+/** The ballot rules' view of the round: `asks[i]` is project i's ask; `poolUsd` defaults
+ * to the manifest's. */
+export const rulesRound = (m: VoteManifest, asks: bigint[], poolUsd?: bigint): RulesRound => ({
   projects: m.projects.map((p) => ({ goalUsd: BigInt(p.goalUsd), rfp: p.rfp, groups: p.groups })),
+  asks,
   groupNames: m.groups,
   poolUsd: poolUsd ?? BigInt(m.poolUsd),
   independentTiers: m.independentTiers,

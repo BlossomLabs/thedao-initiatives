@@ -795,7 +795,8 @@ export default function VotePage(
     const rules = R.ballotRules
       ? checkBallot(
         encodeBallot(R.slugs, tiers),
-        rulesRound(R, BigInt(rv?.poolUsd ?? R.poolUsd)),
+        // asks: Task 6/7
+        rulesRound(R, R.projects.map((p) => BigInt(p.goalUsd)), BigInt(rv?.poolUsd ?? R.poolUsd)),
       )
       : null;
     // An enforced tier left empty: the bytes would read the next one in its place.

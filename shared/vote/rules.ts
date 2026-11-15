@@ -1,13 +1,16 @@
 /** The ballot rules (docs/superpowers/specs/2026-11-11-ballot-rules-design.md): a valid
- * ballot requests at least 1.5× the pool, and each enforced tier (S-Tier always, A-Tier
+ * ballot requests (in asks) at least 1.5× the pool, and each enforced tier (S-Tier always, A-Tier
  * when the round says so) holds at least 3 pairwise-unrelated projects with no related
- * group over half its funds. Related = sharing a group (an affiliation); RFPs have none. Mirrored by
+ * group over half its asks. Related = sharing a group (an affiliation); RFPs have none. Mirrored by
  * vote/reference/ballot_rules.py and the contract; shared fixtures keep them equal.
  * Amounts are micro-USD bigints. Browser and Deno. */
 
 export type RulesProject = { goalUsd: bigint; rfp: boolean; groups: number[] };
 export type RulesRound = {
   projects: RulesProject[];
+  /** What each project still asks for (goal less donations and open pledges), by project
+   * index. Size and group rules count asks, never goals. */
+  asks: bigint[];
   groupNames: string[];
   poolUsd: bigint;
   /** Bit 0 S-Tier, bit 1 A-Tier. B-Tier is never checked. */
@@ -80,7 +83,7 @@ export function checkBallot(ballot: Uint8Array, round: RulesRound): RulesResult 
   const errors: RuleError[] = [];
   const groups = tiersOf(ballot);
   if (groups.length > 3) errors.push({ rule: "tiers" });
-  const ask = (i: number) => round.projects[i].goalUsd;
+  const ask = (i: number) => round.asks[i];
   const sum = (xs: number[]) => xs.reduce((a, i) => a + ask(i), 0n);
   const requested = sum(groups.flat());
   if (2n * requested < 3n * round.poolUsd) {

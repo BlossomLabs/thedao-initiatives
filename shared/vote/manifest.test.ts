@@ -44,13 +44,14 @@ describe("round manifest", () => {
       .toThrow(/group/);
   });
   it("rulesRound maps the manifest", () => {
-    expect(rulesRound(base)).toEqual({
+    expect(rulesRound(base, [5n])).toEqual({
       projects: [{ goalUsd: 5n, rfp: false, groups: [0] }],
+      asks: [5n],
       groupNames: ["Seal"],
       poolUsd: 1n,
       independentTiers: 1,
     });
-    expect(rulesRound(base, 9n).poolUsd).toBe(9n);
+    expect(rulesRound(base, [5n], 9n).poolUsd).toBe(9n);
   });
   it("every round carries the contract's quiet-ending schedule", () => {
     expect(() => checkManifest({ ...base, schedule: undefined as never })).toThrow(/schedule/);

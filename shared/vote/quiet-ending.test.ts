@@ -280,6 +280,7 @@ describe("ballot rules in the replay", () => {
   ) => ({
     round: {
       projects: [100n, 100n, 100n, 100n].map((goalUsd) => ({ goalUsd, rfp: false, groups: [] })),
+      asks: [100n, 100n, 100n, 100n],
       groupNames: [],
       poolUsd: 200n,
       independentTiers: 1,

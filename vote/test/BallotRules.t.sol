@@ -101,11 +101,14 @@ contract BallotRulesTest is Test {
         for (uint256 g; g < groups; ++g) {
             round.addGroup(bytes32(g + 1));
         }
+        uint256[] memory goals = vm.parseJsonUintArray(json, string.concat(c, ".sol.goals"));
         uint256[] memory asks = vm.parseJsonUintArray(json, string.concat(c, ".sol.asks"));
         bool[] memory rfp = vm.parseJsonBoolArray(json, string.concat(c, ".sol.rfp"));
         uint256[] memory masks = vm.parseJsonUintArray(json, string.concat(c, ".sol.masks"));
-        for (uint256 i; i < asks.length; ++i) {
-            round.addInitiative(address(uint160(0x1000 + i)), asks[i], rfp[i], masks[i]);
+        for (uint256 i; i < goals.length; ++i) {
+            round.addInitiative(address(uint160(0x1000 + i)), goals[i], rfp[i], masks[i]);
+            // A USD pledge converts 1:1, so goal minus ask of it leaves exactly the fixture's ask.
+            if (goals[i] > asks[i]) round.setPledge(bytes32(i + 1), i, 0, goals[i] - asks[i]);
         }
         uint256 tiers = vm.parseJsonUint(json, string.concat(c, ".independentTiers"));
         if (tiers != 1) round.setIndependentTiers(uint8(tiers));

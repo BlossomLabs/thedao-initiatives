@@ -12,7 +12,7 @@ def round_(pool=200, tiers=1):
         {"goalUsd": ask, "rfp": i == 5, "groups": [0] if i < 2 else []}
         for i, ask in enumerate([100, 100, 100, 100, 50, 50])
     ]
-    return projects, pool, tiers
+    return projects, [100, 100, 100, 100, 50, 50], pool, tiers
 
 
 def ballot(S=(), A=(), B=(), n=6):
@@ -25,9 +25,9 @@ def ballot(S=(), A=(), B=(), n=6):
     return out
 
 
-def check(b, pool=200, tiers=1):
-    projects, pool, tiers = round_(pool, tiers)
-    return check_ballot(b, projects, pool, tiers)
+def check(b, pool=200, tiers=1, asks=None):
+    projects, default_asks, pool, tiers = round_(pool, tiers)
+    return check_ballot(b, projects, asks or default_asks, pool, tiers)
 
 
 class BallotRules(unittest.TestCase):
@@ -81,12 +81,34 @@ class BallotRules(unittest.TestCase):
         self.assertEqual(check([1, 4, 1, W, W, W])["errors"], [{"rule": "shape"}])
 
     def test_check_proof(self):
-        projects, pool, tiers = round_()
+        projects, _, pool, tiers = round_()
         b = ballot(S=[0, 1, 2, 3], B=[4])
         self.assertTrue(check_proof(b, projects, tiers, [1, 2, 3]))
         self.assertFalse(check_proof(b, projects, tiers, [0, 1, 2]))
         self.assertFalse(check_proof(b, projects, tiers, [2, 3, 4]))
         self.assertFalse(check_proof(b, projects, tiers, [2, 3]))
+
+    def test_size_counts_asks_not_goals(self):
+        asks = [10] * 6
+        b = ballot(S=[0, 2, 3, 4])
+        self.assertTrue(check(b, pool=20, asks=asks)["ok"])
+        self.assertEqual(
+            check(b, pool=30, asks=asks)["errors"],
+            [{"rule": "size", "requested": 40, "needed": 45, "pool": 30}],
+        )
+
+    def test_group_rule_counts_asks(self):
+        self.assertEqual(
+            check(ballot(S=[0, 1, 2, 3]), pool=100, asks=[90, 90, 10, 10, 10, 10])["errors"],
+            [{"rule": "group", "tier": 0, "group": 0, "groupUsd": 180, "tierUsd": 200}],
+        )
+        self.assertTrue(check(ballot(S=[0, 1, 2, 3]), pool=100, asks=[10, 10, 90, 90, 10, 10])["ok"])
+
+    def test_zero_ask_counts_toward_independence(self):
+        self.assertEqual(
+            check(ballot(S=[0, 2, 3]), pool=0, asks=[0] * 6),
+            {"ok": True, "errors": [], "proof": [0, 2, 3]},
+        )
 
     def test_tiers_of(self):
         self.assertEqual(tiers_of([1, 1, 3, W, 3, 1]), [[0, 1, 5], [2, 4]])

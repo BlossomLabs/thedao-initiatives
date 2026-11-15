@@ -33,7 +33,11 @@ describe("dev mocks", () => {
         : encodeBallot(m.round.slugs, tiers ?? {});
       // No ballot yet, or never one (the badge that missed registration).
       if (kind === "started" || kind === "missed") return expect(hex).toBeUndefined();
-      expect(checkBallot(bytes, rulesRound(m.round)).errors).toEqual([]);
+      // asks: Task 6/7
+      expect(
+        checkBallot(bytes, rulesRound(m.round, m.round.projects.map((p) => BigInt(p.goalUsd))))
+          .errors,
+      ).toEqual([]);
     },
   );
 

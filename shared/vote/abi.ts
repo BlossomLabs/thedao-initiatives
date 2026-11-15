@@ -341,11 +341,6 @@ export const SIGNED_BALLOTS_ABI = [
             "type": "uint8",
             "internalType": "uint8",
           },
-          {
-            "name": "maxPriceAge",
-            "type": "uint32",
-            "internalType": "uint32",
-          },
         ],
       },
     ],
@@ -781,6 +776,30 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "lastPrice",
+    "inputs": [
+      {
+        "name": "currencyId",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [
+      {
+        "name": "price",
+        "type": "uint192",
+        "internalType": "uint192",
+      },
+      {
+        "name": "updatedAt",
+        "type": "uint64",
+        "internalType": "uint64",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "latestSettlementAt",
     "inputs": [
       {
@@ -1005,6 +1024,25 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "priceUsd",
+    "inputs": [
+      {
+        "name": "currencyId",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [
+      {
+        "name": "price",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "projectCount",
     "inputs": [],
     "outputs": [
@@ -1144,11 +1182,6 @@ export const SIGNED_BALLOTS_ABI = [
         "name": "usdFeed",
         "type": "address",
         "internalType": "address",
-      },
-      {
-        "name": "maxPriceAge",
-        "type": "uint32",
-        "internalType": "uint32",
       },
     ],
     "outputs": [
@@ -1701,12 +1734,6 @@ export const SIGNED_BALLOTS_ABI = [
         "indexed": false,
         "internalType": "uint8",
       },
-      {
-        "name": "maxPriceAge",
-        "type": "uint32",
-        "indexed": false,
-        "internalType": "uint32",
-      },
     ],
     "anonymous": false,
   },
@@ -1841,6 +1868,31 @@ export const SIGNED_BALLOTS_ABI = [
       },
       {
         "name": "amountUsd",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256",
+      },
+    ],
+    "anonymous": false,
+  },
+  {
+    "type": "event",
+    "name": "PriceStored",
+    "inputs": [
+      {
+        "name": "currencyId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256",
+      },
+      {
+        "name": "price",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256",
+      },
+      {
+        "name": "updatedAt",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256",
@@ -2326,17 +2378,6 @@ export const SIGNED_BALLOTS_ABI = [
     "type": "error",
     "name": "RfpWithGroups",
     "inputs": [],
-  },
-  {
-    "type": "error",
-    "name": "StalePrice",
-    "inputs": [
-      {
-        "name": "currencyId",
-        "type": "uint256",
-        "internalType": "uint256",
-      },
-    ],
   },
   {
     "type": "error",

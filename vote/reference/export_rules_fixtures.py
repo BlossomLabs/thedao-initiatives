@@ -33,7 +33,19 @@ def named():
         ("short ballot", [1, 4, 1, 1], 200, 1),
         ("rank gap", [1, 4, 1, W, W, W], 200, 1),
     ]
-    return [(name, projects, ["Seal"], pool, tiers, b) for name, b, pool, tiers in cases]
+    asks = [p["goalUsd"] for p in projects]
+    out = [(name, projects, asks, ["Seal"], pool, tiers, b) for name, b, pool, tiers in cases]
+    # Three unrelated projects, all fully covered: independent, yet S-Tier asks nothing.
+    out.append((
+        "covered projects independent but too small",
+        projects,
+        [0, 0, 0, 0, 50, 50],
+        ["Seal"],
+        1,
+        1,
+        [1, W, 1, 1, W, W],
+    ))
+    return out
 
 
 def random_case(rng, k):
@@ -58,20 +70,22 @@ def random_case(rng, k):
     if rng.random() < 0.15:  # recorded before the last projects were added
         while len(ballot) > 1 and ballot[-1] == WITHHELD:
             ballot.pop()
-    requested = sum(projects[i]["goalUsd"] for i in placed)
+    asks = [p["goalUsd"] - rng.randint(0, p["goalUsd"]) if rng.random() < 0.7 else 0 for p in projects]
+    requested = sum(asks[i] for i in placed)
     pool = max(1, int(requested * rng.uniform(0.4, 0.9)))
-    return (f"random {k}", projects, [f"G{g}" for g in range(n_groups)], pool, rng.choice([1, 1, 3]), ballot)
+    return (f"random {k}", projects, asks, [f"G{g}" for g in range(n_groups)], pool, rng.choice([1, 1, 3]), ballot)
 
 
 def main():
     rng = random.Random(2026)
     cases = named() + [random_case(rng, k) for k in range(60)]
     out = []
-    for name, projects, names, pool, tiers, ballot in cases:
-        r = check_ballot(ballot, projects, pool, tiers)
+    for name, projects, asks, names, pool, tiers, ballot in cases:
+        r = check_ballot(ballot, projects, asks, pool, tiers)
         out.append({
             "name": name,
             "projects": [{**p, "goalUsd": str(p["goalUsd"])} for p in projects],
+            "asks": [str(a) for a in asks],
             "groupNames": names,
             "poolUsd": str(pool),
             "independentTiers": tiers,
@@ -81,7 +95,8 @@ def main():
             "proof": r["proof"],
             # Flat, numbers only: what the Solidity test reads with vm.parseJson*.
             "sol": {
-                "asks": [p["goalUsd"] for p in projects],
+                "goals": [p["goalUsd"] for p in projects],
+                "asks": asks,
                 "rfp": [p["rfp"] for p in projects],
                 "masks": [sum(1 << g for g in p["groups"]) for p in projects],
                 "groupCount": len(names),

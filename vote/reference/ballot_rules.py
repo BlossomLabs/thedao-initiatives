@@ -1,14 +1,16 @@
 """The ballot rules (docs/superpowers/specs/2026-11-11-ballot-rules-design.md).
 
-A valid ballot requests at least 1.5x the pool, and each enforced tier (S-Tier always,
+A valid ballot requests (in asks) at least 1.5x the pool, and each enforced tier (S-Tier always,
 A-Tier when the round says so) holds at least 3 pairwise-unrelated projects with no
-related group over half its funds. Related = sharing a group (an affiliation); RFPs have none.
+related group over half its asks. Related = sharing a group (an affiliation); RFPs have none.
 
 Ballots are in on-chain form: competition ranks, 255 = unplaced; a ballot shorter than
 the projects reads the missing ones as unplaced. Mirrors shared/vote/rules.ts and the
 contract; shared/vote/fixtures/ballot-rules.json keeps them equal.
 
 `projects[i]` = {"goalUsd": int, "rfp": bool, "groups": [int]}; amounts in micro-USD.
+`asks[i]`: what project i still asks for (goal less donations and open pledges); the size
+and group rules count asks, never goals.
 `independent_tiers`: bit 0 S-Tier, bit 1 A-Tier.
 """
 
@@ -60,7 +62,7 @@ def _independent(projects, tier):
     return None, count
 
 
-def check_ballot(ballot, projects, pool, independent_tiers):
+def check_ballot(ballot, projects, asks, pool, independent_tiers):
     if not _readable(ballot, len(projects)):
         return {"ok": False, "errors": [{"rule": "shape"}], "proof": []}
     errors = []
@@ -69,7 +71,7 @@ def check_ballot(ballot, projects, pool, independent_tiers):
         errors.append({"rule": "tiers"})
 
     def total(xs):
-        return sum(projects[i]["goalUsd"] for i in xs)
+        return sum(asks[i] for i in xs)
 
     requested = total([i for g in groups for i in g])
     if 2 * requested < 3 * pool:

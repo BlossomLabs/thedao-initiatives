@@ -3,6 +3,7 @@
   "specifiers": {
     "jsr:@hono/hono@^4.13.18": "4.13.18",
     "jsr:@std/assert@^1.0.19": "1.0.19",
+    "jsr:@std/cli@1.0.24": "1.0.24",
     "jsr:@std/cli@^1.0.32": "1.0.32",
     "jsr:@std/encoding@^1.0.11": "1.0.11",
     "jsr:@std/fmt@^1.0.10": "1.0.10",
@@ -41,7 +42,9 @@
     "npm:lucide-react@^1.72.0": "1.72.0_@types+react@19.3.0_react@19.3.1",
     "npm:motion@^14.14.0": "14.14.0_react@19.3.1_react-dom@19.3.1",
     "npm:ogl@^1.0.11": "1.0.11",
+    "npm:pdf-lib@1.17.1": "1.17.1",
     "npm:qrcode.react@4.2.0": "4.2.0_react@19.3.1",
+    "npm:qrcode@1.5.4": "1.5.4",
     "npm:react-dom@^19.3.1": "19.3.1_react@19.3.1",
     "npm:react-markdown@^10.1.0": "10.1.0_@types+react@19.3.0_react@19.3.1",
     "npm:react-router@^8.5.1": "8.5.1_@types+react@19.3.0_@types+react-dom@19.3.0_react@19.3.1_react-dom@19.3.1",
@@ -70,6 +73,9 @@
         "jsr:@std/internal@^1.0.12"
       ]
     },
+    "@std/cli@1.0.24": {
+      "integrity": "b655a5beb26aa94f98add6bc8889f5fb9bc3ee2cc3fc954e151201f4c4200a5e"
+    },
     "@std/cli@1.0.32": {
       "integrity": "188b3a100d6202d64e3f5bd3d799c7fa4f6d77f92cc65eb7f641c1fa0aa92a66"
     },
@@ -88,7 +94,7 @@
     "@std/http@1.1.4": {
       "integrity": "4f1575226ca7c0df1df38b26d50265fed30869b2a63ab867edc5b92492150c8c",
       "dependencies": [
-        "jsr:@std/cli",
+        "jsr:@std/cli@^1.0.32",
         "jsr:@std/encoding",
         "jsr:@std/fmt",
         "jsr:@std/fs",
@@ -550,6 +556,18 @@
     "@oxc-project/types@0.156.0": {
       "integrity": "sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw=="
     },
+    "@pdf-lib/standard-fonts@1.0.0": {
+      "integrity": "sha512-hU30BK9IUN/su0Mn9VdlVKsWBS6GyhVfqjwl1FjZN4TxP6cCw0jP2w7V3Hf5uX7M0AZJ16vey9yE0ny7Sa59ZA==",
+      "dependencies": [
+        "pako"
+      ]
+    },
+    "@pdf-lib/upng@1.0.1": {
+      "integrity": "sha512-dQK2FUMQtowVP00mtIksrlZhdFXQZPC+taih1q4CvPZ5vqdxR/LKBaFg0oAfzd1GlHZXXSPdQfzQnt+ViGvEIQ==",
+      "dependencies": [
+        "pako"
+      ]
+    },
     "@phosphor-icons/webcomponents@2.1.5": {
       "integrity": "sha512-JcvQkZxvcX2jK+QCclm8+e8HXqtdFW9xV4/kk2aL9Y3dJA2oQVt+pzbv1orkumz3rfx4K9mn9fDoMr1He1yr7Q==",
       "dependencies": [
@@ -648,7 +666,7 @@
         "mipd",
         "ofetch",
         "pino-pretty",
-        "qrcode",
+        "qrcode@1.5.4",
         "react",
         "react-device-detect",
         "react-dom",
@@ -808,7 +826,7 @@
         "@reown/appkit-controllers",
         "@reown/appkit-wallet",
         "lit",
-        "qrcode"
+        "qrcode@1.5.3"
       ]
     },
     "@reown/appkit-utils@1.8.19_valtio@2.1.7_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76": {
@@ -4404,6 +4422,9 @@
     "p-try@2.2.0": {
       "integrity": "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
     },
+    "pako@1.0.11": {
+      "integrity": "sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw=="
+    },
     "parse-entities@4.0.2": {
       "integrity": "sha512-GG2AQYWoLgL877gQIKeRPGO1xF9+eG1ujIb5soS5gPvLQ1y2o8FL90w2QWNdf9I361Mpp7726c+lj3U0qK1uGw==",
       "dependencies": [
@@ -4433,6 +4454,15 @@
     },
     "pathe@2.0.3": {
       "integrity": "sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w=="
+    },
+    "pdf-lib@1.17.1": {
+      "integrity": "sha512-V/mpyJAoTsN4cnP31vc0wfNA1+p20evqqnap0KLoRUN0Yk/p3wN52DOEsL4oBFcLdb76hlpKPtzJIgo67j/XLw==",
+      "dependencies": [
+        "@pdf-lib/standard-fonts",
+        "@pdf-lib/upng",
+        "pako",
+        "tslib@1.14.1"
+      ]
     },
     "picocolors@1.1.1": {
       "integrity": "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
@@ -4562,6 +4592,15 @@
       "dependencies": [
         "dijkstrajs",
         "encode-utf8",
+        "pngjs",
+        "yargs"
+      ],
+      "bin": true
+    },
+    "qrcode@1.5.4": {
+      "integrity": "sha512-1ca71Zgiu6ORjHqFBDpnSMTR2ReToX4l1Au1VFLyVeBTFavzQnv5JxMFr3ukHVKpSrSA2MCk0lNJSykjUfz7Zg==",
+      "dependencies": [
+        "dijkstrajs",
         "pngjs",
         "yargs"
       ],

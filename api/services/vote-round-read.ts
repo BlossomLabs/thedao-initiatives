@@ -1,4 +1,7 @@
 import {
+  BaseError,
+  ContractFunctionRevertedError,
+  ContractFunctionZeroDataError,
   createPublicClient,
   erc20Abi,
   getAddress,
@@ -9,16 +12,26 @@ import {
 } from "viem";
 import { sepolia } from "viem/chains";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
-import type { RoundOnChain } from "../../shared/vote/round-from-chain.ts";
+import { type RoundOnChain, RoundReadError } from "../../shared/vote/round-from-chain.ts";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
+
+const isRevert = (e: unknown) =>
+  e instanceof BaseError &&
+  Boolean(
+    e.walk((x) =>
+      x instanceof ContractFunctionRevertedError || x instanceof ContractFunctionZeroDataError
+    ),
+  );
 
 /** The block a contract was deployed in: the first with its code (needs an archive node). */
 export async function deployBlockOf(pub: PublicClient, address: `0x${string}`): Promise<number> {
   const head = Number(await pub.getBlockNumber());
   const has = async (n: number) =>
     ((await pub.getCode({ address, blockNumber: BigInt(n) })) ?? "0x") !== "0x";
-  if (!(await has(head))) throw new Error("There's no contract at that address on Sepolia.");
+  if (!(await has(head))) {
+    throw new RoundReadError("There's no contract at that address on Sepolia.");
+  }
   let lo = 0, hi = head;
   while (lo < hi) {
     const mid = Math.floor((lo + hi) / 2);
@@ -43,18 +56,19 @@ export async function readRoundOnChain(
   const c = { address: getAddress(address), abi: SIGNED_BALLOTS_ABI } as const;
   const one = <T>(functionName: string, args: unknown[] = []) =>
     pub.readContract({ ...c, functionName, args } as never) as Promise<T>;
+  /** A revert (or no code to answer) means the contract isn't one; a node that can't be
+   * reached is thrown as it is. */
+  const unless = (message: string) => (e: unknown): never => {
+    throw isRevert(e) ? new RoundReadError(message) : e;
+  };
   const counts = await Promise.all([
     one<bigint>("initiativeCount"),
     one<bigint>("currencyCount"),
-  ]).catch(() => {
-    throw new Error("That address isn't a vote round on Sepolia.");
-  });
+  ]).catch(unless("That address isn't a vote round on Sepolia."));
   // Rounds from before the ballot rules have no affiliations (groups) to read.
-  const nGroups = await one<bigint>("groupCount").catch(() => {
-    throw new Error(
-      "That round was deployed before the ballot rules: deploy a new one with vote-deploy.",
-    );
-  });
+  const nGroups = await one<bigint>("groupCount").catch(
+    unless("That round was deployed before the ballot rules: deploy a new one with vote-deploy."),
+  );
   const [nI, nC] = counts.map(Number);
   const nG = Number(nGroups);
   const range = (n: number) => Array.from({ length: n }, (_, i) => BigInt(i));

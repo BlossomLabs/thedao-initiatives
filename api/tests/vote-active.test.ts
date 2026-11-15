@@ -4,6 +4,7 @@ import { createActiveVote, type VoteRoundSetting } from "../services/vote-active
 import type { VoteRound } from "../services/vote-chain.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import { ADMIN, harness, j, PLAIN } from "./app-helpers.ts";
+import { SESSION_REAUTH_SECS } from "../config.ts";
 
 const manifest = (contract: `0x${string}`): VoteManifest => ({
   kind: "test",
@@ -85,5 +86,41 @@ Deno.test("admin vote round: the pool note is admins' only, checked, and can be 
     json: { contract: "nope", issuer: TEST.issuer },
   });
   assertEquals(test.status, 400);
+  h.close();
+});
+
+Deno.test("admin vote round: changes need a recent sign-in", async () => {
+  const h = await harness();
+  const stale = await h.mint(ADMIN, true);
+  h.clock.now += SESSION_REAUTH_SECS;
+  for (
+    const [method, path, json] of [
+      ["POST", "/api/admin/vote-round/pool", { eth: 400, sold: false }],
+      ["POST", "/api/admin/vote-round/test", { contract: TEST.contract, issuer: TEST.issuer }],
+      ["DELETE", "/api/admin/vote-round/test", {}],
+    ] as const
+  ) {
+    const res = await h.req(path, { method, token: stale, json });
+    assertEquals(res.status, 403, `${method} ${path}`);
+    assertEquals(((await j(res)) as { reauthenticate?: boolean }).reauthenticate, true);
+  }
+  h.close();
+});
+
+Deno.test("admin vote round: a failed chain read doesn't show the RPC's URL", async () => {
+  const secret = "http://127.0.0.1:9/sepolia/v3/SECRET-KEY";
+  const h = await harness({ env: { SEPOLIA_RPC_URL: secret } });
+  const logs: string[] = [];
+  const log = h.deps.log;
+  h.deps.log = (m) => (logs.push(m), log(m));
+  const admin = await h.mint(ADMIN, true);
+  const res = await h.req("/api/admin/vote-round/test", {
+    method: "POST",
+    token: admin,
+    json: { contract: TEST.contract, issuer: TEST.issuer },
+  });
+  const text = await res.text();
+  assertEquals(res.status, 502);
+  assert(!text.includes("SECRET-KEY"), text);
   h.close();
 });

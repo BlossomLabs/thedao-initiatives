@@ -2,6 +2,15 @@ import { getAddress, keccak256, slice, toBytes } from "viem";
 import { SEPOLIA_CHAIN_ID, type VoteManifest } from "./manifest.ts";
 import type { Schedule } from "./quiet-ending.ts";
 
+/** A round that can't be run as read, said in words an admin can act on (safe to show:
+ * no RPC detail). Anything else a read throws is not. */
+export class RoundReadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RoundReadError";
+  }
+}
+
 /** How long a tier can run: its windows, each half the one before. */
 export const tierSpan = (s: { initialWindow: number; maxWindows: number }) =>
   Array.from({ length: s.maxWindows }, (_, k) => s.initialWindow >> k).reduce((a, b) => a + b, 0);
@@ -58,11 +67,13 @@ export function manifestFromChain(
     else slugs.push(slug);
   }
   if (missing.length) {
-    throw new Error(`No initiative on the board has the account of ${missing.join(", ")}.`);
+    throw new RoundReadError(
+      `No initiative on the board has the account of ${missing.join(", ")}.`,
+    );
   }
   const twice = slugs.filter((s, i) => slugs.indexOf(s) !== i);
-  if (twice.length) throw new Error(`${twice[0]} is in the round twice.`);
-  if (!c.initiatives.length) throw new Error("The round has no initiatives yet.");
+  if (twice.length) throw new RoundReadError(`${twice[0]} is in the round twice.`);
+  if (!c.initiatives.length) throw new RoundReadError("The round has no initiatives yet.");
   const s = c.schedule;
   return {
     kind: "test",

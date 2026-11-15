@@ -42,7 +42,11 @@ import { pledgeChainId, pledgeTypedData } from "../../shared/vote/typed-data.ts"
 import { newId } from "../lib/ids.ts";
 import { currentVote, VOTE_ROUND_KEY, type VoteRoundSetting } from "../services/vote-active.ts";
 import { readRoundOnChain } from "../services/vote-round-read.ts";
-import { manifestFromChain, slugsByAccount } from "../../shared/vote/round-from-chain.ts";
+import {
+  manifestFromChain,
+  RoundReadError,
+  slugsByAccount,
+} from "../../shared/vote/round-from-chain.ts";
 import {
   BUILT_ROUND,
   checkManifest,
@@ -136,7 +140,11 @@ export function adminRoutes(deps: Deps) {
   r.get("/vote-round", async (c) => c.json(await roundJson()));
   /** Reads the contract (Sepolia) and runs the site on it; again to refresh it after
    * projects or affiliations change on-chain. */
-  r.post("/vote-round/test", async (c) => {
+  r.post("/vote-round/test", requireRecentAuth(deps.now), async (c) => {
+    // A test round would take the real vote off the site: never while one is built in.
+    if (roundDeployed(BUILT_ROUND) && BUILT_ROUND.kind === "real") {
+      throw new HttpError(409, "The site runs the real vote: a test round can't replace it.");
+    }
     const body = await jsonBody(c, ["contract", "issuer"]);
     const contract = s(body.contract, 60).trim();
     const issuer = s(body.issuer, 60).trim();
@@ -159,7 +167,10 @@ export function adminRoutes(deps: Deps) {
         );
       }
     } catch (e) {
-      throw new HttpError(400, e instanceof Error ? e.message : String(e));
+      if (e instanceof RoundReadError) throw new HttpError(400, e.message);
+      // RPC errors can carry the node's URL (and its key): logged, never shown.
+      deps.log(`vote round read ${contract}: ${e instanceof Error ? e.message : String(e)}`);
+      throw new HttpError(502, "Couldn't read the round from Sepolia. Try again.");
     }
     await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => ({
       ...(cur ?? {}),
@@ -169,7 +180,7 @@ export function adminRoutes(deps: Deps) {
     return c.json({ ...(await roundJson()), warnings });
   });
   /** Back to the round built into the site. */
-  r.delete("/vote-round/test", async (c) => {
+  r.delete("/vote-round/test", requireRecentAuth(deps.now), async (c) => {
     await jsonBody(c, []);
     await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => {
       const { test: _, ...rest } = cur ?? {};
@@ -179,7 +190,7 @@ export function adminRoutes(deps: Deps) {
     return c.json(await roundJson());
   });
   /** The pool's ETH (null: say nothing) and whether it's been sold for USD yet. */
-  r.post("/vote-round/pool", async (c) => {
+  r.post("/vote-round/pool", requireRecentAuth(deps.now), async (c) => {
     const body = await jsonBody(c, ["eth", "sold"]);
     const eth = body.eth === null ? null : Number(body.eth);
     if (eth !== null && !(Number.isFinite(eth) && eth > 0 && eth < 1e7)) {

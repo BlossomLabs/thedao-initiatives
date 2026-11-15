@@ -1,6 +1,7 @@
 # Asks from the chain in the quiet ending
 
-Design, Nov 12, 2026. Status: waiting for approval.
+Design, Nov 12, 2026. Status: approved Nov 15, 2026 (the owner asked to build it, adapted to
+the Nov 15 ballot-rules work; see "Adapted Nov 15" at the end).
 
 ## Why
 
@@ -257,3 +258,39 @@ gap can settle the tier without the project. Goes in
 - The shape of the asks history passed to `replay()`.
 - How admin wallet addresses reach the deploy (the site's existing admin list).
 - Wording and placement of the "covered" label.
+
+## Adapted Nov 15
+
+The owner asked to build this design on top of `2026-11-15-ballot-rules-on-asks-design.md`
+and to make the round **easy to replay**. What changes from the text above:
+
+1. **The ask at a block is the contract's own view.** Since Nov 15, `initiativeUsd(i)` never
+   reverts and applies the vote's price rule (latest answer, no age limit, last good price on
+   failure, a reverting `balanceOf` = $0). So a replayer reads `initiativeUsd(i).askUsd` and
+   `poolUsd()` with an `eth_call` at block `b` on an archive node; nobody re-implements the
+   arithmetic. *(My call.)* The Nov 12 plan's TypeScript ask arithmetic (`shared/vote/asks.ts`)
+   is dropped. Names: the per-initiative amount is `goalUsd`, the remaining one `askUsd`.
+2. **One replayer, used by everyone.** The code that reads chain states and replays the round
+   lives in `shared/` behind a small read interface, so the site's server and a standalone
+   script (`scripts/vote-replay.ts`: an archive RPC URL in, the round's results out, no site
+   database, no secrets) run the same function. A test pins that both give the same result.
+   `vote/README.md` says how to run it. *(My call.)*
+3. **The transcript check stays in front.** The replayer first checks the ballots it counts
+   against the contract's `transcript`, `recordCount` and `ballotHashOf` (Nov 15), then reads
+   the states.
+4. **The size minimum is min(1.5× pool, Σ every project's ask)** *(owner's decision, Nov 15,
+   option B)*. Donations can push the sum of all asks below 1.5× the pool; without this, no
+   ballot could pass. The contract checks it when the placed asks fall short, so a normal
+   ballot pays no extra gas. This is a contract change beyond `setPledgeBySig`, decided by the
+   owner; the rules module, the Python reference, the fixtures and the page follow it.
+5. **Currencies come from `vote/config/mainnet.json`** (today ETH with its Chainlink feed, USDC
+   at $1, EURC with its feed), registered with the Nov 15 `registerCurrency(asset, usdFeed)`.
+   No `maxPriceAge`. *(My call: the config file is the list; the text above names DAI only as
+   an example.)*
+6. **Admins are the site's `adminAddresses`** (`api/config.ts`), so the deploy grants
+   `PLEDGE_ROLE` to those wallets.
+7. **Native ETH changes are found by reading the accounts' balances block by block** across
+   each open window (one multicall per block, cached once final). Any archive node can do it;
+   traces are not needed. *(My call.)*
+8. First on the branch: the parked Nov 15 test gap (`vote/test/HostileReads.t.sol` must fail
+   if the bounded copy is undone).

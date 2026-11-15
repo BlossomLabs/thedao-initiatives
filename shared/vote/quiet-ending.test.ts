@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chainTally } from "./chain";
-import { type Receipt, replay, type Schedule, windowEnds } from "./quiet-ending";
+import { type ChainState, type Receipt, replay, type Schedule, windowEnds } from "./quiet-ending";
 
 const T = 10_000;
 const W = 3600;
@@ -11,23 +11,29 @@ const schedule: Schedule = {
   maxWindows: 3,
 };
 const X = 255;
-let block = 0;
-const r = (
-  tokenId: string,
-  timestamp: number,
-  ballot: number[] | null,
-  sameBlock = false,
-): Receipt => ({
+/** One block a second: a receipt's block is its timestamp. */
+const r = (tokenId: string, timestamp: number, ballot: number[] | null): Receipt => ({
   tokenId,
   nonce: 0,
   ballot: ballot && Uint8Array.from(ballot),
-  block: sameBlock ? block : ++block,
+  block: timestamp,
   timestamp,
 });
+/** The asks and pool from block `at` on; `event` when the block holds a donation, a
+ * pledge or a pool change. */
+const at = (time: number, asks: bigint[], poolUsd: bigint, event = true): ChainState => ({
+  block: time,
+  timestamp: time,
+  asks,
+  poolUsd,
+  event,
+});
+/** One state for the whole round, as at block 0. */
+const flat = (needs: bigint[], poolUsd: bigint): ChainState[] => [at(0, needs, poolUsd, false)];
 /** Two voters, pool 200 (100 each), two proposals needing 150: both on 0 funds it. */
 const base = () => [r("a", 1, [1, X]), r("b", 2, [1, X])];
 const run = (receipts: Receipt[], now: number, extra: Partial<Parameters<typeof replay>[0]> = {}) =>
-  replay({ schedule, m: 2, poolUsd: 200n, needs: [150n, 150n], receipts, ...extra }, now);
+  replay({ schedule, m: 2, states: flat([150n, 150n], 200n), receipts, ...extra }, now);
 
 describe("quiet-ending replay", () => {
   it("window ends halve from the tier's first tally", () => {
@@ -73,7 +79,7 @@ describe("quiet-ending replay", () => {
   });
 
   it("two changes in one block make one tally: back to the same result stays quiet", () => {
-    const s = run([...base(), r("b", T + 100, [X, 1]), r("b", T + 100, [1, X], true)], T + 3600);
+    const s = run([...base(), r("b", T + 100, [X, 1]), r("b", T + 100, [1, X])], T + 3600);
     expect(s.tiers[0]).toMatchObject({ status: "settled", funded: [0] });
   });
 
@@ -132,8 +138,7 @@ describe("quiet-ending replay", () => {
     const s = replay({
       schedule,
       m: 1,
-      poolUsd: 301n,
-      needs: [301n],
+      states: flat([301n], 301n),
       receipts: [r("a", 1, [1]), r("b", 2, [1])],
     }, T - 1);
     expect(s.live.order).toEqual([]);
@@ -160,15 +165,15 @@ describe("quiet-ending replay", () => {
       funded: [1],
       awards: new Map([[1, 99n]]),
       shares: new Map([[1, new Map([["a", 99n]])]]),
+      covered: [],
     };
     const s = run(base(), T + 3600, { snapshots: [snapshot] });
     expect(s.tiers[0]).toMatchObject({ status: "settled", funded: [1] });
   });
 
-  it("a settled tier uses the needs it settled with, not today's", () => {
-    const s = run(base(), T + 3600, {
-      needs: [10n, 10n],
-      settleNeeds: { S: { at: T + 3600, forced: false, needs: [150n, 150n] } },
+  it("a settled tier uses the asks at its cutoff, not later ones", () => {
+    const s = run(base(), T + 3800, {
+      states: [...flat([150n, 150n], 200n), at(T + 3700, [10n, 10n], 200n)],
     });
     expect(s.tiers[0].status === "settled" && s.tiers[0].awards.get(0)).toBe(150n);
   });
@@ -182,6 +187,7 @@ describe("quiet-ending replay", () => {
       funded: [0],
       awards: new Map([[0, 150n]]),
       shares: new Map([[0, new Map([["a", 75n], ["b", 75n]])]]),
+      covered: [],
     };
     const s = run(
       [...base(), r("b", T + 100, [X, 1]), r("a", T + 3700, [X, 1])],
@@ -213,6 +219,7 @@ describe("quiet-ending replay", () => {
       funded: [1],
       awards: new Map([[1, 99n]]),
       shares: new Map([[1, new Map([["a", 99n]])]]),
+      covered: [],
     };
     const st = run(base(), T + 3600, { snapshots: [snapshot] });
     const i = st.settleInputs[0]!;
@@ -220,26 +227,6 @@ describe("quiet-ending replay", () => {
     expect(i.voters).toEqual(["a", "b"]);
     expect(i.spent).toBe(0n);
     expect(i.costs).toEqual([150n, 150n]);
-  });
-
-  it("kept settle needs pin the time once final", () => {
-    const s = run(
-      [...base(), r("b", T + 100, [X, 1]), r("a", T + 3700, [X, 1])],
-      T + 3800,
-      { settleNeeds: { S: { at: T + 3600, forced: false, needs: [150n, 150n], final: true } } },
-    );
-    expect(s.tiers[0]).toMatchObject({ status: "settled", at: T + 3600 });
-    expect(s.rejected.map((x) => x.tokenId)).toEqual(["a"]);
-  });
-
-  it("before final, a late ballot still re-judges the window, but with the kept needs", () => {
-    const kept = { at: T + 3600, forced: false, needs: [150n, 150n], final: false };
-    // A ballot the RPC returned late changes S in window 1: S isn't settled after all.
-    const late = run([...base(), r("b", T + 100, [X, 1])], T + 3700, { settleNeeds: { S: kept } });
-    expect(late.tiers[0]).toMatchObject({ status: "settling", window: 2 });
-    // Today's needs would make nothing fundable; the kept ones still settle S on 0.
-    const donated = run(base(), T + 3700, { needs: [400n, 400n], settleNeeds: { S: kept } });
-    expect(donated.tiers[0]).toMatchObject({ status: "settled", funded: [0] });
   });
 
   it("once B settles, the round is closed", () => {
@@ -253,7 +240,7 @@ describe("quiet-ending replay", () => {
     // Both voters also back proposal 1 (needing 40) next, so A has one to fund.
     const both = () => [r("a", 1, [1, 2]), r("b", 2, [1, 2])];
     const check = (now: number) => {
-      const st = run(both(), now, { needs: [150n, 40n] });
+      const st = run(both(), now, { states: flat([150n, 40n], 200n) });
       const again = () => chainTally(st.liveInputs!, st.firstOpen);
       const stages = again();
       const tiers = new Map(
@@ -272,9 +259,186 @@ describe("quiet-ending replay", () => {
   });
 });
 
+describe("chain states in the replay", () => {
+  // The design's example: S-Tier funds [3, 2]; lower project 0 to 40 and it funds [3, 0].
+  // Its ballots [2,2,3,1] and [1,2,1,2] as the chain records them (competition ranks).
+  const asks = [62n, 12n, 42n, 32n];
+  const ballots = () => [r("a", 1, [2, 2, 4, 1]), r("b", 2, [1, 3, 1, 3])];
+  const run4 = (
+    states: ChainState[],
+    now: number,
+    extra: Partial<Parameters<typeof replay>[0]> = {},
+  ) => replay({ schedule, m: 4, states, receipts: ballots(), ...extra }, now);
+  const settled = (s: ReturnType<typeof replay>, t: number) => {
+    const x = s.tiers[t];
+    if (x.status !== "settled") throw new Error(`tier ${t} is ${x.status}`);
+    return x;
+  };
+
+  it("a donation inside the S-Tier window is a tally event and extends it", () => {
+    const quiet = run4(flat(asks, 152n), T + 3600);
+    expect(settled(quiet, 0)).toMatchObject({ at: T + 3600, funded: [3, 2] });
+    const donated = [...flat(asks, 152n), at(T + 50, [40n, 12n, 42n, 32n], 152n)];
+    expect(run4(donated, T + 3600).tiers[0])
+      .toMatchObject({ status: "settling", window: 2, windowEndsAt: T + 5400 });
+    expect(settled(run4(donated, T + 5400), 0)).toMatchObject({ at: T + 5400, funded: [3, 0] });
+  });
+
+  it("the same donation after S-Tier settled changes nothing", () => {
+    const donated = [...flat(asks, 152n), at(T + 3700, [40n, 12n, 42n, 32n], 152n)];
+    const s = run4(donated, T + 3800);
+    expect(settled(s, 0)).toMatchObject({ at: T + 3600, funded: [3, 2] });
+    expect(settled(s, 0).awards).toEqual(settled(run4(flat(asks, 152n), T + 3800), 0).awards);
+  });
+
+  it("a tally uses the pool at its own block", () => {
+    // Halving the pool leaves 50 a badge: nothing at 150 fits, so S-Tier changed.
+    const s = run(base(), T + 3600, {
+      states: [...flat([150n, 150n], 200n), at(T + 50, [150n, 150n], 100n)],
+    });
+    expect(s.tiers[0]).toMatchObject({ status: "settling", window: 2, funded: [] });
+    expect(s.share).toBe(50n);
+    // Doubled instead: each badge pays half as much of its share, and S-Tier still funds 0.
+    const more = run(base(), T + 3600, {
+      states: [...flat([150n, 150n], 200n), at(T + 50, [150n, 150n], 400n)],
+    });
+    expect(settled(more, 0)).toMatchObject({ funded: [0] });
+    expect(more.settleInputs[0]!.poolUsd).toBe(400n);
+  });
+
+  it("a covered project is not funded and is recorded as covered", () => {
+    const s = replay({
+      schedule,
+      m: 3,
+      states: flat([100n, 100n, 0n], 300n),
+      receipts: [r("a", 1, [1, 2, X]), r("b", 2, [1, 2, X])],
+    }, T + 20_000);
+    expect(s.closed).toBe(true);
+    expect([0, 1, 2].map((t) => settled(s, t).covered)).toEqual([[2], [], []]);
+    expect([0, 1, 2].flatMap((t) => settled(s, t).funded)).not.toContain(2);
+  });
+
+  it("crossing $0 alone does not extend the window", () => {
+    // 1 is funded at 5 and covered at 0; nothing else moves.
+    const states = [...flat([100n, 5n], 200n), at(T + 50, [100n, 0n], 200n)];
+    const both = () => [r("a", 1, [1, 1]), r("b", 2, [1, 1])];
+    const during = replay({ schedule, m: 2, states, receipts: both() }, T + 100);
+    expect(during.tiers[0]).toMatchObject({
+      status: "settling",
+      quiet: true,
+      funded: [0],
+      covered: [1],
+    });
+    expect(during.live.covered).toEqual([1]);
+    const s = replay({ schedule, m: 2, states, receipts: both() }, T + 3600);
+    expect(settled(s, 0)).toMatchObject({ at: T + 3600, funded: [0], covered: [1] });
+  });
+
+  it("covering a funded project extends the window only if it frees money for another", () => {
+    const both = (m: number) => [r("a", 1, Array(m).fill(1)), r("b", 2, Array(m).fill(1))];
+    // 1 is funded already: covering 0 frees nothing.
+    const none = replay({
+      schedule,
+      m: 2,
+      states: [...flat([130n, 90n], 200n), at(T + 50, [0n, 90n], 200n)],
+      receipts: both(2),
+    }, T + 3600);
+    expect(settled(none, 0)).toMatchObject({ at: T + 3600, funded: [1], covered: [0] });
+    // Covering 0, funded, frees the money that brings 1 in.
+    const frees = (now: number) =>
+      replay({
+        schedule,
+        m: 4,
+        states: [...flat([90n, 90n, 60n, 50n], 200n), at(T + 50, [0n, 90n, 60n, 50n], 200n)],
+        receipts: both(4),
+      }, now);
+    expect(frees(T + 3600).tiers[0]).toMatchObject({ status: "settling", window: 2 });
+    expect(settled(frees(T + 5400), 0)).toMatchObject({ funded: [3, 2, 1], covered: [0] });
+  });
+
+  it("a project covered at settlement never returns", () => {
+    // 1 is covered when S-Tier settles; its ask is back before A-Tier, but that is final.
+    const s = replay({
+      schedule,
+      m: 4,
+      states: [...flat([60n, 0n, 60n, 60n], 200n), at(T + 4000, [60n, 10n, 60n, 60n], 200n)],
+      receipts: [r("a", 1, [1, 1, 3, X]), r("b", 2, [1, 1, 3, X])],
+    }, T + 20_000);
+    expect(settled(s, 0)).toMatchObject({ funded: [0], covered: [1] });
+    expect([0, 1, 2].flatMap((t) => settled(s, t).funded)).not.toContain(1);
+    expect([0, 1, 2].flatMap((t) => settled(s, t).covered)).toEqual([1]);
+  });
+
+  it("a funded project whose ask is later covered keeps its award", () => {
+    const s = replay({
+      schedule,
+      m: 4,
+      states: [...flat([60n, 0n, 60n, 60n], 200n), at(T + 4000, [0n, 0n, 60n, 60n], 200n)],
+      receipts: [r("a", 1, [1, 1, 3, X]), r("b", 2, [1, 1, 3, X])],
+    }, T + 20_000);
+    expect([...settled(s, 0).shares.get(0)!]).toEqual([["a", 30n], ["b", 30n]]);
+    expect([0, 1, 2].flatMap((t) => settled(s, t).covered)).toEqual([1]);
+  });
+
+  it("a project covered mid-window but not at the cutoff is an ordinary candidate", () => {
+    const s = run(base(), T + 3600, {
+      states: [
+        ...flat([150n, 150n], 200n),
+        at(T + 50, [0n, 150n], 200n),
+        at(T + 100, [150n, 150n], 200n),
+      ],
+    });
+    expect(settled(s, 0)).toMatchObject({ at: T + 3600, funded: [0], covered: [] });
+  });
+
+  it("a project missing from an early state is not a candidate there", () => {
+    // Project 2 joins at T−100 (asks 40); before, the state has two asks.
+    const states = [...flat([150n, 150n], 200n), at(T - 100, [150n, 150n, 40n], 200n, false)];
+    const go = (st: ChainState[], now: number) =>
+      replay(
+        { schedule, m: 3, states: st, receipts: [r("a", 1, [1, X, 1]), r("b", 2, [1, X, 1])] },
+        now,
+      );
+    expect(go(states, T - 200).live).toMatchObject({ order: [0], covered: [] });
+    expect(go(states, T - 1).live.order).toContain(2);
+    // Missing at the cutoff: not funded and not covered either.
+    expect(settled(go(flat([150n, 150n], 200n), T + 3600), 0)).toMatchObject({
+      funded: [0],
+      covered: [],
+    });
+  });
+
+  it("a receipt's tally uses the asks at its block; a state that is no event is no tally", () => {
+    // For ten blocks project 0 asks 250, out of reach; no ask event is recorded there.
+    const states = [
+      ...flat([150n, 150n], 200n),
+      at(T + 50, [250n, 150n], 200n, false),
+      at(T + 60, [150n, 150n], 200n, false),
+    ];
+    expect(settled(run(base(), T + 3600, { states }), 0)).toMatchObject({ at: T + 3600 });
+    // b sends the same ballot again in that block: its tally funds nothing.
+    const s = run([...base(), r("b", T + 50, [1, X])], T + 3600, { states });
+    expect(s.tiers[0]).toMatchObject({ status: "settling", window: 2 });
+  });
+
+  it("is the same with and without snapshots", () => {
+    const donated = [...flat(asks, 152n), at(T + 50, [40n, 12n, 42n, 32n], 152n)];
+    for (const now of [T + 5400, T + 9000, T + 20_000]) {
+      const fresh = run4(donated, now);
+      const snapshots = fresh.tiers.flatMap((x) => x.status === "settled" ? [x] : []);
+      expect(run4(donated, now, { snapshots })).toEqual(fresh);
+    }
+  });
+
+  it("throws without a chain state before the first tally", () => {
+    expect(() => run(base(), T + 3600, { states: [at(T + 10, [150n, 150n], 200n)] }))
+      .toThrow("no chain state");
+  });
+});
+
 describe("ballot shape in the replay", () => {
   const run4 = (receipts: Receipt[]) =>
-    replay({ schedule, m: 4, poolUsd: 200n, needs: [150n, 150n, 150n, 150n], receipts }, T - 1);
+    replay({ schedule, m: 4, states: flat([150n, 150n, 150n, 150n], 200n), receipts }, T - 1);
 
   it("a ballot the replay can't read is refused; the earlier one still counts", () => {
     const s = run4([r("a", 1, [1, 1, 1, X]), r("a", 2, [1, 3, X, X])]);

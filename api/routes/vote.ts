@@ -20,6 +20,7 @@ import {
 } from "../../shared/vote/next-tier.ts";
 import type { ChainInputs } from "../../shared/vote/chain.ts";
 import {
+  type ChainState,
   type Receipt,
   refusal,
   replay,
@@ -120,9 +121,11 @@ const uint = (v: unknown): bigint | null => {
   return BigInt(v);
 };
 
-type StoredSettled = Omit<Settled, "awards" | "shares"> & {
+type StoredSettled = Omit<Settled, "awards" | "shares" | "covered"> & {
   awards: [number, string][];
   shares: [number, [string, string][]][];
+  /** Absent from settlements stored before covered projects. */
+  covered?: number[];
 };
 const storeSettled = (x: Settled): StoredSettled => ({
   ...x,
@@ -131,6 +134,7 @@ const storeSettled = (x: Settled): StoredSettled => ({
 });
 const loadSettled = (x: StoredSettled): Settled => ({
   ...x,
+  covered: x.covered ?? [],
   awards: new Map(x.awards.map(([c, v]) => [c, BigInt(v)])),
   shares: new Map(x.shares.map(([c, m]) => [c, new Map(m.map(([t, v]) => [t, BigInt(v)]))])),
 });
@@ -347,14 +351,6 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     const kept = await Promise.all(
       tiers.map((t) => kv.get<Kept>([...round(d), "settle-needs", t])),
     );
-    const settleNeeds = Object.fromEntries(
-      tiers.flatMap((t, i) => {
-        const k = kept[i].value;
-        if (!k) return [];
-        const final = deps.now() >= k.at + FINAL_AFTER_SECS;
-        return [[t, { at: k.at, forced: k.forced, needs: k.needs.map(BigInt), final }]];
-      }),
-    );
     // Every round shows the chain's asks; started now, it runs alongside the reads below.
     const asksRead = readAsks(d);
     const needs = await needsOf(d);
@@ -409,14 +405,29 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
     }
     const poolUsd = history?.pool.at(-1)?.poolUsd ?? BigInt(m.poolUsd);
     const asks = await asksRead;
+    // Until the chain's asks reach the replay: the needs as chain states, each tier seen
+    // settled keeping the needs it settled with up to its cutoff, today's after the last.
+    const blockAt = (time: number) =>
+      receipts.find((r) => r.timestamp >= time)?.block ?? (receipts.at(-1)?.block ?? 0) + 1;
+    const states: ChainState[] = [];
+    let from = 0;
+    for (const k of [...kept.map((x) => x.value), null]) {
+      states.push({
+        block: from ? blockAt(from) : 0,
+        timestamp: from,
+        asks: k ? k.needs.map(BigInt) : needs,
+        poolUsd: BigInt(m.poolUsd),
+        event: false,
+      });
+      if (!k) break;
+      from = k.at;
+    }
     const st = replay({
       schedule: m.schedule,
       m: m.slugs.length,
-      poolUsd: BigInt(m.poolUsd),
-      needs,
+      states,
       receipts,
       snapshots,
-      settleNeeds,
     }, deps.now());
     for (const [i, t] of st.tiers.entries()) {
       const k = kept[i].value;

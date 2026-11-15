@@ -133,9 +133,10 @@ function withGift(inp: ChainInputs, c: number, given: bigint): ChainInputs {
 }
 
 /** The donation search for one initiative: the least $1K step that, given to it, gets it
- * funded in tier `target` or higher if the open tiers (from `first`) settled now. Its
- * whole need is the most anyone can give it; when even that doesn't get it there, the gap
- * is null. The knock-on, over every open tier: who comes in, drops out or moves. */
+ * funded in tier `target` or higher if the open tiers (from `first`) settled now. The
+ * last step short of its whole need is the most anyone can give it (given all of it, it is
+ * covered, in no tier); when even that doesn't get it there, the gap is null. The
+ * knock-on, over every open tier: who comes in, drops out or moves. */
 function* giftSearch(
   inp: ChainInputs,
   first: number,
@@ -152,11 +153,11 @@ function* giftSearch(
     dropsOut: [],
     moves: [],
   };
-  const need = (inp.costs[c] + step - 1n) / step;
-  if (need < 1n) return entry;
+  const most = (inp.costs[c] - 1n) / step;
+  if (most < 1n) return entry;
   const run = (k: bigint) => tiersOf(tally, withGift(inp, c, k * step), first);
   const reaches = (r: Map<number, number>) => r.has(c) && r.get(c)! <= target;
-  let hi = need, after = run(need);
+  let hi = most, after = run(most);
   yield;
   if (!reaches(after)) return entry;
   // As in gapSearch, reaching is not assumed monotone: only a step whose run reached is kept.

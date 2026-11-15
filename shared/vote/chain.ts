@@ -4,14 +4,14 @@ import { stageBound, stageTally } from "./stage.ts";
 
 export type ChainInputs = {
   m: number;
-  costs: bigint[]; // needs, by candidate index
+  costs: bigint[]; // asks, by candidate index; $0 is covered, never a candidate
   voters: string[]; // tokenIds, sorted
   weights: bigint[]; // each voter's remaining share, same order
   ranks: number[][]; // effectiveRanks per voter
   ballots: number[][]; // for stage bounds only
   poolUsd: bigint;
   spent: bigint; // settled awards so far
-  done: ReadonlySet<number>; // settled initiatives
+  done: ReadonlySet<number>; // settled initiatives: funded, or covered at a settlement
 };
 export type ChainStage = { order: number[]; shares: Map<number, Map<string, bigint>> };
 
@@ -28,7 +28,8 @@ export function chainTally(inp: ChainInputs, first: number, upTo = TIER_COUNT): 
   for (let t = first; t < upTo; t++) {
     // B, the last tier, counts to the last level (the Python's stage after the tiers).
     const bound = t === TIER_COUNT - 1 ? m : stageBound(ballots, t, TIER_COUNT, m);
-    const candidates = [...Array(m).keys()].filter((c) => !done.has(c));
+    // A project asking $0 is covered by donations: no candidate (plain PB-EAR would fund it).
+    const candidates = [...Array(m).keys()].filter((c) => !done.has(c) && costs[c] > 0n);
     const got = stageTally(costs, weights, ranks, poolUsd, spent, candidates, bound);
     const shares = new Map<number, Map<string, bigint>>();
     for (const c of got.order) {

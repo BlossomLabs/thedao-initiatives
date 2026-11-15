@@ -1,8 +1,10 @@
 /** The slow quiet ending, replayed from the chain: tiers settle one at a time on the
  * contract's dates (vote/docs/quiet-ending-rules.md, 11 November 2026). Each window
- * has an opening tally, one after every block holding a receipt, and a closing tally;
- * only the settling tier's funded set is compared. The tally itself is the Python's
- * stage tally (./stage.ts). Amounts are micro-USD bigints.
+ * has an opening tally, one after every block holding a receipt or an ask event (a
+ * donation, a pledge, a pool change), and a closing tally; only the settling tier's
+ * funded set is compared. Every tally uses the asks and pool at its own block, and a
+ * project asking $0 is covered: no candidate, and left out of every comparison. The
+ * tally itself is the Python's stage tally (./stage.ts). Amounts are micro-USD bigints.
  * Browser and Deno. */
 import { effectiveRanks } from "../../vote/shared/ranks.ts";
 import { isValidOnchainBallot, type Tier } from "./ballot.ts";
@@ -25,6 +27,16 @@ export type Receipt = {
   logIndex?: number;
   timestamp: number;
 };
+/** The asks and pool at one block. `event`: the block holds an ask-side tally event
+ * (a pledge, a pool change, a balance change). `asks` may be shorter than the project
+ * count for a block before later projects joined. */
+export type ChainState = {
+  block: number;
+  timestamp: number;
+  asks: bigint[];
+  poolUsd: bigint;
+  event: boolean;
+};
 export type Settled = {
   tier: Tier;
   at: number;
@@ -33,6 +45,8 @@ export type Settled = {
   awards: Map<number, bigint>;
   /** What each badge paid for each funded initiative. */
   shares: Map<number, Map<string, bigint>>;
+  /** Asking $0 at the cutoff: covered by donations, final, never a candidate again. */
+  covered: number[];
 };
 export type TierState =
   | { tier: Tier; status: "waiting"; startsAt: number }
@@ -46,6 +60,8 @@ export type TierState =
     quiet: boolean;
     /** The latest tally's funded set for this tier. */
     funded: number[];
+    /** The latest tally's covered projects ($0 asks). */
+    covered: number[];
   }
   | ({ status: "settled" } & Settled);
 export type Rejection = {
@@ -68,6 +84,8 @@ export type RoundState = {
     tiers: Map<number, Tier>;
     /** What each badge would pay for each initiative, if it settled now. */
     shares: Map<number, Map<string, bigint>>;
+    /** Asking $0 now, so in no tier. */
+    covered: number[];
   };
   /** The live tally's inputs, to re-run it with another ballot; null once closed. */
   liveInputs: ChainInputs | null;
@@ -96,42 +114,64 @@ const sameSet = (a: number[], b: number[]) => {
   const y = new Set(b);
   return a.every((x) => y.has(x));
 };
-/** When and how a tier settled, kept the first time it was seen settled. */
-export type SettleNeeds = {
-  at: number;
-  forced: boolean;
-  needs: bigint[];
-  /** The blocks before `at` are final: the time is pinned. Before, the windows are
-   * judged again (a lagging RPC may have missed a ballot), with these needs. */
-  final?: boolean;
+/** Two tallies fund the same projects once every project covered at either is left out
+ * of both: crossing $0 alone is no change. */
+const sameFunded = (a: number[], coveredA: number[], b: number[], coveredB: number[]) => {
+  const free = new Set([...coveredA, ...coveredB]);
+  return sameSet(a.filter((c) => !free.has(c)), b.filter((c) => !free.has(c)));
 };
+/** The last item of `xs` for which `ok` holds, `ok` being true up to some index. */
+function lastWhere<T>(xs: T[], ok: (x: T) => boolean): T | undefined {
+  let lo = 0, hi = xs.length; // xs[..lo) ok, xs[hi..) not
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (ok(xs[mid])) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo ? xs[lo - 1] : undefined;
+}
 
 export function replay(
   input: {
     schedule: Schedule;
     m: number;
-    poolUsd: bigint;
-    needs: bigint[];
+    /** Ascending by block; at least one before the first S-Tier tally. */
+    states: ChainState[];
     receipts: Receipt[];
+    /** Settlements already made: used as they are (a cache; the result is the same
+     * without them). */
     snapshots?: Settled[];
-    /** The needs each tier settled with, kept when it first settled: a later donation
-     * never moves a settled tier, even before its settlement is stored for good. */
-    settleNeeds?: Partial<Record<Tier, SettleNeeds>>;
   },
   now: number,
 ): RoundState {
-  const { schedule: s, m, poolUsd, needs } = input;
+  const { schedule: s, m, states } = input;
   // First ballots: until S-Tier settles (the contract takes them until its latest
   // possible settlement). Every tally until then splits the pool among the ballots in,
   // so a newcomer shrinks the others' shares; S-Tier's charges fix them.
   const chainDeadline = windowEnds(s, 0).at(-1)!;
   const rollClosesAt = () => settled.find((x) => x.tier === "S")?.at ?? chainDeadline;
   const receipts = input.receipts.filter((r) => r.timestamp < now);
+  const events = states.filter((x) => x.event && x.timestamp < now);
   const accepted = new Map<string, number[]>();
   const roll = new Set<string>();
   const rejected: Rejection[] = [];
   const settled: Settled[] = [];
   let next = 0; // the next receipt to apply
+  let nextEvent = 0; // the next ask event
+
+  /** The state a tally at block `b` uses: the last one at or before it. */
+  const atBlock = (b: number) => {
+    const x = lastWhere(states, (y) => y.block <= b);
+    if (!x) throw new Error("no chain state");
+    return x;
+  };
+  /** The state a tally at time `t` uses (a window's opening or cutoff, or now): the
+   * last one strictly before it. */
+  const before = (t: number) => {
+    const x = lastWhere(states, (y) => y.timestamp < t);
+    if (!x) throw new Error("no chain state");
+    return x;
+  };
 
   /** The contract judged the rules (size, groups) when it recorded the ballot, and the
    * transcript proves it did; only a ballot this replay can't read is refused. */
@@ -170,20 +210,39 @@ export function replay(
     accepted.set(r.tokenId, ballot);
     roll.add(r.tokenId);
   };
-  /** Applies every receipt before `time`; returns the blocks applied, in order. */
-  const applyBefore = (time: number, perBlock?: () => void) => {
-    while (next < receipts.length && receipts[next].timestamp < time) {
-      const blockNo = receipts[next].block;
+  /** Applies every receipt and passes every ask event before `time`, block by block;
+   * `perBlock` runs once per block, after everything in it. */
+  const applyBefore = (time: number, perBlock?: (block: number) => void) => {
+    for (;;) {
+      const r = next < receipts.length && receipts[next].timestamp < time
+        ? receipts[next].block
+        : Infinity;
+      const e = nextEvent < events.length && events[nextEvent].timestamp < time
+        ? events[nextEvent].block
+        : Infinity;
+      const blockNo = Math.min(r, e);
+      if (blockNo === Infinity) return;
       while (
         next < receipts.length && receipts[next].block === blockNo &&
         receipts[next].timestamp < time
       ) apply(receipts[next++]);
-      perBlock?.();
+      while (nextEvent < events.length && events[nextEvent].block === blockNo) nextEvent++;
+      perBlock?.(blockNo);
     }
   };
 
-  /** What the chained tally starts from: the voters, after the settled tiers' payments. */
-  const inputs = (costs: bigint[]): ChainInputs => {
+  /** Settled for good: funded in a settled tier, or covered at its settlement. */
+  const finished = () => new Set(settled.flatMap((x) => [...x.funded, ...x.covered]));
+  /** The projects asking $0 in `state` that nothing settled yet. */
+  const coveredIn = (state: ChainState) => {
+    const done = finished();
+    return [...Array(m).keys()].filter((c) => state.asks[c] === 0n && !done.has(c));
+  };
+  /** What the chained tally starts from in `state`: the voters, after the settled
+   * tiers' payments, its pool and asks (a project not in it yet asks $0: no candidate). */
+  const inputs = (state: ChainState): ChainInputs => {
+    const { poolUsd } = state;
+    const costs = Array.from({ length: m }, (_, c) => state.asks[c] ?? 0n);
     const voters = [...roll].filter((t) => accepted.has(t)).sort();
     const n = BigInt(voters.length);
     const each = n ? poolUsd / n : 0n;
@@ -194,7 +253,7 @@ export function replay(
     });
     const ballots = voters.map((t) => accepted.get(t)!);
     const ranks = ballots.map((b) => effectiveRanks(b, m));
-    const done = new Set(settled.flatMap((x) => x.funded));
+    const done = finished();
     const spent = settled.reduce(
       (a, x) => a + [...x.awards.values()].reduce((p, q) => p + q, 0n),
       0n,
@@ -202,20 +261,27 @@ export function replay(
     return { m, costs, voters, weights, ranks, ballots, poolUsd, spent, done };
   };
   /** Stages `first` up to (not including) `upTo`; the comparisons need only the first. */
-  const tally = (first: number, costs: bigint[] = needs, upTo = TIERS.length) =>
-    chainTally(inputs(costs), first, upTo);
+  const tally = (first: number, state: ChainState, upTo = TIERS.length) =>
+    chainTally(inputs(state), first, upTo);
+  /** Tier `t`'s funded set and the covered projects at `state`. */
+  const look = (t: number, state: ChainState) => ({
+    funded: tally(t, state, t + 1)[0].order,
+    covered: coveredIn(state),
+  });
   const settleInputs: (ChainInputs | null)[] = TIERS.map(() => null);
+  /** Settles tier `t` with the state at its cutoff `at`. */
   const settle = (t: number, at: number, forced: boolean) => {
-    const costs = input.settleNeeds?.[TIERS[t]]?.needs ?? needs;
-    // Kept before the snapshot return: a frozen settlement still has the state it was made in.
-    settleInputs[t] = inputs(costs);
+    const state = before(at);
+    // Kept before the snapshot return: a cached settlement still has the state it was made in.
+    settleInputs[t] = inputs(state);
     const snap = input.snapshots?.find((x) => x.tier === TIERS[t]);
     if (snap) return settled.push(snap);
-    const { order, shares } = tally(t, costs, t + 1)[0];
+    const covered = coveredIn(state);
+    const { order, shares } = tally(t, state, t + 1)[0];
     const awards = new Map(
       order.map((c) => [c, [...shares.get(c)!.values()].reduce((a, b) => a + b, 0n)] as const),
     );
-    settled.push({ tier: TIERS[t], at, forced, funded: order, awards, shares });
+    settled.push({ tier: TIERS[t], at, forced, funded: order, awards, shares, covered });
   };
 
   const tiers: TierState[] = [];
@@ -226,30 +292,28 @@ export function replay(
       tiers.push({ tier: TIERS[t], status: "waiting", startsAt: start });
       continue;
     }
-    // A tier already seen settled stays settled when it was: today's needs must not
-    // re-judge its windows (they could reopen it, or close it earlier after the fact).
+    // A cached settlement is used as it is, at its time.
     const snap = input.snapshots?.find((x) => x.tier === TIERS[t]);
-    const kept = input.settleNeeds?.[TIERS[t]];
-    const pinned = snap ?? (kept?.final ? { at: kept.at, forced: kept.forced } : undefined);
-    if (pinned && now >= pinned.at) {
-      applyBefore(pinned.at);
-      settle(t, pinned.at, pinned.forced);
+    if (snap && now >= snap.at) {
+      applyBefore(snap.at);
+      settle(t, snap.at, snap.forced);
       tiers.push({ status: "settled", ...settled[settled.length - 1] });
       continue;
     }
     applyBefore(start);
-    // Once seen settled, its windows are judged with the needs it settled with.
-    const first = () => tally(t, kept?.needs ?? needs, t + 1)[0].order;
-    let baseline = first();
+    let baseline = look(t, before(start));
     let state: TierState | null = null;
     for (let k = 0; k < ends.length; k++) {
       const end = ends[k];
       let quiet = true;
-      const check = () => {
-        if (!sameSet(first(), baseline)) quiet = false;
+      const same = (x: { funded: number[]; covered: number[] }) =>
+        sameFunded(x.funded, x.covered, baseline.funded, baseline.covered);
+      const check = (blockNo: number) => {
+        if (!same(look(t, atBlock(blockNo)))) quiet = false;
       };
       if (now < end) {
         applyBefore(now, check);
+        const latest = look(t, before(now));
         state = {
           tier: TIERS[t],
           status: "settling",
@@ -257,13 +321,14 @@ export function replay(
           windowEndsAt: end,
           latestEndAt: ends[ends.length - 1],
           quiet,
-          funded: first(),
+          funded: latest.funded,
+          covered: latest.covered,
         };
         break;
       }
       applyBefore(end, check);
-      const closing = first();
-      if (!sameSet(closing, baseline)) quiet = false;
+      const closing = look(t, before(end));
+      if (!same(closing)) quiet = false;
       if (quiet || k === ends.length - 1) {
         settle(t, end, !quiet);
         const x = settled[settled.length - 1];
@@ -282,6 +347,7 @@ export function replay(
   }
   applyBefore(now);
 
+  const head = before(now);
   const voters = [...roll].filter((t) => accepted.has(t)).length;
   const firstOpen = settled.length;
   const live = {
@@ -289,9 +355,11 @@ export function replay(
     awards: new Map<number, bigint>(),
     tiers: new Map<number, Tier>(),
     shares: new Map<number, Map<string, bigint>>(),
+    covered: [] as number[],
   };
   if (firstOpen < TIERS.length) {
-    for (const [k, stage] of tally(firstOpen).entries()) {
+    live.covered = coveredIn(head);
+    for (const [k, stage] of tally(firstOpen, head).entries()) {
       for (const c of stage.order) {
         live.order.push(c);
         live.tiers.set(c, TIERS[firstOpen + k]);
@@ -306,9 +374,9 @@ export function replay(
     accepted: new Map([...accepted].map(([k, v]) => [k, Uint8Array.from(v)])),
     rejected,
     closed: settled.length === TIERS.length,
-    share: voters ? poolUsd / BigInt(voters) : 0n,
+    share: voters ? head.poolUsd / BigInt(voters) : 0n,
     live,
-    liveInputs: firstOpen < TIERS.length ? inputs(needs) : null,
+    liveInputs: firstOpen < TIERS.length ? inputs(head) : null,
     firstOpen,
     settleInputs,
   };

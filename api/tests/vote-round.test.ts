@@ -230,6 +230,12 @@ const stateAt = (
 ): ChainState => ({ block, timestamp, asks, poolUsd, event });
 /** One chain state for the whole round, as at block 0. */
 const oneState = (asks: bigint[], poolUsd: bigint) => [stateAt(0, 0, asks, poolUsd, false)];
+/** One state for the whole round and the node's head a second before now, as
+ * chainStates() reads them (it always ends with the head). */
+const withHead = (asks: bigint[], poolUsd: bigint) => [
+  ...oneState(asks, poolUsd),
+  stateAt(1_000_000, NOW - 1, asks, poolUsd, false),
+];
 
 async function setup(m: VoteManifest = manifest) {
   const h = await harness();
@@ -1309,6 +1315,27 @@ Deno.test("round: a settlement isn't stored from states whose head is older than
   h.close();
 });
 
+Deno.test("round: served as of the newest block: past a cutoff by the clock only, nothing settles", async () => {
+  const { h, state } = await qeSetup();
+  type Body = { head: { timestamp: number }; tiers: { tier: string; status: string }[] };
+  // S-Tier's one window ends at NOW + 660. The clock is 5 s past it; the newest block is
+  // 3 s before it, so a ballot could still land in a block before the cutoff.
+  h.clock.now = NOW + 665;
+  state.headAt = NOW + 657;
+  const lagging = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(lagging.head.timestamp, NOW + 657);
+  assertEquals([lagging.tiers[0].tier, lagging.tiers[0].status], ["S", "settling"]);
+  // Nothing settled is stored from it.
+  assertEquals((await h.kv.get(["vote", qe.contract.toLowerCase(), "settled", "S"])).value, null);
+  // The block at NOW + 659: every block before the cutoff is known. S-Tier settles.
+  state.headAt = NOW + 659;
+  h.clock.now += 10; // past the few seconds a replay is reused
+  const confirmed = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(confirmed.tiers[0].status, "settled");
+  await h.settle();
+  h.close();
+});
+
 Deno.test("round: a settlement stored before covered projects loads as none covered", async () => {
   const { h } = await qeSetup();
   h.clock.now = NOW + 660 + 30 * 60;
@@ -1327,7 +1354,7 @@ Deno.test("round: a cold chain read answers 503 in time and fills in the backgro
   const { h, state } = await qeSetup();
   let finish = () => {};
   const slow = new Promise<ChainState[]>((ok) => {
-    finish = () => ok(oneState([150n, 150n, 150n], 200n));
+    finish = () => ok(withHead([150n, 150n, 150n], 200n));
   });
   const reads = { n: 0 };
   h.deps.vote!.states = () => (reads.n++, slow);
@@ -1350,11 +1377,11 @@ Deno.test("round: a request with a newer ballot doesn't join a read that lacks i
   const { h, state } = await qeSetup();
   let finish = () => {};
   const first = new Promise<ChainState[]>((ok) => {
-    finish = () => ok(oneState([150n, 150n, 150n], 200n));
+    finish = () => ok(withHead([150n, 150n, 150n], 200n));
   });
   const reads = { n: 0 };
   h.deps.vote!.states = () =>
-    ++reads.n === 1 ? first : Promise.resolve(oneState([150n, 150n, 150n], 200n));
+    ++reads.n === 1 ? first : Promise.resolve(withHead([150n, 150n, 150n], 200n));
   const a = h.req("/api/vote/round");
   await new Promise((r) => setTimeout(r, 5));
   // A ballot at block 3 the first read has no state for.
@@ -1375,7 +1402,7 @@ Deno.test("round: a request whose ballots a read in flight covers joins it", asy
   const { h } = await qeSetup();
   let finish = () => {};
   const slow = new Promise<ChainState[]>((ok) => {
-    finish = () => ok(oneState([150n, 150n, 150n], 200n));
+    finish = () => ok(withHead([150n, 150n, 150n], 200n));
   });
   const reads = { n: 0 };
   h.deps.vote!.states = () => (reads.n++, slow);

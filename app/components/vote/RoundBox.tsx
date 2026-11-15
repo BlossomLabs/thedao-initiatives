@@ -5,7 +5,7 @@ import { clock, dayTime, usd, usdShort } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import { type Tier, tierName } from "../../../shared/vote/ballot";
 import type { Schedule } from "../../../shared/vote/quiet-ending";
-import { type Phase, roundSteps, type Step, type Win } from "./round-steps";
+import { chainNow, dueAt, type Phase, roundSteps, type Step, type Win } from "./round-steps";
 import { Countdown, useNow, When } from "./When";
 
 /** Where the round is: a stepper (Voting → S-Tier → A-Tier → B-Tier → Result), the
@@ -422,6 +422,26 @@ function Stepper({ steps, at, large }: { steps: Step[]; at: number; large?: bool
   );
 }
 
+/** Past a step's time by the clock, before the chain confirms it: the round waits for the
+ * next block. Until then nothing has moved: a ballot can still land before that time. */
+function WaitingLine({ phase }: { phase: Phase }) {
+  const due = dueAt(phase);
+  if (due === undefined) return null;
+  const t = <When at={due} withDay={phase.kind === "before"} />;
+  const what = phase.kind === "before"
+    ? <>voting opens</>
+    : phase.kind === "open"
+    ? <>S-Tier starts settling</>
+    : phase.kind === "between"
+    ? <>{tierName(phase.next)} starts settling</>
+    : <>this window is counted</>;
+  return (
+    <span data-waiting-for-chain="">
+      Waiting for the next block: {what} once the chain reaches {t}.
+    </span>
+  );
+}
+
 export default function RoundBox(
   { schedule, rv, badge, mine, large, stepsOnly, bare }: {
     schedule: Schedule;
@@ -440,13 +460,18 @@ export default function RoundBox(
     bare?: boolean;
   },
 ) {
-  const now = Math.floor(useNow(30_000) / 1000);
+  const clock = Math.floor(useNow(5_000) / 1000);
+  // Where the round is: as of the newest block the server judged it at.
   const { phase, steps, at } = roundSteps({
     schedule,
     tiers: rv?.tiers,
-    now,
+    now: chainNow(clock, rv?.head),
     closed: rv?.closed,
   });
+  // The clock passed the next step, the chain hasn't yet: nothing moves until it has.
+  // Known only from a server that says which block it judged at (not on the examples).
+  const due = dueAt(phase);
+  const waiting = Boolean(rv?.head) && due !== undefined && clock >= due;
   let title: React.ReactNode;
   let to: number | undefined;
   // What the countdown counts down to, said beside it on the ballot editor.
@@ -520,6 +545,7 @@ export default function RoundBox(
       title = "The vote has ended";
       break;
   }
+  if (waiting) status = <WaitingLine phase={phase} />;
   const tone = badge && TONE[badge.tone];
   const BOX = "overflow-visible rounded-xl border border-white/15 bg-white/[.04] text-left";
   const stepper = (
@@ -622,7 +648,16 @@ export default function RoundBox(
   }
   return (
     <section aria-label="Where the round is" className={BOX}>
-      {stepsOnly && <div className="border-b border-white/10 px-4 pb-3 pt-3.5">{titleRow}</div>}
+      {stepsOnly && (
+        <div className="border-b border-white/10 px-4 pb-3 pt-3.5">
+          {titleRow}
+          {waiting && (
+            <p className="m-0 mt-1.5 text-[13px] leading-snug text-white/65">
+              <WaitingLine phase={phase} />
+            </p>
+          )}
+        </div>
+      )}
       {stepper}
       {!stepsOnly && nowBox()}
       {badgeLineEl}
@@ -636,8 +671,13 @@ export default function RoundBox(
 export function RoundDeadline(
   { schedule, rv, badge }: { schedule: Schedule; rv?: RoundView; badge?: BadgeLine },
 ) {
-  const now = Math.floor(useNow(30_000) / 1000);
-  const { phase } = roundSteps({ schedule, tiers: rv?.tiers, now, closed: rv?.closed });
+  const now = Math.floor(useNow(5_000) / 1000);
+  const { phase } = roundSteps({
+    schedule,
+    tiers: rv?.tiers,
+    now: chainNow(now, rv?.head),
+    closed: rv?.closed,
+  });
   let what: string;
   let to: number | undefined;
   switch (phase.kind) {

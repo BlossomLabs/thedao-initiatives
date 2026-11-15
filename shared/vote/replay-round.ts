@@ -6,7 +6,7 @@
  * quiet ending is replayed (./quiet-ending.ts). Nothing here knows about viem's
  * transports, KV or env: browser and Deno. */
 import { type Hex, hexToBytes } from "viem";
-import { chainStates, type StateCache, type StateSource } from "./chain-states.ts";
+import { chainStates, judgedAt, type StateCache, type StateSource } from "./chain-states.ts";
 import { liveInputsJson } from "./live-inputs.ts";
 import type { VoteManifest } from "./manifest.ts";
 import {
@@ -154,8 +154,12 @@ export async function replayRound(
     cache: opts.cache,
     finalAfterSecs: opts.finalAfterSecs,
   });
+  // Judged at the newest block's time (never past `now`): a tally time counts as passed
+  // only once the chain has every block before it. The states end at the node's head.
+  const tip = states.filter((x) => x.timestamp < now).at(-1);
+  const at = tip ? judgedAt(now, tip.timestamp) : now;
   // The head: what the live tally, the page and the relay judge by.
-  const head = states.filter((x) => x.timestamp < now).at(-1);
+  const head = states.filter((x) => x.timestamp < at).at(-1);
   if (!head) throw new ReplayError("no_head", "no_head: no chain state before now");
   let asks: bigint[] | undefined = head.asks;
   if (asks.length !== m.slugs.length) {
@@ -168,7 +172,7 @@ export async function replayRound(
     states,
     receipts,
     snapshots: opts.snapshots,
-  }, now);
+  }, at);
   return Object.assign(st, {
     poolUsd: head.poolUsd,
     ...(asks ? { asks } : {}),
@@ -207,6 +211,8 @@ export function roundJson(st: Round, slugs: string[]) {
       ? { ...t, funded: named(t.funded), covered: named(t.covered) }
       : t;
   return {
+    /** The newest block the round was judged at: nothing after it has happened yet. */
+    head: st.head,
     registrationClosesAt: st.registrationClosesAt,
     closed: st.closed,
     share: st.share.toString(),

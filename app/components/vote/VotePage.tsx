@@ -10,7 +10,7 @@ import { rememberMyCode } from "~/lib/vote-local";
 import BallotStatus, { type SendRoute } from "~/components/vote/BallotStatus";
 import BallotMeter from "~/components/vote/BallotMeter";
 import RoundBox, { badgeLine, RoundDeadline } from "~/components/vote/RoundBox";
-import { roundSteps } from "~/components/vote/round-steps";
+import { chainNow, roundSteps } from "~/components/vote/round-steps";
 import { AddressAvatar, Avatar } from "~/components/wallet/Avatar";
 import { avatarSrc } from "~/lib/avatar";
 import {
@@ -741,7 +741,8 @@ export default function VotePage(
     // Whether there is a ballot that counts depends on the round: hold this URL's skeleton.
     wide = true;
     body = ballotSkeleton;
-  } else if (data && mine && n !== null && (closed(R) || rv?.closed)) {
+  } else if (data && mine && n !== null && (rv ? rv.closed : closed(R))) {
+    // Closed once the chain says so: the server's replay, at its newest block.
     // Two tier tables side by side: this badge's ballot and the vote's result.
     wide = true;
     body = (
@@ -750,6 +751,9 @@ export default function VotePage(
         {closedProps && (
           <VoteClosed
             {...closedProps}
+            // The ballot that counted, as the round view has it; else read from the chain.
+            sent={closedProps.sent ??
+              (countedNow ? countedTiers(countedNow, tiers, R.slugs) : undefined)}
             roundBox={R.schedule && <RoundBox schedule={R.schedule} rv={rv} stepsOnly />}
           />
         )}
@@ -766,11 +770,13 @@ export default function VotePage(
       void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(R.slugs, tiers)));
     };
     const counted = rv ? Boolean(rv.accepted[String(n)]) : true;
-    const registrationOver = rv ? voteNow() / 1000 >= rv.registrationClosesAt : false;
+    // The round as of the newest block the server judged it at, not this browser's clock.
+    const at = chainNow(voteNow() / 1000, rv?.head);
+    const registrationOver = rv ? at >= rv.registrationClosesAt : false;
     const shut = !counted && registrationOver;
     // No ballot for it (below): a narrow page, like the other notices.
     if (shut) wide = false;
-    const early = notOpenYet(R) || shut;
+    const early = (rv ? at < R.opensAt : notOpenYet(R)) || shut;
     // What the server compares is the voter's own groups of equal rank, so lock from
     // the ballot that counts.
     const settledCount = rv?.tiers.filter((t) => t.status === "settled").length ?? 0;
@@ -894,7 +900,7 @@ export default function VotePage(
         phase: roundSteps({
           schedule: R.schedule,
           tiers: rv?.tiers,
-          now: voteNow() / 1000,
+          now: at,
           closed: rv?.closed,
         }).phase,
         counted: Boolean(rv?.accepted[String(n)]),

@@ -66,6 +66,9 @@ export type RoundTier =
   };
 /** GET /api/vote/round: the quiet ending as it stands. */
 export type RoundView = {
+  /** The newest block the server judged the round at: nothing after it has happened yet,
+   * whatever this browser's clock says. Absent from servers before it (and examples). */
+  head?: { block: number; timestamp: number };
   registrationClosesAt: number;
   closed: boolean;
   /** Each voting badge's equal share of the pool, micro-USD. */

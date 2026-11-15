@@ -36,10 +36,18 @@ const READS = 8;
  * costs one block search per step (cached), not one per call. */
 const FINAL_STEP = 300;
 /** How long after a cutoff the node's head may still be older than it: a block lands
- * every 12 s and takes a few seconds to arrive. Within this the head stands in for the
- * last block before the cutoff (a reorg-like change, never kept: a settlement is stored
- * only well past it); later, a head older than the cutoff is a lagging node. */
+ * every 12 s and takes a few seconds to arrive. Within this the round is judged at the
+ * head's time (the cutoff not passed yet); later, a head older than the cutoff is a
+ * lagging node, and the read fails. */
 export const CUTOFF_GRACE_SECS = 30;
+
+/** The time a round is judged at: `now`, but never past the newest block. Until the
+ * chain has every block before a tally time, a ballot, a donation or a pledge may still
+ * land before it. Block times are whole seconds and strictly increase, so a head at `t`
+ * means every block before `t + 1` is known: a tally time T is passed once the head is
+ * at T − 1 or later. */
+export const judgedAt = (now: number, headTimestamp: number): number =>
+  Math.min(now, headTimestamp + 1);
 
 type Block = { block: number; timestamp: number };
 type StoredState = { timestamp: number; asks: string[]; poolUsd: string };
@@ -77,6 +85,8 @@ function merge(ranges: [number, number][]): [number, number][] {
  *    receipt block (`event: false` unless it also holds an ask-side event) and each
  *    block with a pledge, a pool change or a balance change (`event: true`);
  * 3. the head: the last block before `now`.
+ * `now` is judged at the head's time (`judgedAt`): a tally time the head hasn't reached
+ * hasn't passed yet.
  * Reads of blocks older than `now − finalAfterSecs` go in `cache` and are not made again;
  * newer ones are never cached (a reorg could still change them). A block search by time
  * waits one more margin, for the block after its answer. Balance scans run one chunk at a
@@ -90,11 +100,14 @@ export async function chainStates(
   src: StateSource,
   opts: { now: number; receiptBlocks: number[]; cache?: StateCache; finalAfterSecs: number },
 ): Promise<ChainState[]> {
-  const { now, cache } = opts;
+  const { cache } = opts;
   const s = m.schedule;
   const contract = m.contract.toLowerCase();
-  const finalBefore = now - opts.finalAfterSecs;
+  // The clock: what is final, and whether the node lags. The chain: what has happened.
+  const wallNow = opts.now;
+  const finalBefore = wallNow - opts.finalAfterSecs;
   const head = await src.head();
+  const now = judgedAt(wallNow, head.timestamp);
   // Ballots may come from another node: one this node hasn't reached would be judged with
   // an older state. Refuse rather than replay from partial states.
   const ahead = opts.receiptBlocks.filter((b) => b > head.block);
@@ -136,18 +149,26 @@ export async function chainStates(
     return head.timestamp < time ? head : await search(`final:${contract}:${time}`, time, true);
   };
 
-  const points: number[] = [];
-  const spans: [number, number][] = [];
-  for (let t = 0; t < s.firstTallyAt.length; t++) {
-    const start = s.firstTallyAt[t];
-    if (now < start) continue;
-    const ends = windowEnds(s, t);
-    points.push(start, ...ends.filter((e) => e <= now));
-    spans.push([start, Math.min(now, ends.at(-1)!)]);
-  }
-  // A node behind a passed point would give its head as the state before it, missing any
-  // pledge, pool change or donation since. Refuse rather than settle from that.
-  const missed = points.filter((p) => head.timestamp < p && now - p > CUTOFF_GRACE_SECS);
+  /** The tally times passed at `time`: each started tier's first tally and its passed
+   * cutoffs; and each started tier's span up to `time`. */
+  const passed = (time: number) => {
+    const points: number[] = [];
+    const spans: [number, number][] = [];
+    for (let t = 0; t < s.firstTallyAt.length; t++) {
+      const start = s.firstTallyAt[t];
+      if (time < start) continue;
+      const ends = windowEnds(s, t);
+      points.push(start, ...ends.filter((e) => e <= time));
+      spans.push([start, Math.min(time, ends.at(-1)!)]);
+    }
+    return { points, spans };
+  };
+  const { points, spans } = passed(now);
+  // A node whose head is still behind a tally time the clock passed a while ago is
+  // lagging: the round would look stuck before it. Refuse rather than serve that.
+  const missed = passed(wallNow).points.filter((p) =>
+    head.timestamp < p && wallNow - p > CUTOFF_GRACE_SECS
+  );
   if (missed.length) {
     throw new Error(
       `chain states: the node's head at ${head.timestamp} is behind the tally time ${

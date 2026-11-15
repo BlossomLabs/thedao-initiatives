@@ -39,6 +39,28 @@ export type Phase =
 
 const TIERS: Tier[] = ["S", "A", "B"];
 
+/** The time the round stands at: this browser's clock, but never past the newest block
+ * the server judged it at (`head`), as the server judges it. Unix seconds. */
+export const chainNow = (now: number, head?: { timestamp: number }): number =>
+  head ? Math.min(now, head.timestamp + 1) : now;
+
+/** When the phase's next step is due by the clock: voting opens, a tier starts settling,
+ * or a window ends. Past it, the round waits for the chain to confirm it. */
+export function dueAt(phase: Phase): number | undefined {
+  switch (phase.kind) {
+    case "before":
+      return phase.opensAt;
+    case "open":
+      return phase.sStarts;
+    case "settling":
+      return phase.endsAt;
+    case "between":
+      return phase.nextStarts;
+    case "closed":
+      return undefined;
+  }
+}
+
 const usdOf = (awards: Record<string, string>) =>
   Object.values(awards).reduce((a, v) => a + Number(BigInt(v) / 10_000n) / 100, 0);
 

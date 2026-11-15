@@ -4,7 +4,7 @@
 //   deno task vote:replay --rpc <archive RPC URL>
 //     [--manifest <manifest .json or manifest-data.ts>]  (default: shared/vote/manifest-data.ts)
 //     [--at <unix seconds>]                              (default: now)
-//     [--json]                                           (the round as the site serves it)
+//     [--json]                    ({round, transcript, head}: the replay part of /api/vote/round)
 //
 // Past blocks need an archive node. Any read failure or a transcript mismatch exits 1.
 import { parseArgs } from "jsr:@std/cli@^1.0.32/parse-args";

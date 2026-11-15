@@ -19,7 +19,7 @@ The contracts are a development implementation, not a deployed round.
 | [reference/quiet_ending_steps.py](reference/quiet_ending_steps.py) | Earlier quiet-ending models. |
 | [reference/quiet_ending.py](reference/quiet_ending.py) | Earlier models and helpers still used by simulations. |
 | [docs/quiet-ending.md](docs/quiet-ending.md) | Mechanism overview. |
-| [docs/quiet-ending-rules.md](docs/quiet-ending-rules.md) | Detailed requirements, derived checkpoints, acceptance and remaining algorithm questions. |
+| [docs/quiet-ending-rules.md](docs/quiet-ending-rules.md) | Detailed requirements, asks from the chain, covered projects, derived checkpoints, acceptance and remaining decisions. |
 | [docs/settlement-policy.md](docs/settlement-policy.md) | Accepted decision: secure USD funding, share increases equally, and lock awards and NFT charges when each tier settles. |
 | [docs/withholding.md](docs/withholding.md) | Withholding background, examples and reference construction. |
 | [docs/simulation-agent-prompt.txt](docs/simulation-agent-prompt.txt) | Investigation brief for changing currency valuations during a round. |
@@ -203,11 +203,26 @@ settlement tally. Provisional tallies use current project needs; later support
 changes do not reprice settled awards. Results may differ from a fresh final-input
 PB-EAR tally. The contract enforces increase-only funding, its initial deadline and
 nonoverlapping date updates. Settlement awards, NFT
-charges and remaining shares belong to deterministic replay, not contract storage;
-that replay and precise quiet-comparison thresholds remain to be implemented.
+charges and remaining shares belong to deterministic replay, not contract storage.
+The rules the replay follows are in [quiet-ending-rules.md](docs/quiet-ending-rules.md):
+the ask at a block, a tally with its own asks and pool at every event, settlement from the
+cutoff block (the stored record is only a cache), covered projects, and the size minimum.
+The staged tally differs from plain PB-EAR only for $0 projects, which it does not fund.
+Only the round's chain, each project's registered account and the registered currencies
+count; other chains, addresses and tokens never do (an admin may record them as a pledge).
 
-The complete replay checker, payout integration and frontend are still subsequent
-work. The contract tests mock price feeds; they are not live Sepolia tests.
+**Signed pledges.** `setPledgeBySig(pledgeId, initiativeId, currencyId, amount, signer,
+nonce, deadline, signature)` checks an EIP-712 `Pledge` signature in the round's domain
+against the named `signer` (`SignatureChecker`: an EOA's ECDSA or a smart wallet's
+ERC-1271), requires `signer` to hold PLEDGE_ROLE, takes the signer's next consecutive nonce
+and a deadline, and does what `setPledge` does (same `PledgeSet`). The site signs with deadlines of 10 minutes and records
+a pledge only once the chain has it; during the real vote admin pledges are on-chain only.
+
+**Build settings.** The contract compiles with `via_ir` (see foundry.toml) to stay under
+the EIP-170 size limit; `test/Size.t.sol` keeps it under 24,576 bytes.
+
+Payout integration and the frontend are still subsequent work. The contract tests mock
+price feeds; they are not live Sepolia tests.
 
 ### Replay the round yourself
 
@@ -223,8 +238,18 @@ replays the quiet ending. It prints each tier's status, window, funded projects 
 their awards and covered projects, then the transcript check and the head block.
 `--manifest <file>` replays another round (a manifest JSON or `manifest-data.ts`;
 the default is the site's `shared/vote/manifest-data.ts`), `--at <unix seconds>`
-replays it as of that time, and `--json` prints the round as `/api/vote/round`
-serves it. A read the node can't serve (a pruned node, no past state) or a
+replays it as of that time, and `--json` prints `{round, transcript, head}`: `round` is
+the replay part of `/api/vote/round`, all of it but the what-ifs the site adds
+(`live.next`, `live.lead`, `live.give` and `final`).
+
+The transcript check proves that the ballots counted are exactly those the contract
+recorded: their number matches `recordCount`, their order and content match `transcript`,
+and each NFT's latest ballot matches `ballotHashOf`, so nothing is added, dropped or
+reordered. That replay must equal the same part of what `/api/vote/round` returns, so
+anyone can compare the site's results with their own replay; a difference is a bug in one
+of them.
+
+A read the node can't serve (a pruned node, no past state) or a
 transcript mismatch exits 1 with the error.
 
 ## Run the checks
@@ -268,7 +293,9 @@ Oracle interface and historical-state considerations:
 
 A ballot is valid only if (docs/superpowers/specs/2026-11-11-ballot-rules-design.md):
 
-- its ranked projects ask for at least 1.5× the pool (`2 × Σ askUsd ≥ 3 × poolUsd`; a project's
+- its ranked projects ask for at least min(1.5× the pool, the sum of every project's ask)
+  (the placed asks satisfy `2 × Σ askUsd ≥ 3 × poolUsd`, or every project left out asks $0;
+  owner's decision, Nov 15, 2026; sums saturate; a project's
   ask is its goal less its donations and open pledges, `initiativeUsd(i).askUsd`, and the pool
   is `poolUsd`, both on-chain at the block that records the ballot);
 - S-Tier (its first rank group; also A-Tier when `independentTiers` has bit 1) holds at

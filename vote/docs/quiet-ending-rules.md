@@ -1,13 +1,14 @@
 # Blossom Budgeting: contract requirements and quiet-ending rules
 
-Current requirements, 15 October 2026. These incorporate the round-specific
+Current requirements, 15 October 2026, with the rules for asks read from the chain
+added in the Nov 12, 2026 design and adapted on Nov 15, 2026. These incorporate the round-specific
 decisions made after the [public mechanism explanation](../README.md#published-mechanism).
 The [registry](../contracts/SignedBallots.sol) now implements NFT-ID receipts,
 roles, the fixed schedule and [currency accounting](../contracts/RoundAccounting.sol).
 The [USD settlement decision](settlement-policy.md) is accepted and the contract
 enforces increase-only funding, its initial deadline and validated date updates.
-Settlement accounting and complete replay remain
-implementation work outside the contract.
+Settlement accounting and the complete replay live outside the contract, in
+`shared/vote/` and `deno task vote:replay`; [how to run it](../README.md#replay-the-round-yourself).
 
 ## Voters and administration
 
@@ -98,10 +99,35 @@ A block holds a tally event when it contains any of these:
   project's balance block by block, both of which need an archive node.
 
 A block with several events gets one tally, after its last event, so the order of
-transactions inside a block never matters. Each tally values currencies at its own
-block. A price change alone is not an event: it triggers no tally, but it does
-affect any tally taken for another reason. In-window tallies are comparisons only.
-They settle nothing and do not bind supporters; the scheduled checkpoints do.
+transactions inside a block never matters. **Each tally uses the asks and the pool at
+its own block**: the pool is the total `PoolUsdSet` recorded by then, not one total for
+the whole window. The opening tally of a window uses the last block strictly before the
+window opens, the closing tally the last block strictly before its cutoff. A price
+change alone is not an event: it triggers no tally, but every tally values currencies at
+its block, so a price move can change the closing tally. In-window tallies are
+comparisons only. They settle nothing and do not bind supporters; the scheduled
+checkpoints do. Blocks outside every tier's windows need no tally.
+
+Only the round's own chain counts, only the account the project registered, and only the
+registered currencies. Other chains, other addresses and unlisted tokens are never counted;
+an admin may record such money as a pledge. The board's "still needs" and the vote's ask can
+therefore differ. Any balance already in a project's account counts, whatever it was for.
+Balances count, not incoming transfers, so a swap from ETH to DAI inside an account is not
+new money.
+
+**Swaps are a rule for people.** A swap inside a project's account must happen in one
+transaction, or wait until the project's tier has settled. If ETH leaves in one block and
+DAI arrives in a later one, the ask jumps in between. That is a tally event, and a cutoff
+in the gap can settle the tier without the project.
+
+## Ballot size minimum
+
+A ballot passes when the asks of its placed projects add up to at least
+min(1.5× the pool, the sum of every project's ask), sums saturating. That is at least 1.5×
+the pool, or every project the ballot leaves out asks $0 (owner's decision, Nov 15, 2026):
+donations can push the sum of all asks below 1.5× the pool, and without this no ballot could
+pass. Asks and pool are those at the block that records the ballot. The contract checks the
+sum of all asks only when the placed asks fall short, so a normal ballot pays no extra gas.
 
 ## Dollar funding, projects and pledges
 
@@ -123,17 +149,36 @@ Donations are the allowed native/ERC-20 balances at each project's address.
 A pledge has a unique ID, initiative ID, currency ID and amount. Updating its ID
 replaces the prior contribution, including when changing initiative or currency.
 Amount zero cancels it. When a pledge becomes a donation, an admin must reduce or
-cancel the outstanding pledge to avoid double counting.
+cancel the outstanding pledge to avoid double counting. Pledges do not turn into transfers
+during the vote, so no other double-count rule is needed.
 
-Each project's original ask is denominated in dollars. At a tally's block, compute:
+**Signed pledges.** `setPledgeBySig(pledgeId, initiativeId, currencyId, amount, signer,
+nonce, deadline, signature)` may be submitted by anyone. The contract checks the signature
+over an EIP-712 `Pledge` struct in the round's domain against the `signer` it names
+(`SignatureChecker`: ECDSA for an EOA, ERC-1271 for an admin's smart wallet) and requires
+`signer` to hold PLEDGE_ROLE. It then does exactly what
+`setPledge` does and emits the same `PledgeSet`, so replay needs nothing new, under the same
+accounting-open limit. The nonce is per signer and must be the next one, and the signature
+is void after its deadline, so a signed pledge cannot be submitted twice or held back.
+`setPledge` stays for direct calls. During the real vote an admin adds, changes or cancels a
+pledge from the initiative's admin page: the admin signs (the site asks for a deadline of 10
+minutes), the relayer, which never holds PLEDGE_ROLE, submits it, and the site records the
+pledge only once the chain has it. Admin pledges are on-chain only; a refused transaction
+saves nothing.
 
-- pool funding = the recorded USD budget at the applicable historical cutoff;
+Each project's goal is denominated in dollars (`goalUsd`, fixed when voting opens). Its
+**ask** is what remains of the goal. At a tally's block, compute:
+
+- pool funding = the recorded USD budget at that block;
 - project support = allowed-currency balances plus outstanding pledges, valued in USD;
-- project funding need = max(dollar goal minus project support, zero).
+- ask = max(goal minus project support, zero).
 
-Project support reduces that project's need; it is not added to the fungible pool.
+The ask at block `b` is `initiativeUsd(i).askUsd` read at `b`, which never reverts and
+applies the price rule below. Nobody re-implements the arithmetic; a replayer reads the
+view with an `eth_call` at `b` on an archive node, and the pool with `poolUsd()` the same
+way. Project support reduces that project's ask; it is not added to the fungible pool.
 Withdrawals, spending, pledge corrections and changing prices can raise or lower
-the need. Transfers from the pool to project addresses would also need explicit
+the ask. Transfers from the pool to project addresses would also need explicit
 treatment to avoid counting a payout as new outside support.
 
 The accounting implementation uses USD with six decimal places and rounds down.
@@ -155,7 +200,7 @@ Donations and pledges are converted as separate components before their USD tota
 are added.
 
 initiativeUsd returns donated, pledged and total USD plus the ask (the dollar goal less that
-total, never below zero).
+total, never below zero). A test pins the ask at a block to the contract's view.
 poolUsd returns the recorded USD budget separately, without consulting feeds or
 project balances; it can only increase during the active round. The initiative views
 remain live block-state views. Historical
@@ -260,14 +305,41 @@ a tier locks its accepted USD awards and per-NFT USD charges at that cutoff thro
 deterministic replay. Awards, charges, remaining shares and settlement checkpoints
 are not additional contract state.
 Earlier provisional tallies are comparison baselines and commit no money. Project
-needs remain current at every provisional cutoff; inputs are not frozen at the
+asks remain current at every provisional cutoff; inputs are not frozen at the
 tier's first tally, as in the alternative tier_lock policy.
+
+Each tally uses the asks and the pool at its own block. A tier settles with the asks at the
+last block strictly before its cutoff; awards and per-NFT charges are fixed there. The stored
+settlement (the `settled` record the site keeps) is a cache of a value
+anyone can recompute from the chain, never the only place a settlement's asks exist; a
+stored value that disagrees with the chain is a bug, not the truth.
 
 Later prices, donations, withdrawals and pledge corrections do not reprice settled
 awards or trigger automatic top-ups. A resulting project funding gap or excess
 coverage is outside that allocation decision. Unsettled tiers use current project
 needs and the shares remaining after settled charges, including equal shares of
 any subsequent funding increase. These increases do not reopen settled tiers.
+
+### Covered projects
+
+- A project whose ask is $0 at a tally's block is not a candidate in that tally: it is not
+  funded, takes no money and is not part of any funded set the quiet comparison looks at.
+- A project whose ask is $0 at the block a tier settles with is **covered** at that
+  settlement, with a $0 award, unless it was funded in an earlier tier or covered earlier.
+  That is final, like any settlement: it is never a candidate in a later tier, even if ETH
+  falls afterwards. The settlement carries the covered set.
+- A covered project on a ballot is skipped: the voter is not charged for it and their money
+  goes to their other choices in this tier or the next runs.
+- A project covered during a window but not at the settlement block is an ordinary candidate
+  at settlement, with its ask at that block.
+- A project funded in a settled tier whose ask later reaches $0 keeps its award; the pool
+  still pays it.
+- When two tallies are compared, projects at $0 in either tally are dropped from both funded
+  sets first. Crossing $0 alone never extends a window: it does so only when another project
+  enters or leaves because of it.
+- With no $0 asks and no changes, the result is plain PB-EAR. **The staged tally differs from
+  plain PB-EAR only for $0 projects**: plain PB-EAR funds them (zero support meets zero cost),
+  the staged tally does not.
 
 The quiet comparison looks only at which projects in the settling tier are funded.
 Shifts in who pays, and changes in project need or per-NFT payment burden, matter
@@ -295,16 +367,20 @@ Ballot bytes come from BallotRecorded events. Receipt order controls replay. Use
 revisions, including rejected ones, and the on-chain history needed to derive every
 checkpoint. A final accepted-ballot snapshot is insufficient.
 
-The complete Python/browser replay remains to be implemented. They must agree on shared examples. A chain-derived
-checkpoint does not require a separate checkpoint-publication transaction.
+The replay is implemented: one TypeScript function in `shared/vote/` behind a small read
+interface, used by the site's server and by `deno task vote:replay`, which needs only an
+archive RPC for the round's chain ([how to run it](../README.md#replay-the-round-yourself)).
+The replayer first checks the ballots it counts against the contract's `transcript`,
+`recordCount` and `ballotHashOf`, then reads the states. The Python reference and the
+browser tally agree with it on shared examples. A chain-derived checkpoint does not require
+a separate checkpoint-publication transaction.
 
 ## Remaining decisions
 
-- Securing the USD funds, and implementing settled awards and NFT charges in replay.
+- Securing the USD funds.
 - Exact equal-NFT share accounting and rounding for initial USD funding and increases.
 - Supporter restrictions and chain finality policy.
-- Treatment of pool payouts, spent donations and pledge fulfilment to avoid double counting.
-- Production currency/feed configuration.
+- Treatment of pool payouts and spent donations to avoid double counting after the vote.
 
 ## Historical simulation evidence
 

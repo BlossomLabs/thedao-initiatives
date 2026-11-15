@@ -65,7 +65,7 @@ changing settled awards or charges.
 
 Project addresses hold donations in allowed native/ERC-20 currencies. Admins also
 record outstanding pledges, which may be currency-denominated or fixed USD.
-Project need is the original dollar ask minus the USD value of its donations and
+A project's ask is its dollar goal minus the USD value of its donations and
 pledges, floored at zero. Project support is separate from the common pool.
 
 The contract exposes donated, pledged and total USD, the remaining ask, and pool

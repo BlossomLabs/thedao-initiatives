@@ -34,7 +34,10 @@ appear in the UI as decoration or labels.
   the contract already works (unplaced = withheld, byte 255).
 - **No C tier, no hidden checkbox.** Only S, A, B and unplaced.
 - **Minimum ballot size:** the total requested by the placed projects must be at least 1.5× the
-  budget being distributed (the pool).
+  budget being distributed (the pool). *(Note, Nov 15, 2026: this became min(1.5× the pool, the
+  sum of every project's ask), because donations can push the sum of all asks below 1.5× the
+  pool; see `2026-11-12-chain-asks-in-quiet-ending-design.md`, "Adapted Nov 15". The 1.5×
+  below is the rule as first written.)*
 - **S-Tier independence:**
   - At least 3 independent projects. Related projects count as one.
   - RFPs are wildcards: each RFP counts as independent.

@@ -9,6 +9,7 @@ import { isValidOnchainBallot, tierName } from "../../shared/vote/ballot.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { recordVote } from "../../shared/vote/record.ts";
 import { kvStateCache, type VoteRound } from "../services/vote-chain.ts";
+import { currentVote } from "../services/vote-active.ts";
 import { chainStates, type StateSource } from "../../shared/vote/chain-states.ts";
 import {
   finalWhatIfsAsync,
@@ -91,7 +92,8 @@ type Call = Parameters<VoteRound["chain"]["send"]>[0];
  * the chain is behind), fall back to the chain's count so nothing queues behind
  * the gap. */
 export async function sendNext(kv: Deno.Kv, d: VoteRound, now: number, call: Call): Promise<Hex> {
-  const key = ["vote", "relayer-nonce"];
+  // Per chain: one relayer key serves the real round and an admin's Sepolia test round.
+  const key = ["vote", "relayer-nonce", d.manifest.chainId];
   const stored = (await kv.get<{ next: number; hash: Hex; at: number }>(key)).value;
   const pending = await d.chain.relayerNonce();
   let nonce = Math.max(stored?.next ?? 0, pending);
@@ -259,9 +261,10 @@ type KnownFinal = { key: string; at: number; final: FinalJson };
 
 export function voteRoutes(deps: Deps) {
   const r = new Hono<Vars>();
-  const dc = (): VoteRound => {
-    if (!deps.vote) throw fail(503, "off", "No vote is deployed right now.");
-    return deps.vote;
+  const dc = async (): Promise<VoteRound> => {
+    const d = await currentVote(deps);
+    if (!d) throw fail(503, "off", "No vote is deployed right now.");
+    return d;
   };
   /** Paper codes, claims and the gas drip belong to test rounds only. */
   const testOnly = (d: VoteRound) => {
@@ -560,8 +563,15 @@ export function voteRoutes(deps: Deps) {
     return BigInt(n);
   };
 
+  /** The round the site runs now: the pages load it before they show the vote. */
+  r.get("/manifest", async (c) => {
+    const d = await currentVote(deps);
+    c.header("Cache-Control", "no-store");
+    return c.json({ manifest: d?.manifest ?? null });
+  });
+
   r.get("/code/:code", async (c) => {
-    const d = dc();
+    const d = await dc();
     testOnly(d);
     const n = await codeNumber(d, c.req.param("code"));
     const owner = await d.chain.ownerOf(n);
@@ -570,7 +580,7 @@ export function voteRoutes(deps: Deps) {
 
   /** The badges the signed-in account votes with, so the menu and /vote lead to its ballot. */
   r.get("/mine", requireAuth, async (c) => {
-    const d = dc();
+    const d = await dc();
     await limit("mine", c.var.ip);
     const ids = await d.chain.idsOf(c.var.user!.address as Hex);
     return c.json({ ids: [...ids].sort((a, b) => a - b) });
@@ -578,14 +588,14 @@ export function voteRoutes(deps: Deps) {
 
   /** Admin → Vote: who pays for relayed ballots, and what it has left. */
   r.get("/relayer", requireAdmin, async (c) => {
-    const d = dc();
+    const d = await dc();
     const address = d.chain.relayerAddress();
     const balanceWei = address ? (await d.chain.balance(address)).toString() : null;
     return c.json({ address, balanceWei, chainId: d.manifest.chainId });
   });
 
   r.post("/claim", requireAuth, async (c) => {
-    const d = dc();
+    const d = await dc();
     testOnly(d);
     await limit("claim", c.var.ip);
     open(d);
@@ -639,7 +649,7 @@ export function voteRoutes(deps: Deps) {
   });
 
   r.post("/ballot", async (c) => {
-    const d = dc();
+    const d = await dc();
     await limit("ballot", c.var.ip);
     open(d);
     if (deps.now() < d.manifest.opensAt) throw fail(409, "not_open", NOT_OPEN);
@@ -794,7 +804,7 @@ export function voteRoutes(deps: Deps) {
 
   // "Send it yourself": a voter with no Sepolia ETH gets one small top-up, ever.
   r.post("/gas", requireAuth, async (c) => {
-    const d = dc();
+    const d = await dc();
     testOnly(d);
     await limit("gas", c.var.ip);
     open(d);
@@ -823,7 +833,7 @@ export function voteRoutes(deps: Deps) {
   /** The quiet ending: each tier's state, the accepted ballots, refusals, and what the
    * open tiers would fund if they settled now. Polled; read at most once per window. */
   r.get("/round", async (c) => {
-    const d = dc();
+    const d = await dc();
     const kv = deps.db.kv;
     const key = [...round(d), "round"];
     // firstOpen: the first open tier, or null once none is (no live tally to look ahead from).
@@ -909,7 +919,7 @@ export function voteRoutes(deps: Deps) {
   // The ballots that count (the quiet ending's accepted ones), for the vote results.
   // Read at most once per few seconds; once the round's end is final, read once, kept.
   r.get("/ballots", async (c) => {
-    const d = dc();
+    const d = await dc();
     const key = [...round(d), "ballots"];
     const cached = await deps.db.kv.get<{ at: number; final: boolean; ballots: unknown[] }>(key);
     if (cached.value?.final) return c.json({ at: cached.value.at, ballots: cached.value.ballots });

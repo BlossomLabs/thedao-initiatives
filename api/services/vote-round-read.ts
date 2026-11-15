@@ -1,0 +1,116 @@
+import {
+  createPublicClient,
+  erc20Abi,
+  getAddress,
+  hexToString,
+  http,
+  type PublicClient,
+  type Transport,
+} from "viem";
+import { sepolia } from "viem/chains";
+import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
+import type { RoundOnChain } from "../../shared/vote/round-from-chain.ts";
+
+const ZERO = "0x0000000000000000000000000000000000000000";
+
+/** The block a contract was deployed in: the first with its code (needs an archive node). */
+export async function deployBlockOf(pub: PublicClient, address: `0x${string}`): Promise<number> {
+  const head = Number(await pub.getBlockNumber());
+  const has = async (n: number) =>
+    ((await pub.getCode({ address, blockNumber: BigInt(n) })) ?? "0x") !== "0x";
+  if (!(await has(head))) throw new Error("There's no contract at that address on Sepolia.");
+  let lo = 0, hi = head;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (await has(mid)) hi = mid;
+    else lo = mid + 1;
+  }
+  return lo;
+}
+
+/** Everything a Sepolia round's contract says about itself, read at the newest block. */
+export async function readRoundOnChain(
+  address: `0x${string}`,
+  rpcUrl: string,
+  transport: Transport = http(rpcUrl),
+): Promise<RoundOnChain & { minters: (a: `0x${string}`) => Promise<boolean> }> {
+  // The reads go out as a few multicalls, not one request each (80+ initiatives).
+  const pub = createPublicClient({
+    chain: sepolia,
+    transport,
+    batch: { multicall: true },
+  }) as PublicClient;
+  const c = { address: getAddress(address), abi: SIGNED_BALLOTS_ABI } as const;
+  const one = <T>(functionName: string, args: unknown[] = []) =>
+    pub.readContract({ ...c, functionName, args } as never) as Promise<T>;
+  const counts = await Promise.all([
+    one<bigint>("initiativeCount"),
+    one<bigint>("currencyCount"),
+  ]).catch(() => {
+    throw new Error("That address isn't a vote round on Sepolia.");
+  });
+  // Rounds from before the ballot rules have no affiliations (groups) to read.
+  const nGroups = await one<bigint>("groupCount").catch(() => {
+    throw new Error(
+      "That round was deployed before the ballot rules: deploy a new one with vote-deploy.",
+    );
+  });
+  const [nI, nC] = counts.map(Number);
+  const nG = Number(nGroups);
+  const range = (n: number) => Array.from({ length: n }, (_, i) => BigInt(i));
+  const [opensAt, initialWindow, maxWindows, t0, t1, t2, poolUsd, independentTiers] = await Promise
+    .all([
+      one<bigint>("opensAt"),
+      one<bigint>("initialWindow"),
+      one<number>("maxWindows"),
+      one<bigint>("firstTallyAt", [0n]),
+      one<bigint>("firstTallyAt", [1n]),
+      one<bigint>("firstTallyAt", [2n]),
+      one<bigint>("poolUsd"),
+      one<number>("independentTiers"),
+    ]);
+  const [initiatives, groupNames, currencies, deployBlock] = await Promise.all([
+    Promise.all(
+      range(nI).map((i) =>
+        one<{ account: `0x${string}`; rfp: boolean; goalUsd: bigint; groups: bigint }>(
+          "initiative",
+          [i],
+        )
+      ),
+    ),
+    Promise.all(range(nG).map((i) => one<`0x${string}`>("groupName", [i]))),
+    Promise.all(
+      range(nC).map(async (i) => {
+        const x = await one<{ asset: `0x${string}`; usdFeed: `0x${string}` }>("currency", [i]);
+        const symbol = i === 0n
+          ? "USD"
+          : x.asset === ZERO
+          ? "ETH"
+          : await pub.readContract({ address: x.asset, abi: erc20Abi, functionName: "symbol" });
+        return { symbol, asset: getAddress(x.asset), usdFeed: getAddress(x.usdFeed) };
+      }),
+    ),
+    deployBlockOf(pub, c.address),
+  ]);
+  const minter = await one<`0x${string}`>("MINTER_ROLE");
+  return {
+    deployBlock,
+    schedule: {
+      opensAt: Number(opensAt),
+      firstTallyAt: [Number(t0), Number(t1), Number(t2)],
+      initialWindow: Number(initialWindow),
+      maxWindows: Number(maxWindows),
+    },
+    poolUsd,
+    independentTiers: Number(independentTiers),
+    initiatives: initiatives.map((x) => ({
+      account: getAddress(x.account),
+      rfp: x.rfp,
+      goalUsd: x.goalUsd,
+      groups: x.groups,
+    })),
+    groups: groupNames.map((h) => hexToString(h, { size: 32 }).replace(/\0+$/, "")),
+    currencies,
+    minters: (a) => one<boolean>("hasRole", [minter, a]),
+  };
+}

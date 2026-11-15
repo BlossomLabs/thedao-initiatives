@@ -46,7 +46,8 @@ type PreparedPledge = {
 const RECORDING_ROW = "Recording on-chain…";
 /** How long the browser waits for a pledge's receipt, like a ballot's. */
 const RECEIPT_WAIT_MS = 3 * 60_000;
-const CHAIN: VoteChain = ROUND.chainId === MAINNET_CHAIN_ID ? "Ethereum" : "Sepolia";
+/** The round's chain (read when needed: the active round loads with the page). */
+const chainName = (): VoteChain => ROUND.chainId === MAINNET_CHAIN_ID ? "Ethereum" : "Sepolia";
 
 const busyOf = (e: unknown): Busy | null => {
   if (apiCode(e) !== "pledge_pending" || !(e instanceof ApiError)) return null;
@@ -76,7 +77,7 @@ function usePledgeSend(base: string) {
     ) => {
       setPhase({ kind: "idle" });
       const deps: PledgeFlowDeps<PreparedPledge> = {
-        chain: CHAIN,
+        chain: chainName(),
         plain: async () => {
           try {
             await api(path, opts);
@@ -180,27 +181,27 @@ export function PledgeSendStatus({ phase }: { phase: PledgePhase }) {
     text = "Sign the pledge in your wallet. It’s a signature, not a payment.";
   } else if (phase.kind === "waiting" && phase.earlier) {
     text =
-      `An earlier change to this pledge is on its way: waiting for ${CHAIN} to record it. Yours wasn’t sent.`;
+      `An earlier change to this pledge is on its way: waiting for ${chainName()} to record it. Yours wasn’t sent.`;
   } else if (phase.kind === "relaying" || phase.kind === "waiting") {
-    text = `Waiting for ${CHAIN} to record it. Usually under a minute.`;
+    text = `Waiting for ${chainName()} to record it. Usually under a minute.`;
   } else if (phase.kind === "failed" && tx && phase.reason === TOO_LONG) {
     text =
-      `${CHAIN} is taking long. It was sent and may still land; the table shows it once it does.`;
+      `${chainName()} is taking long. It was sent and may still land; the table shows it once it does.`;
   } else if (phase.kind === "failed" && tx && phase.earlier) {
     text = `The earlier change to this pledge, not yours.`;
   } else if ((phase.kind === "saved" || phase.kind === "recorded") && tx) {
     text = phase.earlier
-      ? `The earlier change to this pledge was recorded on ${CHAIN}.`
-      : `Recorded on ${CHAIN}.`;
+      ? `The earlier change to this pledge was recorded on ${chainName()}.`
+      : `Recorded on ${chainName()}.`;
   }
   if (!text && !tx) return null;
   return (
     <p className="small dim m-0 flex flex-wrap items-center gap-x-3 gap-y-1" role="status">
       {text && <span>{text}</span>}
       {tx && (
-        <a href={etherscanTx(tx, CHAIN)} target="_blank" rel="noreferrer" className="tnum">
+        <a href={etherscanTx(tx, chainName())} target="_blank" rel="noreferrer" className="tnum">
           {tx.slice(0, 6)}…{tx.slice(-4)} on{" "}
-          {CHAIN === "Ethereum" ? "Etherscan" : "Sepolia Etherscan"}
+          {chainName() === "Ethereum" ? "Etherscan" : "Sepolia Etherscan"}
         </a>
       )}
     </p>

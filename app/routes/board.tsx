@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import BoardPage from "~/components/board/BoardPage";
 import { ROUND, roundDeployed } from "../../shared/vote/manifest";
+import { loadRound } from "~/lib/vote-round";
 import { generateMeta } from "~/utils/meta";
 
 export function meta() {
@@ -23,7 +24,11 @@ export default function Board() {
   // The prerendered page is the board, so the first render is too (hydration must
   // match); the vote results take over right after, once the clock is known.
   const [vote, setVote] = useState(false);
-  useEffect(() => setVote(realVoteOpen()), []);
+  useEffect(() => {
+    // Only a real round shows here (an admin's test round may stand in for the built-in
+    // one, so the active round is asked for first).
+    if (ROUND.kind === "real") loadRound().then(() => setVote(realVoteOpen()));
+  }, []);
   return vote
     ? (
       <Suspense fallback={<BoardPage />}>

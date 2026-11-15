@@ -1,4 +1,8 @@
 import VotePage from "~/components/vote/VotePage";
+import { roundLoader } from "~/lib/vote-round";
+
+/** The round the site runs now, before the page shows it. */
+export const clientLoader = roundLoader;
 
 export function meta() {
   return [{ title: "Your badge · TheDAO" }, { name: "robots", content: "noindex" }];

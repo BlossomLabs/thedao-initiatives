@@ -10,6 +10,7 @@ import { type BoardCache, readBoard } from "./board.ts";
 import { buildFeed, type Feed, filterFeed, llmsFull, llmsIndex } from "../services/feed.ts";
 import { FEED_JSON_SCHEMA } from "../services/feed-schema.ts";
 import { voteLlms } from "../services/vote-llms.ts";
+import { currentVote } from "../services/vote-active.ts";
 import { gunzip, gzip } from "../lib/gzip.ts";
 
 export const FEED_PATHS = [
@@ -113,11 +114,11 @@ export async function feedResponse(c: Context, body: string, type: string): Prom
   return c.body(body, 200, headers);
 }
 
-export function feedRoutes(feeds: FeedCache, deps?: Pick<Deps, "vote">) {
+export function feedRoutes(feeds: FeedCache, deps?: Pick<Deps, "vote" | "voteRound">) {
   const r = new Hono<Vars>();
   // For an LLM drafting a voter's ballot: the deployed round, its rules and projects.
   r.get("/vote/llms.txt", async (c) => {
-    const round = deps?.vote;
+    const round = deps && await currentVote(deps);
     if (!round) return c.text("No vote is deployed right now.", 404);
     const o = feeds.origin(c);
     // One multicall beside the feed read; only the HTTP response is cached. Asks that

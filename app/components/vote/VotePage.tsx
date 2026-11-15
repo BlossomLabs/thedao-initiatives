@@ -40,13 +40,13 @@ import BallotMenu from "~/components/vote/BallotMenu";
 import { Deadline, setVoteClock, voteNow, When } from "~/components/vote/When";
 import { useMockBallotSubmit } from "~/components/vote/mock-send";
 import { checkBallot, emptyTierErrors } from "../../../shared/vote/rules";
-import { shortDay, usd, usdShort } from "~/lib/format";
+import { shortDay, usd } from "~/lib/format";
 import { encodeBallot, type Tier, tierName } from "../../../shared/vote/ballot";
 import { ROUND, rulesRound, type VoteManifest } from "../../../shared/vote/manifest";
+import { poolName, PoolNote } from "~/components/vote/pool";
 import { askOf, servedAsks } from "~/lib/vote-results";
 
 const poolOf = (m: VoteManifest) => Number(BigInt(m.poolUsd) / 1_000_000n);
-const POOL = poolOf(ROUND);
 const closed = (m = ROUND) => voteNow() / 1000 >= m.closesAt;
 const notOpenYet = (m = ROUND) => voteNow() / 1000 < m.opensAt;
 const REAL = (m = ROUND) => m.kind === "real";
@@ -201,9 +201,9 @@ function Intro(
       <Panel>
         <h2 className="k">How the money is split</h2>
         <p>
-          A <b className="font-medium text-white">{usd(POOL)}</b>{" "}
-          demo pool is split equally among voters. The ballots fund whole initiatives, highest tiers
-          first, using Blossom Budgeting.
+          The <b className="font-medium text-white">{poolName(ROUND, poolOf(ROUND), usd)}</b>{" "}
+          is split equally among voters. The ballots fund whole initiatives, highest tiers first,
+          using Blossom Budgeting.
         </p>
         <p className="mt-2 text-white/60">
           It's a demo: no real funds move. Voting closes <Deadline at={ROUND.closesAt} />.
@@ -923,9 +923,9 @@ export default function VotePage(
     const howItWorks = (
       <div className="space-y-3 text-[14px] leading-snug text-white/70">
         <p className="m-0">
-          The {usdShort(poolOf(R))} {REAL(R) ? "pool" : "demo pool"}{" "}
-          is split equally among the badges that vote.
+          The {poolName(R, poolNow)} is split equally among the badges that vote.
         </p>
+        <PoolNote R={R} />
         <a
           href={BLOSSOM}
           target="_blank"
@@ -1081,8 +1081,7 @@ export default function VotePage(
               where they apply (the ballot box, the round box, the list). */
           }
           <p className="mx-auto mt-3 max-w-[640px] font-inter-tight text-[16px] leading-snug text-white/70">
-            The {usdShort(poolOf(R))} {REAL(R) ? "pool" : "demo pool"}{" "}
-            is split equally among the badges that vote.
+            The {poolName(R, poolNow)} is split equally among the badges that vote.
           </p>
           <a
             href={BLOSSOM}

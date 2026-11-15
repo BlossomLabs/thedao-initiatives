@@ -40,6 +40,15 @@ import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "..
 import type { Hex } from "viem";
 import { pledgeChainId, pledgeTypedData } from "../../shared/vote/typed-data.ts";
 import { newId } from "../lib/ids.ts";
+import { currentVote, VOTE_ROUND_KEY, type VoteRoundSetting } from "../services/vote-active.ts";
+import { readRoundOnChain } from "../services/vote-round-read.ts";
+import { manifestFromChain, slugsByAccount } from "../../shared/vote/round-from-chain.ts";
+import {
+  BUILT_ROUND,
+  checkManifest,
+  roundDeployed,
+  type VoteManifest,
+} from "../../shared/vote/manifest.ts";
 import {
   adminPledges,
   amountAfter,
@@ -99,6 +108,90 @@ export function adminRoutes(deps: Deps) {
     if (err) throw new HttpError(400, err);
     await db.meta.set("vote_settings", v);
     return c.json(v);
+  });
+
+  /** Admin → Vote: the round the site runs (built in, or a Sepolia test round read from
+   * its contract) and the pool's ETH while it waits to be sold. */
+  const roundSetting = async () => (await db.meta.get<VoteRoundSetting>(VOTE_ROUND_KEY)) ?? {};
+  const roundJson = async () => {
+    const s = await roundSetting();
+    const brief = (m: VoteManifest) => ({
+      kind: m.kind,
+      chainId: m.chainId,
+      contract: m.contract,
+      issuer: m.issuer ?? null,
+      opensAt: m.opensAt,
+      closesAt: m.closesAt,
+      firstTallyAt: m.schedule.firstTallyAt[0],
+      projects: m.slugs.length,
+      poolUsd: m.poolUsd,
+    });
+    return {
+      built: roundDeployed(BUILT_ROUND) ? brief(BUILT_ROUND) : null,
+      test: s.test ? { ...brief(s.test.manifest), at: s.test.at, by: s.test.by } : null,
+      pool: s.pool ?? null,
+    };
+  };
+  const changedRound = () => deps.voteRound?.forget?.();
+  r.get("/vote-round", async (c) => c.json(await roundJson()));
+  /** Reads the contract (Sepolia) and runs the site on it; again to refresh it after
+   * projects or affiliations change on-chain. */
+  r.post("/vote-round/test", async (c) => {
+    const body = await jsonBody(c, ["contract", "issuer"]);
+    const contract = s(body.contract, 60).trim();
+    const issuer = s(body.issuer, 60).trim();
+    if (!isAddress(contract)) throw new HttpError(400, "The contract isn't an address.");
+    if (!isAddress(issuer)) throw new HttpError(400, "The issuer isn't an address.");
+    if (!deps.config.sepoliaRpcUrl) throw new HttpError(503, "No Sepolia RPC is configured.");
+    const rows = await db.initiatives.list(["approved", "archived", "pending", "rejected"]);
+    let manifest: VoteManifest;
+    const warnings: string[] = [];
+    try {
+      const chain = await readRoundOnChain(contract as Hex, deps.config.sepoliaRpcUrl);
+      manifest = checkManifest(
+        manifestFromChain(contract as Hex, issuer as Hex, chain, slugsByAccount(rows)),
+      );
+      const relayer = (await currentVote(deps))?.chain.relayerAddress();
+      if (!relayer) warnings.push("No relayer key is configured: ballots can't be relayed.");
+      else if (!(await chain.minters(relayer))) {
+        warnings.push(
+          `The relayer ${relayer} can't mint badges on this contract: codes can't be claimed.`,
+        );
+      }
+    } catch (e) {
+      throw new HttpError(400, e instanceof Error ? e.message : String(e));
+    }
+    await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => ({
+      ...(cur ?? {}),
+      test: { manifest, at: deps.now(), by: c.var.user!.address },
+    }));
+    changedRound();
+    return c.json({ ...(await roundJson()), warnings });
+  });
+  /** Back to the round built into the site. */
+  r.delete("/vote-round/test", async (c) => {
+    await jsonBody(c, []);
+    await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => {
+      const { test: _, ...rest } = cur ?? {};
+      return rest;
+    });
+    changedRound();
+    return c.json(await roundJson());
+  });
+  /** The pool's ETH (null: say nothing) and whether it's been sold for USD yet. */
+  r.post("/vote-round/pool", async (c) => {
+    const body = await jsonBody(c, ["eth", "sold"]);
+    const eth = body.eth === null ? null : Number(body.eth);
+    if (eth !== null && !(Number.isFinite(eth) && eth > 0 && eth < 1e7)) {
+      throw new HttpError(400, "The ETH amount isn't a number.");
+    }
+    if (typeof body.sold !== "boolean") throw new HttpError(400, "sold must be true or false");
+    await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => {
+      const { pool: _, ...rest } = cur ?? {};
+      return eth === null ? rest : { ...rest, pool: { eth, sold: body.sold as boolean } };
+    });
+    changedRound();
+    return c.json(await roundJson());
   });
 
   /**
@@ -593,7 +686,7 @@ export function adminRoutes(deps: Deps) {
    * the receipt, then calls `settle`). */
   async function writeOnChain(
     c: Context<Vars>,
-    chainAt: NonNullable<ReturnType<typeof pledges.onChainFor>>,
+    chainAt: NonNullable<Awaited<ReturnType<typeof pledges.onChainFor>>>,
     rfpId: string,
     signed: ReturnType<typeof signedPledgeOf>,
     change: PledgeChange,
@@ -616,7 +709,7 @@ export function adminRoutes(deps: Deps) {
    */
   r.post("/initiatives/:id/pledges/prepare", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"), true);
-    const chainAt = pledges.onChainFor(initiative);
+    const chainAt = await pledges.onChainFor(initiative);
     if (!chainAt) {
       throw pledgeFail(
         409,
@@ -680,7 +773,7 @@ export function adminRoutes(deps: Deps) {
 
   r.post("/initiatives/:id/pledges", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"), true);
-    const chainAt = pledges.onChainFor(initiative);
+    const chainAt = await pledges.onChainFor(initiative);
     const { patch, status, signed } = await readPledge(c, initiative, chainAt ? "signed" : "plain");
     if (!patch.company) throw new HttpError(400, "Company name is required.");
     if (patch.amountUsd === undefined) throw new HttpError(400, "Amount is required.");
@@ -705,7 +798,7 @@ export function adminRoutes(deps: Deps) {
   r.patch("/initiatives/:id/pledges/:pid", async (c) => {
     const initiative = await initiativeOr404(c.req.param("id"), true);
     const pid = c.req.param("pid");
-    const chainAt = pledges.onChainFor(initiative);
+    const chainAt = await pledges.onChainFor(initiative);
     const { patch, status, signed } = await readPledge(c, initiative, chainAt ? "signed" : "plain");
     if (status !== undefined && !["pledged", "received", "withdrawn"].includes(status)) {
       throw new HttpError(400, "bad status");
@@ -736,7 +829,7 @@ export function adminRoutes(deps: Deps) {
     const body = await jsonBody(c, SIGNED_FIELDS);
     const initiative = await initiativeOr404(c.req.param("id"), true);
     const pid = c.req.param("pid");
-    const chainAt = pledges.onChainFor(initiative);
+    const chainAt = await pledges.onChainFor(initiative);
     if (chainAt) {
       const signed = signedPledgeOf(body);
       if (signed.pid !== pid) throw new HttpError(400, "bad pledge id");

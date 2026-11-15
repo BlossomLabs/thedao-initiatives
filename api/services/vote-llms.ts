@@ -32,6 +32,13 @@ export function voteLlms(
     } configured pool). A project's ask is its goal less its donations and open pledges, ` +
     "on-chain at the block that records your ballot, so it can change before then. If the " +
     "live pool differs, recompute this minimum from its poolUsd.",
+    ...(m.pool && !m.pool.sold
+      ? [
+        `- The pool is ${m.pool.eth} ETH, sold for USD before ${sTier}'s first tally ` +
+        `(${utc(m.schedule.firstTallyAt[0])}). Until then poolUsd is an estimate an admin ` +
+        "sets, so the minimum above can move either way when it is sold: leave room.",
+      ]
+      : []),
     "- Where a project's ask is unknown, the ballot's size can't be checked here: say so to the " +
     "voter rather than estimating it.",
     "- The asks listed below are the chain's current ones: use them for the minimum and the " +

@@ -2,8 +2,13 @@ import PageMain from "~/components/layout/PageMain";
 import Crumbs from "~/components/layout/Crumbs";
 import VoteSettings from "~/components/admin/VoteSettings";
 import VoteRelayer from "~/components/admin/VoteRelayer";
+import VoteRound from "~/components/admin/VoteRound";
 import { roundDeployed } from "../../shared/vote/manifest";
 import { generateMeta } from "~/utils/meta";
+import { roundLoader } from "~/lib/vote-round";
+
+/** The round the site runs now, before the page shows it. */
+export const clientLoader = roundLoader;
 
 export function meta() {
   return generateMeta({ title: "Vote", url: "/admin/vote", noIndex: true });
@@ -18,9 +23,11 @@ export default function VotePage() {
         Vote
       </h1>
       <p className="small dim mt-2.5">
-        When an initiative can go to TheDAO's vote, and whether the site shows it.
+        When an initiative can go to TheDAO's vote, whether the site shows it, and the round it
+        runs.
       </p>
       <VoteSettings />
+      <VoteRound />
       {roundDeployed() && <VoteRelayer />}
     </PageMain>
   );

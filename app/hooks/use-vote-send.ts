@@ -28,12 +28,20 @@ const MAINNET_RPC = (import.meta.env?.VITE_RPC_URL as string | undefined) ||
   "https://ethereum-rpc.publicnode.com";
 const WAIT_MS = 3 * 60_000;
 
-let client: PublicClient | null = null;
+let client: { chainId: number; pub: PublicClient } | null = null;
 /** Reads the round's chain from the browser (receipts, nonces, self-send). */
-export const voteClient = (): PublicClient => (client ??= createPublicClient({
-  chain: voteChain(),
-  transport: http(ROUND.chainId === MAINNET_CHAIN_ID ? MAINNET_RPC : SEPOLIA_RPC),
-}) as PublicClient);
+export const voteClient = (): PublicClient => {
+  if (client?.chainId !== ROUND.chainId) {
+    client = {
+      chainId: ROUND.chainId,
+      pub: createPublicClient({
+        chain: voteChain(),
+        transport: http(ROUND.chainId === MAINNET_CHAIN_ID ? MAINNET_RPC : SEPOLIA_RPC),
+      }) as PublicClient,
+    };
+  }
+  return client.pub;
+};
 
 /** Waits for a mint to land so the ballot can be shown. */
 export function useMintWait() {

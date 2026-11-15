@@ -29,8 +29,12 @@ export interface Deps {
   admins: Admins;
   /** The write freeze admins toggle from the dashboard (services/maintenance.ts). */
   maintenance: Maintenance;
-  /** The vote round; absent until a contract is deployed (routes answer 503). */
+  /** A fixed vote round (tests); absent until a contract is deployed (routes answer 503). */
   vote?: VoteRound;
+  /** The site's vote round now (services/vote-active.ts): the built-in one, or the
+   * Sepolia test round admins set in its place. Wins over `vote`. Read it through
+   * `currentVote(deps)`. */
+  voteRound?: (() => Promise<VoteRound | undefined>) & { forget?: () => void };
   /** Handed work a request starts but doesn't wait for (the vote's gap to the next
    * tier). Absent, it just runs; tests collect it so they can wait for it. */
   background?: (work: Promise<unknown>) => void;

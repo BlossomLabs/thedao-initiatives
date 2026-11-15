@@ -6,6 +6,10 @@ import { useSession } from "~/context/session";
 import { useWalletPicker } from "~/context/wallet-picker";
 import { useMyBadges } from "~/hooks/use-vote";
 import { ROUND, roundDeployed } from "../../shared/vote/manifest";
+import { roundLoader } from "~/lib/vote-round";
+
+/** The round the site runs now, before the page shows it. */
+export const clientLoader = roundLoader;
 
 export function meta() {
   return [{ title: "Vote · TheDAO" }, { name: "robots", content: "noindex" }];

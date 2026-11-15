@@ -45,16 +45,14 @@ import {
   hexToString,
   http,
   isAddress,
-  keccak256,
-  slice,
   stringToHex,
-  toBytes,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { mainnet, sepolia } from "viem/chains";
 import { DEFAULT_ADMIN_ADDRESSES, REVIEW_BADGE_CONTRACT } from "../api/config.ts";
 import { SIGNED_BALLOTS_ABI } from "../shared/vote/abi.ts";
 import type { VoteManifest } from "../shared/vote/manifest.ts";
+import { testPlaceholder, tierSpan } from "../shared/vote/round-from-chain.ts";
 import { pledgeChainId } from "../shared/vote/typed-data.ts";
 import mainnetConfig from "../vote/config/mainnet.json" with { type: "json" };
 
@@ -71,8 +69,7 @@ export const TEST_WINDOWS = { initialWindow: 320, maxWindows: 4 };
 export const REAL_WINDOWS = { initialWindow: 24 * 60 * 60, maxWindows: 9 };
 
 /** The longest a tier can run: every window, as the contract adds them up. */
-export const tierMax = (s: { initialWindow: number; maxWindows: number }) =>
-  Array.from({ length: s.maxWindows }, (_, k) => s.initialWindow >> k).reduce((a, b) => a + b, 0);
+export const tierMax = tierSpan;
 
 export type BoardCard = {
   slug: string;
@@ -155,8 +152,8 @@ export function nextAddingOpen(s: Schedule, now: number): number | null {
   return t;
 }
 
-const placeholder = (slug: string) =>
-  getAddress(slice(keccak256(toBytes(`test-round:${slug}`)), 12));
+// Admin → Vote matches a test round's initiatives to the board by these accounts.
+const placeholder = testPlaceholder;
 
 /** On-chain initiatives in the given order: the Safe when set and unused, else (test
  * votes only) a deterministic placeholder, since the contract needs unique accounts.

@@ -18,6 +18,7 @@ import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import { pledgeChainId, pledgeTypedData } from "../../shared/vote/typed-data.ts";
 import { errorText, sendNext, withRelayer } from "../routes/vote.ts";
 import type { VoteRound } from "./vote-chain.ts";
+import { currentVote } from "./vote-active.ts";
 
 /** How long an admin's pledge signature stays good: short, so an unsent one can't
  * later restore an amount. */
@@ -180,8 +181,8 @@ export function adminPledges(deps: Deps) {
   const kv = db.kv;
 
   /** The vote round and the pledge's place in it, when this initiative's pledges go on-chain. */
-  const onChainFor = (initiative: { slug: string }) => {
-    const d = deps.vote;
+  const onChainFor = async (initiative: { slug: string }) => {
+    const d = await currentVote(deps);
     const at = pledgeOnChain(d?.manifest, initiative.slug, deps.now());
     return d && at ? { d, at } : null;
   };
@@ -303,7 +304,7 @@ export function adminPledges(deps: Deps) {
     pid: string,
     hash: Hex | null,
   ): Promise<{ state: SettleState; pledge: Pledge | null }> {
-    const d = deps.vote;
+    const d = await currentVote(deps);
     if (!d) throw new HttpError(404, "not found");
     const row = async (state: SettleState) => ({
       state,
@@ -336,7 +337,7 @@ export function adminPledges(deps: Deps) {
   /** One look at each of the initiative's changes in flight: the settled ones are applied or
    * dropped, the rest listed. For the admin page. */
   async function settleAll(rfpId: string): Promise<PendingPledgeJson[]> {
-    const d = deps.vote;
+    const d = await currentVote(deps);
     const out: PendingPledgeJson[] = [];
     if (!d) return out;
     for await (const entry of kv.list<PendingRecord>({ prefix: pendingPrefix(d, rfpId) })) {
@@ -520,7 +521,8 @@ export function adminPledges(deps: Deps) {
   /** Settle a change left in flight from the vote (the round may have closed since), before
    * a write that doesn't go on-chain. */
   async function settleLeftover(rfpId: string, pid: string) {
-    if (deps.vote) await settle(deps.vote, rfpId, pid);
+    const d = await currentVote(deps);
+    if (d) await settle(d, rfpId, pid);
   }
 
   return { onChainFor, settle, settleAll, settleLeftover, settleSent, write };

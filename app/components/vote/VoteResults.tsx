@@ -18,6 +18,7 @@ import { useSession } from "~/context/session";
 import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd, usdShort } from "~/lib/format";
 import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
+import { poolEstimated, poolNoteText } from "~/components/vote/pool";
 import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
 import { chainTally } from "../../../shared/vote/chain";
 import { parseCode } from "../../../shared/vote/code";
@@ -382,8 +383,12 @@ export default function VoteResults(
 
 
           <>
-            would be funded by {plural(n, "ballot")} from the {usd(pool)}{" "}
+            would be funded by {plural(n, "ballot")} from the{" "}
+            {poolEstimated(R) ? `${R.pool!.eth.toLocaleString("en-US")} ETH` : usd(pool)}{" "}
             <span className="text-vote">{POOL_NAME}</span>
+            {poolEstimated(R) && (
+              <span title={poolNoteText(R) ?? undefined}>{` (about ${usdShort(pool)})`}</span>
+            )}
             {rv && tierBEmpty(rv) && TIER_B_NOTE}
           </>
 

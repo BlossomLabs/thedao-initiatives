@@ -16,7 +16,13 @@ import type { Deps } from "./middleware/context.ts";
 import { createAdmins } from "./services/admins.ts";
 import { createStateSource, createVoteChain } from "./services/vote-chain.ts";
 import { reviewTokenIds } from "./chain/reviewer.ts";
-import { MAINNET_CHAIN_ID, ROUND, roundDeployed } from "../shared/vote/manifest.ts";
+import {
+  BUILT_ROUND,
+  MAINNET_CHAIN_ID,
+  roundDeployed,
+  type VoteManifest,
+} from "../shared/vote/manifest.ts";
+import { createActiveVote, VOTE_ROUND_KEY, type VoteRoundSetting } from "./services/vote-active.ts";
 import { createStaticSite, type SiteOptions } from "./site.ts";
 
 /** Structured events (audit trail, rate limit breaches) are emitted as one JSON
@@ -63,9 +69,11 @@ export async function createServer(siteOptions?: SiteOptions) {
     );
   }
   const chain = createChain({ endpoints: config.rpcEndpoints, now });
-  const voteRpcUrl = ROUND.chainId === MAINNET_CHAIN_ID
-    ? config.rpcEndpoints[0]
-    : config.sepoliaRpcUrl;
+  const voteRpcUrl = (m: VoteManifest) =>
+    m.chainId === MAINNET_CHAIN_ID ? config.rpcEndpoints[0] : config.sepoliaRpcUrl;
+  const relayerKey = /^0x[0-9a-fA-F]{64}$/.test(config.voteRelayerKey)
+    ? config.voteRelayerKey as `0x${string}`
+    : null;
   const deps: Deps = {
     db,
     chain,
@@ -79,21 +87,23 @@ export async function createServer(siteOptions?: SiteOptions) {
     ens: createEns(fetch, now, { onchain: onchainEns(config.rpcEndpoints, fetch), log }),
     pinata: createPinata(config, fetch),
     log,
-    // Off until the manifest names a deployed contract.
-    vote: !roundDeployed(ROUND) ? undefined : {
-      manifest: ROUND,
-      chain: createVoteChain(
-        ROUND,
-        voteRpcUrl,
-        /^0x[0-9a-fA-F]{64}$/.test(config.voteRelayerKey)
-          ? config.voteRelayerKey as `0x${string}`
-          : null,
-        undefined,
-        (a) => reviewTokenIds(chain.rpc, a, fetch),
-      ),
-      // Past blocks need an archive node: the round's RPC (RPC_URL / SEPOLIA_RPC_URL) must be one.
-      source: createStateSource(ROUND, voteRpcUrl),
-    },
+    // Off until the manifest (or an admin's test round) names a deployed contract.
+    voteRound: createActiveVote({
+      baked: roundDeployed(BUILT_ROUND) ? BUILT_ROUND : undefined,
+      read: () => db.meta.get<VoteRoundSetting>(VOTE_ROUND_KEY),
+      build: (m) => ({
+        manifest: m,
+        chain: createVoteChain(
+          m,
+          voteRpcUrl(m),
+          relayerKey,
+          undefined,
+          (a) => reviewTokenIds(chain.rpc, a, fetch),
+        ),
+        // Past blocks need an archive node: the round's RPC (RPC_URL / SEPOLIA_RPC_URL) must be one.
+        source: createStateSource(m, voteRpcUrl(m)),
+      }),
+    }),
   };
   // Load the image decoder before the first upload asks for it.
   if (deps.pinata.enabled) warmImageWorker();

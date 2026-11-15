@@ -32,6 +32,10 @@ import { walletErrorMessage } from "~/lib/donate";
 import { dt } from "~/lib/format";
 import { discussionKind } from "~/lib/discussion";
 import { withReauthentication } from "~/lib/reauthenticate";
+import { roundLoader } from "~/lib/vote-round";
+
+/** The round the site runs now, before the page shows it. */
+export const clientLoader = roundLoader;
 
 const STATUS_HELP: Record<string, string> = {
   pending: "Submitted and waiting for review. It is not on the board yet.",

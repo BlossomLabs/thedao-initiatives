@@ -9,6 +9,7 @@ import { useWalletPicker } from "~/context/wallet-picker";
 import { useIdentity } from "~/hooks/use-identity";
 import { useMyBadges } from "~/hooks/use-vote";
 import { roundDeployed } from "../../../shared/vote/manifest";
+import { useRoundLoaded } from "~/lib/vote-round";
 import { Avatar } from "./Avatar";
 import WalletMenu, { type WalletMenuItem } from "./WalletMenu";
 import { shortAddr } from "~/lib/format";
@@ -29,7 +30,9 @@ export default function ConnectButton() {
   );
   const identity = useIdentity(address);
   // The badges this account votes with in the current round (none: no Vote item).
-  const voteBadges = useMyBadges(signedIn ? session!.address : null, roundDeployed());
+  // An admin's test round can stand in for the built-in one: ask which once signed in.
+  const roundKnown = useRoundLoaded(signedIn);
+  const voteBadges = useMyBadges(signedIn ? session!.address : null, roundKnown && roundDeployed());
   const { profileOpen, openProfile } = useProfileDialog();
   const { openWalletPicker, walletPickerOpen } = useWalletPicker();
   const navigate = useNavigate();

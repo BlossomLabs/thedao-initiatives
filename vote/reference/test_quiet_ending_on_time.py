@@ -178,6 +178,80 @@ class InWindowTallies(unittest.TestCase):
             self.assertEqual([d["confirmed"] for d in result["days"]], [d["confirmed"] for d in plain["days"]])
 
 
+class CoveredProjects(unittest.TestCase):
+    """A project whose ask is $0 is covered: no candidate, no money, final at the stage
+    that settles with it. This is where the staged tally parts from plain PB-EAR, which
+    funds a $0 project on no support at all."""
+
+    def test_a_donation_before_the_first_tier_settles_extends_the_window(self):
+        # Two holders with 100 each rank both projects in the first tier; at 130 and 90
+        # only the second is funded. A donation brings the first down to 70: both fit.
+        voters = [(100, None), (100, None)]
+        ballots = fixed([[1, 1], [1, 1]])
+        quiet = run_on_time([130, 90], voters, 0, ballots)
+        moved = run_on_time([130, 90], voters, 0, ballots, asks_for_day=lambda day: [70, 90] if day else [130, 90])
+        self.assertEqual(quiet["days"][0]["confirmed"], [0, 1, 2, 3])
+        self.assertEqual(moved["days"][0]["confirmed"], [])
+        self.assertEqual(moved["funded"], [A, B])
+
+    def test_a_covered_project_is_not_funded_and_is_recorded_as_covered(self):
+        result = run_on_time([100, 100, 0], [(150, None), (150, None)], 0, fixed([[1, 2, 0], [1, 2, 0]]))
+        self.assertNotIn(C, result["funded"])
+        self.assertEqual(result["covered"], [[C], [], [], []])
+
+    def test_crossing_zero_alone_does_not_extend(self):
+        # B is funded in the first tier at cost 5 and covered at cost 0; nothing else
+        # moves, so the first tier is confirmed at the deadline, with B as covered.
+        voters = [(100, None), (100, None)]
+        ballots = fixed([[1, 1], [1, 1]])
+        result = run_on_time([100, 5], voters, 0, ballots, asks_for_day=lambda day: [100, 0] if day else [100, 5])
+        self.assertEqual(result["days"][0]["confirmed"], [0, 1, 2, 3])
+        self.assertEqual(result["funded"], [A])
+        self.assertEqual(result["covered"][0], [B])
+
+    def test_a_donation_that_covers_a_funded_project_extends_only_if_it_frees_another(self):
+        voters = [(100, None), (100, None)]
+        ballots = fixed([[1, 1], [1, 1]])
+        # B is already funded: covering A frees nothing, so the tier is confirmed.
+        result = run_on_time([130, 90], voters, 0, ballots, asks_for_day=lambda day: [0, 90] if day else [130, 90])
+        self.assertEqual(result["days"][0]["confirmed"], [0, 1, 2, 3])
+        self.assertEqual(result["covered"][0], [A])
+        # Covering A, a funded project, frees money that brings B in: the window extends.
+        costs = [90, 90, 60, 50]
+        voters, ballots = voters, fixed([[1, 1, 1, 1], [1, 1, 1, 1]])
+        result = run_on_time(costs, voters, 0, ballots, asks_for_day=lambda day: [0, 90, 60, 50] if day else costs)
+        self.assertEqual(result["days"][0]["confirmed"], [])
+        self.assertEqual(result["funded"], [3, 2, B])
+        self.assertEqual(result["covered"][0], [A])
+
+    def test_a_funded_project_whose_ask_is_later_covered_keeps_its_award(self):
+        # A is settled and funded at the first deadline; its ask is 0 at the next
+        # settlement. It is paid, not re-labelled as covered.
+        voters = [(100, None), (100, None)]
+        days = fixed([[1, 1, 3, 4]] * 2, [[1, 1, 4, 3]] * 2)
+        result = run_on_time(
+            [60, 0, 60, 60], voters, 0, days, asks_for_day=lambda day: [0 if day >= 2 else 60, 0, 60, 60]
+        )
+        self.assertEqual(result["days"][0]["confirmed"], [0])
+        self.assertIn(A, result["funded"])
+        self.assertEqual(result["paid"][A], {0: 30, 1: 30})
+        self.assertEqual(sum(result["covered"], []), [B])
+
+    def test_covered_at_settlement_never_returns(self):
+        # B is covered when the first tier settles at the first deadline, while the
+        # second tier moves and the window goes on. Its ask is back at the second
+        # deadline, but it is final.
+        voters = [(100, None), (100, None)]
+        days = fixed([[1, 1, 3, 4]] * 2, [[1, 1, 4, 3]] * 2)
+        result = run_on_time(
+            [60, 0, 60, 60], voters, 0, days, asks_for_day=lambda day: [60, 10 if day >= 2 else 0, 60, 60]
+        )
+        self.assertEqual(result["days"][0]["confirmed"], [0])
+        self.assertEqual(result["covered"][0], [B])
+        self.assertNotIn(B, result["funded"])
+        self.assertEqual(sum(result["covered"], []), [B])
+
+
 class Properties(unittest.TestCase):
     def revised(self, rounds, seed, **options):
         """Random small rounds in which ballots change freely until the deadline and,

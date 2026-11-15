@@ -494,11 +494,20 @@ def run_on_time(
     ``stage`` the first stage still open. Each day record has the stage the comparison
     started at, ``confirmed`` (the stages accepted that day), ``hours`` since the
     previous tally, and ``shifted`` for the stage where the comparison stopped.
+
+    A proposal whose cost is 0 at a tally is covered: it is not a candidate in that
+    tally, so unlike plain PB-EAR (which funds a $0 proposal on no support at all) it
+    is never funded. When a stage is confirmed, every proposal at cost 0 at that tally
+    is final as covered with a $0 award, whatever its cost later: ``covered`` lists
+    them, one entry per confirmed stage, and they are no candidates in later stages.
+    Comparing two tallies leaves out of both funded sets whatever is covered at either,
+    so crossing $0 alone never extends a window.
     """
     m = len(costs)
     weights = [w for w, _ in voters]
     budget = sum(weights) + abstaining
     funded, paid, days, forced = [], {}, [], []
+    covered, covered_done = [], set()
     lengths = extension_lengths(*hours)
     scope = "first" if lock_supporters is True else lock_supporters
 
@@ -524,7 +533,7 @@ def run_on_time(
         spent = sum(sum(shares.values()) for shares in paid.values())
         out = []
         for stage in range(first, tiers + 1):
-            candidates = [c for c in range(m) if c not in done]
+            candidates = [c for c in range(m) if c not in done and c not in covered_done and costs[c] > 0]
             order, shares, _ = _ear(costs, held, ranks, budget, spent, candidates, max_level=bound(ballots, stage))
             done |= set(order)
             spent += sum(sum(shares[c].values()) for c in order)
@@ -539,6 +548,12 @@ def run_on_time(
             was = {i: d * current_costs[c] // earlier_costs[c] for i, d in earlier[c].items()}
             total += sum(abs(now.get(i, 0) - was.get(i, 0)) for i in set(now) | set(was)) // 2
         return total
+
+    def same_funding(order, earlier_order, costs_now, costs_before):
+        """Whether two tallies fund the same proposals once every proposal that is
+        covered (ask $0) at either is left out of both."""
+        free = {c for c in range(m) if costs_now[c] == 0 or costs_before[c] == 0}
+        return set(order) - free == set(earlier_order) - free
 
     def locked(old_ballots, new_ballots):
         """``new_ballots`` with every revision that breaks a lock refused whole."""
@@ -594,7 +609,8 @@ def run_on_time(
             for block_ballots, block_costs in between(day, state(ballots, first, contested, window)):
                 ballots, n = locked(ballots, block_ballots)
                 refused += n
-                inside.append(tally_open(ballots, first, previous_costs if block_costs is None else list(block_costs)))
+                block_costs = previous_costs if block_costs is None else list(block_costs)
+                inside.append((tally_open(ballots, first, block_costs), block_costs))
         before = ballots
         if asks_for_day:
             current_costs = list(asks_for_day(day))
@@ -610,8 +626,11 @@ def run_on_time(
                 earlier_order, earlier_shares = previous[stage - started]
                 shifted = moved(shares, earlier_shares, previous_costs)
                 steady = payment_tolerance is None or shifted <= payment_tolerance
-                wandered = any(set(tally[stage - started][0]) != set(earlier_order) for tally in inside)
-                if set(order) != set(earlier_order) or wandered or not steady:
+                wandered = any(
+                    not same_funding(tally[stage - started][0], earlier_order, block_costs, previous_costs)
+                    for tally, block_costs in inside
+                )
+                if not same_funding(order, earlier_order, current_costs, previous_costs) or wandered or not steady:
                     if stage != first or extensions < len(lengths):
                         break
                     forced.append(stage)
@@ -621,6 +640,9 @@ def run_on_time(
                     weights[i] -= d
                 paid[c] = shares[c]
                 funded.append(c)
+            free = [c for c in range(m) if current_costs[c] == 0 and c not in covered_done and c not in paid]
+            covered.append(free)
+            covered_done.update(free)
             confirmed.append(stage)
             accepted += len(order)
             stage += 1
@@ -654,5 +676,5 @@ def run_on_time(
         locks = supporters(previous) if scope else {}
     previous = [([], {})]
     result = state(ballots, first, set())
-    result["days"], result["forced"] = days, forced
+    result["days"], result["forced"], result["covered"] = days, forced, covered
     return result

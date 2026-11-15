@@ -1,8 +1,8 @@
 /** The ballot's send-and-check flow, with every chain, wallet and API call
  * injected so it can be tested on its own. */
 import { type Hex, hexToBytes, keccak256 } from "viem";
-import type { VoteManifest } from "../../shared/vote/manifest";
-import { findProof, type RulesRound } from "../../shared/vote/rules";
+import { rulesRound, type VoteManifest } from "../../shared/vote/manifest";
+import { findProof } from "../../shared/vote/rules";
 import type { BallotTxResult } from "../../shared/vote/receipt";
 import { voteTypedData } from "../../shared/vote/typed-data";
 
@@ -153,8 +153,6 @@ export async function selfSendBallot(
   tokenId: bigint,
   voter: Hex,
   ballot: Hex,
-  /** The round the ballot was judged on (the chain's asks): its proof is found on it. */
-  rules: RulesRound | undefined,
   last: Signed | null,
   set: (p: BallotPhase) => void,
 ): Promise<Signed | null> {
@@ -179,8 +177,10 @@ export async function selfSendBallot(
   let hash: Hex;
   try {
     // The page only offers this for a ballot that passes the rules; without a proof the
-    // contract refuses it and the failure says so.
-    hash = await d.sendOwn(signed, (rules && findProof(hexToBytes(ballot), rules)) ?? []);
+    // contract refuses it and the failure says so. The proof is three unrelated projects
+    // per enforced tier: groups only, so the manifest finds it whatever the asks are.
+    const round = rulesRound(m, m.projects.map((p) => BigInt(p.goalUsd)));
+    hash = await d.sendOwn(signed, findProof(hexToBytes(ballot), round) ?? []);
   } catch (e) {
     if (declined(e)) set({ kind: "idle", note: "You didn't confirm, so nothing was sent." });
     else set({ kind: "failed", reason: message(e) });

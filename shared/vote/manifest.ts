@@ -63,15 +63,20 @@ export function checkManifest(m: VoteManifest): VoteManifest {
 
 export const ROUND = checkManifest(manifest as unknown as VoteManifest);
 
-/** The ballot rules' view of the round: `asks[i]` is project i's ask; `poolUsd` defaults
- * to the manifest's. */
-export const rulesRound = (m: VoteManifest, asks: bigint[], poolUsd?: bigint): RulesRound => ({
-  projects: m.projects.map((p) => ({ goalUsd: BigInt(p.goalUsd), rfp: p.rfp, groups: p.groups })),
-  asks,
-  groupNames: m.groups,
-  poolUsd: poolUsd ?? BigInt(m.poolUsd),
-  independentTiers: m.independentTiers,
-});
+/** The ballot rules' view of the round: `asks[i]` is project i's ask, one per project
+ * (else it throws); `poolUsd` defaults to the manifest's. */
+export const rulesRound = (m: VoteManifest, asks: bigint[], poolUsd?: bigint): RulesRound => {
+  if (asks.length !== m.projects.length) {
+    throw new Error(`vote manifest: ${asks.length} asks for ${m.projects.length} projects`);
+  }
+  return {
+    projects: m.projects.map((p) => ({ goalUsd: BigInt(p.goalUsd), rfp: p.rfp, groups: p.groups })),
+    asks,
+    groupNames: m.groups,
+    poolUsd: poolUsd ?? BigInt(m.poolUsd),
+    independentTiers: m.independentTiers,
+  };
+};
 
 /** False while the manifest names no contract: no round, nothing to show. */
 export const roundDeployed = (m: VoteManifest = ROUND): boolean => !/^0x0{40}$/i.test(m.contract);

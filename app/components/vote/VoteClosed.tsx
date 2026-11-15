@@ -9,7 +9,7 @@ import { ballotSegments, SegmentRing } from "~/components/vote/BallotMeter";
 import DaoBallot, { daoResult } from "~/components/vote/DaoBallot";
 import type { BallotItem } from "~/components/vote/TierBallot";
 import { useVoteBallots } from "~/hooks/use-vote";
-import { askOf } from "~/lib/vote-results";
+import { askOf, servedAsks } from "~/lib/vote-results";
 import { errorMessage } from "~/lib/api";
 import { decodeBallot, encodeBallot, type Tier, TIERS } from "../../../shared/vote/ballot";
 import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
@@ -176,7 +176,7 @@ export default function VoteClosed(
   // During the vote, the ring is the editor's: what the ballot asks for (the chain's
   // asks), full at 3× the pool; gold what the settled tiers funded, pale gold what they
   // hold unfunded, green the open tiers.
-  const asks = live?.asks;
+  const asks = servedAsks(round, live?.asks);
   const askFor = (slug: string) => askOf(round, asks, slug) ?? 0;
   const settledTier = new Map(settled?.map((t) => [t.tier, t]) ?? []);
   const askRing = live && asks && sent && poolUsd

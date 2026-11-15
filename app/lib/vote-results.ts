@@ -5,6 +5,13 @@ import { type Tier, TIERS } from "../../shared/vote/ballot";
 /** Micro-USD (a decimal string) as dollars, to the cent. */
 export const dollars = (micro: string) => Number(BigInt(micro) / 10_000n) / 100;
 
+/** The asks the round served (micro-USD, manifest order), when there is one per
+ * initiative; otherwise none, as while they're being worked out. */
+export const servedAsks = (
+  round: { slugs: string[] },
+  asks: string[] | undefined,
+): string[] | undefined => asks?.length === round.slugs.length ? asks : undefined;
+
 /** What an initiative asks the pool for, in dollars: its ask on-chain (goal less the
  * donations and open pledges, the contract's `initiativeUsd().askUsd`), as the round
  * serves it in manifest order. The ballot rules count it, and it moves with each donation.

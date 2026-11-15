@@ -16,7 +16,7 @@ abstract contract RoundAccounting is AccessControl {
     uint256 public constant MAX_PROJECTS = 254;
     uint256 public constant MAX_GROUPS = 256;
     /// @dev Gas forwarded to each feed or token read, so a starving callee cannot block a view.
-    uint256 internal constant EXTERNAL_READ_GAS = 100_000;
+    uint256 internal constant EXTERNAL_READ_GAS = 50_000;
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant PLEDGE_ROLE = keccak256("PLEDGE_ROLE");
 
@@ -310,11 +310,10 @@ abstract contract RoundAccounting is AccessControl {
         returns (uint256 price, uint64 updatedAt, bool good)
     {
         if (c.usdFeed == address(0)) return (1, 0, true);
-        (bool ok, bytes memory data) =
-            c.usdFeed.staticcall{gas: EXTERNAL_READ_GAS}(abi.encodeCall(IPriceFeed.decimals, ()));
-        if (ok && data.length >= 32 && abi.decode(data, (uint256)) == c.feedDecimals) {
-            (ok, data) = c.usdFeed.staticcall{gas: EXTERNAL_READ_GAS}(abi.encodeCall(IPriceFeed.latestRoundData, ()));
-            if (ok && data.length >= 160) {
+        (bool ok, bytes memory data) = _boundedRead(c.usdFeed, abi.encodeCall(IPriceFeed.decimals, ()), 32);
+        if (ok && abi.decode(data, (uint256)) == c.feedDecimals) {
+            (ok, data) = _boundedRead(c.usdFeed, abi.encodeCall(IPriceFeed.latestRoundData, ()), 160);
+            if (ok) {
                 (uint256 round, int256 answer,, uint256 at,) =
                     abi.decode(data, (uint256, int256, uint256, uint256, uint256));
                 if (
@@ -338,9 +337,25 @@ abstract contract RoundAccounting is AccessControl {
 
     /// @dev Raw read: any failure (revert, no code, short data, gas use over the cap) counts as zero.
     function _tokenBalance(address token, address account) internal view returns (uint256) {
-        (bool ok, bytes memory data) =
-            token.staticcall{gas: EXTERNAL_READ_GAS}(abi.encodeCall(IERC20.balanceOf, (account)));
-        return ok && data.length >= 32 ? abi.decode(data, (uint256)) : 0;
+        (bool ok, bytes memory data) = _boundedRead(token, abi.encodeCall(IERC20.balanceOf, (account)), 32);
+        return ok ? abi.decode(data, (uint256)) : 0;
+    }
+
+    /// @dev One external read with `EXTERNAL_READ_GAS` and a fixed `outLen`-byte output area:
+    ///      at most `outLen` bytes of the callee's return (or revert) data are ever copied into
+    ///      memory, so a callee returning a huge blob cannot grow memory cost across a ballot's
+    ///      reads. A revert, no code, or fewer than `outLen` bytes returned is `ok == false`.
+    function _boundedRead(address target, bytes memory callData, uint256 outLen)
+        private
+        view
+        returns (bool ok, bytes memory out)
+    {
+        out = new bytes(outLen);
+        uint256 gas_ = EXTERNAL_READ_GAS;
+        assembly ("memory-safe") {
+            ok := staticcall(gas_, target, add(callData, 32), mload(callData), add(out, 32), outLen)
+            if lt(returndatasize(), outLen) { ok := 0 }
+        }
     }
 
     /// @dev Each placed project's ask at this block: its dollar goal less donations and open

@@ -13,7 +13,7 @@ import StickyAside from "~/components/layout/StickyAside";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { boardKey, useBoard } from "~/hooks/use-board";
 import { myCode } from "~/lib/vote-local";
-import { askOf, dollars, splitResults } from "~/lib/vote-results";
+import { askOf, dollars, servedAsks, splitResults } from "~/lib/vote-results";
 import { useSession } from "~/context/session";
 import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd, usdShort } from "~/lib/format";
@@ -109,8 +109,9 @@ export default function VoteResults(
   const tier: Tier = rv?.tiers.find((t) => t.status !== "settled")?.tier ?? "S";
   const give = rv?.live.give;
   const lead = rv?.live.lead;
-  // Each initiative's ask is the chain's, served with the round (none while it's unknown).
-  const asks = rv?.asks;
+  // Each initiative's ask is the chain's, served with the round (none while it's unknown,
+  // or served short).
+  const asks = servedAsks(R, rv?.asks);
   // Every open initiative: below the tier settling now, the donation that moves it up a
   // tier; in it, how far ahead it is.
   const rows = useMemo<GiveRow[] | undefined>(() => {
@@ -276,8 +277,13 @@ export default function VoteResults(
         </p>
       )
       : (
+        // Without the chain's asks, no amount: it would read as $0.
         <p className="m-0 rounded-lg bg-white/[.07] px-3 py-2 text-[13px] leading-snug text-white/80">
-          It asks the pool for {usd(Math.min(given, needFor(open)))} less. Nothing else changes.
+          {askOf(R, asks, open) === undefined ? "What it saves the pool is being worked out." : (
+            <>
+              It asks the pool for {usd(Math.min(given, needFor(open)))} less. Nothing else changes.
+            </>
+          )}
         </p>
       )
   );

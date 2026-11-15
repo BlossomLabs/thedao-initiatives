@@ -43,7 +43,7 @@ import { checkBallot, emptyTierErrors } from "../../../shared/vote/rules";
 import { shortDay, usd, usdShort } from "~/lib/format";
 import { encodeBallot, type Tier, tierName } from "../../../shared/vote/ballot";
 import { ROUND, rulesRound, type VoteManifest } from "../../../shared/vote/manifest";
-import { askOf } from "~/lib/vote-results";
+import { askOf, servedAsks } from "~/lib/vote-results";
 
 const poolOf = (m: VoteManifest) => Number(BigInt(m.poolUsd) / 1_000_000n);
 const POOL = poolOf(ROUND);
@@ -552,8 +552,9 @@ export default function VotePage(
     } catch { /* storage unavailable */ }
   };
 
-  // Each initiative's ask is the chain's, served with the round: none while it's unknown.
-  const asks = rv?.asks;
+  // Each initiative's ask is the chain's, served with the round: none while it's unknown
+  // (or served short).
+  const asks = servedAsks(R, rv?.asks);
   const items = useMemo<BallotItem[]>(() => {
     const cards = new Map(board.data?.cards.map((c) => [c.initiative.slug, c]));
     return R.slugs.map((slug) => {
@@ -762,7 +763,7 @@ export default function VotePage(
       // The contract would refuse it: never open the wallet for a ballot breaking a rule.
       if (broken) return;
       setSendRoute("own");
-      void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(R.slugs, tiers)), rulesFor);
+      void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(R.slugs, tiers)));
     };
     const counted = rv ? Boolean(rv.accepted[String(n)]) : true;
     const registrationOver = rv ? voteNow() / 1000 >= rv.registrationClosesAt : false;
@@ -798,14 +799,13 @@ export default function VotePage(
     // The ballot rules (rounds deployed with them), with the pool on-chain now. Checked
     // from the first pick (and before it, for the ballot box's line); refusals only once
     // something is placed.
-    // A ballot sent from the wallet carries its proof, found on the same round.
     const rulesFor = asks && rulesRound(R, asks.map(BigInt), BigInt(rv?.poolUsd ?? R.poolUsd));
     const rules = rulesFor && R.ballotRules
       ? checkBallot(encodeBallot(R.slugs, tiers), rulesFor)
       : null;
-    // The rules count the chain's asks: without them nothing can be judged, or sent (the
-    // relayer refuses too).
-    const asksPending = Boolean(R.ballotRules && rv && !asks);
+    // The rules count the chain's asks: without them (the round not loaded yet, or served
+    // without asks) nothing can be judged, or sent, relayed or from the wallet.
+    const asksPending = Boolean(R.ballotRules && !asks);
     // An enforced tier left empty: the bytes would read the next one in its place.
     const empty = R.ballotRules ? emptyTierErrors(tiers, R.independentTiers) : [];
     const allErrors = empty.length

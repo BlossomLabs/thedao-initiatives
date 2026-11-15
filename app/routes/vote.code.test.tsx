@@ -1208,6 +1208,24 @@ it("ballot rules: an empty S-Tier is refused, though the chain would read A-Tier
   );
 });
 
+it("ballot rules hold Send, relayed and from the wallet, until the round view loads", async () => {
+  round.ballotRules = true;
+  localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "S", beta: "S", gamma: "S" }));
+  // No round view (the request fails): no asks, so nothing can be judged or sent.
+  session.current = { address: ME };
+  mockApi(() => Promise.resolve({ n: 17, claimed: true, owner: ME }));
+  show();
+  await openEditor();
+  const send = screen.getByRole("button", { name: /send my ballot/i });
+  expect(send).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(send);
+  expect(submit).not.toHaveBeenCalled();
+  const own = screen.getByRole("button", { name: /send it yourself/i });
+  expect(own).toBeDisabled();
+  fireEvent.click(own);
+  expect(selfSend).not.toHaveBeenCalled();
+});
+
 // ---------------------------------------------------------------- asks
 it("the ring and tier totals add up the rows' asks", async () => {
   // The chain's asks, not the goals ($400 each): what donations and pledges left.
@@ -1244,6 +1262,19 @@ it("the ring and tier totals add up the rows' asks", async () => {
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+it("asks served short read as being worked out, not a crash", async () => {
+  round.ballotRules = true;
+  localStorage.setItem(TIERS_KEY, JSON.stringify({ alpha: "S", beta: "S", gamma: "S" }));
+  await ballotWith(roundBody({ asks: ["400000000"], poolUsd: "500000000" }));
+  expect(screen.queryByText(/ ask$/)).toBeNull();
+  const why = document.querySelector<HTMLElement>("[data-ballot-reason]")!;
+  expect(why).toHaveTextContent("The asks are being worked out; try again in a minute.");
+  expect(screen.getByRole("button", { name: /send my ballot/i })).toHaveAttribute(
+    "aria-disabled",
+    "true",
+  );
 });
 
 it("without chain asks the page says the figures are being worked out", async () => {

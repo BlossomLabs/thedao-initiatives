@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import type { Card } from "~/lib/api-types";
 import type { RoundTier } from "~/hooks/use-vote";
-import { splitResults } from "./vote-results";
+import { servedAsks, splitResults } from "./vote-results";
 
 const card = (slug: string, total: number, pct: number, title = slug) =>
   ({ initiative: { slug, title }, summary: { total }, pct }) as unknown as Card;
@@ -38,4 +38,12 @@ it("not funded by how far they got", () => {
   const { notFunded } = splitResults(cards, [settled("S", ["c"], { c: "1000000" })]);
   expect(notFunded.map((r) => r.card.initiative.slug)).toEqual(["e", "d", "b", "a"]);
   expect(notFunded[0].finalUsd).toBe(5);
+});
+
+it("servedAsks keeps asks only when there is one per initiative", () => {
+  const round = { slugs: ["a", "b"] };
+  expect(servedAsks(round, ["1", "2"])).toEqual(["1", "2"]);
+  expect(servedAsks(round, ["1"])).toBeUndefined();
+  expect(servedAsks(round, ["1", "2", "3"])).toBeUndefined();
+  expect(servedAsks(round, undefined)).toBeUndefined();
 });

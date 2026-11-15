@@ -120,8 +120,9 @@ the feed's decimals are unchanged. Its age never matters: Chainlink's latest ans
 it stands. A feed that is not good (reverting, malformed, codeless, zero or negative answer,
 changed decimals) falls back to the stored last price: the last good answer the contract saw,
 written when a recorded ballot reads a newer good answer (event `PriceStored`) and seeded at
-registration. Feed and token reads are staticcalls capped at 100k gas, so a malformed,
-reverting or codeless feed or token never reverts a ballot or a view; a token whose balance
+registration. Feed and token reads are staticcalls capped at 50k gas that copy only the
+bytes they expect (32, or 160 for a feed answer), so a malformed, reverting, codeless or
+blob-returning feed or token never reverts a ballot or a view; a token whose balance
 read fails counts as $0. Conversions round down; donation and pledge components are valued
 separately; sums saturate instead of overflowing.
 

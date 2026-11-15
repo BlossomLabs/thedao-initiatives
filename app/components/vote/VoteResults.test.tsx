@@ -627,6 +627,15 @@ it("without the chain's asks, rows show no ask", async () => {
   expect(row).toHaveTextContent("not included");
 });
 
+it("asks served the wrong length read as none: rows show no ask", async () => {
+  // One ask too many: none of them can be trusted to belong to its initiative.
+  const asks = [usdMicro(50_000), usdMicro(25_000), usdMicro(1_000)];
+  await showOpen(openWith({ beta: give() }, undefined, { asks }));
+  const row = await list().findByRole("button", { name: /Beta audits/ });
+  expect(row).not.toHaveTextContent("Needs");
+  expect(row).toHaveTextContent("not included");
+});
+
 it("says so while the figures are worked out", async () => {
   await showOpen(openWith(undefined));
   expect(await screen.findByText("Working out what each initiative needs…")).toBeInTheDocument();
@@ -778,6 +787,19 @@ it("with the tally's inputs, any amount is previewed: money freed brings another
   const beta = within(daoBallot()).getByLabelText("Beta audits, comes in with your donation");
   expect(beta).toHaveTextContent("↑Beta auditscame in");
   expect(beta.className).toContain("border-dao-green/70");
+});
+
+it("without the chain's asks, the preview gives no amount, it says the figures are being worked out", async () => {
+  const view = openWith({ beta: give({ tier: "B", gap: "20000000000" }) }, undefined, {
+    asks: undefined,
+  });
+  await showOpen({ ...view, live: { ...view.live, inputs: inputsFor([50, 30]) } });
+  fireEvent.click(await list().findByRole("button", { name: /Alpha fuzzing/ }));
+  const amount = await screen.findByRole("spinbutton", { name: "Amount" });
+  fireEvent.change(amount, { target: { value: "5000" } });
+  expect(await screen.findByText("What it saves the pool is being worked out."))
+    .toBeInTheDocument();
+  expect(screen.queryByText(/asks the pool for \$/)).toBeNull();
 });
 
 it("with the tally's inputs, the form suggests the donation to each tier above", async () => {

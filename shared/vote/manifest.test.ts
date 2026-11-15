@@ -53,6 +53,10 @@ describe("round manifest", () => {
     });
     expect(rulesRound(base, [5n], 9n).poolUsd).toBe(9n);
   });
+  it("rulesRound wants one ask per project", () => {
+    expect(() => rulesRound(base, [])).toThrow(/0 asks for 1 projects/);
+    expect(() => rulesRound(base, [5n, 6n])).toThrow(/asks/);
+  });
   it("every round carries the contract's quiet-ending schedule", () => {
     expect(() => checkManifest({ ...base, schedule: undefined as never })).toThrow(/schedule/);
   });

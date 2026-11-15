@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { type Hex, keccak256 } from "viem";
-import { rulesRound, type VoteManifest } from "../../shared/vote/manifest";
+import type { VoteManifest } from "../../shared/vote/manifest";
 import {
   type BallotPhase,
   type FlowDeps,
@@ -29,8 +29,6 @@ const VOTER: Hex = "0x3000000000000000000000000000000000000003";
 /** S-Tier = a, b, c (unrelated): its proof is [0, 1, 2]. */
 const BALLOT: Hex = "0x010101ff";
 const PROOF = [0, 1, 2];
-/** The round as the page judged it: the chain's asks. */
-const RULES = rulesRound(m, [1n, 1n, 1n, 1n]);
 const SIG: Hex = `0x${"ab".repeat(65)}`;
 const HASH: Hex = `0x${"cd".repeat(32)}`;
 const OWN: Hex = `0x${"ef".repeat(32)}`;
@@ -187,7 +185,7 @@ describe("selfSendBallot", () => {
       requestGas: vi.fn(() => Promise.resolve(GAS)),
     });
     const { phases, set } = record();
-    const out = await selfSendBallot(d, m, 7n, VOTER, BALLOT, RULES, null, set);
+    const out = await selfSendBallot(d, m, 7n, VOTER, BALLOT, null, set);
     expect(d.signVote).toHaveBeenCalled();
     expect(d.requestGas).toHaveBeenCalledWith(7n);
     expect(d.waitTx).toHaveBeenCalledWith(GAS);
@@ -205,7 +203,7 @@ describe("selfSendBallot", () => {
     const d = deps({ nonceOf: vi.fn(() => Promise.resolve(2n)) });
     const last = { tokenId: 7n, nonce: 3n, ballot: BALLOT, signature: SIG, hash: HASH };
     const { set } = record();
-    await selfSendBallot(d, m, 7n, VOTER, BALLOT, RULES, last, set);
+    await selfSendBallot(d, m, 7n, VOTER, BALLOT, last, set);
     expect(d.signVote).not.toHaveBeenCalled();
     expect(d.sendOwn).toHaveBeenCalledWith(
       { tokenId: 7n, nonce: 3n, ballot: BALLOT, signature: SIG },
@@ -217,7 +215,7 @@ describe("selfSendBallot", () => {
     const d = deps({ nonceOf: vi.fn(() => Promise.resolve(0n)) });
     const last = { tokenId: 12n, nonce: 1n, ballot: BALLOT, signature: SIG, hash: HASH };
     const { set } = record();
-    await selfSendBallot(d, m, 40n, VOTER, BALLOT, RULES, last, set);
+    await selfSendBallot(d, m, 40n, VOTER, BALLOT, last, set);
     expect(d.signVote).toHaveBeenCalled();
     expect(d.sendOwn).toHaveBeenCalledWith(
       expect.objectContaining({ tokenId: 40n, nonce: 1n }),
@@ -225,17 +223,30 @@ describe("selfSendBallot", () => {
     );
   });
 
-  it("without a round to judge on (no chain asks), it sends no proof", async () => {
+  it("the proof comes from the manifest's groups, whatever the asks", async () => {
+    // a and b share a group: S-Tier a, b, c, d proves with a, c, d.
+    const grouped: VoteManifest = {
+      ...m,
+      projects: m.projects.map((p, i) => ({ ...p, groups: i < 2 ? [0] : [] })),
+      groups: ["Same team"],
+    };
     const d = deps();
     const { set } = record();
-    await selfSendBallot(d, m, 7n, VOTER, BALLOT, undefined, null, set);
+    await selfSendBallot(d, grouped, 7n, VOTER, "0x01010101", null, set);
+    expect(d.sendOwn).toHaveBeenCalledWith(expect.objectContaining({ tokenId: 7n }), [0, 2, 3]);
+  });
+
+  it("a ballot with no unrelated triple in S-Tier sends no proof", async () => {
+    const d = deps();
+    const { set } = record();
+    await selfSendBallot(d, m, 7n, VOTER, "0x0101ffff", null, set);
     expect(d.sendOwn).toHaveBeenCalledWith(expect.objectContaining({ tokenId: 7n }), []);
   });
 
   it("no gas to be had (already given) still lets the wallet try", async () => {
     const d = deps({ requestGas: vi.fn(() => Promise.reject(new Error("already got its gas"))) });
     const { phases, set } = record();
-    await selfSendBallot(d, m, 7n, VOTER, BALLOT, RULES, null, set);
+    await selfSendBallot(d, m, 7n, VOTER, BALLOT, null, set);
     expect(d.sendOwn).toHaveBeenCalled();
     expect(phases.at(-1)?.kind).toBe("counted");
   });
@@ -245,7 +256,7 @@ describe("selfSendBallot", () => {
       sendOwn: vi.fn(() => Promise.reject(new Error("User rejected the request"))),
     });
     const { phases, set } = record();
-    await selfSendBallot(d, m, 7n, VOTER, BALLOT, RULES, null, set);
+    await selfSendBallot(d, m, 7n, VOTER, BALLOT, null, set);
     expect(phases.at(-1)).toEqual({
       kind: "idle",
       note: "You didn't confirm, so nothing was sent.",

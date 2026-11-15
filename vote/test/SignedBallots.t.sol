@@ -221,6 +221,24 @@ contract SignedBallotsTest is Fixture {
         assertEq(ballots.registrationReceiptCount(), 1);
     }
 
+    /// @dev Pins the running hash after two ballots, a revocation, and a later ballot; the
+    ///      TypeScript replay (shared/vote/transcript.test.ts) pins the same values.
+    function test_transcriptVector() public {
+        vm.warp(start);
+        vm.startPrank(alice);
+        ballots.vote(1, 1, ranks, proofOf(ranks));
+        ballots.vote(2, 1, hex"01010101", proofOf(hex"01010101"));
+        vm.stopPrank();
+        assertEq(ballots.transcript(), 0xec5f702e68d55bd39878d3ffc456f6c0b1cb94a16311bb391823968b4dd0224c);
+        ballots.burn(1);
+        assertEq(ballots.transcript(), 0x06ca72bf1b7a0e51976c4ba219d1af5eef9642a6499cd6794206944f8eeaa2f8);
+        ballots.mint(bob, 1);
+        vm.prank(bob);
+        ballots.vote(1, 2, hex"010101ff", proofOf(hex"010101ff"));
+        assertEq(ballots.transcript(), 0xc8bd77f8ca523ce8a4347bf5157c7cb5981f72cbe58c85f2b2e7abbe8d453e43);
+        assertEq(ballots.recordCount(), 4);
+    }
+
     function test_burnRequiresMinterAndClosesWithRegistration() public {
         vm.prank(bob);
         vm.expectRevert();

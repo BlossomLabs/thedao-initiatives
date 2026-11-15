@@ -1,12 +1,13 @@
 import { assertEquals } from "@std/assert";
 import { privateKeyToAccount } from "viem/accounts";
-import { bytesToHex, type Hex, parseSignature, signatureToCompactSignature } from "viem";
+import { bytesToHex, type Hex, parseSignature, signatureToCompactSignature, zeroHash } from "viem";
 import { ADMIN, harness, j, PLAIN } from "./app-helpers.ts";
 import { codeMessage, formatCode } from "../../shared/vote/code.ts";
 import { encodeBallot } from "../../shared/vote/ballot.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
-import type { VoteChain } from "../services/vote-chain.ts";
+import { type TranscriptEvent, transcriptOf } from "../../shared/vote/transcript.ts";
+import type { BallotEvent, VoteChain } from "../services/vote-chain.ts";
 import { cacheSet } from "../routes/vote.ts";
 import { chainTally } from "../../shared/vote/chain.ts";
 import { liveInputsFrom, type LiveInputsJson } from "../../shared/vote/live-inputs.ts";
@@ -80,11 +81,29 @@ function fakeChain() {
     slowSend: null as null | Promise<void>,
     /** false: mints stay pending (not visible to ownerOf/balanceOf). */
     mintsMine: true,
-    logs: [] as ({ tokenId: string; ballot: Hex; timestamp: number } | {
+    /** What the chain emitted; a ballot without a voter or nonce gets PLAIN and the
+     * token's next nonce when read. */
+    logs: [] as ({
+      tokenId: string;
+      ballot: Hex;
+      timestamp: number;
+      block?: number;
+      logIndex?: number;
+      voter?: Hex;
+      nonce?: number;
+    } | {
       tokenId: string;
       revoked: true;
       timestamp: number;
+      block?: number;
     })[],
+    /** What the contract's transcript says instead of the true one (a ballot it never saw). */
+    transcriptOverride: null as Hex | null,
+    /** The contract hashes entries the pre-Nov 14 way. */
+    legacyTranscript: false,
+    /** Likewise for the record count and one token's ballot hash. */
+    countOverride: null as bigint | null,
+    hashOverride: null as { tokenId: string; hash: Hex } | null,
     ballotReads: 0,
     txStatus: new Map<string, "pending" | "success" | "reverted" | "unknown">(),
     /** What the RPC says the relayer's pending nonce is (may lag). */
@@ -92,6 +111,15 @@ function fakeChain() {
     nonces_used: [] as number[],
     /** Voting-badge ids per lowercase address (the real round's index lookup). */
     badges: new Map<string, number[]>(),
+  };
+  const fullEvents = () => {
+    const nonces = new Map<string, number>();
+    return state.logs.map((l): BallotEvent => {
+      if ("revoked" in l) return l;
+      const nonce = l.nonce ?? (nonces.get(l.tokenId) ?? 0) + 1;
+      nonces.set(l.tokenId, nonce);
+      return { ...l, voter: l.voter ?? PLAIN, nonce };
+    });
   };
   const chain: VoteChain = {
     ownerOf: (n) => Promise.resolve(state.owners.get(n) ?? null),
@@ -131,7 +159,27 @@ function fakeChain() {
     },
     ballots: () => {
       state.ballotReads++;
-      return Promise.resolve(state.logs);
+      return Promise.resolve({ events: fullEvents(), block: 100n });
+    },
+    committed: (block, tokenIds) => {
+      if (block !== 100n) throw new Error(`committed read at ${block}, not the ballots' block`);
+      const t = transcriptOf(
+        fullEvents().map((e): TranscriptEvent =>
+          "revoked" in e
+            ? e
+            : { tokenId: e.tokenId, voter: e.voter, nonce: BigInt(e.nonce), ballot: e.ballot }
+        ),
+        state.legacyTranscript,
+      );
+      return Promise.resolve({
+        transcript: state.transcriptOverride ?? t.transcript,
+        recordCount: state.countOverride ?? BigInt(t.count),
+        hashes: tokenIds.map((id) =>
+          state.hashOverride?.tokenId === id.toString()
+            ? state.hashOverride.hash
+            : t.lastHash.get(id.toString()) ?? zeroHash
+        ),
+      });
     },
     rulesHistory: () => Promise.resolve(state.history),
   };
@@ -1180,6 +1228,45 @@ Deno.test("round: an invalid ballot shows as refused with invalid_ballot", async
   assertEquals(Object.keys(body.accepted), ["1"]);
   assertEquals(body.rejected.map((r) => [r.tokenId, r.reason]), [["2", "invalid_ballot"]]);
   assertEquals(body.poolUsd, "200");
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: a ballot the contract didn't commit is never counted", async () => {
+  const { h, state } = await setup(ruled);
+  state.logs = [logOf("1", "01010101", NOW - 100, 1)];
+  state.transcriptOverride = `0x${"ab".repeat(32)}`;
+  const res = await h.req("/api/vote/round");
+  assertEquals(res.status, 503);
+  const body = await j(res);
+  assertEquals(body.code, "transcript_mismatch");
+  assertEquals(
+    body.error,
+    "The ballots read don't match the contract; the results are back once they do.",
+  );
+  h.close();
+});
+
+Deno.test("round: a record count or a token's ballot hash the contract disagrees on is a 503", async () => {
+  for (const wrong of ["count", "hash"] as const) {
+    const { h, state } = await setup(ruled);
+    state.logs = [logOf("1", "01010101", NOW - 100, 1), logOf("2", "01010101", NOW - 90, 2)];
+    if (wrong === "count") state.countOverride = 3n;
+    else state.hashOverride = { tokenId: "2", hash: `0x${"cd".repeat(32)}` };
+    const res = await h.req("/api/vote/round");
+    assertEquals(res.status, 503, wrong);
+    assertEquals((await j(res)).code, "transcript_mismatch", wrong);
+    h.close();
+  }
+});
+
+Deno.test("round: a round from before Nov 14 is read with its legacy transcript", async () => {
+  const { h, state } = await setup(ruled);
+  state.legacyTranscript = true;
+  state.logs = [logOf("1", "01010101", NOW - 100, 1)];
+  const res = await h.req("/api/vote/round");
+  assertEquals(res.status, 200);
+  assertEquals(Object.keys((await j(res) as { accepted: object }).accepted), ["1"]);
   await h.settle();
   h.close();
 });

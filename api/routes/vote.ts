@@ -28,6 +28,7 @@ import {
   type TierState,
 } from "../../shared/vote/quiet-ending.ts";
 import { rulesRound } from "../../shared/vote/manifest.ts";
+import { transcriptOf } from "../../shared/vote/transcript.ts";
 import { checkBallot, findProof } from "../../shared/vote/rules.ts";
 import type { Tier } from "../../shared/vote/ballot.ts";
 
@@ -334,9 +335,36 @@ export function voteRoutes(deps: Deps, boardCache?: BoardCache) {
       }),
     );
     const needs = await needsOf(d);
-    const receipts: Receipt[] = (await d.chain.ballots()).map((b, i) => ({
+    const { events, block: readAt } = await d.chain.ballots();
+    // The replay counts only what the contract committed to: the events read must hash
+    // to its transcript, and each token's last ballot to its stored hash, at that block.
+    const read = events.map((b) =>
+      "revoked" in b
+        ? { tokenId: b.tokenId, revoked: true as const }
+        : { tokenId: b.tokenId, voter: b.voter, nonce: BigInt(b.nonce), ballot: b.ballot }
+    );
+    let proof = transcriptOf(read);
+    const tokenIds = [...proof.lastHash.keys()];
+    const onChain = await d.chain.committed(readAt, tokenIds.map(BigInt));
+    // A round deployed before Nov 14 hashes a sixth, zero word into each entry.
+    if (onChain.transcript !== proof.transcript) {
+      const legacy = transcriptOf(read, true);
+      if (onChain.transcript === legacy.transcript) proof = legacy;
+    }
+    if (
+      onChain.transcript !== proof.transcript ||
+      onChain.recordCount !== BigInt(proof.count) ||
+      tokenIds.some((id, i) => onChain.hashes[i] !== proof.lastHash.get(id))
+    ) {
+      throw fail(
+        503,
+        "transcript_mismatch",
+        "The ballots read don't match the contract; the results are back once they do.",
+      );
+    }
+    const receipts: Receipt[] = events.map((b, i) => ({
       tokenId: b.tokenId,
-      nonce: "revoked" in b ? 0 : b.nonce ?? 0,
+      nonce: "revoked" in b ? 0 : b.nonce,
       ballot: "revoked" in b ? null : hexToBytes(b.ballot),
       block: b.block ?? i + 1,
       ...("logIndex" in b && b.logIndex !== undefined ? { logIndex: b.logIndex } : {}),

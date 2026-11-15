@@ -54,8 +54,15 @@ export interface VoteChain {
       | { fn: "drip"; to: Hex; value: bigint },
     nonce: number,
   ): Promise<Hex>;
-  /** Every BallotRecorded and RegistrationRevoked since the deploy block, in chain order. */
-  ballots(): Promise<BallotEvent[]>;
+  /** Every BallotRecorded and RegistrationRevoked since the deploy block, in chain order,
+   * up to the pinned `block` (what `committed` must be read at). */
+  ballots(): Promise<{ events: BallotEvent[]; block: bigint }>;
+  /** What the contract committed to at `block`: its running transcript hash, its record
+   * count, and each token's current ballot hash (zero when revoked), in one multicall. */
+  committed(
+    block: bigint,
+    tokenIds: bigint[],
+  ): Promise<{ transcript: Hex; recordCount: bigint; hashes: Hex[] }>;
   /** What the ballot rules judge by: when each project joined (`addedAt[id]`, its first
    * InitiativeConfigured) and every PoolUsdSet, stamped like ballots. */
   rulesHistory(): Promise<RulesHistory>;
@@ -71,10 +78,11 @@ export type BallotEvent =
   | {
     tokenId: string;
     ballot: Hex;
+    voter: Hex;
+    nonce: number;
     timestamp: number;
     block?: number;
     logIndex?: number;
-    nonce?: number;
   }
   | { tokenId: string; revoked: true; timestamp: number; block?: number };
 
@@ -219,6 +227,19 @@ export function createVoteChain(
       }
       return null;
     },
+    async committed(block, tokenIds) {
+      const contract = { address: m.contract, abi: SIGNED_BALLOTS_ABI } as const;
+      const r = (await pub.multicall({
+        blockNumber: block,
+        allowFailure: false,
+        contracts: [
+          { ...contract, functionName: "transcript" },
+          { ...contract, functionName: "recordCount" },
+          ...tokenIds.map((id) => ({ ...contract, functionName: "ballotHashOf", args: [id] })),
+        ] as never,
+      })) as unknown as [Hex, bigint, ...Hex[]];
+      return { transcript: r[0], recordCount: BigInt(r[1]), hashes: r.slice(2) as Hex[] };
+    },
     async ballots() {
       const headBlock = await pub.getBlock();
       const head = headBlock.number!;
@@ -260,6 +281,7 @@ export function createVoteChain(
               ? {
                 tokenId,
                 ballot: log.args.ballot,
+                voter: log.args.voter!,
                 timestamp: t,
                 block,
                 logIndex: log.logIndex!,
@@ -269,7 +291,7 @@ export function createVoteChain(
           );
         }
       }
-      return out;
+      return { events: out, block: head };
     },
     async rulesHistory() {
       // Positions, not times: the replay orders these against ballots exactly as the

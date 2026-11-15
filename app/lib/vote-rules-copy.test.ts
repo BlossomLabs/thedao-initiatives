@@ -20,6 +20,13 @@ it("size: what it requests, what it must, and where to add", () => {
     );
 });
 
+it("size: when donations took every ask below 1.5× the pool, the minimum is every ask", () => {
+  expect(say({ rule: "size", requested: 230_000_000n, needed: 280_000_000n, pool: 200_000_000n }))
+    .toBe(
+      "Your ballot requests $230. It must request at least $280 (every ask in the round, which is less than 1.5× the $200 pool). Add more projects; B-Tier is a good place for them.",
+    );
+});
+
 it("independent: names the affiliated projects that count as one", () => {
   expect(say({
     rule: "independent",

@@ -15,9 +15,14 @@ export function ruleMessage(
 ): string {
   switch (e.rule) {
     case "size":
+      // When every ask in the round adds up to less than 1.5× the pool, that sum is the minimum.
       return `Your ballot requests ${dollars(e.requested)}. It must request at least ${
         dollars(e.needed)
-      } (1.5× the ${dollars(e.pool)} pool). Add more projects; B-Tier is a good place for them.`;
+      } (${
+        2n * e.needed >= 3n * e.pool
+          ? `1.5× the ${dollars(e.pool)} pool`
+          : `every ask in the round, which is less than 1.5× the ${dollars(e.pool)} pool`
+      }). Add more projects; B-Tier is a good place for them.`;
     case "independent":
       return [
         `${tierName(TIERS[e.tier])} needs at least 3 independent projects.`,

@@ -1,6 +1,7 @@
 """The ballot rules (docs/superpowers/specs/2026-11-11-ballot-rules-design.md).
 
-A valid ballot requests (in asks) at least 1.5x the pool, and each enforced tier (S-Tier always,
+A valid ballot requests (in asks) at least 1.5x the pool (or every project's ask, when donations
+took that sum below 1.5x the pool), and each enforced tier (S-Tier always,
 A-Tier when the round says so) holds at least 3 pairwise-unrelated projects with no
 related group over half its asks. Related = sharing a group (an affiliation); RFPs have none.
 
@@ -15,6 +16,7 @@ and group rules count asks, never goals.
 """
 
 WITHHELD = 255
+UINT_MAX = 2**256 - 1  # the contract saturates its sums here
 
 
 def tiers_of(ballot):
@@ -73,9 +75,11 @@ def check_ballot(ballot, projects, asks, pool, independent_tiers):
     def total(xs):
         return sum(asks[i] for i in xs)
 
-    requested = total([i for g in groups for i in g])
-    if 2 * requested < 3 * pool:
-        errors.append({"rule": "size", "requested": requested, "needed": (3 * pool + 1) // 2, "pool": pool})
+    requested = min(total([i for g in groups for i in g]), UINT_MAX)
+    # 1.5x the pool, or every project's ask when donations took that below it.
+    needed = min((3 * pool + 1) // 2, sum(asks), UINT_MAX)
+    if requested < needed:
+        errors.append({"rule": "size", "requested": requested, "needed": needed, "pool": pool})
     proof = []
     for t in _enforced(independent_tiers):
         tier = groups[t] if t < len(groups) else []

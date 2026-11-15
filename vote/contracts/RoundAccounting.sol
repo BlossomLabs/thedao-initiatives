@@ -360,21 +360,16 @@ abstract contract RoundAccounting is AccessControl {
 
     /// @dev Each placed project's ask at this block: its dollar goal less donations and open
     ///      pledges, never below zero. A project at rank 255 (unplaced) is not read and stays 0.
-    ///      Every currency's price is read once per ballot; a good answer is kept through
-    ///      `_storePrice`, which writes only when it is newer. The caller checks the length.
-    function _asksOf(bytes calldata ballot) internal returns (uint256[] memory asks) {
-        uint256 n = _currencies.length;
-        Currency[] memory cs = new Currency[](n);
-        uint256[] memory prices = new uint256[](n);
-        for (uint256 i = 1; i < n; ++i) {
-            cs[i] = _currencies[i];
-            (uint256 price, uint64 updatedAt, bool good) = _readPrice(i, cs[i]);
-            prices[i] = price;
-            if (good && cs[i].usdFeed != address(0)) _storePrice(i, price, updatedAt);
-        }
+    ///      The caller checks the length and passes the prices from `_pricesNow`.
+    function _asksOf(bytes calldata ballot, Currency[] memory cs, uint256[] memory prices)
+        internal
+        view
+        returns (uint256[] memory asks)
+    {
         asks = new uint256[](ballot.length);
         for (uint256 p; p < ballot.length; ++p) {
             if (uint8(ballot[p]) == 255) continue;
+            // Written out here, not through `_askOf`: this loop is the hot path of every ballot.
             (uint256 donatedUsd, uint256 pledgedUsd) = _supportOf(p, cs, prices);
             uint256 support = Math.saturatingAdd(donatedUsd, pledgedUsd);
             uint256 goal = _initiatives[p].goalUsd;
@@ -382,7 +377,43 @@ abstract contract RoundAccounting is AccessControl {
         }
     }
 
-    /// @dev The one support computation, for `_asksOf` and `initiativeUsd`: USD of one project's
+    /// @dev Whether every project the ballot leaves out (rank 255, or past its end) asks $0.
+    ///      Stops at the first one that asks anything.
+    function _unplacedAskNothing(bytes calldata ballot, Currency[] memory cs, uint256[] memory prices)
+        internal
+        view
+        returns (bool)
+    {
+        for (uint256 p; p < _initiatives.length; ++p) {
+            if (p < ballot.length && uint8(ballot[p]) != 255) continue;
+            if (_askOf(p, cs, prices) != 0) return false;
+        }
+        return true;
+    }
+
+    /// @dev One project's ask: goal less donations and open pledges, never below zero.
+    function _askOf(uint256 p, Currency[] memory cs, uint256[] memory prices) private view returns (uint256) {
+        (uint256 donatedUsd, uint256 pledgedUsd) = _supportOf(p, cs, prices);
+        uint256 support = Math.saturatingAdd(donatedUsd, pledgedUsd);
+        uint256 goal = _initiatives[p].goalUsd;
+        return support >= goal ? 0 : goal - support;
+    }
+
+    /// @dev Every currency's price, read once per ballot; a good answer is kept through
+    ///      `_storePrice`, which writes only when it is newer. Index 0 (USD) is left empty.
+    function _pricesNow() internal returns (Currency[] memory cs, uint256[] memory prices) {
+        uint256 n = _currencies.length;
+        cs = new Currency[](n);
+        prices = new uint256[](n);
+        for (uint256 i = 1; i < n; ++i) {
+            cs[i] = _currencies[i];
+            (uint256 price, uint64 updatedAt, bool good) = _readPrice(i, cs[i]);
+            prices[i] = price;
+            if (good && cs[i].usdFeed != address(0)) _storePrice(i, price, updatedAt);
+        }
+    }
+
+    /// @dev The one support computation, for `_askOf` and `initiativeUsd`: USD of one project's
     ///      balances and of its open pledges at the given prices (index 0 is the USD unit).
     ///      Each part converts and rounds down on its own, and sums saturate, so no
     ///      balance read can make it revert.

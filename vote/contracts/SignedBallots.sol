@@ -5,6 +5,7 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {RoundAccounting} from "./RoundAccounting.sol";
@@ -315,12 +316,17 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     ///      may be shorter than the project list: the missing projects are unplaced. The
     ///      money rules count each placed project's ask (goal less donations and open pledges)
     ///      at the block that records the ballot; a project with a $0 ask still counts as a
-    ///      project but adds $0 to every total.
+    ///      project but adds $0 to every total. The size minimum is the smaller of 1.5x the pool
+    ///      and every project's ask; the size sums and the 1.5x saturate, so no pool or ask overflows the size rule.
     function _validateBallot(bytes calldata ballot, uint8[] calldata proof) private {
         if (ballot.length == 0 || ballot.length > projectCount()) revert WrongLength();
-        uint256[] memory asks = _asksOf(ballot);
+        (Currency[] memory cs, uint256[] memory prices) = _pricesNow();
+        uint256[] memory asks = _asksOf(ballot, cs, prices);
         (uint256[] memory counts, uint256 requested) = _rankCounts(ballot, asks);
-        if (2 * requested < 3 * poolUsd) revert BallotTooSmall();
+        // The minimum is 1.5x the pool, or every project's ask when donations took that
+        // below it: then only a ballot leaving out nothing that still asks passes.
+        uint256 need = Math.saturatingAdd(poolUsd, poolUsd / 2 + (poolUsd & 1)); // 1.5x, rounded up
+        if (requested < need && !_unplacedAskNothing(ballot, cs, prices)) revert BallotTooSmall();
         _checkTiers(ballot, proof, counts, asks);
     }
 
@@ -357,7 +363,10 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
             // The default is explicit withholding, not implicit tail approval.
             if (rank == 0 || rank > m) revert InvalidBallot();
             ++counts[rank];
-            requested += asks[i];
+            unchecked {
+                requested += asks[i];
+                if (requested < asks[i]) requested = type(uint256).max; // saturate, written out: hot loop
+            }
         }
     }
 

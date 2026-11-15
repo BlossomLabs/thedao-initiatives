@@ -272,7 +272,62 @@ contract BallotRulesTest is Test {
         vm.deal(address(0x1001), 0.04 ether);
         vm.prank(voter);
         vm.expectRevert(SignedBallots.BallotTooSmall.selector);
-        round.vote(1, 2, hex"01010101", proof3(0, 1, 2)); // asks 200 < 300
+        round.vote(1, 2, hex"010101ff", proof3(0, 1, 2)); // asks 100 < 300, and project 3 still asks 100
+    }
+
+    /// Pool 200 wants 300; donations take every ask to 40 + 40 + 100 + 100 = 280, below that.
+    function belowMinimum() internal returns (SignedBallots round) {
+        round = priced(hundreds(), unrelated(), 200e6);
+        vm.deal(address(0x1000), 0.02 ether); // $60
+        vm.deal(address(0x1001), 0.02 ether);
+    }
+
+    function test_SizeRule_AllAsksBelowMinimum_PlacingEveryAskedProjectPasses() public {
+        SignedBallots round = belowMinimum();
+        vm.prank(voter);
+        round.vote(1, 1, hex"01010101", proof3(0, 1, 2)); // asks 280 < 300, but nothing is left out
+        assertEq(round.nonceOf(1), 1);
+    }
+
+    function test_SizeRule_AllAsksBelowMinimum_LeavingOneOutReverts() public {
+        SignedBallots round = belowMinimum();
+        vm.prank(voter);
+        vm.expectRevert(SignedBallots.BallotTooSmall.selector);
+        round.vote(1, 1, hex"010101ff", proof3(0, 1, 2)); // asks 180 of 280: project 3 still asks 100
+    }
+
+    function test_SizeRule_CoveredProjectsMayBeLeftOut() public {
+        SignedBallots round = priced(hundreds(), unrelated(), 200e6);
+        vm.deal(address(0x1000), 0.01 ether); // $30: ask 70
+        vm.deal(address(0x1003), 0.04 ether); // $120: covered
+        vm.prank(voter);
+        round.vote(1, 1, hex"010101ff", proof3(0, 1, 2)); // asks 270 < 300, the one left out asks 0
+        assertEq(round.nonceOf(1), 1);
+    }
+
+    function test_SizeRule_ShortBallotLeavesOutTheProjectsPastItsEnd() public {
+        SignedBallots round = belowMinimum();
+        vm.prank(voter);
+        vm.expectRevert(SignedBallots.BallotTooSmall.selector);
+        round.vote(1, 1, hex"010101", proof3(0, 1, 2)); // project 3 is past the end and asks 100
+    }
+
+    function test_SizeRule_HugePoolAndAsksDoNotOverflow() public {
+        uint256 top = type(uint256).max;
+        uint256[4] memory goals = [uint256(1 << 254), 1 << 254, 1 << 254, 0];
+        // A pool above max/3 and placed asks past 2^255: neither makes the size rule panic.
+        SignedBallots round = priced(goals, unrelated(), top);
+        vm.prank(voter);
+        round.vote(1, 1, hex"010101ff", proof3(0, 1, 2)); // nothing left out asks
+        assertEq(round.nonceOf(1), 1);
+        round = priced([uint256(1 << 254), 1 << 254, 1 << 254, 1 << 255], unrelated(), 1 << 200);
+        vm.prank(voter);
+        round.vote(1, 1, hex"010101ff", proof3(0, 1, 2)); // asks 3 * 2^254 >= 1.5 * 2^200
+        assertEq(round.nonceOf(1), 1);
+        round = priced([uint256(1 << 254), 1 << 254, 1 << 254, 1 << 255], unrelated(), top);
+        vm.prank(voter);
+        vm.expectRevert(SignedBallots.BallotTooSmall.selector);
+        round.vote(1, 1, hex"010101ff", proof3(0, 1, 2)); // project 3 still asks
     }
 
     function test_pledgeCountsAgainstAsk() public {
@@ -281,7 +336,7 @@ contract BallotRulesTest is Test {
         round.setPledge(bytes32(uint256(2)), 1, 0, 100e6);
         vm.prank(voter);
         vm.expectRevert(SignedBallots.BallotTooSmall.selector);
-        round.vote(1, 1, hex"01010101", proof3(0, 1, 2)); // asks 200 < 300
+        round.vote(1, 1, hex"010101ff", proof3(0, 1, 2)); // asks 100 < 300, and project 3 still asks 100
         round.setPledge(bytes32(uint256(2)), 1, 0, 0); // cancelled: asks 300, half of 1.5x passes
         vm.prank(voter);
         round.vote(1, 1, hex"01010101", proof3(0, 1, 2));
@@ -355,11 +410,11 @@ contract BallotRulesTest is Test {
         vm.deal(address(0x1000), 0.04 ether);
         vm.deal(address(0x1001), 0.04 ether);
         ethFeed.setUnavailable(true);
-        // The stored price ($3000) still counts the donations: asks 200 < 300. A zero price
-        // would have left asks at 400 and passed.
+        // The stored price ($3000) still counts the donations: asks 100 < 300, with project 3
+        // left out. A zero price would have left asks at 300 and passed.
         vm.prank(voter);
         vm.expectRevert(SignedBallots.BallotTooSmall.selector);
-        round.vote(1, 1, hex"01010101", proof3(0, 1, 2));
+        round.vote(1, 1, hex"010101ff", proof3(0, 1, 2));
         vm.deal(address(0x1001), 0);
         vm.prank(voter);
         round.vote(1, 1, hex"01010101", proof3(0, 1, 2)); // asks 300: recorded

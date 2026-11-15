@@ -45,6 +45,21 @@ def named():
         1,
         [1, W, 1, 1, W, W],
     ))
+    # Donations took every ask to 280, below 1.5x the pool of 200: placing every project that
+    # still asks is enough; leaving one out is too small.
+    low = [40, 40, 100, 0, 50, 50]
+    out.append(("every asked project placed below 1.5x", projects, low, ["Seal"], 200, 1, [1, 4, 1, W, 4, 1]))
+    out.append(("one asked project left out below 1.5x", projects, low, ["Seal"], 200, 1, [1, 4, 1, W, W, 1]))
+    # Amounts at the top of uint256: 3x the pool and the sums would overflow; the minimum saturates.
+    top = 2**256 - 1
+
+    def funded(asks):  # nothing donated: each goal is its ask
+        return [{**p, "goalUsd": a} for p, a in zip(projects, asks)]
+
+    out.append(("huge asks, small pool", funded([2**254, 0, 2**254, 2**254, 0, 0]), [2**254, 0, 2**254, 2**254, 0, 0], ["Seal"], 2**200, 1, [1, W, 1, 1, W, W]))
+    out.append(("near-max pool, every asked project placed", funded([2**254, 0, 2**254, 2**254, 0, 0]), [2**254, 0, 2**254, 2**254, 0, 0], ["Seal"], top, 1, [1, W, 1, 1, W, W]))
+    huge = [2**254, 2**255, 2**254, 2**254, 2**255, 2**255]
+    out.append(("near-max pool, asks sum past uint256, one left out", funded(huge), huge, ["Seal"], top, 1, [1, W, 1, 1, W, W]))
     return out
 
 

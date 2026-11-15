@@ -72,6 +72,48 @@ describe("ballot rules", () => {
     ]);
   });
 
+  describe("when donations take every ask below 1.5× the pool", () => {
+    // Pool 200 wants 300, but the asks add up to 280; project 3 is covered.
+    const low = { asks: [40n, 40n, 100n, 0n, 50n, 50n] }; // 280 < 300
+
+    it("placing every project passes", () => {
+      expect(checkBallot(ballot({ S: [0, 2, 5], B: [1, 3, 4] }), round(low)).ok).toBe(true);
+    });
+
+    it("leaving one that still asks out is too small, needing every ask", () => {
+      expect(checkBallot(ballot({ S: [0, 2, 5], B: [1] }), round(low)).errors).toEqual([
+        { rule: "size", requested: 230n, needed: 280n, pool: 200n },
+      ]);
+    });
+
+    it("a short ballot leaves out the projects past its end", () => {
+      // Project 3 is covered, 4 and 5 past the end still ask.
+      const short = Uint8Array.from([1, 4, 1, 1]);
+      expect(checkBallot(short, round(low)).errors).toEqual([
+        { rule: "size", requested: 180n, needed: 280n, pool: 200n },
+      ]);
+      expect(checkBallot(short, round({ asks: [40n, 40n, 100n, 0n, 0n, 0n] })).ok).toBe(true);
+    });
+
+    it("projects with a $0 ask may be left out", () => {
+      // Project 3 is covered; the rest are placed.
+      expect(checkBallot(ballot({ S: [0, 2, 5], B: [1, 4] }), round(low)).ok).toBe(true);
+    });
+  });
+
+  it("saturates at 2^256 − 1 like the contract: a near-max pool needs every ask", () => {
+    const max = (1n << 256n) - 1n;
+    const big = round({ poolUsd: max, asks: [1n << 254n, 0n, 1n << 254n, 1n << 254n, 0n, 0n] });
+    expect(checkBallot(ballot({ S: [0, 2, 3] }), big).ok).toBe(true);
+    const unplaced = round({
+      poolUsd: max,
+      asks: [1n << 254n, 1n << 255n, 1n << 254n, 1n << 254n, 1n << 255n, 1n << 255n],
+    });
+    expect(checkBallot(ballot({ S: [0, 2, 3] }), unplaced).errors).toEqual([
+      { rule: "size", requested: 3n << 254n, needed: max, pool: max },
+    ]);
+  });
+
   it("more than three tiers is invalid", () => {
     // Four rank groups: 1, 2, 3, 4.
     expect(checkBallot(Uint8Array.from([1, 2, 3, 4, 255, 255]), round()).errors)

@@ -62,6 +62,39 @@ class BallotRules(unittest.TestCase):
             [{"rule": "size", "requested": 300, "needed": 302, "pool": 201}],
         )
 
+    def test_all_asks_below_minimum_placing_every_asked_project_passes(self):
+        asks = [40, 40, 100, 0, 50, 50]  # 280 < 300
+        self.assertTrue(check(ballot(S=[0, 2, 5], B=[1, 3, 4]), asks=asks)["ok"])
+
+    def test_all_asks_below_minimum_leaving_one_out_is_too_small(self):
+        asks = [40, 40, 100, 0, 50, 50]
+        self.assertEqual(
+            check(ballot(S=[0, 2, 5], B=[1]), asks=asks)["errors"],
+            [{"rule": "size", "requested": 230, "needed": 280, "pool": 200}],
+        )
+
+    def test_covered_projects_may_be_left_out(self):
+        asks = [40, 40, 100, 0, 50, 50]
+        self.assertTrue(check(ballot(S=[0, 2, 5], B=[1, 4]), asks=asks)["ok"])  # project 3 asks 0
+
+    def test_short_ballot_leaves_out_the_projects_past_its_end(self):
+        asks = [40, 40, 100, 0, 50, 50]
+        self.assertEqual(
+            check([1, 4, 1, 1], asks=asks)["errors"],
+            [{"rule": "size", "requested": 180, "needed": 280, "pool": 200}],
+        )
+        self.assertTrue(check([1, 4, 1, 1], asks=[40, 40, 100, 0, 0, 0])["ok"])
+
+    def test_saturates_at_the_largest_uint256(self):
+        top = 2**256 - 1
+        asks = [2**254, 0, 2**254, 2**254, 0, 0]
+        self.assertTrue(check(ballot(S=[0, 2, 3]), pool=top, asks=asks)["ok"])
+        asks = [2**254, 2**255, 2**254, 2**254, 2**255, 2**255]
+        self.assertEqual(
+            check(ballot(S=[0, 2, 3]), pool=top, asks=asks)["errors"],
+            [{"rule": "size", "requested": 3 * 2**254, "needed": top, "pool": top}],
+        )
+
     def test_too_many_tiers(self):
         self.assertIn({"rule": "tiers"}, check([1, 2, 3, 4, W, W])["errors"])
 

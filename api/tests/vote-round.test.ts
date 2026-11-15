@@ -1323,11 +1323,12 @@ Deno.test("ballot: judged with the chain's current pool", async () => {
   const { h, state } = await setup(ruled);
   state.owners.set(17n, VOTER.address);
   state.history.pool = [{ block: 1, logIndex: 0, poolUsd: 1_000n }];
-  const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
+  // The asks add up to $400, below 1.5 × the pool: placing all four would pass, so leave one out.
+  const body = await signedBallot(VOTER, 17n, 1n, "0x010101ff", ruled);
   const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
   assertEquals(res.status, 422);
   const out = await j(res) as { errors: Record<string, unknown>[] };
-  assertEquals(out.errors, [{ rule: "size", requested: "400", needed: "1500", pool: "1000" }]);
+  assertEquals(out.errors, [{ rule: "size", requested: "300", needed: "400", pool: "1000" }]);
   assertEquals(state.sent, []);
   h.close();
 });
@@ -1380,12 +1381,13 @@ Deno.test("the relayer judges with chain asks", async () => {
   state.owners.set(17n, VOTER.address);
   // The goals ($100 each) clear 1.5 × the pool of $200; what is still asked does not.
   state.asks = [50n, 50n, 50n, 50n];
-  const body = await signedBallot(VOTER, 17n, 1n, "0x01010101", ruled);
+  // The asks total $200, below 1.5 × the pool: the minimum is every ask, so leave one out.
+  const body = await signedBallot(VOTER, 17n, 1n, "0x010101ff", ruled);
   const res = await h.req("/api/vote/ballot", { method: "POST", json: body });
   assertEquals(res.status, 422);
   const out = await j(res) as { code: string; errors: Record<string, unknown>[] };
   assertEquals(out.code, "invalid_ballot");
-  assertEquals(out.errors, [{ rule: "size", requested: "200", needed: "300", pool: "200" }]);
+  assertEquals(out.errors, [{ rule: "size", requested: "150", needed: "200", pool: "200" }]);
   assertEquals(state.sent, []);
   h.close();
 });

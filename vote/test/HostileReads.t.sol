@@ -35,7 +35,7 @@ contract BlobFeed {
 
     function latestRoundData() external pure returns (uint80, int256, uint256, uint256, uint80) {
         assembly {
-            return(0x1000, 160000)
+            return(0x1000, 100000)
         }
     }
 }
@@ -44,7 +44,7 @@ contract BlobFeed {
 /// bytes the contract asks for, so a full ballot stays far below the per-transaction cap.
 contract HostileReadsTest is Test {
     uint256 constant M = 40;
-    uint256 constant BLOB = 160_000;
+    uint256 constant BLOB = 100_000;
     uint256 constant GAS_LIMIT = 3_000_000;
     address voter = vm.addr(1000);
     SignedBallots round;

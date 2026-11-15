@@ -1,5 +1,6 @@
 /** The ballot rules (docs/superpowers/specs/2026-11-11-ballot-rules-design.md): a valid
- * ballot requests (in asks) at least 1.5× the pool, and each enforced tier (S-Tier always, A-Tier
+ * ballot requests (in asks) at least 1.5× the pool (or every project's ask, when donations
+ * took that sum below 1.5× the pool), and each enforced tier (S-Tier always, A-Tier
  * when the round says so) holds at least 3 pairwise-unrelated projects with no related
  * group over half its asks. Related = sharing a group (an affiliation); RFPs have none. Mirrored by
  * vote/reference/ballot_rules.py and the contract; shared fixtures keep them equal.
@@ -30,6 +31,7 @@ export type RuleError =
 export type RulesResult = { ok: boolean; errors: RuleError[]; proof: number[] };
 
 const WITHHELD = 255;
+const UINT_MAX = (1n << 256n) - 1n;
 
 /** Project indexes per group of equal rank, best rank first. */
 export function tiersOf(ballot: Uint8Array): number[][] {
@@ -84,16 +86,15 @@ export function checkBallot(ballot: Uint8Array, round: RulesRound): RulesResult 
   const groups = tiersOf(ballot);
   if (groups.length > 3) errors.push({ rule: "tiers" });
   const ask = (i: number) => round.asks[i];
+  // Sums and the 1.5× saturate at 2^256 − 1, as in the contract.
+  const cap = (x: bigint) => (x > UINT_MAX ? UINT_MAX : x);
   const sum = (xs: number[]) => xs.reduce((a, i) => a + ask(i), 0n);
-  const requested = sum(groups.flat());
-  if (2n * requested < 3n * round.poolUsd) {
-    errors.push({
-      rule: "size",
-      requested,
-      needed: (3n * round.poolUsd + 1n) / 2n,
-      pool: round.poolUsd,
-    });
-  }
+  const requested = cap(sum(groups.flat()));
+  // 1.5× the pool, or every project's ask when those add up to less.
+  const total = cap(round.asks.reduce((a, b) => a + b, 0n));
+  const minimum = cap((3n * round.poolUsd + 1n) / 2n);
+  const needed = minimum < total ? minimum : total;
+  if (requested < needed) errors.push({ rule: "size", requested, needed, pool: round.poolUsd });
   const proof: number[] = [];
   for (const t of enforced(round)) {
     const tier = groups[t] ?? [];

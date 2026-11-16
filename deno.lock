@@ -32,7 +32,7 @@
     "npm:@types/node@^26.6.6": "26.6.6",
     "npm:@types/react-dom@^19.3.0": "19.3.0_@types+react@19.3.0",
     "npm:@types/react@^19.3.0": "19.3.0",
-    "npm:@walletconnect/ethereum-provider@2.26.0": "2.26.0_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76",
+    "npm:@walletconnect/ethereum-provider@2.26.0": "2.26.0_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7",
     "npm:clsx@^2.1.1": "2.1.1",
     "npm:diff@9": "9.0.0",
     "npm:html2canvas-pro@^2.6.4": "2.6.4",
@@ -42,9 +42,7 @@
     "npm:lucide-react@^1.72.0": "1.72.0_@types+react@19.3.0_react@19.3.1",
     "npm:motion@^14.14.0": "14.14.0_react@19.3.1_react-dom@19.3.1",
     "npm:ogl@^1.0.11": "1.0.11",
-    "npm:pdf-lib@1.17.1": "1.17.1",
     "npm:qrcode.react@4.2.0": "4.2.0_react@19.3.1",
-    "npm:qrcode@1.5.4": "1.5.4",
     "npm:react-dom@^19.3.1": "19.3.1_react@19.3.1",
     "npm:react-markdown@^10.1.0": "10.1.0_@types+react@19.3.0_react@19.3.1",
     "npm:react-router@^8.5.1": "8.5.1_@types+react@19.3.0_@types+react-dom@19.3.0_react@19.3.1_react-dom@19.3.1",
@@ -56,11 +54,12 @@
     "npm:tw-animate-css@^1.4.0": "1.4.0",
     "npm:typescript@*": "7.0.2",
     "npm:typescript@~7.0.2": "7.0.2",
-    "npm:viem@^2.57.19": "2.57.19_typescript@7.0.2_zod@3.22.4",
+    "npm:viem@^2.57.19": "2.57.19_typescript@7.0.2_zod@4.6.7",
+    "npm:vite@*": "8.3.8_@types+node@26.6.6_yaml@2.9.1",
     "npm:vite@^8.3.8": "8.3.8_@types+node@26.6.6_yaml@2.9.1",
     "npm:vitest@*": "5.1.0_@types+node@26.6.6_jsdom@31.0.1_vite@8.3.8_yaml@2.9.1",
     "npm:vitest@^5.1.0": "5.1.0_@types+node@26.6.6_jsdom@31.0.1_vite@8.3.8_yaml@2.9.1",
-    "npm:wagmi@^3.7.11": "3.7.11_@tanstack+react-query@5.107.1_react@19.3.1_typescript@7.0.2_viem@2.57.19__typescript@7.0.2__zod@3.25.76_@base-org+account@1.1.1_@coinbase+wallet-sdk@4.3.2_@types+react@19.3.0_@walletconnect+ethereum-provider@2.26.0_zod@3.25.76",
+    "npm:wagmi@^3.7.11": "3.7.11_@tanstack+react-query@5.107.1_react@19.3.1_typescript@7.0.2_viem@2.57.19_@base-org+account@1.1.1_@coinbase+wallet-sdk@4.3.2_@types+react@19.3.0_@walletconnect+ethereum-provider@2.26.0_zod@4.6.7",
     "npm:yaml@^2.9.1": "2.9.1"
   },
   "jsr": {
@@ -257,20 +256,20 @@
         "@babel/helper-validator-identifier"
       ]
     },
-    "@base-org/account@1.1.1_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76": {
+    "@base-org/account@1.1.1_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7": {
       "integrity": "sha512-IfVJPrDPhHfqXRDb89472hXkpvJuQQR7FDI9isLPHEqSYt/45whIoBxSPgZ0ssTt379VhQo4+87PWI1DoLSfAQ==",
       "dependencies": [
         "@noble/hashes@1.4.0",
         "clsx@1.2.1",
         "eventemitter3",
         "idb-keyval",
-        "ox@0.6.9_typescript@7.0.2_zod@3.25.76",
+        "ox@0.6.9_typescript@7.0.2_zod@4.6.7",
         "preact",
         "viem",
         "zustand@5.0.3_@types+react@19.3.0_react@19.3.1_use-sync-external-store@1.4.0"
       ]
     },
-    "@base-org/account@2.4.0_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76": {
+    "@base-org/account@2.4.0_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7": {
       "integrity": "sha512-A4Umpi8B9/pqR78D1Yoze4xHyQaujioVRqqO3d6xuDFw9VRtjg6tK3bPlwE0aW+nVH/ntllCpPa2PbI8Rnjcug==",
       "dependencies": [
         "@coinbase/cdp-sdk",
@@ -278,7 +277,7 @@
         "clsx@1.2.1",
         "eventemitter3",
         "idb-keyval",
-        "ox@0.6.9_typescript@7.0.2_zod@3.25.76",
+        "ox@0.6.9_typescript@7.0.2_zod@4.6.7",
         "preact",
         "viem",
         "zustand@5.0.3_@types+react@19.3.0_react@19.3.1_use-sync-external-store@1.4.0"
@@ -321,7 +320,7 @@
         "@solana-program/system@0.16.0_@solana+kit@8.6.0_typescript@7.0.2",
         "@solana-program/token@0.16.1_@solana+kit@8.6.0_typescript@7.0.2",
         "@solana/kit@8.6.0_typescript@7.0.2",
-        "abitype@1.0.6_typescript@7.0.2_zod@3.25.76",
+        "abitype@1.0.6_typescript@7.0.2_zod@4.6.7",
         "axios",
         "axios-retry",
         "bs58",
@@ -329,7 +328,7 @@
         "md5",
         "uncrypto",
         "viem",
-        "zod@3.25.76"
+        "zod"
       ]
     },
     "@coinbase/wallet-sdk@4.3.2": {
@@ -556,18 +555,6 @@
     "@oxc-project/types@0.156.0": {
       "integrity": "sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw=="
     },
-    "@pdf-lib/standard-fonts@1.0.0": {
-      "integrity": "sha512-hU30BK9IUN/su0Mn9VdlVKsWBS6GyhVfqjwl1FjZN4TxP6cCw0jP2w7V3Hf5uX7M0AZJ16vey9yE0ny7Sa59ZA==",
-      "dependencies": [
-        "pako"
-      ]
-    },
-    "@pdf-lib/upng@1.0.1": {
-      "integrity": "sha512-dQK2FUMQtowVP00mtIksrlZhdFXQZPC+taih1q4CvPZ5vqdxR/LKBaFg0oAfzd1GlHZXXSPdQfzQnt+ViGvEIQ==",
-      "dependencies": [
-        "pako"
-      ]
-    },
     "@phosphor-icons/webcomponents@2.1.5": {
       "integrity": "sha512-JcvQkZxvcX2jK+QCclm8+e8HXqtdFW9xV4/kk2aL9Y3dJA2oQVt+pzbv1orkumz3rfx4K9mn9fDoMr1He1yr7Q==",
       "dependencies": [
@@ -595,13 +582,13 @@
         "@scure/base"
       ]
     },
-    "@privy-io/ethereum@0.2.6_viem@2.57.19__typescript@7.0.2__zod@3.22.4_typescript@7.0.2": {
+    "@privy-io/ethereum@0.2.6_viem@2.57.19_typescript@7.0.2": {
       "integrity": "sha512-oRPl/YMpjMzOY3Iu3/g0MwjQy9u5Pyk54hN6kTfV+b2z8TI3B1teh7lo2xifw5PosUmFEBQqMvgpQxTKSS8slw==",
       "dependencies": [
         "viem"
       ]
     },
-    "@privy-io/js-sdk-core@0.79.5_viem@2.57.19__typescript@7.0.2__zod@3.22.4_typescript@7.0.2": {
+    "@privy-io/js-sdk-core@0.79.5_viem@2.57.19_typescript@7.0.2": {
       "integrity": "sha512-RTYyDpEvnYqVh/J2YfUduoazD9FCzUPrpmng1jyCpezgQXNQhE+huOb19R1h6SP/l6/6ZeQVQWYuR12DRUL6ag==",
       "dependencies": [
         "@privy-io/api-base",
@@ -632,7 +619,7 @@
     "@privy-io/react-auth@3.51.4_@solana+kit@8.6.0_react@19.3.1_react-dom@19.3.1_@solana+sysvars@5.5.1_@stripe+stripe-js@1.54.2_@tanstack+react-query@5.107.1_@types+react@19.3.0_typescript@7.0.2": {
       "integrity": "sha512-Pgj4Q/+j+AUMK9jxeZQqbRGd/dcXhv5vtK/hWVvzMBOaVTXiPFrFwi/SmebqlpFPrgyIMqNCwIAN1PNgm1MsuA==",
       "dependencies": [
-        "@base-org/account@1.1.1_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76",
+        "@base-org/account@1.1.1_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7",
         "@base-ui/react",
         "@coinbase/wallet-sdk",
         "@floating-ui/react",
@@ -657,7 +644,7 @@
         "@tanstack/react-virtual",
         "@wallet-standard/app",
         "@walletconnect/ethereum-provider",
-        "@walletconnect/universal-provider@2.26.0_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/universal-provider@2.26.0_typescript@7.0.2_zod@4.6.7",
         "eventemitter3",
         "fast-password-entropy",
         "jose@4.15.9",
@@ -666,7 +653,7 @@
         "mipd",
         "ofetch",
         "pino-pretty",
-        "qrcode@1.5.4",
+        "qrcode",
         "react",
         "react-device-detect",
         "react-dom",
@@ -771,7 +758,7 @@
     "@remix-run/route-pattern@0.22.1": {
       "integrity": "sha512-czdGJWh09Lapvcqt7Vb09KlrU2PhRJ8xQaI+AItTuD9aDJ5MAgxnS38lnys6Ll+6RJEqPiaUqTwIQhVLwFvv+w=="
     },
-    "@reown/appkit-common@1.8.19_typescript@7.0.2_zod@3.22.4": {
+    "@reown/appkit-common@1.8.19_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-z5wDrYjUGY7YbM4b14NHVo54WKZ5++PQtGkcsXhiOP39yAVijubBQD8BfHs/Pu2fSFqnqLIFoCVvIEfNWWccRw==",
       "dependencies": [
         "big.js",
@@ -779,17 +766,17 @@
         "viem"
       ]
     },
-    "@reown/appkit-controllers@1.8.19_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_zod@3.25.76": {
+    "@reown/appkit-controllers@1.8.19_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-JFNT8CfAVit9FJXh596Ye4U8A/oIapW+Y0KQqjB59DXyTCDZbxZDB32rULBQrSkZ6PufTEa239Dil4kABCQKtg==",
       "dependencies": [
         "@reown/appkit-common",
         "@reown/appkit-wallet",
-        "@walletconnect/universal-provider@2.23.7_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/universal-provider@2.23.7_typescript@7.0.2_zod@4.6.7",
         "valtio",
         "viem"
       ]
     },
-    "@reown/appkit-pay@1.8.19_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76": {
+    "@reown/appkit-pay@1.8.19_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7": {
       "integrity": "sha512-HO/tQT0TbTQO3eONxNNPJAOZAOzUiHvjM0Mty1rFFeRBH68auiqQxQi2YFNMs014gNkRN+cb84VYau7+MCC0fQ==",
       "dependencies": [
         "@reown/appkit-common",
@@ -806,7 +793,7 @@
         "buffer"
       ]
     },
-    "@reown/appkit-scaffold-ui@1.8.19_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_valtio@2.1.7_zod@3.25.76": {
+    "@reown/appkit-scaffold-ui@1.8.19_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_valtio@2.1.7_zod@4.6.7": {
       "integrity": "sha512-Ak767x0VzeDIXb0wbzkl19kx6udw7vkb1EU0SAweG3iKc9BunW87Rfcd48/YimzMZycJaYmlbtfmqQQDYs6Few==",
       "dependencies": [
         "@reown/appkit-common",
@@ -818,7 +805,7 @@
         "lit"
       ]
     },
-    "@reown/appkit-ui@1.8.19_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_zod@3.25.76": {
+    "@reown/appkit-ui@1.8.19_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-fCAwW8yyyC3JcgKLBPvCtYuDGC4H8anO7u4LTaAXGEzdcU5H+IrCgNFSPNK7NuTSmgXm1TnoYxPxRFKNiNwFdA==",
       "dependencies": [
         "@phosphor-icons/webcomponents",
@@ -826,10 +813,10 @@
         "@reown/appkit-controllers",
         "@reown/appkit-wallet",
         "lit",
-        "qrcode@1.5.3"
+        "qrcode"
       ]
     },
-    "@reown/appkit-utils@1.8.19_valtio@2.1.7_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76": {
+    "@reown/appkit-utils@1.8.19_valtio@2.1.7_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7": {
       "integrity": "sha512-VQPgUMTFqoh4UD3EDZSw9wyMkyZsmIVmu8CdQ2FUxIuqYW4fLd0VIpkDeO64MMhSv8b0X8Vd6m4+eGcqSwlUAg==",
       "dependencies": [
         "@reown/appkit-common",
@@ -838,12 +825,12 @@
         "@reown/appkit-wallet",
         "@wallet-standard/wallet",
         "@walletconnect/logger",
-        "@walletconnect/universal-provider@2.23.7_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/universal-provider@2.23.7_typescript@7.0.2_zod@4.6.7",
         "valtio",
         "viem"
       ],
       "optionalDependencies": [
-        "@base-org/account@2.4.0_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76",
+        "@base-org/account@2.4.0_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7",
         "@safe-global/safe-apps-provider",
         "@safe-global/safe-apps-sdk"
       ]
@@ -854,10 +841,10 @@
         "@reown/appkit-common",
         "@reown/appkit-polyfills",
         "@walletconnect/logger",
-        "zod@3.22.4"
+        "zod"
       ]
     },
-    "@reown/appkit@1.8.19_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76": {
+    "@reown/appkit@1.8.19_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7": {
       "integrity": "sha512-wB+xatkRbOy0AY1cZxxtcKzzPk3l3CTFulDbaISLVmZI6ZnQrOFuLnYc285zGsC6DB4d6bmwYUh89zcMLa4PvQ==",
       "dependencies": [
         "@reown/appkit-common",
@@ -868,7 +855,7 @@
         "@reown/appkit-ui",
         "@reown/appkit-utils",
         "@reown/appkit-wallet",
-        "@walletconnect/universal-provider@2.23.7_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/universal-provider@2.23.7_typescript@7.0.2_zod@4.6.7",
         "bs58",
         "semver@7.7.2",
         "valtio",
@@ -966,14 +953,14 @@
     "@rolldown/pluginutils@1.1.1": {
       "integrity": "sha512-glFIJDvLNDtJhT9qrMFWLPbvS+skxgt4L0K8Ei2YtnhPysAJnsI7nyxSJxKj4ADeKX0OLjC4ntRkwpLOoS3rwA=="
     },
-    "@safe-global/safe-apps-provider@0.18.6_typescript@7.0.2_zod@3.25.76": {
+    "@safe-global/safe-apps-provider@0.18.6_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-4LhMmjPWlIO8TTDC2AwLk44XKXaK6hfBTWyljDm0HQ6TWlOEijVWNrt2s3OCVMSxlXAcEzYfqyu1daHZooTC2Q==",
       "dependencies": [
         "@safe-global/safe-apps-sdk",
         "events"
       ]
     },
-    "@safe-global/safe-apps-sdk@9.1.0_typescript@7.0.2_zod@3.25.76": {
+    "@safe-global/safe-apps-sdk@9.1.0_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-N5p/ulfnnA2Pi2M3YeWjULeWbjo7ei22JwU/IXnhoHzKq3pYCN6ynL9mJBOlvDVv892EgLPCWCOwQk/uBT2v0Q==",
       "dependencies": [
         "@safe-global/safe-gateway-typescript-sdk",
@@ -2581,10 +2568,10 @@
     "@vitest/spy@5.1.0": {
       "integrity": "sha512-2DPO5OMHWKrBngC+fCmTQqemNF0gidRhp3lxbBmRhW+M1XJrfgPpqNqWVevXtn2f2ufD5ZaR1B6B641aAlcX5A=="
     },
-    "@wagmi/connectors@8.2.4_@base-org+account@1.1.1_@coinbase+wallet-sdk@4.3.2_@wagmi+core@3.6.9_@walletconnect+ethereum-provider@2.26.0_typescript@7.0.2_viem@2.57.19__typescript@7.0.2__zod@3.25.76_@types+react@19.3.0_react@19.3.1_use-sync-external-store@1.4.0_zod@3.25.76": {
+    "@wagmi/connectors@8.2.4_@base-org+account@1.1.1_@coinbase+wallet-sdk@4.3.2_@wagmi+core@3.6.9_@walletconnect+ethereum-provider@2.26.0_typescript@7.0.2_viem@2.57.19_@types+react@19.3.0_react@19.3.1_use-sync-external-store@1.4.0_zod@4.6.7": {
       "integrity": "sha512-r1HmXE2v1utz1fc9njeLfSfKbaErVzSjxL/g6vhtHP9iq6fLIo2iOqUeoDr6iJ0tP3XvShzzpnmQvOAjhU56cg==",
       "dependencies": [
-        "@base-org/account@1.1.1_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76",
+        "@base-org/account@1.1.1_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7",
         "@coinbase/wallet-sdk",
         "@wagmi/core",
         "@walletconnect/ethereum-provider",
@@ -2592,13 +2579,13 @@
         "viem"
       ],
       "optionalPeers": [
-        "@base-org/account@1.1.1_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76",
+        "@base-org/account@1.1.1_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7",
         "@coinbase/wallet-sdk",
         "@walletconnect/ethereum-provider",
         "typescript"
       ]
     },
-    "@wagmi/core@3.6.9_typescript@7.0.2_viem@2.57.19__typescript@7.0.2__zod@3.25.76_@types+react@19.3.0_react@19.3.1_use-sync-external-store@1.4.0_zod@3.25.76": {
+    "@wagmi/core@3.6.9_typescript@7.0.2_viem@2.57.19_@types+react@19.3.0_react@19.3.1_use-sync-external-store@1.4.0_zod@4.6.7": {
       "integrity": "sha512-n9gUa8YKUJK/+ckQ3+Rm/MrZ5u7QAvKeBTfUv8NwMnS20LV9t1vprt/TzU99sTxXmHiuJoMwr6Q32IG601LKyw==",
       "dependencies": [
         "eventemitter3",
@@ -2632,7 +2619,7 @@
         "@wallet-standard/base"
       ]
     },
-    "@walletconnect/core@2.23.7_typescript@7.0.2_zod@3.25.76": {
+    "@walletconnect/core@2.23.7_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-yTyymn9mFaDZkUfLfZ3E9VyaSDPeHAXlrPxQRmNx2zFsEt/25GmTU2A848aomimLxZnAG2jNLhxbJ8I0gyNV+w==",
       "dependencies": [
         "@walletconnect/heartbeat",
@@ -2647,14 +2634,14 @@
         "@walletconnect/safe-json",
         "@walletconnect/time",
         "@walletconnect/types@2.23.7",
-        "@walletconnect/utils@2.23.7_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/utils@2.23.7_typescript@7.0.2_zod@4.6.7",
         "@walletconnect/window-getters",
         "es-toolkit@1.44.0",
         "events",
         "uint8arrays"
       ]
     },
-    "@walletconnect/core@2.26.0_typescript@7.0.2_zod@3.25.76": {
+    "@walletconnect/core@2.26.0_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-lvnqCLEp5Z3DqUFih/FPKbgJHauby5XNAe1clwIf2jYhACFWusRCgUoCK8ULyIopW9FIAqF87ldw/V0Z9v5GAQ==",
       "dependencies": [
         "@walletconnect/heartbeat",
@@ -2669,7 +2656,7 @@
         "@walletconnect/safe-json",
         "@walletconnect/time",
         "@walletconnect/types@2.26.0",
-        "@walletconnect/utils@2.26.0_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/utils@2.26.0_typescript@7.0.2_zod@4.6.7",
         "@walletconnect/window-getters",
         "es-toolkit@1.45.1",
         "events",
@@ -2682,15 +2669,15 @@
         "tslib@1.14.1"
       ]
     },
-    "@walletconnect/ethereum-provider@2.26.0_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@3.25.76": {
+    "@walletconnect/ethereum-provider@2.26.0_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7": {
       "integrity": "sha512-C6Ld+Gv1OurPYvAbFGXRuvthIp4datYqDlmRGjWRWXkkIerijo05vwrH5cGNj9bK93FSfGScqaL2Ig2LvX3QhQ==",
       "dependencies": [
         "@reown/appkit",
         "@walletconnect/jsonrpc-types",
         "@walletconnect/keyvaluestorage",
         "@walletconnect/types@2.26.0",
-        "@walletconnect/universal-provider@2.26.0_typescript@7.0.2_zod@3.25.76",
-        "@walletconnect/utils@2.26.0_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/universal-provider@2.26.0_typescript@7.0.2_zod@4.6.7",
+        "@walletconnect/utils@2.26.0_typescript@7.0.2_zod@4.6.7",
         "events"
       ]
     },
@@ -2787,29 +2774,29 @@
         "tslib@1.14.1"
       ]
     },
-    "@walletconnect/sign-client@2.23.7_typescript@7.0.2_zod@3.25.76": {
+    "@walletconnect/sign-client@2.23.7_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-SX61lzb1bTl/LijlcHQttnoHPBzzoY5mW9ArR6qhFtDNDTS7yr2rcH7rCngxHlYeb4rAYcWLHgbiGSrdKxl/mg==",
       "dependencies": [
-        "@walletconnect/core@2.23.7_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/core@2.23.7_typescript@7.0.2_zod@4.6.7",
         "@walletconnect/events",
         "@walletconnect/heartbeat",
         "@walletconnect/jsonrpc-utils",
         "@walletconnect/logger",
         "@walletconnect/time",
         "@walletconnect/types@2.23.7",
-        "@walletconnect/utils@2.23.7_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/utils@2.23.7_typescript@7.0.2_zod@4.6.7",
         "events"
       ]
     },
-    "@walletconnect/sign-client@2.26.0_typescript@7.0.2_zod@3.25.76": {
+    "@walletconnect/sign-client@2.26.0_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-zu15NhOmGp1o0LsV9t6V1w+DFYx0UdljNLspqXu2L0GDJlU0Nv5Z70gadrbQGHn8tN70aQrrbOxfMCB48GTe8Q==",
       "dependencies": [
-        "@walletconnect/core@2.26.0_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/core@2.26.0_typescript@7.0.2_zod@4.6.7",
         "@walletconnect/jsonrpc-utils",
         "@walletconnect/logger",
         "@walletconnect/time",
         "@walletconnect/types@2.26.0",
-        "@walletconnect/utils@2.26.0_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/utils@2.26.0_typescript@7.0.2_zod@4.6.7",
         "events"
       ]
     },
@@ -2841,7 +2828,7 @@
         "events"
       ]
     },
-    "@walletconnect/universal-provider@2.23.7_typescript@7.0.2_zod@3.25.76": {
+    "@walletconnect/universal-provider@2.23.7_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-6UicU/Mhr/1bh7MNoajypz7BhigORbHpP1LFTf8FYLQGDqzmqHMqmMH2GDAImtaY2sFTi2jBvc22tLl8VMze/A==",
       "dependencies": [
         "@walletconnect/events",
@@ -2851,14 +2838,14 @@
         "@walletconnect/jsonrpc-utils",
         "@walletconnect/keyvaluestorage",
         "@walletconnect/logger",
-        "@walletconnect/sign-client@2.23.7_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/sign-client@2.23.7_typescript@7.0.2_zod@4.6.7",
         "@walletconnect/types@2.23.7",
-        "@walletconnect/utils@2.23.7_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/utils@2.23.7_typescript@7.0.2_zod@4.6.7",
         "es-toolkit@1.44.0",
         "events"
       ]
     },
-    "@walletconnect/universal-provider@2.26.0_typescript@7.0.2_zod@3.25.76": {
+    "@walletconnect/universal-provider@2.26.0_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-Xxap1/U8qNY4k9M+ohV+99n4gUeUeB3iJt60o9RgfHkekbdk16PIp4ayo16pg8hqmam1sNVR6+rR3qL0tuaK3g==",
       "dependencies": [
         "@walletconnect/events",
@@ -2868,14 +2855,14 @@
         "@walletconnect/jsonrpc-utils",
         "@walletconnect/keyvaluestorage",
         "@walletconnect/logger",
-        "@walletconnect/sign-client@2.26.0_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/sign-client@2.26.0_typescript@7.0.2_zod@4.6.7",
         "@walletconnect/types@2.26.0",
-        "@walletconnect/utils@2.26.0_typescript@7.0.2_zod@3.25.76",
+        "@walletconnect/utils@2.26.0_typescript@7.0.2_zod@4.6.7",
         "es-toolkit@1.45.1",
         "events"
       ]
     },
-    "@walletconnect/utils@2.23.7_typescript@7.0.2_zod@3.25.76": {
+    "@walletconnect/utils@2.23.7_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-3p38gNrkVcIiQixVrlsWSa66Gjs5PqHOug2TxDgYUVBW5NcKjwQA08GkC6CKBQUfr5iaCtbfy6uZJW1LKSIvWQ==",
       "dependencies": [
         "@msgpack/msgpack",
@@ -2895,11 +2882,11 @@
         "@walletconnect/window-metadata",
         "blakejs",
         "detect-browser",
-        "ox@0.9.3_typescript@7.0.2_zod@3.25.76",
+        "ox@0.9.3_typescript@7.0.2_zod@4.6.7",
         "uint8arrays"
       ]
     },
-    "@walletconnect/utils@2.26.0_typescript@7.0.2_zod@3.25.76": {
+    "@walletconnect/utils@2.26.0_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-zCpuG8vVvL+vHiX2wE+pChr123prvlQE37lJoHNcRiD2+3RxXFPoHnjJ/zAhN+ivdjK743FHsrP2DRXXqno1fg==",
       "dependencies": [
         "@msgpack/msgpack",
@@ -2918,7 +2905,7 @@
         "@walletconnect/window-metadata",
         "blakejs",
         "detect-browser",
-        "ox@0.9.3_typescript@7.0.2_zod@3.25.76",
+        "ox@0.9.3_typescript@7.0.2_zod@4.6.7",
         "uint8arrays"
       ]
     },
@@ -2935,35 +2922,26 @@
         "tslib@1.14.1"
       ]
     },
-    "abitype@1.0.6_typescript@7.0.2_zod@3.25.76": {
+    "abitype@1.0.6_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-MMSqYh4+C/aVqI2RQaWqbvI4Kxo5cQV40WQ4QFtDnNzCkqChm8MuENhElmynZlO0qUy/ObkEUaXtKqYnx1Kp3A==",
       "dependencies": [
         "typescript",
-        "zod@3.25.76"
+        "zod"
       ],
       "optionalPeers": [
         "typescript",
-        "zod@3.25.76"
+        "zod"
       ]
     },
-    "abitype@1.2.3_typescript@7.0.2_zod@3.22.4": {
-      "integrity": "sha512-Ofer5QUnuUdTFsBRwARMoWKOH1ND5ehwYhJ3OJ/BQO+StkwQjHw0XyVh4vDttzHB7QOFhPHa/o413PJ82gU/Tg==",
-      "dependencies": [
-        "typescript"
-      ],
-      "optionalPeers": [
-        "typescript"
-      ]
-    },
-    "abitype@1.2.3_typescript@7.0.2_zod@3.25.76": {
+    "abitype@1.2.3_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-Ofer5QUnuUdTFsBRwARMoWKOH1ND5ehwYhJ3OJ/BQO+StkwQjHw0XyVh4vDttzHB7QOFhPHa/o413PJ82gU/Tg==",
       "dependencies": [
         "typescript",
-        "zod@3.25.76"
+        "zod"
       ],
       "optionalPeers": [
         "typescript",
-        "zod@3.25.76"
+        "zod"
       ]
     },
     "abort-controller@3.0.0": {
@@ -4354,7 +4332,7 @@
         "wrappy"
       ]
     },
-    "ox@0.14.65_typescript@7.0.2_zod@3.22.4": {
+    "ox@0.14.65_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-K7oj+jvEP4Gf78ZOYuWAWzKEX/g5z7p6ukj84gdbFnezmFSt6SpprEp9tH5tymXsywSqRdeqk+8JL4+9o0Schw==",
       "dependencies": [
         "@adraffy/ens-normalize",
@@ -4363,7 +4341,7 @@
         "@noble/hashes@1.8.0",
         "@scure/bip32",
         "@scure/bip39",
-        "abitype@1.2.3_typescript@7.0.2_zod@3.22.4",
+        "abitype@1.2.3_typescript@7.0.2_zod@4.6.7",
         "eventemitter3",
         "typescript"
       ],
@@ -4371,7 +4349,7 @@
         "typescript"
       ]
     },
-    "ox@0.6.9_typescript@7.0.2_zod@3.25.76": {
+    "ox@0.6.9_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-wi5ShvzE4eOcTwQVsIPdFr+8ycyX+5le/96iAJutaZAvCes1J0+RvpEPg5QDPDiaR0XQQAvZVl7AwqQcINuUug==",
       "dependencies": [
         "@adraffy/ens-normalize",
@@ -4379,7 +4357,7 @@
         "@noble/hashes@1.8.0",
         "@scure/bip32",
         "@scure/bip39",
-        "abitype@1.2.3_typescript@7.0.2_zod@3.25.76",
+        "abitype@1.2.3_typescript@7.0.2_zod@4.6.7",
         "eventemitter3",
         "typescript"
       ],
@@ -4387,7 +4365,7 @@
         "typescript"
       ]
     },
-    "ox@0.9.3_typescript@7.0.2_zod@3.25.76": {
+    "ox@0.9.3_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-KzyJP+fPV4uhuuqrTZyok4DC7vFzi7HLUFiUNEmpbyh59htKWkOC98IONC1zgXJPbHAhQgqs6B0Z6StCGhmQvg==",
       "dependencies": [
         "@adraffy/ens-normalize",
@@ -4396,7 +4374,7 @@
         "@noble/hashes@1.8.0",
         "@scure/bip32",
         "@scure/bip39",
-        "abitype@1.2.3_typescript@7.0.2_zod@3.25.76",
+        "abitype@1.2.3_typescript@7.0.2_zod@4.6.7",
         "eventemitter3",
         "typescript"
       ],
@@ -4421,9 +4399,6 @@
     },
     "p-try@2.2.0": {
       "integrity": "sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ=="
-    },
-    "pako@1.0.11": {
-      "integrity": "sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw=="
     },
     "parse-entities@4.0.2": {
       "integrity": "sha512-GG2AQYWoLgL877gQIKeRPGO1xF9+eG1ujIb5soS5gPvLQ1y2o8FL90w2QWNdf9I361Mpp7726c+lj3U0qK1uGw==",
@@ -4454,15 +4429,6 @@
     },
     "pathe@2.0.3": {
       "integrity": "sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w=="
-    },
-    "pdf-lib@1.17.1": {
-      "integrity": "sha512-V/mpyJAoTsN4cnP31vc0wfNA1+p20evqqnap0KLoRUN0Yk/p3wN52DOEsL4oBFcLdb76hlpKPtzJIgo67j/XLw==",
-      "dependencies": [
-        "@pdf-lib/standard-fonts",
-        "@pdf-lib/upng",
-        "pako",
-        "tslib@1.14.1"
-      ]
     },
     "picocolors@1.1.1": {
       "integrity": "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="
@@ -4537,8 +4503,8 @@
     "pngjs@5.0.0": {
       "integrity": "sha512-40QW5YalBNfQo5yRYmiw7Yz6TKKVr3h6970B2YE+3fQpsWcrbj1PzJgxeJ19DRQjhMbKPIuMY8rFaXc8moolVw=="
     },
-    "postcss@8.5.32": {
-      "integrity": "sha512-LJlKCCAUFKOuZxipUdYw1NzIITEsPcgyOG9LkvRJvuKj/bRzbuRY0ARXvL0pWGpsZvn8jku+LMep2eU0seHp8g==",
+    "postcss@8.5.33": {
+      "integrity": "sha512-RVHEU9/Pp1Fnjr/MpAJsZoADukCKhfIi15OunEYiGktIkYLkPVvC1sioWolGDS7XByMTx9m/IGbro0Js13zhnQ==",
       "dependencies": [
         "nanoid",
         "picocolors",
@@ -4592,15 +4558,6 @@
       "dependencies": [
         "dijkstrajs",
         "encode-utf8",
-        "pngjs",
-        "yargs"
-      ],
-      "bin": true
-    },
-    "qrcode@1.5.4": {
-      "integrity": "sha512-1ca71Zgiu6ORjHqFBDpnSMTR2ReToX4l1Au1VFLyVeBTFavzQnv5JxMFr3ukHVKpSrSA2MCk0lNJSykjUfz7Zg==",
-      "dependencies": [
-        "dijkstrajs",
         "pngjs",
         "yargs"
       ],
@@ -5172,16 +5129,16 @@
         "vfile-message"
       ]
     },
-    "viem@2.57.19_typescript@7.0.2_zod@3.22.4": {
+    "viem@2.57.19_typescript@7.0.2_zod@4.6.7": {
       "integrity": "sha512-ULAHSwef42oL1reV41Os40iR34PF9BFNIX/RBapHLAJL1X6VmrgQikS4q4ulZ7/8GqlFLqrRI5GoNms3hcxsHw==",
       "dependencies": [
         "@noble/curves@1.9.1",
         "@noble/hashes@1.8.0",
         "@scure/bip32",
         "@scure/bip39",
-        "abitype@1.2.3_typescript@7.0.2_zod@3.22.4",
+        "abitype@1.2.3_typescript@7.0.2_zod@4.6.7",
         "isows",
-        "ox@0.14.65_typescript@7.0.2_zod@3.22.4",
+        "ox@0.14.65_typescript@7.0.2_zod@4.6.7",
         "typescript",
         "ws@8.21.0"
       ],
@@ -5241,7 +5198,7 @@
         "xml-name-validator"
       ]
     },
-    "wagmi@3.7.11_@tanstack+react-query@5.107.1_react@19.3.1_typescript@7.0.2_viem@2.57.19__typescript@7.0.2__zod@3.25.76_@base-org+account@1.1.1_@coinbase+wallet-sdk@4.3.2_@types+react@19.3.0_@walletconnect+ethereum-provider@2.26.0_zod@3.25.76": {
+    "wagmi@3.7.11_@tanstack+react-query@5.107.1_react@19.3.1_typescript@7.0.2_viem@2.57.19_@base-org+account@1.1.1_@coinbase+wallet-sdk@4.3.2_@types+react@19.3.0_@walletconnect+ethereum-provider@2.26.0_zod@4.6.7": {
       "integrity": "sha512-2qyRwCXbNrDjy+Amx+HuiufaJAHM49ZiOYFNrNOiRRSS7ODyIKaWMBdllS252hklFm9lUsn/EJfzkcSNrya5fQ==",
       "dependencies": [
         "@tanstack/react-query",
@@ -5322,7 +5279,7 @@
         "@wallet-standard/features",
         "viem",
         "wagmi",
-        "zod@3.25.76"
+        "zod"
       ]
     },
     "xml-name-validator@5.0.0": {
@@ -5364,11 +5321,8 @@
         "yargs-parser"
       ]
     },
-    "zod@3.22.4": {
-      "integrity": "sha512-iC+8Io04lddc+mVqQ9AZ7OQ2MrUKGN+oIQyq1vemgt46jwCwLfhq7/pwnBnNXXXZb8VTVLKwp9EDkx+ryxIWmg=="
-    },
-    "zod@3.25.76": {
-      "integrity": "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="
+    "zod@4.6.7": {
+      "integrity": "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg=="
     },
     "zustand@5.0.0_@types+react@19.3.0_react@19.3.1_use-sync-external-store@1.4.0": {
       "integrity": "sha512-LE+VcmbartOPM+auOjCCLQOsQ05zUTp8RkgwRzefUk+2jISdMMFnxvyTjA4YNWr5ZGXYbVsEMZosttuxUBkojQ==",
@@ -5470,7 +5424,8 @@
           "@walletconnect/universal-provider": "2.26.0",
           "lucide-react": "1.72.0",
           "viem": "^2.57.19"
-        }
+        },
+        "zod": "^4.6.6"
       }
     }
   }

@@ -2,8 +2,9 @@
 // The site reads the round from its contract: set it on Admin → Vote (its address and
 // network) once this prints it.
 //
-// A test vote, on Sepolia, with the board's initiatives (badges: Admin → Vote, or
-// scripts/vote-sim.ts):
+// A test vote, on Sepolia, with the board's initiatives that qualify by Admin → Vote's
+// settings (raised at least the floor share of the goal, at most the cap left to raise)
+// (badges: Admin → Vote, or scripts/vote-sim.ts):
 //   VOTE_RELAYER_KEY=0x… SEPOLIA_RPC_URL=https://… \
 //     deno task vote-deploy [--minter 0x…] [--test-usd 0x…] [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
 // It opens 30 min after the deploy; S-Tier's first tally is 30 min later, and the three
@@ -54,6 +55,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { mainnet, sepolia } from "viem/chains";
 import { DEFAULT_ADMIN_ADDRESSES, REVIEW_BADGE_CONTRACT } from "../api/config.ts";
+import { type VoteSettings, voteState } from "../shared/vote.ts";
 import { SIGNED_BALLOTS_ABI } from "../shared/vote/abi.ts";
 import { adminBatch } from "../shared/vote/admin-batch.ts";
 import { checkManifest, type VoteManifest } from "../shared/vote/manifest.ts";
@@ -87,6 +89,8 @@ export type BoardCard = {
   goalUsd: number;
   safeAddress: string;
   type?: "rfp" | "grant";
+  /** The board's raised total (pledges and donations): what qualifies it for the vote. */
+  raisedUsd?: number;
   /** From /api/initiatives/affiliations (the board doesn't carry them). */
   affiliations?: string[];
   /** From /api/initiatives/:slug (the board doesn't carry them): the pledge records. */
@@ -165,6 +169,32 @@ export function nextAddingOpen(s: Schedule, now: number): number | null {
 
 // Admin → Vote matches a test round's initiatives to the board by these accounts.
 const placeholder = testPlaceholder;
+
+/** A test round's initiatives: the board's that qualify by Admin → Vote's settings
+ * (#99), in board order. `show` only hides the board's mark, so it doesn't matter here. */
+export const qualifyingCards = (cards: BoardCard[], s: VoteSettings): BoardCard[] =>
+  cards.filter((c) =>
+    c.goalUsd > 0 && voteState(c.raisedUsd ?? 0, c.goalUsd, s).kind === "eligible"
+  );
+
+/** Refuses a test round where an initiative would ask for more than the cap. The tally
+ * has no cap of its own: an ask is the goal less what the round holds, and a test round
+ * holds only the open pledges (not donations already received), so one that qualifies
+ * through its donations can still ask for more. */
+export function checkAsks(cards: BoardCard[], s: VoteSettings): void {
+  const over = cards.map((c) => {
+    const pledged = (c.pledges ?? []).filter((p) => p.status === "pledged")
+      .reduce((a, p) => a + p.amountUsd, 0);
+    return { slug: c.slug, ask: Math.max(0, Math.round(c.goalUsd - pledged)) };
+  }).filter((x) => x.ask > s.capUsd);
+  if (over.length) {
+    const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
+    throw new Error(
+      `over the ${usd(s.capUsd)} cap once only open pledges count: ` +
+        over.map((x) => `${x.slug} asks ${usd(x.ask)}`).join(", "),
+    );
+  }
+}
 
 /** On-chain initiatives in the given order: the Safe when set and unused, else (test
  * votes only) a deterministic placeholder, since the contract needs unique accounts.
@@ -532,13 +562,28 @@ async function boardCards(board = "https://initiatives.thedao.fund"): Promise<Bo
   const base = board.replace(/\/+$/, "");
   const [b, a] = await Promise.all([
     fetch(`${base}/api/board`).then((r) => r.json()) as Promise<{
-      cards: { initiative: BoardCard }[];
+      cards: { initiative: BoardCard; summary: { total: number } }[];
     }>,
     fetch(`${base}/api/initiatives/affiliations`).then((r) => r.json()) as Promise<{
       affiliations: Record<string, string[]>;
     }>,
   ]);
-  return b.cards.map((c) => ({ ...c.initiative, affiliations: a.affiliations[c.initiative.slug] }));
+  return b.cards.map((c) => ({
+    ...c.initiative,
+    raisedUsd: c.summary.total,
+    affiliations: a.affiliations[c.initiative.slug],
+  }));
+}
+
+/** Admin → Vote's qualify settings, as the board applies them. */
+async function boardVoteSettings(base: string): Promise<VoteSettings> {
+  const r = await fetch(`${base}/api/board/settings`);
+  if (!r.ok) throw new Error(`vote settings unreadable (${r.status})`);
+  const { vote } = (await r.json()) as { vote?: VoteSettings };
+  if (!vote || !Number.isFinite(vote.floorPct) || !Number.isFinite(vote.capUsd)) {
+    throw new Error("vote settings missing from /api/board/settings");
+  }
+  return vote;
 }
 
 /** --add: the admin's calls as a Safe Transaction Builder batch, if adding is open now.
@@ -657,6 +702,17 @@ async function main() {
   if ((await pub.getChainId()) !== chain.id) throw new Error(`RPC is not ${chain.name}`);
 
   let cards = await boardCards(args.board);
+  const base = (args.board ?? "https://initiatives.thedao.fund").replace(/\/+$/, "");
+  const qualify = real ? null : await boardVoteSettings(base);
+  if (qualify) {
+    const all = cards.length;
+    cards = qualifyingCards(cards, qualify);
+    console.log(
+      `${cards.length} of ${all} initiatives qualify (raised ${qualify.floorPct}% or more, ` +
+        `$${qualify.capUsd.toLocaleString("en-US")} or less left)`,
+    );
+    if (!cards.length) throw new Error("no initiative qualifies: nothing to vote on");
+  }
   if (real) {
     // The real vote's initiatives, in the file's order (ballot byte i = line i).
     const slugs = (await Deno.readTextFile(real.slugsFile)).split("\n").map((l) => l.trim())
@@ -672,12 +728,12 @@ async function main() {
   const plan = planInitiatives(cards, { real: Boolean(real), groups });
   // The open pledges (the board lists only totals; each page has its records). A test
   // round copies them too, so its asks are the board's.
-  const base = (args.board ?? "https://initiatives.thedao.fund").replace(/\/+$/, "");
   for (const c of cards) {
     const r = await fetch(`${base}/api/initiatives/${encodeURIComponent(c.slug)}`);
     if (!r.ok) throw new Error(`${c.slug}: pledges unreadable (${r.status})`);
     c.pledges = ((await r.json()) as { pledges: NonNullable<BoardCard["pledges"]> }).pledges;
   }
+  if (qualify) checkAsks(cards, qualify);
   // The site's admins sign pledges: --admins, else ADMIN_ADDRESSES, else the site's default list.
   const admins = (args.admins ?? Deno.env.get("ADMIN_ADDRESSES") ?? "").split(",").map((x) =>
     x.trim()

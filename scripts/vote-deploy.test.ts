@@ -4,6 +4,7 @@ import { pledgeChainId } from "../shared/vote/typed-data.ts";
 import {
   addingOpen,
   addPlan,
+  checkAsks,
   checkCodeSize,
   CODE_SIZE_LIMIT,
   currencyMismatch,
@@ -15,6 +16,7 @@ import {
   planDonationSetup,
   planGroups,
   planInitiatives,
+  qualifyingCards,
   realSchedule,
   regroupPlan,
   roleChecks,
@@ -489,3 +491,41 @@ Deno.test("deploy: the currencies read back must be the manifest's, in order", (
 });
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
+
+// Admin → Vote's qualify settings (#99): raised at least 25% of the goal, $200,000 at most left.
+const QUALIFY = { show: true, floorPct: 25, capUsd: 200_000 };
+const card = (slug: string, goalUsd: number, raisedUsd: number, pledged = raisedUsd) => ({
+  slug,
+  goalUsd,
+  safeAddress: "",
+  raisedUsd,
+  pledges: [{ id: `${slug}-p`, amountUsd: pledged, status: "pledged" as const }],
+});
+
+Deno.test("qualifyingCards: a test round keeps only the initiatives that qualify, in board order", () => {
+  const cards = [
+    card("quarter", 100_000, 25_000), // exactly 25%
+    card("short", 100_000, 24_999), // under 25%
+    card("big-left", 1_000_000, 790_000), // 79%, but $210,000 left
+    card("big-ok", 1_000_000, 800_000), // $200,000 left
+    card("nothing", 0, 0),
+  ];
+  assertEquals(qualifyingCards(cards, QUALIFY).map((c) => c.slug), ["quarter", "big-ok"]);
+});
+
+Deno.test("qualifyingCards: settings with show off still apply (only the board mark is hidden)", () => {
+  const cards = [card("in", 100_000, 30_000), card("out", 100_000, 10_000)];
+  assertEquals(qualifyingCards(cards, { ...QUALIFY, show: false }).map((c) => c.slug), ["in"]);
+});
+
+Deno.test("checkAsks: refuses a round where an ask is over the cap once only open pledges count", () => {
+  // Qualifies on the board through donations, but the round only copies the pledges:
+  // its ask is the goal less the open pledges, $250,000.
+  const donated = card("donated", 400_000, 220_000, 150_000);
+  assertThrows(
+    () => checkAsks([card("fine", 100_000, 30_000), donated], QUALIFY),
+    Error,
+    "donated asks $250,000",
+  );
+  checkAsks([card("fine", 100_000, 30_000), card("edge", 400_000, 200_000)], QUALIFY);
+});

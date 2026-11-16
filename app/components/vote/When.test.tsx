@@ -40,3 +40,15 @@ it("a deadline in the past is just its date", () => {
   render(<Deadline at={1} />);
   expect(screen.queryByRole("timer")).toBeNull();
 });
+
+it("a countdown in its last five minutes takes its soon class", () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(1_000_000 * 1000));
+  render(<Countdown to={1_000_000 + 301} className="c" soonClassName="soon" />);
+  const t = screen.getByRole("timer");
+  expect(t).not.toHaveClass("soon");
+  expect(t).not.toHaveAttribute("data-soon");
+  act(() => vi.advanceTimersByTime(2000));
+  expect(t).toHaveClass("c", "soon");
+  expect(t).toHaveAttribute("data-soon", "true");
+});

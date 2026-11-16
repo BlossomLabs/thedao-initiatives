@@ -1,13 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api } from "~/lib/api";
 import ConnectButton from "./ConnectButton";
+import { glowBadge } from "~/lib/badge-glow";
 
 const ME = "0x1111111111111111111111111111111111111111";
 const round = vi.hoisted(() => ({ contract: "0x1000000000000000000000000000000000000001" }));
 const navigate = vi.fn();
+const me = vi.hoisted(() => ({ isBadgeHolder: false }));
 
 vi.mock("../../../shared/vote/manifest", async (original) => {
   const m = await original<typeof import("../../../shared/vote/manifest")>();
@@ -26,7 +28,7 @@ vi.mock("~/context/wallet", () => ({
 vi.mock("~/context/session", () => ({
   useSession: () => ({
     session: { address: ME, isAdmin: false },
-    me: { isBadgeHolder: false },
+    me,
     connecting: false,
     signingIn: false,
     signOut: vi.fn(),
@@ -64,6 +66,7 @@ beforeEach(() => {
   round.contract = "0x1000000000000000000000000000000000000001";
   vi.mocked(api).mockReset();
   navigate.mockReset();
+  me.isBadgeHolder = false;
 });
 afterEach(cleanup);
 
@@ -88,4 +91,22 @@ it("with no round deployed: no Vote, and nobody asks", async () => {
   expect(await screen.findByText("My initiatives")).toBeInTheDocument();
   expect(screen.queryByText("Vote")).toBeNull();
   expect(vi.mocked(api)).not.toHaveBeenCalledWith("/api/vote/mine");
+});
+
+it("a ballot of theirs counted: the badge holder mark glows again", async () => {
+  me.isBadgeHolder = true;
+  vi.mocked(api).mockResolvedValue({ ids: [] });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>
+        <ConnectButton />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  const mark = () => document.querySelector(".motion-safe\\:animate-badge-glow");
+  // The page-load glow; the event restarts it: off for a frame, then on again.
+  expect(mark()).not.toBeNull();
+  act(() => glowBadge());
+  expect(mark()).toBeNull();
+  await waitFor(() => expect(mark()).not.toBeNull());
 });

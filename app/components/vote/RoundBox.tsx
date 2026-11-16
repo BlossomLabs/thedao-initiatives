@@ -577,13 +577,19 @@ export default function RoundBox(
           <span className="flex-none rounded-full border border-white/20 px-2.5 py-0.5 text-[12px] text-white/70 tnum">
             {toWhat} {phase.kind === "settling" && "at "}
             <When at={to} withDay={phase.kind !== "settling"} />
-            <Countdown to={to} className="ml-1.5 font-semibold text-white tnum" />
+            <Countdown
+              to={to}
+              className="ml-1.5 font-semibold text-white tnum"
+              soonClassName="text-vote-pale"
+            />
           </span>
         )
         : (
           <Countdown
             to={to}
             className="flex-none rounded-full border border-white/20 px-2.5 py-0.5 text-[12px] text-white/80 tnum"
+            // Its last minutes: the pill breathes gold, and the time in it turns pale gold.
+            soonClassName="text-vote-pale motion-safe:animate-countdown-soon"
           />
         ))}
     </div>
@@ -613,7 +619,11 @@ export default function RoundBox(
               }
               {toWhat} {phase.kind === "settling" && "at "}
               <When at={to} withDay={phase.kind !== "settling"} />
-              <Countdown to={to} className="ml-2 font-semibold text-white tnum" />
+              <Countdown
+                to={to}
+                className="ml-2 font-semibold text-white tnum"
+                soonClassName="text-vote-pale"
+              />
             </span>
           )}
         </div>
@@ -721,7 +731,11 @@ export function RoundDeadline(
             )}
           >
             <When at={to} withDay={phase.kind !== "settling"} />
-            <Countdown to={to} className="ml-1 tnum before:content-['·_']" />
+            <Countdown
+              to={to}
+              className="ml-1 tnum before:content-['·_']"
+              soonClassName="font-semibold text-vote-pale"
+            />
           </span>
         )}
         {todo && <span className="sr-only">This badge hasn’t voted yet.</span>}

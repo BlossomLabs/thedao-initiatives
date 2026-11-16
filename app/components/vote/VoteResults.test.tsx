@@ -1,9 +1,10 @@
 import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { bytesToHex } from "viem";
 import { api } from "~/lib/api";
+import { confettiBurst } from "~/components/donate/Celebration";
 import { encodeBallot } from "../../../shared/vote/ballot";
 import VoteResults from "./VoteResults";
 import { ROUND } from "../../../shared/vote/manifest";
@@ -128,6 +129,7 @@ vi.mock("~/components/donate/DonateWidget", async () => {
   };
 });
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
+vi.mock("~/components/donate/Celebration", () => ({ confettiBurst: vi.fn() }));
 vi.mock("~/lib/api", async (original) => {
   const api = vi.fn();
   return {
@@ -1168,4 +1170,120 @@ it("once closed, a withdrawn project is apart from the tiers and not funded", as
   expect(within(box).queryByText("Alpha fuzzing")).toBeNull();
   expect(heading("S-Tier")).toHaveTextContent("S-Tier$60,000 allocated to 1 initiative");
   expect(heading("Not funded")).toBeNull();
+});
+
+describe("while the page is open", () => {
+  /** The results page on its own QueryClient, refetched by `next`. */
+  async function live(first: Record<string, unknown>) {
+    const qc = new QueryClient();
+    vi.mocked(api).mockResolvedValue(first);
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <VoteResults />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await screen.findByText(/Test vote/i);
+    return async (round: Record<string, unknown>) => {
+      vi.mocked(api).mockResolvedValue(round);
+      await act(() => qc.refetchQueries({ queryKey: ["vote-round"] }));
+    };
+  }
+
+  it("an initiative the live tally moves just changes tier: no arrow, no tier name", async () => {
+    const next = await live(openWith({}, { alpha: [50_000, "A"] }));
+    await waitFor(() => within(daoBallot()).getByLabelText(/^Alpha fuzzing, funded/));
+    await next(openWith({}, { alpha: [50_000, "S"], beta: [30_000, "B"] }));
+    const s = await waitFor(() => {
+      const s = within(daoBallot()).getByRole("region", { name: /^S · / });
+      within(s).getByLabelText(/^Alpha fuzzing, funded/);
+      return s;
+    });
+    expect(within(s).getByLabelText(/^Alpha fuzzing/)).not.toHaveTextContent(/↑|from|Tier/);
+  });
+
+  it("a donation's preview doesn't move the chips, on or off; the live tally does", async () => {
+    // jsdom lays nothing out: a chip is 100px down per tier and 50px along per place in it.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        const li = this.closest("li");
+        const section = this.closest("section");
+        return (li && section
+          ? {
+            left: [...li.parentElement!.children].indexOf(li) * 50,
+            top: [...section.parentElement!.children].indexOf(section) * 100,
+          }
+          : { left: 0, top: 0 }) as DOMRect;
+      },
+    );
+    const animate = vi.fn(() => ({ finished: Promise.resolve() }));
+    Object.defineProperty(HTMLElement.prototype, "animate", { value: animate, configurable: true });
+    try {
+      const next = await live(
+        openWith({ beta: give({ moves: [{ slug: "alpha", from: "S", to: "A" }] }) }),
+      );
+      const row = await list().findByRole("button", { name: /Beta audits/ });
+      // The page loading isn't a move.
+      expect(animate).not.toHaveBeenCalled();
+      fireEvent.click(row);
+      // The preview: Alpha marked in A-Tier, still, with its arrow and where it came from.
+      expect(within(daoBallot()).getByLabelText("Alpha fuzzing, moves down from S-Tier"))
+        .toHaveTextContent("from S-Tier");
+      fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+      await waitFor(() => within(daoBallot()).getByLabelText(/^Alpha fuzzing, funded/));
+      expect(animate).not.toHaveBeenCalled();
+      // The live tally moves Alpha down: now it moves.
+      await next(openWith({}, { alpha: [50_000, "A"] }));
+      await waitFor(() => expect(animate).toHaveBeenCalled());
+    } finally {
+      vi.restoreAllMocks();
+      delete (HTMLElement.prototype as { animate?: unknown }).animate;
+    }
+  });
+
+  it("a gap a donation closes counts down, then flips to how far ahead it is", async () => {
+    const next = await live(openWith({ alpha: give() }, {}));
+    const alpha = () => list().getByRole("button", { name: /Alpha fuzzing/ });
+    await waitFor(() => expect(alpha()).toHaveTextContent("−$9k"));
+    await next(openWith({}, { alpha: [50_000, "S"] }, {}, { alpha: usdMicro(4_000) }));
+    // Still red on its way down to $0, then green.
+    expect(alpha().querySelector("[data-figure]")).toHaveAttribute("data-figure", "gap");
+    await waitFor(() => expect(alpha()).toHaveTextContent("$4kahead"), { timeout: 3000 });
+    expect(alpha().querySelector("[data-figure]")).toHaveAttribute("data-figure", "lead");
+  });
+
+  it("the vote finishing: gold, no confetti (that's for donations)", async () => {
+    vi.mocked(confettiBurst).mockClear();
+    const next = await live(
+      roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] }, {
+        tiers: [
+          settled("S", ["alpha"], { alpha: usdMicro(50_000) }),
+          settled("A", [], {}),
+          waiting("B"),
+        ],
+      }),
+    );
+    expect(confettiBurst).not.toHaveBeenCalled();
+    const closed = roundOf({ "1": ballot({ alpha: "S" }) }, {}, {
+      closed: true,
+      tiers: [
+        settled("S", ["alpha"], { alpha: usdMicro(50_000) }),
+        settled("A", [], {}),
+        settled("B", [], {}),
+      ],
+    });
+    await next(closed);
+    // The hero's amount takes the gold light, and the funded cards glow tier by tier.
+    await waitFor(() => expect(document.querySelector("[data-finished]")).not.toBeNull());
+    expect(document.querySelector(".animate-gold-glow")).not.toBeNull();
+    expect(confettiBurst).not.toHaveBeenCalled();
+  });
+
+  it("a page opened on a finished vote doesn't light up", async () => {
+    vi.mocked(confettiBurst).mockClear();
+    await showClosed();
+    expect(confettiBurst).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-finished]")).toBeNull();
+  });
 });

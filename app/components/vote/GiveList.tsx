@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import BoardSearch from "~/components/board/BoardSearch";
 import CategoryFilter from "~/components/board/filters/CategoryFilter";
@@ -78,6 +78,122 @@ function knockOnLines(entry: NextTierEntry) {
       what: `drops out of ${tierName(o.tier)}`,
     })),
   ];
+}
+
+/** How long a row's figure takes to count to a new value. */
+const COUNT_MS = 800;
+
+/** A number shown counting to `target` over `ms` (eased), from where it was; at once on
+ * the first render and with reduced motion. */
+function useCountTo(target: number, ms: number): number {
+  const [shown, setShown] = useState(target);
+  const at = useRef(target);
+  useEffect(() => {
+    const from = at.current;
+    const still = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (from === target || ms <= 0 || still || typeof requestAnimationFrame !== "function") {
+      at.current = target;
+      setShown(target);
+      return;
+    }
+    const start = performance.now();
+    let id = 0;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / ms);
+      const v = from + (target - from) * (1 - (1 - t) ** 3);
+      at.current = v;
+      setShown(v);
+      if (t < 1) id = requestAnimationFrame(step);
+    };
+    id = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(id);
+  }, [target, ms]);
+  return shown;
+}
+
+/**
+ * A row's figure: the red gap to the next tier ("−$9k to A-Tier"), or how far ahead it is
+ * in the tier settling now (green, "$4k ahead"). A new value counts to itself; a gap a
+ * donation closes counts down to $0, then flips over to green.
+ */
+export function RowFigure(
+  { kind, usd: value, to, name }: {
+    kind: "gap" | "lead";
+    usd: number;
+    /** The tier the gap is to. */
+    to?: string;
+    /** The tier settling now. */
+    name: string;
+  },
+) {
+  const [view, setView] = useState({ kind, value });
+  const [flip, setFlip] = useState(0);
+  const was = useRef({ kind, value });
+  // The gap's tier, kept while it counts down after the gap is gone.
+  const lastTo = useRef(to);
+  if (to) lastTo.current = to;
+  useEffect(() => {
+    const before = was.current;
+    was.current = { kind, value };
+    if (before.kind === kind) return setView({ kind, value });
+    const still = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (before.kind === "gap" && !still) {
+      // Closed: down to $0 first, then over to green.
+      setView({ kind: "gap", value: 0 });
+      const t = setTimeout(() => {
+        setFlip((f) => f + 1);
+        setView({ kind, value });
+      }, COUNT_MS);
+      return () => clearTimeout(t);
+    }
+    setFlip((f) => f + 1);
+    setView({ kind, value });
+  }, [kind, value]);
+  const n = useCountTo(view.value, COUNT_MS);
+  const money = (up: boolean) => (n > 0.5 ? usd2(n, up) : "$0");
+  return (
+    <span
+      data-figure={view.kind}
+      className="flex flex-none items-center gap-1.5 whitespace-nowrap [perspective:400px]"
+    >
+      {view.kind === "gap"
+        ? (
+          <>
+            <b
+              key={flip}
+              className={cn(
+                "rounded-md bg-[#c22d2b] px-2 py-[3px] font-inter-tight text-[15px] font-bold text-white tnum",
+                flip > 0 && "motion-safe:animate-figure-flip",
+              )}
+            >
+              −{money(true)}
+            </b>
+            <small className="w-[46px] text-[12px] text-white/65">to {to ?? lastTo.current}</small>
+          </>
+        )
+        : (
+          <>
+            {view.value > 0 && (
+              <b
+                key={flip}
+                className={cn(
+                  "rounded-md bg-dao-green px-2 py-[3px] font-inter-tight text-[15px] font-bold text-[#0f2a17] tnum",
+                  flip > 0 && "motion-safe:animate-figure-flip",
+                )}
+              >
+                {money(false)}
+              </b>
+            )}
+            {
+              // The words after the pill keep one width, so every pill lines up.
+            }
+            <small className="w-[46px] text-[12px] text-[#a7e3a5]">
+              {view.value > 0 ? "ahead" : `In ${name}`}
+            </small>
+          </>
+        )}
+    </span>
+  );
 }
 
 /** The list the row's "moves N other initiatives" opens. */
@@ -320,37 +436,19 @@ export default function GiveList(
                         )}
                       </span>
                     </span>
-                    {!r.entry
-                      ? (
-                        <span className="flex flex-none items-center gap-1.5 whitespace-nowrap">
-                          {r.lead
-                            ? (
-                              <b className="rounded-md bg-dao-green px-2 py-[3px] font-inter-tight text-[15px] font-bold text-[#0f2a17] tnum">
-                                {usd2(r.lead, false)}
-                              </b>
-                            )
-                            : null}
-                          {
-                            // The words after the pill keep one width, so every pill lines up.
-                          }
-                          <small className="w-[46px] text-[12px] text-[#a7e3a5]">
-                            {r.lead ? "ahead" : `In ${name}`}
-                          </small>
-                        </span>
-                      )
-                      : gap === null
+                    {r.entry && gap === null
                       ? (
                         <span className="flex-none text-[12.5px] text-white/60">
                           Out of reach for <span className="whitespace-nowrap">{to}</span>
                         </span>
                       )
                       : (
-                        <span className="flex flex-none items-center gap-1.5 whitespace-nowrap">
-                          <b className="rounded-md bg-[#c22d2b] px-2 py-[3px] font-inter-tight text-[15px] font-bold text-white tnum">
-                            −{usd2(gap, true)}
-                          </b>
-                          <small className="w-[46px] text-[12px] text-white/65">to {to}</small>
-                        </span>
+                        <RowFigure
+                          kind={r.entry ? "gap" : "lead"}
+                          usd={r.entry ? gap ?? 0 : r.lead ?? 0}
+                          to={to}
+                          name={name}
+                        />
                       )}
                     <ChevronDown
                       className={cn(

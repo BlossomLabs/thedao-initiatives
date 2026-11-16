@@ -1,4 +1,5 @@
-/** Confetti burst on a confirmed donation (port of static/app.js confettiBurst). */
+/** Confetti burst on a confirmed donation (port of static/app.js confettiBurst). Only for
+ * donations: the vote's own moments are gold. */
 export function confettiBurst() {
   try {
     const c = document.createElement("canvas");

@@ -40,6 +40,14 @@ function Arc(
 ) {
   const a = clamp(from);
   const b = Math.max(a, clamp(to));
+  // A segment new on the ring grows in from its start (a tier settling: its gold), as an
+  // existing one grows and shrinks with the transition below.
+  const [grown, setGrown] = useState(false);
+  useEffect(() => {
+    if (typeof requestAnimationFrame !== "function") return setGrown(true);
+    const id = requestAnimationFrame(() => setGrown(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
   return (
     <circle
       cx={RING / 2}
@@ -47,7 +55,7 @@ function Arc(
       r={R}
       fill="none"
       strokeWidth={STROKE}
-      strokeDasharray={`${C * (b - a)} ${C}`}
+      strokeDasharray={`${grown ? C * (b - a) : 0} ${C}`}
       strokeDashoffset={-C * a}
       data-from={a}
       data-to={b}

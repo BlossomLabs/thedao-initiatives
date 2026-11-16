@@ -9,8 +9,9 @@ import { cn } from "~/lib/utils";
  * arrivals come in at once. Reduced motion: no movement at all.
  */
 export function ShuffleItem(
-  { index = 0, stagger, className, children, ref }: {
+  { index = 0, stagger, className, style, children, ref }: {
     index?: number;
+    style?: React.CSSProperties;
     stagger?: boolean;
     className?: string;
     children: React.ReactNode;
@@ -23,6 +24,7 @@ export function ShuffleItem(
       ref={ref}
       // A one-cell grid, so the card fills the grid row's height as before.
       className={cn("grid", className)}
+      style={style}
       layout={!instant}
       initial={instant ? false : { opacity: 0, y: 14, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}

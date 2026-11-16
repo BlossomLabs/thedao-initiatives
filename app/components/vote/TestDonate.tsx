@@ -10,6 +10,7 @@ import { Button } from "~/components/ui/Button";
 import Status from "~/components/ui/Status";
 import type { Suggestion } from "~/components/donate/DonateWidget";
 import OverCap from "~/components/donate/OverCap";
+import { confettiBurst } from "~/components/donate/Celebration";
 import { useEnsureVoteChain } from "~/hooks/use-vote-chain";
 import { voteClient } from "~/hooks/use-vote-send";
 import { ROUND } from "../../../shared/vote/manifest";
@@ -118,6 +119,7 @@ export default function TestDonate(
           usd.toLocaleString("en-US")
         } in test dollars is on its account. It counts from the next tally.`,
       });
+      confettiBurst();
       // Cleared: what was given now shows as given, and another amount can follow (#100).
       setAmount("");
       onDonated?.(usd);

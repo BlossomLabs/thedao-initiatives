@@ -254,7 +254,15 @@ export default function BallotStatus(
               tone === "wait" && "rounded-xl border border-vote/40 bg-vote/[.07] p-3",
             )}
           >
-            {tone === "good" && <Stamp tone="good">Counted</Stamp>}
+            {tone === "good" && (
+              // Just counted (a send seen here): the stamp presses down, glowing green.
+              <Stamp
+                tone="good"
+                className={phase.kind === "counted" ? "animate-stamp-press" : undefined}
+              >
+                Counted
+              </Stamp>
+            )}
             <div className="min-w-0 space-y-1">
               <p className="m-0 font-inter-tight text-[16px] font-semibold text-white">{title}</p>
               <p className="m-0 text-[13.5px] leading-relaxed text-white/72">{body}</p>

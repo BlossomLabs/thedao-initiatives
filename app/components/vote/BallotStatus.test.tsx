@@ -185,3 +185,13 @@ it("in the editor, a ballot that counts offers to see it: a primary button", () 
   fireEvent.click(screen.getByRole("button", { name: "See my ballot" }));
   expect(onSeeBallot).toHaveBeenCalled();
 });
+
+it("just counted, its Counted stamp presses down; one already counting on a fresh page doesn't", () => {
+  const stamp = () =>
+    screen.getAllByText("Counted").find((el) => el.tagName === "SPAN") as HTMLElement;
+  panel({ kind: "counted", hash: HASH }, { upToDate: true });
+  expect(stamp()).toHaveClass("animate-stamp-press");
+  cleanup();
+  panel({ kind: "idle" }, { upToDate: true });
+  expect(stamp()).not.toHaveClass("animate-stamp-press");
+});

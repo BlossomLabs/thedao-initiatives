@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import CategoryDot from "~/components/ui/CategoryDot";
 import { cn } from "~/lib/utils";
 import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
@@ -34,7 +35,16 @@ export default function FinalTiers(
     arrived,
     liveTone = "green",
     withdrawn,
+    celebrate,
+    moves,
   }: {
+    /** The live tally refreshing while the page is open (the vote results): a chip that
+     * changes tier moves there, the others slide aside, and one new in the table pops in.
+     * Off for a donation's preview, which marks its changes instead. */
+    moves?: boolean;
+    /** Tiers settling while the page is open (the vote results): the chips that turn gold
+     * glow, one after another, and their tier's row flashes gold. */
+    celebrate?: boolean;
     items: BallotItem[];
     /** Initiatives an admin withdrew from the vote: an unfunded one's chip says so. */
     withdrawn?: ReadonlySet<string>;
@@ -75,7 +85,7 @@ export default function FinalTiers(
     /** A donation's preview (the vote results): what comes into a tier with it, with the
      * dollars it would take (dashed green, "+$X if you give"), what drops out (red, struck through,
      * "dropped out"), and what it moves to another tier (`moved`: the tier it came from;
-     * yellow, an arrow and "from S-Tier"). */
+     * yellow, an arrow and "from S-Tier"). It stays still: no `moves` in a preview. */
     joining?: ReadonlyMap<string, number>;
     /** What this visitor gave each initiative from the page (#100): solid green and
      * "+$X yours", where a preview's amount is dashed. */
@@ -89,10 +99,24 @@ export default function FinalTiers(
     liveTone?: "green" | "neutral";
   },
 ) {
+  const isGold = (slug: string) =>
+    funded.has(slug) && (!highlight || highlight.has(slug)) && !provisional?.has(slug);
+  const fresh = useNewlyGold(
+    items.filter((i) => tiers[i.slug] !== undefined).map((i) => i.slug),
+    isGold,
+    Boolean(celebrate),
+  );
+  const root = useRef<HTMLDivElement>(null);
+  useChipMoves(
+    root,
+    items.map((i) => `${i.slug}:${tiers[i.slug] ?? ""}`).join(","),
+    Boolean(moves),
+  );
   return (
     // Its rows (S, A, B, totals) are the parent's rows when it sits in a subgrid, so two
     // tables side by side line up row by row; on its own it is a plain grid.
     <div
+      ref={root}
       className={cn(
         "grid min-w-0 grid-cols-1 grid-rows-subgrid gap-y-2",
         footer ? "row-span-4" : "row-span-3",
@@ -119,17 +143,31 @@ export default function FinalTiers(
         );
         // An open tier's amount is the live tally's, not settled: green.
         const tierLive = inHere.some((i) => provisional?.has(i.slug));
+        // Its initiatives that just turned gold (the tier settled), in their order here.
+        const goldNow = inHere.filter((i) => fresh.has(i.slug)).map((i) => i.slug);
         return (
           <section
             key={t.tier}
             aria-label={`${t.grade} · ${t.label}`}
             className={cn(
-              "flex min-h-[76px] min-w-0 items-stretch gap-2 rounded-xl border border-white/10 bg-white/[.03] p-1.5",
+              "relative flex min-h-[76px] min-w-0 items-stretch gap-2 rounded-xl border border-white/10 bg-white/[.03] p-1.5",
               mirrored && "flex-row-reverse",
             )}
           >
+            {goldNow.length > 0 && (
+              <span
+                aria-hidden="true"
+                data-tier-gold
+                className="pointer-events-none absolute -inset-px animate-tier-gold rounded-[inherit] border border-vote bg-vote/[.14] shadow-[0_0_22px_rgba(233,185,73,.45)]"
+              />
+            )}
             <div className="flex w-[76px] flex-none flex-col items-center justify-center gap-1 rounded-lg bg-white/[.06] py-1.5">
-              <b className="font-inter-tight text-[26px] font-bold leading-none text-dao-green">
+              <b
+                className={cn(
+                  "font-inter-tight text-[26px] font-bold leading-none text-dao-green",
+                  goldNow.length > 0 && "motion-safe:animate-grade-bump",
+                )}
+              >
                 {t.grade}
               </b>
               <span className="text-center text-[11px] leading-tight text-white/60">
@@ -174,6 +212,8 @@ export default function FinalTiers(
                     const up = from !== undefined &&
                       TIERS.indexOf(t.tier) < TIERS.indexOf(from);
                     const out = !isFunded && Boolean(withdrawn?.has(i.slug));
+                    // Turning gold now: glows, a beat after the chip before it.
+                    const shine = goldNow.indexOf(i.slug);
                     const label = given !== undefined
                       ? `${i.title}, comes in if you give ${dollars(given)}`
                       : mine !== undefined
@@ -204,6 +244,13 @@ export default function FinalTiers(
                         data-gold={gold || undefined}
                         data-live={green || undefined}
                         data-active={active === i.slug || undefined}
+                        data-gold-new={shine >= 0 || undefined}
+                        style={shine >= 0
+                          ? {
+                            animationDelay: `${shine * STAGGER_MS}ms`,
+                            transitionDelay: `${shine * STAGGER_MS}ms`,
+                          }
+                          : undefined}
                         {...(linked?.has(i.slug)
                           ? {
                             tabIndex: 0,
@@ -217,7 +264,8 @@ export default function FinalTiers(
                           }
                           : {})}
                         className={cn(
-                          "flex h-8 max-w-full items-center gap-1.5 overflow-hidden rounded-lg border px-2 outline-none transition-shadow",
+                          "relative flex h-8 max-w-full items-center gap-1.5 overflow-hidden rounded-lg border px-2 outline-none transition-[box-shadow,background-color,border-color] duration-700",
+                          shine >= 0 && "animate-gold-glow",
                           // The chip an arrow starts or ends at: ringed in its own colour.
                           active === i.slug && (live
                             ? "shadow-[0_0_0_2px_rgba(92,183,90,.6)]"
@@ -241,6 +289,13 @@ export default function FinalTiers(
                             : "border-white/15 bg-white/[.07] opacity-55",
                         )}
                       >
+                        {shine >= 0 && (
+                          <span
+                            aria-hidden="true"
+                            style={{ animationDelay: `${shine * STAGGER_MS + 150}ms` }}
+                            className="pointer-events-none absolute inset-0 bg-[linear-gradient(110deg,transparent_35%,rgba(255,236,170,.5)_50%,transparent_65%)] bg-[length:250%_100%] bg-no-repeat opacity-0 motion-safe:animate-gold-sheen motion-safe:opacity-100"
+                          />
+                        )}
                         {cat ? <CategoryDot slug={cat} className="size-[7px] flex-none" /> : (
                           <span
                             className="size-[7px] flex-none rounded-full bg-white/30"
@@ -325,6 +380,107 @@ export default function FinalTiers(
       {footer && <p className="m-0 pt-1 text-[13.5px] text-white/65 tnum">{footer}</p>}
     </div>
   );
+}
+
+/** Between one chip turning gold and the next, and how long each one glows. */
+const STAGGER_MS = 140;
+const GLOW_MS = 2400;
+
+/**
+ * The chips that just turned gold: shown here before, not gold, and gold now (a tier
+ * settled while the page is open). Not on the first render, nor for a chip that shows up
+ * already gold. Each set clears once its glow is over.
+ */
+function useNewlyGold(
+  shown: string[],
+  isGold: (slug: string) => boolean,
+  on: boolean,
+): ReadonlySet<string> {
+  const plain = useRef<Set<string> | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
+  const gold = shown.filter(isGold);
+  const key = shown.map((s) => s + (gold.includes(s) ? "*" : "")).sort().join(",");
+  useEffect(() => {
+    if (!on) return;
+    const before = plain.current;
+    plain.current = new Set(shown.filter((s) => !gold.includes(s)));
+    const turned = before ? gold.filter((s) => before.has(s)) : [];
+    if (turned.length === 0) return;
+    setFresh(new Set(turned));
+    clearTimeout(timer.current);
+    timer.current = setTimeout(
+      () => setFresh(new Set()),
+      GLOW_MS + turned.length * STAGGER_MS + 300,
+    );
+  }, [key, on]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return fresh;
+}
+
+/** How long a chip takes to move to another tier, and to slide aside in its own. */
+const MOVE_MS = 900;
+const SLIDE_MS = 500;
+
+/**
+ * The live tally's moves, played on the chips (FLIP): after a refresh that changed the
+ * tiers (`key`), each chip starts where it was and glides to where it is now, lifted while
+ * it crosses to another tier; one that wasn't in the table pops in once the others have
+ * moved. Not on the first render nor the first fill of an empty table, nor while `on` is
+ * false (a donation's preview: a change made while off isn't played later), nor with
+ * reduced motion.
+ */
+function useChipMoves(root: React.RefObject<HTMLElement | null>, key: string, on: boolean) {
+  const last = useRef<{ key: string; at: Map<string, { x: number; y: number }> } | null>(null);
+  // Every commit, before the paint: the chips are where they'll be painted.
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const box = el.getBoundingClientRect();
+    const chips = [...el.querySelectorAll<HTMLElement>("[data-final-chip]")];
+    const at = new Map(chips.map((c) => {
+      const r = c.getBoundingClientRect();
+      // From the table's corner: scrolling the page moves nothing.
+      return [c.dataset.finalChip!, { x: r.left - box.left, y: r.top - box.top }];
+    }));
+    const before = last.current;
+    last.current = on ? { key, at } : null;
+    // An empty table filling (the page loading) isn't a move.
+    if (!on || !before || before.key === key || before.at.size === 0) return;
+    if (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    for (const c of chips) {
+      if (typeof c.animate !== "function") return;
+      const now = at.get(c.dataset.finalChip!)!;
+      const was = before.at.get(c.dataset.finalChip!);
+      if (!was) {
+        c.animate([{ opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1 }], {
+          duration: 400,
+          delay: MOVE_MS - 200,
+          easing: "cubic-bezier(0.3, 1.5, 0.5, 1)",
+          fill: "backwards",
+        });
+        continue;
+      }
+      const dx = was.x - now.x;
+      const dy = was.y - now.y;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      // Into another tier (or row): over the others, lifted; within its row, a slide.
+      const far = Math.abs(dy) > 4;
+      const move = c.animate([{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], {
+        duration: far ? MOVE_MS : SLIDE_MS,
+        easing: "cubic-bezier(0.55, 0, 0.2, 1)",
+      });
+      if (!far) continue;
+      c.style.zIndex = "10";
+      c.animate([
+        { scale: 1, boxShadow: "0 0 0 0 rgba(0,0,0,0)" },
+        { scale: 1.08, boxShadow: "0 10px 28px rgba(0,0,0,.55)", offset: 0.3 },
+        { scale: 1.08, boxShadow: "0 10px 28px rgba(0,0,0,.55)", offset: 0.75 },
+        { scale: 1, boxShadow: "0 0 0 0 rgba(0,0,0,0)" },
+      ], { duration: MOVE_MS, easing: "ease-in-out" });
+      move.finished.then(() => c.style.zIndex = "", () => c.style.zIndex = "");
+    }
+  });
 }
 
 const RING = 64;

@@ -15,6 +15,8 @@ export default [
   route("vote/mock/:id/edit?", "routes/vote.mock.tsx"),
   // Examples of the vote results at three moments of the vote.
   route("vote/results/:id", "routes/vote.results.tsx"),
+  // Every animation of the vote on one page, each played by a button.
+  route("vote/effects", "routes/vote.effects.tsx"),
   route("vote", "routes/vote.tsx"),
   route("donation-terms", "routes/terms.tsx"),
   route("donation-terms/v/:id", "routes/terms.version.tsx"),

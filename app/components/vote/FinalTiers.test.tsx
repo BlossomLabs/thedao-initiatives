@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import FinalTiers from "./FinalTiers";
 import VoteClosed from "./VoteClosed";
 
@@ -301,4 +301,135 @@ it("your ballot marks a withdrawn initiative that wasn't funded; a funded one st
   const mine = screen.getByRole("group", { name: "Your ballot" });
   expect(within(mine).getByLabelText("BETA, withdrawn")).toHaveTextContent("Withdrawn");
   expect(within(mine).getByLabelText("ALPHA, funded: your share paid $9,800")).toBeInTheDocument();
+});
+
+describe("a tier settling while the vote results are open", () => {
+  const props = {
+    label: "TheDAO's ballot",
+    items,
+    tiers: { alpha: "S", beta: "S", gamma: "A" } as const,
+    funded: new Set(["alpha", "beta", "gamma"]),
+    amounts: new Map([["alpha", 9800], ["beta", 5000], ["gamma", 1200]]),
+    amountWord: "awarded",
+    celebrate: true,
+  };
+  const chip = (slug: string) =>
+    document.querySelector(`[data-final-chip="${slug}"]`) as HTMLElement;
+
+  it("what it funds turns gold and glows, one after another; its row flashes gold", () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(
+        <FinalTiers {...props} provisional={new Set(["alpha", "beta", "gamma"])} />,
+      );
+      // On the first render, nothing glows.
+      expect(document.querySelector("[data-gold-new]")).toBeNull();
+      // S-Tier settles: ALPHA and BETA are gold now; GAMMA is still the live tally's.
+      rerender(<FinalTiers {...props} provisional={new Set(["gamma"])} />);
+      expect(chip("alpha")).toHaveAttribute("data-gold");
+      expect(chip("alpha")).toHaveClass("animate-gold-glow");
+      expect(chip("beta")).toHaveClass("animate-gold-glow");
+      expect(chip("beta").style.animationDelay).toBe("140ms");
+      expect(chip("gamma")).not.toHaveClass("animate-gold-glow");
+      const s = screen.getByRole("region", { name: "S · Must fund" });
+      expect(s.querySelector("[data-tier-gold]")).not.toBeNull();
+      expect(
+        screen.getByRole("region", { name: "A · Should fund" }).querySelector(
+          "[data-tier-gold]",
+        ),
+      ).toBeNull();
+      // The glow is over: still gold, no longer glowing.
+      act(() => vi.advanceTimersByTime(5000));
+      expect(chip("alpha")).toHaveAttribute("data-gold");
+      expect(chip("alpha")).not.toHaveClass("animate-gold-glow");
+      expect(s.querySelector("[data-tier-gold]")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a chip already gold when the page opens doesn't glow, nor anything without celebrate", () => {
+    const { rerender } = render(<FinalTiers {...props} provisional={new Set(["gamma"])} />);
+    rerender(<FinalTiers {...props} provisional={new Set(["gamma"])} />);
+    expect(document.querySelector("[data-gold-new]")).toBeNull();
+    cleanup();
+    const quiet = render(
+      <FinalTiers {...props} celebrate={false} provisional={new Set(["alpha"])} />,
+    );
+    quiet.rerender(<FinalTiers {...props} celebrate={false} provisional={new Set()} />);
+    expect(document.querySelector("[data-gold-new]")).toBeNull();
+  });
+});
+
+describe("the live tally's moves", () => {
+  // jsdom lays nothing out: a chip is 100px down per tier and 50px along per place in it.
+  const at = (el: Element) => {
+    const li = el.closest("li");
+    const section = el.closest("section");
+    if (!li || !section) return { left: 0, top: 0 };
+    return {
+      left: [...li.parentElement!.children].indexOf(li) * 50,
+      top: [...section.parentElement!.children].indexOf(section) * 100,
+    };
+  };
+  const props = {
+    label: "TheDAO's ballot",
+    items,
+    funded: new Set(["alpha", "beta", "gamma"]),
+    amounts: new Map([["alpha", 9800], ["beta", 5000], ["gamma", 1200]]),
+    amountWord: "awarded",
+  };
+  const animate = vi.fn(() => ({ finished: Promise.resolve() }));
+  beforeEach(() => {
+    animate.mockClear();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        return at(this) as DOMRect;
+      },
+    );
+    Object.defineProperty(HTMLElement.prototype, "animate", {
+      value: animate,
+      configurable: true,
+    });
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete (HTMLElement.prototype as { animate?: unknown }).animate;
+  });
+  const calls = (slug: string) =>
+    (animate.mock.calls as unknown as [Keyframe[], KeyframeAnimationOptions][]).filter((_, n) =>
+      (animate.mock.contexts[n] as HTMLElement).dataset.finalChip === slug
+    );
+
+  it("a chip that changes tier moves there from where it was, lifted; one new pops in", () => {
+    const { rerender } = render(
+      <FinalTiers {...props} tiers={{ alpha: "S", beta: "A" }} moves />,
+    );
+    expect(animate).not.toHaveBeenCalled();
+    rerender(<FinalTiers {...props} tiers={{ alpha: "S", beta: "S", gamma: "B" }} moves />);
+    // BETA was at A-Tier's first place, 100px lower: it starts there and comes up.
+    const [[keys, opts], [lift]] = calls("beta");
+    expect(keys).toEqual([{ translate: "-50px 100px" }, { translate: "0 0" }]);
+    expect(opts.duration).toBe(900);
+    expect(lift[1]).toMatchObject({ scale: 1.08 });
+    // ALPHA stayed put; GAMMA wasn't in the table.
+    expect(calls("alpha")).toHaveLength(0);
+    expect(calls("gamma")[0][0]).toEqual([{ opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1 }]);
+    // No marks: no arrows, no tier names on the chips.
+    expect(screen.getByLabelText(/^BETA/)).not.toHaveTextContent(/↑|from|Tier/);
+  });
+
+  it("a donation's preview (moves off) stays still, on and off, after the live tally", () => {
+    const { rerender } = render(<FinalTiers {...props} tiers={{ beta: "A" }} moves />);
+    rerender(<FinalTiers {...props} tiers={{ beta: "S" }} moves={false} />);
+    rerender(<FinalTiers {...props} tiers={{ beta: "A" }} moves />);
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it("nothing moves without `moves`, nor for a change made while it was off", () => {
+    const { rerender } = render(<FinalTiers {...props} tiers={{ beta: "A" }} />);
+    rerender(<FinalTiers {...props} tiers={{ beta: "S" }} />);
+    rerender(<FinalTiers {...props} tiers={{ beta: "B" }} moves />);
+    expect(animate).not.toHaveBeenCalled();
+  });
 });

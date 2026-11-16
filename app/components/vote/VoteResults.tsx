@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import RoundBox from "./RoundBox";
 import DaoBallot, { daoResult, type SettledTier } from "./DaoBallot";
@@ -129,6 +129,18 @@ export default function VoteResults(
   const raised = rv ? [...result.awards.values()].reduce((a, b) => a + b, 0) : undefined;
   const n = rv ? Object.keys(rv.accepted).length : 0;
   const isClosed = Boolean(rv?.closed);
+  // The vote finishing while the page is open (not a page opened on a finished vote): the
+  // final result lights up in gold (no confetti: that's for donations).
+  const wasClosed = useRef<boolean>(undefined);
+  const [justFinished, setJustFinished] = useState(false);
+  useEffect(() => {
+    if (!rv) return;
+    const was = wasClosed.current;
+    wasClosed.current = isClosed;
+    if (was === false && isClosed) {
+      setJustFinished(true);
+    }
+  }, [rv, isClosed]);
   const pool = dollars(rv?.poolUsd ?? R.poolUsd);
 
   /** The tier settling now (or next to): the first one not settled. */
@@ -409,6 +421,7 @@ export default function VoteResults(
         raised={raised}
         mine={mine}
         example={Boolean(example)}
+        justFinished={justFinished}
       />
     );
   }
@@ -487,6 +500,11 @@ export default function VoteResults(
               settling={tier}
               table={{
                 mirrored: false,
+                // A tier settling while you watch: what it funds turns gold, glowing.
+                celebrate: true,
+                // What the live tally moves, moving there; a donation's preview (on or off)
+                // only marks its changes.
+                moves: !preview,
                 joining: preview?.joining,
                 yours: yoursMap,
                 leaving: preview?.leaving,
@@ -578,9 +596,13 @@ function Legend({ preview }: { preview: boolean }) {
 /** Once the vote is closed: the board, limited to the round's initiatives, in a Funded and
  * a Not funded list, each card with its final amount and its gap judged at its settlement. */
 function ClosedResults(
-  { R, rv, cards, raised, mine, example }: {
+  { R, rv, cards, raised, mine, example, justFinished }: {
     /** An example page: the examples' picker over the hero. */
     example?: boolean;
+    /** The vote finished while the page was open: the hero glows gold, a gold light runs
+     * across its amount and fills the line under it, and the funded cards glow tier by
+     * tier. */
+    justFinished?: boolean;
     R: VoteManifest;
     rv: RoundView;
     cards: NonNullable<ReturnType<typeof useBoard>["data"]>["cards"];
@@ -644,6 +666,7 @@ function ClosedResults(
   const hero = (
     <Hero
       raised={raised}
+      finished={justFinished}
       kicker={<span className="text-vote">{REAL ? "TheDAO vote" : "Test vote"}</span>}
       sub={
         <>
@@ -693,6 +716,9 @@ function ClosedResults(
     </Hero>
   );
 
+  const halo = (h: React.ReactNode) =>
+    justFinished ? <div data-finished="" className="animate-gold-halo">{h}</div> : h;
+
   return (
     <BoardPage
       only={listed}
@@ -708,11 +734,12 @@ function ClosedResults(
             <div className="px-6 pt-8">
               <MockNav />
             </div>
-            {hero}
+            {halo(hero)}
           </>
         )
-        : hero}
+        : halo(hero)}
       heading="The vote's final result"
+      finished={justFinished}
       defaultSort="closest"
     />
   );

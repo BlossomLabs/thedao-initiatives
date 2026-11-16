@@ -68,6 +68,11 @@ const BAND_ICONS: Record<string, { Icon: LucideIcon; color: string }> = {
   disliked: { Icon: Frown, color: "text-dao-sky" },
   "strongly-disliked": { Icon: ThumbsDown, color: "text-white/50" },
 };
+/** The vote finishing: between one funded tier's cards glowing and the next tier's, and
+ * between two cards of a tier. */
+const FINISH_TIER_MS = 900;
+const FINISH_CARD_MS = 120;
+
 /** The front page's board. The vote results reuse it with `only` (the round's
  * slugs), `votePct` (each initiative's vote share, % of its goal, by id) and its own hero. */
 export default function BoardPage(
@@ -84,7 +89,11 @@ export default function BoardPage(
     heading,
     defaultSort,
     withdrawn,
+    finished,
   }: {
+    /** The vote just finished while the page was open: the funded cards glow gold, tier
+     * by tier (S-Tier first), as the vote settled them. */
+    finished?: boolean;
     only?: ReadonlySet<string>;
     /** Slugs an admin withdrew from the vote running now: their cards and rows say so. */
     withdrawn?: ReadonlySet<string>;
@@ -412,99 +421,116 @@ export default function BoardPage(
           </div>
         )}
         {data && (all.length === 0 || cards.length > 0 || results) &&
-          groups.map((g, gi) => (
-            <Fragment key={g.key}>
-              {g.heading && (
-                <h3
-                  className={cn(
-                    "mb-4 flex items-center gap-2.5 font-inter-tight text-[20px] font-semibold leading-[26px] text-white",
-                    // The first sits under the filter row's own margin.
-                    gi > 0 && "mt-9",
-                  )}
-                >
-                  {g.heading}
-                </h3>
-              )}
-              {view.view === "list"
-                ? (
-                  <Suspense fallback={<ListSkeleton />}>
-                    <BoardList
-                      cards={g.cards}
-                      aiTop={picks}
-                      aiScores={scores}
-                      featured={featuredSet}
-                      watch={watchlist}
-                      vote={qualifyMark ? data.flags.vote : undefined}
-                      ratings={ratings}
-                      canRate={canRate}
-                      votePct={votePct}
-                      votePendingPct={votePendingPct}
-                      voteTiers={resultTiers ?? voteTiers}
-                      finals={finals}
-                      unfunded={g.key === "not-funded"}
-                      next={next}
-                      lead={lead}
-                      titles={titles}
-                      withdrawn={withdrawn}
-                    />
-                  </Suspense>
-                )
-                : (
-                  // `relative`: cards leaving are taken out of the flow while they fade.
-                  <div className="relative grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
-                    <AnimatePresence mode="popLayout">
-                      {
-                        /* Under 69 approved initiatives the suggest card leads the grid (Griff, 20 -> 69 on
-                  2026-09-16); while filters narrow the board it goes last. */
-                      }
-                      {gi === 0 && all.length < SUGGEST_LAST_FROM && !filtered && !g.heading && (
-                        <ShuffleItem key="suggest-first" stagger={firstShow}>
-                          <SuggestCard />
-                        </ShuffleItem>
-                      )}
-                      {g.cards.map((c, i) => (
-                        <ShuffleItem key={c.initiative.id} index={i + 1} stagger={firstShow}>
-                          <InitiativeCard
-                            card={c}
-                            tokensOk={data.flags.tokensOk}
-                            vote={qualifyMark ? data.flags.vote : undefined}
-                            aiTop={picks.includes(c.initiative.id)}
-                            aiScore={scores.get(c.initiative.id)}
-                            featured={featuredSet.has(c.initiative.id)}
-                            onDonated={() =>
-                              void qc.invalidateQueries({ queryKey: boardKey })}
-                            watch={{
-                              on: watchlist.has(c.initiative.id),
-                              toggle: () =>
-                                watchlist.toggle(c.initiative.id),
-                            }}
-                            rating={ratings && { summary: ratings[c.initiative.id], canRate }}
-                            votePct={votePct?.get(c.initiative.id)}
-                            votePendingPct={votePendingPct?.get(c.initiative.id)}
-                            voteTier={(resultTiers ?? voteTiers)?.get(c.initiative.id)}
-                            final={finals?.get(c.initiative.id)}
-                            next={next?.get(c.initiative.id)}
-                            lead={lead?.get(c.initiative.id)}
-                            titles={titles}
-                            withdrawn={withdrawn?.has(c.initiative.slug)}
-                          />
-                        </ShuffleItem>
-                      ))}
-                      {gi === groups.length - 1 &&
-                        (all.length >= SUGGEST_LAST_FROM || filtered || Boolean(g.heading)) && (
-                        <ShuffleItem
-                          key="suggest-last"
-                          index={g.cards.length + 1}
-                          stagger={firstShow}
-                        >
-                          <SuggestCard />
-                        </ShuffleItem>
-                      )}
-                    </AnimatePresence>
-                  </div>
+          groups.map((g, gi) => {
+            // The vote just finished: a funded tier's cards glow, a beat after the tier before.
+            const glow = finished && g.key.startsWith("tier-");
+            const glowAt = gi * FINISH_TIER_MS;
+            return (
+              <Fragment key={g.key}>
+                {g.heading && (
+                  <h3
+                    className={cn(
+                      "mb-4 flex items-center gap-2.5 font-inter-tight text-[20px] font-semibold leading-[26px] text-white",
+                      // The first sits under the filter row's own margin.
+                      gi > 0 && "mt-9",
+                    )}
+                  >
+                    {g.heading}
+                  </h3>
                 )}
-            </Fragment>
-          ))}
+                {view.view === "list"
+                  ? (
+                    <Suspense fallback={<ListSkeleton />}>
+                      <div
+                        data-finish-glow={glow || undefined}
+                        style={glow ? { animationDelay: `${glowAt}ms` } : undefined}
+                        className={cn(glow && "animate-gold-glow rounded-xl")}
+                      >
+                        <BoardList
+                          cards={g.cards}
+                          aiTop={picks}
+                          aiScores={scores}
+                          featured={featuredSet}
+                          watch={watchlist}
+                          vote={qualifyMark ? data.flags.vote : undefined}
+                          ratings={ratings}
+                          canRate={canRate}
+                          votePct={votePct}
+                          votePendingPct={votePendingPct}
+                          voteTiers={resultTiers ?? voteTiers}
+                          finals={finals}
+                          unfunded={g.key === "not-funded"}
+                          next={next}
+                          lead={lead}
+                          titles={titles}
+                          withdrawn={withdrawn}
+                        />
+                      </div>
+                    </Suspense>
+                  )
+                  : (
+                    // `relative`: cards leaving are taken out of the flow while they fade.
+                    <div className="relative grid grid-cols-2 gap-5 max-[860px]:grid-cols-1">
+                      <AnimatePresence mode="popLayout">
+                        {
+                          /* Under 69 approved initiatives the suggest card leads the grid (Griff, 20 -> 69 on
+                  2026-09-16); while filters narrow the board it goes last. */
+                        }
+                        {gi === 0 && all.length < SUGGEST_LAST_FROM && !filtered && !g.heading && (
+                          <ShuffleItem key="suggest-first" stagger={firstShow}>
+                            <SuggestCard />
+                          </ShuffleItem>
+                        )}
+                        {g.cards.map((c, i) => (
+                          <ShuffleItem
+                            key={c.initiative.id}
+                            index={i + 1}
+                            stagger={firstShow}
+                            className={glow ? "animate-gold-glow rounded-2xl" : undefined}
+                            style={glow
+                              ? { animationDelay: `${glowAt + i * FINISH_CARD_MS}ms` }
+                              : undefined}
+                          >
+                            <InitiativeCard
+                              card={c}
+                              tokensOk={data.flags.tokensOk}
+                              vote={qualifyMark ? data.flags.vote : undefined}
+                              aiTop={picks.includes(c.initiative.id)}
+                              aiScore={scores.get(c.initiative.id)}
+                              featured={featuredSet.has(c.initiative.id)}
+                              onDonated={() => void qc.invalidateQueries({ queryKey: boardKey })}
+                              watch={{
+                                on: watchlist.has(c.initiative.id),
+                                toggle: () => watchlist.toggle(c.initiative.id),
+                              }}
+                              rating={ratings && { summary: ratings[c.initiative.id], canRate }}
+                              votePct={votePct?.get(c.initiative.id)}
+                              votePendingPct={votePendingPct?.get(c.initiative.id)}
+                              voteTier={(resultTiers ?? voteTiers)?.get(c.initiative.id)}
+                              final={finals?.get(c.initiative.id)}
+                              next={next?.get(c.initiative.id)}
+                              lead={lead?.get(c.initiative.id)}
+                              titles={titles}
+                              withdrawn={withdrawn?.has(c.initiative.slug)}
+                            />
+                          </ShuffleItem>
+                        ))}
+                        {gi === groups.length - 1 &&
+                          (all.length >= SUGGEST_LAST_FROM || filtered || Boolean(g.heading)) && (
+                          <ShuffleItem
+                            key="suggest-last"
+                            index={g.cards.length + 1}
+                            stagger={firstShow}
+                          >
+                            <SuggestCard />
+                          </ShuffleItem>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+              </Fragment>
+            );
+          })}
         <PledgeBand />
       </PageMain>
     </>

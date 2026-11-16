@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { writeContract } from "wagmi/actions";
 import { api } from "~/lib/api";
+import { confettiBurst } from "~/components/donate/Celebration";
 import TestDonate from "./TestDonate";
 
 const { TOKEN, BETA, ME, ZERO } = vi.hoisted(() => ({
@@ -24,6 +25,7 @@ vi.mock("../../../shared/vote/manifest", async (original) => ({
     ],
   },
 }));
+vi.mock("~/components/donate/Celebration", () => ({ confettiBurst: vi.fn() }));
 vi.mock("wagmi/actions", () => ({ writeContract: vi.fn() }));
 const chain = vi.hoisted(() => ({
   balance: 0n,
@@ -47,6 +49,7 @@ vi.mock("~/lib/api", async (original) => ({
 }));
 
 beforeEach(() => {
+  vi.mocked(confettiBurst).mockClear();
   vi.mocked(writeContract).mockReset().mockResolvedValue("0xabc" as never);
   vi.mocked(api).mockReset().mockResolvedValue({ hash: "0xgas" });
   chain.getBalance.mockReset().mockImplementation(() => Promise.resolve(chain.balance));
@@ -76,6 +79,7 @@ it("mints the amount in test dollars straight to the initiative's account", asyn
   // The page hears the dollars given, and the field clears for another amount (#100).
   expect(onDonated).toHaveBeenCalledWith(9000);
   expect((screen.getByLabelText("Amount in US dollars") as HTMLInputElement).value).toBe("");
+  expect(confettiBurst).toHaveBeenCalledOnce();
   // The wallet had gas: no top-up.
   expect(api).not.toHaveBeenCalled();
 });
@@ -103,6 +107,7 @@ it("refuses a blank amount and one over a million", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Donate test dollars" }));
   expect(await screen.findByText(/A million test dollars at most/)).toBeInTheDocument();
   expect(writeContract).not.toHaveBeenCalled();
+  expect(confettiBurst).not.toHaveBeenCalled();
 });
 
 it("an initiative the round doesn't have can't be given to", () => {

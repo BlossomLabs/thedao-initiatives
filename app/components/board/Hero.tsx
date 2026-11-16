@@ -11,7 +11,10 @@ import Shimmer from "~/components/layout/Shimmer";
  * instead: from `countFrom` it creeps toward 10% more while the board loads,
  * then counts to the amount in a second. Reduced motion: shown once known. */
 export default function Hero(
-  { raised, kicker, sub, children, countFrom = 0, countEarly = false }: {
+  { raised, kicker, sub, children, countFrom = 0, countEarly = false, finished = false }: {
+    /** The vote just finished (the vote results, open as it did): a gold light runs
+     * across the amount, and the line under the hero fills with gold. */
+    finished?: boolean;
     raised?: number;
     /** Where the count starts (the homepage: HERO_COUNT_FROM). */
     countFrom?: number;
@@ -38,7 +41,8 @@ export default function Hero(
       <div
         className={`mt-3.5 font-inter-tight text-[clamp(40px,10vw,100px)] font-bold leading-none tracking-[-.04em] text-white tnum transition-opacity duration-700 motion-reduce:transition-none ${
           shown ? "opacity-100" : "opacity-0"
-        }`}
+        } ${finished ? "motion-safe:glint-text motion-safe:animate-gold-glint" : ""}`}
+        data-finished={finished || undefined}
         aria-hidden={!known}
       >
         $<CountUp
@@ -59,7 +63,17 @@ export default function Hero(
         )}
       </p>
       {children}
-      <Shimmer />
+      {finished
+        ? (
+          <div className="relative">
+            <Shimmer />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 mx-auto h-px max-w-[1052px] origin-left animate-rule-fill bg-[linear-gradient(90deg,rgba(233,185,73,.15),#e9b949_50%,rgba(233,185,73,.15))] shadow-[0_0_8px_rgba(233,185,73,.6)]"
+            />
+          </div>
+        )
+        : <Shimmer />}
     </section>
   );
 }

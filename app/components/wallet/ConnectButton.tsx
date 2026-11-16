@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BADGE_GLOW_EVENT } from "~/lib/badge-glow";
 import { BadgeHolderMark, BadgeHolderNote } from "~/components/ui/Badge";
 import { Wallet } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -62,6 +63,20 @@ export default function ConnectButton() {
     }
     lastKey.current = who;
   }, [who, profileOpen]);
+  // A ballot of theirs counted: the glow again (restarted if it is playing).
+  useEffect(() => {
+    let id = 0;
+    const glow = () => {
+      setEntrance(null);
+      cancelAnimationFrame(id);
+      id = requestAnimationFrame(() => setEntrance("glow"));
+    };
+    globalThis.addEventListener(BADGE_GLOW_EVENT, glow);
+    return () => {
+      globalThis.removeEventListener(BADGE_GLOW_EVENT, glow);
+      cancelAnimationFrame(id);
+    };
+  }, []);
 
   // Once signed in: if ENS and the site profile still leave the name or the
   // picture unset, offer to complete them.

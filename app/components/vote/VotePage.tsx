@@ -20,6 +20,7 @@ import {
   useMockCards,
 } from "~/components/vote/mock-round";
 import MockNav from "./MockNav";
+import { glowBadge } from "~/lib/badge-glow";
 import VoteClosed from "~/components/vote/VoteClosed";
 import { ArrowUpRight } from "lucide-react";
 import { useSession } from "~/context/session";
@@ -177,6 +178,17 @@ export default function VotePage(
   const [mockSent, setMockSent] = useState<Hex>();
   const mockFlow = useMockBallotSubmit(setMockSent);
   const ballotFlow = mock ? mockFlow : realFlow;
+  // A send that ends counted, seen here from start to end: the badge mark in the top bar
+  // glows (and the Counted stamp presses down, BallotStatus). Not for a page that opens
+  // on a ballot already counted.
+  const lastPhase = useRef(ballotFlow.phase.kind);
+  useEffect(() => {
+    const was = lastPhase.current;
+    lastPhase.current = ballotFlow.phase.kind;
+    if (ballotFlow.phase.kind === "counted" && was !== "counted" && was !== "idle") {
+      glowBadge();
+    }
+  }, [ballotFlow.phase.kind]);
   /** Who is sending the ballot in progress (or sent the last): TheDAO, or the voter. */
   const [sendRoute, setSendRoute] = useState<SendRoute>("relay");
   /** Two pages, one route: the ballot that counts (its path), and its editor (/edit).

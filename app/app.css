@@ -28,6 +28,137 @@
   --animate-tier-land: tier-land 0.7s ease-out both;
   --animate-grade-bump: grade-bump 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
   --animate-chip-land: chip-land 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  /* The vote results: a tier settling while the page is open. Its row flashes gold and
+     its grade bumps (grade-bump); each initiative it funds turns gold one after another,
+     glowing twice (box-shadow, so it stays with reduced motion) while a sheen crosses it. */
+  --animate-tier-gold: tier-gold 1.6s ease-out both;
+  --animate-gold-glow: gold-glow 2.4s ease-out both;
+  --animate-gold-sheen: gold-sheen 1.1s ease-in-out both;
+  @keyframes tier-gold {
+    0% {
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes gold-glow {
+    0% {
+      box-shadow: 0 0 0 0 rgba(233, 185, 73, 0);
+    }
+    20% {
+      box-shadow: 0 0 0 1px rgba(245, 220, 140, 0.95), 0 0 18px 2px rgba(233, 185, 73, 0.85);
+    }
+    45% {
+      box-shadow: 0 0 0 1px rgba(233, 185, 73, 0.5), 0 0 8px 0 rgba(233, 185, 73, 0.35);
+    }
+    65% {
+      box-shadow: 0 0 0 1px rgba(245, 220, 140, 0.8), 0 0 14px 1px rgba(233, 185, 73, 0.65);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(233, 185, 73, 0);
+    }
+  }
+  @keyframes gold-sheen {
+    from {
+      background-position: 150% 0;
+    }
+    to {
+      background-position: -50% 0;
+    }
+  }
+  /* The vote finishing while the results are open: the final result's hero glows gold,
+     twice (a filter, so it stays with reduced motion). */
+  --animate-gold-halo: gold-halo 2.6s ease-in-out both;
+  @keyframes gold-halo {
+    0%,
+    100% {
+      filter: none;
+    }
+    25%,
+    70% {
+      filter: drop-shadow(0 0 4px rgb(242, 193, 78)) drop-shadow(0 0 14px rgba(242, 193, 78, 0.8));
+    }
+    48% {
+      filter: drop-shadow(0 0 2px rgba(242, 193, 78, 0.6));
+    }
+  }
+  /* A ballot just counted: its Counted stamp presses down with a green glow, the stamp's
+     own colour (none with reduced motion: see the media query below). */
+  --animate-stamp-press: stamp-press 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  @keyframes stamp-press {
+    0% {
+      scale: 1.9;
+      opacity: 0;
+      box-shadow: 0 0 0 0 rgba(92, 183, 90, 0);
+    }
+    35% {
+      scale: 0.94;
+      opacity: 1;
+      box-shadow: 0 0 0 2px rgba(167, 227, 165, 0.85), 0 0 18px 2px rgba(92, 183, 90, 0.75);
+    }
+    55% {
+      scale: 1;
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(92, 183, 90, 0);
+    }
+  }
+  /* The vote finishing: a gold light runs once across the final amount, and the line
+     under it fills with gold from the left, then fades back. */
+  --animate-gold-glint: gold-glint 1.6s ease-in-out 0.3s both;
+  @keyframes gold-glint {
+    from {
+      background-position: 150% 0;
+    }
+    to {
+      background-position: -50% 0;
+    }
+  }
+  --animate-rule-fill: rule-fill 5s ease-out both;
+  @keyframes rule-fill {
+    0% {
+      scale: 0 1;
+      opacity: 1;
+    }
+    30% {
+      scale: 1 1;
+      opacity: 1;
+    }
+    70% {
+      opacity: 1;
+    }
+    100% {
+      scale: 1 1;
+      opacity: 0;
+    }
+  }
+  /* The vote results' figures: a red gap closed by a donation flips over to green. */
+  --animate-figure-flip: figure-flip 0.5s ease-out both;
+  @keyframes figure-flip {
+    0% {
+      transform: rotateX(90deg);
+    }
+    100% {
+      transform: rotateX(0);
+    }
+  }
+  /* A countdown in its last minutes: its pill breathes gold. Colour only. */
+  --animate-countdown-soon: countdown-soon 1.6s ease-in-out infinite;
+  @keyframes countdown-soon {
+    0%,
+    100% {
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 0 0 rgba(233, 185, 73, 0);
+    }
+    50% {
+      border-color: rgba(233, 185, 73, 0.75);
+      box-shadow: 0 0 10px 0 rgba(233, 185, 73, 0.35);
+    }
+  }
   /* Why a ballot can't be sent, pointed at from its disabled Send: a short shake. */
   --animate-reason-nudge: reason-nudge 0.6s ease-out;
   /* The closed ballot's arrow to the result: the line draws in, then its head shows. */
@@ -1019,6 +1150,23 @@ html:not([data-board="cards"]) .board-skeleton-cards {
 }
 
 /* The shiny text itself: the letters show a gradient, a bright band in dimmer white. */
+/* The final amount's gold light (gold-glint): white with a band of gold, run once. */
+@utility glint-text {
+  color: transparent;
+  background-image: linear-gradient(100deg, #fff 38%, #f5dc8c 47%, #e9b949 50%, #f5dc8c 53%, #fff
+    62%);
+  background-size: 250% 100%;
+  background-position: -50% 0;
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-stamp-press {
+    animation-name: none;
+  }
+}
+
 @utility shine-text {
   color: transparent;
   background-image: linear-gradient(

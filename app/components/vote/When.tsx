@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { clock, dayTime } from "~/lib/format";
+import { cn } from "~/lib/utils";
 
 /** The vote's dates: in the reader's own time zone, with UTC in the hover title, and a
  * live countdown where a deadline matters. Times are unix seconds. */
@@ -51,16 +52,32 @@ export function When({ at, withDay = true }: { at: number; withDay?: boolean }) 
 }
 
 /** "in 2d 4h", live; nothing once it's due. */
-export function Countdown({ to, className }: { to: number; className?: string }) {
+export function Countdown(
+  { to, className, soonClassName }: {
+    to: number;
+    className?: string;
+    /** Added in its last minutes (SOON_SECS): what's next is about to happen. */
+    soonClassName?: string;
+  },
+) {
   const now = useNow();
-  const left = timeLeft(to - Math.floor(now / 1000));
+  const secs = to - Math.floor(now / 1000);
+  const left = timeLeft(secs);
   if (!left) return null;
+  const soon = secs <= SOON_SECS;
   return (
-    <span className={className ?? "tnum text-white/60"} role="timer">
+    <span
+      className={cn(className ?? "tnum text-white/60", soon && soonClassName)}
+      data-soon={soon || undefined}
+      role="timer"
+    >
       in {left}
     </span>
   );
 }
+
+/** A countdown's last minutes, when it says so. */
+export const SOON_SECS = 5 * 60;
 
 /** A deadline: its local date, then "(in 2d 4h)" while it's ahead. */
 export function Deadline({ at, withDay = true }: { at: number; withDay?: boolean }) {

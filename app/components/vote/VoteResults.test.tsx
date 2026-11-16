@@ -526,6 +526,7 @@ it("while open: TheDAO's ballot beside what it takes each initiative to move up"
   expect(row).toHaveTextContent("−$9k");
   expect(row).toHaveTextContent("to S-Tier");
   expect(row).toHaveTextContent("not included");
+  expect(within(row).getByText("not included").className).toContain("text-[#ff8a88]");
   // Alpha, in S-Tier if it settled now, is in the list too, first: $4k ahead there.
   const ahead = list().getByRole("button", { name: /Alpha fuzzing/ });
   expect(ahead).toHaveTextContent("$4k");

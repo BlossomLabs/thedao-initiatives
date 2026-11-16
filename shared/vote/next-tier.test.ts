@@ -433,13 +433,29 @@ const TIER_INDEX = { S: 0, A: 1, B: 2 } as const;
 
 describe("the donation to the next tier", () => {
   it("targets the tier just above where the live tally has it: B-Tier when unfunded", () => {
-    // Initiative 0 ($70K) is unfunded; initiative 1 ($40K) is funded in A-Tier.
+    // Initiative 1 ($40K) is funded in A-Tier: one tier up is S-Tier.
+    const inp = knockOn();
+    expect(liveTier(inp, 1)).toBe(1);
+    expect(giftGaps(inp, 0).get(1)!.tier).toBe("S");
+    // Initiative 0 ($70K) is unfunded and out of reach (its backer spent all on S-Tier):
+    // the target stays B-Tier.
+    const spent = inputs([70, 40], [40], [[2, 1]]);
+    expect(liveTier(spent, 0)).toBeUndefined();
+    const g = giftGaps(spent, 0).get(0)!;
+    expect(g.gap).toBeNull();
+    expect(g.tier).toBe("B");
+  });
+
+  it("names the tier the donation lands it in, when that is higher than the target (#101)", () => {
+    // Initiative 0 ($70K) is unfunded, but its one backer ranks it in S-Tier: the $30K
+    // that gets it into B-Tier gets it into S-Tier too. The row's badge, sentence and
+    // button all say the tier from here, so they must say S-Tier, not B-Tier.
     const inp = knockOn();
     expect(liveTier(inp, 0)).toBeUndefined();
-    expect(liveTier(inp, 1)).toBe(1);
-    const gifts = giftGaps(inp, 0);
-    expect(gifts.get(0)!.tier).toBe("B");
-    expect(gifts.get(1)!.tier).toBe("S");
+    const g = giftGaps(inp, 0).get(0)!;
+    expect(g.gap).toBe(30n * K);
+    expect(tierGiven(inp, 0, g.gap! / FINE, 0, FINE)).toBe(0);
+    expect(g.tier).toBe("S");
   });
 
   it("is the least $10 step that gets it there or higher", () => {
@@ -480,7 +496,10 @@ describe("the donation to the next tier", () => {
     for (const [c, g] of gifts) {
       expect(g.tier).not.toBe("S");
       const now = liveTier(settledInp, c, 1);
-      expect(TIER_INDEX[g.tier]).toBe(now === undefined ? 2 : now - 1);
+      const target = now === undefined ? 2 : now - 1;
+      // One tier up, or higher when the donation lands it there.
+      if (g.gap === null) expect(TIER_INDEX[g.tier]).toBe(target);
+      else expect(TIER_INDEX[g.tier]).toBeLessThanOrEqual(target);
     }
   });
 

@@ -134,7 +134,7 @@ describe("example vote results: the real tally over made-up ballots", () => {
   });
 
   it.each(open)(
-    "%s: below the tier settling now, figures one tier up; in it, leads",
+    "%s: below the tier settling now, figures one tier up or more; in it, leads",
     async (_, kind) => {
       const { round, view } = mockRound(kind, cards, 1);
       const live = (await withFigures(view, round)).live;
@@ -145,8 +145,11 @@ describe("example vote results: the real tally over made-up ballots", () => {
         expect(settled.has(slug)).toBe(false);
         const now = view.live.tiers?.[slug];
         expect(now).not.toBe(settling);
-        // One tier above where the live tally has it; B-Tier when it isn't funded.
-        expect(g.tier).toBe(now ? order[order.indexOf(now) - 1] : "B");
+        // One tier above where the live tally has it (B-Tier when it isn't funded), or
+        // higher when the donation lands it there.
+        const target = now ? order.indexOf(now) - 1 : 2;
+        if (g.gap === null) expect(g.tier).toBe(order[target]);
+        else expect(order.indexOf(g.tier)).toBeLessThanOrEqual(target);
         if (g.gap !== null) expect(BigInt(g.gap) % 10_000_000n).toBe(0n);
       }
       for (const [slug, l] of Object.entries(live.lead ?? {})) {

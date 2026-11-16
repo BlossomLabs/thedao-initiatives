@@ -300,7 +300,12 @@ export default function GiveList(
                       <span className="block truncate text-[14px] text-white">{i.title}</span>
                       <span className="mt-0.5 block truncate text-[12px] text-white/55 tnum">
                         {need !== undefined && `Needs ${usd(need)} · `}
-                        {r.now ? `now in ${tierName(r.now)}` : "not included"}
+                        {r.now ? `now in ${tierName(r.now)}` : (
+                          // Not funded if the vote ended now: red, as the money it misses.
+                          <span className="text-[#ff8a88]" data-not-included="">
+                            not included
+                          </span>
+                        )}
                       </span>
                     </span>
                     {!r.entry

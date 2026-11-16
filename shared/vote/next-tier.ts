@@ -15,7 +15,7 @@ export const STEP = 1_000_000_000n;
 export const FINE = 10_000_000n;
 
 export type NextTier = {
-  tier: Tier; // the target
+  tier: Tier; // the target; for a donation with a gap, the tier that gap lands it in
   gap: bigint | null; // micro-USD, a multiple of STEP; null = out of reach
   comesIn: [number, Tier][]; // newly funded, with their tier
   dropsOut: [number, Tier][]; // no longer funded, with the tier they lose
@@ -134,7 +134,8 @@ function withGift(inp: ChainInputs, c: number, given: bigint): ChainInputs {
 }
 
 /** The donation search for one initiative: the least $1K step that, given to it, gets it
- * funded in tier `target` or higher if the open tiers (from `first`) settled now. The
+ * funded in tier `target` or higher if the open tiers (from `first`) settled now (the
+ * entry's tier is where it lands with it). The
  * last step short of its whole need is the most anyone can give it (given all of it, it is
  * covered, in no tier); when even that doesn't get it there, the gap is null. The
  * knock-on, over every open tier: who comes in, drops out or moves. */
@@ -173,6 +174,9 @@ function* giftSearch(
     else lo = mid + 1n;
   }
   entry.gap = hi * step;
+  // The amount that reaches the target can land it higher still (its backers rank it
+  // there): name the tier it lands in, so the page says one tier for one amount.
+  entry.tier = TIERS[after.get(c)!];
   for (let o = 0; o < inp.m; o++) {
     if (o === c) continue;
     const was = live.get(o), is = after.get(o);

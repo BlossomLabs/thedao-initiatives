@@ -79,6 +79,13 @@ Deno.test("admin vote round: the real vote's round can't change or go while it's
   assertEquals(swap.status, 409);
   const off = await h.req("/api/admin/vote-round/round", { method: "DELETE", token, json: {} });
   assertEquals(off.status, 409);
+  // The same address on the other network is another contract: refused before any read.
+  const otherChain = await h.req("/api/admin/vote-round/round", {
+    method: "POST",
+    token,
+    json: { contract: realRound.contract, chain: "sepolia" },
+  });
+  assertEquals(otherChain.status, 409);
   // Once it closes, it can go.
   h.clock.now = NOW + 3600;
   const later = await h.req("/api/admin/vote-round/round", {

@@ -144,13 +144,19 @@ export function adminRoutes(deps: Deps) {
   };
   /** While the real vote is open its round is fixed: it can be read again (projects added
    * on-chain), never swapped or taken off the site. */
-  const refuseWhileRealOpen = (cur: VoteRoundSetting, contract?: string) => {
+  /** `next`: the round asked for (its contract and chain, then the manifest read back).
+   * Allowed only when it's that same real round: same contract, same chain, still real. */
+  const refuseWhileRealOpen = (
+    cur: VoteRoundSetting,
+    next?: { contract: string; chainId: number; kind?: VoteManifest["kind"] },
+  ) => {
     const m = roundOf(cur)?.manifest;
     const now = deps.now();
-    if (
-      m?.kind === "real" && now >= m.opensAt && now < m.closesAt &&
-      m.contract.toLowerCase() !== contract?.toLowerCase()
-    ) {
+    if (!(m?.kind === "real" && now >= m.opensAt && now < m.closesAt)) return;
+    const same = next !== undefined &&
+      m.contract.toLowerCase() === next.contract.toLowerCase() &&
+      m.chainId === next.chainId && (next.kind === undefined || next.kind === "real");
+    if (!same) {
       throw new HttpError(409, "The real vote is open: its round can't change until it closes.");
     }
   };
@@ -171,7 +177,8 @@ export function adminRoutes(deps: Deps) {
     const chainName = chain === "ethereum" ? "Ethereum" : "Sepolia";
     const rpc = chain === "ethereum" ? deps.config.rpcEndpoints[0] : deps.config.sepoliaRpcUrl;
     if (!rpc) throw new HttpError(503, `No ${chainName} RPC is configured.`);
-    refuseWhileRealOpen(await roundSetting(), contract);
+    const chainId = chain === "ethereum" ? 1 : 11155111;
+    refuseWhileRealOpen(await roundSetting(), { contract, chainId });
     const rows = await db.initiatives.list(["approved", "archived", "pending", "rejected"]);
     let manifest: VoteManifest;
     const warnings: string[] = [];
@@ -180,7 +187,7 @@ export function adminRoutes(deps: Deps) {
         contract as Hex,
         rpc,
         undefined,
-        chain === "ethereum" ? 1 : 11155111,
+        chainId,
       );
       manifest = checkManifest(manifestFromChain(contract as Hex, read, slugsByAccount(rows)));
       const relayer = (await currentVote(deps))?.chain.relayerAddress();
@@ -197,7 +204,11 @@ export function adminRoutes(deps: Deps) {
       throw new HttpError(502, `Couldn't read the round from ${chainName}. Try again.`);
     }
     await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => {
-      refuseWhileRealOpen(cur ?? {}, contract);
+      refuseWhileRealOpen(cur ?? {}, {
+        contract: manifest.contract,
+        chainId: manifest.chainId,
+        kind: manifest.kind,
+      });
       const { test: _, ...rest } = cur ?? {};
       return { ...rest, round: { manifest, at: deps.now(), by: c.var.user!.address } };
     });

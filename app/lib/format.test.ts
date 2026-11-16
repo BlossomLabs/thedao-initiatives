@@ -8,6 +8,7 @@ import {
   shortDay,
   usd,
   usd2,
+  usdK,
   usdShort,
   usdShortUp,
 } from "./format";
@@ -30,6 +31,19 @@ describe("format", () => {
     expect(pct(150938, 236438)).toBe(63.8);
     expect(pct(500, 100)).toBe(100);
     expect(pct(1, 0)).toBe(0);
+  });
+});
+
+describe("usdK", () => {
+  it("keeps up to three significant digits in thousands without trailing zeros", () => {
+    expect(usdK(62_000)).toBe("$62k");
+    expect(usdK(1_000)).toBe("$1k");
+    expect(usdK(1_234)).toBe("$1.23k");
+    expect(usdK(12_340)).toBe("$12.3k");
+    expect(usdK(123_456)).toBe("$123k");
+    expect(usdK(1_234_567)).toBe("$1230k");
+    expect(usdK(8)).toBe("$0.008k");
+    expect(usdK(0)).toBe("$0k");
   });
 });
 

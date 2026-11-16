@@ -143,6 +143,31 @@ it("never offers or sends more than the initiative still needs (#102)", () => {
   expect(screen.getByRole("button", { name: "Donate test dollars" })).toBeEnabled();
 });
 
+it.each([false, true])(
+  "ends with the full-funding amount and label (matching suggestion: %s)",
+  (matching) => {
+    render(
+      <TestDonate
+        slug="beta"
+        suggested={[
+          { usd: 1000, note: "adds $1,000 to its checked amount", label: "+1k ahead" },
+          ...(matching
+            ? [{ usd: 80_000, note: "supports its place", label: "to stay ahead" }]
+            : []),
+        ]}
+        cap={{ usd: 80_000, note: "all it still needs", label: "to be funded" }}
+      />,
+    );
+    const buttons = screen.getAllByRole("button", { name: /^\$/ });
+    const last = buttons.at(-1)!;
+    expect(buttons).toHaveLength(4);
+    expect(last).toHaveTextContent("$80,000to be funded");
+    expect(last).toHaveAccessibleName("$80,000, all it still needs");
+    fireEvent.click(last);
+    expect(screen.getByLabelText("Amount in US dollars")).toHaveValue("80000");
+  },
+);
+
 it("a new suggestion for the same initiative never moves the amount (#100)", () => {
   const at = (usd: number) => (
     <TestDonate
@@ -164,7 +189,7 @@ it("preselect false: the field starts empty and suggestions don't fill it", () =
       suggested={usds.map((usd) => ({
         usd,
         note: "in S-Tier in the scenarios checked",
-        label: "In S-Tier",
+        label: "to stay ahead",
       }))}
       preselect={false}
     />

@@ -36,15 +36,15 @@ function show() {
 }
 const card = (name: string) => within(screen.getByRole("region", { name }));
 
-it("a green figure updates directly to the checked amount without counting through unchecked amounts", () => {
+it("a compact green figure updates directly without counting through unchecked amounts", () => {
   const frame = vi.spyOn(globalThis, "requestAnimationFrame");
   try {
     const { rerender, container } = render(
       <RowFigure kind="threat" usd={12_340} name="S-Tier" />,
     );
-    expect(container).toHaveTextContent("$12,340ahead");
+    expect(container).toHaveTextContent("$12.3kahead");
     rerender(<RowFigure kind="threat" usd={37_890} name="S-Tier" />);
-    expect(container).toHaveTextContent("$37,890ahead");
+    expect(container).toHaveTextContent("$37.9kahead");
     expect(frame).not.toHaveBeenCalled();
     rerender(<RowFigure kind="threat" usd={null} name="S-Tier" />);
     expect(container.querySelector("[data-figure]")).toHaveTextContent(/^$/);

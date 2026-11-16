@@ -18,6 +18,14 @@ export function usdShort(v: unknown): string {
   return `$${trim(n / 1_000_000, 1)}M`;
 }
 
+/** Compact dollar amounts in thousands, with up to three significant digits. */
+export function usdK(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return "$0k";
+  return `$${
+    (n / 1000).toLocaleString("en-US", { maximumSignificantDigits: 3, useGrouping: false })
+  }k`;
+}
+
 /** Money to two significant digits, always in thousands (or millions), so a list reads
  * at a glance: "$0.3k", "$1.5k", "$11k", "$120k", "$1.2M". `up` rounds a missing amount
  * up, so it never reads as less than it is; otherwise it rounds down (a lead never reads

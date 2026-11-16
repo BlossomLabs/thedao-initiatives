@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bytesToHex } from "viem";
 import { api } from "~/lib/api";
+import { usdK } from "~/lib/format";
 import { confettiBurst } from "~/components/donate/Celebration";
 import { encodeBallot } from "../../../shared/vote/ballot";
 import { ROUND } from "../../../shared/vote/manifest";
@@ -621,8 +622,8 @@ it("while open: TheDAO's ballot beside what it takes each initiative to move up"
   // Alpha, in S-Tier if it settled now, is in the list too, first: $4k given to another
   // initiative would push it out.
   const ahead = list().getByRole("button", { name: /Alpha fuzzing/ });
-  expect(ahead).toHaveTextContent("$4,000");
-  expect(ahead).toHaveTextContent("$4,000ahead");
+  expect(ahead).toHaveTextContent("$4k");
+  expect(ahead).toHaveTextContent("$4kahead");
   expect(ahead).not.toHaveTextContent("−");
   const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits/ });
   expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta "]);
@@ -947,18 +948,21 @@ it("green rows show ahead amounts and hide rows without a checked amount until e
   fireEvent.click(await list().findByRole("button", { name: "+ 1 more initiative" }));
   const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits|Gamma/ });
   expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Beta ", "Alpha", "Gamma"]);
-  expect(order[0]).toHaveTextContent("$1,000ahead");
-  expect(order[1]).toHaveTextContent("$12,000ahead");
+  expect(order[0]).toHaveTextContent("$1kahead");
+  expect(order[1]).toHaveTextContent("$12kahead");
   expect(order[2].querySelector("[data-figure]")).toHaveTextContent(/^$/);
   expect(order[2]).not.toHaveTextContent("ahead");
   expect(order[2].querySelector("b")).toBeNull();
 });
 
-it("a green pill shows the checked amount without rounding it to an untested donation", async () => {
+it("a compact green pill keeps the exact checked amount in its title", async () => {
   await showOpen(openWith({}, { alpha: [20_000, "S"] }, {}, { alpha: usdMicro(12_340) }));
   const row = await list().findByRole("button", { name: /Alpha fuzzing/ });
-  expect(row).toHaveTextContent("$12,340ahead");
-  expect(row).toHaveTextContent("ahead");
+  expect(row).toHaveTextContent("$12.3kahead");
+  expect(row.querySelector("[data-figure]")).toHaveAttribute(
+    "title",
+    "$12,340 donated elsewhere could move it out of S-Tier; smaller amounts may also do so.",
+  );
   fireEvent.click(row);
   expect(screen.getByText((_, el) =>
     el?.tagName === "P" &&
@@ -1453,7 +1457,7 @@ describe("while the page is open", () => {
     await next(openWith({}, { alpha: [50_000, "S"] }, {}, { alpha: usdMicro(4_000) }));
     // Still red on its way down to $0, then green.
     expect(alpha().querySelector("[data-figure]")).toHaveAttribute("data-figure", "gap");
-    await waitFor(() => expect(alpha()).toHaveTextContent("$4,000ahead"), {
+    await waitFor(() => expect(alpha()).toHaveTextContent("$4kahead"), {
       timeout: 3000,
     });
     expect(alpha().querySelector("[data-figure]")).toHaveAttribute("data-figure", "threat");
@@ -1530,7 +1534,7 @@ describe("an open green row's jumps (worked out on the page from the tally's inp
     return jumps(inp, first, 2).map((j) => {
       const usd = Number(j.usd / 1_000_000n);
       const t = j.threat === null ? null : Number(j.threat / 1_000_000n);
-      return `$${usd} ${t === null ? "In S-Tier" : `$${t.toLocaleString("en-US")} ahead`}`;
+      return `$${usd} ${t === null ? "to stay ahead" : `+${usdK(t - 10_000).slice(1)} ahead`}`;
     });
   };
   const chips = () =>
@@ -1543,7 +1547,7 @@ describe("an open green row's jumps (worked out on the page from the tally's inp
 
   it("an open green row suggests the donations at which its number jumps", async () => {
     const want = expectedChips(greenInputs());
-    expect(want).toEqual(["$1000 $11,000 ahead", "$10000 In S-Tier"]);
+    expect(want).toEqual(["$1000 +1k ahead", "$10000 to stay ahead"]);
     jumpsGate.hold();
     await showOpen(greenRound());
     fireEvent.click(await gammaRow());

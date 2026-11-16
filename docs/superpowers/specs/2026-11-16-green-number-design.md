@@ -167,8 +167,8 @@ S-Tier is the tier settling now. …
 Open initiatives · 31 initiatives        [Category ▾]
 [ search … ]
 
-● Initiative A   Needs $25,000 · now in S-Tier   $3,000  ahead  ˅
-● Initiative B   Needs $20,000 · now in S-Tier   $7,000  ahead  ˅
+● Initiative A   Needs $25,000 · now in S-Tier     $3k  ahead  ˅
+● Initiative B   Needs $20,000 · now in S-Tier     $7k  ahead  ˅
 ● …all other green rows with a checked amount…
 ● Initiative C   Needs $30,000 · not included    −$4.1k to S-Tier ˅
 ● …the red rows, as today…
@@ -187,7 +187,8 @@ Open initiatives · 31 initiatives        [Category ▾]
 
 ### A green row, closed
 
-- Pill: green, the full checked dollar amount ("$3,000"), with "ahead" after it.
+- Pill: green, the checked amount in thousands with up to three significant digits
+  ("$62k", "$12.3k"), with "ahead" after it. Keep the exact amount in its hover title.
 - With no checked amount, leave the figure area blank. The subtitle still names
   the initiative's current tier.
 
@@ -511,10 +512,10 @@ does not establish minimality when displacement disappears and returns.
 ### Meaning and presentation of the shipped values
 
 - A finite `live.threat` is a checked donation elsewhere that displaces the subject
-  in the current inputs: an **upper bound** on the true minimum. Show its full
-  dollar amount, with "ahead" and an explanation that smaller donations
-  elsewhere may also move it out of the tier. Do not round it to a different,
-  unchecked donation in the pill.
+  in the current inputs: an **upper bound** on the true minimum. Show a compact
+  amount in thousands with up to three significant digits and "ahead". Keep the
+  exact checked amount in the hover title and expanded explanation, which also
+  says that smaller donations elsewhere may move it out of the tier.
   When integrating the results animations from `main`, retain the red countdown
   and flip to green, but show a green amount directly. Counting between green
   values would display donations that were never checked.
@@ -524,10 +525,17 @@ does not establish minimality when displacement disappears and returns.
   amounts may still do so. It never means safe.
 - Missing data also leaves the figure blank, but stays visible until known and its
   expanded explanation makes no claim about checked donations.
-- Jump chips say "$X ahead" or "In S-Tier" (using the current tier), with the same
-  limitations in their notes. Typed-amount results explain the reduction in the
-  subject's ask and whether a checked donation elsewhere would move it out.
-  Neither promises the minimum useful self-donation or a guaranteed increase in safety.
+- Jump chips show the increase over the current checked amount: from $62k to
+  $63k means "+1k ahead". Use up to three significant digits in thousands. When no
+  displacement is found after the donation, label it "to stay ahead". Keep the
+  exact resulting amount and limitations in the notes. Without a known baseline,
+  omit the numeric increase.
+- Always reserve the last donation button for the full amount still needed,
+  labelled "to be funded", even when all other suggestions are smaller. This
+  label takes precedence if a suggested amount equals the full-funding amount.
+- Typed-amount results explain the reduction in the subject's ask and whether a
+  checked donation elsewhere would move it out. Neither promises the minimum
+  useful self-donation or a guaranteed increase in safety.
 - Sorting still uses checked amounts, then no hit, then missing data. This is an
   ordering of search results, not a proven ranking of actual safety margins.
 

@@ -36,7 +36,16 @@ describe("donateChips", () => {
     expect(donateChips([], 3_000)).toEqual(["50", "500", "3000"]);
   });
 
-  it("no cap chip when every amount is below it", () => {
-    expect(donateChips([], 80_000)).toEqual(["50", "500", "5000", "50000"]);
+  it("always reserves the last button for full funding, even above all usual amounts", () => {
+    expect(donateChips([], 80_000)).toEqual(["50", "500", "5000", "80000"]);
+    expect(donateChips(["1000", "10000"], 80_000))
+      .toEqual(["500", "1000", "10000", "80000"]);
+    expect(donateChips(["1000", "2000", "3000", "4000"], 80_000))
+      .toEqual(["1000", "2000", "3000", "80000"]);
+  });
+
+  it("offers the full-funding amount once when it is also a suggestion", () => {
+    expect(donateChips(["1000", "80000"], 80_000))
+      .toEqual(["500", "1000", "5000", "80000"]);
   });
 });

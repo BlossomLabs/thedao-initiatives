@@ -153,8 +153,7 @@ export default function DonateWidget({
    * wherever it sits. */
   const suggestedAt = new Map(suggestions.map((x) => [String(x.usd), x]));
   const chips = donateChips([...suggestedAt.keys()], cap?.usd);
-  const chipAt = (c: string) =>
-    suggestedAt.get(c) ?? (cap && c === String(cap.usd) ? cap : undefined);
+  const chipAt = (c: string) => cap && c === String(cap.usd) ? cap : suggestedAt.get(c);
   const labelled = chips.some((c) => chipAt(c)?.label);
   const [symbol, setSymbol] = useState("");
   const [method, setMethod] = useState<Method>("wallet");

@@ -9,7 +9,7 @@ import CategoryDot from "~/components/ui/CategoryDot";
 import Reveal from "~/components/ui/Reveal";
 import type { NextTierEntry } from "~/hooks/use-vote";
 import type { Card } from "~/lib/api-types";
-import { usd, usd2, usdShortUp } from "~/lib/format";
+import { usd, usd2, usdK, usdShortUp } from "~/lib/format";
 import { lazyPart } from "~/lib/lazy-part";
 import { cn } from "~/lib/utils";
 import type { JumpUsd } from "~/lib/threat-queue";
@@ -122,7 +122,7 @@ function useCountTo(target: number, ms: number): number {
 /**
  * A row's figure: the red gap to the next tier or a checked green threat. Red gaps count
  * to their new value; a closed gap counts down to $0, then flips green. Green figures
- * show the full checked amount directly: intermediate amounts are not verified threats.
+ * show a compact checked amount directly, with the exact amount in the title.
  */
 export function RowFigure(
   { kind, usd: value, to, name }: {
@@ -194,7 +194,7 @@ export function RowFigure(
                   flip > 0 && "motion-safe:animate-figure-flip",
                 )}
               >
-                {usd(view.value)}
+                {usdK(view.value)}
               </b>
             )}
             {
@@ -462,7 +462,11 @@ export default function GiveList(
                     : `then a donation of ${
                       usd(j.threat)
                     } elsewhere could move it out of ${name}; smaller donations may also do so`,
-                  label: j.threat === null ? `In ${name}` : `${usd(j.threat)} ahead`,
+                  label: j.threat === null
+                    ? "to stay ahead"
+                    : typeof r.threat === "number" && j.threat > r.threat
+                    ? `+${usdK(j.threat - r.threat).slice(1)} ahead`
+                    : undefined,
                 }))
                 : steps?.length
                 ? steps.map((x) => ({

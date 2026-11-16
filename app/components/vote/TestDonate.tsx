@@ -72,8 +72,7 @@ export default function TestDonate(
 
   const suggestedAt = new Map(suggested.map((x) => [String(x.usd), x]));
   const chips = donateChips([...suggestedAt.keys()], cap?.usd);
-  const chipAt = (c: string) =>
-    suggestedAt.get(c) ?? (cap && c === String(cap.usd) ? cap : undefined);
+  const chipAt = (c: string) => cap && c === String(cap.usd) ? cap : suggestedAt.get(c);
   const labelled = chips.some((c) => chipAt(c)?.label);
   const usd = parseUsd(amount);
   // More than it needs: not sent.

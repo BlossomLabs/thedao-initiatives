@@ -185,11 +185,13 @@ git commit -m "Vote: serve each green row's threat instead of its lead (#98)"
 ### Task 4: Green rows in the list
 
 **Current presentation update (supersedes the original folding instructions below):**
-Show every finite checked amount as "$X ahead". Leave missing and `null` figures
+Show every finite checked amount as "$Xk ahead", with up to three significant digits
+and the exact amount in the hover title. Leave missing and `null` figures
 blank; only `null` rows are hidden above by default. One bottom "+ N more initiatives"
 link reveals these rows and the out-of-reach rows together, and toggles to "Show fewer".
 Search reveals matching rows from both ends, and open rows remain visible on collapse.
-
+Suggested donations show the increase ("+1k ahead") or "to stay ahead". The last
+button always shows the full remaining funding amount, labelled "to be funded".
 
 **Files:**
 - Modify: `app/components/vote/GiveList.tsx` (`GiveRow`, sort, collapse, closed and open green row)

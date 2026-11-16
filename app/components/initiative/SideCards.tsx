@@ -10,7 +10,6 @@ import Skeleton from "~/components/ui/Skeleton";
 import { useSession } from "~/context/session";
 import type { Initiative, InitiativePage, Summary } from "~/lib/api-types";
 import { openDiscussion } from "~/lib/discussion";
-import { CONTACT_EMAIL, CONTACT_MAILTO } from "~/data/site";
 import { WHAT_NEXT } from "~/data/what-next";
 import RatingCard from "~/components/ratings/RatingCard";
 
@@ -48,9 +47,6 @@ export function PublicCards(
               Commit publicly now and pay only when the entire funding goal has been reached.
             </p>
             {r.id && r.status === "approved" && <PledgeRequestLink initiativeId={r.id} />}
-            <p className="m-0 mt-2 small dim">
-              Or email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>.
-            </p>
           </div>
         )
       }

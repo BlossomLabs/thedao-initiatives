@@ -37,7 +37,7 @@ export default function PledgeSupportForm({ initialInitiativeId, sending, onSend
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
-  const amountRef = useRef<HTMLInputElement>(null);
+  const orgRef = useRef<HTMLInputElement>(null);
   const sendingRef = useRef(false);
   const initialized = useRef(false);
   const id = useId();
@@ -49,7 +49,7 @@ export default function PledgeSupportForm({ initialInitiativeId, sending, onSend
     if (selected) {
       setInitiative(selected);
       setSearch(selected.title);
-      amountRef.current?.focus();
+      orgRef.current?.focus();
     } else {
       inputRef.current?.focus();
     }
@@ -161,6 +161,7 @@ export default function PledgeSupportForm({ initialInitiativeId, sending, onSend
       <label className="flex flex-col gap-1.5 text-[12.5px] text-white/80">
         Pledge Organization
         <Input
+          ref={orgRef}
           autoComplete="organization"
           placeholder="e.g. Acme Foundation"
           required
@@ -179,7 +180,6 @@ export default function PledgeSupportForm({ initialInitiativeId, sending, onSend
       <label className="flex flex-col gap-1.5 text-[12.5px] text-white/80">
         Pledge Amount (USD)
         <Input
-          ref={amountRef}
           inputMode="decimal"
           placeholder="e.g. 25,000"
           required

@@ -1,6 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
+import { vi } from "vitest";
 import Footer from "./Footer";
+
+const open = vi.hoisted(() => vi.fn());
+vi.mock("~/lib/support", () => ({ openPledgeRequest: open }));
 
 test("the footer links to the donation terms on every page", () => {
   render(
@@ -22,4 +26,15 @@ test("no transparency link anywhere in the footer (Griff, 2026-09-12)", () => {
   );
   expect(screen.queryByRole("link", { name: /transparency/i })).toBeNull();
   expect(document.body.textContent).not.toMatch(/transparency/i);
+});
+
+test("sends backers to the pledge form, not to an email address", () => {
+  render(
+    <MemoryRouter>
+      <Footer />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByText(/@/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "pledge form" }));
+  expect(open).toHaveBeenCalledWith();
 });

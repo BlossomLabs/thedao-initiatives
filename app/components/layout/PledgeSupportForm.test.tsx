@@ -141,9 +141,9 @@ it("preselects the initiative from its Pledge button and updates when opened for
   const { rerender } = render(view("grant-id"));
   fireEvent.click(screen.getByRole("button", { name: "Pledge" }));
   expect(screen.getByRole("combobox", { name: "Initiative" })).toHaveValue("Compiler security");
-  expect(screen.getByRole("textbox", { name: "Pledge Amount (USD)" })).toHaveFocus();
+  expect(screen.getByRole("textbox", { name: "Pledge Organization" })).toHaveFocus();
   rerender(view("rfp-id"));
   fireEvent.click(screen.getByRole("button", { name: "Pledge" }));
   expect(screen.getByRole("combobox", { name: "Initiative" })).toHaveValue("Wallet review");
-  expect(screen.getByRole("textbox", { name: "Pledge Amount (USD)" })).toHaveFocus();
+  expect(screen.getByRole("textbox", { name: "Pledge Organization" })).toHaveFocus();
 });

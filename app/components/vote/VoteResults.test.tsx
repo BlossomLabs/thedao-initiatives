@@ -90,10 +90,12 @@ vi.mock("~/components/donate/DonateWidget", async () => {
   const { parseUsd } = await import("~/lib/donate");
   return {
     default: (
-      { onAmount, suggested, cap }: {
+      { onAmount, suggested, cap, onDonated, onConfirmed }: {
         onAmount?: (usd: number) => void;
         suggested?: { usd: number; label?: string } | { usd: number; label?: string }[];
         cap?: { usd: number; label?: string };
+        onDonated?: (usd: number) => void;
+        onConfirmed?: (r: { status: string; amountUsd: number }) => void;
       },
     ) => (
       <>
@@ -107,6 +109,20 @@ vi.mock("~/components/donate/DonateWidget", async () => {
           // As the real form does: parseUsd, so a blank field is NaN.
           onChange={(e) => onAmount?.(parseUsd(e.currentTarget.value))}
         />
+        <button
+          type="button"
+          // As both forms do once it goes through: the amount clears, then the page hears.
+          onClick={(e) => {
+            const field = e.currentTarget.previousElementSibling as HTMLInputElement;
+            const usd = parseUsd(field.value);
+            field.value = "";
+            onAmount?.(Number.NaN);
+            onDonated?.(usd);
+            onConfirmed?.({ status: "confirmed", amountUsd: usd });
+          }}
+        >
+          Donate
+        </button>
       </>
     ),
   };
@@ -630,6 +646,93 @@ it("an amount typed and then removed leaves nothing on TheDAO's ballot (#100)", 
   );
   fireEvent.change(field, { target: { value: "" } });
   await waitFor(() => expect(within(daoBallot()).queryByText(/if you give/)).toBeNull());
+});
+
+// #100: a donation that went through stays green on TheDAO's ballot, solid, "+$X yours",
+// and its row says so, so the voter can keep giving.
+afterEach(() => localStorage.clear());
+
+async function donateToBeta(usd: string) {
+  const field = await screen.findByRole("spinbutton", { name: "Amount" });
+  fireEvent.change(field, { target: { value: usd } });
+  fireEvent.click(screen.getByRole("button", { name: "Donate" }));
+}
+
+it("a donation that went through stays green, solid, with '+$X yours'; its row says so", async () => {
+  await showOpen(openWith({ beta: give() }));
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  await donateToBeta("9000");
+  const chip = await within(daoBallot()).findByLabelText(
+    "Beta audits, funded if it ended now, $9,000 of it yours",
+  );
+  expect(chip).toHaveTextContent("+$9,000 yours");
+  expect(chip.className).toContain("border-dao-green");
+  expect(chip.className).not.toContain("border-dashed");
+  expect(within(daoBallot()).queryByText(/if you give/)).toBeNull();
+  expect(document.querySelector("[data-yours]")).toHaveTextContent(
+    "+$9,000 yours so far. You can keep giving.",
+  );
+});
+
+it("after a donation, another amount is previewed dashed on top of what was given", async () => {
+  await showOpen(openWith({ beta: give() }));
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  await donateToBeta("9000");
+  await within(daoBallot()).findByText("+$9,000 yours");
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Amount" }), {
+    target: { value: "3000" },
+  });
+  expect(await within(daoBallot()).findByText("+$3,000 if you give")).toBeInTheDocument();
+  // What it says counts both: the $9,000 isn't in the figures yet.
+  expect(
+    screen.getAllByText((_, el) =>
+      el?.tagName === "P" && /^With your \$12,000, /.test(el.textContent ?? "")
+    ).length,
+  ).toBeGreaterThan(0);
+  // Two donations add up.
+  fireEvent.click(screen.getByRole("button", { name: "Donate" }));
+  expect(await within(daoBallot()).findByText("+$12,000 yours")).toBeInTheDocument();
+});
+
+it("once the figures count the donation, the real result takes over, still '+$X yours'", async () => {
+  const qc = new QueryClient();
+  vi.mocked(api).mockResolvedValue(openWith({ beta: give() }));
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <VoteResults />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  await donateToBeta("9000");
+  await within(daoBallot()).findByText("+$9,000 yours");
+  // Figures without it yet (Beta still asks $30K): still held where the preview put it.
+  await act(() => qc.refetchQueries({ queryKey: ["vote-round"] }));
+  expect(within(daoBallot()).getByText("+$9,000 yours")).toBeInTheDocument();
+  // Counted: Beta asks $21K, and the live tally funds it in A-Tier, not where the preview had it.
+  vi.mocked(api).mockResolvedValue(
+    openWith(undefined, { alpha: [50_000, "S"], beta: [21_000, "A"] }, {
+      asks: [usdMicro(50_000), usdMicro(21_000)],
+    }),
+  );
+  await act(() => qc.refetchQueries({ queryKey: ["vote-round"] }));
+  const chip = await within(daoBallot()).findByLabelText(
+    "Beta audits, funded if it ended now, $9,000 of it yours",
+  );
+  expect(within(daoBallot()).getByRole("region", { name: /^A/ })).toContainElement(chip);
+});
+
+it("what was given is remembered in this browser, per round", async () => {
+  await showOpen(openWith({ beta: give() }));
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  await donateToBeta("9000");
+  await within(daoBallot()).findByText("+$9,000 yours");
+  cleanup();
+  await showOpen(openWith({ beta: give() }));
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  expect(await screen.findByText("+$9,000 yours so far. You can keep giving."))
+    .toBeInTheDocument();
 });
 
 it("once S-Tier settles, the figures are to A-Tier and S-Tier's chips are gold", async () => {

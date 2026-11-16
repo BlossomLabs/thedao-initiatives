@@ -123,6 +123,7 @@ export default function GiveList(
     test,
     stale,
     onDonated,
+    yours,
     search = {},
     steps,
   }: {
@@ -144,7 +145,10 @@ export default function GiveList(
     test?: { badge?: number };
     /** The figures are from before the latest change on-chain, being worked out again. */
     stale?: boolean;
-    onDonated?: () => void;
+    /** A donation went through on a row: its initiative and dollars. */
+    onDonated?: (slug: string, usd: number) => void;
+    /** What this visitor gave each initiative from the page (#100), said on its open row. */
+    yours?: ReadonlyMap<string, number>;
     /** The board's AI search flags: the box offers AI only while it is on. */
     search?: { ai?: boolean; aiAuto?: boolean };
     /** For the open row, when the page could work them out: the donation that gets it
@@ -421,6 +425,11 @@ export default function GiveList(
                           <KnockOnList lines={lines} titleOf={titleOf} />
                         </Reveal>
                       )}
+                      {isOpen && yours?.get(i.slug) !== undefined && (
+                        <p className="m-0 text-[13px] font-semibold text-[#a7e3a5]" data-yours>
+                          +{usd(yours.get(i.slug)!)} yours so far. You can keep giving.
+                        </p>
+                      )}
                       {test && !example
                         ? (
                           isOpen && (
@@ -437,7 +446,7 @@ export default function GiveList(
                                   ? undefined
                                   : [{ usd: gap, note: `brings it into ${to}`, label: `to ${to}` }]}
                                 onAmount={onAmount}
-                                onDonated={onDonated}
+                                onDonated={(usd) => onDonated?.(i.slug, usd)}
                                 badge={test.badge}
                                 accent={r.entry ? "red" : "green"}
                                 cap={cap}
@@ -453,7 +462,8 @@ export default function GiveList(
                                 initiativeId={i.id}
                                 slug={i.slug}
                                 safeAddress={i.safeAddress}
-                                onConfirmed={onDonated}
+                                onConfirmed={(r) =>
+                                  r.amountUsd > 0 && onDonated?.(i.slug, r.amountUsd)}
                                 suggested={steps?.length
                                   ? steps.map((x) => ({
                                     usd: x.usd,

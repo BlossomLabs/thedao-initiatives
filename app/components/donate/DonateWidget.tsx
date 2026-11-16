@@ -80,7 +80,20 @@ export default function DonateWidget({
   const [exchangeAmount, setExchangeAmount] = useState("");
   const [currency, setCurrency] = useState("");
   const [txHash, setTxHash] = useState("");
-  const d = useDonation({ initiativeId, slug, safeAddress, params, onConfirmed, accepted });
+  // Once it goes through the amount clears: what was given shows as given, and another
+  // amount can follow (#100).
+  const confirmed = (r: DonateResult) => {
+    setAmount("");
+    onConfirmed?.(r);
+  };
+  const d = useDonation({
+    initiativeId,
+    slug,
+    safeAddress,
+    params,
+    onConfirmed: confirmed,
+    accepted,
+  });
   const toggleTerms = (on: boolean) => {
     setAccepted(on);
     setExchangeAttempt(null);

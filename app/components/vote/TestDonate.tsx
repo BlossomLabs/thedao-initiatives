@@ -28,7 +28,8 @@ export default function TestDonate(
     slug: string;
     suggested?: Suggestion[];
     onAmount?: (usd: number) => void;
-    onDonated?: () => void;
+    /** A donation went through: its dollars. */
+    onDonated?: (usd: number) => void;
     /** The voter's badge, for the gas top-up. */
     badge?: number;
     accent?: "green" | "red";
@@ -117,7 +118,9 @@ export default function TestDonate(
           usd.toLocaleString("en-US")
         } in test dollars is on its account. It counts from the next tally.`,
       });
-      onDonated?.();
+      // Cleared: what was given now shows as given, and another amount can follow (#100).
+      setAmount("");
+      onDonated?.(usd);
     } catch (e) {
       setStatus({ kind: "err", text: walletErrorMessage(e) });
     } finally {

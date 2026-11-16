@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import RoundBox from "./RoundBox";
 import DaoBallot, { daoResult, type SettledTier } from "./DaoBallot";
@@ -177,17 +177,55 @@ export default function VoteResults(
     const { inp, first } = liveInputsFrom(liveInputs);
     return { inp, first, base: liveTiers(inp, first) };
   }, [liveInputs]);
-  const entry: NextTierEntry | undefined = open ? give?.[open] : undefined;
-  const gap = entry ? gapUsd(entry) : null;
   // A cleared or mistyped amount (NaN from the form) gives nothing.
   const given = Number.isFinite(amount) ? amount : 0;
   const needFor = (slug: string) => askOf(R, asks, slug) ?? 0;
+  // What this visitor gave each initiative from here, kept in this browser per round
+  // (#100): its chip on TheDAO's ballot says "+$X yours", its row "yours so far".
+  const yoursKey = `thedao:vote-given:${R.chainId}:${R.contract.toLowerCase()}`;
+  const [yours, setYours] = useState<Record<string, number>>({});
+  // Read after mounting (the first render matches a prerendered page).
+  useEffect(() => setYours(readYours(yoursKey)), [yoursKey]);
+  const yoursMap = useMemo(() => new Map(Object.entries(yours)), [yours]);
+  // The last donation until the round's figures count it (its ask drops by it): its
+  // preview is held, solid, so it doesn't fall back for the few seconds that takes.
+  const [held, setHeld] = useState<{ slug: string; usd: number; askAt: number }>();
+  const heldAsk = held && askOf(R, asks, held.slug);
+  useEffect(() => {
+    if (!held) return;
+    // Counted: the ask dropped by it (or to nothing).
+    if (heldAsk !== undefined && heldAsk <= Math.max(0, held.askAt - held.usd) + 1) {
+      return setHeld(undefined);
+    }
+    // Never held for long: past two minutes the figures are what they are.
+    const t = setTimeout(() => setHeld(undefined), HOLD_MS);
+    return () => clearTimeout(t);
+  }, [held, heldAsk]);
+  const onDonated = (slug: string, usd: number) => {
+    setYours((y) => {
+      const next = { ...y, [slug]: (y[slug] ?? 0) + usd };
+      writeYours(yoursKey, next);
+      return next;
+    });
+    setHeld((h) =>
+      h?.slug === slug ? { ...h, usd: h.usd + usd } : { slug, usd, askAt: needFor(slug) }
+    );
+    setAmount(0);
+    void qc.invalidateQueries({ queryKey: boardKey });
+  };
+  // What the preview is of: the open row, or the held donation while no other row is open.
+  // A held donation counts in its own initiative's previews until the figures have it.
+  const heldOn = held && (!open || open === held.slug) ? held : undefined;
+  const subject = open ?? heldOn?.slug;
+  const previewUsd = (heldOn ? heldOn.usd : 0) + (subject === open ? given : 0);
+  const entry: NextTierEntry | undefined = subject ? give?.[subject] : undefined;
+  const gap = entry ? gapUsd(entry) : null;
   const titleOf = (slug: string) =>
     cards.find((x) => x.initiative.slug === slug)?.initiative.title ?? slug;
   /** An initiative named in running text: set apart from the words around it. The one your
    * donation brings in is green, as its chip; all are in italics. */
   const named = (slug: string) => (
-    <i className={slug === open ? "text-[#a7e3a5]" : "text-white"}>{titleOf(slug)}</i>
+    <i className={slug === subject ? "text-[#a7e3a5]" : "text-white"}>{titleOf(slug)}</i>
   );
   /** With the tally's inputs: the donation that gets the open initiative into each open
    * tier above where it is now, lowest first (a few tallies each, worked out as it opens).
@@ -214,11 +252,11 @@ export default function VoteResults(
    * in); without them (the examples, an older server), only at the gap, as the server
    * worked it out. */
   const change = useMemo((): Change | undefined => {
-    if (!open || given <= 0) return undefined;
+    if (!subject || previewUsd <= 0) return undefined;
     if (liveRun) {
-      const c = R.slugs.indexOf(open);
+      const c = R.slugs.indexOf(subject);
       if (c < 0) return undefined;
-      const micro = BigInt(Math.round(given)) * 1_000_000n;
+      const micro = BigInt(Math.round(previewUsd)) * 1_000_000n;
       const e = giftEffect(liveRun.inp, liveRun.first, c, micro, chainTally, liveRun.base);
       return {
         was: e.was,
@@ -229,9 +267,9 @@ export default function VoteResults(
         moves: e.moves.map(([o, from, to]) => ({ slug: R.slugs[o], from, to })),
       };
     }
-    if (!entry || gap === null || given < gap) return undefined;
-    return { was: result.tiers[open] ?? null, ...entry };
-  }, [open, given, liveRun, R, entry, gap, result]);
+    if (!entry || gap === null || previewUsd < gap) return undefined;
+    return { was: result.tiers[subject] ?? null, ...entry };
+  }, [subject, previewUsd, liveRun, R, entry, gap, result]);
   // Who else it moves is on TheDAO's ballot and in the row's "What else changes": here,
   // only how many.
   const others = change
@@ -239,8 +277,10 @@ export default function VoteResults(
     : 0;
   const movesUp = Boolean(change?.tier && change.tier !== change.was);
   /** With the donation, if it changes anything: TheDAO's ballot as the tally would have it. */
-  const preview = open && change && (movesUp || others > 0 || change.covered)
+  const rowOpen = open;
+  const preview = subject && change && (movesUp || others > 0 || change.covered)
     ? (() => {
+      const open = subject;
       const tiers = { ...result.tiers };
       const funded = new Set(result.funded);
       const provisional = new Set(result.provisional);
@@ -250,7 +290,7 @@ export default function VoteResults(
         funded.add(open);
         provisional.add(open);
         // The donation pays that much of its need: the pool is asked for the rest.
-        awards.set(open, Math.max(0, needFor(open) - given));
+        awards.set(open, Math.max(0, needFor(open) - previewUsd));
       } else if (change.covered) {
         // Its whole ask given: covered by donations, in no tier, nothing from the pool.
         delete tiers[open];
@@ -268,7 +308,10 @@ export default function VoteResults(
       }
       return {
         result: { tiers, funded, provisional, awards },
-        joining: change.tier ? new Map([[open, given]]) : undefined,
+        // Dashed "+$X if you give" only for an amount typed now; what was given is solid.
+        joining: change.tier && given > 0 && subject === rowOpen
+          ? new Map([[open, given]])
+          : undefined,
         leaving: new Set(change.dropsOut.map((o) => o.slug)),
         moved: new Map(change.moves.map((o) => [o.slug, o.from] as const)),
         arrived: new Set(change.comesIn.map((o) => o.slug)),
@@ -294,17 +337,17 @@ export default function VoteResults(
     </>
   );
   /** The donation's effect in a few words: it comes in, or (already in) it frees money. */
-  const said = open && change && (
+  const said = subject && change && (
     change.covered
-      ? <>With your {usd(given)}, {named(open)} is covered by donations</>
+      ? <>With your {usd(previewUsd)}, {named(subject)} is covered by donations</>
       : movesUp
       ? (
         <>
-          With your {usd(given)}, the initiative {named(open)} comes into{" "}
+          With your {usd(previewUsd)}, the initiative {named(subject)} comes into{" "}
           <span className="whitespace-nowrap">{tierName(change.tier!)}</span>
         </>
       )
-      : <>With your {usd(given)}, {named(open)} asks the pool for less</>
+      : <>With your {usd(previewUsd)}, {named(subject)} asks the pool for less</>
   );
   // Under the form only when the amount changes nothing on TheDAO's ballot: what it does
   // is said above the tier table, beside its preview.
@@ -445,6 +488,7 @@ export default function VoteResults(
               table={{
                 mirrored: false,
                 joining: preview?.joining,
+                yours: yoursMap,
                 leaving: preview?.leaving,
                 moved: preview?.moved,
                 arrived: preview?.arrived,
@@ -466,7 +510,7 @@ export default function VoteResults(
             <Covered label="Covered by donations" titles={covered.final.map(titleOf)} />
             <Covered
               label="Covered by donations for now"
-              titles={[...covered.now, ...(change?.covered && open && preview ? [open] : [])]
+              titles={[...covered.now, ...(change?.covered && subject && preview ? [subject] : [])]
                 .filter((s, i, all) => all.indexOf(s) === i).map(titleOf)}
             />
             <Covered label="Withdrawn" titles={withdrawn.map(titleOf)} />
@@ -483,7 +527,8 @@ export default function VoteResults(
             example={Boolean(example)}
             test={REAL ? undefined : { badge: myBadge }}
             stale={Boolean(rv?.live.aheadStale)}
-            onDonated={() => void qc.invalidateQueries({ queryKey: boardKey })}
+            onDonated={onDonated}
+            yours={yoursMap}
             search={{
               ai: board.data?.flags.aiSearch,
               aiAuto: board.data?.flags.aiSearchAuto,
@@ -671,4 +716,26 @@ function ClosedResults(
       defaultSort="closest"
     />
   );
+}
+
+/** How long a donation's preview is held, at most, waiting for the figures to count it. */
+const HOLD_MS = 120_000;
+
+/** What this visitor gave from the vote page, per initiative: this browser only. */
+function readYours(key: string): Record<string, number> {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) ?? "{}") as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(v).filter((e): e is [string, number] =>
+        typeof e[1] === "number" && Number.isFinite(e[1]) && e[1] > 0
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+function writeYours(key: string, v: Record<string, number>) {
+  try {
+    localStorage.setItem(key, JSON.stringify(v));
+  } catch { /* storage unavailable: kept for this visit only */ }
 }

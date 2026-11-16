@@ -73,7 +73,9 @@ it("mints the amount in test dollars straight to the initiative's account", asyn
     args: [BETA, 9_000_000_000n],
     chainId: 11155111,
   });
-  expect(onDonated).toHaveBeenCalled();
+  // The page hears the dollars given, and the field clears for another amount (#100).
+  expect(onDonated).toHaveBeenCalledWith(9000);
+  expect((screen.getByLabelText("Amount in US dollars") as HTMLInputElement).value).toBe("");
   // The wallet had gas: no top-up.
   expect(api).not.toHaveBeenCalled();
 });

@@ -28,6 +28,7 @@ export default function FinalTiers(
     onHover,
     onTap,
     joining,
+    yours,
     leaving,
     moved,
     arrived,
@@ -76,6 +77,9 @@ export default function FinalTiers(
      * "dropped out"), and what it moves to another tier (`moved`: the tier it came from;
      * yellow, an arrow and "from S-Tier"). */
     joining?: ReadonlyMap<string, number>;
+    /** What this visitor gave each initiative from the page (#100): solid green and
+     * "+$X yours", where a preview's amount is dashed. */
+    yours?: ReadonlyMap<string, number>;
     leaving?: ReadonlySet<string>;
     moved?: ReadonlyMap<string, Tier>;
     /** Brought in by the donation (it frees money for them): green, ↑ and "came in". */
@@ -102,7 +106,7 @@ export default function FinalTiers(
         const rank = (slug: string) =>
           leaving?.has(slug)
             ? 3
-            : joining?.has(slug)
+            : joining?.has(slug) || yours?.has(slug)
             ? 1
             : moved?.has(slug) || arrived?.has(slug)
             ? 2
@@ -163,14 +167,19 @@ export default function FinalTiers(
                     const fundedWord = live ? "funded if it ended now" : "funded";
                     const given = joining?.get(i.slug);
                     const gone = Boolean(leaving?.has(i.slug));
+                    const mine = given === undefined && !gone ? yours?.get(i.slug) : undefined;
                     const from = moved?.get(i.slug);
                     const came = !gone && from === undefined && given === undefined &&
-                      Boolean(arrived?.has(i.slug));
+                      mine === undefined && Boolean(arrived?.has(i.slug));
                     const up = from !== undefined &&
                       TIERS.indexOf(t.tier) < TIERS.indexOf(from);
                     const out = !isFunded && Boolean(withdrawn?.has(i.slug));
                     const label = given !== undefined
                       ? `${i.title}, comes in if you give ${dollars(given)}`
+                      : mine !== undefined
+                      ? `${i.title}, ${isFunded ? fundedWord : "not funded"}, ${
+                        dollars(mine)
+                      } of it yours`
                       : gone
                       ? `${i.title}, drops out`
                       : from
@@ -215,6 +224,8 @@ export default function FinalTiers(
                             : "shadow-[0_0_0_2px_rgba(233,185,73,.6)]"),
                           given !== undefined
                             ? "border-dashed border-dao-green bg-dao-green/[.14]"
+                            : mine !== undefined
+                            ? "border-dao-green bg-dao-green/[.14]"
                             : gone
                             ? "border-dashed border-[#ff8a88] bg-[#c22d2b]/[.22]"
                             : from
@@ -277,6 +288,12 @@ export default function FinalTiers(
                           ? (
                             <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-[#a7e3a5] tnum">
                               +{dollars(given)} if you give
+                            </span>
+                          )
+                          : mine !== undefined
+                          ? (
+                            <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-[#a7e3a5] tnum">
+                              +{dollars(mine)} yours
                             </span>
                           )
                           : out

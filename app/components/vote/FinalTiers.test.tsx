@@ -208,6 +208,30 @@ describe("a donation's preview", () => {
     expect(screen.getByLabelText("Beta, drops out")).toHaveTextContent("dropped out");
     expect(screen.queryByText("$40,000")).toBeNull();
   });
+  it("what the visitor gave is solid green, '+$X yours'; a typed amount stays dashed", () => {
+    render(
+      <FinalTiers
+        items={[
+          { slug: "a", title: "Alpha" },
+          { slug: "b", title: "Beta" },
+        ] as never}
+        tiers={{ a: "S", b: "S" }}
+        funded={new Set(["a", "b"])}
+        amounts={new Map()}
+        amountWord="awarded"
+        provisional={new Set(["a", "b"])}
+        label="TheDAO's ballot"
+        joining={new Map([["b", 3000]])}
+        yours={new Map([["a", 9000], ["b", 1000]])}
+      />,
+    );
+    const a = screen.getByLabelText("Alpha, funded if it ended now, $9,000 of it yours");
+    expect(a).toHaveTextContent("+$9,000 yours");
+    expect(a.className).not.toContain("border-dashed");
+    const b = screen.getByLabelText("Beta, comes in if you give $3,000");
+    expect(b).toHaveTextContent("+$3,000 if you give");
+    expect(b.className).toContain("border-dashed");
+  });
 
   it("lists, in a tier, those that stay, then yours, those moved in, and those dropping out", () => {
     render(

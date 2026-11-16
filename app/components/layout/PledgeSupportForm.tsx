@@ -215,10 +215,10 @@ export default function PledgeSupportForm({ initialInitiativeId, sending, onSend
       </label>
       {fieldError("email")}
       <label className="flex flex-col gap-1.5 text-[12.5px] text-white/80">
-        Who are we talking with?
+        Who are you talking with?
         <Input
           autoComplete="name"
-          placeholder="e.g. Alex Chen, Grants Lead"
+          placeholder="e.g. Jake from TheDAO"
           required
           maxLength={inputMax(PLEDGE_CONTACT_MAX)}
           disabled={sending}

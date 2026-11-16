@@ -50,7 +50,7 @@ async function fillForm() {
   fireEvent.change(screen.getByRole("textbox", { name: "Pledge Contact Email" }), {
     target: { value: " donor@example.com " },
   });
-  fireEvent.change(screen.getByRole("textbox", { name: "Who are we talking with?" }), {
+  fireEvent.change(screen.getByRole("textbox", { name: "Who are you talking with?" }), {
     target: { value: " Alex " },
   });
   fireEvent.change(screen.getByRole("textbox", { name: "Message" }), {
@@ -110,7 +110,7 @@ it("validates amount and email, and preserves pledge details after failed delive
   await screen.findByRole("alert");
   expect(screen.getByRole("combobox", { name: "Initiative" })).toHaveValue("Compiler security");
   expect(screen.getByRole("textbox", { name: "Pledge Organization" })).toHaveValue(" Acme ");
-  expect(screen.getByRole("textbox", { name: "Who are we talking with?" })).toHaveValue(" Alex ");
+  expect(screen.getByRole("textbox", { name: "Who are you talking with?" })).toHaveValue(" Alex ");
   expect(screen.getByRole("button", { name: "Send pledge request" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   fireEvent.click(screen.getByRole("button", { name: "Pledge to an Initiative" }));

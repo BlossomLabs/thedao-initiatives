@@ -73,8 +73,16 @@ it("the ballot box's line: the first rule to meet, size before tiers, else valid
   const a: RuleError = { rule: "independent", tier: 1, count: 2, related: [] };
   expect(ruleStatus([a, s, size])).toEqual({
     ok: false,
-    text: "Needs at least $1,369,866 to be valid",
+    text: "Needs at least $1,370,000 to be valid",
   });
+  // The ballot box rounds up to three significant digits; the box below keeps the exact sum.
+  const up = (needed: bigint) =>
+    ruleStatus([{ rule: "size", requested: 1n, needed, pool: 2n }]).text;
+  expect(up(1_360_000_000_001n)).toBe("Needs at least $1,370,000 to be valid");
+  expect(up(1_360_000_000_000n)).toBe("Needs at least $1,360,000 to be valid");
+  expect(up(13_421_000_000n)).toBe("Needs at least $13,500 to be valid");
+  expect(up(999_500_000n)).toBe("Needs at least $1,000 to be valid");
+  expect(up(999_000_000n)).toBe("Needs at least $999 to be valid");
   expect(ruleStatus([a, s])).toEqual({
     ok: false,
     text: "Needs at least 3 independent projects in S-Tier",

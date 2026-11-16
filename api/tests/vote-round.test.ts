@@ -11,6 +11,8 @@ import { cacheSet, errorText } from "../routes/vote.ts";
 import { chainTally } from "../../shared/vote/chain.ts";
 import { liveInputsFrom, type LiveInputsJson } from "../../shared/vote/live-inputs.ts";
 import type { ChainState } from "../../shared/vote/quiet-ending.ts";
+import { decodeFunctionData } from "viem";
+import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
 
 // PLAIN's key (app-helpers: wallet("0x22..22")).
 const VOTER = privateKeyToAccount(`0x${"22".repeat(32)}`);
@@ -1707,5 +1709,133 @@ Deno.test("test pledge: never in the real vote", async () => {
     json: { amount: "1" },
   });
   assertEquals(res.status, 409);
+  h.close();
+});
+
+// ------------------------------------------------------------------ withdrawing
+const withdraw = (h: Awaited<ReturnType<typeof harness>>, json: unknown, token: string) =>
+  h.req("/api/admin/vote-round/withdraw", { method: "POST", token, json });
+const msg = async (res: Response) => ((await j(res)) as { error: string }).error;
+
+Deno.test("withdraw: a Safe batch for the round's contract, audited; admins with a recent sign-in only", async () => {
+  const { h } = await qeSetup();
+  const logs: string[] = [];
+  h.deps.log = (line: string) => logs.push(line);
+  assertEquals(
+    (await withdraw(h, { slug: "b", withdrawn: true }, await h.mint(PLAIN))).status,
+    403,
+  );
+  assertEquals(
+    (await withdraw(h, { slug: "b", withdrawn: true }, await h.mint(ADMIN))).status,
+    403,
+  );
+  const token = await h.mint(ADMIN, true);
+  const res = await withdraw(h, { slug: "b", withdrawn: true }, token);
+  assertEquals(res.status, 200);
+  const batch = await j(res) as {
+    chainId: string;
+    transactions: { to: string; value: string; data: Hex }[];
+  };
+  assertEquals(batch.chainId, "11155111");
+  assertEquals(batch.transactions.length, 1);
+  assertEquals(batch.transactions[0].to, qe.contract);
+  const call = decodeFunctionData({ abi: SIGNED_BALLOTS_ABI, data: batch.transactions[0].data });
+  assertEquals([call.functionName, call.args], ["withdrawInitiative", [1n]]);
+  const audit = logs.map((l) => JSON.parse(l)).filter((e) => e.securityAudit);
+  assertEquals(audit.some((e) => e.action === "vote.withdraw" && e.outcome === "success"), true);
+  h.close();
+});
+
+Deno.test("withdraw: undo is undoWithdrawInitiative, only for one withdrawn on-chain", async () => {
+  const { h, state } = await qeSetup();
+  const token = await h.mint(ADMIN, true);
+  const notYet = await withdraw(h, { slug: "b", withdrawn: false }, token);
+  assertEquals(notYet.status, 409);
+  assertEquals(await msg(notYet), "This initiative isn't withdrawn.");
+  state.states = [{ ...oneState([150n, 150n, 150n], 200n)[0], withdrawn: [false, true, false] }];
+  h.clock.now += 10; // the round is read again every few seconds
+  const fresh = await h.mint(ADMIN, true);
+  const again = await withdraw(h, { slug: "b", withdrawn: true }, fresh);
+  assertEquals(again.status, 409);
+  assertEquals(await msg(again), "This initiative is already withdrawn.");
+  const res = await withdraw(h, { slug: "b", withdrawn: false }, fresh);
+  assertEquals(res.status, 200);
+  const data = ((await j(res)) as { transactions: { data: Hex }[] }).transactions[0].data;
+  const call = decodeFunctionData({ abi: SIGNED_BALLOTS_ABI, data });
+  assertEquals([call.functionName, call.args], ["undoWithdrawInitiative", [1n]]);
+  h.close();
+});
+
+Deno.test("withdraw: a project settled or covered at a settlement is refused, with its tier", async () => {
+  const { h } = await qeSetup([150n, 0n, 150n]);
+  h.clock.now = NOW + 700; // S-Tier has settled: a funded, b covered
+  const token = await h.mint(ADMIN, true);
+  const funded = await withdraw(h, { slug: "a", withdrawn: true }, token);
+  assertEquals(funded.status, 409);
+  assertEquals(await msg(funded), "This initiative is settled in S-Tier; it can't be withdrawn.");
+  const covered = await withdraw(h, { slug: "b", withdrawn: true }, token);
+  assertEquals(covered.status, 409);
+  assertEquals(await msg(covered), "This initiative is settled in S-Tier; it can't be withdrawn.");
+  // The list says the same, for the page to disable the button.
+  const list = await j(await h.req("/api/admin/vote-round/initiatives", { token })) as {
+    initiatives: { slug: string; withdrawn: boolean; settledIn: string | null }[];
+  };
+  assertEquals(list.initiatives.map((x) => [x.slug, x.settledIn]), [
+    ["a", "S"],
+    ["b", "S"],
+    ["c", null],
+  ]);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("withdraw: unknown slug is 404, a closed vote is 409, no round is 503", async () => {
+  const { h } = await qeSetup();
+  const token = await h.mint(ADMIN, true);
+  assertEquals((await withdraw(h, { slug: "nope", withdrawn: true }, token)).status, 404);
+  assertEquals((await withdraw(h, { slug: "a", withdrawn: "yes" }, token)).status, 400);
+  h.clock.now = qe.closesAt;
+  const closed = await withdraw(h, { slug: "c", withdrawn: true }, await h.mint(ADMIN, true));
+  assertEquals(closed.status, 409);
+  assertEquals(await msg(closed), "Voting has closed; nothing can be withdrawn now.");
+  h.deps.vote = undefined;
+  const none = await withdraw(h, { slug: "c", withdrawn: true }, await h.mint(ADMIN, true));
+  assertEquals(none.status, 503);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("withdraw: once every tier has settled (before the close) the tally is final: 409, and the list says so", async () => {
+  const { h } = await qeSetup();
+  h.clock.now = NOW + 800; // B-Tier settled at NOW + 780; the vote closes at NOW + 3600
+  const token = await h.mint(ADMIN, true);
+  const res = await withdraw(h, { slug: "c", withdrawn: true }, token);
+  assertEquals(res.status, 409);
+  assertEquals(
+    await msg(res),
+    "Every tier has settled: the vote's tally is final, nothing to withdraw from.",
+  );
+  const list = await j(await h.req("/api/admin/vote-round/initiatives", { token })) as {
+    final: boolean;
+    canWithdraw: boolean;
+  };
+  assertEquals([list.final, list.canWithdraw], [true, true]);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("withdraw: a contract from before withdrawals is refused, and the list says so", async () => {
+  const { h, chain } = await qeSetup();
+  chain.canWithdraw = () => Promise.resolve(false);
+  const token = await h.mint(ADMIN, true);
+  const res = await withdraw(h, { slug: "c", withdrawn: true }, token);
+  assertEquals(res.status, 409);
+  assertEquals(await msg(res), "This round's contract predates withdrawals.");
+  const list = await j(await h.req("/api/admin/vote-round/initiatives", { token })) as {
+    final: boolean;
+    canWithdraw: boolean;
+  };
+  assertEquals([list.final, list.canWithdraw], [false, false]);
+  await h.settle();
   h.close();
 });

@@ -889,5 +889,9 @@ export function voteRoutes(deps: Deps) {
     return c.json({ at, ballots });
   });
 
-  return r;
+  // The replay alone (no gap or final searches), shared with this instance's reads.
+  return Object.assign(r, { replay: (d: VoteRound) => recentRound(d) });
 }
+
+/** The replay a vote instance reads (its in-flight chain read and few-second cache). */
+export type VoteReplay = ReturnType<typeof voteRoutes>["replay"];

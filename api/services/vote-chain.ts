@@ -1,4 +1,7 @@
 import {
+  BaseError,
+  ContractFunctionRevertedError,
+  ContractFunctionZeroDataError,
   createPublicClient,
   createWalletClient,
   type Hex,
@@ -91,6 +94,10 @@ export interface VoteChain {
   /** Each project's ask on-chain at the head block (`initiativeUsd`'s fourth value: goal
    * less donations and open pledges), micro-USD, in manifest order, in one multicall. */
   asks(): Promise<bigint[]>;
+  /** Whether the round's contract can withdraw initiatives: it has `withdrawnMask` (the
+   * first test round predates it, and a withdrawal batch would revert). Absent (a test
+   * fake): it can. */
+  canWithdraw?(): Promise<boolean>;
 }
 
 export type { BallotEvent, RulesHistory };
@@ -165,6 +172,22 @@ export function createVoteChain(
       }
     },
     balanceOf: (a) => read<bigint>("balanceOf", [a]),
+    async canWithdraw() {
+      try {
+        await read<bigint>("withdrawnMask", []);
+        return true;
+      } catch (e) {
+        // The view reverts or returns nothing (no such function): a contract from before
+        // withdrawals. A transport failure is no answer, so it propagates.
+        const missing = e instanceof BaseError &&
+          e.walk((x) =>
+            x instanceof ContractFunctionRevertedError ||
+            x instanceof ContractFunctionZeroDataError
+          );
+        if (missing) return false;
+        throw e;
+      }
+    },
     codeOf: async (a) => (await pub.getCode({ address: a })) ?? "0x",
     async canMint(to, n) {
       if (!account) return false;

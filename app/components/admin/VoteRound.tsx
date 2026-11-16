@@ -12,6 +12,7 @@ import InitiativeCombobox from "~/components/ui/InitiativeCombobox";
 import { useRun } from "~/components/admin/dashboard/run";
 import { useBoard } from "~/hooks/use-board";
 import { ROUND } from "../../../shared/vote/manifest";
+import { type Tier, tierName } from "../../../shared/vote/ballot";
 
 type Brief = {
   kind: "test" | "real";
@@ -220,6 +221,8 @@ export default function VoteRound() {
           <TestPledge />
         </>
       )}
+
+      {set && <Withdrawals />}
 
       {/* The pool: ETH until it's sold, its dollars an estimate until then. */}
       <form
@@ -479,6 +482,101 @@ function TestPledge() {
           />
         </div>
       )}
+      {said}
+    </section>
+  );
+}
+
+type Withdrawal = { slug: string; withdrawn: boolean; settledIn: Tier | null };
+const withdrawalsKey = ["admin", "vote-round", "initiatives"] as const;
+
+/**
+ * Withdraw an initiative from the vote, or undo it. The round's admin is a Safe, so the
+ * site sends nothing: each button downloads a Transaction Builder batch to import there.
+ * Once an initiative is settled in a tier it can't be withdrawn.
+ */
+function Withdrawals() {
+  const adminApi = useAdminApi();
+  const id = useId();
+  const board = useBoard();
+  const { data } = useQuery({
+    queryKey: withdrawalsKey,
+    queryFn: ({ signal }) =>
+      api<{ initiatives: Withdrawal[]; final?: boolean; canWithdraw?: boolean }>(
+        "/api/admin/vote-round/initiatives",
+        { signal },
+      ),
+  });
+  const { run, said } = useRun();
+  const titles = useMemo(
+    () => new Map(board.data?.cards.map((c) => [c.initiative.slug, c.initiative.title])),
+    [board.data],
+  );
+  const rows = useMemo(
+    () =>
+      (data?.initiatives ?? [])
+        .map((x) => ({ ...x, title: titles.get(x.slug) ?? x.slug }))
+        .sort((a, b) => a.title.localeCompare(b.title)),
+    [data, titles],
+  );
+  const send = (x: Withdrawal, title: string) =>
+    run(async () => {
+      const batch = await adminApi<unknown>("/api/admin/vote-round/withdraw", {
+        json: { slug: x.slug, withdrawn: !x.withdrawn },
+      });
+      const blob = new Blob([JSON.stringify(batch, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${x.withdrawn ? "undo-withdraw" : "withdraw"}-${x.slug}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, `Batch saved for ${title}: import it in the Safe's Transaction Builder and sign it.`);
+  return (
+    <section className={CARD} aria-labelledby={`${id}-h`}>
+      <b id={`${id}-h`} className={TITLE}>Withdraw from the vote</b>
+      <small className={HINT}>
+        A withdrawn initiative is not a candidate in any tier. The round's admin is a Safe: this
+        downloads the batch for its Transaction Builder, and the list updates once it is executed.
+        Not possible once an initiative is settled in a tier.
+      </small>
+      {data?.canWithdraw === false
+        ? (
+          <p className="mt-3 text-[13px] text-muted">
+            This round's contract predates withdrawals: nothing can be withdrawn from it.
+          </p>
+        )
+        : data?.final
+        ? (
+          <p className="mt-3 text-[13px] text-muted">
+            Every tier has settled: the vote's tally is final, nothing to withdraw from.
+          </p>
+        )
+        : (
+          <ul className="mt-3 flex list-none flex-col gap-2 p-0">
+            {rows.map((x) => (
+              <li key={x.slug} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="min-w-[160px] flex-1 text-[13px]">{x.title}</span>
+                {x.withdrawn && <span className="text-[12px] text-[#ffb4b1]">Withdrawn</span>}
+                {x.settledIn && (
+                  <span className="text-[12px] text-muted">
+                    Settled in {tierName(x.settledIn)}: it can't be withdrawn.
+                  </span>
+                )}
+                <Button
+                  sm
+                  type="button"
+                  variant="ghost"
+                  disabled={Boolean(x.settledIn)}
+                  onClick={() =>
+                    void send(x, x.title)}
+                >
+                  {x.withdrawn ? "Undo withdrawal" : "Withdraw from the vote"}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
       {said}
     </section>
   );

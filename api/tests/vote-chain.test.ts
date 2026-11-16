@@ -132,3 +132,51 @@ Deno.test("asks: every project's initiativeUsd ask, in manifest order, in one mu
   assertEquals(await chain.asks(), [100n, 250n]);
   assertEquals(calls, 1);
 });
+
+Deno.test("canWithdraw: a contract with withdrawnMask can; one without (reverts, or no data) can't; a network failure throws", async () => {
+  const { createVoteChain } = await import("../services/vote-chain.ts");
+  const { custom, encodeFunctionResult } = await import("viem");
+  const { SIGNED_BALLOTS_ABI } = await import("../../shared/vote/abi.ts");
+  const m: import("../../shared/vote/manifest.ts").VoteManifest = {
+    kind: "test",
+    chainId: 11155111,
+    contract: "0x1000000000000000000000000000000000000001",
+    deployBlock: 1,
+    opensAt: 0,
+    closesAt: 1,
+    schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
+    poolUsd: "1",
+    slugs: ["a"],
+    projects: [{ goalUsd: "1", rfp: false, groups: [] }],
+    groups: [],
+    independentTiers: 1,
+  };
+  const chainWith = (call: () => Promise<unknown>) =>
+    createVoteChain(
+      m,
+      "http://unused",
+      null,
+      custom({
+        request: ({ method }: { method: string }) => {
+          if (method === "eth_chainId") return Promise.resolve("0xaa36a7");
+          if (method === "eth_call") return call();
+          return Promise.reject(new Error("unexpected " + method));
+        },
+      }),
+    );
+  const has = chainWith(() =>
+    Promise.resolve(
+      encodeFunctionResult({ abi: SIGNED_BALLOTS_ABI, functionName: "withdrawnMask", result: 0n }),
+    )
+  );
+  assertEquals(await has.canWithdraw!(), true);
+  const reverts = chainWith(() =>
+    Promise.reject(Object.assign(new Error("execution reverted"), { code: 3, data: "0x" }))
+  );
+  assertEquals(await reverts.canWithdraw!(), false);
+  assertEquals(await chainWith(() => Promise.resolve("0x")).canWithdraw!(), false);
+  const down = chainWith(() => Promise.reject(new Error("fetch failed")));
+  let threw = false;
+  await down.canWithdraw!().catch(() => (threw = true));
+  assertEquals(threw, true);
+});

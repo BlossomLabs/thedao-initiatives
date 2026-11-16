@@ -46,6 +46,11 @@ import {
   VOTE_ROUND_KEY,
   type VoteRoundSetting,
 } from "../services/vote-active.ts";
+import { adminBatch } from "../../shared/vote/admin-batch.ts";
+import { type Tier, tierName } from "../../shared/vote/ballot.ts";
+import type { VoteRound } from "../services/vote-chain.ts";
+import type { VoteReplay } from "./vote.ts";
+import { roundJson as replayJson } from "../../shared/vote/replay-round.ts";
 import { readRoundOnChain } from "../services/vote-round-read.ts";
 import { errorText, sendNext, withRelayer } from "./vote.ts";
 import { TEST_USD_MAX_MINT } from "../../shared/vote/test-usd.ts";
@@ -73,7 +78,7 @@ import {
 
 export { pledgeOnChain } from "../services/admin-pledges.ts";
 
-export function adminRoutes(deps: Deps) {
+export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
   const r = new Hono<Vars>();
   const { db, config, chain, ens } = deps;
   const pledges = adminPledges(deps);
@@ -240,6 +245,105 @@ export function adminRoutes(deps: Deps) {
     });
     changedRound();
     return c.json(await roundJson());
+  });
+
+  /**
+   * Each initiative of the round now: withdrawn at the replay's head, and the tier it is
+   * settled in (funded or covered at a settlement), which closes the withdrawal. Read from
+   * the public round (its few-second cache), so it agrees with what voters see.
+   */
+  const withdrawals = async (d: VoteRound) => {
+    const st = await voteReplay(d);
+    const body = replayJson(st, d.manifest.slugs);
+    const settled = new Map<string, Tier>();
+    for (const t of body.tiers) {
+      if (t.status !== "settled") continue;
+      for (const slug of [...t.funded, ...t.covered]) {
+        if (!settled.has(slug)) settled.set(slug, t.tier);
+      }
+    }
+    const withdrawn = new Set(body.live.withdrawn);
+    // Every tier settled: the tally is final (and `live` is empty), nothing to withdraw from.
+    const final = body.tiers.every((t) => t.status === "settled");
+    const last = body.tiers[2];
+    const lastWithdrawn = new Set(last.status === "settled" ? last.withdrawn : []);
+    return {
+      final,
+      initiatives: d.manifest.slugs.map((slug) => ({
+        slug,
+        withdrawn: final ? lastWithdrawn.has(slug) : withdrawn.has(slug),
+        settledIn: settled.get(slug) ?? null,
+      })),
+    };
+  };
+  /** Whether the round's contract has withdrawals at all (the first test round doesn't). */
+  const canWithdraw = (d: VoteRound) => d.chain.canWithdraw?.() ?? Promise.resolve(true);
+  const roundNow = async () => {
+    const d = await currentVote(deps);
+    if (!d) throw new HttpError(503, "No vote is deployed right now.");
+    return d;
+  };
+  r.get("/vote-round/initiatives", async (c) => {
+    const d = await roundNow();
+    const [list, can] = await Promise.all([withdrawals(d), canWithdraw(d)]);
+    return c.json({ ...list, canWithdraw: can });
+  });
+  /**
+   * Withdraw an initiative from the vote, or undo it: the Safe Transaction Builder batch
+   * for the round's admin (the site never sends it). Refused once the project is settled
+   * in a tier, when it is already in the requested state at the replay's head, once every
+   * tier has settled (the tally is final), after the vote closes, and for a contract from
+   * before withdrawals (the contract refuses the state and the close; the replay ignores a
+   * withdrawal of a settled project).
+   */
+  r.post("/vote-round/withdraw", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["slug", "withdrawn"]);
+    const slug = s(body.slug, 200);
+    if (typeof body.withdrawn !== "boolean") {
+      throw new HttpError(400, "withdrawn must be true or false");
+    }
+    const d = await roundNow();
+    const i = d.manifest.slugs.indexOf(slug);
+    if (i < 0) throw new HttpError(404, "That initiative isn't in the vote.");
+    auditContext(c, { target: slug });
+    if (deps.now() >= d.manifest.closesAt) {
+      throw new HttpError(409, "Voting has closed; nothing can be withdrawn now.");
+    }
+    if (!await canWithdraw(d)) {
+      throw new HttpError(409, "This round's contract predates withdrawals.");
+    }
+    const list = await withdrawals(d);
+    if (list.final) {
+      throw new HttpError(
+        409,
+        "Every tier has settled: the vote's tally is final, nothing to withdraw from.",
+      );
+    }
+    const st = list.initiatives[i];
+    if (st.settledIn) {
+      throw new HttpError(
+        409,
+        `This initiative is settled in ${tierName(st.settledIn)}; it can't be withdrawn.`,
+      );
+    }
+    if (st.withdrawn === body.withdrawn) {
+      throw new HttpError(
+        409,
+        body.withdrawn
+          ? "This initiative is already withdrawn."
+          : "This initiative isn't withdrawn.",
+      );
+    }
+    return c.json(
+      adminBatch(
+        d.manifest,
+        body.withdrawn ? `Withdraw ${slug} from the vote` : `Undo the withdrawal of ${slug}`,
+        [{
+          fn: body.withdrawn ? "withdrawInitiative" : "undoWithdrawInitiative",
+          args: [BigInt(i)],
+        }],
+      ),
+    );
   });
 
   /** A test round's helpers for people joining it (badges, Sepolia ETH, TestUSD), sent

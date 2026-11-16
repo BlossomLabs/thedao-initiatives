@@ -55,6 +55,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { mainnet, sepolia } from "viem/chains";
 import { DEFAULT_ADMIN_ADDRESSES, REVIEW_BADGE_CONTRACT } from "../api/config.ts";
 import { SIGNED_BALLOTS_ABI } from "../shared/vote/abi.ts";
+import { adminBatch } from "../shared/vote/admin-batch.ts";
 import { checkManifest, type VoteManifest } from "../shared/vote/manifest.ts";
 import { readRoundOnChain } from "../api/services/vote-round-read.ts";
 import {
@@ -486,26 +487,6 @@ export function regroupPlan(
     changed,
   };
 }
-
-/** The admin's calls as a Safe Transaction Builder batch. */
-const adminBatch = (
-  m: VoteManifest,
-  name: string,
-  calls: { fn: string; args: readonly unknown[] }[],
-) => ({
-  version: "1.0",
-  chainId: String(m.chainId),
-  meta: { name },
-  transactions: calls.map((c) => ({
-    to: m.contract,
-    value: "0",
-    data: encodeFunctionData({
-      abi: SIGNED_BALLOTS_ABI,
-      functionName: c.fn as never,
-      args: c.args as never,
-    }),
-  })),
-});
 
 /** A deployed round as the site reads it: from its contract, the board matching each
  * initiative by its account (the same as Admin → Vote). */

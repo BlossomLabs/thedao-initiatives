@@ -144,14 +144,15 @@ export function createApp(
   app.route("/api/donate", donateRoutes(deps));
   app.route("/api/uploads", uploadRoutes(deps));
   app.route("/api/watchlist", watchlistRoutes(deps));
-  app.route("/api/vote", voteRoutes(deps));
+  const votes = voteRoutes(deps);
+  app.route("/api/vote", votes);
   app.route("/api", profileRoutes(deps));
   app.route("/api", commentRoutes(deps));
   app.route("/api", aiRoutes(deps));
   app.route("/api", supportRoutes(deps));
   app.route("/api/admin/audit", auditRoutes(deps));
   app.route("/api/reviews", reviewRoutes(deps));
-  app.route("/api/admin", adminRoutes(deps));
+  app.route("/api/admin", adminRoutes(deps, votes.replay));
   app.route("/initiative", markdownRoutes(deps, feedCache));
 
   if (site) {

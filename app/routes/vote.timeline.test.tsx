@@ -652,6 +652,12 @@ it("the editor follows every event: asks, the share, and what settles", async ()
   const asked = () => document.body.textContent?.match(/\$[\d,]+ asked/)?.[0];
   await walkEvents((name) => {
     const page = document.body.textContent ?? "";
+    // This ballot includes every initiative. Its ring remains full as donations and
+    // pledges shrink the asks, and changing the pool does not change that scale.
+    for (const ring of screen.getAllByRole("meter", { name: "What your ballot asks for" })) {
+      expect(ring.getAttribute("aria-valuenow"), name).toBe(ring.getAttribute("aria-valuemax"));
+      expect(ring.querySelector("[stroke-dasharray='2 2']"), name).toBeNull();
+    }
     switch (name) {
       case "two ballots":
         expect(page, name).toMatch(/share: about \$600/);

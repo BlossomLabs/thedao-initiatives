@@ -35,6 +35,17 @@ export type RulesResult = { ok: boolean; errors: RuleError[]; proof: number[] };
 
 const WITHHELD = 255;
 const UINT_MAX = (1n << 256n) - 1n;
+const cap = (x: bigint) => (x > UINT_MAX ? UINT_MAX : x);
+
+/** The reachable size requirement: 1.5× the pool or all non-withdrawn asks, whichever
+ * is smaller. Round the pool term up to a micro-USD and saturate as the contract does. */
+export function minimumAsk(round: Pick<RulesRound, "asks" | "poolUsd" | "withdrawn">): bigint {
+  const total = cap(
+    round.asks.reduce((sum, ask, i) => sum + (round.withdrawn?.[i] ? 0n : ask), 0n),
+  );
+  const minimum = cap((3n * round.poolUsd + 1n) / 2n);
+  return minimum < total ? minimum : total;
+}
 
 /** Project indexes per group of equal rank, best rank first. */
 export function tiersOf(ballot: Uint8Array): number[][] {
@@ -90,14 +101,11 @@ export function checkBallot(ballot: Uint8Array, round: RulesRound): RulesResult 
   if (groups.length > 3) errors.push({ rule: "tiers" });
   const ask = (i: number) => round.asks[i];
   // Sums and the 1.5× saturate at 2^256 − 1, as in the contract.
-  const cap = (x: bigint) => (x > UINT_MAX ? UINT_MAX : x);
   const sum = (xs: number[]) => xs.reduce((a, i) => a + ask(i), 0n);
   const live = (i: number) => (round.withdrawn?.[i] ? 0n : round.asks[i]);
   const requested = cap(groups.flat().reduce((a, i) => a + live(i), 0n));
   // 1.5× the pool, or every project's ask (withdrawn ones ask nothing) when less.
-  const total = cap(round.asks.reduce((a, _, i) => a + live(i), 0n));
-  const minimum = cap((3n * round.poolUsd + 1n) / 2n);
-  const needed = minimum < total ? minimum : total;
+  const needed = minimumAsk(round);
   if (requested < needed) errors.push({ rule: "size", requested, needed, pool: round.poolUsd });
   const proof: number[] = [];
   for (const t of enforced(round)) {

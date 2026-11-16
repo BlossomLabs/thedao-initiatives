@@ -4,14 +4,12 @@
  * rules, the ballot format, every project with its affiliations, and what to do. */
 import { tierName, TIERS } from "../../shared/vote/ballot.ts";
 import { formatBallotText } from "../../shared/vote/ballot-text.ts";
+import { formatMicroUsd as dollars } from "../../shared/vote/format.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import { windowEnds } from "../../shared/vote/quiet-ending.ts";
+import { minimumAsk } from "../../shared/vote/rules.ts";
 import type { FeedInitiative } from "./feed.ts";
 
-const dollars = (micro: bigint) => {
-  const fraction = (micro % 1_000_000n).toString().padStart(6, "0").replace(/0+$/, "");
-  return `$${(micro / 1_000_000n).toLocaleString("en-US")}${fraction ? `.${fraction}` : ""}`;
-};
 const utc = (secs: number) =>
   `${new Date(secs * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 
@@ -26,15 +24,35 @@ export function voteLlms(
 ): string {
   const [sTier, aTier, bTier] = TIERS.map(tierName);
   const pool = BigInt(m.poolUsd);
-  const needed = (3n * pool + 1n) / 2n;
+  const needed = asks?.length === m.slugs.length &&
+      m.slugs.every((_, i) => typeof asks[i] === "bigint") && withdrawn !== null
+    ? minimumAsk({
+      poolUsd: pool,
+      asks,
+      withdrawn: m.slugs.map((slug) => withdrawn.has(slug)),
+    })
+    : undefined;
   const tierA = (m.independentTiers & 2) !== 0;
   const enforced = tierA ? `${sTier} and ${aTier}` : sTier;
   const rules = () => [
-    `- The projects you rank must ask for at least ${dollars(needed)} in total (1.5× the ${
-      dollars(pool)
-    } configured pool). A project's ask is its goal less its donations and open pledges, ` +
+    needed === undefined
+      ? "- The current total-ask minimum is unknown because the current asks or withdrawal " +
+        "status could not be read. Re-read this feed before checking the ballot's size."
+      : `- The projects you rank must ask for at least ${dollars(needed)} in total (${
+        2n * needed >= 3n * pool
+          ? `1.5× the ${dollars(pool)} configured pool`
+          : `every non-withdrawn project's current ask, which is less than 1.5× the ${
+            dollars(pool)
+          } configured pool`
+      }).`,
+    "- The minimum is the smaller of 1.5× the pool (rounded up to one micro-USD) and the " +
+    "combined current asks of all non-withdrawn projects. When those asks total less than " +
+    "1.5× the pool, rank every non-withdrawn project with a positive ask to meet the size rule. " +
+    "The independence and affiliation rules still apply.",
+    "- A project's ask is its goal less its donations and open pledges, " +
     "on-chain at the block that records your ballot, so it can change before then. If the " +
-    "live pool differs, recompute this minimum from its poolUsd.",
+    "live pool or asks differ, recompute this capped minimum from poolUsd, asks and the " +
+    "withdrawn projects in the current round state.",
     ...(m.pool && !m.pool.sold
       ? [
         `- The pool is ${m.pool.eth} ETH, sold for USD before ${sTier}'s first tally ` +
@@ -175,7 +193,8 @@ export function voteLlms(
     "write the vote in the YAML format above, all three tiers, in a ```yaml code block.",
     ...(m.ballotRules
       ? [
-        "Before returning it, check the total asks against 1.5× the live pool, " +
+        "Before returning it, check the total asks against the smaller of 1.5× the live pool " +
+        "(rounded up to one micro-USD) and all non-withdrawn projects' current asks, " +
         `name three pairwise-independent projects in each of ${enforced}, and check every ` +
         "affiliation's share of each enforced tier's asks is at most 50%. If the voter's " +
         "choices cannot satisfy the rules, explain what is missing and ask which projects " +

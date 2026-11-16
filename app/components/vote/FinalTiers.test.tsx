@@ -4,11 +4,52 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import FinalTiers from "./FinalTiers";
 import VoteClosed from "./VoteClosed";
+import { NO_ROUND } from "../../../shared/vote/manifest";
+import type { Tier } from "../../../shared/vote/ballot";
 
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
 afterEach(cleanup);
 
 const items = ["alpha", "beta", "gamma"].map((slug) => ({ slug, title: slug.toUpperCase() }));
+
+it.each([
+  { placed: ["alpha", "beta", "gamma"], withdrawn: [], asked: 1_026_100, total: 1_026_100 },
+  { placed: ["alpha"], withdrawn: [], asked: 600_000, total: 1_026_100 },
+  { placed: ["alpha", "gamma"], withdrawn: ["beta"], asked: 726_100, total: 726_100 },
+])(
+  "the sent ballot ring measures $asked of $total in available asks",
+  ({ placed, withdrawn, asked, total }) => {
+    const asks = [600_000, 300_000, 126_100].map((n) => String(BigInt(n) * 1_000_000n));
+    const round = {
+      ...NO_ROUND,
+      slugs: items.map((i) => i.slug),
+      projects: asks.map((goalUsd) => ({ goalUsd, rfp: true, groups: [] })),
+    };
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <VoteClosed
+            n={17}
+            round={round}
+            titles={new Map(items.map((i) => [i.slug, i.title]))}
+            closeText="Nov 1, 14:00"
+            items={items}
+            sent={Object.fromEntries(placed.map((s) => [s, "S" as Tier]))}
+            poolUsd={724_876}
+            withdrawn={new Set(withdrawn)}
+            live={{ onEdit: () => {}, asks }}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const ring = screen.getByRole("meter", { name: "What your ballot asks for" });
+    expect(ring).toHaveAttribute("aria-valuenow", String(asked));
+    expect(ring).toHaveAttribute("aria-valuemax", String(total));
+    expect(Number(ring.querySelector<SVGCircleElement>("circle.stroke-dao-green")!.dataset.to))
+      .toBeCloseTo(asked / total);
+    expect(ring.querySelector("[stroke-dasharray='2 2']")).toBeNull();
+  },
+);
 
 it("a settled tier table: each tier's amount, funded chips with theirs, the rest dimmed", () => {
   render(

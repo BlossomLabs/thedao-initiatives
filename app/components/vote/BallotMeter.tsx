@@ -13,10 +13,6 @@ const C = 2 * Math.PI * R;
 /** How far past the ring its hover area reaches: the 4px arc alone is too thin to aim
  * at, so the whole disc and a margin round it pick a segment by the pointer's angle. */
 const HIT_MARGIN = 8;
-/** The ring's dashed end: how long (px along the ring), and dash, gap (px). A ballot that
- * reaches it reads as one that can keep growing past the full ring. */
-const TAIL = 24;
-const DASH = "2 2";
 const clamp = (x: number) => Math.min(1, Math.max(0, x));
 /** The least a ballot must ask for, as a multiple of the pool (the ballot rules). */
 const MIN_ASK = 1.5;
@@ -66,35 +62,8 @@ function Arc(
   );
 }
 
-/** A dashed stretch of the ring, from `from` to `to` (fractions from the top): the ring's
- * last stretch, so a full one reads as a line you can keep extending. Drawn as an arc path, since
- * the dashes need their own dash pattern (a circle's is taken by a segment's extent). */
-function Dashes({ from, to, className, dim }: {
-  from: number;
-  to: number;
-  className: string;
-  dim?: boolean;
-}) {
-  const c = RING / 2;
-  const at = (t: number) =>
-    `${(c + R * Math.cos(2 * Math.PI * t)).toFixed(3)} ${
-      (c + R * Math.sin(2 * Math.PI * t)).toFixed(3)
-    }`;
-  return (
-    <path
-      d={`M ${at(from)} A ${R} ${R} 0 ${to - from > 0.5 ? 1 : 0} 1 ${at(to)}`}
-      fill="none"
-      strokeWidth={STROKE}
-      strokeDasharray={DASH}
-      opacity={dim ? 0.3 : 1}
-      data-dashes=""
-      className={`${className} [transition:opacity_.15s_ease-out] motion-reduce:[transition:none]`}
-    />
-  );
-}
-
 /** On the ballot: the voter's avatar ringed by what the ballot asks for, full at `target`
- * (3× the pool: the 1.5× the ballot rules want is half way round), in three parts from the top: gold for what the
+ * (all non-withdrawn initiatives' current asks), in three parts from the top: gold for what the
  * settled tiers funded, pale gold for what they hold but didn't fund (locked, still first
  * in line for what is left), green for the open tiers, the part still yours to change.
  * Beside it, the ask, this badge's share and what each settled tier took. Without `asked`
@@ -106,9 +75,9 @@ export default function BallotMeter(
     /** What the ballot's placed initiatives ask for in all, in USD; absent while the
      * chain's asks are being worked out. */
     asked?: number;
-    /** Where the ring is full, in USD: 3× the pool, twice what a ballot must ask for. */
+    /** Total current ask of all non-withdrawn initiatives, in USD. */
     target: number;
-    /** The pool, in USD (for the tooltip). */
+    /** The pool, in USD (for the warning near the ballot minimum). */
     pool: number;
     /** This badge's equal share of the pool, in USD, if known. */
     share?: number;
@@ -139,12 +108,11 @@ export default function BallotMeter(
   const waitingAsk = settled.reduce((a, t) => a + t.waitingAsk, 0);
   const known = asked !== undefined;
   // A valid ballot only just over the minimum: the asks can move before it's recorded.
-  const near = known && status?.ok === true && asked >= MIN_ASK * pool &&
+  const near = known && status?.ok === true && asked < target && asked >= MIN_ASK * pool &&
     asked < MIN_ASK * NEAR * pool;
   const segments = !known ? [] : ballotSegments({
     asked,
     target,
-    pool,
     fundedAsk,
     waitingAsk,
     anySettled: settled.length > 0,
@@ -165,7 +133,6 @@ export default function BallotMeter(
         valueText={known
           ? `${dollars(asked)} of ${dollars(target)}.`
           : "The asks are being worked out."}
-        dashedEnd
       >
         {avatar}
       </SegmentRing>
@@ -226,12 +193,11 @@ const fit = (xs: Segment[]) =>
 
 /** A ballot's ring, end to end from the top: gold what the settled tiers funded, pale gold
  * what they hold unfunded, green the open tiers, then what's left to fill (full at
- * `target`, 3× the pool). The editor's ring, and the "your ballot" page's. */
+ * `target`, the total current ask). The editor's ring, and the "your ballot" page's. */
 export function ballotSegments(
-  { asked, target, pool, fundedAsk, waitingAsk, anySettled }: {
+  { asked, target, fundedAsk, waitingAsk, anySettled }: {
     asked: number;
     target: number;
-    pool: number;
     fundedAsk: number;
     waitingAsk: number;
     anySettled: boolean;
@@ -278,9 +244,9 @@ export function ballotSegments(
       swatch: "border-2 border-white/30",
       title: "Left to fill",
       amount: target - asked,
-      text: `The ring is full at ${dollars(target)}, 3× the ${
-        dollars(pool)
-      } pool. A ballot needs at least half of it.`,
+      text: `The ring is full at ${
+        dollars(target)
+      }, the total ask of all non-withdrawn initiatives. Each initiative fills its share of the ring.`,
     },
   ]);
 }
@@ -391,18 +357,16 @@ export function poolSegments(
   ]);
 }
 
-/** An avatar in a ring of segments, each with a popup on hover (or tap) saying what it
- * means. With `dashedEnd`, the ring's last stretch is dashed: a line that can keep
- * growing past the full ring. */
+/** An avatar in a ring of solid segments, each with a popup on hover (or tap) saying
+ * what it means. */
 export function SegmentRing(
-  { segments, label, max, now, valueText, dashedEnd, children }: {
+  { segments, label, max, now, valueText, children }: {
     segments: Segment[];
     label: string;
     max: number;
     now: number;
     /** Read before the segments' own lines. */
     valueText: string;
-    dashedEnd?: boolean;
     children: React.ReactNode;
   },
 ) {
@@ -454,32 +418,15 @@ export function SegmentRing(
           strokeWidth={STROKE}
           className="stroke-white/15"
         />
-        {segments.filter((x) => x.className).map((x) => {
-          const dim = tip !== undefined && tip !== x.key;
-          // Solid up to the ring's last stretch, dashed in it: only a ballot that reaches
-          // the end of the ring has dashes, the room to keep adding past it.
-          const end = dashedEnd ? 1 - TAIL / C : 1;
-          return (
-            <g key={x.key}>
-              {x.from < end && (
-                <Arc
-                  from={x.from}
-                  to={Math.min(x.to, end)}
-                  className={x.className}
-                  dim={dim}
-                />
-              )}
-              {x.to > end && (
-                <Dashes
-                  from={Math.max(x.from, end)}
-                  to={x.to}
-                  className={x.className}
-                  dim={dim}
-                />
-              )}
-            </g>
-          );
-        })}
+        {segments.filter((x) => x.className).map((x) => (
+          <Arc
+            key={x.key}
+            from={x.from}
+            to={x.to}
+            className={x.className}
+            dim={tip !== undefined && tip !== x.key}
+          />
+        ))}
       </svg>
       <div className="pointer-events-none grid size-[48px] place-items-center overflow-hidden rounded-full [&_img]:!size-full">
         {children}

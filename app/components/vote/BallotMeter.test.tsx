@@ -4,7 +4,7 @@ import BallotMeter, { poolSegments } from "./BallotMeter";
 
 afterEach(cleanup);
 
-it("before anything settles: the ring is the ask toward 3× the pool, and the share is an estimate", () => {
+it("before anything settles: the ring is the included share of all asks, and the share is an estimate", () => {
   render(
     <BallotMeter
       avatar={<img alt="" />}
@@ -148,7 +148,7 @@ it("each segment has its own popup: its dot, title and amount, then what it mean
   await hover(
     "rest",
     "Left to fill",
-    "$300,000The ring is full at $1,500,000, 3× the $1,000,000 pool. A ballot needs at least half of it.",
+    "$300,000The ring is full at $1,500,000, the total ask of all non-withdrawn initiatives. Each initiative fills its share of the ring.",
   );
 });
 
@@ -202,39 +202,43 @@ it("anywhere in a segment's direction picks it: over the avatar, on the ring, ju
   }
 });
 
-it("only the ring's last 24px is dashed: a ballot that reaches it, can keep growing", () => {
-  const ring = (asked: number) =>
-    render(
+it.each([0, 0.25, 0.5, 1])(
+  "fills %s of the ring from the included share of asks, with no dashed ending",
+  (fraction) => {
+    const total = 1_026_100;
+    const { container } = render(
       <BallotMeter
         avatar={<img alt="" />}
-        asked={asked}
-        target={3_000_000}
-        pool={1_000_000}
+        asked={total * fraction}
+        target={total}
+        pool={724_876}
         shareFinal={false}
         settled={[]}
       />,
-    ).container;
-  const C = 2 * Math.PI * 30;
-  const at = (turn: number) =>
-    `${(32 + 30 * Math.cos(2 * Math.PI * turn)).toFixed(3)} ${
-      (32 + 30 * Math.sin(2 * Math.PI * turn)).toFixed(3)
-    }`;
-  // $1,500,000 of $3,000,000 (the 1.5× the rules want): half way round, solid, no dashes.
-  let c = ring(1_500_000);
-  expect(c.querySelectorAll("[data-dashes]")).toHaveLength(0);
-  expect(Number(c.querySelector<SVGCircleElement>("circle.stroke-dao-green")!.dataset.to))
-    .toBe(0.5);
-  cleanup();
-  // Past 3×, a full ring: solid up to its last 24px, dashed in them.
-  c = ring(4_000_000);
-  const dashes = c.querySelectorAll("[data-dashes]");
-  expect(dashes).toHaveLength(1);
-  expect(dashes[0].getAttribute("class")).toContain("stroke-dao-green");
-  expect(dashes[0].getAttribute("d")).toBe(`M ${at(1 - 24 / C)} A 30 30 0 0 1 ${at(1)}`);
-  expect(dashes[0].getAttribute("stroke-dasharray")).toBe("2 2");
-  expect(Number(c.querySelector<SVGCircleElement>("circle.stroke-dao-green")!.dataset.to))
-    .toBeCloseTo(1 - 24 / C);
-  cleanup();
+    );
+    const meter = screen.getByRole("meter", { name: "What your ballot asks for" });
+    expect(meter).toHaveAttribute("aria-valuenow", String(total * fraction));
+    expect(meter).toHaveAttribute("aria-valuemax", String(total));
+    expect(container.querySelector("[stroke-dasharray='2 2']")).toBeNull();
+    const arc = container.querySelector<SVGCircleElement>("circle.stroke-dao-green");
+    if (fraction === 0) expect(arc).toBeNull();
+    else expect(Number(arc!.dataset.to)).toBe(fraction);
+  },
+);
+
+it("a ballot covering every ask has no warning about a donation making it too small", () => {
+  render(
+    <BallotMeter
+      avatar={<img alt="" />}
+      asked={1_520_000}
+      target={1_520_000}
+      pool={1_000_000}
+      shareFinal={false}
+      settled={[]}
+      status={{ ok: true, text: "You can add as many initiatives as you want" }}
+    />,
+  );
+  expect(screen.queryByText(/Close to the minimum/)).toBeNull();
 });
 
 it("with ballot rules, the share gives way to what the ballot still needs", () => {

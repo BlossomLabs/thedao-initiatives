@@ -1,8 +1,9 @@
 /** /vote/llms.txt: the round, its rules and every project, for an LLM drafting a ballot. */
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { voteLlms } from "../services/vote-llms.ts";
-import { withdrawnNow } from "../routes/feeds.ts";
-import type { VoteManifest } from "../../shared/vote/manifest.ts";
+import { feedRoutes, withdrawnNow } from "../routes/feeds.ts";
+import { rulesRound, type VoteManifest } from "../../shared/vote/manifest.ts";
+import { checkBallot } from "../../shared/vote/rules.ts";
 import type { FeedInitiative } from "../services/feed.ts";
 import { parseBallotText } from "../../shared/vote/ballot-text.ts";
 import { harness } from "./app-helpers.ts";
@@ -62,7 +63,13 @@ Deno.test("vote llms: lists every round project with type, amounts and affiliati
 });
 
 Deno.test("vote llms: states the rules with the pool's 1.5× in dollars", () => {
-  assertStringIncludes(text, "at least $1,500,000 in total (1.5× the $1,000,000 configured pool)");
+  const enough = voteLlms(
+    { ...m, poolUsd: "500000000000" },
+    entries,
+    "https://x.test",
+    m.projects.map((p) => BigInt(p.goalUsd)),
+  );
+  assertStringIncludes(enough, "at least $750,000 in total (1.5× the $500,000 configured pool)");
   assertStringIncludes(text, "S-Tier needs at least 3 independent projects");
   assertStringIncludes(text, "Anything you leave unranked gets nothing from you");
   assertStringIncludes(text, "no pair shares any listed affiliation");
@@ -114,9 +121,91 @@ Deno.test("vote llms: A-Tier enforcement changes both the rules and the drafting
 });
 
 Deno.test("vote llms: the minimum never rounds below the required micro-USD", () => {
-  const precise = voteLlms({ ...m, poolUsd: "1000001" }, entries, "https://x.test");
+  const precise = voteLlms(
+    { ...m, poolUsd: "1000001" },
+    entries,
+    "https://x.test",
+    m.projects.map((p) => BigInt(p.goalUsd)),
+  );
   assertStringIncludes(precise, "at least $1.500002 in total (1.5× the $1.000001 configured pool)");
-  assertStringIncludes(precise, "recompute this minimum from its poolUsd");
+  assertStringIncludes(precise, "recompute this capped minimum from poolUsd, asks");
+});
+
+Deno.test("vote llms: the 15-project minimum agrees with validation and is reachable", () => {
+  const asks = Array.from(
+    { length: 15 },
+    (_, i) => BigInt(i === 14 ? 74_100 : 68_000) * 1_000_000n,
+  );
+  const rehearsal = {
+    ...m,
+    poolUsd: "724876000000",
+    slugs: asks.map((_, i) => `project-${i}`),
+    projects: asks.map((ask) => ({ goalUsd: String(ask), rfp: true, groups: [] })),
+  };
+  const guide = voteLlms(rehearsal, [], "https://x.test", asks);
+  assertStringIncludes(guide, "must ask for at least $1,026,100 in total");
+  assert(!guide.includes("at least $1,087,314"));
+  assertStringIncludes(
+    guide,
+    "rank every non-withdrawn project with a positive ask to meet the size rule",
+  );
+  assertStringIncludes(guide, "Before returning it, check the total asks against the smaller of");
+  const round = rulesRound(rehearsal, asks);
+  const partial = new Uint8Array(15).fill(255);
+  partial.set([1, 1, 1]);
+  assertEquals(checkBallot(partial, round).errors, [{
+    rule: "size",
+    requested: 204_000_000_000n,
+    needed: 1_026_100_000_000n,
+    pool: 724_876_000_000n,
+  }]);
+  assert(checkBallot(new Uint8Array(15).fill(1), round).ok);
+});
+
+Deno.test("vote llms: donations and withdrawals reduce the minimum, fully funded asks add zero", () => {
+  const asks = [250_000_000_000n, 200_000_000_000n, 0n, 400_000_000_000n];
+  const guide = voteLlms(m, entries, "https://x.test", asks, new Set(["wallets"]));
+  assertStringIncludes(guide, "must ask for at least $450,000 in total");
+  assertStringIncludes(guide, "every non-withdrawn project's current ask");
+  const covered = voteLlms(m, entries, "https://x.test", [0n, 0n, 0n, 0n]);
+  assertStringIncludes(covered, "must ask for at least $0 in total");
+});
+
+Deno.test("vote llms: missing asks or withdrawal status never produce a guessed minimum", () => {
+  const full = m.projects.map((p) => BigInt(p.goalUsd));
+  const unknown = [
+    voteLlms(m, entries, "https://x.test"),
+    voteLlms(m, entries, "https://x.test", full.slice(0, 3)),
+    voteLlms(m, entries, "https://x.test", full, null),
+  ];
+  for (const guide of unknown) {
+    assertStringIncludes(guide, "The current total-ask minimum is unknown");
+    assert(!guide.includes("must ask for at least $"));
+  }
+});
+
+Deno.test("vote llms: the route serves the capped minimum from asks and the replay's withdrawals", async () => {
+  const app = feedRoutes(
+    {
+      origin: () => "https://x.test",
+      get: () => Promise.resolve({ initiatives: entries }),
+    } as never,
+    {
+      vote: {
+        manifest: m,
+        chain: {
+          asks: () => Promise.resolve([250_000_000_000n, 200_000_000_000n, 0n, 400_000_000_000n]),
+        } as never,
+      },
+    },
+    () =>
+      Promise.resolve(
+        { tiers: [{}, {}, { status: "waiting" }], live: { withdrawn: [3] } } as never,
+      ),
+  );
+  const res = await app.request("https://x.test/vote/llms.txt");
+  assertEquals(res.status, 200);
+  assertStringIncludes(await res.text(), "must ask for at least $450,000 in total");
 });
 
 Deno.test("vote llms: a draft must use unique known slugs and pass validation", () => {
@@ -182,7 +271,7 @@ Deno.test("vote llms: a round from before the ballot rules states none", () => {
 });
 
 Deno.test("vote llms: the rules count asks at the recording block", () => {
-  assertStringIncludes(text, "must ask for at least $1,500,000 in total");
+  assertStringIncludes(text, "The minimum is the smaller of 1.5× the pool");
   assertStringIncludes(
     text,
     "A project's ask is its goal less its donations and open pledges, on-chain at the block that records your ballot, so it can change before then",

@@ -1,17 +1,6 @@
 import { tierName, TIERS } from "../../shared/vote/ballot";
 import type { RuleError } from "../../shared/vote/rules";
-
-/** Whole dollars from micro-USD: "$1,369,866". */
-const dollars = (micro: bigint) =>
-  `$${(Number((micro + 500_000n) / 1_000_000n)).toLocaleString("en-US")}`;
-/** Rounded up to three significant digits, so the minimum shown is never below the real
- * one: "$1,370,000" for 1,369,866 dollars, "$13,500" for 13,421. */
-const upTo3 = (micro: bigint) => {
-  const usd = (micro + 999_999n) / 1_000_000n;
-  let step = 1n;
-  while (usd >= 1000n * step) step *= 10n;
-  return dollars((usd + step - 1n) / step * step * 1_000_000n);
-};
+import { formatMicroUsd as dollars } from "../../shared/vote/format";
 const and = (xs: string[]) =>
   xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 
@@ -61,7 +50,7 @@ export function ruleStatus(errors: RuleError[]): { ok: boolean; text: string } {
   if (!e) return { ok: true, text: "You can add as many initiatives as you want" };
   switch (e.rule) {
     case "size":
-      return { ok: false, text: `Needs at least ${upTo3(e.needed)} to be valid` };
+      return { ok: false, text: `Needs at least ${dollars(e.needed)} to be valid` };
     case "independent":
       return {
         ok: false,

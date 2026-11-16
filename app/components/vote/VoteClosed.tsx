@@ -178,12 +178,12 @@ export default function VoteClosed(
   const allocated = [...(paid ?? new Map<string, number>()).values()].reduce((a, b) => a + b, 0);
   const sentSomething = Boolean(sent && Object.keys(sent).length);
   // During the vote, the ring is the editor's: what the ballot asks for (the chain's
-  // asks), full at 3× the pool; gold what the settled tiers funded, pale gold what they
-  // hold unfunded, green the open tiers.
+  // asks), full at the total ask of all non-withdrawn initiatives; gold what the settled
+  // tiers funded, pale gold what they hold unfunded, green the open tiers.
   const asks = servedAsks(round, live?.asks);
-  const askFor = (slug: string) => askOf(round, asks, slug) ?? 0;
+  const askFor = (slug: string) => withdrawn?.has(slug) ? 0 : askOf(round, asks, slug) ?? 0;
   const settledTier = new Map(settled?.map((t) => [t.tier, t]) ?? []);
-  const askRing = live && asks && sent && poolUsd
+  const askRing = live && asks && sent
     ? (() => {
       let fundedAsk = 0, waitingAsk = 0, asked = 0;
       for (const [slug, t] of Object.entries(sent)) {
@@ -193,25 +193,28 @@ export default function VoteClosed(
         if (s?.funded.includes(slug)) fundedAsk += askFor(slug);
         else if (s) waitingAsk += askFor(slug);
       }
-      return { asked, target: poolUsd * 3, fundedAsk, waitingAsk };
+      return {
+        asked,
+        target: round.slugs.reduce((sum, slug) => sum + askFor(slug), 0),
+        fundedAsk,
+        waitingAsk,
+      };
     })()
     : undefined;
   const mineHeader = (
     <CardHeader
-      avatar={askRing && poolUsd
+      avatar={askRing
         ? (
           // The editor's ring, with its popups.
           <SegmentRing
             segments={ballotSegments({
               ...askRing,
-              pool: poolUsd,
               anySettled: Boolean(settled?.length),
             })}
-            label="What your ballot asks for, of 3× the pool"
+            label="What your ballot asks for"
             max={askRing.target}
             now={Math.min(askRing.asked, askRing.target)}
             valueText={`${dollars(askRing.asked)} of ${dollars(askRing.target)}.`}
-            dashedEnd
           >
             {avatar}
           </SegmentRing>

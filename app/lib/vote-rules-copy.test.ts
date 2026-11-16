@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { RuleError } from "../../shared/vote/rules";
+import { checkBallot, type RuleError } from "../../shared/vote/rules";
 import { explainBelow, ruleMessage, ruleStatus } from "./vote-rules-copy";
 
 const titleOf = (i: number) => ["Seal Audits", "Seal Tooling", "Gamma", "Delta"][i];
@@ -73,16 +73,16 @@ it("the ballot box's line: the first rule to meet, size before tiers, else valid
   const a: RuleError = { rule: "independent", tier: 1, count: 2, related: [] };
   expect(ruleStatus([a, s, size])).toEqual({
     ok: false,
-    text: "Needs at least $1,370,000 to be valid",
+    text: "Needs at least $1,369,866 to be valid",
   });
-  // The ballot box rounds up to three significant digits; the box below keeps the exact sum.
-  const up = (needed: bigint) =>
+  // Required amounts stay exact, including fractions of a dollar.
+  const status = (needed: bigint) =>
     ruleStatus([{ rule: "size", requested: 1n, needed, pool: 2n }]).text;
-  expect(up(1_360_000_000_001n)).toBe("Needs at least $1,370,000 to be valid");
-  expect(up(1_360_000_000_000n)).toBe("Needs at least $1,360,000 to be valid");
-  expect(up(13_421_000_000n)).toBe("Needs at least $13,500 to be valid");
-  expect(up(999_500_000n)).toBe("Needs at least $1,000 to be valid");
-  expect(up(999_000_000n)).toBe("Needs at least $999 to be valid");
+  expect(status(1_360_000_000_001n)).toBe("Needs at least $1,360,000.000001 to be valid");
+  expect(status(1_360_000_000_000n)).toBe("Needs at least $1,360,000 to be valid");
+  expect(status(13_421_000_000n)).toBe("Needs at least $13,421 to be valid");
+  expect(status(999_500_000n)).toBe("Needs at least $999.5 to be valid");
+  expect(status(999_000_000n)).toBe("Needs at least $999 to be valid");
   expect(ruleStatus([a, s])).toEqual({
     ok: false,
     text: "Needs at least 3 independent projects in S-Tier",
@@ -105,4 +105,25 @@ it("only affiliation problems get the box under the tiers", () => {
   expect(explainBelow({ rule: "group", tier: 1, group: 0, groupUsd: 3n, tierUsd: 4n })).toBe(
     true,
   );
+});
+
+it("the reachable $1,026,100 minimum is displayed exactly and accepts the full ballot", () => {
+  const asks = Array.from(
+    { length: 15 },
+    (_, i) => BigInt(i === 14 ? 74_100 : 68_000) * 1_000_000n,
+  );
+  const round = {
+    projects: asks.map((goalUsd) => ({ goalUsd, rfp: true, groups: [] })),
+    asks,
+    poolUsd: 724_876_000_000n,
+    groupNames: [],
+    independentTiers: 1,
+  };
+  const partial = new Uint8Array(15).fill(255);
+  partial.set([1, 1, 1]);
+  expect(ruleStatus(checkBallot(partial, round).errors)).toEqual({
+    ok: false,
+    text: "Needs at least $1,026,100 to be valid",
+  });
+  expect(ruleStatus(checkBallot(new Uint8Array(15).fill(1), round).errors).ok).toBe(true);
 });

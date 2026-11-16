@@ -568,8 +568,8 @@ export default function VotePage(
     const refused = rv?.rejected.find((r) =>
       r.tokenId === String(n) && ballotFlow.last && BigInt(r.nonce) === ballotFlow.last.nonce
     );
-    // The ballot's ask, on a ring full at 3× the pool (the 1.5× the rules want is half way);
-    // the settled tiers' part of it. Counted on the chain's asks, as the contract judges it;
+    // The ballot's ask as a share of all non-withdrawn initiatives' current asks,
+    // including the settled tiers' part of it. Counted on the chain's asks;
     // while they're being worked out, no amount at all.
     const poolNow = Number(BigInt(rv?.poolUsd ?? R.poolUsd) / 1_000_000n);
     // A withdrawn initiative asks $0 for the ballot's size, as the rules count it.
@@ -635,7 +635,7 @@ export default function VotePage(
             ? <AddressAvatar address={me} size={48} />
             : <Avatar src={avatarSrc(`badge-${n}`)} size={48} />}
           asked={asked}
-          target={poolNow * 3}
+          target={askIn?.(R.slugs) ?? 0}
           pool={poolNow}
           share={share}
           shareFinal={registrationOver}

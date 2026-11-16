@@ -146,6 +146,35 @@ it("suggests several amounts, each labelled, the first picked", () => {
   expect(chips[0].className).toContain("bg-dao-green");
 });
 
+it("with a cap, no chip goes past it, the last one is it, and more can't be sent (#102)", () => {
+  render(
+    <MemoryRouter>
+      <DonateWidget
+        initiativeId="id"
+        slug="test"
+        safeAddress={SAFE}
+        suggested={[{ usd: 4050, note: "brings it into A-Tier", label: "to A-Tier" }]}
+        cap={{ usd: 30_000, note: "all it still needs", label: "to be funded" }}
+      />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByText("Wallet"));
+  const order = screen.getAllByRole("button", { name: /^\$[\d,]+/ }).map((b) => b.textContent);
+  expect(order).toEqual(["$500", "$4,050to A-Tier", "$5,000", "$30,000to be funded"]);
+  // The suggestion stays picked, not the cap.
+  expect(screen.getByLabelText("Amount in US dollars")).toHaveValue("4050");
+  fireEvent.click(screen.getByRole("checkbox"));
+  const donate = screen.getByRole("button", { name: "Donate" });
+  expect(donate).toBeEnabled();
+  fireEvent.change(screen.getByLabelText("Amount in US dollars"), {
+    target: { value: "50000" },
+  });
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "It needs $30,000 at most: that funds it fully.",
+  );
+  expect(donate).toBeDisabled();
+});
+
 it("on an example page, Donate and the address only say nothing is donated", () => {
   render(
     <MemoryRouter>

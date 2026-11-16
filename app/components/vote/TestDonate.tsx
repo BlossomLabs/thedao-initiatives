@@ -3,18 +3,18 @@ import type { Hex } from "viem";
 import { writeContract } from "wagmi/actions";
 import { useWallet } from "~/context/wallet";
 import { api } from "~/lib/api";
-import { parseUsd, walletErrorMessage } from "~/lib/donate";
+import { donateChips, parseUsd, walletErrorMessage } from "~/lib/donate";
 import { liveConnector } from "~/lib/wallet-store";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/Button";
 import Status from "~/components/ui/Status";
 import type { Suggestion } from "~/components/donate/DonateWidget";
+import OverCap from "~/components/donate/OverCap";
 import { useEnsureVoteChain } from "~/hooks/use-vote-chain";
 import { voteClient } from "~/hooks/use-vote-send";
 import { ROUND } from "../../../shared/vote/manifest";
 import { TEST_USD_ABI, TEST_USD_MAX_MINT, testDonation } from "../../../shared/vote/test-usd";
 
-const CHIPS = ["50", "500", "5000", "50000"];
 const WAIT_MS = 3 * 60_000;
 
 /**
@@ -24,7 +24,7 @@ const WAIT_MS = 3 * 60_000;
  * gas top-up when the wallet has none).
  */
 export default function TestDonate(
-  { slug, suggested = [], onAmount, onDonated, badge, accent = "green" }: {
+  { slug, suggested = [], onAmount, onDonated, badge, accent = "green", cap }: {
     slug: string;
     suggested?: Suggestion[];
     onAmount?: (usd: number) => void;
@@ -32,6 +32,8 @@ export default function TestDonate(
     /** The voter's badge, for the gas top-up. */
     badge?: number;
     accent?: "green" | "red";
+    /** The most it can take: what the initiative still needs, as DonateWidget's. */
+    cap?: Suggestion;
   },
 ) {
   const red = accent === "red";
@@ -65,12 +67,13 @@ export default function TestDonate(
   useEffect(() => onAmountRef.current?.(parseUsd(amount)), [amount]);
 
   const suggestedAt = new Map(suggested.map((x) => [String(x.usd), x]));
-  const chips = suggested.length
-    ? [...suggestedAt.keys(), ...CHIPS.slice(1).filter((c) => !suggestedAt.has(c))]
-      .slice(0, CHIPS.length)
-      .sort((a, b) => Number(a) - Number(b))
-    : CHIPS;
+  const chips = donateChips([...suggestedAt.keys()], cap?.usd);
+  const chipAt = (c: string) =>
+    suggestedAt.get(c) ?? (cap && c === String(cap.usd) ? cap : undefined);
+  const labelled = chips.some((c) => chipAt(c)?.label);
   const usd = parseUsd(amount);
+  // More than it needs: not sent.
+  const over = Boolean(cap && usd > cap.usd);
 
   const donate = async () => {
     if (!target) return setStatus({ kind: "err", text: "This round takes no test donations." });
@@ -129,12 +132,12 @@ export default function TestDonate(
           <button
             key={c}
             type="button"
-            aria-label={suggestedAt.has(c)
-              ? `$${Number(c).toLocaleString("en-US")}, ${suggestedAt.get(c)!.note}`
+            aria-label={chipAt(c)
+              ? `$${Number(c).toLocaleString("en-US")}, ${chipAt(c)!.note}`
               : undefined}
             className={cn(
               "cursor-pointer whitespace-nowrap rounded-full border px-1 py-2 text-center font-inter-tight text-[13px] transition-all duration-150 max-[760px]:py-[11px]",
-              suggested.some((x) => x.label) && "rounded-xl py-1.5 max-[760px]:py-2",
+              labelled && "rounded-xl py-1.5 max-[760px]:py-2",
               amount === c
                 ? red
                   ? "border-dao-red bg-dao-red font-medium text-white"
@@ -146,9 +149,9 @@ export default function TestDonate(
             onClick={() => setAmount(c)}
           >
             ${Number(c).toLocaleString("en-US")}
-            {suggestedAt.get(c)?.label && (
+            {chipAt(c)?.label && (
               <small className="block text-[11px] font-normal leading-tight opacity-80">
-                {suggestedAt.get(c)!.label}
+                {chipAt(c)!.label}
               </small>
             )}
           </button>
@@ -171,11 +174,12 @@ export default function TestDonate(
         />
         <span className="flex-none pr-3.5 font-inter-tight text-[13px] text-muted">tUSD</span>
       </label>
+      {over && <OverCap cap={cap!.usd} />}
       <p className="m-0 small dim">
         A test vote: this sends test dollars (tUSD) on Sepolia straight to the initiative's account.
         No real money moves.
       </p>
-      <Button variant="primary" onClick={donate} disabled={Boolean(busy) || !target}>
+      <Button variant="primary" onClick={donate} disabled={Boolean(busy) || !target || over}>
         {busy ?? "Donate test dollars"}
       </Button>
       {status && <Status kind={status.kind}>{status.text}</Status>}

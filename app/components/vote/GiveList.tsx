@@ -273,6 +273,14 @@ export default function GiveList(
               const knockKind = r.entry ? knockOnVerb(r.entry) : undefined;
               const cat = i.categories[0];
               const need = r.askUsd;
+              // Never more than it still needs: given all of it, it is funded in full.
+              const cap = need !== undefined && need > 0
+                ? {
+                  usd: Math.ceil(need),
+                  note: "all it still needs: funded in full, nothing from the pool",
+                  label: "to be funded",
+                }
+                : undefined;
               return (
                 <li
                   key={i.slug}
@@ -432,6 +440,7 @@ export default function GiveList(
                                 onDonated={onDonated}
                                 badge={test.badge}
                                 accent={r.entry ? "red" : "green"}
+                                cap={cap}
                               />
                             </Suspense>
                           )
@@ -457,6 +466,7 @@ export default function GiveList(
                                 onAmount={onAmount}
                                 example={example}
                                 accent={r.entry ? "red" : "green"}
+                                cap={cap}
                               />
                             </Suspense>
                           )

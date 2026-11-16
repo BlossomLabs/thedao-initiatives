@@ -89,15 +89,17 @@ vi.mock("~/components/donate/DonateWidget", async () => {
   const { parseUsd } = await import("~/lib/donate");
   return {
     default: (
-      { onAmount, suggested }: {
+      { onAmount, suggested, cap }: {
         onAmount?: (usd: number) => void;
         suggested?: { usd: number; label?: string } | { usd: number; label?: string }[];
+        cap?: { usd: number; label?: string };
       },
     ) => (
       <>
         <ul aria-label="Suggested amounts">
           {[suggested ?? []].flat().map((x) => <li key={x.usd}>${x.usd} {x.label}</li>)}
         </ul>
+        {cap && <p data-cap="">${cap.usd} {cap.label}</p>}
         <input
           aria-label="Amount"
           type="number"
@@ -536,6 +538,17 @@ it("while open: TheDAO's ballot beside what it takes each initiative to move up"
   expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta "]);
   // Only the round's initiatives.
   expect(screen.queryByText("Gamma outside")).toBeNull();
+});
+
+it("an open row's donate form stops at what the initiative still needs (#102)", async () => {
+  await showOpen(openWith({ beta: give() }));
+  const row = await list().findByRole("button", { name: /Beta audits/ });
+  expect(row).toHaveTextContent("Needs $30,000");
+  fireEvent.click(row);
+  // The form gets the cap: what it still needs, "to be funded".
+  await waitFor(() =>
+    expect(document.querySelector("[data-cap]")).toHaveTextContent("$30000 to be funded")
+  );
 });
 
 it("opening an initiative previews its donation on TheDAO's ballot", async () => {

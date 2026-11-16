@@ -25,6 +25,24 @@ export function parseUsd(raw: string): number {
   return /^\d+(\.\d+)?$/.test(String(raw).trim()) ? parseFloat(raw) : NaN;
 }
 
+/** The donate forms' usual quick amounts, in whole dollars. */
+export const CHIPS = ["50", "500", "5000", "50000"];
+
+/** The quick amounts: the suggestions (four at most), then the usual amounts after the
+ * smallest, four in all, smallest first. With `cap` (what the initiative still needs),
+ * none above it: an amount that would be more ends the row as the cap itself. */
+export function donateChips(suggested: string[], cap?: number): string[] {
+  let list = suggested.length
+    ? [...suggested, ...CHIPS.slice(1).filter((c) => !suggested.includes(c))]
+    : [...CHIPS];
+  if (cap !== undefined && cap > 0) {
+    const over = list.some((c) => Number(c) >= cap);
+    list = list.filter((c) => Number(c) < cap);
+    if (over) list = [...list.slice(0, CHIPS.length - 1), String(cap)];
+  }
+  return list.slice(0, CHIPS.length).sort((a, b) => Number(a) - Number(b));
+}
+
 /** ERC-20 transfer(address,uint256) calldata. Mirrors api/tests/chain.test.ts. */
 export function transferCalldata(to: string, amount: bigint): `0x${string}` {
   return ("0xa9059cbb" + pad32(to) + pad32(amount.toString(16))) as `0x${string}`;

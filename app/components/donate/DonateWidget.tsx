@@ -6,7 +6,7 @@ import { useDonateParams } from "~/hooks/use-donate-params";
 import { TERMS } from "~/data/terms";
 import GovernedBy from "~/components/terms/GovernedBy";
 import type { DonateResult } from "~/lib/api-types";
-import { parseUsd, tokenQty } from "~/lib/donate";
+import { donateChips, parseUsd, tokenQty } from "~/lib/donate";
 import { cn } from "~/lib/utils";
 import Status from "~/components/ui/Status";
 import { Button } from "~/components/ui/Button";
@@ -21,9 +21,9 @@ import {
 import { errorMessage } from "~/lib/api";
 import { useDonation } from "./useDonation";
 import Reveal from "~/components/ui/Reveal";
+import OverCap from "./OverCap";
 import { WALLETCONNECT_PROJECT_ID } from "~/lib/wallet-env";
 
-const CHIPS = ["50", "500", "5000", "50000"];
 /** What the buttons say on an example page, where nothing is donated. */
 export const EXAMPLE_NOTE = "An example page: nothing is donated from it.";
 type Method = "wallet" | "exchange";
@@ -41,6 +41,7 @@ export default function DonateWidget({
   onAmount,
   example,
   accent = "green",
+  cap,
 }: {
   initiativeId: string;
   slug: string;
@@ -58,6 +59,10 @@ export default function DonateWidget({
   /** The picked amount and the focused field: green, or red like the page's red numbers
    * and its buttons (the vote results). */
   accent?: "green" | "red";
+  /** The most it can take, in whole dollars, with what it does: what the initiative still
+   * needs (the vote results). No chip goes past it, the last one is it, and a larger
+   * amount can't be sent. */
+  cap?: Suggestion;
 }) {
   const red = accent === "red";
   const { data: params } = useDonateParams();
@@ -128,13 +133,13 @@ export default function DonateWidget({
   onAmountRef.current = onAmount;
   useEffect(() => onAmountRef.current?.(parseUsd(amount)), [amount]);
   /** The suggestions (four at most), then the usual amounts after the smallest, four in
-   * all, smallest first. The first suggestion stays the one picked, wherever it sits. */
+   * all, smallest first, none past the cap. The first suggestion stays the one picked,
+   * wherever it sits. */
   const suggestedAt = new Map(suggestions.map((x) => [String(x.usd), x]));
-  const chips = suggestions.length
-    ? [...suggestedAt.keys(), ...CHIPS.slice(1).filter((c) => !suggestedAt.has(c))]
-      .slice(0, CHIPS.length)
-      .sort((a, b) => Number(a) - Number(b))
-    : CHIPS;
+  const chips = donateChips([...suggestedAt.keys()], cap?.usd);
+  const chipAt = (c: string) =>
+    suggestedAt.get(c) ?? (cap && c === String(cap.usd) ? cap : undefined);
+  const labelled = chips.some((c) => chipAt(c)?.label);
   const [symbol, setSymbol] = useState("");
   const [method, setMethod] = useState<Method>("wallet");
   const [balances, setBalances] = useState<Record<string, number | null>>({});
@@ -180,6 +185,8 @@ export default function DonateWidget({
 
   const rate = params?.enabled ? params.rates[symbol] || 1 : 1;
   const usd = parseUsd(amount);
+  // More than it needs: not sent.
+  const over = Boolean(cap && usd > cap.usd);
   // The trigger shows the bare symbol (it is 110px wide); the list adds the balance.
   const tokenItems = (tokens.length ? tokens : ["USDC"]).map((t) => ({
     value: t,
@@ -223,13 +230,13 @@ export default function DonateWidget({
               <button
                 key={c}
                 type="button"
-                aria-label={suggestedAt.has(c)
-                  ? `$${Number(c).toLocaleString("en-US")}, ${suggestedAt.get(c)!.note}`
+                aria-label={chipAt(c)
+                  ? `$${Number(c).toLocaleString("en-US")}, ${chipAt(c)!.note}`
                   : undefined}
                 className={cn(
                   "cursor-pointer whitespace-nowrap rounded-full border px-1 py-2 text-center font-inter-tight text-[13px] transition-all duration-150 max-[760px]:py-[11px]",
                   // A chip with a label under its amount is two lines: less round.
-                  suggestions.some((x) => x.label) && "rounded-xl py-1.5 max-[760px]:py-2",
+                  labelled && "rounded-xl py-1.5 max-[760px]:py-2",
                   amount === c
                     ? red
                       ? "border-dao-red bg-dao-red font-medium text-white"
@@ -241,9 +248,9 @@ export default function DonateWidget({
                 onClick={() => setAmount(c)}
               >
                 ${Number(c).toLocaleString("en-US")}
-                {suggestedAt.get(c)?.label && (
+                {chipAt(c)?.label && (
                   <small className="block text-[11px] font-normal leading-tight opacity-80">
-                    {suggestedAt.get(c)!.label}
+                    {chipAt(c)!.label}
                   </small>
                 )}
               </button>
@@ -288,6 +295,7 @@ export default function DonateWidget({
             </Select>
           </div>
           {conv && <p className="-mt-0.5 ml-0.5 m-0 small dim">{conv}</p>}
+          {over && <OverCap cap={cap!.usd} />}
         </div>
       </Reveal>
 
@@ -345,7 +353,7 @@ export default function DonateWidget({
               if (example) return d.setStatus({ kind: "wait", text: EXAMPLE_NOTE });
               if (await d.donate(symbol, amount, balances)) setAccepted(false);
             }}
-            disabled={Boolean(d.busy) || !accepted}
+            disabled={Boolean(d.busy) || !accepted || over}
           >
             {d.busy ?? "Donate"}
           </Button>

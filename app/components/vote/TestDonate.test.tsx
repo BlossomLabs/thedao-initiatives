@@ -107,3 +107,31 @@ it("an initiative the round doesn't have can't be given to", () => {
   render(<TestDonate slug="nope" />);
   expect(screen.getByRole("button", { name: "Donate test dollars" })).toBeDisabled();
 });
+
+it("never offers or sends more than the initiative still needs (#102)", () => {
+  const cap = { usd: 30_000, note: "all it still needs", label: "to be funded" };
+  render(
+    <TestDonate
+      slug="beta"
+      suggested={[{ usd: 4050, note: "brings it into A-Tier", label: "to A-Tier" }]}
+      cap={cap}
+    />,
+  );
+  // No $50,000: the last chip is what it needs, labelled.
+  expect(screen.queryByRole("button", { name: /50,000/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "$30,000, all it still needs" }))
+    .toHaveTextContent("to be funded");
+  // Typing more is blocked, with the reason.
+  fireEvent.change(screen.getByLabelText("Amount in US dollars"), {
+    target: { value: "50000" },
+  });
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "It needs $30,000 at most: that funds it fully.",
+  );
+  expect(screen.getByRole("button", { name: "Donate test dollars" })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("Amount in US dollars"), {
+    target: { value: "30000" },
+  });
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByRole("button", { name: "Donate test dollars" })).toBeEnabled();
+});

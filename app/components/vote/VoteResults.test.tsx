@@ -588,8 +588,8 @@ it("opening an initiative previews its donation on TheDAO's ballot", async () =>
   expect(ring().querySelector(".stroke-dao-green")).toBeNull();
   fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
   const ballotNow = daoBallot();
-  const joining = within(ballotNow).getByLabelText("Beta audits, comes in with your $9,000");
-  expect(joining).toHaveTextContent("+$9,000 yours");
+  const joining = within(ballotNow).getByLabelText("Beta audits, comes in if you give $9,000");
+  expect(joining).toHaveTextContent("+$9,000 if you give");
   // TheDAO's ring shows it too: a green stretch.
   expect(ring().querySelector(".stroke-dao-green")).not.toBeNull();
   // Dashed green: what your money brings in.
@@ -614,7 +614,22 @@ it("opening an initiative previews its donation on TheDAO's ballot", async () =>
   expect(within(said[0]).queryByText("Alpha fuzzing")).toBeNull();
   // Clearing the preview closes it.
   fireEvent.click(screen.getByRole("button", { name: "Clear" }));
-  expect(screen.queryByLabelText("Beta audits, comes in with your $9,000")).toBeNull();
+  expect(screen.queryByLabelText("Beta audits, comes in if you give $9,000")).toBeNull();
+});
+
+it("an amount typed and then removed leaves nothing on TheDAO's ballot (#100)", async () => {
+  await showOpen(openWith({ beta: give() }));
+  fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
+  expect(within(daoBallot()).getByLabelText("Beta audits, comes in if you give $9,000"))
+    .toBeInTheDocument();
+  const field = await screen.findByRole("spinbutton", { name: "Amount" });
+  fireEvent.change(field, { target: { value: "12000" } });
+  await waitFor(() =>
+    expect(within(daoBallot()).getByLabelText("Beta audits, comes in if you give $12,000"))
+      .toBeInTheDocument()
+  );
+  fireEvent.change(field, { target: { value: "" } });
+  await waitFor(() => expect(within(daoBallot()).queryByText(/if you give/)).toBeNull());
 });
 
 it("once S-Tier settles, the figures are to A-Tier and S-Tier's chips are gold", async () => {
@@ -711,7 +726,7 @@ it("beside the round box: the three closest to the tier settling now", async () 
   // Picking one opens it in the list, with its preview on TheDAO's ballot.
   fireEvent.click(picks[0]);
   expect(list().getByRole("button", { name: /Beta audits/, expanded: true })).toBeInTheDocument();
-  expect(within(daoBallot()).getByLabelText("Beta audits, comes in with your $3,000"))
+  expect(within(daoBallot()).getByLabelText("Beta audits, comes in if you give $3,000"))
     .toBeInTheDocument();
 });
 

@@ -46,8 +46,9 @@ export default function TestDonate(
   const [status, setStatus] = useState<{ kind: "ok" | "err" | "wait"; text: string } | null>(
     null,
   );
-  // Another initiative: start from its suggestion. A new suggestion for the same one (the
-  // round changed on-chain) replaces the amount only if it was the last suggestion.
+  // Another initiative: start from its suggestion. For the same one the amount never moves
+  // (#100): a new suggestion shows in the chips, and the preview says what the amount
+  // does now. Only a form that opened before any suggestion takes the first, if empty.
   const suggestedFor = useRef({ slug, usd: first?.usd });
   useEffect(() => {
     const was = suggestedFor.current;
@@ -57,10 +58,9 @@ export default function TestDonate(
       if (first) setAmount(String(first.usd));
       return;
     }
-    if (!first) return;
-    setAmount((
-      cur,
-    ) => (was.usd === undefined || cur === String(was.usd) ? String(first.usd) : cur));
+    if (first && was.usd === undefined) {
+      setAmount((cur) => (cur === "" ? String(first.usd) : cur));
+    }
   }, [first?.usd, slug]); // eslint-disable-line react-hooks/exhaustive-deps
   const onAmountRef = useRef(onAmount);
   onAmountRef.current = onAmount;

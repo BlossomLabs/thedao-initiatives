@@ -72,7 +72,7 @@ export default function FinalTiers(
     /** Names the table for screen readers: "Your ballot", "TheDAO's result". */
     label: string;
     /** A donation's preview (the vote results): what comes into a tier with it, with the
-     * dollars given (dashed green, "+$X yours"), what drops out (red, struck through,
+     * dollars it would take (dashed green, "+$X if you give"), what drops out (red, struck through,
      * "dropped out"), and what it moves to another tier (`moved`: the tier it came from;
      * yellow, an arrow and "from S-Tier"). */
     joining?: ReadonlyMap<string, number>;
@@ -170,7 +170,7 @@ export default function FinalTiers(
                       TIERS.indexOf(t.tier) < TIERS.indexOf(from);
                     const out = !isFunded && Boolean(withdrawn?.has(i.slug));
                     const label = given !== undefined
-                      ? `${i.title}, comes in with your ${dollars(given)}`
+                      ? `${i.title}, comes in if you give ${dollars(given)}`
                       : gone
                       ? `${i.title}, drops out`
                       : from
@@ -276,7 +276,7 @@ export default function FinalTiers(
                           : given !== undefined
                           ? (
                             <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-[#a7e3a5] tnum">
-                              +{dollars(given)} yours
+                              +{dollars(given)} if you give
                             </span>
                           )
                           : out

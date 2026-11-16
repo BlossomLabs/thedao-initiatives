@@ -135,3 +135,17 @@ it("never offers or sends more than the initiative still needs (#102)", () => {
   expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.getByRole("button", { name: "Donate test dollars" })).toBeEnabled();
 });
+
+it("a new suggestion for the same initiative never moves the amount (#100)", () => {
+  const at = (usd: number) => (
+    <TestDonate
+      slug="beta"
+      suggested={[{ usd, note: "brings it into A-Tier", label: "to A-Tier" }]}
+    />
+  );
+  const { rerender } = render(at(4050));
+  const amount = () => (screen.getByLabelText("Amount in US dollars") as HTMLInputElement).value;
+  expect(amount()).toBe("4050");
+  rerender(at(3000));
+  expect(amount()).toBe("4050");
+});

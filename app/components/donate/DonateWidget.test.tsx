@@ -193,26 +193,30 @@ it("on an example page, Donate and the address only say nothing is donated", () 
   expect(mock.setStatus).toHaveBeenLastCalledWith({ kind: "wait", text: EXAMPLE_NOTE });
 });
 
-it("a new suggestion (the round changed on-chain) follows the suggested amount, never a typed one", () => {
-  const at = (usd: number, initiativeId = "id") => (
+it("a new suggestion (the round changed on-chain) never moves the amount: it stays what was offered or typed (#100)", () => {
+  const at = (usd: number | undefined, initiativeId = "id") => (
     <MemoryRouter>
       <DonateWidget
         initiativeId={initiativeId}
         slug="test"
         safeAddress={SAFE}
-        suggested={{ usd, note: "gets it into S-Tier" }}
+        suggested={usd === undefined ? undefined : { usd, note: "gets it into S-Tier" }}
       />
     </MemoryRouter>
   );
-  const { rerender } = render(at(9000));
+  const { rerender } = render(at(undefined));
   // No wallet in the test browser: the exchange tab leads.
   fireEvent.click(screen.getByText("Wallet"));
   const amount = () => (screen.getByLabelText("Amount in US dollars") as HTMLInputElement).value;
+  expect(amount()).toBe("");
+  // The first suggestion arrives after the form opened: it fills the empty field once.
+  rerender(at(9000));
   expect(amount()).toBe("9000");
-  // Somebody else voted: the gap is smaller now. Untouched, the amount follows it.
+  // Somebody else voted: the gap is smaller now. The amount stays; the chip shows the new one.
   rerender(at(8000));
-  expect(amount()).toBe("8000");
-  // Typed: it stays, whatever the next poll suggests.
+  expect(amount()).toBe("9000");
+  expect(screen.getByRole("button", { name: /\$8,000/ })).toBeInTheDocument();
+  // Typed: it stays too.
   fireEvent.change(screen.getByLabelText("Amount in US dollars"), { target: { value: "5000" } });
   rerender(at(7000));
   expect(amount()).toBe("5000");

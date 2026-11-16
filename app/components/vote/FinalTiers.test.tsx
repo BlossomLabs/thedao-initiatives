@@ -201,8 +201,8 @@ describe("a donation's preview", () => {
         leaving={new Set(["b"])}
       />,
     );
-    expect(screen.getByLabelText("Alpha, comes in with your $8,412")).toHaveTextContent(
-      "+$8,412 yours",
+    expect(screen.getByLabelText("Alpha, comes in if you give $8,412")).toHaveTextContent(
+      "+$8,412 if you give",
     );
     // What drops out says so in place of its amount, which no longer counts in its tier's.
     expect(screen.getByLabelText("Beta, drops out")).toHaveTextContent("dropped out");

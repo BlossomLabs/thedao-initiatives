@@ -290,6 +290,13 @@ three retired `terms_accept*` shapes, and the maintenance flag itself. The file 
 field (contacts, funders, comment emails): keep it as safely as the database. A stored value the
 format cannot carry (there is none today) fails the export with 500 rather than dropping data.
 
+Within `vote`, exports omit the relayer lease, pending ballot receipts, pledge outcome receipts,
+and derived round/ballot caches, whose expirations cannot be carried by this format. Restores skip
+those keys in older files too, without overwriting or deleting a destination's active lease.
+Comment votes, relayer nonce journals, relay counts, gas grants and unsettled pledge records remain
+durable. A permanent orphan lease left by a restore performed before this fix is not automatically
+removed: repair it only when no relayer send is active.
+
 **Restore**: `POST /api/admin/restore` `{mode?: "merge" | "replace", backup}` (recent
 authentication, up to 32 MB, audited as `backup.restore` with the mode as detail) only while
 maintenance mode is on (409 otherwise). `merge` (the default) writes only the keys that do not exist

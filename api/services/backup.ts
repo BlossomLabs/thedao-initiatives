@@ -72,6 +72,17 @@ const BATCH_BYTES = 600 * 1024;
 const GET_MANY_LIMIT = 10;
 
 const isFlagKey = (key: BackupKey) => key[0] === "meta" && key[1] === MAINTENANCE_META_KEY;
+/** Vote shares a prefix with durable comments, nonce journals and pledge records.
+ * These particular leases, receipts and derived caches cannot survive losing TTL. */
+function isTransientVoteKey(key: BackupKey): boolean {
+  if (key[0] !== "vote") return false;
+  if (key.length === 2 && key[1] === "relayer") return true;
+  if (typeof key[1] !== "string" || !/^0x[0-9a-f]{40}$/i.test(key[1])) return false;
+  if (key.length === 5 && (key[2] === "pending" || key[2] === "pledge-outcome")) return true;
+  return (key.length === 3 || key[2] === "corrections1") &&
+    (key.at(-1) === "round" || key.at(-1) === "ballots");
+}
+const excludedKey = (key: BackupKey) => isFlagKey(key) || isTransientVoteKey(key);
 const keyId = (key: BackupKey) => JSON.stringify(key);
 
 /** JSON carries strings, finite numbers, booleans, null, arrays and plain objects. */
@@ -100,7 +111,7 @@ export async function exportBackup(db: Db, now: () => number): Promise<BackupFil
         if (typeof part === "string" || typeof part === "number") return part;
         throw new HttpError(500, `backup: unsupported key under ${prefix}`);
       });
-      if (isFlagKey(key)) continue;
+      if (excludedKey(key)) continue;
       if (!jsonSafe(e.value)) throw new HttpError(500, `backup: unsupported value under ${prefix}`);
       entries.push({ key, value: e.value });
       n++;
@@ -180,7 +191,8 @@ function* batches(entries: BackupEntry[]): Generator<BackupEntry[]> {
 
 /**
  * Merge writes only the keys that do not exist yet; replace overwrites them.
- * Neither deletes anything, and the maintenance flag inside a file is ignored.
+ * Neither deletes anything. Ignore maintenance and transient vote entries even
+ * in old backup files; never replace or delete a live lease on the destination.
  */
 export async function restoreBackup(
   db: Db,
@@ -210,8 +222,11 @@ export async function restoreBackup(
   };
 
   const entries = backup.entries.filter((e) => {
-    if (isFlagKey(e.key)) result.skipped++;
-    return !isFlagKey(e.key);
+    if (excludedKey(e.key)) {
+      result.skipped++;
+      return false;
+    }
+    return true;
   });
   for (const batch of batches(entries)) {
     let pending = batch;

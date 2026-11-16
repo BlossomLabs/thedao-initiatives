@@ -8,6 +8,7 @@ import type { Config } from "../config.ts";
 import { isStructured } from "../../shared/draft/mod.ts";
 import { type CardRow, pickText } from "../db/initiatives.ts";
 import { categoriesOf } from "../../shared/categories.ts";
+import { donationDetail } from "./donation-detail.ts";
 
 export function ipfsUrl(config: Config, cid: string): string {
   return cid ? `https://${config.pinataGateway}/ipfs/${cid}` : "";
@@ -171,7 +172,7 @@ export function donationJson(
     amountUsd: d.amountUsd,
     donor: d.donor,
     status: d.status,
-    detail: d.detail,
+    detail: donationDetail(d.detail),
     source: d.source,
     createdAt: d.createdAt,
     confirmedAt: d.confirmedAt,

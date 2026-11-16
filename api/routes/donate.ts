@@ -13,6 +13,7 @@ import type { ExchangeDetails, WalletIntent } from "../../shared/terms.ts";
 import { publishedDonationTerms } from "../services/donation-terms.ts";
 import { donationSession, requireDonationOrigin } from "../lib/donation-session.ts";
 import { matchDonation } from "../services/donation-matching.ts";
+import { donationDetail } from "../lib/donation-detail.ts";
 
 const TX_HASH_RE = /^0x[0-9a-f]{64}$/;
 const ATTEMPT_RE = /^[A-Za-z0-9_-]{43}$/;
@@ -232,7 +233,7 @@ export function donateRoutes(deps: Deps) {
     return c.json({
       status,
       association: association ? await db.terms.association(association.attemptId) : undefined,
-      detail: v.detail,
+      detail: donationDetail(v.detail),
       amount: v.amount,
       token: v.tokenSymbol,
       amountUsd: v.amountUsd,
@@ -259,7 +260,7 @@ export function donateRoutes(deps: Deps) {
     }
     return c.json({
       status: row.status,
-      detail: row.detail,
+      detail: donationDetail(row.detail),
       amount: tokenQty(row, decimalsOf),
       token: row.tokenSymbol,
       amountUsd: row.amountUsd,

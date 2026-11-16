@@ -4,6 +4,7 @@ import { decodeHexInt } from "./abi.ts";
 import { eventTopic } from "./keccak.ts";
 import { getBlockNumber, type Rpc } from "./rpc.ts";
 import type { UsdRate } from "./price.ts";
+import { PRICE_UNAVAILABLE_DETAIL } from "../lib/donation-detail.ts";
 
 export const TRANSFER_TOPIC = eventTopic("Transfer(address,address,uint256)");
 
@@ -147,9 +148,9 @@ export async function verifyDonationTx(
     let rate: number;
     try {
       rate = await usdRate(creditedSym);
-    } catch (e) {
+    } catch {
       r.pending = true;
-      r.detail = `price feed unavailable, will retry: ${String(e)}`;
+      r.detail = PRICE_UNAVAILABLE_DETAIL;
       return r;
     }
     r.singleTransfer = matchingLogs === 1;
@@ -180,9 +181,9 @@ export async function verifyDonationTx(
         let rate: number;
         try {
           rate = await usdRate("ETH");
-        } catch (e) {
+        } catch {
           r.pending = true;
-          r.detail = `price feed unavailable, will retry: ${String(e)}`;
+          r.detail = PRICE_UNAVAILABLE_DETAIL;
           return r;
         }
         r.singleTransfer = true;

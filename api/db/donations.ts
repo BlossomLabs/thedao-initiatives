@@ -1,6 +1,7 @@
 import { collect, K, type ReadOptions } from "./keys.ts";
 import type { Donation, DonationStatus } from "./types.ts";
 import type { Verification } from "../chain/verify.ts";
+import { donationDetail } from "../lib/donation-detail.ts";
 
 export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
   const get = async (rfpId: string, tx: string) =>
@@ -37,7 +38,7 @@ export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions 
         amountUsd: v.amountUsd,
         donor: v.donor,
         status,
-        detail: v.detail,
+        detail: donationDetail(v.detail),
         source,
         createdAt: cur.value?.createdAt ?? t,
         confirmedAt: status === "confirmed" ? t : null,

@@ -14,6 +14,7 @@ import type { Chain } from "../chain/mod.ts";
 import type { Initiative, SafeSyncState } from "../db/types.ts";
 import type { Verification } from "../chain/verify.ts";
 import { toChecksum } from "../chain/address.ts";
+import { PRICE_UNAVAILABLE_DETAIL } from "../lib/donation-detail.ts";
 
 /** What a Safe sync reads from an initiative: a board card row carries these. */
 export type SafeRow = Pick<Initiative, "id" | "safeAddress" | "slug">;
@@ -124,12 +125,12 @@ async function creditTx(
         };
         await deps.db.donations.record(initiative.id, txHash, v, "safe-api");
         return;
-      } catch (e) {
+      } catch {
         v = {
           ...v,
           found: true,
           pending: true,
-          detail: `price feed unavailable, will retry: ${String(e)}`,
+          detail: PRICE_UNAVAILABLE_DETAIL,
         };
         await deps.db.donations.record(initiative.id, txHash, v, "safe-api");
         return;

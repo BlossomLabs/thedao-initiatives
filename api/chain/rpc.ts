@@ -20,9 +20,12 @@ export function createRpc(opts: RpcOptions): Rpc {
     const n = opts.endpoints.length;
     if (n === 0) throw new RpcError("no RPC endpoints configured");
     const start = lastGood < n ? lastGood : 0;
-    let lastErr: unknown = null;
+    let lastFailure = "request failed";
     for (let k = 0; k < n; k++) {
       const i = (start + k) % n;
+      // Fetch exceptions and provider payloads can echo credential-bearing URLs.
+      // Retain only an endpoint ordinal and protocol status, never their text.
+      lastFailure = `endpoint ${i + 1}: request failed`;
       try {
         const res = await f(opts.endpoints[i], {
           method: "POST",
@@ -33,16 +36,22 @@ export function createRpc(opts: RpcOptions): Rpc {
           body,
           signal: AbortSignal.timeout(timeoutMs),
         });
-        if (!res.ok) throw new RpcError(`HTTP ${res.status} from ${opts.endpoints[i]}`);
+        if (!res.ok) {
+          lastFailure = `endpoint ${i + 1}: HTTP ${res.status}`;
+          continue;
+        }
         const out = await res.json() as { result?: unknown; error?: unknown };
-        if (out.error) throw new RpcError(JSON.stringify(out.error));
+        if (out.error) {
+          const code = (out.error as { code?: unknown }).code;
+          lastFailure = `endpoint ${i + 1}: JSON-RPC error` +
+            (typeof code === "number" && Number.isFinite(code) ? ` ${code}` : "");
+          continue;
+        }
         lastGood = i;
         return out.result ?? null;
-      } catch (e) {
-        lastErr = e;
-      }
+      } catch { /* Try the next endpoint without retaining exception text. */ }
     }
-    throw new RpcError(`all RPC endpoints failed: ${String(lastErr)}`);
+    throw new RpcError(`all RPC endpoints failed: ${lastFailure}`);
   };
 }
 

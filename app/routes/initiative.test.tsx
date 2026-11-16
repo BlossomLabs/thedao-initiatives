@@ -246,7 +246,7 @@ it("an archived page says so first, with the same stamp a counted ballot gets (#
     .toBeInTheDocument();
   expect(screen.queryByText("Donations are temporarily unavailable.")).toBeNull();
   // No pledge invitation, no next step.
-  expect(screen.queryByText("Back this initiative")).toBeNull();
+  expect(screen.queryByText("Pledge to this initiative")).toBeNull();
   expect(screen.queryByText("What happens next")).toBeNull();
   // A record, not for search engines.
   expect(document.querySelector('meta[name="robots"]')).toHaveAttribute("content", "noindex");
@@ -254,7 +254,7 @@ it("an archived page says so first, with the same stamp a counted ballot gets (#
   show("approved");
   expect(screen.queryByRole("note", { name: "Archived" })).toBeNull();
   expect(document.querySelector('meta[name="robots"]')).toBeNull();
-  expect(screen.getByText("Back this initiative")).toBeInTheDocument();
+  expect(screen.getByText("Pledge to this initiative")).toBeInTheDocument();
   expect(screen.getByText("What happens next")).toBeInTheDocument();
   expect(screen.getByText("Donations are temporarily unavailable.")).toBeInTheDocument();
 });

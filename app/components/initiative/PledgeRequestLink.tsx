@@ -1,20 +1,19 @@
+import { Button } from "~/components/ui/Button";
 import { useSiteSettings } from "~/hooks/use-site-settings";
 import { openPledgeRequest } from "~/lib/support";
 
+/** The red Pledge button of an initiative page: opens the pledge form for this initiative. */
 export default function PledgeRequestLink({ initiativeId }: { initiativeId: string }) {
   const { data } = useSiteSettings();
   if (!data?.support) return null;
   return (
-    <>
-      {" or use the "}
-      <button
-        type="button"
-        onClick={() => openPledgeRequest(initiativeId)}
-        aria-haspopup="dialog"
-        className="cursor-pointer text-dao-green"
-      >
-        support form
-      </button>
-    </>
+    <Button
+      variant="primary"
+      className="mt-3 w-full"
+      onClick={() => openPledgeRequest(initiativeId)}
+      aria-haspopup="dialog"
+    >
+      Pledge
+    </Button>
   );
 }

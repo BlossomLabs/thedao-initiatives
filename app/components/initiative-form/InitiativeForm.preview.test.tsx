@@ -79,10 +79,10 @@ describe("InitiativeForm preview", () => {
     const cards = [...(facts.parentElement as HTMLElement).querySelectorAll(".panel > .k")]
       .map((k) => k.textContent);
     expect(cards).toEqual([
+      "Pledge to this initiative",
       "Donate to this initiative",
       "Key facts",
       "Join the discussion",
-      "Back this initiative",
       "What happens next",
     ]);
   });

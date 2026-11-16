@@ -131,7 +131,7 @@ it("searches initiatives and closes the choices on Escape while keeping the form
   expect(input).toHaveValue("Compiler security");
 });
 
-it("preselects the initiative from its support form link and updates when opened for another initiative", () => {
+it("preselects the initiative from its Pledge button and updates when opened for another initiative", () => {
   const view = (initiativeId: string) => (
     <>
       <PledgeRequestLink initiativeId={initiativeId} />
@@ -139,11 +139,11 @@ it("preselects the initiative from its support form link and updates when opened
     </>
   );
   const { rerender } = render(view("grant-id"));
-  fireEvent.click(screen.getByRole("button", { name: "support form" }));
+  fireEvent.click(screen.getByRole("button", { name: "Pledge" }));
   expect(screen.getByRole("combobox", { name: "Initiative" })).toHaveValue("Compiler security");
   expect(screen.getByRole("textbox", { name: "Pledge Amount (USD)" })).toHaveFocus();
   rerender(view("rfp-id"));
-  fireEvent.click(screen.getByRole("button", { name: "support form" }));
+  fireEvent.click(screen.getByRole("button", { name: "Pledge" }));
   expect(screen.getByRole("combobox", { name: "Initiative" })).toHaveValue("Wallet review");
   expect(screen.getByRole("textbox", { name: "Pledge Amount (USD)" })).toHaveFocus();
 });

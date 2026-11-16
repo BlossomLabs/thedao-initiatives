@@ -622,7 +622,7 @@ it("while open: TheDAO's ballot beside what it takes each initiative to move up"
   // initiative would push it out.
   const ahead = list().getByRole("button", { name: /Alpha fuzzing/ });
   expect(ahead).toHaveTextContent("$4,000");
-  expect(ahead).toHaveTextContent("$4,000could push out");
+  expect(ahead).toHaveTextContent("$4,000ahead");
   expect(ahead).not.toHaveTextContent("−");
   const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits/ });
   expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta "]);
@@ -804,7 +804,7 @@ it("once S-Tier settles, the figures are to A-Tier and S-Tier's chips are gold",
 
 it("what no donation alone brings in is counted at the end, shown on demand", async () => {
   await showOpen(openWith({ beta: give({ gap: null }) }));
-  const more = await screen.findByRole("button", { name: "+ 1 more out of reach" });
+  const more = await screen.findByRole("button", { name: "+ 1 more initiative" });
   expect(list().queryByRole("button", { name: /Beta audits/ })).toBeNull();
   fireEvent.click(more);
   expect(list().getByRole("button", { name: /Beta audits/ })).toHaveTextContent(
@@ -933,7 +933,7 @@ it("a donation that changes nothing else has no link to who", async () => {
   expect(screen.queryByRole("button", { name: /other initiative/ })).toBeNull();
 });
 
-it("green rows show checked amounts, with no threat found last", async () => {
+it("green rows show ahead amounts and hide rows without a checked amount until expanded", async () => {
   withFour();
   await showOpen(
     openWith({}, { alpha: [20_000, "S"], beta: [20_000, "S"], gamma: [10_000, "S"] }, {}, {
@@ -942,13 +942,14 @@ it("green rows show checked amounts, with no threat found last", async () => {
       gamma: null,
     }),
   );
-  // Three: two show, the link shows the third.
-  fireEvent.click(await list().findByRole("button", { name: "Show all 3 in S-Tier" }));
+  expect(list().queryByRole("button", { name: /Gamma outside/ })).toBeNull();
+  // Three: two show, the link shows the third with its amount left blank.
+  fireEvent.click(await list().findByRole("button", { name: "+ 1 more initiative" }));
   const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits|Gamma/ });
   expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Beta ", "Alpha", "Gamma"]);
-  expect(order[0]).toHaveTextContent("$1,000could push out");
-  expect(order[1]).toHaveTextContent("$12,000could push out");
-  expect(order[2]).toHaveTextContent("No threat found");
+  expect(order[0]).toHaveTextContent("$1,000ahead");
+  expect(order[1]).toHaveTextContent("$12,000ahead");
+  expect(order[2].querySelector("[data-figure]")).toHaveTextContent(/^$/);
   expect(order[2]).not.toHaveTextContent("ahead");
   expect(order[2].querySelector("b")).toBeNull();
 });
@@ -956,13 +957,13 @@ it("green rows show checked amounts, with no threat found last", async () => {
 it("a green pill shows the checked amount without rounding it to an untested donation", async () => {
   await showOpen(openWith({}, { alpha: [20_000, "S"] }, {}, { alpha: usdMicro(12_340) }));
   const row = await list().findByRole("button", { name: /Alpha fuzzing/ });
-  expect(row).toHaveTextContent("$12,340could push out");
-  expect(row).not.toHaveTextContent("ahead");
+  expect(row).toHaveTextContent("$12,340ahead");
+  expect(row).toHaveTextContent("ahead");
   fireEvent.click(row);
   expect(screen.getByText((_, el) =>
     el?.tagName === "P" &&
     el.textContent!.startsWith("A donation of $12,340")
-  )).toHaveTextContent("Smaller threats may exist.");
+  )).toHaveTextContent("Smaller donations may also do so.");
 });
 
 /** Four initiatives in S-Tier if it settled now, each a donation elsewhere from out. */
@@ -988,57 +989,71 @@ function fourGreen() {
 const greenRows = () =>
   list().queryAllByRole("button", { name: /Alpha fuzzing|Beta audits|Gamma|Delta/ });
 
-it("only two green rows show, with a link above them for the rest", async () => {
+it("every green row with an ahead amount remains visible", async () => {
   await showOpen(fourGreen());
   await list().findByRole("button", { name: /Alpha fuzzing/ });
-  expect(greenRows().map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta "]);
-  const more = list().getByRole("button", { name: "Show all 4 in S-Tier" });
-  // Above the green rows.
-  expect(more.compareDocumentPosition(greenRows()[0]) & Node.DOCUMENT_POSITION_FOLLOWING)
+  expect(greenRows().map((b) => b.textContent?.slice(0, 5)))
+    .toEqual(["Alpha", "Beta ", "Gamma", "Delta"]);
+  expect(list().queryByRole("button", { name: /^Show |^\+ / })).toBeNull();
+});
+
+/** One checked green amount, one green row with none found, one red gap and one out of reach. */
+function bothEnds() {
+  withFour();
+  return openWith(
+    { gamma: give(), delta: give({ gap: null }) },
+    { alpha: [20_000, "S"], beta: [20_000, "S"] },
+    {},
+    { alpha: usdMicro(1_000), beta: null },
+  );
+}
+
+it("one bottom link expands and collapses both ends of the list", async () => {
+  await showOpen(bothEnds());
+  const more = await list().findByRole("button", { name: "+ 2 more initiatives" });
+  expect(greenRows().map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Gamma"]);
+  expect(list().getAllByRole("button", { name: /^Show |^\+ / })).toHaveLength(1);
+  expect(greenRows()[1].compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING)
     .toBeTruthy();
+  expect(more).toHaveAttribute("aria-expanded", "false");
   fireEvent.click(more);
-  expect(greenRows()).toHaveLength(4);
-  fireEvent.click(list().getByRole("button", { name: "Show fewer" }));
-  expect(greenRows()).toHaveLength(2);
-  cleanup();
-  // Three: two show, and the link.
-  await showOpen(
-    openWith({}, { alpha: [20_000, "S"], beta: [20_000, "S"], gamma: [10_000, "S"] }, {}, {
-      alpha: usdMicro(1_000),
-      beta: usdMicro(2_000),
-      gamma: usdMicro(3_000),
-    }),
-  );
-  await list().findByRole("button", { name: "Show all 3 in S-Tier" });
-  expect(greenRows().map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta "]);
-  cleanup();
-  // Two or fewer: all of them, no link.
-  await showOpen(
-    openWith({}, { alpha: [20_000, "S"], beta: [20_000, "S"] }, {}, {
-      alpha: usdMicro(1_000),
-      beta: usdMicro(2_000),
-    }),
-  );
-  await list().findByRole("button", { name: /Beta audits/ });
-  expect(greenRows()).toHaveLength(2);
-  expect(list().queryByRole("button", { name: /^Show / })).toBeNull();
+  expect(greenRows().map((b) => b.textContent?.slice(0, 5)))
+    .toEqual(["Alpha", "Beta ", "Gamma", "Delta"]);
+  expect(greenRows()[1].querySelector("[data-figure]")).toHaveTextContent(/^$/);
+  expect(greenRows()[3]).toHaveTextContent("Out of reach for S-Tier");
+  const less = list().getByRole("button", { name: "Show fewer" });
+  expect(less).toHaveAttribute("aria-expanded", "true");
+  fireEvent.click(less);
+  expect(greenRows().map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Gamma"]);
+  expect(list().getByRole("button", { name: "+ 2 more initiatives" })).toBeInTheDocument();
 });
 
-it("an open green row stays visible while the rest are collapsed", async () => {
-  await showOpen(fourGreen());
-  fireEvent.click(await list().findByRole("button", { name: "Show all 4 in S-Tier" }));
-  fireEvent.click(list().getByRole("button", { name: /Delta reviews/ }));
+it.each([
+  { title: /Beta audits/, order: ["Alpha", "Beta ", "Gamma"] },
+  { title: /Delta reviews/, order: ["Alpha", "Gamma", "Delta"] },
+])("an open $title row remains visible when both ends are collapsed", async ({ title, order }) => {
+  await showOpen(bothEnds());
+  fireEvent.click(await list().findByRole("button", { name: "+ 2 more initiatives" }));
+  fireEvent.click(list().getByRole("button", { name: title }));
   fireEvent.click(list().getByRole("button", { name: "Show fewer" }));
-  expect(greenRows().map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta ", "Delta"]);
+  expect(greenRows().map((b) => b.textContent?.slice(0, 5))).toEqual(order);
+  expect(list().getByRole("button", { name: "+ 1 more initiative" })).toBeInTheDocument();
+  // Closing the row puts it back behind the same link.
+  fireEvent.click(list().getByRole("button", { name: title }));
+  expect(greenRows().map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Gamma"]);
+  expect(list().getByRole("button", { name: "+ 2 more initiatives" })).toBeInTheDocument();
 });
 
-it("a filter shows every matching green row", async () => {
-  await showOpen(fourGreen());
-  await list().findByRole("button", { name: "Show all 4 in S-Tier" });
+it("a filter reveals matching rows from both hidden ends", async () => {
+  await showOpen(bothEnds());
+  await list().findByRole("button", { name: "+ 2 more initiatives" });
   // Every title has an "a".
   fireEvent.change(list().getByRole("searchbox"), { target: { value: "a" } });
   await waitFor(() => expect(greenRows()).toHaveLength(4));
-  expect(list().queryByRole("button", { name: /^Show / })).toBeNull();
+  expect(list().queryByRole("button", { name: /^Show |^\+ / })).toBeNull();
+  fireEvent.change(list().getByRole("searchbox"), { target: { value: "" } });
+  await waitFor(() => expect(greenRows()).toHaveLength(2));
+  expect(list().getByRole("button", { name: "+ 2 more initiatives" })).toBeInTheDocument();
 });
 
 it("an open green row's sentence", async () => {
@@ -1053,20 +1068,21 @@ it("an open green row's sentence", async () => {
   fireEvent.click(await list().findByRole("button", { name: /Alpha fuzzing/ }));
   const [one] = sentence("A donation of $1,000");
   expect(one).toHaveTextContent(
-    "A donation of $1,000 to another initiative could push it out of S-Tier if the vote ended now.",
+    "A donation of $1,000 to another initiative could move it out of S-Tier if the vote ended now.",
   );
   expect(one).not.toHaveTextContent("Beta");
+  fireEvent.click(list().getByRole("button", { name: "+ 1 more initiative" }));
   fireEvent.click(list().getByRole("button", { name: /Beta audits/ }));
-  const [noThreat] = sentence("No threat found");
-  expect(noThreat).toHaveTextContent(
-    "No threat found from donations elsewhere to push it out of S-Tier now. Other amounts may still do so.",
+  const [included] = sentence("In S-Tier");
+  expect(included).toHaveTextContent(
+    "In S-Tier if the vote ended now. None of the donations to other initiatives we checked would move it out. Other amounts may still do so.",
   );
-  expect(noThreat).not.toHaveTextContent("Alpha");
-  expect(noThreat).not.toHaveTextContent(/safe|No single donation/);
-  expect(one).toHaveTextContent("Smaller threats may exist.");
+  expect(included).not.toHaveTextContent("Alpha");
+  expect(included).not.toHaveTextContent(/safe|No single donation/);
+  expect(one).toHaveTextContent("Smaller donations may also do so.");
 });
 
-it("a missing green figure stays distinct from no threat found and makes no risk claim", async () => {
+it("a missing green figure stays blank without claiming donations were checked", async () => {
   withFour();
   await showOpen(
     openWith({}, { alpha: [20_000, "S"], beta: [20_000, "S"], gamma: [10_000, "S"] }, {}, {
@@ -1074,10 +1090,10 @@ it("a missing green figure stays distinct from no threat found and makes no risk
       beta: null,
     }),
   );
-  fireEvent.click(await list().findByRole("button", { name: "Show all 3 in S-Tier" }));
+  fireEvent.click(await list().findByRole("button", { name: "+ 1 more initiative" }));
   const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits|Gamma/ });
   expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta ", "Gamma"]);
-  expect(order[2]).toHaveTextContent("In S-Tier");
+  expect(order[2].querySelector("[data-figure]")).toHaveTextContent(/^$/);
   expect(order[2]).not.toHaveTextContent("safe");
   expect(order[2]).not.toHaveTextContent("ahead");
   fireEvent.click(order[2]);
@@ -1118,7 +1134,7 @@ it("with the tally's inputs, any amount is previewed: money freed brings another
   fireEvent.change(amount, { target: { value: "5000" } });
   expect(
     await screen.findByText(
-      "It asks the pool for $5,000 less. No threat found after this donation; other amounts elsewhere may still push it out.",
+      "It asks the pool for $5,000 less. None of the donations to other initiatives we checked would move it out of S-Tier after this donation. Other amounts may still do so.",
     ),
   ).toBeInTheDocument();
   // $20K frees enough for Beta ($30K) to come in.
@@ -1437,7 +1453,7 @@ describe("while the page is open", () => {
     await next(openWith({}, { alpha: [50_000, "S"] }, {}, { alpha: usdMicro(4_000) }));
     // Still red on its way down to $0, then green.
     expect(alpha().querySelector("[data-figure]")).toHaveAttribute("data-figure", "gap");
-    await waitFor(() => expect(alpha()).toHaveTextContent("$4,000could push out"), {
+    await waitFor(() => expect(alpha()).toHaveTextContent("$4,000ahead"), {
       timeout: 3000,
     });
     expect(alpha().querySelector("[data-figure]")).toHaveAttribute("data-figure", "threat");
@@ -1514,9 +1530,7 @@ describe("an open green row's jumps (worked out on the page from the tally's inp
     return jumps(inp, first, 2).map((j) => {
       const usd = Number(j.usd / 1_000_000n);
       const t = j.threat === null ? null : Number(j.threat / 1_000_000n);
-      return `$${usd} ${
-        t === null ? "No threat found" : `$${t.toLocaleString("en-US")} threat found`
-      }`;
+      return `$${usd} ${t === null ? "In S-Tier" : `$${t.toLocaleString("en-US")} ahead`}`;
     });
   };
   const chips = () =>
@@ -1529,7 +1543,7 @@ describe("an open green row's jumps (worked out on the page from the tally's inp
 
   it("an open green row suggests the donations at which its number jumps", async () => {
     const want = expectedChips(greenInputs());
-    expect(want).toEqual(["$1000 $11,000 threat found", "$10000 No threat found"]);
+    expect(want).toEqual(["$1000 $11,000 ahead", "$10000 In S-Tier"]);
     jumpsGate.hold();
     await showOpen(greenRound());
     fireEvent.click(await gammaRow());
@@ -1543,7 +1557,7 @@ describe("an open green row's jumps (worked out on the page from the tally's inp
     expect(document.querySelector("[data-cap]")).toHaveTextContent("$30000 to be funded");
   });
 
-  it("the two visible green rows are worked out before anything is opened", async () => {
+  it("the visible green rows are worked out before anything is opened", async () => {
     await showOpen(greenRound());
     await gammaRow();
     // The page works them out with nothing open.
@@ -1555,7 +1569,8 @@ describe("an open green row's jumps (worked out on the page from the tally's inp
 
   it("a row with no threat found has no jump chips", async () => {
     await showOpen(greenRound());
-    fireEvent.click(await list().findByRole("button", { name: /Delta reviews/ }));
+    fireEvent.click(await list().findByRole("button", { name: "+ 1 more initiative" }));
+    fireEvent.click(list().getByRole("button", { name: /Delta reviews/ }));
     expect(chips()).toEqual([]);
     expect(screen.queryByText(WORKING)).toBeNull();
     expect(document.querySelector("[data-cap]")).toHaveTextContent("$20000 to be funded");
@@ -1607,10 +1622,10 @@ describe("an open green row's jumps (worked out on the page from the tally's inp
     const { inp, first } = liveInputsFrom(greenInputs());
     const after = threatOf(withGift(inp, 2, 2000n * 1_000_000n), first, 2);
     const line = after === null
-      ? "It asks the pool for $2,000 less. No threat found after this donation; other amounts elsewhere may still push it out."
+      ? "It asks the pool for $2,000 less. None of the donations to other initiatives we checked would move it out of S-Tier after this donation. Other amounts may still do so."
       : `It asks the pool for $2,000 less. A donation of ${
         "$" + Number(after! / 1_000_000n).toLocaleString("en-US")
-      } elsewhere could then push it out. Smaller threats may exist.`;
+      } elsewhere could then move it out of S-Tier. Smaller donations may also do so.`;
     fireEvent.change(await screen.findByRole("spinbutton", { name: "Amount" }), {
       target: { value: "2000" },
     });
@@ -1647,6 +1662,6 @@ describe("an open green row's jumps (worked out on the page from the tally's inp
     ).toBeInTheDocument();
     await pause(500);
     expect(said()).toBeNull();
-    expect(screen.queryByText(/elsewhere could then push it out/)).toBeNull();
+    expect(screen.queryByText(/elsewhere could then move it out/)).toBeNull();
   });
 });

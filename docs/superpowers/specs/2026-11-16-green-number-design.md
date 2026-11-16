@@ -158,7 +158,7 @@ All amounts micro-USD bigints, as the rest of `shared/vote/next-tier.ts`.
 
 ## The page
 
-### List order and the two visible green rows
+### List order and shared expansion
 
 ```
 What it takes to move up
@@ -167,31 +167,29 @@ S-Tier is the tier settling now. …
 Open initiatives · 31 initiatives        [Category ▾]
 [ search … ]
 
-Show all 9 in S-Tier ↓                        ← link, only when there are more than 2
-● Initiative A   Needs $25,000 · now in S-Tier     $3k  ahead  ˅
-● Initiative B   Needs $20,000 · now in S-Tier     $7k  ahead  ˅
+● Initiative A   Needs $25,000 · now in S-Tier   $3,000  ahead  ˅
+● Initiative B   Needs $20,000 · now in S-Tier   $7,000  ahead  ˅
+● …all other green rows with a checked amount…
 ● Initiative C   Needs $30,000 · not included    −$4.1k to S-Tier ˅
 ● …the red rows, as today…
-+ 3 more out of reach
++ 3 more initiatives
 ```
 
-- Green rows stay first, as today, but sorted **closest to being pushed out first**
-  (smallest number first; safe rows last). *My call: the maintainer asked for two green
-  rows at the top without saying which; the two most at risk are where a donation
-  matters most, and this matches the red rows, sorted closest first.*
-- Only the first two green rows show. When there are more, a link **above them** says
-  how many there are and expands the rest in place ("Show all 9 in S-Tier"). Once
-  expanded it can collapse them again. The exact words are the builder's, following
-  `AGENTS.md`.
-- A filtered list (search, category, AI order) shows every matching green row: the
-  filter is already the visitor's choice of what to see. *My call.*
-- A green row that is open (from the "Closest to" box or a link) always shows, even
-  when collapsed.
+- All green rows with a checked amount remain visible, smallest amount first.
+- Green rows with no displacement found (`null`) are hidden by default. Pending
+  figures remain visible until known; they are not treated as completed searches.
+- One link below the list reveals the hidden green rows above the red rows and the
+  out-of-reach rows below them. It counts both groups and changes to "Show fewer"
+  when expanded. There is no separate link above the list.
+- Search, category filters and AI ordering reveal all matching rows from both ends.
+- An open row stays visible when the list is collapsed. Closing it returns it to
+  the hidden group when appropriate.
 
 ### A green row, closed
 
-- Pill: green, as today, the number in `usd2` ("$3k"), the word "ahead" after it.
-- Safe: no pill, "safe" in the same green small text and width as "ahead".
+- Pill: green, the full checked dollar amount ("$3,000"), with "ahead" after it.
+- With no checked amount, leave the figure area blank. The subtitle still names
+  the initiative's current tier.
 
 ### A green row, open
 
@@ -514,19 +512,22 @@ does not establish minimality when displacement disappears and returns.
 
 - A finite `live.threat` is a checked donation elsewhere that displaces the subject
   in the current inputs: an **upper bound** on the true minimum. Show its full
-  dollar amount, with "could push out" and an explanation that smaller threats may
-  exist. Do not round it to a different, unchecked donation in the pill.
+  dollar amount, with "ahead" and an explanation that smaller donations
+  elsewhere may also move it out of the tier. Do not round it to a different,
+  unchecked donation in the pill.
   When integrating the results animations from `main`, retain the red countdown
   and flip to green, but show a green amount directly. Counting between green
   values would display donations that were never checked.
-- `null` means **"No threat found"** in the attempted checks. The expanded row
-  explains that other amounts may still push it out. It never means safe.
-- Missing data stays distinct from `null`. A missing figure retains the existing
-  tier-membership label and makes no threat or safety claim.
-- Jump chips say "$X threat found" or "No threat found", with the same limitations
-  in their notes. Typed-amount results explain the reduction in the subject's ask
-  and a checked donation elsewhere, or that no threat was found. Neither promises
-  the minimum useful self-donation or a guaranteed increase in safety.
+- `null` leaves the figure area blank and hides the row behind the shared bottom
+  expansion link alongside out-of-reach rows. The expanded row explains that none
+  of the donations to other initiatives checked would move it out, but other
+  amounts may still do so. It never means safe.
+- Missing data also leaves the figure blank, but stays visible until known and its
+  expanded explanation makes no claim about checked donations.
+- Jump chips say "$X ahead" or "In S-Tier" (using the current tier), with the same
+  limitations in their notes. Typed-amount results explain the reduction in the
+  subject's ask and whether a checked donation elsewhere would move it out.
+  Neither promises the minimum useful self-donation or a guaranteed increase in safety.
 - Sorting still uses checked amounts, then no hit, then missing data. This is an
   ordering of search results, not a proven ranking of actual safety margins.
 

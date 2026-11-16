@@ -161,14 +161,19 @@ it("preselect false: the field starts empty and suggestions don't fill it", () =
   const at = (usds: number[]) => (
     <TestDonate
       slug="beta"
-      suggested={usds.map((usd) => ({ usd, note: "no threat found", label: "No threat found" }))}
+      suggested={usds.map((usd) => ({
+        usd,
+        note: "in S-Tier in the scenarios checked",
+        label: "In S-Tier",
+      }))}
       preselect={false}
     />
   );
   const { rerender } = render(at([2000, 10_000]));
   const amount = () => (screen.getByLabelText("Amount in US dollars") as HTMLInputElement).value;
   expect(amount()).toBe("");
-  expect(screen.getByRole("button", { name: "$2,000, no threat found" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "$2,000, in S-Tier in the scenarios checked" }))
+    .toBeInTheDocument();
   rerender(at([3000, 12_000]));
   expect(amount()).toBe("");
 });

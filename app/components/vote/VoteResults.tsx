@@ -444,14 +444,14 @@ export default function VoteResults(
         ? (
           <>
             It asks the pool for {usd(given)}{" "}
-            less. No threat found after this donation; other amounts elsewhere may still push it
-            out.
+            less. None of the donations to other initiatives we checked would move it out of{" "}
+            {tierName(tier)} after this donation. Other amounts may still do so.
           </>
         )
         : (
           <>
             It asks the pool for {usd(given)} less. A donation of {usd(typedThreat!)}{" "}
-            elsewhere could then push it out. Smaller threats may exist.
+            elsewhere could then move it out of {tierName(tier)}. Smaller donations may also do so.
           </>
         )}
     </p>

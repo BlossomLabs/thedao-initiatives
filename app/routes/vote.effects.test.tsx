@@ -42,15 +42,15 @@ it("a green figure updates directly to the checked amount without counting throu
     const { rerender, container } = render(
       <RowFigure kind="threat" usd={12_340} name="S-Tier" />,
     );
-    expect(container).toHaveTextContent("$12,340could push out");
+    expect(container).toHaveTextContent("$12,340ahead");
     rerender(<RowFigure kind="threat" usd={37_890} name="S-Tier" />);
-    expect(container).toHaveTextContent("$37,890could push out");
+    expect(container).toHaveTextContent("$37,890ahead");
     expect(frame).not.toHaveBeenCalled();
     rerender(<RowFigure kind="threat" usd={null} name="S-Tier" />);
-    expect(container).toHaveTextContent("No threat found");
+    expect(container.querySelector("[data-figure]")).toHaveTextContent(/^$/);
     expect(container.querySelector("b")).toBeNull();
     rerender(<RowFigure kind="threat" usd={undefined} name="S-Tier" />);
-    expect(container).toHaveTextContent("In S-Tier");
+    expect(container.querySelector("[data-figure]")).toHaveTextContent(/^$/);
   } finally {
     frame.mockRestore();
   }

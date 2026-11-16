@@ -40,9 +40,6 @@ export type GiveRow = {
   now?: Tier;
 };
 
-/** How many green rows show while the list is unfiltered and not expanded. */
-const GREEN_SHOWN = 2;
-
 /** Green rows' order: smallest checked threat first, then none found, then unknown
  * (two unknown: Infinity − Infinity is NaN, read as a tie). */
 const threatRank = (r: GiveRow) =>
@@ -165,6 +162,11 @@ export function RowFigure(
   return (
     <span
       data-figure={view.kind}
+      title={view.kind === "threat" && typeof view.value === "number"
+        ? `${
+          usd(view.value)
+        } donated elsewhere could move it out of ${name}; smaller amounts may also do so.`
+        : undefined}
       className="flex flex-none items-center gap-1.5 whitespace-nowrap [perspective:400px]"
     >
       {view.kind === "gap"
@@ -198,12 +200,8 @@ export function RowFigure(
             {
               // The words after the pill keep one width, so every pill lines up.
             }
-            <small className="w-[64px] whitespace-normal text-[12px] leading-tight text-[#a7e3a5]">
-              {view.value === undefined
-                ? `In ${name}`
-                : view.value === null
-                ? "No threat found"
-                : "could push out"}
+            <small className="w-[46px] text-[12px] text-[#a7e3a5]">
+              {typeof view.value === "number" ? "ahead" : ""}
             </small>
           </>
         )}
@@ -236,12 +234,12 @@ function KnockOnList(
 /**
  * The vote results' call to action: every open initiative. Those in the tier settling now
  * first, smallest checked threat first, with a donation elsewhere that could push each
- * out (green; "No threat found" when the search found none). Only two show unless the list is
- * filtered, expanded or one of the others is open. Then the rest,
+ * out (green; blank when the search found none). Rows with no amount found stay folded
+ * unless the list is filtered, expanded or the row is open. Then the rest,
  * closest first, with what a donation would take to move each up a tier, into B-Tier
  * when it isn't funded (a red number: money missing). Opening one shows the donate form, starting from that amount;
  * what it would change is previewed on TheDAO's ballot beside it. Those no donation alone
- * moves up are counted at the end, and can still be opened.
+ * moves up and the remaining green rows share one expansion link at the end.
  */
 export default function GiveList(
   {
@@ -299,8 +297,7 @@ export default function GiveList(
   },
 ) {
   const name = tierName(tier);
-  const [showFar, setShowFar] = useState(false);
-  const [showGreen, setShowGreen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   /** The row whose "moves N other initiatives" list is open. */
   const [knock, setKnock] = useState<string>();
   // The ballot editor's search (keywords, or AI) and category filter, over the list.
@@ -321,7 +318,7 @@ export default function GiveList(
   const titleOf = (slug: string) => titles.get(slug) ?? slug;
   const counts = useMemo(() => facetCounts(all.map((r) => r.card), shownView), [all, shownView]);
   const filtered = isFiltered(shownView);
-  // AI asked as the visitor types: about to filter, so the green rows don't fold meanwhile.
+  // AI asked as the visitor types: about to filter, so the list doesn't fold meanwhile.
   const aiAsking = Boolean(search.aiAuto && asking);
   const found = all.filter((r) => matches(r.card, shownView));
   // Closest first; with the AI order on, the best matches first.
@@ -331,11 +328,12 @@ export default function GiveList(
   // (below them) those closest to coming in.
   const ahead = found.filter((r) => !r.entry)
     .sort((a, b) => ai ? of(b) - of(a) : threatRank(a) - threatRank(b) || 0);
-  // Unfiltered, two green rows show (and the open one); a link above them shows the rest.
-  const greenFold = !filtered && !ai && !aiAsking && ahead.length > GREEN_SHOWN;
-  const green = greenFold && !showGreen
-    ? ahead.filter((r, k) => k < GREEN_SHOWN || r.card.initiative.slug === open)
-    : ahead;
+  const searching = filtered || ai || aiAsking;
+  const expanded = showAll || searching;
+  // A completed search with no amount stays folded. Pending figures keep their place
+  // until known; an open row stays visible when the list is collapsed.
+  const keepGreen = (r: GiveRow) => r.threat !== null || r.card.initiative.slug === open;
+  const green = expanded ? ahead : ahead.filter(keepGreen);
   // The page works out the green rows shown first, then the others, closest first.
   const greenShown = new Set(green.map((r) => r.card.initiative.slug));
   const visibleKey = [...greenShown].join("\n");
@@ -354,9 +352,13 @@ export default function GiveList(
     .sort((a, b) =>
       ai ? of(b) - of(a) : a.card.initiative.title.localeCompare(b.card.initiative.title)
     );
-  const shown = showFar || far.some((r) => r.card.initiative.slug === open)
-    ? [...green, ...near, ...far]
-    : [...green, ...near];
+  const closedFar = far.filter((r) => r.card.initiative.slug !== open);
+  const moreCount = ahead.filter((r) => !keepGreen(r)).length + closedFar.length;
+  const shown = [
+    ...green,
+    ...near,
+    ...far.filter((r) => expanded || r.card.initiative.slug === open),
+  ];
 
   return (
     <section aria-labelledby="give-heading" className="min-w-0">
@@ -369,8 +371,8 @@ export default function GiveList(
       <p className="m-0 mt-1.5 text-[14px] leading-snug text-white/65">
         {name}{" "}
         is the tier settling now. Donations count in the next tally: the red number is what each
-        initiative still misses to move up a tier if the vote ended now. A green number is a
-        donation elsewhere that could push it out of {name}. Smaller threats may exist.
+        initiative still misses to move up a tier if the vote ended now. The green “ahead” amount is
+        a donation elsewhere that could move it out of {name}. Smaller donations may also do so.
       </p>
       {rows !== undefined && rows.length > 0 && (
         <div className="mt-4">
@@ -409,19 +411,6 @@ export default function GiveList(
           Something changed on-chain: these figures are being updated.
         </p>
       )}
-      {
-        // More than two green rows, unfiltered: a link above them to show them all.
-        greenFold && (
-          <button
-            type="button"
-            aria-expanded={showGreen}
-            onClick={() => setShowGreen(!showGreen)}
-            className="mt-3 cursor-pointer px-1 text-[13px] text-white/55 underline-offset-2 hover:text-white hover:underline"
-          >
-            {showGreen ? "Show fewer" : `Show all ${ahead.length} in ${name}`}
-          </button>
-        )
-      }
       {rows === undefined
         ? <p className="mt-5 text-[14px] text-white/55">Working out what each initiative needs…</p>
         : rows.length === 0
@@ -469,11 +458,11 @@ export default function GiveList(
                 ? rowJumps?.map((j) => ({
                   usd: j.usd,
                   note: j.threat === null
-                    ? "no threat found after this donation; other amounts may still push it out"
+                    ? `after this donation, none of the donations to other initiatives we checked would move it out of ${name}; other amounts may still do so`
                     : `then a donation of ${
                       usd(j.threat)
-                    } elsewhere could push it out; smaller threats may exist`,
-                  label: j.threat === null ? "No threat found" : `${usd(j.threat)} threat found`,
+                    } elsewhere could move it out of ${name}; smaller donations may also do so`,
+                  label: j.threat === null ? `In ${name}` : `${usd(j.threat)} ahead`,
                 }))
                 : steps?.length
                 ? steps.map((x) => ({
@@ -556,20 +545,20 @@ export default function GiveList(
                               : r.threat === null
                               ? (
                                 <>
-                                  No threat found from donations elsewhere to push it out of{" "}
-                                  <span className="whitespace-nowrap">{name}</span>{" "}
-                                  now. Other amounts may still do so. A donation lowers what it asks
-                                  of the pool.
+                                  In <span className="whitespace-nowrap">{name}</span>{" "}
+                                  if the vote ended now. None of the donations to other initiatives
+                                  we checked would move it out. Other amounts may still do so. A
+                                  donation lowers what it asks of the pool.
                                 </>
                               )
                               : (
                                 <>
                                   A donation of{" "}
                                   <b className="font-semibold text-white">{usd(r.threat)}</b>{" "}
-                                  to another initiative could push it out of{" "}
+                                  to another initiative could move it out of{" "}
                                   <span className="whitespace-nowrap">{name}</span>{" "}
-                                  if the vote ended now. Smaller threats may exist. A donation
-                                  lowers what it asks of the pool.
+                                  if the vote ended now. Smaller donations may also do so. A
+                                  donation lowers what it asks of the pool.
                                 </>
                               )
                           )
@@ -678,13 +667,16 @@ export default function GiveList(
             })}
           </ul>
         )}
-      {far.length > 0 && !shown.includes(far[0]) && (
+      {!searching && moreCount > 0 && (
         <button
           type="button"
-          onClick={() => setShowFar(true)}
+          aria-expanded={showAll}
+          onClick={() => setShowAll(!showAll)}
           className="mt-2 cursor-pointer text-[13px] text-white/55 underline-offset-2 hover:text-white hover:underline"
         >
-          + {far.length} more out of reach
+          {showAll
+            ? "Show fewer"
+            : `+ ${moreCount} more ${moreCount === 1 ? "initiative" : "initiatives"}`}
         </button>
       )}
     </section>

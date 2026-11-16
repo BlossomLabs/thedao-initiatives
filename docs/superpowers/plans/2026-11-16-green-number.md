@@ -184,6 +184,13 @@ git commit -m "Vote: serve each green row's threat instead of its lead (#98)"
 
 ### Task 4: Green rows in the list
 
+**Current presentation update (supersedes the original folding instructions below):**
+Show every finite checked amount as "$X ahead". Leave missing and `null` figures
+blank; only `null` rows are hidden above by default. One bottom "+ N more initiatives"
+link reveals these rows and the out-of-reach rows together, and toggles to "Show fewer".
+Search reveals matching rows from both ends, and open rows remain visible on collapse.
+
+
 **Files:**
 - Modify: `app/components/vote/GiveList.tsx` (`GiveRow`, sort, collapse, closed and open green row)
 - Modify: `app/components/vote/VoteResults.tsx:130-170` (rows from `live.threat`)
@@ -341,7 +348,7 @@ git commit -m "Vote results: an open green row suggests the donations at which i
 Run: `deno task test && deno task test:api && deno task typecheck && deno lint && deno fmt --check`
 Expected: all pass (the one file `deno fmt --check` already flagged on `main` may remain; nothing new).
 
-- [ ] **Step 2: See it**: start the app (the `run` skill or the project's dev task) and open `/vote/results/s-settling`: two green rows with full dollar amounts and "could push out" or "No threat found", the "Show all N in S-Tier" link above them, the visible green rows' chips ready on opening (the worker shows in the browser's devtools), typing an amount updates the line, scrolling stays smooth while it works. Check narrow-screen wrapping of the longer labels and screenshot it for the maintainer.
+- [ ] **Step 2: See it**: start the app (the `run` skill or the project's dev task) and open `/vote/results/s-settling`: all green rows with checked dollar amounts and "ahead", blank figures for rows with no amount, and one bottom "+ N more initiatives" link revealing both hidden green rows and out-of-reach rows, the visible green rows' chips ready on opening (the worker shows in the browser's devtools), typing an amount updates the line, scrolling stays smooth while it works. Check narrow-screen wrapping of the longer labels and screenshot it for the maintainer.
 
 - [ ] **Step 3: Note the timings** of the server search on the example round in the final message (from a quick `performance.now()` around `threatsAsync` in a scratch script, not committed).
 

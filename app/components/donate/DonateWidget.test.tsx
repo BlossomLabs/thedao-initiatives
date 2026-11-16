@@ -232,7 +232,11 @@ it("preselect false: the field starts empty and suggestions don't fill it", () =
         initiativeId="id"
         slug="test"
         safeAddress={SAFE}
-        suggested={usds.map((usd) => ({ usd, note: "no threat found", label: "No threat found" }))}
+        suggested={usds.map((usd) => ({
+          usd,
+          note: "in S-Tier in the scenarios checked",
+          label: "In S-Tier",
+        }))}
         preselect={false}
       />
     </MemoryRouter>
@@ -242,7 +246,8 @@ it("preselect false: the field starts empty and suggestions don't fill it", () =
   const amount = () => (screen.getByLabelText("Amount in US dollars") as HTMLInputElement).value;
   expect(amount()).toBe("");
   // The suggestions are chips all the same.
-  expect(screen.getByRole("button", { name: "$2,000, no threat found" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "$2,000, in S-Tier in the scenarios checked" }))
+    .toBeInTheDocument();
   rerender(at([3000, 12_000]));
   expect(amount()).toBe("");
 });

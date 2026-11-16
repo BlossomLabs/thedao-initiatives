@@ -9,7 +9,7 @@ import BoardPage from "~/components/board/BoardPage";
 import Hero from "~/components/board/Hero";
 import PledgeBand from "~/components/board/PledgeBand";
 import PageMain from "~/components/layout/PageMain";
-import StickyAside from "~/components/layout/StickyAside";
+import ScrollAside from "~/components/layout/ScrollAside";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { boardKey, useBoard } from "~/hooks/use-board";
 import {
@@ -480,12 +480,10 @@ export default function VoteResults(
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
           {
             /* Stays in view beside the long list, so a donation's preview shows by its form.
-              Taller than the screen, it scrolls with the page until its bottom shows. */
+              It scrolls on its own: the wheel over it moves only it, over the list only the
+              list (#95). */
           }
-          <StickyAside
-            narrow="(max-width: 1023.98px)"
-            className="card grid min-w-0 grid-cols-1 gap-y-2 text-[15px] leading-relaxed text-white/80 max-lg:static"
-          >
+          <ScrollAside className="card grid min-w-0 grid-cols-1 gap-y-2 text-[15px] leading-relaxed text-white/80">
             <DaoBallot
               items={items}
               result={preview?.result ?? result}
@@ -533,7 +531,7 @@ export default function VoteResults(
             />
             <Covered label="Withdrawn" titles={withdrawn.map(titleOf)} />
             <Legend preview={Boolean(preview)} />
-          </StickyAside>
+          </ScrollAside>
           <GiveList
             tier={tier}
             rows={rows}

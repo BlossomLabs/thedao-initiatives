@@ -13,7 +13,7 @@ import {
 import CategoryDot from "~/components/ui/CategoryDot";
 import type { Card } from "~/lib/api-types";
 import type { AiSearchResult } from "../../../shared/ai-search";
-import StickyAside from "~/components/layout/StickyAside";
+import ScrollAside from "~/components/layout/ScrollAside";
 import BoardSearch from "~/components/board/BoardSearch";
 import CategoryFilter from "~/components/board/filters/CategoryFilter";
 import { type BoardView, DEFAULT_VIEW, facetCounts, isFiltered, matches } from "~/lib/board-view";
@@ -1062,10 +1062,10 @@ export default function TierBallot(
         {
           /* The tier list: pinned under the top bar on a phone, the left column on wider
             screens, with the send bar under it there. On a phone this wrapper steps aside.
-            Wider, the column follows the page's scroll (no scroll of its own), so the tiers
-            stay beside the list however long either gets. */
+            Wider, the column scrolls on its own when taller than the screen: the wheel over
+            it moves only it, over the list only the list (#95). */
         }
-        <StickyAside narrow="(max-width: 639.98px)" className="contents sm:block">
+        <ScrollAside from="sm" className="contents sm:block">
           {head && <div className="order-first mb-4 sm:mb-3">{head}</div>}
           <div className="sticky top-[57px] z-20 -mx-6 mb-4 border-b border-white/10 bg-panel/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:rounded-2xl sm:border sm:bg-white/[.03] sm:p-3 sm:backdrop-blur-none">
             {
@@ -1194,7 +1194,7 @@ export default function TierBallot(
             // Phone: first, above the tiers; wider: under the send bar.
             aside && <div className="order-first mb-4 sm:mb-0 sm:mt-3">{aside}</div>
           }
-        </StickyAside>
+        </ScrollAside>
 
         {/* The list is as long as it needs: the page scrolls, on every screen. */}
         <div className="flex min-w-0 flex-col gap-4">

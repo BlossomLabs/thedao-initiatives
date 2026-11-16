@@ -121,6 +121,7 @@ export async function verifyDonationTx(
   let creditedAddr = "";
   let totalRaw = 0n;
   let donor = "";
+  let multipleSenders = false;
   let extraTokens = false;
   let matchingLogs = 0;
   for (const log of receipt.logs ?? []) {
@@ -138,8 +139,12 @@ export async function verifyDonationTx(
       creditedAddr = addr;
       donor = toChecksum("0x" + topics[1].slice(-40));
     }
-    if (addr === creditedAddr) totalRaw += raw;
-    else extraTokens = true;
+    if (addr === creditedAddr) {
+      totalRaw += raw;
+      if (donor.toLowerCase() !== "0x" + topics[1].slice(-40).toLowerCase()) {
+        multipleSenders = true;
+      }
+    } else extraTokens = true;
   }
 
   if (creditedSym !== null && totalRaw > 0n) {
@@ -163,8 +168,11 @@ export async function verifyDonationTx(
     r.amountRaw = totalRaw.toString();
     r.amount = Number(totalRaw) / 10 ** creditedDec;
     r.amountUsd = Math.round(r.amount * rate * 100) / 100;
-    r.donor = donor;
+    // The ledger has one donor per transaction. Keep the funding, but never
+    // assign another sender's amount (or its permissions) to the first log.
+    r.donor = multipleSenders ? "" : donor;
     r.detail = `verified: ${r.amount} ${creditedSym} received` +
+      (multipleSenders ? " (multiple senders; donor credit is unattributed)" : "") +
       (extraTokens ? " (other tokens in this tx were not credited)" : "");
     return r;
   }

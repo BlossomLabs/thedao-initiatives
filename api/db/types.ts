@@ -136,6 +136,7 @@ export interface Donation {
   amountRaw: string;
   /** USD value at confirmation time. */
   amountUsd: number;
+  /** Empty for a multi-sender transaction: funding counts, individual donor credit does not. */
   donor: string;
   status: DonationStatus;
   detail: string;

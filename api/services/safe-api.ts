@@ -122,6 +122,7 @@ async function creditTx(
     if (amount > 0) {
       try {
         const rate = await deps.chain.usdRate("ETH");
+        const senders = [...new Set(eth.map((r) => r.from.toLowerCase()))];
         v = {
           found: true,
           pending: false,
@@ -131,8 +132,9 @@ async function creditTx(
           amountRaw: wei.toString(),
           amount,
           amountUsd: Math.round(amount * rate * 100) / 100,
-          donor: safeChecksum(eth[0].from),
-          detail: `credited from Safe indexer: ${amount} ETH received (internal transfer)`,
+          donor: senders.length === 1 ? safeChecksum(senders[0]) : "",
+          detail: `credited from Safe indexer: ${amount} ETH received (internal transfer)` +
+            (senders.length > 1 ? " (multiple senders; donor credit is unattributed)" : ""),
         };
         await deps.db.donations.record(initiative.id, txHash, v, "safe-api");
         return;

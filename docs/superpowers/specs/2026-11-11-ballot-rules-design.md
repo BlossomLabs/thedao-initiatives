@@ -98,6 +98,17 @@ A ballot is **valid** when all of these hold:
 A revision is judged on its own like any ballot. The quiet ending's settled-tier rule
 (`tier_settled`) still applies on top.
 
+*(Amended Nov 16, 2026, see `2026-11-15-withdrawn-initiatives-design.md`.)* A withdrawn project
+asks $0 for the size rule: it adds nothing to the 1.5× total, and leaving it unplaced never
+blocks the escape "every project that still asks is placed". The independence and affiliation
+rules count it with its real ask. A settled tier cannot change, so a voter whose settled
+S-Tier holds a project that is withdrawn later must still be able to send a ballot; if the
+withdrawn project stopped counting there, their independent three or a group's share could
+fail and strand them. The cost is that a ballot sent straight to the contract can lean on a
+withdrawn project for those two rules. The site's editor relies on withdrawn projects only
+where it must keep them: in a settled tier, or as a placeholder holding an open tier's place
+so the picks below keep their tier.
+
 ### Why a proof
 
 "At least 3 projects with no shared group" is a search over combinations; on-chain with ~80 projects

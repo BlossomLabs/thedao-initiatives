@@ -341,6 +341,18 @@ any subsequent funding increase. These increases do not reopen settled tiers.
   plain PB-EAR only for $0 projects**: plain PB-EAR funds them (zero support meets zero cost),
   the staged tally does not.
 
+### Withdrawn projects
+
+An admin can withdraw a project at any time before the hard deadline and can undo it. A project
+that is withdrawn at a tally's block is not a candidate in that tally, and a withdrawn project
+that also asks $0 counts as withdrawn, not covered. When two tallies are compared, projects
+withdrawn at either are dropped from both funded sets, as covered ones are, so withdrawing and
+undoing alone never extend a window. A project withdrawn at the block a tier settles with is
+recorded apart from the covered ones, with a $0 award, and unlike covered that is not final:
+if the withdrawal is undone, it is an ordinary candidate in the tiers still open. A withdrawal
+of a project that is already settled, funded in a settled tier or covered at a settlement, is
+ignored: its award stands. The supporter lock is unchanged.
+
 The quiet comparison looks only at which projects in the settling tier are funded.
 Shifts in who pays, and changes in project need or per-NFT payment burden, matter
 only when they change that set at some tally of the window. The maximum-window

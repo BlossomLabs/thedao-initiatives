@@ -13,6 +13,7 @@ import {
   nextAddingOpen,
   parseMinters,
   parseRealArgs,
+  parseTestTiming,
   planDonationSetup,
   planGroups,
   planInitiatives,
@@ -66,7 +67,7 @@ Deno.test("planInitiatives: a Safe used twice gets a placeholder the second time
   assertNotEquals(plan[1].account.toLowerCase(), SAFE.toLowerCase());
 });
 
-Deno.test("voteSchedule: S 30 min after opening, the three tiers 30 min at most", () => {
+Deno.test("voteSchedule: S-Tier 30 min after opening, the three tiers 30 min at most", () => {
   const s = voteSchedule(1793800000);
   const open = 1793800000 + 30 * 60;
   const S = open + 30 * 60;
@@ -79,6 +80,40 @@ Deno.test("voteSchedule: S 30 min after opening, the three tiers 30 min at most"
     maxWindows: 4,
   });
   assertEquals(s.firstTallyAt[2] + tierMax(s) - S, 30 * 60);
+});
+
+Deno.test("voteSchedule: overnight rehearsal ends at the requested local noon", () => {
+  const timing = parseTestTiming({
+    until: "2026-11-17T12:00:00+05:30",
+    "setup-minutes": "10",
+  });
+  const now = at("2026-11-16T15:00:00Z");
+  const s = voteSchedule(now, timing);
+  assertEquals(s.opensAt, now + 600);
+  assertEquals(s.firstTallyAt, [
+    at("2026-11-17T06:00:00Z"),
+    at("2026-11-17T06:10:00Z"),
+    at("2026-11-17T06:20:00Z"),
+  ]);
+  assertEquals(s.firstTallyAt[2] + tierMax(s), at("2026-11-17T06:30:00Z"));
+  assertThrows(() => voteSchedule(timing.until! - 2400, timing), Error, "voting time");
+  assertThrows(() => voteSchedule(timing.until!, timing), Error, "voting time");
+});
+
+Deno.test("parseTestTiming: rejects ambiguous dates, short setups and real votes", () => {
+  assertEquals(parseTestTiming({}), {});
+  for (const until of ["tomorrow", "2026-11-17", "2026-11-17T12:00:00", ""]) {
+    assertThrows(() => parseTestTiming({ until }), Error, "explicit time zone");
+  }
+  for (const minutes of ["", "0", "-1", "4", "5.5", "NaN", "Infinity"]) {
+    assertThrows(() => parseTestTiming({ "setup-minutes": minutes }), Error, "at least 5");
+  }
+  assertThrows(
+    () => parseTestTiming({ real: true, until: "2026-11-17T06:30:00Z" }),
+    Error,
+    "test votes",
+  );
+  assertThrows(() => parseTestTiming({ real: true, "setup-minutes": "10" }), Error, "test votes");
 });
 
 const SAFE2 = "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063";

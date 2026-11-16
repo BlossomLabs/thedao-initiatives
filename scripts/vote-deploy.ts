@@ -7,8 +7,10 @@
 // (badges: Admin → Vote, or scripts/vote-sim.ts):
 //   VOTE_RELAYER_KEY=0x… SEPOLIA_RPC_URL=https://… \
 //     deno task vote-deploy [--minter 0x…] [--test-usd 0x…] [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
+// For a longer rehearsal, --until <ISO date with time zone> sets the final cutoff;
+// --setup-minutes 10 opens ten minutes after deployment (default: 30).
 // The pool is 400 ETH in dollars at Chainlink's live ETH/USD (read on mainnet:
-// MAINNET_RPC_URL, else a public node). It opens 30 min after the deploy; S-Tier's
+// MAINNET_RPC_URL, else a public node). By default it opens 30 min after the deploy; S-Tier's
 // first tally is 30 min later, and the three tiers then take 30 min at most (10 min
 // each). Donations are in a test dollar (TestUSD,
 // anyone can mint it; deployed here unless --test-usd names one), and the board's open
@@ -391,10 +393,45 @@ export function planDonationSetup(o: {
   ];
 }
 
-export function voteSchedule(now: number) {
-  const opensAt = now + SETUP_MINUTES * 60;
-  const s = opensAt + VOTING_MINUTES * 60;
+export type TestTiming = { until?: number; setupMinutes?: number };
+
+/** Explicit test timing is checked before any deployment transaction. */
+export function parseTestTiming(a: {
+  real?: boolean;
+  until?: string;
+  "setup-minutes"?: string;
+}): TestTiming {
+  if (a.real && (a.until !== undefined || a["setup-minutes"] !== undefined)) {
+    throw new Error("--until and --setup-minutes are only for test votes");
+  }
+  const timing: TestTiming = {};
+  if (a.until !== undefined) {
+    const value = a.until.trim();
+    const t = Date.parse(value);
+    if (!/T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(t)) {
+      throw new Error("--until must be an ISO date with an explicit time zone");
+    }
+    timing.until = Math.floor(t / 1000);
+  }
+  if (a["setup-minutes"] !== undefined) {
+    const n = Number(a["setup-minutes"]);
+    if (!Number.isSafeInteger(n) || n < 5) {
+      throw new Error("--setup-minutes must be a whole number of at least 5");
+    }
+    timing.setupMinutes = n;
+  }
+  return timing;
+}
+
+export function voteSchedule(now: number, timing: TestTiming = {}) {
+  const opensAt = now + (timing.setupMinutes ?? SETUP_MINUTES) * 60;
   const span = tierMax(TEST_WINDOWS);
+  const s = timing.until === undefined ? opensAt + VOTING_MINUTES * 60 : timing.until - 3 * span;
+  if (s <= opensAt) {
+    throw new Error(
+      "--until must leave voting time after setup and 30 minutes for the three tiers",
+    );
+  }
   return {
     opensAt,
     ...TEST_WINDOWS,
@@ -735,6 +772,8 @@ async function main() {
       "test-usd",
       "minter",
       "contract",
+      "until",
+      "setup-minutes",
     ],
   });
   if (args.add || args.added) return await addMain(args);
@@ -744,6 +783,7 @@ async function main() {
     throw new Error("--independent-tiers is 1 (S-Tier) or 3 (S-Tier and A-Tier)");
   }
   const real = args.real ? parseRealArgs(args) : null;
+  const testTiming = parseTestTiming(args);
   const chain = real ? mainnet : sepolia;
   // DEVCON_RELAYER_KEY: the name before the rename, still accepted.
   const key = (Deno.env.get("VOTE_RELAYER_KEY") || Deno.env.get("DEVCON_RELAYER_KEY"))?.trim() as
@@ -837,6 +877,7 @@ async function main() {
   ) as { bytecode: { object: Hex }; deployedBytecode: { object: Hex } };
   checkCodeSize("SignedBallots", artifact.deployedBytecode.object);
   const block = await pub.getBlock();
+  if (!real) voteSchedule(Number(block.timestamp), testTiming);
   if (real && Number(block.timestamp) + SETUP_MINUTES * 60 > real.opensAt) {
     throw new Error(`--opens must leave ${SETUP_MINUTES} minutes for the setup`);
   }
@@ -847,7 +888,7 @@ async function main() {
   };
 
   // A test round's donations: its own dollar, deployed before the round so it doesn't
-  // eat into the setup's 30 minutes (or one deployed earlier, reused).
+  // eat into the setup time (or one deployed earlier, reused).
   let testUsd = args["test-usd"] ? getAddress(args["test-usd"]) : null;
   if (!real && !testUsd) {
     const t = JSON.parse(
@@ -860,9 +901,10 @@ async function main() {
     console.log(`TestUSD ${testUsd}`);
   }
   const currencies = real ? MAINNET_CURRENCIES : testCurrencies(testUsd!);
-  // Opening is 30 minutes after the round's deploy, not after the script started.
+  // Reserve setup time from the round's deploy, not from when the script started.
   const s = real ? realSchedule(real.opensAt, real.tallies) : voteSchedule(
     Number((await pub.getBlock()).timestamp),
+    testTiming,
   );
 
   const deployHash = await wallet.deployContract({

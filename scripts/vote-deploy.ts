@@ -7,8 +7,10 @@
 // (badges: Admin → Vote, or scripts/vote-sim.ts):
 //   VOTE_RELAYER_KEY=0x… SEPOLIA_RPC_URL=https://… \
 //     deno task vote-deploy [--minter 0x…] [--test-usd 0x…] [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
-// It opens 30 min after the deploy; S-Tier's first tally is 30 min later, and the three
-// tiers then take 30 min at most (10 min each). Donations are in a test dollar (TestUSD,
+// The pool is 400 ETH in dollars at Chainlink's live ETH/USD (read on mainnet:
+// MAINNET_RPC_URL, else a public node). It opens 30 min after the deploy; S-Tier's
+// first tally is 30 min later, and the three tiers then take 30 min at most (10 min
+// each). Donations are in a test dollar (TestUSD,
 // anyone can mint it; deployed here unless --test-usd names one), and the board's open
 // pledges are copied in, as the real vote does.
 //
@@ -54,7 +56,12 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { mainnet, sepolia } from "viem/chains";
-import { DEFAULT_ADMIN_ADDRESSES, REVIEW_BADGE_CONTRACT } from "../api/config.ts";
+import {
+  CHAINLINK_FEEDS,
+  DEFAULT_ADMIN_ADDRESSES,
+  DEFAULT_RPC_ENDPOINTS,
+  REVIEW_BADGE_CONTRACT,
+} from "../api/config.ts";
 import { type VoteSettings, voteState } from "../shared/vote.ts";
 import { SIGNED_BALLOTS_ABI } from "../shared/vote/abi.ts";
 import { adminBatch } from "../shared/vote/admin-batch.ts";
@@ -70,7 +77,64 @@ import { pledgeChainId } from "../shared/vote/typed-data.ts";
 import mainnetConfig from "../vote/config/mainnet.json" with { type: "json" };
 
 export const ADMIN = "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF"; // sem-the-bee.eth
-export const POOL_USD = 913_244_000_000n; // 400 ETH × $2,283.11, six decimals
+/** A test round's pool: 400 ETH, in dollars at the live ETH/USD price when it is deployed (#97). */
+export const TEST_POOL_ETH = 400;
+/** Chainlink's ETH/USD feed updates at least hourly; older than this, the deploy stops. */
+const FEED_MAX_AGE = 2 * 3600;
+const FEED_ABI = [{
+  type: "function",
+  name: "latestRoundData",
+  stateMutability: "view",
+  inputs: [],
+  outputs: [
+    { name: "roundId", type: "uint80" },
+    { name: "answer", type: "int256" },
+    { name: "startedAt", type: "uint256" },
+    { name: "updatedAt", type: "uint256" },
+    { name: "answeredInRound", type: "uint80" },
+  ],
+}] as const;
+
+/** `eth` ETH in dollars (six decimals) at a Chainlink ETH/USD answer (eight decimals),
+ * refusing a stale, empty or absurd price. */
+export function poolUsdFromFeed(
+  eth: number,
+  answer: bigint,
+  updatedAt: number,
+  now: number,
+): bigint {
+  if (answer <= 0n) throw new Error("the feed gave no ETH price");
+  if (now - updatedAt > FEED_MAX_AGE) {
+    throw new Error(`the ETH price is stale (${Math.floor((now - updatedAt) / 60)} min old)`);
+  }
+  if (answer < 100n * 10n ** 8n || answer > 100_000n * 10n ** 8n) {
+    throw new Error(`the ETH price is out of range: $${Number(answer) / 1e8}`);
+  }
+  return (BigInt(Math.round(eth * 1e6)) * answer) / 10n ** 8n;
+}
+
+/** How far a pool set by hand is from the live estimate, as a share of the estimate. */
+export const poolDrift = (set: bigint, live: bigint): number =>
+  Math.abs(Number(set - live)) / Number(live);
+
+/** The pool's dollars now: `eth` at Chainlink's ETH/USD on mainnet (MAINNET_RPC_URL, else
+ * a public node), whatever chain the round is on. */
+export async function livePoolUsd(eth: number): Promise<{ usd: bigint; price: number }> {
+  const client = createPublicClient({
+    chain: mainnet,
+    transport: http(Deno.env.get("MAINNET_RPC_URL") || DEFAULT_RPC_ENDPOINTS[0], {
+      timeout: 30_000,
+      retryCount: 3,
+    }),
+  });
+  const [, answer, , updatedAt] = await client.readContract({
+    address: CHAINLINK_FEEDS.ETH as `0x${string}`,
+    abi: FEED_ABI,
+    functionName: "latestRoundData",
+  });
+  const usd = poolUsdFromFeed(eth, answer, Number(updatedAt), Math.floor(Date.now() / 1000));
+  return { usd, price: Number(answer) / 1e8 };
+}
 const SETUP_MINUTES = 30;
 // A test vote: S's first tally 30 min after opening, then windows of 5 min 20 s,
 // 2 min 40 s, 1 min 20 s and 40 s at most (10 min); A and B each start when the tier
@@ -740,7 +804,27 @@ async function main() {
   ).filter(Boolean);
   if (!admins.length) admins.push(...DEFAULT_ADMIN_ADDRESSES);
   for (const a of admins) if (!isAddress(a)) throw new Error(`admin is not an address: ${a}`);
-  const poolUsd = real ? real.poolUsd : POOL_USD;
+  const usd = (n: bigint) =>
+    `$${(Number(n) / 1e6).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  let poolUsd: bigint;
+  if (real) {
+    // Set by hand (--pool-usd); the live estimate is only a check against a stale figure.
+    poolUsd = real.poolUsd;
+    const live = await livePoolUsd(TEST_POOL_ETH).catch(() => null);
+    if (!live) console.warn("Couldn't read the ETH price to check --pool-usd against it.");
+    else if (poolDrift(poolUsd, live.usd) > 0.05) {
+      console.warn(
+        `WARNING: --pool-usd ${usd(poolUsd)} is ${
+          Math.round(poolDrift(poolUsd, live.usd) * 100)
+        }% ` +
+          `off ${TEST_POOL_ETH} ETH at $${live.price.toFixed(2)} (${usd(live.usd)}).`,
+      );
+    }
+  } else {
+    const live = await livePoolUsd(TEST_POOL_ETH);
+    poolUsd = live.usd;
+    console.log(`Pool: ${TEST_POOL_ETH} ETH at $${live.price.toFixed(2)} = ${usd(poolUsd)}`);
+  }
   const openPledges = cards.flatMap((c) => c.pledges ?? []).filter((p) => p.status === "pledged");
   console.log(
     `${plan.length} initiatives, ${groups.names.length} affiliations, ${openPledges.length} open pledges`,

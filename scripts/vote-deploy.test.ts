@@ -16,10 +16,13 @@ import {
   planDonationSetup,
   planGroups,
   planInitiatives,
+  poolDrift,
+  poolUsdFromFeed,
   qualifyingCards,
   realSchedule,
   regroupPlan,
   roleChecks,
+  TEST_POOL_ETH,
   testCurrencies,
   tierMax,
   USD_CURRENCY,
@@ -528,4 +531,22 @@ Deno.test("checkAsks: refuses a round where an ask is over the cap once only ope
     "donated asks $250,000",
   );
   checkAsks([card("fine", 100_000, 30_000), card("edge", 400_000, 200_000)], QUALIFY);
+});
+
+// #97: a test round's pool is 400 ETH at the live ETH/USD price (Chainlink, 8 decimals).
+const NOW = at("2026-11-16T12:00:00Z");
+
+Deno.test("poolUsdFromFeed: 400 ETH at $1,813 is $725,200, in six decimals", () => {
+  assertEquals(poolUsdFromFeed(TEST_POOL_ETH, 181_300_000_000n, NOW - 600, NOW), 725_200_000_000n);
+});
+
+Deno.test("poolUsdFromFeed: refuses a stale, empty or absurd price", () => {
+  assertThrows(() => poolUsdFromFeed(400, 181_300_000_000n, NOW - 3 * 3600, NOW), Error, "stale");
+  assertThrows(() => poolUsdFromFeed(400, 0n, NOW, NOW), Error, "no ETH price");
+  assertThrows(() => poolUsdFromFeed(400, 5_000_000n, NOW, NOW), Error, "out of range");
+});
+
+Deno.test("poolDrift: how far a hand-set pool is from the live estimate, as a share", () => {
+  assertEquals(poolDrift(1_000_000_000_000n, 725_200_000_000n).toFixed(3), "0.379");
+  assertEquals(poolDrift(725_200_000_000n, 725_200_000_000n), 0);
 });

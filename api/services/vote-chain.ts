@@ -136,8 +136,8 @@ const OWNER_OF_ABI = parseAbi([
   "error ERC721NonexistentToken(uint256 tokenId)",
 ]);
 const LOG_CHUNK = 50_000n;
-/** _safeMint to a wallet is ~100k gas; the rest is room for a small receive hook. */
-const MINT_GAS = 250_000n;
+/** Leave room for a smart wallet's receive hook while bounding the relayer's gas. */
+const MINT_GAS = 500_000n;
 
 export function createVoteChain(
   m: VoteManifest,
@@ -225,6 +225,7 @@ export function createVoteChain(
           functionName: "mint",
           args: [to, n],
           account: account.address,
+          gas: MINT_GAS,
         });
         return true;
       } catch {

@@ -16,12 +16,7 @@ import type { Deps } from "./middleware/context.ts";
 import { createAdmins } from "./services/admins.ts";
 import { createStateSource, createVoteChain } from "./services/vote-chain.ts";
 import { reviewTokenIds } from "./chain/reviewer.ts";
-import {
-  BUILT_ROUND,
-  MAINNET_CHAIN_ID,
-  roundDeployed,
-  type VoteManifest,
-} from "../shared/vote/manifest.ts";
+import { MAINNET_CHAIN_ID, type VoteManifest } from "../shared/vote/manifest.ts";
 import { createActiveVote, VOTE_ROUND_KEY, type VoteRoundSetting } from "./services/vote-active.ts";
 import { createStaticSite, type SiteOptions } from "./site.ts";
 
@@ -87,9 +82,8 @@ export async function createServer(siteOptions?: SiteOptions) {
     ens: createEns(fetch, now, { onchain: onchainEns(config.rpcEndpoints, fetch), log }),
     pinata: createPinata(config, fetch),
     log,
-    // Off until the manifest (or an admin's test round) names a deployed contract.
+    // Off until an admin sets a round (Admin → Vote, by its contract address).
     voteRound: createActiveVote({
-      baked: roundDeployed(BUILT_ROUND) ? BUILT_ROUND : undefined,
       read: () => db.meta.get<VoteRoundSetting>(VOTE_ROUND_KEY),
       build: (m) => ({
         manifest: m,

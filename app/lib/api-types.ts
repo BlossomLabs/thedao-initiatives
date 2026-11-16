@@ -1,4 +1,5 @@
 /** Hand-mirrored shapes of the API's JSON (api/lib/json.ts + routes). */
+import type { VoteManifest } from "../../shared/vote/manifest";
 import type { Finding, Findings, Milestone, SectionKey, Sections } from "@shared/draft/types";
 import type { VoteSettings, VoteState } from "@shared/vote";
 
@@ -207,6 +208,16 @@ export interface BoardFlags {
   safeOwnerCount: number;
   /** Vote eligibility: the floor tick and its line show only while `show` is on. */
   vote: VoteSettings;
+  /** The round the site runs (null: none), and the whole of it once the real vote has
+   * opened (its results replace the board). Older boards in a cache may lack it. */
+  round?: {
+    kind: "test" | "real";
+    chainId: number;
+    contract: string;
+    opensAt: number;
+    closesAt: number;
+    manifest?: VoteManifest;
+  } | null;
 }
 
 export interface Sponsor {

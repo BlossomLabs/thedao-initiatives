@@ -35,7 +35,7 @@ export const PLEDGE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const UINT_RE = /^\d{1,20}$/;
 export const SIGNED_FIELDS = ["pid", "nonce", "deadline", "signature"];
 /** The contract's reverts for setPledgeBySig, in words for the admin. */
-const PLEDGE_REVERTS: [RegExp, string][] = [
+export const PLEDGE_REVERTS: [RegExp, string][] = [
   [/PledgeExpired/, "the signature expired"],
   [/InvalidPledgeNonce/, "the signature was already used, or another pledge of yours went first"],
   [/InvalidSignature/, "the contract didn't accept the signature"],

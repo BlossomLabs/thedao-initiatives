@@ -5,25 +5,33 @@ import type { VoteRound } from "./vote-chain.ts";
 /** db.meta key of the admins' round setting. */
 export const VOTE_ROUND_KEY = "vote_round";
 
-/** What admins set on the Vote page: a Sepolia test round in place of the built-in one,
- * and the pool's ETH while it waits to be sold. */
+type SetRound = { manifest: VoteManifest; at: number; by: string };
+
+/** What admins set on the Vote page: the round the site runs, read from its contract (a
+ * test round on Sepolia, the real vote on Ethereum), and the pool's ETH while it waits to
+ * be sold. No round set: no vote. */
 export type VoteRoundSetting = {
-  /** Read from the chain when added (or refreshed): replaces the built-in round. */
-  test?: { manifest: VoteManifest; at: number; by: string };
+  /** Read from the chain when set (or read again). */
+  round?: SetRound;
+  /** The same, as it was stored before real rounds were set this way too (test only). */
+  test?: SetRound;
   /** The pool is this much ETH; the on-chain poolUsd is an estimate until `sold`. */
   pool?: { eth: number; sold: boolean };
 };
+
+/** The round a setting names: `round`, or one stored under its earlier name. */
+export const roundOf = (s: VoteRoundSetting | null | undefined): SetRound | undefined =>
+  s?.round ?? s?.test;
 
 /** How long an isolate trusts its copy of the setting (admins on another isolate). */
 const FRESH_MS = 5_000;
 
 /**
- * The round the site runs now: the admins' test round if one is set, else the built-in
- * manifest; with the admins' pool note. One VoteRound is built per manifest and kept, so
- * its caches outlive requests; the setting is re-read at most every few seconds.
+ * The round the site runs now, as admins set it (none: no vote), with their pool note.
+ * One VoteRound is built per manifest and kept, so its caches outlive requests; the
+ * setting is re-read at most every few seconds.
  */
 export function createActiveVote(o: {
-  baked: VoteManifest | undefined;
   read: () => Promise<VoteRoundSetting | null>;
   build: (m: VoteManifest) => VoteRound;
   clock?: () => number;
@@ -46,7 +54,7 @@ export function createActiveVote(o: {
       setting = { at: clock(), value };
     }
     const s = await setting.value;
-    const m = s?.test?.manifest ?? o.baked;
+    const m = roundOf(s)?.manifest;
     if (!m) return undefined;
     const r = roundFor(m);
     return s?.pool ? { ...r, manifest: { ...r.manifest, pool: s.pool } } : r;

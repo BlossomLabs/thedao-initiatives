@@ -91,13 +91,13 @@ export function createFeedCache(deps: Deps, board: BoardCache) {
 export type FeedCache = ReturnType<typeof createFeedCache>;
 
 /** Weak: the same tag covers the gzip and identity encodings of the body. */
-async function etagOf(body: string): Promise<string> {
+export async function etagOf(body: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body));
   return `W/"${encodeHex(new Uint8Array(digest)).slice(0, 32)}"`;
 }
 
 /** If-None-Match as a list of tags, weak or strong; `*` matches anything. */
-const matchesEtag = (header: string | undefined, etag: string): boolean =>
+export const matchesEtag = (header: string | undefined, etag: string): boolean =>
   (header ?? "").split(",").map((t) => t.trim().replace(/^W\//, "")).some((t) =>
     t === "*" || t === etag.replace(/^W\//, "")
   );

@@ -10,6 +10,7 @@ import {
   MAINNET_CURRENCIES,
   manifestFor,
   nextAddingOpen,
+  parseMinters,
   parseRealArgs,
   planDonationSetup,
   planGroups,
@@ -446,6 +447,30 @@ Deno.test("deploy: the relayer ends the setup with none of the handed-over roles
   const test = roleChecks({ ...base, real: false });
   assertEquals(test.filter(([x]) => x === m), [[m, relayer, true]]);
   assertEquals(test.some(([, who]) => who === signer), false);
+});
+
+Deno.test("deploy: --minter gives a test round's MINTER_ROLE to the site's relayer too", () => {
+  const deployer = "0x22797B059E20C1ef64CFe12815e09c0E984832F3" as const;
+  const site = "0xC36A23065a7EC768B4f0e161EB94615FAA77404e";
+  assertEquals(parseMinters(undefined, false, deployer), []);
+  // Checksummed, once, and never the deployer (it mints already).
+  assertEquals(
+    parseMinters(`${site.toLowerCase()}, ${site},${deployer}`, false, deployer),
+    [site],
+  );
+  assertThrows(() => parseMinters("nope", false, deployer), Error, "isn't an address");
+  assertThrows(() => parseMinters(site, true, deployer), Error, "test votes");
+  const m = "0x30" as const;
+  const checks = roleChecks({
+    real: false,
+    handed: ["0xd0", "0xa0", "0x90"],
+    minter: m,
+    admin: "0x0000000000000000000000000000000000000001",
+    relayer: deployer,
+    admins: [],
+    minters: [site as `0x${string}`],
+  });
+  assertEquals(checks.filter(([x]) => x === m), [[m, deployer, true], [m, site, true]]);
 });
 
 Deno.test("deploy: the currencies read back must be the manifest's, in order", () => {

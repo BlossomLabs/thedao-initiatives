@@ -1625,3 +1625,61 @@ Deno.test("the round carries the live tally's inputs, which re-run to its result
   await h.settle();
   h.close();
 });
+
+Deno.test("test pledge: on the test round's chain only, signed by the admin, then settled", async () => {
+  const { h, state } = await setup();
+  const base = "/api/admin/vote-round/test-pledges";
+  const token = await h.mint(ADMIN, true);
+  const post = (path: string, json: unknown) =>
+    h.req(`${base}/${path}`, { method: "POST", token, json });
+  // Unsigned: the form is told to sign first (the pledge form's 428).
+  const plain = await post("b/pledges", { company: "Acme", amount: "1500" });
+  assertEquals([plain.status, (await j(plain)).code], [428, "signature_required"]);
+  // The typed data: initiative b is #1 in the round, the amount in micro-USD.
+  const prep = await j(await post("b/pledges/prepare", { company: "Acme", amount: "1500" }));
+  const typed = prep.typedData as { message: Record<string, string> };
+  assertEquals([typed.message.initiativeId, typed.message.amount], ["1", "1500000000"]);
+  assertEquals(String(prep.pid).startsWith("test-"), true);
+  const sent = await post("b/pledges", {
+    company: "Acme",
+    amount: "1500",
+    pid: prep.pid,
+    nonce: typed.message.nonce,
+    deadline: typed.message.deadline,
+    signature: "0x1234",
+  });
+  assertEquals(sent.status, 202);
+  const { hash } = await j(sent);
+  const call = state.sent.at(-1)!;
+  assertEquals(call.fn, "setPledgeBySig");
+  if (call.fn === "setPledgeBySig") {
+    assertEquals(call.args.slice(1, 5), [1n, 0n, 1_500_000_000n, ADMIN]);
+  }
+  state.txStatus.set(hash as string, "success");
+  const settled = await post(`b/pledges/${prep.pid}/settle`, { hash });
+  assertEquals((await j(settled)).state, "saved");
+  // Not in the round, a received pledge, a plain account: refused.
+  assertEquals((await post("nope/pledges/prepare", { amount: "1" })).status, 404);
+  assertEquals((await post("b/pledges", { amount: "1", status: "received" })).status, 400);
+  const plainUser = await h.mint(PLAIN);
+  assertEquals(
+    (await h.req(`${base}/b/pledges/prepare`, {
+      method: "POST",
+      token: plainUser,
+      json: { amount: "1" },
+    })).status,
+    403,
+  );
+  h.close();
+});
+
+Deno.test("test pledge: never in the real vote", async () => {
+  const { h } = await setup(real);
+  const res = await h.req("/api/admin/vote-round/test-pledges/a/pledges/prepare", {
+    method: "POST",
+    token: await h.mint(ADMIN, true),
+    json: { amount: "1" },
+  });
+  assertEquals(res.status, 409);
+  h.close();
+});

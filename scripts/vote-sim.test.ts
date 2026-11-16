@@ -3,7 +3,15 @@ import { encodeBallot } from "../shared/vote/ballot.ts";
 import type { VoteManifest } from "../shared/vote/manifest.ts";
 import { checkBallot } from "../shared/vote/rules.ts";
 import { rulesRound } from "../shared/vote/manifest.ts";
-import { drawBallot, keptFor, revisionsPlan, rng, timeline, voterKey } from "./vote-sim.ts";
+import {
+  drawBallot,
+  keptFor,
+  revisionsPlan,
+  rng,
+  timeline,
+  voterKey,
+  windows,
+} from "./vote-sim.ts";
 import { bytesToHex } from "viem";
 
 const slugs = Array.from({ length: 12 }, (_, i) => `p${i}`);
@@ -39,18 +47,41 @@ Deno.test("revisionsPlan: 40x2,10x3,3x5 over 100 voters", () => {
   assertThrows(() => revisionsPlan("lots", 100), Error, "isn't");
 });
 
-Deno.test("timeline: first ballots before the S-Tier first tally, revisions from it to the close", () => {
-  const plan = revisionsPlan("4x2,1x5", 10);
+Deno.test("timeline: first ballots paced before the S-Tier first tally, changes in every window", () => {
+  const plan = revisionsPlan("40x2,10x3,3x5", 100);
   const ev = timeline(m, plan, rng("t"), 1100);
-  assertEquals(ev.filter((e) => e.kind === "first").length, 10);
-  assertEquals(ev.filter((e) => e.kind === "revise").length, 13);
-  for (const e of ev) {
-    if (e.kind === "first") assert(e.at >= 1100 && e.at <= 2940, String(e.at));
-    else assert(e.at >= 3000 && e.at <= 4400 + 600 - 30, String(e.at));
+  const first = ev.filter((e) => e.kind === "first");
+  const revise = ev.filter((e) => e.kind === "revise");
+  assertEquals(first.length, 100);
+  assertEquals(revise.length, 125);
+  for (const e of first) assert(e.at >= 1100 && e.at < 2940, String(e.at));
+  // Slowly: no two first ballots more than ~2 steps apart or in the same second twice over.
+  const gaps = first.slice(1).map((e, i) => e.at - first[i].at);
+  assert(Math.max(...gaps) <= 2 * (1840 / 100) + 1, String(Math.max(...gaps)));
+  // Each voter revises as many times as planned.
+  for (const [voter, n] of plan.entries()) {
+    assertEquals(revise.filter((e) => e.voter === voter).length, n);
   }
-  assertEquals(ev.map((e) => e.at), [...ev.map((e) => e.at)].sort((a, b) => a - b));
+  // Every window of every tier gets some, the long ones more; none in a window's last 5 s.
+  const ws = windows(m.schedule);
+  const inW = ws.map((w) => revise.filter((e) => e.at >= w.start && e.at < w.end - 5).length);
+  assertEquals(inW.reduce((a, b) => a + b, 0), 125);
+  assert(inW.every((n) => n > 0), inW.join(","));
+  assert(inW[0] > inW[3], inW.join(","));
   // The same seed, the same run.
   assertEquals(timeline(m, plan, rng("t"), 1100), ev);
+});
+
+Deno.test("windows: each tier's windows from its first tally, halving", () => {
+  const ws = windows(m.schedule);
+  assertEquals(ws.length, 12);
+  assertEquals(ws.slice(0, 4).map((w) => [w.tier, w.start, w.end]), [
+    ["S", 3000, 3320],
+    ["S", 3320, 3480],
+    ["S", 3480, 3560],
+    ["S", 3560, 3600],
+  ]);
+  assertEquals(ws[4].start, 3700);
 });
 
 Deno.test("drawBallot: every draw passes the ballot rules", () => {

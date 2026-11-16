@@ -99,6 +99,28 @@ it("with a remembered session, sends the cookie; an expired one counts as signed
 it("starts nothing on other pages, an initiative's editor included", () => {
   const fetchMock = vi.fn(() => Promise.resolve(new Response("{}")));
   vi.stubGlobal("fetch", fetchMock);
-  for (const path of ["/submit", "/initiative/x/edit", "/initiative/", "/vote"]) runScript(path);
+  for (
+    const path of ["/submit", "/initiative/x/edit", "/initiative/", "/vote/mock/a", "/admin"]
+  ) runScript(path);
   expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it("on the pages that wait for the vote's round, starts it, with the cookie", () => {
+  const fetchMock = vi.fn(() => Promise.resolve(new Response("{}")));
+  vi.stubGlobal("fetch", fetchMock);
+  for (
+    const path of [
+      "/vote",
+      "/vote/ballot",
+      "/vote/ballot/edit",
+      "/admin/vote",
+      "/admin/initiatives/x",
+    ]
+  ) {
+    runScript(path);
+    const [url, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit];
+    expect([url, init.credentials]).toEqual(["/api/vote/manifest", "include"]);
+    expect(takeEarly("/api/vote/manifest")).toBeDefined();
+  }
+  expect(fetchMock).toHaveBeenCalledTimes(5);
 });

@@ -46,6 +46,7 @@ const answers: Record<string, (args: readonly unknown[]) => unknown> = {
     feedDecimals: 0,
   }),
   MINTER_ROLE: () => toHex(7, { size: 32 }),
+  eligibilityNFT: () => ROUND,
   hasRole: ([, a]) => (a as string).toLowerCase() === RELAYER,
 };
 
@@ -97,6 +98,7 @@ const node = (o: { code?: boolean } = {}) =>
 Deno.test("readRoundOnChain: dates, pool, initiatives, affiliations, currencies and the deploy block", async () => {
   const r = await readRoundOnChain(ROUND, "http://node.test", node());
   assertEquals(r.deployBlock, DEPLOYED);
+  assertEquals([r.chainId, r.eligibilityNFT.toLowerCase()], [11155111, ROUND]);
   assertEquals(r.schedule, {
     opensAt: 1000,
     firstTallyAt: [2000, 3000, 4000],

@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Switch } from "@base-ui/react/switch";
 import { Button } from "~/components/ui/Button";
@@ -7,6 +7,11 @@ import { useAdminApi } from "~/hooks/use-admin-api";
 import { api, errorMessage } from "~/lib/api";
 import { dayTime, usdShort } from "~/lib/format";
 import { cn } from "~/lib/utils";
+import { PledgeForm } from "~/components/admin/initiative/Pledges";
+import InitiativeCombobox from "~/components/ui/InitiativeCombobox";
+import { useRun } from "~/components/admin/dashboard/run";
+import { useBoard } from "~/hooks/use-board";
+import { ROUND } from "../../../shared/vote/manifest";
 
 type Brief = {
   kind: "test" | "real";
@@ -19,8 +24,7 @@ type Brief = {
   poolUsd: string;
 };
 export type VoteRoundJson = {
-  built: Brief | null;
-  test: (Brief & { at: number; by: string }) | null;
+  round: (Brief & { at: number; by: string }) | null;
   pool: { eth: number; sold: boolean } | null;
   warnings?: string[];
 };
@@ -48,8 +52,8 @@ function RoundLine({ b }: { b: Brief }) {
 }
 
 /**
- * Admin → Vote: which round the site runs (the one built in, or a Sepolia test round
- * read from its contract address), and the pool's ETH while it waits to be sold.
+ * Admin → Vote: which round the site runs, read from its contract address (a test round
+ * on Sepolia, the real vote on Ethereum), and the pool's ETH while it waits to be sold.
  */
 export default function VoteRound() {
   const adminApi = useAdminApi();
@@ -60,6 +64,7 @@ export default function VoteRound() {
     queryFn: ({ signal }) => api<VoteRoundJson>("/api/admin/vote-round", { signal }),
   });
   const [contract, setContract] = useState("");
+  const [chain, setChain] = useState<"sepolia" | "ethereum">("sepolia");
   const [eth, setEth] = useState("");
   const [sold, setSold] = useState(false);
   const [busy, setBusy] = useState<"add" | "remove" | "pool" | null>(null);
@@ -68,7 +73,8 @@ export default function VoteRound() {
   const [poolMsg, setPoolMsg] = useState<{ ok: boolean; text: string } | null>(null);
   useEffect(() => {
     if (!data) return;
-    setContract((c) => c || data.test?.contract || "");
+    setContract((c) => c || data.round?.contract || "");
+    if (data.round) setChain(data.round.chainId === 1 ? "ethereum" : "sepolia");
     setEth(data.pool ? String(data.pool.eth) : "");
     setSold(data.pool?.sold ?? false);
   }, [data]);
@@ -103,8 +109,8 @@ export default function VoteRound() {
 
   const add = () =>
     run("add", () =>
-      adminApi<VoteRoundJson>("/api/admin/vote-round/test", {
-        json: { contract: contract.trim() },
+      adminApi<VoteRoundJson>("/api/admin/vote-round/round", {
+        json: { contract: contract.trim(), chain },
       }), (r) => {
       setWarnings(r.warnings ?? []);
       setRoundMsg({ ok: true, text: "The site runs this round within a few seconds." });
@@ -112,11 +118,11 @@ export default function VoteRound() {
   const remove = () =>
     run(
       "remove",
-      () => adminApi<VoteRoundJson>("/api/admin/vote-round/test", { method: "DELETE", json: {} }),
+      () => adminApi<VoteRoundJson>("/api/admin/vote-round/round", { method: "DELETE", json: {} }),
       () => {
         setWarnings([]);
         setContract("");
-        setRoundMsg({ ok: true, text: "Back to the round built into the site." });
+        setRoundMsg({ ok: true, text: "No vote on the site now." });
       },
       setRoundMsg,
     );
@@ -127,10 +133,15 @@ export default function VoteRound() {
       }), () =>
       setPoolMsg({ ok: true, text: "Saved. Pages say it on their next load." }), setPoolMsg);
 
-  const test = data?.test;
+  const set = data?.round ?? null;
+  const same = Boolean(set) && set!.contract.toLowerCase() === contract.trim().toLowerCase() &&
+    (set!.chainId === 1) === (chain === "ethereum");
+  // The real vote's round is fixed while it's open: read it again, nothing else.
+  const nowSecs = Date.now() / 1000;
+  const realOpen = set?.kind === "real" && nowSecs >= set.opensAt && nowSecs < set.closesAt;
   return (
     <div className="mt-3 flex flex-col gap-3">
-      {/* The round: built in, or a test round read from Sepolia. */}
+      {/* The round: read from its contract, on Sepolia or Ethereum. */}
       <form
         className={CARD}
         onSubmit={(e) => {
@@ -139,27 +150,29 @@ export default function VoteRound() {
         }}
       >
         <b className={TITLE}>The round the site runs</b>
-        {data && (test
-          ? (
-            <>
-              <small className={HINT}>
-                A test round added by an admin, in place of the one built into the site.
-              </small>
-              <RoundLine b={test} />
-            </>
-          )
-          : data.built
-          ? (
-            <>
-              <small className={HINT}>The round built into the site.</small>
-              <RoundLine b={data.built} />
-            </>
-          )
-          : <small className={HINT}>None: no vote is deployed.</small>)}
+        {data && (set
+          ? <RoundLine b={set} />
+          : <small className={HINT}>None: the site shows no vote.</small>)}
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Network">
+          {([["sepolia", "Sepolia (test vote)"], ["ethereum", "Ethereum (the real vote)"]] as const)
+            .map(([k, label]) => (
+              <Button
+                key={k}
+                sm
+                type="button"
+                variant={chain === k ? "primary" : "ghost"}
+                aria-pressed={chain === k}
+                disabled={realOpen}
+                onClick={() => setChain(k)}
+              >
+                {label}
+              </Button>
+            ))}
+        </div>
+        <div className="mt-3">
           <label className="block">
-            <span className={cn(HINT, "mb-1")}>Test round contract on Sepolia</span>
+            <span className={cn(HINT, "mb-1")}>Round contract</span>
             <input
               id={`${ids}-contract`}
               className={FIELD}
@@ -168,22 +181,21 @@ export default function VoteRound() {
               autoComplete="off"
               aria-invalid={contractBad}
               value={contract}
+              disabled={realOpen}
               onChange={(e) => setContract(e.target.value)}
             />
           </label>
         </div>
         <small className={cn(HINT, "mt-2")}>
-          Dates, pool, initiatives, affiliations and currencies are read from the contract; each
-          initiative is matched to the board by its account. Add it again after projects or
-          affiliations change on-chain.
+          {realOpen
+            ? "The real vote is open: its round can't change until it closes. Read it again after projects or affiliations change on-chain."
+            : "Dates, pool, initiatives, affiliations, currencies and (on Ethereum) the voting badge are read from the contract; each initiative is matched to the board by its account. Read it again after projects or affiliations change on-chain."}
         </small>
         <div className="mt-3 flex min-h-[34px] flex-wrap items-center gap-3">
           <Button sm type="submit" loading={busy === "add"} disabled={!canAdd || busy !== null}>
-            {test && test.contract.toLowerCase() === contract.trim().toLowerCase()
-              ? "Read it again"
-              : "Run this test round"}
+            {same ? "Read it again" : "Run this round"}
           </Button>
-          {test && (
+          {set && !realOpen && (
             <Button
               sm
               type="button"
@@ -192,7 +204,7 @@ export default function VoteRound() {
               disabled={busy !== null}
               onClick={() => void remove()}
             >
-              Back to the built-in round
+              Take it off the site
             </Button>
           )}
           {roundMsg && <Status kind={roundMsg.ok ? "ok" : "err"}>{roundMsg.text}</Status>}
@@ -202,7 +214,12 @@ export default function VoteRound() {
         ))}
       </form>
 
-      {(test ?? data?.built)?.kind === "test" && <TestVoters />}
+      {set?.kind === "test" && (
+        <>
+          <TestVoters />
+          <TestPledge />
+        </>
+      )}
 
       {/* The pool: ETH until it's sold, its dollars an estimate until then. */}
       <form
@@ -243,9 +260,7 @@ export default function VoteRound() {
             <b className={TITLE}>Sold for dollars</b>
             <small className={HINT}>
               Once the ETH is sold, set the pool's dollars on-chain (setPoolUsd) before the S-Tier
-              first tally{data?.test || data?.built
-                ? ` (${dayTime((data.test ?? data.built)!.firstTallyAt)})`
-                : ""}, then turn this on.
+              first tally{set ? ` (${dayTime(set.firstTallyAt)})` : ""}, then turn this on.
             </small>
           </div>
           <div className="flex flex-none items-center gap-2.5 font-inter-tight text-[13px]">
@@ -408,6 +423,63 @@ function TestVoters() {
           )}
         </div>
       )}
+    </section>
+  );
+}
+
+/**
+ * A pledge in the test round only, on Sepolia: pick an initiative of the round, then the
+ * usual pledge form. Signed with the admin's wallet (it needs the round's PLEDGE_ROLE,
+ * which sem-the-bee.eth has) and relayed; it lowers that initiative's ask in the test vote
+ * and never reaches the site's pledges.
+ */
+function TestPledge() {
+  const id = useId();
+  const board = useBoard();
+  const [picked, setPicked] = useState<{ id: string; title: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const { run, said, setMsg } = useRun();
+  // The round's initiatives (its slugs), by their board titles.
+  const items = useMemo(() => {
+    const titles = new Map(board.data?.cards.map((c) => [c.initiative.slug, c.initiative.title]));
+    return ROUND.slugs
+      .map((slug) => ({ id: slug, title: titles.get(slug) ?? slug }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }, [board.data]);
+  return (
+    <section className={CARD} aria-labelledby={`${id}-h`}>
+      <b id={`${id}-h`} className={TITLE}>Test pledge</b>
+      <small className={HINT}>
+        A pledge to one initiative in this test round only, on Sepolia: it lowers what the
+        initiative asks of the pool here, and never shows on the site. Sign with a wallet that holds
+        the round's pledge role (sem-the-bee.eth).
+      </small>
+      <label htmlFor={id} className="mt-3 block text-[12.5px] text-white/80">Initiative</label>
+      <InitiativeCombobox
+        id={id}
+        items={items}
+        value={picked}
+        onValueChange={(x) => {
+          setPicked(x);
+          setMsg(null);
+        }}
+        inputValue={search}
+        onInputValueChange={setSearch}
+        popupZ="z-50"
+      />
+      {picked && search === picked.title && (
+        <div className="mt-3">
+          <PledgeForm
+            key={picked.id}
+            base={`/api/admin/vote-round/test-pledges/${encodeURIComponent(picked.id)}`}
+            run={(fn, ok) => run(fn, typeof ok === "string" ? `${ok} (${picked.title})` : ok)}
+            editing={null}
+            onDone={() => {}}
+            stacked
+          />
+        </div>
+      )}
+      {said}
     </section>
   );
 }

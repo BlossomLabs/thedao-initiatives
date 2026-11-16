@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
+import { currentVote } from "../services/vote-active.ts";
+import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import { cardInitiative, ipfsUrl } from "../lib/json.ts";
 import type { Donation, Pledge } from "../db/types.ts";
 import type { CardRow } from "../db/initiatives.ts";
@@ -164,10 +166,11 @@ export const createBoardCache = (deps: Deps): BoardCache =>
 
 async function buildBoard(deps: Deps, refresh: boolean) {
   const { db, config } = deps;
-  const [initiatives, state, vote] = await Promise.all([
+  const [initiatives, state, vote, round] = await Promise.all([
     db.initiatives.cards("approved"),
     sharedChainState(deps, refresh),
     voteSettings(deps),
+    currentVote(deps).catch(() => undefined),
   ]);
   if (refresh) {
     // Every due Safe's balances in one batched chain read, alongside the ledgers;
@@ -212,8 +215,35 @@ async function buildBoard(deps: Deps, refresh: boolean) {
       safeThreshold: SAFE_THRESHOLD,
       safeOwnerCount: SAFE_OWNER_COUNT,
       vote,
+      round: boardRound(round?.manifest, deps.now()),
     },
   };
+}
+
+/** The round the site runs, as the front page needs it at once: what it is and when (so
+ * the board knows whether the real vote's results take its place, with no request of
+ * its own), and the whole round once the real vote has opened, so they show without
+ * waiting for /api/vote/manifest. */
+export function boardRound(
+  m: VoteManifest | undefined,
+  now: number,
+): {
+  kind: VoteManifest["kind"];
+  chainId: VoteManifest["chainId"];
+  contract: string;
+  opensAt: number;
+  closesAt: number;
+  manifest?: VoteManifest;
+} | null {
+  if (!m) return null;
+  const brief = {
+    kind: m.kind,
+    chainId: m.chainId,
+    contract: m.contract,
+    opensAt: m.opensAt,
+    closesAt: m.closesAt,
+  };
+  return m.kind === "real" && now >= m.opensAt ? { ...brief, manifest: m } : brief;
 }
 
 /** The board as the public GET serves it (no refresh), for the feeds. */

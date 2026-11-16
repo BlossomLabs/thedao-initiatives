@@ -1,10 +1,10 @@
 import { type Chain, mainnet, sepolia } from "viem/chains";
-import manifest from "./manifest-data.ts";
 import type { Schedule } from "./quiet-ending.ts";
 import type { RulesRound } from "./rules.ts";
 
-/** The current vote round, written by scripts/vote-deploy.ts. `slugs[i]` is
- * on-chain initiative `i`, so ballot byte `i` ranks that initiative. A test round
+/** A vote round, read from its contract (shared/vote/round-from-chain.ts) when an admin
+ * sets it on Admin → Vote. `slugs[i]` is on-chain initiative `i`, so ballot byte `i`
+ * ranks that initiative. A test round
  * (Sepolia) mints its own badges (admins give them, or scripts/vote-sim.ts); the real
  * round (mainnet) votes with TheDAO's private voting badge. */
 export type VoteManifest = {
@@ -72,13 +72,27 @@ export function checkManifest(m: VoteManifest): VoteManifest {
   return m;
 }
 
-/** The round built into the site (shared/vote/manifest-data.ts). */
-export const BUILT_ROUND = checkManifest(manifest as unknown as VoteManifest);
+/** No round: what the site runs until it learns the one an admin set (`roundDeployed`
+ * is false for it). */
+export const NO_ROUND: VoteManifest = {
+  kind: "test",
+  chainId: SEPOLIA_CHAIN_ID,
+  contract: "0x0000000000000000000000000000000000000000",
+  deployBlock: 0,
+  opensAt: 0,
+  closesAt: 0,
+  schedule: { opensAt: 0, firstTallyAt: [0, 0, 0], initialWindow: 0, maxWindows: 0 },
+  poolUsd: "0",
+  slugs: [],
+  projects: [],
+  groups: [],
+  independentTiers: 1,
+};
 
-/** The round the site runs: the built-in one until the page learns the active round
- * (an admin can put a Sepolia test round in its place, `setRound`). A live binding: read
- * it when needed, never copy it at module load. */
-export let ROUND: VoteManifest = BUILT_ROUND;
+/** The round the site runs: none until the page learns the one an admin set
+ * (/api/vote/manifest, `setRound`). A live binding: read it when needed, never copy it at
+ * module load. */
+export let ROUND: VoteManifest = NO_ROUND;
 
 /** Runs the site on another round (the one /api/vote/manifest names). */
 export function setRound(m: VoteManifest) {

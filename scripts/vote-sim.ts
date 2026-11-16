@@ -27,7 +27,6 @@ import { rulesRound, type VoteManifest } from "../shared/vote/manifest.ts";
 import { checkBallot, findProof } from "../shared/vote/rules.ts";
 import { recordVote } from "../shared/vote/record.ts";
 import { voteTypedData } from "../shared/vote/typed-data.ts";
-import { tierSpan } from "../shared/vote/round-from-chain.ts";
 import { lockedLabels } from "../shared/vote/locks.ts";
 
 type Ballot = Partial<Record<string, Tier>>;
@@ -78,9 +77,34 @@ export function revisionsPlan(spec: string, voters: number): number[] {
 
 export type SimEvent = { at: number; voter: number; kind: "first" | "revise" };
 
-/** When each voter sends: a first ballot between `firstFrom` and the S-Tier first tally
- * (a minute before it), then its revisions at random times from the S-Tier first tally to
- * the close (stopping 30 s short). Sorted by time. */
+/** Each tier's quiet-ending windows, in order: [start, end) from its first tally, each
+ * half the one before (320, 160, 80, 40 s). A window is only reached when the one before
+ * changed what the tier funds; until then its moments are still worth a ballot. */
+export function windows(s: VoteManifest["schedule"]) {
+  const out: { tier: Tier; window: number; start: number; end: number }[] = [];
+  s.firstTallyAt.forEach((at, t) => {
+    let start = at;
+    for (let k = 0; k < s.maxWindows; k++) {
+      const end = start + (s.initialWindow >> k);
+      out.push({ tier: TIERS[t], window: k + 1, start, end });
+      start = end;
+    }
+  });
+  return out;
+}
+
+/** `n` moments spread evenly over [from, to), each nudged a little at random. */
+const paced = (n: number, from: number, to: number, r: Rng) => {
+  const step = (to - from) / Math.max(n, 1);
+  return Array.from({ length: n }, (_, j) => Math.floor(from + step * (j + 0.2 + 0.6 * r.next())));
+};
+
+/**
+ * When each voter sends, slowly: the first ballots evenly from `firstFrom` to a minute
+ * before the S-Tier first tally, in a random voter order; then the revisions inside the
+ * quiet-ending windows of every tier, each window getting its share by length (so the
+ * short last windows see a few too), the last 5 s of each left out. Sorted by time.
+ */
 export function timeline(
   m: Pick<VoteManifest, "schedule" | "closesAt">,
   revisions: number[],
@@ -88,15 +112,22 @@ export function timeline(
   firstFrom: number,
 ): SimEvent[] {
   const s = m.schedule;
-  const firstTo = Math.max(firstFrom, s.firstTallyAt[0] - 60);
-  const lastAt = Math.min(m.closesAt, s.firstTallyAt[2] + tierSpan(s)) - 30;
+  const firstTo = Math.max(firstFrom + 1, s.firstTallyAt[0] - 60);
   const events: SimEvent[] = [];
-  revisions.forEach((n, voter) => {
-    events.push({ at: r.int(firstFrom, firstTo), voter, kind: "first" });
-    for (let k = 0; k < n; k++) {
-      events.push({ at: r.int(s.firstTallyAt[0], lastAt), voter, kind: "revise" });
-    }
-  });
+  const order = r.shuffle(revisions.map((_, voter) => voter));
+  paced(order.length, firstFrom, firstTo, r).forEach((at, j) =>
+    events.push({ at, voter: order[j], kind: "first" })
+  );
+  const total = revisions.reduce((a, b) => a + b, 0);
+  const ws = windows(s).filter((w) => w.end <= m.closesAt);
+  const span = ws.reduce((a, w) => a + (w.end - w.start), 0);
+  // Each window's share, by length; the rounding left over goes to the longest ones.
+  const shares = ws.map((w) => Math.floor(total * (w.end - w.start) / span));
+  for (let k = 0; shares.reduce((a, b) => a + b, 0) < total; k++) shares[k % ws.length]++;
+  const moments = ws.flatMap((w, k) => paced(shares[k], w.start, w.end - 5, r));
+  // Who sends at each moment: every revision of every voter, shuffled.
+  const who = r.shuffle(revisions.flatMap((n, voter) => Array<number>(n).fill(voter)));
+  moments.forEach((at, j) => events.push({ at, voter: who[j], kind: "revise" }));
   return events.sort((a, b) => a.at - b.at || a.voter - b.voter);
 }
 
@@ -232,9 +263,16 @@ async function main() {
       people.map((p) => `${p.i},${p.account.address},${p.tokenId},${plan[p.i]}`).join("\n") + "\n",
   );
   if (args["dry-run"]) {
-    for (const e of events) {
-      console.log(`${new Date(e.at * 1000).toISOString()}  voter ${e.voter}  ${e.kind}`);
-    }
+    const hhmmss = (t: number) => new Date(t * 1000).toISOString().slice(11, 19);
+    const marks = windows(m.schedule).map((w) => ({
+      at: w.start,
+      text: `── ${w.tier}-Tier window ${w.window} (to ${hhmmss(w.end)})`,
+    }));
+    const lines = [
+      ...marks,
+      ...events.map((e) => ({ at: e.at, text: `${hhmmss(e.at)}  voter ${e.voter}  ${e.kind}` })),
+    ].sort((a, b) => a.at - b.at);
+    for (const l of lines) console.log(l.text);
     return;
   }
   const record = (line: unknown) =>
@@ -252,19 +290,42 @@ async function main() {
     }
   };
 
-  // Badges: each voter's, unless it's already minted.
+  // Badges: each voter's, unless it's already minted. All sent at once with consecutive
+  // nonces, then waited for together (one at a time takes ~20 min for 100).
+  const missing: typeof people = [];
   for (const p of people) {
-    const owner = await chain.ownerOf(p.tokenId);
+    // A badge nobody holds yet reverts (ERC721NonexistentToken): it's free.
+    const owner = await chain.ownerOf(p.tokenId).catch((e) => {
+      if (/0x7e273289|NonexistentToken/.test(String(e))) return null;
+      throw e;
+    });
     if (owner && owner.toLowerCase() !== p.account.address.toLowerCase()) {
       throw new Error(`badge #${p.tokenId} belongs to someone else: use another --first-id`);
     }
-    if (!owner) {
-      const hash = await sendWait({ fn: "mint", args: [p.account.address, p.tokenId] });
-      log(`minted #${p.tokenId} to voter ${p.i}`);
+    if (!owner) missing.push(p);
+  }
+  if (missing.length) {
+    let nonce = await chain.relayerNonce();
+    const sent: { p: (typeof people)[number]; hash: Hex }[] = [];
+    for (const p of missing) {
+      sent.push({
+        p,
+        hash: await chain.send({ fn: "mint", args: [p.account.address, p.tokenId] }, nonce++),
+      });
+    }
+    log(`sent ${sent.length} mints; waiting for them`);
+    for (const { p, hash } of sent) {
+      for (;;) {
+        const s = await chain.txStatus(hash);
+        if (s === "success") break;
+        if (s === "reverted") throw new Error(`mint of #${p.tokenId} reverted: ${hash}`);
+        await sleep(3000);
+      }
       await record({ at: now(), kind: "mint", voter: p.i, tokenId: String(p.tokenId), hash });
     }
-    p.nonce = await chain.nonceOf(p.tokenId);
+    log(`minted #${missing[0].tokenId}–#${missing.at(-1)!.tokenId}`);
   }
+  for (const p of people) p.nonce = await chain.nonceOf(p.tokenId);
 
   let view: { at: number; v: RoundView } | null = null;
   const roundNow = async () => {

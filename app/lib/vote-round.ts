@@ -4,9 +4,10 @@ import { setRound, type VoteManifest } from "../../shared/vote/manifest";
 
 let loading: Promise<void> | null = null;
 
-/** Learns the round the site runs now (an admin may have put a Sepolia test round in
- * place of the built-in one) and runs the pages on it. Once per page load; on a failed
- * read the built-in round stays. A route's clientLoader awaits it before the vote shows. */
+/** Learns the round the site runs now (the one admins set on Admin → Vote) and runs the
+ * pages on it. Once per page load; on a failed read the page has no round. A route's
+ * clientLoader awaits it before the vote shows. The head script may have started the
+ * request already (early-fetch.ts), and the browser keeps the answer a few seconds. */
 export function loadRound(): Promise<void> {
   loading ??= Promise.resolve()
     .then(() => api<{ manifest: VoteManifest | null }>("/api/vote/manifest"))
@@ -17,6 +18,13 @@ export function loadRound(): Promise<void> {
       loading = null;
     });
   return loading;
+}
+
+/** The round as another response carried it (the board's, during the real vote): the
+ * pages run on it and loadRound() asks for nothing more. */
+export function primeRound(m: VoteManifest) {
+  setRound(m);
+  loading = Promise.resolve();
 }
 
 /** For a route module: `export const clientLoader = roundLoader;`. */

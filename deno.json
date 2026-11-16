@@ -29,7 +29,7 @@
     "bench": "deno run --allow-net api/scripts/bench.ts",
     "vote:replay": "deno run --allow-net --allow-read scripts/vote-replay.ts scripts/vote-sim.ts",
     "vote-sim": "deno run --allow-env=VOTE_RELAYER_KEY,SEPOLIA_RPC_URL,VOTE_SIM_SEED --allow-net --allow-read --allow-write=vote-sim scripts/vote-sim.ts",
-    "vote-deploy": "deno run --allow-env=VOTE_RELAYER_KEY,DEVCON_RELAYER_KEY,SEPOLIA_RPC_URL,MAINNET_RPC_URL,ADMIN_ADDRESSES --allow-net --allow-read --allow-write=shared/vote/manifest-data.ts scripts/vote-deploy.ts"
+    "vote-deploy": "deno run --allow-env=VOTE_RELAYER_KEY,DEVCON_RELAYER_KEY,SEPOLIA_RPC_URL,MAINNET_RPC_URL,ADMIN_ADDRESSES --allow-net --allow-read scripts/vote-deploy.ts"
   },
   "imports": {
     "@std/http": "jsr:@std/http@^1.1.4",

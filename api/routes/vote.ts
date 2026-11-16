@@ -9,6 +9,7 @@ import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { recordVote } from "../../shared/vote/record.ts";
 import { kvStateCache, type VoteRound } from "../services/vote-chain.ts";
 import { currentVote } from "../services/vote-active.ts";
+import { etagOf, matchesEtag } from "./feeds.ts";
 import { chainStates, type StateSource } from "../../shared/vote/chain-states.ts";
 import {
   finalWhatIfsAsync,
@@ -554,11 +555,21 @@ export function voteRoutes(deps: Deps) {
       throw new HttpError(429, "slow down");
     }
   };
-  /** The round the site runs now: the pages load it before they show the vote. */
+  /** The round the site runs now: the pages load it before they show the vote. The
+   * browser may keep it a few seconds (an admin's change shows within ~10 s; the server
+   * reads the setting every 5 s anyway), then asks again with its ETag (304 when the same).
+   * Private: a response can carry a refreshed session cookie. */
   r.get("/manifest", async (c) => {
     const d = await currentVote(deps);
-    c.header("Cache-Control", "no-store");
-    return c.json({ manifest: d?.manifest ?? null });
+    const body = JSON.stringify({ manifest: d?.manifest ?? null });
+    const etag = await etagOf(body);
+    const headers = {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "private, max-age=10, stale-while-revalidate=60",
+      ETag: etag,
+    };
+    if (matchesEtag(c.req.header("If-None-Match"), etag)) return c.body(null, 304, headers);
+    return c.body(body, 200, headers);
   });
 
   /** The badges the signed-in account votes with, so the menu and /vote lead to its ballot. */

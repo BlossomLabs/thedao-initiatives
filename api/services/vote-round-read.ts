@@ -10,7 +10,7 @@ import {
   type PublicClient,
   type Transport,
 } from "viem";
-import { sepolia } from "viem/chains";
+import { mainnet, sepolia } from "viem/chains";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
 import { type RoundOnChain, RoundReadError } from "../../shared/vote/round-from-chain.ts";
 
@@ -25,12 +25,16 @@ const isRevert = (e: unknown) =>
   );
 
 /** The block a contract was deployed in: the first with its code (needs an archive node). */
-export async function deployBlockOf(pub: PublicClient, address: `0x${string}`): Promise<number> {
+export async function deployBlockOf(
+  pub: PublicClient,
+  address: `0x${string}`,
+  chainName = "Sepolia",
+): Promise<number> {
   const head = Number(await pub.getBlockNumber());
   const has = async (n: number) =>
     ((await pub.getCode({ address, blockNumber: BigInt(n) })) ?? "0x") !== "0x";
   if (!(await has(head))) {
-    throw new RoundReadError("There's no contract at that address on Sepolia.");
+    throw new RoundReadError(`There's no contract at that address on ${chainName}.`);
   }
   let lo = 0, hi = head;
   while (lo < hi) {
@@ -41,15 +45,19 @@ export async function deployBlockOf(pub: PublicClient, address: `0x${string}`): 
   return lo;
 }
 
-/** Everything a Sepolia round's contract says about itself, read at the newest block. */
+/** Everything a round's contract says about itself, read at the newest block: on Sepolia
+ * (a test round) or Ethereum (the real vote). */
 export async function readRoundOnChain(
   address: `0x${string}`,
   rpcUrl: string,
   transport: Transport = http(rpcUrl),
+  chainId: 1 | 11155111 = 11155111,
 ): Promise<RoundOnChain & { minters: (a: `0x${string}`) => Promise<boolean> }> {
+  const chain = chainId === mainnet.id ? mainnet : sepolia;
+  const chainName = chainId === mainnet.id ? "Ethereum" : "Sepolia";
   // The reads go out as a few multicalls, not one request each (80+ initiatives).
   const pub = createPublicClient({
-    chain: sepolia,
+    chain,
     transport,
     batch: { multicall: true },
   }) as PublicClient;
@@ -64,7 +72,7 @@ export async function readRoundOnChain(
   const counts = await Promise.all([
     one<bigint>("initiativeCount"),
     one<bigint>("currencyCount"),
-  ]).catch(unless("That address isn't a vote round on Sepolia."));
+  ]).catch(unless(`That address isn't a vote round on ${chainName}.`));
   // Rounds from before the ballot rules have no affiliations (groups) to read.
   const nGroups = await one<bigint>("groupCount").catch(
     unless("That round was deployed before the ballot rules: deploy a new one with vote-deploy."),
@@ -104,10 +112,15 @@ export async function readRoundOnChain(
         return { symbol, asset: getAddress(x.asset), usdFeed: getAddress(x.usdFeed) };
       }),
     ),
-    deployBlockOf(pub, c.address),
+    deployBlockOf(pub, c.address, chainName),
   ]);
-  const minter = await one<`0x${string}`>("MINTER_ROLE");
+  const [minter, eligibilityNFT] = await Promise.all([
+    one<`0x${string}`>("MINTER_ROLE"),
+    one<`0x${string}`>("eligibilityNFT"),
+  ]);
   return {
+    chainId,
+    eligibilityNFT: getAddress(eligibilityNFT),
     deployBlock,
     schedule: {
       opensAt: Number(opensAt),

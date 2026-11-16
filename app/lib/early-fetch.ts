@@ -2,7 +2,9 @@
  * so it overlaps the JavaScript download; `api()` picks the response up on its
  * first read of the same path and the page paints as soon as the app hydrates.
  * The board page ("/") starts the board; an initiative's page
- * ("/initiative/<slug>") starts that initiative. Each request is sent as the app
+ * ("/initiative/<slug>") starts that initiative; the pages that wait for the vote's
+ * round before they show (vote-round.ts: /vote, /vote/ballot, Admin → Vote, an admin
+ * initiative page) start the round. Each request is sent as the app
  * would send it: marked passive so it does not extend the session's inactivity
  * deadline, and with the cookie only while this browser remembers a session
  * (the initiative read is anonymous otherwise, see use-initiative.ts). A failure
@@ -21,6 +23,7 @@ declare global {
 }
 
 const BOARD_PATH = "/api/board";
+const ROUND_PATH = "/api/vote/manifest";
 
 /** The head script. Kept to plain ES5: it runs before anything else on the page.
  * The session check is context/session.tsx's `load()`: an address and an expiry
@@ -28,6 +31,8 @@ const BOARD_PATH = "/api/board";
 export const EARLY_FETCH_SCRIPT = "(function(){var l=location.pathname,path,anon=false;" +
   "var m=/^\\/initiative\\/([a-z0-9-]+)\\/?$/i.exec(l);" +
   "if(l==='/')path=" + JSON.stringify(BOARD_PATH) + ";" +
+  "else if(/^\\/(vote(\\/ballot(\\/edit)?)?|admin\\/vote|admin\\/initiatives\\/[^/]+)\\/?$/.test(l))" +
+  "path=" + JSON.stringify(ROUND_PATH) + ";" +
   "else if(m){path='/api/initiatives/'+m[1];" +
   "try{var s=JSON.parse(localStorage.getItem(" + JSON.stringify(SESSION_KEY) + ")||'null');" +
   "anon=!(s&&typeof s.address==='string'&&typeof s.expiresAt==='number'&&s.expiresAt*1000>=Date.now())}" +

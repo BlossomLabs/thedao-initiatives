@@ -10,7 +10,9 @@ import {
 const C = "0x1000000000000000000000000000000000000001";
 const SAFE = "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C";
 
-const chain = (accounts: `0x${string}`[]): RoundOnChain => ({
+const chain = (accounts: `0x${string}`[], o: Partial<RoundOnChain> = {}): RoundOnChain => ({
+  chainId: 11155111,
+  eligibilityNFT: C,
   deployBlock: 12,
   schedule: { opensAt: 1000, firstTallyAt: [2000, 3000, 4000], initialWindow: 320, maxWindows: 4 },
   poolUsd: 913_244_000_000n,
@@ -27,6 +29,7 @@ const chain = (accounts: `0x${string}`[]): RoundOnChain => ({
     asset: "0x0000000000000000000000000000000000000000",
     usdFeed: "0x0000000000000000000000000000000000000000",
   }],
+  ...o,
 });
 
 const board = [
@@ -72,5 +75,39 @@ describe("manifestFromChain", () => {
     }]);
     expect(() => manifestFromChain(C, chain([SAFE, testPlaceholder("a")]), twice))
       .toThrow("twice");
+  });
+
+  it("on Ethereum it's the real vote, counting the voting badge", () => {
+    const BADGE = "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C";
+    const Z = "0x0000000000000000000000000000000000000000";
+    const m = manifestFromChain(
+      C,
+      chain([SAFE, "0x5000000000000000000000000000000000000005"], {
+        chainId: 1,
+        eligibilityNFT: BADGE,
+        currencies: [
+          { symbol: "USD", asset: Z, usdFeed: Z },
+          { symbol: "ETH", asset: Z, usdFeed: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" },
+        ],
+      }),
+      slugsByAccount([...board, {
+        slug: "two",
+        safeAddress: "0x5000000000000000000000000000000000000005",
+      }]),
+    );
+    expect(checkManifest(m)).toBe(m);
+    expect([m.kind, m.chainId, m.badge]).toEqual(["real", 1, BADGE]);
+  });
+
+  it("refuses badges that don't fit the chain", () => {
+    expect(() => manifestFromChain(C, chain([SAFE], { chainId: 1 }), slugsByAccount(board)))
+      .toThrow("voting badge");
+    expect(() =>
+      manifestFromChain(
+        C,
+        chain([SAFE], { eligibilityNFT: "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C" }),
+        slugsByAccount(board),
+      )
+    ).toThrow("own badges");
   });
 });

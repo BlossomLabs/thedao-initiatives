@@ -241,8 +241,9 @@ ballot, checks them against the contract's `transcript`, `recordCount` and
 `ballotHashOf`, reads each project's ask and the pool at every tally block, and
 replays the quiet ending. It prints each tier's status, window, funded projects with
 their awards and covered projects, then the transcript check and the head block.
-`--manifest <file>` replays another round (a manifest JSON or `manifest-data.ts`;
-the default is the site's `shared/vote/manifest-data.ts`), `--at <unix seconds>`
+By default it replays the round the site runs (its public `/api/vote/manifest`, which
+the site reads from the round's contract; `--site <url>` for another site).
+`--manifest <file>` replays another round (a manifest JSON), `--at <unix seconds>`
 replays it as of that time, and `--json` prints `{round, transcript, head}`: `round` is
 the replay part of `/api/vote/round`, all of it but the what-ifs the site adds
 (`live.next`, `live.lead`, `live.give` and `final`).

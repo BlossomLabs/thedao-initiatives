@@ -1,10 +1,11 @@
-// Deploys a SignedBallots round, sets it up, hands the admin roles to
-// sem-the-bee.eth and writes shared/vote/manifest-data.ts.
+// Deploys a SignedBallots round, sets it up and hands the admin roles to sem-the-bee.eth.
+// The site reads the round from its contract: set it on Admin → Vote (its address and
+// network) once this prints it.
 //
 // A test vote, on Sepolia, with the board's initiatives (badges: Admin → Vote, or
 // scripts/vote-sim.ts):
 //   VOTE_RELAYER_KEY=0x… SEPOLIA_RPC_URL=https://… \
-//     deno task vote-deploy [--test-usd 0x…] [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
+//     deno task vote-deploy [--minter 0x…] [--test-usd 0x…] [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
 // It opens 30 min after the deploy; S-Tier's first tally is 30 min later, and the three
 // tiers then take 30 min at most (10 min each). Donations are in a test dollar (TestUSD,
 // anyone can mint it; deployed here unless --test-usd names one), and the board's open
@@ -26,15 +27,18 @@
 //
 // Adding projects to a deployed round (outside every quiet-ending span; the admin
 // holds the role, so the admin's wallet sends the calls):
-//   deno task vote-deploy --add slug-a,slug-b [--rpc …] > add.json   (Safe Transaction Builder batch)
+//   deno task vote-deploy --contract 0x… [--real] --add slug-a,slug-b [--rpc …] > add.json
+//                                                           (Safe Transaction Builder batch)
 //   … the admin executes it …
-//   deno task vote-deploy --added slug-a,slug-b [--rpc …]            (checks on-chain, appends to the manifest)
+//   deno task vote-deploy --contract 0x… [--real] --added slug-a,slug-b [--rpc …]
+//                                (checks them on-chain; then "Read it again" on Admin → Vote)
 //
 // Bringing the round's affiliations up to the board's (same windows as adding; add new
 // projects first, with --add):
-//   deno task vote-deploy --affiliations [--rpc …] > groups.json     (the admin's batch)
+//   deno task vote-deploy --contract 0x… [--real] --affiliations [--rpc …] > groups.json
 //   … the admin executes it …
-//   deno task vote-deploy --affiliated [--rpc …]                     (checks on-chain, rewrites the manifest)
+//   deno task vote-deploy --contract 0x… [--real] --affiliated [--rpc …]
+//                                (checks them on-chain; then "Read it again" on Admin → Vote)
 import { parseArgs } from "jsr:@std/cli@1.0.24/parse-args";
 import {
   type Abi,
@@ -43,7 +47,6 @@ import {
   encodeFunctionData,
   getAddress,
   type Hex,
-  hexToString,
   http,
   isAddress,
   stringToHex,
@@ -52,8 +55,14 @@ import { privateKeyToAccount } from "viem/accounts";
 import { mainnet, sepolia } from "viem/chains";
 import { DEFAULT_ADMIN_ADDRESSES, REVIEW_BADGE_CONTRACT } from "../api/config.ts";
 import { SIGNED_BALLOTS_ABI } from "../shared/vote/abi.ts";
-import type { VoteManifest } from "../shared/vote/manifest.ts";
-import { testPlaceholder, tierSpan } from "../shared/vote/round-from-chain.ts";
+import { checkManifest, type VoteManifest } from "../shared/vote/manifest.ts";
+import { readRoundOnChain } from "../api/services/vote-round-read.ts";
+import {
+  manifestFromChain,
+  slugsByAccount,
+  testPlaceholder,
+  tierSpan,
+} from "../shared/vote/round-from-chain.ts";
 import { pledgeChainId } from "../shared/vote/typed-data.ts";
 import mainnetConfig from "../vote/config/mainnet.json" with { type: "json" };
 
@@ -204,7 +213,8 @@ export function checkCodeSize(name: string, deployedBytecode: Hex): void {
 
 /** The roles the round must end the setup with: [role, account, held]. The site's admin
  * holds the three handed-over roles and the relayer none of them; with the real vote each
- * site admin can sign pledges, and a test vote's relayer mints its badges. */
+ * site admin can sign pledges, and a test vote's relayer mints its badges, as does each
+ * of `minters` (the site's relayer, when it isn't the account deploying). */
 export function roleChecks(o: {
   real: boolean;
   /** DEFAULT_ADMIN_ROLE, ADMIN_ROLE, PLEDGE_ROLE. */
@@ -213,13 +223,27 @@ export function roleChecks(o: {
   admin: Hex;
   relayer: Hex;
   admins: string[];
+  minters?: Hex[];
 }): [Hex, Hex, boolean][] {
   return [
     ...o.handed.map((r): [Hex, Hex, boolean] => [r, o.admin, true]),
     ...o.handed.map((r): [Hex, Hex, boolean] => [r, o.relayer, false]),
     ...(o.real ? o.admins.map((a): [Hex, Hex, boolean] => [o.handed[2], a as Hex, true]) : []),
     ...(o.real ? [] : [[o.minter, o.relayer, true] as [Hex, Hex, boolean]]),
+    ...(o.real ? [] : (o.minters ?? []).map((a): [Hex, Hex, boolean] => [o.minter, a, true])),
   ];
+}
+
+/** --minter: the extra accounts that mint a test round's badges (comma-separated), e.g. the
+ * site's relayer (Admin → Vote shows it) when another key deploys. Not for the real vote. */
+export function parseMinters(value: string | undefined, real: boolean, deployer: Hex): Hex[] {
+  if (!value) return [];
+  if (real) throw new Error("--minter is for test votes: the real vote mints no badges");
+  const out = value.split(",").map((a) => a.trim()).filter(Boolean).map((a) => {
+    if (!isAddress(a)) throw new Error(`--minter: ${a} isn't an address`);
+    return getAddress(a);
+  });
+  return [...new Set(out)].filter((a) => a.toLowerCase() !== deployer.toLowerCase());
 }
 
 /** What differs between the currencies the round registered (`currency(i)`, read back)
@@ -340,7 +364,7 @@ export function parseRealArgs(
   return { opensAt, tallies, poolUsd: BigInt(dollars) * 1_000_000n, slugsFile: need("slugs") };
 }
 
-/** What the site reads (shared/vote/manifest-data.ts). */
+/** A round's manifest as the site reads it from the contract (tests build fixtures with it). */
 export function manifestFor(
   r: {
     kind: "test" | "real";
@@ -483,16 +507,33 @@ const adminBatch = (
   })),
 });
 
-const writeManifest = async (m: VoteManifest, out?: string) => {
-  const path = out ?? new URL("../shared/vote/manifest-data.ts", import.meta.url).pathname;
-  await Deno.writeTextFile(
-    path,
-    `// Written by scripts/vote-deploy.ts. Do not edit by hand.\nexport default ${
-      JSON.stringify(m, null, 2)
-    };\n`,
+/** A deployed round as the site reads it: from its contract, the board matching each
+ * initiative by its account (the same as Admin → Vote). */
+async function roundAt(
+  args: { contract?: string; real?: boolean; rpc?: string; board?: string },
+) {
+  if (!args.contract || !isAddress(args.contract)) {
+    throw new Error("--contract <the round's address> is required");
+  }
+  const chain = args.real ? mainnet : sepolia;
+  const rpc = args.rpc ?? Deno.env.get(args.real ? "MAINNET_RPC_URL" : "SEPOLIA_RPC_URL");
+  if (!rpc) throw new Error("--rpc or the chain's RPC env var is required");
+  const cards = await boardCards(args.board);
+  const read = await readRoundOnChain(
+    getAddress(args.contract),
+    rpc,
+    http(rpc, { timeout: 60_000, retryCount: 6 }),
+    chain.id as 1 | 11155111,
   );
-  return path;
-};
+  const m = checkManifest(
+    manifestFromChain(getAddress(args.contract), read, slugsByAccount(cards)),
+  );
+  const pub = createPublicClient({
+    chain,
+    transport: http(rpc, { timeout: 60_000, retryCount: 6 }),
+  });
+  return { m, pub, cards };
+}
 
 /** Refuses when the contract won't take projects or group changes now. */
 function requireAddingOpen(m: VoteManifest, now: number) {
@@ -520,133 +561,69 @@ async function boardCards(board = "https://initiatives.thedao.fund"): Promise<Bo
 }
 
 /** --add: the admin's calls as a Safe Transaction Builder batch, if adding is open now.
- * --added: after the admin ran them, checks each project on-chain and appends it to
- * the manifest. */
+ * --added: after the admin ran them, checks each project is in the round on-chain. */
 async function addMain(
-  args: { add?: string; added?: string; board?: string; rpc?: string; out?: string },
+  args: {
+    add?: string;
+    added?: string;
+    board?: string;
+    rpc?: string;
+    contract?: string;
+    real?: boolean;
+  },
 ) {
-  const m = (await import("../shared/vote/manifest-data.ts")).default as unknown as VoteManifest;
-  const chain = m.chainId === mainnet.id ? mainnet : sepolia;
-  const rpc = args.rpc ??
-    Deno.env.get(chain.id === mainnet.id ? "MAINNET_RPC_URL" : "SEPOLIA_RPC_URL");
-  if (!rpc) throw new Error("--rpc or the chain's RPC env var is required");
-  const pub = createPublicClient({
-    chain,
-    transport: http(rpc, { timeout: 60_000, retryCount: 6 }),
-  });
+  const { m, pub, cards: board } = await roundAt(args);
   const slugs = (args.add ?? args.added)!.split(",").map((x) => x.trim()).filter(Boolean);
-  const bySlug = new Map((await boardCards(args.board)).map((c) => [c.slug, c]));
+  if (args.added) {
+    const missing = slugs.filter((slug) => !m.slugs.includes(slug));
+    if (missing.length) throw new Error(`not in the round on-chain yet: ${missing.join(", ")}`);
+    console.log(
+      `${slugs.join(", ")} in the round on-chain; press "Read it again" on Admin → Vote.`,
+    );
+    return;
+  }
+  const bySlug = new Map(board.map((c) => [c.slug, c]));
   const cards = slugs.map((slug) => {
     const c = bySlug.get(slug);
     if (!c) throw new Error(`not on the board: ${slug}`);
     return c;
   });
-  const { calls, manifest } = addPlan(m, cards);
-  if (args.add) {
-    requireAddingOpen(m, Number((await pub.getBlock()).timestamp));
-    console.log(
-      JSON.stringify(adminBatch(m, `Add ${slugs.join(", ")} to the vote`, calls), null, 2),
-    );
-    return;
-  }
-  const read = (functionName: string, a: readonly unknown[] = []) =>
-    pub.readContract({
-      address: m.contract,
-      abi: SIGNED_BALLOTS_ABI,
-      functionName: functionName as never,
-      args: a as never,
-    });
-  const count = Number(await read("initiativeCount"));
-  if (count !== manifest.slugs.length) {
-    throw new Error(
-      `initiativeCount ${count}, expected ${manifest.slugs.length}: run the batch first`,
-    );
-  }
-  for (const [i, name] of manifest.groups.entries()) {
-    if (await read("groupName", [BigInt(i)]) !== stringToHex(name, { size: 32 })) {
-      throw new Error(`group ${i} on-chain isn't ${name}`);
-    }
-  }
-  const plan = planInitiatives(cards, {
-    real: m.kind === "real",
-    groups: planGroups(cards, m.groups),
-  });
-  for (const [k, p] of plan.entries()) {
-    const x = await read("initiative", [BigInt(m.slugs.length + k)]) as {
-      account: string;
-      goalUsd: bigint;
-      rfp: boolean;
-      groups: bigint;
-    };
-    if (
-      x.account.toLowerCase() !== p.account.toLowerCase() || x.goalUsd !== p.goalUsd ||
-      x.rfp !== p.rfp || x.groups !== groupMask(p.groups)
-    ) throw new Error(`initiative ${m.slugs.length + k} on-chain doesn't match ${p.slug}`);
-  }
-  const out = await writeManifest(manifest, args.out);
-  console.log(`Appended ${slugs.join(", ")}; manifest written to ${out}`);
+  const { calls } = addPlan(m, cards);
+  requireAddingOpen(m, Number((await pub.getBlock()).timestamp));
+  console.log(JSON.stringify(adminBatch(m, `Add ${slugs.join(", ")} to the vote`, calls), null, 2));
 }
 
 /** --affiliations: the admin's calls that bring the round's affiliations up to the
- * board's, if adding is open now. --affiliated: after the admin ran them, checks every
- * group and project on-chain and rewrites the manifest. */
+ * board's, if adding is open now. --affiliated: after the admin ran them, checks that the
+ * round on-chain matches the board. */
 async function regroupMain(
-  args: { affiliations?: boolean; board?: string; rpc?: string; out?: string },
+  args: {
+    affiliations?: boolean;
+    affiliated?: boolean;
+    board?: string;
+    rpc?: string;
+    contract?: string;
+    real?: boolean;
+  },
 ) {
-  const m = (await import("../shared/vote/manifest-data.ts")).default as unknown as VoteManifest;
-  const chain = m.chainId === mainnet.id ? mainnet : sepolia;
-  const rpc = args.rpc ??
-    Deno.env.get(chain.id === mainnet.id ? "MAINNET_RPC_URL" : "SEPOLIA_RPC_URL");
-  if (!rpc) throw new Error("--rpc or the chain's RPC env var is required");
-  const pub = createPublicClient({
-    chain,
-    transport: http(rpc, { timeout: 60_000, retryCount: 6 }),
-  });
-  const read = (functionName: string, a: readonly unknown[] = []) =>
-    pub.readContract({
-      address: m.contract,
-      abi: SIGNED_BALLOTS_ABI,
-      functionName: functionName as never,
-      args: a as never,
-    });
-  if (args.affiliations) {
-    const { calls, changed } = regroupPlan(m, await boardCards(args.board));
-    if (!calls.length) {
-      console.error("The round's affiliations already match the board's.");
-      return;
+  const { m, pub, cards } = await roundAt(args);
+  const { calls, changed } = regroupPlan(m, cards);
+  if (args.affiliated) {
+    if (calls.length) {
+      throw new Error(`still differs from the board: ${changed.join(", ") || "new groups"}`);
     }
-    requireAddingOpen(m, Number((await pub.getBlock()).timestamp));
-    console.error(`${changed.length} projects change groups: ${changed.join(", ")}`);
-    console.log(JSON.stringify(adminBatch(m, "Update the vote's affiliations", calls), null, 2));
+    console.log(
+      `The round's affiliations match the board's; press "Read it again" on Admin → Vote.`,
+    );
     return;
   }
-  // What the chain has now, whatever the board says meanwhile.
-  const groupCount = Number(await read("groupCount"));
-  const names: string[] = [];
-  for (let i = 0; i < groupCount; i++) {
-    const raw = await read("groupName", [BigInt(i)]) as Hex;
-    names.push(hexToString(raw, { size: 32 }));
+  if (!calls.length) {
+    console.error("The round's affiliations already match the board's.");
+    return;
   }
-  for (const [i, name] of m.groups.entries()) {
-    if (names[i] !== name) throw new Error(`group ${i} on-chain is "${names[i]}", not "${name}"`);
-  }
-  const projects: VoteManifest["projects"] = [];
-  for (const [i, p] of m.projects.entries()) {
-    const x = await read("initiative", [BigInt(i)]) as { groups: bigint };
-    const groups = Array.from({ length: groupCount }, (_, g) => g).filter((g) =>
-      (x.groups >> BigInt(g)) & 1n
-    );
-    projects.push({ ...p, groups });
-  }
-  const changed = m.slugs.filter((_, i) =>
-    groupMask(projects[i].groups) !== groupMask(m.projects[i].groups)
-  );
-  const out = await writeManifest({ ...m, groups: names, projects }, args.out);
-  console.log(
-    `${names.length - m.groups.length} new groups, ${changed.length} projects regrouped${
-      changed.length ? ` (${changed.join(", ")})` : ""
-    }; manifest written to ${out}`,
-  );
+  requireAddingOpen(m, Number((await pub.getBlock()).timestamp));
+  console.error(`${changed.length} projects change groups: ${changed.join(", ")}`);
+  console.log(JSON.stringify(adminBatch(m, "Update the vote's affiliations", calls), null, 2));
 }
 
 async function main() {
@@ -655,7 +632,6 @@ async function main() {
     string: [
       "board",
       "rpc",
-      "out",
       "opens",
       "s-tally",
       "a-tally",
@@ -667,6 +643,8 @@ async function main() {
       "added",
       "admins",
       "test-usd",
+      "minter",
+      "contract",
     ],
   });
   if (args.add || args.added) return await addMain(args);
@@ -690,6 +668,7 @@ async function main() {
   if (!rpc) throw new Error(`--rpc or ${rpcEnv} is required`);
 
   const account = privateKeyToAccount(key);
+  const minters = parseMinters(args.minter, Boolean(real), account.address);
   // Public RPCs are slow at times: long timeouts, several retries.
   const transport = http(rpc, { timeout: 60_000, retryCount: 6, retryDelay: 1_000 });
   const pub = createPublicClient({ chain, transport });
@@ -793,13 +772,24 @@ async function main() {
   // The whole setup is one atomic transaction (EIP-7702): the relayer account
   // delegates to BatchExecutor and calls itself, so every step runs with the
   // relayer as msg.sender. All of it lands or none of it does.
-  const role = (name: string) =>
-    pub.readContract({
-      address: contract,
-      abi: SIGNED_BALLOTS_ABI,
-      functionName: name as never,
-    }) as Promise<Hex>;
+  // At the deploy's block, retried: a load-balanced RPC may not have it yet.
+  const role = async (name: string): Promise<Hex> => {
+    for (let k = 1;; k++) {
+      try {
+        return await pub.readContract({
+          address: contract,
+          abi: SIGNED_BALLOTS_ABI,
+          functionName: name as never,
+          blockNumber: deployed.blockNumber,
+        }) as Hex;
+      } catch (e) {
+        if (k >= 6) throw e;
+        await new Promise((r) => setTimeout(r, 4000));
+      }
+    }
+  };
   const handed = await Promise.all(["DEFAULT_ADMIN_ROLE", "ADMIN_ROLE", "PLEDGE_ROLE"].map(role));
+  const minterRole = await role("MINTER_ROLE");
   const step = (functionName: string, fnArgs: readonly unknown[]) => ({
     to: contract,
     value: 0n,
@@ -825,6 +815,8 @@ async function main() {
     // Currencies, the pledge role and the pledges go before the hand-over, while the relayer
     // still holds the roles; currencies freeze at opening.
     ...donation,
+    // The site's relayer, when another key deploys: it mints the badges admins give.
+    ...minters.map((a) => step("grantRole", [minterRole, a])),
     ...handed.map((r) => step("grantRole", [r, ADMIN])),
     // The default admin goes last.
     ...[...handed.slice(1), handed[0]].map((r) => step("renounceRole", [r, account.address])),
@@ -835,47 +827,78 @@ async function main() {
       new URL("../vote/out/BatchExecutor.sol/BatchExecutor.json", import.meta.url),
     ),
   ) as { abi: Abi; bytecode: { object: Hex } };
-  const executor = (await wait(
+  const executorReceipt = await wait(
     await wallet.deployContract({
       abi: executorArtifact.abi,
       bytecode: executorArtifact.bytecode.object,
     }),
     "BatchExecutor deploy",
-  )).contractAddress!;
+  );
+  const executor = executorReceipt.contractAddress!;
+  // Every read after a send is made at the block it landed in: a load-balanced RPC
+  // (dRPC's lb.…) can answer from a node a block or two behind, which would estimate the
+  // next batch on state from before the last one. A node without that block yet errors,
+  // so each read retries a few times.
+  let atBlock = executorReceipt.blockNumber;
+  const caughtUp = async <T>(what: string, f: () => Promise<T>): Promise<T> => {
+    for (let k = 1;; k++) {
+      try {
+        return await f();
+      } catch (e) {
+        if (k >= 6) throw e;
+        console.log(`  ${what}: the node may be behind block ${atBlock} (try ${k}); again in 4 s`);
+        await new Promise((r) => setTimeout(r, 4000));
+      }
+    }
+  };
   console.log(`BatchExecutor ${executor}; setting up ${calls.length} steps in batches`);
 
   // Batches: Sepolia's gas schedule puts the whole setup near 28M gas, over the ~16.7M
-  // per-transaction cap (EIP-7825), so it goes in half-project-count steps at a time (at
-  // least 25; a currency, role grant or pledge costs less than a project). Batch 1 also
-  // delegates the account (EIP-7702); the rest find the delegation in place. Each batch is
-  // estimated against live state and refused before sending if it can't fit.
+  // per-transaction cap (EIP-7825). Steps differ in cost (a project with affiliations or
+  // a pledge costs more than a role grant), so each batch is sized by its estimate against
+  // live state: it starts at half the project count (at least 25) and halves until it
+  // fits. Batch 1 also delegates the account (EIP-7702); the rest find
+  // the delegation in place.
   const TX_GAS_CAP = 16_700_000n;
-  const per = Math.max(25, Math.ceil(plan.length / 2));
-  const batches = Array.from(
-    { length: Math.ceil(calls.length / per) },
-    (_, i) => calls.slice(i * per, (i + 1) * per),
-  );
-  for (const [i, batch] of batches.entries()) {
+  // A 20% margin, capped at the cap; the estimate must stay 5% under the limit.
+  const limitFor = (estimate: bigint) =>
+    estimate * 12n / 10n < TX_GAS_CAP ? estimate * 12n / 10n : TX_GAS_CAP;
+  const fits = (estimate: bigint) => estimate <= limitFor(estimate) * 95n / 100n;
+  let next = 0;
+  let per = Math.max(25, Math.ceil(plan.length / 2));
+  for (let i = 0; next < calls.length; i++) {
     const authorizationList = i === 0
       ? [await wallet.signAuthorization({ contractAddress: executor, executor: "self" })]
       : undefined;
-    const data = encodeFunctionData({
-      abi: executorArtifact.abi,
-      functionName: "execute",
-      args: [batch],
-    });
-    const estimate = await pub.estimateGas({
-      account: account.address,
-      to: account.address,
-      data,
-      authorizationList,
-    });
-    const gas = estimate * 12n / 10n < TX_GAS_CAP ? estimate * 12n / 10n : TX_GAS_CAP;
-    if (estimate > gas * 95n / 100n) {
-      throw new Error(`batch ${i + 1} needs ${estimate} gas, too close to the ${TX_GAS_CAP} cap`);
+    let batch: typeof calls;
+    let data: Hex;
+    let estimate: bigint;
+    for (;;) {
+      batch = calls.slice(next, next + per);
+      data = encodeFunctionData({
+        abi: executorArtifact.abi,
+        functionName: "execute",
+        args: [batch],
+      });
+      const [d, auth] = [data, authorizationList];
+      estimate = await caughtUp(`batch ${i + 1} estimate`, () =>
+        pub.estimateGas({
+          account: account.address,
+          to: account.address,
+          data: d,
+          authorizationList: auth,
+          blockNumber: atBlock,
+        }));
+      if (fits(estimate)) break;
+      if (batch.length === 1) {
+        throw new Error(`step ${next + 1} alone needs ${estimate} gas, over the ${TX_GAS_CAP} cap`);
+      }
+      per = Math.ceil(batch.length / 2);
     }
+    const gas = limitFor(estimate);
     console.log(
-      `Batch ${i + 1}/${batches.length}: ${batch.length} steps, estimate ${estimate}, limit ${gas}`,
+      `Batch ${i + 1}: steps ${next + 1}–${next + batch.length} of ${calls.length}, ` +
+        `estimate ${estimate}, limit ${gas}`,
     );
     const hash = await wallet.sendTransaction({
       to: account.address,
@@ -883,8 +906,9 @@ async function main() {
       authorizationList,
       gas,
     });
-    await wait(hash, `setup batch ${i + 1}`);
-    console.log(`  done in ${hash}`);
+    atBlock = (await wait(hash, `setup batch ${i + 1}`)).blockNumber;
+    console.log(`  done in ${hash} (block ${atBlock})`);
+    next += batch.length;
   }
 
   // Back to a plain account: delegate to the zero address.
@@ -892,87 +916,92 @@ async function main() {
     contractAddress: "0x0000000000000000000000000000000000000000",
     executor: "self",
   });
-  await wait(
+  atBlock = (await wait(
     await wallet.sendTransaction({
       to: account.address,
       value: 0n,
       authorizationList: [undelegate],
     }),
     "clear delegation",
+  )).blockNumber;
+  const code = await caughtUp(
+    "relayer code",
+    () => pub.getCode({ address: account.address, blockNumber: atBlock }),
   );
-  const code = await pub.getCode({ address: account.address });
   if (code && code !== "0x") console.warn(`Note: the relayer still has code ${code}`);
 
-  const minter = await role("MINTER_ROLE");
   for (
     const [r, who, want] of roleChecks({
       real: Boolean(real),
       handed,
-      minter,
+      minter: minterRole,
       admin: ADMIN,
       relayer: account.address,
       admins,
+      minters,
     })
   ) {
-    const has = await pub.readContract({
-      address: contract,
-      abi: SIGNED_BALLOTS_ABI,
-      functionName: "hasRole",
-      args: [r, who],
-    });
+    const has = await caughtUp("role check", () =>
+      pub.readContract({
+        address: contract,
+        abi: SIGNED_BALLOTS_ABI,
+        functionName: "hasRole",
+        args: [r, who],
+        blockNumber: atBlock,
+      }));
     if (has !== want) throw new Error(`role ${r} for ${who} is ${has}, expected ${want}`);
   }
-  const pool = await pub.readContract({
-    address: contract,
-    abi: SIGNED_BALLOTS_ABI,
-    functionName: "poolUsd",
-  });
+  const pool = await caughtUp("pool check", () =>
+    pub.readContract({
+      address: contract,
+      abi: SIGNED_BALLOTS_ABI,
+      functionName: "poolUsd",
+      blockNumber: atBlock,
+    }));
   if (pool !== poolUsd) throw new Error(`poolUsd ${pool} != ${poolUsd}`);
 
   {
-    const n = await pub.readContract({
-      address: contract,
-      abi: SIGNED_BALLOTS_ABI,
-      functionName: "currencyCount",
-    });
+    const n = await caughtUp("currency check", () =>
+      pub.readContract({
+        address: contract,
+        abi: SIGNED_BALLOTS_ABI,
+        functionName: "currencyCount",
+        blockNumber: atBlock,
+      }));
     if (n !== BigInt(currencies.length + 1)) throw new Error(`currencyCount ${n}`);
     // Each one as registered: the asset and feed the manifest (and the replay) will name.
     const got = await Promise.all(
-      Array.from({ length: Number(n) }, (_, i) =>
-        pub.readContract({
-          address: contract,
-          abi: SIGNED_BALLOTS_ABI,
-          functionName: "currency",
-          args: [BigInt(i)],
-        })),
+      Array.from(
+        { length: Number(n) },
+        (_, i) =>
+          caughtUp("currency check", () =>
+            pub.readContract({
+              address: contract,
+              abi: SIGNED_BALLOTS_ABI,
+              functionName: "currency",
+              args: [BigInt(i)],
+              blockNumber: atBlock,
+            })),
+      ),
     );
     const wrong = currencyMismatch([USD_CURRENCY, ...currencies], got);
     if (wrong) throw new Error(`currencies: ${wrong}`);
   }
   const now = Number((await pub.getBlock()).timestamp);
   if (now >= s.opensAt) throw new Error("Setup ran past opensAt: redeploy (the round is frozen).");
-  const count = await pub.readContract({
-    address: contract,
-    abi: SIGNED_BALLOTS_ABI,
-    functionName: "initiativeCount",
-  });
+  const count = await caughtUp("initiative check", () =>
+    pub.readContract({
+      address: contract,
+      abi: SIGNED_BALLOTS_ABI,
+      functionName: "initiativeCount",
+      blockNumber: atBlock,
+    }));
   if (count !== BigInt(plan.length)) throw new Error(`initiativeCount ${count} != ${plan.length}`);
 
-  const manifest = manifestFor({
-    kind: real ? "real" : "test",
-    contract,
-    deployBlock: Number(deployed.blockNumber),
-    schedule: s,
-    poolUsd,
-    slugs: plan.map((p) => p.slug),
-    projects: plan.map((p) => ({ goalUsd: p.goalUsd.toString(), rfp: p.rfp, groups: p.groups })),
-    groups: groups.names,
-    independentTiers,
-    accounts: plan.map((p) => p.account),
-    currencies: [USD_CURRENCY, ...currencies],
-  });
-  const out = await writeManifest(manifest, args.out);
-  console.log(`Manifest written to ${out}`);
+  console.log(
+    `Round ${contract} on ${real ? "Ethereum" : "Sepolia"} is set up. Run it on the site: ` +
+      `Admin → Vote, network ${real ? "Ethereum" : "Sepolia"}, this address.`,
+  );
 }
 
 if (import.meta.main) await main();

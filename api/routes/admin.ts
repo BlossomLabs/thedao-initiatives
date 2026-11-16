@@ -40,9 +40,14 @@ import { CHAIN_ID, LOGO_MAX_BYTES, SAFE_PROXY_FACTORY, SAFE_THRESHOLD } from "..
 import type { Hex } from "viem";
 import { pledgeChainId, pledgeTypedData } from "../../shared/vote/typed-data.ts";
 import { newId } from "../lib/ids.ts";
-import { currentVote, VOTE_ROUND_KEY, type VoteRoundSetting } from "../services/vote-active.ts";
+import {
+  currentVote,
+  roundOf,
+  VOTE_ROUND_KEY,
+  type VoteRoundSetting,
+} from "../services/vote-active.ts";
 import { readRoundOnChain } from "../services/vote-round-read.ts";
-import { sendNext, withRelayer } from "./vote.ts";
+import { errorText, sendNext, withRelayer } from "./vote.ts";
 import { TEST_USD_MAX_MINT } from "../../shared/vote/test-usd.ts";
 import { parseEther } from "viem";
 
@@ -53,17 +58,13 @@ import {
   RoundReadError,
   slugsByAccount,
 } from "../../shared/vote/round-from-chain.ts";
-import {
-  BUILT_ROUND,
-  checkManifest,
-  roundDeployed,
-  type VoteManifest,
-} from "../../shared/vote/manifest.ts";
+import { checkManifest, type VoteManifest } from "../../shared/vote/manifest.ts";
 import {
   adminPledges,
   amountAfter,
   PLEDGE_DEADLINE_SECS,
   PLEDGE_ID_RE,
+  PLEDGE_REVERTS,
   type PledgeChange,
   pledgeFail,
   SIGNED_FIELDS,
@@ -120,11 +121,12 @@ export function adminRoutes(deps: Deps) {
     return c.json(v);
   });
 
-  /** Admin → Vote: the round the site runs (built in, or a Sepolia test round read from
-   * its contract) and the pool's ETH while it waits to be sold. */
+  /** Admin → Vote: the round the site runs, read from its contract (a test round on
+   * Sepolia, the real vote on Ethereum), and the pool's ETH while it waits to be sold. */
   const roundSetting = async () => (await db.meta.get<VoteRoundSetting>(VOTE_ROUND_KEY)) ?? {};
   const roundJson = async () => {
     const s = await roundSetting();
+    const set = roundOf(s);
     const brief = (m: VoteManifest) => ({
       kind: m.kind,
       chainId: m.chainId,
@@ -136,35 +138,54 @@ export function adminRoutes(deps: Deps) {
       poolUsd: m.poolUsd,
     });
     return {
-      built: roundDeployed(BUILT_ROUND) ? brief(BUILT_ROUND) : null,
-      test: s.test ? { ...brief(s.test.manifest), at: s.test.at, by: s.test.by } : null,
+      round: set ? { ...brief(set.manifest), at: set.at, by: set.by } : null,
       pool: s.pool ?? null,
     };
   };
+  /** While the real vote is open its round is fixed: it can be read again (projects added
+   * on-chain), never swapped or taken off the site. */
+  const refuseWhileRealOpen = (cur: VoteRoundSetting, contract?: string) => {
+    const m = roundOf(cur)?.manifest;
+    const now = deps.now();
+    if (
+      m?.kind === "real" && now >= m.opensAt && now < m.closesAt &&
+      m.contract.toLowerCase() !== contract?.toLowerCase()
+    ) {
+      throw new HttpError(409, "The real vote is open: its round can't change until it closes.");
+    }
+  };
   const changedRound = () => deps.voteRound?.forget?.();
   r.get("/vote-round", async (c) => c.json(await roundJson()));
-  /** Reads the contract (Sepolia) and runs the site on it; again to refresh it after
-   * projects or affiliations change on-chain. */
-  r.post("/vote-round/test", requireRecentAuth(deps.now), async (c) => {
-    // A test round would take the real vote off the site: never while one is built in.
-    if (roundDeployed(BUILT_ROUND) && BUILT_ROUND.kind === "real") {
-      throw new HttpError(409, "The site runs the real vote: a test round can't replace it.");
-    }
-    const body = await jsonBody(c, ["contract"]);
+  /** Reads the contract and runs the site on it; again to refresh it after projects or
+   * affiliations change on-chain. `chain`: "sepolia" (a test round) or "ethereum". */
+  r.post("/vote-round/round", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["contract", "chain"]);
     const contract = s(body.contract, 60).trim();
     if (!isAddress(contract)) throw new HttpError(400, "The contract isn't an address.");
-    if (!deps.config.sepoliaRpcUrl) throw new HttpError(503, "No Sepolia RPC is configured.");
+    const chain = body.chain === "ethereum"
+      ? "ethereum"
+      : body.chain === "sepolia"
+      ? "sepolia"
+      : null;
+    if (!chain) throw new HttpError(400, "chain is sepolia or ethereum");
+    const chainName = chain === "ethereum" ? "Ethereum" : "Sepolia";
+    const rpc = chain === "ethereum" ? deps.config.rpcEndpoints[0] : deps.config.sepoliaRpcUrl;
+    if (!rpc) throw new HttpError(503, `No ${chainName} RPC is configured.`);
+    refuseWhileRealOpen(await roundSetting(), contract);
     const rows = await db.initiatives.list(["approved", "archived", "pending", "rejected"]);
     let manifest: VoteManifest;
     const warnings: string[] = [];
     try {
-      const chain = await readRoundOnChain(contract as Hex, deps.config.sepoliaRpcUrl);
-      manifest = checkManifest(
-        manifestFromChain(contract as Hex, chain, slugsByAccount(rows)),
+      const read = await readRoundOnChain(
+        contract as Hex,
+        rpc,
+        undefined,
+        chain === "ethereum" ? 1 : 11155111,
       );
+      manifest = checkManifest(manifestFromChain(contract as Hex, read, slugsByAccount(rows)));
       const relayer = (await currentVote(deps))?.chain.relayerAddress();
       if (!relayer) warnings.push("No relayer key is configured: ballots can't be relayed.");
-      else if (!(await chain.minters(relayer))) {
+      else if (manifest.kind === "test" && !(await read.minters(relayer))) {
         warnings.push(
           `The relayer ${relayer} can't mint badges on this contract: no badges can be given.`,
         );
@@ -173,20 +194,22 @@ export function adminRoutes(deps: Deps) {
       if (e instanceof RoundReadError) throw new HttpError(400, e.message);
       // RPC errors can carry the node's URL (and its key): logged, never shown.
       deps.log(`vote round read ${contract}: ${e instanceof Error ? e.message : String(e)}`);
-      throw new HttpError(502, "Couldn't read the round from Sepolia. Try again.");
+      throw new HttpError(502, `Couldn't read the round from ${chainName}. Try again.`);
     }
-    await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => ({
-      ...(cur ?? {}),
-      test: { manifest, at: deps.now(), by: c.var.user!.address },
-    }));
+    await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => {
+      refuseWhileRealOpen(cur ?? {}, contract);
+      const { test: _, ...rest } = cur ?? {};
+      return { ...rest, round: { manifest, at: deps.now(), by: c.var.user!.address } };
+    });
     changedRound();
     return c.json({ ...(await roundJson()), warnings });
   });
-  /** Back to the round built into the site. */
-  r.delete("/vote-round/test", requireRecentAuth(deps.now), async (c) => {
+  /** No round on the site: the vote pages say there's none. */
+  r.delete("/vote-round/round", requireRecentAuth(deps.now), async (c) => {
     await jsonBody(c, []);
     await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => {
-      const { test: _, ...rest } = cur ?? {};
+      refuseWhileRealOpen(cur ?? {});
+      const { test: _, round: __, ...rest } = cur ?? {};
       return rest;
     });
     changedRound();
@@ -295,6 +318,104 @@ export function adminRoutes(deps: Deps) {
         }),
     );
     return c.json({ hash });
+  });
+
+  /**
+   * Admin → Vote "Test pledge": a pledge in the test round only, on Sepolia, to one of its
+   * initiatives. It lowers that initiative's ask in the test vote and is never one of the
+   * site's pledge records. The pledge form's own steps: the write is a 428 until signed,
+   * `prepare` gives the typed data, the signed write is relayed (setPledgeBySig, 202 with
+   * the hash), and `settle` says once it landed. The signer needs the round's PLEDGE_ROLE
+   * (sem-the-bee.eth has it from the deploy).
+   */
+  const testPledgeTarget = async (slug: string) => {
+    const d = await testRoundNow();
+    if (deps.now() >= d.manifest.closesAt) throw new HttpError(410, "Voting has closed.");
+    const initiativeId = d.manifest.slugs.indexOf(slug);
+    if (initiativeId < 0) throw new HttpError(404, "That initiative isn't in the test round.");
+    return { d, initiativeId };
+  };
+  /** The form's body (multipart, its logo ignored; or JSON): the amount in micro-USD. */
+  const testPledgeBody = async (c: Context<Vars>) => {
+    const allowed = ["company", "amount", "url", "note", "status", ...SIGNED_FIELDS, "remove"];
+    const fields: Record<string, unknown> = {};
+    if ((c.req.header("content-type") ?? "").startsWith("multipart/form-data")) {
+      const form = await formBody(c, [...allowed, "logo"]);
+      for (const [k, v] of form.entries()) if (typeof v === "string") fields[k] = v;
+    } else Object.assign(fields, await jsonBody(c, allowed));
+    if (fields.status !== undefined && fields.status !== "pledged") {
+      throw new HttpError(400, "A test pledge is an open pledge: choose “pledged”.");
+    }
+    const [usd, err] = parseGoal(fields.amount);
+    if (err) throw new HttpError(400, err);
+    return { fields, amount: BigInt(Math.round(usd! * 1e6)) };
+  };
+  r.post("/vote-round/test-pledges/:slug/pledges/prepare", async (c) => {
+    const { d, initiativeId } = await testPledgeTarget(c.req.param("slug"));
+    const { fields, amount } = await testPledgeBody(c);
+    if (
+      fields.pid !== undefined && (typeof fields.pid !== "string" || !PLEDGE_ID_RE.test(fields.pid))
+    ) {
+      throw new HttpError(400, "bad pledge id");
+    }
+    const pid = (fields.pid as string | undefined) ?? `test-${newId()}`;
+    const typed = pledgeTypedData(d.manifest, {
+      pledgeId: pledgeChainId(pid),
+      initiativeId: BigInt(initiativeId),
+      currencyId: 0n,
+      amount,
+      nonce: await d.chain.pledgeNonceOf(c.var.user!.address as Hex),
+      deadline: BigInt(deps.now() + PLEDGE_DEADLINE_SECS),
+    });
+    return c.json({
+      pid,
+      typedData: {
+        ...typed,
+        message: Object.fromEntries(
+          Object.entries(typed.message).map(([k, v]) => [k, v.toString()]),
+        ),
+      },
+    });
+  });
+  r.post("/vote-round/test-pledges/:slug/pledges", async (c) => {
+    const { d, initiativeId } = await testPledgeTarget(c.req.param("slug"));
+    const { fields, amount } = await testPledgeBody(c);
+    const signed = signedPledgeOf(fields);
+    try {
+      const hash = await withRelayer(db.kv, () =>
+        sendNext(db.kv, d, deps.now(), {
+          fn: "setPledgeBySig",
+          args: [
+            pledgeChainId(signed.pid),
+            BigInt(initiativeId),
+            0n,
+            amount,
+            c.var.user!.address as Hex,
+            signed.nonce,
+            signed.deadline,
+            signed.signature as Hex,
+          ],
+        }));
+      return c.json({ hash, pid: signed.pid }, 202);
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      const revert = PLEDGE_REVERTS.find(([re]) => re.test(String(e)));
+      deps.log(`test pledge: setPledgeBySig refused (${errorText(e)})`);
+      throw pledgeFail(
+        502,
+        "pledge_not_recorded",
+        `The test pledge wasn't recorded: ${revert?.[1] ?? "the chain refused it"}.`,
+      );
+    }
+  });
+  r.post("/vote-round/test-pledges/:slug/pledges/:pid/settle", async (c) => {
+    const { d } = await testPledgeTarget(c.req.param("slug"));
+    const hash = s((await jsonBody(c, ["hash"])).hash, 80);
+    if (!TX_HASH_RE.test(hash)) return c.json({ state: "pending" });
+    const status = await d.chain.txStatus(hash as Hex).catch(() => "unknown" as const);
+    return c.json({
+      state: status === "success" ? "saved" : status === "reverted" ? "failed" : "pending",
+    });
   });
 
   /**

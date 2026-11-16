@@ -36,6 +36,29 @@ vi.mock("../../shared/vote/manifest", async (original) => {
   };
 });
 vi.mock("~/components/vote/VoteResults", () => ({ default: () => <p>vote results</p> }));
+// The board's answer names the round, and carries the whole of it once the real vote has
+// opened: that's how the front page learns it, with no request of its own.
+vi.mock("~/hooks/use-board", () => ({
+  useBoard: () => ({
+    data: {
+      flags: {
+        round: {
+          kind: round.kind,
+          contract: round.contract,
+          opensAt: round.opensAt,
+          ...(round.kind === "real" && Date.now() / 1000 >= round.opensAt
+            ? { manifest: { kind: "real" } }
+            : {}),
+        },
+      },
+    },
+  }),
+}));
+vi.mock("~/lib/vote-round", async (original) => ({
+  ...await original<typeof import("~/lib/vote-round")>(),
+  // The round is the mock above: nothing to set.
+  primeRound: () => {},
+}));
 vi.mock("~/components/board/BoardPage", () => ({ default: () => <p>the board</p> }));
 vi.mock("~/context/session", () => ({
   useSession: () => ({

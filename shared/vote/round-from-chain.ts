@@ -1,5 +1,5 @@
 import { getAddress, keccak256, slice, toBytes } from "viem";
-import { SEPOLIA_CHAIN_ID, type VoteManifest } from "./manifest.ts";
+import { MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID, type VoteManifest } from "./manifest.ts";
 import type { Schedule } from "./quiet-ending.ts";
 
 /** A round that can't be run as read, said in words an admin can act on (safe to show:
@@ -22,6 +22,10 @@ export const testPlaceholder = (slug: string): `0x${string}` =>
 
 /** What a round's contract says about itself (read by api/services/vote-round-read.ts). */
 export type RoundOnChain = {
+  chainId: number;
+  /** The NFT whose owners vote: the contract itself (a test round mints its own badges),
+   * or the voting badge (the real vote). */
+  eligibilityNFT: `0x${string}`;
   deployBlock: number;
   schedule: Schedule;
   poolUsd: bigint;
@@ -49,9 +53,10 @@ const bitsOf = (mask: bigint) => {
 };
 
 /**
- * A Sepolia test round's manifest from its contract: everything the deploy script would
- * write, the slugs matched through each initiative's account. Throws, naming them, when
- * an on-chain initiative matches no board initiative or two match the same one.
+ * A round's manifest from its contract, the slugs matched through each initiative's
+ * account: on Sepolia a test round (its own badges), on Ethereum the real vote (counting
+ * the voting badge). Throws, naming them, when an on-chain initiative matches no board
+ * initiative or two match the same one, or when the round's badges don't fit its chain.
  */
 export function manifestFromChain(
   contract: `0x${string}`,
@@ -73,10 +78,24 @@ export function manifestFromChain(
   const twice = slugs.filter((s, i) => slugs.indexOf(s) !== i);
   if (twice.length) throw new RoundReadError(`${twice[0]} is in the round twice.`);
   if (!c.initiatives.length) throw new RoundReadError("The round has no initiatives yet.");
+  const real = c.chainId === MAINNET_CHAIN_ID;
+  if (!real && c.chainId !== SEPOLIA_CHAIN_ID) {
+    throw new RoundReadError("A round runs on Ethereum (the real vote) or Sepolia (a test).");
+  }
+  const own = c.eligibilityNFT.toLowerCase() === contract.toLowerCase();
+  if (real && own) {
+    throw new RoundReadError(
+      "That round mints its own badges: the real vote counts the voting badge.",
+    );
+  }
+  if (!real && !own) {
+    throw new RoundReadError("A test round mints its own badges; that one counts another NFT.");
+  }
   const s = c.schedule;
   return {
-    kind: "test",
-    chainId: SEPOLIA_CHAIN_ID,
+    kind: real ? "real" : "test",
+    chainId: real ? MAINNET_CHAIN_ID : SEPOLIA_CHAIN_ID,
+    ...(real ? { badge: getAddress(c.eligibilityNFT) } : {}),
     contract: getAddress(contract),
     deployBlock: c.deployBlock,
     opensAt: s.opensAt,

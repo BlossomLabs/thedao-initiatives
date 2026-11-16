@@ -228,7 +228,7 @@ const inputsParts = (inp: ChainInputs) => [
 /** The what-if search's own version, part of every cache digest: when the way gaps, leads or
  * final figures are computed changes, bump it, and figures cached under the old code are
  * computed again instead of being served. */
-export const WHAT_IFS_VERSION = 6;
+export const WHAT_IFS_VERSION = 7;
 
 async function digest(parts: unknown[]) {
   const text = JSON.stringify(

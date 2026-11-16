@@ -1,0 +1,1216 @@
+{
+  "head": { "block": 12145142, "timestamp": 1794805548 },
+  "registrationClosesAt": 1794767556,
+  "closed": true,
+  "share": "9042019801",
+  "poolUsd": "913244000000",
+  "asks": [
+    "400000000000",
+    "128000000000",
+    "125000000000",
+    "303000000000",
+    "112500000000",
+    "100000000000",
+    "90000000000",
+    "90000000000",
+    "63000000000",
+    "75000000000",
+    "60000000000",
+    "44600000000",
+    "37500000000",
+    "240000000000",
+    "0",
+    "80000000000",
+    "125000000000",
+    "165000000000",
+    "235000000000",
+    "140000000000",
+    "40000000000",
+    "30000000000",
+    "10910000000",
+    "10500000000",
+    "0",
+    "27500000000",
+    "45000000000",
+    "47970000000",
+    "240000000000",
+    "31380000000",
+    "8700000000",
+    "75000000000",
+    "240000000000",
+    "75000000000",
+    "267000000000",
+    "53000000000",
+    "50000000000",
+    "20000000000",
+    "300000000000",
+    "20950000000",
+    "75000000000",
+    "75000000000",
+    "19200000000",
+    "10000000000",
+    "60000000000",
+    "30000000000",
+    "100000000000",
+    "0",
+    "120000000000",
+    "24000000000",
+    "60000000000",
+    "108000000000",
+    "200000000000",
+    "80000000000",
+    "100500000000",
+    "50000000000",
+    "200000000000",
+    "150000000000",
+    "60000000000",
+    "100000000000",
+    "36000000000",
+    "265000000000",
+    "260000000000",
+    "80000000000",
+    "265000000000",
+    "125000000000",
+    "200000000000",
+    "150000000000",
+    "21000000000",
+    "11500000000",
+    "180000000000",
+    "350000000000",
+    "12000000000",
+    "75000000000",
+    "50000000000",
+    "10000000000",
+    "135000000000",
+    "110000000000",
+    "25000000000",
+    "300000000000",
+    "120000000000",
+    "18000000000",
+    "90000000000",
+    "10000000000",
+    "20000000000",
+    "120000000000",
+    "100000000000",
+    "75000000000",
+    "45000000000",
+    "44000000000",
+    "150000000000",
+    "120000000000",
+    "185000000000",
+    "250000000000",
+    "200000000000",
+    "20000000000"
+  ],
+  "tiers": [
+    {
+      "tier": "S",
+      "status": "settled",
+      "at": 1794767556,
+      "forced": true,
+      "funded": [
+        "scar-test-security-fixes-against-the-real-exploit-before-the",
+        "trust-and-security-assessment-framework-for-agentic-defi",
+        "relayer-failure-lab-reproductions-and-release-tests-for-the",
+        "solidity-wake-vs-code-extension-maintenance-and-ai-fuzzing",
+        "securing-ethereum-with-formal-verification",
+        "seal-security-frameworks-maintaining-open-security-knowledge",
+        "from-community-contracts-to-openzeppelin-contracts-erc-7786",
+        "thatsrekt-evm-exploit-alerts-for-the-public-good",
+        "safe-to-send-warn-before-a-send-to-a-smart-wallet-that-does",
+        "eth-daily-security-getting-ethereum-users-to-the-tools-that",
+        "safe-lockdown-guard-an-emergency-freeze-for-kidnapping-and-c",
+        "reusable-security-workflows-for-triage-of-vulnerability-repo",
+        "hookscope-browser-native-uniswap-v4-hook-transparency",
+        "tee-security-handbook-practical-verification-failure-analysi",
+        "wake-v5-maintenance-and-ai-assisted-fuzzing",
+        "etherform-a-hardened-ci-cd-standard-for-foundry-smart-contra",
+        "clearsign-check-catch-erc-7730-clear-signing-descriptors-tha",
+        "mab-xyz-provably-hardware-ethereum-wallet-a-public-proof-tha",
+        "preparing-encrypted-mempools-for-inclusion-in-the-earliest-e",
+        "nanojs-investigations-sustaining-independent-ethereum-forens"
+      ],
+      "covered": [],
+      "awards": {
+        "scar-test-security-fixes-against-the-real-exploit-before-the": "80000000000",
+        "trust-and-security-assessment-framework-for-agentic-defi": "27500000000",
+        "relayer-failure-lab-reproductions-and-release-tests-for-the": "36000000000",
+        "solidity-wake-vs-code-extension-maintenance-and-ai-fuzzing": "10000000000",
+        "securing-ethereum-with-formal-verification": "30000000000",
+        "seal-security-frameworks-maintaining-open-security-knowledge": "50000000000",
+        "from-community-contracts-to-openzeppelin-contracts-erc-7786": "21000000000",
+        "thatsrekt-evm-exploit-alerts-for-the-public-good": "45000000000",
+        "safe-to-send-warn-before-a-send-to-a-smart-wallet-that-does": "30000000000",
+        "eth-daily-security-getting-ethereum-users-to-the-tools-that": "8700000000",
+        "safe-lockdown-guard-an-emergency-freeze-for-kidnapping-and-c": "10500000000",
+        "reusable-security-workflows-for-triage-of-vulnerability-repo": "10000000000",
+        "hookscope-browser-native-uniswap-v4-hook-transparency": "25000000000",
+        "tee-security-handbook-practical-verification-failure-analysi": "18000000000",
+        "wake-v5-maintenance-and-ai-assisted-fuzzing": "20000000000",
+        "etherform-a-hardened-ci-cd-standard-for-foundry-smart-contra": "12000000000",
+        "clearsign-check-catch-erc-7730-clear-signing-descriptors-tha": "24000000000",
+        "mab-xyz-provably-hardware-ethereum-wallet-a-public-proof-tha": "19200000000",
+        "preparing-encrypted-mempools-for-inclusion-in-the-earliest-e": "11500000000",
+        "nanojs-investigations-sustaining-independent-ethereum-forens": "10000000000"
+      },
+      "paid": {
+        "2": { "securing-ethereum-with-formal-verification": "4486760766" },
+        "1000001": {
+          "seal-security-frameworks-maintaining-open-security-knowledge": "8153022493",
+          "safe-lockdown-guard-an-emergency-freeze-for-kidnapping-and-c": "285767952"
+        },
+        "1000002": {
+          "from-community-contracts-to-openzeppelin-contracts-erc-7786": "3555974151",
+          "thatsrekt-evm-exploit-alerts-for-the-public-good": "5122236560",
+          "nanojs-investigations-sustaining-independent-ethereum-forens": "283350137"
+        },
+        "1000003": { "safe-lockdown-guard-an-emergency-freeze-for-kidnapping-and-c": "2906554908" },
+        "1000004": { "thatsrekt-evm-exploit-alerts-for-the-public-good": "8442395009" },
+        "1000005": { "scar-test-security-fixes-against-the-real-exploit-before-the": "7272727272" },
+        "1000006": { "relayer-failure-lab-reproductions-and-release-tests-for-the": "4392560988" },
+        "1000007": {
+          "trust-and-security-assessment-framework-for-agentic-defi": "3355428533",
+          "tee-security-handbook-practical-verification-failure-analysi": "3691451478"
+        },
+        "1000008": {
+          "securing-ethereum-with-formal-verification": "4486760765",
+          "seal-security-frameworks-maintaining-open-security-knowledge": "4107393061"
+        },
+        "1000009": {
+          "eth-daily-security-getting-ethereum-users-to-the-tools-that": "2252860811",
+          "mab-xyz-provably-hardware-ethereum-wallet-a-public-proof-tha": "6498244299"
+        },
+        "1000010": {
+          "trust-and-security-assessment-framework-for-agentic-defi": "3355428533",
+          "seal-security-frameworks-maintaining-open-security-knowledge": "5127494470"
+        },
+        "1000011": {
+          "solidity-wake-vs-code-extension-maintenance-and-ai-fuzzing": "1250000000",
+          "hookscope-browser-native-uniswap-v4-hook-transparency": "6584209050"
+        },
+        "1000012": {
+          "solidity-wake-vs-code-extension-maintenance-and-ai-fuzzing": "1250000000",
+          "eth-daily-security-getting-ethereum-users-to-the-tools-that": "1941417565"
+        },
+        "1000013": { "scar-test-security-fixes-against-the-real-exploit-before-the": "7272727273" },
+        "1000014": { "trust-and-security-assessment-framework-for-agentic-defi": "3355428533" },
+        "1000015": { "securing-ethereum-with-formal-verification": "4486760765" },
+        "1000016": { "solidity-wake-vs-code-extension-maintenance-and-ai-fuzzing": "1250000000" },
+        "1000017": {
+          "solidity-wake-vs-code-extension-maintenance-and-ai-fuzzing": "1250000000",
+          "thatsrekt-evm-exploit-alerts-for-the-public-good": "7275289207"
+        },
+        "1000019": {
+          "scar-test-security-fixes-against-the-real-exploit-before-the": "7272727273",
+          "from-community-contracts-to-openzeppelin-contracts-erc-7786": "695813396",
+          "mab-xyz-provably-hardware-ethereum-wallet-a-public-proof-tha": "1027480673"
+        },
+        "1000022": { "wake-v5-maintenance-and-ai-assisted-fuzzing": "6666666666" },
+        "1000023": { "clearsign-check-catch-erc-7730-clear-signing-descriptors-tha": "8856479889" },
+        "1000024": { "tee-security-handbook-practical-verification-failure-analysi": "5869628357" },
+        "1000025": {
+          "relayer-failure-lab-reproductions-and-release-tests-for-the": "4392560989",
+          "etherform-a-hardened-ci-cd-standard-for-foundry-smart-contra": "2182520886"
+        },
+        "1000029": {
+          "solidity-wake-vs-code-extension-maintenance-and-ai-fuzzing": "1250000000",
+          "thatsrekt-evm-exploit-alerts-for-the-public-good": "7275289207"
+        },
+        "1000030": {
+          "trust-and-security-assessment-framework-for-agentic-defi": "3355428533",
+          "preparing-encrypted-mempools-for-inclusion-in-the-earliest-e": "4440052037"
+        },
+        "1000031": { "from-community-contracts-to-openzeppelin-contracts-erc-7786": "3555974152" },
+        "1000032": {
+          "relayer-failure-lab-reproductions-and-release-tests-for-the": "4392560989",
+          "safe-lockdown-guard-an-emergency-freeze-for-kidnapping-and-c": "1494567324",
+          "mab-xyz-provably-hardware-ethereum-wallet-a-public-proof-tha": "3019704747"
+        },
+        "1000033": { "from-community-contracts-to-openzeppelin-contracts-erc-7786": "3555974152" },
+        "1000034": { "scar-test-security-fixes-against-the-real-exploit-before-the": "7272727272" },
+        "1000035": {
+          "trust-and-security-assessment-framework-for-agentic-defi": "3355428533",
+          "nanojs-investigations-sustaining-independent-ethereum-forens": "4428961395"
+        },
+        "1000037": { "wake-v5-maintenance-and-ai-assisted-fuzzing": "6666666667" },
+        "1000041": {
+          "solidity-wake-vs-code-extension-maintenance-and-ai-fuzzing": "1250000000",
+          "securing-ethereum-with-formal-verification": "3866495484",
+          "safe-to-send-warn-before-a-send-to-a-smart-wallet-that-does": "3060233117"
+        },
+        "1000043": {
+          "seal-security-frameworks-maintaining-open-security-knowledge": "8153022494",
+          "safe-to-send-warn-before-a-send-to-a-smart-wallet-that-does": "693038377"
+        },
+        "1000044": { "thatsrekt-evm-exploit-alerts-for-the-public-good": "8442395008" },
+        "1000045": {
+          "eth-daily-security-getting-ethereum-users-to-the-tools-that": "2252860812",
+          "nanojs-investigations-sustaining-independent-ethereum-forens": "5287688468"
+        },
+        "1000046": { "securing-ethereum-with-formal-verification": "4486760766" },
+        "1000047": {
+          "scar-test-security-fixes-against-the-real-exploit-before-the": "7272727273",
+          "relayer-failure-lab-reproductions-and-release-tests-for-the": "859512090"
+        },
+        "1000048": {
+          "scar-test-security-fixes-against-the-real-exploit-before-the": "7272727273",
+          "from-community-contracts-to-openzeppelin-contracts-erc-7786": "695813395",
+          "tee-security-handbook-practical-verification-failure-analysi": "696849122"
+        },
+        "1000049": { "etherform-a-hardened-ci-cd-standard-for-foundry-smart-contra": "4244450347" },
+        "1000050": {
+          "solidity-wake-vs-code-extension-maintenance-and-ai-fuzzing": "1250000000",
+          "safe-to-send-warn-before-a-send-to-a-smart-wallet-that-does": "6074448946"
+        },
+        "1000051": { "eth-daily-security-getting-ethereum-users-to-the-tools-that": "2252860812" },
+        "1000052": {
+          "relayer-failure-lab-reproductions-and-release-tests-for-the": "4392560988",
+          "clearsign-check-catch-erc-7730-clear-signing-descriptors-tha": "4554053119"
+        },
+        "1000053": { "from-community-contracts-to-openzeppelin-contracts-erc-7786": "3555974152" },
+        "1000054": { "from-community-contracts-to-openzeppelin-contracts-erc-7786": "3555974152" },
+        "1000055": { "mab-xyz-provably-hardware-ethereum-wallet-a-public-proof-tha": "8654570281" },
+        "1000056": { "securing-ethereum-with-formal-verification": "4486760765" },
+        "1000057": {
+          "scar-test-security-fixes-against-the-real-exploit-before-the": "7272727273",
+          "clearsign-check-catch-erc-7730-clear-signing-descriptors-tha": "1732987102"
+        },
+        "1000058": { "reusable-security-workflows-for-triage-of-vulnerability-repo": "2927313581" },
+        "1000059": {
+          "scar-test-security-fixes-against-the-real-exploit-before-the": "7272727272",
+          "reusable-security-workflows-for-triage-of-vulnerability-repo": "572800565"
+        },
+        "1000061": { "scar-test-security-fixes-against-the-real-exploit-before-the": "7272727273" },
+        "1000062": { "hookscope-browser-native-uniswap-v4-hook-transparency": "7640451401" },
+        "1000063": { "safe-lockdown-guard-an-emergency-freeze-for-kidnapping-and-c": "2906554908" },
+        "1000064": { "reusable-security-workflows-for-triage-of-vulnerability-repo": "2927313582" },
+        "1000065": {
+          "solidity-wake-vs-code-extension-maintenance-and-ai-fuzzing": "1250000000",
+          "safe-to-send-warn-before-a-send-to-a-smart-wallet-that-does": "6074448945",
+          "etherform-a-hardened-ci-cd-standard-for-foundry-smart-contra": "806251742"
+        },
+        "1000066": { "hookscope-browser-native-uniswap-v4-hook-transparency": "7640451401" },
+        "1000068": { "etherform-a-hardened-ci-cd-standard-for-foundry-smart-contra": "4244450348" },
+        "1000070": { "relayer-failure-lab-reproductions-and-release-tests-for-the": "4392560989" },
+        "1000071": { "seal-security-frameworks-maintaining-open-security-knowledge": "8153022494" },
+        "1000072": {
+          "safe-to-send-warn-before-a-send-to-a-smart-wallet-that-does": "7048915307",
+          "reusable-security-workflows-for-triage-of-vulnerability-repo": "645258690"
+        },
+        "1000074": { "relayer-failure-lab-reproductions-and-release-tests-for-the": "4392560989" },
+        "1000076": { "clearsign-check-catch-erc-7730-clear-signing-descriptors-tha": "8856479890" },
+        "1000077": { "trust-and-security-assessment-framework-for-agentic-defi": "3355428533" },
+        "1000078": { "thatsrekt-evm-exploit-alerts-for-the-public-good": "8442395009" },
+        "1000079": {
+          "relayer-failure-lab-reproductions-and-release-tests-for-the": "4392560989",
+          "from-community-contracts-to-openzeppelin-contracts-erc-7786": "1828502450",
+          "hookscope-browser-native-uniswap-v4-hook-transparency": "2383690863"
+        },
+        "1000081": {
+          "safe-to-send-warn-before-a-send-to-a-smart-wallet-that-does": "7048915308",
+          "tee-security-handbook-practical-verification-failure-analysi": "1293824047"
+        },
+        "1000082": { "wake-v5-maintenance-and-ai-assisted-fuzzing": "6666666667" },
+        "1000084": { "tee-security-handbook-practical-verification-failure-analysi": "5869628358" },
+        "1000087": {
+          "trust-and-security-assessment-framework-for-agentic-defi": "3355428533",
+          "securing-ethereum-with-formal-verification": "2821756107"
+        },
+        "1000088": {
+          "seal-security-frameworks-maintaining-open-security-knowledge": "8153022494",
+          "hookscope-browser-native-uniswap-v4-hook-transparency": "751197285"
+        },
+        "1000089": { "seal-security-frameworks-maintaining-open-security-knowledge": "8153022494" },
+        "1000091": { "reusable-security-workflows-for-triage-of-vulnerability-repo": "2927313582" },
+        "1000092": { "preparing-encrypted-mempools-for-inclusion-in-the-earliest-e": "7059947963" },
+        "1000093": { "relayer-failure-lab-reproductions-and-release-tests-for-the": "4392560989" },
+        "1000094": { "safe-lockdown-guard-an-emergency-freeze-for-kidnapping-and-c": "2906554908" },
+        "1000095": { "trust-and-security-assessment-framework-for-agentic-defi": "3355428533" },
+        "1000099": {
+          "scar-test-security-fixes-against-the-real-exploit-before-the": "7272727273",
+          "trust-and-security-assessment-framework-for-agentic-defi": "656571736",
+          "etherform-a-hardened-ci-cd-standard-for-foundry-smart-contra": "522326677"
+        },
+        "1000100": {
+          "scar-test-security-fixes-against-the-real-exploit-before-the": "7272727273",
+          "securing-ethereum-with-formal-verification": "877944582",
+          "tee-security-handbook-practical-verification-failure-analysi": "578618638"
+        }
+      }
+    },
+    {
+      "tier": "A",
+      "status": "settled",
+      "at": 1794768156,
+      "forced": false,
+      "funded": [
+        "etherworld-security-news-reports-eip-7702-encrypted-mempools",
+        "hackviz-interactive-real-world-ethereum-exploit-learning-san",
+        "independent-attestations-for-the-erc-7730-descriptors-of-eth",
+        "onchain-risk-map-an-open-operational-incident-graph-for-ethe",
+        "assertions-for-safes-enforced-on-every-transaction-readable",
+        "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element"
+      ],
+      "covered": [],
+      "awards": {
+        "etherworld-security-news-reports-eip-7702-encrypted-mempools": "20950000000",
+        "hackviz-interactive-real-world-ethereum-exploit-learning-san": "20000000000",
+        "independent-attestations-for-the-erc-7730-descriptors-of-eth": "60000000000",
+        "onchain-risk-map-an-open-operational-incident-graph-for-ethe": "40000000000",
+        "assertions-for-safes-enforced-on-every-transaction-readable": "75000000000",
+        "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "31380000000"
+      },
+      "paid": {
+        "2": { "assertions-for-safes-enforced-on-every-transaction-readable": "4540699504" },
+        "1000001": { "onchain-risk-map-an-open-operational-incident-graph-for-ethe": "485652930" },
+        "1000003": { "onchain-risk-map-an-open-operational-incident-graph-for-ethe": "4939591343" },
+        "1000006": {
+          "hackviz-interactive-real-world-ethereum-exploit-learning-san": "3295204771",
+          "assertions-for-safes-enforced-on-every-transaction-readable": "1349925571"
+        },
+        "1000010": { "onchain-risk-map-an-open-operational-incident-graph-for-ethe": "450122322" },
+        "1000012": { "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "5490224529" },
+        "1000015": {
+          "independent-attestations-for-the-erc-7730-descriptors-of-eth": "4469724893",
+          "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "80265523"
+        },
+        "1000016": { "onchain-risk-map-an-open-operational-incident-graph-for-ethe": "6273264410" },
+        "1000018": { "hackviz-interactive-real-world-ethereum-exploit-learning-san": "6408338690" },
+        "1000020": { "hackviz-interactive-real-world-ethereum-exploit-learning-san": "6408338689" },
+        "1000021": { "assertions-for-safes-enforced-on-every-transaction-readable": "9013119673" },
+        "1000022": { "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "2229039255" },
+        "1000025": { "independent-attestations-for-the-erc-7730-descriptors-of-eth": "2420616208" },
+        "1000026": { "onchain-risk-map-an-open-operational-incident-graph-for-ethe": "7279624855" },
+        "1000028": { "assertions-for-safes-enforced-on-every-transaction-readable": "9013119673" },
+        "1000029": { "assertions-for-safes-enforced-on-every-transaction-readable": "515079019" },
+        "1000031": {
+          "hackviz-interactive-real-world-ethereum-exploit-learning-san": "3888117850",
+          "assertions-for-safes-enforced-on-every-transaction-readable": "1592820497",
+          "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "4792709"
+        },
+        "1000033": {
+          "etherworld-security-news-reports-eip-7702-encrypted-mempools": "5484547497",
+          "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "1405871"
+        },
+        "1000037": { "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "2229039253" },
+        "1000038": { "assertions-for-safes-enforced-on-every-transaction-readable": "9013119674" },
+        "1000040": { "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "8485061350" },
+        "1000041": { "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "811992130" },
+        "1000042": { "independent-attestations-for-the-erc-7730-descriptors-of-eth": "8872237708" },
+        "1000043": { "assertions-for-safes-enforced-on-every-transaction-readable": "195332605" },
+        "1000046": { "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "4274670177" },
+        "1000048": { "etherworld-security-news-reports-eip-7702-encrypted-mempools": "376527159" },
+        "1000053": { "onchain-risk-map-an-open-operational-incident-graph-for-ethe": "4416751472" },
+        "1000056": { "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "4274670177" },
+        "1000058": { "assertions-for-safes-enforced-on-every-transaction-readable": "6095162380" },
+        "1000063": { "independent-attestations-for-the-erc-7730-descriptors-of-eth": "6020259210" },
+        "1000066": {
+          "etherworld-security-news-reports-eip-7702-encrypted-mempools": "1401185655",
+          "independent-attestations-for-the-erc-7730-descriptors-of-eth": "375558"
+        },
+        "1000067": { "onchain-risk-map-an-open-operational-incident-graph-for-ethe": "7279624855" },
+        "1000072": { "assertions-for-safes-enforced-on-every-transaction-readable": "1343537815" },
+        "1000073": { "assertions-for-safes-enforced-on-every-transaction-readable": "9013119673" },
+        "1000074": {
+          "etherworld-security-news-reports-eip-7702-encrypted-mempools": "4648189119",
+          "assertions-for-safes-enforced-on-every-transaction-readable": "1265635"
+        },
+        "1000075": { "independent-attestations-for-the-erc-7730-descriptors-of-eth": "8872237708" },
+        "1000077": { "assertions-for-safes-enforced-on-every-transaction-readable": "5668415770" },
+        "1000082": { "assertions-for-safes-enforced-on-every-transaction-readable": "2367761024" },
+        "1000084": { "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "2976982644" },
+        "1000085": {
+          "independent-attestations-for-the-erc-7730-descriptors-of-eth": "8872237708",
+          "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "159324079"
+        },
+        "1000086": { "assertions-for-safes-enforced-on-every-transaction-readable": "9013119673" },
+        "1000091": { "assertions-for-safes-enforced-on-every-transaction-readable": "6095162379" },
+        "1000092": {
+          "onchain-risk-map-an-open-operational-incident-graph-for-ethe": "1595742957",
+          "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": "362532303"
+        },
+        "1000094": { "independent-attestations-for-the-erc-7730-descriptors-of-eth": "6020259210" },
+        "1000095": { "independent-attestations-for-the-erc-7730-descriptors-of-eth": "5579814089" },
+        "1000096": { "onchain-risk-map-an-open-operational-incident-graph-for-ethe": "7279624856" },
+        "1000097": { "etherworld-security-news-reports-eip-7702-encrypted-mempools": "9039550570" },
+        "1000098": {
+          "independent-attestations-for-the-erc-7730-descriptors-of-eth": "8872237708",
+          "assertions-for-safes-enforced-on-every-transaction-readable": "169239435"
+        }
+      }
+    },
+    {
+      "tier": "B",
+      "status": "settled",
+      "at": 1794768636,
+      "forced": false,
+      "funded": [
+        "automated-eip-compliance-checks-for-ethereum-clients",
+        "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw"
+      ],
+      "covered": [
+        "reproducible-ethereum-clients-official-releases-that-anyone",
+        "onay-local-signing-companion",
+        "upgrade-rehearsal-replay-real-user-transactions-on-a-new-imp"
+      ],
+      "awards": {
+        "automated-eip-compliance-checks-for-ethereum-clients": "20000000000",
+        "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "10910000000"
+      },
+      "paid": {
+        "1000002": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "57546404" },
+        "1000011": { "automated-eip-compliance-checks-for-ethereum-clients": "1194198782" },
+        "1000019": {
+          "automated-eip-compliance-checks-for-ethereum-clients": "45480059",
+          "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "370773"
+        },
+        "1000021": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "20670148" },
+        "1000022": {
+          "automated-eip-compliance-checks-for-ethereum-clients": "144664929",
+          "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "1179374"
+        },
+        "1000027": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "6467095421" },
+        "1000038": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "20670147" },
+        "1000039": { "automated-eip-compliance-checks-for-ethereum-clients": "8940116678" },
+        "1000041": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "38120926" },
+        "1000042": { "automated-eip-compliance-checks-for-ethereum-clients": "167868658" },
+        "1000043": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "447964" },
+        "1000047": { "automated-eip-compliance-checks-for-ethereum-clients": "899527256" },
+        "1000049": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "3431350531" },
+        "1000051": { "automated-eip-compliance-checks-for-ethereum-clients": "6712645498" },
+        "1000058": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "13978280" },
+        "1000071": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "635834751" },
+        "1000074": { "automated-eip-compliance-checks-for-ethereum-clients": "4012" },
+        "1000078": {
+          "automated-eip-compliance-checks-for-ethereum-clients": "592867050",
+          "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "4833319"
+        },
+        "1000084": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "139761621" },
+        "1000089": { "automated-eip-compliance-checks-for-ethereum-clients": "878978351" },
+        "1000094": { "automated-eip-compliance-checks-for-ethereum-clients": "113907320" },
+        "1000095": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "76369907" },
+        "1000097": { "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "1766060" },
+        "1000098": {
+          "automated-eip-compliance-checks-for-ethereum-clients": "536543",
+          "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": "4374"
+        },
+        "1000100": { "automated-eip-compliance-checks-for-ethereum-clients": "309204864" }
+      }
+    }
+  ],
+  "accepted": {
+    "2": "0xff1010ff1010101010ff1006ffffffff10ffff06ff01101006ff100101ff0606ffff100610ffffffff10ffffffffffffffff10101010ffff010610ffff10ff10ffffffffffffff06ffff01ffffffffff06ffffffffff10ffffffffffffff0610",
+    "1000001": "0xff0dffffffffffffffffffff01ffffffff01ffff0107ff01ffffffffffff07ffffffffff01ffff07ffffffffffff07ffffff0dffffffffffffffffff0dffffffffff0dffffffffffffffffffff01ffff0dffffff0d070dffff07ffffffffffff",
+    "1000002": "0x05ffffffffffffffffffffffffff050aff05ffffffff01ffffff01ffffffffffffffffffffffffffffff0affffffffffffffff0a05ffff0affffffffffffffffffff0aff01ffffffffff0501ffffffffffffffffffffffffffffffffffffffff",
+    "1000003": "0xffffffffffffffff01ffffffffffff09ffffffff04ffff01ffffffffffffffff09ffffffffff04ffffffffff09ffffffffffffffffffffff04ffff04ffffffffffffffffffffff04ffffffffffffffff09ffff09ffffffffffffff01ffffffff",
+    "1000004": "0xffffffffff06ffffffffffffffff06ffffffffffffffffffff0601ffffffffffffff01ffffffffffffffffff0cffffffffffffff01ffffff01ffffffff0106ffffffffffffffffffff06ffff06ffffffff0cffffffffffffffffffffffffffff",
+    "1000005": "0xffffffffffff01ffffffff07ffff0c01ffffffffffffffffffffffff01ffffffffff01ffffffffffffffffffffffffff07ffff07ffffffffffffffffffff0cff01ffffffffffffffffffffffffffffffff0c01ffffffffff07ff07ffffffffff",
+    "1000006": "0xffffffff010c07ffffffffffffffffffffffffffffffffffffffffff01ffff0707ffffffff01ffffffffffffffffffffffffffffffffff0107ff0c0c01ffff07ffffffffffffffffffffffffffffffffffff0cffffffff01ffffff0cffffffff",
+    "1000007": "0x05ffffffffffffffffffffffffffffffffffffffffffffffff01ffffffffffffff0105ffffffffffffff05ffffff05ffffffffffffff05ffffffffffffffffffff05ffffffff0bffffffff0bffffffffff0101ffffffffffffffffff0bffffff",
+    "1000008": "0xffffffffffff0dffffffffffff0dffffffffffffff01ffffffffff01ff0dffffffffffff0107ffffffffffff07ffffffff07ffffffffff07ff0dff01ffffffffffffffffffffffff0dff01ff07ffff01ffffffffffff0dffff07ffffffffffff",
+    "1000009": "0xffffffffffffffffff09ffffffffffffffffffffffffffffffffffffffff01ffffffffffffffff06ff0101ffffffff06ffff09ff090909ffffffffffff09ffffffffffffffffffffff09ffffff09ffff01ffffff0601ffffffffffffffffffff",
+    "1000010": "0xffffffffff0c0cffffffff0cffffffffff01ff060106ff0cff01ffffff0cffffffffffff01ffffffff010cff06ffffffffffffffffffff0cffffffff0c0cffffffffffffffffffffffffffffffffff06ff06ffffffffffffff06ffffffffffff",
+    "1000011": "0xffffffffffffffffff07ff01ff0107ff01ffffffff07ffffffff07ffffffffffffffffffffffffffffffffffffffffff0cff0cffffffffffffff07ffffff0cffffffffffffffffffffffffffffff01ffffffff010cffffffffffff0cffff0c01",
+    "1000012": "0x0affffffffffffffffffffff07ffffffffffffffffffffffffffffffff0701ffffffffffffffffffffffffff07ffffffffffffffffffffffffffffffffffff01ffffffffffffffffffffffff01ffff0a01ffff01ffffffffffffff0a01ffffff",
+    "1000013": "0xffffffffff0905ffffffffffffffff01ffffffffff09ffff09ffffffffffffffffffffffffffff05ff01ffffffffffff01ffffff0901ffffffffffffffffffffff05ffffffffffffffffffffffff09ffffffffff05ffffff09ff09ffffff09ff",
+    "1000014": "0x09ffffffffffffff01ffffffffffffffffffffffffffffff0901ffff01ffffffffffffffffffffffffffffffffffffffffffffff06ffffffff06ffff06ffffffffffff09ffffff01ffffffffff01ffffffffffffffffffffffffffffffffffff",
+    "1000015": "0xffff01ffffffffffffffff0affffffffff0affffff01ffffffffffffff01ffffff0affffffffffffffffffffffffffffffff01ffffff010aff01ffffffffffffff0affffffffffffffffffffffffffff07ff07ffff07ffffffffffffffff0aff",
+    "1000016": "0x01ff0501ffff08ffffffffffffffffffffffffff01ffffffffffffffffffffffffffffffffffffffffff08ffffffffffffffffffffff05ffffffffffffffffffffff08ffffffffffffffffffffffff05ffffff01ffffffffffffffffffffffff",
+    "1000017": "0xffffffffff0505ffffffffffffffffffffff0bffffffffffffff01ffffff05ffff01ffffff05ffffffffffffffffffffffffffffffffff0bffffffffffffffffffffffffffff0bff05ffffffffffffffffffff01ffff0bffffffff01050bffff",
+    "1000018": "0xffffffffffff04ff09ffffffffffffffffffffffffffffffffffffffffffffffffffff01ff04ffffffffffff09ffffffffffffffffffffffffffffffffff01ff09ffffffffffffffffffffffffffffffff09ff04ffffffff09ff04ff0104ffff",
+    "1000019": "0xffff0805ffffffffffffffffffffff0108ffffffffff05ffffffff08ffffffffffffffffffffffffffff01ffffff08ffffffff0801ffffffffffff08ffffffffffffffff01ffffffffffffffffffffffffffff05ffff08ffffffffffffffff08",
+    "1000020": "0x04ffffffffffffffffffffffffffffffffffffffffffffff01ffffffffffffffffffff0aff040a0affffffffff04ffffffffff0affffff04ffffffffffffffffff01ffff0affffffffffffffffffffffffffffffff0104ffffffffff04ffffff",
+    "1000021": "0x09ffffff09ff01ffffffffffffff09ffffffffffffff0505ffffff09ffffff01ffffff05ffffffffffffff09ffffffff05ff09ff09ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0101ffffffffffffffff",
+    "1000022": "0xff0affffffffffffffffffffff0affffffffffffffff04ffff0aff0aff04ffffffffffffffffff04ffffffffffffffffffffffffffffffffffff01ffffffffffffffffffffffffffff0affffff0affffffffffff01ffffffffff04ffff040104",
+    "1000023": "0xff08ffffffffff01ffffffffffff08ff0508ffffffffffffffffffffffffffffffffffff08ffffffffffff08ffffffffff01ffffffffffffffffffffffffffffffff05ffffff01ffffffffffffffffffffffffffffffffffffff0801ffff05ff",
+    "1000024": "0xffffffff0affffff06ffffff06ffffffffffffffffffffffffffffff01ffffffff06ffffffffffffff01ffffffff06ffffffffffffffffffffffff0affffffffffffffffffffffffffff0affffffff010101ffffffffffffffffff0affffffff",
+    "1000025": "0xff0aff0a0affffff05ffffffffffffffffffffffffffffffffff05ffffffffffffffffffff0affffffffffff05ffff0affff01ffffffff05ffffffff01ff0affffffffffff0affff01010affffff0affffffffffff05ffff0affffffffffffff",
+    "1000026": "0xffffffffffffffffffffff0707ff07ffffff01ff01ffffffffffffffff0cffffffffffffffffffffffffffffffffffffff07ff01ffffff01ff07ffffffffffffffffffffffffff0cffffffff01ffffffffffffffffffffffffff010cffffffff",
+    "1000027": "0xffffffffff01ff0affffffffffffffffffff0107ffff0affffffffff01ffffffffffffffffffffffffffffffffff01ffffffffffffff070affffffffffffffffffffffffffffffffffffffffffffffffffff01ffffff07ffffffffffff01ffff",
+    "1000028": "0xffff01ffffff01ffffffffffff07ffff07ffffffffffffffffffff01ffffff07ffffffffff07ffffff07ffffffffffffffffffff0cff01ffffff01ff0cffffffffffffffffffffffffffff0cffffffffffffffffff0cff01ffffffffffffffff",
+    "1000029": "0xff010dffffffffffff07ffffffffffffffff01ffffffffffffff01ffffffff010d07ff0dffffffffff07ffffff0d0dffffff07ffffffffffffff07ffffffffffffffff07ffffffffffffffffffffffffffffff01ffffffff01ffffffffffffff",
+    "1000030": "0x06ffffffffffffffffffffffffffffffffffffffffffffffff01ffffffffffffffffffffffffffffff06ffffffffffffffff0601ffff0cffffffff01ffffffffff060606ff01ff0cffffffff01ffffffffffffffffff0cffffffffffffffffff",
+    "1000031": "0xffffffffffffffffffffffffffffffffff06ffffff0bffffffffffffff06ff06ffff06ff0b01ffffffff06ffffffffffffffffffffff01ffffff01ffffffffffffffffff01ff0bffff0bffffff0bffffffffffffffffffffffffffffffff01ff",
+    "1000032": "0xffff0606ffff0bffffffffffff01ffffffffffff0bffff01ffffffffffffffffffffffffffffffff06ff01ffffffffffffffffffffff06ffffff06ff010bff01ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "1000033": "0xff01ffffffffffffffffffffffffffffffffff01ffffffffffffffffff05ffffffffffffffffff01ffffff0bffffffffffffffffffff0b0bff05ff05ffffffffffffffff01ffffffffffffffffffff0505ffff05ffffffffffffffffffff0bff",
+    "1000034": "0xffff04ffffffffffffffffffff01ff01ffffffffffffffffffffffffffffffffff04ffffffffffffffffffffffffffffffffffffffffffffffffff04ffffffffffffffffffff0707ffffffffffffffffffff01ffffffffffffffffffffff07ff",
+    "1000035": "0xffffff0bffffffffffff01ffffffffff05ffffff0b05ffffff01ffff05ffffffff0bffffffffffffff05ffffffffffffffff0bffffffffff05ff01ffffffff05ffffffffffffffffffffff01ffff0bffffffffff0bffffffffffffffffffffff",
+    "1000036": "0xffffffff01ffffffffffff0bffffffffffffffffff0bffffffffffffffffffff01ffffffffffffffffffff05ffff01ffffffffffff0bffffffffff01ffffffffffff05ffffff05ffffffffffffffffffffffffffff050505ffffffffffffffff",
+    "1000037": "0x08ffffffff04ffffffff04ff01ffffffffffffffffffffffffffff08ff04ffffffffffffffffffffffffffffffffffffffffffffffffffff04ffffffffffffffffff08ffffffffffffffff08ffffffffffffffff01ff01ffff08ffff08ffffff",
+    "1000038": "0xffffffffff09ffffffffffffffffffffffffffffffff09ffffffff09ffff0505ffff01ffffffffffff0909ffffffffffffffffffffffffffffffff01ffffffff09ffff0105ffffffffff09ffff05ffffffff01ffffffffffffffffffffffffff",
+    "1000039": "0xffff01ff0affff01ffffffffffffff0701ffffffffffffffff0affffffffffffffffff0affff0aff0701ffffffffffffffffffffffffff01ffffffffffffffffff01ffffffffffffffffffffff0affffff07ffffffffffffffffffffffffff0a",
+    "1000040": "0xffffff06ffff01ffffffffffffffffffffff06ffffffffffffffffff0106ffff010bff06ffffffffffffffffff06ffff0bffffffffffffffffffffffffffffffff01ffffffffffffffffffff0b0bffff0bffffffffffff01ffffffffffffffff",
+    "1000041": "0xffffff0cffffffffffff07ffffff01ffff0cffffff0101ffffffffffff07ffffffffffffffffffff0cffffff0701ffffffffffffffff01ffff0cffffffffffffff07ffffffffffffffff0cffff07ffffff0cff01ffffffffffffffffffffffff",
+    "1000042": "0xffffffffffffffffff01ffffffffffffffffffffffffff0affffffffffffffff01ffffffffffffff05ffffffffffffffffff05ffffffffff05ffffffffffff05ffff01ffff0affff0affffffff01ffffffffffff0affffffffffffff05ff0a0a",
+    "1000043": "0xffffffffffffffffffffffffff0affffffffffffffff0affffffffffffffff01ffffffff010affffffffffffff010affff0affffffffffffffffffff0404ffffff0affffffffffffffff04ff04ffffffffff04ffffffffffff040affffffffff",
+    "1000044": "0xffffffffffffffffffffffffff07ffffffff01ffffffff0dffff01ffffffffff07ff07ffffffffffffffffffffffffffffffffff01ffff01ffffffffff07ff0dff01ffffffffffffffffffffffff07ffffffff07ffffffff01ffffffffff0dff",
+    "1000045": "0xff08ffffffffff08ffffffffffffffffffffffffffffffffffff08ff05ff01ffffffffffffffffffffffffff05ff08ffffff08ffffffff08ffffffffffffffff01ffff01ff08ffffffffff01ff0508ffffff08ffffffffffffffffffffffffff",
+    "1000046": "0xff0a06ffffff01ffffffffffffff01ffffff0affff01ffffffffffffff01ffff0affffffffffffffffffffffffffffffffffffff01ffffffffffffffff06ffffffffffffffffffffffffffff06ffffffffffffffffffffffffff06ffffffffff",
+    "1000047": "0x09ff09ff05ffffffffffff09ffffff01ffffffffffffffffffffffffffffffffffffffffffffffffff01ffff05ffffff05ffffffffffffffffffffff01ffffffff09ffffffffffffffffffffffffffffffffffffff05ffffffff01ffffffff09",
+    "1000048": "0xffffffffffffff0cffffff0cffff0701ff0cffffff07ffffffffffffffffffffffffffffffffff01ff0cffffffffffffff0cffffffffff07ffffffffffffffffffffffff01ffff0cffffffffffff0707ff01ffffffffffffff01ff01ffffffff",
+    "1000049": "0xffff04ff01ffffffffffff04ffffffffff04ffffffff0affffffff04ffff0affff04ffffffffffff0affffffffffffffffffffff0affffffff01ffffffff0a0affffffffffffffff01ffffffffffffffff0affffffffff040affffffffffffff",
+    "1000050": "0xffffffffffff07ff07ffffffff04ffffffffffffffffffffffffffffffffffffffffff07ffffffffffffffffff0104ffffffffffffffffffffffffffffff07ffffffffff07ff04ffff07ffffffffffffffffff01ffff01ffffffffffffff07ff",
+    "1000051": "0xffffff0affffffffffffffffffffffffffffff0affffffffffffffff01ff01ffff07ffff0affffffffffff07ffffffffffffff01ff01ffffffffffffffffffffffffffffffffffffffffffffffffff01ffff07ffffff0affff01ffffffffff0a",
+    "1000052": "0xffffffff04ffffffffffffffffffffffff08ffffffffffff08ffffffffffffffffffffffffffffffffffffffffffffffff01ffffffffff080801ffff01ffffffffff08ffffffffffffffffffffffffff08ff040804ffffffffffffff04ffffff",
+    "1000053": "0x01ff07ff07ff01ffffffff0dffffffffffffffff01ffffffffffffffffffffffffffffffffffff0d01ffffff07ffffff0dffffffffff01ffffffffffffffffffffffffff01ffffffffffffffffffffffffffffff07ffffffffffffff0707ffff",
+    "1000054": "0xffffffffffff06010cffffffffffffffffffffffffffff06ffffff01ffffffffffffffffff0cffffffffff0c06ffffffffffff0cffff0c0cffffffff0cff01ffffffffff01ffffffffffffffff06ffff060cffffffffff06ffffff01ffffffff",
+    "1000055": "0x0108ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01ffffff05ffffffff01ffffffffffffffffff08ffff08ffffffffffffff08ffff05ffffff01ff08ffffffffffffffffffffff05ffff",
+    "1000056": "0xffffffff01ffffffffffff07ffffffff0704ffffff01ffffffffffffff07ffffffff04ffffffffffffffffffffff0704ffffffffff01ffffffffffffffffffffff07ffffffff07ffffffffffffffffffffffffffff07ffffffffffffffffffff",
+    "1000057": "0xffffffffff07ffffffffffffffffff01ffffffffff0cffffffffffffffffffffffffffffff0c01ffffffffffffffffff0701ffffffff07ff01ff01ffffffffffffffff01ffffffffffffffffffffff07ffffffffffffffffffffffffffff07ff",
+    "1000058": "0xffffffff05ffffffffffff01ffffffffffff0affffff0affff0affff0affff01ffffffffffffffffffffff0105ffffffffffffffffff0aff0affff01ffffffffff05ffff05ffffffffffffffffffffffffff05ffffffffffffffffffffffffff",
+    "1000059": "0x01ffffffffffff01ffffff0dffffff01ffffffffff07ffffff0707ff07ffffffffffffffffffffff0dffff010dffffffffffffffffffff0707ffffffffff01ffffffff0dffffffffffffffffffffffffff0d01ffffffffffffffffffffffffff",
+    "1000060": "0xffffff04ffff04ffffffffff04ffffffff01ffffffffffffffffffffffffffffffffffffffffffffffffffff04ffffffffffffffffff08ffffffffffff01ff0801ffffffffffffffff08ffffffffffffffffffffffffffffffffffffffffffff",
+    "1000061": "0xffffffffffffffffffffffff0a0aff01ffffffffffffffffffffffffffffffffffffff05ffffffff01ffffff050affffffffff0a05ffffffffffffffff05ffffffffff0affff05ffff01ffffffffffffffffffffffffffffff01ffffffffffff",
+    "1000062": "0xffffff06ffff06ffffffffffffff06ffffffffffffffff06ffff0c06ffffffffff0cffffffffffffffffffffffffffffffffffffffffffff0cffffffffff01ffffffffffffff01ffffffffffffff010cffffffff0cffffffff010106ffffffff",
+    "1000063": "0x0408ffffffffff08ffffffffffffffffffffffffffffff01ffffff01ffffffffffffffffff08ffffffffffffffffffffffff04ffffffffffffff08ffffffff04ffff080804ffffffff01ffffffffffffffffff08ffffffff08ffffffffffffff",
+    "1000064": "0xffffffffffffffffffffffffffff08ffffff05ffffffff08ffffffffffffffffffffffffff08ff08ff080501ffffff01ffffffffffffffff01ff08ffffff08ffff08ffffffffffffff01ff08ffffffffffffffff05ffffffff080808ffffffff",
+    "1000065": "0x0dffffffffffff0dffffffffffffffffffff07ffffffffffffffffffff0d0dffff01ffffffffffff0dff07ffff01ffffffffffffffffffffffffffff07ffffffff01ffffffffff0d010707ffffffffffff07ff01ffffffff01ffffffffffffff",
+    "1000066": "0xffffffffffffffffffff07ffffffffffffffffffffffffffffffffffffffffffff01ffffffffff01ffffffffffffffffff0701ffffffff07ffffffffffffffffffff0cffffffffffffffffff070101ff01ff0cffffff07ffffff0cff0cffffff",
+    "1000067": "0xff06ffffff01ff01ffff06ffffffffffff01ffff06ffffffffffffffffffffffffffffffffffffff01ffff0bffffffffffffffffffffffffffffffffff06ffff0bffffffffffff01ffffffffffff06ffffffffffffffffffffffffffffffffff",
+    "1000068": "0xffffffff0bffffffff05ffffffffffffff05ff050bffffffff0bffffffff05ffffffffffffffff0bffffffff05ffff05ffffffffffff0bffff0b0bffffffffffffffffffffffffff01ff01ffffffffffffffffffffffffffffff01ff01ffffff",
+    "1000069": "0x01ffffffffffffff01ffffffffffffff0cffff0107ffffff01ffffffffffffff07ffffffffffffffff0c0cffffffffff0cffff07ffffffffffffffffffff07ffffffff010cffffffffffffff01ffffffffffffffffffffffffffffffff07ffff",
+    "1000070": "0xffffff07ff01ffffffff0107ffff0dffffffffffff07ffffffffffffffff07ffffffffffffffffffffffffffffffff07ffffffffffffffff01ffffff01ffffff07ffffffffffffffffffffffffffffffffffff0dffff01ffff0dff01ffff0dff",
+    "1000071": "0xffff0d0d07ffffffffff01ffffffffffffffffffffff07ffffffffffffffffffffffffff01ffffff07ffffff01ff07ffffffffffffffffffffff01ff07ffffffffff01ffffff0dffffffffffff0dffffffffffff07ffffffffffffffffff01ff",
+    "1000072": "0xffffffffffffffffff0bffffffffffff0bff01ffffffffffffffff07ffffff07ffffffffffffffffffffff01ff01ff0bffffffff01ff07ffffffffffffffffffffff01ffffffffffff0bff07ffffffffffffffffffffffff01ffffff0bffffff",
+    "1000073": "0xff06ffffffffffffffff01ffffffffffffffff01ffffffff06ffffffffffff01ffffffffffffffffffffff09ffffffffffffffffffffffffffffffffffffffffffffffffffff09ffffffffffff01ff0609ff09ffffffffffffffff01ffffffff",
+    "1000074": "0xffffffffffffffffffff0909ffff01ffffffffffffffffffffff0909ffffff0109ffffffffffff0109ffffffffffffff0109ffffffffffffffffffff01ffffffffffffff06ffffffff0909ffffffffffff09ffffff0906ffffffff0609ffff09",
+    "1000075": "0xffffffffffffffff0901ffffffffff09ffffff01ff09ff09ffffffffff09ffffffff09ffffffffffffffff09ffff0105ffff0509ffffffffffffffff09ffffffffffffffffffffffffffffffffffffffffff05ffffffffffff05ffffffff01ff",
+    "1000076": "0xffffffffffffffffff04ffffffffffffffffffffffffffff04ffffffffffffffffffffff0affffffffffffffff0affff0401ffffffffffffffffffffffffff010404ff01ffffffffffffffffffffffffffffffffff0aff04ff0affffffff0aff",
+    "1000077": "0xffffffffffffffffff01ff0dffff010dffffffffffffffffff01ffffffffff01ffffffffffffff07ffffffffffffff0d07ff07ffffffffffffffff01ff01ffffffffffffffffffffffffffffffffff07ffffffffffffffffffff07ffffff07ff",
+    "1000078": "0xffffffffffffffff01ffffffffffffffff01ffffffff0affff0a01ffffffffffff05ff05ffff0affffffffff0affffffffffffffffffffffff0affff05ffffff01ff0affffffffffffffffffffffffffffffff05ffffffffffffffffffffff05",
+    "1000079": "0xffff07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0c0107ffffffffffffffffffffffffff01ffffff01ffffffffffffff01ffff07ffffffff07ff010cffffffffffffff01ffffffffff07ffff",
+    "1000080": "0x04ffffffff01ff04ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff04ffffffffffffff01ffffffff07ffffffffffffffffffffffffff07ffffffff07ffffffffffffffffff07ffffffffffff01ffffff",
+    "1000081": "0xffffffffffff07ff01ffffffffffffffffffffffffff0cffffffff07ffffffffffff01ffffffffff01ffffffff01ffff0107ffff070cffff0cffffffffffffffffffffffffffffffffffffffffff070cff01ffffffffffff0cffffffffffffff",
+    "1000082": "0x05ffffffffffffffff01ffffffffffff050bffffffffffffffffffff0bffff05ffffffffffffffffffffffff01ffffffffffffffffffffffffffffffffff05ffffffff01ffffffffff05ffff05ffffffffffffff010bffffffffffffffffffff",
+    "1000083": "0xffffffff0affffffffffffffff01ffff010affffffffffff0affffffffffffffffffffffffffffffffffffffffff01ffffff0aff05ffffffffff05ffff05ffffffffffffffffffffffffffffff05ffffffffffffff01ffffffffffff05ffffff",
+    "1000084": "0xffffffffffffff01ffffff01ff0affffffffff04ffff04ffffffffff0404ffffffffffffffffffffffffffffffffffffffffffffffffffff0affffffff04ffffffff04ffffffffffffffffffff0affffff01ffffffffffffffffffffffffffff",
+    "1000085": "0x01ffffffffff05ffffffffffffffffffffffff05ffffffffffffffffff01ffff0aff01ffffffffffffffffffffffff0aff0505ffffffffffffffff010affffffffffffffffffffffffffffffffffffffffffffffffffffffffff05ffffffffff",
+    "1000086": "0xffffff09ffffff01ffffffffffff09ffffff01ffffffffffffffffffff09ff06ffff09ffffffffffffffffffffffff09ffffff01ffffffffffff0109ffffffffff09ffff06ffffffffffffffffffffffff09ffffffffffff0601ffffffffffff",
+    "1000087": "0xff01ff0101ffffffffff0cffffffffffffffffffff01ffffff01ffffffffffffffffffffffffffffffffff07ffff07ffffffffffffffff01ffffffffffffffffffffffffffffffffffffff07ffff070cffffffffffffff07ffffff0cffffff0c",
+    "1000088": "0xffffffffff07ffffffffffffffff01ffffffffffffffffffffffff0bffffffffffff010b01ffffffffffffffffffffffffffffff07ffffffff01ffffffffffffffff01ffffffff07ffffffffffff01ffffffffff07ffffffff0bffffffffff0b",
+    "1000089": "0x0bffffffff0b05ff05ffffffffffffffffff0b01ffffffffffffffffffffffff05ffffff01ffffffffffffffffffffffff0bffffffffff01ffffffffffffffffffffffffffffffffffff05ffffffffff01ffffffffff05ffffffffffffffff05",
+    "1000090": "0xff04ffff09ffffffffffffffffff04ffffffffffffffffffffffffffffffffff04ffffffffffffffffffffffffffffff01ffffffffffffffffffff09ffffffffffffffffffff04ffffffffffffffffffffffffffff01ffffffff04ffffff01ff",
+    "1000091": "0xffffffffffffff06ffffffffffffffff01ffffffffffffffff0affff010a0a06ffffffffffffffff0affff01ffff06ffffffff01ffffff0affffff0affffffffff0601ffffffffff0a0affffffffffffffffffffffffffffffffffffffffffff",
+    "1000092": "0xffff01ffffffffffffffffffffff01ffffffffff06ffffffffff0a06ff010affff0affffff0affffff0affffffffffffffffffffffffffffff0aff06ffffffff0affffffff0101ffffff0affffffffffffffffffffffffffffffffffffff06ff",
+    "1000093": "0xffffffffffffff08ffffffffffffffffffffffffffffffff08ffffffffff08ffff08ffffff08ff0404ffffff04ff01ffff08ffffffffffff08ff08ff0101ffffffffffffffffffffff0804ffffffffffffff08ffffff08ff08ffffffffffffff",
+    "1000094": "0xffffffffff04ff01ff0affffffffff0affffffffff0aff010aff0affffff0affff0aff04ff0affffffff04ffffffff0affff04ffffffffffffffffffffffffff04ffffffffffffffffffffffffffff0affff0a0a0affff04ffffff0affffff01",
+    "1000095": "0xffffffff01ffffffff05ffffffffffffffff05ffffff05ffff01ff01ffffffffff05ffffffffffff0bffffffffffffffffff050bffffffffffffff0bffffffffff0bffffffffffffffffffff01ff05ffffffffffffffffffffffffff0bffffff",
+    "1000096": "0xffffffffffffffffff01ff0505ffff0aff05ffff01ffffffffffffffffffffffff05ff01ffff05ffffffffff0affffffffffff0a0aff01ffffffffffffffffffffffffffffffffffff0affffffffffffffff0affffffffffffffffffffffffff",
+    "1000097": "0xffffffffffffffffffffff08ffffff08ffffffffff0801ff04ffffffffffffffffff040408ffff01ffffff0808ffff04ffffffff01ffffffffffffffffffffff08ffffffffff08ffffff0808ffffffffff08ffffffffffffffffffffffffffff",
+    "1000098": "0xffffffffffffffff08ffffff04ffffffffff04ffffff01ffffffffff08ffff0408ffffffffffffff04ffffffffffffffffff0108ffffffffffffffffffffff01ffffffffffffffffffffff08ffffffff08ffffffffffffffffffffffffffff08",
+    "1000099": "0xffffffffffffffffffffff01ffffff01ff06ffffffffffffff01ffffffffffffffff0affffff0aff06ff0affffff01ffffff0affffff0affffffffffffffffffffffffff06ffff0601ffffffffffffffffffff0affffffffffffffffffffffff",
+    "1000100": "0xffffffffff0affffffffffffffffff01ffffffffff01ffffffffff01ffffffff0affff07ffffffffffffffffff0affffffffffffffffffff01ffffffffffffffffffff0a07ffffffffffffff0affffffff01ff0a07ffffffffffffffff0aff01"
+  },
+  "rejected": [{ "tokenId": "1000013", "nonce": 3, "reason": "tier_settled" }],
+  "live": { "funded": [], "awards": {}, "tiers": {}, "paid": {}, "covered": [] },
+  "final": {
+    "next": {
+      "vyper-verified-compilation-and-secure-language-upgrades": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "source-level-debugging-for-solidity-ethdebug-in-solc-2": {
+        "tier": "B",
+        "gap": "112000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "ai-guided-smart-contract-security-checks-in-remix": {
+        "tier": "B",
+        "gap": "105000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "formally-verified-evm-for-ethereum": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "community-fuzzing-tooling-for-ethereum-ecosystem-projects": {
+        "tier": "B",
+        "gap": "63000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "forensiq-faster-ethereum-incident-response-through-evidence": {
+        "tier": "B",
+        "gap": "72000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "independent-security-assurance-for-the-eez-smart-contracts": {
+        "tier": "B",
+        "gap": "61000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "shift-left-security-for-ethereum-open-source-agent-enforced": {
+        "tier": "B",
+        "gap": "48000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw", "tier": "B" },
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "dappfence-verifiable-frontend-security": {
+        "tier": "B",
+        "gap": "34000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "open-risk-pricing-for-defi-a-public-price-for-default-risk": {
+        "tier": "B",
+        "gap": "67000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "decentralized-archive-for-ethereum-blob-data": {
+        "tier": "B",
+        "gap": "50000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "address-poisoning-detection-and-public-api-for-ethereum-and": {
+        "tier": "B",
+        "gap": "21000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "scaling-kann-ai-for-ai-smart-contract-security-2": {
+        "tier": "B",
+        "gap": "20000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "wallet-security-for-post-quantum-ethereum": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "know-what-you-sign-verified-simulation-against-blind-signing": {
+        "tier": "B",
+        "gap": "104000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "make-dapps-verify-what-they-show-colibri-in-wallets-defi-and": {
+        "tier": "B",
+        "gap": "132000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw", "tier": "B" },
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "trustless-across-ethereum-colibri-verification-for-l2-networ": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "blockful-governance-recovery-responder": {
+        "tier": "B",
+        "gap": "109000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw", "tier": "B" },
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "onchain-risk-map-an-open-operational-incident-graph-for-ethe": {
+        "tier": "S",
+        "gap": "6000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "seal-security-frameworks-maintaining-open-security-knowledge", "tier": "S" }
+        ],
+        "moves": []
+      },
+      "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw": {
+        "tier": "A",
+        "gap": "2000000000",
+        "comesIn": [
+          { "slug": "upgrade-rehearsal-replay-real-user-transactions-on-a-new-imp", "tier": "A" }
+        ],
+        "dropsOut": [
+          { "slug": "etherworld-security-news-reports-eip-7702-encrypted-mempools", "tier": "A" },
+          { "slug": "independent-attestations-for-the-erc-7730-descriptors-of-eth", "tier": "A" }
+        ],
+        "moves": []
+      },
+      "fund-echidna-development-through-2027-2": {
+        "tier": "B",
+        "gap": "35000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "preventing-theft-with-vaults-in-mainstream-wallets": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "leekwallet-an-open-diy-hardware-wallet-with-a-secure-element": {
+        "tier": "S",
+        "gap": "5000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "preparing-encrypted-mempools-for-inclusion-in-the-earliest-e", "tier": "S" }
+        ],
+        "moves": []
+      },
+      "assertions-for-safes-enforced-on-every-transaction-readable": {
+        "tier": "S",
+        "gap": "12000000000",
+        "comesIn": [
+          { "slug": "onchain-risk-map-an-open-operational-incident-graph-for-ethe", "tier": "S" }
+        ],
+        "dropsOut": [
+          { "slug": "thatsrekt-evm-exploit-alerts-for-the-public-good", "tier": "S" },
+          { "slug": "seal-security-frameworks-maintaining-open-security-knowledge", "tier": "S" },
+          { "slug": "clearsign-check-catch-erc-7730-clear-signing-descriptors-tha", "tier": "S" }
+        ],
+        "moves": []
+      },
+      "equivm-formal-verification-of-evm-bytecode": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "phishing-dojo-interactive-security-training-for-teams": {
+        "tier": "B",
+        "gap": "48000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "seal-intel-scaling-blockchain-threat-intelligence-enhancing": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "audit-transparency-for-ethereum-every-defi-protocol-s-audits": {
+        "tier": "B",
+        "gap": "32000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "hackviz-interactive-real-world-ethereum-exploit-learning-san": {
+        "tier": "S",
+        "gap": "10000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "privacy-preserving-edr": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "etherworld-security-news-reports-eip-7702-encrypted-mempools": {
+        "tier": "S",
+        "gap": "1000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "hookscope-browser-native-uniswap-v4-hook-transparency", "tier": "S" }
+        ],
+        "moves": []
+      },
+      "proof-of-audits-proof-before-sign-for-ethereum-wallets-and-a": {
+        "tier": "B",
+        "gap": "50000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw", "tier": "B" },
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "open-recovery-tool-for-major-erc-4337-smart-accounts": {
+        "tier": "B",
+        "gap": "51000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "a-front-page-for-ethereum-security-research-hacker-news-for-2": {
+        "tier": "B",
+        "gap": "23000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "safer-ethereum-asset-transfers-through-receiver-consent": {
+        "tier": "B",
+        "gap": "55000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "sweepcheck-an-open-eip-7702-sweeper-registry-and-warning-fee": {
+        "tier": "B",
+        "gap": "96000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "independent-attestations-for-the-erc-7730-descriptors-of-eth": {
+        "tier": "S",
+        "gap": "29000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "hookscope-browser-native-uniswap-v4-hook-transparency", "tier": "S" }
+        ],
+        "moves": []
+      },
+      "keep-eth-infraops-open-secure-resilient-validator-operation": {
+        "tier": "B",
+        "gap": "72000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "glider-monitor-circuit-breakers-for-ethereum-defi": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "lights-in-dark-rooms-expansion-a-deeper-expos-a-global-film": {
+        "tier": "B",
+        "gap": "68000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "post-quantum-signatures-for-ethereum-smart-accounts-an-audit": {
+        "tier": "B",
+        "gap": "70000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "zerodrift-synthetic-evm-security-benchmark": {
+        "tier": "B",
+        "gap": "20000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw", "tier": "B" },
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "an-open-bug-bounty-program-for-all-of-ethereum-white-hat-res": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "formal-mind-agent-swarms-that-keep-lean-proofs-of-solidity-c": {
+        "tier": "B",
+        "gap": "137000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "ethereum-phishing-takedown-scam-intelligence": {
+        "tier": "B",
+        "gap": "34000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "economic-property-packs-for-amms-and-lending-markets-fuzz-te": {
+        "tier": "B",
+        "gap": "74000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "free-backtestable-onchain-monitoring-on-17-evm-chains": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "geth-as-a-zkvm-guest-a-second-client-family-for-ethereum-blo": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "1-opsec-audits": {
+        "tier": "B",
+        "gap": "64000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "actual-rollup-exit-guarantees-for-defi-and-multisigs": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "crypto-social-account-security-rapid-response-network": {
+        "tier": "B",
+        "gap": "99000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "zk-clear-signing-verifiable-transaction-display-for-hardware": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "perimeterwatch-private-external-exposure-monitoring-for-ethe": {
+        "tier": "B",
+        "gap": "131000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "sealed-signing-agent-a-low-cost-tamper-responsive-hsm-with-a": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "towards-a-formally-verified-solc": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "state-of-ethereum-ai-agent-security": {
+        "tier": "B",
+        "gap": "48000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "dprk-it-worker-screening-for-the-ethereum-ecosystem": {
+        "tier": "B",
+        "gap": "35000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "self-serve-scoped-permissions-and-pre-signature-checks-for-s": {
+        "tier": "B",
+        "gap": "121000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "from-code-to-audit-ready-security-workshops-for-smart-contra": {
+        "tier": "B",
+        "gap": "79000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "expiring-approvals-erc-8255-registry-tooling-audits-and-adop": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "exploit-exposure-layer-free-data-on-every-wallet-still-appro": {
+        "tier": "B",
+        "gap": "109000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "from-community-contracts-to-openzeppelin-contracts-erc-7540": {
+        "tier": "B",
+        "gap": "60000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw", "tier": "B" },
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "open-ethereum-bytecode-transparency-decompilation-infrastruc": {
+        "tier": "B",
+        "gap": "80000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "spec-bank-a-public-composable-registry-of-formal-specificati": {
+        "tier": "B",
+        "gap": "61000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw", "tier": "B" },
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "open-evm-compiler-differential-fuzzing-platform": {
+        "tier": "B",
+        "gap": "52000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "account-abstraction-and-mempool-security-analytics": {
+        "tier": "B",
+        "gap": "28000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "the-ethernaut-six-new-levels-built-from-real-world-exploits": {
+        "tier": "B",
+        "gap": "27000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "provider-independent-client-verified-ens-resolution": {
+        "tier": "B",
+        "gap": "120000000000",
+        "comesIn": [],
+        "dropsOut": [
+          { "slug": "automated-eip-compliance-checks-for-ethereum-clients", "tier": "B" }
+        ],
+        "moves": []
+      },
+      "production-ready-local-first-safe-ui": {
+        "tier": "B",
+        "gap": "93000000000",
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "directory-of-value": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "a-unified-platform-for-web3-opsec": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "opsec-ratings-coalition-to-build-maintain-an-l2beat-for-opse": {
+        "tier": "B",
+        "gap": null,
+        "comesIn": [],
+        "dropsOut": [],
+        "moves": []
+      },
+      "automated-eip-compliance-checks-for-ethereum-clients": {
+        "tier": "A",
+        "gap": "10000000000",
+        "comesIn": [
+          { "slug": "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw", "tier": "A" }
+        ],
+        "dropsOut": [
+          { "slug": "assertions-for-safes-enforced-on-every-transaction-readable", "tier": "A" },
+          { "slug": "independent-attestations-for-the-erc-7730-descriptors-of-eth", "tier": "A" }
+        ],
+        "moves": []
+      }
+    },
+    "lead": {
+      "scar-test-security-fixes-against-the-real-exploit-before-the": "19000000000",
+      "securing-ethereum-with-formal-verification": "25000000000",
+      "safe-lockdown-guard-an-emergency-freeze-for-kidnapping-and-c": "33000000000",
+      "trust-and-security-assessment-framework-for-agentic-defi": "44000000000",
+      "thatsrekt-evm-exploit-alerts-for-the-public-good": "3000000000",
+      "eth-daily-security-getting-ethereum-users-to-the-tools-that": "27000000000",
+      "seal-security-frameworks-maintaining-open-security-knowledge": "6000000000",
+      "mab-xyz-provably-hardware-ethereum-wallet-a-public-proof-tha": "1000000000",
+      "reusable-security-workflows-for-triage-of-vulnerability-repo": "33000000000",
+      "safe-to-send-warn-before-a-send-to-a-smart-wallet-that-does": "2000000000",
+      "relayer-failure-lab-reproductions-and-release-tests-for-the": "39000000000",
+      "from-community-contracts-to-openzeppelin-contracts-erc-7786": "33000000000",
+      "preparing-encrypted-mempools-for-inclusion-in-the-earliest-e": "3000000000",
+      "etherform-a-hardened-ci-cd-standard-for-foundry-smart-contra": "27000000000",
+      "nanojs-investigations-sustaining-independent-ethereum-forens": "5000000000",
+      "tee-security-handbook-practical-verification-failure-analysi": "16000000000",
+      "solidity-wake-vs-code-extension-maintenance-and-ai-fuzzing": "60000000000",
+      "wake-v5-maintenance-and-ai-assisted-fuzzing": "7000000000"
+    }
+  }
+}

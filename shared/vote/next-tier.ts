@@ -6,6 +6,7 @@
  * Pure; browser and Deno. */
 import { type Tier, TIERS } from "./ballot.ts";
 import { type ChainInputs, chainTally } from "./chain.ts";
+import { entries, type Entry, maxWinningAsk, minExtraBacking } from "./entry.ts";
 import { cumulativeDeductions, stageBound } from "./stage.ts";
 
 /** Gaps are whole $1K steps, rounded up; leads are rounded down. */
@@ -22,7 +23,11 @@ export type NextTier = {
   moves: [number, Tier, Tier][]; // still funded, from → to
 };
 
-/** The tally the search re-runs; a parameter so tests can count the runs. */
+/** The tally the search re-runs; a parameter so tests can count the runs. A tally passed
+ * here must follow chainTally's rules (chainTally itself, wrapped to count): the gap
+ * formulas (entry.ts) are chainTally's, and a different tally only drives the live and
+ * knock-on runs. Where the knock-on run doesn't fund the initiative in the target tier
+ * or higher, the two disagree, and there is no figure (gap null) rather than a wrong one. */
 export type Tally = typeof chainTally;
 
 /** Candidate → tier index, over the stages from `first` up to (not including) `upTo`. */
@@ -38,6 +43,10 @@ function tiersOf(
   });
   return out;
 }
+
+/** Whether `run` funds `c` in tier `target` or higher. */
+const reaches = (run: Map<number, number>, c: number, target: number) =>
+  run.has(c) && run.get(c)! <= target;
 
 /** `inp` plus a voter who backs only `c` with `weight`. The rank `m + 2` never opens,
  * and `ballots` stays as it is, so the stage bounds do not move.
@@ -55,9 +64,12 @@ function withPhantom(inp: ChainInputs, c: number, weight: bigint): ChainInputs {
   };
 }
 
-/** The gap search for one initiative, against `live` (the run from `first` without a
- * phantom). The searches are generators that yield after every tally they run, so the
- * async variants can let other work in between; they return the result. */
+/** The gap for one initiative, against `live` (the run from `first` without a phantom):
+ * the least extra backing that gets it to `target` or higher (entry.ts), rounded up to a
+ * $1K step, then one run with that much for the knock-on. `backing` is that least backing
+ * when the caller has it already (entries: one run for every initiative); undefined: it
+ * is worked out here. The searches are generators that yield after every tally they run,
+ * so the async variants can let other work in between; they return the result. */
 function* gapSearch(
   inp: ChainInputs,
   first: number,
@@ -66,6 +78,7 @@ function* gapSearch(
   live: Map<number, number>,
   tally: Tally,
   onlyTarget: boolean,
+  backing?: bigint | null,
 ): Generator<void, NextTier> {
   const entry: NextTier = {
     tier: TIERS[target],
@@ -79,35 +92,23 @@ function* gapSearch(
   if (target < first || inp.withdrawn.has(c)) return entry;
   const room = inp.poolUsd - inp.spent;
   const hiSteps = room / STEP; // bigint division rounds down
-  // Reaching and an onlyTarget knock-on only look at the stages up to the target.
-  const upTo = onlyTarget ? target + 1 : TIERS.length;
-  const run = (k: bigint) => tiersOf(tally, withPhantom(inp, c, k * STEP), first, upTo);
-  const reaches = (r: Map<number, number>) => r.has(c) && r.get(c)! <= target;
   // What's left of the pool can't pay for it, whoever backs it.
   if (hiSteps < 1n || inp.costs[c] > room) return entry;
-  // Backing its whole need almost always gets it there, so look below that first, and
-  // up to the whole pool only when it doesn't.
-  const need = (inp.costs[c] + STEP - 1n) / STEP;
-  const cap = need < 1n ? 1n : need < hiSteps ? need : hiSteps;
-  let hi = cap, after = run(cap);
+  if (backing === undefined) {
+    backing = minExtraBacking(inp, first, c, target + 1);
+    yield;
+  }
+  if (backing === null) return entry;
+  // Whole $1K steps, at least one; no more than what's left of the pool.
+  const k = backing > STEP ? (backing + STEP - 1n) / STEP : 1n;
+  if (k > hiSteps) return entry;
+  entry.gap = k * STEP;
+  // An onlyTarget knock-on only looks at the stages up to the target.
+  const upTo = onlyTarget ? target + 1 : TIERS.length;
+  const after = tiersOf(tally, withPhantom(inp, c, entry.gap), first, upTo);
   yield;
-  if (!reaches(after)) {
-    if (cap === hiSteps) return entry;
-    [hi, after] = [hiSteps, run(hiSteps)];
-    yield;
-    if (!reaches(after)) return entry;
-  }
-  // Reaching is not assumed monotone in the amount: the search only ever returns a
-  // step whose run reached, and keeps that run for the knock-on.
-  let lo = 1n;
-  while (lo < hi) {
-    const mid = (lo + hi) / 2n;
-    const r = run(mid);
-    yield;
-    if (reaches(r)) [hi, after] = [mid, r];
-    else lo = mid + 1n;
-  }
-  entry.gap = hi * STEP;
+  // The run disagrees with the formula (a tally not following chainTally's rules): no figure.
+  if (!reaches(after, c, target)) return { ...entry, gap: null };
   for (let o = 0; o < inp.m; o++) {
     if (o === c) continue;
     const was = live.get(o), is = after.get(o);
@@ -127,18 +128,21 @@ function* gapSearch(
 
 /** `inp` with `c`'s need lowered by `given`: a donation (or pledge) pays that much of it,
  * so the pool is asked for less. */
-function withGift(inp: ChainInputs, c: number, given: bigint): ChainInputs {
+export function withGift(inp: ChainInputs, c: number, given: bigint): ChainInputs {
   const costs = [...inp.costs];
   costs[c] = costs[c] > given ? costs[c] - given : 0n;
   return { ...inp, costs };
 }
 
-/** The donation search for one initiative: the least $1K step that, given to it, gets it
- * funded in tier `target` or higher if the open tiers (from `first`) settled now (the
- * entry's tier is where it lands with it). The
- * last step short of its whole need is the most anyone can give it (given all of it, it is
- * covered, in no tier); when even that doesn't get it there, the gap is null. The
- * knock-on, over every open tier: who comes in, drops out or moves. */
+/** The donation for one initiative: the least `step` that, given to it, gets it funded
+ * in tier `target` or higher if the open tiers (from `first`) settled now (the entry's
+ * tier is where it lands with it). From the largest ask with which the tally would pick
+ * it (entry.ts): its ask less that, rounded up to a step, at least one. The last step
+ * short of its whole need is the most anyone can give it (given all of it, it is covered,
+ * in no tier); when it takes more, the gap is null. `ask` is that largest ask when the
+ * caller has it already; undefined: it is worked out here. With `knockOn`, one run with
+ * the donation names the tier it lands in and, over every open tier, who comes in, drops
+ * out or moves. */
 function* giftSearch(
   inp: ChainInputs,
   first: number,
@@ -147,6 +151,8 @@ function* giftSearch(
   live: Map<number, number>,
   tally: Tally,
   step: bigint = STEP,
+  ask?: bigint,
+  knockOn = true,
 ): Generator<void, NextTier> {
   const entry: NextTier = {
     tier: TIERS[target],
@@ -157,23 +163,21 @@ function* giftSearch(
   };
   // Withdrawn: no candidate, so no donation gets it anywhere.
   if (inp.withdrawn.has(c)) return entry;
-  const most = (inp.costs[c] - 1n) / step;
-  if (most < 1n) return entry;
-  const run = (k: bigint) => tiersOf(tally, withGift(inp, c, k * step), first);
-  const reaches = (r: Map<number, number>) => r.has(c) && r.get(c)! <= target;
-  let hi = most, after = run(most);
-  yield;
-  if (!reaches(after)) return entry;
-  // As in gapSearch, reaching is not assumed monotone: only a step whose run reached is kept.
-  let lo = 1n;
-  while (lo < hi) {
-    const mid = (lo + hi) / 2n;
-    const r = run(mid);
+  if (ask === undefined) {
+    ask = maxWinningAsk(inp, first, c, target + 1);
     yield;
-    if (reaches(r)) [hi, after] = [mid, r];
-    else lo = mid + 1n;
   }
-  entry.gap = hi * step;
+  if (ask === 0n) return entry;
+  const cost = inp.costs[c];
+  const short = cost > ask ? cost - ask : 0n;
+  const k = short > step ? (short + step - 1n) / step : 1n;
+  if (k * step >= cost) return entry;
+  entry.gap = k * step;
+  if (!knockOn) return entry;
+  const after = tiersOf(tally, withGift(inp, c, entry.gap), first);
+  yield;
+  // The run disagrees with the formula (a tally not following chainTally's rules): no figure.
+  if (!reaches(after, c, target)) return { ...entry, gap: null };
   // The amount that reaches the target can land it higher still (its backers rank it
   // there): name the tier it lands in, so the page says one tier for one amount.
   entry.tier = TIERS[after.get(c)!];
@@ -189,6 +193,11 @@ function* giftSearch(
   return entry;
 }
 
+/** Initiative `c`'s thresholds through stage `target` from `all` (entries from `first`);
+ * undefined when the run picks it by then. */
+const through = (all: Map<number, Entry[]>, first: number, c: number, target: number) =>
+  all.get(c)?.[target - first];
+
 /** Every open initiative below the tier settling now (`firstOpen`), as the live tally has
  * it: the donation that gets it one tier higher (into B-Tier when it isn't funded). Those
  * in the tier settling now have their lead instead (liveLeads). */
@@ -201,13 +210,17 @@ function* giftsSearch(
   if (firstOpen < 0 || firstOpen >= TIERS.length) return out;
   const live = tiersOf(tally, inp, firstOpen);
   yield;
+  // One run for every initiative's threshold: none of them is picked before its target.
+  const all = entries(inp, firstOpen, TIERS.length);
+  yield;
   for (let c = 0; c < inp.m; c++) {
     // Settled, covered by donations (asking $0) or withdrawn: nothing more to give it.
     if (inp.done.has(c) || inp.withdrawn.has(c) || inp.costs[c] === 0n) continue;
     const now = live.get(c);
     if (now === firstOpen) continue;
     const target = now === undefined ? TIERS.length - 1 : now - 1;
-    out.set(c, yield* giftSearch(inp, firstOpen, c, target, live, tally, FINE));
+    const ask = through(all, firstOpen, c, target)?.ask;
+    out.set(c, yield* giftSearch(inp, firstOpen, c, target, live, tally, FINE, ask));
   }
   return out;
 }
@@ -220,6 +233,11 @@ function* search(
 ): Generator<void, Map<number, NextTier>> {
   const live = tiersOf(tally, inp, firstOpen);
   yield;
+  // One run for every initiative's threshold: none of them is picked before its target.
+  const all = firstOpen >= 0 && firstOpen < TIERS.length
+    ? entries(inp, firstOpen, TIERS.length)
+    : new Map<number, Entry[]>();
+  yield;
   const out = new Map<number, NextTier>();
   for (let c = 0; c < inp.m; c++) {
     // Settled, covered (asking $0: in no tier, and no gap to one) or withdrawn.
@@ -227,7 +245,8 @@ function* search(
     const now = live.get(c);
     const target = now === undefined ? TIERS.length - 1 : now - 1;
     if (target < firstOpen || target < 0) continue;
-    out.set(c, yield* gapSearch(inp, firstOpen, c, target, live, tally, false));
+    const backing = through(all, firstOpen, c, target)?.backing;
+    out.set(c, yield* gapSearch(inp, firstOpen, c, target, live, tally, false, backing));
   }
   return out;
 }
@@ -311,24 +330,27 @@ function* finalSearch(
     const inp = settleInputs[t];
     return inp && inp.voters.length > 0 ? inp : null;
   };
-  // Each settlement's run without a phantom, shared by every figure judged there.
-  const lives = new Map<number, Map<number, number>>();
+  // Each settlement's run without a phantom, and the one giving every initiative's
+  // threshold, shared by every figure judged there.
+  const lives = new Map<number, [Map<number, number>, Map<number, Entry[]>]>();
   // Each tier is judged where it would have had to win: at its own settlement.
   function* gap(t: number, c: number): Generator<void, void> {
     const inp = at(t);
     // Covered or withdrawn at that settlement (or settled before it): no tier to have reached.
     if (!inp || inp.done.has(c) || inp.withdrawn.has(c) || inp.costs[c] === 0n) return;
-    let live = lives.get(t);
-    if (!live) {
+    let got = lives.get(t);
+    if (!got) {
       // Every figure here targets tier t itself: the later stages aren't looked at.
-      live = tiersOf(tally, inp, t, t + 1);
-      lives.set(t, live);
+      got = [tiersOf(tally, inp, t, t + 1), entries(inp, t, t + 1)];
+      lives.set(t, got);
       yield;
     }
+    const [live, all] = got;
     // Already in the target tier at these inputs (a stored snapshot the re-tally doesn't
     // reproduce): there is no gap to tell.
     if (live.has(c) && live.get(c)! <= t) return;
-    next.set(c, yield* gapSearch(inp, t, c, t, live, tally, true));
+    const backing = through(all, t, c, t)?.backing;
+    next.set(c, yield* gapSearch(inp, t, c, t, live, tally, true, backing));
   }
   for (let c = 0; c < m; c++) {
     const k = finalTier.get(c);
@@ -344,7 +366,7 @@ function* finalSearch(
   return { next, lead };
 }
 
-function drive<T>(it: Generator<void, T>): T {
+export function drive<T>(it: Generator<void, T>): T {
   for (;;) {
     const step = it.next();
     if (step.done) return step.value;
@@ -354,14 +376,21 @@ function drive<T>(it: Generator<void, T>): T {
 /** `drive`, handing the event loop back after every tally: a server isolate keeps
  * answering (ballot relays among them) while a large round is searched. With `sliceMs`
  * (a page), after that many milliseconds of tallies instead: a timer costs a few ms
- * itself, so handing back after each one made a page's search many times slower. */
-async function driveAsync<T>(it: Generator<void, T>, sliceMs = 0): Promise<T> {
+ * itself, so handing back after each one made a page's search many times slower. With
+ * `signal`, it throws `signal.reason` at the first hand-back after an abort. */
+export async function driveAsync<T>(
+  it: Generator<void, T>,
+  sliceMs = 0,
+  signal?: AbortSignal,
+): Promise<T> {
   let since = performance.now();
   for (;;) {
     const step = it.next();
     if (step.done) return step.value;
     if (performance.now() - since >= sliceMs) {
       await new Promise((r) => setTimeout(r, 0));
+      // Aborted while handed back: the caller no longer wants the result.
+      if (signal?.aborted) throw signal.reason;
       since = performance.now();
     }
   }
@@ -532,16 +561,18 @@ export const liveTiers = (inp: ChainInputs, first: number, tally: Tally = chainT
  * `target` (index) or higher if the open tiers (from `first`) settled now; null when
  * even its whole need doesn't. The donation search for any tier, not only the next one
  * up; a donate form's suggestions take a finer step, so an amount below one really
- * doesn't get there. */
+ * doesn't get there. One run of the tally (entry.ts), no knock-on; `_live` is no longer
+ * needed and kept so callers passing a step don't change. */
 export function giftGapTo(
   inp: ChainInputs,
   first: number,
   c: number,
   target: number,
   tally: Tally = chainTally,
-  live: Map<number, number> = tiersOf(tally, inp, first),
+  _live?: Map<number, number>,
   step: bigint = STEP,
 ): bigint | null {
   if (target < first) return null;
-  return drive(giftSearch(inp, first, c, target, live, tally, step)).gap;
+  const it = giftSearch(inp, first, c, target, new Map(), tally, step, undefined, false);
+  return drive(it).gap;
 }

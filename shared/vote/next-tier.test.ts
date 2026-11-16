@@ -3,6 +3,7 @@ import { effectiveRanks } from "../../vote/shared/ranks";
 import { type ChainInputs, chainTally } from "./chain";
 import { stageBound } from "./stage";
 import {
+  driveAsync,
   finalWhatIfs,
   finalWhatIfsAsync,
   FINE,
@@ -11,8 +12,6 @@ import {
   giftGaps,
   giftGapsAsync,
   leadIn,
-  liveLeads,
-  liveLeadsAsync,
   nextTiers,
   nextTiersAsync,
   STEP,
@@ -339,18 +338,6 @@ describe("the S-Tier lead", () => {
     expect(leadIn(inp, 0, 0)).toBe(null);
     expect(leadIn(inp, 0, 1)).toBe(null);
   });
-
-  it("live leads: for the initiatives in the tier settling now", async () => {
-    const inp = inputs([10, 40], [49.7], [[1, 2]]);
-    // To $10: its backer could give $39,700 less and still fund its $10K.
-    expect(liveLeads(inp, 0)).toEqual(new Map([[0, 39_700n * 1_000_000n]]));
-    expect(await liveLeadsAsync(inp, 0)).toEqual(liveLeads(inp, 0));
-    // S-Tier settled with initiative 0: A-Tier settles now, and 1 leads there.
-    const later = { ...inp, done: new Set([0]), spent: 10n * K };
-    const inA = chainTally(later, 1, 2)[0].order;
-    expect([...liveLeads(later, 1).keys()]).toEqual(inA);
-    expect(liveLeads(later, 3).size).toBe(0);
-  });
 });
 
 describe("the final what-ifs", () => {
@@ -480,11 +467,10 @@ describe("the donation to the next tier", () => {
     }
   });
 
-  it("has no entry for what the tier settling now funds: those have a lead", () => {
+  it("has no entry for what the tier settling now funds: those have a threat", () => {
     // Initiative 1 ($40K) is funded in S-Tier by the voter.
     const inp = inputs([70, 40], [40], [[2, 1]]);
     expect(giftGaps(inp, 0).has(1)).toBe(false);
-    expect(liveLeads(inp, 0).has(1)).toBe(true);
   });
 
   it("once S-Tier has settled, the tier settling now is the top one", () => {
@@ -546,5 +532,39 @@ describe("the donation to the next tier", () => {
     const all = giftEffect(inp, 0, 0, 40n * K);
     expect(all).toMatchObject({ was: null, tier: null, covered: false });
     expect(finalWhatIfs([inp, inp, inp], new Map([[1, 0]]), 3).next.has(0)).toBe(false);
+  });
+});
+
+describe("handing the event loop back", () => {
+  function* counting(n: number) {
+    for (let i = 0; i < n; i++) yield;
+    return n;
+  }
+
+  it("runs to the end without a signal, or with one never aborted", async () => {
+    expect(await driveAsync(counting(5))).toBe(5);
+    expect(await driveAsync(counting(5), 0, new AbortController().signal)).toBe(5);
+  });
+
+  it("an abort while handed back rejects with its reason", async () => {
+    const c = new AbortController();
+    const reason = new Error("not wanted");
+    const p = driveAsync(counting(1000), 0, c.signal);
+    c.abort(reason);
+    await expect(p).rejects.toBe(reason);
+  });
+
+  it("an already-aborted signal rejects at the first hand-back", async () => {
+    const reason = new Error("gone already");
+    let ran = 0;
+    function* tallies() {
+      while (ran < 1000) {
+        ran++; // one tally
+        yield;
+      }
+      return ran;
+    }
+    await expect(driveAsync(tallies(), 0, AbortSignal.abort(reason))).rejects.toBe(reason);
+    expect(ran).toBe(1); // only the first slice ran
   });
 });

@@ -20,17 +20,21 @@ export type ChainStage = { order: number[]; shares: Map<number, Map<string, bigi
 
 const TIER_COUNT = 3;
 
+/** The last rank level stage `t` counts to: B, the last tier, counts to the last level
+ * (the Python's stage after the tiers). */
+export const stageLevel = (inp: ChainInputs, t: number): number =>
+  t >= TIER_COUNT - 1 ? inp.m : stageBound(inp.ballots, t, TIER_COUNT, inp.m);
+
 /** Stages `first` up to (not including) `upTo`, chained: each stage pays from what the
  * ones before left. It works on copies, so the same inputs always give the same result. */
 export function chainTally(inp: ChainInputs, first: number, upTo = TIER_COUNT): ChainStage[] {
-  const { m, costs, voters, ranks, ballots, poolUsd } = inp;
+  const { m, costs, voters, ranks, poolUsd } = inp;
   const weights = [...inp.weights]; // stageTally spends these in place
   const done = new Set(inp.done);
   let spent = inp.spent;
   const stages: ChainStage[] = [];
   for (let t = first; t < upTo; t++) {
-    // B, the last tier, counts to the last level (the Python's stage after the tiers).
-    const bound = t === TIER_COUNT - 1 ? m : stageBound(ballots, t, TIER_COUNT, m);
+    const bound = stageLevel(inp, t);
     // A project asking $0 is covered by donations: no candidate (plain PB-EAR would fund
     // it). A withdrawn one is no candidate either: a ballot placing it is skipped for it.
     const candidates = [...Array(m).keys()].filter((c) =>

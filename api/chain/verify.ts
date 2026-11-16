@@ -12,6 +12,9 @@ export interface Verification {
   /** Matching metadata is only provided by RPC verification, never indexer fallback. */
   blockNumber?: number;
   singleTransfer?: boolean;
+  /** A successful, confirmed transaction with no direct donation; the indexer
+   * may identify internal ETH. Explicit rejections never permit fallback. */
+  allowIndexerEth?: boolean;
   found: boolean;
   pending: boolean;
   ok: boolean;
@@ -198,6 +201,7 @@ export async function verifyDonationTx(
         return r;
       }
     }
+    if (tx) r.allowIndexerEth = true;
   }
   r.detail =
     "no transfer of an accepted token or ETH to this RFP's address found in this transaction";

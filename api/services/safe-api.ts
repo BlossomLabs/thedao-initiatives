@@ -7,7 +7,7 @@
  * chain); only ETH sends the RPC path cannot see are credited from the
  * indexer's value.
  */
-import { MIN_CONFIRMATIONS, SAFE_TX_SERVICE_BASE, TOKENS } from "../config.ts";
+import { MIN_CONFIRMATIONS, MIN_ETH_DONATION, SAFE_TX_SERVICE_BASE, TOKENS } from "../config.ts";
 import type { Config } from "../config.ts";
 import type { Db } from "../db/mod.ts";
 import type { Chain } from "../chain/mod.ts";
@@ -100,14 +100,25 @@ async function creditTx(
     await deps.db.donations.record(initiative.id, txHash, v, "tx");
     return;
   }
-  // RPC saw nothing creditable. Internal ETH transfers (Safe->Safe, exchange
-  // contracts) never show as `tx.to == safe`, so trust the indexer for those.
+  if (!v.allowIndexerEth) {
+    if (v.found) await deps.db.donations.record(initiative.id, txHash, v, "tx");
+    return;
+  }
+  // Only an explicitly eligible confirmed transaction may use internal ETH
+  // from the indexer. A revert or minimum rejection must remain rejected.
   const eth = rows.filter((r) =>
     r.type === "ETHER_TRANSFER" && r.to.toLowerCase() === initiative.safeAddress.toLowerCase()
   );
   if (eth.length) {
     const wei = eth.reduce((s, r) => s + BigInt(r.value ?? "0"), 0n);
     const amount = Number(wei) / 1e18;
+    if (amount > 0 && amount < MIN_ETH_DONATION) {
+      await deps.db.donations.record(initiative.id, txHash, {
+        ...v,
+        detail: `ETH amount below the minimum donation of ${MIN_ETH_DONATION} ETH`,
+      }, "safe-api");
+      return;
+    }
     if (amount > 0) {
       try {
         const rate = await deps.chain.usdRate("ETH");

@@ -789,8 +789,9 @@ Deno.test("the round lists the donation that moves each initiative up a tier", a
   type Give = { tier: string; gap: string | null };
   const body = await j(await h.req("/api/vote/round")) as { live: { give: Record<string, Give> } };
   const give = body.live.give;
-  // c isn't funded: its figure is to B-Tier, the first tier up.
-  assertEquals(give.c.tier, "B");
+  // c isn't funded, so the search aims for B-Tier, the first tier up; both ballots have
+  // it in S-Tier, so the donation that gets it there lands it in S-Tier (#101).
+  assertEquals(give.c.tier, "S");
   // Given all but what the two ballots hold ($100K), c is funded.
   // In $10 steps, rounded up.
   const step = 10_000_000n;

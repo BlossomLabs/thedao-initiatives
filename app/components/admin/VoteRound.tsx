@@ -390,8 +390,9 @@ function PoolOnChain({ eth }: { eth: number | null }) {
                   {dollars(estimate!)}
                   {drift != null && Math.abs(drift) >= 0.005 && (
                     <span className={Math.abs(drift) > 0.05 ? "text-[#ffb4b1]" : undefined}>
-                      {" "}The contract is {Math.round(Math.abs(drift) * 100)}%{" "}
-                      {drift > 0 ? "above" : "below"} the live estimate.
+                      {` The contract is ${Math.round(Math.abs(drift) * 100)}% ${
+                        drift > 0 ? "above" : "below"
+                      } the live estimate.`}
                     </span>
                   )}
                 </>

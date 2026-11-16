@@ -67,7 +67,7 @@ Deno.test("support: pledge requests forward current initiative facts and every c
           "Pledge Amount: $25,000.50",
           "Pledge Org: Acme",
           "Pledge Contact Email: donor@example.com",
-          "Who are we talking with?: Alex",
+          "Who are you talking with?: Alex",
           "Message: We would like to fund this work.",
         ]
       ) assertStringIncludes(sent.message, line);

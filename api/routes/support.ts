@@ -87,7 +87,7 @@ export function supportRoutes(deps: Deps) {
       const org = capped(body.pledgeOrg, PLEDGE_ORG_MAX, "The pledge org");
       if (!org) throw new HttpError(400, "add a pledge org");
       contact = capped(body.pledgeContact, PLEDGE_CONTACT_MAX, "The contact name");
-      if (!contact) throw new HttpError(400, "tell us who we are talking with");
+      if (!contact) throw new HttpError(400, "tell us who you are talking with");
       const usd = (n: number) =>
         n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
       pledgeInfo.push(
@@ -100,7 +100,7 @@ export function supportRoutes(deps: Deps) {
         `Pledge Amount: ${usd(amount)}`,
         `Pledge Org: ${org}`,
         `Pledge Contact Email: ${email}`,
-        `Who are we talking with?: ${contact}`,
+        `Who are you talking with?: ${contact}`,
       );
     } else if (
       ["initiativeId", "pledgeAmount", "pledgeOrg", "pledgeContact"].some((key) =>

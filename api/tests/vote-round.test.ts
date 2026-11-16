@@ -1840,3 +1840,89 @@ Deno.test("withdraw: a contract from before withdrawals is refused, and the list
   await h.settle();
   h.close();
 });
+
+// ------------------------------------------------------------------ the pool on-chain (#103)
+const poolUsdReq = (h: Awaited<ReturnType<typeof harness>>, json: unknown, token: string) =>
+  h.req("/api/admin/vote-round/pool-usd", { method: "POST", token, json });
+
+Deno.test("pool on-chain: the contract's last PoolUsdSet, the live ETH price and the dates; admins only", async () => {
+  const { h, state } = await setup();
+  h.script.ethUsd = 1813.5;
+  const get = (token: string) => h.req("/api/admin/vote-round/pool-usd", { token });
+  assertEquals((await get(await h.mint(PLAIN))).status, 403);
+  const token = await h.mint(ADMIN, true);
+  // No PoolUsdSet read yet: the deploy's figure.
+  assertEquals(await j(await get(token)), {
+    poolUsd: "913244000000",
+    ethUsd: 1813.5,
+    lowerUntil: NOW + 600,
+    closesAt: NOW + 3600,
+  });
+  state.history.pool = [
+    { block: 1, logIndex: 0, poolUsd: 913_244_000_000n },
+    { block: 9, logIndex: 2, poolUsd: 725_400_000_000n },
+  ];
+  assertEquals((await j(await get(token)) as { poolUsd: string }).poolUsd, "725400000000");
+  h.close();
+});
+
+Deno.test("pool on-chain: no ETH price says so instead of failing", async () => {
+  const { h } = await setup();
+  h.script.brokenFeeds.add("ETH");
+  const res = await h.req("/api/admin/vote-round/pool-usd", { token: await h.mint(ADMIN, true) });
+  assertEquals((await j(res) as { ethUsd: number | null }).ethUsd, null);
+  h.close();
+});
+
+Deno.test("pool on-chain: a setPoolUsd batch for the round's admin, in six decimals, audited", async () => {
+  const { h } = await setup();
+  const logs: string[] = [];
+  h.deps.log = (line: string) => logs.push(line);
+  assertEquals((await poolUsdReq(h, { usd: 725_400 }, await h.mint(ADMIN))).status, 403);
+  const token = await h.mint(ADMIN, true);
+  const res = await poolUsdReq(h, { usd: 725_400.5 }, token);
+  assertEquals(res.status, 200);
+  const batch = await j(res) as {
+    chainId: string;
+    meta: { name: string };
+    transactions: { to: string; data: Hex }[];
+  };
+  assertEquals(batch.chainId, "11155111");
+  assertEquals(batch.meta.name, "Set the vote's pool to $725,400.50");
+  assertEquals(batch.transactions[0].to, manifest.contract);
+  const call = decodeFunctionData({ abi: SIGNED_BALLOTS_ABI, data: batch.transactions[0].data });
+  assertEquals([call.functionName, call.args], ["setPoolUsd", [725_400_500_000n]]);
+  const audit = logs.map((l) => JSON.parse(l)).filter((e) => e.securityAudit);
+  assertEquals(audit.some((e) => e.action === "vote.pool_usd" && e.outcome === "success"), true);
+  h.close();
+});
+
+Deno.test("pool on-chain: refusals (not a number, the same amount, lower after S-Tier's first tally, closed)", async () => {
+  const { h, state } = await setup();
+  const token = await h.mint(ADMIN, true);
+  const refused = async (json: unknown, status: number, text: string) => {
+    const res = await poolUsdReq(h, json, token);
+    assertEquals(res.status, status);
+    assertEquals(await msg(res), text);
+  };
+  await refused({ usd: "lots" }, 400, "The pool's dollars aren't a number.");
+  await refused({ usd: -1 }, 400, "The pool's dollars aren't a number.");
+  await refused({ usd: 913_244 }, 409, "The contract already holds $913,244.");
+  // Before S-Tier's first tally it may go down (a correction); after it, only up.
+  assertEquals((await poolUsdReq(h, { usd: 700_000 }, token)).status, 200);
+  h.clock.now = NOW + 600;
+  const later = await h.mint(ADMIN, true);
+  const down = await poolUsdReq(h, { usd: 700_000 }, later);
+  assertEquals(down.status, 409);
+  assertEquals(
+    await msg(down),
+    "S-Tier's first tally has passed: the pool can only go up now (the contract holds $913,244).",
+  );
+  assertEquals((await poolUsdReq(h, { usd: 950_000 }, later)).status, 200);
+  state.history.pool = [{ block: 9, logIndex: 0, poolUsd: 950_000_000_000n }];
+  h.clock.now = NOW + 3600;
+  const closed = await poolUsdReq(h, { usd: 990_000 }, await h.mint(ADMIN, true));
+  assertEquals(closed.status, 409);
+  assertEquals(await msg(closed), "Voting has closed; the pool can't change now.");
+  h.close();
+});

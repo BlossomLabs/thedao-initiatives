@@ -41,6 +41,17 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 const chainName = (id: number) => (id === 1 ? "Ethereum" : "Sepolia");
 
+/** Hands an admin batch to the browser as a file, for the Transaction Builder. */
+function downloadBatch(batch: unknown, name: string) {
+  const blob = new Blob([JSON.stringify(batch, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function RoundLine({ b }: { b: Brief }) {
   return (
     <span className="mt-1 block text-[12px] text-muted">
@@ -262,8 +273,9 @@ export default function VoteRound() {
           <div className="min-w-[220px] flex-1">
             <b className={TITLE}>Sold for dollars</b>
             <small className={HINT}>
-              Once the ETH is sold, set the pool's dollars on-chain (setPoolUsd) before the S-Tier
-              first tally{set ? ` (${dayTime(set.firstTallyAt)})` : ""}, then turn this on.
+              Once the ETH is sold, set the pool's dollars on-chain (below) before{" "}
+              {tierName("S")}'s first tally{set ? ` (${dayTime(set.firstTallyAt)})` : ""}, then turn
+              this on.
             </small>
           </div>
           <div className="flex flex-none items-center gap-2.5 font-inter-tight text-[13px]">
@@ -293,7 +305,159 @@ export default function VoteRound() {
           {poolMsg && <Status kind={poolMsg.ok ? "ok" : "err"}>{poolMsg.text}</Status>}
         </div>
       </form>
+
+      {set && <PoolOnChain eth={data?.pool?.eth ?? null} />}
     </div>
+  );
+}
+
+type PoolUsdJson = { poolUsd: string; ethUsd: number | null; lowerUntil: number; closesAt: number };
+const dollars = (n: number, cents = n % 1 !== 0) =>
+  `$${
+    n.toLocaleString("en-US", { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 })
+  }`;
+
+/**
+ * The pool's dollars on the contract (#103): what each badge's share and the ballot
+ * minimum (1.5x) are counted from. Beside it the saved ETH at the live price, and how far
+ * the contract is from that. Setting it downloads a setPoolUsd batch for the round's
+ * admin (the site never sends it); the figure here changes once it is executed. It can go
+ * down until S-Tier's first tally, only up after that, and not at all once voting closes.
+ */
+function PoolOnChain({ eth }: { eth: number | null }) {
+  const adminApi = useAdminApi();
+  const id = useId();
+  const { data } = useQuery({
+    queryKey: ["admin", "vote-round", "pool-usd"],
+    queryFn: ({ signal }) => api<PoolUsdJson>("/api/admin/vote-round/pool-usd", { signal }),
+    refetchInterval: 15_000,
+  });
+  const { run, said } = useRun();
+  const [value, setValue] = useState("");
+  const [sending, setSending] = useState(false);
+  const now = Date.now() / 1000;
+  const onChain = data ? Number(BigInt(data.poolUsd)) / 1e6 : null;
+  const estimate = data?.ethUsd != null && eth != null ? Math.round(eth * data.ethUsd) : null;
+  const drift = onChain != null && estimate ? (onChain - estimate) / estimate : null;
+  const closed = data ? now >= data.closesAt : false;
+  const onlyUp = data ? now >= data.lowerUntil : false;
+  const typed = Number(value.replace(/[\s,$]/g, ""));
+  const bad = value.trim() !== "" && !(Number.isFinite(typed) && typed >= 0);
+  const tooLow = !bad && value.trim() !== "" && onlyUp && onChain != null && typed < onChain;
+  const same = !bad && onChain != null && typed === onChain;
+  const send = async () => {
+    setSending(true);
+    await run(
+      async () => {
+        const batch = await adminApi<unknown>("/api/admin/vote-round/pool-usd", {
+          json: { usd: typed },
+        });
+        downloadBatch(batch, `pool-${typed}.json`);
+      },
+      `Batch saved for ${
+        dollars(typed)
+      }: import it in the Transaction Builder of the round's admin and sign it.`,
+    );
+    setSending(false);
+  };
+  return (
+    <section className={CARD} aria-labelledby={`${id}-h`}>
+      <b id={`${id}-h`} className={TITLE}>The pool on-chain</b>
+      <small className={HINT}>
+        What the contract counts each badge's share and the ballot minimum (1.5×) from. Setting it
+        downloads a batch for the round's admin to sign; this updates once it is executed.
+        {data && !closed && !onlyUp &&
+          ` It can go up or down until ${tierName("S")}'s first tally (${
+            dayTime(data.lowerUntil)
+          }), only up after that.`}
+      </small>
+      {data && (
+        <div className="mt-3 flex flex-col gap-1 text-[13px]">
+          <span>
+            On the contract: <b className="tnum">{dollars(onChain!)}</b>
+          </span>
+          <span className="text-muted">
+            {eth == null
+              ? "Save the pool's ETH above for a live estimate."
+              : data.ethUsd == null
+              ? "The ETH price can't be read right now."
+              : (
+                <>
+                  Live estimate: {eth.toLocaleString("en-US")} ETH at {dollars(data.ethUsd, true)}:
+                  {" "}
+                  {dollars(estimate!)}
+                  {drift != null && Math.abs(drift) >= 0.005 && (
+                    <span className={Math.abs(drift) > 0.05 ? "text-[#ffb4b1]" : undefined}>
+                      {" "}The contract is {Math.round(Math.abs(drift) * 100)}%{" "}
+                      {drift > 0 ? "above" : "below"} the live estimate.
+                    </span>
+                  )}
+                </>
+              )}
+          </span>
+        </div>
+      )}
+      {data && closed && (
+        <p className="mt-3 mb-0 text-[13px] text-muted">
+          Voting has closed; the pool can't change now.
+        </p>
+      )}
+      {data && !closed && (
+        <form
+          className="mt-3 flex flex-wrap items-center gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (value.trim() && !bad && !tooLow && !same) void send();
+          }}
+        >
+          <label htmlFor={`${id}-usd`} className="sr-only">New pool in dollars</label>
+          <span className="relative flex-none">
+            <span
+              className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center font-inter-tight text-[14px] text-muted"
+              aria-hidden="true"
+            >
+              $
+            </span>
+            <input
+              id={`${id}-usd`}
+              className="w-[160px] rounded-lg border border-edge2 bg-white/5 py-1.5 pl-6 pr-2.5 text-right font-inter-tight text-[14px] tnum text-white outline-none focus:border-[rgba(92,183,90,.6)] aria-[invalid=true]:border-dao-red"
+              inputMode="decimal"
+              aria-invalid={bad || tooLow}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </span>
+          {estimate != null && (
+            <Button
+              sm
+              type="button"
+              variant="ghost"
+              onClick={() => setValue(String(estimate))}
+            >
+              Use the estimate
+            </Button>
+          )}
+          <Button
+            sm
+            type="submit"
+            loading={sending}
+            disabled={!value.trim() || bad || tooLow || same || sending}
+          >
+            Set the pool on-chain
+          </Button>
+          {(onlyUp || bad || same) && (
+            <small className={cn(HINT, "w-full", (bad || tooLow) && "text-[#ffb4b1]")}>
+              {bad
+                ? "Use an amount of dollars, 0 or more."
+                : same
+                ? "The contract already holds that amount."
+                : `${tierName("S")}'s first tally has passed: it can only go up now.`}
+            </small>
+          )}
+        </form>
+      )}
+      {said}
+    </section>
   );
 }
 
@@ -524,13 +688,7 @@ function Withdrawals() {
       const batch = await adminApi<unknown>("/api/admin/vote-round/withdraw", {
         json: { slug: x.slug, withdrawn: !x.withdrawn },
       });
-      const blob = new Blob([JSON.stringify(batch, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${x.withdrawn ? "undo-withdraw" : "withdraw"}-${x.slug}.json`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      downloadBatch(batch, `${x.withdrawn ? "undo-withdraw" : "withdraw"}-${x.slug}.json`);
     }, `Batch saved for ${title}: import it in the Safe's Transaction Builder and sign it.`);
   return (
     <section className={CARD} aria-labelledby={`${id}-h`}>

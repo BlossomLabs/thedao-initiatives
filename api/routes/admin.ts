@@ -248,6 +248,73 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
   });
 
   /**
+   * The pool's dollars on the contract (#103): its last PoolUsdSet (the deploy's figure
+   * before any is read), the live ETH price for the card's estimate (null when the feed
+   * can't be read), and the contract's dates: lowering it is allowed only before S-Tier's
+   * first tally (`lowerUntil`), and nothing changes once voting closes.
+   */
+  const poolOnChain = async (d: VoteRound): Promise<bigint> => {
+    try {
+      const last = (await d.chain.rulesHistory()).pool.at(-1);
+      return last ? last.poolUsd : BigInt(d.manifest.poolUsd);
+    } catch (e) {
+      deps.log(`vote pool read: ${e instanceof Error ? e.message : String(e)}`);
+      throw new HttpError(502, "Couldn't read the pool from the contract. Try again.");
+    }
+  };
+  const dollars = (micro: bigint) =>
+    `$${
+      (Number(micro) / 1e6).toLocaleString("en-US", {
+        minimumFractionDigits: micro % 1_000_000n ? 2 : 0,
+        maximumFractionDigits: 2,
+      })
+    }`;
+  r.get("/vote-round/pool-usd", async (c) => {
+    const d = await roundNow();
+    const [poolUsd, ethUsd] = await Promise.all([
+      poolOnChain(d),
+      deps.chain.usdRate("ETH").catch(() => null),
+    ]);
+    return c.json({
+      poolUsd: String(poolUsd),
+      ethUsd,
+      lowerUntil: d.manifest.schedule.firstTallyAt[0],
+      closesAt: d.manifest.closesAt,
+    });
+  });
+  /** Set the pool's dollars on-chain: the Transaction Builder batch for the round's admin
+   * (setPoolUsd needs ADMIN_ROLE; the site never sends it). Refused when it holds that
+   * already, when it would go down after S-Tier's first tally, and after the close. */
+  r.post("/vote-round/pool-usd", requireRecentAuth(deps.now), async (c) => {
+    const body = await jsonBody(c, ["usd"]);
+    const usd = typeof body.usd === "number" ? body.usd : Number.NaN;
+    if (!(Number.isFinite(usd) && usd >= 0 && usd < 1e10)) {
+      throw new HttpError(400, "The pool's dollars aren't a number.");
+    }
+    const micro = BigInt(Math.round(usd * 100)) * 10_000n; // whole cents
+    auditContext(c, { detail: dollars(micro) });
+    const d = await roundNow();
+    if (deps.now() >= d.manifest.closesAt) {
+      throw new HttpError(409, "Voting has closed; the pool can't change now.");
+    }
+    const cur = await poolOnChain(d);
+    if (micro === cur) throw new HttpError(409, `The contract already holds ${dollars(cur)}.`);
+    if (micro < cur && deps.now() >= d.manifest.schedule.firstTallyAt[0]) {
+      throw new HttpError(
+        409,
+        `${tierName("S")}'s first tally has passed: the pool can only go up now ` +
+          `(the contract holds ${dollars(cur)}).`,
+      );
+    }
+    return c.json(
+      adminBatch(d.manifest, `Set the vote's pool to ${dollars(micro)}`, [{
+        fn: "setPoolUsd",
+        args: [micro],
+      }]),
+    );
+  });
+
+  /**
    * Each initiative of the round now: withdrawn at the replay's head, and the tier it is
    * settled in (funded or covered at a settlement), which closes the withdrawal. Read from
    * the public round (its few-second cache), so it agrees with what voters see.

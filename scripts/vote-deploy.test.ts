@@ -116,6 +116,38 @@ Deno.test("parseTestTiming: rejects ambiguous dates, short setups and real votes
   assertThrows(() => parseTestTiming({ real: true, "setup-minutes": "10" }), Error, "test votes");
 });
 
+Deno.test("voteSchedule: nine halving windows from 30 minutes finish at midnight", () => {
+  const timing = parseTestTiming({
+    until: "2026-11-17T00:00:00+05:30",
+    "setup-minutes": "10",
+    "window-minutes": "30",
+    windows: "9",
+  });
+  const s = voteSchedule(at("2026-11-16T15:00:00Z"), timing);
+  assertEquals(s.initialWindow, 1800);
+  assertEquals(s.maxWindows, 9);
+  assertEquals(tierMax(s), 3592);
+  assertEquals(s.firstTallyAt, [
+    at("2026-11-16T15:30:24Z"),
+    at("2026-11-16T16:30:16Z"),
+    at("2026-11-16T17:30:08Z"),
+  ]);
+  assertEquals(s.firstTallyAt[2] + tierMax(s), timing.until);
+  assertThrows(() => voteSchedule(s.firstTallyAt[0] - 600, timing), Error, "voting time");
+});
+
+Deno.test("parseTestTiming: window options match the contract's bounds", () => {
+  for (const minutes of ["", "0", "-1", "0.5", "Infinity", "NaN", "9007199254740991"]) {
+    assertThrows(() => parseTestTiming({ "window-minutes": minutes }), Error, "positive whole");
+  }
+  for (const windows of ["", "0", "-1", "1.5", "65", "NaN"]) {
+    assertThrows(() => parseTestTiming({ windows }), Error, "from 1 to 64");
+  }
+  assertThrows(() => parseTestTiming({ "window-minutes": "1", windows: "7" }), Error, "one second");
+  assertThrows(() => parseTestTiming({ real: true, "window-minutes": "30" }), Error, "test votes");
+  assertThrows(() => parseTestTiming({ real: true, windows: "9" }), Error, "test votes");
+});
+
 const SAFE2 = "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063";
 
 Deno.test("planInitiatives, real vote: every initiative needs its own Safe", () => {

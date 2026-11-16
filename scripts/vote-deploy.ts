@@ -9,6 +9,7 @@
 //     deno task vote-deploy [--minter 0x…] [--test-usd 0x…] [--board https://initiatives.thedao.fund] [--rpc http://127.0.0.1:8545]
 // For a longer rehearsal, --until <ISO date with time zone> sets the final cutoff;
 // --setup-minutes 10 opens ten minutes after deployment (default: 30).
+// --window-minutes 30 --windows 9 gives each tier nine windows, halving from 30 minutes.
 // The pool is 400 ETH in dollars at Chainlink's live ETH/USD (read on mainnet:
 // MAINNET_RPC_URL, else a public node). By default it opens 30 min after the deploy; S-Tier's
 // first tally is 30 min later, and the three tiers then take 30 min at most (10 min
@@ -393,16 +394,26 @@ export function planDonationSetup(o: {
   ];
 }
 
-export type TestTiming = { until?: number; setupMinutes?: number };
+export type TestTiming = {
+  until?: number;
+  setupMinutes?: number;
+  initialWindow?: number;
+  maxWindows?: number;
+};
 
 /** Explicit test timing is checked before any deployment transaction. */
 export function parseTestTiming(a: {
   real?: boolean;
   until?: string;
   "setup-minutes"?: string;
+  "window-minutes"?: string;
+  windows?: string;
 }): TestTiming {
-  if (a.real && (a.until !== undefined || a["setup-minutes"] !== undefined)) {
-    throw new Error("--until and --setup-minutes are only for test votes");
+  const flags = ["until", "setup-minutes", "window-minutes", "windows"] as const;
+  if (a.real && flags.some((flag) => a[flag] !== undefined)) {
+    throw new Error(
+      "--until, --setup-minutes, --window-minutes and --windows are only for test votes",
+    );
   }
   const timing: TestTiming = {};
   if (a.until !== undefined) {
@@ -420,21 +431,43 @@ export function parseTestTiming(a: {
     }
     timing.setupMinutes = n;
   }
+  if (a["window-minutes"] !== undefined) {
+    const n = Number(a["window-minutes"]);
+    if (!Number.isSafeInteger(n) || n < 1 || !Number.isSafeInteger(n * 60)) {
+      throw new Error("--window-minutes must be a positive whole number of minutes");
+    }
+    timing.initialWindow = n * 60;
+  }
+  if (a.windows !== undefined) {
+    const n = Number(a.windows);
+    if (!Number.isSafeInteger(n) || n < 1 || n > 64) {
+      throw new Error("--windows must be a whole number from 1 to 64");
+    }
+    timing.maxWindows = n;
+  }
+  const last = (timing.initialWindow ?? TEST_WINDOWS.initialWindow) /
+    2 ** ((timing.maxWindows ?? TEST_WINDOWS.maxWindows) - 1);
+  if (last < 1) throw new Error("--windows would shrink the last window below one second");
   return timing;
 }
 
 export function voteSchedule(now: number, timing: TestTiming = {}) {
   const opensAt = now + (timing.setupMinutes ?? SETUP_MINUTES) * 60;
-  const span = tierMax(TEST_WINDOWS);
+  const windows = {
+    initialWindow: timing.initialWindow ?? TEST_WINDOWS.initialWindow,
+    maxWindows: timing.maxWindows ?? TEST_WINDOWS.maxWindows,
+  };
+  const span = tierMax(windows);
   const s = timing.until === undefined ? opensAt + VOTING_MINUTES * 60 : timing.until - 3 * span;
+  if (!Number.isSafeInteger(s + 3 * span)) throw new Error("The test schedule is out of range");
   if (s <= opensAt) {
     throw new Error(
-      "--until must leave voting time after setup and 30 minutes for the three tiers",
+      `--until must leave voting time after setup and ${3 * span} seconds for the three tiers`,
     );
   }
   return {
     opensAt,
-    ...TEST_WINDOWS,
+    ...windows,
     firstTallyAt: [s, s + span, s + 2 * span] as [number, number, number],
   };
 }
@@ -774,6 +807,8 @@ async function main() {
       "contract",
       "until",
       "setup-minutes",
+      "window-minutes",
+      "windows",
     ],
   });
   if (args.add || args.added) return await addMain(args);

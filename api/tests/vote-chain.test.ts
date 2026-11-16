@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { stampLogs } from "../services/vote-chain.ts";
 
 const logs = [{ blockNumber: 10n }, { blockNumber: 10n }, { blockNumber: 12n }];
@@ -73,6 +73,50 @@ Deno.test("a real round reads ownerOf from the voting badge, not the ballots con
   );
   assertEquals((await chain.ownerOf(7n))?.toLowerCase(), "0x" + "11".repeat(20));
   assertEquals(calls, [BADGE]);
+});
+
+Deno.test("ownerOf: an unminted badge is free; other reverts and RPC failures propagate", async () => {
+  const { createVoteChain } = await import("../services/vote-chain.ts");
+  const { custom, encodeErrorResult, parseAbi } = await import("viem");
+  const m: import("../../shared/vote/manifest.ts").VoteManifest = {
+    kind: "test",
+    chainId: 11155111,
+    contract: "0x1000000000000000000000000000000000000001",
+    deployBlock: 1,
+    opensAt: 0,
+    closesAt: 1,
+    schedule: { opensAt: 0, firstTallyAt: [1, 2, 3], initialWindow: 1, maxWindows: 1 },
+    poolUsd: "1",
+    slugs: ["a"],
+    projects: [{ goalUsd: "1", rfp: false, groups: [] }],
+    groups: [],
+    independentTiers: 1,
+  };
+  const chainWith = (error: Error) =>
+    createVoteChain(
+      m,
+      "http://unused",
+      null,
+      custom({
+        request: ({ method }: { method: string }) => {
+          if (method === "eth_chainId") return Promise.resolve("0xaa36a7");
+          if (method === "eth_call") return Promise.reject(error);
+          return Promise.reject(new Error("unexpected " + method));
+        },
+      }, { retryCount: 0 }),
+    );
+  const missing = encodeErrorResult({
+    abi: parseAbi(["error ERC721NonexistentToken(uint256 tokenId)"]),
+    errorName: "ERC721NonexistentToken",
+    args: [1n],
+  });
+  const revert = (data: string) =>
+    Object.assign(new Error("execution reverted"), { code: 3, data });
+  assertEquals(await chainWith(revert(missing)).ownerOf(1n), null);
+  await assertRejects(() => chainWith(revert("0xdeadbeef")).ownerOf(1n));
+  await assertRejects(() => chainWith(revert("0x")).ownerOf(1n));
+  // A provider message isn't proof that the contract says the badge is unminted.
+  await assertRejects(() => chainWith(new Error("RPC failed: ERC721NonexistentToken")).ownerOf(1n));
 });
 
 Deno.test("asks: every project's initiativeUsd ask, in manifest order, in one multicall", async () => {

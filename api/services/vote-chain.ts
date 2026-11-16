@@ -131,7 +131,10 @@ const INITIATIVE_WITHDRAWN = parseAbiItem(
 const TRANSFER = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
 );
-const OWNER_OF_ABI = parseAbi(["function ownerOf(uint256) view returns (address)"]);
+const OWNER_OF_ABI = parseAbi([
+  "function ownerOf(uint256) view returns (address)",
+  "error ERC721NonexistentToken(uint256 tokenId)",
+]);
 const LOG_CHUNK = 50_000n;
 /** _safeMint to a wallet is ~100k gas; the rest is room for a small receive hook. */
 const MINT_GAS = 250_000n;
@@ -170,8 +173,14 @@ export function createVoteChain(
           args: [n],
         });
       } catch (e) {
-        // ERC721NonexistentToken: not minted yet.
-        if (String(e).includes("ERC721NonexistentToken")) return null;
+        // Only the contract's decoded missing-token error means this id is free.
+        const reverted = e instanceof BaseError
+          ? e.walk((x) => x instanceof ContractFunctionRevertedError)
+          : null;
+        if (
+          reverted instanceof ContractFunctionRevertedError &&
+          reverted.data?.errorName === "ERC721NonexistentToken"
+        ) return null;
         throw e;
       }
     },

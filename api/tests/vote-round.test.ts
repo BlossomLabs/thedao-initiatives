@@ -7,7 +7,7 @@ import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import { type TranscriptEvent, transcriptOf } from "../../shared/vote/transcript.ts";
 import type { BallotEvent, VoteChain } from "../services/vote-chain.ts";
-import { cacheSet, errorText } from "../routes/vote.ts";
+import { cacheSet, errorText, voteSearches } from "../routes/vote.ts";
 import { chainTally } from "../../shared/vote/chain.ts";
 import { liveInputsFrom, type LiveInputsJson } from "../../shared/vote/live-inputs.ts";
 import type { ChainState } from "../../shared/vote/quiet-ending.ts";
@@ -831,39 +831,66 @@ Deno.test("round next: the same tally inputs are searched once", async () => {
 });
 
 /** $6K pool, $3K asks; both voters back a alone, so the live tally funds a in S-Tier. */
-async function leadSetup() {
+async function threatSetup() {
   const { h, state } = await setup({ ...qe, poolUsd: "6000000000" });
   state.asks = [3_000_000_000n, 3_000_000_000n, 3_000_000_000n];
   state.logs = [logOf("1", `01${X}${X}`, NOW - 100, 1), logOf("2", `01${X}${X}`, NOW - 90, 2)];
   return { h, state };
 }
-type LiveBody = { live: { next?: unknown; lead?: Record<string, string> } };
+type LiveBody = {
+  live: {
+    next?: unknown;
+    give?: unknown;
+    lead?: Record<string, string>;
+    threat?: Record<string, string | null>;
+  };
+};
 
-Deno.test("an open round serves S-Tier leads", async () => {
-  const { h } = await leadSetup();
+Deno.test("an open round serves each S-Tier initiative's threat", async () => {
+  const { h } = await threatSetup();
   // Like the gaps: the first read starts the work and doesn't wait for it.
   const first = await j(await h.req("/api/vote/round")) as LiveBody;
-  assertEquals(first.live.lead, undefined);
+  assertEquals(first.live.threat, undefined);
   await h.settle();
   const body = await j(await h.req("/api/vote/round")) as LiveBody;
   assertEquals(body.live.next !== undefined, true);
-  // The voters hold $6K and a costs $3K: its backers could pay $3K more and keep it.
-  assertEquals(body.live.lead, { a: "3000000000" });
+  // a costs $3K of the voters' $6K and nothing else is ranked: no donation elsewhere
+  // pushes it out.
+  assertEquals(body.live.threat, { a: null });
+  assertEquals(body.live.lead, undefined);
   await h.settle();
   h.close();
 });
 
-Deno.test("once S-Tier has settled, the leads are A-Tier's", async () => {
-  const { h } = await leadSetup();
+Deno.test("once S-Tier has settled, the threats are A-Tier's", async () => {
+  const { h } = await threatSetup();
   h.clock.now = NOW + 700; // S settled at NOW + 660; A is open
   await h.req("/api/vote/round");
   await h.settle();
   h.clock.now += 10;
   const body = await j(await h.req("/api/vote/round")) as LiveBody;
   assertEquals(body.live.next !== undefined, true, "the search ran");
-  // a was S-Tier's; the ballots rank nothing else, so A-Tier funds nothing to lead.
-  assertEquals(body.live.lead, {});
+  // a was S-Tier's; the ballots rank nothing else, so A-Tier funds nothing to threaten.
+  assertEquals(body.live.threat, {});
   await h.settle();
+  h.close();
+});
+
+Deno.test("a failed threat search keeps the gaps", async () => {
+  const { h } = await threatSetup();
+  const real = voteSearches.threats;
+  voteSearches.threats = () => Promise.reject(new Error("boom"));
+  try {
+    await h.req("/api/vote/round");
+    await h.settle();
+    const body = await j(await h.req("/api/vote/round")) as LiveBody;
+    assertEquals(body.live.next !== undefined, true);
+    assertEquals(body.live.give !== undefined, true);
+    assertEquals(body.live.threat, undefined);
+    await h.settle();
+  } finally {
+    voteSearches.threats = real;
+  }
   h.close();
 });
 
@@ -1643,7 +1670,7 @@ Deno.test("round: held while the chain has a project this site doesn't know yet"
 });
 
 Deno.test("the round carries the live tally's inputs, which re-run to its result", async () => {
-  const { h } = await leadSetup();
+  const { h } = await threatSetup();
   const body = await j(await h.req("/api/vote/round")) as {
     live: { funded: string[]; inputs?: LiveInputsJson };
   };

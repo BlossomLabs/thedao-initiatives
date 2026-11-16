@@ -14,3 +14,12 @@ MotionGlobalConfig.skipAnimations = true;
 
 // Deliver query updates synchronously so `act()` sees them without a timer tick.
 notifyManager.setScheduler((cb) => cb());
+
+// Deno's own `Worker` leaks into jsdom, which has none. A page that starts a web worker
+// (the vote results' green-row jumps) would load the module over a dev server that isn't
+// there and crash the test run; without one it works on the page's thread, as in jsdom.
+Object.defineProperty(globalThis, "Worker", {
+  configurable: true,
+  writable: true,
+  value: undefined,
+});

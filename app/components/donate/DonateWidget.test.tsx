@@ -224,3 +224,25 @@ it("a new suggestion (the round changed on-chain) never moves the amount: it sta
   rerender(at(3000, "other"));
   expect(amount()).toBe("3000");
 });
+
+it("preselect false: the field starts empty and suggestions don't fill it", () => {
+  const at = (usds: number[]) => (
+    <MemoryRouter>
+      <DonateWidget
+        initiativeId="id"
+        slug="test"
+        safeAddress={SAFE}
+        suggested={usds.map((usd) => ({ usd, note: "no threat found", label: "No threat found" }))}
+        preselect={false}
+      />
+    </MemoryRouter>
+  );
+  const { rerender } = render(at([2000, 10_000]));
+  fireEvent.click(screen.getByText("Wallet"));
+  const amount = () => (screen.getByLabelText("Amount in US dollars") as HTMLInputElement).value;
+  expect(amount()).toBe("");
+  // The suggestions are chips all the same.
+  expect(screen.getByRole("button", { name: "$2,000, no threat found" })).toBeInTheDocument();
+  rerender(at([3000, 12_000]));
+  expect(amount()).toBe("");
+});

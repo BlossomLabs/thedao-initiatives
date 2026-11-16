@@ -5,7 +5,8 @@ import type { Card } from "~/lib/api-types";
 import { encodeBallot, type Tier, TIERS } from "../../../shared/vote/ballot";
 import { type ChainInputs, type ChainStage, chainTally } from "../../../shared/vote/chain";
 import { liveInputsFrom, liveInputsJson } from "../../../shared/vote/live-inputs";
-import { giftGapsAsync, liveLeadsAsync } from "../../../shared/vote/next-tier";
+import { giftGapsAsync } from "../../../shared/vote/next-tier";
+import { threatsAsync } from "../../../shared/vote/threat";
 import { effectiveRanks } from "../../../vote/shared/ranks";
 import type { VoteManifest } from "../../../shared/vote/manifest";
 
@@ -459,7 +460,7 @@ export const momentOf = (k: MockKind): MockKind =>
 /** `view` as the results page shows it: the figures the server works out, worked out
  * here by the same searches over the example's tally inputs: for each open initiative
  * below the tier settling now, the donation that moves it up a tier (`live.give`), and
- * how far ahead those in it are (`live.lead`). Yields between tallies. A round with no
+ * what pushes those in it out (`live.threat`). Yields between tallies. A round with no
  * inputs (nothing counted yet, or closed) comes back as it is. */
 export async function withFigures(view: RoundView, round: VoteManifest): Promise<RoundView> {
   const json = view.live.inputs;
@@ -468,7 +469,7 @@ export async function withFigures(view: RoundView, round: VoteManifest): Promise
   const { slugs } = round;
   // In slices of 10 ms: the page stays responsive, the search doesn't crawl.
   const gifts = await giftGapsAsync(inp, first, chainTally, 10);
-  const leads = await liveLeadsAsync(inp, first, chainTally, 10);
+  const threats = await threatsAsync(inp, first, chainTally, 10);
   const give: NonNullable<RoundView["live"]["give"]> = Object.fromEntries(
     [...gifts].map(([c, g]) => [slugs[c], {
       tier: g.tier,
@@ -478,9 +479,8 @@ export async function withFigures(view: RoundView, round: VoteManifest): Promise
       moves: g.moves.map(([o, from, to]) => ({ slug: slugs[o], from, to })),
     }]),
   );
-  // As the server sends them: any lead above nothing.
-  const lead = Object.fromEntries(
-    [...leads].filter(([, v]) => v > 0n).map(([c, v]) => [slugs[c], String(v)]),
+  const threat = Object.fromEntries(
+    [...threats].map(([c, v]) => [slugs[c], v === null ? null : String(v)]),
   );
-  return { ...view, live: { ...view.live, give, lead } };
+  return { ...view, live: { ...view.live, give, threat } };
 }

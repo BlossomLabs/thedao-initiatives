@@ -42,6 +42,7 @@ export default function DonateWidget({
   example,
   accent = "green",
   cap,
+  preselect = true,
 }: {
   initiativeId: string;
   slug: string;
@@ -63,6 +64,9 @@ export default function DonateWidget({
    * needs (the vote results). No chip goes past it, the last one is it, and a larger
    * amount can't be sent. */
   cap?: Suggestion;
+  /** Pick the first suggestion (true, as for a gap). False: the field starts empty and a
+   * suggestion never fills it (a green row's jumps: nothing is missing). */
+  preselect?: boolean;
 }) {
   const red = accent === "red";
   const { data: params } = useDonateParams();
@@ -128,7 +132,7 @@ export default function DonateWidget({
     ? suggested
     : [suggested];
   const first = suggestions[0];
-  const [amount, setAmount] = useState(first ? String(first.usd) : "");
+  const [amount, setAmount] = useState(preselect && first ? String(first.usd) : "");
   // Another initiative: start from its suggestion. For the same one the amount never moves
   // (#100): a new suggestion (the round changed on-chain) shows in the chips, and the
   // preview says what the amount does now. Only a form that opened before any suggestion
@@ -137,7 +141,7 @@ export default function DonateWidget({
   useEffect(() => {
     const was = suggestedFor.current;
     suggestedFor.current = { initiativeId, usd: first?.usd };
-    if (!first) return;
+    if (!preselect || !first) return;
     if (was.initiativeId !== initiativeId) return setAmount(String(first.usd));
     if (was.usd === undefined) setAmount((cur) => (cur === "" ? String(first.usd) : cur));
   }, [first?.usd, initiativeId]); // eslint-disable-line react-hooks/exhaustive-deps

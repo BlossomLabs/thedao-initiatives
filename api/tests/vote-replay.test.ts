@@ -134,7 +134,7 @@ Deno.test("the script and the API agree on the same fake chain", async () => {
   await h.settle();
   h.close();
   // What the site adds on top of the replay: its what-if searches.
-  const { next: _n, lead: _l, give: _g, ...live } = api.live;
+  const { next: _n, threat: _t, give: _g, ...live } = api.live;
   const { final: _f, ...rest } = api;
   const fromApi = { ...rest, live };
 
@@ -189,7 +189,7 @@ Deno.test("the script and the API agree once the API replays from a stored settl
   const api = await j(res) as Record<string, unknown> & { live: Record<string, unknown> };
   await h.settle();
   h.close();
-  const { next: _n, lead: _l, give: _g, ...live } = api.live;
+  const { next: _n, threat: _t, give: _g, ...live } = api.live;
   const { final: _f, ...rest } = api;
 
   const path = await manifestFile();

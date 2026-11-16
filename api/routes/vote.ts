@@ -14,10 +14,10 @@ import { chainStates, type StateSource } from "../../shared/vote/chain-states.ts
 import {
   finalWhatIfsAsync,
   giftGapsAsync,
-  liveLeadsAsync,
   type NextTier,
   nextTiersAsync,
 } from "../../shared/vote/next-tier.ts";
+import { type Threats, threatsAsync } from "../../shared/vote/threat.ts";
 import type { ChainInputs } from "../../shared/vote/chain.ts";
 import {
   type ChainState,
@@ -225,10 +225,10 @@ const inputsParts = (inp: ChainInputs) => [
   [...inp.withdrawn].sort((a, b) => a - b),
 ];
 
-/** The what-if search's own version, part of every cache digest: when the way gaps, leads or
+/** The what-if search's own version, part of every cache digest: when the way gaps, threats or
  * final figures are computed changes, bump it, and figures cached under the old code are
  * computed again instead of being served. */
-export const WHAT_IFS_VERSION = 7;
+export const WHAT_IFS_VERSION = 8;
 
 async function digest(parts: unknown[]) {
   const text = JSON.stringify(
@@ -264,14 +264,20 @@ const leadJson = (lead: Map<number, bigint>, slugs: string[]): Record<string, st
   Object.fromEntries(
     [...lead].filter(([, v]) => v > 0n).map(([c, v]) => [slugs[c], v.toString()]),
   );
+/** A checked donation elsewhere that pushes each one out, as JSON: micro-USD as a string,
+ * or null when none was found. Smaller threats can be missed; null does not mean safe. */
+const threatJson = (t: Threats, slugs: string[]): Record<string, string | null> =>
+  Object.fromEntries([...t].map(([c, v]) => [slugs[c], v === null ? null : v.toString()]));
+/** The searches a round runs in the background; tests replace one to make it fail. */
+export const voteSearches = { threats: threatsAsync };
 /** A finished search: the digest of its inputs, the open tier it looked from, and when,
- * with the leads of the initiatives in the tier settling now. */
+ * with the threats to the initiatives in the tier settling now. */
 type KnownNext = {
   key: string;
   firstOpen: number;
   at: number;
   next: NextJson;
-  lead?: Record<string, string>;
+  threat?: Record<string, string | null>;
   /** The donation that gets each initiative one tier higher. */
   give?: NextJson;
 };
@@ -445,7 +451,7 @@ export function voteRoutes(deps: Deps) {
   let lastNext: (KnownNext & { contract: string }) | null = null;
   let searching = false;
   const nextKey = (d: VoteRound) => [...round(d), "next"];
-  type Ahead = Pick<KnownNext, "key" | "next" | "lead" | "give">;
+  type Ahead = Pick<KnownNext, "key" | "next" | "threat" | "give">;
   /** The newest search known (this isolate's or the stored one) for the open tier
    * `firstOpen`, whichever inputs it ran on; none once no tier is open. */
   const knownNext = async (d: VoteRound, firstOpen: number | null, stored?: KnownNext | null) => {
@@ -477,13 +483,13 @@ export function voteRoutes(deps: Deps) {
       const work = (async () => {
         const slugs = d.manifest.slugs;
         const next = nextJson(await nextTiersAsync(liveInputs, firstOpen), slugs);
-        // How far ahead each initiative in the tier settling now is. A failed lead search
-        // still keeps the gaps.
-        let lead: Record<string, string> | undefined;
+        // What it takes to push out each initiative in the tier settling now. A failed
+        // threat search still keeps the gaps.
+        let threat: Record<string, string | null> | undefined;
         try {
-          lead = leadJson(await liveLeadsAsync(liveInputs, firstOpen), slugs);
+          threat = threatJson(await voteSearches.threats(liveInputs, firstOpen), slugs);
         } catch (e) {
-          deps.log(`vote lead: ${errorText(e)}`);
+          deps.log(`vote threat: ${errorText(e)}`);
         }
         // The donation that gets each initiative one tier higher; a failed search still
         // keeps the gaps.
@@ -498,7 +504,7 @@ export function voteRoutes(deps: Deps) {
           firstOpen,
           at: deps.now(),
           next,
-          ...(lead ? { lead } : {}),
+          ...(threat ? { threat } : {}),
           ...(give ? { give } : {}),
         };
         lastNext = { ...known, contract };
@@ -825,7 +831,7 @@ export function voteRoutes(deps: Deps) {
       live: {
         ...body.live,
         ...(ahead ? { next: ahead.next } : {}),
-        ...(ahead?.lead ? { lead: ahead.lead } : {}),
+        ...(ahead?.threat ? { threat: ahead.threat } : {}),
         ...(ahead?.give ? { give: ahead.give } : {}),
         ...(ahead && inputs && ahead.key !== inputs ? { aheadStale: true } : {}),
       },

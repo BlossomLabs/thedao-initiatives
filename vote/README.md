@@ -288,7 +288,7 @@ the site reads from the round's contract; `--site <url>` for another site).
 `--manifest <file>` replays another round (a manifest JSON), `--at <unix seconds>`
 replays it as of that time, and `--json` prints `{round, transcript, head}`: `round` is
 the replay part of `/api/vote/round`, all of it but the what-ifs the site adds
-(`live.next`, `live.lead`, `live.give` and `final`).
+(`live.next`, `live.threat` with `null` for no threat found, `live.give` and `final`).
 
 The transcript check proves that the ballots counted are exactly those the contract
 recorded: their number matches `recordCount`, their order and content match `transcript`,

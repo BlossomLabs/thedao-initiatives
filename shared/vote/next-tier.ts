@@ -200,7 +200,7 @@ const through = (all: Map<number, Entry[]>, first: number, c: number, target: nu
 
 /** Every open initiative below the tier settling now (`firstOpen`), as the live tally has
  * it: the donation that gets it one tier higher (into B-Tier when it isn't funded). Those
- * in the tier settling now have their lead instead (liveLeads). */
+ * in the tier settling now have their threat instead (shared/vote/threat.ts). */
 function* giftsSearch(
   inp: ChainInputs,
   firstOpen: number,
@@ -297,22 +297,6 @@ function* leadSearch(
     else hi = mid;
   }
   return lo * step;
-}
-
-function* liveLeadsSearch(
-  inp: ChainInputs,
-  firstOpen: number,
-  tally: Tally,
-): Generator<void, Map<number, bigint>> {
-  const out = new Map<number, bigint>();
-  if (firstOpen < 0 || firstOpen >= TIERS.length) return out;
-  const inTier = tally(inp, firstOpen, firstOpen + 1)[0].order;
-  yield;
-  for (const c of inTier) {
-    const lead = yield* leadSearch(inp, firstOpen, c, tally, FINE);
-    if (lead !== null) out.set(c, lead);
-  }
-  return out;
 }
 
 export type FinalWhatIfs = { next: Map<number, NextTier>; lead: Map<number, bigint> };
@@ -464,27 +448,6 @@ export function leadIn(
   tally: Tally = chainTally,
 ): bigint | null {
   return drive(leadSearch(inp, first, c, tally));
-}
-
-/** Open round: leads for the initiatives the live tally funds in the tier settling now
- * (`firstOpen`), judged on that tier: how much less backing they could have and stay
- * ($10 steps, rounded down). */
-export function liveLeads(
-  inp: ChainInputs,
-  firstOpen: number,
-  tally: Tally = chainTally,
-): Map<number, bigint> {
-  return drive(liveLeadsSearch(inp, firstOpen, tally));
-}
-
-/** `liveLeads`, yielding between tallies. */
-export function liveLeadsAsync(
-  inp: ChainInputs,
-  firstOpen: number,
-  tally: Tally = chainTally,
-  sliceMs = 0,
-): Promise<Map<number, bigint>> {
-  return driveAsync(liveLeadsSearch(inp, firstOpen, tally), sliceMs);
 }
 
 /** Closed round: tier k's initiatives (k ≥ 1) → gapTo tier k−1 judged at settleInputs[k−1];

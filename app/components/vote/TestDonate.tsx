@@ -25,7 +25,7 @@ const WAIT_MS = 3 * 60_000;
  * gas top-up when the wallet has none).
  */
 export default function TestDonate(
-  { slug, suggested = [], onAmount, onDonated, badge, accent = "green", cap }: {
+  { slug, suggested = [], onAmount, onDonated, badge, accent = "green", cap, preselect = true }: {
     slug: string;
     suggested?: Suggestion[];
     onAmount?: (usd: number) => void;
@@ -36,6 +36,8 @@ export default function TestDonate(
     accent?: "green" | "red";
     /** The most it can take: what the initiative still needs, as DonateWidget's. */
     cap?: Suggestion;
+    /** As DonateWidget's: false starts the field empty and a suggestion never fills it. */
+    preselect?: boolean;
   },
 ) {
   const red = accent === "red";
@@ -43,7 +45,7 @@ export default function TestDonate(
   const ensureChain = useEnsureVoteChain();
   const target = testDonation(ROUND, slug);
   const first = suggested[0];
-  const [amount, setAmount] = useState(first ? String(first.usd) : "");
+  const [amount, setAmount] = useState(preselect && first ? String(first.usd) : "");
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState<{ kind: "ok" | "err" | "wait"; text: string } | null>(
     null,
@@ -57,10 +59,10 @@ export default function TestDonate(
     suggestedFor.current = { slug, usd: first?.usd };
     if (was.slug !== slug) {
       setStatus(null);
-      if (first) setAmount(String(first.usd));
+      if (preselect && first) setAmount(String(first.usd));
       return;
     }
-    if (first && was.usd === undefined) {
+    if (preselect && first && was.usd === undefined) {
       setAmount((cur) => (cur === "" ? String(first.usd) : cur));
     }
   }, [first?.usd, slug]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -209,7 +209,7 @@ function LiveMovesEffect() {
 }
 
 function GapEffect() {
-  const [state, setState] = useState<"gap" | "smaller" | "lead">("gap");
+  const [state, setState] = useState<"gap" | "smaller" | "threat">("gap");
   const row = (title: string, figure: React.ReactNode) => (
     <div className="flex min-h-14 items-center gap-3 rounded-xl border border-white/[.08] bg-white/[.04] px-3.5 py-2.5">
       <span className="size-2 flex-none rounded-full bg-white/30" aria-hidden="true" />
@@ -222,14 +222,14 @@ function GapEffect() {
       title="A gap closes"
       where="What it takes to move up, on the vote results: a gap counts to its new amount; one a donation closes counts down to $0 and flips green."
       playLabel={state === "gap" ? "Close the gap" : "Reset"}
-      onPlay={() => setState((s) => (s === "gap" ? "lead" : "gap"))}
+      onPlay={() => setState((s) => (s === "gap" ? "threat" : "gap"))}
     >
       <div className="flex flex-col gap-1.5">
         {row(
           "Audit fund",
           <RowFigure
-            kind={state === "lead" ? "lead" : "gap"}
-            usd={state === "lead" ? 4_000 : state === "smaller" ? 3_000 : 9_000}
+            kind={state === "threat" ? "threat" : "gap"}
+            usd={state === "threat" ? 4_000 : state === "smaller" ? 3_000 : 9_000}
             to="A-Tier"
             name="A-Tier"
           />,

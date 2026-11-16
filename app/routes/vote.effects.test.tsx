@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { MemoryRouter } from "react-router";
 import { afterEach, expect, it, vi } from "vitest";
 import { confettiBurst } from "~/components/donate/Celebration";
+import { RowFigure } from "~/components/vote/GiveList";
 import VoteEffects from "./vote.effects";
 
 vi.mock("~/components/donate/Celebration", () => ({ confettiBurst: vi.fn() }));
@@ -34,6 +35,26 @@ function show() {
   );
 }
 const card = (name: string) => within(screen.getByRole("region", { name }));
+
+it("a green figure updates directly to the checked amount without counting through unchecked amounts", () => {
+  const frame = vi.spyOn(globalThis, "requestAnimationFrame");
+  try {
+    const { rerender, container } = render(
+      <RowFigure kind="threat" usd={12_340} name="S-Tier" />,
+    );
+    expect(container).toHaveTextContent("$12,340could push out");
+    rerender(<RowFigure kind="threat" usd={37_890} name="S-Tier" />);
+    expect(container).toHaveTextContent("$37,890could push out");
+    expect(frame).not.toHaveBeenCalled();
+    rerender(<RowFigure kind="threat" usd={null} name="S-Tier" />);
+    expect(container).toHaveTextContent("No threat found");
+    expect(container.querySelector("b")).toBeNull();
+    rerender(<RowFigure kind="threat" usd={undefined} name="S-Tier" />);
+    expect(container).toHaveTextContent("In S-Tier");
+  } finally {
+    frame.mockRestore();
+  }
+});
 
 it("every effect has its card and a button that plays it", () => {
   vi.useFakeTimers();

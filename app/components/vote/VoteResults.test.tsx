@@ -6,9 +6,11 @@ import { bytesToHex } from "viem";
 import { api } from "~/lib/api";
 import { confettiBurst } from "~/components/donate/Celebration";
 import { encodeBallot } from "../../../shared/vote/ballot";
-import VoteResults from "./VoteResults";
 import { ROUND } from "../../../shared/vote/manifest";
-import { liveInputsJson } from "../../../shared/vote/live-inputs";
+import VoteResults from "./VoteResults";
+import { liveInputsFrom, liveInputsJson } from "../../../shared/vote/live-inputs";
+import { withGift } from "../../../shared/vote/next-tier";
+import { jumps, threatOf } from "../../../shared/vote/threat";
 import { effectiveRanks } from "../../../vote/shared/ranks";
 
 vi.mock("../../../shared/vote/manifest", async (original) => ({
@@ -38,6 +40,7 @@ const boardCards = [
   { id: "A", slug: "alpha", title: "Alpha fuzzing", goalUsd: 60_000, total: 10_000 },
   { id: "B", slug: "beta", title: "Beta audits", goalUsd: 30_000, total: 0 },
   { id: "G", slug: "gamma", title: "Gamma outside", goalUsd: 10_000, total: 0 },
+  { id: "D", slug: "delta", title: "Delta reviews", goalUsd: 10_000, total: 0 },
 ].map((c) => ({
   initiative: {
     id: c.id,
@@ -163,7 +166,43 @@ vi.stubGlobal(
   },
 );
 
+// Green rows' jumps, held back while a test wants to see them being worked out.
+const jumpsGate = vi.hoisted(() => {
+  const gate = { wait: Promise.resolve(), release: () => {}, hold: () => {} };
+  gate.hold = () => {
+    gate.wait = new Promise<void>((r) => (gate.release = r));
+  };
+  return gate;
+});
+vi.mock("../../../shared/vote/threat", async (original) => {
+  const real = await original<typeof import("../../../shared/vote/threat")>();
+  return {
+    ...real,
+    jumpsAsync: async (...a: Parameters<typeof real.jumpsAsync>) => {
+      await jumpsGate.wait;
+      return real.jumpsAsync(...a);
+    },
+  };
+});
+afterEach(() => {
+  jumpsGate.release();
+  jumpsGate.wait = Promise.resolve();
+});
 afterEach(cleanup);
+// Some tests take Gamma and Delta into the round as well (`withFour`): back to two after.
+const roundTwo = { slugs: [...ROUND.slugs], projects: [...ROUND.projects] };
+afterEach(() => {
+  ROUND.slugs.splice(0, Infinity, ...roundTwo.slugs);
+  ROUND.projects.splice(0, Infinity, ...roundTwo.projects);
+});
+/** The round with Gamma and Delta in it too (initiatives 2 and 3). */
+function withFour() {
+  ROUND.slugs.push("gamma", "delta");
+  ROUND.projects.push(
+    { goalUsd: "10000000000", rfp: false, groups: [] },
+    { goalUsd: "10000000000", rfp: false, groups: [] },
+  );
+}
 
 const ballot = (t: Record<string, "S" | "A" | "B">) =>
   bytesToHex(encodeBallot(["alpha", "beta"], t));
@@ -543,17 +582,18 @@ const give = (over: Record<string, unknown> = {}) => ({
   moves: [],
   ...over,
 });
-/** An open round with `give` figures, and the leads of what the tier settling now funds. */
+/** An open round with `give` figures, and what one donation elsewhere takes to push each
+ * of those in the tier settling now out of it (`null`: no threat found). */
 function openWith(
   figures: Record<string, unknown> | undefined,
   live: Record<string, [number, "S" | "A" | "B"]> = { alpha: [50_000, "S"] },
   over: Record<string, unknown> = {},
-  lead?: Record<string, string>,
+  threat?: Record<string, string | null>,
 ) {
   const view = roundOf({ "1": ballot({ alpha: "S" }) }, live, over);
   return {
     ...view,
-    live: { ...view.live, ...(figures ? { give: figures } : {}), ...(lead ? { lead } : {}) },
+    live: { ...view.live, ...(figures ? { give: figures } : {}), ...(threat ? { threat } : {}) },
   };
 }
 const daoBallot = () => screen.getByRole("group", { name: /^TheDAO's ballot/ });
@@ -578,10 +618,11 @@ it("while open: TheDAO's ballot beside what it takes each initiative to move up"
   expect(row).toHaveTextContent("to S-Tier");
   expect(row).toHaveTextContent("not included");
   expect(within(row).getByText("not included").className).toContain("text-[#ff8a88]");
-  // Alpha, in S-Tier if it settled now, is in the list too, first: $4k ahead there.
+  // Alpha, in S-Tier if it settled now, is in the list too, first: $4k given to another
+  // initiative would push it out.
   const ahead = list().getByRole("button", { name: /Alpha fuzzing/ });
-  expect(ahead).toHaveTextContent("$4k");
-  expect(ahead).toHaveTextContent("$4kahead");
+  expect(ahead).toHaveTextContent("$4,000");
+  expect(ahead).toHaveTextContent("$4,000could push out");
   expect(ahead).not.toHaveTextContent("−");
   const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits/ });
   expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta "]);
@@ -892,17 +933,161 @@ it("a donation that changes nothing else has no link to who", async () => {
   expect(screen.queryByRole("button", { name: /other initiative/ })).toBeNull();
 });
 
-it("those ahead in the tier settling now come first, furthest ahead first", async () => {
+it("green rows show checked amounts, with no threat found last", async () => {
+  withFour();
   await showOpen(
-    openWith({ gamma: give() }, { alpha: [50_000, "S"], beta: [30_000, "S"] }, {}, {
+    openWith({}, { alpha: [20_000, "S"], beta: [20_000, "S"], gamma: [10_000, "S"] }, {}, {
+      alpha: usdMicro(12_000),
+      beta: usdMicro(1_000),
+      gamma: null,
+    }),
+  );
+  // Three: two show, the link shows the third.
+  fireEvent.click(await list().findByRole("button", { name: "Show all 3 in S-Tier" }));
+  const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits|Gamma/ });
+  expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Beta ", "Alpha", "Gamma"]);
+  expect(order[0]).toHaveTextContent("$1,000could push out");
+  expect(order[1]).toHaveTextContent("$12,000could push out");
+  expect(order[2]).toHaveTextContent("No threat found");
+  expect(order[2]).not.toHaveTextContent("ahead");
+  expect(order[2].querySelector("b")).toBeNull();
+});
+
+it("a green pill shows the checked amount without rounding it to an untested donation", async () => {
+  await showOpen(openWith({}, { alpha: [20_000, "S"] }, {}, { alpha: usdMicro(12_340) }));
+  const row = await list().findByRole("button", { name: /Alpha fuzzing/ });
+  expect(row).toHaveTextContent("$12,340could push out");
+  expect(row).not.toHaveTextContent("ahead");
+  fireEvent.click(row);
+  expect(screen.getByText((_, el) =>
+    el?.tagName === "P" &&
+    el.textContent!.startsWith("A donation of $12,340")
+  )).toHaveTextContent("Smaller threats may exist.");
+});
+
+/** Four initiatives in S-Tier if it settled now, each a donation elsewhere from out. */
+function fourGreen() {
+  withFour();
+  return openWith(
+    {},
+    {
+      alpha: [20_000, "S"],
+      beta: [20_000, "S"],
+      gamma: [10_000, "S"],
+      delta: [10_000, "S"],
+    },
+    {},
+    {
       alpha: usdMicro(1_000),
-      beta: usdMicro(12_000),
+      beta: usdMicro(2_000),
+      gamma: usdMicro(3_000),
+      delta: usdMicro(4_000),
+    },
+  );
+}
+const greenRows = () =>
+  list().queryAllByRole("button", { name: /Alpha fuzzing|Beta audits|Gamma|Delta/ });
+
+it("only two green rows show, with a link above them for the rest", async () => {
+  await showOpen(fourGreen());
+  await list().findByRole("button", { name: /Alpha fuzzing/ });
+  expect(greenRows().map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta "]);
+  const more = list().getByRole("button", { name: "Show all 4 in S-Tier" });
+  // Above the green rows.
+  expect(more.compareDocumentPosition(greenRows()[0]) & Node.DOCUMENT_POSITION_FOLLOWING)
+    .toBeTruthy();
+  fireEvent.click(more);
+  expect(greenRows()).toHaveLength(4);
+  fireEvent.click(list().getByRole("button", { name: "Show fewer" }));
+  expect(greenRows()).toHaveLength(2);
+  cleanup();
+  // Three: two show, and the link.
+  await showOpen(
+    openWith({}, { alpha: [20_000, "S"], beta: [20_000, "S"], gamma: [10_000, "S"] }, {}, {
+      alpha: usdMicro(1_000),
+      beta: usdMicro(2_000),
+      gamma: usdMicro(3_000),
+    }),
+  );
+  await list().findByRole("button", { name: "Show all 3 in S-Tier" });
+  expect(greenRows().map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta "]);
+  cleanup();
+  // Two or fewer: all of them, no link.
+  await showOpen(
+    openWith({}, { alpha: [20_000, "S"], beta: [20_000, "S"] }, {}, {
+      alpha: usdMicro(1_000),
+      beta: usdMicro(2_000),
     }),
   );
   await list().findByRole("button", { name: /Beta audits/ });
-  const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits/ });
-  expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Beta ", "Alpha"]);
-  expect(order[0]).toHaveTextContent("$12k");
+  expect(greenRows()).toHaveLength(2);
+  expect(list().queryByRole("button", { name: /^Show / })).toBeNull();
+});
+
+it("an open green row stays visible while the rest are collapsed", async () => {
+  await showOpen(fourGreen());
+  fireEvent.click(await list().findByRole("button", { name: "Show all 4 in S-Tier" }));
+  fireEvent.click(list().getByRole("button", { name: /Delta reviews/ }));
+  fireEvent.click(list().getByRole("button", { name: "Show fewer" }));
+  expect(greenRows().map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta ", "Delta"]);
+});
+
+it("a filter shows every matching green row", async () => {
+  await showOpen(fourGreen());
+  await list().findByRole("button", { name: "Show all 4 in S-Tier" });
+  // Every title has an "a".
+  fireEvent.change(list().getByRole("searchbox"), { target: { value: "a" } });
+  await waitFor(() => expect(greenRows()).toHaveLength(4));
+  expect(list().queryByRole("button", { name: /^Show / })).toBeNull();
+});
+
+it("an open green row's sentence", async () => {
+  await showOpen(
+    openWith({}, { alpha: [20_000, "S"], beta: [20_000, "S"] }, {}, {
+      alpha: usdMicro(1_000),
+      beta: null,
+    }),
+  );
+  const sentence = (start: string) =>
+    screen.getAllByText((_, el) => el?.tagName === "P" && el.textContent!.startsWith(start));
+  fireEvent.click(await list().findByRole("button", { name: /Alpha fuzzing/ }));
+  const [one] = sentence("A donation of $1,000");
+  expect(one).toHaveTextContent(
+    "A donation of $1,000 to another initiative could push it out of S-Tier if the vote ended now.",
+  );
+  expect(one).not.toHaveTextContent("Beta");
+  fireEvent.click(list().getByRole("button", { name: /Beta audits/ }));
+  const [noThreat] = sentence("No threat found");
+  expect(noThreat).toHaveTextContent(
+    "No threat found from donations elsewhere to push it out of S-Tier now. Other amounts may still do so.",
+  );
+  expect(noThreat).not.toHaveTextContent("Alpha");
+  expect(noThreat).not.toHaveTextContent(/safe|No single donation/);
+  expect(one).toHaveTextContent("Smaller threats may exist.");
+});
+
+it("a missing green figure stays distinct from no threat found and makes no risk claim", async () => {
+  withFour();
+  await showOpen(
+    openWith({}, { alpha: [20_000, "S"], beta: [20_000, "S"], gamma: [10_000, "S"] }, {}, {
+      alpha: usdMicro(1_000),
+      beta: null,
+    }),
+  );
+  fireEvent.click(await list().findByRole("button", { name: "Show all 3 in S-Tier" }));
+  const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits|Gamma/ });
+  expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta ", "Gamma"]);
+  expect(order[2]).toHaveTextContent("In S-Tier");
+  expect(order[2]).not.toHaveTextContent("safe");
+  expect(order[2]).not.toHaveTextContent("ahead");
+  fireEvent.click(order[2]);
+  const [p] = screen.getAllByText((_, el) =>
+    el?.tagName === "P" && el.textContent!.startsWith("In S-Tier")
+  );
+  expect(p).toHaveTextContent(
+    "In S-Tier if it settled now. A donation lowers what it asks of the pool.",
+  );
+  expect(p).not.toHaveTextContent("with little to spare");
 });
 
 /** The live tally's inputs for the test round: Alpha ($50K) and Beta ($30K), one voter
@@ -929,10 +1114,13 @@ it("with the tally's inputs, any amount is previewed: money freed brings another
   await showOpen({ ...view, live: { ...view.live, inputs: inputsFor([50, 30]) } });
   fireEvent.click(await list().findByRole("button", { name: /Alpha fuzzing/ }));
   const amount = await screen.findByRole("spinbutton", { name: "Amount" });
-  // $5K frees too little: it only asks the pool for less.
+  // $5K frees too little: it only asks the pool for less (and Alpha, in S-Tier, has no threat found).
   fireEvent.change(amount, { target: { value: "5000" } });
-  expect(await screen.findByText("It asks the pool for $5,000 less. Nothing else changes."))
-    .toBeInTheDocument();
+  expect(
+    await screen.findByText(
+      "It asks the pool for $5,000 less. No threat found after this donation; other amounts elsewhere may still push it out.",
+    ),
+  ).toBeInTheDocument();
   // $20K frees enough for Beta ($30K) to come in.
   fireEvent.change(amount, { target: { value: "20000" } });
   // Said once, above TheDAO's ballot, beside its preview (not again under the form).
@@ -1242,15 +1430,17 @@ describe("while the page is open", () => {
     }
   });
 
-  it("a gap a donation closes counts down, then flips to how far ahead it is", async () => {
+  it("a gap a donation closes counts down, then flips to its checked threat", async () => {
     const next = await live(openWith({ alpha: give() }, {}));
     const alpha = () => list().getByRole("button", { name: /Alpha fuzzing/ });
     await waitFor(() => expect(alpha()).toHaveTextContent("−$9k"));
     await next(openWith({}, { alpha: [50_000, "S"] }, {}, { alpha: usdMicro(4_000) }));
     // Still red on its way down to $0, then green.
     expect(alpha().querySelector("[data-figure]")).toHaveAttribute("data-figure", "gap");
-    await waitFor(() => expect(alpha()).toHaveTextContent("$4kahead"), { timeout: 3000 });
-    expect(alpha().querySelector("[data-figure]")).toHaveAttribute("data-figure", "lead");
+    await waitFor(() => expect(alpha()).toHaveTextContent("$4,000could push out"), {
+      timeout: 3000,
+    });
+    expect(alpha().querySelector("[data-figure]")).toHaveAttribute("data-figure", "threat");
   });
 
   it("the vote finishing: gold, no confetti (that's for donations)", async () => {
@@ -1285,5 +1475,178 @@ describe("while the page is open", () => {
     await showClosed();
     expect(confettiBurst).not.toHaveBeenCalled();
     expect(document.querySelector("[data-finished]")).toBeNull();
+  });
+});
+
+describe("an open green row's jumps (worked out on the page from the tally's inputs)", () => {
+  const K = 1_000_000_000n;
+  /** Four in the round, both voters placing all four in S-Tier: Gamma ($30K) is in S-Tier
+   * with a number, Delta ($20K) is in it with no threat found, Alpha and Beta ($40K) don't fit. */
+  function greenInputs(weightsK: [number, number] = [25, 25], deltaK = 20) {
+    const ballots = [[1, 1, 1, 1], [1, 1, 1, 1]];
+    return liveInputsJson({
+      m: 4,
+      costs: [40, 40, 30, deltaK].map((k) => BigInt(k) * K),
+      voters: ["1", "2"],
+      weights: weightsK.map((w) => BigInt(w) * K),
+      ranks: ballots.map((b) => effectiveRanks(b, 4)),
+      ballots,
+      poolUsd: 60n * K,
+      spent: 0n,
+      done: new Set(),
+      withdrawn: new Set(),
+    }, 0);
+  }
+  /** The round view serving those inputs: Gamma and Delta in S-Tier, Gamma's number served. */
+  function greenRound(inputs = greenInputs()) {
+    if (ROUND.slugs.length === 2) withFour();
+    const view = openWith(
+      {},
+      { gamma: [30_000, "S"], delta: [20_000, "S"] },
+      { asks: [40_000, 40_000, 30_000, 20_000].map(usdMicro) },
+      { gamma: usdMicro(10_000), delta: null },
+    );
+    return { ...view, live: { ...view.live, inputs } };
+  }
+  /** Gamma's chips as the page should label them, from `jumps()` on the same inputs. */
+  const expectedChips = (inputs: ReturnType<typeof greenInputs>) => {
+    const { inp, first } = liveInputsFrom(inputs);
+    return jumps(inp, first, 2).map((j) => {
+      const usd = Number(j.usd / 1_000_000n);
+      const t = j.threat === null ? null : Number(j.threat / 1_000_000n);
+      return `$${usd} ${
+        t === null ? "No threat found" : `$${t.toLocaleString("en-US")} threat found`
+      }`;
+    });
+  };
+  const chips = () =>
+    within(screen.getByRole("list", { name: "Suggested amounts" })).queryAllByRole("listitem")
+      .map((li) => li.textContent);
+  const WORKING = "Working out what a donation does…";
+  const TYPED_WORKING = "Working out what it does…";
+  const gammaRow = () => list().findByRole("button", { name: /Gamma outside/ });
+  const pause = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));
+
+  it("an open green row suggests the donations at which its number jumps", async () => {
+    const want = expectedChips(greenInputs());
+    expect(want).toEqual(["$1000 $11,000 threat found", "$10000 No threat found"]);
+    jumpsGate.hold();
+    await showOpen(greenRound());
+    fireEvent.click(await gammaRow());
+    // Opened while the work is still under way: the usual chips, and a line saying so.
+    expect(screen.getByText(WORKING)).toBeInTheDocument();
+    expect(chips()).toEqual([]);
+    jumpsGate.release();
+    await waitFor(() => expect(chips()).toEqual(want));
+    expect(screen.queryByText(WORKING)).toBeNull();
+    // The cap stays: what it still needs.
+    expect(document.querySelector("[data-cap]")).toHaveTextContent("$30000 to be funded");
+  });
+
+  it("the two visible green rows are worked out before anything is opened", async () => {
+    await showOpen(greenRound());
+    await gammaRow();
+    // The page works them out with nothing open.
+    await pause(300);
+    fireEvent.click(await gammaRow());
+    expect(screen.queryByText(WORKING)).toBeNull();
+    expect(chips()).toEqual(expectedChips(greenInputs()));
+  });
+
+  it("a row with no threat found has no jump chips", async () => {
+    await showOpen(greenRound());
+    fireEvent.click(await list().findByRole("button", { name: /Delta reviews/ }));
+    expect(chips()).toEqual([]);
+    expect(screen.queryByText(WORKING)).toBeNull();
+    expect(document.querySelector("[data-cap]")).toHaveTextContent("$20000 to be funded");
+  });
+
+  it("jump chips are worked out again when the round's inputs change", async () => {
+    const qc = new QueryClient();
+    vi.mocked(api).mockResolvedValue(greenRound());
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <VoteResults />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await gammaRow());
+    await waitFor(() => expect(chips()).toEqual(expectedChips(greenInputs())));
+    // Somebody voted: new figures, new chips.
+    const next = greenInputs([30, 30], 25);
+    const want = expectedChips(next);
+    expect(want).not.toEqual(expectedChips(greenInputs()));
+    vi.mocked(api).mockResolvedValue(greenRound(next));
+    await act(() => qc.invalidateQueries());
+    await waitFor(() => expect(chips()).toEqual(want));
+  });
+
+  it("closing a green row stops its work", async () => {
+    const error = vi.spyOn(console, "error");
+    try {
+      jumpsGate.hold();
+      await showOpen(greenRound());
+      const row = await gammaRow();
+      fireEvent.click(row);
+      expect(screen.getByText(WORKING)).toBeInTheDocument();
+      fireEvent.click(row);
+      jumpsGate.release();
+      await pause(300);
+      expect(screen.queryByRole("list", { name: "Suggested amounts" })).toBeNull();
+      expect(screen.queryByText(WORKING)).toBeNull();
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it("a typed amount on a green row says the new number", async () => {
+    await showOpen(greenRound());
+    fireEvent.click(await gammaRow());
+    const { inp, first } = liveInputsFrom(greenInputs());
+    const after = threatOf(withGift(inp, 2, 2000n * 1_000_000n), first, 2);
+    const line = after === null
+      ? "It asks the pool for $2,000 less. No threat found after this donation; other amounts elsewhere may still push it out."
+      : `It asks the pool for $2,000 less. A donation of ${
+        "$" + Number(after! / 1_000_000n).toLocaleString("en-US")
+      } elsewhere could then push it out. Smaller threats may exist.`;
+    fireEvent.change(await screen.findByRole("spinbutton", { name: "Amount" }), {
+      target: { value: "2000" },
+    });
+    // While it is worked out, the line says so.
+    expect(screen.getByText(TYPED_WORKING)).toBeInTheDocument();
+    expect(await screen.findByText(line, {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.queryByText(TYPED_WORKING)).toBeNull();
+    // Cleared, then the same amount again: the same line at once.
+    const amount = screen.getByRole("spinbutton", { name: "Amount" });
+    fireEvent.change(amount, { target: { value: "" } });
+    expect(screen.queryByText(line)).toBeNull();
+    await pause(500);
+    fireEvent.change(amount, { target: { value: "2000" } });
+    expect(screen.getByText(line)).toBeInTheDocument();
+  });
+
+  it("no number for a blank, mistyped or covering amount", async () => {
+    await showOpen(greenRound());
+    fireEvent.click(await gammaRow());
+    const amount = await screen.findByRole("spinbutton", { name: "Amount" });
+    const said = () => screen.queryByText(/It asks the pool for|Working out what it does/);
+    for (const value of ["", "abc"]) {
+      fireEvent.change(amount, { target: { value } });
+      await pause(500);
+      expect(said()).toBeNull();
+    }
+    // Its whole ask: covered by donations, in no tier, no number.
+    fireEvent.change(amount, { target: { value: "30000" } });
+    expect(
+      await screen.findByText((_, el) =>
+        el?.tagName === "P" &&
+        /^With your \$30,000, Gamma outside is covered by donations/.test(el.textContent ?? "")
+      ),
+    ).toBeInTheDocument();
+    await pause(500);
+    expect(said()).toBeNull();
+    expect(screen.queryByText(/elsewhere could then push it out/)).toBeNull();
   });
 });

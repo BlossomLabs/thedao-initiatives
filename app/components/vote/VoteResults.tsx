@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import RoundBox from "./RoundBox";
 import DaoBallot, { daoResult, type SettledTier } from "./DaoBallot";
@@ -12,6 +12,7 @@ import PageMain from "~/components/layout/PageMain";
 import ScrollAside from "~/components/layout/ScrollAside";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { boardKey, useBoard } from "~/hooks/use-board";
+import { useThreatJumps } from "~/hooks/use-threat-jumps";
 import {
   askOf,
   coveredProjects,
@@ -28,10 +29,21 @@ import { poolEstimated, poolName, poolNoteText } from "~/components/vote/pool";
 import { dollars as dollarsFull } from "~/components/vote/FinalTiers";
 import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
 import { chainTally } from "../../../shared/vote/chain";
-import { liveInputsFrom } from "../../../shared/vote/live-inputs";
+import { liveInputsFrom, type LiveInputsJson } from "../../../shared/vote/live-inputs";
 import { FINE, giftEffect, giftGapTo, liveTiers } from "../../../shared/vote/next-tier";
 
 const POLL_MS = 5_000;
+/** How long typing pauses before a typed amount's number is worked out, ms. */
+const TYPED_PAUSE_MS = 400;
+
+/** A short name for the live tally's inputs: any change in them changes it (FNV-1a over
+ * their JSON, with its length). */
+function inputsKey(inputs: LiveInputsJson): string {
+  const s = JSON.stringify(inputs);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+  return `${s.length}:${(h >>> 0).toString(36)}`;
+}
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 /** Voters should expect B-Tier may be empty: it only funds what the pool has left. Said
@@ -51,8 +63,8 @@ const TIER_B_NOTE = " · B-Tier: nothing funded yet, the pool may not reach it."
  *
  * While the vote is open: TheDAO's ballot (what the vote would fund if it ended now) beside
  * every open initiative: what a donation takes to move it up a tier (or, in the tier
- * settling now, how far ahead it is), with the donate form, whose donation is previewed on
- * TheDAO's ballot. Once closed: the board, limited to the
+ * settling now, what a donation elsewhere takes to push it out), with the donate form,
+ * whose donation is previewed on TheDAO's ballot. Once closed: the board, limited to the
  * round's initiatives, as the final result. */
 /** What a donation does to the open tiers, if the vote ended now: where the initiative
  * lands (null: not funded), and who else comes in, drops out or moves. */
@@ -148,12 +160,13 @@ export default function VoteResults(
   const give = rv?.live.give;
   const covered = useMemo(() => coveredProjects(rv?.tiers ?? [], rv?.live.covered), [rv]);
   const withdrawn = useMemo(() => withdrawnProjects(rv?.tiers ?? [], rv?.live.withdrawn), [rv]);
-  const lead = rv?.live.lead;
+  // In the tier settling now: what one donation elsewhere takes to push each out of it.
+  const threat = rv?.live.threat;
   // Each initiative's ask is the chain's, served with the round (none while it's unknown,
   // or served short).
   const asks = servedAsks(R, rv?.asks);
   // Every open initiative: below the tier settling now, the donation that moves it up a
-  // tier; in it, how far ahead it is.
+  // tier; in it, what a donation to another initiative takes to push it out.
   const rows = useMemo<GiveRow[] | undefined>(() => {
     if (!give) return undefined;
     const bySlug = new Map(cards.map((c) => [c.initiative.slug, c]));
@@ -168,16 +181,16 @@ export default function VoteResults(
     const ahead = [...result.provisional].flatMap((slug) => {
       const card = bySlug.get(slug);
       if (!card || give[slug] || coveredNow.has(slug) || result.tiers[slug] !== tier) return [];
-      const l = lead?.[slug];
+      const t = threat?.[slug];
       return [{
         card,
         askUsd: askOf(R, asks, slug),
-        lead: l ? dollars(l) : 0,
+        threat: t === undefined ? undefined : t === null ? null : dollars(t),
         now: tier,
       }];
     });
     return [...ahead, ...below];
-  }, [give, lead, cards, result, tier, R, asks, covered, withdrawn]);
+  }, [give, threat, cards, result, tier, R, asks, covered, withdrawn]);
 
   // The initiative open in the list, and the amount in its donate form.
   const [open, setOpen] = useState<string>();
@@ -361,10 +374,94 @@ export default function VoteResults(
       )
       : <>With your {usd(previewUsd)}, {named(subject)} asks the pool for less</>
   );
+  // An open green row: the donations at which its number jumps, worked out ahead of a
+  // click (the green rows shown first, in the order the list reports), and a typed
+  // amount's number once typing pauses. Rows with no threat found have no suggestions.
+  const [greenOrder, setGreenOrder] = useState<{ visible: string[]; rest: string[] }>({
+    visible: [],
+    rest: [],
+  });
+  const onGreenOrder = useCallback(
+    (visible: string[], rest: string[]) => setGreenOrder({ visible, rest }),
+    [],
+  );
+  const figures = useMemo(() => liveInputs && inputsKey(liveInputs), [liveInputs]);
+  const rowOf = (slug: string) => rows?.find((r) => r.card.initiative.slug === slug);
+  const workable = (slug: string) => {
+    const r = rowOf(slug);
+    return r !== undefined && !r.entry && r.threat !== null;
+  };
+  const indices = (slugs: string[]) =>
+    slugs.filter(workable).map((s) => R.slugs.indexOf(s)).filter((c) => c >= 0);
+  const openGreen = open !== undefined && rowOf(open) !== undefined && !rowOf(open)!.entry;
+  const openC = openGreen ? R.slugs.indexOf(open!) : -1;
+  // The amount in whole dollars, below the row's whole ask (all of it: covered, no number).
+  const whole = Math.round(given);
+  const typedNow = openGreen && liveRun && openC >= 0 && whole > 0 &&
+      BigInt(whole) * 1_000_000n < liveRun.inp.costs[openC]
+    ? { c: openC, given: whole }
+    : undefined;
+  // Sent once typing pauses; a new amount stops the work on the last one at once.
+  const [typedSent, setTypedSent] = useState<{ c: number; given: number }>();
+  useEffect(() => {
+    setTypedSent(undefined);
+    if (!typedNow) return;
+    const t = setTimeout(() => setTypedSent(typedNow), TYPED_PAUSE_MS);
+    return () => clearTimeout(t);
+  }, [typedNow?.c, typedNow?.given]); // eslint-disable-line react-hooks/exhaustive-deps
+  const worked = useThreatJumps({
+    key: figures,
+    inputs: liveInputs,
+    open: openGreen && workable(open!) && openC >= 0 ? openC : undefined,
+    visible: indices(greenOrder.visible),
+    rest: indices(greenOrder.rest),
+    typed: typedSent,
+  });
+  // Typed numbers worked out on these figures, kept: an amount typed again (cleared, then
+  // the same) shows its line at once, though the work isn't done again.
+  const typedSeen = useRef({ key: figures, at: new Map<string, number | null | undefined>() });
+  if (typedSeen.current.key !== figures) typedSeen.current = { key: figures, at: new Map() };
+  if (worked.typed) {
+    typedSeen.current.at.set(`${worked.typed.c}:${worked.typed.given}`, worked.typed.threat);
+  }
+  const typedKey = typedNow && `${typedNow.c}:${typedNow.given}`;
+  const typedKnown = typedKey !== undefined && typedSeen.current.at.has(typedKey);
+  const typedThreat = typedKnown ? typedSeen.current.at.get(typedKey!) : undefined;
+  const jumpsBySlug = useMemo(
+    () =>
+      liveInputs
+        ? new Map([...worked.jumps].map(([c, js]) => [R.slugs[c], js] as const))
+        : undefined,
+    [worked.jumps, liveInputs, R],
+  );
+  /** On an open green row, under the form: what the amount does to its number (none when
+   * the row isn't green after it, or the asks are unknown). */
+  const greenLine = open && typedNow && askOf(R, asks, open) !== undefined &&
+    !(typedKnown && typedThreat === undefined) && (
+    <p className="m-0 rounded-lg bg-white/[.07] px-3 py-2 text-[13px] leading-snug text-white/80">
+      {!typedKnown ? "Working out what it does…" : typedThreat === null
+        ? (
+          <>
+            It asks the pool for {usd(given)}{" "}
+            less. No threat found after this donation; other amounts elsewhere may still push it
+            out.
+          </>
+        )
+        : (
+          <>
+            It asks the pool for {usd(given)} less. A donation of {usd(typedThreat!)}{" "}
+            elsewhere could then push it out. Smaller threats may exist.
+          </>
+        )}
+    </p>
+  );
   // Under the form only when the amount changes nothing on TheDAO's ballot: what it does
-  // is said above the tier table, beside its preview.
+  // is said above the tier table, beside its preview. On a green row, its number is said
+  // here either way.
   const effect = open && given > 0 && (
-    preview
+    greenLine
+      ? greenLine
+      : preview
       ? null
       : entry && gap !== null && given < gap
       ? (
@@ -550,6 +647,8 @@ export default function VoteResults(
               aiAuto: board.data?.flags.aiSearchAuto,
             }}
             steps={steps}
+            onGreenOrder={onGreenOrder}
+            jumps={jumpsBySlug}
           />
         </div>
         <PledgeBand />

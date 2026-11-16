@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import BoardSearch from "~/components/board/BoardSearch";
 import CategoryFilter from "~/components/board/filters/CategoryFilter";
 import { DonateStandIn } from "~/components/board/InitiativeCard";
+import type { Suggestion } from "~/components/donate/DonateWidget";
 import { type BoardView, DEFAULT_VIEW, facetCounts, isFiltered, matches } from "~/lib/board-view";
 import CategoryDot from "~/components/ui/CategoryDot";
 import Reveal from "~/components/ui/Reveal";
@@ -11,6 +12,7 @@ import type { Card } from "~/lib/api-types";
 import { usd, usd2, usdShortUp } from "~/lib/format";
 import { lazyPart } from "~/lib/lazy-part";
 import { cn } from "~/lib/utils";
+import type { JumpUsd } from "~/lib/threat-queue";
 import { dollars } from "~/lib/vote-results";
 import type { AiSearchResult } from "../../../shared/ai-search";
 import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
@@ -31,11 +33,20 @@ export type GiveRow = {
   askUsd?: number;
   /** Below the tier settling now: the donation that moves it up a tier. */
   entry?: NextTierEntry;
-  /** In the tier settling now: how far ahead it is, in whole dollars (0: barely). */
-  lead?: number;
+  /** In the tier settling now: a checked donation elsewhere that pushes it out, in
+   * whole dollars. Null means none found, not safe; absent while not known. */
+  threat?: number | null;
   /** Where TheDAO's ballot has it now, if anywhere. */
   now?: Tier;
 };
+
+/** How many green rows show while the list is unfiltered and not expanded. */
+const GREEN_SHOWN = 2;
+
+/** Green rows' order: smallest checked threat first, then none found, then unknown
+ * (two unknown: Infinity − Infinity is NaN, read as a tie). */
+const threatRank = (r: GiveRow) =>
+  r.threat === undefined ? Infinity : r.threat === null ? Number.MAX_VALUE : r.threat;
 
 /** The gap in whole dollars; null when no donation alone gets it there. */
 export const gapUsd = (e: NextTierEntry) => (e.gap === null ? null : dollars(e.gap));
@@ -112,14 +123,14 @@ function useCountTo(target: number, ms: number): number {
 }
 
 /**
- * A row's figure: the red gap to the next tier ("−$9k to A-Tier"), or how far ahead it is
- * in the tier settling now (green, "$4k ahead"). A new value counts to itself; a gap a
- * donation closes counts down to $0, then flips over to green.
+ * A row's figure: the red gap to the next tier or a checked green threat. Red gaps count
+ * to their new value; a closed gap counts down to $0, then flips green. Green figures
+ * show the full checked amount directly: intermediate amounts are not verified threats.
  */
 export function RowFigure(
   { kind, usd: value, to, name }: {
-    kind: "gap" | "lead";
-    usd: number;
+    kind: "gap" | "threat";
+    usd: number | null | undefined;
     /** The tier the gap is to. */
     to?: string;
     /** The tier settling now. */
@@ -149,7 +160,7 @@ export function RowFigure(
     setFlip((f) => f + 1);
     setView({ kind, value });
   }, [kind, value]);
-  const n = useCountTo(view.value, COUNT_MS);
+  const n = useCountTo(view.value ?? 0, view.kind === "gap" ? COUNT_MS : 0);
   const money = (up: boolean) => (n > 0.5 ? usd2(n, up) : "$0");
   return (
     <span
@@ -173,7 +184,7 @@ export function RowFigure(
         )
         : (
           <>
-            {view.value > 0 && (
+            {typeof view.value === "number" && (
               <b
                 key={flip}
                 className={cn(
@@ -181,14 +192,18 @@ export function RowFigure(
                   flip > 0 && "motion-safe:animate-figure-flip",
                 )}
               >
-                {money(false)}
+                {usd(view.value)}
               </b>
             )}
             {
               // The words after the pill keep one width, so every pill lines up.
             }
-            <small className="w-[46px] text-[12px] text-[#a7e3a5]">
-              {view.value > 0 ? "ahead" : `In ${name}`}
+            <small className="w-[64px] whitespace-normal text-[12px] leading-tight text-[#a7e3a5]">
+              {view.value === undefined
+                ? `In ${name}`
+                : view.value === null
+                ? "No threat found"
+                : "could push out"}
             </small>
           </>
         )}
@@ -220,7 +235,9 @@ function KnockOnList(
 
 /**
  * The vote results' call to action: every open initiative. Those in the tier settling now
- * first, furthest ahead first, with how far ahead they are (green); then the rest,
+ * first, smallest checked threat first, with a donation elsewhere that could push each
+ * out (green; "No threat found" when the search found none). Only two show unless the list is
+ * filtered, expanded or one of the others is open. Then the rest,
  * closest first, with what a donation would take to move each up a tier, into B-Tier
  * when it isn't funded (a red number: money missing). Opening one shows the donate form, starting from that amount;
  * what it would change is previewed on TheDAO's ballot beside it. Those no donation alone
@@ -242,6 +259,8 @@ export default function GiveList(
     yours,
     search = {},
     steps,
+    onGreenOrder,
+    jumps,
   }: {
     /** The tier settling now. */
     tier: Tier;
@@ -270,10 +289,18 @@ export default function GiveList(
     /** For the open row, when the page could work them out: the donation that gets it
      * into each tier above it, lowest first. The donate form suggests them all. */
     steps?: { usd: number; tier: Tier }[];
+    /** The green rows shown and the others (slugs, each in display order), each time
+     * either changes: the page works out their jumps in that order. */
+    onGreenOrder?: (visible: string[], rest: string[]) => void;
+    /** Green rows' jumps on the current figures, by slug: the donate form suggests them.
+     * A green row absent from it is still being worked out; undefined when the page can't
+     * work them out (no tally inputs). */
+    jumps?: Map<string, JumpUsd[]>;
   },
 ) {
   const name = tierName(tier);
   const [showFar, setShowFar] = useState(false);
+  const [showGreen, setShowGreen] = useState(false);
   /** The row whose "moves N other initiatives" list is open. */
   const [knock, setKnock] = useState<string>();
   // The ballot editor's search (keywords, or AI) and category filter, over the list.
@@ -294,14 +321,33 @@ export default function GiveList(
   const titleOf = (slug: string) => titles.get(slug) ?? slug;
   const counts = useMemo(() => facetCounts(all.map((r) => r.card), shownView), [all, shownView]);
   const filtered = isFiltered(shownView);
+  // AI asked as the visitor types: about to filter, so the green rows don't fold meanwhile.
+  const aiAsking = Boolean(search.aiAuto && asking);
   const found = all.filter((r) => matches(r.card, shownView));
   // Closest first; with the AI order on, the best matches first.
   const score = new Map(aiResult?.scores.map(({ id, score }) => [id, score]) ?? []);
   const of = (r: GiveRow) => score.get(r.card.initiative.id) ?? -1;
-  // In the tier settling now: the furthest ahead first, down to the closest to dropping
-  // out, then (below them) those closest to coming in.
+  // In the tier settling now: smallest checked threat first, then none found, then
+  // (below them) those closest to coming in.
   const ahead = found.filter((r) => !r.entry)
-    .sort((a, b) => ai ? of(b) - of(a) : (b.lead ?? 0) - (a.lead ?? 0));
+    .sort((a, b) => ai ? of(b) - of(a) : threatRank(a) - threatRank(b) || 0);
+  // Unfiltered, two green rows show (and the open one); a link above them shows the rest.
+  const greenFold = !filtered && !ai && !aiAsking && ahead.length > GREEN_SHOWN;
+  const green = greenFold && !showGreen
+    ? ahead.filter((r, k) => k < GREEN_SHOWN || r.card.initiative.slug === open)
+    : ahead;
+  // The page works out the green rows shown first, then the others, closest first.
+  const greenShown = new Set(green.map((r) => r.card.initiative.slug));
+  const visibleKey = [...greenShown].join("\n");
+  const restKey = all.filter((r) => !r.entry && !greenShown.has(r.card.initiative.slug))
+    .sort((a, b) => threatRank(a) - threatRank(b) || 0)
+    .map((r) => r.card.initiative.slug).join("\n");
+  const onGreenOrderRef = useRef(onGreenOrder);
+  onGreenOrderRef.current = onGreenOrder;
+  useEffect(() => {
+    const split = (k: string) => (k ? k.split("\n") : []);
+    onGreenOrderRef.current?.(split(visibleKey), split(restKey));
+  }, [visibleKey, restKey]);
   const near = found.filter((r) => rowGap(r) !== null)
     .sort((a, b) => ai ? of(b) - of(a) : rowGap(a)! - rowGap(b)!);
   const far = found.filter((r) => r.entry && r.entry.gap === null)
@@ -309,8 +355,8 @@ export default function GiveList(
       ai ? of(b) - of(a) : a.card.initiative.title.localeCompare(b.card.initiative.title)
     );
   const shown = showFar || far.some((r) => r.card.initiative.slug === open)
-    ? [...ahead, ...near, ...far]
-    : [...ahead, ...near];
+    ? [...green, ...near, ...far]
+    : [...green, ...near];
 
   return (
     <section aria-labelledby="give-heading" className="min-w-0">
@@ -323,8 +369,8 @@ export default function GiveList(
       <p className="m-0 mt-1.5 text-[14px] leading-snug text-white/65">
         {name}{" "}
         is the tier settling now. Donations count in the next tally: the red number is what each
-        initiative still misses to move up a tier if the vote ended now; the green one, how far
-        ahead those in {name} are.
+        initiative still misses to move up a tier if the vote ended now. A green number is a
+        donation elsewhere that could push it out of {name}. Smaller threats may exist.
       </p>
       {rows !== undefined && rows.length > 0 && (
         <div className="mt-4">
@@ -363,6 +409,19 @@ export default function GiveList(
           Something changed on-chain: these figures are being updated.
         </p>
       )}
+      {
+        // More than two green rows, unfiltered: a link above them to show them all.
+        greenFold && (
+          <button
+            type="button"
+            aria-expanded={showGreen}
+            onClick={() => setShowGreen(!showGreen)}
+            className="mt-3 cursor-pointer px-1 text-[13px] text-white/55 underline-offset-2 hover:text-white hover:underline"
+          >
+            {showGreen ? "Show fewer" : `Show all ${ahead.length} in ${name}`}
+          </button>
+        )
+      }
       {rows === undefined
         ? <p className="mt-5 text-[14px] text-white/55">Working out what each initiative needs…</p>
         : rows.length === 0
@@ -401,6 +460,30 @@ export default function GiveList(
                   label: "to be funded",
                 }
                 : undefined;
+              // A green row: the donations at which its number jumps, once worked out (a
+              // row with no threat found has none). A red row: what gets it into each tier above it.
+              const rowJumps = r.entry ? undefined : jumps?.get(i.slug);
+              const working = !r.entry && r.threat !== null && jumps !== undefined &&
+                rowJumps === undefined;
+              const suggested: Suggestion[] | undefined = !r.entry
+                ? rowJumps?.map((j) => ({
+                  usd: j.usd,
+                  note: j.threat === null
+                    ? "no threat found after this donation; other amounts may still push it out"
+                    : `then a donation of ${
+                      usd(j.threat)
+                    } elsewhere could push it out; smaller threats may exist`,
+                  label: j.threat === null ? "No threat found" : `${usd(j.threat)} threat found`,
+                }))
+                : steps?.length
+                ? steps.map((x) => ({
+                  usd: x.usd,
+                  note: `brings it into ${tierName(x.tier)}`,
+                  label: `to ${tierName(x.tier)}`,
+                }))
+                : gap === null
+                ? undefined
+                : [{ usd: gap, note: `brings it into ${to}`, label: `to ${to}` }];
               return (
                 <li
                   key={i.slug}
@@ -444,8 +527,8 @@ export default function GiveList(
                       )
                       : (
                         <RowFigure
-                          kind={r.entry ? "gap" : "lead"}
-                          usd={r.entry ? gap ?? 0 : r.lead ?? 0}
+                          kind={r.entry ? "gap" : "threat"}
+                          usd={r.entry ? gap ?? 0 : r.threat}
                           to={to}
                           name={name}
                         />
@@ -463,20 +546,32 @@ export default function GiveList(
                       <p className="m-0 text-[13.5px] leading-snug text-white/75">
                         {!r.entry
                           ? (
-                            <>
-                              {r.lead
-                                ? (
-                                  <>
-                                    <b className="font-semibold text-white">{usd(r.lead)}</b>{" "}
-                                    ahead in{" "}
-                                    <span className="whitespace-nowrap">{name}</span>: it would stay
-                                    funded there if it settled now, even with that much less
-                                    backing.
-                                  </>
-                                )
-                                : <>In {name} if it settled now, with little to spare.</>}{" "}
-                              A donation lowers what it asks of the pool.
-                            </>
+                            r.threat === undefined
+                              ? (
+                                <>
+                                  In {name}{" "}
+                                  if it settled now. A donation lowers what it asks of the pool.
+                                </>
+                              )
+                              : r.threat === null
+                              ? (
+                                <>
+                                  No threat found from donations elsewhere to push it out of{" "}
+                                  <span className="whitespace-nowrap">{name}</span>{" "}
+                                  now. Other amounts may still do so. A donation lowers what it asks
+                                  of the pool.
+                                </>
+                              )
+                              : (
+                                <>
+                                  A donation of{" "}
+                                  <b className="font-semibold text-white">{usd(r.threat)}</b>{" "}
+                                  to another initiative could push it out of{" "}
+                                  <span className="whitespace-nowrap">{name}</span>{" "}
+                                  if the vote ended now. Smaller threats may exist. A donation
+                                  lowers what it asks of the pool.
+                                </>
+                              )
                           )
                           : gap === null
                           ? (
@@ -528,21 +623,19 @@ export default function GiveList(
                           +{usd(yours.get(i.slug)!)} yours so far. You can keep giving.
                         </p>
                       )}
+                      {isOpen && working && (
+                        <p className="m-0 text-[13px] text-white/60" role="status">
+                          Working out what a donation does…
+                        </p>
+                      )}
                       {test && !example
                         ? (
                           isOpen && (
                             <Suspense fallback={<DonateStandIn />}>
                               <TestDonate
                                 slug={i.slug}
-                                suggested={steps?.length
-                                  ? steps.map((x) => ({
-                                    usd: x.usd,
-                                    note: `brings it into ${tierName(x.tier)}`,
-                                    label: `to ${tierName(x.tier)}`,
-                                  }))
-                                  : gap === null
-                                  ? undefined
-                                  : [{ usd: gap, note: `brings it into ${to}`, label: `to ${to}` }]}
+                                suggested={suggested}
+                                preselect={Boolean(r.entry)}
                                 onAmount={onAmount}
                                 onDonated={(usd) => onDonated?.(i.slug, usd)}
                                 badge={test.badge}
@@ -562,15 +655,8 @@ export default function GiveList(
                                 safeAddress={i.safeAddress}
                                 onConfirmed={(r) =>
                                   r.amountUsd > 0 && onDonated?.(i.slug, r.amountUsd)}
-                                suggested={steps?.length
-                                  ? steps.map((x) => ({
-                                    usd: x.usd,
-                                    note: `brings it into ${tierName(x.tier)}`,
-                                    label: `to ${tierName(x.tier)}`,
-                                  }))
-                                  : gap === null
-                                  ? undefined
-                                  : { usd: gap, note: `brings it into ${to}`, label: `to ${to}` }}
+                                suggested={suggested}
+                                preselect={Boolean(r.entry)}
                                 onAmount={onAmount}
                                 example={example}
                                 accent={r.entry ? "red" : "green"}

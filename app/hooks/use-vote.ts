@@ -91,9 +91,10 @@ export type RoundView = {
     withdrawn?: string[];
     /** Each unsettled initiative's gap to its next tier; absent once the round is closed. */
     next?: Record<string, NextTierEntry>;
-    /** How far ahead each initiative in the tier settling now is, micro-USD: how much
-     * less backing it could have and stay (only leads of at least $1K). */
-    lead?: Record<string, string>;
+    /** For each initiative the live tally funds in the tier settling now: a checked
+     * donation elsewhere that pushes it out, micro-USD, or null when none was found.
+     * Smaller threats can be missed; null is not a safety guarantee. */
+    threat?: Record<string, string | null>;
     /** The live tally's inputs: the browser re-runs it for a donation's preview. Absent
      * once closed, and from servers before it. */
     inputs?: LiveInputsJson;
@@ -101,7 +102,7 @@ export type RoundView = {
      * it (into B-Tier when unfunded): its gap, and who comes in, drops out or moves. For
      * every open initiative not in the tier settling now; absent once closed. */
     give?: Record<string, NextTierEntry>;
-    /** `next`, `lead` and `give` are from before the latest change (a ballot, a donation,
+    /** `next`, `threat` and `give` are from before the latest change (a ballot, a donation,
      * a pledge, the pool): served while they are worked out again. */
     aheadStale?: boolean;
   };

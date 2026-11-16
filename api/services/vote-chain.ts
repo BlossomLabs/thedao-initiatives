@@ -114,6 +114,9 @@ const INITIATIVE_CONFIGURED = parseAbiItem(
   "event InitiativeConfigured(uint256 indexed initiativeId, address indexed account, uint256 goalUsd, bool rfp, uint256 groups)",
 );
 const POOL_USD_SET = parseAbiItem("event PoolUsdSet(uint256 previousAmountUsd, uint256 amountUsd)");
+const INITIATIVE_WITHDRAWN = parseAbiItem(
+  "event InitiativeWithdrawn(uint256 indexed initiativeId, bool withdrawn)",
+);
 const TRANSFER = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
 );
@@ -473,6 +476,7 @@ export function createStateSource(
           contracts: [
             { ...contract, functionName: "initiativeCount" },
             { ...contract, functionName: "poolUsd" },
+            { ...contract, functionName: "withdrawnMask" },
             ...m.slugs.map((_, i) => ({
               ...contract,
               functionName: "initiativeUsd",
@@ -489,17 +493,20 @@ export function createStateSource(
           `vote manifest: the contract has ${count} projects at block ${block}, the manifest ${m.slugs.length}`,
         );
       }
-      const asks = r.slice(2, 2 + count).map((x) => {
+      const asks = r.slice(3, 3 + count).map((x) => {
         if (x.status !== "success") throw x.error;
         return BigInt((x.result as readonly bigint[])[3]);
       });
-      return { timestamp: b.timestamp, asks, poolUsd: BigInt(r[1].result as bigint) };
+      // A contract without withdrawnMask (the first test round) fails just that entry.
+      const mask = r[2].status === "success" ? BigInt(r[2].result as bigint) : 0n;
+      const withdrawn = Array.from({ length: count }, (_, i) => ((mask >> BigInt(i)) & 1n) === 1n);
+      return { timestamp: b.timestamp, asks, poolUsd: BigInt(r[1].result as bigint), withdrawn };
     },
     accountingEventBlocks: (from, to) =>
       logBlocks(from, to, (fromBlock, toBlock) =>
         pub.getLogs({
           address: m.contract,
-          events: [PLEDGE_SET, POOL_USD_SET],
+          events: [PLEDGE_SET, POOL_USD_SET, INITIATIVE_WITHDRAWN],
           fromBlock,
           toBlock,
         })),

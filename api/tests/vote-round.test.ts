@@ -222,7 +222,7 @@ const stateAt = (
   asks: bigint[],
   poolUsd: bigint,
   event = true,
-): ChainState => ({ block, timestamp, asks, poolUsd, event });
+): ChainState => ({ block, timestamp, asks, poolUsd, withdrawn: [], event });
 /** One chain state for the whole round, as at block 0. */
 const oneState = (asks: bigint[], poolUsd: bigint) => [stateAt(0, 0, asks, poolUsd, false)];
 /** One state for the whole round and the node's head a second before now, as
@@ -1025,6 +1025,7 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
     tiers: { a: "S" },
     paid: { "1": { a: "75" }, "2": { a: "75" } },
     covered: [],
+    withdrawn: [],
   });
   assertEquals(body.registrationClosesAt, NOW + 660);
   assertEquals(body.accepted, { "1": `0x01${X}${X}`, "2": `0x01${X}${X}` });
@@ -1037,7 +1038,7 @@ Deno.test("round: S's settlement is kept only once the blocks before it are fina
   h.clock.now = NOW + 700; // settled at NOW + 660, but logs before it may still arrive
   await h.req("/api/vote/round");
   assertEquals(
-    (await h.deps.db.kv.get(["vote", qe.contract.toLowerCase(), "settled", "S"])).value,
+    (await h.deps.db.kv.get(["vote", qe.contract.toLowerCase(), "settled-w1", "S"])).value,
     null,
   );
   // A donation after the cutoff doesn't move it: it settled with the asks before it.
@@ -1088,6 +1089,7 @@ Deno.test("round: a quiet window settles S-Tier; later ask changes never move it
     forced: false,
     funded: ["a"],
     covered: [],
+    withdrawn: [],
     awards: { a: "150" },
     paid: { "1": { a: "75" }, "2": { a: "75" } },
   });
@@ -1198,7 +1200,7 @@ Deno.test("round: a covered project is listed as covered", async () => {
 
 Deno.test("round: a settled tier is the same before and after its record is stored", async () => {
   const { h } = await qeSetup([150n, 0n, 150n]);
-  const key = ["vote", qe.contract.toLowerCase(), "settled", "S"];
+  const key = ["vote", qe.contract.toLowerCase(), "settled-w1", "S"];
   h.clock.now = NOW + 700;
   const before = (await j(await h.req("/api/vote/round")) as { tiers: unknown[] }).tiers[0];
   assertEquals((await h.kv.get(key)).value, null);
@@ -1216,7 +1218,7 @@ Deno.test("round: a settled tier is the same before and after its record is stor
 
 Deno.test("round: a settlement isn't stored from states whose head is older than its cutoff", async () => {
   const { h, state } = await qeSetup([150n, 0n, 150n]);
-  const key = ["vote", qe.contract.toLowerCase(), "settled", "S"];
+  const key = ["vote", qe.contract.toLowerCase(), "settled-w1", "S"];
   h.clock.now = NOW + 660 + 30 * 60;
   // The states node stopped before the cutoff at NOW + 660: what came after is unseen.
   state.headAt = NOW + 600;
@@ -1242,7 +1244,10 @@ Deno.test("round: served as of the newest block: past a cutoff by the clock only
   assertEquals(lagging.head.timestamp, NOW + 657);
   assertEquals([lagging.tiers[0].tier, lagging.tiers[0].status], ["S", "settling"]);
   // Nothing settled is stored from it.
-  assertEquals((await h.kv.get(["vote", qe.contract.toLowerCase(), "settled", "S"])).value, null);
+  assertEquals(
+    (await h.kv.get(["vote", qe.contract.toLowerCase(), "settled-w1", "S"])).value,
+    null,
+  );
   // The block at NOW + 659: every block before the cutoff is known. S-Tier settles.
   state.headAt = NOW + 659;
   h.clock.now += 10; // past the few seconds a replay is reused
@@ -1256,12 +1261,33 @@ Deno.test("round: a settlement stored before covered projects loads as none cove
   const { h } = await qeSetup();
   h.clock.now = NOW + 660 + 30 * 60;
   await h.req("/api/vote/round");
-  const key = ["vote", qe.contract.toLowerCase(), "settled", "S"];
+  const key = ["vote", qe.contract.toLowerCase(), "settled-w1", "S"];
   const { covered: _, ...old } = (await h.kv.get<Record<string, unknown>>(key)).value!;
   await h.kv.set(key, old);
   h.clock.now += 10;
   const body = await j(await h.req("/api/vote/round")) as { tiers: { covered: string[] }[] };
   assertEquals(body.tiers[0].covered, []);
+  await h.settle();
+  h.close();
+});
+
+Deno.test("round: a settlement stored before withdrawn projects is recomputed, not read as none withdrawn", async () => {
+  const { h } = await qeSetup();
+  h.clock.now = NOW + 660 + 30 * 60;
+  type Body = { tiers: { funded: string[]; withdrawn: string[] }[] };
+  const fresh = (await j(await h.req("/api/vote/round")) as Body).tiers[0];
+  assertEquals(fresh.withdrawn, []);
+  const key = ["vote", qe.contract.toLowerCase(), "settled-w1", "S"];
+  const kept = (await h.kv.get<Record<string, unknown>>(key)).value!;
+  assertEquals([kept.tier, kept.withdrawn], ["S", []]);
+  // Only an old record, under the old key, and one that says otherwise: it is not read.
+  await h.kv.delete(key);
+  const oldKey = ["vote", qe.contract.toLowerCase(), "settled", "S"];
+  await h.kv.set(oldKey, { ...kept, funded: [], awards: [], shares: [] });
+  h.clock.now += 10;
+  const body = await j(await h.req("/api/vote/round")) as Body;
+  assertEquals(body.tiers[0].funded, fresh.funded);
+  assertEquals((await h.kv.get(key)).value, kept);
   await h.settle();
   h.close();
 });
@@ -1356,7 +1382,7 @@ Deno.test("round ballot: relayed ballots reuse one replay for a few seconds; non
 Deno.test("round: a ballot the RPC returned late can still unsettle S before it is final", async () => {
   const { h, state } = await qeSetup();
   h.clock.now = NOW + 700;
-  const key = ["vote", qe.contract.toLowerCase(), "settled", "S"];
+  const key = ["vote", qe.contract.toLowerCase(), "settled-w1", "S"];
   type Body = { tiers: { status: string; forced?: boolean }[] };
   const first = await j(await h.req("/api/vote/round")) as Body;
   assertEquals([first.tiers[0].status, first.tiers[0].forced], ["settled", false]);

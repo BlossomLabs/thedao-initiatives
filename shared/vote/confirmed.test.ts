@@ -45,7 +45,8 @@ function chainAt(head: number, all: BallotEvent[]): RoundSource {
       const b = Math.min(head, t - 1);
       return Promise.resolve({ block: b, timestamp: b });
     },
-    stateAt: (b) => Promise.resolve({ timestamp: b, asks: [100n, 100n, 100n], poolUsd: 300n }),
+    stateAt: (b) =>
+      Promise.resolve({ timestamp: b, asks: [100n, 100n, 100n], poolUsd: 300n, withdrawn: [] }),
     accountingEventBlocks: () => Promise.resolve([]),
     balanceChangeBlocks: () => Promise.resolve([]),
     ballots: () => Promise.resolve({ events, block: BigInt(head) }),

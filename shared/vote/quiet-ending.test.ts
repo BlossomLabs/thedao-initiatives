@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { chainTally } from "./chain";
-import { type ChainState, type Receipt, replay, type Schedule, windowEnds } from "./quiet-ending";
+import {
+  type ChainState,
+  type Receipt,
+  refusal,
+  replay,
+  type Schedule,
+  windowEnds,
+} from "./quiet-ending";
 
 const T = 10_000;
 const W = 3600;
@@ -26,6 +33,7 @@ const at = (time: number, asks: bigint[], poolUsd: bigint, event = true): ChainS
   timestamp: time,
   asks,
   poolUsd,
+  withdrawn: [],
   event,
 });
 /** One state for the whole round, as at block 0. */
@@ -175,6 +183,7 @@ describe("quiet-ending replay", () => {
       awards: new Map([[1, 99n]]),
       shares: new Map([[1, new Map([["a", 99n]])]]),
       covered: [],
+      withdrawn: [],
     };
     const s = run(base(), T + 3600, { snapshots: [snapshot] });
     expect(s.tiers[0]).toMatchObject({ status: "settled", funded: [1] });
@@ -197,6 +206,7 @@ describe("quiet-ending replay", () => {
       awards: new Map([[0, 150n]]),
       shares: new Map([[0, new Map([["a", 75n], ["b", 75n]])]]),
       covered: [],
+      withdrawn: [],
     };
     const s = run(
       [...base(), r("b", T + 100, [X, 1]), r("a", T + 3700, [X, 1])],
@@ -229,6 +239,7 @@ describe("quiet-ending replay", () => {
       awards: new Map([[1, 99n]]),
       shares: new Map([[1, new Map([["a", 99n]])]]),
       covered: [],
+      withdrawn: [],
     };
     const st = run(base(), T + 3600, { snapshots: [snapshot] });
     const i = st.settleInputs[0]!;
@@ -442,6 +453,154 @@ describe("chain states in the replay", () => {
   it("throws without a chain state before the first tally", () => {
     expect(() => run(base(), T + 3600, { states: [at(T + 10, [150n, 150n], 200n)] }))
       .toThrow("no chain state");
+  });
+});
+
+describe("withdrawn projects in the replay", () => {
+  /** The asks and pool from block `time` on, with `out` withdrawn; a tally event. */
+  const wd = (time: number, asks: bigint[], poolUsd: bigint, out: number[]): ChainState => ({
+    ...at(time, asks, poolUsd),
+    withdrawn: asks.map((_, c) => out.includes(c)),
+  });
+  const go = (m: number, states: ChainState[], receipts: Receipt[], now: number) =>
+    replay({ schedule, m, states, receipts }, now);
+  const settled = (s: ReturnType<typeof replay>, t: number) => {
+    const x = s.tiers[t];
+    if (x.status !== "settled") throw new Error(`tier ${t} is ${x.status}`);
+    return x;
+  };
+
+  it("funded project withdrawn mid-window, freed money funds nobody new: S-Tier settles on time, quiet", () => {
+    const states = [...flat([150n, 150n], 200n), wd(T + 50, [150n, 150n], 200n, [0])];
+    const during = go(2, states, base(), T + 100);
+    expect(during.tiers[0]).toMatchObject({
+      status: "settling",
+      window: 1,
+      quiet: true,
+      funded: [],
+      covered: [],
+      withdrawn: [0],
+    });
+    expect(during.live).toMatchObject({ order: [], covered: [], withdrawn: [0] });
+    // The live inputs keep the real ask and carry the withdrawn set apart.
+    expect(during.liveInputs!.costs[0]).toBe(150n);
+    expect([...during.liveInputs!.withdrawn]).toEqual([0]);
+    const s = go(2, states, base(), T + 3600);
+    expect(settled(s, 0)).toMatchObject({
+      at: T + 3600,
+      forced: false,
+      funded: [],
+      covered: [],
+      withdrawn: [0],
+    });
+    expect(settled(s, 0).awards.size).toBe(0);
+  });
+
+  it("funded project withdrawn mid-window, freed money brings another in: S-Tier window extends", () => {
+    const both = [r("a", 1, [1, 1, 1, 1]), r("b", 2, [1, 1, 1, 1])];
+    const asks = [90n, 90n, 60n, 50n];
+    const states = [...flat(asks, 200n), wd(T + 50, asks, 200n, [0])];
+    expect(settled(go(4, flat(asks, 200n), both, T + 3600), 0).funded).toContain(0);
+    expect(go(4, states, both, T + 3600).tiers[0]).toMatchObject({ status: "settling", window: 2 });
+    expect(settled(go(4, states, both, T + 5400), 0)).toMatchObject({
+      funded: [3, 2, 1],
+      covered: [],
+      withdrawn: [0],
+    });
+  });
+
+  it("withdraw then undo inside one window, nothing else changes: quiet", () => {
+    const states = [
+      ...flat([150n, 150n], 200n),
+      wd(T + 50, [150n, 150n], 200n, [0]),
+      wd(T + 100, [150n, 150n], 200n, []),
+    ];
+    expect(settled(go(2, states, base(), T + 3600), 0)).toMatchObject({
+      at: T + 3600,
+      funded: [0],
+      withdrawn: [],
+    });
+  });
+
+  it("withdrawn at S-Tier's settlement, undone during A-Tier: competes in A-Tier", () => {
+    const ballots = [r("a", 1, [1, 2]), r("b", 2, [1, 2])];
+    const states = [
+      ...flat([150n, 150n], 200n),
+      wd(T - 100, [150n, 150n], 200n, [0]),
+      wd(T + 7000, [150n, 150n], 200n, []),
+    ];
+    const s = go(2, states, ballots, T + 20_000);
+    expect(settled(s, 0)).toMatchObject({ funded: [], withdrawn: [0] });
+    expect(settled(s, 1)).toMatchObject({ funded: [0], withdrawn: [] });
+    expect(settled(s, 1).awards.get(0)).toBe(150n);
+    // A cached settlement gives the same.
+    const snapshots = s.tiers.flatMap((x) => x.status === "settled" ? [x] : []);
+    expect(replay({ schedule, m: 2, states, receipts: ballots, snapshots }, T + 20_000))
+      .toEqual(s);
+  });
+
+  it("withdrawn in the block S-Tier settles with: in withdrawn, not funded", () => {
+    const states = [...flat([150n, 150n], 200n), wd(T + 3599, [150n, 150n], 200n, [0])];
+    const s = go(2, states, base(), T + 3600);
+    expect(settled(s, 0)).toMatchObject({ at: T + 3600, funded: [], withdrawn: [0] });
+  });
+
+  it("withdrawn and asking $0: listed withdrawn, not covered", () => {
+    const states = [wd(0, [100n, 100n, 0n], 300n, [2])];
+    const receipts = [r("a", 1, [1, 2, X]), r("b", 2, [1, 2, X])];
+    const open = go(3, states, receipts, T - 1);
+    expect(open.live).toMatchObject({ covered: [], withdrawn: [2] });
+    const s = go(3, states, receipts, T + 20_000);
+    expect([0, 1, 2].map((t) => settled(s, t).covered)).toEqual([[], [], []]);
+    expect([0, 1, 2].map((t) => settled(s, t).withdrawn)).toEqual([[2], [2], [2]]);
+    expect([0, 1, 2].flatMap((t) => settled(s, t).funded)).not.toContain(2);
+  });
+
+  it("withdrawal after the project was funded in S-Tier: ignored, award unchanged", () => {
+    const states = [...flat([150n, 150n], 200n), wd(T + 4000, [150n, 150n], 200n, [0])];
+    const s = go(2, states, base(), T + 20_000);
+    expect(settled(s, 0)).toMatchObject({ funded: [0], withdrawn: [] });
+    expect(settled(s, 0).awards.get(0)).toBe(150n);
+    expect([1, 2].map((t) => settled(s, t).withdrawn)).toEqual([[], []]);
+    expect(go(2, states, base(), T + 7000).live.withdrawn).toEqual([]);
+  });
+
+  it("withdrawal one second after S-Tier's cutoff: S-Tier settled without it in withdrawn", () => {
+    // S-Tier funds 1 (150); A-Tier would fund 0 (50) with what is left.
+    const ballots = [r("a", 1, [2, 1]), r("b", 2, [2, 1])];
+    const plain = go(2, flat([50n, 150n], 200n), ballots, T + 20_000);
+    expect(settled(plain, 1).funded).toEqual([0]);
+    for (const when of [T + 3600, T + 3601]) {
+      const states = [...flat([50n, 150n], 200n), wd(when, [50n, 150n], 200n, [0])];
+      const s = go(2, states, ballots, T + 20_000);
+      expect(settled(s, 0)).toMatchObject({ at: T + 3600, funded: [1], withdrawn: [] });
+      expect(settled(s, 1)).toMatchObject({ funded: [], withdrawn: [0] });
+    }
+  });
+
+  it("ballot keeps a withdrawn project: voter not charged for it, money goes to their other choices", () => {
+    // Without the withdrawal S-Tier funds 0 (75 each) and 1 (100) can't be paid in A-Tier.
+    const ballots = [r("a", 1, [1, 2]), r("b", 2, [1, 2])];
+    const plain = go(2, flat([150n, 100n], 200n), ballots, T + 20_000);
+    expect([settled(plain, 0).funded, settled(plain, 1).funded]).toEqual([[0], []]);
+    const s = go(2, [wd(0, [150n, 100n], 200n, [0])], ballots, T + 20_000);
+    expect(settled(s, 0)).toMatchObject({ funded: [], withdrawn: [0] });
+    expect(settled(s, 0).shares.size).toBe(0);
+    expect(settled(s, 1).funded).toEqual([1]);
+    expect([...settled(s, 1).shares.get(1)!]).toEqual([["a", 50n], ["b", 50n]]);
+  });
+
+  it("voter keeps a withdrawn project in their settled S-Tier and changes B-Tier: accepted", () => {
+    const states = [wd(0, [150n, 50n, 50n], 200n, [0])];
+    const ballots = [r("a", 1, [1, 2, 3]), r("b", 2, [1, 2, 3])];
+    const s = go(3, states, [...ballots, r("a", T + 4000, [1, 2, X])], T + 4100);
+    expect(settled(s, 0)).toMatchObject({ funded: [], withdrawn: [0] });
+    expect(s.rejected).toEqual([]);
+    expect([...s.accepted.get("a")!]).toEqual([1, 2, X]);
+    // The supporter lock is as it was: taking the withdrawn project out of S-Tier is refused.
+    expect(refusal(s, "a", Uint8Array.from([1, 2, 3]), T + 4100, 3)).toBe(null);
+    expect(refusal(s, "a", Uint8Array.from([X, 1, 2]), T + 4100, 3))
+      .toEqual({ code: "tier_settled", tier: "S" });
   });
 });
 

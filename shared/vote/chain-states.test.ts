@@ -35,6 +35,7 @@ function fakeChain(o: {
   accounting?: number[];
   balances?: number[];
   asksAt?: (b: number) => bigint[];
+  withdrawnAt?: (b: number) => boolean[];
   fail?: (b: number) => boolean;
   noBalances?: boolean;
 }) {
@@ -52,7 +53,12 @@ function fakeChain(o: {
     stateAt: (b) => {
       reads.push(b);
       if (o.fail?.(b)) return Promise.reject(new Error(`missing trie node at ${b}`));
-      return Promise.resolve({ timestamp: b, asks: o.asksAt?.(b) ?? [1n, 2n, 3n], poolUsd: 100n });
+      return Promise.resolve({
+        timestamp: b,
+        asks: o.asksAt?.(b) ?? [1n, 2n, 3n],
+        poolUsd: 100n,
+        withdrawn: o.withdrawnAt?.(b) ?? [],
+      });
     },
     accountingEventBlocks: (from, to) =>
       Promise.resolve((o.accounting ?? []).filter((b) => b >= from && b <= to)),
@@ -85,6 +91,30 @@ const events = (xs: { block: number; event: boolean }[]) =>
   xs.filter((x) => x.event).map((x) => x.block);
 
 describe("chainStates", () => {
+  it("each state carries the withdrawn flags; an InitiativeWithdrawn block is an event", async () => {
+    const { src } = fakeChain({
+      head: 1649,
+      accounting: [1300, 1500],
+      withdrawnAt: (b) => (b >= 1500 ? [false, true] : []),
+    });
+    const out = await chainStates(manifest(false), src, opts(1650));
+    expect(out.find((x) => x.block === 1300)).toMatchObject({ withdrawn: [], event: true });
+    expect(out.find((x) => x.block === 1500)).toMatchObject({
+      withdrawn: [false, true],
+      event: true,
+    });
+    expect(out.at(-1)?.withdrawn).toEqual([false, true]);
+  });
+
+  it("a cached state stored under the old key shape is not used", async () => {
+    const { cache, map } = memoryCache();
+    map.set(`state:${CONTRACT}:1649`, { timestamp: 1649, asks: ["9"], poolUsd: "9" });
+    const { src, reads } = fakeChain({ head: 1649, withdrawnAt: () => [true] });
+    const out = await chainStates(manifest(false), src, { ...opts(1650), cache });
+    expect(reads).toContain(1649);
+    expect(out.at(-1)).toMatchObject({ asks: [1n, 2n, 3n], withdrawn: [true] });
+  });
+
   it("a state for each boundary, each event block and the head", async () => {
     const { src } = fakeChain({ head: 1649, accounting: [900, 1300], balances: [1450] });
     const out = await chainStates(manifest(), src, opts(1650, [500, 1200, 1500]));

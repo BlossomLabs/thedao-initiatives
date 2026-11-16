@@ -3,7 +3,10 @@
  * has an opening tally, one after every block holding a receipt or an ask event (a
  * donation, a pledge, a pool change), and a closing tally; only the settling tier's
  * funded set is compared. Every tally uses the asks and pool at its own block, and a
- * project asking $0 is covered: no candidate, and left out of every comparison. The
+ * project asking $0 is covered: no candidate, and left out of every comparison. A project
+ * withdrawn at a tally's block is no candidate there either and is left out of the
+ * comparison the same way, but unlike covered that is not final: undone, it competes
+ * again in the tiers still open. The
  * tally itself is the Python's stage tally (./stage.ts). Amounts are micro-USD bigints.
  * Browser and Deno. */
 import { effectiveRanks } from "../../vote/shared/ranks.ts";
@@ -35,6 +38,8 @@ export type ChainState = {
   timestamp: number;
   asks: bigint[];
   poolUsd: bigint;
+  /** Flags by project; may be shorter than the project count (missing = false). */
+  withdrawn: boolean[];
   event: boolean;
 };
 export type Settled = {
@@ -47,6 +52,9 @@ export type Settled = {
   shares: Map<number, Map<string, bigint>>;
   /** Asking $0 at the cutoff: covered by donations, final, never a candidate again. */
   covered: number[];
+  /** Withdrawn at the cutoff ($0 award), and not covered: not final, a candidate again in
+   * the tiers still open if the withdrawal is undone. */
+  withdrawn: number[];
 };
 export type TierState =
   | { tier: Tier; status: "waiting"; startsAt: number }
@@ -62,6 +70,8 @@ export type TierState =
     funded: number[];
     /** The latest tally's covered projects ($0 asks). */
     covered: number[];
+    /** The latest tally's withdrawn projects. */
+    withdrawn: number[];
   }
   | ({ status: "settled" } & Settled);
 export type Rejection = {
@@ -86,6 +96,8 @@ export type RoundState = {
     shares: Map<number, Map<string, bigint>>;
     /** Asking $0 now, so in no tier. */
     covered: number[];
+    /** Withdrawn now, so in no tier (and not covered). */
+    withdrawn: number[];
   };
   /** The live tally's inputs, to re-run it with another ballot; null once closed. */
   liveInputs: ChainInputs | null;
@@ -114,11 +126,12 @@ const sameSet = (a: number[], b: number[]) => {
   const y = new Set(b);
   return a.every((x) => y.has(x));
 };
-/** Two tallies fund the same projects once every project covered at either is left out
- * of both: crossing $0 alone is no change. */
-const sameFunded = (a: number[], coveredA: number[], b: number[], coveredB: number[]) => {
-  const free = new Set([...coveredA, ...coveredB]);
-  return sameSet(a.filter((c) => !free.has(c)), b.filter((c) => !free.has(c)));
+type Look = { funded: number[]; covered: number[]; withdrawn: number[] };
+/** Two tallies fund the same projects once every project covered or withdrawn at either
+ * is left out of both: crossing $0, withdrawing or undoing alone is no change. */
+const sameFunded = (a: Look, b: Look) => {
+  const free = new Set([...a.covered, ...a.withdrawn, ...b.covered, ...b.withdrawn]);
+  return sameSet(a.funded.filter((c) => !free.has(c)), b.funded.filter((c) => !free.has(c)));
 };
 /** The last item of `xs` for which `ok` holds, `ok` being true up to some index. */
 function lastWhere<T>(xs: T[], ok: (x: T) => boolean): T | undefined {
@@ -239,15 +252,25 @@ export function replay(
     }
   };
 
-  /** Settled for good: funded in a settled tier, or covered at its settlement. */
+  /** Settled for good: funded in a settled tier, or covered at its settlement. Withdrawn
+   * at a settlement is not final. */
   const finished = () => new Set(settled.flatMap((x) => [...x.funded, ...x.covered]));
-  /** The projects asking $0 in `state` that nothing settled yet. */
+  /** The projects withdrawn in `state` that nothing settled yet: a finished project's
+   * flag is ignored, its award stands. */
+  const withdrawnIn = (state: ChainState) => {
+    const done = finished();
+    return [...Array(m).keys()].filter((c) => state.withdrawn[c] === true && !done.has(c));
+  };
+  /** The projects asking $0 in `state` that nothing settled yet and that are not
+   * withdrawn (withdrawn wins over covered). */
   const coveredIn = (state: ChainState) => {
     const done = finished();
-    return [...Array(m).keys()].filter((c) => state.asks[c] === 0n && !done.has(c));
+    const out = new Set(withdrawnIn(state));
+    return [...Array(m).keys()].filter((c) => state.asks[c] === 0n && !done.has(c) && !out.has(c));
   };
   /** What the chained tally starts from in `state`: the voters, after the settled
-   * tiers' payments, its pool and asks (a project not in it yet asks $0: no candidate). */
+   * tiers' payments, its pool and asks (a project not in it yet asks $0: no candidate),
+   * and its withdrawn projects (their costs stay their real asks). */
   const inputs = (state: ChainState): ChainInputs => {
     const { poolUsd } = state;
     const costs = Array.from({ length: m }, (_, c) => state.asks[c] ?? 0n);
@@ -266,15 +289,17 @@ export function replay(
       (a, x) => a + [...x.awards.values()].reduce((p, q) => p + q, 0n),
       0n,
     );
-    return { m, costs, voters, weights, ranks, ballots, poolUsd, spent, done };
+    const withdrawn = new Set(withdrawnIn(state));
+    return { m, costs, voters, weights, ranks, ballots, poolUsd, spent, done, withdrawn };
   };
   /** Stages `first` up to (not including) `upTo`; the comparisons need only the first. */
   const tally = (first: number, state: ChainState, upTo = TIERS.length) =>
     chainTally(inputs(state), first, upTo);
-  /** Tier `t`'s funded set and the covered projects at `state`. */
-  const look = (t: number, state: ChainState) => ({
+  /** Tier `t`'s funded set and the covered and withdrawn projects at `state`. */
+  const look = (t: number, state: ChainState): Look => ({
     funded: tally(t, state, t + 1)[0].order,
     covered: coveredIn(state),
+    withdrawn: withdrawnIn(state),
   });
   const settleInputs: (ChainInputs | null)[] = TIERS.map(() => null);
   /** Settles tier `t` with the state at its cutoff `at`. */
@@ -285,11 +310,21 @@ export function replay(
     const snap = input.snapshots?.find((x) => x.tier === TIERS[t]);
     if (snap) return settled.push(snap);
     const covered = coveredIn(state);
+    const withdrawn = withdrawnIn(state);
     const { order, shares } = tally(t, state, t + 1)[0];
     const awards = new Map(
       order.map((c) => [c, [...shares.get(c)!.values()].reduce((a, b) => a + b, 0n)] as const),
     );
-    settled.push({ tier: TIERS[t], at, forced, funded: order, awards, shares, covered });
+    settled.push({
+      tier: TIERS[t],
+      at,
+      forced,
+      funded: order,
+      awards,
+      shares,
+      covered,
+      withdrawn,
+    });
   };
 
   const tiers: TierState[] = [];
@@ -314,8 +349,7 @@ export function replay(
     for (let k = 0; k < ends.length; k++) {
       const end = ends[k];
       let quiet = true;
-      const same = (x: { funded: number[]; covered: number[] }) =>
-        sameFunded(x.funded, x.covered, baseline.funded, baseline.covered);
+      const same = (x: Look) => sameFunded(x, baseline);
       const check = (blockNo: number) => {
         if (!same(look(t, atBlock(blockNo)))) quiet = false;
       };
@@ -331,6 +365,7 @@ export function replay(
           quiet,
           funded: latest.funded,
           covered: latest.covered,
+          withdrawn: latest.withdrawn,
         };
         break;
       }
@@ -364,9 +399,11 @@ export function replay(
     tiers: new Map<number, Tier>(),
     shares: new Map<number, Map<string, bigint>>(),
     covered: [] as number[],
+    withdrawn: [] as number[],
   };
   if (firstOpen < TIERS.length) {
     live.covered = coveredIn(head);
+    live.withdrawn = withdrawnIn(head);
     for (const [k, stage] of tally(firstOpen, head).entries()) {
       for (const c of stage.order) {
         live.order.push(c);

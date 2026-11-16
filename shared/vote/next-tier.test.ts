@@ -7,6 +7,7 @@ import {
   finalWhatIfsAsync,
   FINE,
   gapTo,
+  giftEffect,
   giftGaps,
   giftGapsAsync,
   leadIn,
@@ -38,6 +39,7 @@ function inputs(
     poolUsd: BigInt(poolK) * K,
     spent: 0n,
     done: new Set(done),
+    withdrawn: new Set(),
   };
 }
 
@@ -302,6 +304,7 @@ describe("the S-Tier lead", () => {
       poolUsd: 1000n * K,
       spent: 0n,
       done: new Set(),
+      withdrawn: new Set(),
     };
     expect(chainTally(inp, 0, 1)[0].order).toEqual([0]);
     const lead = leadIn(inp, 0, 0)!;
@@ -512,5 +515,17 @@ describe("the donation to the next tier", () => {
   it("gives the same answer async", async () => {
     const inp = knockOn();
     expect(await giftGapsAsync(inp, 0)).toEqual(giftGaps(inp, 0));
+  });
+
+  it("a withdrawn project has no gap and is not listed covered", () => {
+    // Initiative 0 is withdrawn: it keeps its real ask, yet is in no tier and has no figure.
+    const inp = { ...inputs([40, 40, 30], [40], [[1, 2, 3]]), withdrawn: new Set([0]) };
+    expect(chainTally(inp, 0).flatMap((s) => s.order)).not.toContain(0);
+    expect(nextTiers(inp, 0).has(0)).toBe(false);
+    expect(giftGaps(inp, 0).has(0)).toBe(false);
+    expect(gapTo(inp, 0, 0, 0).gap).toBe(null);
+    const all = giftEffect(inp, 0, 0, 40n * K);
+    expect(all).toMatchObject({ was: null, tier: null, covered: false });
+    expect(finalWhatIfs([inp, inp, inp], new Map([[1, 0]]), 3).next.has(0)).toBe(false);
   });
 });

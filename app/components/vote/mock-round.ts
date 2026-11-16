@@ -227,6 +227,7 @@ function tallied(
     poolUsd: pool,
     spent: 0n,
     done: new Set(),
+    withdrawn: new Set(),
   };
   const settledTiers: { tier: Tier; stage: ChainStage }[] = [];
   for (let t = 0; t < settledCount; t++) {

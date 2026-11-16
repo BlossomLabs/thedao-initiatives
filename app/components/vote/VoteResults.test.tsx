@@ -754,6 +754,7 @@ function inputsFor(costsK: [number, number]) {
     poolUsd: 60_000_000_000n,
     spent: 0n,
     done: new Set(),
+    withdrawn: new Set(),
   }, 0);
 }
 

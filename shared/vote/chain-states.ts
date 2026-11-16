@@ -12,8 +12,10 @@ export interface StateSource {
   /** The last block with timestamp < time. */
   blockBefore(time: number): Promise<{ block: number; timestamp: number }>;
   /** At `block` (eth_call with that block): initiativeCount, each initiativeUsd(i).askUsd, poolUsd(). */
-  stateAt(block: number): Promise<{ timestamp: number; asks: bigint[]; poolUsd: bigint }>;
-  /** Blocks in [from, to] holding a PledgeSet or PoolUsdSet log from the round's contract. */
+  stateAt(
+    block: number,
+  ): Promise<{ timestamp: number; asks: bigint[]; poolUsd: bigint; withdrawn: boolean[] }>;
+  /** Blocks in [from, to] holding a PledgeSet, PoolUsdSet or InitiativeWithdrawn log from the round's contract. */
   accountingEventBlocks(from: number, to: number): Promise<number[]>;
   /** Blocks in [from, to] where any account's balance in any registered currency changed:
    * ERC-20 Transfer logs to or from an account, and native balances read block by block
@@ -50,7 +52,7 @@ export const judgedAt = (now: number, headTimestamp: number): number =>
   Math.min(now, headTimestamp + 1);
 
 type Block = { block: number; timestamp: number };
-type StoredState = { timestamp: number; asks: string[]; poolUsd: string };
+type StoredState = { timestamp: number; asks: string[]; poolUsd: string; withdrawn: boolean[] };
 type StoredScan = { from: number; to: number; blocks: number[] };
 
 /** Runs `f` over `xs`, at most `n` at a time; the first failure rejects the whole call. */
@@ -253,7 +255,8 @@ export async function chainStates(
   });
 
   async function stateAt(block: number) {
-    const key = `state:${contract}:${block}`;
+    // `:w1`: states stored before the withdrawn flags existed lack them, and are skipped.
+    const key = `state:${contract}:${block}:w1`;
     if (cache) {
       const hit = (await cache.get(key)) as StoredState | undefined;
       if (hit !== undefined) {
@@ -261,6 +264,7 @@ export async function chainStates(
           timestamp: hit.timestamp,
           asks: hit.asks.map(BigInt),
           poolUsd: BigInt(hit.poolUsd),
+          withdrawn: hit.withdrawn,
         };
       }
     }
@@ -272,6 +276,7 @@ export async function chainStates(
           timestamp: x.timestamp,
           asks: x.asks.map(String),
           poolUsd: String(x.poolUsd),
+          withdrawn: x.withdrawn,
         } satisfies StoredState,
       );
     }

@@ -204,11 +204,17 @@ export function roundJson(st: Round, slugs: string[]) {
         forced: t.forced,
         funded: named(t.funded),
         covered: named(t.covered),
+        withdrawn: named(t.withdrawn),
         awards: money(t.awards),
         paid: paidBy(t.shares),
       }
       : t.status === "settling"
-      ? { ...t, funded: named(t.funded), covered: named(t.covered) }
+      ? {
+        ...t,
+        funded: named(t.funded),
+        covered: named(t.covered),
+        withdrawn: named(t.withdrawn),
+      }
       : t;
   return {
     /** The newest block the round was judged at: nothing after it has happened yet. */
@@ -236,6 +242,8 @@ export function roundJson(st: Round, slugs: string[]) {
       paid: paidBy(st.live.shares),
       /** Asking $0 now: covered by donations, in no tier. */
       covered: named(st.live.covered),
+      /** Withdrawn now: in no tier, and not covered. */
+      withdrawn: named(st.live.withdrawn),
       // The live tally's inputs, so a donation's preview re-runs it in the browser.
       ...(st.liveInputs ? { inputs: liveInputsJson(st.liveInputs, st.firstOpen) } : {}),
     },

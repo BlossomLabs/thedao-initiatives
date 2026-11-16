@@ -17,6 +17,8 @@ export type LiveInputsJson = {
   spent: string;
   /** Settled initiatives (manifest indices). */
   done: number[];
+  /** Withdrawn now and not settled (manifest indices): no candidate, not covered. */
+  withdrawn: number[];
 };
 
 const hex = (b: number[]) => `0x${b.map((x) => x.toString(16).padStart(2, "0")).join("")}`;
@@ -33,6 +35,7 @@ export function liveInputsJson(inp: ChainInputs, first: number): LiveInputsJson 
     poolUsd: String(inp.poolUsd),
     spent: String(inp.spent),
     done: [...inp.done].sort((a, b) => a - b),
+    withdrawn: [...inp.withdrawn].sort((a, b) => a - b),
   };
 }
 
@@ -51,6 +54,7 @@ export function liveInputsFrom(j: LiveInputsJson): { inp: ChainInputs; first: nu
       poolUsd: BigInt(j.poolUsd),
       spent: BigInt(j.spent),
       done: new Set(j.done),
+      withdrawn: new Set(j.withdrawn),
     },
   };
 }

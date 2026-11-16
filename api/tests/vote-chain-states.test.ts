@@ -57,6 +57,8 @@ function node(o: {
   head: number;
   pruned?: boolean;
   count?: number;
+  mask?: bigint;
+  noMask?: boolean;
   ethOf?: (block: number, account: Hex) => bigint;
   logs?: Log[];
 }) {
@@ -111,6 +113,10 @@ function node(o: {
           const count = o.count ?? 2;
           if (functionName === "initiativeCount") {
             return ok(SIGNED_BALLOTS_ABI, functionName, BigInt(count));
+          }
+          if (functionName === "withdrawnMask") {
+            if (o.noMask) return { success: false, returnData: "0x" as Hex };
+            return ok(SIGNED_BALLOTS_ABI, functionName, o.mask ?? 0n);
           }
           if (functionName === "poolUsd") return ok(SIGNED_BALLOTS_ABI, functionName, 500n);
           if (functionName === "initiativeUsd") {
@@ -176,8 +182,24 @@ Deno.test("stateAt: one multicall at that block; asks only for projects the cont
   const { transport, calls } = node({ head: 1000, count: 1 });
   const src = createStateSource(manifest(), "http://unused", transport);
   const s = await src.stateAt(400);
-  assertEquals(s, { timestamp: 400 * SECS, asks: [500n], poolUsd: 500n });
+  assertEquals(s, { timestamp: 400 * SECS, asks: [500n], poolUsd: 500n, withdrawn: [false] });
   assertEquals(calls, [{ method: "eth_call", block: toHex(400) }]);
+});
+
+Deno.test("stateAt: withdrawnMask bits become one flag per project", async () => {
+  const { transport } = node({ head: 1000, count: 3, mask: 0b101n });
+  const src = createStateSource(
+    { ...manifest(), slugs: ["a", "b", "c"] },
+    "http://unused",
+    transport,
+  );
+  assertEquals((await src.stateAt(400)).withdrawn, [true, false, true]);
+});
+
+Deno.test("stateAt: a contract without withdrawnMask reads as nothing withdrawn", async () => {
+  const { transport } = node({ head: 1000, count: 2, noMask: true });
+  const src = createStateSource(manifest(), "http://unused", transport);
+  assertEquals((await src.stateAt(400)).withdrawn, [false, false]);
 });
 
 Deno.test("stateAt: a contract with more projects than the manifest is an error", async () => {
@@ -280,12 +302,28 @@ Deno.test("accountingEventBlocks: blocks with a PledgeSet or PoolUsdSet from the
     data: encodeAbiParameters([{ type: "uint256" }], [9n]),
     block,
   });
+  const withdrawn = parseAbiItem(
+    "event InitiativeWithdrawn(uint256 indexed initiativeId, bool withdrawn)",
+  );
+  const withdrawnLog = (block: number): Log => ({
+    address: CONTRACT,
+    topics: encodeEventTopics({ abi: [withdrawn], args: { initiativeId: 1n } }) as Hex[],
+    data: encodeAbiParameters([{ type: "bool" }], [true]),
+    block,
+  });
   const { transport } = node({
     head: 1000,
-    logs: [poolLog(102), pledgeLog(106), pledgeLog(106), poolLog(104, TOKEN), poolLog(300)],
+    logs: [
+      poolLog(102),
+      pledgeLog(106),
+      pledgeLog(106),
+      withdrawnLog(108),
+      poolLog(104, TOKEN),
+      poolLog(300),
+    ],
   });
   const src = createStateSource(manifest(), "http://unused", transport);
-  assertEquals(await src.accountingEventBlocks(100, 110), [102, 106]);
+  assertEquals(await src.accountingEventBlocks(100, 110), [102, 106, 108]);
 });
 
 Deno.test("the KV cache keeps chain reads under the round's prefix", async () => {

@@ -37,7 +37,12 @@ function fakeSource(o: { head: number; transcript?: Hex }) {
     },
     stateAt: (b) => {
       stateReads.push(b);
-      return Promise.resolve({ timestamp: b, asks: [150n, 150n, 150n], poolUsd: 200n });
+      return Promise.resolve({
+        timestamp: b,
+        asks: [150n, 150n, 150n],
+        poolUsd: 200n,
+        withdrawn: [],
+      });
     },
     accountingEventBlocks: () => Promise.resolve([]),
     balanceChangeBlocks: () => Promise.resolve([]),

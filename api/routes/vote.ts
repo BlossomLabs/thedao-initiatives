@@ -148,6 +148,14 @@ type StoredSettled = Omit<Settled, "awards" | "shares" | "covered"> & {
   /** Absent from settlements stored before covered projects. */
   covered?: number[];
 };
+/** Where a tier's settlement is stored. The version moves when `Settled` gains what an
+ * older snapshot can't tell (w1: `withdrawn`): an older one is recomputed, never read
+ * as "nothing withdrawn". */
+const settledKey = (d: VoteRound, tier: Tier): Deno.KvKey => [
+  ...round(d),
+  "settled-w1",
+  tier,
+];
 const storeSettled = (x: Settled): StoredSettled => ({
   ...x,
   awards: [...x.awards].map(([c, v]) => [c, v.toString()]),
@@ -156,6 +164,7 @@ const storeSettled = (x: Settled): StoredSettled => ({
 const loadSettled = (x: StoredSettled): Settled => ({
   ...x,
   covered: x.covered ?? [],
+  withdrawn: x.withdrawn ?? [],
   awards: new Map(x.awards.map(([c, v]) => [c, BigInt(v)])),
   shares: new Map(x.shares.map(([c, m]) => [c, new Map(m.map(([t, v]) => [t, BigInt(v)]))])),
 });
@@ -201,6 +210,7 @@ const inputsParts = (inp: ChainInputs) => [
   inp.poolUsd,
   inp.spent,
   [...inp.done].sort((a, b) => a - b),
+  [...inp.withdrawn].sort((a, b) => a - b),
 ];
 
 /** The what-if search's own version, part of every cache digest: when the way gaps, leads or
@@ -350,7 +360,7 @@ export function voteRoutes(deps: Deps) {
     const kv = deps.db.kv;
     const tiers: Tier[] = ["S", "A", "B"];
     const stored = await Promise.all(
-      tiers.map((t) => kv.get<StoredSettled>([...round(d), "settled", t])),
+      tiers.map((t) => kv.get<StoredSettled>(settledKey(d, t))),
     );
     const snapshots = stored.flatMap((x) => (x.value ? [loadSettled(x.value)] : []));
     const now = deps.now();
@@ -396,8 +406,7 @@ export function voteRoutes(deps: Deps) {
       if (t.status !== "settled" || stored[i].value) continue;
       if (now < t.at + FINAL_AFTER_SECS || st.head.timestamp < t.at) continue;
       const { status: _, ...x } = t;
-      await kv.atomic().check(stored[i]).set([...round(d), "settled", t.tier], storeSettled(x))
-        .commit();
+      await kv.atomic().check(stored[i]).set(settledKey(d, t.tier), storeSettled(x)).commit();
     }
     return st;
   };

@@ -74,6 +74,7 @@ function fakeSource(o: { failAt?: number; now?: number } = {}): RoundSource {
       return Promise.resolve({
         timestamp: b + t0,
         asks: [150n, 150n, b >= donation ? 40n : 150n],
+        withdrawn: [],
         poolUsd: 300n,
       });
     },
@@ -178,7 +179,7 @@ Deno.test("the script and the API agree once the API replays from a stored settl
   const key = ["vote", manifest.contract.toLowerCase()];
   h.clock.now = at;
   assertEquals((await h.req("/api/vote/round")).status, 200);
-  assert((await h.deps.db.kv.get([...key, "settled", "S"])).value, "S-Tier's record is kept");
+  assert((await h.deps.db.kv.get([...key, "settled-w1", "S"])).value, "S-Tier's record is kept");
   // A minute on, with the served round dropped: the API replays with the stored records.
   await h.deps.db.kv.delete([...key, "round"]);
   h.clock.now = at + 60;

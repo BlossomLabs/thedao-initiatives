@@ -252,6 +252,69 @@ class CoveredProjects(unittest.TestCase):
         self.assertEqual(sum(result["covered"], []), [B])
 
 
+
+class WithdrawnProjects(unittest.TestCase):
+    """A withdrawn project is no candidate and is left out of the comparison, like a
+    covered one, but it is not final: undone, it competes again in the tiers still
+    open. A project already funded, or covered, when it is withdrawn keeps what it got."""
+
+    def test_funded_project_withdrawn_mid_window_freed_money_funds_nobody_new_settles_on_time(self):
+        # A is funded at the opening tally and withdrawn at the deadline; B is on no
+        # ballot and costs more than the pool, so nothing else moves: the first tier is
+        # confirmed, A as withdrawn.
+        voters = [(100, None), (100, None)]
+        ballots = fixed([[1, 0], [1, 0]])
+        result = run_on_time([150, 250], voters, 0, ballots, withdrawn_for_day=lambda day: {A} if day else set())
+        self.assertEqual(result["days"][0]["confirmed"], [0, 1, 2, 3])
+        self.assertEqual(result["funded"], [])
+        self.assertEqual(result["withdrawn"], [[A], [A], [A], [A]])
+        self.assertEqual(result["covered"], [[], [], [], []])
+
+    def test_funded_project_withdrawn_mid_window_freed_money_brings_another_in_extends(self):
+        costs = [90, 90, 60, 50]
+        voters, ballots = [(100, None), (100, None)], fixed([[1, 1, 1, 1], [1, 1, 1, 1]])
+        self.assertIn(A, run_on_time(costs, voters, 0, ballots)["funded"])
+        result = run_on_time(costs, voters, 0, ballots, withdrawn_for_day=lambda day: {A} if day else set())
+        self.assertEqual(result["days"][0]["confirmed"], [])
+        self.assertEqual(result["funded"], [3, 2, B])
+        self.assertEqual(result["withdrawn"][0], [A])
+
+    def test_withdraw_then_undo_inside_one_window_nothing_else_changes_quiet(self):
+        voters = [(100, None), (100, None)]
+        ballots = [[1, 0], [1, 0]]
+        result = run_on_time([150, 150], voters, 0, fixed(ballots), between=inside([(ballots, None, {A})]))
+        self.assertEqual((result["days"][0]["confirmed"], result["days"][0]["between"]), ([0, 1, 2, 3], 1))
+        self.assertEqual(result["funded"], [A])
+        self.assertEqual(result["withdrawn"], [[], [], [], []])
+
+    def test_withdrawn_at_the_first_tier_s_settlement_undone_during_the_second_competes_there(self):
+        # A is withdrawn until the first tier settles (at the first deadline, funding
+        # nothing); the second tier moved then, so it goes on. A is back at the next
+        # tally and wins the second tier over C.
+        voters = [(100, None), (100, None)]
+        days = fixed([[1, 2, 0]] * 2, [[1, 0, 2]] * 2)
+        result = run_on_time(
+            [150, 150, 150], voters, 0, days, withdrawn_for_day=lambda day: {A} if day <= 1 else set()
+        )
+        self.assertEqual(result["days"][0]["confirmed"], [0])
+        self.assertEqual(result["withdrawn"][0], [A])
+        self.assertEqual(result["withdrawn"][1:], [[], [], []])
+        self.assertEqual(result["funded"], [A])
+        self.assertEqual(result["paid"][A], {0: 75, 1: 75})
+
+    def test_withdrawal_after_the_project_was_funded_in_the_first_tier_is_ignored(self):
+        voters = [(100, None), (100, None)]
+        days = fixed([[1, 1, 3, 4]] * 2, [[1, 1, 4, 3]] * 2)
+        plain = run_on_time([60, 60, 60, 60], voters, 0, days)
+        result = run_on_time(
+            [60, 60, 60, 60], voters, 0, days, withdrawn_for_day=lambda day: {A} if day >= 2 else set()
+        )
+        self.assertEqual(result["days"][0]["confirmed"], [0])
+        self.assertIn(A, result["funded"])
+        self.assertEqual(result["paid"][A], plain["paid"][A])
+        self.assertEqual(sum(result["withdrawn"], []), [])
+
+
 class Properties(unittest.TestCase):
     def revised(self, rounds, seed, **options):
         """Random small rounds in which ballots change freely until the deadline and,

@@ -17,6 +17,7 @@ function inputs(costsK: number[], weightsK: number[], ballots: number[][], poolK
     poolUsd: BigInt(poolK) * K,
     spent: 0n,
     done: new Set<number>(),
+    withdrawn: new Set<number>(),
   } satisfies ChainInputs;
 }
 
@@ -25,6 +26,7 @@ describe("the live inputs as JSON", () => {
     const inp = {
       ...inputs([40, 40, 30], [25, 25], [[1, 2, 3], [2, 1, 255]], 60),
       done: new Set([2]),
+      withdrawn: new Set([1]),
     };
     const back = liveInputsFrom(JSON.parse(JSON.stringify(liveInputsJson(inp, 1))));
     expect(back.first).toBe(1);

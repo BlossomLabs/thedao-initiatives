@@ -495,3 +495,13 @@ describe("the vote results' what-ifs", () => {
     expect(container.querySelector("[data-vote-tick]")).toBeNull();
   });
 });
+
+it("a card withdrawn from the vote says so in place of its %", () => {
+  render(
+    <MemoryRouter>
+      <InitiativeCard card={card({ pct: 40 })} tokensOk={false} withdrawn />
+    </MemoryRouter>,
+  );
+  expect(screen.getByTitle("Withdrawn from the vote by an admin")).toHaveTextContent("Withdrawn");
+  expect(screen.queryByText("40%")).toBeNull();
+});

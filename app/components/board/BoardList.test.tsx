@@ -309,3 +309,10 @@ it("the board's list keeps its Funded column", () => {
   expect(screen.getByText("Funded")).toBeInTheDocument();
   expect(container.querySelector("[data-what-if]")).toBeNull();
 });
+
+it("a row withdrawn from the vote says so in place of its %", () => {
+  mount({ withdrawn: new Set([cards[0].initiative.slug]) });
+  const rows = screen.getAllByRole("listitem");
+  expect(rows[0]).toHaveTextContent("Withdrawn");
+  expect(rows[1]).not.toHaveTextContent("Withdrawn");
+});

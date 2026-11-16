@@ -32,8 +32,11 @@ export default function FinalTiers(
     moved,
     arrived,
     liveTone = "green",
+    withdrawn,
   }: {
     items: BallotItem[];
+    /** Initiatives an admin withdrew from the vote: an unfunded one's chip says so. */
+    withdrawn?: ReadonlySet<string>;
     /** slug → tier: the ballot that counted, or the tier that funded it. */
     tiers: Partial<Record<string, Tier>>;
     /** What the vote funded (slugs). */
@@ -165,6 +168,7 @@ export default function FinalTiers(
                       Boolean(arrived?.has(i.slug));
                     const up = from !== undefined &&
                       TIERS.indexOf(t.tier) < TIERS.indexOf(from);
+                    const out = !isFunded && Boolean(withdrawn?.has(i.slug));
                     const label = given !== undefined
                       ? `${i.title}, comes in with your ${dollars(given)}`
                       : gone
@@ -173,6 +177,8 @@ export default function FinalTiers(
                       ? `${i.title}, moves ${up ? "up" : "down"} from ${tierName(from)}`
                       : came
                       ? `${i.title}, comes in with your donation`
+                      : out
+                      ? `${i.title}, withdrawn`
                       : isFunded
                       ? youPaid !== undefined
                         ? `${i.title}, ${fundedWord}: ${live ? liveAmountWord : amountWord} ${
@@ -271,6 +277,12 @@ export default function FinalTiers(
                           ? (
                             <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-[#a7e3a5] tnum">
                               +{dollars(given)} yours
+                            </span>
+                          )
+                          : out
+                          ? (
+                            <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-dao-red-pale">
+                              Withdrawn
                             </span>
                           )
                           : youPaid !== undefined

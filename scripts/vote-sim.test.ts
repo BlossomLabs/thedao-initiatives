@@ -94,6 +94,17 @@ Deno.test("drawBallot: every draw passes the ballot rules", () => {
   }
 });
 
+Deno.test("drawBallot: withdrawn projects are never drawn, and the rules count them at $0", () => {
+  const r = rng("withdrawn");
+  const round = rulesRound(m, asks, pool, [0]);
+  for (let k = 0; k < 20; k++) {
+    const b = drawBallot(m, asks, pool, r, {}, [0]);
+    assert(b, "a ballot");
+    assertEquals(b[slugs[0]], undefined);
+    assert(checkBallot(encodeBallot(slugs, b), round).ok);
+  }
+});
+
 Deno.test("drawBallot: a revision keeps the settled tier's projects where they are", () => {
   const r = rng("keep");
   const first = drawBallot(m, asks, pool, r)!;

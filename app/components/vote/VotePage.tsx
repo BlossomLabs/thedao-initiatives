@@ -39,10 +39,16 @@ import { setVoteClock, voteNow, When } from "~/components/vote/When";
 import { useMockBallotSubmit } from "~/components/vote/mock-send";
 import { checkBallot, emptyTierErrors } from "../../../shared/vote/rules";
 import { shortDay, usd } from "~/lib/format";
-import { encodeBallot, type Tier, tierName } from "../../../shared/vote/ballot";
+import {
+  encodeBallot,
+  freshDraft,
+  sendableTiers,
+  type Tier,
+  tierName,
+} from "../../../shared/vote/ballot";
 import { ROUND, rulesRound, type VoteManifest } from "../../../shared/vote/manifest";
 import { poolName, PoolNote } from "~/components/vote/pool";
-import { askOf, servedAsks } from "~/lib/vote-results";
+import { askOf, servedAsks, withdrawnProjects } from "~/lib/vote-results";
 
 const closed = (m = ROUND) => voteNow() / 1000 >= m.closesAt;
 const notOpenYet = (m = ROUND) => voteNow() / 1000 < m.opensAt;
@@ -234,6 +240,18 @@ export default function VotePage(
         : mockData.view)
     : roundQ.data;
 
+  // Withdrawn by an admin (at the round's head; once closed, the last settlement's): never
+  // placed, left out of the open tiers when sent, marked on the ballot. A body served
+  // before withdrawals has none.
+  const withdrawnList = rv?.live.withdrawn;
+  const roundTiers = rv?.tiers;
+  const withdrawn = useMemo<ReadonlySet<string>>(
+    () => new Set(roundTiers ? withdrawnProjects(roundTiers, withdrawnList) : []),
+    [roundTiers, withdrawnList],
+  );
+  // The contract's raw flags (a settled project's too): what the size rule counts at $0.
+  const flagList = rv?.withdrawnFlags ?? withdrawnList;
+  const flagged = useMemo<ReadonlySet<string>>(() => new Set(flagList ?? []), [flagList]);
   const [tiers, setTiers] = useState<Partial<Record<string, Tier>>>({});
   // A mock starts from nothing (or its ratings) and keeps nothing in this browser.
   const [skipped, setSkipped] = useState<ReadonlySet<string>>(new Set());
@@ -327,11 +345,15 @@ export default function VotePage(
       }),
     );
     if (fresh) {
-      setTiers((prev) => Object.keys(prev).length ? prev : prefillFromRatings(mine, R.slugs));
+      // A withdrawn initiative is never placed, whatever its rating.
+      setTiers((prev) =>
+        Object.keys(prev).length ? prev : freshDraft(prefillFromRatings(mine, R.slugs), withdrawn)
+      );
     }
     // A skip never hides what a tier holds (the tier wins on the ballot anyway).
     if (noSkips) prefillSkips(skipsFromRatings(mine, R.slugs));
-  }, [fresh, noSkips, ratings.data, board.data]);
+    // `withdrawn` too: `fresh` waits for the round, so it is the round's when this runs.
+  }, [fresh, noSkips, ratings.data, board.data, withdrawn]);
 
   // Dev mock: its skips, and a fresh ballot from its own ratings, once per visit.
   useEffect(() => {
@@ -415,6 +437,8 @@ export default function VotePage(
       ) ?? [],
     ),
     shareUsd: rv?.share ? microUsd(rv.share) : undefined,
+    // Marked on the ballot (once closed, the last settlement's).
+    withdrawn,
   };
   let body: React.ReactNode;
   let wide = false;
@@ -494,7 +518,7 @@ export default function VotePage(
       // The contract would refuse it: never open the wallet for a ballot breaking a rule.
       if (broken) return;
       setSendRoute("own");
-      void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(R.slugs, tiers)));
+      void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(R.slugs, toSend)));
     };
     const counted = rv ? Boolean(rv.accepted[String(n)]) : true;
     // The round as of the newest block the server judged it at, not this browser's clock.
@@ -511,6 +535,18 @@ export default function VotePage(
     const locked = countedHex
       ? lockedLabels(countedTiers(countedHex, tiers, R.slugs), settledCount)
       : new Set<Tier>();
+    // What Send sends: the ballot without the withdrawn initiatives in its open tiers (the
+    // ranks below move up); in a settled tier they stay, as the lock needs.
+    const toSend = sendableTiers(tiers, withdrawn, locked);
+    const sending = Object.keys(toSend).length;
+    const hexOf = (t: Partial<Record<string, Tier>>) =>
+      bytesToHex(encodeBallot(R.slugs, t)).toLowerCase();
+    // The draft is the ballot that counts, withdrawn initiatives and all: it still counts
+    // (a ballot is as valid after a withdrawal as before), so the drop alone neither
+    // breaks a rule nor calls for a resend.
+    const asCounted = Boolean(countedHex) && countedHex!.toLowerCase() === hexOf(tiers);
+    /** What a resend would leave out: withdrawn initiatives in its open tiers. */
+    const leftOut = Object.keys(tiers).filter((slug) => tiers[slug] && !toSend[slug]);
     // What this badge has paid in the settled tiers, for good, and what is left.
     const settledTiers = rv?.tiers.flatMap((t) => t.status === "settled" ? [t] : []) ?? [];
     const paidHere = (t: (typeof settledTiers)[number]) =>
@@ -524,24 +560,34 @@ export default function VotePage(
     // the settled tiers' part of it. Counted on the chain's asks, as the contract judges it;
     // while they're being worked out, no amount at all.
     const poolNow = Number(BigInt(rv?.poolUsd ?? R.poolUsd) / 1_000_000n);
+    // A withdrawn initiative asks $0 for the ballot's size, as the rules count it.
     const askIn = asks &&
-      ((slugs: string[]) => slugs.reduce((a, slug) => a + (askOf(R, asks, slug) ?? 0), 0));
-    const asked = askIn?.(Object.keys(tiers).filter((slug) => tiers[slug]));
+      ((slugs: string[]) =>
+        slugs.reduce((a, slug) => a + (flagged.has(slug) ? 0 : askOf(R, asks, slug) ?? 0), 0));
+    const asked = askIn?.(Object.keys(toSend).filter((slug) => toSend[slug]));
     const voters = rv ? Object.keys(rv.accepted).length : 0;
     const share = rv?.share ? microUsd(rv.share) : voters > 0 ? poolNow / voters : undefined;
     // The ballot rules (rounds deployed with them), with the pool on-chain now. Checked
     // from the first pick (and before it, for the ballot box's line); refusals only once
     // something is placed.
-    const rulesFor = asks && rulesRound(R, asks.map(BigInt), BigInt(rv?.poolUsd ?? R.poolUsd));
+    const rulesFor = asks &&
+      rulesRound(
+        R,
+        asks.map(BigInt),
+        BigInt(rv?.poolUsd ?? R.poolUsd),
+        R.slugs.flatMap((slug, i) => flagged.has(slug) ? [i] : []),
+      );
     const rules = rulesFor && R.ballotRules
-      ? checkBallot(encodeBallot(R.slugs, tiers), rulesFor)
+      ? checkBallot(encodeBallot(R.slugs, toSend), rulesFor)
       : null;
     // The rules count the chain's asks: without them (the round not loaded yet, or served
     // without asks) nothing can be judged, or sent, relayed or from the wallet.
     const asksPending = Boolean(R.ballotRules && !asks);
     // An enforced tier left empty: the bytes would read the next one in its place.
-    const empty = R.ballotRules ? emptyTierErrors(tiers, R.independentTiers) : [];
-    const allErrors = empty.length
+    const empty = R.ballotRules ? emptyTierErrors(toSend, R.independentTiers) : [];
+    const allErrors = asCounted
+      ? []
+      : empty.length
       ? [...empty, ...(rules?.errors.filter((e) => e.rule === "size") ?? [])]
       : rules?.errors ?? [];
     const errors = placed > 0 ? allErrors : [];
@@ -551,7 +597,10 @@ export default function VotePage(
     if (wasInvalid.current === false && invalid) setTimeout(() => showWhyNot(false));
     wasInvalid.current = invalid;
     // A pasted ballot replaces the draft; the settled tiers stay as they were counted.
-    const applyPasted = (next: Partial<Record<string, Tier>>): boolean => {
+    const applyPasted = (pasted: Partial<Record<string, Tier>>): boolean => {
+      // A withdrawn initiative can't be placed: a paste leaves it out (the settled tiers
+      // come back from the ballot that counts below, withdrawn ones and all).
+      const next = freshDraft(pasted, withdrawn);
       if (!countedHex) {
         replaceTiers(next);
         return false;
@@ -607,6 +656,18 @@ export default function VotePage(
     const sharePanel = meter(false);
     // The ballot box says what's missing; this box only explains the affiliations.
     const below = errors.filter(explainBelow);
+    // The ballot that counts holds initiatives withdrawn since: it still counts, quietly.
+    const names = leftOut.map((slug) => titles.get(slug) ?? slug);
+    const list = names.length > 1
+      ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
+      : names[0];
+    const withdrawnNote = asCounted && leftOut.length > 0 && (
+      <p className="m-0 rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-[13.5px] leading-snug text-white/70">
+        {list} {leftOut.length === 1 ? "was" : "were"}{" "}
+        withdrawn from the vote; your ballot still counts, and {list}{" "}
+        will be left out if you resend.
+      </p>
+    );
     const rulesBox = below.length > 0 && (
       <BallotRules
         messages={below.map((e) =>
@@ -665,17 +726,17 @@ export default function VotePage(
       </div>
     );
     const phaseKind = ballotFlow.phase.kind;
-    const upToDateNow = Boolean(countedHex) &&
-      countedHex!.toLowerCase() === bytesToHex(encodeBallot(R.slugs, tiers)).toLowerCase();
+    const upToDateNow = asCounted ||
+      (Boolean(countedHex) && countedHex!.toLowerCase() === hexOf(toSend));
     // The sheet has something to say whatever the ballot: a send running, its outcome.
     const sheetNews = busy || upToDateNow || phaseKind === "failed" || phaseKind === "late" ||
       (phaseKind === "idle" && Boolean(ballotFlow.phase.note));
-    const canSend = !busy && placed > 0 && !broken;
+    const canSend = !busy && sending > 0 && !broken;
     const summary = !sheetNews && (
       <div>
         <ul className="m-0 list-none divide-y divide-white/[.08] rounded-[14px] border border-white/10 bg-white/[.04] p-0">
           {TIER_LABELS.map((t) => {
-            const inTier = Object.keys(tiers).filter((slug) => tiers[slug] === t.tier);
+            const inTier = Object.keys(toSend).filter((slug) => toSend[slug] === t.tier);
             return (
               <li key={t.tier} className="flex items-baseline gap-2 px-3.5 py-3 text-[13px]">
                 <b className="w-14 font-inter-tight text-[14px] text-[#8fd18d]">
@@ -733,8 +794,7 @@ export default function VotePage(
     // only) and where to follow it.
     const sSettled = rv?.tiers.find((t) => t.tier === "S" && t.status === "settled");
     // The ballot on screen is the one that counts: seen as "your ballot", with Edit.
-    const upToDate = Boolean(countedHex) &&
-      countedHex!.toLowerCase() === bytesToHex(encodeBallot(R.slugs, tiers)).toLowerCase();
+    const upToDate = upToDateNow;
     const seenPage = countedHex && !editing && closedProps && (
       <>
         {picker}
@@ -826,7 +886,7 @@ export default function VotePage(
           disabled={busy || early}
           locked={locked}
           head={sharePanel}
-          notice={rulesBox}
+          notice={rulesBox || withdrawnNote || undefined}
           listHead={roundBox}
           phone={phone}
           funded={settledTiers.length ? funded : undefined}
@@ -837,6 +897,7 @@ export default function VotePage(
           sent={countedHex ? countedTiers(countedHex, tiers, R.slugs) : undefined}
           skipped={skipped}
           onSkip={setSkip}
+          withdrawn={withdrawn}
           search={{ ai: board.data?.flags?.aiSearch, aiAuto: board.data?.flags?.aiSearchAuto }}
           actions={early ? undefined : (
             // On a phone it's in the send sheet (PhoneEditor), which is its box.
@@ -863,14 +924,14 @@ export default function VotePage(
                 upToDate={upToDate}
                 onSeeBallot={() => showEditor(false)}
                 onBlocked={showWhyNot}
-                canSend={!busy && placed > 0 && !broken}
+                canSend={!busy && sending > 0 && !broken}
                 // Not ready, it stays as it is, disabled: the ballot box's line says what
                 // the ballot still needs. With a ballot that counts already, it's a resend.
                 sendLabel={countedHex ? "Resend my ballot" : "Send my ballot"}
                 resultsHref={REAL(R) ? "/" : "/vote"}
                 onSend={() => {
                   setSendRoute("relay");
-                  void ballotFlow.submit(BigInt(n), bytesToHex(encodeBallot(R.slugs, tiers)));
+                  void ballotFlow.submit(BigInt(n), bytesToHex(encodeBallot(R.slugs, toSend)));
                 }}
                 onSelfSend={sendYourself}
                 onRetry={() => void ballotFlow.retry()}

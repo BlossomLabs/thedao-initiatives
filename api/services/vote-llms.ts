@@ -20,6 +20,9 @@ export function voteLlms(
   entries: FeedInitiative[],
   origin: string,
   asks?: bigint[],
+  /** Slugs an admin withdrew from the vote (at the replay's head). Null: it couldn't be
+   * read, and the feed says so (none marked is then "unknown", not "none"). */
+  withdrawn: ReadonlySet<string> | null = new Set(),
 ): string {
   const [sTier, aTier, bTier] = TIERS.map(tierName);
   const pool = BigInt(m.poolUsd);
@@ -73,9 +76,9 @@ export function voteLlms(
       dollars(BigInt(p.goalUsd))
     } · asks ${
       asks?.[i] === undefined ? "unknown" : dollars(asks[i])
-    } · affiliations: ${affiliations} · [details](${
-      e?.markdownUrl ?? `${origin}/initiative/${slug}.md`
-    })`;
+    } · affiliations: ${affiliations}${
+      withdrawn?.has(slug) ? " · withdrawn: true" : ""
+    } · [details](${e?.markdownUrl ?? `${origin}/initiative/${slug}.md`})`;
   });
   return [
     `# TheDAO vote: build your ballot`,
@@ -150,6 +153,20 @@ export function voteLlms(
     "",
     "## Projects",
     "",
+    ...(withdrawn === null
+      ? [
+        "Which projects an admin withdrew from the vote couldn't be read right now: none is " +
+        "marked below, but some may be. Re-read this feed in a minute.",
+        "",
+      ]
+      : withdrawn.size
+      ? [
+        "A project marked withdrawn: true was withdrawn by an admin: it is not a candidate and " +
+        "asks $0 toward the total. Leave it unranked; if the ballot that counts has it in a " +
+        "settled tier, keep it there as it is.",
+        "",
+      ]
+      : []),
     ...projects,
     "",
     "## What to do",

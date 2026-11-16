@@ -11,6 +11,8 @@ import { buildFeed, type Feed, filterFeed, llmsFull, llmsIndex } from "../servic
 import { FEED_JSON_SCHEMA } from "../services/feed-schema.ts";
 import { voteLlms } from "../services/vote-llms.ts";
 import { currentVote } from "../services/vote-active.ts";
+import type { VoteReplay } from "./vote.ts";
+import type { VoteRound } from "../services/vote-chain.ts";
 import { gunzip, gzip } from "../lib/gzip.ts";
 
 export const FEED_PATHS = [
@@ -114,7 +116,43 @@ export async function feedResponse(c: Context, body: string, type: string): Prom
   return c.body(body, 200, headers);
 }
 
-export function feedRoutes(feeds: FeedCache, deps?: Pick<Deps, "vote" | "voteRound">) {
+/** How long /vote/llms.txt waits for the replay's withdrawn list. */
+export const WITHDRAWN_WAIT_MS = 2_000;
+
+/** The slugs withdrawn now, from the vote's replay (B-Tier's settlement once closed); null
+ * when it can't be read within WITHDRAWN_WAIT_MS. */
+export async function withdrawnNow(
+  round: VoteRound,
+  replay: VoteReplay | undefined,
+  waitMs = WITHDRAWN_WAIT_MS,
+): Promise<ReadonlySet<string> | null> {
+  if (!replay) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), waitMs);
+  });
+  const read = replay(round).then((st) => {
+    // Once B-Tier settled no tier is live: its settlement's are the last word.
+    const last = st.tiers[2];
+    const ids = last.status === "settled" ? last.withdrawn : st.live.withdrawn;
+    return new Set(ids.map((i) => round.manifest.slugs[i]));
+  });
+  try {
+    return await Promise.race([read, late]);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+    read.catch(() => {});
+  }
+}
+
+export function feedRoutes(
+  feeds: FeedCache,
+  deps?: Pick<Deps, "vote" | "voteRound">,
+  /** The vote's replay (its few-second cache): which projects are withdrawn now. */
+  replay?: VoteReplay,
+) {
   const r = new Hono<Vars>();
   // For an LLM drafting a voter's ballot: the deployed round, its rules and projects.
   r.get("/vote/llms.txt", async (c) => {
@@ -123,14 +161,17 @@ export function feedRoutes(feeds: FeedCache, deps?: Pick<Deps, "vote" | "voteRou
     const o = feeds.origin(c);
     // One multicall beside the feed read; only the HTTP response is cached. Asks that
     // can't be read are said to be unknown rather than guessed.
-    const [asks, feed] = await Promise.all([
+    // Withdrawn ones from the replay (a settled one's flag is ignored there, its award
+    // stands), waited for WITHDRAWN_WAIT_MS at most: unread, the feed says so (null).
+    const [asks, feed, withdrawn] = await Promise.all([
       (async () => {
         const a = await round.chain.asks();
         return a.length === round.manifest.slugs.length ? a : undefined;
       })().catch(() => undefined),
       feeds.get(o),
+      withdrawnNow(round, replay),
     ]);
-    const body = voteLlms(round.manifest, feed.initiatives, o, asks);
+    const body = voteLlms(round.manifest, feed.initiatives, o, asks, withdrawn);
     return feedResponse(c, body, "text/plain; charset=utf-8");
   });
   r.get("/llms.txt", async (c) => {

@@ -100,8 +100,14 @@ export function setRound(m: VoteManifest) {
 }
 
 /** The ballot rules' view of the round: `asks[i]` is project i's ask, one per project
- * (else it throws); `poolUsd` defaults to the manifest's. */
-export const rulesRound = (m: VoteManifest, asks: bigint[], poolUsd?: bigint): RulesRound => {
+ * (else it throws); `poolUsd` defaults to the manifest's; `withdrawn` names the projects
+ * an admin withdrew, by index (each asks $0 for the size rule). */
+export const rulesRound = (
+  m: VoteManifest,
+  asks: bigint[],
+  poolUsd?: bigint,
+  withdrawn?: readonly number[],
+): RulesRound => {
   if (asks.length !== m.projects.length) {
     throw new Error(`vote manifest: ${asks.length} asks for ${m.projects.length} projects`);
   }
@@ -110,6 +116,7 @@ export const rulesRound = (m: VoteManifest, asks: bigint[], poolUsd?: bigint): R
     asks,
     groupNames: m.groups,
     poolUsd: poolUsd ?? BigInt(m.poolUsd),
+    ...(withdrawn ? { withdrawn: m.projects.map((_, i) => withdrawn.includes(i)) } : {}),
     independentTiers: m.independentTiers,
   };
 };

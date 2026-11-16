@@ -557,7 +557,7 @@ function Withdrawals() {
             {rows.map((x) => (
               <li key={x.slug} className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="min-w-[160px] flex-1 text-[13px]">{x.title}</span>
-                {x.withdrawn && <span className="text-[12px] text-[#ffb4b1]">Withdrawn</span>}
+                {x.withdrawn && <span className="text-[12px] text-dao-red-pale">Withdrawn</span>}
                 {x.settledIn && (
                   <span className="text-[12px] text-muted">
                     Settled in {tierName(x.settledIn)}: it can't be withdrawn.

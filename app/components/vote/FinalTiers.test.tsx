@@ -250,3 +250,31 @@ describe("a donation's preview", () => {
     );
   });
 });
+
+it("your ballot marks a withdrawn initiative that wasn't funded; a funded one stays funded", () => {
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>
+        <VoteClosed
+          n={17}
+          titles={new Map(items.map((i) => [i.slug, i.title]))}
+          closeText="Friday"
+          items={items}
+          sent={{ alpha: "S", beta: "A" }}
+          settled={[
+            { tier: "S", funded: ["alpha"], awards: { alpha: 300_000 } },
+            { tier: "A", funded: [], awards: {} },
+            { tier: "B", funded: [], awards: {} },
+          ]}
+          paid={new Map([["alpha", 9800]])}
+          shareUsd={25000}
+          poolUsd={1_000_000}
+          withdrawn={new Set(["alpha", "beta"])}
+        />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  const mine = screen.getByRole("group", { name: "Your ballot" });
+  expect(within(mine).getByLabelText("BETA, withdrawn")).toHaveTextContent("Withdrawn");
+  expect(within(mine).getByLabelText("ALPHA, funded: your share paid $9,800")).toBeInTheDocument();
+});

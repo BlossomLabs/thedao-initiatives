@@ -24,6 +24,53 @@ export function encodeBallot(
   });
 }
 
+/** The tiers a voter sends: an initiative an admin withdrew is left out of the open tiers,
+ * and kept in a `settled` one (the supporter lock needs that tier's set unchanged). The
+ * ranks below a dropped one move up to close the gap, as `encodeBallot` counts only what
+ * is placed: blanking its byte alone would break the competition ranks. Except where
+ * dropping would empty an open tier while a lower one still has picks: those picks would
+ * then count a tier higher than the voter put them, so the withdrawn ones stay there as
+ * a placeholder (the tally gives them nothing, so they cost the voter nothing). The same
+ * object when nothing is dropped. */
+export function sendableTiers(
+  tiers: Partial<Record<string, Tier>>,
+  withdrawn: ReadonlySet<string>,
+  settled: ReadonlySet<Tier>,
+): Partial<Record<string, Tier>> {
+  const entries = Object.entries(tiers).filter((e): e is [string, Tier] => e[1] !== undefined);
+  const dropped = new Set<string>();
+  // From B-Tier up, so "a lower tier still has picks" counts what is sent there.
+  let below = false;
+  for (const t of [...TIERS].reverse()) {
+    const inTier = entries.filter(([, x]) => x === t).map(([slug]) => slug);
+    const out = settled.has(t) ? [] : inTier.filter((slug) => withdrawn.has(slug));
+    const placeholder = out.length === inTier.length && out.length > 0 && below;
+    if (!placeholder) { for (const slug of out) dropped.add(slug); }
+    if (inTier.length > (placeholder ? 0 : out.length)) below = true;
+  }
+  if (!dropped.size) return tiers;
+  return Object.fromEntries(Object.entries(tiers).filter(([slug]) => !dropped.has(slug)));
+}
+
+/** A fresh draft (from ratings, or pasted): every withdrawn initiative left out, with no
+ * placeholder. Nothing on it was counted yet, so nothing needs keeping: an emptied tier
+ * says so and asks the voter to choose. The same object when nothing is withdrawn. */
+export function freshDraft(
+  tiers: Partial<Record<string, Tier>>,
+  withdrawn: ReadonlySet<string>,
+): Partial<Record<string, Tier>> {
+  if (!Object.keys(tiers).some((slug) => withdrawn.has(slug))) return tiers;
+  return Object.fromEntries(Object.entries(tiers).filter(([slug]) => !withdrawn.has(slug)));
+}
+
+/** The bytes a voter sends: `sendableTiers`, encoded. */
+export const sendableBallot = (
+  slugs: string[],
+  tiers: Partial<Record<string, Tier>>,
+  withdrawn: ReadonlySet<string>,
+  settled: ReadonlySet<Tier>,
+): Uint8Array => encodeBallot(slugs, sendableTiers(tiers, withdrawn, settled));
+
 export function decodeBallot(bytes: Uint8Array, slugs: string[]): Partial<Record<string, Tier>> {
   // Lossy when a higher tier is empty (an A-only ballot reads back as S); the
   // order, which is all the tally uses, always survives.

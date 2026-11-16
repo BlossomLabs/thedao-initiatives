@@ -49,7 +49,7 @@ export type PeekChoice<W extends string> = {
 };
 
 export default function InitiativePeek<W extends string>(
-  { item, nav, choices, current, onChoose, note, paid, onClose }: {
+  { item, nav, choices, current, onChoose, note, withdrawn, paid, onClose }: {
     item: BallotItem;
     /** ‹ › through the ballot: where this one is (-1 when it's not in the order). */
     nav?: { index: number; count: number; onStep: (dir: -1 | 1) => void };
@@ -60,6 +60,8 @@ export default function InitiativePeek<W extends string>(
     onChoose: (w: W) => void;
     /** Why the selector is locked (a settled tier), and what it paid: in a popover. */
     note?: string;
+    /** An admin withdrew it from the vote: what that means for this ballot. */
+    withdrawn?: string;
     /** What this badge paid for it, once its tier has settled: "$7,000". */
     paid?: string;
     onClose: () => void;
@@ -302,6 +304,11 @@ export default function InitiativePeek<W extends string>(
                 <span className="font-inter-tight text-[12.5px] text-vote">You paid {paid}</span>
               )}
             </div>
+            {withdrawn && (
+              <p className="m-0 font-inter-tight text-[12.5px] leading-snug text-dao-red-pale">
+                {withdrawn}
+              </p>
+            )}
           </div>
           {/* Only the description scrolls; the arrows on its faded edges scroll it too. */}
           <div ref={descWrap} className="relative min-h-0 flex-1">

@@ -136,15 +136,15 @@ export function createApp(
   });
 
   app.route("/healthz", healthRoutes(deps));
+  const votes = voteRoutes(deps);
   // Before /api/initiatives, so /api/initiatives.json is never read as a slug.
-  app.route("/", feedRoutes(feedCache, deps));
+  app.route("/", feedRoutes(feedCache, deps, votes.replay));
   app.route("/api/auth", authRoutes(deps));
   app.route("/api/board", boardRoutes(deps, boardCache));
   app.route("/api/initiatives", initiativeRoutes(deps));
   app.route("/api/donate", donateRoutes(deps));
   app.route("/api/uploads", uploadRoutes(deps));
   app.route("/api/watchlist", watchlistRoutes(deps));
-  const votes = voteRoutes(deps);
   app.route("/api/vote", votes);
   app.route("/api", profileRoutes(deps));
   app.route("/api", commentRoutes(deps));

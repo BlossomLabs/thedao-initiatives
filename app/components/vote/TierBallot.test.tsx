@@ -396,3 +396,69 @@ it("a choice on the card moves the initiative but keeps the card open, and â€¹ â
   fireEvent.click(within(card).getByRole("button", { name: "Next initiative" }));
   expect(await screen.findByRole("dialog", { name: "BETA" })).toBeInTheDocument();
 });
+
+function withdrawnBallot(tiers: Partial<Record<string, Tier>>, onChange = vi.fn()) {
+  inRouter(
+    <TierBallot
+      items={items}
+      tiers={tiers}
+      disabled={false}
+      locked={new Set<Tier>(["S"])}
+      withdrawn={new Set(["beta"])}
+      onChange={onChange}
+      onReplace={vi.fn()}
+    />,
+  );
+  return { onChange };
+}
+
+it("a withdrawn initiative in the list is marked Withdrawn and can't be placed", async () => {
+  const { onChange } = withdrawnBallot({});
+  const tile = screen.getByRole("button", { name: "Details for BETA" }).closest("li")!;
+  expect(tile).toHaveTextContent("Withdrawn");
+  fireEvent.click(screen.getByRole("button", { name: "Details for BETA" }));
+  const card = await screen.findByRole("dialog", { name: "BETA" });
+  expect(card).toHaveTextContent("Withdrawn from the vote: it can't be ranked.");
+  const option = await optionsIn(card);
+  expect(option("A-Tier, Should fund")).toHaveAttribute("aria-disabled", "true");
+  expect(option("B-Tier, Nice to have")).toHaveAttribute("aria-disabled", "true");
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+it("a withdrawn initiative in a settled tier stays where it is, marked Withdrawn", async () => {
+  withdrawnBallot({ alpha: "S", beta: "S" });
+  const chip = within(screen.getByRole("list", { name: "Must fund" }))
+    .getByRole("button", { name: "BETA, withdrawn" });
+  expect(chip).toHaveTextContent("Withdrawn");
+  fireEvent.click(chip);
+  const card = await screen.findByRole("dialog", { name: "BETA" });
+  expect(card).toHaveTextContent(
+    "Withdrawn from the vote: it stays in S-Tier, as your ballot counted it, and gets nothing.",
+  );
+});
+
+it("a withdrawn initiative in an open tier is marked Withdrawn, left out when sent, and can leave", async () => {
+  const { onChange } = withdrawnBallot({ alpha: "S", beta: "A" });
+  const chip = within(screen.getByRole("list", { name: "Should fund" }))
+    .getByRole("button", { name: "BETA, withdrawn" });
+  fireEvent.click(chip);
+  const card = await screen.findByRole("dialog", { name: "BETA" });
+  expect(card).toHaveTextContent("Withdrawn from the vote: it's left out when you send.");
+  const option = await optionsIn(card);
+  expect(option("B-Tier, Nice to have")).toHaveAttribute("aria-disabled", "true");
+  expect(option("Not ranked yet")).not.toHaveAttribute("aria-disabled", "true");
+  await pickIn(card, "Not ranked yet");
+  expect(onChange).toHaveBeenCalledWith("beta", undefined);
+});
+
+it("a withdrawn initiative alone in an open tier above other picks holds its place", async () => {
+  withdrawnBallot({ alpha: "S", beta: "A", gamma: "B" });
+  fireEvent.click(
+    within(screen.getByRole("list", { name: "Should fund" }))
+      .getByRole("button", { name: "BETA, withdrawn" }),
+  );
+  const card = await screen.findByRole("dialog", { name: "BETA" });
+  expect(card).toHaveTextContent(
+    "Withdrawn from the vote: it holds A-Tier's place, so your picks below keep their tier, and gets nothing.",
+  );
+});

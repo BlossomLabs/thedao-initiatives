@@ -10,6 +10,7 @@ import CardTitle from "~/components/board/CardTitle";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
 import WatchlistButton from "~/components/board/WatchlistButton";
 import FundingStatus from "~/components/board/FundingStatus";
+import { WithdrawnChip } from "~/components/board/VoteTierChip";
 import { whatIf, WhatIfCallout, whatIfText, whatIfTick } from "~/components/vote/NextTier";
 import type { NextTierEntry } from "~/hooks/use-vote";
 import RatingChip, { RatingForm } from "~/components/ratings/RatingChip";
@@ -125,8 +126,11 @@ function Row(
     lead,
     titles,
     voteResults = false,
+    withdrawn = false,
   }: {
     card: Card;
+    /** An admin withdrew it from the vote running now: marked so, in place of its %. */
+    withdrawn?: boolean;
     /** On the vote results page: no Funded cell, the tier after the title. */
     voteResults?: boolean;
     next?: NextTierEntry;
@@ -155,19 +159,25 @@ function Row(
   const pctOn = standing ? standing.kind === "eligible" : pct >= 1;
   const full = fullyFunded(card, votePct);
   const votedFull = (votePct ?? 0) > 0 && full;
-  const pctShown = full ? <FundingStatus tier={voteTier} byVote={votedFull} /> : (
-    <>
-      {pctText(pct)}
-      <span className="sr-only">funded</span>
-    </>
-  );
+  const pctShown = withdrawn
+    ? <WithdrawnChip />
+    : full
+    ? <FundingStatus tier={voteTier} byVote={votedFull} />
+    : (
+      <>
+        {pctText(pct)}
+        <span className="sr-only">funded</span>
+      </>
+    );
   // The vote results' what-if: S-Tier's lead, or the gap to the next tier (to B-Tier for
   // one the vote didn't fund), as a tick on the bar and its callout.
   const w = whatIf({ tier: voteTier, next, lead });
   const wTick = whatIfTick(w, summary.total, r.goalUsd);
   // While the vote runs, the row's tier sits after its title (there is no Funded column);
   // after it, the section names the tier.
-  const status = voteResults && final === undefined && (voteTier || full)
+  const status = voteResults && withdrawn
+    ? <WithdrawnChip />
+    : voteResults && final === undefined && (voteTier || full)
     ? <FundingStatus tier={voteTier} byVote={votedFull || Boolean(voteTier)} />
     : null;
   const tick = vote ? voteFloorPct(r.goalUsd, vote) : 0;
@@ -462,8 +472,11 @@ export default function BoardList(
     next,
     lead,
     titles,
+    withdrawn,
   }: {
     cards: Card[];
+    /** Slugs an admin withdrew from the vote running now: each row marked so. */
+    withdrawn?: ReadonlySet<string>;
     /** S-Tier's lead (micro-USD), by initiative id. */
     lead?: ReadonlyMap<string, string>;
     /** The vote's gap to each initiative's next tier, by initiative id (live while it is
@@ -543,6 +556,7 @@ export default function BoardList(
                 next={next?.get(c.initiative.id)}
                 lead={lead?.get(c.initiative.id)}
                 titles={titles}
+                withdrawn={withdrawn?.has(c.initiative.slug)}
                 voteResults={voteResults}
               />
             ))}

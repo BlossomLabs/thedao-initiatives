@@ -65,3 +65,21 @@ export function coveredProjects(
   const done = new Set(final);
   return { final, now: (liveCovered ?? []).filter((s) => !done.has(s)) };
 }
+
+/** Projects an admin withdrew from the vote: in no tier, and no gap to one. While a tier is
+ * open, the live tally's (the head's flags); once every tier settled, the last settlement's.
+ * A withdrawal is never final while the vote is open (it can be undone), and one funded or
+ * covered in a settled tier shows as funded or covered, never withdrawn. An older served
+ * round, without the field, has none. */
+export function withdrawnProjects(
+  tiers: RoundTier[],
+  liveWithdrawn: string[] | undefined,
+): string[] {
+  const settled = tiers.flatMap((t) => t.status === "settled" ? [t] : []);
+  const done = new Set(settled.flatMap((t) => [...t.funded, ...t.covered ?? []]));
+  const closed = TIERS.every((x) => settled.some((t) => t.tier === x));
+  const now = closed
+    ? TIERS.flatMap((x) => settled.filter((t) => t.tier === x)).at(-1)?.withdrawn
+    : liveWithdrawn;
+  return (now ?? []).filter((s, i, all) => !done.has(s) && all.indexOf(s) === i);
+}

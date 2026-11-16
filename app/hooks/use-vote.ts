@@ -32,6 +32,8 @@ export type RoundTier =
     funded: string[];
     /** Asking $0 at the latest tally: covered by donations. Absent from servers before it. */
     covered?: string[];
+    /** Withdrawn by an admin at the latest tally. Absent from servers before it. */
+    withdrawn?: string[];
   }
   | {
     tier: Tier;
@@ -41,6 +43,9 @@ export type RoundTier =
     funded: string[];
     /** Asking $0 when it settled: covered by donations, final. Absent from servers before it. */
     covered?: string[];
+    /** Withdrawn by an admin when it settled (not final: a withdrawal can be undone before
+     * the next tier settles). Absent from servers before it. */
+    withdrawn?: string[];
     /** Micro-USD per initiative, as decimal strings. */
     awards: Record<string, string>;
     /** tokenId → slug → micro-USD that badge paid for it (only what it paid). */
@@ -69,6 +74,9 @@ export type RoundView = {
    * what the ballot rules and the live tally count. In manifest order; absent when the
    * chain has fewer projects than the site. */
   asks?: string[];
+  /** The contract's withdrawn flags at the head (slugs), a settled project's too: what the
+   * ballot rules count. Display uses `live.withdrawn`. Absent from servers before it. */
+  withdrawnFlags?: string[];
   live: {
     funded: string[];
     awards: Record<string, string>;
@@ -78,6 +86,9 @@ export type RoundView = {
     paid?: Record<string, Record<string, string>>;
     /** Asking $0 now: covered by donations, in no tier. Absent from servers before it. */
     covered?: string[];
+    /** Withdrawn by an admin now: in no tier, and not covered. Absent from servers before
+     * it (and from a cached closed round's body). */
+    withdrawn?: string[];
     /** Each unsettled initiative's gap to its next tier; absent once the round is closed. */
     next?: Record<string, NextTierEntry>;
     /** How far ahead each initiative in the tier settling now is, micro-USD: how much

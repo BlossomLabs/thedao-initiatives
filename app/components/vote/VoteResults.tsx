@@ -12,7 +12,14 @@ import PageMain from "~/components/layout/PageMain";
 import StickyAside from "~/components/layout/StickyAside";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { boardKey, useBoard } from "~/hooks/use-board";
-import { askOf, coveredProjects, dollars, servedAsks, splitResults } from "~/lib/vote-results";
+import {
+  askOf,
+  coveredProjects,
+  dollars,
+  servedAsks,
+  splitResults,
+  withdrawnProjects,
+} from "~/lib/vote-results";
 import { useSession } from "~/context/session";
 import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd, usdShort } from "~/lib/format";
@@ -58,7 +65,8 @@ type Change = {
   moves: { slug: string; from: Tier; to: Tier }[];
 };
 
-/** Projects covered by donations, apart from the tiers: nothing from the pool, in no tier. */
+/** Projects apart from the tiers, nothing from the pool and in no tier: covered by
+ * donations, or withdrawn by an admin. */
 function Covered({ label, titles }: { label: string; titles: string[] }) {
   if (!titles.length) return null;
   return (
@@ -126,6 +134,7 @@ export default function VoteResults(
   const tier: Tier = rv?.tiers.find((t) => t.status !== "settled")?.tier ?? "S";
   const give = rv?.live.give;
   const covered = useMemo(() => coveredProjects(rv?.tiers ?? [], rv?.live.covered), [rv]);
+  const withdrawn = useMemo(() => withdrawnProjects(rv?.tiers ?? [], rv?.live.withdrawn), [rv]);
   const lead = rv?.live.lead;
   // Each initiative's ask is the chain's, served with the round (none while it's unknown,
   // or served short).
@@ -135,8 +144,8 @@ export default function VoteResults(
   const rows = useMemo<GiveRow[] | undefined>(() => {
     if (!give) return undefined;
     const bySlug = new Map(cards.map((c) => [c.initiative.slug, c]));
-    // Covered by donations now: asking nothing, it's in no tier, whatever older gaps say.
-    const coveredNow = new Set(covered.now);
+    // Covered by donations or withdrawn now: in no tier, whatever older gaps say.
+    const coveredNow = new Set([...covered.now, ...withdrawn]);
     const below = Object.entries(give).flatMap(([slug, entry]) => {
       const card = bySlug.get(slug);
       return card && !coveredNow.has(slug)
@@ -155,7 +164,7 @@ export default function VoteResults(
       }];
     });
     return [...ahead, ...below];
-  }, [give, lead, cards, result, tier, R, asks, covered]);
+  }, [give, lead, cards, result, tier, R, asks, covered, withdrawn]);
 
   // The initiative open in the list, and the amount in its donate form.
   const [open, setOpen] = useState<string>();
@@ -459,6 +468,7 @@ export default function VoteResults(
               titles={[...covered.now, ...(change?.covered && open && preview ? [open] : [])]
                 .filter((s, i, all) => all.indexOf(s) === i).map(titleOf)}
             />
+            <Covered label="Withdrawn" titles={withdrawn.map(titleOf)} />
             <Legend preview={Boolean(preview)} />
           </StickyAside>
           <GiveList
@@ -569,7 +579,12 @@ function ClosedResults(
 
   // Covered by donations when a tier settled: not funded, and not "not funded" either.
   const covered = useMemo(() => coveredProjects(rv.tiers, undefined).final, [rv]);
-  const listed = useMemo(() => new Set(R.slugs.filter((s) => !covered.includes(s))), [R, covered]);
+  // Withdrawn by an admin: apart too (one funded before stays funded).
+  const withdrawn = useMemo(() => withdrawnProjects(rv.tiers, rv.live.withdrawn), [rv]);
+  const listed = useMemo(
+    () => new Set(R.slugs.filter((s) => !covered.includes(s) && !withdrawn.includes(s))),
+    [R, covered, withdrawn],
+  );
   const results = useMemo(
     () => splitResults(cards.filter((c) => listed.has(c.initiative.slug)), rv.tiers),
     [rv, cards, listed],
@@ -604,12 +619,13 @@ function ClosedResults(
           from the vote
         </span>
       </div>
-      {covered.length > 0 && (
-        <div className="mx-auto mt-4 max-w-md text-left">
+      {(covered.length > 0 || withdrawn.length > 0) && (
+        <div className="mx-auto mt-4 max-w-md space-y-2 text-left">
           <Covered
             label="Covered by donations"
             titles={covered.map((s) => titles.get(s) ?? s)}
           />
+          <Covered label="Withdrawn" titles={withdrawn.map((s) => titles.get(s) ?? s)} />
         </div>
       )}
       {mine && (

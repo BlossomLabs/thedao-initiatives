@@ -168,6 +168,8 @@
   --color-vote-pale: #f5dc8c;
   --color-dao-red: #ff3b38;
   --color-dao-red-hover: #e63633;
+  /* The pale red for text on the dark panels: a warning, a withdrawn initiative. */
+  --color-dao-red-pale: #ffb4b1;
   --color-dao-sky: #5ac8fa;
   --color-dao-amber: #f0b429;
   --color-dao-rfp: #7eb3ff;

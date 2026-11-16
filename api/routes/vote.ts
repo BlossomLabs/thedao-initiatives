@@ -639,7 +639,11 @@ export function voteRoutes(deps: Deps) {
           "The asks on-chain can't be read right now; try again in a minute.",
         );
       }
-      const checked = checkBallot(hexToBytes(ballot), rulesRound(d.manifest, asks, now.poolUsd));
+      // A withdrawn project asks $0 for the size rule, by the contract's raw flags.
+      const checked = checkBallot(
+        hexToBytes(ballot),
+        rulesRound(d.manifest, asks, now.poolUsd, now.withdrawnFlags ?? []),
+      );
       if (!checked.ok) {
         throw fail(422, "invalid_ballot", "This ballot breaks the ballot rules.", {
           errors: checked.errors.map((e) =>

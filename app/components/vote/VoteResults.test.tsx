@@ -979,3 +979,30 @@ it("gaps from before the latest change say they are being updated; a project cov
   await list().findByRole("button", { name: /Beta audits/ });
   expect(screen.queryByText(/these figures are being updated/)).toBeNull();
 });
+
+it("while open, a withdrawn project is listed as Withdrawn, apart, with no donation gap", async () => {
+  const view = openWith({ beta: give() });
+  await showOpen({ ...view, live: { ...view.live, withdrawn: ["beta"] } });
+  const box = await screen.findByRole("region", { name: "Withdrawn" });
+  expect(within(box).getByText("Beta audits")).toBeInTheDocument();
+  // Not under covered, and no row to donate to (its old gap is dropped).
+  expect(screen.queryByRole("region", { name: /^Covered by donations/ })).toBeNull();
+  expect(list().queryByRole("button", { name: /Beta audits/ })).toBeNull();
+  expect(list().getByRole("button", { name: /Alpha fuzzing/ })).toBeInTheDocument();
+});
+
+it("once closed, a withdrawn project is apart from the tiers and not funded", async () => {
+  await showClosed({
+    tiers: [
+      settled("S", ["alpha"], { alpha: usdMicro(60_000) }),
+      settled("A", [], {}),
+      // Alpha's flag says withdrawn, but it was funded in S-Tier: it shows as funded.
+      { ...settled("B", [], {}), withdrawn: ["alpha", "beta"] },
+    ],
+  });
+  const box = screen.getByRole("region", { name: "Withdrawn" });
+  expect(within(box).getByText("Beta audits")).toBeInTheDocument();
+  expect(within(box).queryByText("Alpha fuzzing")).toBeNull();
+  expect(heading("S-Tier")).toHaveTextContent("S-Tier$60,000 allocated to 1 initiative");
+  expect(heading("Not funded")).toBeNull();
+});

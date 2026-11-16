@@ -127,3 +127,29 @@ it("opens the round box from the deadline", () => {
   expect(within(screen.getByRole("dialog", { name: "Where the round is" })).getByText("Round box"))
     .toBeInTheDocument();
 });
+
+it("a withdrawn initiative is marked Withdrawn, and its card can't place it", () => {
+  render(
+    <MemoryRouter>
+      <TierBallot
+        items={items}
+        tiers={{}}
+        disabled={false}
+        withdrawn={new Set(["beta"])}
+        onChange={vi.fn()}
+        phone={{
+          head: <p>Ballot box</p>,
+          round: <span>S-Tier starts settling</span>,
+          roundSheet: <p>Round box</p>,
+          send: { label: "Send my ballot", ready: true, summary: <p>Summary</p> },
+        }}
+      />
+    </MemoryRouter>,
+  );
+  const row = screen.getByRole("button", { name: /BETA/ });
+  expect(row).toHaveTextContent("Withdrawn");
+  fireEvent.click(row);
+  const card = screen.getByRole("dialog", { name: "BETA" });
+  expect(card).toHaveTextContent("Withdrawn from the vote: it can't be ranked.");
+  expect(within(card).getByRole("button", { name: "S-Tier, Must fund" })).toBeDisabled();
+});

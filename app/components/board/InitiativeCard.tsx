@@ -7,6 +7,7 @@ import { fullyFunded } from "~/lib/board-view";
 import CardTitle from "./CardTitle";
 import WatchlistButton from "~/components/board/WatchlistButton";
 import FundingStatus from "~/components/board/FundingStatus";
+import { WithdrawnChip } from "~/components/board/VoteTierChip";
 import { whatIf, WhatIfCallout, WhatIfFigure, whatIfTick } from "~/components/vote/NextTier";
 import type { NextTierEntry } from "~/hooks/use-vote";
 import CardLabel, { cardLabel } from "~/components/board/CardLabel";
@@ -58,8 +59,11 @@ export default function InitiativeCard({
   next,
   lead,
   titles,
+  withdrawn = false,
 }: {
   card: Card;
+  /** An admin withdrew it from the vote running now: marked so, in place of its %. */
+  withdrawn?: boolean;
   /** S-Tier's lead, micro-USD. */
   lead?: string;
   /** The open vote's gap to this initiative's next tier, drawn in place of the %. */
@@ -197,7 +201,7 @@ export default function InitiativeCard({
             <span className="text-[12px] text-white/30">· {plural(backers, "backer")}</span>
           )}
         </span>
-        {w && final !== undefined
+        {withdrawn ? <WithdrawnChip /> : w && final !== undefined
           // After the vote the figure takes the place of the tier chip (the section names it).
           ? <WhatIfFigure w={w} />
           : w

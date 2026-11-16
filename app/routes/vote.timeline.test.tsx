@@ -10,7 +10,7 @@
  */
 import { MemoryRouter, Route, Routes } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { bytesToHex, zeroHash } from "viem";
 import { api } from "~/lib/api";
@@ -117,11 +117,13 @@ vi.mock("~/context/wallet", () => ({
 vi.mock("~/context/wallet-picker", () => ({
   useWalletPicker: () => ({ openWalletPicker: vi.fn(), walletPickerOpen: false }),
 }));
+/** What the editor's Send hands the relay. */
+const submit = vi.hoisted(() => vi.fn());
 vi.mock("~/hooks/use-vote-send", async (original) => ({
   ...await original<typeof import("~/hooks/use-vote-send")>(),
   useBallotSubmit: () => ({
     phase: { kind: "idle" },
-    submit: vi.fn(),
+    submit,
     retry: vi.fn(),
     selfSend: vi.fn(),
     last: null,
@@ -166,7 +168,7 @@ type Change = {
   pool?: bigint;
 };
 const USD = (n: number) => BigInt(n) * 1_000_000n;
-const chain = { events: EVENTS, changes: [] as Change[] };
+const chain = { events: EVENTS, changes: [] as Change[], withdrawn: [] as boolean[] };
 
 /** The chain as a node whose newest block is `head` sees it. */
 function chainAt(head: number): RoundSource {
@@ -193,7 +195,12 @@ function chainAt(head: number): RoundSource {
       return Promise.resolve({ block: b, timestamp: b });
     },
     stateAt: (b) =>
-      Promise.resolve({ timestamp: b, asks: at(b).asks, poolUsd: at(b).pool, withdrawn: [] }),
+      Promise.resolve({
+        timestamp: b,
+        asks: at(b).asks,
+        poolUsd: at(b).pool,
+        withdrawn: chain.withdrawn,
+      }),
     accountingEventBlocks: (from, to) => Promise.resolve(blocksOf(["pledge", "pool"], from, to)),
     balanceChangeBlocks: (from, to) => Promise.resolve(blocksOf(["donation"], from, to)),
     ballots: () => Promise.resolve({ events, block: BigInt(head) }),
@@ -228,6 +235,8 @@ let qc: QueryClient;
 beforeEach(() => {
   chain.events = EVENTS;
   chain.changes = [];
+  chain.withdrawn = [];
+  submit.mockReset();
   vi.useFakeTimers({ shouldAdvanceTime: true });
   localStorage.clear();
   vi.mocked(api).mockReset().mockImplementation(
@@ -668,4 +677,94 @@ it("the editor follows every event: asks, the share, and what settles", async ()
         break;
     }
   });
+});
+
+it("the editor marks a withdrawn initiative; alone in its open tier it stays, so the picks below keep their tier", async () => {
+  // Beta was withdrawn before anything settled: badge 1's counted ballot has it alone in
+  // A-Tier, with gamma in B-Tier. Dropping beta would count gamma in A-Tier.
+  chain.withdrawn = [false, true, false];
+  await serve(1500, 1499);
+  // The rules' raw flags and the display's list, both served.
+  const body = served.body as { withdrawnFlags: string[]; live: { withdrawn: string[] } };
+  expect(body.withdrawnFlags).toEqual(["beta"]);
+  expect(body.live.withdrawn).toEqual(["beta"]);
+  vi.setSystemTime(1500_000);
+  mount("editor");
+  const chip = await screen.findByRole("button", { name: "BETA, withdrawn" });
+  expect(chip).toHaveTextContent("Withdrawn");
+  const tierOf = (slug: string) =>
+    document.querySelector(`[data-ballot-box="${slug}"]`)?.closest("[data-drop]")
+      ?.getAttribute("data-drop");
+  expect(["alpha", "beta", "gamma"].map(tierOf)).toEqual(["S", "A", "B"]);
+  // What it would send is what counts: nothing to resend, gamma stays in B-Tier.
+  expect(await screen.findByText("Your ballot counts")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Resend my ballot/ })).toBeNull();
+  expect(submit).not.toHaveBeenCalled();
+});
+
+it("a counted ballot stays counted after an open tier's project is withdrawn: a quiet note, no resend", async () => {
+  // Gamma, alone in badge 1's open B-Tier with nothing below, is withdrawn after the
+  // ballot was counted: a resend would leave it out, but the ballot still counts.
+  chain.withdrawn = [false, false, true];
+  await serve(1500, 1499);
+  vi.setSystemTime(1500_000);
+  mount("editor");
+  expect(await screen.findByRole("button", { name: "GAMMA, withdrawn" })).toBeInTheDocument();
+  expect(await screen.findByText("Your ballot counts")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^Resend my ballot/ })).toBeNull();
+  expect(
+    screen.getByText((_, el) =>
+      el?.tagName === "P" &&
+      el.textContent ===
+        "GAMMA was withdrawn from the vote; your ballot still counts, and GAMMA will be left out if you resend."
+    ),
+  ).toBeInTheDocument();
+  // Nothing shakes: no rule broke.
+  await act(() => vi.advanceTimersByTimeAsync(500));
+  expect(document.querySelector("[class*='animate-reason-nudge']")).toBeNull();
+  expect(submit).not.toHaveBeenCalled();
+});
+
+it("a pasted ballot leaves a withdrawn initiative out entirely, with no placeholder", async () => {
+  // Alpha is withdrawn; the paste puts it alone in S-Tier, above A-Tier and B-Tier picks
+  // (gamma moved up from B-Tier, so the paste is seen to land).
+  chain.withdrawn = [true, false, false];
+  await serve(1500, 1499);
+  vi.setSystemTime(1500_000);
+  mount("editor");
+  fireEvent.click(await screen.findByRole("button", { name: "Use an LLM…" }));
+  fireEvent.change(screen.getByLabelText("Paste its ballot"), {
+    target: { value: "S-Tier:\n  - alpha\nA-Tier:\n  - beta\n  - gamma\nB-Tier: []" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Use this ballot" }));
+  const tierOf = (slug: string) =>
+    document.querySelector(`[data-ballot-box="${slug}"]`)?.closest("[data-drop]")
+      ?.getAttribute("data-drop");
+  await waitFor(() => expect(tierOf("gamma")).toBe("A"));
+  expect(tierOf("alpha")).toBe("unplaced");
+  expect(tierOf("beta")).toBe("A");
+});
+
+it("a fresh draft from ratings leaves a withdrawn 5★ initiative out, with no placeholder", async () => {
+  // Before badge 1's first ballot: its draft starts from its ratings. Alpha (5★, alone in
+  // S-Tier) is withdrawn; beta (4★) goes to A-Tier.
+  chain.withdrawn = [true, false, false];
+  const plain = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation(
+    ((path: string, ...rest: unknown[]) =>
+      path.startsWith("/api/reviews/ratings")
+        ? Promise.resolve({ ratings: { alpha: { mine: 5 }, beta: { mine: 4 } } })
+        // A test round's ratings are the review badge's: this account has one.
+        : path === "/api/reviews/identity"
+        ? Promise.resolve({ tokenIds: ["9"], canReview: true })
+        : (plain as (...a: unknown[]) => unknown)(path, ...rest)) as typeof api,
+  );
+  await serve(1050, 1049);
+  vi.setSystemTime(1050_000);
+  mount("editor");
+  const tierOf = (slug: string) =>
+    document.querySelector(`[data-ballot-box="${slug}"]`)?.closest("[data-drop]")
+      ?.getAttribute("data-drop");
+  await waitFor(() => expect(tierOf("beta")).toBe("A"));
+  expect(tierOf("alpha")).toBe("unplaced");
 });

@@ -333,6 +333,8 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
         funded: [],
         awards: {},
         covered: round.slugs.filter((_, i) => needs[i] === 0n),
+        // The examples withdraw nothing.
+        withdrawn: [],
       },
     };
     if (kind === "started") return { round, view };
@@ -362,9 +364,11 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   const settledTiers = t.settledTiers.map(({ tier, stage }, i) => ({
     ...settledTier(round.slugs, tier, first[i] + WINDOW, stage),
     ...(i === 0 ? { covered } : {}),
+    withdrawn: [],
   }));
   const live = liveJson(round, t, settledCount);
   live.covered = covered;
+  live.withdrawn = [];
   // The tier settling now: in its first window, quiet; or, while S-Tier settles, changed
   // in its first (in its second now), or in its last, where it settles whatever happens.
   const settlingNow = (tier: Tier): RoundTier => {
@@ -409,7 +413,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
             x.status === "settled" ? x.funded.map((s) => [s, x.tier]) : []
           ),
         );
-        return { funded: all, awards, tiers: tierOf, covered };
+        return { funded: all, awards, tiers: tierOf, covered, withdrawn: [] };
       })()
       : live,
   };

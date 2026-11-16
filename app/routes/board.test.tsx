@@ -11,6 +11,10 @@ import { preloadSelects } from "~/components/board/FilterBar";
 beforeAll(() => preloadSelects());
 
 const searchMode = vi.hoisted(() => ({ automatic: false }));
+/** The round the board's flags name (none unless a test sets one). */
+const flagRound = vi.hoisted(() => ({ value: undefined as unknown }));
+// The round's manifest is primed in the app; here the board only needs to see it.
+vi.mock("~/lib/vote-round", () => ({ primeRound: () => {} }));
 
 const cards = vi.hoisted(() =>
   [
@@ -49,7 +53,12 @@ vi.mock("~/hooks/use-board", () => ({
     data: {
       cards,
       totals: { raised: 0 },
-      flags: { aiSearch: true, aiSearchAuto: searchMode.automatic, tokensOk: false },
+      flags: {
+        aiSearch: true,
+        aiSearchAuto: searchMode.automatic,
+        tokensOk: false,
+        round: flagRound.value,
+      },
     },
     isLoading: false,
     isError: false,
@@ -69,6 +78,7 @@ vi.mock("~/lib/api", async (o) => ({
 beforeEach(() => {
   api.mockReset();
   searchMode.automatic = false;
+  flagRound.value = undefined;
 });
 
 const at = (url: string) => {
@@ -338,4 +348,38 @@ it("only the first three scored results get labels when there are more proposals
   } finally {
     cards.pop();
   }
+});
+
+it("during a test vote, the board marks what an admin withdrew from it", async () => {
+  flagRound.value = {
+    kind: "test",
+    chainId: 11155111,
+    contract: "0x1",
+    opensAt: 1,
+    closesAt: 4_000_000_000,
+    manifest: { kind: "test", opensAt: 1, closesAt: 4_000_000_000 },
+  };
+  api.mockImplementation((path: string) =>
+    path === "/api/vote/round"
+      ? Promise.resolve({
+        registrationClosesAt: 0,
+        closed: false,
+        tiers: [{ tier: "S", status: "waiting", startsAt: 2 }],
+        accepted: {},
+        rejected: [],
+        live: { funded: [], awards: {}, withdrawn: ["b"] },
+      })
+      : Promise.reject(new Error("not in test: " + path))
+  );
+  at("/");
+  const beta = (await screen.findAllByText("Beta wallets"))[0].closest("li, [data-initiative-id]")!;
+  await waitFor(() => expect(beta).toHaveTextContent("Withdrawn"));
+  const alpha = screen.getAllByText("Alpha fuzzing")[0].closest("li, [data-initiative-id]")!;
+  expect(alpha).not.toHaveTextContent("Withdrawn");
+});
+
+it("no round open: the board doesn't read the vote", async () => {
+  at("/");
+  await screen.findAllByText("Beta wallets");
+  expect(api).not.toHaveBeenCalledWith("/api/vote/round", expect.anything());
 });

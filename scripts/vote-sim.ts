@@ -134,7 +134,8 @@ export function timeline(
 /**
  * A ballot that passes the rules at these asks and pool: the `kept` projects stay where
  * they are (settled tiers), the rest is drawn at random into the open tiers until the
- * ballot asks for enough. Null when no draw passes in `tries`.
+ * ballot asks for enough. `withdrawn` (project indexes, the contract's raw flags) ask $0
+ * for the size rule and are never drawn. Null when no draw passes in `tries`.
  */
 export function drawBallot(
   m: VoteManifest,
@@ -142,13 +143,14 @@ export function drawBallot(
   poolUsd: bigint,
   r: Rng,
   kept: Ballot = {},
+  withdrawn: readonly number[] = [],
   tries = 200,
 ): Ballot | null {
-  const round = rulesRound(m, asks, poolUsd);
+  const round = rulesRound(m, asks, poolUsd, withdrawn);
   const locked = new Set(Object.values(kept));
   const open = TIERS.filter((t) => !locked.has(t));
   if (!open.length) return null;
-  const free = m.slugs.filter((slug) => !kept[slug]);
+  const free = m.slugs.filter((slug, i) => !kept[slug] && !withdrawn.includes(i));
   for (let k = 0; k < tries; k++) {
     const b: Ballot = { ...kept };
     const order = r.shuffle(free);
@@ -189,6 +191,8 @@ type RoundView = {
   closed: boolean;
   poolUsd: string;
   asks?: string[];
+  /** The contract's withdrawn flags at the head (slugs); absent from servers before it. */
+  withdrawnFlags?: string[];
   accepted: Record<string, Hex>;
   tiers: { tier: Tier; status: string }[];
 };
@@ -358,6 +362,7 @@ async function main() {
     const settled = v.tiers.filter((t) => t.status === "settled").length;
     const asks = (v.asks ?? []).map(BigInt);
     const pool = BigInt(v.poolUsd);
+    const withdrawn = m.slugs.flatMap((slug, i) => v.withdrawnFlags?.includes(slug) ? [i] : []);
     if (asks.length !== m.slugs.length) {
       log("the round has no asks yet; trying again in 10 s");
       queue.unshift(...due.map((x) => ({ ...x, at: now() + 10 })));
@@ -372,7 +377,7 @@ async function main() {
         log(`voter ${p.i}: no counted ballot and S-Tier settled; skipped`);
         continue;
       }
-      const b = drawBallot(m, asks, pool, r, keptFor(m, counted, settled));
+      const b = drawBallot(m, asks, pool, r, keptFor(m, counted, settled), withdrawn);
       if (!b) {
         log(`voter ${p.i}: every tier it holds has settled; nothing left to change`);
         continue;
@@ -382,7 +387,7 @@ async function main() {
       const signature = await p.account.signTypedData(
         voteTypedData(m, p.tokenId, p.account.address, nonce, ballot),
       );
-      const proof = findProof(hexToBytes(ballot), rulesRound(m, asks, pool)) ?? [];
+      const proof = findProof(hexToBytes(ballot), rulesRound(m, asks, pool, withdrawn)) ?? [];
       votes.push({
         p,
         e,

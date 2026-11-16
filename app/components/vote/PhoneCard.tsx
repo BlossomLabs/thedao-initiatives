@@ -28,7 +28,7 @@ export function swipeStep(dx: number, index: number, count: number): -1 | 0 | 1 
  * initiative, in the order the list showed when the card opened.
  */
 export default function PhoneCard<W extends string>(
-  { item, nav, choices, current, onChoose, note, paid, onClose }: {
+  { item, nav, choices, current, onChoose, note, withdrawn, paid, onClose }: {
     item: BallotItem;
     nav: { index: number; count: number; onStep: (dir: -1 | 1) => void };
     /** The three tiers, then the list and skipped, in order (as InitiativePeek's). */
@@ -38,6 +38,8 @@ export default function PhoneCard<W extends string>(
     onChoose: (w: W) => void;
     /** Why it can't move (a settled tier), and what it paid. */
     note?: string;
+    /** An admin withdrew it from the vote: what that means for this ballot. */
+    withdrawn?: string;
     /** What this badge paid for it, once its tier has settled: "$7,000". */
     paid?: string;
     onClose: () => void;
@@ -198,6 +200,9 @@ export default function PhoneCard<W extends string>(
             </p>
           )}
           {note && <p className="m-0 mt-2 text-[13px] leading-snug text-vote">{note}</p>}
+          {withdrawn && (
+            <p className="m-0 mt-2 text-[13px] leading-snug text-dao-red-pale">{withdrawn}</p>
+          )}
           <div className="mt-3.5 min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {r?.summary && (
               <p className="m-0 select-text text-[14px] leading-relaxed text-white/75">

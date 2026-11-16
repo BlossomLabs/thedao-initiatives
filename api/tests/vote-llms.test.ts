@@ -1,6 +1,7 @@
 /** /vote/llms.txt: the round, its rules and every project, for an LLM drafting a ballot. */
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { voteLlms } from "../services/vote-llms.ts";
+import { withdrawnNow } from "../routes/feeds.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import type { FeedInitiative } from "../services/feed.ts";
 import { parseBallotText } from "../../shared/vote/ballot-text.ts";
@@ -204,4 +205,54 @@ Deno.test("vote llms: each project lists its chain ask", () => {
     "Where a project's ask is unknown, the ballot's size can't be checked here: say so to the voter rather than estimating it.",
   );
   assert(!text.includes("still needs"));
+});
+
+Deno.test("vote llms: a withdrawn initiative is marked withdrawn: true, the times stay ISO UTC", () => {
+  const out = voteLlms(m, entries, "https://x.test", undefined, new Set(["fuzzing"]));
+  assertStringIncludes(
+    out,
+    "- fuzzing — Community fuzzing · RFP · goal $250,000 · asks unknown · affiliations: none · withdrawn: true · [details]",
+  );
+  assert(
+    !out.includes(
+      "seal-audits — Seal audits · Grant · goal $300,000 · asks unknown · affiliations: Seal · withdrawn",
+    ),
+  );
+  assertStringIncludes(out, "marked withdrawn: true");
+  assertStringIncludes(out, "S-Tier starts settling 2027-01-16 11:46 UTC");
+  // None withdrawn: no marks, and no word on them.
+  assert(!text.includes("withdrawn: true"));
+});
+
+Deno.test("vote llms: withdrawn unknown says so, apart from none withdrawn", () => {
+  const unknown = voteLlms(m, entries, "https://x.test", undefined, null);
+  assertStringIncludes(unknown, "Which projects an admin withdrew from the vote couldn't be read");
+  assert(!unknown.includes("withdrawn: true"));
+  assert(!text.includes("couldn't be read"));
+  const some = voteLlms(m, entries, "https://x.test", undefined, new Set(["wallets"]));
+  assertStringIncludes(some, "it is not a candidate");
+  assert(!some.includes("no candidate"));
+});
+
+Deno.test("vote llms: the route says withdrawn is unknown when the replay can't be read", async () => {
+  const h = await harness();
+  h.deps.vote = { chain: {} as never, manifest: m };
+  const body = await (await h.req("/vote/llms.txt")).text();
+  assertStringIncludes(body, "couldn't be read right now");
+  h.close();
+});
+
+Deno.test("withdrawnNow: the replay's live list, null on a failure or past the wait", async () => {
+  const round = { chain: {} as never, manifest: m };
+  const st = (live: number[], last: unknown = { status: "waiting" }) =>
+    Promise.resolve({ tiers: [{}, {}, last], live: { withdrawn: live } } as never);
+  assertEquals([...(await withdrawnNow(round, () => st([2])))!], ["fuzzing"]);
+  // Closed: B-Tier's settlement.
+  assertEquals(
+    [...(await withdrawnNow(round, () => st([], { status: "settled", withdrawn: [3] })))!],
+    ["wallets"],
+  );
+  assertEquals(await withdrawnNow(round, () => Promise.reject(new Error("rpc"))), null);
+  assertEquals(await withdrawnNow(round, () => new Promise(() => {}), 10), null);
+  assertEquals(await withdrawnNow(round, undefined), null);
 });

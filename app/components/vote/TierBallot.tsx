@@ -20,7 +20,7 @@ import { type BoardView, DEFAULT_VIEW, facetCounts, isFiltered, matches } from "
 import { categoryOf } from "~/lib/categories";
 import { usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
-import { type Tier, tierName } from "../../../shared/vote/ballot";
+import { sendableTiers, type Tier, tierName } from "../../../shared/vote/ballot";
 import InitiativePeek, { type PeekChoice } from "./InitiativePeek";
 import PhoneCard from "./PhoneCard";
 import PhoneEditor from "./PhoneEditor";
@@ -73,6 +73,11 @@ export type BallotItem = {
 type Where = Tier | "unplaced" | "skipped";
 
 const UNRANKED = "Not ranked yet";
+/** An initiative an admin withdrew from the vote. */
+const WITHDRAWN = "Withdrawn";
+/** Its tag on a tile, a row or a chip: the admin's withdrawn red. */
+const WITHDRAWN_TAG =
+  "flex-none rounded-[5px] border border-dao-red-pale/40 px-1 text-[11px] font-medium leading-[16px] text-dao-red-pale";
 const SKIPPED = "Skipped";
 /** A small button on a list tile's right: Details, Skip. */
 const TILE_ACTION =
@@ -181,6 +186,7 @@ export default function TierBallot(
     skipped,
     onSkip,
     sent,
+    withdrawn,
     phone: phoneParts,
   }: {
     items: BallotItem[];
@@ -214,6 +220,10 @@ export default function TierBallot(
     onSkip?: (slug: string, skip: boolean) => void;
     /** The ballot that counts, once one was sent: changed since, it can be restored. */
     sent?: Partial<Record<string, Tier>>;
+    /** Initiatives an admin withdrew from the vote: marked Withdrawn, never placed in a
+     * tier. One in a settled tier stays there (the lock); one in an open tier can leave
+     * it, and is left out when the ballot is sent. */
+    withdrawn?: ReadonlySet<string>;
     /** On a phone, the editor is one list (S-Tier, A-Tier, B-Tier, then the rest) under the
      * ballot box, and an initiative's card fills the screen. These are its parts. */
     phone?: PhoneParts;
@@ -301,6 +311,7 @@ export default function TierBallot(
     tiers[slug] ?? (skipped?.has(slug) ? "skipped" : "unplaced");
   const isTier = (w: Where): w is Tier => w !== "unplaced" && w !== "skipped";
   const isLocked = (w: Where) => isTier(w) && Boolean(locked?.has(w));
+  const isOut = (slug: string) => Boolean(withdrawn?.has(slug));
   const labelOf = (w: Where) =>
     TIER_LABELS.find((t) => t.tier === w)?.label ?? (w === "skipped" ? SKIPPED : UNRANKED);
   /** The skipped list: hidden until asked for. */
@@ -319,6 +330,8 @@ export default function TierBallot(
     if (!dest || where(slug) === dest) return;
     const from = where(slug);
     if (isLocked(from) || isLocked(dest)) return;
+    // Withdrawn: out of a tier, or skipped, but into none.
+    if (isOut(slug) && isTier(dest)) return;
     if (dest === "skipped") {
       if (isTier(from)) onChange(slug, undefined);
       onSkip?.(slug, true);
@@ -485,7 +498,8 @@ export default function TierBallot(
 
   /** A tier (or the list) that would take the initiative being dragged or tapped. */
   const takes = (t: Where) =>
-    picked !== undefined && where(picked) !== t && !isLocked(t) && !isLocked(where(picked));
+    picked !== undefined && where(picked) !== t && !isLocked(t) && !isLocked(where(picked)) &&
+    !(isOut(picked) && isTier(t));
   const lit = (t: Where) => Boolean(drag) && over === t && takes(t);
 
   /** The card: the initiative's chip or tile morphs into it (the browser's own morph). */
@@ -566,14 +580,19 @@ export default function TierBallot(
           >
             {i.title}
           </span>
-          {i.askUsd !== undefined && (
+          {(i.askUsd !== undefined || isOut(i.slug)) && (
             <span className="flex h-[18px] items-center gap-1.5 truncate text-[12px] text-white/45">
-              {cat && <CategoryDot slug={cat} className="size-[7px]" data-peek-dot="" />}
-              {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
-              <span className="tnum whitespace-nowrap">
-                {cat && "· "}
-                {usd(i.askUsd)} ask
-              </span>
+              {isOut(i.slug) && <span className={WITHDRAWN_TAG}>{WITHDRAWN}</span>}
+              {i.askUsd !== undefined && (
+                <>
+                  {cat && <CategoryDot slug={cat} className="size-[7px]" data-peek-dot="" />}
+                  {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
+                  <span className="tnum whitespace-nowrap">
+                    {cat && "· "}
+                    {usd(i.askUsd)} ask
+                  </span>
+                </>
+              )}
             </span>
           )}
         </span>
@@ -599,6 +618,24 @@ export default function TierBallot(
     const youPaid = isLocked(where(slug)) && funded?.has(slug) ? paid?.get(slug) : undefined;
     return youPaid ? `$${Math.round(youPaid).toLocaleString("en-US")}` : undefined;
   };
+  /** A withdrawn initiative's line on its card: where it stays, or that it's left out. */
+  const withdrawnOf = (slug: string): string | undefined => {
+    if (!isOut(slug)) return undefined;
+    const w = where(slug);
+    if (!isTier(w)) return "Withdrawn from the vote: it can't be ranked.";
+    if (isLocked(w)) {
+      return `Withdrawn from the vote: it stays in ${
+        tierName(w)
+      }, as your ballot counted it, and gets nothing.`;
+    }
+    // Alone in its tier above other picks: kept, so they don't move up a tier.
+    const kept = sendableTiers(tiers, withdrawn!, locked ?? new Set())[slug] !== undefined;
+    return kept
+      ? `Withdrawn from the vote: it holds ${
+        tierName(w)
+      }'s place, so your picks below keep their tier, and gets nothing.`
+      : "Withdrawn from the vote: it's left out when you send.";
+  };
   /** The card's choices: the three tiers and the list, a settled one locked. */
   const choicesFor = (slug: string): PeekChoice<Where>[] => [
     ...TIER_LABELS.map((t) => ({
@@ -607,7 +644,7 @@ export default function TierBallot(
       label: t.label,
       name: `${tierName(t.tier)}, ${t.label}`,
       display: `${tierName(t.tier)} · ${t.label}`,
-      disabled: disabled || isLocked(where(slug)) || isLocked(t.tier),
+      disabled: disabled || isLocked(where(slug)) || isLocked(t.tier) || isOut(slug),
     })),
     {
       value: "unplaced" as Where,
@@ -731,14 +768,19 @@ export default function TierBallot(
             <span className="line-clamp-2 font-inter-tight text-[14px] font-medium leading-[1.3] text-white">
               {i.title}
             </span>
-            {i.askUsd !== undefined && (
+            {(i.askUsd !== undefined || isOut(i.slug)) && (
               <span className="mt-1 flex items-center gap-1.5 truncate text-[12px] text-white/60">
-                {cat && <CategoryDot slug={cat} className="size-[7px] flex-none" />}
-                {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
-                <span className="whitespace-nowrap tnum">
-                  {cat && "· "}
-                  {usd(i.askUsd)} ask
-                </span>
+                {isOut(i.slug) && <span className={WITHDRAWN_TAG}>{WITHDRAWN}</span>}
+                {i.askUsd !== undefined && (
+                  <>
+                    {cat && <CategoryDot slug={cat} className="size-[7px] flex-none" />}
+                    {cat && <span className="truncate">{categoryOf(cat)?.label}</span>}
+                    <span className="whitespace-nowrap tnum">
+                      {cat && "· "}
+                      {usd(i.askUsd)} ask
+                    </span>
+                  </>
+                )}
                 {paidText && (
                   <span className="whitespace-nowrap font-semibold text-vote tnum">
                     · You paid {paidText}
@@ -760,7 +802,9 @@ export default function TierBallot(
     const isFunded = settledHere && Boolean(funded?.has(i.slug));
     const youPaid = isFunded ? paid?.get(i.slug) : undefined;
     const paidText = youPaid ? `$${Math.round(youPaid).toLocaleString("en-US")}` : undefined;
-    const label = !settledHere || !funded
+    const label = isOut(i.slug)
+      ? `${i.title}, withdrawn`
+      : !settledHere || !funded
       ? i.title
       : isFunded
       ? paidText ? `${i.title}, funded: your share paid ${paidText}` : `${i.title}, funded`
@@ -788,7 +832,7 @@ export default function TierBallot(
             drag?.slug === i.slug && "opacity-40",
             isFunded && "border-vote/50 bg-vote/[.12]",
             settledHere && funded && !isFunded && "opacity-55",
-            paidText && "sm:w-[176px]",
+            (paidText || isOut(i.slug)) && "sm:w-[176px]",
           )}
           data-peek-slot={slotOf(i.slug)}
         >
@@ -810,6 +854,11 @@ export default function TierBallot(
           {paidText && (
             <span className="ml-auto hidden flex-none text-[11.5px] font-semibold leading-none text-vote tnum sm:inline">
               {paidText}
+            </span>
+          )}
+          {isOut(i.slug) && (
+            <span className={cn(WITHDRAWN_TAG, "ml-auto text-[10px] leading-[14px]")}>
+              {WITHDRAWN}
             </span>
           )}
         </button>
@@ -993,6 +1042,7 @@ export default function TierBallot(
               current={where(peek.slug)}
               onChoose={movePeek}
               note={noteOf(peek.slug)}
+              withdrawn={withdrawnOf(peek.slug)}
               paid={paidOf(peek.slug)}
               onClose={() => closePeek()}
             />
@@ -1216,6 +1266,7 @@ export default function TierBallot(
             current={where(peek.slug)}
             onChoose={movePeek}
             note={noteOf(peek.slug)}
+            withdrawn={withdrawnOf(peek.slug)}
             paid={paidOf(peek.slug)}
             onClose={() => closePeek()}
           />

@@ -1,5 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { decodeBallot, encodeBallot, isValidOnchainBallot, type Tier } from "./ballot.ts";
+import {
+  decodeBallot,
+  encodeBallot,
+  freshDraft,
+  isValidOnchainBallot,
+  sendableBallot,
+  sendableTiers,
+  type Tier,
+} from "./ballot.ts";
+import { checkBallot } from "./rules.ts";
 
 const slugs = ["a", "b", "c", "d"];
 
@@ -57,5 +66,86 @@ describe("ballots", () => {
     expect(isValidOnchainBallot(Uint8Array.from([1, 1, 2, 255]), 4)).toBe(false);
     expect(isValidOnchainBallot(Uint8Array.from([5, 1, 1, 1]), 4)).toBe(false);
     expect(isValidOnchainBallot(Uint8Array.from([1, 255, 255]), 4)).toBe(false);
+  });
+});
+
+describe("withdrawn initiatives on a ballot", () => {
+  const six = ["p0", "p1", "p2", "p3", "p4", "p5"];
+  // S-Tier settled: p0–p2 (rank 1); A-Tier open: p3 (withdrawn) and p4 (rank 4); B-Tier:
+  // p5 (rank 6).
+  const tiers: Partial<Record<string, Tier>> = {
+    p0: "S",
+    p1: "S",
+    p2: "S",
+    p3: "A",
+    p4: "A",
+    p5: "B",
+  };
+
+  test("one in an open tier is dropped on send, and the ranks below it move up", () => {
+    expect([...encodeBallot(six, tiers)]).toEqual([1, 1, 1, 4, 4, 6]);
+    const sent = sendableBallot(six, tiers, new Set(["p3"]), new Set<Tier>(["S"]));
+    expect([...sent]).toEqual([1, 1, 1, 255, 4, 5]);
+    expect(isValidOnchainBallot(sent, six.length)).toBe(true);
+    const round = {
+      projects: six.map(() => ({ goalUsd: 1n, rfp: false, groups: [] })),
+      asks: six.map(() => 1n),
+      groupNames: [],
+      poolUsd: 0n,
+      independentTiers: 1,
+    };
+    expect(checkBallot(sent, round).errors).not.toContainEqual({ rule: "shape" });
+  });
+
+  test("one in a settled tier stays where it is: the lock needs that tier unchanged", () => {
+    const sent = sendableBallot(six, tiers, new Set(["p1"]), new Set<Tier>(["S"]));
+    expect([...sent]).toEqual([1, 1, 1, 4, 4, 6]);
+  });
+
+  test("one alone in an open tier with picks below stays as a placeholder: they keep their tier", () => {
+    // A-Tier holds only p3 (withdrawn), B-Tier p5: dropping p3 would read p5 as A-Tier.
+    const alone: Partial<Record<string, Tier>> = { p0: "S", p1: "S", p2: "S", p3: "A", p5: "B" };
+    const settled = new Set<Tier>(["S"]);
+    expect(sendableTiers(alone, new Set(["p3"]), settled)).toBe(alone);
+    expect([...sendableBallot(six, alone, new Set(["p3"]), settled)]).toEqual([
+      1,
+      1,
+      1,
+      4,
+      255,
+      5,
+    ]);
+    // Nothing below it: dropped, the tier left empty.
+    const last = { p0: "S", p1: "S", p2: "S", p3: "A" } as const;
+    expect(sendableTiers(last, new Set(["p3"]), settled)).toEqual({ p0: "S", p1: "S", p2: "S" });
+    // B-Tier only withdrawn ones: dropped; then A-Tier's withdrawn one has nothing below.
+    expect(sendableTiers({ p0: "S", p3: "A", p5: "B" }, new Set(["p3", "p5"]), new Set()))
+      .toEqual({ p0: "S" });
+    // An open S-Tier of withdrawn ones above A-Tier picks stays too.
+    expect(sendableTiers({ p0: "S", p4: "A" }, new Set(["p0"]), new Set())).toEqual({
+      p0: "S",
+      p4: "A",
+    });
+  });
+
+  test("sendableTiers drops only the open tiers' withdrawn ones, and nothing else", () => {
+    expect(sendableTiers(tiers, new Set(["p1", "p5"]), new Set<Tier>(["S"]))).toEqual({
+      p0: "S",
+      p1: "S",
+      p2: "S",
+      p3: "A",
+      p4: "A",
+    });
+    expect(sendableTiers(tiers, new Set(), new Set())).toBe(tiers);
+  });
+});
+
+describe("a fresh draft", () => {
+  test("leaves every withdrawn initiative out, placeholders too: an emptied tier asks for a choice", () => {
+    // Three 5★ projects, all withdrawn: no S-Tier of placeholders that funds nothing.
+    const rated: Partial<Record<string, Tier>> = { a: "S", b: "S", c: "S", d: "A" };
+    expect(freshDraft(rated, new Set(["a", "b", "c"]))).toEqual({ d: "A" });
+    expect(sendableTiers(rated, new Set(["a", "b", "c"]), new Set())).toBe(rated);
+    expect(freshDraft(rated, new Set())).toBe(rated);
   });
 });

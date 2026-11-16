@@ -70,8 +70,11 @@ export default function VoteClosed(
     avatar,
     live,
     roundBox,
+    withdrawn,
   }: {
     n: number | null;
+    /** Initiatives an admin withdrew from the vote: marked on this badge's ballot. */
+    withdrawn?: ReadonlySet<string>;
     /** The round (a dev mock's fictional one, or the real one). */
     round?: VoteManifest;
     /** The ballot the badge sent, when known without the chain (a dev mock). */
@@ -298,6 +301,7 @@ export default function VoteClosed(
         liveAmountWord="your share would pay"
         showZero
         provisional={provisional}
+        withdrawn={withdrawn}
         {...link("ballot")}
       />
     );

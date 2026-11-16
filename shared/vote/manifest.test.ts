@@ -76,6 +76,11 @@ describe("round manifest", () => {
     });
     expect(rulesRound(base, [5n], 9n).poolUsd).toBe(9n);
   });
+  it("rulesRound marks the withdrawn projects by index, for the size rule", () => {
+    expect(rulesRound(base, [5n], undefined, [0]).withdrawn).toEqual([true]);
+    expect(rulesRound(base, [5n], undefined, []).withdrawn).toEqual([false]);
+    expect(rulesRound(base, [5n]).withdrawn).toBeUndefined();
+  });
   it("rulesRound wants one ask per project", () => {
     expect(() => rulesRound(base, [])).toThrow(/0 asks for 1 projects/);
     expect(() => rulesRound(base, [5n, 6n])).toThrow(/asks/);

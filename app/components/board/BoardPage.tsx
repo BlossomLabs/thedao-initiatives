@@ -83,8 +83,11 @@ export default function BoardPage(
     hero,
     heading,
     defaultSort,
+    withdrawn,
   }: {
     only?: ReadonlySet<string>;
+    /** Slugs an admin withdrew from the vote running now: their cards and rows say so. */
+    withdrawn?: ReadonlySet<string>;
     votePct?: ReadonlyMap<string, number>;
     /** The part of `votePct` the settling tier would add if it settled now. */
     votePendingPct?: ReadonlyMap<string, number>;
@@ -442,6 +445,7 @@ export default function BoardPage(
                       next={next}
                       lead={lead}
                       titles={titles}
+                      withdrawn={withdrawn}
                     />
                   </Suspense>
                 )
@@ -482,6 +486,7 @@ export default function BoardPage(
                             next={next?.get(c.initiative.id)}
                             lead={lead?.get(c.initiative.id)}
                             titles={titles}
+                            withdrawn={withdrawn?.has(c.initiative.slug)}
                           />
                         </ShuffleItem>
                       ))}

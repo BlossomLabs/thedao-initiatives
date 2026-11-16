@@ -74,6 +74,9 @@ export class ReplayError extends Error {
 export type Round = RoundState & {
   poolUsd: bigint;
   asks?: bigint[];
+  /** The contract's withdrawn flags at the head, by project index, a settled project's
+   * too: what the ballot rules count (`live.withdrawn` leaves settled ones out). */
+  withdrawnFlags?: number[];
   transcript: { block: bigint; records: number; hash: Hex; legacy: boolean };
   head: { block: number; timestamp: number };
 };
@@ -176,6 +179,7 @@ export async function replayRound(
   return Object.assign(st, {
     poolUsd: head.poolUsd,
     ...(asks ? { asks } : {}),
+    withdrawnFlags: [...Array(m.slugs.length).keys()].filter((i) => head.withdrawn?.[i] === true),
     transcript: { block: readAt, records: proof.count, hash: proof.transcript, legacy },
     head: { block: head.block, timestamp: head.timestamp },
   });
@@ -228,6 +232,9 @@ export function roundJson(st: Round, slugs: string[]) {
      * the same the live tally and the relay use; absent when the head has fewer projects
      * than the manifest. */
     ...(st.asks ? { asks: st.asks.map(String) } : {}),
+    /** The contract's withdrawn flags at the head (slugs), a settled project's too: what
+     * the ballot rules count. For display, `live.withdrawn`. */
+    withdrawnFlags: named(st.withdrawnFlags ?? []),
     tiers: st.tiers.map(tier),
     accepted: Object.fromEntries(
       [...st.accepted].map((

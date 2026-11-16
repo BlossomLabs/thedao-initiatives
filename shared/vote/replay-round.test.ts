@@ -102,6 +102,18 @@ describe("replayRound", () => {
     expect(stateReads).toEqual([]);
   });
 
+  it("the raw withdrawn flags are served for the rules; live.withdrawn leaves a settled one out", async () => {
+    const { src } = fakeSource({ head: 1499 });
+    const read = src.stateAt;
+    // a was funded when S-Tier settled at 1100; its flag is set after.
+    src.stateAt = async (b) => ({ ...await read(b), withdrawn: b > 1200 ? [true] : [] });
+    const st = await replayRound(manifest, src, { now: 1500, finalAfterSecs: 10 });
+    const json = roundJson(st, manifest.slugs);
+    expect(json.tiers[0]).toMatchObject({ status: "settled", funded: ["a"] });
+    expect(json.withdrawnFlags).toEqual(["a"]);
+    expect(json.live.withdrawn).toEqual([]);
+  });
+
   it("a read error rejects the replay", async () => {
     const { src } = fakeSource({ head: 1499 });
     src.stateAt = () => Promise.reject(new Error("missing trie node"));

@@ -379,7 +379,8 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         }
     }
 
-    /// @dev How many projects hold each rank, and the placed projects' asked total.
+    /// @dev How many projects hold each rank, and the placed projects' asked total, where a
+    ///      withdrawn project adds $0 (`asks` keeps its real ask for the affiliation rule).
     function _rankCounts(bytes calldata ballot, uint256[] memory asks)
         private
         view
@@ -387,12 +388,14 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     {
         uint256 m = projectCount();
         counts = new uint256[](m + 1);
+        uint256 withdrawn = withdrawnMask;
         for (uint256 i; i < ballot.length; ++i) {
             uint8 rank = uint8(ballot[i]);
             if (rank == 255) continue;
             // The default is explicit withholding, not implicit tail approval.
             if (rank == 0 || rank > m) revert InvalidBallot();
             ++counts[rank];
+            if ((withdrawn >> i) & 1 == 1) continue;
             unchecked {
                 requested += asks[i];
                 if (requested < asks[i]) requested = type(uint256).max; // saturate, written out: hot loop

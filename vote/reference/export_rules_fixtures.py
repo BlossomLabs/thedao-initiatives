@@ -34,7 +34,7 @@ def named():
         ("rank gap", [1, 4, 1, W, W, W], 200, 1),
     ]
     asks = [p["goalUsd"] for p in projects]
-    out = [(name, projects, asks, ["Seal"], pool, tiers, b) for name, b, pool, tiers in cases]
+    out = [(name, projects, asks, ["Seal"], pool, tiers, b, None) for name, b, pool, tiers in cases]
     # Three unrelated projects, all fully covered: independent, yet S-Tier asks nothing.
     out.append((
         "covered projects independent but too small",
@@ -44,22 +44,33 @@ def named():
         1,
         1,
         [1, W, 1, 1, W, W],
+        None,
     ))
     # Donations took every ask to 280, below 1.5x the pool of 200: placing every project that
     # still asks is enough; leaving one out is too small.
     low = [40, 40, 100, 0, 50, 50]
-    out.append(("every asked project placed below 1.5x", projects, low, ["Seal"], 200, 1, [1, 4, 1, W, 4, 1]))
-    out.append(("one asked project left out below 1.5x", projects, low, ["Seal"], 200, 1, [1, 4, 1, W, W, 1]))
+    out.append(("every asked project placed below 1.5x", projects, low, ["Seal"], 200, 1, [1, 4, 1, W, 4, 1], None))
+    out.append(("one asked project left out below 1.5x", projects, low, ["Seal"], 200, 1, [1, 4, 1, W, W, 1], None))
     # Amounts at the top of uint256: 3x the pool and the sums would overflow; the minimum saturates.
     top = 2**256 - 1
 
     def funded(asks):  # nothing donated: each goal is its ask
         return [{**p, "goalUsd": a} for p, a in zip(projects, asks)]
 
-    out.append(("huge asks, small pool", funded([2**254, 0, 2**254, 2**254, 0, 0]), [2**254, 0, 2**254, 2**254, 0, 0], ["Seal"], 2**200, 1, [1, W, 1, 1, W, W]))
-    out.append(("near-max pool, every asked project placed", funded([2**254, 0, 2**254, 2**254, 0, 0]), [2**254, 0, 2**254, 2**254, 0, 0], ["Seal"], top, 1, [1, W, 1, 1, W, W]))
+    out.append(("huge asks, small pool", funded([2**254, 0, 2**254, 2**254, 0, 0]), [2**254, 0, 2**254, 2**254, 0, 0], ["Seal"], 2**200, 1, [1, W, 1, 1, W, W], None))
+    out.append(("near-max pool, every asked project placed", funded([2**254, 0, 2**254, 2**254, 0, 0]), [2**254, 0, 2**254, 2**254, 0, 0], ["Seal"], top, 1, [1, W, 1, 1, W, W], None))
     huge = [2**254, 2**255, 2**254, 2**254, 2**255, 2**255]
-    out.append(("near-max pool, asks sum past uint256, one left out", funded(huge), huge, ["Seal"], top, 1, [1, W, 1, 1, W, W]))
+    out.append(("near-max pool, asks sum past uint256, one left out", funded(huge), huge, ["Seal"], top, 1, [1, W, 1, 1, W, W], None))
+    # Withdrawn projects ask $0 for the size rule only (vote/test/Withdrawn.t.sol).
+    def only(*ids):
+        return [i in ids for i in range(6)]
+
+    out.append(("withdrawn: left out project no longer blocks", projects, [50, 0, 30, 20, 40, 0], ["Seal"], 100, 1, [1, W, 1, 1, W, W], only(4)))
+    out.append(("same ballot, nobody withdrawn: too small", projects, [50, 0, 30, 20, 40, 0], ["Seal"], 100, 1, [1, W, 1, 1, W, W], None))
+    out.append(("withdrawn placed project makes the ballot too small", projects, asks, ["Seal"], 200, 1, [1, W, 1, 1, W, W], only(3)))
+    out.append(("withdrawn: total below 1.5x the pool", projects, asks, ["Seal"], 300, 1, [1, 4, 1, 1, W, W], only(4, 5)))
+    out.append(("withdrawn is still independent", projects, [0] * 6, ["Seal"], 0, 1, [1, W, 1, 1, W, W], only(0)))
+    out.append(("withdrawn keeps its real ask in groups", projects, asks, ["Seal"], 0, 1, [1, 1, 1, 1, W, W], only(2, 3)))
     return out
 
 
@@ -88,15 +99,19 @@ def random_case(rng, k):
     asks = [p["goalUsd"] - rng.randint(0, p["goalUsd"]) if rng.random() < 0.7 else 0 for p in projects]
     requested = sum(asks[i] for i in placed)
     pool = max(1, int(requested * rng.uniform(0.4, 0.9)))
-    return (f"random {k}", projects, asks, [f"G{g}" for g in range(n_groups)], pool, rng.choice([1, 1, 3]), ballot)
+    tiers = rng.choice([1, 1, 3])
+    # A separate generator, so the cases above keep their values.
+    w = random.Random(f"withdrawn {k}")
+    withdrawn = [w.random() < 0.25 for _ in range(m)] if k % 3 == 0 else None
+    return (f"random {k}", projects, asks, [f"G{g}" for g in range(n_groups)], pool, tiers, ballot, withdrawn)
 
 
 def main():
     rng = random.Random(2026)
     cases = named() + [random_case(rng, k) for k in range(60)]
     out = []
-    for name, projects, asks, names, pool, tiers, ballot in cases:
-        r = check_ballot(ballot, projects, asks, pool, tiers)
+    for name, projects, asks, names, pool, tiers, ballot, withdrawn in cases:
+        r = check_ballot(ballot, projects, asks, pool, tiers, withdrawn=withdrawn)
         out.append({
             "name": name,
             "projects": [{**p, "goalUsd": str(p["goalUsd"])} for p in projects],
@@ -108,6 +123,7 @@ def main():
             "ok": r["ok"],
             "rules": [e["rule"] for e in r["errors"]],
             "proof": r["proof"],
+            **({"withdrawn": withdrawn} if withdrawn else {}),
             # Flat, numbers only: what the Solidity test reads with vm.parseJson*.
             "sol": {
                 "goals": [p["goalUsd"] for p in projects],

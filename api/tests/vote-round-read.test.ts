@@ -37,6 +37,7 @@ const answers: Record<string, (args: readonly unknown[]) => unknown> = {
     rfp: i === 1n,
     goalUsd: 1_000_000n,
     groups: i === 0n ? 1n : 0n,
+    withdrawn: false,
   }),
   groupName: () => stringToHex("Argot", { size: 32 }),
   currency: ([i]) => ({

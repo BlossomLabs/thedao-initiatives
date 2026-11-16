@@ -1734,6 +1734,660 @@
   }
  },
  {
+  "name": "withdrawn: left out project no longer blocks",
+  "projects": [
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": true,
+    "groups": []
+   }
+  ],
+  "asks": [
+   "50",
+   "0",
+   "30",
+   "20",
+   "40",
+   "0"
+  ],
+  "groupNames": [
+   "Seal"
+  ],
+  "poolUsd": "100",
+  "independentTiers": 1,
+  "ballot": [
+   1,
+   255,
+   1,
+   1,
+   255,
+   255
+  ],
+  "ok": true,
+  "rules": [],
+  "proof": [
+   0,
+   2,
+   3
+  ],
+  "withdrawn": [
+   false,
+   false,
+   false,
+   false,
+   true,
+   false
+  ],
+  "sol": {
+   "goals": [
+    100,
+    100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "asks": [
+    50,
+    0,
+    30,
+    20,
+    40,
+    0
+   ],
+   "rfp": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+   ],
+   "masks": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "groupCount": 1,
+   "pool": 100
+  }
+ },
+ {
+  "name": "same ballot, nobody withdrawn: too small",
+  "projects": [
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": true,
+    "groups": []
+   }
+  ],
+  "asks": [
+   "50",
+   "0",
+   "30",
+   "20",
+   "40",
+   "0"
+  ],
+  "groupNames": [
+   "Seal"
+  ],
+  "poolUsd": "100",
+  "independentTiers": 1,
+  "ballot": [
+   1,
+   255,
+   1,
+   1,
+   255,
+   255
+  ],
+  "ok": false,
+  "rules": [
+   "size"
+  ],
+  "proof": [],
+  "sol": {
+   "goals": [
+    100,
+    100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "asks": [
+    50,
+    0,
+    30,
+    20,
+    40,
+    0
+   ],
+   "rfp": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+   ],
+   "masks": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "groupCount": 1,
+   "pool": 100
+  }
+ },
+ {
+  "name": "withdrawn placed project makes the ballot too small",
+  "projects": [
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": true,
+    "groups": []
+   }
+  ],
+  "asks": [
+   "100",
+   "100",
+   "100",
+   "100",
+   "50",
+   "50"
+  ],
+  "groupNames": [
+   "Seal"
+  ],
+  "poolUsd": "200",
+  "independentTiers": 1,
+  "ballot": [
+   1,
+   255,
+   1,
+   1,
+   255,
+   255
+  ],
+  "ok": false,
+  "rules": [
+   "size"
+  ],
+  "proof": [],
+  "withdrawn": [
+   false,
+   false,
+   false,
+   true,
+   false,
+   false
+  ],
+  "sol": {
+   "goals": [
+    100,
+    100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "asks": [
+    100,
+    100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "rfp": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+   ],
+   "masks": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "groupCount": 1,
+   "pool": 200
+  }
+ },
+ {
+  "name": "withdrawn: total below 1.5x the pool",
+  "projects": [
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": true,
+    "groups": []
+   }
+  ],
+  "asks": [
+   "100",
+   "100",
+   "100",
+   "100",
+   "50",
+   "50"
+  ],
+  "groupNames": [
+   "Seal"
+  ],
+  "poolUsd": "300",
+  "independentTiers": 1,
+  "ballot": [
+   1,
+   4,
+   1,
+   1,
+   255,
+   255
+  ],
+  "ok": true,
+  "rules": [],
+  "proof": [
+   0,
+   2,
+   3
+  ],
+  "withdrawn": [
+   false,
+   false,
+   false,
+   false,
+   true,
+   true
+  ],
+  "sol": {
+   "goals": [
+    100,
+    100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "asks": [
+    100,
+    100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "rfp": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+   ],
+   "masks": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "groupCount": 1,
+   "pool": 300
+  }
+ },
+ {
+  "name": "withdrawn is still independent",
+  "projects": [
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": true,
+    "groups": []
+   }
+  ],
+  "asks": [
+   "0",
+   "0",
+   "0",
+   "0",
+   "0",
+   "0"
+  ],
+  "groupNames": [
+   "Seal"
+  ],
+  "poolUsd": "0",
+  "independentTiers": 1,
+  "ballot": [
+   1,
+   255,
+   1,
+   1,
+   255,
+   255
+  ],
+  "ok": true,
+  "rules": [],
+  "proof": [
+   0,
+   2,
+   3
+  ],
+  "withdrawn": [
+   true,
+   false,
+   false,
+   false,
+   false,
+   false
+  ],
+  "sol": {
+   "goals": [
+    100,
+    100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "asks": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "rfp": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+   ],
+   "masks": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "groupCount": 1,
+   "pool": 0
+  }
+ },
+ {
+  "name": "withdrawn keeps its real ask in groups",
+  "projects": [
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": true,
+    "groups": []
+   }
+  ],
+  "asks": [
+   "100",
+   "100",
+   "100",
+   "100",
+   "50",
+   "50"
+  ],
+  "groupNames": [
+   "Seal"
+  ],
+  "poolUsd": "0",
+  "independentTiers": 1,
+  "ballot": [
+   1,
+   1,
+   1,
+   1,
+   255,
+   255
+  ],
+  "ok": true,
+  "rules": [],
+  "proof": [
+   0,
+   2,
+   3
+  ],
+  "withdrawn": [
+   false,
+   false,
+   true,
+   true,
+   false,
+   false
+  ],
+  "sol": {
+   "goals": [
+    100,
+    100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "asks": [
+    100,
+    100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "rfp": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+   ],
+   "masks": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "groupCount": 1,
+   "pool": 0
+  }
+ },
+ {
   "name": "random 0",
   "projects": [
    {
@@ -1834,6 +2488,17 @@
    "independent"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   false,
+   true,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false
+  ],
   "sol": {
    "goals": [
     390000,
@@ -2676,6 +3341,35 @@
    "group"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false
+  ],
   "sol": {
    "goals": [
     480000,
@@ -3380,6 +4074,16 @@
    "group"
   ],
   "proof": [],
+  "withdrawn": [
+   true,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   true
+  ],
   "sol": {
    "goals": [
     210000,
@@ -3804,10 +4508,29 @@
   ],
   "ok": false,
   "rules": [
+   "size",
    "group",
    "group"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false
+  ],
   "sol": {
    "goals": [
     390000,
@@ -4380,6 +5103,16 @@
    "independent"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false
+  ],
   "sol": {
    "goals": [
     280000,
@@ -5083,9 +5816,41 @@
   ],
   "ok": false,
   "rules": [
+   "size",
    "independent"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   true,
+   true,
+   false,
+   false,
+   false,
+   true,
+   false,
+   true,
+   true,
+   false,
+   true,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   false
+  ],
   "sol": {
    "goals": [
     200000,
@@ -5540,6 +6305,15 @@
    "group"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false
+  ],
   "sol": {
    "goals": [
     330000,
@@ -6264,10 +7038,26 @@
   ],
   "ok": false,
   "rules": [
+   "size",
    "group",
    "group"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   true,
+   false,
+   true,
+   false
+  ],
   "sol": {
    "goals": [
     210000,
@@ -6722,6 +7512,15 @@
    "independent"
   ],
   "proof": [],
+  "withdrawn": [
+   true,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false
+  ],
   "sol": {
    "goals": [
     410000,
@@ -7577,6 +8376,21 @@
    0,
    1,
    2
+  ],
+  "withdrawn": [
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   true,
+   true,
+   false,
+   true,
+   false,
+   false,
+   false
   ],
   "sol": {
    "goals": [
@@ -8445,6 +9259,38 @@
    7,
    12
   ],
+  "withdrawn": [
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   true,
+   true,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   true,
+   false,
+   true,
+   false,
+   false,
+   false,
+   true,
+   false,
+   false,
+   true,
+   false
+  ],
   "sol": {
    "goals": [
     180000,
@@ -9073,6 +9919,15 @@
    "independent"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   false,
+   true,
+   true,
+   false,
+   false,
+   true
+  ],
   "sol": {
    "goals": [
     100000,
@@ -9456,6 +10311,24 @@
    "independent"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   false,
+   true,
+   false,
+   true,
+   false,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false
+  ],
   "sol": {
    "goals": [
     290000,
@@ -10324,6 +11197,35 @@
    "independent"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   true,
+   false,
+   false,
+   true,
+   false,
+   false,
+   true,
+   false,
+   false,
+   true,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   true,
+   false,
+   true,
+   true,
+   false,
+   true,
+   false,
+   false,
+   true,
+   false
+  ],
   "sol": {
    "goals": [
     120000,
@@ -10959,6 +11861,17 @@
    "size"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   true,
+   true,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false
+  ],
   "sol": {
    "goals": [
     170000,
@@ -11871,6 +12784,15 @@
    "independent"
   ],
   "proof": [],
+  "withdrawn": [
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false
+  ],
   "sol": {
    "goals": [
     190000,
@@ -12512,9 +13434,40 @@
   ],
   "ok": false,
   "rules": [
+   "size",
    "independent"
   ],
   "proof": [],
+  "withdrawn": [
+   true,
+   true,
+   false,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false,
+   true,
+   false,
+   true,
+   false,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false
+  ],
   "sol": {
    "goals": [
     60000,
@@ -13074,9 +14027,21 @@
   ],
   "ok": false,
   "rules": [
+   "size",
    "independent"
   ],
   "proof": [],
+  "withdrawn": [
+   true,
+   false,
+   false,
+   false,
+   false,
+   false,
+   true,
+   true,
+   false
+  ],
   "sol": {
    "goals": [
     20000,
@@ -13909,12 +14874,31 @@
    1,
    255
   ],
-  "ok": true,
-  "rules": [],
-  "proof": [
-   1,
-   2,
-   3
+  "ok": false,
+  "rules": [
+   "size"
+  ],
+  "proof": [],
+  "withdrawn": [
+   false,
+   false,
+   false,
+   true,
+   false,
+   false,
+   true,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false
   ],
   "sol": {
    "goals": [
@@ -14925,6 +15909,38 @@
    "size"
   ],
   "proof": [],
+  "withdrawn": [
+   true,
+   true,
+   false,
+   false,
+   true,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   false,
+   true,
+   false,
+   false,
+   true,
+   false
+  ],
   "sol": {
    "goals": [
     270000,

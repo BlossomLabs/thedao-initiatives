@@ -14,6 +14,9 @@ export type RulesRound = {
   asks: bigint[];
   groupNames: string[];
   poolUsd: bigint;
+  /** Projects an admin withdrew, by project index (absent = none). A withdrawn project asks $0
+   * for the size rule only; independence, group sums and ranks ignore it. */
+  withdrawn?: boolean[];
   /** Bit 0 S-Tier, bit 1 A-Tier. B-Tier is never checked. */
   independentTiers: number;
 };
@@ -89,9 +92,10 @@ export function checkBallot(ballot: Uint8Array, round: RulesRound): RulesResult 
   // Sums and the 1.5× saturate at 2^256 − 1, as in the contract.
   const cap = (x: bigint) => (x > UINT_MAX ? UINT_MAX : x);
   const sum = (xs: number[]) => xs.reduce((a, i) => a + ask(i), 0n);
-  const requested = cap(sum(groups.flat()));
-  // 1.5× the pool, or every project's ask when those add up to less.
-  const total = cap(round.asks.reduce((a, b) => a + b, 0n));
+  const live = (i: number) => (round.withdrawn?.[i] ? 0n : round.asks[i]);
+  const requested = cap(groups.flat().reduce((a, i) => a + live(i), 0n));
+  // 1.5× the pool, or every project's ask (withdrawn ones ask nothing) when less.
+  const total = cap(round.asks.reduce((a, _, i) => a + live(i), 0n));
   const minimum = cap((3n * round.poolUsd + 1n) / 2n);
   const needed = minimum < total ? minimum : total;
   if (requested < needed) errors.push({ rule: "size", requested, needed, pool: round.poolUsd });

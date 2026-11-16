@@ -673,6 +673,11 @@ export const SIGNED_BALLOTS_ABI = [
             "internalType": "bool",
           },
           {
+            "name": "withdrawn",
+            "type": "bool",
+            "internalType": "bool",
+          },
+          {
             "name": "goalUsd",
             "type": "uint256",
             "internalType": "uint256",
@@ -1629,6 +1634,19 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "undoWithdrawInitiative",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable",
+  },
+  {
+    "type": "function",
     "name": "vote",
     "inputs": [
       {
@@ -1713,6 +1731,32 @@ export const SIGNED_BALLOTS_ABI = [
         "name": "",
         "type": "uint64",
         "internalType": "uint64",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
+    "name": "withdrawInitiative",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable",
+  },
+  {
+    "type": "function",
+    "name": "withdrawnMask",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256",
       },
     ],
     "stateMutability": "view",
@@ -1906,6 +1950,25 @@ export const SIGNED_BALLOTS_ABI = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256",
+      },
+    ],
+    "anonymous": false,
+  },
+  {
+    "type": "event",
+    "name": "InitiativeWithdrawn",
+    "inputs": [
+      {
+        "name": "initiativeId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256",
+      },
+      {
+        "name": "withdrawn",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool",
       },
     ],
     "anonymous": false,
@@ -2195,6 +2258,11 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "error",
+    "name": "AlreadyWithdrawn",
+    "inputs": [],
+  },
+  {
+    "type": "error",
     "name": "BadProof",
     "inputs": [
       {
@@ -2477,6 +2545,11 @@ export const SIGNED_BALLOTS_ABI = [
         "internalType": "uint256",
       },
     ],
+  },
+  {
+    "type": "error",
+    "name": "NotWithdrawn",
+    "inputs": [],
   },
   {
     "type": "error",

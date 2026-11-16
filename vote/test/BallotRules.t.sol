@@ -110,6 +110,13 @@ contract BallotRulesTest is Test {
             // A USD pledge converts 1:1, so goal minus ask of it leaves exactly the fixture's ask.
             if (goals[i] > asks[i]) round.setPledge(bytes32(i + 1), i, 0, goals[i] - asks[i]);
         }
+        // Cases carrying `withdrawn` have an admin withdraw those projects first.
+        if (vm.keyExistsJson(json, string.concat(c, ".withdrawn"))) {
+            bool[] memory out = vm.parseJsonBoolArray(json, string.concat(c, ".withdrawn"));
+            for (uint256 i; i < out.length; ++i) {
+                if (out[i]) round.withdrawInitiative(i);
+            }
+        }
         uint256 tiers = vm.parseJsonUint(json, string.concat(c, ".independentTiers"));
         if (tiers != 1) round.setIndependentTiers(uint8(tiers));
         round.setPoolUsd(vm.parseJsonUint(json, string.concat(c, ".sol.pool")));

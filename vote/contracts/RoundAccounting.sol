@@ -34,6 +34,8 @@ abstract contract RoundAccounting is AccessControl {
     error TooManyGroups();
     error UnknownGroup();
     error RfpWithGroups();
+    error AlreadyWithdrawn();
+    error NotWithdrawn();
 
     struct Currency {
         address asset; // address(0) means native currency, except virtual currency USD.
@@ -49,10 +51,12 @@ abstract contract RoundAccounting is AccessControl {
     }
 
     /// @dev `groups` is a bitmask over the registered groups (affiliations): two projects are
-    ///      related when their masks overlap. RFPs belong to no group.
+    ///      related when their masks overlap. RFPs belong to no group. A `withdrawn` project
+    ///      asks $0 for the size rule only (see `withdrawInitiative`).
     struct Initiative {
         address account;
         bool rfp;
+        bool withdrawn;
         uint256 goalUsd; // Six decimal places.
         uint256 groups;
     }
@@ -79,6 +83,9 @@ abstract contract RoundAccounting is AccessControl {
     mapping(uint256 initiativeId => mapping(uint256 currencyId => uint256 amount)) public pledgedAmount;
     /// @notice Per currency, the newest good price stored (registration or a ballot). No age limit.
     mapping(uint256 currencyId => LastPrice) public lastPrice;
+    /// @notice Bit `i` set when initiative `i` is withdrawn (at most 254 initiatives). Mirrors
+    ///         `Initiative.withdrawn`, so a ballot reads every flag in one storage read.
+    uint256 public withdrawnMask;
 
     event CurrencyRegistered(
         uint256 indexed currencyId, address indexed asset, address usdFeed, uint8 amountDecimals, uint8 feedDecimals
@@ -87,6 +94,7 @@ abstract contract RoundAccounting is AccessControl {
     event InitiativeConfigured(
         uint256 indexed initiativeId, address indexed account, uint256 goalUsd, bool rfp, uint256 groups
     );
+    event InitiativeWithdrawn(uint256 indexed initiativeId, bool withdrawn);
     event GroupAdded(uint8 indexed id, bytes32 name);
     event PoolUsdSet(uint256 previousAmountUsd, uint256 amountUsd);
     event PledgeSet(bytes32 indexed pledgeId, uint256 indexed initiativeId, uint256 indexed currencyId, uint256 amount);
@@ -181,7 +189,7 @@ abstract contract RoundAccounting is AccessControl {
         _checkInitiativeAccount(account);
         _checkGroups(rfp, groups);
         id = _initiatives.length;
-        _initiatives.push(Initiative(account, rfp, goalUsd, groups));
+        _initiatives.push(Initiative(account, rfp, false, goalUsd, groups));
         _initiativeRegistered[account] = true;
         emit InitiativeConfigured(id, account, goalUsd, rfp, groups);
     }
@@ -199,7 +207,7 @@ abstract contract RoundAccounting is AccessControl {
             _initiativeRegistered[previous] = false;
             _initiativeRegistered[account] = true;
         }
-        _initiatives[id] = Initiative(account, rfp, goalUsd, groups);
+        _initiatives[id] = Initiative(account, rfp, _initiatives[id].withdrawn, goalUsd, groups);
         emit InitiativeConfigured(id, account, goalUsd, rfp, groups);
     }
 
@@ -214,6 +222,33 @@ abstract contract RoundAccounting is AccessControl {
         _checkGroups(x.rfp, groups);
         x.groups = groups;
         emit InitiativeConfigured(id, x.account, x.goalUsd, x.rfp, groups);
+    }
+
+    /// @notice Mark a project withdrawn: its ask counts as $0 toward the ballot size rule,
+    ///         placed or left out. Open until the hard deadline, quiet endings included.
+    /// @dev The independence and affiliation rules and the rank structure ignore the flag, so
+    ///      a voter whose settled tier holds the project can still send ballots. Ballots
+    ///      already recorded are untouched. `initiativeUsd` still reports the real ask.
+    function withdrawInitiative(uint256 id) external onlyRole(ADMIN_ROLE) {
+        _setWithdrawn(id, true);
+    }
+
+    /// @notice Undo `withdrawInitiative`, under the same gate.
+    function undoWithdrawInitiative(uint256 id) external onlyRole(ADMIN_ROLE) {
+        _setWithdrawn(id, false);
+    }
+
+    function _setWithdrawn(uint256 id, bool withdrawn) private {
+        _requireAccountingOpen();
+        _requireInitiative(id);
+        Initiative storage x = _initiatives[id];
+        if (x.withdrawn == withdrawn) {
+            if (withdrawn) revert AlreadyWithdrawn();
+            revert NotWithdrawn();
+        }
+        x.withdrawn = withdrawn;
+        withdrawnMask ^= 1 << id;
+        emit InitiativeWithdrawn(id, withdrawn);
     }
 
     /// @notice Initialize, correct or increase net USD funding while the round is open.
@@ -395,14 +430,16 @@ abstract contract RoundAccounting is AccessControl {
     }
 
     /// @dev Whether every project the ballot leaves out (rank 255, or past its end) asks $0.
-    ///      Stops at the first one that asks anything.
+    ///      A withdrawn project asks nothing here. Stops at the first one that asks anything.
     function _unplacedAskNothing(bytes calldata ballot, Currency[] memory cs, uint256[] memory prices)
         internal
         view
         returns (bool)
     {
+        uint256 withdrawn = withdrawnMask;
         for (uint256 p; p < _initiatives.length; ++p) {
             if (p < ballot.length && uint8(ballot[p]) != 255) continue;
+            if ((withdrawn >> p) & 1 == 1) continue;
             if (_askOf(p, cs, prices) != 0) return false;
         }
         return true;

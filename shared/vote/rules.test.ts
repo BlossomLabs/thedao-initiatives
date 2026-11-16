@@ -189,6 +189,54 @@ describe("ballot rules", () => {
     });
   });
 
+  const only = (...ids: number[]) => [0, 1, 2, 3, 4, 5].map((i) => ids.includes(i));
+
+  it("withdrawn asks nothing", () => {
+    const b = ballot({ S: [0, 2, 3] });
+    expect(checkBallot(b, round()).ok).toBe(true);
+    expect(checkBallot(b, round({ withdrawn: only(3) })).errors).toEqual([
+      { rule: "size", requested: 200n, needed: 300n, pool: 200n },
+    ]);
+  });
+
+  it("withdrawn asks nothing in the total", () => {
+    const b = ballot({ S: [0, 2, 3], B: [1] });
+    expect(checkBallot(b, round({ poolUsd: 300n })).errors).toEqual([
+      { rule: "size", requested: 400n, needed: 450n, pool: 300n },
+    ]);
+    expect(checkBallot(b, round({ poolUsd: 300n, withdrawn: only(4, 5) })).ok).toBe(true);
+  });
+
+  it("withdrawn left out is fine", () => {
+    const asks = [50n, 0n, 30n, 20n, 40n, 0n];
+    const b = ballot({ S: [0, 2, 3] });
+    expect(checkBallot(b, round({ poolUsd: 100n, asks })).errors).toEqual([
+      { rule: "size", requested: 100n, needed: 140n, pool: 100n },
+    ]);
+    expect(checkBallot(b, round({ poolUsd: 100n, asks, withdrawn: only(4) })).ok).toBe(true);
+  });
+
+  it("withdrawn still independent", () => {
+    const r = round({ poolUsd: 0n, withdrawn: only(0) });
+    expect(checkBallot(ballot({ S: [0, 2, 3] }), r)).toEqual({
+      ok: true,
+      errors: [],
+      proof: [0, 2, 3],
+    });
+    expect(findProof(ballot({ S: [0, 2, 3] }), r)).toEqual([0, 2, 3]);
+    expect(checkProof(ballot({ S: [0, 2, 3] }), r, [0, 2, 3])).toBe(true);
+  });
+
+  it("withdrawn keeps its real ask in the group rule", () => {
+    // Seal holds 200 of 400: exactly half. Were 2 and 3 worth 0 it would hold all of it.
+    const r = round({ poolUsd: 0n, withdrawn: only(2, 3) });
+    expect(checkBallot(ballot({ S: [0, 1, 2, 3] }), r)).toEqual({
+      ok: true,
+      errors: [],
+      proof: [0, 2, 3],
+    });
+  });
+
   it("tiersOf groups by competition rank", () => {
     expect(tiersOf(Uint8Array.from([1, 1, 3, 255, 3, 1]))).toEqual([[0, 1, 5], [2, 4]]);
   });
@@ -203,6 +251,7 @@ describe("parity with the Python reference", () => {
         groupNames: c.groupNames,
         poolUsd: BigInt(c.poolUsd),
         independentTiers: c.independentTiers,
+        withdrawn: "withdrawn" in c ? (c as { withdrawn: boolean[] }).withdrawn : undefined,
       });
       expect({ name: c.name, ok: r.ok, rules: r.errors.map((e) => e.rule), proof: r.proof })
         .toEqual({ name: c.name, ok: c.ok, rules: c.rules, proof: c.proof });

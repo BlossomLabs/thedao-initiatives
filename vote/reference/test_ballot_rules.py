@@ -25,9 +25,9 @@ def ballot(S=(), A=(), B=(), n=6):
     return out
 
 
-def check(b, pool=200, tiers=1, asks=None):
+def check(b, pool=200, tiers=1, asks=None, withdrawn=None):
     projects, default_asks, pool, tiers = round_(pool, tiers)
-    return check_ballot(b, projects, asks or default_asks, pool, tiers)
+    return check_ballot(b, projects, asks or default_asks, pool, tiers, withdrawn=withdrawn)
 
 
 class BallotRules(unittest.TestCase):
@@ -142,6 +142,50 @@ class BallotRules(unittest.TestCase):
             check(ballot(S=[0, 2, 3]), pool=0, asks=[0] * 6),
             {"ok": True, "errors": [], "proof": [0, 2, 3]},
         )
+
+    def test_withdrawn_asks_nothing(self):
+        # Pool 200 needs 300 of the 500 asked: S-Tier {0, 2, 3} asks 300.
+        b = ballot(S=[0, 2, 3])
+        self.assertTrue(check(b)["ok"])
+        self.assertEqual(
+            check(b, withdrawn=[False, False, False, True, False, False])["errors"],
+            [{"rule": "size", "requested": 200, "needed": 300, "pool": 200}],
+        )
+
+    def test_withdrawn_asks_nothing_in_the_total(self):
+        # Pool 300 wants 450, but only 400 is asked once 4 and 5 are withdrawn.
+        b = ballot(S=[0, 2, 3], B=[1])
+        w = [False, False, False, False, True, True]
+        self.assertEqual(
+            check(b, pool=300)["errors"],
+            [{"rule": "size", "requested": 400, "needed": 450, "pool": 300}],
+        )
+        self.assertTrue(check(b, pool=300, withdrawn=w)["ok"])
+
+    def test_withdrawn_left_out_is_fine(self):
+        asks = [50, 0, 30, 20, 40, 0]
+        b = ballot(S=[0, 2, 3])
+        self.assertEqual(
+            check(b, pool=100, asks=asks)["errors"],
+            [{"rule": "size", "requested": 100, "needed": 140, "pool": 100}],
+        )
+        self.assertTrue(check(b, pool=100, asks=asks, withdrawn=[False, False, False, False, True, False])["ok"])
+
+    def test_withdrawn_still_independent(self):
+        self.assertEqual(
+            check(ballot(S=[0, 2, 3]), pool=0, withdrawn=[True, False, False, False, False, False]),
+            {"ok": True, "errors": [], "proof": [0, 2, 3]},
+        )
+        projects, _, _, tiers = round_()
+        self.assertTrue(
+            check_proof(ballot(S=[0, 2, 3]), projects, tiers, [0, 2, 3], withdrawn=[True] * 6)
+        )
+
+    def test_withdrawn_keeps_real_ask_in_groups(self):
+        # Seal holds 200 of 400 in S-Tier: exactly half. Were the withdrawn 2 and 3 worth 0 it
+        # would hold all of it.
+        r = check(ballot(S=[0, 1, 2, 3]), pool=0, withdrawn=[False, False, True, True, False, False])
+        self.assertEqual(r, {"ok": True, "errors": [], "proof": [0, 2, 3]})
 
     def test_tiers_of(self):
         self.assertEqual(tiers_of([1, 1, 3, W, 3, 1]), [[0, 1, 5], [2, 4]])

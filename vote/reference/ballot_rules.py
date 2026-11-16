@@ -13,6 +13,9 @@ contract; shared/vote/fixtures/ballot-rules.json keeps them equal.
 `asks[i]`: what project i still asks for (goal less donations and open pledges); the size
 and group rules count asks, never goals.
 `independent_tiers`: bit 0 S-Tier, bit 1 A-Tier.
+`withdrawn[i]` (optional, default none): an admin withdrew project i. It asks $0 for the size
+rule only (`requested` and the every-project total); independence, the group sums and the rank
+shape ignore it.
 """
 
 WITHHELD = 255
@@ -64,7 +67,7 @@ def _independent(projects, tier):
     return None, count
 
 
-def check_ballot(ballot, projects, asks, pool, independent_tiers):
+def check_ballot(ballot, projects, asks, pool, independent_tiers, withdrawn=None):
     if not _readable(ballot, len(projects)):
         return {"ok": False, "errors": [{"rule": "shape"}], "proof": []}
     errors = []
@@ -75,9 +78,10 @@ def check_ballot(ballot, projects, asks, pool, independent_tiers):
     def total(xs):
         return sum(asks[i] for i in xs)
 
-    requested = min(total([i for g in groups for i in g]), UINT_MAX)
-    # 1.5x the pool, or every project's ask when donations took that below it.
-    needed = min((3 * pool + 1) // 2, sum(asks), UINT_MAX)
+    live = [0 if withdrawn and i < len(withdrawn) and withdrawn[i] else a for i, a in enumerate(asks)]
+    requested = min(sum(live[i] for g in groups for i in g), UINT_MAX)
+    # 1.5x the pool, or every project's ask (withdrawn ones ask nothing) when that is less.
+    needed = min((3 * pool + 1) // 2, sum(live), UINT_MAX)
     if requested < needed:
         errors.append({"rule": "size", "requested": requested, "needed": needed, "pool": pool})
     proof = []
@@ -108,8 +112,9 @@ def check_ballot(ballot, projects, asks, pool, independent_tiers):
     return {"ok": True, "errors": [], "proof": proof}
 
 
-def check_proof(ballot, projects, independent_tiers, proof):
-    """Whether `proof` names, per enforced tier in order, three pairwise-unrelated projects in it."""
+def check_proof(ballot, projects, independent_tiers, proof, withdrawn=None):
+    """Whether `proof` names, per enforced tier in order, three pairwise-unrelated projects in it.
+    `withdrawn` is accepted for symmetry and ignored: a withdrawn project still counts."""
     tiers = _enforced(independent_tiers)
     if len(proof) != 3 * len(tiers):
         return False

@@ -24,7 +24,8 @@ import { useSession } from "~/context/session";
 import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd, usdShort } from "~/lib/format";
 import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
-import { poolEstimated, poolNoteText } from "~/components/vote/pool";
+import { poolEstimated, poolName, poolNoteText } from "~/components/vote/pool";
+import { dollars as dollarsFull } from "~/components/vote/FinalTiers";
 import { type Tier, tierName, TIERS } from "../../../shared/vote/ballot";
 import { chainTally } from "../../../shared/vote/chain";
 import { liveInputsFrom } from "../../../shared/vote/live-inputs";
@@ -433,7 +434,7 @@ export default function VoteResults(
               items={items}
               result={preview?.result ?? result}
               poolUsd={pool}
-              poolName={POOL_NAME}
+              poolLabel={poolName(R, pool, dollarsFull)}
               live
               // Green is a donation's preview here: what the live tally adds stays neutral.
               liveTone="neutral"
@@ -601,8 +602,19 @@ function ClosedResults(
       kicker={<span className="text-vote">{REAL ? "TheDAO vote" : "Test vote"}</span>}
       sub={
         <>
-          {usdShort(raised ?? 0)} of {usdShort(pool)}{" "}
-          <span className="text-vote">{REAL ? "pool" : "demo pool"}</span> spent
+          {usdShort(raised ?? 0)} spent of the {poolEstimated(R)
+            ? (
+              <span title={poolNoteText(R) ?? undefined}>
+                {R.pool!.eth.toLocaleString("en-US")} ETH{" "}
+                <span className="text-vote">{REAL ? "pool" : "demo pool"}</span>
+                {` (about ${usdShort(pool)})`}
+              </span>
+            )
+            : (
+              <>
+                {usdShort(pool)} <span className="text-vote">{REAL ? "pool" : "demo pool"}</span>
+              </>
+            )}
         </>
       }
     >

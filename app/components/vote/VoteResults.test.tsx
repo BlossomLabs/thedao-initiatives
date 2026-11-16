@@ -6,6 +6,7 @@ import { bytesToHex } from "viem";
 import { api } from "~/lib/api";
 import { encodeBallot } from "../../../shared/vote/ballot";
 import VoteResults from "./VoteResults";
+import { ROUND } from "../../../shared/vote/manifest";
 import { liveInputsJson } from "../../../shared/vote/live-inputs";
 import { effectiveRanks } from "../../../vote/shared/ranks";
 
@@ -239,7 +240,7 @@ async function showClosed(over: Record<string, unknown> = {}, url = "/") {
     </QueryClientProvider>,
   );
   await screen.findByText((_, el) =>
-    el?.tagName === "P" && /pool spent/.test(el.textContent ?? "")
+    el?.tagName === "P" && /spent of the /.test(el.textContent ?? "")
   );
   // The board's list mounts with the closed round: wait for its cards.
   await screen.findAllByText("Beta audits");
@@ -257,7 +258,7 @@ it("once B settles, the final result: spent of the pool, a section per tier", as
       settled("B", [], {}),
     ],
   });
-  expect(hero(/\$80k of \$100k demo pool spent/)).toBeInTheDocument();
+  expect(hero(/\$80k spent of the \$100k demo pool/)).toBeInTheDocument();
   // Each tier heads its own section, with its count and what the vote gave it.
   expect(heading("S-Tier")).toHaveTextContent("S-Tier$30,000 allocated to 1 initiative");
   expect(heading("A-Tier")).toHaveTextContent("A-Tier$50,000 allocated to 1 initiative");
@@ -315,7 +316,7 @@ it("an empty list draws no heading", async () => {
 
 it("spent of the pool uses the pool on-chain", async () => {
   await showClosed({ poolUsd: usdMicro(250_000) });
-  expect(hero(/\$60k of \$250k demo pool spent/)).toBeInTheDocument();
+  expect(hero(/\$60k spent of the \$250k demo pool/)).toBeInTheDocument();
 });
 
 it("a tier that funded nothing says so", async () => {
@@ -472,6 +473,36 @@ it("no B-Tier warning before anything is funded: no ballots yet", async () => {
   await showOpen(roundOf({}, {}));
   expect(await screen.findByText(/would be funded by 0 ballots/)).toBeInTheDocument();
   expect(screen.queryByText(/B-Tier: nothing funded yet/)).toBeNull();
+});
+
+// #104: while the pool is ETH not yet sold, its dollars are an estimate (they set the ballot
+// minimum): the pages name it in ETH, the dollars only as "about".
+const withPool = (pool: { eth: number; sold: boolean } | undefined) => {
+  (ROUND as { pool?: { eth: number; sold: boolean } }).pool = pool;
+};
+afterEach(() => withPool(undefined));
+
+it("the final result names an unsold pool in ETH, its dollars only as an estimate", async () => {
+  withPool({ eth: 400, sold: false });
+  await showClosed();
+  const line = hero(/\$60k spent of the 400 ETH demo pool \(about \$100k\)/);
+  expect(line).toBeInTheDocument();
+  expect(line.textContent).not.toMatch(/of \$100k/);
+  expect(screen.getByTitle(/its dollar value is an estimate/)).toBeInTheDocument();
+});
+
+it("once the pool is sold the final result names it in dollars", async () => {
+  withPool({ eth: 400, sold: true });
+  await showClosed();
+  expect(hero(/\$60k spent of the \$100k demo pool$/)).toBeInTheDocument();
+});
+
+it("TheDAO's ballot names an unsold pool in ETH, as the hero does", async () => {
+  withPool({ eth: 400, sold: false });
+  await showOpen(roundOf({ "1": ballot({ alpha: "S" }) }, { alpha: [50_000, "S"] }));
+  expect(
+    await screen.findByText(/ of the 400 ETH demo pool \(about \$100,000\) if it ended now/),
+  ).toBeInTheDocument();
 });
 
 it("TheDAO's ballot on a test round names the demo pool, as the hero does", async () => {
@@ -935,7 +966,7 @@ it("covered projects are not counted as funded by the pool", async () => {
       settled("B", [], {}),
     ],
   });
-  expect(hero(/\$60k of \$100k demo pool spent/)).toBeInTheDocument();
+  expect(hero(/\$60k spent of the \$100k demo pool/)).toBeInTheDocument();
   expect(heading("S-Tier")).toHaveTextContent("1 initiative");
 });
 

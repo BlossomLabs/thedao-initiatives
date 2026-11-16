@@ -7,6 +7,7 @@ import { cn } from "~/lib/utils";
 import FinalTiers, { AvatarRing, CardHeader, dollars } from "~/components/vote/FinalTiers";
 import { ballotSegments, SegmentRing } from "~/components/vote/BallotMeter";
 import DaoBallot, { daoResult } from "~/components/vote/DaoBallot";
+import { poolName } from "~/components/vote/pool";
 import type { BallotItem } from "~/components/vote/TierBallot";
 import { useVoteBallots } from "~/hooks/use-vote";
 import { askOf, servedAsks } from "~/lib/vote-results";
@@ -247,7 +248,7 @@ export default function VoteClosed(
       items={all}
       result={result}
       poolUsd={poolUsd}
-      poolName={round.kind === "real" ? "pool" : "demo pool"}
+      poolLabel={poolUsd ? poolName(round, poolUsd, dollars) : undefined}
       live={Boolean(live)}
       label={resultLabel}
       // Green on its ring: what the live tally would give the initiatives on this ballot.

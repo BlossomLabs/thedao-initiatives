@@ -47,7 +47,7 @@ export default function DaoBallot(
     items,
     result,
     poolUsd,
-    poolName = "pool",
+    poolLabel,
     live,
     label,
     action,
@@ -60,8 +60,9 @@ export default function DaoBallot(
     items: BallotItem[];
     result: ReturnType<typeof daoResult>;
     poolUsd?: number;
-    /** What the pool is called in the header line: a test round's is the "demo pool". */
-    poolName?: string;
+    /** The pool in the header line, as poolName() says it: "$913K demo pool", or "400 ETH
+     * pool (about $913K)" while it's ETH not yet sold. Default: its dollars, "pool". */
+    poolLabel?: string;
     live?: boolean;
     /** Its title, and the table's name for screen readers. */
     label: string;
@@ -141,9 +142,11 @@ export default function DaoBallot(
               </AvatarRing>
             )}
           title={label}
-          line={`${dollars(awarded)}${poolUsd ? ` of the ${dollars(poolUsd)} ${poolName}` : ""}${
-            live ? " if it ended now" : ""
-          } · ${count} ${count === 1 ? "initiative" : "initiatives"}`}
+          line={`${dollars(awarded)}${
+            poolUsd ? ` of the ${poolLabel ?? `${dollars(poolUsd)} pool`}` : ""
+          }${live ? " if it ended now" : ""} · ${count} ${
+            count === 1 ? "initiative" : "initiatives"
+          }`}
           action={action}
         />
         {note}

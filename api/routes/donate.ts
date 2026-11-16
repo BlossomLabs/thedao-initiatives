@@ -227,13 +227,13 @@ export function donateRoutes(deps: Deps) {
       return c.json({ status: "error", detail: v.detail }, 400);
     }
     if (association) await matchDonation(db, association, v);
-    let [, status] = await db.donations.record(initiative.id, txHash, v, "tx");
+    let [recorded, status] = await db.donations.record(initiative.id, txHash, v, "tx");
     if (status === "confirmed") await deps.funding.invalidate(initiative.safeAddress);
     if (status === "already-confirmed") status = "confirmed";
     return c.json({
       status,
       association: association ? await db.terms.association(association.attemptId) : undefined,
-      detail: donationDetail(v.detail),
+      detail: donationDetail(recorded.detail),
       amount: v.amount,
       token: v.tokenSymbol,
       amountUsd: v.amountUsd,
@@ -246,16 +246,15 @@ export function donateRoutes(deps: Deps) {
     if (!row) throw new HttpError(404, "not found");
     if (
       row.status === "pending" && !(await deps.maintenance.on()) &&
+      (row.retryAfter ?? 0) <= deps.now() &&
       (await db.rateLimit("st:" + txHash, 1, 5))
     ) {
       const initiative = await db.initiatives.get(row.rfpId);
       if (initiative?.safeAddress && Object.keys(await chain.activeTokens()).length) {
         const v = await chain.verifyDonation(txHash, initiative.safeAddress);
-        if (v.found && !v.pending) {
-          await db.donations.record(initiative.id, txHash, v, row.source);
-          if (v.ok) await deps.funding.invalidate(initiative.safeAddress);
-          row = (await db.donations.get(initiative.id, txHash)) ?? row;
-        }
+        await db.donations.record(initiative.id, txHash, v, row.source);
+        if (v.ok) await deps.funding.invalidate(initiative.safeAddress);
+        row = (await db.donations.get(initiative.id, txHash)) ?? row;
       }
     }
     return c.json({

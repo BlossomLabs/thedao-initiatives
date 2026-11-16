@@ -55,6 +55,14 @@ egress policy and request/resource limits.
   authenticated indexer access. Empty/known indexer results need no ledger RPC calls. Donation
   verification shares one lazy block-number lookup per refresh batch; receipt and price reads still
   use RPC. Failed head lookups never bypass the confirmation requirement.
+  Pending rechecks scan at most 100 saved rows and verify at most 20 transactions per Safe per
+  refresh, resuming after the last inspected hash and wrapping at the end. No new check starts
+  after a 20-second retry budget; an in-flight call retains its RPC timeout. Repeated pending
+  checks and transport failures back off from one minute to one hour. Status polling respects
+  that per-row backoff; an admin's forced sync may bypass it but keeps the batch limits. A hash
+  never observed on-chain is marked failed after seven days of unsuccessful verification; it
+  stays in the ledger for diagnosis and can still be confirmed if submitted again after appearing
+  on-chain. Previously observed transactions are not expired on age alone.
 - **A daily production fallback keeps quiet-day snapshots recent.** `server.ts` registers
   `refresh-public-cache-daily` at module scope for 03:00 UTC. Its handler checks the runtime
   `DENO_TIMELINE` before reading KV or calling any upstream service; only the exact value

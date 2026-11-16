@@ -2,6 +2,7 @@ import { collect, K, type ReadOptions } from "./keys.ts";
 import type { Donation, DonationStatus } from "./types.ts";
 import type { Verification } from "../chain/verify.ts";
 import { donationDetail } from "../lib/donation-detail.ts";
+import { donationRetryDelay, UNKNOWN_DONATION_MAX_AGE_SECS } from "../lib/donation-retry.ts";
 
 export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = undefined) {
   const get = async (rfpId: string, tx: string) =>
@@ -9,7 +10,7 @@ export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions 
 
   /**
    * Insert or update a donation row from a chain verification result.
-   * confirmed = verified transfer to the RFP's Safe; failed = mined but wrong;
+   * confirmed = verified transfer to the RFP's Safe; failed = rejected or an expired unknown hash;
    * pending = in the mempool, too shallow, or unpriceable right now.
    * Idempotent: an already-confirmed row is never touched.
    */
@@ -20,7 +21,7 @@ export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions 
     source: Donation["source"] = "tx",
   ): Promise<[Donation, DonationStatus | "already-confirmed"]> {
     const tx = txHash.toLowerCase();
-    const status: DonationStatus = v.ok
+    const verifiedStatus: DonationStatus = v.ok
       ? "confirmed"
       : v.found && !v.pending
       ? "failed"
@@ -29,6 +30,19 @@ export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions 
       const cur = await kv.get<Donation>(K.donation(rfpId, tx));
       if (cur.value?.status === "confirmed") return [cur.value, "already-confirmed"];
       const t = now();
+      const createdAt = cur.value?.createdAt ?? t;
+      // Legacy price/confirmation/mempool rows were observed. Only the exact
+      // old not-found result is safe to retire as a never-seen transaction.
+      const seenOnChain = v.found || cur.value?.seenOnChain === true || Boolean(
+        cur.value && cur.value.seenOnChain === undefined &&
+          cur.value.detail !== "transaction not found on mainnet",
+      );
+      const expired = !v.ok && !v.found && !seenOnChain &&
+        t - createdAt >= UNKNOWN_DONATION_MAX_AGE_SECS;
+      const status = expired ? "failed" : verifiedStatus;
+      const retryAttempts = status === "pending" && cur.value?.status === "pending"
+        ? (cur.value.retryAttempts ?? 0) + 1
+        : 0;
       const row: Donation = {
         rfpId,
         txHash: tx,
@@ -38,10 +52,15 @@ export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions 
         amountUsd: v.amountUsd,
         donor: v.donor,
         status,
-        detail: donationDetail(v.detail),
+        detail: expired
+          ? "transaction not found; automatic verification window expired"
+          : donationDetail(v.detail),
         source,
-        createdAt: cur.value?.createdAt ?? t,
+        createdAt,
         confirmedAt: status === "confirmed" ? t : null,
+        seenOnChain,
+        retryAttempts,
+        retryAfter: status === "pending" ? t + donationRetryDelay(retryAttempts) : undefined,
       };
       const res = await kv.atomic().check(cur)
         .set(K.donation(rfpId, tx), row)
@@ -52,6 +71,40 @@ export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions 
       if (res.ok) return [row, status];
     }
     throw new Error("donation write conflict");
+  }
+
+  /** Bound reads as well as RPC work, resuming after a stable transaction key.
+   * Includes final rows so old databases need no unbounded index backfill. */
+  async function scan(rfpId: string, after: string, limit: number): Promise<Donation[]> {
+    const rows: Donation[] = [];
+    for await (
+      const e of kv.list<Donation>({
+        prefix: K.donations(rfpId),
+        ...(after ? { start: K.donation(rfpId, after) } : {}),
+      }, { limit: limit + 1 })
+    ) {
+      if (after && e.value.txHash === after) continue;
+      rows.push(e.value);
+      if (rows.length === limit) break;
+    }
+    return rows;
+  }
+
+  /** Transport failures back off without pretending the chain rejected a tx. */
+  async function defer(rfpId: string, tx: string): Promise<void> {
+    const key = K.donation(rfpId, tx);
+    for (let i = 0; i < 5; i++) {
+      const cur = await kv.get<Donation>(key);
+      if (cur.value?.status !== "pending") return;
+      const retryAttempts = (cur.value.retryAttempts ?? 0) + 1;
+      if (
+        (await kv.atomic().check(cur).set(key, {
+          ...cur.value,
+          retryAttempts,
+          retryAfter: now() + donationRetryDelay(retryAttempts),
+        }).commit()).ok
+      ) return;
+    }
   }
 
   /** `strong` for a copy built from the rows (db/cards.ts): never from a replica behind a write. */
@@ -104,5 +157,5 @@ export function donationsRepo(kv: Deno.Kv, now: () => number, read: ReadOptions 
     return out;
   }
 
-  return { get, record, list, byHash, pending, confirmedTotal, totalFor, byDonors };
+  return { get, record, scan, defer, list, byHash, pending, confirmedTotal, totalFor, byDonors };
 }

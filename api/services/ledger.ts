@@ -6,6 +6,7 @@ import type { SafeSyncState } from "../db/types.ts";
 import {
   DEFAULT_BUDGET_MS,
   lazyBlockNumber,
+  PENDING_BUDGET_MS,
   reverifyPending,
   type SafeApiDeps,
   type SafeRow,
@@ -112,7 +113,7 @@ export async function refreshLedger(
     next = await syncSafe(deps, initiative, DEFAULT_BUDGET_MS, getBlockNumber, false);
     // Manual submissions may not be in the indexer's latest page. Only retry
     // this initiative's pending rows, reusing this request's confirmation head.
-    await reverifyPending(deps, getBlockNumber, initiative);
+    await reverifyPending(deps, getBlockNumber, initiative, PENDING_BUDGET_MS, force);
     await retryDonationMatches(deps.db, deps.chain, initiative.id);
   } catch (e) {
     next = { ...saved, ok: false, error: e instanceof Error ? e.message : String(e) };

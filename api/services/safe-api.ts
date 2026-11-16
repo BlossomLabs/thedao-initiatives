@@ -15,6 +15,7 @@ import type { Initiative, SafeSyncState } from "../db/types.ts";
 import type { Verification } from "../chain/verify.ts";
 import { toChecksum } from "../chain/address.ts";
 import { PRICE_UNAVAILABLE_DETAIL } from "../lib/donation-detail.ts";
+import { K } from "../db/keys.ts";
 
 /** What a Safe sync reads from an initiative: a board card row carries these. */
 export type SafeRow = Pick<Initiative, "id" | "safeAddress" | "slug">;
@@ -276,25 +277,44 @@ export async function syncSafe(
   return state;
 }
 
-/** Re-verify pending rows (price feed hiccups, shallow confirmations). */
+export const PENDING_SCAN_LIMIT = 100;
+export const PENDING_VERIFY_LIMIT = 20;
+export const PENDING_BUDGET_MS = 20_000;
+
+/** A bounded, resumable scan. The existing ledger lease serializes callers.
+ * Stop starting checks at the deadline; an in-flight RPC retains its own timeout. */
 export async function reverifyPending(
   deps: SafeApiDeps,
-  getBlockNumber = lazyBlockNumber(deps),
-  only?: SafeRow,
-): Promise<void> {
-  const pending = only
-    ? (await deps.db.donations.list(only.id, false)).filter((d) => d.status === "pending")
-    : await deps.db.donations.pending();
-  for (const d of pending) {
-    const initiative = only ?? await deps.db.initiatives.get(d.rfpId);
-    if (!initiative?.safeAddress) continue;
+  getBlockNumber: () => Promise<number>,
+  initiative: SafeRow,
+  budgetMs = PENDING_BUDGET_MS,
+  force = false,
+): Promise<{ checked: number; scanned: number; more: boolean }> {
+  const deadline = Date.now() + budgetMs;
+  const key = K.donationRetry(initiative.id);
+  const previous = await deps.db.kv.get<string>(key);
+  let after = previous.value ?? "";
+  const rows = await deps.db.donations.scan(initiative.id, after, PENDING_SCAN_LIMIT);
+  let checked = 0;
+  let scanned = 0;
+  for (const d of rows) {
+    if (Date.now() >= deadline || checked >= PENDING_VERIFY_LIMIT) break;
+    scanned++;
+    after = d.txHash;
+    if (d.status !== "pending" || (!force && (d.retryAfter ?? 0) > deps.now())) continue;
+    checked++;
     try {
       const v = await deps.chain.verifyDonation(d.txHash, initiative.safeAddress, {
         getBlockNumber,
       });
-      if (v.found && !v.pending) {
-        await deps.db.donations.record(initiative.id, d.txHash, v, d.source);
-      }
-    } catch { /* transient; next cycle */ }
+      await deps.db.donations.record(initiative.id, d.txHash, v, d.source);
+    } catch {
+      await deps.db.donations.defer(initiative.id, d.txHash);
+    }
   }
+  // Wrap at the end so new rows before the cursor and delayed transactions get
+  // their turn. A partial batch resumes after the last row actually inspected.
+  if (scanned === rows.length && rows.length < PENDING_SCAN_LIMIT) after = "";
+  await deps.db.kv.atomic().check(previous).set(key, after).commit();
+  return { checked, scanned, more: Boolean(after) };
 }

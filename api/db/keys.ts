@@ -15,6 +15,8 @@ export const K = {
   pledges: (rfpId: string) => ["pledge", rfpId] as const,
   donation: (rfpId: string, tx: string) => ["donation", rfpId, tx.toLowerCase()] as const,
   donations: (rfpId: string) => ["donation", rfpId] as const,
+  /** Disposable retry scan position; not part of database backups. */
+  donationRetry: (rfpId: string) => ["donation_retry", rfpId] as const,
   donationByTx: (tx: string, rfpId: string) => ["donation_by_tx", tx.toLowerCase(), rfpId] as const,
   donationsByTx: (tx: string) => ["donation_by_tx", tx.toLowerCase()] as const,
   comment: (rfpId: string, id: string) => ["comment", rfpId, id] as const,

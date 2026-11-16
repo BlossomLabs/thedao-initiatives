@@ -143,6 +143,10 @@ export interface Donation {
   source: "tx" | "safe-api";
   createdAt: number;
   confirmedAt: number | null;
+  /** Retry bookkeeping; absent on older records. */
+  seenOnChain?: boolean;
+  retryAttempts?: number;
+  retryAfter?: number;
 }
 
 export type CommentType = "suggestion" | "question" | "other";

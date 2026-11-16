@@ -142,6 +142,43 @@ it("a round whose contract predates withdrawals says so, with no buttons", async
   expect(screen.queryByRole("button", { name: "Withdraw from the vote" })).toBeNull();
 });
 
+it("switching rounds refreshes withdrawal support instead of keeping the old warning", async () => {
+  listState.extra = { canWithdraw: false, final: false };
+  mount();
+  await screen.findByText(
+    "This round's contract predates withdrawals: nothing can be withdrawn from it.",
+  );
+  const contract = "0x2000000000000000000000000000000000000002";
+  post.mockImplementationOnce(() => {
+    listState.extra = { canWithdraw: true, final: false };
+    return Promise.resolve({ ...ROUND, round: { ...ROUND.round, contract } });
+  });
+  fireEvent.change(screen.getByLabelText("Round contract"), { target: { value: contract } });
+  fireEvent.click(screen.getByRole("button", { name: "Run this round" }));
+  const row = await rowOf("Alpha project");
+  expect(within(row).getByRole("button", { name: "Withdraw from the vote" })).toBeEnabled();
+  expect(
+    screen.queryByText(
+      "This round's contract predates withdrawals: nothing can be withdrawn from it.",
+    ),
+  ).toBeNull();
+});
+
+it("reading the same round again refreshes its withdrawal state", async () => {
+  listState.extra = { canWithdraw: false, final: false };
+  mount();
+  await screen.findByText(
+    "This round's contract predates withdrawals: nothing can be withdrawn from it.",
+  );
+  post.mockImplementationOnce(() => {
+    listState.extra = { canWithdraw: true, final: false };
+    return Promise.resolve(ROUND);
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Read it again" }));
+  const row = await rowOf("Alpha project");
+  expect(within(row).getByRole("button", { name: "Withdraw from the vote" })).toBeEnabled();
+});
+
 it("once every tier has settled the card says the tally is final, with no buttons", async () => {
   listState.extra = { canWithdraw: true, final: true };
   mount();

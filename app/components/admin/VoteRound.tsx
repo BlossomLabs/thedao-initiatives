@@ -111,6 +111,10 @@ export default function VoteRound() {
     try {
       const r = await call();
       qc.setQueryData(voteRoundKey, r);
+      void qc.invalidateQueries({
+        queryKey: voteRoundKey,
+        predicate: (q) => q.queryKey.length > voteRoundKey.length,
+      });
       void qc.invalidateQueries({ queryKey: ["admin", "vote-relayer"] });
       done(r);
     } catch (e) {
@@ -234,7 +238,7 @@ export default function VoteRound() {
         </>
       )}
 
-      {set && <Withdrawals />}
+      {set && <Withdrawals round={set} />}
       {set && <VoteCorrections />}
 
       {/* The pool: ETH until it's sold, its dollars an estimate until then. */}
@@ -658,21 +662,22 @@ type Withdrawal = { slug: string; withdrawn: boolean; settledIn: Tier | null };
 const withdrawalsKey = ["admin", "vote-round", "initiatives"] as const;
 
 /**
- * Withdraw an initiative from the vote, or undo it. The round's admin is a Safe, so the
- * site sends nothing: each button downloads a Transaction Builder batch to import there.
+ * Withdraw an initiative from the vote, or undo it. Each button downloads a Transaction
+ * Builder batch for the round's admin to execute; the site sends nothing.
  * Once an initiative is settled in a tier it can't be withdrawn.
  */
-function Withdrawals() {
+function Withdrawals({ round }: { round: Brief }) {
   const adminApi = useAdminApi();
   const id = useId();
   const board = useBoard();
   const { data } = useQuery({
-    queryKey: withdrawalsKey,
+    queryKey: [...withdrawalsKey, round.chainId, round.contract.toLowerCase()],
     queryFn: ({ signal }) =>
       api<{ initiatives: Withdrawal[]; final?: boolean; canWithdraw?: boolean }>(
         "/api/admin/vote-round/initiatives",
         { signal },
       ),
+    refetchInterval: 15_000,
   });
   const { run, said } = useRun();
   const titles = useMemo(
@@ -692,13 +697,13 @@ function Withdrawals() {
         json: { slug: x.slug, withdrawn: !x.withdrawn },
       });
       downloadBatch(batch, `${x.withdrawn ? "undo-withdraw" : "withdraw"}-${x.slug}.json`);
-    }, `Batch saved for ${title}: import it in the Safe's Transaction Builder and sign it.`);
+    }, `Batch saved for ${title}: execute it with the round's admin account.`);
   return (
     <section className={CARD} aria-labelledby={`${id}-h`}>
       <b id={`${id}-h`} className={TITLE}>Withdraw from the vote</b>
       <small className={HINT}>
-        A withdrawn initiative is not a candidate in any tier. The round's admin is a Safe: this
-        downloads the batch for its Transaction Builder, and the list updates once it is executed.
+        A withdrawn initiative is not a candidate in any tier. Only the round's admin can execute
+        withdrawals. This downloads a transaction batch, and the list updates after it is executed.
         Not possible once an initiative is settled in a tier.
       </small>
       {data?.canWithdraw === false

@@ -390,8 +390,8 @@ contract SignedBallotsTest is Fixture {
         ballots.setBaseURI("ipfs://badges/");
         assertEq(ballots.tokenURI(1), "ipfs://badges/1");
         vm.warp(start);
-        vm.expectRevert(SignedBallots.ConfigurationFrozen.selector);
         ballots.setInitiative(0, INITIATIVE_A, 1e6, false, 0);
+        assertEq(ballots.initiative(0).goalUsd, 1e6);
         vm.expectRevert(SignedBallots.ConfigurationFrozen.selector);
         ballots.setIndependentTiers(3);
         // New projects may still join during the vote, outside the quiet-ending spans.

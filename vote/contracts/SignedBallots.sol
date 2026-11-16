@@ -70,8 +70,8 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
 
     address public immutable eligibilityNFT;
     uint64 public opensAt;
-    uint64 public immutable initialWindow;
-    uint8 public immutable maxWindows;
+    uint64 public initialWindow;
+    uint8 public maxWindows;
     /// @notice Admin-configured tally dates. Started tiers cannot be rescheduled.
     uint64[3] public firstTallyAt;
     /// @notice First ballots (registration receipts) are taken until S's latest possible
@@ -81,7 +81,7 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     /// @notice Minting and burning internal NFTs close at the end of S's first window,
     ///         before any tier can settle, so a burn never revokes a settled charge.
     uint64 public mintDeadline;
-    uint64 public immutable maximumTierDuration;
+    uint64 public maximumTierDuration;
     uint64 public hardDeadline;
     /// @notice Tiers held to the independence rules: bit 0 S-Tier (always), bit 1 A-Tier.
     uint8 public independentTiers = 1;
@@ -162,12 +162,29 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
             }
         }
         _validateSchedule(Schedule(opensAt_, initialWindow, firstTallyAt_, maxWindows));
+        _setSchedule(Schedule(opensAt_, initialWindow, firstTallyAt_, maxWindows));
+    }
+
+    /// Correct the complete schedule before opening. All dependent cutoffs move atomically.
+    function setSchedule(Schedule calldata schedule) external onlyRole(ADMIN_ROLE) {
+        _requireSetup();
+        if (schedule.opensAt <= block.timestamp) revert InvalidSchedule();
+        maximumTierDuration = uint64(_validateSchedule(schedule));
+        initialWindow = schedule.initialWindow;
+        maxWindows = schedule.maxWindows;
+        _setSchedule(schedule);
+    }
+
+    function _setSchedule(Schedule memory schedule) private {
+        uint64 opensAt_ = schedule.opensAt;
+        uint64[3] memory firstTallyAt_ = schedule.firstTallyAt;
         opensAt = opensAt_;
         firstTallyAt = firstTallyAt_;
         mintDeadline = uint64(uint256(firstTallyAt_[0]) + initialWindow);
         registrationDeadline = uint64(uint256(firstTallyAt_[0]) + maximumTierDuration);
         hardDeadline = uint64(uint256(firstTallyAt_[2]) + maximumTierDuration);
         emit ScheduleConfigured(opensAt, initialWindow, firstTallyAt, maxWindows, registrationDeadline, hardDeadline);
+        _configurationChanged();
     }
 
     function mint(address to, uint256 tokenId) external onlyRole(MINTER_ROLE) {
@@ -201,12 +218,13 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         _requireSetup();
         if (mask & 1 == 0 || mask > 3) revert InvalidTiers();
         independentTiers = mask;
+        _configurationChanged();
     }
 
     function setBaseURI(string calldata baseURI) external onlyRole(ADMIN_ROLE) {
-        _requireSetup();
         _metadataBaseURI = baseURI;
         emit MetadataBaseURISet(baseURI);
+        _configurationChanged();
     }
 
     function _baseURI() internal view override returns (string memory) {

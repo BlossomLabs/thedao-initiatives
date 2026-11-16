@@ -11,6 +11,8 @@ import {
   toHex,
 } from "viem";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
+import { refreshVoteManifest } from "../services/vote-refresh.ts";
+import { manifestFromChain } from "../../shared/vote/round-from-chain.ts";
 import { readRoundOnChain } from "../services/vote-round-read.ts";
 
 const ROUND: Hex = "0x1000000000000000000000000000000000000001";
@@ -21,6 +23,8 @@ const RELAYER: Hex = "0x3000000000000000000000000000000000000003";
 const DEPLOYED = 70;
 
 const answers: Record<string, (args: readonly unknown[]) => unknown> = {
+  configRevision: () => 7n,
+  currencyDisabled: () => false,
   initiativeCount: () => 2n,
   currencyCount: () => 2n,
   groupCount: () => 1n,
@@ -55,9 +59,10 @@ function call(to: string, data: Hex): Hex {
   if (to.toLowerCase() === TUSD) {
     return encodeFunctionResult({ abi: erc20Abi, functionName: "symbol", result: "tUSD" });
   }
-  if (to.toLowerCase() !== ROUND) throw new Error("no contract");
+  if (to.toLowerCase() !== ROUND) return "0x";
   const { functionName, args } = decodeFunctionData({ abi: SIGNED_BALLOTS_ABI, data });
   const answer = answers[functionName];
+  if (!answer && functionName === "configRevision") return "0x";
   if (!answer) throw new Error("unexpected " + functionName);
   return encodeFunctionResult({
     abi: SIGNED_BALLOTS_ABI,
@@ -66,9 +71,19 @@ function call(to: string, data: Hex): Hex {
   } as never) as Hex;
 }
 
-const node = (o: { code?: boolean } = {}) =>
+const node = (o: { code?: boolean; calls?: string[]; hash?: (block: number) => Hex } = {}) =>
   custom({
     request: ({ method, params }: { method: string; params: unknown[] }) => {
+      if (method === "eth_getBlockByNumber") {
+        const block = params[0] === "latest" ? 100 : Number(params[0]);
+        return Promise.resolve({
+          number: toHex(block),
+          timestamp: toHex(block * 5),
+          hash: o.hash?.(block) ?? toHex(block, { size: 32 }),
+          parentHash: toHex(Math.max(0, block - 1), { size: 32 }),
+          transactions: [],
+        });
+      }
       if (method === "eth_chainId") return Promise.resolve(toHex(11155111));
       if (method === "eth_blockNumber") return Promise.resolve(toHex(100));
       if (method === "eth_getCode") {
@@ -76,6 +91,7 @@ const node = (o: { code?: boolean } = {}) =>
         return Promise.resolve(o.code !== false && at >= DEPLOYED ? "0x6000" : "0x");
       }
       if (method === "eth_call") {
+        o.calls?.push(String(params[1]));
         const { to, data } = params[0] as { to: string; data: Hex };
         if (to.toLowerCase() !== MULTICALL3) return Promise.resolve(call(to, data));
         const [subs] = decodeFunctionData({ abi: multicall3Abi, data }).args as unknown as [
@@ -121,4 +137,74 @@ Deno.test("readRoundOnChain: an address with no contract is said so", async () =
     Error,
     "isn't a vote round",
   );
+});
+
+Deno.test("corrections refresh uses a pinned head and keeps initiative identity after wallet edits", async () => {
+  const calls: string[] = [];
+  const transport = node({ calls });
+  const original = await readRoundOnChain(ROUND, "http://unused", transport);
+  const m = manifestFromChain(ROUND, original, () => undefined, {
+    chainId: 11155111,
+    contract: ROUND,
+    slugs: ["alpha", "beta"],
+  } as never);
+  const read = answers.initiative;
+  const revision = answers.configRevision;
+  try {
+    answers.configRevision = () => 8n;
+    answers.initiative = (args) => ({
+      ...read(args) as object,
+      account: args[0] === 0n ? RELAYER : "0x5000000000000000000000000000000000000005",
+    });
+    const fresh = await refreshVoteManifest(m, "http://unused", { transport });
+    assertEquals(fresh.configRevision, "8");
+    assertEquals(fresh.slugs, ["alpha", "beta"]);
+    assertEquals(fresh.accounts![0].toLowerCase(), RELAYER);
+    assertEquals(fresh.readAt, { block: 100, timestamp: 500, hash: toHex(100, { size: 32 }) });
+    assertEquals(calls.every((tag) => tag === "0x64"), true);
+  } finally {
+    answers.initiative = read;
+    answers.configRevision = revision;
+  }
+});
+
+Deno.test("old rounds without configuration revisions remain readable", async () => {
+  const revision = answers.configRevision;
+  try {
+    delete answers.configRevision;
+    assertEquals(
+      (await readRoundOnChain(ROUND, "http://unused", node())).configRevision,
+      undefined,
+    );
+  } finally {
+    answers.configRevision = revision;
+  }
+});
+
+Deno.test("refresh reuses canonical configuration but reloads a same-revision reorg", async () => {
+  let reorg = false;
+  const calls: string[] = [];
+  const transport = node({ calls, hash: (b) => toHex(b + (reorg ? 1000 : 0), { size: 32 }) });
+  const original = await readRoundOnChain(ROUND, "http://unused", transport);
+  const m = manifestFromChain(ROUND, original, () => undefined, {
+    chainId: 11155111,
+    contract: ROUND,
+    slugs: ["alpha", "beta"],
+  } as never);
+  const anchored = await refreshVoteManifest(m, "http://unused", { transport });
+  calls.length = 0;
+  assertEquals(await refreshVoteManifest(anchored, "http://unused", { transport }), anchored);
+  assertEquals(calls.length, 1); // Only the revision, with no configuration multicalls.
+  const read = answers.initiative;
+  try {
+    reorg = true;
+    answers.initiative = (args) => ({ ...read(args) as object, goalUsd: 2_000_000n });
+    const fresh = await refreshVoteManifest(anchored, "http://unused", { transport });
+    assertEquals(fresh.configRevision, anchored.configRevision);
+    assertEquals(fresh.projects[0].goalUsd, "2000000");
+    assertEquals(fresh.configAnchor?.hash, toHex(1100, { size: 32 }));
+    assertEquals(fresh.slugs, ["alpha", "beta"]);
+  } finally {
+    answers.initiative = read;
+  }
 });

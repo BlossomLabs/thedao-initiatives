@@ -1,3 +1,4 @@
+import VoteCorrections from "./VoteCorrections";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Switch } from "@base-ui/react/switch";
@@ -234,6 +235,7 @@ export default function VoteRound() {
       )}
 
       {set && <Withdrawals />}
+      {set && <VoteCorrections />}
 
       {/* The pool: ETH until it's sold, its dollars an estimate until then. */}
       <form

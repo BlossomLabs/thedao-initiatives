@@ -219,6 +219,19 @@ Deno.test("blockBefore: the last block strictly before a time", async () => {
   await assertRejects(() => src.blockBefore(0), Error, "no block before");
 });
 
+Deno.test("replay refuses a pinned head replaced by a reorganization", async () => {
+  const { transport } = node({ head: 1000 });
+  const src = createStateSource(
+    {
+      ...manifest(),
+      readAt: { block: 999, timestamp: 999 * SECS, hash: toHex(2000, { size: 32 }) },
+    },
+    "http://unused",
+    transport,
+  );
+  await assertRejects(() => src.head(), Error, "vote head changed during replay");
+});
+
 Deno.test("native balances: a block where an account's ETH balance changed, one multicall per block", async () => {
   const { transport, calls } = node({
     head: 1000,
@@ -326,7 +339,7 @@ Deno.test("accountingEventBlocks: blocks with a PledgeSet or PoolUsdSet from the
   assertEquals(await src.accountingEventBlocks(100, 110), [102, 106, 108]);
 });
 
-Deno.test("the KV cache keeps chain reads under the round's prefix", async () => {
+Deno.test("the KV cache isolates the same round address on different chains", async () => {
   const kv = await Deno.openKv(":memory:");
   try {
     const cache = kvStateCache(kv, manifest());
@@ -334,11 +347,64 @@ Deno.test("the KV cache keeps chain reads under the round's prefix", async () =>
     await cache.set("state:1", { timestamp: 12, asks: ["5"], poolUsd: "7" });
     assertEquals(await cache.get("state:1"), { timestamp: 12, asks: ["5"], poolUsd: "7" });
     const keys = [];
-    for await (const e of kv.list({ prefix: ["vote", CONTRACT.toLowerCase(), "chain"] })) {
+    for await (const e of kv.list({ prefix: ["vote", 1, CONTRACT.toLowerCase(), "chain"] })) {
       keys.push(e.key);
     }
-    assertEquals(keys, [["vote", CONTRACT.toLowerCase(), "chain", "state:1"]]);
+    assertEquals(keys, [["vote", 1, CONTRACT.toLowerCase(), "chain", "state:1"]]);
+    const other = kvStateCache(kv, { ...manifest(), chainId: 11155111 });
+    assertEquals(await other.get("state:1"), undefined);
   } finally {
     kv.close();
   }
+});
+
+Deno.test("corrections: balance scans follow active account periods, including native balances", async () => {
+  const configured = parseAbiItem(
+    "event InitiativeConfigured(uint256 indexed initiativeId, address indexed account, uint256 goalUsd, bool rfp, uint256 groups)",
+  );
+  const transfer = parseAbiItem(
+    "event Transfer(address indexed from, address indexed to, uint256 value)",
+  );
+  const NEW: Hex = "0x5000000000000000000000000000000000000005";
+  const config = (account: Hex, block: number): Log => ({
+    address: CONTRACT,
+    block,
+    topics: encodeEventTopics({ abi: [configured], args: { initiativeId: 0n, account } }) as Hex[],
+    data: encodeAbiParameters([{ type: "uint256" }, { type: "bool" }, { type: "uint256" }], [
+      100n,
+      false,
+      0n,
+    ]),
+  });
+  const sent = (to: Hex, block: number): Log => ({
+    address: TOKEN,
+    block,
+    topics: encodeEventTopics({ abi: [transfer], args: { from: ZERO, to } }) as Hex[],
+    data: encodeAbiParameters([{ type: "uint256" }], [1n]),
+  });
+  const { transport } = node({
+    head: 200,
+    logs: [
+      config(ACCOUNTS[0], 1),
+      config(NEW, 105),
+      sent(ACCOUNTS[0], 102),
+      sent(NEW, 103),
+      sent(ACCOUNTS[0], 107),
+      sent(NEW, 108),
+    ],
+    ethOf: (b, a) =>
+      a.toLowerCase() === ACCOUNTS[0]
+        ? (b >= 104 ? 1n : 0n) + (b >= 109 ? 1n : 0n)
+        : (b >= 101 ? 1n : 0n) + (b >= 106 ? 1n : 0n),
+  });
+  const m = { ...manifest([{ asset: ZERO }, { asset: TOKEN }]), configRevision: "3" };
+  const source = createStateSource(m, "http://unused", transport);
+  assertEquals(await source.balanceChangeBlocks(100, 110), [102, 104, 106, 108]);
+  assertEquals(await source.accountingEventBlocks(100, 110), [105]);
+  // Repeating the scan, and replaying from a new source, recover the same events.
+  assertEquals(await source.balanceChangeBlocks(100, 110), [102, 104, 106, 108]);
+  assertEquals(
+    await createStateSource(m, "http://unused", transport).balanceChangeBlocks(100, 110),
+    [102, 104, 106, 108],
+  );
 });

@@ -111,3 +111,15 @@ describe("manifestFromChain", () => {
     ).toThrow("own badges");
   });
 });
+
+it("an existing initiative keeps its slug when its wallet is corrected to another board account", () => {
+  const before = manifestFromChain(C, chain([SAFE]), slugsByAccount(board));
+  const after = manifestFromChain(
+    C,
+    chain([testPlaceholder("no-safe")]),
+    slugsByAccount(board),
+    before,
+  );
+  expect(after.slugs).toEqual(["with-safe"]);
+  expect(after.accounts).toEqual([testPlaceholder("no-safe")]);
+});

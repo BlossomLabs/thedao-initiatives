@@ -12,6 +12,12 @@ export type VoteManifest = {
   chainId: 1 | 11155111;
   contract: `0x${string}`;
   deployBlock: number;
+  /** Present on rounds supporting corrections. Serialized without losing uint256 precision. */
+  configRevision?: string;
+  /** One pinned head shared by configuration, ballots and accounting reads. */
+  readAt?: { block: number; timestamp: number; hash?: `0x${string}` };
+  /** Canonical block anchoring the cached configuration; detects same-revision reorgs. */
+  configAnchor?: { block: number; hash: `0x${string}` };
   opensAt: number;
   /** The latest the round can end (B's last window): nothing counts from here on. */
   closesAt: number;
@@ -31,7 +37,12 @@ export type VoteManifest = {
   groups: string[];
   /** The contract's registered currencies, in id order; [0] is the virtual USD unit.
    * Absent for rounds from before them (or test rounds): currency 0 only. */
-  currencies?: { symbol: string; asset: `0x${string}`; usdFeed: `0x${string}` }[];
+  currencies?: {
+    symbol: string;
+    asset: `0x${string}`;
+    usdFeed: `0x${string}`;
+    disabled?: boolean;
+  }[];
   /** Per slug, in the same order: the project's account on the round's chain (its Safe). */
   accounts?: `0x${string}`[];
   /** Tiers held to the independence rules: bit 0 S-Tier (always), bit 1 A-Tier. */

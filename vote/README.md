@@ -52,7 +52,7 @@ The references retain byte 0 for the older optional unplaced tail.
 | Maximum windows | Includes the initial window; durations halve and must remain positive. |
 | Registration deadline | First ballots until S's latest possible settlement (`registrationDeadline`); replay accepts one only before S actually settles. Minting and burning close at the end of S's first window (`mintDeadline`). |
 | Pool | One admin-recorded USD budget. It can be corrected in either direction strictly before S's first tally, then only increases. Initial funding must be recorded strictly before S's first tally. Funding must be secured separately. |
-| Initiatives | Unique project addresses and dollar asks, frozen when voting opens. |
+| Initiatives | Permanent numeric IDs; accounts, goals, RFP status and affiliations can be corrected outside scheduled quiet-ending spans. |
 | Donations | Actual native/ERC-20 balances at each project address, for allowed currencies only. |
 | Pledges | Admin-recorded outstanding amounts keyed by unique pledge IDs; updatable and cancellable. |
 | Checkpoints | Derived from canonical on-chain history; no checkpoint publication or approval. |
@@ -78,26 +78,34 @@ All USD inputs and results use **six decimal places**: 1,000,000 means one dolla
 - Currency ID 0 is the virtual USD accounting unit, not a stablecoin or native ETH.
   It supports dollar pledges but never reads account balances. The pool uses the
   same USD precision and is recorded separately.
-- addInitiative(account, goalUsd) and setInitiative(...) configure up to 254 unique
-  initiative addresses before opening. There are at most 32 currencies including USD.
+- addInitiative(account, goalUsd, rfp, groups) and setInitiative(...) configure up to 254
+  unique initiative addresses before opening or outside every scheduled quiet-ending span,
+  strictly before the hard deadline. Corrections preserve the initiative ID and withdrawal flag. There are at most 32 currencies including USD.
 - setInitiativeGroups(id, groups) changes a project's groups (affiliations) whenever
   projects may be added: before opening, or outside every tier's quiet-ending span.
   Ballots are judged when recorded, so a change only applies to ballots sent after it.
 - TestUSD (test votes on Sepolia only) is a six-decimal dollar anyone may mint, up to a
   million at a time, to any account; a test round registers it at a fixed $1.
-- setPoolUsd(amountUsd) initializes, corrects or increases the total USD pool budget.
-  Strictly before firstTallyAt(0) any value is accepted, so a mistyped total can be
-  lowered; from that tally on, decreases revert with PoolCannotDecrease. The first call sets
+- setPoolUsd(amountUsd) initializes or corrects the total USD pool budget strictly before
+  S-Tier's first tally. Any value is accepted then, so a mistyped total can be lowered.
+  After that tally, increases use proposePoolUsd(amountUsd) followed by
+  activatePoolUpdate(nonce) in a later block; direct increases revert with PoolUpdatePending,
+  and decreases revert with PoolCannotDecrease. The first call sets
   poolInitialized and must be strictly before firstTallyAt(0); otherwise it reverts
   with InitialFundingTooLate. An explicit zero also initializes. Funding never
   changes dates. Later increases remain allowed strictly before hardDeadline.
+  A proposal may be replaced or cancelled with cancelPoolUpdate(nonce). A stale nonce
+  cannot activate a replacement; activation rechecks funding deadlines and the increase-only
+  rule. Proposals and cancellations do not affect replay; only PoolUsdSet does.
   PoolUsdSet records previous and new totals for replay. This is a funding assertion,
   not custody or conversion.
 - setDates(opensAt, firstTallyAt) lets ADMIN_ROLE change future dates independently.
   Opening must not follow S; A must be at or after S's maximum possible ending, and
   B at or after A's. These same checks run at deployment. Changed dates must be in
   the future. Opening locks once voting starts; each funded tier's first tally locks
-  when it occurs. Window lengths and maximum windows remain fixed.
+  when it occurs. setSchedule(schedule) can also correct window lengths and maximum
+  windows before opening, recalculating every derived deadline atomically. Window
+  parameters freeze at opening.
 - Without funding, no tally can settle and registration, receipts, minting and
   pledges remain open. If S's date passes, an admin must explicitly set a valid future
   S date before initializing funding. Registration closes at S's latest possible
@@ -146,6 +154,40 @@ All tallies use the ordinary [cutoff rules](docs/quiet-ending-rules.md#checkpoin
 the last canonical block strictly before the tally timestamp. In-window tallies
 are taken at each block that holds a [tally event](docs/quiet-ending-rules.md#tally-events).
 No funds are transferred or custody/payout mechanism supplied by these accounting views.
+
+### Admin corrections and replay
+
+New deployments expose `configRevision` and emit `ConfigurationChanged` for configuration
+edits. Admin → Vote offers reviewed Safe Transaction Builder batches. Each batch checks
+`requireConfigRevision` before its edit, so a batch prepared against stale settings cannot
+silently overwrite a later correction. Pool proposals, cancellations and activations also
+advance this revision. No transaction is sent by the site.
+
+- `setCurrency(id, usdFeed, disabled)` corrects pricing or enables/disables an existing
+  currency before opening. IDs, tokens and token decimals never change. Disabled entries
+  retain their pledge quantities but contribute no donations or pledges; cancellations
+  remain possible. Virtual USD cannot be disabled. Replacing a feed validates it and resets
+  its cached fallback price, even if the new feed's timestamp is older. Disable a wrong
+  token and register its replacement under a new ID.
+- `setGroupName(id, name)` and `setBaseURI(uri)` remain available after opening and closing.
+  Names and metadata cannot change group membership or voting rights.
+- Initiative edits retain earlier ballots. The site refuses edits of funded or covered
+  initiatives after settlement; the receipt contract does not store settlement and cannot
+  enforce that restriction. Even a direct edit cannot rewrite replay's settled awards or
+  voter charges. A corrected account switches the balance counted; it moves no funds.
+
+The server refreshes changed configuration automatically. An existing initiative keeps its
+board identity by chain, round contract and numeric ID, regardless of account changes.
+Configuration, ballot logs and accounting reads share one pinned chain head. A canonical
+block anchors cached configuration, detecting reorgs even when the revision number is unchanged.
+The standalone replay refreshes configuration from the chain as well, including historical
+`--at` requests; board labels are optional for newly discovered IDs.
+
+Historical asks still come from `initiativeUsd(id)` at the requested block. Donation scans
+follow the account periods in `InitiativeConfigured` history, watching only the addresses
+active in each period. Configuration edits are discovered as accounting events. Cached
+balance scans and results are separated by configuration revision and anchor; finalized
+raw block states remain reusable. A fresh replay and one using settlement caches must agree.
 
 ### Ethereum mainnet currencies
 

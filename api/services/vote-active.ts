@@ -34,6 +34,7 @@ const FRESH_MS = 5_000;
 export function createActiveVote(o: {
   read: () => Promise<VoteRoundSetting | null>;
   build: (m: VoteManifest) => VoteRound;
+  refresh?: (m: VoteManifest) => Promise<VoteManifest>;
   clock?: () => number;
 }) {
   const clock = o.clock ?? Date.now;
@@ -44,13 +45,19 @@ export function createActiveVote(o: {
     let r = built.get(key);
     if (!r) {
       r = o.build(m);
+      if (built.size >= 4) built.delete(built.keys().next().value!);
       built.set(key, r);
     }
     return r;
   };
   const active = async (): Promise<VoteRound | undefined> => {
     if (!setting || clock() - setting.at >= FRESH_MS) {
-      const value = o.read().catch(() => null);
+      const value = o.read().then(async (s) => {
+        const set = roundOf(s);
+        if (!s || !set || !o.refresh) return s;
+        const manifest = await o.refresh(set.manifest);
+        return { ...s, round: { ...set, manifest } };
+      });
       setting = { at: clock(), value };
     }
     const s = await setting.value;

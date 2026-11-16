@@ -113,7 +113,9 @@ contract FundingScheduleTest is Fixture {
         }
         assertEq(round.registrationDeadline(), registrationEnd);
         assertEq(round.hardDeadline(), hardEnd);
-        round.setPoolUsd(2_000e6);
+        round.proposePoolUsd(2_000e6);
+        vm.roll(vm.getBlockNumber() + 1);
+        round.activatePoolUpdate(round.poolUpdateNonce());
         assertEq(round.firstTallyAt(1), next[1]);
     }
 

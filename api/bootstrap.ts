@@ -14,9 +14,16 @@ import { toChecksum } from "./chain/address.ts";
 import { ALWAYS_ENFORCED_RATE_LIMITS, BADGE_CONTRACT, CURATOR_ADDRESSES } from "./config.ts";
 import type { Deps } from "./middleware/context.ts";
 import { createAdmins } from "./services/admins.ts";
-import { createStateSource, createVoteChain } from "./services/vote-chain.ts";
+import {
+  createStateSource,
+  createVoteChain,
+  type StateSourceMemo,
+  stateSourceMemo,
+} from "./services/vote-chain.ts";
 import { reviewTokenIds } from "./chain/reviewer.ts";
 import { MAINNET_CHAIN_ID, type VoteManifest } from "../shared/vote/manifest.ts";
+import { refreshVoteManifest } from "./services/vote-refresh.ts";
+import { slugsByAccount } from "../shared/vote/round-from-chain.ts";
 import { createActiveVote, VOTE_ROUND_KEY, type VoteRoundSetting } from "./services/vote-active.ts";
 import { createStaticSite, type SiteOptions } from "./site.ts";
 
@@ -69,6 +76,18 @@ export async function createServer(siteOptions?: SiteOptions) {
   const relayerKey = /^0x[0-9a-fA-F]{64}$/.test(config.voteRelayerKey)
     ? config.voteRelayerKey as `0x${string}`
     : null;
+  const stateMemos = new Map<string, StateSourceMemo>();
+  const stateSourceFor = (m: VoteManifest) => {
+    const key = `${m.chainId}:${m.contract}:${m.configRevision ?? "legacy"}:${
+      m.configAnchor?.hash ?? ""
+    }`;
+    let memo = stateMemos.get(key);
+    if (!memo) {
+      if (stateMemos.size >= 4) stateMemos.delete(stateMemos.keys().next().value!);
+      stateMemos.set(key, memo = stateSourceMemo());
+    }
+    return createStateSource(m, voteRpcUrl(m), undefined, memo);
+  };
   const deps: Deps = {
     db,
     chain,
@@ -85,6 +104,33 @@ export async function createServer(siteOptions?: SiteOptions) {
     // Off until an admin sets a round (Admin → Vote, by its contract address).
     voteRound: createActiveVote({
       read: () => db.meta.get<VoteRoundSetting>(VOTE_ROUND_KEY),
+      refresh: async (m) => {
+        const next = await refreshVoteManifest(m, voteRpcUrl(m), {
+          slugOf: async () =>
+            slugsByAccount(
+              await db.initiatives.list(["approved", "archived", "pending", "rejected"]),
+            ),
+        });
+        if (
+          next.configRevision !== m.configRevision ||
+          next.configAnchor?.hash !== m.configAnchor?.hash
+        ) {
+          await db.meta.update<VoteRoundSetting>(VOTE_ROUND_KEY, (cur) => {
+            const set = cur?.round ?? cur?.test;
+            if (
+              !set || set.manifest.chainId !== m.chainId ||
+              set.manifest.contract.toLowerCase() !== m.contract.toLowerCase()
+            ) return cur!;
+            // Do not overwrite a concurrent refresh. A lower revision can be canonical after a reorg.
+            if (
+              set.manifest.configRevision !== m.configRevision ||
+              set.manifest.configAnchor?.hash !== m.configAnchor?.hash
+            ) return cur!;
+            return { ...cur, round: { ...set, manifest: next } };
+          });
+        }
+        return next;
+      },
       build: (m) => ({
         manifest: m,
         chain: createVoteChain(
@@ -95,7 +141,7 @@ export async function createServer(siteOptions?: SiteOptions) {
           (a) => reviewTokenIds(chain.rpc, a, fetch),
         ),
         // Past blocks need an archive node: the round's RPC (RPC_URL / SEPOLIA_RPC_URL) must be one.
-        source: createStateSource(m, voteRpcUrl(m)),
+        source: stateSourceFor(m),
       }),
     }),
   };

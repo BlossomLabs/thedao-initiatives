@@ -223,3 +223,63 @@ Deno.test("the script needs an archive RPC", async () => {
   assertEquals(code, 1);
   assertStringIncludes(err.join("\n"), "--rpc");
 });
+
+Deno.test("wallet and goal corrections reproduce settled awards in the API, cached replay and CLI", async () => {
+  const at = NOW + 2000;
+  const source = fakeSource({ now: at + 100 });
+  const original = source.stateAt;
+  source.stateAt = async (b) => {
+    const state = await original(b);
+    // A correction in the gap after S-Tier: a's current ask changes, but its
+    // historical goal/account at S-Tier's cutoff still produces its $150 award.
+    return {
+      ...state,
+      asks: state.timestamp >= NOW - 300 ? [1n, 150n, state.asks[2]] : state.asks,
+    };
+  };
+  const m = {
+    ...manifest,
+    configRevision: "2",
+    projects: manifest.projects.map((p, i) => i === 0 ? { ...p, goalUsd: "1" } : p),
+  };
+  const h = await harness();
+  h.deps.vote = {
+    manifest: m,
+    source,
+    chain: {
+      ballots: source.ballots,
+      committed: source.committed,
+      rulesHistory: source.rulesHistory,
+    } as VoteChain,
+  };
+  const path = await Deno.makeTempFile({ suffix: ".json" });
+  try {
+    await Deno.writeTextFile(path, JSON.stringify(m));
+    for (const now of [at, at + 60]) {
+      h.clock.now = now;
+      const res = await h.req("/api/vote/round");
+      assertEquals(res.status, 200);
+      const result = await j(res) as Record<string, unknown> & { live: Record<string, unknown> };
+      const { next: _n, lead: _l, give: _g, ...live } = result.live;
+      const { final: _f, ...rest } = result;
+      const script = await runScript(["--manifest", path, "--at", String(now), "--json"], source);
+      assertEquals([script.code, script.err], [0, ""]);
+      const expected = JSON.parse(script.out).round;
+      assertEquals({ ...rest, live }, expected);
+      assertEquals(expected.tiers[0].awards.a, "150");
+      await h.settle();
+      await h.deps.db.kv.delete([
+        "vote",
+        m.contract.toLowerCase(),
+        "corrections1",
+        m.chainId,
+        "2",
+        "round",
+      ]);
+    }
+  } finally {
+    await Deno.remove(path);
+    await h.settle();
+    h.close();
+  }
+});

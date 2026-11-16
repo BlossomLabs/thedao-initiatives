@@ -15,6 +15,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { TEST_USD_ABI } from "../../shared/vote/test-usd.ts";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
+import { type AccountChange, accountPeriods } from "../../shared/vote/account-history.ts";
 import type { StateCache, StateSource } from "../../shared/vote/chain-states.ts";
 import type { ChainState } from "../../shared/vote/quiet-ending.ts";
 import type { BallotEvent, RoundSource, RulesHistory } from "../../shared/vote/replay-round.ts";
@@ -98,6 +99,9 @@ export interface VoteChain {
    * first test round predates it, and a withdrawal batch would revert). Absent (a test
    * fake): it can. */
   canWithdraw?(): Promise<boolean>;
+  corrections?(): Promise<
+    { poolUsd: string; pendingPoolUsd: string | null; poolUpdateNonce: string }
+  >;
 }
 
 export type { BallotEvent, RulesHistory };
@@ -172,6 +176,20 @@ export function createVoteChain(
       }
     },
     balanceOf: (a) => read<bigint>("balanceOf", [a]),
+    async corrections() {
+      const at = m.readAt ? BigInt(m.readAt.block) : await pub.getBlockNumber();
+      const [pool, pending, nonce, has] = await Promise.all([
+        read<bigint>("poolUsd", [], at),
+        read<bigint>("pendingPoolUsd", [], at),
+        read<bigint>("poolUpdateNonce", [], at),
+        read<boolean>("hasPendingPool", [], at),
+      ]);
+      return {
+        poolUsd: pool.toString(),
+        pendingPoolUsd: has ? pending.toString() : null,
+        poolUpdateNonce: nonce.toString(),
+      };
+    },
     async canWithdraw() {
       try {
         await read<bigint>("withdrawnMask", []);
@@ -297,7 +315,12 @@ export function createVoteChain(
       return { transcript: r[0], recordCount: BigInt(r[1]), hashes: r.slice(2) as Hex[] };
     },
     async ballots() {
-      const headBlock = await pub.getBlock();
+      const headBlock = await pub.getBlock(
+        m.readAt ? { blockNumber: BigInt(m.readAt.block) } : undefined,
+      );
+      if (m.readAt?.hash && headBlock.hash !== m.readAt.hash) {
+        throw new Error("vote head changed during replay");
+      }
       const head = headBlock.number!;
       const headTime = Number(headBlock.timestamp);
       const out: BallotEvent[] = [];
@@ -364,7 +387,7 @@ export function createVoteChain(
     async rulesHistory() {
       // Positions, not times: the replay orders these against ballots exactly as the
       // contract saw them (a pool raise in a ballot's own block may come after it).
-      const head = await pub.getBlockNumber();
+      const head = m.readAt ? BigInt(m.readAt.block) : await pub.getBlockNumber();
       const out: RulesHistory = { addedAt: [], pool: [] };
       for (let from = BigInt(m.deployBlock); from <= head; from += LOG_CHUNK) {
         const to = from + LOG_CHUNK - 1n < head ? from + LOG_CHUNK - 1n : head;
@@ -374,7 +397,7 @@ export function createVoteChain(
           pub.getLogs({ ...range, event: POOL_USD_SET }),
         ]);
         for (const log of added) {
-          // setInitiative re-emits it before opening: the first one counts.
+          // Corrections re-emit it too: only the first event adds this ID.
           out.addedAt[Number(log.args.initiativeId)] ??= {
             block: Number(log.blockNumber),
             logIndex: log.logIndex!,
@@ -432,10 +455,20 @@ const NATIVE_MEMO = 20_000;
 /** The round's chain states read from an RPC (an archive node, for past blocks):
  * shared/vote/chain-states.ts turns them into the replay's states. Every read names its
  * block; a node that can't serve it fails the read. */
+export type StateSourceMemo = {
+  nativeScans: Map<string, Map<number, boolean>>;
+  histories: Map<number, Promise<AccountChange[]>>;
+};
+export const stateSourceMemo = (): StateSourceMemo => ({
+  nativeScans: new Map(),
+  histories: new Map(),
+});
+
 export function createStateSource(
   m: VoteManifest,
   rpcUrl: string,
   transport: Transport = http(rpcUrl),
+  memo = stateSourceMemo(),
 ): StateSource {
   const pub = createPublicClient({ chain: voteChain(m), transport }) as PublicClient;
   const contract = { address: m.contract, abi: SIGNED_BALLOTS_ABI } as const;
@@ -443,13 +476,16 @@ export function createStateSource(
    * scanned: kept for this source's life (one per isolate on the site). The KV cache keeps
    * final scans across isolates (chain-states.ts) but never the newer tail, which every
    * read would otherwise scan again block by block. */
-  const nativeSeen = new Map<number, boolean>();
+  const { nativeScans, histories } = memo;
   const blockAt = async (n: number) => {
     const b = await pub.getBlock({ blockNumber: BigInt(n) });
     return { block: n, timestamp: Number(b.timestamp) };
   };
   const head = async () => {
-    const b = await pub.getBlock();
+    const b = await pub.getBlock(m.readAt ? { blockNumber: BigInt(m.readAt.block) } : undefined);
+    if (m.readAt?.hash && b.hash !== m.readAt.hash) {
+      throw new Error("vote head changed during replay");
+    }
     return { block: Number(b.number), timestamp: Number(b.timestamp) };
   };
   /** Blocks in [from, to] holding a log `get` returns (read in chunks), ascending, once each. */
@@ -464,6 +500,99 @@ export function createStateSource(
       for (const l of await get(a, b)) out.add(Number(l.blockNumber));
     }
     return [...out].sort((x, y) => x - y);
+  };
+
+  const scanBalances = async (from: number, to: number, accounts: Hex[]): Promise<number[]> => {
+    const currencies = (m.currencies ?? []).slice(1).filter((c) => !c.disabled);
+    if (!currencies.length) return [];
+    if (!accounts.length) return [];
+    const key = accounts.join().toLowerCase();
+    let nativeSeen = nativeScans.get(key);
+    if (!nativeSeen) nativeScans.set(key, nativeSeen = new Map());
+    const tokens = currencies.map((c) => c.asset).filter((a) => !NATIVE.test(a));
+    const out = new Set<number>();
+    if (tokens.length) {
+      for (const side of ["from", "to"] as const) {
+        const blocks = await logBlocks(from, to, (fromBlock, toBlock) =>
+          pub.getLogs({
+            address: tokens,
+            event: ERC20_TRANSFER,
+            args: { [side]: accounts },
+            fromBlock,
+            toBlock,
+          }));
+        for (const b of blocks) out.add(b);
+      }
+    }
+    if (currencies.some((c) => NATIVE.test(c.asset))) {
+      // No log for an internal transfer: each block's balances against the block before.
+      const ethAt = (block: number) =>
+        pub.multicall({
+          blockNumber: BigInt(block),
+          batchSize: 0,
+          multicallAddress: MULTICALL3,
+          allowFailure: false,
+          contracts: accounts.map((a) => ({
+            address: MULTICALL3,
+            abi: multicall3Abi,
+            functionName: "getEthBalance",
+            args: [a],
+          })),
+        }) as Promise<bigint[]>;
+      // The blocks scanned before and deep enough are known; the scan goes on after them.
+      let start = from;
+      for (; start <= to && nativeSeen.has(start); start++) {
+        if (nativeSeen.get(start)) out.add(start);
+      }
+      let before = start <= to ? await ethAt(start - 1) : [];
+      for (let a = start; a <= to; a += BALANCE_READS) {
+        const batch = Array.from(
+          { length: Math.min(BALANCE_READS, to - a + 1) },
+          (_, i) => a + i,
+        );
+        const reads = await Promise.all(batch.map(ethAt));
+        for (const [i, now] of reads.entries()) {
+          const changed = now.some((x, j) => x !== before[j]);
+          if (changed) out.add(batch[i]);
+          if (batch[i] <= to - REORG_DEPTH) nativeSeen.set(batch[i], changed);
+          before = now;
+        }
+      }
+      for (const b of nativeSeen.keys()) {
+        if (nativeSeen.size <= NATIVE_MEMO) break;
+        nativeSeen.delete(b);
+      }
+    }
+    return [...out].sort((x, y) => x - y);
+  };
+  const accountHistory = (to: number): Promise<AccountChange[]> => {
+    let p = histories.get(to);
+    if (!p) {
+      p = (async () => {
+        const out: AccountChange[] = [];
+        for (let from = m.deployBlock; from <= to; from += Number(LOG_CHUNK)) {
+          const logs = await pub.getLogs({
+            address: m.contract,
+            event: INITIATIVE_CONFIGURED,
+            fromBlock: BigInt(from),
+            toBlock: BigInt(Math.min(to, from + Number(LOG_CHUNK) - 1)),
+          });
+          for (const log of logs) {
+            out.push({
+              block: Number(log.blockNumber),
+              logIndex: log.logIndex!,
+              id: Number(log.args.initiativeId!),
+              account: log.args.account!,
+            });
+          }
+        }
+        return out;
+      })();
+      if (histories.size >= 4) histories.delete(histories.keys().next().value!);
+      histories.set(to, p);
+      p.catch(() => histories.delete(to));
+    }
+    return p;
   };
 
   return {
@@ -529,72 +658,24 @@ export function createStateSource(
       logBlocks(from, to, (fromBlock, toBlock) =>
         pub.getLogs({
           address: m.contract,
-          events: [PLEDGE_SET, POOL_USD_SET, INITIATIVE_WITHDRAWN],
+          events: [PLEDGE_SET, POOL_USD_SET, INITIATIVE_WITHDRAWN, INITIATIVE_CONFIGURED],
           fromBlock,
           toBlock,
         })),
     async balanceChangeBlocks(from, to) {
-      const currencies = (m.currencies ?? []).slice(1);
-      if (!currencies.length) return [];
-      const accounts = m.accounts;
-      if (accounts?.length !== m.slugs.length) {
-        throw new Error("vote manifest: currencies need one account per project");
+      if (m.configRevision === undefined) {
+        if (m.currencies && m.currencies.length > 1 && m.accounts?.length !== m.slugs.length) {
+          throw new Error("vote manifest: currencies need one account per project");
+        }
+        return await scanBalances(from, to, m.accounts ?? []);
       }
-      const tokens = currencies.map((c) => c.asset).filter((a) => !NATIVE.test(a));
-      const out = new Set<number>();
-      if (tokens.length) {
-        for (const side of ["from", "to"] as const) {
-          const blocks = await logBlocks(from, to, (fromBlock, toBlock) =>
-            pub.getLogs({
-              address: tokens,
-              event: ERC20_TRANSFER,
-              args: { [side]: accounts },
-              fromBlock,
-              toBlock,
-            }));
-          for (const b of blocks) out.add(b);
-        }
+      const history = await accountHistory(m.readAt?.block ?? to);
+      const periods = accountPeriods(history, from, to);
+      const blocks = new Set<number>();
+      for (const p of periods) {
+        for (const b of await scanBalances(p.from, p.to, p.accounts)) blocks.add(b);
       }
-      if (currencies.some((c) => NATIVE.test(c.asset))) {
-        // No log for an internal transfer: each block's balances against the block before.
-        const ethAt = (block: number) =>
-          pub.multicall({
-            blockNumber: BigInt(block),
-            batchSize: 0,
-            multicallAddress: MULTICALL3,
-            allowFailure: false,
-            contracts: accounts.map((a) => ({
-              address: MULTICALL3,
-              abi: multicall3Abi,
-              functionName: "getEthBalance",
-              args: [a],
-            })),
-          }) as Promise<bigint[]>;
-        // The blocks scanned before and deep enough are known; the scan goes on after them.
-        let start = from;
-        for (; start <= to && nativeSeen.has(start); start++) {
-          if (nativeSeen.get(start)) out.add(start);
-        }
-        let before = start <= to ? await ethAt(start - 1) : [];
-        for (let a = start; a <= to; a += BALANCE_READS) {
-          const batch = Array.from(
-            { length: Math.min(BALANCE_READS, to - a + 1) },
-            (_, i) => a + i,
-          );
-          const reads = await Promise.all(batch.map(ethAt));
-          for (const [i, now] of reads.entries()) {
-            const changed = now.some((x, j) => x !== before[j]);
-            if (changed) out.add(batch[i]);
-            if (batch[i] <= to - REORG_DEPTH) nativeSeen.set(batch[i], changed);
-            before = now;
-          }
-        }
-        for (const b of nativeSeen.keys()) {
-          if (nativeSeen.size <= NATIVE_MEMO) break;
-          nativeSeen.delete(b);
-        }
-      }
-      return [...out].sort((x, y) => x - y);
+      return [...blocks].sort((a, b) => a - b);
     },
   };
 }
@@ -618,7 +699,7 @@ export function createRoundSource(
 
 /** Chain reads that are final, kept in KV under the round's prefix. */
 export function kvStateCache(kv: Deno.Kv, m: VoteManifest): StateCache {
-  const prefix = ["vote", m.contract.toLowerCase(), "chain"];
+  const prefix = ["vote", m.chainId, m.contract.toLowerCase(), "chain"];
   return {
     get: async (key) => (await kv.get([...prefix, key])).value ?? undefined,
     set: async (key, value) => {

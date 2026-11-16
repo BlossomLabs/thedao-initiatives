@@ -198,6 +198,19 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "activatePoolUpdate",
+    "inputs": [
+      {
+        "name": "nonce",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable",
+  },
+  {
+    "type": "function",
     "name": "addGroup",
     "inputs": [
       {
@@ -320,6 +333,32 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "cancelPoolUpdate",
+    "inputs": [
+      {
+        "name": "nonce",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable",
+  },
+  {
+    "type": "function",
+    "name": "configRevision",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "currency",
     "inputs": [
       {
@@ -368,6 +407,25 @@ export const SIGNED_BALLOTS_ABI = [
         "name": "",
         "type": "uint256",
         "internalType": "uint256",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
+    "name": "currencyDisabled",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool",
       },
     ],
     "stateMutability": "view",
@@ -573,6 +631,19 @@ export const SIGNED_BALLOTS_ABI = [
         "name": "",
         "type": "uint64",
         "internalType": "uint64",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
+    "name": "hasPendingPool",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool",
       },
     ],
     "stateMutability": "view",
@@ -958,6 +1029,19 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "pendingPoolUsd",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "pledgeNonceOf",
     "inputs": [
       {
@@ -1048,6 +1132,32 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "poolUpdateBlock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
+    "name": "poolUpdateNonce",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "poolUsd",
     "inputs": [],
     "outputs": [
@@ -1090,6 +1200,19 @@ export const SIGNED_BALLOTS_ABI = [
       },
     ],
     "stateMutability": "view",
+  },
+  {
+    "type": "function",
+    "name": "proposePoolUsd",
+    "inputs": [
+      {
+        "name": "amountUsd",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable",
   },
   {
     "type": "function",
@@ -1276,6 +1399,19 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "requireConfigRevision",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "revokeRole",
     "inputs": [
       {
@@ -1376,6 +1512,29 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "setCurrency",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+      {
+        "name": "usdFeed",
+        "type": "address",
+        "internalType": "address",
+      },
+      {
+        "name": "disabled",
+        "type": "bool",
+        "internalType": "bool",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable",
+  },
+  {
+    "type": "function",
     "name": "setDates",
     "inputs": [
       {
@@ -1387,6 +1546,24 @@ export const SIGNED_BALLOTS_ABI = [
         "name": "firstTallyAt_",
         "type": "uint64[3]",
         "internalType": "uint64[3]",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable",
+  },
+  {
+    "type": "function",
+    "name": "setGroupName",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint8",
+        "internalType": "uint8",
+      },
+      {
+        "name": "name",
+        "type": "bytes32",
+        "internalType": "bytes32",
       },
     ],
     "outputs": [],
@@ -1540,6 +1717,41 @@ export const SIGNED_BALLOTS_ABI = [
         "name": "amountUsd",
         "type": "uint256",
         "internalType": "uint256",
+      },
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable",
+  },
+  {
+    "type": "function",
+    "name": "setSchedule",
+    "inputs": [
+      {
+        "name": "schedule",
+        "type": "tuple",
+        "internalType": "struct SignedBallots.Schedule",
+        "components": [
+          {
+            "name": "opensAt",
+            "type": "uint64",
+            "internalType": "uint64",
+          },
+          {
+            "name": "initialWindow",
+            "type": "uint64",
+            "internalType": "uint64",
+          },
+          {
+            "name": "firstTallyAt",
+            "type": "uint64[3]",
+            "internalType": "uint64[3]",
+          },
+          {
+            "name": "maxWindows",
+            "type": "uint8",
+            "internalType": "uint8",
+          },
+        ],
       },
     ],
     "outputs": [],
@@ -1844,6 +2056,44 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "event",
+    "name": "ConfigurationChanged",
+    "inputs": [
+      {
+        "name": "revision",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256",
+      },
+    ],
+    "anonymous": false,
+  },
+  {
+    "type": "event",
+    "name": "CurrencyConfigured",
+    "inputs": [
+      {
+        "name": "currencyId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256",
+      },
+      {
+        "name": "usdFeed",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address",
+      },
+      {
+        "name": "disabled",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool",
+      },
+    ],
+    "anonymous": false,
+  },
+  {
+    "type": "event",
     "name": "CurrencyRegistered",
     "inputs": [
       {
@@ -1901,6 +2151,25 @@ export const SIGNED_BALLOTS_ABI = [
   {
     "type": "event",
     "name": "GroupAdded",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8",
+      },
+      {
+        "name": "name",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32",
+      },
+    ],
+    "anonymous": false,
+  },
+  {
+    "type": "event",
+    "name": "GroupRenamed",
     "inputs": [
       {
         "name": "id",
@@ -2010,6 +2279,38 @@ export const SIGNED_BALLOTS_ABI = [
       },
       {
         "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256",
+      },
+    ],
+    "anonymous": false,
+  },
+  {
+    "type": "event",
+    "name": "PoolUpdateCancelled",
+    "inputs": [
+      {
+        "name": "nonce",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256",
+      },
+    ],
+    "anonymous": false,
+  },
+  {
+    "type": "event",
+    "name": "PoolUpdateProposed",
+    "inputs": [
+      {
+        "name": "nonce",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256",
+      },
+      {
+        "name": "amountUsd",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256",
@@ -2279,6 +2580,11 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "error",
+    "name": "ConfigurationChangedSinceReview",
+    "inputs": [],
+  },
+  {
+    "type": "error",
     "name": "ConfigurationFrozen",
     "inputs": [],
   },
@@ -2516,6 +2822,11 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "error",
+    "name": "NoPoolUpdate",
+    "inputs": [],
+  },
+  {
+    "type": "error",
     "name": "NoProjects",
     "inputs": [],
   },
@@ -2563,12 +2874,27 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "error",
+    "name": "PoolUpdateNotReady",
+    "inputs": [],
+  },
+  {
+    "type": "error",
+    "name": "PoolUpdatePending",
+    "inputs": [],
+  },
+  {
+    "type": "error",
     "name": "RegistrationClosed",
     "inputs": [],
   },
   {
     "type": "error",
     "name": "RfpWithGroups",
+    "inputs": [],
+  },
+  {
+    "type": "error",
+    "name": "StalePoolUpdate",
     "inputs": [],
   },
   {

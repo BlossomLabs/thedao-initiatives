@@ -36,6 +36,11 @@ abstract contract RoundAccounting is AccessControl {
     error RfpWithGroups();
     error AlreadyWithdrawn();
     error NotWithdrawn();
+    error PoolUpdatePending();
+    error NoPoolUpdate();
+    error StalePoolUpdate();
+    error ConfigurationChangedSinceReview();
+    error PoolUpdateNotReady();
 
     struct Currency {
         address asset; // address(0) means native currency, except virtual currency USD.
@@ -86,6 +91,20 @@ abstract contract RoundAccounting is AccessControl {
     /// @notice Bit `i` set when initiative `i` is withdrawn (at most 254 initiatives). Mirrors
     ///         `Initiative.withdrawn`, so a ballot reads every flag in one storage read.
     uint256 public withdrawnMask;
+    /// Configuration changes invalidate the site's current configuration, not historical states.
+    uint256 public configRevision;
+    /// Disabled entries retain their IDs and pledge quantities, but contribute no support.
+    mapping(uint256 => bool) public currencyDisabled;
+    uint256 public pendingPoolUsd;
+    uint256 public poolUpdateNonce;
+    uint256 public poolUpdateBlock;
+    bool public hasPendingPool;
+
+    event ConfigurationChanged(uint256 revision);
+    event CurrencyConfigured(uint256 indexed currencyId, address usdFeed, bool disabled);
+    event GroupRenamed(uint8 indexed id, bytes32 name);
+    event PoolUpdateProposed(uint256 indexed nonce, uint256 amountUsd);
+    event PoolUpdateCancelled(uint256 indexed nonce);
 
     event CurrencyRegistered(
         uint256 indexed currencyId, address indexed asset, address usdFeed, uint8 amountDecimals, uint8 feedDecimals
@@ -142,11 +161,50 @@ abstract contract RoundAccounting is AccessControl {
         _currencies.push(c);
         _assetRegistered[asset] = true;
         emit CurrencyRegistered(id, asset, usdFeed, amountDecimals, feedDecimals);
-        if (usdFeed != address(0)) {
-            (uint256 price, uint64 updatedAt, bool good) = _readPrice(id, c);
-            if (!good) revert InvalidPrice(id);
-            _storePrice(id, price, updatedAt);
+        _seedPrice(id, c);
+        _configurationChanged();
+    }
+
+    /// Correct pricing without reinterpreting the token quantities of existing pledges.
+    function setCurrency(uint256 id, address usdFeed, bool disabled) external onlyRole(ADMIN_ROLE) {
+        _requireSetup();
+        _requireCurrency(id);
+        if (id == USD) revert InvalidCurrency();
+        Currency storage c = _currencies[id];
+        if (usdFeed != c.usdFeed) {
+            if (usdFeed == address(0)) {
+                if (c.asset == address(0)) revert InvalidCurrency();
+                c.feedDecimals = 0;
+            } else {
+                if (usdFeed.code.length == 0) revert InvalidCurrency();
+                uint8 decimals = IPriceFeed(usdFeed).decimals();
+                if (decimals > 18) revert InvalidCurrency();
+                c.feedDecimals = decimals;
+            }
+            c.usdFeed = usdFeed;
+            // A replacement feed may have an older timestamp or different decimals.
+            delete lastPrice[id];
+            _seedPrice(id, c);
         }
+        currencyDisabled[id] = disabled;
+        emit CurrencyConfigured(id, usdFeed, disabled);
+        _configurationChanged();
+    }
+
+    function _seedPrice(uint256 id, Currency memory c) private {
+        if (c.usdFeed == address(0)) return;
+        (uint256 price, uint64 updatedAt, bool good) = _readPrice(id, c);
+        if (!good) revert InvalidPrice(id);
+        _storePrice(id, price, updatedAt);
+    }
+
+    /// First call of an atomic Safe batch: refuse an edit prepared against stale settings.
+    function requireConfigRevision(uint256 expected) external view {
+        if (configRevision != expected) revert ConfigurationChangedSinceReview();
+    }
+
+    function _configurationChanged() internal {
+        emit ConfigurationChanged(++configRevision);
     }
 
     function initiativeCount() public view returns (uint256) {
@@ -174,6 +232,14 @@ abstract contract RoundAccounting is AccessControl {
         id = uint8(_groupNames.length);
         _groupNames.push(name);
         emit GroupAdded(id, name);
+        _configurationChanged();
+    }
+
+    function setGroupName(uint8 id, bytes32 name) external onlyRole(ADMIN_ROLE) {
+        if (id >= _groupNames.length) revert UnknownGroup();
+        _groupNames[id] = name;
+        emit GroupRenamed(id, name);
+        _configurationChanged();
     }
 
     /// @notice Before voting opens, or during the vote outside every tier's quiet-ending
@@ -192,13 +258,14 @@ abstract contract RoundAccounting is AccessControl {
         _initiatives.push(Initiative(account, rfp, false, goalUsd, groups));
         _initiativeRegistered[account] = true;
         emit InitiativeConfigured(id, account, goalUsd, rfp, groups);
+        _configurationChanged();
     }
 
     function setInitiative(uint256 id, address account, uint256 goalUsd, bool rfp, uint256 groups)
         external
         onlyRole(ADMIN_ROLE)
     {
-        _requireSetup();
+        _requireAdding();
         _requireInitiative(id);
         _checkGroups(rfp, groups);
         address previous = _initiatives[id].account;
@@ -209,6 +276,7 @@ abstract contract RoundAccounting is AccessControl {
         }
         _initiatives[id] = Initiative(account, rfp, _initiatives[id].withdrawn, goalUsd, groups);
         emit InitiativeConfigured(id, account, goalUsd, rfp, groups);
+        _configurationChanged();
     }
 
     /// @notice Change which groups (affiliations) a project belongs to, whenever projects
@@ -222,6 +290,7 @@ abstract contract RoundAccounting is AccessControl {
         _checkGroups(x.rfp, groups);
         x.groups = groups;
         emit InitiativeConfigured(id, x.account, x.goalUsd, x.rfp, groups);
+        _configurationChanged();
     }
 
     /// @notice Mark a project withdrawn: its ask counts as $0 toward the ballot size rule,
@@ -258,6 +327,55 @@ abstract contract RoundAccounting is AccessControl {
     ///      dates. No conversion occurs.
     function setPoolUsd(uint256 amountUsd) external onlyRole(ADMIN_ROLE) {
         _requireAccountingOpen();
+        if (!poolInitialized) _requireInitialFundingOpen();
+        if (!_initialFundingOpen() && amountUsd < poolUsd) revert PoolCannotDecrease();
+        // After the first tally a typo cannot be rolled back: require a separate activation.
+        if (!_initialFundingOpen()) revert PoolUpdatePending();
+        _setPoolUsd(amountUsd);
+        _cancelPoolUpdate();
+    }
+
+    function proposePoolUsd(uint256 amountUsd) external onlyRole(ADMIN_ROLE) {
+        _requireAccountingOpen();
+        if (!poolInitialized) _requireInitialFundingOpen();
+        if (!_initialFundingOpen() && amountUsd < poolUsd) revert PoolCannotDecrease();
+        pendingPoolUsd = amountUsd;
+        poolUpdateBlock = block.number;
+        hasPendingPool = true;
+        emit PoolUpdateProposed(++poolUpdateNonce, amountUsd);
+        _configurationChanged();
+    }
+
+    function cancelPoolUpdate(uint256 nonce) external onlyRole(ADMIN_ROLE) {
+        _checkPoolUpdate(nonce);
+        _cancelPoolUpdate();
+    }
+
+    function activatePoolUpdate(uint256 nonce) external onlyRole(ADMIN_ROLE) {
+        _checkPoolUpdate(nonce);
+        // A propose+activate atomic batch would provide no opportunity to correct a typo.
+        if (block.number <= poolUpdateBlock) revert PoolUpdateNotReady();
+        uint256 amount = pendingPoolUsd;
+        hasPendingPool = false;
+        pendingPoolUsd = 0;
+        _setPoolUsd(amount);
+    }
+
+    function _checkPoolUpdate(uint256 nonce) private view {
+        if (!hasPendingPool) revert NoPoolUpdate();
+        if (nonce != poolUpdateNonce) revert StalePoolUpdate();
+    }
+
+    function _cancelPoolUpdate() private {
+        if (!hasPendingPool) return;
+        hasPendingPool = false;
+        pendingPoolUsd = 0;
+        emit PoolUpdateCancelled(poolUpdateNonce);
+        _configurationChanged();
+    }
+
+    function _setPoolUsd(uint256 amountUsd) private {
+        _requireAccountingOpen();
         uint256 previous = poolUsd;
         if (amountUsd < previous && !_initialFundingOpen()) revert PoolCannotDecrease();
         poolUsd = amountUsd;
@@ -266,6 +384,7 @@ abstract contract RoundAccounting is AccessControl {
             poolInitialized = true;
         }
         emit PoolUsdSet(previous, amountUsd);
+        _configurationChanged();
     }
 
     /// @notice Upsert a pledge by its unique ID. Setting amount to zero cancels it;
@@ -284,6 +403,7 @@ abstract contract RoundAccounting is AccessControl {
         if (pledgeId == bytes32(0)) revert InvalidPledgeId();
         _requireInitiative(initiativeId);
         _requireCurrency(currencyId);
+        if (amount != 0 && currencyDisabled[currencyId]) revert InvalidCurrency();
         Pledge memory previous = pledges[pledgeId];
         if (previous.exists) {
             pledgedAmount[previous.initiativeId][previous.currencyId] -= previous.amount;
@@ -297,7 +417,7 @@ abstract contract RoundAccounting is AccessControl {
     function quoteUsd(uint256 currencyId, uint256 amount) public view returns (uint256) {
         _requireCurrency(currencyId);
         if (currencyId == USD) return amount;
-        if (amount == 0) return 0;
+        if (amount == 0 || currencyDisabled[currencyId]) return 0;
         Currency memory c = _currencies[currencyId];
         (uint256 price,,) = _readPrice(currencyId, c);
         return _convert(amount, price, c);
@@ -336,7 +456,7 @@ abstract contract RoundAccounting is AccessControl {
         uint256[] memory prices = new uint256[](n);
         for (uint256 i = 1; i < n; ++i) {
             cs[i] = _currencies[i];
-            (prices[i],,) = _readPrice(i, cs[i]);
+            if (!currencyDisabled[i]) (prices[i],,) = _readPrice(i, cs[i]);
         }
         (donatedUsd, pledgedUsd) = _supportOf(initiativeId, cs, prices);
         totalUsd = Math.saturatingAdd(donatedUsd, pledgedUsd);
@@ -348,7 +468,7 @@ abstract contract RoundAccounting is AccessControl {
     ///         when good, else the last good price stored.
     function priceUsd(uint256 currencyId) external view returns (uint256 price) {
         _requireCurrency(currencyId);
-        (price,,) = _readPrice(currencyId, _currencies[currencyId]);
+        if (!currencyDisabled[currencyId]) (price,,) = _readPrice(currencyId, _currencies[currencyId]);
     }
 
     /// @dev A feed answer is good when the call succeeds, `roundId != 0`, `answer > 0`,
@@ -461,6 +581,7 @@ abstract contract RoundAccounting is AccessControl {
         prices = new uint256[](n);
         for (uint256 i = 1; i < n; ++i) {
             cs[i] = _currencies[i];
+            if (currencyDisabled[i]) continue;
             (uint256 price, uint64 updatedAt, bool good) = _readPrice(i, cs[i]);
             prices[i] = price;
             if (good && cs[i].usdFeed != address(0)) _storePrice(i, price, updatedAt);
@@ -479,6 +600,7 @@ abstract contract RoundAccounting is AccessControl {
         address account = _initiatives[p].account;
         pledgedUsd = pledgedAmount[p][USD];
         for (uint256 i = 1; i < cs.length; ++i) {
+            if (prices[i] == 0) continue;
             Currency memory c = cs[i];
             uint256 donated = c.asset == address(0) ? account.balance : _tokenBalance(c.asset, account);
             donatedUsd = Math.saturatingAdd(donatedUsd, _convert(donated, prices[i], c));

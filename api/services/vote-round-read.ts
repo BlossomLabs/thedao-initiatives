@@ -16,7 +16,7 @@ import { type RoundOnChain, RoundReadError } from "../../shared/vote/round-from-
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 
-const isRevert = (e: unknown) =>
+export const isRevert = (e: unknown) =>
   e instanceof BaseError &&
   Boolean(
     e.walk((x) =>
@@ -52,6 +52,7 @@ export async function readRoundOnChain(
   rpcUrl: string,
   transport: Transport = http(rpcUrl),
   chainId: 1 | 11155111 = 11155111,
+  at?: { block: number; deployBlock?: number },
 ): Promise<RoundOnChain & { minters: (a: `0x${string}`) => Promise<boolean> }> {
   const chain = chainId === mainnet.id ? mainnet : sepolia;
   const chainName = chainId === mainnet.id ? "Ethereum" : "Sepolia";
@@ -61,9 +62,10 @@ export async function readRoundOnChain(
     transport,
     batch: { multicall: true },
   }) as PublicClient;
+  const blockNumber = BigInt(at?.block ?? await pub.getBlockNumber());
   const c = { address: getAddress(address), abi: SIGNED_BALLOTS_ABI } as const;
   const one = <T>(functionName: string, args: unknown[] = []) =>
-    pub.readContract({ ...c, functionName, args } as never) as Promise<T>;
+    pub.readContract({ ...c, functionName, args, blockNumber } as never) as Promise<T>;
   /** A revert (or no code to answer) means the contract isn't one; a node that can't be
    * reached is thrown as it is. */
   const unless = (message: string) => (e: unknown): never => {
@@ -77,6 +79,10 @@ export async function readRoundOnChain(
   const nGroups = await one<bigint>("groupCount").catch(
     unless("That round was deployed before the ballot rules: deploy a new one with vote-deploy."),
   );
+  const revision = await one<bigint>("configRevision").catch((e) => {
+    if (isRevert(e)) return undefined;
+    throw e;
+  });
   const [nI, nC] = counts.map(Number);
   const nG = Number(nGroups);
   const range = (n: number) => Array.from({ length: n }, (_, i) => BigInt(i));
@@ -104,15 +110,23 @@ export async function readRoundOnChain(
     Promise.all(
       range(nC).map(async (i) => {
         const x = await one<{ asset: `0x${string}`; usdFeed: `0x${string}` }>("currency", [i]);
-        const symbol = i === 0n
-          ? "USD"
-          : x.asset === ZERO
-          ? "ETH"
-          : await pub.readContract({ address: x.asset, abi: erc20Abi, functionName: "symbol" });
-        return { symbol, asset: getAddress(x.asset), usdFeed: getAddress(x.usdFeed) };
+        const symbol = i === 0n ? "USD" : x.asset === ZERO ? "ETH" : await pub.readContract({
+          address: x.asset,
+          abi: erc20Abi,
+          functionName: "symbol",
+          blockNumber,
+        }).catch(() => "Token");
+        return {
+          symbol,
+          asset: getAddress(x.asset),
+          usdFeed: getAddress(x.usdFeed),
+          ...(revision === undefined
+            ? {}
+            : { disabled: await one<boolean>("currencyDisabled", [i]) }),
+        };
       }),
     ),
-    deployBlockOf(pub, c.address, chainName),
+    at?.deployBlock ?? deployBlockOf(pub, c.address, chainName),
   ]);
   const [minter, eligibilityNFT] = await Promise.all([
     one<`0x${string}`>("MINTER_ROLE"),
@@ -122,6 +136,7 @@ export async function readRoundOnChain(
     chainId,
     eligibilityNFT: getAddress(eligibilityNFT),
     deployBlock,
+    ...(revision === undefined ? {} : { configRevision: revision.toString() }),
     schedule: {
       opensAt: Number(opensAt),
       firstTallyAt: [Number(t0), Number(t1), Number(t2)],

@@ -21,6 +21,7 @@ import {
   type RoundSource,
 } from "../shared/vote/replay-round.ts";
 import { dayTime } from "../app/lib/format.ts";
+import { refreshVoteManifest } from "../api/services/vote-refresh.ts";
 import { createRoundSource } from "../api/services/vote-chain.ts";
 
 type Io = {
@@ -100,7 +101,8 @@ export async function main(argv: string[], io: Io = {}): Promise<number> {
     if (!io.source && !args.rpc) throw new Error("--rpc <archive RPC URL> is required");
     const now = args.at === undefined ? Math.floor(Date.now() / 1000) : Number(args.at);
     if (!Number.isInteger(now) || now <= 0) throw new Error("--at is a time in unix seconds");
-    const m = await loadManifest(args.manifest, args.site);
+    const saved = await loadManifest(args.manifest, args.site);
+    const m = io.source ? saved : await refreshVoteManifest(saved, args.rpc!, { at: now });
     const src = io.source ??
       createRoundSource(
         m,

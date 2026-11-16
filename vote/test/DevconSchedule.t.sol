@@ -125,11 +125,11 @@ contract DevconScheduleTest is Test {
 
     /// Existing projects freeze at opening; a new one may join, but not while a tier
     /// is settling (here S's one-second span starts at C - 1).
-    function test_initiativesFreezeAtOpening() public {
+    function test_initiativesCorrectableBeforeQuietEnding() public {
         vm.warp(opensAt);
         vm.startPrank(ADMIN);
-        vm.expectRevert(SignedBallots.ConfigurationFrozen.selector);
         round.setInitiative(0, makeAddr("i0"), 1e6, false, 0);
+        assertEq(round.initiative(0).goalUsd, 1e6);
         round.addInitiative(makeAddr("late"), 1e6, false, 0);
         vm.warp(C - 1);
         vm.expectRevert(SignedBallots.AddingClosed.selector);

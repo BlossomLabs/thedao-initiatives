@@ -1,3 +1,4 @@
+import { voteCorrectionRoutes } from "./vote-corrections.ts";
 import { parseAffiliations } from "../../shared/affiliations.ts";
 import { type Context, Hono } from "hono";
 import { voteSettings } from "./board.ts";
@@ -83,6 +84,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
   const { db, config, chain, ens } = deps;
   const pledges = adminPledges(deps);
   r.use("*", requireAdmin);
+  r.route("/vote-round/corrections", voteCorrectionRoutes(deps, voteReplay));
 
   r.post("/sessions/revoke", requireRecentAuth(deps.now), async (c) => {
     const body = await jsonBody(c, ["address"]);
@@ -194,7 +196,14 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
         undefined,
         chainId,
       );
-      manifest = checkManifest(manifestFromChain(contract as Hex, read, slugsByAccount(rows)));
+      manifest = checkManifest(
+        manifestFromChain(
+          contract as Hex,
+          read,
+          slugsByAccount(rows),
+          roundOf(await roundSetting())?.manifest,
+        ),
+      );
       const relayer = (await currentVote(deps))?.chain.relayerAddress();
       if (!relayer) warnings.push("No relayer key is configured: ballots can't be relayed.");
       else if (manifest.kind === "test" && !(await read.minters(relayer))) {

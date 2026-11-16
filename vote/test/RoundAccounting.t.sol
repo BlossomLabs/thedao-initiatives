@@ -78,7 +78,9 @@ contract RoundAccountingTest is Fixture {
         ballots.setPoolUsd(900_000e6 - 1);
         vm.expectRevert(RoundAccounting.PoolCannotDecrease.selector);
         ballots.setPoolUsd(0);
-        ballots.setPoolUsd(900_000e6 + 123_456);
+        ballots.proposePoolUsd(900_000e6 + 123_456);
+        vm.roll(vm.getBlockNumber() + 1);
+        ballots.activatePoolUpdate(ballots.poolUpdateNonce());
         assertEq(ballots.poolUsd(), 900_000e6 + 123_456);
     }
 
@@ -89,7 +91,9 @@ contract RoundAccountingTest is Fixture {
         vm.warp(firstTally - 1);
         ballots.setPoolUsd(800_000e6);
         vm.warp(firstTally);
-        ballots.setPoolUsd(900_000e6);
+        ballots.proposePoolUsd(900_000e6);
+        vm.roll(vm.getBlockNumber() + 1);
+        ballots.activatePoolUpdate(ballots.poolUpdateNonce());
         vm.expectRevert(RoundAccounting.PoolCannotDecrease.selector);
         ballots.setPoolUsd(0);
         assertEq(ballots.poolUsd(), 900_000e6);
@@ -100,8 +104,12 @@ contract RoundAccountingTest is Fixture {
         ballots.setPledge(keccak256("during S window"), 0, ballots.USD(), 100e6);
         assertEq(ballots.pledgedAmount(0, ballots.USD()), 100e6);
         vm.warp(registrationEnd + 1);
-        ballots.setPoolUsd(1_000_000e6);
-        ballots.setPoolUsd(1_000_000e6); // An unchanged total adds no funding.
+        ballots.proposePoolUsd(1_000_000e6);
+        vm.roll(vm.getBlockNumber() + 1);
+        ballots.activatePoolUpdate(ballots.poolUpdateNonce());
+        ballots.proposePoolUsd(1_000_000e6);
+        vm.roll(vm.getBlockNumber() + 1);
+        ballots.activatePoolUpdate(ballots.poolUpdateNonce());
         assertEq(ballots.firstTallyAt(0), firstTally);
         assertEq(ballots.registrationDeadline(), registrationEnd);
         assertEq(ballots.hardDeadline(), hardEnd);
@@ -297,7 +305,9 @@ contract RoundAccountingTest is Fixture {
         vm.expectRevert(SignedBallots.ConfigurationFrozen.selector);
         ballots.registerCurrency(address(other), address(ethFeed));
         vm.warp(ballots.registrationDeadline());
-        ballots.setPoolUsd(900_000e6);
+        ballots.proposePoolUsd(900_000e6);
+        vm.roll(vm.getBlockNumber() + 1);
+        ballots.activatePoolUpdate(ballots.poolUpdateNonce());
         ballots.setPledge(keccak256("late"), 0, eth, 1 ether);
         vm.warp(ballots.hardDeadline() - 1);
         ballots.setPledge(keccak256("late"), 0, eth, 2 ether);

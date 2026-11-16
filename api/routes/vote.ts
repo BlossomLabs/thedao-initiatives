@@ -151,8 +151,20 @@ type StoredSettled = Omit<Settled, "awards" | "shares" | "covered"> & {
 /** Where a tier's settlement is stored. The version moves when `Settled` gains what an
  * older snapshot can't tell (w1: `withdrawn`): an older one is recomputed, never read
  * as "nothing withdrawn". */
+const configurationKey = (d: VoteRound) =>
+  `${d.manifest.chainId}:${d.manifest.contract.toLowerCase()}:${
+    d.manifest.configRevision ?? "legacy"
+  }:${d.manifest.configAnchor?.hash ?? ""}`;
+const resultPrefix = (d: VoteRound): Deno.KvKey =>
+  d.manifest.configRevision === undefined ? round(d) : [
+    ...round(d),
+    "corrections1",
+    d.manifest.chainId,
+    d.manifest.configRevision,
+    ...(d.manifest.configAnchor ? [d.manifest.configAnchor.hash] : []),
+  ];
 const settledKey = (d: VoteRound, tier: Tier): Deno.KvKey => [
-  ...round(d),
+  ...resultPrefix(d),
   "settled-w1",
   tier,
 ];
@@ -297,7 +309,7 @@ export function voteRoutes(deps: Deps) {
    * starts its own. A read that outlasts
    * the wait goes on in the background; the request is a 503. */
   const statesFor = async (d: VoteRound, now: number, receiptBlocks: number[]) => {
-    const contract = d.manifest.contract.toLowerCase();
+    const contract = `${configurationKey(d)}:${d.manifest.readAt?.block ?? "live"}`;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let waited: Reading | undefined;
     const late = new Promise<never>((_, no) => {
@@ -417,11 +429,11 @@ export function voteRoutes(deps: Deps) {
     | null = null;
   const recentRound = (d: VoteRound): Promise<Round> => {
     if (
-      !recent || recent.contract !== d.manifest.contract ||
+      !recent || recent.contract !== configurationKey(d) ||
       deps.now() - recent.at >= BALLOTS_CACHE_SECS
     ) {
       const state = roundState(d);
-      recent = { at: deps.now(), contract: d.manifest.contract, state };
+      recent = { at: deps.now(), contract: configurationKey(d), state };
       state.catch(() => (recent = null));
     }
     return recent.state;
@@ -788,7 +800,7 @@ export function voteRoutes(deps: Deps) {
   r.get("/round", async (c) => {
     const d = await dc();
     const kv = deps.db.kv;
-    const key = [...round(d), "round"];
+    const key = [...resultPrefix(d), "round"];
     // firstOpen: the first open tier, or null once none is (no live tally to look ahead from).
     // finalKey: once closed, the digest its final what-ifs are judged from.
     type Cached = {
@@ -873,7 +885,7 @@ export function voteRoutes(deps: Deps) {
   // Read at most once per few seconds; once the round's end is final, read once, kept.
   r.get("/ballots", async (c) => {
     const d = await dc();
-    const key = [...round(d), "ballots"];
+    const key = [...resultPrefix(d), "ballots"];
     const cached = await deps.db.kv.get<{ at: number; final: boolean; ballots: unknown[] }>(key);
     if (cached.value?.final) return c.json({ at: cached.value.at, ballots: cached.value.ballots });
     if (cached.value && deps.now() - cached.value.at < BALLOTS_CACHE_SECS) {

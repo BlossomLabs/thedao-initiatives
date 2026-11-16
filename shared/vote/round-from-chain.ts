@@ -13,7 +13,10 @@ export class RoundReadError extends Error {
 
 /** How long a tier can run: its windows, each half the one before. */
 export const tierSpan = (s: { initialWindow: number; maxWindows: number }) =>
-  Array.from({ length: s.maxWindows }, (_, k) => s.initialWindow >> k).reduce((a, b) => a + b, 0);
+  Array.from({ length: s.maxWindows }, (_, k) => Math.floor(s.initialWindow / 2 ** k)).reduce(
+    (a, b) => a + b,
+    0,
+  );
 
 /** The account a test round registers for an initiative without a Safe (the contract
  * needs one unique account per initiative). scripts/vote-deploy.ts writes the same. */
@@ -27,12 +30,18 @@ export type RoundOnChain = {
    * or the voting badge (the real vote). */
   eligibilityNFT: `0x${string}`;
   deployBlock: number;
+  configRevision?: string;
   schedule: Schedule;
   poolUsd: bigint;
   independentTiers: number;
   initiatives: { account: `0x${string}`; rfp: boolean; goalUsd: bigint; groups: bigint }[];
   groups: string[];
-  currencies: { symbol: string; asset: `0x${string}`; usdFeed: `0x${string}` }[];
+  currencies: {
+    symbol: string;
+    asset: `0x${string}`;
+    usdFeed: `0x${string}`;
+    disabled?: boolean;
+  }[];
 };
 
 /** The board initiatives an on-chain account can be: by Safe, or by a test round's
@@ -62,11 +71,14 @@ export function manifestFromChain(
   contract: `0x${string}`,
   c: RoundOnChain,
   slugOf: (account: string) => string | undefined,
+  previous?: VoteManifest,
 ): VoteManifest {
+  const same = previous?.chainId === c.chainId &&
+    previous.contract.toLowerCase() === contract.toLowerCase();
   const slugs: string[] = [];
   const missing: string[] = [];
   for (const [i, x] of c.initiatives.entries()) {
-    const slug = slugOf(x.account);
+    const slug = (same ? previous?.slugs[i] : undefined) ?? slugOf(x.account);
     if (!slug) missing.push(`#${i} (${x.account})`);
     else slugs.push(slug);
   }
@@ -98,6 +110,7 @@ export function manifestFromChain(
     ...(real ? { badge: getAddress(c.eligibilityNFT) } : {}),
     contract: getAddress(contract),
     deployBlock: c.deployBlock,
+    ...(c.configRevision === undefined ? {} : { configRevision: c.configRevision }),
     opensAt: s.opensAt,
     closesAt: s.firstTallyAt[2] + tierSpan(s),
     schedule: s,

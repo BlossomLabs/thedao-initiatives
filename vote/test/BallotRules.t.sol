@@ -307,10 +307,10 @@ contract BallotRulesTest is Test {
         round.vote(1, 1, hex"01010303", proof3(0, 1, 2));
     }
 
-    function test_frozenAfterOpen() public {
+    function test_independenceFreezesButInitiativesStayCorrectable() public {
         SignedBallots round = simple();
-        vm.expectRevert(SignedBallots.ConfigurationFrozen.selector);
         round.setInitiative(0, address(0x1000), 1, false, 0);
+        assertEq(round.initiative(0).goalUsd, 1);
         vm.expectRevert(SignedBallots.ConfigurationFrozen.selector);
         round.setIndependentTiers(3);
     }

@@ -15,7 +15,7 @@ export interface StateSource {
   stateAt(
     block: number,
   ): Promise<{ timestamp: number; asks: bigint[]; poolUsd: bigint; withdrawn: boolean[] }>;
-  /** Blocks in [from, to] holding a PledgeSet, PoolUsdSet or InitiativeWithdrawn log from the round's contract. */
+  /** Blocks in [from, to] holding a PledgeSet, PoolUsdSet, InitiativeWithdrawn or InitiativeConfigured log from the round's contract. */
   accountingEventBlocks(from: number, to: number): Promise<number[]>;
   /** Blocks in [from, to] where any account's balance in any registered currency changed:
    * ERC-20 Transfer logs to or from an account, and native balances read block by block
@@ -219,7 +219,9 @@ export async function chainStates(
       const lo = Math.max(from, c);
       const hi = Math.min(to, c + SCAN_CHUNK - 1);
       const finalHi = finalBlock === null ? lo - 1 : Math.min(hi, finalBlock);
-      const key = `balances:${contract}:${c}`;
+      const key = `balances:${m.chainId}:${contract}:accounts2:${m.configRevision ?? "legacy"}:${
+        m.configAnchor?.hash ?? ""
+      }:${c}`;
       const stored = cache && finalHi >= lo
         ? (await cache.get(key)) as StoredScan | undefined
         : undefined;

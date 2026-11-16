@@ -205,3 +205,32 @@ Deno.test("vote manifest: kept a few seconds by the browser, a 304 when it hasn'
   assertEquals(again.status, 304);
   h.close();
 });
+
+Deno.test("active vote refreshes configuration automatically and fails closed when refresh fails", async () => {
+  let now = 0, revision = "1", fail = false, refreshes = 0;
+  const active = createActiveVote({
+    read: () => Promise.resolve({ round: { manifest: BUILT, at: 1, by: "x" } }),
+    refresh: (m) => {
+      refreshes++;
+      if (fail) return Promise.reject(new Error("cannot read configuration"));
+      return Promise.resolve({ ...m, configRevision: revision });
+    },
+    build: (m) => ({ manifest: m } as VoteRound),
+    clock: () => now,
+  });
+  assertEquals((await active())!.manifest.configRevision, "1");
+  revision = "2";
+  assertEquals((await active())!.manifest.configRevision, "1");
+  assertEquals(refreshes, 1);
+  now = 6000;
+  assertEquals((await active())!.manifest.configRevision, "2");
+  fail = true;
+  now = 12000;
+  let rejected = false;
+  try {
+    await active();
+  } catch {
+    rejected = true;
+  }
+  assert(rejected);
+});

@@ -121,3 +121,34 @@ describe("replayRound", () => {
       .toThrow("missing trie node");
   });
 });
+
+it("goal and account corrections preserve settled awards in fresh, cached and snapshot replay", async () => {
+  const { src } = fakeSource({ head: 2199 });
+  // The old account/goal funded a in S-Tier. Both now show a different ask after a
+  // correction between tiers; historical eth_call still returns the old values.
+  src.stateAt = (b) =>
+    Promise.resolve({
+      timestamp: b,
+      asks: b < 1500 ? [150n, 150n, 150n] : [1n, 40n, 150n],
+      poolUsd: 200n,
+      withdrawn: [],
+    });
+  const opts = { now: 2200, finalAfterSecs: 10 };
+  const plain = await replayRound(manifest, src, opts);
+  const cache = memoryCache();
+  const warm = await replayRound(manifest, src, { ...opts, cache });
+  const again = await replayRound(manifest, src, {
+    ...opts,
+    cache,
+    snapshots: warm.tiers.flatMap((t) => t.status === "settled" ? [t] : []),
+  });
+  for (const st of [plain, warm, again]) {
+    expect(st.tiers[0]).toMatchObject({
+      status: "settled",
+      funded: [0],
+      awards: new Map([[0, 150n]]),
+    });
+    expect(st.asks).toEqual([1n, 40n, 150n]);
+    expect(roundJson(st, manifest.slugs)).toEqual(roundJson(plain, manifest.slugs));
+  }
+});

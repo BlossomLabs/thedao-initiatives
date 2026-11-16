@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { Hex } from "viem";
 import { api, ApiError } from "~/lib/api";
 import type { Tier } from "../../shared/vote/ballot";
+import type { ValuationEvidence } from "../../shared/vote/quiet-ending";
 import type { LiveInputsJson } from "../../shared/vote/live-inputs";
 
 /* The vote's reads and types. Sending a ballot (wallet, signing, the chain client)
@@ -40,6 +41,8 @@ export type RoundTier =
     status: "settled";
     at: number;
     forced: boolean;
+    confirmed?: boolean;
+    valuation?: ValuationEvidence;
     funded: string[];
     /** Asking $0 when it settled: covered by donations, final. Absent from servers before it. */
     covered?: string[];
@@ -56,6 +59,12 @@ export type RoundView = {
   /** The newest block the server judged the round at: nothing after it has happened yet,
    * whatever this browser's clock says. Absent from servers before it (and examples). */
   head?: { block: number; timestamp: number };
+  finalized?: { block: number; timestamp: number; hash?: string } | null;
+  valuation?: ValuationEvidence;
+  settlementCoverage?: Record<
+    string,
+    { awardUsd: string; askUsd: string; shortfallUsd: string; excessAwardUsd: string }
+  >;
   registrationClosesAt: number;
   closed: boolean;
   /** Each voting badge's equal share of the pool, micro-USD. */
@@ -132,7 +141,10 @@ export function roundPollInterval(
   // The tally can't change once the round is over, but the final what-ifs are worked
   // out in the background after it closes and only come in a later response: wait for
   // them, at an unhurried pace, then stop.
-  return view.final ? false : Math.max(refetchInterval, CLOSED_POLL_MS);
+  const confirmed = (view.tiers ?? []).every((t) =>
+    t.status !== "settled" || t.confirmed !== false
+  );
+  return view.final && confirmed ? false : Math.max(refetchInterval, CLOSED_POLL_MS);
 }
 
 /** The round's quiet ending (each tier's state, what counts, what was refused). */

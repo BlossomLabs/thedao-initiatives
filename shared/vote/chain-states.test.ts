@@ -32,6 +32,8 @@ const manifest = (currencies = true): VoteManifest => ({
 /** One block a second: block b has timestamp b. */
 function fakeChain(o: {
   head: number;
+  finalized?: number;
+  hashAt?: (b: number) => `0x${string}`;
   accounting?: number[];
   balances?: number[];
   asksAt?: (b: number) => bigint[];
@@ -43,7 +45,15 @@ function fakeChain(o: {
   const scanned: [number, number][] = [];
   const searches: number[] = [];
   const scans = { inFlight: 0, most: 0 };
+  const blockAt = (b: number) =>
+    Promise.resolve({
+      block: b,
+      timestamp: b,
+      hash: o.hashAt?.(b) ?? `0x${b.toString(16).padStart(64, "0")}` as `0x${string}`,
+    });
   const src: StateSource = {
+    blockAt,
+    finalized: () => blockAt(o.finalized ?? o.head - 100),
     head: () => Promise.resolve({ block: o.head, timestamp: o.head }),
     blockBefore: (t) => {
       searches.push(t);
@@ -84,7 +94,6 @@ const memoryCache = () => {
 const opts = (now: number, receiptBlocks: number[] = []) => ({
   now,
   receiptBlocks,
-  finalAfterSecs: 100,
 });
 const blocks = (xs: { block: number }[]) => xs.map((x) => x.block);
 const events = (xs: { block: number; event: boolean }[]) =>
@@ -228,11 +237,8 @@ describe("chainStates", () => {
     // Final: older than now − 100 s = 1550. 1560, 1590, 1599 and the head are not.
     expect(reads.sort((a, b) => a - b)).toEqual([1560, 1590, 1599, 1649]);
     expect(scanned.length).toBeGreaterThan(0);
-    // The balance cache's line: the last block before 1550 rounded down to 300 s.
-    expect(scanned.every(([from]) => from >= 1500)).toBe(true);
-    // Keys name the round's contract; nothing recent was stored.
-    expect([...map.keys()].every((k) => k.includes(CONTRACT.toLowerCase()))).toBe(true);
-    expect([...map.keys()].some((k) => /:15[5-9]\d$|:1649$/.test(k))).toBe(false);
+    expect(scanned.every(([from]) => from >= 1550)).toBe(true);
+    expect([...map.keys()].some((k) => k.startsWith("state:") && k.includes("0x"))).toBe(true);
   });
 
   it("a scan that moves on with time reads only the new blocks", async () => {
@@ -247,25 +253,71 @@ describe("chainStates", () => {
     expect(later.scanned.every(([from]) => from >= 1200)).toBe(true);
   });
 
-  it("finding the finality line is one search per step, not one per call", async () => {
-    const { cache } = memoryCache();
-    const { src, searches } = fakeChain({ head: 1719, balances: [1450] });
-    await chainStates(manifest(), src, { ...opts(1650), cache });
-    await chainStates(manifest(), src, { ...opts(1650), cache });
-    await chainStates(manifest(), src, { ...opts(1700), cache });
-    // now − 100 s is 1550, then 1600: both on the 1500 line.
-    expect(searches.filter((t) => t === 1500)).toEqual([1500]);
+  it("elapsed time never promotes unfinalized states into the persistent cache", async () => {
+    const { cache, map } = memoryCache();
+    const { src, reads } = fakeChain({ head: 1719, finalized: 900 });
+    await chainStates(manifest(), src, { ...opts(1720), cache });
+    reads.length = 0;
+    await chainStates(manifest(), src, { ...opts(1720), cache });
+    expect(reads).toContain(1399);
+    expect([...map.keys()].filter((k) => k.startsWith("state:"))).toEqual([]);
   });
 
-  it("a block search is cached only once the block after it is final too", async () => {
+  it("a reorganization with unchanged configuration invalidates state and balance caches", async () => {
+    const { cache } = memoryCache();
+    const old = fakeChain({ head: 1719, finalized: 1600, balances: [1300], asksAt: () => [1n] });
+    await chainStates(manifest(), old.src, { ...opts(1720), cache });
+    const next = fakeChain({
+      head: 1719,
+      finalized: 1600,
+      balances: [1350],
+      asksAt: () => [9n],
+      hashAt: (b) => `0x${(b + 10000).toString(16).padStart(64, "0")}`,
+    });
+    const result = await chainStates(manifest(), next.src, { ...opts(1720), cache });
+    expect(result.every((s) => s.asks[0] === 9n)).toBe(true);
+    expect(events(result)).toContain(1350);
+    expect(events(result)).not.toContain(1300);
+  });
+
+  it("a reorganization during a historical state read aborts replay", async () => {
+    const { src } = fakeChain({ head: 1719 });
+    const read = src.blockAt!;
+    src.finalized = undefined;
+    let changed = false;
+    const stateAt = src.stateAt;
+    src.stateAt = async (b) => {
+      const state = await stateAt(b);
+      changed = true;
+      return state;
+    };
+    src.blockAt = async (b) => ({ ...await read(b), hash: changed ? "0xdead" : "0xbeef" });
+    await expect(chainStates(manifest(false), src, opts(1720))).rejects.toThrow(/changed during/);
+  });
+
+  it("cache read and write failures do not prevent a chain-derived result", async () => {
+    const { src } = fakeChain({ head: 1719 });
+    const broken: StateCache = {
+      get: () => Promise.reject(new Error("KV down")),
+      set: () => Promise.reject(new Error("KV full")),
+    };
+    const plain = await chainStates(manifest(false), src, opts(1720));
+    expect(await chainStates(manifest(false), src, { ...opts(1720), cache: broken })).toEqual(
+      plain,
+    );
+  });
+
+  it("a malformed cached input is discarded and read from the chain again", async () => {
+    const { src, reads } = fakeChain({ head: 1719 });
     const { cache, map } = memoryCache();
-    const { src, searches } = fakeChain({ head: 1719 });
-    await chainStates(manifest(), src, { ...opts(1720), cache });
-    // 1600 is past the margin (1620) but not by a whole margin: searched again.
-    expect(map.has(`before:${CONTRACT.toLowerCase()}:1400`)).toBe(true);
-    expect(map.has(`before:${CONTRACT.toLowerCase()}:1600`)).toBe(false);
-    // Each time is searched once per call, though the span and the boundary both need it.
-    expect(searches.filter((t) => t === 1000)).toEqual([1000]);
+    await chainStates(manifest(false), src, { ...opts(1720), cache });
+    for (const key of map.keys()) {
+      if (key.startsWith("state:")) map.set(key, { timestamp: 1399, asks: ["bad"] });
+    }
+    reads.length = 0;
+    const result = await chainStates(manifest(false), src, { ...opts(1720), cache });
+    expect(reads).toContain(1399);
+    expect(result.every((s) => s.asks[0] === 1n)).toBe(true);
   });
 
   it("balance scans run one at a time", async () => {

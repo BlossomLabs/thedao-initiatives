@@ -17,7 +17,7 @@ import { TEST_USD_ABI } from "../../shared/vote/test-usd.ts";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
 import { type AccountChange, accountPeriods } from "../../shared/vote/account-history.ts";
 import type { StateCache, StateSource } from "../../shared/vote/chain-states.ts";
-import type { ChainState } from "../../shared/vote/quiet-ending.ts";
+import type { ChainState, ValuationEvidence } from "../../shared/vote/quiet-ending.ts";
 import type { BallotEvent, RoundSource, RulesHistory } from "../../shared/vote/replay-round.ts";
 import { voteChain, type VoteManifest, voterNft } from "../../shared/vote/manifest.ts";
 
@@ -445,10 +445,6 @@ const MULTICALL3: Hex = "0xcA11bde05977b3631167028862bE2a173976CA11";
 const NATIVE = /^0x0{40}$/i;
 /** Native balance multicalls in flight at once (one per block). */
 const BALANCE_READS = 8;
-/** A native balance scan of a block is kept in memory once the block is this deep under
- * the newest block of the scan that read it; shallower ones are read again next time, as
- * a reorg may still replace them. */
-const REORG_DEPTH = 12;
 /** Most blocks whose native scan is kept in memory (the oldest go first). */
 const NATIVE_MEMO = 20_000;
 
@@ -458,10 +454,12 @@ const NATIVE_MEMO = 20_000;
 export type StateSourceMemo = {
   nativeScans: Map<string, Map<number, boolean>>;
   histories: Map<number, Promise<AccountChange[]>>;
+  anchors: Map<string, { block: number; hash: Hex }>;
 };
 export const stateSourceMemo = (): StateSourceMemo => ({
   nativeScans: new Map(),
   histories: new Map(),
+  anchors: new Map(),
 });
 
 export function createStateSource(
@@ -472,21 +470,19 @@ export function createStateSource(
 ): StateSource {
   const pub = createPublicClient({ chain: voteChain(m), transport }) as PublicClient;
   const contract = { address: m.contract, abi: SIGNED_BALLOTS_ABI } as const;
-  /** Whether a block changed a native balance, for blocks already REORG_DEPTH deep when
-   * scanned: kept for this source's life (one per isolate on the site). The KV cache keeps
-   * final scans across isolates (chain-states.ts) but never the newer tail, which every
-   * read would otherwise scan again block by block. */
+  /** Native balance scans through a canonical finalized anchor are reused. Newer
+   * blocks are scanned again; the KV cache shares finalized scans across instances. */
   const { nativeScans, histories } = memo;
   const blockAt = async (n: number) => {
     const b = await pub.getBlock({ blockNumber: BigInt(n) });
-    return { block: n, timestamp: Number(b.timestamp) };
+    return { block: n, timestamp: Number(b.timestamp), hash: b.hash! };
   };
   const head = async () => {
     const b = await pub.getBlock(m.readAt ? { blockNumber: BigInt(m.readAt.block) } : undefined);
     if (m.readAt?.hash && b.hash !== m.readAt.hash) {
       throw new Error("vote head changed during replay");
     }
-    return { block: Number(b.number), timestamp: Number(b.timestamp) };
+    return { block: Number(b.number), timestamp: Number(b.timestamp), hash: b.hash! };
   };
   /** Blocks in [from, to] holding a log `get` returns (read in chunks), ascending, once each. */
   const logBlocks = async (
@@ -525,6 +521,13 @@ export function createStateSource(
       }
     }
     if (currencies.some((c) => NATIVE.test(c.asset))) {
+      const final = await pub.getBlock({ blockTag: "finalized" });
+      const finalNumber = Number(final.number);
+      // A memo belongs to this finalized prefix; discard it if that anchor was replaced.
+      const anchorKey = `anchor:${key}`;
+      const anchor = memo.anchors.get(anchorKey);
+      if (anchor && (await blockAt(anchor.block)).hash !== anchor.hash) nativeSeen.clear();
+      memo.anchors.set(anchorKey, { block: finalNumber, hash: final.hash! });
       // No log for an internal transfer: each block's balances against the block before.
       const ethAt = (block: number) =>
         pub.multicall({
@@ -539,7 +542,7 @@ export function createStateSource(
             args: [a],
           })),
         }) as Promise<bigint[]>;
-      // The blocks scanned before and deep enough are known; the scan goes on after them.
+      // Previously finalized blocks are known; scan the unfinalized tail again.
       let start = from;
       for (; start <= to && nativeSeen.has(start); start++) {
         if (nativeSeen.get(start)) out.add(start);
@@ -554,7 +557,7 @@ export function createStateSource(
         for (const [i, now] of reads.entries()) {
           const changed = now.some((x, j) => x !== before[j]);
           if (changed) out.add(batch[i]);
-          if (batch[i] <= to - REORG_DEPTH) nativeSeen.set(batch[i], changed);
+          if (batch[i] <= finalNumber) nativeSeen.set(batch[i], changed);
           before = now;
         }
       }
@@ -597,6 +600,16 @@ export function createStateSource(
 
   return {
     head,
+    blockAt,
+    async finalized() {
+      const b = await pub.getBlock({ blockTag: "finalized" });
+      const tip = await head();
+      return Number(b.number) > tip.block ? tip : {
+        block: Number(b.number),
+        timestamp: Number(b.timestamp),
+        hash: b.hash!,
+      };
+    },
     async blockBefore(time) {
       const top = await head();
       if (top.timestamp < time) return top;
@@ -634,6 +647,11 @@ export function createStateSource(
               functionName: "initiativeUsd",
               args: [BigInt(i)],
             })),
+            ...m.slugs.map((_, i) => ({
+              ...contract,
+              functionName: "valuationDiagnostics",
+              args: [BigInt(i)],
+            })),
           ],
         } as never) as Promise<{ status: string; result?: unknown; error?: Error }[]>,
       ]);
@@ -652,7 +670,29 @@ export function createStateSource(
       // A contract without withdrawnMask (the first test round) fails just that entry.
       const mask = r[2].status === "success" ? BigInt(r[2].result as bigint) : 0n;
       const withdrawn = Array.from({ length: count }, (_, i) => ((mask >> BigInt(i)) & 1n) === 1n);
-      return { timestamp: b.timestamp, asks, poolUsd: BigInt(r[1].result as bigint), withdrawn };
+      const diagnostics = r.slice(3 + m.slugs.length, 3 + m.slugs.length + count);
+      const valuation: ValuationEvidence = {
+        available: diagnostics.every((x) => x.status === "success"),
+        issues: diagnostics.flatMap((x, project) => {
+          if (x.status !== "success") return [];
+          const packed = x.result as bigint;
+          return Array.from(
+            { length: 32 },
+            (_, currency) => ({
+              project,
+              currency,
+              flags: Number((packed >> BigInt(4 * currency)) & 15n),
+            }),
+          ).filter((d) => d.flags !== 0);
+        }),
+      };
+      return {
+        timestamp: b.timestamp,
+        asks,
+        poolUsd: BigInt(r[1].result as bigint),
+        withdrawn,
+        valuation,
+      };
     },
     accountingEventBlocks: (from, to) =>
       logBlocks(from, to, (fromBlock, toBlock) =>

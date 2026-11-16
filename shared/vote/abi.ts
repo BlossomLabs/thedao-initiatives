@@ -1859,6 +1859,25 @@ export const SIGNED_BALLOTS_ABI = [
   },
   {
     "type": "function",
+    "name": "valuationDiagnostics",
+    "inputs": [
+      {
+        "name": "initiativeId",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "outputs": [
+      {
+        "name": "diagnostics",
+        "type": "uint256",
+        "internalType": "uint256",
+      },
+    ],
+    "stateMutability": "view",
+  },
+  {
+    "type": "function",
     "name": "vote",
     "inputs": [
       {

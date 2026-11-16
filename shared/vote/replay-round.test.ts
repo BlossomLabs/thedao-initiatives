@@ -30,6 +30,9 @@ function fakeSource(o: { head: number; transcript?: Hex }) {
   ];
   const stateReads: number[] = [];
   const src: RoundSource = {
+    blockAt: (b) =>
+      Promise.resolve({ block: b, timestamp: b, hash: `0x${b.toString(16).padStart(64, "0")}` }),
+    finalized: () => Promise.resolve({ block: o.head - 100, timestamp: o.head - 100 }),
     head: () => Promise.resolve({ block: o.head, timestamp: o.head }),
     blockBefore: (t) => {
       const b = Math.min(o.head, t - 1);
@@ -76,7 +79,7 @@ const memoryCache = (): StateCache => {
 
 describe("replayRound", () => {
   it("replayRound gives the same result with and without a cache", async () => {
-    const opts = { now: 1500, finalAfterSecs: 10 };
+    const opts = { now: 1500 };
     const plain = await replayRound(manifest, fakeSource({ head: 1499 }).src, opts);
     const cache = memoryCache();
     const warm = fakeSource({ head: 1499 });
@@ -96,7 +99,7 @@ describe("replayRound", () => {
 
   it("replayRound throws on a transcript mismatch and returns nothing", async () => {
     const { src, stateReads } = fakeSource({ head: 1499, transcript: `0x${"ab".repeat(32)}` });
-    await expect(replayRound(manifest, src, { now: 1500, finalAfterSecs: 10 })).rejects
+    await expect(replayRound(manifest, src, { now: 1500 })).rejects
       .toMatchObject({ code: "transcript_mismatch" });
     // Checked before anything else is read.
     expect(stateReads).toEqual([]);
@@ -107,7 +110,7 @@ describe("replayRound", () => {
     const read = src.stateAt;
     // a was funded when S-Tier settled at 1100; its flag is set after.
     src.stateAt = async (b) => ({ ...await read(b), withdrawn: b > 1200 ? [true] : [] });
-    const st = await replayRound(manifest, src, { now: 1500, finalAfterSecs: 10 });
+    const st = await replayRound(manifest, src, { now: 1500 });
     const json = roundJson(st, manifest.slugs);
     expect(json.tiers[0]).toMatchObject({ status: "settled", funded: ["a"] });
     expect(json.withdrawnFlags).toEqual(["a"]);
@@ -117,7 +120,7 @@ describe("replayRound", () => {
   it("a read error rejects the replay", async () => {
     const { src } = fakeSource({ head: 1499 });
     src.stateAt = () => Promise.reject(new Error("missing trie node"));
-    await expect(replayRound(manifest, src, { now: 1500, finalAfterSecs: 10 })).rejects
+    await expect(replayRound(manifest, src, { now: 1500 })).rejects
       .toThrow("missing trie node");
   });
 });
@@ -133,14 +136,14 @@ it("goal and account corrections preserve settled awards in fresh, cached and sn
       poolUsd: 200n,
       withdrawn: [],
     });
-  const opts = { now: 2200, finalAfterSecs: 10 };
+  const opts = { now: 2200 };
   const plain = await replayRound(manifest, src, opts);
   const cache = memoryCache();
   const warm = await replayRound(manifest, src, { ...opts, cache });
   const again = await replayRound(manifest, src, {
     ...opts,
     cache,
-    snapshots: warm.tiers.flatMap((t) => t.status === "settled" ? [t] : []),
+    ...{ snapshots: warm.tiers.flatMap((t) => t.status === "settled" ? [t] : []) },
   });
   for (const st of [plain, warm, again]) {
     expect(st.tiers[0]).toMatchObject({
@@ -151,4 +154,39 @@ it("goal and account corrections preserve settled awards in fresh, cached and sn
     expect(st.asks).toEqual([1n, 40n, 150n]);
     expect(roundJson(st, manifest.slugs)).toEqual(roundJson(plain, manifest.slugs));
   }
+});
+
+it("a settlement is confirmed by the finalized chain prefix, never by wall-clock age", async () => {
+  const { src } = fakeSource({ head: 1499 });
+  src.finalized = () => Promise.resolve({ block: 1000, timestamp: 1000 });
+  const provisional = roundJson(await replayRound(manifest, src, { now: 1500 }), manifest.slugs);
+  expect(provisional.tiers[0]).toMatchObject({ status: "settled", confirmed: false });
+  src.finalized = () => Promise.resolve({ block: 1100, timestamp: 1100 });
+  const confirmed = roundJson(await replayRound(manifest, src, { now: 1500 }), manifest.slugs);
+  expect(confirmed.tiers[0]).toMatchObject({ status: "settled", confirmed: true });
+});
+
+it("later asks are compared with fixed awards without repricing the settlement", async () => {
+  const { src } = fakeSource({ head: 1499 });
+  const read = src.stateAt;
+  src.stateAt = async (block) => ({
+    ...await read(block),
+    asks: block > 1200 ? [10n, 150n, 150n] : [150n, 150n, 150n],
+    valuation: {
+      available: true,
+      issues: block > 1200 ? [{ project: 0, currency: 1, flags: 3 }] : [],
+    },
+  });
+  const json = roundJson(await replayRound(manifest, src, { now: 1500 }), manifest.slugs);
+  expect(json.tiers[0]).toMatchObject({
+    awards: { a: "150" },
+    valuation: { available: true, issues: [] },
+  });
+  expect(json.valuation).toMatchObject({ issues: [{ project: 0, currency: 1, flags: 3 }] });
+  expect(json.settlementCoverage.a).toEqual({
+    awardUsd: "150",
+    askUsd: "10",
+    shortfallUsd: "0",
+    excessAwardUsd: "140",
+  });
 });

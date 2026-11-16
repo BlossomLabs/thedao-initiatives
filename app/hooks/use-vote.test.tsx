@@ -33,3 +33,14 @@ it("a closed round keeps polling, more slowly, until its final what-ifs arrive",
   // A page that never polled doesn't start because the round closed.
   expect(roundPollInterval(view({ closed: true }), false)).toBe(false);
 });
+
+it("a closed round with what-ifs keeps polling until its settlements are confirmed", () => {
+  const pending = {
+    closed: true,
+    final: { next: {}, lead: {} },
+    tiers: [{ status: "settled", confirmed: false }],
+  } as unknown as RoundView;
+  expect(roundPollInterval(pending, 5000)).toBe(15000);
+  const final = { ...pending, tiers: [{ ...pending.tiers[0], confirmed: true }] } as RoundView;
+  expect(roundPollInterval(final, 5000)).toBe(false);
+});

@@ -16,10 +16,10 @@ The contracts are a development implementation, not a deployed round.
 | [shared/ranks.ts](shared/ranks.ts) | Rank validation, packing and withholding marker 255. |
 | [reference/pbear.py](reference/pbear.py) | Original Python tally, using only the standard library. |
 | [reference/withhold.py](reference/withhold.py) | Withholding reference and comparison with padded original ballots. |
-| [reference/quiet_ending_steps.py](reference/quiet_ending_steps.py) | Earlier quiet-ending models. |
+| [reference/scheduled_replay.py](reference/scheduled_replay.py) | Independent complete-history reference for the production three-stage vote. |
 | [reference/quiet_ending.py](reference/quiet_ending.py) | Earlier models and helpers still used by simulations. |
 | [docs/quiet-ending.md](docs/quiet-ending.md) | Mechanism overview. |
-| [docs/quiet-ending-rules.md](docs/quiet-ending-rules.md) | Detailed requirements, asks from the chain, covered projects, derived checkpoints, acceptance and remaining decisions. |
+| [docs/quiet-ending-rules.md](docs/quiet-ending-rules.md) | Detailed requirements, asks from the chain, covered projects, derived checkpoints, acceptance, rounding and finality. |
 | [docs/settlement-policy.md](docs/settlement-policy.md) | Accepted decision: secure USD funding, share increases equally, and lock awards and NFT charges when each tier settles. |
 | [docs/withholding.md](docs/withholding.md) | Withholding background, examples and reference construction. |
 | [docs/simulation-agent-prompt.txt](docs/simulation-agent-prompt.txt) | Investigation brief for changing currency valuations during a round. |
@@ -186,8 +186,8 @@ The standalone replay refreshes configuration from the chain as well, including 
 Historical asks still come from `initiativeUsd(id)` at the requested block. Donation scans
 follow the account periods in `InitiativeConfigured` history, watching only the addresses
 active in each period. Configuration edits are discovered as accounting events. Cached
-balance scans and results are separated by configuration revision and anchor; finalized
-raw block states remain reusable. A fresh replay and one using settlement caches must agree.
+balance scans are separated by configuration revision and anchor; hash-keyed finalized
+raw block states remain reusable. Settlements are always derived again; saved results cannot override replay.
 
 ### Ethereum mainnet currencies
 
@@ -364,3 +364,24 @@ with; only the recording block decides. New projects may join during the vote ou
 every tier's quiet-ending span; a ballot shorter than the project list reads the missing
 ones as unplaced. The Python reference is `reference/ballot_rules.py`, kept equal to the
 TypeScript and Solidity versions by `shared/vote/fixtures/ballot-rules.json`.
+
+### Finality, diagnostics and reference checks
+
+Logical tier settlements take effect at their cutoffs. The results label them as awaiting chain
+finality until the RPC's finalized block reaches that cutoff. No elapsed-time rule promotes a result
+to final. Historical input caches are bound to canonical block hashes, and settlement/result
+snapshots are not replay inputs.
+
+`valuationDiagnostics(initiativeId)` exposes four bits per currency ID: stored price (1), failed
+balance read (2), changed token precision (4), unavailable precision (8). These explain the
+contract's valuation without changing it. The API serves evidence at the head and settlements; the
+results' Funding details expose the same evidence. This view requires the updated contract; existing
+deployments remain replayable and are explicitly marked when diagnostics are unavailable.
+
+Regenerate the complete-history parity fixtures from the repository root:
+
+    python3 vote/reference/export_scheduled_fixtures.py > shared/vote/fixtures/scheduled-replay.json
+    python3 -m unittest discover -s vote/reference -p 'test_scheduled_replay.py'
+
+The [voting rules](docs/quiet-ending-rules.md) specify cumulative share rounding and firm awards,
+including how later support can leave gaps or excess coverage.

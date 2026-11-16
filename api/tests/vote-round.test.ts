@@ -516,13 +516,13 @@ Deno.test("vote round ballots: latest per badge, only before the close, cached b
   h.close();
 });
 
-Deno.test("vote round ballots: once the close is final, the chain is read once and kept", async () => {
+Deno.test("vote round ballots: closed results are revalidated after the short memory cache", async () => {
   const { h, state } = await setup();
   h.clock.now = manifest.closesAt + 60 * 60;
   await h.req("/api/vote/ballots");
   h.clock.now += 24 * 60 * 60;
   await h.req("/api/vote/ballots");
-  assertEquals(state.ballotReads, 1);
+  assertEquals(state.ballotReads, 2);
   h.close();
 });
 
@@ -913,7 +913,11 @@ async function closedCachedElsewhere() {
   const other = await closedSetup();
   await other.h.req("/api/vote/round");
   await other.h.settle();
-  const entry = (await other.h.kv.get<{ body: unknown; finalKey?: string }>(roundKey)).value!;
+  const entry = {
+    at: other.h.clock.now,
+    body: await j(await other.h.req("/api/vote/round")),
+    finalKey: "obsolete",
+  };
   other.h.close();
   assertEquals(typeof entry.finalKey, "string");
   const here = await closedSetup();
@@ -921,7 +925,7 @@ async function closedCachedElsewhere() {
   return { ...here, entry };
 }
 
-Deno.test("a closed round cached without its what-ifs replays once to start them", async () => {
+Deno.test("a closed round ignores obsolete saved results and computes its what-ifs", async () => {
   const { h, state } = await closedCachedElsewhere();
   type Body = { final?: unknown };
   const first = await j(await h.req("/api/vote/round")) as Body;
@@ -939,29 +943,19 @@ Deno.test("a closed round cached without its what-ifs replays once to start them
   h.close();
 });
 
-Deno.test("a failed replay for the what-ifs serves the cached round, retried a minute on", async () => {
-  const { h, state, chain, entry } = await closedCachedElsewhere();
+Deno.test("an unreadable chain never falls back to an old cached allocation", async () => {
+  const { h, state, chain } = await closedCachedElsewhere();
   const ballots = chain.ballots;
   chain.ballots = () => {
     state.ballotReads++;
     return Promise.reject(new Error("RPC down"));
   };
   const first = await h.req("/api/vote/round");
-  assertEquals(first.status, 200);
-  assertEquals(await j(first), entry.body);
-  assertEquals(state.ballotReads, 1);
-  // Not tried again on every request.
-  h.clock.now += 30;
-  assertEquals((await h.req("/api/vote/round")).status, 200);
-  assertEquals(state.ballotReads, 1);
-  // A minute on it is tried again; once the chain answers, the search starts.
+  assertEquals(first.status, 503);
+  assertEquals((await j(first)).code, "asks_unavailable");
   chain.ballots = ballots;
-  h.clock.now += 31;
-  await h.req("/api/vote/round");
-  assertEquals(state.ballotReads, 2);
-  await h.settle();
-  const done = await j(await h.req("/api/vote/round")) as { final?: unknown };
-  assertEquals(done.final !== undefined, true);
+  h.clock.now += 6;
+  assertEquals((await h.req("/api/vote/round")).status, 200);
   await h.settle();
   h.close();
 });
@@ -984,7 +978,7 @@ Deno.test("a closed round serves the final what-ifs", async () => {
   assertEquals(first.tiers.map((t) => t.funded), [["a"], ["b"], []]);
   assertEquals(first.final, undefined);
   await h.settle();
-  // The round itself is cached for good now; the what-ifs come with it.
+  // The short-lived replay is reused; derived what-ifs come with its result.
   const body = await j(await h.req("/api/vote/round")) as Body;
   const final = body.final!;
   assertEquals([body.live.next, body.live.lead], [undefined, undefined]);
@@ -1063,7 +1057,7 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
   h.close();
 });
 
-Deno.test("round: S's settlement is kept only once the blocks before it are final", async () => {
+Deno.test("round: historical asks preserve S-Tier awards without storing a settlement", async () => {
   const { h, state } = await qeSetup();
   h.clock.now = NOW + 700; // settled at NOW + 660, but logs before it may still arrive
   await h.req("/api/vote/round");
@@ -1117,6 +1111,7 @@ Deno.test("round: a quiet window settles S-Tier; later ask changes never move it
     status: "settled",
     at: NOW + 660,
     forced: false,
+    confirmed: false,
     funded: ["a"],
     covered: [],
     withdrawn: [],
@@ -1228,7 +1223,7 @@ Deno.test("round: a covered project is listed as covered", async () => {
   h.close();
 });
 
-Deno.test("round: a settled tier is the same before and after its record is stored", async () => {
+Deno.test("round: a settled tier is stable without persisting any result", async () => {
   const { h } = await qeSetup([150n, 0n, 150n]);
   const key = ["vote", qe.contract.toLowerCase(), "settled-w1", "S"];
   h.clock.now = NOW + 700;
@@ -1236,7 +1231,7 @@ Deno.test("round: a settled tier is the same before and after its record is stor
   assertEquals((await h.kv.get(key)).value, null);
   h.clock.now = NOW + 660 + 30 * 60;
   const stored = (await j(await h.req("/api/vote/round")) as { tiers: unknown[] }).tiers[0];
-  assertEquals((await h.kv.get<{ covered: number[] }>(key)).value?.covered, [1]);
+  assertEquals((await h.kv.get(key)).value, null);
   assertEquals(stored, before);
   // Read back from the record: the same again.
   h.clock.now += 10;
@@ -1246,7 +1241,7 @@ Deno.test("round: a settled tier is the same before and after its record is stor
   h.close();
 });
 
-Deno.test("round: a settlement isn't stored from states whose head is older than its cutoff", async () => {
+Deno.test("round: neither lagging nor caught-up states create authoritative result caches", async () => {
   const { h, state } = await qeSetup([150n, 0n, 150n]);
   const key = ["vote", qe.contract.toLowerCase(), "settled-w1", "S"];
   h.clock.now = NOW + 660 + 30 * 60;
@@ -1254,11 +1249,11 @@ Deno.test("round: a settlement isn't stored from states whose head is older than
   state.headAt = NOW + 600;
   await h.req("/api/vote/round");
   assertEquals((await h.kv.get(key)).value, null);
-  // Once it has caught up, the settlement is kept.
+  // Once it has caught up, replay still creates no authoritative result cache.
   state.headAt = null;
   h.clock.now += 10;
   await h.req("/api/vote/round");
-  assertEquals((await h.kv.get<{ covered: number[] }>(key)).value?.covered, [1]);
+  assertEquals((await h.kv.get(key)).value, null);
   await h.settle();
   h.close();
 });
@@ -1287,37 +1282,25 @@ Deno.test("round: served as of the newest block: past a cutoff by the clock only
   h.close();
 });
 
-Deno.test("round: a settlement stored before covered projects loads as none covered", async () => {
-  const { h } = await qeSetup();
-  h.clock.now = NOW + 660 + 30 * 60;
-  await h.req("/api/vote/round");
+Deno.test("round: corrupt settlement caches cannot alter coverage, awards or accepted ballots", async () => {
+  const { h } = await qeSetup([150n, 0n, 150n]);
+  h.clock.now = NOW + 2500;
   const key = ["vote", qe.contract.toLowerCase(), "settled-w1", "S"];
-  const { covered: _, ...old } = (await h.kv.get<Record<string, unknown>>(key)).value!;
-  await h.kv.set(key, old);
-  h.clock.now += 10;
-  const body = await j(await h.req("/api/vote/round")) as { tiers: { covered: string[] }[] };
-  assertEquals(body.tiers[0].covered, []);
-  await h.settle();
-  h.close();
-});
-
-Deno.test("round: a settlement stored before withdrawn projects is recomputed, not read as none withdrawn", async () => {
-  const { h } = await qeSetup();
-  h.clock.now = NOW + 660 + 30 * 60;
-  type Body = { tiers: { funded: string[]; withdrawn: string[] }[] };
-  const fresh = (await j(await h.req("/api/vote/round")) as Body).tiers[0];
-  assertEquals(fresh.withdrawn, []);
-  const key = ["vote", qe.contract.toLowerCase(), "settled-w1", "S"];
-  const kept = (await h.kv.get<Record<string, unknown>>(key)).value!;
-  assertEquals([kept.tier, kept.withdrawn], ["S", []]);
-  // Only an old record, under the old key, and one that says otherwise: it is not read.
-  await h.kv.delete(key);
-  const oldKey = ["vote", qe.contract.toLowerCase(), "settled", "S"];
-  await h.kv.set(oldKey, { ...kept, funded: [], awards: [], shares: [] });
-  h.clock.now += 10;
-  const body = await j(await h.req("/api/vote/round")) as Body;
-  assertEquals(body.tiers[0].funded, fresh.funded);
-  assertEquals((await h.kv.get(key)).value, kept);
+  await h.kv.set(key, {
+    tier: "S",
+    at: NOW,
+    funded: [2],
+    awards: [[2, "999"]],
+    shares: [],
+    covered: [],
+    withdrawn: [],
+  });
+  const body = await j(await h.req("/api/vote/round")) as {
+    tiers: { funded: string[]; covered: string[]; awards: unknown }[];
+  };
+  assertEquals(body.tiers[0].funded, ["a"]);
+  assertEquals(body.tiers[0].covered, ["b"]);
+  assertEquals(body.tiers[0].awards, { a: "150" });
   await h.settle();
   h.close();
 });
@@ -1423,10 +1406,10 @@ Deno.test("round: a ballot the RPC returned late can still unsettle S before it 
   const again = await j(await h.req("/api/vote/round")) as Body;
   // maxWindows 1: forced at the same cutoff.
   assertEquals([again.tiers[0].status, again.tiers[0].forced], ["settled", true]);
-  // Stored only once final: then late logs can't move it.
+  // Time never creates an authoritative settlement cache.
   h.clock.now = NOW + 660 + 30 * 60;
   await h.req("/api/vote/round");
-  assertEquals((await h.deps.db.kv.get<{ at: number; forced: boolean }>(key)).value?.forced, true);
+  assertEquals((await h.deps.db.kv.get(key)).value, null);
   await h.settle();
   h.close();
 });

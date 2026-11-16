@@ -464,6 +464,28 @@ abstract contract RoundAccounting is AccessControl {
         askUsd = totalUsd >= goal ? 0 : goal - totalUsd;
     }
 
+    /// Four diagnostic bits per currency: stored price, unavailable balance, changed
+    /// token precision, unavailable precision. Explains valuation without changing it.
+    function valuationDiagnostics(uint256 initiativeId) external view returns (uint256 diagnostics) {
+        _requireInitiative(initiativeId);
+        address account = _initiatives[initiativeId].account;
+        for (uint256 i = 1; i < _currencies.length; ++i) {
+            if (currencyDisabled[i]) continue;
+            Currency memory c = _currencies[i];
+            uint256 flags;
+            if (c.asset != address(0)) {
+                (bool ok, bytes memory data) = _boundedRead(c.asset, abi.encodeCall(IERC20.balanceOf, (account)), 32);
+                if (!ok) flags = 2;
+                (ok, data) = _boundedRead(c.asset, abi.encodeCall(IERC20Metadata.decimals, ()), 32);
+                if (!ok) flags |= 8;
+                else if (abi.decode(data, (uint256)) != c.amountDecimals) flags |= 4;
+            }
+            (,, bool good) = _readPrice(i, c);
+            if (!good) flags |= 1;
+            diagnostics |= flags << (4 * i);
+        }
+    }
+
     /// @notice The price `quoteUsd` and `initiativeUsd` use for a currency: the feed's answer
     ///         when good, else the last good price stored.
     function priceUsd(uint256 currencyId) external view returns (uint256 price) {

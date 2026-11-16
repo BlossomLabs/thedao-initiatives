@@ -6,7 +6,13 @@
  * quiet ending is replayed (./quiet-ending.ts). Nothing here knows about viem's
  * transports, KV or env: browser and Deno. */
 import { type Hex, hexToBytes } from "viem";
-import { chainStates, judgedAt, type StateCache, type StateSource } from "./chain-states.ts";
+import {
+  chainStates,
+  finalizedBlock,
+  judgedAt,
+  type StateCache,
+  type StateSource,
+} from "./chain-states.ts";
 import { liveInputsJson } from "./live-inputs.ts";
 import type { VoteManifest } from "./manifest.ts";
 import {
@@ -14,14 +20,10 @@ import {
   type Receipt,
   replay,
   type RoundState,
-  type Settled,
   type TierState,
+  type ValuationEvidence,
 } from "./quiet-ending.ts";
 import { transcriptOf } from "./transcript.ts";
-
-/** Blocks older than this are taken as final: their reads may be cached, and nothing
- * before a settlement this old can still arrive. */
-export const FINAL_AFTER_SECS = 30 * 60;
 
 /** In chain order; `block` and `nonce` let the quiet ending group a block's receipts. */
 export type BallotEvent =
@@ -74,11 +76,14 @@ export class ReplayError extends Error {
 export type Round = RoundState & {
   poolUsd: bigint;
   asks?: bigint[];
+  valuation?: ValuationEvidence;
+  settlementValuations: Record<string, ValuationEvidence>;
   /** The contract's withdrawn flags at the head, by project index, a settled project's
    * too: what the ballot rules count (`live.withdrawn` leaves settled ones out). */
   withdrawnFlags?: number[];
   transcript: { block: bigint; records: number; hash: Hex; legacy: boolean };
   head: { block: number; timestamp: number };
+  finalized: { block: number; timestamp: number; hash?: `0x${string}` } | null;
 };
 
 /** An error for a log or a terminal, with URLs cut out: viem's messages name the RPC's
@@ -96,8 +101,6 @@ export async function replayRound(
   opts: {
     now: number;
     cache?: StateCache;
-    snapshots?: Settled[];
-    finalAfterSecs: number;
     states?: (receiptBlocks: number[]) => Promise<ChainState[]>;
     log?: (msg: string) => void;
   },
@@ -155,7 +158,6 @@ export async function replayRound(
     now,
     receiptBlocks,
     cache: opts.cache,
-    finalAfterSecs: opts.finalAfterSecs,
   });
   // Judged at the newest block's time (never past `now`): a tally time counts as passed
   // only once the chain has every block before it. The states end at the node's head.
@@ -169,14 +171,21 @@ export async function replayRound(
     opts.log?.(`vote asks: ${asks.length} at the head for ${m.slugs.length} projects`);
     asks = undefined;
   }
+  const finalized = await finalizedBlock(src, { block: head.block, timestamp: head.timestamp });
   const st = replay({
     schedule: m.schedule,
     m: m.slugs.length,
     states,
     receipts,
-    snapshots: opts.snapshots,
   }, at);
   return Object.assign(st, {
+    finalized,
+    ...(head.valuation ? { valuation: head.valuation } : {}),
+    settlementValuations: Object.fromEntries(st.tiers.flatMap((t) => {
+      if (t.status !== "settled") return [];
+      const state = states.filter((x) => x.timestamp < t.at).at(-1);
+      return state?.valuation ? [[t.tier, state.valuation]] : [];
+    })),
     poolUsd: head.poolUsd,
     ...(asks ? { asks } : {}),
     withdrawnFlags: [...Array(m.slugs.length).keys()].filter((i) => head.withdrawn?.[i] === true),
@@ -206,6 +215,8 @@ export function roundJson(st: Round, slugs: string[]) {
         status: t.status,
         at: t.at,
         forced: t.forced,
+        confirmed: st.finalized !== null && st.finalized.timestamp >= t.at,
+        ...(st.settlementValuations[t.tier] ? { valuation: st.settlementValuations[t.tier] } : {}),
         funded: named(t.funded),
         covered: named(t.covered),
         withdrawn: named(t.withdrawn),
@@ -223,6 +234,23 @@ export function roundJson(st: Round, slugs: string[]) {
   return {
     /** The newest block the round was judged at: nothing after it has happened yet. */
     head: st.head,
+    finalized: st.finalized,
+    ...(st.valuation ? { valuation: st.valuation } : {}),
+    settlementCoverage: Object.fromEntries(
+      st.tiers.flatMap((t) =>
+        t.status !== "settled" ? [] : [...t.funded, ...t.covered].flatMap((i) => {
+          const ask = st.asks?.[i];
+          if (ask === undefined) return [];
+          const award = t.awards.get(i) ?? 0n;
+          return [[slugs[i], {
+            awardUsd: award.toString(),
+            askUsd: ask.toString(),
+            shortfallUsd: (ask > award ? ask - award : 0n).toString(),
+            excessAwardUsd: (award > ask ? award - ask : 0n).toString(),
+          }]];
+        })
+      ),
+    ),
     registrationClosesAt: st.registrationClosesAt,
     closed: st.closed,
     share: st.share.toString(),

@@ -14,7 +14,6 @@ import { tierName } from "../shared/vote/ballot.ts";
 import { checkManifest, type VoteManifest } from "../shared/vote/manifest.ts";
 import {
   errorText,
-  FINAL_AFTER_SECS,
   replayRound,
   type Round,
   roundJson,
@@ -70,7 +69,14 @@ export function report(m: VoteManifest, st: Round, now: number): string[] {
       continue;
     }
     if (t.status === "settled") {
-      out.push(`${name}: settled ${dayTime(t.at)}${t.forced ? " (last window, forced)" : ""}`);
+      const confirmation = st.finalized && st.finalized.timestamp >= t.at
+        ? ""
+        : " (awaiting chain finality)";
+      out.push(
+        `${name}: settled ${dayTime(t.at)}${
+          t.forced ? " (last window, forced)" : ""
+        }${confirmation}`,
+      );
       out.push(`  funded: ${funded(t.funded, t.awards)}`);
     } else {
       out.push(
@@ -88,6 +94,22 @@ export function report(m: VoteManifest, st: Round, now: number): string[] {
       st.transcript.legacy ? ", pre-Nov 14 entries" : ""
     })`,
   );
+  if (st.valuation && !st.valuation.available) {
+    out.push("Valuation diagnostics: unavailable for this contract");
+  }
+  for (const x of st.valuation?.issues ?? []) {
+    const flags = [
+      x.flags & 1 ? "stored price" : "",
+      x.flags & 2 ? "unavailable balance counted as zero" : "",
+      x.flags & 4 ? "changed precision, registered precision retained" : "",
+      x.flags & 8 ? "precision check unavailable" : "",
+    ].filter(Boolean);
+    out.push(
+      `Valuation: ${m.slugs[x.project]} / ${m.currencies?.[x.currency]?.symbol ?? x.currency}: ${
+        flags.join(", ")
+      }`,
+    );
+  }
   out.push(`Head: block ${st.head.block} (${dayTime(st.head.timestamp)})`);
   return out;
 }
@@ -110,7 +132,7 @@ export async function main(argv: string[], io: Io = {}): Promise<number> {
         // Public nodes are slow at times: long timeouts, a few retries.
         http(args.rpc, { timeout: 60_000, retryCount: 4, retryDelay: 1_000 }),
       );
-    const st = await replayRound(m, src, { now, finalAfterSecs: FINAL_AFTER_SECS });
+    const st = await replayRound(m, src, { now });
     if (args.json) {
       out(JSON.stringify(
         {

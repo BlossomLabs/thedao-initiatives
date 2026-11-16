@@ -33,11 +33,16 @@ export type Receipt = {
 /** The asks and pool at one block. `event`: the block holds an ask-side tally event
  * (a pledge, a pool change, a balance change). `asks` may be shorter than the project
  * count for a block before later projects joined. */
+export type ValuationEvidence = {
+  available: boolean;
+  issues: { project: number; currency: number; flags: number }[];
+};
 export type ChainState = {
   block: number;
   timestamp: number;
   asks: bigint[];
   poolUsd: bigint;
+  valuation?: ValuationEvidence;
   /** Flags by project; may be shorter than the project count (missing = false). */
   withdrawn: boolean[];
   event: boolean;
@@ -152,9 +157,6 @@ export function replay(
      * S-Tier tally. */
     states: ChainState[];
     receipts: Receipt[];
-    /** Settlements already made: used as they are (a cache; the result is the same
-     * without them). */
-    snapshots?: Settled[];
   },
   now: number,
 ): RoundState {
@@ -305,10 +307,7 @@ export function replay(
   /** Settles tier `t` with the state at its cutoff `at`. */
   const settle = (t: number, at: number, forced: boolean) => {
     const state = before(at);
-    // Kept before the snapshot return: a cached settlement still has the state it was made in.
     settleInputs[t] = inputs(state);
-    const snap = input.snapshots?.find((x) => x.tier === TIERS[t]);
-    if (snap) return settled.push(snap);
     const covered = coveredIn(state);
     const withdrawn = withdrawnIn(state);
     const { order, shares } = tally(t, state, t + 1)[0];
@@ -333,14 +332,6 @@ export function replay(
     const ends = windowEnds(s, t);
     if (now < start) {
       tiers.push({ tier: TIERS[t], status: "waiting", startsAt: start });
-      continue;
-    }
-    // A cached settlement is used as it is, at its time.
-    const snap = input.snapshots?.find((x) => x.tier === TIERS[t]);
-    if (snap && now >= snap.at) {
-      applyBefore(snap.at);
-      settle(t, snap.at, snap.forced);
-      tiers.push({ status: "settled", ...settled[settled.length - 1] });
       continue;
     }
     applyBefore(start);

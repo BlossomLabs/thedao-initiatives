@@ -19,15 +19,9 @@ import {
 } from "../../shared/vote/next-tier.ts";
 import { type Threats, threatsAsync } from "../../shared/vote/threat.ts";
 import type { ChainInputs } from "../../shared/vote/chain.ts";
-import {
-  type ChainState,
-  refusal,
-  type RoundState,
-  type Settled,
-} from "../../shared/vote/quiet-ending.ts";
+import { type ChainState, refusal, type RoundState } from "../../shared/vote/quiet-ending.ts";
 import {
   errorText,
-  FINAL_AFTER_SECS,
   ReplayError,
   replayRound,
   type Round,
@@ -36,7 +30,6 @@ import {
 } from "../../shared/vote/replay-round.ts";
 import { rulesRound } from "../../shared/vote/manifest.ts";
 import { checkBallot, findProof } from "../../shared/vote/rules.ts";
-import type { Tier } from "../../shared/vote/ballot.ts";
 
 const PER_MINUTE = 30;
 const PENDING_MS = 10 * 60_000;
@@ -142,52 +135,10 @@ const uint = (v: unknown): bigint | null => {
   return BigInt(v);
 };
 
-type StoredSettled = Omit<Settled, "awards" | "shares" | "covered"> & {
-  awards: [number, string][];
-  shares: [number, [string, string][]][];
-  /** Absent from settlements stored before covered projects. */
-  covered?: number[];
-};
-/** Where a tier's settlement is stored. The version moves when `Settled` gains what an
- * older snapshot can't tell (w1: `withdrawn`): an older one is recomputed, never read
- * as "nothing withdrawn". */
 const configurationKey = (d: VoteRound) =>
   `${d.manifest.chainId}:${d.manifest.contract.toLowerCase()}:${
     d.manifest.configRevision ?? "legacy"
-  }:${d.manifest.configAnchor?.hash ?? ""}`;
-const resultPrefix = (d: VoteRound): Deno.KvKey =>
-  d.manifest.configRevision === undefined ? round(d) : [
-    ...round(d),
-    "corrections1",
-    d.manifest.chainId,
-    d.manifest.configRevision,
-    ...(d.manifest.configAnchor ? [d.manifest.configAnchor.hash] : []),
-  ];
-const settledKey = (d: VoteRound, tier: Tier): Deno.KvKey => [
-  ...resultPrefix(d),
-  "settled-w1",
-  tier,
-];
-const storeSettled = (x: Settled): StoredSettled => ({
-  ...x,
-  awards: [...x.awards].map(([c, v]) => [c, v.toString()]),
-  shares: [...x.shares].map(([c, m]) => [c, [...m].map(([t, v]) => [t, v.toString()])]),
-});
-const loadSettled = (x: StoredSettled): Settled => ({
-  ...x,
-  covered: x.covered ?? [],
-  withdrawn: x.withdrawn ?? [],
-  awards: new Map(x.awards.map(([c, v]) => [c, BigInt(v)])),
-  shares: new Map(x.shares.map(([c, m]) => [c, new Map(m.map(([t, v]) => [t, BigInt(v)]))])),
-});
-
-/** Over, and the blocks before the last settlement are final: nothing can change it. */
-function isFinal(body: { closed: boolean; tiers: { status: string; at?: number }[] }, now: number) {
-  const last = body.tiers[body.tiers.length - 1];
-  return body.closed && last.status === "settled" &&
-    now >= (last.at ?? Infinity) + FINAL_AFTER_SECS;
-}
-
+  }:${d.manifest.configAnchor?.hash ?? ""}:${d.manifest.readAt?.hash ?? ""}`;
 /** A cache write that never fails the request: a value too large for one KV entry is
  * not cached (the caller still serves it), and a failed write is only logged. */
 export async function cacheSet(
@@ -341,7 +292,6 @@ export function voteRoutes(deps: Deps) {
             now,
             receiptBlocks,
             cache: kvStateCache(deps.db.kv, m),
-            finalAfterSecs: FINAL_AFTER_SECS,
           });
         })();
         const entry: Reading = {
@@ -372,15 +322,9 @@ export function voteRoutes(deps: Deps) {
       clearTimeout(timer);
     }
   };
-  /** The quiet ending replayed now from the chain states. A tier's settlement is stored
-   * once final and reused: a cache of what the chain states give again. */
+  /** Every settlement is derived again from canonical chain inputs. Stored result
+   * snapshots never select a settlement time, award or accepted ballot. */
   const roundState = async (d: VoteRound): Promise<Round> => {
-    const kv = deps.db.kv;
-    const tiers: Tier[] = ["S", "A", "B"];
-    const stored = await Promise.all(
-      tiers.map((t) => kv.get<StoredSettled>(settledKey(d, t))),
-    );
-    const snapshots = stored.flatMap((x) => (x.value ? [loadSettled(x.value)] : []));
     const now = deps.now();
     // Ballots through the VoteChain, states through the bounded, shared read below.
     const { ballots, committed, rulesHistory } = d.chain;
@@ -394,13 +338,11 @@ export function voteRoutes(deps: Deps) {
     try {
       st = await replayRound(d.manifest, src, {
         now,
-        snapshots,
-        finalAfterSecs: FINAL_AFTER_SECS,
         states: (receiptBlocks) => statesFor(d, now, receiptBlocks),
         log: deps.log,
       });
     } catch (e) {
-      if (!(e instanceof ReplayError)) throw e;
+      if (!(e instanceof ReplayError)) throw asksUnavailable();
       if (e.code === "transcript_mismatch") {
         throw fail(
           503,
@@ -417,30 +359,26 @@ export function voteRoutes(deps: Deps) {
       }
       throw asksUnavailable();
     }
-    for (const [i, t] of st.tiers.entries()) {
-      // Kept only once the blocks before the settlement are final: until then a
-      // lagging RPC may still be missing a ballot that changes it. And only from states
-      // read past it: a head older than the cutoff hasn't seen the blocks before it.
-      if (t.status !== "settled" || stored[i].value) continue;
-      if (now < t.at + FINAL_AFTER_SECS || st.head.timestamp < t.at) continue;
-      const { status: _, ...x } = t;
-      await kv.atomic().check(stored[i]).set(settledKey(d, t.tier), storeSettled(x)).commit();
-    }
     return st;
   };
 
   /** The replay, reused for a few seconds in this isolate: every relayed ballot asks. */
   let recent:
-    | { at: number; contract: string; state: Promise<Round> }
+    | { at: number; contract: string; state: Promise<Round>; ready: boolean }
     | null = null;
   const recentRound = (d: VoteRound): Promise<Round> => {
     if (
-      !recent || recent.contract !== configurationKey(d) ||
+      !recent || !recent.ready || recent.contract !== configurationKey(d) ||
       deps.now() - recent.at >= BALLOTS_CACHE_SECS
     ) {
       const state = roundState(d);
-      recent = { at: deps.now(), contract: configurationKey(d), state };
-      state.catch(() => (recent = null));
+      const entry = { at: deps.now(), contract: configurationKey(d), state, ready: false };
+      recent = entry;
+      state.then(() => {
+        entry.ready = true;
+      }, () => {
+        if (recent === entry) recent = null;
+      });
     }
     return recent.state;
   };
@@ -805,24 +743,11 @@ export function voteRoutes(deps: Deps) {
    * open tiers would fund if they settled now. Polled; read at most once per window. */
   r.get("/round", async (c) => {
     const d = await dc();
-    const kv = deps.db.kv;
-    const key = [...resultPrefix(d), "round"];
-    // firstOpen: the first open tier, or null once none is (no live tally to look ahead from).
-    // finalKey: once closed, the digest its final what-ifs are judged from.
-    type Cached = {
-      at: number;
-      body: ReturnType<typeof roundJson>;
-      firstOpen?: number | null;
-      finalKey?: string;
-      /** The digest of the live tally's inputs: what the gaps served with it must match. */
-      inputsKey?: string;
-    };
-    const cached = (await kv.get<Cached>(key)).value;
     /** The round with the gaps known for its open tier. Gaps searched on earlier inputs
      * (before the latest ballot, donation, pledge or pool change) are still served while
      * the new search runs, marked `aheadStale`: the page says they are being updated. */
     const withAhead = (
-      body: Cached["body"],
+      body: ReturnType<typeof roundJson>,
       ahead: Ahead | undefined,
       final: FinalJson | undefined,
       inputs: string | undefined,
@@ -837,78 +762,22 @@ export function voteRoutes(deps: Deps) {
       },
       ...(final ? { final } : {}),
     });
-    let replayed: (Round) | undefined;
-    if (
-      cached &&
-      (isFinal(cached.body, cached.at) || deps.now() - cached.at < BALLOTS_CACHE_SECS)
-    ) {
-      const final = await knownFinal(d, cached.finalKey);
-      const fromCache = async () =>
-        c.json(
-          withAhead(
-            cached.body,
-            await knownNext(d, cached.firstOpen ?? null),
-            final,
-            cached.inputsKey,
-          ),
-        );
-      // A closed round whose what-ifs nobody here has, or is searching for, is replayed
-      // once more below: the cached round has no inputs to start the search from.
-      // (An entry cached before it carried a digest is tried under "".)
-      const tried = cached.finalKey ?? "";
-      if (!cached.body.closed || final || searching || triedRecently(tried)) {
-        return await fromCache();
-      }
-      // That replay is only for the what-ifs: if it fails (the chain unreadable), the
-      // cached round is still served, and the replay waits a minute before trying again.
-      try {
-        replayed = await roundState(d);
-      } catch (e) {
-        deps.log(`vote final: replay failed (${errorText(e)})`);
-        finalTried = { key: tried, at: deps.now() };
-        return await fromCache();
-      }
-    }
-    const st = replayed ?? await roundState(d);
+    const st = await recentRound(d);
     const body = roundJson(st, d.manifest.slugs);
-    const at = deps.now();
-    const firstOpen = st.liveInputs ? st.firstOpen : null;
     const fk = await finalDigest(d, st);
     const ik = st.liveInputs
       ? await inputsKey(d.manifest.contract, st.liveInputs, st.firstOpen)
       : undefined;
-    await cacheSet(
-      kv,
-      key,
-      { at, body, firstOpen, ...(fk ? { finalKey: fk } : {}), ...(ik ? { inputsKey: ik } : {}) },
-      isFinal(body, at) ? undefined : { expireIn: 60_000 },
-      deps.log,
-    );
     return c.json(withAhead(body, await nextFor(d, st), await finalFor(d, st, fk), ik));
   });
 
-  // The ballots that count (the quiet ending's accepted ones), for the vote results.
-  // Read at most once per few seconds; once the round's end is final, read once, kept.
+  // Accepted ballots are derived from the same short-lived in-memory replay as results.
+  // Old persistent round and ballot caches are deliberately not read.
   r.get("/ballots", async (c) => {
     const d = await dc();
-    const key = [...resultPrefix(d), "ballots"];
-    const cached = await deps.db.kv.get<{ at: number; final: boolean; ballots: unknown[] }>(key);
-    if (cached.value?.final) return c.json({ at: cached.value.at, ballots: cached.value.ballots });
-    if (cached.value && deps.now() - cached.value.at < BALLOTS_CACHE_SECS) {
-      return c.json({ at: cached.value.at, ballots: cached.value.ballots });
-    }
-    const body = roundJson(await roundState(d), d.manifest.slugs);
+    const body = roundJson(await recentRound(d), d.manifest.slugs);
     const ballots = Object.entries(body.accepted).map(([tokenId, ballot]) => ({ tokenId, ballot }));
-    const at = deps.now();
-    const final = isFinal(body, at);
-    await cacheSet(
-      deps.db.kv,
-      key,
-      { at, final, ballots },
-      final ? undefined : { expireIn: 60_000 },
-      deps.log,
-    );
-    return c.json({ at, ballots });
+    return c.json({ at: deps.now(), ballots });
   });
 
   // The replay alone (no gap or final searches), shared with this instance's reads.

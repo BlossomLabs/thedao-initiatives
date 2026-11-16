@@ -174,7 +174,7 @@ describe("quiet-ending replay", () => {
     expect(s.live.order).toEqual([0]); // a alone now has the whole pool
   });
 
-  it("a stored settlement wins over a fresh one (later donations don't move it)", () => {
+  it("an incorrect stored settlement cannot override chain replay", () => {
     const snapshot = {
       tier: "S" as const,
       at: T + 3600,
@@ -185,8 +185,12 @@ describe("quiet-ending replay", () => {
       covered: [],
       withdrawn: [],
     };
-    const s = run(base(), T + 3600, { snapshots: [snapshot] });
-    expect(s.tiers[0]).toMatchObject({ status: "settled", funded: [1] });
+    const s = run(base(), T + 3600, { m: 2, ...{ snapshots: [snapshot] } });
+    expect(s.tiers[0]).toMatchObject({
+      status: "settled",
+      funded: [0],
+      awards: new Map([[0, 150n]]),
+    });
   });
 
   it("a settled tier uses the asks at its cutoff, not later ones", () => {
@@ -196,7 +200,7 @@ describe("quiet-ending replay", () => {
     expect(s.tiers[0].status === "settled" && s.tiers[0].awards.get(0)).toBe(150n);
   });
 
-  it("a stored settlement pins when S settled, whatever today's needs say about its windows", () => {
+  it("an incorrect cached cutoff cannot settle a tier or reject a revision", () => {
     // Without the snapshot, b's change at T+100 would extend S into window 2.
     const snapshot = {
       tier: "S" as const,
@@ -211,10 +215,10 @@ describe("quiet-ending replay", () => {
     const s = run(
       [...base(), r("b", T + 100, [X, 1]), r("a", T + 3700, [X, 1])],
       T + 3800,
-      { snapshots: [snapshot] },
+      { m: 2, ...{ snapshots: [snapshot] } },
     );
-    expect(s.tiers[0]).toMatchObject({ status: "settled", at: T + 3600, funded: [0] });
-    expect(s.rejected).toEqual([{ tokenId: "a", nonce: 0, reason: "tier_settled" }]);
+    expect(s.tiers[0]).toMatchObject({ status: "settling", window: 2, funded: [1] });
+    expect(s.rejected).toEqual([]);
   });
 
   it("each settlement keeps its inputs", () => {
@@ -230,7 +234,7 @@ describe("quiet-ending replay", () => {
     expect(st.settleInputs[2]).toBeNull();
   });
 
-  it("settle inputs are kept when the settlement comes from a snapshot", () => {
+  it("settlement inputs are derived despite an obsolete snapshot argument", () => {
     const snapshot = {
       tier: "S" as const,
       at: T + 3600,
@@ -241,7 +245,7 @@ describe("quiet-ending replay", () => {
       covered: [],
       withdrawn: [],
     };
-    const st = run(base(), T + 3600, { snapshots: [snapshot] });
+    const st = run(base(), T + 3600, { m: 2, ...{ snapshots: [snapshot] } });
     const i = st.settleInputs[0]!;
     expect(i).not.toBeNull();
     expect(i.voters).toEqual(["a", "b"]);
@@ -446,7 +450,7 @@ describe("chain states in the replay", () => {
     for (const now of [T + 5400, T + 9000, T + 20_000]) {
       const fresh = run4(donated, now);
       const snapshots = fresh.tiers.flatMap((x) => x.status === "settled" ? [x] : []);
-      expect(run4(donated, now, { snapshots })).toEqual(fresh);
+      expect(run4(donated, now, { m: 4, ...{ snapshots } })).toEqual(fresh);
     }
   });
 
@@ -535,7 +539,7 @@ describe("withdrawn projects in the replay", () => {
     expect(settled(s, 1).awards.get(0)).toBe(150n);
     // A cached settlement gives the same.
     const snapshots = s.tiers.flatMap((x) => x.status === "settled" ? [x] : []);
-    expect(replay({ schedule, m: 2, states, receipts: ballots, snapshots }, T + 20_000))
+    expect(replay({ schedule, m: 2, states, receipts: ballots, ...{ snapshots } }, T + 20_000))
       .toEqual(s);
   });
 

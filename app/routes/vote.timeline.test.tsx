@@ -225,7 +225,7 @@ function chainAt(head: number): RoundSource {
 /** What /api/vote/round serves at `wall` (the server's clock), the node at `head`. */
 const served = { body: null as unknown };
 async function serve(wall: number, head: number) {
-  const st = await replayRound(M, chainAt(head), { now: wall, finalAfterSecs: 600 });
+  const st = await replayRound(M, chainAt(head), { now: wall });
   served.body = roundJson(st, M.slugs);
 }
 

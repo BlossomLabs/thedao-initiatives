@@ -5,16 +5,29 @@
  * archive node serves any block). Nothing here knows about viem, KV or env: browser and
  * Deno. */
 import type { VoteManifest } from "./manifest.ts";
-import { type ChainState, windowEnds } from "./quiet-ending.ts";
+import { type ChainState, type ValuationEvidence, windowEnds } from "./quiet-ending.ts";
+
+export type ChainBlock = { block: number; timestamp: number; hash?: `0x${string}` };
 
 export interface StateSource {
-  head(): Promise<{ block: number; timestamp: number }>;
+  /** Sources without finality evidence never persist historical reads. */
+  finalized?(): Promise<ChainBlock>;
+  blockAt?(block: number): Promise<ChainBlock>;
+  head(): Promise<ChainBlock>;
   /** The last block with timestamp < time. */
-  blockBefore(time: number): Promise<{ block: number; timestamp: number }>;
+  blockBefore(time: number): Promise<ChainBlock>;
   /** At `block` (eth_call with that block): initiativeCount, each initiativeUsd(i).askUsd, poolUsd(). */
   stateAt(
     block: number,
-  ): Promise<{ timestamp: number; asks: bigint[]; poolUsd: bigint; withdrawn: boolean[] }>;
+  ): Promise<
+    {
+      timestamp: number;
+      asks: bigint[];
+      poolUsd: bigint;
+      withdrawn: boolean[];
+      valuation?: ValuationEvidence;
+    }
+  >;
   /** Blocks in [from, to] holding a PledgeSet, PoolUsdSet, InitiativeWithdrawn or InitiativeConfigured log from the round's contract. */
   accountingEventBlocks(from: number, to: number): Promise<number[]>;
   /** Blocks in [from, to] where any account's balance in any registered currency changed:
@@ -22,7 +35,23 @@ export interface StateSource {
    * (a source may keep blocks it has scanned deep enough, and read only the rest again). */
   balanceChangeBlocks(from: number, to: number): Promise<number[]>;
 }
-/** Optional; only reads of blocks older than the finality margin go in. Values are plain
+/** Finality evidence must identify a canonical block hash within this replay's head. */
+export async function finalizedBlock(
+  src: StateSource,
+  head: ChainBlock,
+): Promise<ChainBlock | null> {
+  if (!src.finalized || !src.blockAt) return null;
+  const value = await src.finalized();
+  const at = value.block > head.block ? head : value;
+  const canonical = await src.blockAt(at.block);
+  if (!canonical.hash) return null;
+  if (at.hash && at.hash !== canonical.hash) {
+    throw new Error("finalized block is no longer canonical");
+  }
+  return canonical;
+}
+
+/** Optional; only canonical, finalized reads go in. Values are plain
  * JSON (bigints as decimal strings). */
 export interface StateCache {
   get(key: string): Promise<unknown | undefined>;
@@ -34,9 +63,7 @@ export interface StateCache {
 const SCAN_CHUNK = 2_000;
 /** State reads in flight at once. */
 const READS = 8;
-/** The balance cache's finality line moves in steps of this many seconds, so finding it
- * costs one block search per step (cached), not one per call. */
-const FINAL_STEP = 300;
+
 /** How long after a cutoff the node's head may still be older than it: a block lands
  * every 12 s and takes a few seconds to arrive. Within this the round is judged at the
  * head's time (the cutoff not passed yet); later, a head older than the cutoff is a
@@ -51,9 +78,15 @@ export const CUTOFF_GRACE_SECS = 30;
 export const judgedAt = (now: number, headTimestamp: number): number =>
   Math.min(now, headTimestamp + 1);
 
-type Block = { block: number; timestamp: number };
-type StoredState = { timestamp: number; asks: string[]; poolUsd: string; withdrawn: boolean[] };
-type StoredScan = { from: number; to: number; blocks: number[] };
+type Block = ChainBlock;
+type StoredState = {
+  timestamp: number;
+  asks: string[];
+  poolUsd: string;
+  withdrawn: boolean[];
+  valuation?: ValuationEvidence;
+};
+type StoredScan = { from: number; to: number; hash: string; blocks: number[] };
 
 /** Runs `f` over `xs`, at most `n` at a time; the first failure rejects the whole call. */
 async function mapLimit<T, U>(xs: T[], n: number, f: (x: T) => Promise<U>): Promise<U[]> {
@@ -89,10 +122,9 @@ function merge(ranges: [number, number][]): [number, number][] {
  * 3. the head: the last block before `now`.
  * `now` is judged at the head's time (`judgedAt`): a tally time the head hasn't reached
  * hasn't passed yet.
- * Reads of blocks older than `now − finalAfterSecs` go in `cache` and are not made again;
- * newer ones are never cached (a reorg could still change them). A block search by time
- * waits one more margin, for the block after its answer. Balance scans run one chunk at a
- * time. Any read error rejects
+ * Persistent reads are keyed by canonical block hash and only written through the
+ * node's finalized block. Sources without finality and block hashes are never cached.
+ * Balance scans run one chunk at a time. Any read error rejects
  * the whole call: no zeros, and no head values for a past block. A receipt block past
  * the node's head (a lagging archive node) rejects too, and so does a head older than a
  * passed tally start or cutoff (beyond CUTOFF_GRACE_SECS): the blocks between the head
@@ -100,16 +132,44 @@ function merge(ranges: [number, number][]): [number, number][] {
 export async function chainStates(
   m: VoteManifest,
   src: StateSource,
-  opts: { now: number; receiptBlocks: number[]; cache?: StateCache; finalAfterSecs: number },
+  opts: { now: number; receiptBlocks: number[]; cache?: StateCache },
 ): Promise<ChainState[]> {
-  const { cache } = opts;
+  // Cache failures and entries too large for KV never prevent a chain-derived result.
+  const cache: StateCache | undefined = opts.cache
+    ? {
+      get: async (key) => {
+        try {
+          return await opts.cache!.get(key);
+        } catch {
+          return undefined;
+        }
+      },
+      set: async (key, value) => {
+        try {
+          if (new TextEncoder().encode(JSON.stringify(value)).length <= 60_000) {
+            await opts.cache!.set(key, value);
+          }
+        } catch { /* A disposable optimization, never a required write. */ }
+      },
+    }
+    : undefined;
   const s = m.schedule;
   const contract = m.contract.toLowerCase();
   // The clock: what is final, and whether the node lags. The chain: what has happened.
   const wallNow = opts.now;
-  const finalBefore = wallNow - opts.finalAfterSecs;
   const head = await src.head();
+  const finalized = await finalizedBlock(src, head);
+  const finalBlock = finalized?.block ?? -1;
   const now = judgedAt(wallNow, head.timestamp);
+  const checked = new Map<number, Promise<ChainBlock>>();
+  const canonical = (block: number): Promise<ChainBlock> => {
+    let read = checked.get(block);
+    if (!read) {
+      read = src.blockAt ? src.blockAt(block) : Promise.resolve({ block, timestamp: 0 });
+      checked.set(block, read);
+    }
+    return read;
+  };
   // Ballots may come from another node: one this node hasn't reached would be judged with
   // an older state. Refuse rather than replay from partial states.
   const ahead = opts.receiptBlocks.filter((b) => b > head.block);
@@ -119,36 +179,14 @@ export async function chainStates(
     );
   }
 
-  /** The last block before `time`: the head when even it is older. Settled only once the
-   * block after it is final too; that one is not read, so a whole finality margin past
-   * `time` stands in for it (empty slots never span that long). Searched once per call. */
-  const searched = new Map<string, Promise<Block>>();
-  const search = (key: string, time: number, keep: boolean): Promise<Block> => {
-    let p = searched.get(key);
-    if (!p) {
-      p = (async () => {
-        if (keep && cache) {
-          const hit = await cache.get(key);
-          if (hit !== undefined) return hit as Block;
-        }
-        const b = await src.blockBefore(time);
-        if (keep && cache) await cache.set(key, { block: b.block, timestamp: b.timestamp });
-        return b;
-      })();
-      searched.set(key, p);
-    }
-    return p;
-  };
-  const lastBefore = async (time: number): Promise<Block> =>
-    head.timestamp < time
-      ? head
-      : await search(`before:${contract}:${time}`, time, time + opts.finalAfterSecs <= finalBefore);
-  /** A block known final (timestamp < finalBefore), close to the line: the last one
-   * before the line rounded down to FINAL_STEP. Any final block is final for good, so
-   * this is cached as soon as it is found. */
-  const finalLine = async (): Promise<Block> => {
-    const time = Math.floor(finalBefore / FINAL_STEP) * FINAL_STEP;
-    return head.timestamp < time ? head : await search(`final:${contract}:${time}`, time, true);
+  // Boundary searches are cheap compared with scanning balances. Never trust a cached
+  // block number to identify a canonical prefix after a reorganization.
+  const searched = new Map<number, Promise<Block>>();
+  const lastBefore = (time: number): Promise<Block> => {
+    if (head.timestamp < time) return Promise.resolve(head);
+    let read = searched.get(time);
+    if (!read) searched.set(time, read = src.blockBefore(time));
+    return read;
   };
 
   /** The tally times passed at `time`: each started tier's first tally and its passed
@@ -191,8 +229,6 @@ export async function chainStates(
 
   const events = new Set<number>();
   const scanBalances = (m.currencies?.length ?? 0) > 1;
-  /** The last final block, for the balance cache; null when nothing is cached. */
-  const finalBlock = scanBalances && cache && scanned.length ? (await finalLine()).block : null;
   const [accounting, balances] = await Promise.all([
     Promise.all(scanned.map(([from, to]) => src.accountingEventBlocks(from, to))),
     (async () => {
@@ -218,14 +254,17 @@ export async function chainStates(
     for (const c of chunks) {
       const lo = Math.max(from, c);
       const hi = Math.min(to, c + SCAN_CHUNK - 1);
-      const finalHi = finalBlock === null ? lo - 1 : Math.min(hi, finalBlock);
-      const key = `balances:${m.chainId}:${contract}:accounts2:${m.configRevision ?? "legacy"}:${
+      const finalHi = Math.min(hi, finalBlock);
+      const key = `balances:${m.chainId}:${contract}:accounts3:${m.configRevision ?? "legacy"}:${
         m.configAnchor?.hash ?? ""
       }:${c}`;
       const stored = cache && finalHi >= lo
         ? (await cache.get(key)) as StoredScan | undefined
         : undefined;
-      const known = stored && stored.from <= lo ? stored : undefined;
+      const anchor = stored && stored.to <= finalBlock ? await canonical(stored.to) : null;
+      const known = stored && stored.from <= lo && anchor?.hash === stored.hash
+        ? stored
+        : undefined;
       const scanFrom = known ? Math.max(lo, known.to + 1) : lo;
       const found = scanFrom <= hi ? await src.balanceChangeBlocks(scanFrom, hi) : [];
       for (const b of known?.blocks ?? []) if (b >= lo && b <= hi) out.push(b);
@@ -236,6 +275,7 @@ export async function chainStates(
           {
             from: known?.from ?? lo,
             to: finalHi,
+            hash: (await canonical(finalHi)).hash!,
             blocks: [...(known?.blocks ?? []), ...found.filter((b) => b <= finalHi)],
           } satisfies StoredScan,
         );
@@ -251,27 +291,43 @@ export async function chainStates(
     nowBlock.block,
   ]);
   const order = [...wanted].sort((a, b) => a - b);
-  return await mapLimit(order, READS, async (block): Promise<ChainState> => {
+  const result = await mapLimit(order, READS, async (block): Promise<ChainState> => {
     const x = await stateAt(block);
     return { block, ...x, event: events.has(block) };
   });
+  const after = await src.head();
+  if (head.block !== after.block || ("hash" in head && head.hash !== (after as ChainBlock).hash)) {
+    throw new Error("vote head changed during replay");
+  }
+  return result;
 
   async function stateAt(block: number) {
-    // `:w1`: states stored before the withdrawn flags existed lack them, and are skipped.
-    const key = `state:${contract}:${block}:w1`;
-    if (cache) {
+    const reference = await canonical(block);
+    const key = `state:${contract}:${reference.hash}:v3`;
+    const persistent = cache && block <= finalBlock && reference.hash;
+    if (persistent) {
       const hit = (await cache.get(key)) as StoredState | undefined;
-      if (hit !== undefined) {
+      if (
+        hit && hit.timestamp === reference.timestamp &&
+        Array.isArray(hit.asks) && hit.asks.length <= m.slugs.length &&
+        hit.asks.every((x) => typeof x === "string" && /^\d{1,78}$/.test(x)) &&
+        typeof hit.poolUsd === "string" && /^\d{1,78}$/.test(hit.poolUsd) &&
+        Array.isArray(hit.withdrawn) && hit.withdrawn.every((x) => typeof x === "boolean")
+      ) {
         return {
           timestamp: hit.timestamp,
           asks: hit.asks.map(BigInt),
           poolUsd: BigInt(hit.poolUsd),
           withdrawn: hit.withdrawn,
+          ...(hit.valuation ? { valuation: hit.valuation } : {}),
         };
       }
     }
     const x = await src.stateAt(block);
-    if (cache && x.timestamp < finalBefore) {
+    if (src.blockAt && (await src.blockAt(block)).hash !== reference.hash) {
+      throw new Error("vote block changed during state read");
+    }
+    if (persistent) {
       await cache.set(
         key,
         {
@@ -279,6 +335,7 @@ export async function chainStates(
           asks: x.asks.map(String),
           poolUsd: String(x.poolUsd),
           withdrawn: x.withdrawn,
+          ...(x.valuation ? { valuation: x.valuation } : {}),
         } satisfies StoredState,
       );
     }

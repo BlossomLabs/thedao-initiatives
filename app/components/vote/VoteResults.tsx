@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import RoundBox from "./RoundBox";
+import ValuationNotes from "./ValuationNotes";
 import DaoBallot, { daoResult, type SettledTier } from "./DaoBallot";
 import GiveList, { ClosestBox, gapUsd, type GiveRow, knockOnVerb } from "./GiveList";
 import MockNav from "./MockNav";
@@ -557,6 +558,7 @@ export default function VoteResults(
           <ClosestBox tier={tier} rows={rows} onPick={pick} />
         </div>
       )}
+      {rv && <ValuationNotes view={rv} round={R} />}
       {mine && (
         <div className="mt-5 flex justify-center">
           <LinkButton variant="primary" to={mine}>See or change your ballot</LinkButton>
@@ -805,6 +807,7 @@ function ClosedResults(
           <Covered label="Withdrawn" titles={withdrawn.map((s) => titles.get(s) ?? s)} />
         </div>
       )}
+      {rv && <ValuationNotes view={rv} round={R} />}
       {mine && (
         <div className="mt-5 flex justify-center">
           <LinkButton variant="primary" to={mine}>See your ballot</LinkButton>

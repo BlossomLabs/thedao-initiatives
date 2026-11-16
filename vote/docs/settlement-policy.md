@@ -1,52 +1,34 @@
 # USD pool and tier settlement
 
-Decision recorded 15 October 2026 (chain asks added Nov 12, 2026 and adapted Nov 15, 2026): adopt **fixed_usd**. Replay locks USD awards at
-settlement, rather than freezing economic inputs at a tier's first tally (tier_lock).
+The round uses firm USD settlements, one each for S-Tier, A-Tier and B-Tier. Each tier uses current
+historical asks and the shares left after earlier settlements. The complete
+[voting rules](quiet-ending-rules.md) define the process.
 
-- **Funding:** record actual net USD conversion proceeds or an enforceable guarantee
-  in the award currency. Oracle valuation does not secure funding. Before S's first
-  tally the total may be corrected in either direction, since no tally has run; from
-  then on it may increase but never decrease.
-- **Timing:** admins set future dates independently, with nonoverlapping windows
-  checked at deployment and on updates. Initial funding must be recorded strictly
-  before S's first tally; it never moves dates. If funding is missing, registration
-  stays open and admins must explicitly reschedule S before setting it. Started
-  opening and funded tier dates cannot change. An explicit zero initializes funding;
-  the default zero does not.
-- **Shares:** registration closes when S settles, fixing the accepted NFT count and
-  equal initial shares; until then each tally splits the pool among the ballots in
-  (simulated in `reference/quiet_ending_sim.py`, `main_registration`). Later increases add equally to those NFTs'
-  remaining shares without changing settled awards or charges. Exact rounding remains open.
-- **Provisional tallies:** at each historical cutoff, each project's ask is
-  `max(goalUSD - donationsUSD - outstandingPledgesUSD, 0)`, which is
-  `initiativeUsd(i).askUsd` read at that block. Each tally uses the asks and the pool at its
-  own block. Only the round's chain, the project's registered account and the registered
-  currencies count. USD pledges retain their
-  outstanding dollar amount; other denominations must be explicit. Valuing balances
-  does not exchange tokens.
-- **Settlement:** replay fixes USD awards and per-NFT charges at the tally that
-  finalizes the tier. Earlier tallies commit no money. Later prices, donations,
-  withdrawals or pledge corrections neither reprice awards nor trigger top-ups.
-  Resulting project gaps or excess coverage are outside that decision. Unsettled
-  tiers use current asks and remaining shares, including added funding. A tier settles with
-  the asks at the last block strictly before its cutoff; the stored settlement is a cache of
-  that value, which anyone can recompute. A project whose ask is $0 at that block is covered:
-  final, $0 award, never a candidate later; a funded project whose ask later reaches $0 keeps
-  its award.
+- The pool records secured USD. Before S-Tier's first tally it may be corrected; afterwards it only
+  increases. The contract records funding assertions and does not hold or pay the funds.
+- First ballots count until S-Tier actually settles. Then the accepted NFT roll freezes. For N
+  registered badges and pool P, each entitlement is `floor(P / N)`; remaining share is that
+  entitlement minus fixed settled charges. An increase adds the difference between the old and new
+  entitlements. The rounding remainder stays unallocated. With no registered badges, nothing is
+  allocated.
+- Each tally reads the contract's asks and pool at its own canonical block. The closing tally uses
+  the last block strictly before the cutoff. Stored-price fallbacks, failed balance reads and
+  retained token precision are exposed as valuation diagnostics without changing the contract's
+  conversion rules.
+- Settlement fixes USD awards and per-badge charges. Replay recomputes them from historical inputs;
+  a cached result cannot choose an outcome or settlement time.
+- Settled outcomes govern subsequent revisions at their scheduled cutoff. They are labelled as
+  awaiting chain finality until a finalized block reaches that cutoff. Elapsed time alone never
+  confirms them.
+- Later donations, withdrawals, prices, pledge changes and goal corrections do not reduce awards or
+  create automatic top-ups. A project covered at settlement receives a zero award and does not
+  return in a later tier. Unsettled initiatives use current asks and remaining shares.
+- Fixed awards and current asks are shown separately. Coverage comparisons assume awards have not
+  yet been paid; a pool payout must not be double-counted as outside support. A supplemental funding
+  process requires separate funds and rules.
 
-The quiet comparison is the funded set of the settling tier at every tally of a
-window: the opening tally, one after each block with a tally event and the closing
-tally ([rules](quiet-ending-rules.md#tally-events)). Projects at $0 in either of two compared
-tallies are dropped from both sets, so crossing $0 alone never extends a window. Changes in
-ask or per-NFT payment burden count only when they change that set. Maximum windows and forced
-closure still apply.
-
-**Accepted tradeoff:** results may differ from a fresh PB-EAR tally of final inputs;
-its proportionality guarantee does not automatically extend to this process.
-
-**Implementation:** the contract records funding, enforces its initial deadline and
-validates date changes; increases remain allowed until the maximum end. It does not execute or prove funding.
-Settlement, shares and checkpoints belong to replay, implemented in `shared/vote/` and run
-by anyone with `deno task vote:replay` ([README](../README.md#replay-the-round-yourself)).
-Shared tally references are unchanged, except that the staged tally leaves $0 projects out
-(plain PB-EAR funds them).
+Firm settlements can produce a different allocation from a fresh PB-EAR tally of all final inputs.
+For example, a $60 award from a $100 pool stays $60 after a later $50 donation, leaving $40 for
+subsequent tiers. A fresh tally might fund both that initiative's $10 remaining ask and another
+initiative asking $60. The round accepts this tradeoff to give earlier settlements finality. The
+fixed-input proportionality guarantee does not automatically apply to the changing-input process.

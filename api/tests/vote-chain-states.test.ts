@@ -55,6 +55,9 @@ type Log = { address: Hex; topics: Hex[]; data: Hex; block: number };
 /** A JSON-RPC node over blocks 0..head. `pruned`: no state before head − 10. */
 function node(o: {
   head: number;
+  finalized?: number;
+  diagnostics?: bigint;
+  noDiagnostics?: boolean;
   pruned?: boolean;
   count?: number;
   mask?: bigint;
@@ -80,7 +83,15 @@ function node(o: {
       if (method === "eth_blockNumber") return Promise.resolve(toHex(o.head));
       if (method === "eth_getBlockByNumber") {
         const tag = params[0] as string;
-        return Promise.resolve(block(tag === "latest" ? o.head : Number(tag)));
+        return Promise.resolve(
+          block(
+            tag === "latest"
+              ? o.head
+              : tag === "finalized"
+              ? o.finalized ?? o.head - 12
+              : Number(tag),
+          ),
+        );
       }
       if (method === "eth_call") {
         const tag = params[1] as string;
@@ -111,6 +122,10 @@ function node(o: {
             data: s.callData,
           });
           const count = o.count ?? 2;
+          if (functionName === "valuationDiagnostics") {
+            if (o.noDiagnostics) return { success: false, returnData: "0x" as Hex };
+            return ok(SIGNED_BALLOTS_ABI, functionName, o.diagnostics ?? 0n);
+          }
           if (functionName === "initiativeCount") {
             return ok(SIGNED_BALLOTS_ABI, functionName, BigInt(count));
           }
@@ -171,8 +186,7 @@ Deno.test("a pruned RPC error on a past block propagates", async () => {
   assertEquals((await src.stateAt(1000)).asks.length, 2);
   await assertRejects(() => src.stateAt(100), Error, "missing trie node");
   await assertRejects(
-    () =>
-      chainStates(manifest(), src, { now: 1000 * SECS, receiptBlocks: [], finalAfterSecs: 1800 }),
+    () => chainStates(manifest(), src, { now: 1000 * SECS, receiptBlocks: [] }),
     Error,
     "missing trie node",
   );
@@ -182,7 +196,13 @@ Deno.test("stateAt: one multicall at that block; asks only for projects the cont
   const { transport, calls } = node({ head: 1000, count: 1 });
   const src = createStateSource(manifest(), "http://unused", transport);
   const s = await src.stateAt(400);
-  assertEquals(s, { timestamp: 400 * SECS, asks: [500n], poolUsd: 500n, withdrawn: [false] });
+  assertEquals(s, {
+    timestamp: 400 * SECS,
+    asks: [500n],
+    poolUsd: 500n,
+    withdrawn: [false],
+    valuation: { available: true, issues: [] },
+  });
   assertEquals(calls, [{ method: "eth_call", block: toHex(400) }]);
 });
 
@@ -211,11 +231,23 @@ Deno.test("stateAt: a contract with more projects than the manifest is an error"
 Deno.test("blockBefore: the last block strictly before a time", async () => {
   const { transport } = node({ head: 1000 });
   const src = createStateSource(manifest(), "http://unused", transport);
-  assertEquals(await src.blockBefore(1200), { block: 99, timestamp: 1188 });
-  assertEquals(await src.blockBefore(1201), { block: 100, timestamp: 1200 });
-  assertEquals(await src.blockBefore(1), { block: 0, timestamp: 0 });
+  assertEquals(await src.blockBefore(1200), {
+    block: 99,
+    timestamp: 1188,
+    hash: toHex(99, { size: 32 }),
+  });
+  assertEquals(await src.blockBefore(1201), {
+    block: 100,
+    timestamp: 1200,
+    hash: toHex(100, { size: 32 }),
+  });
+  assertEquals(await src.blockBefore(1), { block: 0, timestamp: 0, hash: toHex(0, { size: 32 }) });
   // Past the head: the head.
-  assertEquals(await src.blockBefore(99_999), { block: 1000, timestamp: 12_000 });
+  assertEquals(await src.blockBefore(99_999), {
+    block: 1000,
+    timestamp: 12_000,
+    hash: toHex(1000, { size: 32 }),
+  });
   await assertRejects(() => src.blockBefore(0), Error, "no block before");
 });
 
@@ -407,4 +439,20 @@ Deno.test("corrections: balance scans follow active account periods, including n
     await createStateSource(m, "http://unused", transport).balanceChangeBlocks(100, 110),
     [102, 104, 106, 108],
   );
+});
+
+Deno.test("valuation evidence distinguishes failed balance reads, fallbacks and retained precision", async () => {
+  const { transport } = node({ head: 1000, count: 1, diagnostics: 7n << 4n });
+  const result = await createStateSource(manifest(), "http://unused", transport).stateAt(400);
+  assertEquals(result.valuation, {
+    available: true,
+    issues: [{ project: 0, currency: 1, flags: 7 }],
+  });
+});
+
+Deno.test("older contracts keep their asks and explicitly lack valuation diagnostics", async () => {
+  const { transport } = node({ head: 1000, count: 1, noDiagnostics: true });
+  const state = await createStateSource(manifest(), "http://unused", transport).stateAt(400);
+  assertEquals(state.asks, [500n]);
+  assertEquals(state.valuation, { available: false, issues: [] });
 });

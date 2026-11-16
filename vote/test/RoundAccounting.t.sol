@@ -407,6 +407,25 @@ contract RoundAccountingTest is Fixture {
         assertEq(ballots.quoteUsd(eth, 1 ether), 2_000e6);
     }
 
+    function test_runtimeFitsEthereumCodeSizeLimit() public view {
+        assertLe(address(ballots).code.length, 24_576);
+    }
+
+    function test_valuationDiagnosticsDistinguishZeroFailureFallbackAndPrecision() public {
+        assertEq(ballots.valuationDiagnostics(0), 0);
+        vm.deal(INITIATIVE_A, 1 ether);
+        ethFeed.setUnavailable(true);
+        uint256 d = ballots.valuationDiagnostics(0);
+        assertEq((d >> (4 * eth)) & 15, 1);
+        assertEq(ballots.priceUsd(eth), 2_000e8);
+        usdc.setBroken(true);
+        usdc.setDecimals(18);
+        d = ballots.valuationDiagnostics(0);
+        assertEq((d >> (4 * dollarToken)) & 15, 6);
+        (uint256 donated,,,) = ballots.initiativeUsd(0);
+        assertEq(donated, 2_000e6);
+    }
+
     function test_tokenDecimalsChangeIgnored() public {
         usdc.mint(INITIATIVE_A, 1_000e6);
         usdc.setDecimals(18);

@@ -4,11 +4,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { type Hex, zeroHash } from "viem";
 import { harness, j } from "./app-helpers.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
-import {
-  type BallotEvent,
-  FINAL_AFTER_SECS,
-  type RoundSource,
-} from "../../shared/vote/replay-round.ts";
+import { type BallotEvent, type RoundSource } from "../../shared/vote/replay-round.ts";
 import { transcriptOf } from "../../shared/vote/transcript.ts";
 import type { VoteChain } from "../services/vote-chain.ts";
 import { main } from "../../scripts/vote-replay.ts";
@@ -162,10 +158,10 @@ Deno.test("the script and the API agree on the same fake chain", async () => {
   await Deno.remove(path);
 });
 
-Deno.test("the script and the API agree once the API replays from a stored settlement", async () => {
-  // Past S-Tier's settlement (NOW − 400) and its finality margin: the API keeps S-Tier's
-  // record and replays the rest around it; the script recomputes it from the chain.
-  const at = NOW - 400 + FINAL_AFTER_SECS + 60;
+Deno.test("the script and API agree despite an incorrect stored settlement", async () => {
+  // The API and script both reconstruct historical settlements; obsolete saved
+  // awards cannot override that reconstruction.
+  const at = NOW - 400 + 1860;
   const source = fakeSource({ now: at + 60 });
   const h = await harness();
   const { committed, rulesHistory } = source;
@@ -179,8 +175,17 @@ Deno.test("the script and the API agree once the API replays from a stored settl
   const key = ["vote", manifest.contract.toLowerCase()];
   h.clock.now = at;
   assertEquals((await h.req("/api/vote/round")).status, 200);
-  assert((await h.deps.db.kv.get([...key, "settled-w1", "S"])).value, "S-Tier's record is kept");
-  // A minute on, with the served round dropped: the API replays with the stored records.
+  assertEquals((await h.deps.db.kv.get([...key, "settled-w1", "S"])).value, null);
+  await h.deps.db.kv.set([...key, "settled-w1", "S"], {
+    tier: "S",
+    at: at,
+    funded: [],
+    awards: [],
+    shares: [],
+    covered: [],
+    withdrawn: [],
+  });
+  // A minute on, the API recomputes despite an incorrect saved record.
   await h.deps.db.kv.delete([...key, "round"]);
   h.clock.now = at + 60;
   const res = await h.req("/api/vote/round");

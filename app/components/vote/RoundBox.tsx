@@ -470,6 +470,15 @@ export default function RoundBox(
   });
   // The clock passed the next step, the chain hasn't yet: nothing moves until it has.
   // Known only from a server that says which block it judged at (not on the examples).
+  const unconfirmed = rv?.tiers.filter((t) => t.status === "settled" && t.confirmed === false) ??
+    [];
+  const confirmation = unconfirmed.length
+    ? (
+      <p className="m-0 px-4 py-2 text-[13px] text-white/70">
+        {unconfirmed.map((t) => tierName(t.tier)).join(", ")} settled, awaiting chain finality.
+      </p>
+    )
+    : null;
   const due = dueAt(phase);
   const waiting = Boolean(rv?.head) && due !== undefined && clock >= due;
   let title: React.ReactNode;
@@ -628,6 +637,7 @@ export default function RoundBox(
           )}
         </div>
         <Stepper steps={steps} at={at} />
+        {confirmation}
         {
           // The countdown line already says when the next step comes; only before the vote
           // opens is there a second date to give (S-Tier's).
@@ -669,6 +679,7 @@ export default function RoundBox(
         </div>
       )}
       {stepper}
+      {confirmation}
       {!stepsOnly && nowBox()}
       {badgeLineEl}
     </section>

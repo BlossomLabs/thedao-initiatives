@@ -74,7 +74,7 @@ const EARLY = [ballot("1", "0x01ffff", 500), ballot("2", "0x01ffff", 600)];
 const LATE = ballot("3", "0xff01ff", 1099);
 
 const replay = (now: number, head: number) =>
-  replayRound(manifest, chainAt(head, [...EARLY, LATE]), { now, finalAfterSecs: 10 });
+  replayRound(manifest, chainAt(head, [...EARLY, LATE]), { now });
 
 describe("results only once the chain confirms them", () => {
   it("a tier still settles while the newest block is before its cutoff, whatever the clock says", async () => {

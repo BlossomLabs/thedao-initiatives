@@ -535,8 +535,7 @@ export default function TierBallot(
     const next = order[order.indexOf(peek.slug) + dir];
     if (!next) return;
     if (isPhone) return setPeek({ slug: next, order });
-    const box = document.querySelector<HTMLElement>(`[data-ballot-box="${next}"]`);
-    box?.scrollIntoView?.({ block: "nearest" });
+    // The page behind stays put: the card scrolls to its initiative only when it closes.
     void morph(cardEl(), () => setPeek({ slug: next, order }), cardEl);
   };
   /** A choice on the card: the initiative moves (its outline with it), the card stays. */
@@ -561,7 +560,13 @@ export default function TierBallot(
         setPeek(undefined);
         setClosing(slug);
       },
-      () => boxEl(slug),
+      () => {
+        // Stepping ‹ › doesn't scroll the page, so the initiative may be out of view:
+        // brought in here, inside the morph, the page's jump is hidden by its crossfade.
+        const box = boxEl(slug);
+        box?.scrollIntoView?.({ block: "nearest" });
+        return box;
+      },
       { ghost: "to", landed: () => setClosing(undefined) },
     ).then(() => boxEl(slug)?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true }));
   };

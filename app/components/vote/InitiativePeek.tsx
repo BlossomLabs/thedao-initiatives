@@ -7,7 +7,6 @@ import { LinkButton } from "~/components/ui/Button";
 import { Select, SelectContent, SelectItem } from "~/components/ui/Select";
 import CategoryDot from "~/components/ui/CategoryDot";
 import { categoryOf } from "~/lib/categories";
-import { usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import type { BallotItem } from "./TierBallot";
 import BriefList, { askText, PledgerStack } from "./BriefList";
@@ -195,7 +194,6 @@ export default function InitiativePeek<W extends string>(
                     {askText(item)}
                   </span>
                 )}
-                <PledgerStack item={item} />
               </p>
               <div className="-my-1 -mr-1 flex flex-none items-center gap-1">
                 <button
@@ -307,6 +305,8 @@ export default function InitiativePeek<W extends string>(
               {paid && (
                 <span className="font-inter-tight text-[12.5px] text-vote">You paid {paid}</span>
               )}
+              {/* Who pledged, on the right, as tall as the stamp. */}
+              <PledgerStack item={item} size={32} className="ml-auto" />
             </div>
             {withdrawn && (
               <p className="m-0 font-inter-tight text-[12.5px] leading-snug text-dao-red-pale">

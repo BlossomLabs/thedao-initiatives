@@ -89,24 +89,30 @@ export function askText(item: BallotItem): string {
 
 /** The pledgers, a very small stack of their logos (silhouettes without one), as the
  * board's: the card carries up to four. Names in each logo's title. */
-export function PledgerStack({ item, size = 16 }: { item: BallotItem; size?: 16 | 20 }) {
+export function PledgerStack(
+  { item, size = 16, className }: { item: BallotItem; size?: 16 | 20 | 32; className?: string },
+) {
   const logos = item.card?.logos ?? [];
   if (!logos.length) return null;
   return (
     <span
       data-pledgers=""
-      className="flex flex-none items-center"
+      className={cn("flex flex-none items-center", className)}
       aria-label={`Pledged by ${logos.map((l) => l.company).join(", ")}`}
       role="img"
     >
       {logos.map((l, i) => (
-        <span key={i} className="-ml-1 flex first:ml-0">
+        <span key={i} className={cn("flex first:ml-0", size === 32 ? "-ml-2" : "-ml-1")}>
           <BackerLogo
             logoUrl={l.logoUrl}
             company={l.company}
             className={cn(
               "p-px ring-2 ring-panel-modal",
-              size === 16 ? "size-4 [&>svg]:size-2.5" : "size-5 [&>svg]:size-3",
+              size === 16
+                ? "size-4 [&>svg]:size-2.5"
+                : size === 20
+                ? "size-5 [&>svg]:size-3"
+                : "size-8 [&>svg]:size-4",
             )}
           />
         </span>

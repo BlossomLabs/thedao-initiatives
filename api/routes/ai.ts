@@ -6,7 +6,7 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { requireClientIp } from "../middleware/ip.ts";
 import { jsonBody, s } from "../lib/body.ts";
-import { AI_QUERY_MAX_CHARS, aiFilterCategories } from "../services/ai.ts";
+import { AI_QUERY_MAX_CHARS, AiBudgetError, aiFilterCategories } from "../services/ai.ts";
 
 const CACHE_TTL = 600;
 const CACHE_MAX = 500;
@@ -46,13 +46,13 @@ export function aiRoutes(deps: Deps) {
     if (!(await db.rateLimit("ai:global", 30, 60))) {
       throw new HttpError(429, "search is busy, try again shortly");
     }
-    if (!(await db.meta.aiBudgetOk())) {
-      throw new HttpError(429, "search is resting until tomorrow");
-    }
     let scores: AiSearchResult["scores"];
     try {
-      scores = await deps.ai.rank(query, items);
+      scores = await deps.ai.rank(query, items, (calls) => db.meta.aiBudgetOk(calls));
     } catch (e) {
+      if (e instanceof AiBudgetError) {
+        throw new HttpError(429, "search is resting until tomorrow");
+      }
       deps.log(`ai-search failed: ${String(e)}`);
       throw new HttpError(502, "search is unavailable right now");
     }

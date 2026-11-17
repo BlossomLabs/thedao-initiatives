@@ -31,14 +31,23 @@ export function metaRepo(kv: Deno.Kv, now: () => number, read: ReadOptions = und
   }
   const unlock = (name: string) => kv.delete(K.lock(name));
 
-  /** Count one upstream AI call against today's cap; false = cap reached. */
-  async function aiBudgetOk(): Promise<boolean> {
+  /** Atomically reserve upstream AI calls, including every batch in a search. */
+  async function aiBudgetOk(calls = 1): Promise<boolean> {
+    if (!Number.isSafeInteger(calls) || calls < 1) return false;
     const day = new Date(now() * 1000).toISOString().slice(0, 10);
     const key = K.aiBudget(day);
-    const cur = (await kv.get<number>(key)).value ?? 0;
-    if (cur >= AI_DAILY_CALL_CAP) return false;
-    await bumpCounter(kv, key, 2 * 86400 * 1000);
-    return true;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const cur = await kv.get<number>(key);
+      const next = (cur.value ?? 0) + calls;
+      if (next > AI_DAILY_CALL_CAP) return false;
+      if (
+        (await kv.atomic().check(cur).set(key, next, { expireIn: 2 * 86400 * 1000 }).commit()).ok
+      ) {
+        return true;
+      }
+    }
+    // A concurrent caller may have spent the remaining budget; fail closed.
+    return false;
   }
 
   /** The support screen's share of today's cap: its own smaller counter first,

@@ -30,9 +30,10 @@ describe("writeSummaries", () => {
     let gone = false;
     await writeSummaries(
       ["a", "b", "c", "d", "e"],
-      async (id) => {
+      (id) => {
         asked.push(id);
         gone = true;
+        return Promise.resolve();
       },
       () => {},
       () => gone,

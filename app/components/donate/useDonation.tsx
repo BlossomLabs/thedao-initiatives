@@ -36,6 +36,8 @@ export interface UseDonationArgs {
   onConfirmed?: (r: DonateResult) => void;
   /** Current explicit checkbox state; never restored from a local timestamp. */
   accepted?: boolean;
+  /** The Donate button: the confetti bursts out of it. */
+  burstFrom?: React.RefObject<Element | null>;
 }
 
 const POLL_MS = 6000;
@@ -65,7 +67,7 @@ async function readBalance(config: Config, account: `0x${string}`, token: string
 }
 
 export function useDonation(
-  { initiativeId, slug, safeAddress, params, onConfirmed, accepted }: UseDonationArgs,
+  { initiativeId, slug, safeAddress, params, onConfirmed, accepted, burstFrom }: UseDonationArgs,
 ) {
   const wallet = useWalletStore();
   const { address, isConnected, connect } = useWallet();
@@ -116,7 +118,7 @@ export function useDonation(
           </>
         ),
       });
-      confettiBurst();
+      confettiBurst(burstFrom?.current);
       onConfirmed?.(res);
       return;
     }

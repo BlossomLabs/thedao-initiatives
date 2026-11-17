@@ -90,6 +90,8 @@ export default function DonateWidget({
     setAmount("");
     onConfirmed?.(r);
   };
+  /** The wallet's Donate button: the confetti bursts out of it. */
+  const donateButton = useRef<HTMLButtonElement>(null);
   const d = useDonation({
     initiativeId,
     slug,
@@ -97,6 +99,7 @@ export default function DonateWidget({
     params,
     onConfirmed: confirmed,
     accepted,
+    burstFrom: donateButton,
   });
   const toggleTerms = (on: boolean) => {
     setAccepted(on);
@@ -362,6 +365,7 @@ export default function DonateWidget({
       <Reveal show={method === "wallet"} className="-mt-2.5">
         <div className="flex flex-col pt-2.5">
           <Button
+            ref={donateButton}
             variant="primary"
             onClick={async () => {
               if (!gated()) return;

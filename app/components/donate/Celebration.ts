@@ -1,6 +1,7 @@
 /** Confetti burst on a confirmed donation (port of static/app.js confettiBurst). Only for
- * donations: the vote's own moments are gold. */
-export function confettiBurst() {
+ * donations: the vote's own moments are gold. With `from` (the Donate button, #129) it
+ * bursts out of that element, while it is on screen; otherwise from the screen's middle. */
+export function confettiBurst(from?: Element | null) {
   try {
     const c = document.createElement("canvas");
     const W = globalThis.innerWidth, H = globalThis.innerHeight;
@@ -11,9 +12,14 @@ export function confettiBurst() {
     const ctx = c.getContext("2d");
     if (!ctx) return;
     const colors = ["#ff3b38", "#00ff88", "#5ac8fa", "#f0b429", "#ffffff", "#5cb75a"];
+    const r = from?.getBoundingClientRect();
+    const seen = r && r.width > 0 && r.bottom > 0 && r.top < H;
+    const x0 = seen ? r.left + r.width / 2 : W / 2;
+    const spread = seen ? r.width : W * 0.3;
+    const y0 = seen ? r.top + r.height / 2 : H * 0.4;
     const parts = Array.from({ length: 160 }, (_, i) => ({
-      x: W / 2 + (Math.random() - 0.5) * W * 0.3,
-      y: H * 0.4,
+      x: x0 + (Math.random() - 0.5) * spread,
+      y: y0,
       vx: (Math.random() - 0.5) * 16,
       vy: -(Math.random() * 14 + 6),
       w: 5 + Math.random() * 6,

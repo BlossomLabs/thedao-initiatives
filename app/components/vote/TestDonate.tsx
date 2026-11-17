@@ -56,6 +56,8 @@ export default function TestDonate(
   // Another initiative: start from its suggestion. For the same one the amount never moves
   // (#100): a new suggestion shows in the chips, and the preview says what the amount
   // does now. Only a form that opened before any suggestion takes the first, if empty.
+  /** The Donate button: the confetti bursts out of it (#129). */
+  const donateButton = useRef<HTMLButtonElement>(null);
   const suggestedFor = useRef({ slug, usd: first?.usd });
   useEffect(() => {
     const was = suggestedFor.current;
@@ -123,7 +125,7 @@ export default function TestDonate(
           usd.toLocaleString("en-US")
         } in test dollars is on its account. It counts from the next tally.`,
       });
-      confettiBurst();
+      confettiBurst(donateButton.current);
       // Cleared: what was given now shows as given, and another amount can follow (#100).
       setAmount("");
       onDonated?.(usd);
@@ -188,7 +190,12 @@ export default function TestDonate(
         A test vote: this sends test dollars (tUSD) on Sepolia straight to the initiative's account.
         No real money moves.
       </p>
-      <Button variant="primary" onClick={donate} disabled={Boolean(busy) || !target || over}>
+      <Button
+        ref={donateButton}
+        variant="primary"
+        onClick={donate}
+        disabled={Boolean(busy) || !target || over}
+      >
         {busy ?? "Donate test dollars"}
       </Button>
       {status && <Status kind={status.kind}>{status.text}</Status>}

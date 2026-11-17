@@ -1,0 +1,16 @@
+
+ RUN  v5.1.0 /tmp/thedao-security-b471ac5-OmYihJ
+
+error: Uncaught Error: fd is not from BiPipe
+		this._fork ||= fork(this.entrypoint, [], {
+		               ^
+    at nodeSpawnChild (ext:deno_process/40_process.js:1:4315)
+    at ChildProcess.#spawnInternal (ext:deno_node/internal/child_process.ts:1:6763)
+    at ChildProcess.spawn (ext:deno_node/internal/child_process.ts:1:5844)
+    at spawn (ext:deno_node/child_process.ts:1:3828)
+    at fork (ext:deno_node/child_process.ts:1:3656)
+    at ForksPoolWorker.start (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/vitest@5.1.0/node_modules/vitest/dist/chunks/index.Di8au7q4.js:5490:18)
+    at file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/vitest@5.1.0/node_modules/vitest/dist/chunks/index.Di8au7q4.js:5264:119
+    at Traces.$ (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/vitest@5.1.0/node_modules/vitest/dist/traces.js:143:27)
+    at PoolRunner.start (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/vitest@5.1.0/node_modules/vitest/dist/chunks/index.Di8au7q4.js:5264:23)
+    at Pool.schedule (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/vitest@5.1.0/node_modules/vitest/dist/chunks/index.Di8au7q4.js:5932:18)

@@ -1,0 +1,28 @@
+Check api/tests/sitelock.test.ts
+running 1 test from ./api/tests/sitelock.test.ts
+site lock: a copied unlock cookie expires on the server after thirty days ... FAILED (21ms)
+
+ ERRORS 
+
+site lock: a copied unlock cookie expires on the server after thirty days => ./api/tests/sitelock.test.ts:14:6
+error: AssertionError: Values are not equal.
+
+
+    [Diff] Actual / Expected
+
+
+-   200
++   401
+
+  throw new AssertionError(message);
+        ^
+    at assertEquals (https://jsr.io/@std/assert/1.0.19/equals.ts:67:9)
+    at file:///home/sem/Projects/thedao-initiatives/api/tests/sitelock.test.ts:21:5
+
+ FAILURES 
+
+site lock: a copied unlock cookie expires on the server after thirty days => ./api/tests/sitelock.test.ts:14:6
+
+FAILED | 0 passed | 1 failed | 3 filtered out (32ms)
+
+error: Test failed

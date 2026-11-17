@@ -1,0 +1,17 @@
+Check docs/security/review-2026-11-17/evidence/relayer-gas.repro.test.ts
+Check docs/security/review-2026-11-17/evidence/settled-donation.repro.test.ts
+running 1 test from ./docs/security/review-2026-11-17/evidence/relayer-gas.repro.test.ts
+NOV-01: public ballot relay signs an eight-million-gas contract-wallet transaction ...
+------- output -------
+{"status":200,"gas":"8200000","maxFeePerGas":"2200000000","method":"recordFor"}
+----- output end -----
+NOV-01: public ballot relay signs an eight-million-gas contract-wallet transaction ... ok (59ms)
+running 1 test from ./docs/security/review-2026-11-17/evidence/settled-donation.repro.test.ts
+NOV-02: a third-party donation blocks every revision preserving the settled S-Tier ...
+------- post-test output -------
+Unchanged S-Tier fails the current group rule; repaired S-Tier is rejected by replay; original nonce 1 remains accepted.
+----- post-test output end -----
+NOV-02: a third-party donation blocks every revision preserving the settled S-Tier ... ok (2ms)
+
+ok | 2 passed | 0 failed (164ms)
+

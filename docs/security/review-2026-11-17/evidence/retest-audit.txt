@@ -1,0 +1,8 @@
+╭ Zod can exhaust memory while validating oversized constrained collections
+│ Severity:   high
+│ Package:    zod
+│ Vulnerable: <4.6.6
+╰ Info:       https://github.com/advisories/GHSA-mrhx-c7xc-m3w5
+
+Found 1 vulnerabilities
+Severity: 0 low, 0 moderate, 1 high, 0 critical

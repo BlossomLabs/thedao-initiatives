@@ -1,0 +1,8 @@
+{
+  "recorded": "2026-11-17",
+  "source": "Owner confirmation in the review conversation",
+  "revocation": "Nexus API keys can be manually revoked.",
+  "expiration": "Nexus API keys do not expire.",
+  "verification": "Owner attestation; no live revocation, rotation or authenticated inference test was performed.",
+  "disposition": "Revocation capability is established by owner attestation. This does not itself establish routine replacement of long-lived credentials. GAP-04 remains an operational ASVS conformance gap, not an additional demonstrated website vulnerability; no exception is assumed."
+}

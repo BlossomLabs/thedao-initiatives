@@ -1,0 +1,13 @@
+Initialize zod@4.6.7
+Installed 1 package in 508ms
+Reused 15 packages from cache
++++++++++++++++
+Downloaded 0 packages from JSR
+Downloaded 0 packages from npm
+╭ Warning
+│
+│  Ignored build scripts for packages:
+│  npm:@reown/appkit@1.8.19
+│
+│  Run "deno approve-scripts" to run build scripts.
+╰─

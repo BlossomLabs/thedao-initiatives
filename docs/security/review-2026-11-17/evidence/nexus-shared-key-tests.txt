@@ -1,0 +1,67 @@
+Check api/tests/routes.test.ts
+Check api/tests/write-fields.test.ts
+Check api/tests/structured.test.ts
+Check api/tests/moderation.test.ts
+running 21 tests from ./api/tests/routes.test.ts
+content sync publishes the repo files as structured rows; public JSON never leaks private fields ... ok (152ms)
+board ordering: pins first, then money, then newest ... ok (7ms)
+submit: needs a signed-in wallet with a display name; records the proposer ... ok (12ms)
+submit: validation, honeypot, rate limit, pending never on board ... ok (17ms)
+mine: a proposer lists and opens their own submissions, rejected ones only for them and admins ... ok (20ms)
+SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, logout ... ok (37ms)
+origin guard and CORS ... ok (4ms)
+donate: params, confirm, status, totals ... ok (33ms)
+profile: nickname rules, .eth ownership, pfp presets and upload ...Check api/lib/image-worker.ts
+ ok (674ms)
+admin: settings, status, pledges with logo, safe deploy params + confirm, comments actions ... ok (34ms)
+ai-search: accepts zk in either provider mode but rejects other short queries ... ok (14ms)
+ai-search: Jev scores every proposal, caches content, and shares the AI key ... ok (15ms)
+ai-search: Jev scores a board too large for one request in batches ... ok (21ms)
+ai-search: disabling Jev uses the configured LLM and scores the whole board ... ok (7ms)
+ai-search: LLM mode requires its key and rejects missing or malformed scores ... ok (19ms)
+ai-search: invalid or missing Jev scores fail without caching partial rankings ... ok (19ms)
+submit: discussion links are stored without fetching; title is required ... ok (10ms)
+content backers: file pledges are created once, kept in step, never own the status ... ok (131ms)
+page facts: content keys sync, an admin's patch validates and clears per type ... ok (91ms)
+RATE_LIMIT_MODE=off: the submit limit stops counting ... ok (15ms)
+submit: a discussion link past the form's cap is too long, not silently accepted ... ok (6ms)
+running 5 tests from ./api/tests/write-fields.test.ts
+writes: every JSON endpoint rejects unknown fields before changing domain data ... ok (57ms)
+writes: unknown multipart text and file fields are rejected before uploads ... ok (24ms)
+writes: unknown nested fields reject the entire request, including bulk content sync ... ok (30ms)
+writes: malformed JSON cannot become an empty update or logout ... ok (13ms)
+writes: unknown actions cannot match inherited object properties ... ok (10ms)
+running 21 tests from ./api/tests/structured.test.ts
+submit: the guide's example lands structured, with its backers as pledges ...Check api/lib/image-worker.ts
+ ok (1s)
+submit: a missing section and a bad sum come back as findings, nothing is written ... ok (6ms)
+initiative writes reject retired amount/duration aliases without partial updates ... ok (23ms)
+submit: an all-done top-up needs no adoption milestone and warns instead ... ok (10ms)
+submit: rejected proposals still block the same text ... ok (8ms)
+submit: renaming a duplicate explains the match; revising its section text permits submission ... ok (7ms)
+submit: links must be https; the body has a byte cap ... ok (31ms)
+uploads: auth, disabled, junk, ok, rate limit; a CID someone else pinned is refused ... ok (58ms)
+proposer edit: structured revisions, unchanged, legacy body on a structured row ... ok (16ms)
+proposer edit: legacy text stays readable but edits must migrate to sections ... ok (7ms)
+proposer PATCH: page facts while pending, locked after approval, admin always ... ok (20ms)
+admin settings: a legacy row keeps its text, and text cannot ride along ... ok (5ms)
+bulk admin actions: initiatives and comments roll back on any failure ... ok (28ms)
+GET /initiative/<slug>.md: the content-file shape, public rows only, round-trips ... ok (43ms)
+<slug>-PRIVATE.md: admins only, any status, carries contact and funders; admin API by slug ... ok (15ms)
+content logos: pinned once by name, mapped onto the pledge by the sync ... ok (18ms)
+admin pledges reject direct CIDs and amount aliases before changing data or uploading ... ok (19ms)
+pledge edit: PATCH takes the same fields as adding, including a new logo ... ok (24ms)
+edit: a top-up measures the adoption floor against the goal minus the stored pledges ... ok (10ms)
+caps: a long link, an edited long title and a long pledge company are refused with the message ... ok (12ms)
+team edit: an editorial finding and a field past its cap both block the save ... ok (6ms)
+running 7 tests from ./api/tests/moderation.test.ts
+AI screen: a provider that refuses response_format is asked again without it, once ... ok (26ms)
+AI screen: a failure is retried once, then held with the reason ... ok (6ms)
+AI screen: bad JSON and invalid verdicts say so ... ok (10ms)
+parseJsonObject reads bare, fenced and wrapped objects and rejects the rest ... ok (241µs)
+AI screen: spam on a link-only comment is held for a person, other spam is dropped ... ok (6ms)
+re-run AI screen: held rows only, stores the new answer, never publishes ... ok (20ms)
+dashboard: a held reply shows its parent and what the board knows about the author ... ok (19ms)
+
+ok | 54 passed | 0 failed (3s)
+

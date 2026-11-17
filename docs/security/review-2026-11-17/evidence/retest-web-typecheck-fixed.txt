@@ -1,0 +1,1 @@
+Task typecheck deno run -A npm:@react-router/dev typegen && deno run -A npm:typescript/tsc

@@ -1,0 +1,810 @@
+Check api/tests/admin-pledges-vote.test.ts
+Check api/tests/admin-reauth.test.ts
+Check api/tests/admin-todo.test.ts
+Check api/tests/admins-concurrency.test.ts
+Check api/tests/admins.test.ts
+Check api/tests/affiliations.test.ts
+Check api/tests/audit.test.ts
+Check api/tests/backup-vote.test.ts
+Check api/tests/backup.test.ts
+Check api/tests/badge-holder.test.ts
+Check api/tests/bench.test.ts
+Check api/tests/board-cache.test.ts
+Check api/tests/board.test.ts
+Check api/tests/card-summary.test.ts
+Check api/tests/categories.test.ts
+Check api/tests/chain-state.test.ts
+Check api/tests/chain.test.ts
+Check api/tests/cold-snapshot.test.ts
+Check api/tests/comments.test.ts
+Check api/tests/compress.test.ts
+Check api/tests/content-caps.test.ts
+Check api/tests/csp.test.ts
+Check api/tests/daily-cache.test.ts
+Check api/tests/db.test.ts
+Check api/tests/donation-errors.test.ts
+Check api/tests/donation-minimum.test.ts
+Check api/tests/donation-retry.test.ts
+Check api/tests/donation-senders.test.ts
+Check api/tests/ens-ccip.test.ts
+Check api/tests/ens.test.ts
+Check api/tests/eventual-reads.test.ts
+Check api/tests/feeds.test.ts
+Check api/tests/forum.test.ts
+Check api/tests/funding.test.ts
+Check api/tests/images.test.ts
+Check api/tests/ip.test.ts
+Check api/tests/kv-depth.test.ts
+Check api/tests/ledger.test.ts
+Check api/tests/maintenance.test.ts
+Check api/tests/moderation.test.ts
+Check api/tests/origin.test.ts
+Check api/tests/pending-revisions.test.ts
+Check api/tests/prefix.test.ts
+Check api/tests/private-fields.test.ts
+Check api/tests/ratelimit.test.ts
+Check api/tests/reviewer-nft.test.ts
+Check api/tests/reviews.test.ts
+Check api/tests/revisions.test.ts
+Check api/tests/routes.test.ts
+Check api/tests/rpc.test.ts
+Check api/tests/safe-api.test.ts
+Check api/tests/safe-deploy.test.ts
+Check api/tests/session-cookie.test.ts
+Check api/tests/session-lifecycle.test.ts
+Check api/tests/session-upgrade.test.ts
+Check api/tests/site-headers.test.ts
+Check api/tests/site.test.ts
+Check api/tests/sitelock.test.ts
+Check api/tests/slug-reuse.test.ts
+Check api/tests/smoke.test.ts
+Check api/tests/status-index.test.ts
+Check api/tests/structured.test.ts
+Check api/tests/support.test.ts
+Check api/tests/terms.test.ts
+Check api/tests/vote-active.test.ts
+Check api/tests/vote-chain-states.test.ts
+Check api/tests/vote-chain.test.ts
+Check api/tests/vote-config.test.ts
+Check api/tests/vote-corrections.test.ts
+Check api/tests/vote-llms.test.ts
+Check api/tests/vote-pinned.test.ts
+Check api/tests/vote-replay.test.ts
+Check api/tests/vote-round-read.test.ts
+Check api/tests/vote-round.test.ts
+Check api/tests/vote.test.ts
+Check api/tests/watchlist.test.ts
+Check api/tests/write-fields.test.ts
+running 33 tests from ./api/tests/admin-pledges-vote.test.ts
+pledgeOnChain: the real vote, before it closes, for an initiative in the round ... ok (15ms)
+admin pledges: outside the real vote a pledge saves as today ... ok (51ms)
+admin pledges: an initiative outside the round saves as today ... ok (43ms)
+admin pledges: during the real vote a pledge without a signature is refused and nothing is saved ... ok (20ms)
+admin pledges: a signed pledge is relayed and then saved ... ok (33ms)
+admin pledges: a signed pledge is answered at once, without waiting for its receipt ... ok (30ms)
+admin pledges: a pledge whose transaction reverts is not saved ... ok (25ms)
+admin pledges: a pledge refused before its broadcast answers 502 and keeps nothing ... ok (20ms)
+admin pledges: the same signature sent twice saves one pledge ... ok (31ms)
+admin pledges: a second signature with a used nonce fails on the nonce and saves nothing ... ok (40ms)
+admin pledges: a pledge id already used by another initiative's pledge is refused ... ok (20ms)
+admin pledges: a timed-out pledge that lands later is saved on the next read ... ok (21ms)
+admin pledges: a timed-out pledge that reverts later is dropped ... ok (16ms)
+admin pledges: a retry waits for the change in flight and never sends a second one ... ok (23ms)
+admin pledges: a signature from another wallet is refused ... ok (14ms)
+admin pledges: a signature over another amount than the one sent is refused ... ok (13ms)
+admin pledges: a deadline past the ten minutes is refused ... ok (9ms)
+admin pledges: marking a pledge received sends amount 0 ... ok (17ms)
+admin pledges: removing a pledge sends amount 0 and removes it ... ok (15ms)
+admin pledges: a node that loses the transaction or errors never drops a change that lands ... ok (20ms)
+admin pledges: settle says failed once the change can no longer land ... ok (16ms)
+admin pledges: settle says failed once another signature used the nonce ... ok (14ms)
+admin pledges: settle after the page load applied it says saved ... ok (17ms)
+admin pledges: settle with no record or outcome for the hash reports the transaction, with no row ... ok (9ms)
+admin pledges: settle with a hash other than the record's leaves that record alone ... ok (18ms)
+admin pledges: a send with no hash that can no longer land settles as failed from its kept outcome ... ok (17ms)
+admin pledges: a change is dropped once it can no longer land ... ok (17ms)
+admin pledges: a change whose nonce another signature used is dropped ... ok (16ms)
+admin pledges: a send that fails after its broadcast keeps the change, saved when it lands ... ok (19ms)
+admin pledges: after the round closes a write settles the change left in flight first ... ok (19ms)
+admin pledges: a pledge id on its way for another initiative is refused ... ok (17ms)
+admin pledges: a request that dies while applying a landed change leaves it, applied once later ... ok (10ms)
+admin pledges: settling reads the nonce and the pledge at one block ... ok (16ms)
+running 1 test from ./api/tests/admin-reauth.test.ts
+sensitive admin changes reject stale authentication before any side effect ... ok (84ms)
+running 2 tests from ./api/tests/admin-todo.test.ts
+todo: submissions oldest first, waiting edits, held comments; no chain or Safe calls ... ok (77ms)
+todo: admins only ... ok (10ms)
+running 4 tests from ./api/tests/admins-concurrency.test.ts
+admins: an overlapping addition cannot restore a successfully removed wallet ... ok (41ms)
+admins: overlapping additions preserve both wallets ... ok (9ms)
+admins: overlapping removals preserve both revocations ... ok (8ms)
+admins: overlapping additions of the same wallet have one winner ... ok (4ms)
+running 2 tests from ./api/tests/admins.test.ts
+admins: env addresses are fixed, dashboard changes invalidate existing sessions ... ok (63ms)
+admins: a dashboard admin gets the ADMIN role tag and an admin session at sign-in ... ok (15ms)
+running 3 tests from ./api/tests/affiliations.test.ts
+admin sets affiliations; an RFP's affiliations are refused ... ok (48ms)
+affiliations appear in no public page or feed; /api/initiatives/affiliations lists them ... ok (32ms)
+content: affiliations parse; an RFP with affiliations is an error ... ok (7ms)
+running 10 tests from ./api/tests/audit.test.ts
+audit: verified login, reauthentication and revocation emit structured safe metadata ... ok (48ms)
+audit: auth failures, early Origin denials, validation and throttling exclude raw input ... ok (8ms)
+audit: admin changes and mixed bulk outcomes identify each item without private content ... ok (8ms)
+audit: an admin's edit through the proposer's routes is recorded, a proposer's is not ... ok (7ms)
+audit: controlled test requires a recently authenticated admin and history is unavailable ... ok (5ms)
+audit: each session revocation mode records actor, target and success ... ok (7ms)
+audit: events are logged without touching KV ... ok (3ms)
+audit: unexpected failures emit metadata without raw errors and request data ... ok (1ms)
+audit: logger failures do not block mutations or change their responses ... ok (8ms)
+audit: logo replacement and reuse identify the target without logging its name ...Check api/lib/image-worker.ts
+ ok (945ms)
+running 2 tests from ./api/tests/backup-vote.test.ts
+backup during a relayer send excludes transient vote records and keeps durable votes ... ok (44ms)
+merge and replace restore skip historical vote leases and preserve an active destination lease ... ok (55ms)
+running 3 tests from ./api/tests/backup.test.ts
+backup: an admin downloads every record; secrets, TTL rows and the maintenance flag stay out ... ok (102ms)
+backup: restore is idempotent, only while paused, never deletes, and reproduces the pages ... ok (143ms)
+backup: a bad file is refused whole, and a big valid one fits ... ok (57ms)
+running 2 tests from ./api/tests/badge-holder.test.ts
+auth/me: isBadgeHolder follows the badge check behind the EXPERT role ... ok (56ms)
+badges: which of the addresses hold the badge, lowercase ... ok (13ms)
+running 2 tests from ./api/tests/bench.test.ts
+bench: percentile interpolates over sorted samples ... ok (1ms)
+bench: runBench samples each path and reports wire bytes ... ok (12ms)
+running 12 tests from ./api/tests/board-cache.test.ts
+snapshot cache: builds once inside the window, again after it ... ok (14ms)
+snapshot cache: concurrent readers share one build ... ok (452µs)
+snapshot cache: a build already running when the cache is cleared is not kept ... ok (281µs)
+snapshot cache: rebuild always builds, replaces the value and restarts the window ... ok (151µs)
+snapshot cache: a rebuild running when the cache is cleared is not kept ... ok (164µs)
+snapshot cache: a failed build is not kept ... ok (1ms)
+snapshot cache: zero seconds builds on every read ... ok (130µs)
+board cache: a repeat read inside the window is the saved board, then it is rebuilt ... ok (45ms)
+board cache: a write through the API drops the saved board ... ok (20ms)
+board cache: ?refresh=1 rebuilds and replaces the saved board ... ok (16ms)
+board cache: BOARD_CACHE_SECS=0 turns it off ... ok (9ms)
+board cache: on for 5 seconds unless configured ... ok (485µs)
+running 9 tests from ./api/tests/board.test.ts
+backers: open pledges plus the distinct addresses that donated ... ok (863µs)
+backers: a donor who gave twice is one backer, whatever the address casing ... ok (143µs)
+backers: a received pledge is counted through its donation, not twice ... ok (153µs)
+backers: a donation with no sender on record adds nobody ... ok (100µs)
+sponsors: one row per company across initiatives, biggest total first ... ok (657µs)
+sponsors: withdrawn and empty pledges do not count, all the rest are listed ... ok (210µs)
+sponsors: the response stays bounded at 50 ... ok (199µs)
+sponsors: the name shown is the biggest pledge's spelling ... ok (81µs)
+sponsors: a slot takes $5,000 pledged in total, across initiatives ... ok (163µs)
+running 4 tests from ./api/tests/card-summary.test.ts
+card summary: built from the rows once, reused until a pledge or donation write ... ok (35ms)
+card summary: a copy built from rows older than the last write is not reused ... ok (6ms)
+card summary: many at once, in the order asked, misses built alongside hits ... ok (14ms)
+card summary: a restore drops every copy, since it writes the rows without a version ... ok (9ms)
+running 8 tests from ./api/tests/categories.test.ts
+readCategories: 1 to 3 unique registry slugs, first is primary ... ok (5ms)
+aiFilterCategories: registry slugs only, no repeats, at most 3 ... ok (113µs)
+submit: categories are required and validated, then stored and shown ... ok (28ms)
+db: categories are written with a revision and snapshotted in it, never patched ... ok (4ms)
+admin: categories change through a revision in every status; approve needs one ... ok (20ms)
+proposer: categories change only with a revision, while the text is editable ... ok (15ms)
+board and page: categories on cards and the public initiative; legacy rows show none ... ok (7ms)
+ai-categories: mocked provider, bogus slugs dropped, needs text, disabled ... ok (6ms)
+running 3 tests from ./api/tests/chain-state.test.ts
+chain state: a new instance adopts the saved token check instead of asking for a refresh ... ok (24ms)
+chain state: a check that verified no token is not shared ... ok (4ms)
+chain state: a check saved under another token config is not adopted ... ok (3ms)
+running 21 tests from ./api/tests/chain.test.ts
+keccak constants match published values ... ok (536µs)
+EIP-55 reference vectors and config addresses ... ok (764µs)
+verifyDonationTx: valid USDC transfer ... ok (487µs)
+verifyDonationTx: 18-decimal DAI ... ok (138µs)
+verifyDonationTx: rejects wrong recipient, unknown token, revert, zero ... ok (133µs)
+verifyDonationTx: pending / not found / malformed ... ok (43µs)
+verifyDonationTx: sums same-token transfers, notes extra tokens, dust floor ... ok (70µs)
+verifyDonationTx: confirmation depth ... ok (47µs)
+verifyDonationTx: shared head failure stays pending without a separate RPC lookup ... ok (251µs)
+verifyDonationTx: native ETH ... ok (547µs)
+usdRate: stables are 1, feeds via Chainlink, guards ... ok (609µs)
+Safe setup / createProxy encoding layout ... ok (402µs)
+verifySafe checks owner set, threshold, singleton, handler ... ok (484µs)
+signersConfigured validation ... ok (89µs)
+recoverPersonalSign: known-good vectors, wrong sig, malformed, local wallet ... ok (14ms)
+SIWE parser: spec example, no-statement form, rejects junk ... ok (3ms)
+verifySiwe: happy path and each rejection ... ok (9ms)
+encodeIsValidSignature matches viem's ABI encoding ... ok (868µs)
+verifySiwe: EIP-1271 fallback for contract accounts ... ok (1ms)
+verifySiwe: a valid EOA signature never touches the rpc ... ok (1ms)
+predictSafeAddress matches a Safe deployed from the panel on mainnet ... ok (1ms)
+running 2 tests from ./api/tests/cold-snapshot.test.ts
+cold snapshot: donations stay enabled until the token check has run ... ok (30ms)
+a token check that ran and verified nothing disables donations ... ok (9ms)
+running 11 tests from ./api/tests/comments.test.ts
+comment claim rotation cannot be overwritten by a concurrent review ... ok (30ms)
+comment claims: POST only, bounded input, rotation, expiry and moderation revocation ... ok (26ms)
+comments: anonymous needs a name; without AI, anon posts are held with a private claim token ... ok (16ms)
+new comments are generic and cannot collect categories, topics or email ... ok (10ms)
+AI screen: constructive publishes, unclear holds, spam discards but looks held, failure holds ... ok (46ms)
+voting badge holders skip the review queue for comments and replies, unlabelled ... ok (17ms)
+roles: fast lane, starting vote, eligibility, replies, ordering, featured cap ... ok (86ms)
+EXPERT is a live role: a separate request says who holds the badge, and the comment list never asks the chain ... ok (37ms)
+two-tier ordering: featured (newest featured first), then votes, then newest ... ok (492µs)
+names: .eth is only allowed as the poster's own ENS name ... ok (33ms)
+comments: a name past its cap is refused as too long, never cut ... ok (8ms)
+running 1 test from ./api/tests/compress.test.ts
+api: JSON is gzipped when the client accepts it, unchanged otherwise ... ok (27ms)
+running 4 tests from ./api/tests/content-caps.test.ts
+content: a section past its cap is a sync error, not a cut ... ok (1ms)
+content: a milestone link or a page link past the cap is a sync error ... ok (590µs)
+content: the recipient link has the same cap as the form ... ok (607µs)
+content: a backer organisation past the cap uses the shared wording ... ok (159µs)
+running 1 test from ./api/tests/csp.test.ts
+CSP reports are bounded and redacted, and do not refresh sessions ... ok (39ms)
+running 3 tests from ./api/tests/daily-cache.test.ts
+daily cache: only the exact production timeline may access KV or upstream services ... ok (19ms)
+daily cache: production refreshes approved Safes, persists both caches, and skips fresh data ... ok (49ms)
+daily cache: visitor refreshes share the scheduled job's ledger and balance leases ... ok (17ms)
+running 10 tests from ./api/tests/db.test.ts
+rfps: slug uniqueness, lookup, list order, update guard ... ok (17ms)
+rfps: a Safe address belongs to exactly one initiative ... ok (5ms)
+rfps: content upsert never touches lifecycle or money ... ok (5ms)
+rfps: revise ignores reordered or trimmed structured text, refuses details+sections ... ok (7ms)
+donations: one tx credits two initiatives, idempotent, pending->confirmed ... ok (6ms)
+pledges: totals count open pledges only, not received or withdrawn ... ok (6ms)
+comments: author starting vote, toggle, switch, ordering data, claim tokens ... ok (8ms)
+profiles: nickname uniqueness is case-insensitive, pfp independent ... ok (3ms)
+sessions + nonces: single-use nonce, expiry, revoke all ... ok (8ms)
+rate limit windows, locks, ai budget ... ok (104ms)
+running 2 tests from ./api/tests/donation-errors.test.ts
+donation pricing failures stay generic in confirmation, storage and public status ... ok (69ms)
+Safe indexer pricing failures never persist upstream error text ... ok (8ms)
+running 2 tests from ./api/tests/donation-minimum.test.ts
+Safe sync enforces the ETH minimum for direct and internal transfers ... ok (71ms)
+Safe indexer data cannot override reverted or unknown RPC transactions ... ok (10ms)
+running 5 tests from ./api/tests/donation-retry.test.ts
+public status polling respects retry backoff and reports retirement of unknown hashes ... ok (63ms)
+board retries a bounded backlog, shares cooldown and eventually reaches every hash ... ok (79ms)
+pending retry scan bounds KV work and progresses past final rows ... ok (29ms)
+retry deadline resumes at the first unchecked row and applies per-row backoff ... ok (8ms)
+unknown hashes retire while observed, delayed and temporarily unreachable transactions can recover ... ok (12ms)
+running 2 tests from ./api/tests/donation-senders.test.ts
+ERC-20 batches preserve funding without assigning mixed senders to one donor ... ok (56ms)
+internal ETH batches do not assign every sender's credit to the first indexer row ... ok (6ms)
+running 2 tests from ./api/tests/ens-ccip.test.ts
+ENS: direct and nested CCIP gateways never become server HTTP requests ...
+  direct: http://127.0.0.1:8888/internal/{data} ... ok (134ms)
+  direct: http://[::1]/internal/{data} ... ok (6ms)
+  direct: http://169.254.169.254/metadata ... ok (5ms)
+  direct: https://attacker.example/gateway ... ok (7ms)
+  local batch: http://127.0.0.1:8888/internal/{data} ... ok (4ms)
+  local batch: http://[::1]/internal/{data} ... ok (3ms)
+  local batch: http://169.254.169.254/metadata ... ok (4ms)
+  local batch: https://attacker.example/gateway ... ok (4ms)
+ENS: direct and nested CCIP gateways never become server HTTP requests ... ok (173ms)
+ENS: disabling CCIP still resolves an ordinary on-chain address ... ok (1ms)
+running 6 tests from ./api/tests/ens.test.ts
+ens: on-chain name + avatar, forward-verified, ensdata never asked ... ok (6ms)
+ens: a name whose forward record points elsewhere is not shown ... ok (140µs)
+ens: non-https avatars are dropped and a broken avatar record keeps the name ... ok (291µs)
+ens: an authoritative on-chain 'no name' does not fall back to ensdata ... ok (78µs)
+ens: when the chain cannot be asked, ensdata answers and the failure is logged ... ok (4ms)
+ens: both sources down fails closed and is cached ... ok (841µs)
+running 3 tests from ./api/tests/eventual-reads.test.ts
+eventual reads: public pages read eventually when enabled, writes stay strong ... ok (42ms)
+eventual reads: off by default ... ok (9ms)
+eventual reads: a card summary is built from strong reads and served from eventual ones ... ok (5ms)
+running 5 tests from ./api/tests/feeds.test.ts
+feeds: approved only, allowlisted fields, open CORS, cache and ETag ... ok (71ms)
+initiatives.json: shape, totals, filters by type, category and status ... ok (21ms)
+markdown file: feed facts in front matter, still syncs back, approved rows only ... ok (27ms)
+feed cache: built once and shared through KV, dropped by a write, aged out elsewhere ... ok (43ms)
+feed build: pledges come from the card summaries, not a read per initiative ... ok (51ms)
+running 11 tests from ./api/tests/forum.test.ts
+submit never fetches a discussion URL: https://forum.example.com//127.0.0.1:8443/admin ... ok (82ms)
+submit never fetches a discussion URL: https://forum.example.com///169.254.169.254/latest/meta-data ... ok (29ms)
+submit never fetches a discussion URL: https://forum.example.com//[::1]:8443/admin ... ok (16ms)
+submit never fetches a discussion URL: https://forum.example.com/\127.0.0.1:8443/admin ... ok (20ms)
+submit never fetches a discussion URL: https://127.0.0.1:8443/admin ... ok (15ms)
+submit never fetches a discussion URL: https://10.0.0.1/admin ... ok (14ms)
+submit never fetches a discussion URL: https://[::1]/admin ... ok (12ms)
+submit never fetches a discussion URL: https://[::ffff:127.0.0.1]/admin ... ok (12ms)
+submit never fetches a discussion URL: https://forum.example.com/redirect-to-private ... ok (46ms)
+submit never fetches a discussion URL: https://rebind.example.com/t/topic/123 ... ok (11ms)
+submit: a private DNS result rejects a discussion link without fetching it ... ok (6ms)
+running 9 tests from ./api/tests/funding.test.ts
+funding: settings and cold snapshots do not read balances; the ledger is the first fallback ... ok (63ms)
+funding: old values return during a slow refresh, with one lease across instances ... ok (29ms)
+funding: expired lease recovers and its late worker cannot overwrite the new snapshot ... ok (9ms)
+funding: 30-second board polls share one two-minute refresh across 19 Safes ... ok (140ms)
+funding: a newly confirmed donation invalidates only its Safe, repeated confirms do not ... ok (26ms)
+funding: raised comes from the Safe's balances, priced by the feeds, plus paid out ... ok (44ms)
+funding: shared snapshot, explicit refresh, failure cooldown, ledger without a Safe ... ok (48ms)
+funding: the page says when the ledger was last checked and whether it needs refreshing ... ok (18ms)
+config: ALCHEMY_API_KEY adds an Alchemy RPC ahead of the public endpoints, after RPC_URL ... ok (482µs)
+running 3 tests from ./api/tests/images.test.ts
+uploads decode and re-encode all supported formats and strip metadata/appended bytes ...Check api/lib/image-worker.ts
+ ok (1s)
+the decoder is initialised once per process and reused, so a deadline only covers decoding ...Check api/lib/image-worker.ts
+ ok (668ms)
+invalid, truncated, unsupported and oversized-dimension images never reach the upload provider ...Check api/lib/image-worker.ts
+ ok (699ms)
+running 6 tests from ./api/tests/ip.test.ts
+client IP: canonical forms cannot create distinct quota identities ... ok (6ms)
+client IP: real server dispatch preserves distinct socket peers and ignores spoofed forwarding ... ok (2ms)
+client IP: missing identity fails IP-limited routes closed without consuming a shared quota ... ok (17ms)
+client IP: socket peers have independent quotas; IPv4-mapped aliases share one ... ok (23ms)
+client IP: global quotas remain effective when clients change addresses ... ok (5ms)
+client IP: IPv6 peers share one quota per /64 and get a fresh one per prefix ... ok (36ms)
+running 1 test from ./api/tests/kv-depth.test.ts
+kv depth: the board and the initiative page stay within a few round trips ... ok (1s)
+running 11 tests from ./api/tests/ledger.test.ts
+ledger: snapshot first, refresh saves donations to KV, fresh visits do no upstream work ... ok (68ms)
+ledger: concurrent visitors share a KV lease and see saved donations while updating ... ok (21ms)
+ledger: failures preserve saved rows and share a retry cooldown ... ok (12ms)
+ledger: an expired lease recovers and its late worker cannot overwrite the new cursor ... ok (8ms)
+ledger: page refresh retries only that initiative's pending donations ... ok (6ms)
+ledger: board refreshes visible Safes and reuses the result on initiative pages ... ok (29ms)
+ledger: cache lifetime replaces the old schedule configuration ... ok (847µs)
+ledger: an incomplete backfill resumes after the short cooldown while viewed ... ok (8ms)
+ledger: failures in a row double the cooldown up to 30 minutes, a success resets it ... ok (11ms)
+ledger: a 429 pauses every Safe and quiets their refresh flags, doubling while it repeats ... ok (12ms)
+ledger: 429s from parallel lanes count as one pause ... ok (47ms)
+running 4 tests from ./api/tests/maintenance.test.ts
+maintenance: admins toggle it with recent authentication; the change is audited ... ok (41ms)
+maintenance: every write answers 503, sign-in and the admin controls keep working, reads are untouched ... ok (46ms)
+maintenance: background refreshes reachable from reads and the cron stay quiet ... ok (22ms)
+maintenance: another isolate sees the change within the cache window ... ok (6ms)
+running 7 tests from ./api/tests/moderation.test.ts
+AI screen: a provider that refuses response_format is asked again without it, once ... ok (27ms)
+AI screen: a failure is retried once, then held with the reason ... ok (13ms)
+AI screen: bad JSON and invalid verdicts say so ... ok (22ms)
+parseJsonObject reads bare, fenced and wrapped objects and rejects the rest ... ok (777µs)
+AI screen: spam on a link-only comment is held for a person, other spam is dropped ... ok (12ms)
+re-run AI screen: held rows only, stores the new answer, never publishes ... ok (42ms)
+dashboard: a held reply shows its parent and what the board knows about the author ... ok (17ms)
+running 3 tests from ./api/tests/origin.test.ts
+selfOrigin: platform hosts only; forwarding headers cannot change the scheme ... ok (4ms)
+config: WEB_ORIGIN entries are normalized to bare origins (trailing slash, path, case) ... ok (162µs)
+config: WEB_ORIGIN falls back to VITE_SITE_URL's origin, then localhost ... ok (98µs)
+running 22 tests from ./api/tests/pending-revisions.test.ts
+a proposer's edit to an approved initiative is held: the approved version stays live ... ok (51ms)
+a held or rejected edit is for its proposer and the admins only ... ok (30ms)
+accept makes the held edit live; reject leaves the live text alone; both clear the wait ... ok (16ms)
+a second edit while one waits supersedes the first ... ok (41ms)
+admin edits, and proposer edits to a pending initiative, still go live at once ... ok (18ms)
+revisions written before states existed read as live ... ok (6ms)
+held edits count against the proposer's hourly cap ... ok (68ms)
+my initiatives: an edit in review, then the note when it was turned down ... ok (17ms)
+a row older than revisions: the held edit still snapshots the live text as revision 1 ... ok (4ms)
+whether an edit is held is decided on the row as written, not as the request read it ... ok (3ms)
+a change landing between the request's check and its write is seen by the write ... ok (8ms)
+the page facts lock with the approval, even one that lands mid-request ... ok (7ms)
+a held edit may change the goal with the milestones; accepting it moves the goal (#71) ... ok (16ms)
+a rejected goal change leaves the goal alone, and an edit that keeps the goal stores none (#71) ... ok (19ms)
+a goal change alone is an edit, and a bad goal is refused (#71) ... ok (16ms)
+an admin's text edit to an initiative they proposed is held like any proposer's ... ok (23ms)
+another admin accepts it, and the proposing admin may too ... ok (49ms)
+an admin proposer retags directly, unless their own edit is waiting ... ok (24ms)
+an admin proposer's edits to a pending initiative go live ... ok (9ms)
+an admin's edit to someone else's approved initiative still goes live ... ok (11ms)
+an admin proposer's held edit may carry the goal; accepting moves it ... ok (19ms)
+an admin proposer is recognised whatever the letter case of their address ... ok (12ms)
+running 3 tests from ./api/tests/prefix.test.ts
+prefixedKv: empty prefix returns the bare handle ... ok (3ms)
+prefixedKv: two prefixes on one database never collide ... ok (3ms)
+prefixedKv: repos on separate prefixes see separate data ... ok (2ms)
+running 3 tests from ./api/tests/private-fields.test.ts
+private fields: stale admin reads and harmless edits cannot bypass the leads gate ... ok (54ms)
+private fields: older proposer can edit their own pending row; other users read it without them ... ok (6ms)
+private fields: freshness and proposer ownership are checked again inside the write ... ok (7ms)
+running 13 tests from ./api/tests/ratelimit.test.ts
+rate limit mode: enforce by default, RATE_LIMIT_MODE selects observe or off ... ok (6ms)
+rate limit mode: the retired DISABLE_RATE_LIMITS variable is ignored ... ok (212µs)
+rate limit mode: a misspelt mode stops the app instead of silently enforcing ... ok (581µs)
+rate limiter: observe mode counts, allows past the cap and logs the breach once per window ... ok (14ms)
+rate limiter: enforce mode refuses past the cap and logs the breach as enforced ... ok (2ms)
+rate limiter: off mode neither counts nor logs ... ok (1ms)
+rate limiter: observe mode still refuses buckets listed as always enforced ... ok (1ms)
+rate limiter: the default mode is enforce and a missing logger is fine ... ok (1ms)
+rate limiter: the breach line is one JSON object with a stable shape ... ok (1ms)
+RATE_LIMIT_MODE=observe: a public quota past its cap is reported through the app logger, not refused ... ok (27ms)
+RATE_LIMIT_MODE=observe: submissions, support and uploads keep their caps ... ok (45ms)
+RATE_LIMIT_MODE=off: nothing is counted or reported ... ok (22ms)
+bootstrap log: structured JSON lines reach the console unprefixed, plain text is timestamped ... ok (171µs)
+running 3 tests from ./api/tests/reviewer-nft.test.ts
+review NFTs: indexed candidates are deduplicated and current ownerOf decides ownership ... ok (8ms)
+review NFTs: malformed or failed chain responses never grant ownership ... ok (685µs)
+review NFTs: follows index pages, ignores other contracts, and verifies stale candidates ... ok (415µs)
+running 19 tests from ./api/tests/reviews.test.ts
+reviews: public reads are open; signed-out writes are 401 and non-holder writes are 403 ... ok (51ms)
+reviews: each NFT's latest review counts; average and distribution ... ok (21ms)
+ratings: only initiatives on the board (approved or archived) are listed ... ok (7ms)
+reviews: deleting the latest brings back the previous; only the author deletes ... ok (23ms)
+reviews: bad stars, long text and non-board initiatives are rejected ... ok (15ms)
+reviews: nothing reaches the board, the comments or the feeds ... ok (52ms)
+reviews: the backup carries reviews and ratings ... ok (159µs)
+ratings: the average as it will be with the viewer's pick ... ok (212µs)
+reviews: a non-admin holder can review; admins without the NFT cannot ... ok (11ms)
+reviews: transferring an NFT replaces its rating instead of adding a reviewer ... ok (12ms)
+reviews: legacy admin keys are excluded from lists and averages ... ok (6ms)
+reviews: ownership lookup failure refuses writes and stores nothing ... ok (5ms)
+reviews: concurrent writes for the same NFT leave one current rating ... ok (4ms)
+reviews: public reads include badge reviews without relying on NFT services ... ok (14ms)
+identity: a holder's lookup is reused for five minutes ... ok (8ms)
+identity: a non-holder who gets a badge sees it within a minute ... ok (9ms)
+identity: the cache never authorizes a write ... ok (12ms)
+identity: a failed lookup is not cached ... ok (10ms)
+identity: while the index is down, the last lookup answers ... ok (12ms)
+running 7 tests from ./api/tests/revisions.test.ts
+submit writes revision 1; the proposer's edit, once accepted, is revision 2 ... ok (72ms)
+pending initiative: anyone with the link reads it, noindex; only its proposer and admins edit ... ok (23ms)
+team edits: an admin uses the edit routes; text is an admin revision, facts are not ... ok (20ms)
+the hourly revision cap stops a proposer, not an admin ... ok (35ms)
+content sync: an unchanged file adds no revision, a changed one does ... ok (18ms)
+archive: hides a superseded revision publicly, never the current one, reversible ... ok (27ms)
+legacy rows: the first edit snapshots the old text as revision 1 ... ok (7ms)
+running 21 tests from ./api/tests/routes.test.ts
+content sync publishes the repo files as structured rows; public JSON never leaks private fields ... ok (128ms)
+board ordering: pins first, then money, then newest ... ok (8ms)
+submit: needs a signed-in wallet with a display name; records the proposer ... ok (35ms)
+submit: validation, honeypot, rate limit, pending never on board ... ok (38ms)
+mine: a proposer lists and opens their own submissions, rejected ones only for them and admins ... ok (47ms)
+SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, logout ... ok (28ms)
+origin guard and CORS ... ok (3ms)
+donate: params, confirm, status, totals ... ok (42ms)
+profile: nickname rules, .eth ownership, pfp presets and upload ...Check api/lib/image-worker.ts
+ ok (775ms)
+admin: settings, status, pledges with logo, safe deploy params + confirm, comments actions ... ok (47ms)
+ai-search: accepts zk in either provider mode but rejects other short queries ... ok (29ms)
+ai-search: Jev scores every proposal, caches content, and has its own key ... ok (25ms)
+ai-search: Jev scores a board too large for one request in batches ... ok (18ms)
+ai-search: disabling TypeSafe uses the configured LLM and scores the whole board ... ok (6ms)
+ai-search: LLM mode requires its key and rejects missing or malformed scores ... ok (33ms)
+ai-search: invalid or missing Jev scores fail without caching partial rankings ... ok (27ms)
+submit: discussion links are stored without fetching; title is required ... ok (8ms)
+content backers: file pledges are created once, kept in step, never own the status ... ok (44ms)
+page facts: content keys sync, an admin's patch validates and clears per type ... ok (52ms)
+RATE_LIMIT_MODE=off: the submit limit stops counting ... ok (18ms)
+submit: a discussion link past the form's cap is too long, not silently accepted ... ok (9ms)
+running 2 tests from ./api/tests/rpc.test.ts
+RPC failures omit endpoint credentials, provider payloads and fetch exceptions ... ok (5ms)
+RPC failover still reuses the last successful endpoint ... ok (333µs)
+running 7 tests from ./api/tests/safe-api.test.ts
+safe sync: groups rows per tx, verifies over RPC, sends bearer, incremental stop, ETH fallback, 429 ... ok (37ms)
+safe sync: shallow transfers wait for confirmations, pending rows get re-verified ... ok (7ms)
+safe refresh: 19 idle Safes use zero RPC, including unaccepted transfers and API errors ... ok (19ms)
+safe refresh: one head serves all Safes and pending receipts, with a fresh head next run ... ok (8ms)
+safe refresh: a failed head is shared, preserves cursors, and retries next run ... ok (6ms)
+safe sync: a time budget cuts a backfill short, progress persists, the next run completes ... ok (23ms)
+safe sync: a failed manual verification does not block the indexer fallback ... ok (15ms)
+running 6 tests from ./api/tests/safe-deploy.test.ts
+approval needs a deployed Safe: the panel targets the predicted address, safe-confirm binds it once it exists ... ok (61ms)
+a contract at the predicted address that is not our Safe is rejected, never bound ... ok (7ms)
+a Safe held by another initiative cannot be reassigned or detached through the editor ... ok (14ms)
+page refresh only syncs initiatives with a Safe; it never assigns one ... ok (8ms)
+bulk approve: rows without a Safe fail one by one, the rest land ... ok (14ms)
+a Safe already on-chain but not yet bound: the panel reports it deployed, so no second (reverting) factory tx ... ok (8ms)
+running 7 tests from ./api/tests/session-cookie.test.ts
+verify with cookie: true sets an HttpOnly cookie and omits the token ... ok (55ms)
+verify without cookie: true still returns the token and sets no cookie ... ok (17ms)
+a bad signature gets 401 and no cookie, even with cookie: true ... ok (6ms)
+logout-all clears the cookie and revokes every session of the address ... ok (14ms)
+site lock: a valid session cookie passes, a stale one does not ... ok (14ms)
+cookie name: __Host- + Secure over https, plain over http, forwarding headers ignored ... ok (13ms)
+POST /api/auth/cookie: a pre-cookie bearer session gets its cookie, same expiry ... ok (13ms)
+running 10 tests from ./api/tests/session-lifecycle.test.ts
+reauthentication invalidates the presented bearer or cookie, and leaves other devices intact ... ok (62ms)
+idle deadlines slide with activity, absolute deadlines never do ... ok (8ms)
+administrator access is bounded by authentication privilege and its absolute limit ... ok (12ms)
+session inventory is private; remote termination needs fresh auth and checks ownership ... ok (14ms)
+administrator per-user and global revocation require recent privileged authentication ... ok (36ms)
+revocation wins a concurrent session activity write ... ok (8ms)
+partially upgraded session rows cannot acquire a fresh inactivity window ... ok (6ms)
+passive funding polls and preview-lock checks do not extend inactivity ... ok (25ms)
+promotion does not grant comment fast-lane or voting privileges to an ordinary session ... ok (21ms)
+administrator authorization ignores another instance's stale display snapshot after removal ... ok (3ms)
+running 8 tests from ./api/tests/session-upgrade.test.ts
+legacy localStorage bearer upgrades through the cookie exchange without signing in ... ok (32ms)
+existing legacy cookies retain only their original and currently authorized privilege ... ok (7ms)
+legacy upgrade initializes idle time once, even through passive site-lock reads ... ok (4ms)
+upgraded sessions slide idle time but keep the original or stricter absolute deadline ... ok (3ms)
+expired, malformed, and partially upgraded legacy rows cannot migrate or receive a cookie ... ok (10ms)
+any persisted wallet or global revocation marker prevents legacy migration ... ok (10ms)
+concurrent legacy upgrades converge on one session and repair its inventory entry ... ok (5ms)
+logout and wallet/global revocation win races against legacy upgrade writes ... ok (7ms)
+running 7 tests from ./api/tests/site-headers.test.ts
+site headers: every header is present and Cache-Control survives ... ok (20ms)
+site headers: report-only by default, full policy enforced with CSP_ENFORCE ... ok (1ms)
+config: CSP_ENFORCE flag ... ok (547µs)
+inline scripts: extracted without src, ignored with src ... ok (348µs)
+script hashes: 'sha256-<base64>' tokens, deduplicated across documents ... ok (2ms)
+collectScriptHashes: walks a directory of HTML; missing directory yields none ... ok (5ms)
+CSP connections only accept explicit secure deployment origins ... ok (1ms)
+running 12 tests from ./api/tests/site.test.ts
+site: only approved origins rewrite HTML, including hydration hashes ... ok (36ms)
+site: Hono serves pages, assets and SPA fallbacks without swallowing API routes ... ok (15ms)
+site: only an approved initiative's page is for search engines ... ok (16ms)
+site: static requests skip API sessions, auditing and CORS; API guards still run ... ok (8ms)
+site: the shared preview gate covers all routes and preserves session cookies ... ok (11ms)
+site: enforced CSP and shared headers cover static 404s and unexpected errors ... ok (11ms)
+site: Markdown downloads keep API authorization and never fall through to HTML ... ok (11ms)
+site: HEAD, conditional requests and ranges retain static-file semantics ... ok (7ms)
+site: a revalidated SPA URL answers for the shell, never with the board page ... ok (12ms)
+site: the combined app uses runtime IPs and rejects missing identity ... ok (11ms)
+site: built assets and pages are gzipped when the client accepts it ... ok (37ms)
+site: API answers carry the served build's version, so an open tab can tell it is behind ... ok (12ms)
+running 3 tests from ./api/tests/sitelock.test.ts
+site lock: off by default ... ok (19ms)
+site lock: basic -> cookie -> bearer session; healthz stays open ... ok (19ms)
+admin promotion requires fresh authentication; demotion removes access immediately ... ok (33ms)
+running 9 tests from ./api/tests/slug-reuse.test.ts
+slug transfer preserves legacy deployment, source identity, and all attached records ... ok (10ms)
+only an opted-in desired slug is reclaimable; archive URLs stay reserved ... ok (10ms)
+simultaneous claims have one clean URL; a competing unarchive cannot be overwritten ... ok (7ms)
+failed transfer transactions leave no partial archive, source binding, or replacement ... ok (6ms)
+unarchive recalculates from title, skips occupied slugs, and preserves archive aliases ... ok (10ms)
+unarchive retries a competing claim and freezes legacy salt before releasing a URL ... ok (7ms)
+content and backer resync keep the original ID across multiple replacements ... ok (31ms)
+submission reuses archived text and URL; approval and unarchive preserve both pages ... ok (116ms)
+reused URLs reject stale writes and admin slug actions; matching IDs and archive reads work ... ok (48ms)
+running 1 test from ./api/tests/smoke.test.ts
+healthz verifies tokens through the scripted rpc ... ok (21ms)
+running 4 tests from ./api/tests/status-index.test.ts
+status index: cards(status) equals a full scan after every kind of write ... ok (33ms)
+status index: rows from before the index are indexed on the first read, then the index is the source ... ok (4ms)
+status index: a restore drops the built mark so the index is rebuilt from the restored rows ... ok (7ms)
+status index: cards carry the grant's recipient team; an index from before it is rebuilt ... ok (11ms)
+running 21 tests from ./api/tests/structured.test.ts
+submit: the guide's example lands structured, with its backers as pledges ...Check api/lib/image-worker.ts
+ ok (843ms)
+submit: a missing section and a bad sum come back as findings, nothing is written ... ok (15ms)
+initiative writes reject retired amount/duration aliases without partial updates ... ok (27ms)
+submit: an all-done top-up needs no adoption milestone and warns instead ... ok (14ms)
+submit: rejected proposals still block the same text ... ok (17ms)
+submit: renaming a duplicate explains the match; revising its section text permits submission ... ok (12ms)
+submit: links must be https; the body has a byte cap ... ok (33ms)
+uploads: auth, disabled, junk, ok, rate limit; a CID someone else pinned is refused ... ok (108ms)
+proposer edit: structured revisions, unchanged, legacy body on a structured row ... ok (31ms)
+proposer edit: legacy text stays readable but edits must migrate to sections ... ok (15ms)
+proposer PATCH: page facts while pending, locked after approval, admin always ... ok (47ms)
+admin settings: a legacy row keeps its text, and text cannot ride along ... ok (12ms)
+bulk admin actions: initiatives and comments, per-id failures reported ... ok (27ms)
+GET /initiative/<slug>.md: the content-file shape, public rows only, round-trips ... ok (38ms)
+<slug>-PRIVATE.md: admins only, any status, carries contact and funders; admin API by slug ... ok (7ms)
+content logos: pinned once by name, mapped onto the pledge by the sync ... ok (19ms)
+admin pledges reject direct CIDs and amount aliases before changing data or uploading ... ok (13ms)
+pledge edit: PATCH takes the same fields as adding, including a new logo ... ok (23ms)
+edit: a top-up measures the adoption floor against the goal minus the stored pledges ... ok (17ms)
+caps: a long link, an edited long title and a long pledge company are refused with the message ... ok (23ms)
+team edit: an editorial finding and a field past its cap both block the save ... ok (6ms)
+running 17 tests from ./api/tests/support.test.ts
+support: pledge requests forward current initiative facts and every contact field ... ok (25ms)
+support: invalid or unpublished pledge requests never reach the relay ... ok (22ms)
+support: 503 until SUPPORT_URL is set ... ok (5ms)
+support: rejects an unknown category, an empty message and a bad email ... ok (6ms)
+support: forwards the tagged message, page URL and screenshot upstream ... ok (2ms)
+support: email and screenshot are optional; an off-site page is dropped ... ok (2ms)
+support: receipt requests forward the email and transaction through the existing relay ... ok (6ms)
+support: receipt requests require a valid email and an https transaction link ... ok (35ms)
+support: other categories reject receipt fields instead of dropping them ... ok (4ms)
+support: 502 when the upstream fails ... ok (4ms)
+support: 5 messages per hour per IP ... ok (9ms)
+support: the board's flags.support says whether the widget can show ... ok (8ms)
+support: a message past its cap is refused as too long, never cut ... ok (3ms)
+support: spam is tagged SPAM and still sent, with unknown link domains named ... ok (11ms)
+support: a genuine message gets its line and no SPAM tag ... ok (8ms)
+support: a failed screen still sends the message, with the reason ... ok (6ms)
+support: its own share of the AI budget, so comment moderation keeps the rest ... ok (38ms)
+running 12 tests from ./api/tests/terms.test.ts
+checkbox: records server time before transfer and correlates without authentication or signature ... ok (52ms)
+checkbox: rejects unknown/future versions, client timestamps, unchecked consent and malformed intents ... ok (14ms)
+checkbox: exchange fields are independently optional and private; hash is only visitor-reported ... ok (41ms)
+checkbox: other sessions cannot attach or read; a forged first claim cannot block another attempt ... ok (34ms)
+checkbox: pending/RPC failures queue matching and server retries survive browser closure and prior accounting ... ok (13ms)
+checkbox: mismatched sender, amount, token, older transfers and ambiguous receipts remain unmatched ... ok (61ms)
+checkbox: missing, reverted, shallow and wrong-recipient transfers never match ... ok (38ms)
+checkbox: forged origins, form posts, stale scopes and expired sessions are rejected ... ok (15ms)
+checkbox: direct confirmations credit transfers without inventing acceptance ... ok (3ms)
+admin leads: a row for every approved and pending initiative (blank leads allowed), rejected and archived only with leads, private, admin-only ... ok (11ms)
+checkbox: secure cookie is separate from login and oversized requests are refused ... ok (5ms)
+checkbox: native ETH matches and expired pending associations stop retrying ... ok (12ms)
+running 9 tests from ./api/tests/vote-active.test.ts
+active vote: the round admins set, re-read every few seconds; none set, no vote ... ok (7ms)
+admin vote round: the real vote's round can't change or go while it's open ... ok (27ms)
+active vote: none deployed and no test round is no vote ... ok (84µs)
+admin vote round: the pool note is admins' only, checked, and can be cleared ... ok (10ms)
+admin vote round: changes need a recent sign-in ... ok (7ms)
+admin vote round: a failed chain read doesn't show the RPC's URL ... ok (1s)
+boardRound: what the round is for every board, the whole of it once the real vote opens ... ok (535µs)
+vote manifest: kept a few seconds by the browser, a 304 when it hasn't changed ... ok (11ms)
+active vote refreshes configuration automatically and fails closed when refresh fails ... ok (797µs)
+running 16 tests from ./api/tests/vote-chain-states.test.ts
+a pruned RPC error on a past block propagates ... ok (17ms)
+stateAt: one multicall at that block; asks only for projects the contract has ... ok (1ms)
+stateAt: withdrawnMask bits become one flag per project ... ok (1ms)
+stateAt: a contract without withdrawnMask reads as nothing withdrawn ... ok (2ms)
+stateAt: a contract with more projects than the manifest is an error ... ok (997µs)
+blockBefore: the last block strictly before a time ... ok (379µs)
+replay refuses a pinned head replaced by a reorganization ... ok (278µs)
+native balances: a block where an account's ETH balance changed, one multicall per block ... ok (3ms)
+native balances: a second scan reads only new blocks and the last few again ... ok (17ms)
+ERC-20 balances: a Transfer to or from an account; others are not seen ... ok (2ms)
+accountingEventBlocks: blocks with a PledgeSet or PoolUsdSet from the round's contract ... ok (873µs)
+the KV cache isolates the same round address on different chains ... ok (6ms)
+corrections: balance scans follow active account periods, including native balances ... ok (4ms)
+valuation evidence distinguishes failed balance reads, fallbacks and retained precision ... ok (1ms)
+older contracts keep their asks and explicitly lack valuation diagnostics ... ok (1ms)
+stateAt and stateAtHash preserve an uninitialized pool ... ok (1ms)
+running 9 tests from ./api/tests/vote-chain.test.ts
+stampLogs: before S's first tally, no block lookups (the head's time bounds every log) ... ok (523µs)
+stampLogs: from S's first tally, one lookup per distinct block ... ok (220µs)
+Sepolia RPC: SEPOLIA_RPC_URL, else the public node — never the mainnet Alchemy app ... ok (8ms)
+a real round reads ownerOf from the voting badge, not the ballots contract ... ok (7ms)
+ownerOf: an unminted badge is free; other reverts and RPC failures propagate ... ok (6ms)
+asks: every project's initiativeUsd ask, in manifest order, in one multicall ... ok (2ms)
+canWithdraw: a contract with withdrawnMask can; one without (reverts, or no data) can't; a network failure throws ... ok (2s)
+blockTime: one read per block hash, shared across reads; a failed read is not kept ... ok (601µs)
+contract vote verification checks the owner's ERC-1271 magic value and exact typed digest ... ok (3ms)
+running 1 test from ./api/tests/vote-config.test.ts
+the vote relayer key: VOTE_RELAYER_KEY, else the old DEVCON_RELAYER_KEY ... ok (1ms)
+running 1 test from ./api/tests/vote-corrections.test.ts
+correction batches require admins, fresh authentication, current settings and valid inputs ... ok (43ms)
+running 22 tests from ./api/tests/vote-llms.test.ts
+vote llms: lists every round project with type, amounts and affiliations ... ok (5ms)
+vote llms: states the rules with the pool's 1.5× in dollars ... ok (451µs)
+vote llms: voting eligibility, first-ballot cutoff and revisions ... ok (45µs)
+vote llms: the configured schedule and quiet-ending rules ... ok (39µs)
+vote llms: A-Tier enforcement changes both the rules and the drafting checklist ... ok (210µs)
+vote llms: the minimum never rounds below the required micro-USD ... ok (201µs)
+vote llms: the 15-project minimum agrees with validation and is reachable ... ok (995µs)
+vote llms: donations and withdrawals reduce the minimum, fully funded asks add zero ... ok (334µs)
+vote llms: missing asks or withdrawal status never produce a guessed minimum ... ok (334µs)
+vote llms: the route serves the capped minimum from asks and the replay's withdrawals ... ok (3ms)
+vote llms: a draft must use unique known slugs and pass validation ... ok (40µs)
+vote llms: the format example parses ... ok (16ms)
+vote llms: 404 without a round ... ok (10ms)
+vote llms: served as plain text, cached like the other feeds ... ok (8ms)
+vote llms: the route passes the chain asks ... ok (4ms)
+vote llms: a round from before the ballot rules states none ... ok (474µs)
+vote llms: the rules count asks at the recording block ... ok (85µs)
+vote llms: each project lists its chain ask ... ok (453µs)
+vote llms: a withdrawn initiative is marked withdrawn: true, the times stay ISO UTC ... ok (298µs)
+vote llms: withdrawn unknown says so, apart from none withdrawn ... ok (449µs)
+vote llms: the route says withdrawn is unknown when the replay can't be read ... ok (7ms)
+withdrawnNow: the replay's live list, null on a failure or past the wait ... ok (12ms)
+running 4 tests from ./api/tests/vote-pinned.test.ts
+pinned: the same round as the unpinned reads, in far fewer calls ... ok (51ms)
+pinned: ballot times come with the logs; without them, each block is read once per isolate ... ok (16ms)
+pinned: a head that is no longer canonical is refused ... ok (1ms)
+pinned: the next pin reads the logs after the finalized block, and searches nothing again ... ok (17ms)
+running 5 tests from ./api/tests/vote-replay.test.ts
+the script and the API agree on the same fake chain ... ok (54ms)
+the script and API agree despite an incorrect stored settlement ... ok (13ms)
+the script exits non-zero when a past block cannot be read ... ok (1ms)
+the script needs an archive RPC ... ok (337µs)
+wallet and goal corrections reproduce settled awards in the API, cached replay and CLI ... ok (16ms)
+running 5 tests from ./api/tests/vote-round-read.test.ts
+readRoundOnChain: dates, pool, initiatives, affiliations, currencies and the deploy block ... ok (10ms)
+readRoundOnChain: an address with no contract is said so ... ok (1ms)
+corrections refresh uses a pinned head and keeps initiative identity after wallet edits ... ok (4ms)
+old rounds without configuration revisions remain readable ... ok (3ms)
+refresh reuses canonical configuration but reloads a same-revision reorg ... ok (4ms)
+running 95 tests from ./api/tests/vote-round.test.ts
+vote round mine: the signed-in account's badges, or none; needs a session ... ok (24ms)
+real round mine: every voting badge the account holds, in order ... ok (6ms)
+real round: no test badges, ETH or TestUSD from admins, no gas drip ... ok (30ms)
+real round ballot: the badge's owner votes; another wallet's signature is refused ... ok (12ms)
+real round ballot: the relay pays for at most 5 ballots per badge ... ok (27ms)
+real round ballot: a relayer low on gas says to send it yourself ... ok (5ms)
+vote relayer: admins see its address and balance; nobody else ... ok (7ms)
+admin badge: mints the next free badge to the address; admins only ... ok (15ms)
+admin badge: refusals ... ok (19ms)
+vote round ballot: relays record() with the signature as r and vs (plain ECDSA) ... ok (16ms)
+admin badge: an EIP-7702 wallet gets one; one whose delegate can't take it doesn't ... ok (12ms)
+admin ETH and TestUSD: sent by the relayer to the address, within limits ... ok (16ms)
+vote round ballot: refusals ... ok (26ms)
+vote round ballot: a second relay of the same nonce returns the pending hash ... ok (10ms)
+vote round ballots: latest per badge, only before the close, cached briefly ... ok (5ms)
+vote round ballots: closed results are revalidated after the short memory cache ... ok (3ms)
+vote round gas: tops up a low balance once per badge, only for its owner ... ok (14ms)
+vote round gas: enough balance already needs no drip and leaves the one-time drip unused ... ok (6ms)
+vote round gas: closed after the vote ... ok (4ms)
+vote round ballots: a revoked (burned) badge's earlier ballot no longer counts ... ok (3ms)
+vote round relayer: nonces stay consecutive while the RPC's pending count lags ... ok (5ms)
+vote round ballot: a pending relay that reverted no longer blocks a retry ... ok (8ms)
+vote round ballot: a pending relay the node never saw frees after a minute ... ok (20ms)
+vote round ballot: the relay pays for at most 20 ballots per badge ... ok (81ms)
+vote round relayer: a dropped relay's nonce is reused, so later sends don't queue behind a gap ... ok (13ms)
+vote round: a new round starts clean (gas and badge numbers are per contract) ... ok (15ms)
+the round lists each initiative's gap to the next tier ... ok (56ms)
+round: after a new ballot the gaps from before it are marked stale until searched again ... ok (77ms)
+round next: who it knocks out is named by slug ... ok (34ms)
+the round lists the donation that moves each initiative up a tier ... ok (33ms)
+round next: the same tally inputs are searched once ... ok (67ms)
+an open round serves each S-Tier initiative's threat ... ok (29ms)
+once S-Tier has settled, the threats are A-Tier's ... ok (31ms)
+a failed threat search keeps the gaps ... ok (22ms)
+a closed round ignores obsolete saved results and computes its what-ifs ... ok (54ms)
+an unreadable chain never falls back to an old cached allocation ... ok (54ms)
+a closed round serves the final what-ifs ... ok (27ms)
+round: a round too large for one KV value is served, just not cached ... ok (337ms)
+errorText: URLs are cut from logged errors (an RPC URL may carry its key) ... ok (696µs)
+cacheSet: a value over the KV limit is skipped, never thrown ... ok (2ms)
+round: before S's first tally every tier waits; the live tally funds a ... ok (22ms)
+round: historical asks preserve S-Tier awards without storing a settlement ... ok (19ms)
+round: each badge's share, and what it paid in a settled tier ... ok (21ms)
+ballots: only what the quiet ending counts (a refused revision isn't served) ... ok (7ms)
+round: a quiet window settles S-Tier; later ask changes never move it ... ok (10ms)
+round ballot: a settled tier can't change; registration closes; B settled closes ... ok (11ms)
+round: an RPC without past state is a 503, not a result ... ok (3ms)
+round: the round's asks come from the chain states, not the board ... ok (17ms)
+round: a donation inside the S-Tier window shows the tier still settling ... ok (15ms)
+round: a covered project is listed as covered ... ok (19ms)
+round: a settled tier is stable without persisting any result ... ok (15ms)
+round: neither lagging nor caught-up states create authoritative result caches ... ok (17ms)
+round: served as of the newest block: past a cutoff by the clock only, nothing settles ... ok (16ms)
+round: corrupt settlement caches cannot alter coverage, awards or accepted ballots ... ok (10ms)
+round: a cold chain read answers 503 in time and fills in the background, one at a time ... ok (71ms)
+round: a request with a newer ballot doesn't join a read that lacks its block ... ok (35ms)
+round: pinned to one head block, the replay is reused (and joined) until the next block ... ok (23ms)
+round: a request whose ballots a read in flight covers joins it ... ok (37ms)
+round ballot: relayed ballots reuse one replay for a few seconds; none before registration closes ... ok (17ms)
+round: a ballot the RPC returned late can still unsettle S before it is final ... ok (16ms)
+round: an invalid ballot shows as refused with invalid_ballot ... ok (19ms)
+round: a ballot the contract didn't commit is never counted ... ok (6ms)
+round: a record count or a token's ballot hash the contract disagrees on is a 503 ... ok (19ms)
+round: a round from before Nov 14 is read with its legacy transcript ... ok (20ms)
+round: the pool the chain raised shows, but recorded ballots aren't re-judged ... ok (22ms)
+ballot: a ballot breaking a rule is refused with its errors, nothing sent ... ok (17ms)
+ballot: a valid ballot is relayed with its proof ... ok (16ms)
+ballot: judged with the chain's current pool ... ok (12ms)
+ballot: a ballot signed before a project was added still relays (short) ... ok (12ms)
+ballot: a rule the contract enforced after a pool change is a 422, not a 500 ... ok (10ms)
+ballot: before voting opens it is a 409 not_open, not a 500 ... ok (5ms)
+ballot: opened by the clock but not yet on-chain is a 409 not_open ... ok (7ms)
+the round carries the chain asks ... ok (17ms)
+a round without ballot rules still carries the chain asks ... ok (27ms)
+the relayer judges with chain asks ... ok (13ms)
+asks unavailable: the round and the relay are a 503 ... ok (35ms)
+round: held while the chain has a project this site doesn't know yet ... ok (6ms)
+the round carries the live tally's inputs, which re-run to its result ... ok (25ms)
+test pledge: on the test round's chain only, signed by the admin, then settled ... ok (15ms)
+test pledge: never in the real vote ... ok (4ms)
+withdraw: a Safe batch for the round's contract, audited; admins with a recent sign-in only ... ok (7ms)
+withdraw: undo is undoWithdrawInitiative, only for one withdrawn on-chain ... ok (4ms)
+withdraw: a project settled or covered at a settlement is refused, with its tier ... ok (3ms)
+withdraw: unknown slug is 404, a closed vote is 409, no round is 503 ... ok (3ms)
+withdraw: once every tier has settled (before the close) the tally is final: 409, and the list says so ... ok (2ms)
+withdraw: a contract from before withdrawals is refused, and the list says so ... ok (2ms)
+pool on-chain: the contract's last PoolUsdSet, the live ETH price and the dates; admins only ... ok (4ms)
+pool on-chain: no ETH price says so instead of failing ... ok (2ms)
+pool on-chain: a setPoolUsd batch for the round's admin, in six decimals, audited ... ok (4ms)
+pool on-chain: refusals (not a number, the same amount, lower after S-Tier's first tally, closed) ... ok (6ms)
+unfunded rounds remain open to public reads, ballots and gas past their dates ... ok (5ms)
+ERC-1271 owners relay recordFor with the original variable-length signature ... ok (2ms)
+EIP-7702 owners keep the ECDSA record relay path ... ok (8ms)
+same-address rounds on different chains do not share pending ballots, quotas or gas ... ok (6ms)
+relayer nonces and leases are independent across signing accounts ... ok (1ms)
+running 3 tests from ./api/tests/vote.test.ts
+vote settings: off by default, admins change them, the board and site settings carry them ... ok (46ms)
+voteState: below the floor, eligible, and a large goal's floor is the goal less the cap ... ok (146µs)
+the board marks each card's vote state only while the display is on ... ok (9ms)
+running 11 tests from ./api/tests/watchlist.test.ts
+watchlist: signed out is 401 on every route ... ok (40ms)
+watchlist: none until imported; import creates, merges, dedupes, drops non-approved ... ok (17ms)
+watchlist: import rejects a bad body and a merge over the limit ... ok (97ms)
+watchlist: PUT and DELETE are idempotent; PUT of a non-approved id is 404 ... ok (21ms)
+watchlist: PUT and DELETE before any import are 404 and create nothing ... ok (41ms)
+watchlist: one account never reads or writes another's list ... ok (18ms)
+watchlist: concurrent imports keep every id ... ok (6ms)
+watchlist: writes are rate limited per account ... ok (106ms)
+watchlist: the record is backed up ... ok (136µs)
+watchlist: the CORS preflight for PUT is allowed from the web origin ... ok (5ms)
+watchlist: PUT into a full list (200 ids) is 400 ... ok (82ms)
+running 5 tests from ./api/tests/write-fields.test.ts
+writes: every JSON endpoint rejects unknown fields before changing domain data ... ok (100ms)
+writes: unknown multipart text and file fields are rejected before uploads ... ok (58ms)
+writes: unknown nested fields reject the entire request, including bulk content sync ... ok (24ms)
+writes: malformed JSON cannot become an empty update or logout ... ok (13ms)
+writes: unknown actions cannot match inherited object properties ... ok (11ms)
+
+ok | 638 passed (8 steps) | 0 failed (51s)
+

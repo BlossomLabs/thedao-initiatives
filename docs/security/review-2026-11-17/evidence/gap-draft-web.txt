@@ -1,0 +1,9 @@
+
+ RUN  v5.1.0 /home/sem/Projects/thedao-initiatives
+
+
+ Test Files  2 passed (2)
+      Tests  47 passed (47)
+   Start at  16:31:49
+   Duration  3.08s (tests 54%, import 18%, environment 15%, setup 8%, transform 4%)
+

@@ -1,0 +1,12 @@
+Check api/tests/dataset.test.ts
+running 7 tests from ./api/tests/dataset.test.ts
+dataset: failed staging never changes the active rows, even beyond a transaction ... ok (35ms)
+dataset: publication pins readers and rejects an old request's unguarded write ... ok (6ms)
+dataset: a concurrent writer aborts publication without losing the writer ... ok (3ms)
+dataset: repeated large restores keep sessions, leases, ordering and unrelated rows ... ok (103ms)
+dataset: garbage collection preserves live generations and operational state ... ok (7ms)
+dataset: an ambiguous publication result never deletes the published data ... ok (3ms)
+dataset: restoring a later failed batch leaves the active database unchanged ... ok (13ms)
+
+ok | 7 passed | 0 failed (186ms)
+

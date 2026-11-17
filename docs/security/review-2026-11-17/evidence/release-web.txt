@@ -1,0 +1,13 @@
+
+ RUN  v5.1.0 /tmp/thedao-security-release-ad4b955
+
+
+ Test Files  186 passed (186)
+      Tests  1645 passed (1645)
+   Start at  17:08:22
+   Duration  51.37s (tests 38%, environment 30%, setup 14%, import 13%, transform 4%)
+
+Environment  jsdom was created 186 times · 56.38s total, 30% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+

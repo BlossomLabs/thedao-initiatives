@@ -1,0 +1,6 @@
+Check api/tests/reviews.test.ts
+running 1 test from ./api/tests/reviews.test.ts
+reviews: transferring an NFT replaces its rating instead of adding a reviewer ... ok (33ms)
+
+ok | 1 passed | 0 failed | 18 filtered out (43ms)
+

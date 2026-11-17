@@ -1,0 +1,46 @@
+Task build deno run -A npm:@react-router/dev build
+Using Vite Environment API
+vite v8.3.8 building client environment for production...
+transforming...
+[plugin rolldown:vite-resolve] Module "node:worker_threads" has been externalized for browser compatibility, imported by "/home/sem/Projects/thedao-initiatives/node_modules/.deno/ox@0.14.65/node_modules/ox/_esm/tempo/internal/virtualMasterPool.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:worker_threads" has been externalized for browser compatibility, imported by "/home/sem/Projects/thedao-initiatives/node_modules/.deno/ox@0.14.65/node_modules/ox/_esm/tempo/internal/virtualMasterPool.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+✓ 8726 modules transformed.
+✗ Build failed in 2m 48s
+Build failed with 1 error:
+
+[31m[UNRESOLVED_IMPORT] [0mCould not resolve './cache.js' in node_modules/.deno/abitype@1.2.3_1/node_modules/abitype/dist/esm/human-readable/runtime/utils.js
+   [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m node_modules/.deno/abitype@1.2.3_1/node_modules/abitype/dist/esm/human-readable/runtime/utils.js:6:54 [38;5;246m][0m
+   [38;5;246m│[0m
+ [38;5;246m6 │[0m [38;5;249mi[0m[38;5;249mm[0m[38;5;249mp[0m[38;5;249mo[0m[38;5;249mr[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249m{[0m[38;5;249m [0m[38;5;249mg[0m[38;5;249me[0m[38;5;249mt[0m[38;5;249mP[0m[38;5;249ma[0m[38;5;249mr[0m[38;5;249ma[0m[38;5;249mm[0m[38;5;249me[0m[38;5;249mt[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249mC[0m[38;5;249ma[0m[38;5;249mc[0m[38;5;249mh[0m[38;5;249me[0m[38;5;249mK[0m[38;5;249me[0m[38;5;249my[0m[38;5;249m,[0m[38;5;249m [0m[38;5;249mp[0m[38;5;249ma[0m[38;5;249mr[0m[38;5;249ma[0m[38;5;249mm[0m[38;5;249me[0m[38;5;249mt[0m[38;5;249me[0m[38;5;249mr[0m[38;5;249mC[0m[38;5;249ma[0m[38;5;249mc[0m[38;5;249mh[0m[38;5;249me[0m[38;5;249m [0m[38;5;249m}[0m[38;5;249m [0m[38;5;249mf[0m[38;5;249mr[0m[38;5;249mo[0m[38;5;249mm[0m[38;5;249m [0m'./cache.js'[38;5;249m;[0m
+ [38;5;240m  │[0m                                                      ──────┬─────  
+ [38;5;240m  │[0m                                                            ╰─────── Module not found.
+ [38;5;240m  │[0m 
+ [38;5;240m  │[0m [38;5;115mHelp[0m: 'node_modules/.deno/abitype@1.2.3_1/node_modules/abitype/dist/esm/human-readable/runtime/utils.js' is imported by the following path:
+ [38;5;240m  │[0m         - node_modules/.deno/abitype@1.2.3_1/node_modules/abitype/dist/esm/human-readable/runtime/utils.js
+ [38;5;240m  │[0m         - node_modules/.deno/abitype@1.2.3_1/node_modules/abitype/dist/esm/human-readable/parseAbi.js
+ [38;5;240m  │[0m         - node_modules/.deno/abitype@1.2.3_1/node_modules/abitype/dist/esm/exports/index.js
+ [38;5;240m  │[0m         - node_modules/.deno/ox@0.6.9/node_modules/ox/_esm/core/Abi.js
+ [38;5;240m  │[0m         - node_modules/.deno/ox@0.6.9/node_modules/ox/_esm/index.js
+ [38;5;240m  │[0m         - node_modules/.deno/@base-org+account@1.1.1/node_modules/@base-org/account/dist/kms/crypto-key/index.js
+ [38;5;240m  │[0m         - node_modules/.deno/@base-org+account@1.1.1/node_modules/@base-org/account/dist/index.js
+ [38;5;240m  │[0m         - node_modules/.deno/@privy-io+react-auth@3.51.4/node_modules/@privy-io/react-auth/dist/esm/use-sign-transaction-internal-Cx-lKGKG.mjs
+ [38;5;240m  │[0m         - node_modules/.deno/@privy-io+react-auth@3.51.4/node_modules/@privy-io/react-auth/dist/esm/index.mjs
+ [38;5;240m  │[0m         - app/context/privy.tsx
+ [38;5;240m  │[0m         - app/context/email-sign-in.tsx
+ [38;5;240m  │[0m         - app/context/providers.tsx
+ [38;5;240m  │[0m         - app/root.tsx
+ [38;5;240m  │[0m         - app/root.tsx?__react-router-build-client-route
+[38;5;246m───╯[0m
+
+    at aggregateBindingErrorsIntoJsError (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/rolldown@1.2.19/node_modules/rolldown/dist/shared/error-CLo6EJKG.mjs:50:18)
+    at unwrapBindingResult (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/rolldown@1.2.19/node_modules/rolldown/dist/shared/error-CLo6EJKG.mjs:20:128)
+    at RolldownBuild.#build (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/rolldown@1.2.19/node_modules/rolldown/dist/shared/rolldown-AohEFLrh.mjs:146:34)
+    at async buildEnvironment (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/vite@8.3.8/node_modules/vite/dist/node/chunks/node.js:34787:66)
+    at async Object.build (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/vite@8.3.8/node_modules/vite/dist/node/chunks/node.js:35208:19)
+    at async buildApp (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/@react-router+dev@8.5.1/node_modules/@react-router/dev/dist/vite.js:1573:8)
+    at async Object.buildApp (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/@react-router+dev@8.5.1/node_modules/@react-router/dev/dist/vite.js:2257:8)
+    at async Object.buildApp (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/vite@8.3.8/node_modules/vite/dist/node/chunks/node.js:35200:6)
+    at async build (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/@react-router+dev@8.5.1/node_modules/@react-router/dev/dist/build-DjEus3HZ.js:40:3)
+    at async build (file:///home/sem/Projects/thedao-initiatives/node_modules/.deno/@react-router+dev@8.5.1/node_modules/@react-router/dev/dist/cli/index.js:178:3) {
+  errors: [Getter/Setter]
+}

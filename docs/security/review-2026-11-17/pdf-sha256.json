@@ -1,0 +1,29 @@
+{
+  "file": "output/pdf/security-review-b471ac5.pdf",
+  "sha256": "5bfcfaccb2f7a354e3dbfb3866b9a26853abbb9a43f4ec56870ea8d245bff1c7",
+  "pages": 7,
+  "attachments": [
+    "application-profile.md",
+    "asvs-verification.md",
+    "control-matrix.json",
+    "control-matrix.md",
+    "evidence-README.md",
+    "evidence-asvs-live.json",
+    "report.md",
+    "retest.md",
+    "verification.md"
+  ],
+  "attachment_sources": [
+    "report.md",
+    "verification.md",
+    "retest.md",
+    "control-matrix.json",
+    "control-matrix.md",
+    "asvs-verification.md",
+    "application-profile.md",
+    "evidence/asvs-live.json",
+    "evidence/README.md"
+  ],
+  "visual_review": "All seven pages rendered; unchanged pages retain their prior visual verification, and changed release pages 1 and 7 re-inspected. No clipping, overlap or table overflow. All nine embedded attachments match their source files byte for byte.",
+  "source": "docs/security/review-2026-11-17/report.md"
+}

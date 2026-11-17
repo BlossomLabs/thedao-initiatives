@@ -1,0 +1,376 @@
+{
+  "source_commit": "b471ac5ee3430fb344128850cc1a6d5ef204a75b",
+  "assessment_date": "2026-11-17",
+  "note": "Inventory is lockfile metadata, not installed-package provenance verification. Versions with peer suffixes retain Deno's exact lock keys. Advisory output is in evidence/.",
+  "lockfile_sha256": {
+    "deno.lock": "2ea8e5eb3476bcd9e5e773d461d0a3f0f4cb631f0e375975c35b36b465beae9f",
+    "vote/package-lock.json": "03a402731477a4ed3e0e2421005ab88668647d04baf98f9746427bf495446920"
+  },
+  "runtime_tools": {
+    "deno": "2.9.8",
+    "deno_bundled_typescript": "6.0.3",
+    "node": "26.12.1",
+    "forge": "1.5.1",
+    "solc": "0.8.28"
+  },
+  "application_direct_dependencies": {
+    "@base-ui/react": "^1.9.0",
+    "@fontsource-variable/inter-tight": "^5.3.0",
+    "@fontsource-variable/roboto-mono": "^5.3.0",
+    "@imagemagick/magick-wasm": "^0.0.46",
+    "@privy-io/react-auth": "^3.51.4",
+    "@tailwindcss/vite": "^4.3.5",
+    "@tanstack/react-query": "^5.107.1",
+    "@walletconnect/ethereum-provider": "2.26.0",
+    "clsx": "^2.1.1",
+    "diff": "^9.0.0",
+    "html2canvas-pro": "^2.6.4",
+    "input-otp": "^1.5.0",
+    "isbot": "^5.2.3",
+    "lucide-react": "^1.72.0",
+    "motion": "^14.14.0",
+    "ogl": "^1.0.11",
+    "qrcode.react": "4.2.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
+    "react-router": "^8.5.1",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.5",
+    "viem": "^2.57.19",
+    "wagmi": "^3.7.11",
+    "yaml": "^2.9.1"
+  },
+  "application_dev_dependencies": {
+    "@react-router/dev": "^8.5.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "jsdom": "^31.0.1",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  },
+  "deno_specifiers": {
+    "jsr:@hono/hono@^4.13.18": "4.13.18",
+    "jsr:@std/assert@^1.0.19": "1.0.19",
+    "jsr:@std/cli@1.0.24": "1.0.24",
+    "jsr:@std/cli@^1.0.32": "1.0.32",
+    "jsr:@std/encoding@^1.0.11": "1.0.11",
+    "jsr:@std/fmt@^1.0.10": "1.0.10",
+    "jsr:@std/fs@^1.0.24": "1.0.24",
+    "jsr:@std/html@^1.0.7": "1.0.7",
+    "jsr:@std/http@^1.1.4": "1.1.4",
+    "jsr:@std/internal@^1.0.12": "1.0.14",
+    "jsr:@std/internal@^1.0.14": "1.0.14",
+    "jsr:@std/media-types@^1.1.0": "1.1.0",
+    "jsr:@std/net@^1.0.7": "1.0.7",
+    "jsr:@std/path@^1.1.6": "1.1.6",
+    "jsr:@std/streams@^1.2.0": "1.2.0",
+    "jsr:@std/ulid@1": "1.0.0",
+    "npm:@base-ui/react@^1.9.0": "1.9.0_@types+react@19.3.0_react@19.3.1_react-dom@19.3.1",
+    "npm:@fontsource-variable/inter-tight@^5.3.0": "5.3.0",
+    "npm:@fontsource-variable/roboto-mono@^5.3.0": "5.3.0",
+    "npm:@imagemagick/magick-wasm@0.0.46": "0.0.46",
+    "npm:@imagemagick/magick-wasm@^0.0.46": "0.0.46",
+    "npm:@privy-io/react-auth@^3.51.4": "3.51.4_@solana+kit@8.6.0_react@19.3.1_react-dom@19.3.1_@solana+sysvars@5.5.1_@stripe+stripe-js@1.54.2_@tanstack+react-query@5.107.1_@types+react@19.3.0_typescript@7.0.2",
+    "npm:@react-router/dev@*": "8.5.1_react-router@8.5.1_typescript@7.0.2_vite@8.3.8_@types+node@26.6.6_@types+react@19.3.0_@types+react-dom@19.3.0_react@19.3.1_react-dom@19.3.1_yaml@2.9.1",
+    "npm:@react-router/dev@^8.5.1": "8.5.1_react-router@8.5.1_typescript@7.0.2_vite@8.3.8_@types+node@26.6.6_@types+react@19.3.0_@types+react-dom@19.3.0_react@19.3.1_react-dom@19.3.1_yaml@2.9.1",
+    "npm:@tailwindcss/vite@^4.3.5": "4.3.5_vite@8.3.8_@types+node@26.6.6_yaml@2.9.1",
+    "npm:@tanstack/react-query@^5.107.1": "5.107.1_@types+react@19.3.0_react@19.3.1",
+    "npm:@testing-library/jest-dom@^7.0.1": "7.0.1_@testing-library+dom@10.4.2_vitest@5.1.0_@types+node@26.6.6_jsdom@31.0.1_vite@8.3.8_yaml@2.9.1",
+    "npm:@testing-library/react@^16.3.3": "16.3.3_@testing-library+dom@10.4.2_@types+react@19.3.0_@types+react-dom@19.3.0_react@19.3.1_react-dom@19.3.1",
+    "npm:@types/node@^26.6.6": "26.6.6",
+    "npm:@types/react-dom@^19.3.0": "19.3.0_@types+react@19.3.0",
+    "npm:@types/react@^19.3.0": "19.3.0",
+    "npm:@walletconnect/ethereum-provider@2.26.0": "2.26.0_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7",
+    "npm:clsx@^2.1.1": "2.1.1",
+    "npm:diff@9": "9.0.0",
+    "npm:html2canvas-pro@^2.6.4": "2.6.4",
+    "npm:input-otp@^1.5.0": "1.5.0_react@19.3.1_react-dom@19.3.1",
+    "npm:isbot@^5.2.3": "5.2.3",
+    "npm:jsdom@^31.0.1": "31.0.1",
+    "npm:lucide-react@^1.72.0": "1.72.0_@types+react@19.3.0_react@19.3.1",
+    "npm:motion@^14.14.0": "14.14.0_react@19.3.1_react-dom@19.3.1",
+    "npm:ogl@^1.0.11": "1.0.11",
+    "npm:qrcode.react@4.2.0": "4.2.0_react@19.3.1",
+    "npm:react-dom@^19.3.1": "19.3.1_react@19.3.1",
+    "npm:react-markdown@^10.1.0": "10.1.0_@types+react@19.3.0_react@19.3.1",
+    "npm:react-router@^8.5.1": "8.5.1_@types+react@19.3.0_@types+react-dom@19.3.0_react@19.3.1_react-dom@19.3.1",
+    "npm:react@^19.3.1": "19.3.1",
+    "npm:rehype-sanitize@6": "6.0.0",
+    "npm:remark-gfm@^4.0.1": "4.0.1",
+    "npm:tailwind-merge@^3.7.0": "3.7.0",
+    "npm:tailwindcss@^4.3.5": "4.3.5",
+    "npm:tw-animate-css@^1.4.0": "1.4.0",
+    "npm:typescript@*": "7.0.2",
+    "npm:typescript@~7.0.2": "7.0.2",
+    "npm:viem@^2.57.19": "2.57.19_typescript@7.0.2_zod@4.6.7",
+    "npm:vite@*": "8.3.8_@types+node@26.6.6_yaml@2.9.1",
+    "npm:vite@^8.3.8": "8.3.8_@types+node@26.6.6_yaml@2.9.1",
+    "npm:vitest@*": "5.1.0_@types+node@26.6.6_jsdom@31.0.1_vite@8.3.8_yaml@2.9.1",
+    "npm:vitest@^5.1.0": "5.1.0_@types+node@26.6.6_jsdom@31.0.1_vite@8.3.8_yaml@2.9.1",
+    "npm:wagmi@^3.7.11": "3.7.11_@tanstack+react-query@5.107.1_react@19.3.1_typescript@7.0.2_viem@2.57.19_@base-org+account@1.1.1_@coinbase+wallet-sdk@4.3.2_@types+react@19.3.0_@walletconnect+ethereum-provider@2.26.0_zod@4.6.7",
+    "npm:yaml@^2.9.1": "2.9.1"
+  },
+  "locked_npm_entries": 713,
+  "locked_jsr_entries": 15,
+  "selected_resolutions": {
+    "@imagemagick/magick-wasm@0.0.46": {
+      "integrity": "sha512-0HKJmmqUTFwXm6Z/1lGtOx7JE/FpZiJg8sXBnAho1NgzunEOkgUILU7rskUnYbtdG/hJiFe9viVatWuWDZ9S0g=="
+    },
+    "@privy-io/react-auth@3.51.4_@solana+kit@8.6.0_react@19.3.1_react-dom@19.3.1_@solana+sysvars@5.5.1_@stripe+stripe-js@1.54.2_@tanstack+react-query@5.107.1_@types+react@19.3.0_typescript@7.0.2": {
+      "integrity": "sha512-Pgj4Q/+j+AUMK9jxeZQqbRGd/dcXhv5vtK/hWVvzMBOaVTXiPFrFwi/SmebqlpFPrgyIMqNCwIAN1PNgm1MsuA==",
+      "dependencies": [
+        "@base-org/account@1.1.1_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7",
+        "@base-ui/react",
+        "@coinbase/wallet-sdk",
+        "@floating-ui/react",
+        "@hcaptcha/react-hcaptcha",
+        "@headlessui/react",
+        "@heroicons/react",
+        "@marsidev/react-turnstile",
+        "@privy-io/api-base",
+        "@privy-io/api-types",
+        "@privy-io/are-addresses-equal",
+        "@privy-io/chains",
+        "@privy-io/encoding",
+        "@privy-io/ethereum",
+        "@privy-io/js-sdk-core",
+        "@privy-io/popup",
+        "@privy-io/routes",
+        "@privy-io/urls",
+        "@scure/base",
+        "@simplewebauthn/browser",
+        "@solana/kit@8.6.0_typescript@7.0.2",
+        "@stripe/crypto",
+        "@tanstack/react-virtual",
+        "@wallet-standard/app",
+        "@walletconnect/ethereum-provider",
+        "@walletconnect/universal-provider@2.26.0_typescript@7.0.2_zod@4.6.7",
+        "eventemitter3",
+        "fast-password-entropy",
+        "jose@4.15.9",
+        "js-cookie",
+        "lucide-react",
+        "mipd",
+        "ofetch",
+        "pino-pretty",
+        "qrcode",
+        "react",
+        "react-device-detect",
+        "react-dom",
+        "secure-password-utilities",
+        "styled-components",
+        "stylis",
+        "tinycolor2",
+        "viem",
+        "x402",
+        "zustand@5.1.0_@types+react@19.3.0_react@19.3.1"
+      ],
+      "optionalPeers": [
+        "@solana/kit@8.6.0_typescript@7.0.2"
+      ]
+    },
+    "@walletconnect/ethereum-provider@2.26.0_@types+react@19.3.0_react@19.3.1_typescript@7.0.2_use-sync-external-store@1.4.0_zod@4.6.7": {
+      "integrity": "sha512-C6Ld+Gv1OurPYvAbFGXRuvthIp4datYqDlmRGjWRWXkkIerijo05vwrH5cGNj9bK93FSfGScqaL2Ig2LvX3QhQ==",
+      "dependencies": [
+        "@reown/appkit",
+        "@walletconnect/jsonrpc-types",
+        "@walletconnect/keyvaluestorage",
+        "@walletconnect/types@2.26.0",
+        "@walletconnect/universal-provider@2.26.0_typescript@7.0.2_zod@4.6.7",
+        "@walletconnect/utils@2.26.0_typescript@7.0.2_zod@4.6.7",
+        "events"
+      ]
+    },
+    "react-router@8.5.1_@types+react@19.3.0_@types+react-dom@19.3.0_react@19.3.1_react-dom@19.3.1": {
+      "integrity": "sha512-5u1eQ46QjuXjNfEnLwzrnou1Bm5dquO3xjVYkkMYCudtkicD2AQHtx+fvXzPATtPJx8TW6DR1x1TDRqsfHyZBw==",
+      "dependencies": [
+        "@remix-run/route-pattern",
+        "@types/react",
+        "@types/react-dom",
+        "cookie-es@3.1.1",
+        "react",
+        "react-dom"
+      ],
+      "optionalPeers": [
+        "@types/react",
+        "@types/react-dom",
+        "react-dom"
+      ]
+    },
+    "react@19.3.1": {
+      "integrity": "sha512-QNhWdt7nrgVWWQG58QuGsAR3jv3Hbe4mb4vz7w2csnHavciZJgda1CPNaldF6eVxv90ud3jUXpKlHL69gO38yw=="
+    },
+    "source-map-js@1.2.2": {
+      "integrity": "sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw=="
+    },
+    "typescript@7.0.2": {
+      "integrity": "sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==",
+      "optionalDependencies": [
+        "@typescript/typescript-aix-ppc64",
+        "@typescript/typescript-darwin-arm64",
+        "@typescript/typescript-darwin-x64",
+        "@typescript/typescript-freebsd-arm64",
+        "@typescript/typescript-freebsd-x64",
+        "@typescript/typescript-linux-arm",
+        "@typescript/typescript-linux-arm64",
+        "@typescript/typescript-linux-loong64",
+        "@typescript/typescript-linux-mips64el",
+        "@typescript/typescript-linux-ppc64",
+        "@typescript/typescript-linux-riscv64",
+        "@typescript/typescript-linux-s390x",
+        "@typescript/typescript-linux-x64",
+        "@typescript/typescript-netbsd-arm64",
+        "@typescript/typescript-netbsd-x64",
+        "@typescript/typescript-openbsd-arm64",
+        "@typescript/typescript-openbsd-x64",
+        "@typescript/typescript-sunos-x64",
+        "@typescript/typescript-win32-arm64",
+        "@typescript/typescript-win32-x64"
+      ],
+      "bin": true
+    },
+    "viem@2.57.19_typescript@7.0.2_zod@4.6.7": {
+      "integrity": "sha512-ULAHSwef42oL1reV41Os40iR34PF9BFNIX/RBapHLAJL1X6VmrgQikS4q4ulZ7/8GqlFLqrRI5GoNms3hcxsHw==",
+      "dependencies": [
+        "@noble/curves@1.9.1",
+        "@noble/hashes@1.8.0",
+        "@scure/bip32",
+        "@scure/bip39",
+        "abitype@1.2.3_typescript@7.0.2_zod@4.6.7",
+        "isows",
+        "ox@0.14.65_typescript@7.0.2_zod@4.6.7",
+        "typescript",
+        "ws@8.21.0"
+      ],
+      "optionalPeers": [
+        "typescript"
+      ]
+    },
+    "vitest@5.1.0_@types+node@26.6.6_jsdom@31.0.1_vite@8.3.8_yaml@2.9.1": {
+      "integrity": "sha512-MzmNFnrwa8v8lF1bLxw3UJ4EREwVOVb75VqJZmUDRjJ6EluK/x9th7qTbaeDk41WxE1GxWqmTXcdsfobfH5sOA==",
+      "dependencies": [
+        "@types/chai",
+        "@types/node",
+        "@vitest/mocker",
+        "chai",
+        "es-module-lexer",
+        "expect-type",
+        "jsdom",
+        "magic-string",
+        "obug",
+        "picomatch@4.0.7",
+        "std-env",
+        "tinybench",
+        "tinyexec",
+        "tinyglobby",
+        "vite",
+        "why-is-node-running"
+      ],
+      "optionalPeers": [
+        "@types/node",
+        "jsdom"
+      ],
+      "bin": true
+    }
+  },
+  "jsr_resolutions": {
+    "@hono/hono@4.13.18": {
+      "integrity": "2e9a294f8ed5ca8f0dddf08927ad46111e756f3329f1483db550cd60757f7e21"
+    },
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal@^1.0.12"
+      ]
+    },
+    "@std/cli@1.0.24": {
+      "integrity": "b655a5beb26aa94f98add6bc8889f5fb9bc3ee2cc3fc954e151201f4c4200a5e"
+    },
+    "@std/cli@1.0.32": {
+      "integrity": "188b3a100d6202d64e3f5bd3d799c7fa4f6d77f92cc65eb7f641c1fa0aa92a66"
+    },
+    "@std/encoding@1.0.11": {
+      "integrity": "e7cef2f0b3153bccc17431e7c864a1de03a4b6d9647389c43e08aaa775d37385"
+    },
+    "@std/fmt@1.0.10": {
+      "integrity": "90dfba288802ac6de82fb31d0917eb9e4450b9925b954d5e51fc29ac07419db5"
+    },
+    "@std/fs@1.0.24": {
+      "integrity": "f3061b45b81673a2bece689da041df32d174be064c89eb6397fb5718d3fb7877"
+    },
+    "@std/html@1.0.7": {
+      "integrity": "175c818905a6e75743c69c251395e273d82698e58cfe7dd76268d70e28b8d8fe"
+    },
+    "@std/http@1.1.4": {
+      "integrity": "4f1575226ca7c0df1df38b26d50265fed30869b2a63ab867edc5b92492150c8c",
+      "dependencies": [
+        "jsr:@std/cli@^1.0.32",
+        "jsr:@std/encoding",
+        "jsr:@std/fmt",
+        "jsr:@std/fs",
+        "jsr:@std/html",
+        "jsr:@std/media-types",
+        "jsr:@std/net",
+        "jsr:@std/path",
+        "jsr:@std/streams"
+      ]
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
+    },
+    "@std/media-types@1.1.0": {
+      "integrity": "c9d093f0c05c3512932b330e3cc1fe1d627b301db33a4c2c2185c02471d6eaa4"
+    },
+    "@std/net@1.0.7": {
+      "integrity": "e0b995738cfe2ed56f64591d400e55f143cff164efd690343f2deb4cf4d06d86"
+    },
+    "@std/path@1.1.6": {
+      "integrity": "c68485c2a4dfbb5ae3cc74fae4e8c4e5d874cf8a8ed12927917235c758b46cbe",
+      "dependencies": [
+        "jsr:@std/internal@^1.0.14"
+      ]
+    },
+    "@std/streams@1.2.0": {
+      "integrity": "256b934254778f2bf45f5713b934209ff29e9b4b7fd4ec095219966813758c5f"
+    },
+    "@std/ulid@1.0.0": {
+      "integrity": "d41c3d27a907714413649fee864b7cde8d42ee68437d22b79d5de4f81d808780"
+    }
+  },
+  "contract_direct_dependencies": {
+    "@openzeppelin/contracts": "5.7.0",
+    "forge-std": "https://codeload.github.com/foundry-rs/forge-std/tar.gz/bf647bd6046f2f7da30d0c2bf435e5c76a780c1b"
+  },
+  "contract_locked_packages": {
+    "": {
+      "name": "@blossom/vote",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@openzeppelin/contracts": "5.7.0",
+        "forge-std": "https://codeload.github.com/foundry-rs/forge-std/tar.gz/bf647bd6046f2f7da30d0c2bf435e5c76a780c1b"
+      }
+    },
+    "node_modules/@openzeppelin/contracts": {
+      "version": "5.7.0",
+      "resolved": "https://registry.npmjs.org/@openzeppelin/contracts/-/contracts-5.7.0.tgz",
+      "integrity": "sha512-IL2AZpI+7THMzt1u6Cxmc1zLwVnudtUGvrqXQ/HnbLKfQ/8dIWMMQPDwPIjRQzNrlAo4cxZaCGRB/XvwPo9ILA==",
+      "dev": true,
+      "license": "MIT"
+    },
+    "node_modules/forge-std": {
+      "version": "1.16.2",
+      "resolved": "https://codeload.github.com/foundry-rs/forge-std/tar.gz/bf647bd6046f2f7da30d0c2bf435e5c76a780c1b",
+      "integrity": "sha512-oHf+awjQrrLSzWgSdQv6exE1+0cmCHIxGGmzQJ9pX5F/pEQq1yHGwfkd++cC1lF7z9edarEX8GgHL5nq3MaF8A==",
+      "dev": true,
+      "license": "(Apache-2.0 OR MIT)"
+    }
+  }
+}

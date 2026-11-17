@@ -1,0 +1,25 @@
+Check api/tests/sitelock.test.ts
+Check api/tests/site.test.ts
+running 5 tests from ./api/tests/sitelock.test.ts
+site lock: signed cookies reject tampering, another origin and secret rotation ... ok (9ms)
+site lock: off by default ... ok (12ms)
+site lock: a copied unlock cookie expires on the server after thirty days ... ok (4ms)
+site lock: basic -> cookie -> bearer session; healthz stays open ... ok (12ms)
+admin promotion requires fresh authentication; demotion removes access immediately ... ok (42ms)
+running 13 tests from ./api/tests/site.test.ts
+site: static serving hides dotfiles, listings and files outside the root ... ok (50ms)
+site: only approved origins rewrite HTML, including hydration hashes ... ok (11ms)
+site: Hono serves pages, assets and SPA fallbacks without swallowing API routes ... ok (11ms)
+site: only an approved initiative's page is for search engines ... ok (31ms)
+site: static requests skip API sessions, auditing and CORS; API guards still run ... ok (8ms)
+site: the shared preview gate covers all routes and preserves session cookies ... ok (19ms)
+site: enforced CSP and shared headers cover static 404s and unexpected errors ... ok (9ms)
+site: Markdown downloads keep API authorization and never fall through to HTML ... ok (8ms)
+site: HEAD, conditional requests and ranges retain static-file semantics ... ok (5ms)
+site: a revalidated SPA URL answers for the shell, never with the board page ... ok (5ms)
+site: the combined app uses runtime IPs and rejects missing identity ... ok (3ms)
+site: built assets and pages are gzipped when the client accepts it ... ok (9ms)
+site: API answers carry the served build's version, so an open tab can tell it is behind ... ok (8ms)
+
+ok | 18 passed | 0 failed (573ms)
+

@@ -1,0 +1,36 @@
+{
+  "source": "https://nexus-api.dappnode.com/v1/models",
+  "retrieved": "2026-11-17",
+  "authentication": "none",
+  "models": [
+    {
+      "id": "jev",
+      "object": "model",
+      "kind": "public_model",
+      "owned_by": "nexus",
+      "created": 1791468066,
+      "display_name": "Jev",
+      "description": "Structured decision model for fast, reliable software workflows.",
+      "context_size": 64000,
+      "max_output_tokens": 1,
+      "currency": "EUR",
+      "input_price_per_1m_tokens_cents": 4,
+      "output_price_per_1m_tokens_cents": 0,
+      "input_price_per_1m_tokens_usd": 0.044056,
+      "output_price_per_1m_tokens_usd": 0,
+      "capabilities": {
+        "reasoning": false,
+        "streaming": false,
+        "tool_call": false,
+        "structured_output": true,
+        "parallel_tool_calls": false
+      },
+      "endpoints": [
+        "systemone"
+      ],
+      "proof_mode": "none",
+      "proofs_enabled": false
+    }
+  ],
+  "scope": "Catalog compatibility only; does not establish credential expiry or successful authenticated inference."
+}

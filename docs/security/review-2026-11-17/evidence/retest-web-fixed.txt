@@ -1,0 +1,13 @@
+
+ RUN  v5.1.0 /home/sem/Projects/thedao-initiatives
+
+
+ Test Files  184 passed (184)
+      Tests  1635 passed (1635)
+   Start at  14:12:24
+   Duration  79.92s (environment 37%, tests 31%, setup 15%, import 15%, transform 1%)
+
+Environment  jsdom was created 184 times · 106.50s total, 37% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+

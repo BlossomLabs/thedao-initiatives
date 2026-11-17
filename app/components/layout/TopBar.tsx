@@ -4,6 +4,10 @@ import { Menu, X } from "lucide-react";
 import { cn } from "~/lib/utils";
 import Pop from "~/components/ui/Pop";
 import WatchlistOfferSlot from "~/components/wallet/WatchlistOfferSlot";
+import { useSession } from "~/context/session";
+import { useMyBadges } from "~/hooks/use-vote";
+import { useRound, useRoundLoaded, useVoteBase } from "~/lib/vote-round";
+import { roundDeployed } from "../../../shared/vote/manifest";
 
 const ConnectButton = lazy(() => import("~/components/wallet/ConnectButton"));
 
@@ -23,10 +27,42 @@ const menuLink = ({ isActive }: { isActive: boolean }) =>
     isActive ? "text-dao-green" : "text-soft",
   );
 
-const LINKS = [
+type NavItem = { to: string; label: string; end?: boolean; active?: (path: string) => boolean };
+
+const LINKS: NavItem[] = [
   { to: "/", label: "Initiatives", end: true },
   { to: "/submit", label: "Suggest an initiative" },
 ];
+
+/** The vote's own links (#124), for the vote the page is on (the vote, or the test vote on
+ * /vote-test): Vote, to a badge holder's ballot editor, and Results. None while that vote
+ * has no round deployed. */
+function useVoteLinks(): NavItem[] {
+  const base = useVoteBase();
+  useRoundLoaded();
+  const round = useRound();
+  const deployed = roundDeployed(round);
+  const { session } = useSession();
+  const badges = useMyBadges(session?.address ?? null, deployed);
+  if (!deployed) return [];
+  const ballot = `${base}/ballot`;
+  return [
+    ...(badges.data?.length
+      ? [{
+        to: `${ballot}/edit`,
+        label: "Vote",
+        active: (path: string) => path === ballot || path.startsWith(`${ballot}/`),
+      }]
+      : []),
+    { to: base, label: "Results", end: true },
+  ];
+}
+
+/** The site's links, then the vote's (in the full app; the static shell has no vote). */
+function NavLinks({ render }: { render: (l: NavItem) => React.ReactNode }) {
+  const vote = useVoteLinks();
+  return <>{[...LINKS, ...vote].map(render)}</>;
+}
 
 const Fallback = () => (
   <button type="button" className="btn btn-wallet" disabled>
@@ -63,10 +99,23 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
   // The static shell is prerendered once (at "/") and served for every URL
   // without a page of its own, so it marks no link as current: plain links,
   // which also keeps its HTML identical to what the client hydrates there.
-  const item = (l: typeof LINKS[number], style: typeof link) =>
+  const item = (l: NavItem, style: typeof link) =>
     staticShell
       ? <Link key={l.to} to={l.to} className={style({ isActive: false })}>{l.label}</Link>
+      : l.active
+      ? (
+        <Link
+          key={l.to}
+          to={l.to}
+          aria-current={l.active(pathname) ? "page" : undefined}
+          className={style({ isActive: l.active(pathname) })}
+        >
+          {l.label}
+        </Link>
+      )
       : <NavLink key={l.to} to={l.to} end={l.end} className={style}>{l.label}</NavLink>;
+  const links = (style: typeof link) =>
+    staticShell ? LINKS.map((l) => item(l, style)) : <NavLinks render={(l) => item(l, style)} />;
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/[.07] bg-[rgba(44,94,134,.5)] px-8 py-3 backdrop-blur-[20px] max-[760px]:px-3.5 max-[760px]:py-2.5">
@@ -89,7 +138,7 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
         </Link>
         <div className="flex items-center gap-[22px] max-[760px]:gap-2.5">
           <nav className="flex items-center gap-[22px] max-[760px]:hidden" aria-label="Site">
-            {LINKS.map((l) => item(l, link))}
+            {links(link)}
           </nav>
           {staticShell ? <Fallback /> : (
             <div className="relative">
@@ -120,7 +169,7 @@ export default function TopBar({ staticShell }: { staticShell?: boolean }) {
         aria-label="Site"
         className="absolute inset-x-3.5 top-full mt-2 hidden flex-col rounded-[14px] border border-edge2 bg-panel p-1.5 shadow-menu max-[760px]:flex"
       >
-        {LINKS.map((l) => item(l, menuLink))}
+        {links(menuLink)}
       </Pop>
     </header>
   );

@@ -3,6 +3,10 @@ import type { RuleError } from "../../shared/vote/rules";
 import { formatMicroUsd as dollars } from "../../shared/vote/format";
 const and = (xs: string[]) =>
   xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+const emptyTierMessage = (tier: 0 | 1) =>
+  `${tierName(TIERS[tier])} must have at least one project if ${
+    tier === 1 ? tierName("B") : `${tierName("A")} or ${tierName("B")}`
+  } is not empty`;
 
 /** A broken ballot rule in plain words (docs/superpowers/specs/2026-11-11-ballot-rules-design.md). */
 export function ruleMessage(
@@ -34,9 +38,7 @@ export function ruleMessage(
         tierName(TIERS[e.tier])
       }'s ${dollars(e.tierUsd)}. One affiliation can hold at most half.`;
     case "empty_tier":
-      return `${
-        tierName(TIERS[e.tier])
-      } needs a pick before a later tier can be used. If it already settled empty on this ballot, later tiers cannot be added in this round.`;
+      return `${emptyTierMessage(e.tier)}.`;
     case "tiers":
       return "Use at most three tiers.";
     case "shape":
@@ -68,7 +70,7 @@ export function ruleStatus(errors: RuleError[]): { ok: boolean; text: string } {
     case "empty_tier":
       return {
         ok: false,
-        text: `Add a pick to ${tierName(TIERS[e.tier])} before using a later tier`,
+        text: emptyTierMessage(e.tier),
       };
     case "tiers":
       return { ok: false, text: "Use at most three tiers" };

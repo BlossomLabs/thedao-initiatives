@@ -615,6 +615,8 @@ it("while open: TheDAO's ballot beside what it takes each initiative to move up"
   expect(alpha.className).not.toContain("dao-green");
   // The call to action: Beta needs $9k donated to come into S-Tier.
   expect(screen.getByRole("heading", { name: "What it takes to move up" })).toBeInTheDocument();
+  // The intro ends on the green amount; no "smaller donations" hedge there (#120).
+  expect(list().getByText(/is the tier settling now/)).not.toHaveTextContent("Smaller donations");
   const row = list().getByRole("button", { name: /Beta audits/ });
   expect(row).toHaveTextContent("−$9k");
   expect(row).toHaveTextContent("to S-Tier");
@@ -970,7 +972,7 @@ it("a compact green pill keeps the exact checked amount in its title", async () 
   expect(screen.getByText((_, el) =>
     el?.tagName === "P" &&
     el.textContent!.startsWith("A donation of $12,340")
-  )).toHaveTextContent("Smaller donations may also do so.");
+  )).not.toHaveTextContent("Smaller donations");
 });
 
 /** Four initiatives in S-Tier if it settled now, each a donation elsewhere from out. */
@@ -1086,7 +1088,7 @@ it("an open green row's sentence", async () => {
   );
   expect(included).not.toHaveTextContent("Alpha");
   expect(included).not.toHaveTextContent(/safe|No single donation/);
-  expect(one).toHaveTextContent("Smaller donations may also do so.");
+  expect(one).not.toHaveTextContent("Smaller donations");
 });
 
 it("a missing green figure stays blank without claiming donations were checked", async () => {
@@ -1632,7 +1634,7 @@ describe("an open green row's jumps (worked out on the page from the tally's inp
       ? "It asks the pool for $2,000 less. None of the donations to other initiatives we checked would move it out of S-Tier after this donation. Other amounts may still do so."
       : `It asks the pool for $2,000 less. A donation of ${
         "$" + Number(after! / 1_000_000n).toLocaleString("en-US")
-      } elsewhere could then move it out of S-Tier. Smaller donations may also do so.`;
+      } elsewhere could then move it out of S-Tier.`;
     fireEvent.change(await screen.findByRole("spinbutton", { name: "Amount" }), {
       target: { value: "2000" },
     });

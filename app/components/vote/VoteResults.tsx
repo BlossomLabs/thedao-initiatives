@@ -451,7 +451,7 @@ export default function VoteResults(
         : (
           <>
             It asks the pool for {usd(given)} less. A donation of {usd(typedThreat!)}{" "}
-            elsewhere could then move it out of {tierName(tier)}. Smaller donations may also do so.
+            elsewhere could then move it out of {tierName(tier)}.
           </>
         )}
     </p>

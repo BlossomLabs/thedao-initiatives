@@ -372,7 +372,7 @@ export default function GiveList(
         {name}{" "}
         is the tier settling now. Donations count in the next tally: the red number is what each
         initiative still misses to move up a tier if the vote ended now. The green “ahead” amount is
-        a donation elsewhere that could move it out of {name}. Smaller donations may also do so.
+        a donation elsewhere that could move it out of {name}.
       </p>
       {rows !== undefined && rows.length > 0 && (
         <div className="mt-4">
@@ -566,7 +566,7 @@ export default function GiveList(
                                   <b className="font-semibold text-white">{usd(r.threat)}</b>{" "}
                                   to another initiative could move it out of{" "}
                                   <span className="whitespace-nowrap">{name}</span>{" "}
-                                  if the vote ended now. Smaller donations may also do so. A
+                                  if the vote ended now. A
                                   donation lowers what it asks of the pool.
                                 </>
                               )

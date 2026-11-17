@@ -10,6 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-11-vote-screens-design.md`
 
+**Nov 16, 2026 addendum:** [Section 5 of the spec](../specs/2026-11-11-vote-screens-design.md#5-addendum-exact-gaps-and-the-green-numbers-nov-16-2026)
+derives exact thresholds to replace Task 2's gap binary search and distinguishes
+those gaps from the green leads. Implementation remains follow-up work in the
+[what-ifs plan](2026-11-12-vote-what-ifs.md#addendum-follow-up-exact-gaps-and-green-lead-correctness-nov-16-2026).
+
 ## Global Constraints
 
 - Tier names in copy: always "S-Tier", "A-Tier", "B-Tier" (`tierName` in `shared/vote/ballot.ts`); the bare letter only in the tier table.

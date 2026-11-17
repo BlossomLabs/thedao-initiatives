@@ -10,6 +10,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-11-vote-screens-design.md`, section 3 (decisions 5–7).
 
+**Nov 16, 2026 addendum:** See [section 5 of the spec](../specs/2026-11-11-vote-screens-design.md#5-addendum-exact-gaps-and-the-green-numbers-nov-16-2026)
+for exact gap formulas, the current $10 live precision, leads in the tier settling now,
+and a reproduced non-monotone green lead. The historical Task 2 interface comment
+about raising cost and pool is superseded by proportional backing loss in the spec
+and current code. The follow-up below is planned work, not an implemented correction.
+
 ## Global Constraints
 
 - `$1K` steps: `STEP = 1_000_000_000n` micro-USD. Gaps round **up**; leads round **down**.
@@ -103,3 +109,35 @@ Computed in the existing background job next to `live.next` (same digest, single
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run `deno task test`, `deno task typecheck`, `deno lint` — PASS (except the two `/vote` gate tests while the local demo bypass is in place; they are not this task's).
 - [ ] **Step 5:** Commit `Vote: leads, gaps and what-ifs on every initiative`
+
+## Addendum follow-up: exact gaps and green lead correctness (Nov 16, 2026)
+
+The donation and extra-backing thresholds can use one shared baseline trace plus one
+modified tally per reported gap for the knock-on. Green leads cannot use that proof:
+their changed weights also change rivals before the initiative is selected.
+
+- [ ] Add both versions of the spec's two-initiative green fixture to `shared/vote/next-tier.test.ts`.
+  Verify the loss, recovery and final failure against `chainTally`, including $11,140,
+  $30,010 and $35,010. In the second version, verify that the reported $43,000 loss
+  succeeds while $1,560 and $2,000 fail. Keep an exhaustive small-fixture oracle:
+  testing only a reported success and the following failure misses disconnected
+  successful intervals.
+- [ ] Resolve whether "ahead" means the largest successful proportional loss or the
+  safe buffer before the first failure. The fixture's answers are $35,000 and $11,130.
+  Align the spec, API comments and UI explanation with that decision; preserve the
+  qualification that this models proportional loss, not any possible withdrawal.
+- [ ] Implement the donation and phantom-backing threshold calculations from section 5.
+  Include cost/support ties, manifest-order ties, one-micro-dollar boundaries, unused
+  rank openings after no ask fits, $10 and $1K rounding, covered/withdrawn/settled
+  exclusions, and pool caps. Preserve the tally's funding results and diff scopes.
+- [ ] Validate gaps against exhaustive small rounds and the existing search before
+  removing it. Require the returned step to reach and every smaller permitted step
+  to fail; compare the complete knock-on, not just the subject's tier. Keep async
+  yielding and the existing background cache behavior.
+- [ ] Develop and prove a separate lead method for the chosen meaning. Compare it
+  against exhaustive losses with shared backers, changing selection order, integer
+  payment rounding, all open tiers and frozen settlement inputs. Do not treat binary
+  search or `support - ask` as exact without proving the necessary conditions.
+- [ ] Run the affected shared-vote, results UI and API tests when implementation lands.
+  Benchmark gaps and leads separately; the gap improvement does not establish a
+  speedup or correctness improvement for the green numbers.

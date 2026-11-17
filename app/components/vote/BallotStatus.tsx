@@ -318,12 +318,13 @@ export default function BallotStatus(
           if (!button.on && button.blocked && e.pointerType === "mouse") onBlocked?.(false);
         }}
         className={cn(
-          "flex w-full items-center justify-center gap-2.5 rounded-xl px-4 py-3 font-inter-tight text-[15px] font-semibold transition-colors",
+          // The site's big button (51px, `.btn`): red when it sends.
+          "btn w-full",
           button.on
-            ? "bg-[#e5484d] text-white hover:bg-[#d83c41]"
+            ? "btn-primary"
             : button.good
-            ? "cursor-default bg-dao-green/[.18] text-[#a7e3a5]"
-            : "cursor-not-allowed bg-white/[.08] text-white/70",
+            ? "cursor-default border-dao-green/40 bg-dao-green/[.18] text-[#a7e3a5] hover:shadow-none"
+            : "cursor-not-allowed hover:border-white/15 hover:shadow-none",
         )}
       >
         {button.busy && (

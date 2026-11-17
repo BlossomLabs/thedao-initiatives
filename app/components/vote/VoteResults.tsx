@@ -168,7 +168,11 @@ function Covered({ label, titles }: { label: string; titles: string[] }) {
 }
 
 export default function VoteResults(
-  { example }: { example?: { round: VoteManifest; view: RoundView } } = {},
+  { example }: {
+    /** An example's round and tally, and its example ballot (the mock editor's page), for
+     * the Vote button without a badge or a sign-in. */
+    example?: { round: VoteManifest; view: RoundView; ballot?: string };
+  } = {},
 ) {
   const ROUND = useRound();
   const voteBase = useVoteBase();
@@ -179,13 +183,13 @@ export default function VoteResults(
   const qc = useQueryClient();
   const round = useVoteRound(POLL_MS, !example);
   const rv = example?.view ?? round.data;
-  // The way back to your ballot: by the signed-in account's badge (found on-chain). Not
-  // on an example.
+  // The way back to your ballot: by the signed-in account's badge (found on-chain). On an
+  // example, its example ballot.
   const { session } = useSession();
   const badges = useMyBadges(session?.address ?? null, !example);
   // A test round's gas top-up for donating goes by the voter's badge.
   const myBadge = badges.data?.[0];
-  const mine = example ? null : badges.data?.length ? `${voteBase}/ballot` : null;
+  const mine = example ? example.ballot ?? null : badges.data?.length ? `${voteBase}/ballot` : null;
 
   const inRound = useMemo(() => new Set(R.slugs), [R]);
   const cards = useMemo(
@@ -645,8 +649,13 @@ export default function VoteResults(
     >
       {mine && (
         // A badge holder's way in, right under what the ballots fund (#123): the editor.
+        // The page's big call to action: larger type, a wider button.
         <div className="mt-5 flex justify-center">
-          <LinkButton variant="primary" to={`${mine}/edit`} className="min-w-[180px] px-10">
+          <LinkButton
+            variant="primary"
+            to={`${mine}/edit`}
+            className="px-10 text-[15px] font-semibold"
+          >
             <Vote className="size-[18px]" aria-hidden="true" />
             Vote
           </LinkButton>

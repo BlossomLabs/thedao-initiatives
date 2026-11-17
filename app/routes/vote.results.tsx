@@ -56,6 +56,8 @@ export default function ExampleResults() {
   const example = base && {
     round: base.round,
     view: figures?.for === base ? figures.view : base.view,
+    // Its Vote button opens the example ballot at the same moment.
+    ballot: `/vote-test/mock/${kind}`,
   };
 
   if (!kind) return <Navigate to="/vote-test/results/s-settling" replace />;

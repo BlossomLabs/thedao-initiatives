@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { vi } from "vitest";
-import Footer from "./Footer";
+import Footer, { copyrightYears } from "./Footer";
 
 const open = vi.hoisted(() => vi.fn());
 vi.mock("~/lib/support", () => ({ openPledgeRequest: open }));
@@ -37,4 +37,9 @@ test("sends backers to the pledge form, not to an email address", () => {
   expect(screen.queryByText(/@/)).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "pledge form" }));
   expect(open).toHaveBeenCalledWith();
+});
+
+test("the copyright starts in 2026, when TheDAO LLC was founded", () => {
+  expect(copyrightYears(new Date(2026, 10, 18))).toBe("2026");
+  expect(copyrightYears(new Date(2027, 0, 1))).toBe("2026–2027");
 });

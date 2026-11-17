@@ -3,6 +3,12 @@ import { SOCIAL_LINKS } from "~/data/site";
 import { openPledgeRequest } from "~/lib/support";
 
 // Figma: two 12.5px muted lines (30px above, 46px below), then an 88px legal bar.
+/** TheDAO LLC was founded in 2026: "2026", then "2026–2027" and on. */
+export const copyrightYears = (now = new Date()) => {
+  const year = now.getFullYear();
+  return year > 2026 ? `2026–${year}` : "2026";
+};
+
 export default function Footer() {
   return (
     <>
@@ -26,7 +32,7 @@ export default function Footer() {
       </footer>
       <div className="flex min-h-[88px] flex-wrap items-center justify-between gap-5 border-t border-white/[.08] bg-dao-blue-legal px-12 py-4 max-[620px]:justify-center max-[620px]:px-5 max-[620px]:text-center">
         <p className="m-0 text-[12.5px] text-soft">
-          © 2025–{new Date().getFullYear()} TheDAO LLC. All rights reserved.
+          © {copyrightYears()} TheDAO LLC. All rights reserved.
         </p>
         <div className="flex items-center gap-3">
           {[

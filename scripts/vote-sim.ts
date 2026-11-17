@@ -10,7 +10,8 @@
 // The round is the one the site runs (its /api/vote/manifest). Each voter mints badge
 // first-id + i (if no one holds it yet), sends a first ballot between the opening and the
 // S-Tier first tally, and the voters named by --revise change it that many times (40x2:
-// 40 voters, twice each), spread from the S-Tier first tally to the close. A revision
+// 40 voters, twice each), spread from the S-Tier first tally to the close, each time with
+// one or two small edits (a project moved a tier, placed or taken off), as people do. A revision
 // never moves what a settled tier holds for that voter (the site's /api/vote/round says
 // which tiers settled and which ballot counts). Every ballot passes the ballot rules at
 // the chain's asks and pool when it's built. Run it again with the same seed to go on:
@@ -176,6 +177,57 @@ export function drawBallot(
   }
   return null;
 }
+
+/**
+ * A revision as a person makes one: one or two small edits to the ballot that counts
+ * (`counted`): an open tier's project moved one tier up or down, a new one placed, or one
+ * taken off. The `kept` projects (settled tiers) stay where they are, and the result
+ * passes the rules at these asks and pool. Redrawing the whole ballot at random, as the
+ * sim first did, moved several initiatives in and out of the tier settling at every
+ * revision (#119). Falls back to `drawBallot` when no small edit passes in `tries`.
+ */
+export function reviseBallot(
+  m: VoteManifest,
+  asks: bigint[],
+  poolUsd: bigint,
+  r: Rng,
+  counted: Ballot,
+  kept: Ballot = {},
+  withdrawn: readonly number[] = [],
+  tries = 200,
+): Ballot | null {
+  const round = rulesRound(m, asks, poolUsd, withdrawn);
+  const locked = new Set(Object.values(kept));
+  const open = TIERS.filter((t) => !locked.has(t));
+  if (!open.length) return null;
+  const movable = m.slugs.filter((slug, i) => !kept[slug] && !withdrawn.includes(i));
+  const base: Ballot = { ...kept };
+  for (const slug of movable) {
+    if (counted[slug] && open.includes(counted[slug]!)) base[slug] = counted[slug];
+  }
+  const edit = (b: Ballot) => {
+    const slug = movable[r.int(0, movable.length - 1)];
+    const at = b[slug] ? open.indexOf(b[slug]!) : -1;
+    if (at === -1) b[slug] = open[r.int(0, open.length - 1)];
+    else {
+      const to = at + (r.next() < 0.5 ? -1 : 1);
+      if (to < 0 || to >= open.length) delete b[slug];
+      else b[slug] = open[to];
+    }
+  };
+  for (let k = 0; k < tries && movable.length; k++) {
+    const b: Ballot = { ...base };
+    for (let n = r.int(1, 2); n > 0; n--) edit(b);
+    if (sameBallot(b, base)) continue;
+    if (checkBallot(encodeBallot(m.slugs, b), round).ok) return b;
+  }
+  return drawBallot(m, asks, poolUsd, r, kept, withdrawn, tries);
+}
+
+const sameBallot = (a: Ballot, b: Ballot) => {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys].every((k) => a[k] === b[k]);
+};
 
 /** What a revision must keep: the projects of the tiers locked for this voter, from the
  * ballot that counts (`counted`, as bytes) and how many tiers settled. */
@@ -377,7 +429,18 @@ async function main() {
         log(`voter ${p.i}: no counted ballot and S-Tier settled; skipped`);
         continue;
       }
-      const b = drawBallot(m, asks, pool, r, keptFor(m, counted, settled), withdrawn);
+      const kept = keptFor(m, counted, settled);
+      const b = counted
+        ? reviseBallot(
+          m,
+          asks,
+          pool,
+          r,
+          decodeBallot(hexToBytes(counted), m.slugs),
+          kept,
+          withdrawn,
+        )
+        : drawBallot(m, asks, pool, r, kept, withdrawn);
       if (!b) {
         log(`voter ${p.i}: every tier it holds has settled; nothing left to change`);
         continue;

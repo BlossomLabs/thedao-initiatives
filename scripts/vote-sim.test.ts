@@ -6,6 +6,7 @@ import { rulesRound } from "../shared/vote/manifest.ts";
 import {
   drawBallot,
   keptFor,
+  reviseBallot,
   revisionsPlan,
   rng,
   timeline,
@@ -116,6 +117,25 @@ Deno.test("drawBallot: a revision keeps the settled tier's projects where they a
   // Every tier settled: nothing left to change.
   const all = keptFor(m, bytesToHex(encodeBallot(slugs, next)), 3);
   assertEquals(drawBallot(m, asks, pool, r, all), null);
+});
+
+Deno.test("reviseBallot: a small edit to the ballot that counts, within the rules", () => {
+  const r = rng("revise");
+  const round = rulesRound(m, asks, pool);
+  for (let k = 0; k < 30; k++) {
+    const first = drawBallot(m, asks, pool, r)!;
+    const next = reviseBallot(m, asks, pool, r, first)!;
+    assert(checkBallot(encodeBallot(slugs, next), round).ok);
+    const changed = slugs.filter((s) => first[s] !== next[s]);
+    assert(changed.length >= 1 && changed.length <= 2, `${changed.length} changed`);
+  }
+  // A settled S-Tier stays as it was.
+  const first = drawBallot(m, asks, pool, r)!;
+  const kept = keptFor(m, bytesToHex(encodeBallot(slugs, first)), 1);
+  for (let k = 0; k < 20; k++) {
+    const next = reviseBallot(m, asks, pool, r, first, kept)!;
+    for (const s of slugs) assertEquals(next[s] === "S", first[s] === "S");
+  }
 });
 
 Deno.test("voterKey: one key per voter, the same for the same seed", () => {

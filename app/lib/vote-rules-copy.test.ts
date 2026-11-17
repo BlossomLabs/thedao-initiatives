@@ -128,12 +128,10 @@ it("the reachable $1,026,100 minimum is displayed exactly and accepts the full b
   expect(ruleStatus(checkBallot(new Uint8Array(15).fill(1), round).errors).ok).toBe(true);
 });
 
-it("an empty A-Tier explains that B-Tier requires at least one A-Tier project", () => {
+it("an empty A-Tier explains the B-Tier encoding restriction and settlement limit", () => {
   const e: RuleError = { rule: "empty_tier", tier: 1 };
-  expect(say(e)).toBe("A-Tier must have at least one project if B-Tier is not empty.");
-  expect(ruleStatus([e])).toEqual({
-    ok: false,
-    text: "A-Tier must have at least one project if B-Tier is not empty",
-  });
+  expect(say(e)).toContain("A-Tier needs a pick before a later tier can be used");
+  expect(say(e)).toContain("already settled empty");
+  expect(ruleStatus([e]).ok).toBe(false);
   expect(explainBelow(e)).toBe(true);
 });

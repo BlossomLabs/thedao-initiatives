@@ -802,9 +802,7 @@ for (const failed of [false, true]) {
     );
     flow.failed = failed;
     mount("editor");
-    expect(
-      await screen.findByText("A-Tier must have at least one project if B-Tier is not empty."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/A-Tier needs a pick before a later tier/)).toBeInTheDocument();
     expect(screen.queryByText("Your ballot counts")).not.toBeInTheDocument();
     if (failed) fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(submit).not.toHaveBeenCalled();

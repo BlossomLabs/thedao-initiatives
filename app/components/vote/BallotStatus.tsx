@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import Stamp from "~/components/ui/Stamp";
-import { Check } from "lucide-react";
+import { Check, ExternalLink } from "lucide-react";
 import { Link } from "react-router";
 import type { BallotPhase } from "~/lib/vote-flow";
 import { cn } from "~/lib/utils";
 
 /** The chain the round's ballots are recorded on: the real vote's, or a test vote's. */
 export type VoteChain = "Ethereum" | "Sepolia";
-export const etherscanTx = (hash: string, chain: VoteChain = "Sepolia") =>
-  `https://${chain === "Ethereum" ? "" : "sepolia."}etherscan.io/tx/${hash}`;
+/** A ballot's transaction on Blockscout, the explorer the site links everywhere. */
+export const explorerTx = (hash: string, chain: VoteChain = "Sepolia") =>
+  `https://${chain === "Ethereum" ? "eth" : "eth-sepolia"}.blockscout.com/tx/${hash}`;
 
 /** Who sends it to the chain: TheDAO's relayer, or the voter's own wallet. */
 export type SendRoute = "relay" | "own";
@@ -61,16 +62,20 @@ export default function BallotStatus(
 
   const own = route === "own";
   const tx = "hash" in phase && phase.hash && phase.hash !== "0x" ? phase.hash : undefined;
+  /** The transaction, under the message in its box (the counted box says it in its text). */
   const txLink = tx && (
     <a
-      href={etherscanTx(tx, chain)}
+      href={explorerTx(tx, chain)}
       target="_blank"
       rel="noreferrer"
-      className="tnum text-white/55 hover:text-white"
+      className="text-white/55 no-underline [font-feature-settings:'calt'_0] hover:text-white hover:underline"
     >
-      {tx.slice(0, 6)}…{tx.slice(-4)} on {chain === "Ethereum" ? "Etherscan" : "Sepolia Etherscan"}
+      Transaction {tx.slice(0, 6)}…{tx.slice(-4)} on {chain}
+      <ExternalLink className="ml-0.5 inline size-3.5 align-[-2px]" aria-hidden="true" />
     </a>
   );
+  /** Set when the message's own text links the transaction. */
+  let txInText = false;
   const selfSendLink = (
     <button
       type="button"
@@ -134,7 +139,6 @@ export default function BallotStatus(
             Already sent. The tally checks whether it counts after it is recorded, even if you close
             this page.
           </span>
-          {txLink}
         </>
       );
       break;
@@ -143,7 +147,6 @@ export default function BallotStatus(
       body =
         "Waiting for the tally to accept this ballot. Your earlier accepted ballot counts until then.";
       button = { text: "Awaiting tally…", busy: true };
-      foot = txLink;
       break;
     case "rejected":
       tone = "bad";
@@ -153,7 +156,6 @@ export default function BallotStatus(
       body =
         "Review your ballot and send a new revision. Your latest accepted ballot is the one that counts.";
       button = { text: sendLabel, on: canSend ? onSend : undefined, blocked: !canSend };
-      foot = txLink;
       break;
     case "late":
       title = "It landed after voting closed";
@@ -161,12 +163,9 @@ export default function BallotStatus(
         `${chain} recorded it after the vote had ended, so it doesn’t count. The ballot that counted before is the one in the result.`;
       button = { text: "Voting has closed" };
       foot = (
-        <>
-          <Link to={resultsHref} className="text-dao-green underline-offset-2 hover:underline">
-            See the result
-          </Link>
-          {txLink}
-        </>
+        <Link to={resultsHref} className="text-dao-green underline-offset-2 hover:underline">
+          See the result
+        </Link>
       );
       break;
     case "failed": {
@@ -177,23 +176,13 @@ export default function BallotStatus(
         body =
           "It was sent but isn’t mined yet, and it may still land. Check before sending again, so it isn’t sent twice.";
         button = { text: "Check again", on: onRetry };
-        foot = (
-          <>
-            <span>Your earlier ballot counts until then.</span>
-            {txLink}
-          </>
-        );
+        foot = <span>Your earlier ballot counts until then.</span>;
       } else if (tx) {
         tone = "bad";
         title = `${chain} refused it`;
         body = `${phase.reason} It doesn’t count; your earlier ballot still does.`;
         button = { text: "Retry", on: onRetry };
-        foot = (
-          <>
-            <span>Retry checks the chain first.</span>
-            {txLink}
-          </>
-        );
+        foot = <span>Retry checks the chain first.</span>;
       } else if (lastActive.current === "relaying") {
         tone = "bad";
         title = "It never left";
@@ -234,7 +223,35 @@ export default function BallotStatus(
       if (upToDate) {
         tone = "good";
         title = "Your ballot counts";
-        body = `Recorded on ${chain}. Change a tier and you can send again, until it settles.`;
+        txInText = true;
+        // Where it was recorded, linked to its transaction when this page saw the send.
+        body = (
+          <>
+            Your ballot was recorded on {tx
+              ? (
+                <a
+                  href={explorerTx(tx, chain)}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`${chain}, transaction ${tx.slice(0, 6)}…${tx.slice(-4)}`}
+                  className="text-dao-green no-underline underline-offset-2 hover:underline"
+                >
+                  {chain}
+                  <ExternalLink
+                    className="ml-0.5 inline size-3.5 align-[-2px]"
+                    aria-hidden="true"
+                  />{" "}
+                  <span className="text-white/55 [font-feature-settings:'calt'_0]">
+                    ({tx.slice(0, 6)}…{tx.slice(-4)})
+                  </span>
+                </a>
+              )
+              : chain}
+            .
+            <br />
+            You can still adjust your ballot and resubmit.
+          </>
+        );
         // Where a send lands: the ballot that counts. Without that page, it just counts.
         button = onSeeBallot
           ? { text: "See my ballot", on: onSeeBallot }
@@ -246,7 +263,6 @@ export default function BallotStatus(
                 See the live results
               </Link>
             )}
-            {txLink}
           </>
         );
         break;
@@ -286,6 +302,7 @@ export default function BallotStatus(
             <div className="min-w-0 space-y-1">
               <p className="m-0 font-inter-tight text-[16px] font-semibold text-white">{title}</p>
               <p className="m-0 text-[13.5px] leading-relaxed text-white/72">{body}</p>
+              {txLink && !txInText && <p className="m-0 text-[13px]">{txLink}</p>}
             </div>
           </div>
         )}

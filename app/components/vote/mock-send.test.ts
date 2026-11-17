@@ -19,7 +19,7 @@ it("Send goes through the real steps, then counts the ballot, with nothing signe
   }
   expect(kinds).toEqual(["signing", "relaying", "waiting", "counted"]);
   expect(counted).toHaveBeenCalledWith("0x01ffff");
-  // No transaction: no Etherscan link to a made-up hash.
+  // No transaction: no explorer link to a made-up hash.
   expect(result.current.phase).toEqual({ kind: "counted", hash: "0x" });
 });
 

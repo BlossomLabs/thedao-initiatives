@@ -1,8 +1,8 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import type { BallotPhase } from "~/lib/vote-flow";
-import BallotStatus, { etherscanTx, type SendRoute } from "./BallotStatus";
+import BallotStatus, { explorerTx, type SendRoute } from "./BallotStatus";
 
 afterEach(cleanup);
 
@@ -58,8 +58,8 @@ it("each wait keeps the button, disabled, saying what it waits for", () => {
   expect(p.button("Waiting for Ethereum…")).toBeDisabled();
   expect(screen.getByText(/tally checks whether it counts after it is recorded/))
     .toBeInTheDocument();
-  expect(screen.getByRole("link", { name: /on Etherscan/ }))
-    .toHaveAttribute("href", `https://etherscan.io/tx/${HASH}`);
+  expect(screen.getByRole("link", { name: /on Ethereum/ }))
+    .toHaveAttribute("href", `https://eth.blockscout.com/tx/${HASH}`);
 });
 
 it("counted: the button says Counted; a changed ballot can be sent again", () => {
@@ -67,6 +67,14 @@ it("counted: the button says Counted; a changed ballot can be sent again", () =>
   expect(screen.getByText("Your ballot counts")).toBeInTheDocument();
   expect(p.button("Counted")).toBeDisabled();
   expect(screen.getByRole("link", { name: "See the live results" })).toHaveAttribute("href", "/");
+  // The transaction is linked in the counted box, from where it was recorded.
+  const box = screen.getByText("Your ballot counts").parentElement!;
+  expect(box).toHaveTextContent(
+    "Your ballot was recorded on Sepolia (0x" + HASH.slice(2, 6) + "…" + HASH.slice(-4) +
+      ").You can still adjust your ballot and resubmit.",
+  );
+  expect(within(box).getByRole("link", { name: /^Sepolia, transaction 0x/ }))
+    .toHaveAttribute("href", `https://eth-sepolia.blockscout.com/tx/${HASH}`);
   cleanup();
   p = panel({ kind: "counted", hash: HASH }, { upToDate: false });
   expect(p.button("Send my ballot")).toBeEnabled();
@@ -75,7 +83,8 @@ it("counted: the button says Counted; a changed ballot can be sent again", () =>
 it("a ballot that already counts, on a fresh page, shows as counted (no transaction to link)", () => {
   const p = panel({ kind: "idle" }, { upToDate: true });
   expect(p.button("Counted")).toBeDisabled();
-  expect(screen.queryByRole("link", { name: /Etherscan/ })).toBeNull();
+  expect(screen.queryByRole("link", { name: /transaction|0x/ })).toBeNull();
+  expect(screen.getByText(/Your ballot was recorded on Sepolia\./)).toBeInTheDocument();
 });
 
 it("not signed: nothing was sent, Send again", () => {
@@ -90,7 +99,10 @@ it("failures say what went wrong and what next, with the transaction when there 
   expect(screen.getByText("Sepolia refused it")).toBeInTheDocument();
   fireEvent.click(p.button("Retry"));
   expect(p.onRetry).toHaveBeenCalled();
-  expect(screen.getByRole("link", { name: /Etherscan/ })).toBeInTheDocument();
+  // In the box, under its message, not below the button.
+  expect(screen.getByText("Sepolia refused it").parentElement!).toContainElement(
+    screen.getByRole("link", { name: /^Transaction 0x.* on Sepolia$/ }),
+  );
   cleanup();
 
   // Too slow: it may still land, so Check again (Retry reads the chain first).
@@ -130,9 +142,9 @@ it("a send that fails at Send says it never left, and offers your own wallet", (
   expect(screen.getByRole("button", { name: /send it yourself/i })).toBeEnabled();
 });
 
-it("test votes link to Sepolia's Etherscan", () => {
-  expect(etherscanTx(HASH)).toBe(`https://sepolia.etherscan.io/tx/${HASH}`);
-  expect(etherscanTx(HASH, "Ethereum")).toBe(`https://etherscan.io/tx/${HASH}`);
+it("test votes link to Sepolia's Blockscout, the real vote to Ethereum's", () => {
+  expect(explorerTx(HASH)).toBe(`https://eth-sepolia.blockscout.com/tx/${HASH}`);
+  expect(explorerTx(HASH, "Ethereum")).toBe(`https://eth.blockscout.com/tx/${HASH}`);
 });
 
 it("a failure right after Sign (no transaction) is at Sign: Try again", () => {

@@ -17,7 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, type ApiOptions } from "~/lib/api";
 import { apiCode } from "~/hooks/use-vote";
 import { voteClient } from "~/hooks/use-vote-send";
-import { etherscanTx, type VoteChain } from "~/components/vote/BallotStatus";
+import { explorerTx, type VoteChain } from "~/components/vote/BallotStatus";
 import {
   type Busy,
   type PledgeFlowDeps,
@@ -206,13 +206,13 @@ export function PledgeSendStatus({ phase }: { phase: PledgePhase }) {
       {text && <span>{text}</span>}
       {tx && (
         <a
-          href={etherscanTx(tx, chainName(ROUND))}
+          href={explorerTx(tx, chainName(ROUND))}
           target="_blank"
           rel="noreferrer"
-          className="tnum"
+          // Without contextual alternates the font draws 0x as 0×.
+          className="[font-feature-settings:'calt'_0]"
         >
-          {tx.slice(0, 6)}…{tx.slice(-4)} on{" "}
-          {chainName(ROUND) === "Ethereum" ? "Etherscan" : "Sepolia Etherscan"}
+          {tx.slice(0, 6)}…{tx.slice(-4)} on {chainName(ROUND)}
         </a>
       )}
     </p>

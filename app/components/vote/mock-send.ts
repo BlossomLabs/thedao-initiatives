@@ -9,7 +9,7 @@ const STEP_MS: Partial<Record<BallotPhase["kind"], number>> = {
   relaying: 900,
   waiting: 1600,
 };
-/** A hash of "0x": BallotStatus shows no Etherscan link for it (there is no transaction). */
+/** A hash of "0x": BallotStatus shows no explorer link for it (there is no transaction). */
 const NO_TX = "0x" as Hex;
 
 /** An example ballot's Send (mock-round.ts): the same steps as a real one (sign in the

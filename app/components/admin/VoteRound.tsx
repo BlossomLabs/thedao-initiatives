@@ -13,6 +13,7 @@ import { PledgeForm } from "~/components/admin/initiative/Pledges";
 import InitiativeCombobox from "~/components/ui/InitiativeCombobox";
 import { useRun } from "~/components/admin/dashboard/run";
 import { useBoard } from "~/hooks/use-board";
+import { explorerTx } from "~/components/vote/BallotStatus";
 
 import { type Tier, tierName } from "../../../shared/vote/ballot";
 import { voteFilePrefix } from "../../../shared/vote/environment";
@@ -598,11 +599,11 @@ function TestVoters() {
           {msg.hash && (
             <a
               className="text-[12px] text-muted underline"
-              href={`https://sepolia.etherscan.io/tx/${msg.hash}`}
+              href={explorerTx(msg.hash)}
               target="_blank"
               rel="noreferrer"
             >
-              Sepolia Etherscan
+              Sepolia
             </a>
           )}
         </div>

@@ -1,0 +1,19 @@
+{
+  "status": "confirmed",
+  "chainId": 1,
+  "from": "0x22797B059E20C1ef64CFe12815e09c0E984832F3",
+  "ens": "sem-the-bee.eth",
+  "to": "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF",
+  "valueWei": "1624444466179989",
+  "valueEth": "0.001624444466179989",
+  "gas": "21055",
+  "gasPriceWei": "146935011",
+  "feeEth": "0.000003093716656605",
+  "nonce": 20,
+  "simulatedRemainingWei": "0",
+  "hash": "0x490ce1841fc9c3889ed18906de8ee37a0148b45f68c8256673a608a471beeb9d",
+  "blockNumber": "26437014",
+  "gasUsed": "21055",
+  "actualFeeEth": "0.000003093716656605",
+  "remainingWei": "0"
+}

@@ -628,7 +628,16 @@
     "initialEth": "0.005",
     "firstDeploymentSpentEth": "0.001703653793050643",
     "replacementSpentEth": "0.001668808024112763",
-    "remainingEth": "0.001627538182836594"
+    "remainingEth": "0",
+    "remainingBeforeRefundEth": "0.001627538182836594",
+    "refund": {
+      "to": "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF",
+      "ens": "sem-the-bee.eth",
+      "amountEth": "0.001624444466179989",
+      "gasFeeEth": "0.000003093716656605",
+      "hash": "0x490ce1841fc9c3889ed18906de8ee37a0148b45f68c8256673a608a471beeb9d",
+      "artifact": "mainnet-2026-11-18.refund.json"
+    }
   },
   "initialPriceSnapshot": {
     "ethUsdAnswer": "179543871513",

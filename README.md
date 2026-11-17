@@ -192,8 +192,11 @@ so wallet users never download it.
 The browser origins allowed to call the API default to `VITE_SITE_URL`'s origin, so a deployment on
 one custom domain needs nothing more; `WEB_ORIGIN` (comma-separated) overrides that list for local
 dev or a second domain. Requests served on a platform host (`*.deno.net`, `*.deno.dev`, or whatever
-`SELF_HOST_SUFFIXES` names) are additionally accepted as their own origin, for both the origin guard
-and the SIWE domain, so production and branch preview URLs work without listing each one. Set
+`SELF_HOST_SUFFIXES` names) are additionally accepted as their own origin by the origin guard.
+SIWE sign-in always requires an explicitly configured origin: add production and branch preview
+URLs that need sign-in to `WEB_ORIGIN`. SIWE domains default to those origins' hosts; if overriding
+`SIWE_DOMAINS`, list those preview hosts there too. A request's hostname never expands the SIWE
+allowlists. Set
 `SITE_USERNAME` and `SITE_PASSWORD` to keep the site in private preview behind HTTP Basic Auth; see
 `api/README.md`. Set `DB_PREFIX` when two deployments share one KV database (keys are namespaced
 under it; changing it means starting from an empty database).

@@ -359,7 +359,7 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
     },
   });
   assertEquals(bad.status, 401);
-  // The host the page was served on is accepted even when not configured.
+  // A platform-suffix request host cannot widen the configured SIWE policy.
   const { nonce: n0 } = await j(await h.req("/api/auth/nonce")) as { nonce: string };
   const own = msg(n0, "preview.deno.net").replace(
     `URI: ${ORIGIN}`,
@@ -370,7 +370,8 @@ Deno.test("SIWE: nonce -> verify -> session; reuse, wrong domain, admin flag, lo
     headers: { Origin: "https://preview.deno.net", "Content-Type": "application/json" },
     body: JSON.stringify({ message: own, signature: await w.sign(own) }),
   }, testConnection());
-  assertEquals(onSelf.status, 200);
+  assertEquals(onSelf.status, 401);
+  assertEquals((await j(onSelf)).error, "domain not allowed");
   // A forged Host outside the platform suffixes does not widen the binding.
   const { nonce: n1 } = await j(await h.req("/api/auth/nonce")) as { nonce: string };
   const forged = msg(n1, "evil.example").replace(`URI: ${ORIGIN}`, "URI: https://evil.example");

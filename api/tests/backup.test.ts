@@ -246,7 +246,7 @@ Deno.test("backup: restore is idempotent, only while paused, never deletes, and 
     assertEquals(await j(await restore(b, adminB, { backup })), {
       written: 0,
       skipped: backup.entries.length,
-      claimsRebuilt: 0,
+      claimsRebuilt: 1,
     });
     const before = (await b.db.revisions.list(first.id, true)).length;
     await b.db.initiatives.revise(first.id, { ...first, title: "Changed in B" }, {

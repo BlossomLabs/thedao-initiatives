@@ -294,8 +294,7 @@ Within `vote`, exports omit the relayer lease, pending ballot receipts, pledge o
 and derived round/ballot caches, whose expirations cannot be carried by this format. Restores skip
 those keys in older files too, without overwriting or deleting a destination's active lease.
 Comment votes, relayer nonce journals, relay counts, gas grants and unsettled pledge records remain
-durable. A permanent orphan lease left by a restore performed before this fix is not automatically
-removed: repair it only when no relayer send is active.
+durable.
 
 **Restore**: `POST /api/admin/restore` `{mode?: "merge" | "replace", backup}` (recent
 authentication, up to 32 MB, audited as `backup.restore` with the mode as detail) only while
@@ -303,9 +302,10 @@ maintenance mode is on (409 otherwise). `merge` (the default) writes only the ke
 yet; `replace` overwrites existing keys with the file's values. Neither deletes anything, and the
 maintenance flag inside a file is ignored. The whole file is validated first and refused as a whole
 (`400` naming the first bad entry) before any write; a `200 {written, skipped, claimsRebuilt}` means
-every entry was either written or skipped, so re-running a restore is safe. Held comments that were
-written get their claim index back with the remaining lifetime, so their authors can still find
-them. The `/admin/maintenance` page wraps all of this: enter maintenance, download, restore a file,
+every entry was either written or skipped. All writes are staged and published with a single
+head/revision CAS: a failed batch or concurrent durable write leaves the active dataset unchanged.
+A lost publication acknowledgement may return an error after complete activation; re-running the
+restore is safe. All held comments get their claim index back with the remaining lifetime. The `/admin/maintenance` page wraps all of this: enter maintenance, download, restore a file,
 exit.
 
 ## SIWE from the frontend
@@ -356,11 +356,13 @@ platform; each timeline gets its own database. If two deployments must share one
 each its own `DB_PREFIX`: every key is stored under that first part, so the two never see each
 other's rows (changing it on a live deployment starts from empty).
 
-`KV_EVENTUAL_READS=1` serves the public pages' reads (initiative rows and lists, pledges, donations,
-revisions, comments, funding snapshots) with Deno KV eventual consistency, from the nearest replica.
-Every write keeps strong reads for the entries it checks. It is an experiment: measure with
-`deno task bench` on a preview before keeping it on, since a page read right after a write may
-briefly show the previous state.
+Application records use strong reads and a request-pinned dataset generation. Large restores,
+bulk moderation/status changes and content sync stage their changes before one atomic publication.
+Concurrent durable writes abort publication; requests pinned to the previous generation cannot write.
+One additional KV read pins the generation per request. Sessions, rate counters, private autosaves
+and live leases stay outside restored datasets. Retired/abandoned generations are collected by the
+production daily cron after a one-hour grace period; request and staging scopes expire after ten
+minutes. A failed or interrupted staging job never becomes visible.
 
 `BOARD_CACHE_SECS` (default 5, `0` = off) is how long an isolate serves `GET /api/board` from its
 own memory instead of reading KV: the board is public, polled every 30 s by every open tab, and

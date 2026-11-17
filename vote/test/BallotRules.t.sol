@@ -403,7 +403,7 @@ contract BallotRulesTest is Test {
         round.vote(1, 1, hex"01010101", proof3(0, 1, 2));
     }
 
-    function test_groupRuleCountsAsks() public {
+    function test_pledgingToAnAffiliationDoesNotReduceItsGoalShare() public {
         // Projects 0 and 1 share a group: 200 of 350 by goal, over half.
         uint256[4] memory goals = [uint256(100e6), 100e6, 100e6, 50e6];
         uint256[4] memory masks = [uint256(1), 1, 0, 0];
@@ -413,10 +413,11 @@ contract BallotRulesTest is Test {
         round.vote(1, 1, hex"01010101", proof3(0, 2, 3));
         round.setPledge(bytes32(uint256(1)), 0, 0, 60e6); // asks 40 + 100 + 100 + 50: group 140 of 290
         vm.prank(voter);
+        vm.expectRevert(abi.encodeWithSelector(SignedBallots.GroupOverHalf.selector, uint8(0), uint8(0)));
         round.vote(1, 1, hex"01010101", proof3(0, 2, 3));
     }
 
-    function test_groupOverHalfByAskNotByGoal() public {
+    function test_unrelatedPledgesDoNotInvalidateAnUnchangedGoalShare() public {
         // Goals put the group at exactly half (200 of 400), which passes.
         uint256[4] memory masks = [uint256(1), 1, 0, 0];
         SignedBallots round = priced(hundreds(), masks, 150e6);
@@ -425,7 +426,6 @@ contract BallotRulesTest is Test {
         round.setPledge(bytes32(uint256(1)), 2, 0, 60e6);
         round.setPledge(bytes32(uint256(2)), 3, 0, 60e6); // asks 100 + 100 + 40 + 40: group 200 of 280
         vm.prank(voter);
-        vm.expectRevert(abi.encodeWithSelector(SignedBallots.GroupOverHalf.selector, uint8(0), uint8(0)));
         round.vote(1, 2, hex"01010101", proof3(0, 2, 3));
     }
 

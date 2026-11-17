@@ -1,3 +1,4 @@
+import { stageDataset, transientVoteKey } from "../db/dataset.ts";
 /**
  * Whole-database backup as one JSON file: every KV entry under the prefixes
  * that hold the site's records, keys and values verbatim, so a restore puts
@@ -67,24 +68,14 @@ export interface RestoreResult {
 
 /** Deno KV caps: 64 KiB per value; keep commits well under 1000 mutations / 800 KiB. */
 const MAX_VALUE_BYTES = 64 * 1024;
-const BATCH_MUTATIONS = 500;
+const BATCH_MUTATIONS = 90;
 const BATCH_BYTES = 600 * 1024;
 const GET_MANY_LIMIT = 10;
 
 const isFlagKey = (key: BackupKey) => key[0] === "meta" && key[1] === MAINTENANCE_META_KEY;
 /** Vote shares a prefix with durable comments, nonce journals and pledge records.
  * These particular leases, receipts and derived caches cannot survive losing TTL. */
-function isTransientVoteKey(key: BackupKey): boolean {
-  if (key[0] !== "vote") return false;
-  if (key[1] === "relayer" && (key.length === 2 || key.length === 4)) return true;
-  // Normalize current chain-scoped round keys for the same transient-record rules.
-  if (typeof key[1] === "number") key = [key[0], ...key.slice(2)];
-  if (typeof key[1] !== "string" || !/^0x[0-9a-f]{40}$/i.test(key[1])) return false;
-  if (key.length === 5 && (key[2] === "pending" || key[2] === "pledge-outcome")) return true;
-  return (key.length === 3 || key[2] === "corrections1") &&
-    (key.at(-1) === "round" || key.at(-1) === "ballots");
-}
-const excludedKey = (key: BackupKey) => isFlagKey(key) || isTransientVoteKey(key);
+const excludedKey = (key: BackupKey) => isFlagKey(key) || transientVoteKey(key);
 const keyId = (key: BackupKey) => JSON.stringify(key);
 
 /** JSON carries strings, finite numbers, booleans, null, arrays and plain objects. */
@@ -159,7 +150,10 @@ export function validateBackup(input: unknown): BackupFile {
     if (!("value" in e!) || e!.value === undefined) {
       throw new HttpError(400, `entry ${i}: value is missing`);
     }
-    if (!jsonSafe(e!.value) || JSON.stringify(e!.value).length > MAX_VALUE_BYTES) {
+    if (
+      !jsonSafe(e!.value) ||
+      new TextEncoder().encode(JSON.stringify(e!.value)).length > MAX_VALUE_BYTES
+    ) {
       throw new HttpError(400, `entry ${i}: value exceeds 64 KiB`);
     }
     const id = keyId(key as BackupKey);
@@ -179,7 +173,7 @@ function* batches(entries: BackupEntry[]): Generator<BackupEntry[]> {
   let batch: BackupEntry[] = [];
   let bytes = 0;
   for (const e of entries) {
-    const size = JSON.stringify(e.value).length;
+    const size = new TextEncoder().encode(JSON.stringify(e.value)).length;
     if (batch.length && (batch.length >= BATCH_MUTATIONS || bytes + size > BATCH_BYTES)) {
       yield batch;
       batch = [];
@@ -202,17 +196,23 @@ export async function restoreBackup(
   mode: RestoreMode,
   now: () => number,
 ): Promise<RestoreResult> {
+  const maintenance = await db.kv.get<{ on: boolean }>(K.meta(MAINTENANCE_META_KEY));
+  if (!maintenance.value?.on) {
+    throw new HttpError(409, "Turn maintenance mode on before restoring a backup.");
+  }
+  return await stageDataset(db.kv, () => restoreStaged(db, backup, mode, now), [maintenance], now);
+}
+
+async function restoreStaged(
+  db: Db,
+  backup: BackupFile,
+  mode: RestoreMode,
+  now: () => number,
+): Promise<RestoreResult> {
   const kv = db.kv;
   const result: RestoreResult = { written: 0, skipped: 0, claimsRebuilt: 0 };
-  const held: Comment[] = [];
   const note = (items: BackupEntry[]) => {
     result.written += items.length;
-    for (const e of items) {
-      const c = e.value as Partial<Comment>;
-      if (e.key[0] === "comment" && c?.status === "held" && c.claimToken && c.id) {
-        held.push(c as Comment);
-      }
-    }
   };
   const commit = async (items: BackupEntry[]): Promise<boolean> => {
     const op = kv.atomic();
@@ -256,7 +256,9 @@ export async function restoreBackup(
     }
   }
 
-  for (const c of held) {
+  for await (const entry of kv.list<Comment>({ prefix: ["comment"] })) {
+    const c = entry.value;
+    if (c.status !== "held" || !c.claimToken || !c.id) continue;
     const expiresAt = c.claimExpiresAt ?? c.createdAt + CLAIM_TTL_SECS;
     const ttlMs = (expiresAt - now()) * 1000;
     if (ttlMs <= 0) continue;

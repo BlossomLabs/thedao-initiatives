@@ -1,8 +1,4 @@
-/**
- * KV_EVENTUAL_READS=1 lets the public pages read from the nearest replica
- * (Deno KV "eventual" consistency); every write path keeps strong reads for
- * the entries it checks. Off by default.
- */
+/** Atomic dataset publication requires strong reads of both the head and its records. */
 import { assert, assertEquals } from "@std/assert";
 import { harness } from "./app-helpers.ts";
 
@@ -41,7 +37,7 @@ async function record(run: () => Promise<Response>) {
   return seen.map((s) => s.consistency);
 }
 
-Deno.test("eventual reads: public pages read eventually when enabled, writes stay strong", async () => {
+Deno.test("dataset consistency: public pages and writes read strongly", async () => {
   const h = await harness({ env: { KV_EVENTUAL_READS: "1" } });
   const r = await h.db.initiatives.insert({
     title: "Read me",
@@ -64,11 +60,11 @@ Deno.test("eventual reads: public pages read eventually when enabled, writes sta
   await h.db.cards.summary(r.id);
   const board = await record(() => h.req("/api/board"));
   assert(board.length >= 4, `board did ${board.length} reads`);
-  assert(board.every((c) => c === "eventual"), `board reads: ${board.join(",")}`);
+  assert(board.every((c) => c !== "eventual"), `board reads: ${board.join(",")}`);
 
   const page = await record(() => h.req(`/api/initiatives/${r.slug}`));
   assert(page.length >= 5, `page did ${page.length} reads`);
-  assert(page.every((c) => c === "eventual"), `page reads: ${page.join(",")}`);
+  assert(page.every((c) => c !== "eventual"), `page reads: ${page.join(",")}`);
 
   // A write re-reads what it checks with strong consistency.
   seen.length = 0;
@@ -76,11 +72,11 @@ Deno.test("eventual reads: public pages read eventually when enabled, writes sta
   await h.db.initiatives.update(r.id, { goalUsd: 20 });
   recording = false;
   assert(seen.length >= 1);
-  assert(seen.every((s) => s.consistency === undefined), "update used an eventual read");
+  assert(seen.every((s) => s.consistency !== "eventual"), "update used an eventual read");
   h.close();
 });
 
-Deno.test("eventual reads: off by default", async () => {
+Deno.test("dataset consistency: strong by default", async () => {
   const h = await harness();
   await h.db.initiatives.insert({
     title: "Read me",
@@ -90,11 +86,11 @@ Deno.test("eventual reads: off by default", async () => {
   });
   const board = await record(() => h.req("/api/board"));
   assert(board.length >= 1);
-  assert(board.every((c) => c === undefined), `board reads: ${board.join(",")}`);
+  assert(board.every((c) => c !== "eventual"), `board reads: ${board.join(",")}`);
   h.close();
 });
 
-Deno.test("eventual reads: a card summary is built from strong reads and served from eventual ones", async () => {
+Deno.test("dataset consistency: cached summaries avoid rebuilding and remain strongly read", async () => {
   const h = await harness({ env: { KV_EVENTUAL_READS: "1" } });
   const r = await h.db.initiatives.insert({ title: "Summed", summary: "s", status: "approved" });
   await h.db.pledges.add(r.id, {
@@ -105,22 +101,20 @@ Deno.test("eventual reads: a card summary is built from strong reads and served 
     url: "",
     logoCid: "",
   });
-  // Cold: the version and summary lookup may be eventual; the rows it is built
-  // from may not, or a replica behind the write would be frozen into the copy.
+  // The first summary builds from strong reads; a warm summary only looks up
+  // the generation and the cached summary/version pair.
   seen.length = 0;
   recording = true;
   await h.db.cards.summary(r.id);
   recording = false;
-  assertEquals(seen.map((s) => `${s.op}:${s.consistency}`), [
-    "getMany:eventual",
-    "list:undefined",
-    "list:undefined",
-  ]);
-  // Warm: one eventual lookup.
+  assert(seen.some((s) => s.op === "list"));
+  assert(seen.every((s) => s.consistency !== "eventual"));
   seen.length = 0;
   recording = true;
   await h.db.cards.summary(r.id);
   recording = false;
-  assertEquals(seen.map((s) => `${s.op}:${s.consistency}`), ["getMany:eventual"]);
+  assertEquals(seen.filter((s) => s.op === "getMany").length, 1);
+  assertEquals(seen.filter((s) => s.op === "list").length, 0);
+  assert(seen.every((s) => s.consistency !== "eventual"));
   h.close();
 });

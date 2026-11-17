@@ -1,9 +1,13 @@
-/**
- * Autosave under the wallet's key for reload and browser-restart recovery.
- * Debounced 400 ms; flushed before logout/switch/unmount. Deleted only by explicit choice.
- * Restore happens once on mount; the form shows a banner with Discard.
- */
-import { cancelDraftWrites, draftVersion, registerDraftFlusher } from "~/lib/browser-privacy";
+/** Private server autosave. The browser holds draft content only in memory. */
+import {
+  cancelDraftWrites,
+  draftPath,
+  draftVersion,
+  readPrivateDraft,
+  registerDraftFlusher,
+} from "~/lib/browser-privacy";
+import { api, errorMessage } from "~/lib/api";
+import type { SavedDraft } from "@shared/draft/autosave";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Draft } from "./types";
 import { emptyDraft, isEmptyDraft, newId } from "./useDraft";
@@ -28,9 +32,15 @@ export function reviveDraft(raw: unknown): Draft | null {
     topup: s.type === "grant" && Boolean(s.topup),
     categories: Array.isArray(s.categories) ? normaliseCategories(s.categories) : [],
     milestoneReviewer: String(s.milestoneReviewer ?? ""),
-    page: { ...base.page, ...(s.page && typeof s.page === "object" ? s.page : {}) },
-    sections: s.sections && typeof s.sections === "object" ? { ...s.sections } : {},
-    priv: { ...base.priv, ...(s.priv && typeof s.priv === "object" ? s.priv : {}) },
+    page: Object.fromEntries(
+      Object.entries(base.page).map((
+        [k, v],
+      ) => [k, String(s.page?.[k as keyof Draft["page"]] ?? v)]),
+    ) as unknown as Draft["page"],
+    sections: s.sections && typeof s.sections === "object"
+      ? Object.fromEntries(Object.entries(s.sections).map(([k, v]) => [k, String(v ?? "")]))
+      : {},
+    priv: { funders: String(s.priv?.funders ?? ""), contact: String(s.priv?.contact ?? "") },
     unsorted: String(s.unsorted ?? ""),
     milestones: Array.isArray(s.milestones)
       ? s.milestones.map((m) => ({
@@ -60,94 +70,150 @@ export function reviveDraft(raw: unknown): Draft | null {
   return isEmptyDraft(d) ? null : d;
 }
 
-export function readAutosave(key = AUTOSAVE_KEY): Draft | null {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? reviveDraft(JSON.parse(raw)) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function clearAutosave(key = AUTOSAVE_KEY) {
-  cancelDraftWrites(key);
-  try {
-    localStorage.removeItem(key);
-  } catch { /* storage blocked: fine */ }
-}
-
-/**
- * `key` null disables everything (edit pages). `onRestore` receives the
- * stored draft once, on mount, when there is one with text in it.
- */
 export function useAutosave(
   draft: Draft,
   { key = AUTOSAVE_KEY, onRestore }: { key?: string | null; onRestore: (d: Draft) => void },
 ) {
+  const owner = key?.startsWith(AUTOSAVE_KEY + ":") ? key.slice(AUTOSAVE_KEY.length + 1) : null;
   const [restored, setRestored] = useState(false);
-  const restoreRef = useRef(onRestore);
-  restoreRef.current = onRestore;
-  const armed = useRef(false);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
   const latest = useRef(draft);
   latest.current = draft;
-  const version = useRef(key ? draftVersion(key) : 0);
+  const restoreRef = useRef(onRestore);
+  restoreRef.current = onRestore;
+  const state = useRef<
+    {
+      key: string;
+      epoch: number;
+      version: string | null;
+      saved: string;
+      blocked: boolean;
+      ignored?: Draft;
+    } | null
+  >(null);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+
+  const save = useCallback(async () => {
+    const current = state.current;
+    if (
+      !owner || !current || current.blocked || current.ignored === latest.current ||
+      current.epoch !== draftVersion(current.key)
+    ) return;
+    const data = isEmptyDraft(latest.current) ? null : snapshot(latest.current);
+    const text = JSON.stringify(data);
+    const run = queue.current.then(async () => {
+      if (
+        current !== state.current || current.epoch !== draftVersion(current.key) ||
+        text === current.saved
+      ) return;
+      const result = await api<SavedDraft>(draftPath(owner), {
+        method: "PUT",
+        json: { version: current.version, data },
+        signal: AbortSignal.timeout(15_000),
+      });
+      current.version = result.version;
+      current.saved = text;
+      setError("");
+    });
+    queue.current = run;
+    try {
+      await run;
+    } catch (e) {
+      current.blocked = true;
+      setError(errorMessage(e));
+      throw e;
+    }
+  }, [owner]);
 
   useEffect(() => {
-    if (!key) return;
-    const restore = () => {
-      const stored = readAutosave(key);
+    state.current = null;
+    queue.current = Promise.resolve();
+    setReady(false);
+    setRestored(false);
+    setError("");
+    if (!owner || !key) return;
+    let mounted = true;
+    const initial = latest.current;
+    const epoch = draftVersion(key);
+    void readPrivateDraft(owner).then((saved) => {
+      if (!mounted || epoch !== draftVersion(key)) return;
+      const stored = reviveDraft(saved.data);
+      if (stored && latest.current !== initial && !isEmptyDraft(latest.current)) {
+        setError("A saved draft exists. Reload before editing so it can be restored.");
+        return;
+      }
+      state.current = {
+        key,
+        epoch,
+        version: saved.version,
+        saved: JSON.stringify(saved.data),
+        blocked: false,
+      };
       if (stored) {
         latest.current = stored;
         restoreRef.current(stored);
         setRestored(true);
       }
-    };
-    restore();
-    globalThis.addEventListener("draft-migrated", restore);
-    armed.current = true;
-    return () => globalThis.removeEventListener("draft-migrated", restore);
-  }, [key]);
-
-  useEffect(() => {
-    if (!key || !armed.current) return;
-    version.current = draftVersion(key);
-    const generation = version.current;
-    const t = setTimeout(() => {
-      if (generation !== draftVersion(key)) return;
-      try {
-        if (isEmptyDraft(draft)) localStorage.removeItem(key);
-        else localStorage.setItem(key, JSON.stringify(snapshot(draft)));
-      } catch { /* storage blocked: fine */ }
-    }, AUTOSAVE_DELAY);
-    return () => clearTimeout(t);
-  }, [draft, key]);
-
-  useEffect(() => {
-    if (!key) return;
-    const flush = () => {
-      if (!armed.current || version.current !== draftVersion(key)) return;
-      try {
-        const d = latest.current;
-        if (isEmptyDraft(d)) localStorage.removeItem(key);
-        else localStorage.setItem(key, JSON.stringify(snapshot(d)));
-      } catch { /* storage blocked */ }
-    };
-    const unregister = registerDraftFlusher(key, flush);
-    const changed = (event: StorageEvent) => {
-      if (event.key === key && event.newValue === null) cancelDraftWrites(key);
-    };
-    globalThis.addEventListener("storage", changed);
+      setReady(true);
+    }).catch((e) => {
+      if (mounted) setError(errorMessage(e));
+    });
+    const unregister = registerDraftFlusher(key, async () => {
+      if (!state.current) {
+        throw new Error(
+          "Your saved draft has not loaded. Please wait or reload before logging out.",
+        );
+      }
+      if (state.current.blocked) {
+        throw new Error(
+          "Your latest draft has not been saved. Keep this tab open and resolve the autosave error first.",
+        );
+      }
+      await save();
+    });
     return () => {
-      flush();
+      mounted = false;
+      void save().catch(() => {});
       unregister();
-      globalThis.removeEventListener("storage", changed);
     };
-  }, [key]);
+  }, [key, owner, save]);
 
-  const clear = useCallback(() => {
-    if (key) clearAutosave(key);
-    setRestored(false);
-  }, [key]);
+  useEffect(() => {
+    if (!ready) return;
+    const timer = setTimeout(() => void save().catch(() => {}), AUTOSAVE_DELAY);
+    return () => clearTimeout(timer);
+  }, [draft, ready, save]);
 
-  return { restored, clear, dismiss: () => setRestored(false) };
+  const clear = useCallback(async () => {
+    const current = state.current;
+    if (!owner || !current) return;
+    cancelDraftWrites(current.key);
+    current.ignored = latest.current;
+    try {
+      await queue.current.catch(() => {});
+      const saved = await readPrivateDraft(owner);
+      // Do not silently delete a different tab's newer work.
+      if (saved.version !== current.version) {
+        throw new Error("This draft changed in another tab. Reload before deleting it.");
+      }
+      const result = await api<SavedDraft>(draftPath(owner), {
+        method: "DELETE",
+        json: { version: saved.version },
+        signal: AbortSignal.timeout(15_000),
+      });
+      current.version = result.version;
+      current.saved = "null";
+      current.blocked = false;
+      current.epoch = draftVersion(current.key);
+      queue.current = Promise.resolve();
+      setRestored(false);
+      setError("");
+    } catch (e) {
+      current.blocked = true;
+      setError(errorMessage(e));
+      throw e;
+    }
+  }, [owner]);
+  return { restored, error, clear, dismiss: () => setRestored(false) };
 }

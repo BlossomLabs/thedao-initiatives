@@ -1,14 +1,86 @@
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { ADMIN, harness, ORIGIN, PLAIN } from "./app-helpers.ts";
-import { LOCK_COOKIE } from "../lib/sitelock.ts";
+import { createSiteLock, LOCK_COOKIE } from "../lib/sitelock.ts";
 import { wallet } from "./helpers.ts";
 
 const BASIC = "Basic " + btoa("preview:s3cret");
+
+Deno.test("site lock: signed cookies reject tampering, another origin and secret rotation", async () => {
+  let now = 1_800_000_000;
+  const config = {
+    siteUsername: "preview",
+    sitePassword: "s3cret",
+    siteCookieKey: "12".repeat(32),
+  };
+  const lock = createSiteLock(config, () => Promise.resolve(false), () => now);
+  const origin = "https://preview.test";
+  const request = new Request(origin);
+  const issued = await lock.cookie(request);
+  for (const flag of ["__Host-site_lock=", "Path=/", "HttpOnly", "Secure", "SameSite=Lax"]) {
+    assertStringIncludes(issued, flag);
+  }
+  assert(!issued.includes("Domain="));
+  const cookie = issued.split(";")[0];
+  assert(cookie !== (await lock.cookie(request)).split(";")[0]);
+  const withCookie = (value: string, url = origin) =>
+    new Request(url, { headers: { Cookie: value } });
+  assertEquals(await lock.check(withCookie(cookie)), "cookie");
+  assertEquals(await lock.check(withCookie(cookie, "https://other.test")), "denied");
+  assertEquals(await lock.check(withCookie(cookie, "http://preview.test")), "denied");
+  const extended = cookie.replace(String(now + 30 * 86400), String(now + 30 * 86400 + 1));
+  now++;
+  assertEquals(await lock.check(withCookie(extended)), "denied");
+  const corrupted = cookie.slice(0, -1) + (cookie.endsWith("0") ? "1" : "0");
+  assertEquals(await lock.check(withCookie(corrupted)), "denied");
+  const rotated = createSiteLock(
+    { ...config, sitePassword: "rotated" },
+    () => Promise.resolve(false),
+    () => now,
+  );
+  assertEquals(await rotated.check(withCookie(cookie)), "denied");
+  const rekeyed = createSiteLock(
+    { ...config, siteCookieKey: "34".repeat(32) },
+    () => Promise.resolve(false),
+    () => now,
+  );
+  assertEquals(await rekeyed.check(withCookie(cookie)), "denied");
+  now += 30 * 86400 - 2;
+  assertEquals(await lock.check(withCookie(cookie)), "cookie");
+  now++;
+  assertEquals(await lock.check(withCookie(cookie)), "denied");
+});
+
+Deno.test("site lock: enabled preview refuses a missing or malformed independent signing key", () => {
+  for (const siteCookieKey of ["", "password", "ab".repeat(31), "xx".repeat(32)]) {
+    assertThrows(
+      () =>
+        createSiteLock(
+          { siteUsername: "preview", sitePassword: "secret", siteCookieKey },
+          () => Promise.resolve(false),
+        ),
+      Error,
+      "SITE_COOKIE_KEY",
+    );
+  }
+});
 
 Deno.test("site lock: off by default", async () => {
   const h = await harness();
   assertEquals((await h.req("/api/board")).status, 200);
   h.close();
+});
+
+Deno.test("site lock: a copied unlock cookie expires on the server after thirty days", async () => {
+  const h = await harness({ env: { SITE_USERNAME: "preview", SITE_PASSWORD: "s3cret" } });
+  try {
+    const opened = await h.req("/api/board", { headers: { Authorization: BASIC } });
+    const cookie = opened.headers.get("Set-Cookie")!.split(";")[0];
+    assertEquals((await h.req("/api/board", { headers: { Cookie: cookie } })).status, 200);
+    h.clock.now += 30 * 86400;
+    assertEquals((await h.req("/api/board", { headers: { Cookie: cookie } })).status, 401);
+  } finally {
+    h.close();
+  }
 });
 
 Deno.test("site lock: basic -> cookie -> bearer session; healthz stays open", async () => {

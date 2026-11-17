@@ -50,7 +50,7 @@ export async function deployBlockOf(
 export async function readRoundOnChain(
   address: `0x${string}`,
   rpcUrl: string,
-  transport: Transport = http(rpcUrl),
+  transport: Transport = http(rpcUrl, { fetchOptions: { redirect: "error" } }),
   chainId: 1 | 11155111 = 11155111,
   at?: { block: number; deployBlock?: number },
 ): Promise<RoundOnChain & { minters: (a: `0x${string}`) => Promise<boolean> }> {

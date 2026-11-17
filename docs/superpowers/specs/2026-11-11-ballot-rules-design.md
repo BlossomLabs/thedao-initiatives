@@ -41,7 +41,7 @@ appear in the UI as decoration or labels.
 - **S-Tier independence:**
   - At least 3 independent projects. Related projects count as one.
   - RFPs are wildcards: each RFP counts as independent.
-  - No single related group can hold more than half of the tier's funds.
+  - No single related group can hold more than half of the tier's total funding goals.
   - These rules never apply to B-Tier. Whether they apply to A-Tier is undecided, so it is a
     per-round setting (default: S-Tier only).
 - **Relatedness is affiliations** (first called tags; renamed at the user's request). Projects get a
@@ -70,10 +70,10 @@ appear in the UI as decoration or labels.
 Definitions, for one ballot, at the block that records it:
 
 - **Placed projects:** those in S-Tier, A-Tier or B-Tier.
-- **Requested amount** of a project: *(Superseded Nov 15 by `2026-11-15-ballot-rules-on-asks-design.md`:
-  rules now count each project's **ask**, its goal less donations and open pledges, computed
-  on-chain at the block that records the ballot.)* Originally its `goalUsd` registered in the
-  contract (micro-USD), not the remaining need. _(My call.)_
+- **Requested amount** of a project: its **ask**, its goal less donations and open pledges,
+  computed on-chain at the block that records the ballot (amended Nov 15, 2026).
+- **Funding goal:** its `goalUsd` registered in the contract (micro-USD). The affiliation
+  limit uses goals; the size rule and funding use live asks (owner's decision, Nov 17, 2026).
 - **Pool:** `poolUsd` in the contract at that block.
 - **Tiers as the contract sees them:** the ballot's groups of equal rank, in order. The first group
   is S-Tier, the second A-Tier, the third B-Tier. A valid ballot has at most three groups. Because
@@ -92,8 +92,11 @@ A ballot is **valid** when all of these hold:
 3. For each tier the round enforces (S-Tier always; A-Tier if switched on):
    - **Independence:** the tier holds at least 3 projects no two of which are related. Checked
      against the proof: three project indexes, all in that tier, pairwise unrelated.
-   - **No dominant group:** for every group g, `2 × Σ requested(tier ∩ g) ≤ Σ requested(tier)`.
-     (Exactly half is allowed.)
+   - **No dominant group:** for every group g, `2 × Σ goalUsd(tier ∩ g) ≤ Σ goalUsd(tier)`.
+     Exactly half is allowed. Affiliated Initiatives' combined funding goals must not exceed
+     half of the total funding goals of all Initiatives in a ballot's S-Tier. Donations,
+     pledges and price changes do not change this share. The same rule applies to A-Tier
+     when enforced.
 
 A revision is judged on its own like any ballot. The quiet ending's settled-tier rule
 (`tier_settled`) still applies on top.
@@ -101,7 +104,7 @@ A revision is judged on its own like any ballot. The quiet ending's settled-tier
 *(Amended Nov 16, 2026, see `2026-11-15-withdrawn-initiatives-design.md`.)* A withdrawn project
 asks $0 for the size rule: it adds nothing to the 1.5× total, and leaving it unplaced never
 blocks the escape "every project that still asks is placed". The independence and affiliation
-rules count it with its real ask. A settled tier cannot change, so a voter whose settled
+rules count it with its registered goal. A settled tier cannot change, so a voter whose settled
 S-Tier holds a project that is withdrawn later must still be able to send a ballot; if the
 withdrawn project stopped counting there, their independent three or a group's share could
 fail and strand them. The cost is that a ballot sent straight to the contract can lean on a
@@ -222,8 +225,8 @@ ratings" button.)_
   share"), lists each problem in plain words, for example:
   - "S-Tier needs at least 3 independent projects. Seal Audits and Seal Tooling are affiliated with
     Seal, so they count as one."
-  - "Projects affiliated with Seal take $310,000 of S-Tier's $500,000. One affiliation can hold at
-    most half."
+  - "Projects affiliated with Seal have goals totaling $310,000 of S-Tier's $500,000 in goals.
+    One affiliation can hold at most half."
   - "Your ballot requests $1,100,000. It must request at least $1,369,866 (1.5× the $913,244 pool).
     Add more projects; B-Tier is a good place for them."
 - When it passes, no box (no "valid ✓" noise).

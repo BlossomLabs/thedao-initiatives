@@ -29,6 +29,7 @@ export function createRpc(opts: RpcOptions): Rpc {
       try {
         const res = await f(opts.endpoints[i], {
           method: "POST",
+          redirect: "error",
           headers: {
             "Content-Type": "application/json",
             "User-Agent": "thedao-initiatives/2.0",

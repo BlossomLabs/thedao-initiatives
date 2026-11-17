@@ -3,7 +3,7 @@
 A valid ballot requests (in asks) at least 1.5x the pool (or every project's ask, when donations
 took that sum below 1.5x the pool), and each enforced tier (S-Tier always,
 A-Tier when the round says so) holds at least 3 pairwise-unrelated projects with no
-related group over half its asks. Related = sharing a group (an affiliation); RFPs have none.
+related group over half its registered goals. Related = sharing a group (an affiliation); RFPs have none.
 
 Ballots are in on-chain form: competition ranks, 255 = unplaced; a ballot shorter than
 the projects reads the missing ones as unplaced. Mirrors shared/vote/rules.ts and the
@@ -11,7 +11,7 @@ contract; shared/vote/fixtures/ballot-rules.json keeps them equal.
 
 `projects[i]` = {"goalUsd": int, "rfp": bool, "groups": [int]}; amounts in micro-USD.
 `asks[i]`: what project i still asks for (goal less donations and open pledges); the size
-and group rules count asks, never goals.
+rule counts live asks, while affiliation totals count registered goals.
 `independent_tiers`: bit 0 S-Tier, bit 1 A-Tier.
 `withdrawn[i]` (optional, default none): an admin withdrew project i. It asks $0 for the size
 rule only (`requested` and the every-project total); independence, the group sums and the rank
@@ -76,7 +76,7 @@ def check_ballot(ballot, projects, asks, pool, independent_tiers, withdrawn=None
         errors.append({"rule": "tiers"})
 
     def total(xs):
-        return sum(asks[i] for i in xs)
+        return sum(projects[i]["goalUsd"] for i in xs)
 
     live = [0 if withdrawn and i < len(withdrawn) and withdrawn[i] else a for i, a in enumerate(asks)]
     requested = min(sum(live[i] for g in groups for i in g), UINT_MAX)

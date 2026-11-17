@@ -47,22 +47,25 @@ The visible tab passively checks session validity on focus and once per minute s
 or role changes are noticed without extending session inactivity. A hidden/offline tab rechecks when
 it becomes visible and connectivity permits; the API always enforces current privileges independently.
 
-Draft persistence is deliberately retained to protect work in progress. Only the submit form uses
-`thedao:submit-draft:<lowercase wallet address>` in localStorage. It survives reloads, browser restarts
-with a valid stored session, same-wallet reauthentication and role changes. Legacy drafts are copied
-into the validated current wallet's key before the old key is removed; an existing scoped draft is
-never overwritten. Switching wallets retains each wallet's draft under its own key; signing back in
-with that wallet restores it. Logging out with an unfinished draft opens a dialog offering **Keep draft
-and log out**, **Delete draft and log out**, or **Cancel**. Keep is the primary/default action; deletion
-removes only that wallet's draft and legacy backup, and cancels pending writes so it cannot reappear.
-The latest form state is flushed before the decision or wallet switch, including edits still inside
-the autosave debounce window. Session-management actions that also log out ask before revoking any
-session. Automatic session expiry/revocation hides the form and purges server data from cache but
-retains the wallet's own saved draft for reauthentication. An expired identity hint (expiry zero) is
-not accepted as a session. These operations do not delete or modify saved server proposals,
-profiles, contacts or funders. Persistent drafts remain readable to scripts on this origin and to
-someone with browser-profile access; this is the recovery/privacy tradeoff. Shared-device users can
-choose deletion when signing out. No session credential is stored in the draft.
+Unpublished drafts are stored privately on the server, under the authenticated wallet's address.
+The browser holds their content only in memory: no localStorage or sessionStorage autosave. The
+submit form debounces writes by 400 ms and flushes before an explicit logout. The owner is part of
+the request path and checked against the current session, so a queued request cannot save another
+wallet's content under a newly selected identity. Authenticated reads are no-store; an administrator
+cannot access another wallet's draft through this API.
+
+Each draft is limited to 256 KiB of UTF-8 JSON, chunked and committed atomically with its version.
+Version checks reject stale writes and concurrent-tab deletion; deletion leaves an expiring tombstone
+so queued writes cannot resurrect the draft. A draft expires 30 days after its last edit. Private
+autosaves are excluded from backup exports and restores. Autosave failures remain visible in the
+form, and explicit logout waits for the final save. Failed automatic flushes after session expiry
+cannot save until the owner authenticates again; already saved work remains on the server.
+
+Logout offers **Keep draft and log out**, **Delete draft and log out**, or **Cancel**. Deletion runs
+before any requested session revocation and must succeed before logout continues. Session expiry
+hides the form and clears private query data; signing in with the same wallet restores saved work.
+The expiry-zero identity hint is never accepted as a session. Server proposals, profiles and
+submitted private fields are unaffected by deleting an autosave.
 
 Administrators can revoke a wallet's sessions through `POST /api/admin/sessions/revoke` with `{ "address": "0x…" }`. `POST /api/admin/sessions/revoke-all` requires `{ "confirmation": "revoke all sessions" }` and ends every existing session, including the administrator's. Both controls are available on the sessions page. Durable per-wallet and global revocation epochs make invalidation independent of a potentially incomplete scan, and session creation/activity updates compare those epochs transactionally. Reauthentication after the revocation creates a valid new session. The per-wallet response count is the inventory observed before revocation; concurrent authentications can make that count approximate without escaping revocation.
 

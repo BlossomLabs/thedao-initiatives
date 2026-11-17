@@ -30,9 +30,11 @@ export function ruleMessage(
         ),
       ].join(" ");
     case "group":
-      return `Projects affiliated with ${groupName(e.group)} take ${dollars(e.groupUsd)} of ${
-        tierName(TIERS[e.tier])
-      }'s ${dollars(e.tierUsd)}. One affiliation can hold at most half.`;
+      return `Projects affiliated with ${groupName(e.group)} have goals totaling ${
+        dollars(e.groupUsd)
+      } of ${tierName(TIERS[e.tier])}'s ${
+        dollars(e.tierUsd)
+      } in goals. One affiliation can hold at most half.`;
     case "empty_tier":
       return `${
         tierName(TIERS[e.tier])

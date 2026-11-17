@@ -2,7 +2,7 @@
  * ballot requests (in asks) at least 1.5× the pool (or every project's ask, when donations
  * took that sum below 1.5× the pool), and each enforced tier (S-Tier always, A-Tier
  * when the round says so) holds at least 3 pairwise-unrelated projects with no related
- * group over half its asks. Related = sharing a group (an affiliation); RFPs have none. Mirrored by
+ * group over half its registered goals. Related = sharing a group (an affiliation); RFPs have none. Mirrored by
  * vote/reference/ballot_rules.py and the contract; shared fixtures keep them equal.
  * Amounts are micro-USD bigints. Browser and Deno. */
 
@@ -12,7 +12,7 @@ export type RulesProject = { goalUsd: bigint; rfp: boolean; groups: number[] };
 export type RulesRound = {
   projects: RulesProject[];
   /** What each project still asks for (goal less donations and open pledges), by project
-   * index. Size and group rules count asks, never goals. */
+   * index. The size rule counts live asks; affiliation totals use registered goals. */
   asks: bigint[];
   groupNames: string[];
   poolUsd: bigint;
@@ -102,9 +102,9 @@ export function checkBallot(ballot: Uint8Array, round: RulesRound): RulesResult 
   const errors: RuleError[] = [];
   const groups = tiersOf(ballot);
   if (groups.length > 3) errors.push({ rule: "tiers" });
-  const ask = (i: number) => round.asks[i];
-  // Sums and the 1.5× saturate at 2^256 − 1, as in the contract.
-  const sum = (xs: number[]) => xs.reduce((a, i) => a + ask(i), 0n);
+  // Donations, pledges and prices cannot invalidate a settled tier's affiliation share.
+  const weight = (i: number) => round.projects[i].goalUsd;
+  const sum = (xs: number[]) => xs.reduce((a, i) => a + weight(i), 0n);
   const live = (i: number) => (round.withdrawn?.[i] ? 0n : round.asks[i]);
   const requested = cap(groups.flat().reduce((a, i) => a + live(i), 0n));
   // 1.5× the pool, or every project's ask (withdrawn ones ask nothing) when less.

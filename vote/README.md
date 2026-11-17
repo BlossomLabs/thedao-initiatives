@@ -348,9 +348,15 @@ A ballot is valid only if (docs/superpowers/specs/2026-11-11-ballot-rules-design
   is `poolUsd`, both on-chain at the block that records the ballot);
 - S-Tier (its first rank group; also A-Tier when `independentTiers` has bit 1) holds at
   least 3 projects with no shared affiliation, and no affiliation holds more than half of the
-  tier's asked total (a $0-ask project still counts toward S-Tier independence). RFPs have no
+  tier's total registered funding goals (a $0-ask project still counts toward independence
+  and contributes its full goal to the affiliation totals). RFPs have no
   affiliations; B-Tier is never checked;
 - it has at most three rank groups.
+
+Affiliated Initiatives' combined funding goals must not exceed half of the total funding
+goals of all Initiatives in a ballot's S-Tier. The same limit applies to A-Tier when enforced.
+Donations, pledges and price changes affect live asks and funding, but do not change the
+affiliation share of an unchanged tier (owner's decision, Nov 17, 2026).
 
 Affiliations are registered as groups (`addGroup`, a `groups` bitmask per initiative). The
 contract checks every ballot with a proof: three unrelated project indexes per enforced

@@ -232,6 +232,7 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     WEB_ORIGIN: ORIGIN,
     ADMIN_ADDRESSES: ADMIN,
     OPERATIONAL_SIGNERS: SIGNERS.join(","),
+    SITE_COOKIE_KEY: "12".repeat(32), // Fixture only; production must provision its own random key.
     ...opts.env,
   });
   const kv = await Deno.openKv(":memory:");
@@ -239,7 +240,6 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     mode: cfg.rateLimitMode,
     log: (line) => deps.log(line), // tests swap deps.log after construction
     alwaysEnforce: config.ALWAYS_ENFORCED_RATE_LIMITS,
-    eventualReads: cfg.kvEventualReads,
   });
   const script: ChainScript = {
     head: 1000,
@@ -264,6 +264,9 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
       : input instanceof URL
       ? input.toString()
       : input.url;
+    if ((init?.redirect ?? (input instanceof Request ? input.redirect : undefined)) !== "error") {
+      throw new Error("Server fetch must refuse redirects");
+    }
     fetchLog.push({ url, init });
     if (opts.fetch) return Promise.resolve(opts.fetch(url, init));
     return Promise.resolve(new Response("not mocked", { status: 599 }));
@@ -293,7 +296,7 @@ export async function harness(opts: HarnessOptions = {}): Promise<Harness> {
     app,
     deps,
     db,
-    kv,
+    kv: db.kv,
     script,
     fetchLog,
     clock,

@@ -1,3 +1,4 @@
+import { datasetGeneration } from "../db/dataset.ts";
 /**
  * Live funding from Safe balances (docs/balance-funding-design-2026-09-12.md).
  *
@@ -160,10 +161,11 @@ export function createFunding(deps: FundingDeps) {
   async function cached(safe: string, revalidate: boolean): Promise<CachedBalances | null> {
     const key = safe.toLowerCase();
     if (!revalidate) return (await kv.get<CachedBalances>(K.safeBalances(key), deps.db.read)).value;
-    let p = inflight.get(key);
+    const flightKey = `${await datasetGeneration(kv)}:${key}`;
+    let p = inflight.get(flightKey);
     if (!p) {
-      p = refresh(key).finally(() => inflight.delete(key));
-      inflight.set(key, p);
+      p = refresh(key).finally(() => inflight.delete(flightKey));
+      inflight.set(flightKey, p);
     }
     return await p;
   }

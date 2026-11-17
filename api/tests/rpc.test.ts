@@ -31,7 +31,8 @@ Deno.test("RPC failover still reuses the last successful endpoint", async () => 
   const calls: string[] = [];
   const rpc = createRpc({
     endpoints: ["https://first.invalid", "https://second.invalid"],
-    fetch: ((input) => {
+    fetch: ((input, init) => {
+      assertEquals(init?.redirect, "error");
       calls.push(String(input));
       return Promise.resolve(
         String(input).includes("first")

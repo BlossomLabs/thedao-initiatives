@@ -55,7 +55,7 @@ export interface InitiativeFormProps {
   showRules?: boolean;
   showTypePicker?: boolean;
   showPaste?: boolean;
-  /** localStorage key, null to disable (edit pages). */
+  /** Wallet-scoped autosave identity, null to disable (edit pages). */
   autosaveKey?: string | null;
   /** Whether the API accepts logo uploads right now. */
   uploads?: boolean;
@@ -172,7 +172,7 @@ export default function InitiativeForm({
     setBusy(true);
     try {
       await onSubmit(toPayload(draft, {}), draft);
-      autosave.clear();
+      await autosave.clear().catch(() => {});
       setFailed(false);
     } catch (err) {
       const findings = findingsOf(err);
@@ -229,6 +229,11 @@ export default function InitiativeForm({
 
   const main = (
     <>
+      {autosave.error && (
+        <Status kind="err" className="mt-2">
+          Draft not saved: {autosave.error} Keep this tab open to preserve your edits.
+        </Status>
+      )}
       {autosave.restored && (
         <Status
           kind="wait"
@@ -238,10 +243,12 @@ export default function InitiativeForm({
           <Button
             variant="ghost"
             sm
-            onClick={() => {
-              autosave.clear();
-              reset(emptyDraft());
-              setSubmitted(false);
+            onClick={async () => {
+              try {
+                await autosave.clear();
+                reset(emptyDraft());
+                setSubmitted(false);
+              } catch { /* Autosave displays the failure. */ }
             }}
           >
             Discard

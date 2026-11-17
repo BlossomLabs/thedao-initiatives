@@ -14,7 +14,7 @@ export default function DraftLogoutDialog({ open, onChoose }: {
         if (!value) onChoose("cancel");
       }}
       title="Keep your unfinished draft?"
-      description="Your draft is saved for this wallet in this browser. Keep it to continue when you sign back in, or delete it before logging out."
+      description="Your draft is saved privately for this wallet for 30 days after your last edit. Keep it to continue when you sign back in, or delete it before logging out."
     >
       <div className="mt-2 flex flex-col gap-2">
         <Button variant="primary" onClick={() => onChoose("keep")}>Keep draft and log out</Button>

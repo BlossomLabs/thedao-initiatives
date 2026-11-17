@@ -70,7 +70,9 @@ def named():
     out.append(("withdrawn placed project makes the ballot too small", projects, asks, ["Seal"], 200, 1, [1, W, 1, 1, W, W], only(3)))
     out.append(("withdrawn: total below 1.5x the pool", projects, asks, ["Seal"], 300, 1, [1, 4, 1, 1, W, W], only(4, 5)))
     out.append(("withdrawn is still independent", projects, [0] * 6, ["Seal"], 0, 1, [1, W, 1, 1, W, W], only(0)))
-    out.append(("withdrawn keeps its real ask in groups", projects, asks, ["Seal"], 0, 1, [1, 1, 1, 1, W, W], only(2, 3)))
+    out.append(("withdrawn keeps its registered goal in groups", projects, asks, ["Seal"], 0, 1, [1, 1, 1, 1, W, W], only(2, 3)))
+    out.append(("unrelated support preserves a half-goal share", projects, [90, 90, 10, 10, 10, 10], ["Seal"], 100, 1, [1, 1, 1, 1, W, W], None))
+    out.append(("funding an affiliation does not reduce its goal share", projects, [0, 0, 100, 100, 50, 50], ["Seal"], 0, 1, [1, 1, 1, W, W, 1], None))
     return out
 
 

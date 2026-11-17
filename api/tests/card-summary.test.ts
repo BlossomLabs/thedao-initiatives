@@ -109,6 +109,7 @@ Deno.test("card summary: a restore drops every copy, since it writes the rows wi
   await h.db.pledges.add(r.id, pledge(40));
   const file = await exportBackup(h.db, h.deps.now);
   await h.db.cards.summary(r.id);
+  await h.db.kv.set(["meta", "maintenance"], { on: true });
   await restoreBackup(h.db, file, "replace", h.deps.now);
   assertEquals((await h.kv.get(K.cardSummary(r.id))).value, null);
   h.close();

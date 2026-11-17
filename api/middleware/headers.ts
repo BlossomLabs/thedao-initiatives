@@ -63,6 +63,6 @@ export function siteLock(lock: SiteLock): MiddlewareHandler<Vars> {
       return c.json({ error: LOCK_MESSAGE }, 401);
     }
     await next();
-    if (verdict === "basic") c.header("Set-Cookie", await lock.cookie(), { append: true });
+    if (verdict === "basic") c.header("Set-Cookie", await lock.cookie(c.req.raw), { append: true });
   };
 }

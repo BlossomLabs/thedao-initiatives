@@ -147,7 +147,7 @@ Deno.test("page refresh only syncs initiatives with a Safe; it never assigns one
   h.close();
 });
 
-Deno.test("bulk approve: rows without a Safe fail one by one, the rest land", async () => {
+Deno.test("bulk approve: a row without a Safe rolls back the whole selection", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
   const ready = await h.db.initiatives.insert({
@@ -164,10 +164,10 @@ Deno.test("bulk approve: rows without a Safe fail one by one, the rest land", as
       json: { action: "approve", ids: [ready.id, bare.id] },
     }),
   ) as { done: number; failed: { id: string; error: string }[] };
-  assertEquals(res.done, 1);
-  assertEquals(res.failed.map((f) => f.id), [bare.id]);
-  assertStringIncludes(res.failed[0].error, "Deploy");
-  assertEquals((await h.db.initiatives.get(ready.id))!.status, "approved");
+  assertEquals(res.done, 0);
+  assertEquals(res.failed.map((f) => f.id), [ready.id, bare.id]);
+  assertStringIncludes(res.failed[1].error, "Deploy");
+  assertEquals((await h.db.initiatives.get(ready.id))!.status, "pending");
   assertEquals((await h.db.initiatives.get(bare.id))!.status, "pending");
   h.close();
 });

@@ -162,6 +162,7 @@ Deno.test("re-run AI screen: held rows only, stores the new answer, never publis
       "constructive",
       "",
     ]);
+    const beforeBulk = await h.db.comments.get(b.id);
     const bulk = await j(
       await h.req("/api/admin/comments/bulk", {
         method: "POST",
@@ -169,10 +170,10 @@ Deno.test("re-run AI screen: held rows only, stores the new answer, never publis
         json: { action: "rescreen", ids: [b.id, "missing"] },
       }),
     );
-    assertEquals(bulk.done, 1);
-    assertEquals((bulk.failed as { id: string }[]).map((f) => f.id), ["missing"]);
+    assertEquals(bulk.done, 0);
+    assertEquals((bulk.failed as { id: string }[]).map((f) => f.id), [b.id, "missing"]);
     assertEquals((await h.db.comments.get(b.id))?.status, "held");
-    assertEquals((await h.db.comments.get(b.id))?.aiScreen?.verdict, "constructive");
+    assertEquals(await h.db.comments.get(b.id), beforeBulk);
     await h.req(`/api/admin/comments/${a.id}/publish`, { method: "POST", token: admin });
     assertEquals(
       (await h.req(`/api/admin/comments/${a.id}/rescreen`, { method: "POST", token: admin }))

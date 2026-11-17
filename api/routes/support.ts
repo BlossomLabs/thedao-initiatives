@@ -154,6 +154,8 @@ export function supportRoutes(deps: Deps) {
     try {
       res = await deps.fetch(config.supportUrl, {
         method: "POST",
+        redirect: "error",
+        signal: AbortSignal.timeout(15_000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: contact,
@@ -162,12 +164,13 @@ export function supportRoutes(deps: Deps) {
           ...(screenshot ? { screenshot } : {}),
         }),
       });
-    } catch (e) {
-      deps.log(`support forward failed: ${String(e)}`);
+    } catch {
+      deps.log("support forward failed");
       throw new HttpError(502, "could not deliver the message, try again");
     }
     if (!res.ok) {
-      deps.log(`support upstream ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      await res.body?.cancel();
+      deps.log(`support upstream HTTP ${res.status}`);
       throw new HttpError(502, "could not deliver the message, try again");
     }
     return c.json({ ok: true });

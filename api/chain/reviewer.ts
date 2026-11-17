@@ -39,7 +39,10 @@ export async function reviewTokenIds(
     if (page >= 50 || seenPages.has(url.href)) throw new Error("review NFT index pagination limit");
     seenPages.add(url.href);
     // Its p95 is about 1.5 s; past 5 s the caller's last lookup is the better answer.
-    const response = await fetcher(url.href, { signal: AbortSignal.timeout(5_000) });
+    const response = await fetcher(url.href, {
+      redirect: "error",
+      signal: AbortSignal.timeout(5_000),
+    });
     if (!response.ok) throw new Error("review NFT index unavailable");
     const data = await response.json();
     if (!Array.isArray(data.items)) throw new Error("invalid review NFT index response");

@@ -2277,7 +2277,7 @@
   }
  },
  {
-  "name": "withdrawn keeps its real ask in groups",
+  "name": "withdrawn keeps its registered goal in groups",
   "projects": [
    {
     "goalUsd": "100",
@@ -2362,6 +2362,210 @@
    "asks": [
     100,
     100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "rfp": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+   ],
+   "masks": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "groupCount": 1,
+   "pool": 0
+  }
+ },
+ {
+  "name": "unrelated support preserves a half-goal share",
+  "projects": [
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": true,
+    "groups": []
+   }
+  ],
+  "asks": [
+   "90",
+   "90",
+   "10",
+   "10",
+   "10",
+   "10"
+  ],
+  "groupNames": [
+   "Seal"
+  ],
+  "poolUsd": "100",
+  "independentTiers": 1,
+  "ballot": [
+   1,
+   1,
+   1,
+   1,
+   255,
+   255
+  ],
+  "ok": true,
+  "rules": [],
+  "proof": [
+   0,
+   2,
+   3
+  ],
+  "sol": {
+   "goals": [
+    100,
+    100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "asks": [
+    90,
+    90,
+    10,
+    10,
+    10,
+    10
+   ],
+   "rfp": [
+    false,
+    false,
+    false,
+    false,
+    false,
+    true
+   ],
+   "masks": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "groupCount": 1,
+   "pool": 100
+  }
+ },
+ {
+  "name": "funding an affiliation does not reduce its goal share",
+  "projects": [
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": [
+     0
+    ]
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "100",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": false,
+    "groups": []
+   },
+   {
+    "goalUsd": "50",
+    "rfp": true,
+    "groups": []
+   }
+  ],
+  "asks": [
+   "0",
+   "0",
+   "100",
+   "100",
+   "50",
+   "50"
+  ],
+  "groupNames": [
+   "Seal"
+  ],
+  "poolUsd": "0",
+  "independentTiers": 1,
+  "ballot": [
+   1,
+   1,
+   1,
+   255,
+   255,
+   1
+  ],
+  "ok": false,
+  "rules": [
+   "group"
+  ],
+  "proof": [],
+  "sol": {
+   "goals": [
+    100,
+    100,
+    100,
+    100,
+    50,
+    50
+   ],
+   "asks": [
+    0,
+    0,
     100,
     100,
     50,
@@ -3620,7 +3824,6 @@
   ],
   "ok": false,
   "rules": [
-   "group",
    "group"
   ],
   "proof": [],
@@ -4069,9 +4272,7 @@
   ],
   "ok": false,
   "rules": [
-   "size",
-   "group",
-   "group"
+   "size"
   ],
   "proof": [],
   "withdrawn": [
@@ -4508,9 +4709,7 @@
   ],
   "ok": false,
   "rules": [
-   "size",
-   "group",
-   "group"
+   "size"
   ],
   "proof": [],
   "withdrawn": [
@@ -6072,11 +6271,13 @@
    1,
    9
   ],
-  "ok": false,
-  "rules": [
-   "group"
+  "ok": true,
+  "rules": [],
+  "proof": [
+   0,
+   1,
+   4
   ],
-  "proof": [],
   "sol": {
    "goals": [
     120000,
@@ -6301,8 +6502,7 @@
   ],
   "ok": false,
   "rules": [
-   "independent",
-   "group"
+   "independent"
   ],
   "proof": [],
   "withdrawn": [
@@ -7038,9 +7238,7 @@
   ],
   "ok": false,
   "rules": [
-   "size",
-   "group",
-   "group"
+   "size"
   ],
   "proof": [],
   "withdrawn": [
@@ -7509,7 +7707,8 @@
   "ok": false,
   "rules": [
    "size",
-   "independent"
+   "independent",
+   "group"
   ],
   "proof": [],
   "withdrawn": [
@@ -7762,11 +7961,16 @@
    1,
    13
   ],
-  "ok": false,
-  "rules": [
-   "group"
+  "ok": true,
+  "rules": [],
+  "proof": [
+   0,
+   2,
+   7,
+   4,
+   8,
+   13
   ],
-  "proof": [],
   "sol": {
    "goals": [
     340000,
@@ -8909,7 +9113,8 @@
   "ok": false,
   "rules": [
    "size",
-   "independent"
+   "independent",
+   "group"
   ],
   "proof": [],
   "sol": {
@@ -10139,7 +10344,8 @@
   ],
   "ok": false,
   "rules": [
-   "independent"
+   "independent",
+   "group"
   ],
   "proof": [],
   "sol": {
@@ -12571,8 +12777,7 @@
   ],
   "ok": false,
   "rules": [
-   "size",
-   "group"
+   "size"
   ],
   "proof": [],
   "sol": {
@@ -12925,8 +13130,9 @@
    "size",
    "independent",
    "group",
+   "independent",
    "group",
-   "independent"
+   "group"
   ],
   "proof": [],
   "sol": {
@@ -13706,13 +13912,11 @@
    1,
    1
   ],
-  "ok": true,
-  "rules": [],
-  "proof": [
-   2,
-   4,
-   6
+  "ok": false,
+  "rules": [
+   "group"
   ],
+  "proof": [],
   "sol": {
    "goals": [
     430000,
@@ -14028,7 +14232,8 @@
   "ok": false,
   "rules": [
    "size",
-   "independent"
+   "independent",
+   "group"
   ],
   "proof": [],
   "withdrawn": [

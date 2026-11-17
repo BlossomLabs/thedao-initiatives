@@ -1,3 +1,4 @@
+import { datasetGeneration } from "../db/dataset.ts";
 import { Hono } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { currentVote } from "../services/vote-active.ts";
@@ -161,8 +162,26 @@ export type BoardCache = SnapshotCache<Awaited<ReturnType<typeof buildBoard>>>;
 
 /** Each isolate serves its last built board for a few seconds: it is public, polled, and costs
  * a KV read wave per card. app.ts clears it after every write request. */
-export const createBoardCache = (deps: Deps): BoardCache =>
-  createSnapshotCache(deps.now, deps.config.boardCacheSecs);
+export const createBoardCache = (deps: Deps): BoardCache => {
+  const generations = new Map<string, BoardCache>();
+  const current = async () => {
+    const key = await datasetGeneration(deps.db.kv);
+    let cache = generations.get(key);
+    if (!cache) {
+      cache = createSnapshotCache(deps.now, deps.config.boardCacheSecs);
+      generations.set(key, cache);
+      if (generations.size > 4) generations.delete(generations.keys().next().value!);
+    }
+    return cache;
+  };
+  return {
+    get: async (build) => (await current()).get(build),
+    rebuild: async (build) => (await current()).rebuild(build),
+    clear: () => {
+      for (const cache of generations.values()) cache.clear();
+    },
+  };
+};
 
 async function buildBoard(deps: Deps, refresh: boolean) {
   const { db, config } = deps;

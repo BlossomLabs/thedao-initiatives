@@ -59,6 +59,42 @@ function sharedHeaders(res: Response) {
   );
 }
 
+Deno.test("site: static serving hides dotfiles, listings and files outside the root", async () => {
+  const h = await siteHarness();
+  const sentinel = "PRIVATE_STATIC_SENTINEL";
+  const outside = `${h.root}-outside.txt`;
+  try {
+    await Deno.mkdir(`${h.root}/.git`);
+    await Deno.writeTextFile(`${h.root}/.env`, sentinel);
+    await Deno.writeTextFile(`${h.root}/.git/config`, sentinel);
+    await Deno.writeTextFile(outside, sentinel);
+    const outsideName = outside.split("/").pop()!;
+    for (
+      const path of [
+        "/.env",
+        "/.git/config",
+        "/%2eenv",
+        "/assets/",
+        `/..%2f${outsideName}`,
+        `/%252e%252e%252f${outsideName}`,
+      ]
+    ) {
+      const response = await h.req(path);
+      const body = await response.text();
+      assert(!body.includes(sentinel), path);
+      assert(!body.includes("app-abc123.js"), path);
+    }
+    for (const method of ["POST", "PUT", "DELETE"]) {
+      const response = await h.req("/assets/app-abc123.js", { method });
+      assert(response.status >= 400);
+      assert(!(await response.text()).includes(SCRIPT));
+    }
+  } finally {
+    await h.close();
+    await Deno.remove(outside);
+  }
+});
+
 Deno.test("site: only approved origins rewrite HTML, including hydration hashes", async () => {
   const h = await siteHarness({ CSP_ENFORCE: "true" });
   try {

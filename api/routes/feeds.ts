@@ -1,3 +1,4 @@
+import { datasetGeneration } from "../db/dataset.ts";
 /**
  * Agent-readable feeds, no JavaScript, wallet or login needed: /llms.txt,
  * /llms-full.txt, /api/initiatives.json and its schema. Open to
@@ -39,18 +40,18 @@ export function createFeedCache(deps: Deps, board: BoardCache) {
   const { db, now, log } = deps;
   const saved = new Map<string, { feed: Feed; until: number }>();
   const inflight = new Map<string, Promise<Feed>>();
-  const load = async (origin: string): Promise<Feed> => {
+  const load = async (origin: string, key: string): Promise<Feed> => {
     const stored = await db.snapshots.get("feed", origin).catch((e) => {
       log(`feed snapshot read failed: ${String(e)}`);
       return null;
     });
     if (stored) {
       const feed = JSON.parse(new TextDecoder().decode(await gunzip(stored.bytes))) as Feed;
-      saved.set(origin, { feed, until: stored.until });
+      saved.set(key, { feed, until: stored.until });
       return feed;
     }
     const feed = await buildFeed(deps, origin, (await readBoard(deps, board)).cards);
-    saved.set(origin, { feed, until: now() + FEED_TTL_SECS });
+    saved.set(key, { feed, until: now() + FEED_TTL_SECS });
     try {
       const bytes = await gzip(new TextEncoder().encode(JSON.stringify(feed)));
       if (!await db.snapshots.set("feed", origin, bytes, FEED_TTL_SECS)) {
@@ -62,15 +63,16 @@ export function createFeedCache(deps: Deps, board: BoardCache) {
     return feed;
   };
   return {
-    get(origin: string): Promise<Feed> {
-      const s = saved.get(origin);
+    async get(origin: string): Promise<Feed> {
+      const key = `${await datasetGeneration(db.kv)}:${origin}`;
+      const s = saved.get(key);
       if (s && now() < s.until) return Promise.resolve(s.feed);
-      let p = inflight.get(origin);
+      let p = inflight.get(key);
       if (!p) {
-        p = load(origin).finally(() => {
-          if (inflight.get(origin) === p) inflight.delete(origin);
+        p = load(origin, key).finally(() => {
+          if (inflight.get(key) === p) inflight.delete(key);
         });
-        inflight.set(origin, p);
+        inflight.set(key, p);
       }
       return p;
     },

@@ -1,3 +1,4 @@
+import { collectDatasets, withDataset } from "../db/dataset.ts";
 /** Daily fallback for quiet production days. Visitor refreshes remain the
  * normal path; both paths share freshness checks and per-Safe KV leases. */
 import type { Funding } from "./funding.ts";
@@ -14,17 +15,20 @@ export async function refreshDailyCache(
   deps: DailyCacheDeps,
   timeline: string | undefined,
 ): Promise<void> {
-  // Check the runtime timeline, not the git branch name. Preview, branch,
-  // local, and missing/unknown environments must do no scheduled work.
-  if (timeline !== "production") return;
-  // A paused site is being backed up or moved: no background writes.
-  if (await deps.maintenance.on()) return;
+  return await withDataset(deps.db.kv, async () => {
+    // Check the runtime timeline, not the git branch name. Preview, branch,
+    // local, and missing/unknown environments must do no scheduled work.
+    if (timeline !== "production") return;
+    await collectDatasets(deps.db.kv);
+    // A paused site is being backed up or moved: no background writes.
+    if (await deps.maintenance.on()) return;
 
-  const initiatives = (await deps.db.initiatives.cards("approved")).filter((initiative) =>
-    initiative.safeAddress
-  );
-  await refreshLedgers(deps, initiatives);
-  // One batched balance read for every due Safe; freshness and active leases still apply.
-  await deps.funding.refreshMany(initiatives.map((initiative) => initiative.safeAddress));
-  deps.log?.(`daily cache refresh: ${initiatives.length} approved Safe(s) checked`);
+    const initiatives = (await deps.db.initiatives.cards("approved")).filter((initiative) =>
+      initiative.safeAddress
+    );
+    await refreshLedgers(deps, initiatives);
+    // One batched balance read for every due Safe; freshness and active leases still apply.
+    await deps.funding.refreshMany(initiatives.map((initiative) => initiative.safeAddress));
+    deps.log?.(`daily cache refresh: ${initiatives.length} approved Safe(s) checked`);
+  });
 }

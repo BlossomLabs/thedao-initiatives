@@ -1,3 +1,4 @@
+import { DatasetAbort, stageDataset } from "../db/dataset.ts";
 import { roundKey } from "../../shared/vote/keys.ts";
 import { voteCorrectionRoutes } from "./vote-corrections.ts";
 import { parseAffiliations } from "../../shared/affiliations.ts";
@@ -967,6 +968,35 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     return { ids, action };
   }
 
+  async function atomicBulk(
+    ids: string[],
+    run: () => Promise<{ done: number; failed: { id: string; error: string }[] }>,
+  ) {
+    try {
+      return await stageDataset(
+        db.kv,
+        async () => {
+          const result = await run();
+          if (result.failed.length) {
+            throw new DatasetAbort({
+              done: 0,
+              failed: ids.map((id) =>
+                result.failed.find((f) => f.id === id) ??
+                  { id, error: "No changes saved: another row in this batch failed." }
+              ),
+            });
+          }
+          return result;
+        },
+        [],
+        db.now,
+      );
+    } catch (e) {
+      if (e instanceof DatasetAbort) return e.result;
+      throw e;
+    }
+  }
+
   const STATUS_ACTIONS: Record<string, Initiative["status"]> = {
     approve: "approved",
     reject: "rejected",
@@ -997,33 +1027,36 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     });
   });
 
-  /** The same status change on many initiatives at once. Each id is applied
-   * on its own; the response lists what failed so the rest still lands. */
+  /** Apply the complete selection atomically; invalid rows roll back the batch. */
   r.post("/initiatives/bulk", requireRecentAuth(deps.now), async (c) => {
     const body = await jsonBody(c, ["ids", "action"]);
     const { ids, action } = readBulk(body, STATUS_ACTIONS);
     auditContext(c, { detail: action });
-    const failed: { id: string; error: string }[] = [];
-    let done = 0;
-    for (const id of ids) {
-      try {
-        await auditedItem(deps, c, {
-          action: "initiative.status",
-          targetKind: "initiative",
-          target: id,
-          detail: action,
-        }, async () => {
-          const initiative = await db.initiatives.get(id);
-          if (!initiative) throw new HttpError(404, "not found");
-          await applyStatus(initiative, action);
-        });
-        done++;
-      } catch (e) {
-        failed.push({ id, error: e instanceof Error ? e.message : "failed" });
-      }
-    }
-    auditContext(c, { outcome: failed.length ? done ? "partial" : "failure" : "success" });
-    return c.json({ done, failed });
+    return c.json(
+      await atomicBulk(ids, async () => {
+        const failed: { id: string; error: string }[] = [];
+        let done = 0;
+        for (const id of ids) {
+          try {
+            await auditedItem(deps, c, {
+              action: "initiative.status",
+              targetKind: "initiative",
+              target: id,
+              detail: action,
+            }, async () => {
+              const initiative = await db.initiatives.get(id);
+              if (!initiative) throw new HttpError(404, "not found");
+              await applyStatus(initiative, action);
+            });
+            done++;
+          } catch (e) {
+            failed.push({ id, error: e instanceof Error ? e.message : "failed" });
+          }
+        }
+        auditContext(c, { outcome: failed.length ? "failure" : "success" });
+        return { done, failed };
+      }),
+    );
   });
 
   /**
@@ -1395,35 +1428,39 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       throw new HttpError(400, `Re-run the AI screen on at most ${RESCREEN_MAX} rows at once.`);
     }
     auditContext(c, { detail: action });
-    const failed: { id: string; error: string }[] = [];
-    let done = 0;
-    const one = async (id: string) => {
-      try {
-        await auditedItem(deps, c, {
-          action: "comment.moderate",
-          targetKind: "comment",
-          target: id,
-          detail: action,
-        }, async () => {
-          if (action === "rescreen") {
-            await rescreen(deps, id);
-            return;
+    return c.json(
+      await atomicBulk(ids, async () => {
+        const failed: { id: string; error: string }[] = [];
+        let done = 0;
+        const one = async (id: string) => {
+          try {
+            await auditedItem(deps, c, {
+              action: "comment.moderate",
+              targetKind: "comment",
+              target: id,
+              detail: action,
+            }, async () => {
+              if (action === "rescreen") {
+                await rescreen(deps, id);
+                return;
+              }
+              const row = await db.comments.get(id);
+              if (!row) throw new HttpError(404, "not found");
+              await db.comments.set(row.id, commentPatch(row, action));
+            });
+            done++;
+          } catch (e) {
+            failed.push({ id, error: e instanceof Error ? e.message : "failed" });
           }
-          const row = await db.comments.get(id);
-          if (!row) throw new HttpError(404, "not found");
-          await db.comments.set(row.id, commentPatch(row, action));
-        });
-        done++;
-      } catch (e) {
-        failed.push({ id, error: e instanceof Error ? e.message : "failed" });
-      }
-    };
-    const step = action === "rescreen" ? RESCREEN_PARALLEL : 1;
-    for (let i = 0; i < ids.length; i += step) {
-      await Promise.all(ids.slice(i, i + step).map(one));
-    }
-    auditContext(c, { outcome: failed.length ? done ? "partial" : "failure" : "success" });
-    return c.json({ done, failed });
+        };
+        const step = action === "rescreen" ? RESCREEN_PARALLEL : 1;
+        for (let i = 0; i < ids.length; i += step) {
+          await Promise.all(ids.slice(i, i + step).map(one));
+        }
+        auditContext(c, { outcome: failed.length ? "failure" : "success" });
+        return { done, failed };
+      }),
+    );
   });
 
   /** Ask the AI screen again about one held comment; it stays held. */

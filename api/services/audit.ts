@@ -1,3 +1,4 @@
+import { datasetOutcome } from "../db/dataset.ts";
 /** Security events contain only explicitly selected metadata, never request payloads. */
 import type { Context, MiddlewareHandler } from "hono";
 import type { Deps, Vars } from "../middleware/context.ts";
@@ -212,7 +213,7 @@ export function auditContext(
   if (update.outcome) state.outcome = update.outcome;
 }
 
-/** Emit one JSON line through the console logger for OpenTelemetry collection. */
+/** Emit one JSON line through the console logger for platform collection. */
 export function recordAudit(deps: Deps, c: Context<Vars>, input: AuditInput): void {
   const state = states.get(c);
   if (!state) throw new Error("audit middleware is required");
@@ -266,7 +267,15 @@ export async function auditedItem<T>(
     });
     throw error;
   }
-  recordAudit(deps, c, { ...input, outcome: "success" });
+  datasetOutcome(
+    deps.db.kv,
+    (committed) =>
+      recordAudit(deps, c, {
+        ...input,
+        outcome: committed ? "success" : "failure",
+        ...(committed ? {} : { status: 409 }),
+      }),
+  );
   return result;
 }
 

@@ -130,12 +130,15 @@ class BallotRules(unittest.TestCase):
             [{"rule": "size", "requested": 40, "needed": 45, "pool": 30}],
         )
 
-    def test_group_rule_counts_asks(self):
-        self.assertEqual(
-            check(ballot(S=[0, 1, 2, 3]), pool=100, asks=[90, 90, 10, 10, 10, 10])["errors"],
-            [{"rule": "group", "tier": 0, "group": 0, "groupUsd": 180, "tierUsd": 200}],
-        )
+    def test_group_rule_counts_goals_despite_support(self):
+        self.assertTrue(check(ballot(S=[0, 1, 2, 3]), pool=100, asks=[90, 90, 10, 10, 10, 10])["ok"])
         self.assertTrue(check(ballot(S=[0, 1, 2, 3]), pool=100, asks=[10, 10, 90, 90, 10, 10])["ok"])
+
+    def test_funding_an_affiliation_does_not_reduce_its_goal_share(self):
+        self.assertEqual(
+            check(ballot(S=[0, 1, 2, 5]), pool=0, asks=[0, 0, 100, 100, 50, 50])["errors"],
+            [{"rule": "group", "tier": 0, "group": 0, "groupUsd": 200, "tierUsd": 350}],
+        )
 
     def test_zero_ask_counts_toward_independence(self):
         self.assertEqual(

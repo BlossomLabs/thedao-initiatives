@@ -168,13 +168,13 @@ export interface Config {
   walletConnectProjectId: string;
   siteUsername: string;
   sitePassword: string;
+  /** Independent 256-bit random key for preview cookies; never derived from the password. */
+  siteCookieKey: string;
   /** Enforced by default; explicitly false supports a temporary diagnostic rollout. */
   cspEnforce: boolean;
   cspConnectOrigins: string[];
   port: number;
   kvPath: string | undefined;
-  /** Public pages read KV with eventual consistency (nearest replica). */
-  kvEventualReads: boolean;
   /** BOARD_CACHE_SECS: how long an isolate serves its saved board; 0 = off. */
   boardCacheSecs: number;
   /** First key part every KV key is stored under; empty = bare keys. */
@@ -275,6 +275,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     walletConnectProjectId: (env.WALLETCONNECT_PROJECT_ID ?? "").trim(),
     siteUsername: (env.SITE_USERNAME ?? "").trim(),
     sitePassword: (env.SITE_PASSWORD ?? "").trim(),
+    siteCookieKey: (env.SITE_COOKIE_KEY ?? "").trim(),
     cspEnforce: env.CSP_ENFORCE === undefined || env.CSP_ENFORCE.trim() === "" ||
       flag(env.CSP_ENFORCE),
     cspConnectOrigins: [
@@ -283,7 +284,6 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     ],
     port: Number(env.PORT ?? "8000") || 8000,
     kvPath: (env.KV_PATH ?? "").trim() || undefined,
-    kvEventualReads: flag(env.KV_EVENTUAL_READS),
     boardCacheSecs: Number.isFinite(boardCache) && boardCache >= 0 ? boardCache : 5,
     dbPrefix: (env.DB_PREFIX ?? "").trim(),
   };

@@ -170,14 +170,19 @@ describe("ballot rules", () => {
     ]);
   });
 
-  it("the group rule counts asks", () => {
-    // Seal's goals are the smaller half, but its asks are over half of S-Tier's.
+  it("the group rule keeps counting goals when unrelated projects receive support", () => {
+    // Seal's goals are exactly half, even when its live asks become most of S-Tier's.
     const r = round({ asks: [90n, 90n, 10n, 10n, 10n, 10n], poolUsd: 100n });
-    expect(checkBallot(ballot({ S: [0, 1, 2, 3] }), r).errors).toEqual([
-      { rule: "group", tier: 0, group: 0, groupUsd: 180n, tierUsd: 200n },
-    ]);
+    expect(checkBallot(ballot({ S: [0, 1, 2, 3] }), r).ok).toBe(true);
     const even = round({ asks: [10n, 10n, 90n, 90n, 10n, 10n], poolUsd: 100n });
     expect(checkBallot(ballot({ S: [0, 1, 2, 3] }), even).ok).toBe(true);
+  });
+
+  it("funding an affiliation does not let its goals exceed half of S-Tier", () => {
+    const r = round({ asks: [0n, 0n, 100n, 100n, 50n, 50n], poolUsd: 0n });
+    expect(checkBallot(ballot({ S: [0, 1, 2, 5] }), r).errors).toEqual([
+      { rule: "group", tier: 0, group: 0, groupUsd: 200n, tierUsd: 350n },
+    ]);
   });
 
   it("a $0 ask counts toward independence", () => {

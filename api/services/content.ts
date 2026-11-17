@@ -1,3 +1,4 @@
+import { DatasetAbort, stageDataset } from "../db/dataset.ts";
 /**
  * Content as code: an initiative is a markdown file with a small frontmatter
  * header. The filename is a permanent source key; its original proposal ID
@@ -301,12 +302,35 @@ export async function syncBackers(
   return changed;
 }
 
-/** Upsert every file; bad files are reported and skipped, never blocking. */
+/** Publish the complete content batch together, or return errors without changes. */
 
 export async function syncContent(
   db: Db,
   files: { name: string; text: string }[],
   audit: <T>(name: string, run: () => Promise<T>) => Promise<T> = (_name, run) => run(),
+): Promise<SyncResult> {
+  try {
+    return await stageDataset(
+      db.kv,
+      async () => {
+        const out = await syncStaged(db, files, audit);
+        if (out.errors.length) {
+          throw new DatasetAbort({ ...out, created: 0, updated: 0, backers: 0 });
+        }
+        return out;
+      },
+      [],
+      db.now,
+    );
+  } catch (e) {
+    if (e instanceof DatasetAbort) return e.result;
+    throw e;
+  }
+}
+async function syncStaged(
+  db: Db,
+  files: { name: string; text: string }[],
+  audit: <T>(name: string, run: () => Promise<T>) => Promise<T>,
 ): Promise<SyncResult> {
   const out: SyncResult = { created: 0, updated: 0, backers: 0, errors: [] };
   for (const f of [...files].sort((a, b) => a.name.localeCompare(b.name))) {

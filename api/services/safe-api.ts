@@ -66,13 +66,33 @@ export class SafeApiError extends Error {
   }
 }
 
+/** A provider's pagination link must not choose a new destination for our bearer. */
+export function safePageUrl(input: unknown, firstUrl: string): string {
+  try {
+    if (typeof input !== "string" || !input) throw new Error();
+    const first = new URL(firstUrl);
+    const next = new URL(input, first);
+    if (
+      next.origin !== first.origin || next.pathname !== first.pathname ||
+      next.username || next.password || next.hash
+    ) throw new Error();
+    return next.href;
+  } catch {
+    throw new SafeApiError(502, "Safe API returned an invalid pagination destination");
+  }
+}
+
 async function fetchPage(deps: SafeApiDeps, url: string): Promise<Page> {
   const headers: Record<string, string> = {
     Accept: "application/json",
     "User-Agent": "thedao-initiatives/2.0",
   };
   if (deps.config.safeApiKey) headers.Authorization = "Bearer " + deps.config.safeApiKey;
-  const res = await deps.fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
+  const res = await deps.fetch(url, {
+    headers,
+    redirect: "error",
+    signal: AbortSignal.timeout(15_000),
+  });
   const remaining = res.headers.get("x-ratelimit-remaining");
   if (remaining !== null) {
     await deps.db.meta.set("safe_api_quota", {
@@ -201,6 +221,7 @@ export async function syncSafe(
     let complete = false;
     for (let page = 0; url && page < MAX_PAGES_PER_RUN; page++) {
       if (overBudget()) break;
+      url = safePageUrl(url, firstUrl);
       const data = await fetchPage(deps, url);
       requests++;
       const byTx = new Map<string, SafeTransfer[]>();
@@ -253,8 +274,8 @@ export async function syncSafe(
         complete = true;
         break;
       }
-      state.resumeUrl = data.next;
-      url = data.next;
+      state.resumeUrl = safePageUrl(data.next, firstUrl);
+      url = state.resumeUrl;
     }
     state.ok = true;
     if (complete) {

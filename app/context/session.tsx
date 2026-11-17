@@ -26,11 +26,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useWallet, useWalletStore } from "./wallet";
 import { hasStoredWagmiConnection } from "~/lib/wallet-store";
 import {
+  cancelPrivateDrafts,
   clearPrivateQueries,
   deletePrivateDraft,
   flushPrivateDrafts,
   hasPrivateDraft,
-  preserveLegacyDraft,
 } from "~/lib/browser-privacy";
 import { api, ApiError } from "~/lib/api";
 import type { Me, SessionInfo } from "~/lib/api-types";
@@ -101,16 +101,6 @@ function save(s: SessionInfo | null) {
     if (s) localStorage.setItem(KEY, JSON.stringify(s));
     else localStorage.removeItem(KEY);
   } catch { /* private mode */ }
-}
-
-/** An expired identity is only a draft-owner hint, never an authenticated session. */
-function storedWallet(): string | undefined {
-  try {
-    const address = JSON.parse(localStorage.getItem(KEY) || "null")?.address;
-    return typeof address === "string" ? address.toLowerCase() : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 interface SessionCtx {
@@ -185,7 +175,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const authGeneration = useRef(0);
   const sessionRef = useRef(stored);
   sessionRef.current = stored;
-  const legacyDraftOwner = useRef(storedWallet());
   const [logoutPrompt, setLogoutPrompt] = useState<
     {
       wallet: string;
@@ -196,8 +185,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const clear = useCallback((rememberExpiredIdentity = false) => {
     const previous = sessionRef.current;
-    flushPrivateDrafts();
-    if (legacyDraftOwner.current) preserveLegacyDraft(legacyDraftOwner.current);
+    void flushPrivateDrafts().catch(() => {});
+    cancelPrivateDrafts();
     authGeneration.current++;
     sessionRef.current = null;
     clearPrivateQueries(qc);
@@ -222,7 +211,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       clear();
       return;
     }
-    if (legacyDraftOwner.current === s.address.toLowerCase()) preserveLegacyDraft(s.address);
     setMe(m);
     // The API may remove privileges; newly granted privileges need another sign-in.
     if (m.isAdmin !== s.isAdmin && sessionKey(sessionRef.current) === sessionKey(s)) {
@@ -302,8 +290,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       authGeneration.current++;
       clearPrivateQueries(qc);
       const next = load();
-      flushPrivateDrafts();
-      if (legacyDraftOwner.current) preserveLegacyDraft(legacyDraftOwner.current);
+      void flushPrivateDrafts().catch(() => {});
       sessionRef.current = next;
       setSession(next);
       setMe(null);
@@ -432,8 +419,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           sessionRef.current?.address.toLowerCase() !== s.address.toLowerCase() ||
           sessionRef.current?.isAdmin !== s.isAdmin
         ) clearPrivateQueries(qc);
-        flushPrivateDrafts();
-        if (legacyDraftOwner.current) preserveLegacyDraft(legacyDraftOwner.current);
+        void flushPrivateDrafts().catch(() => {});
         // The account comes with the sign-in; an older API without it is asked.
         const { me: account, ...info } = s;
         s = info;
@@ -550,16 +536,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (pendingLogout.current) return pendingLogout.current;
     const generation = authGeneration.current;
     const wallet = sessionRef.current?.address.toLowerCase();
-    flushPrivateDrafts();
-    if (legacyDraftOwner.current) preserveLegacyDraft(legacyDraftOwner.current);
     const promise = Promise.resolve().then(async () => {
-      const choice = wallet && hasPrivateDraft(wallet)
+      await flushPrivateDrafts();
+      const choice = wallet && await hasPrivateDraft(wallet)
         ? await new Promise<DraftLogoutChoice>((resolve) => setLogoutPrompt({ wallet, resolve }))
         : "keep";
       if (choice === "cancel" || generation !== authGeneration.current) return false;
+      if (choice === "delete" && wallet) await deletePrivateDraft(wallet);
       await beforeLogout?.();
       if (generation !== authGeneration.current) return false;
-      if (choice === "delete" && wallet) deletePrivateDraft(wallet);
       await endSession();
       return true;
     }).finally(() => {

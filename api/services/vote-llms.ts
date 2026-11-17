@@ -62,15 +62,17 @@ export function voteLlms(
       : []),
     "- Where a project's ask is unknown, the ballot's size can't be checked here: say so to the " +
     "voter rather than estimating it.",
-    "- The asks listed below are the chain's current ones: use them for the minimum and the " +
-    "affiliation limits, and leave room for them to shrink. A project already fully funded " +
-    "asks $0: it counts toward S-Tier independence but adds nothing to a total or a share.",
+    "- The asks listed below are the chain's current ones: use them for the ballot-size " +
+    "minimum, and leave room for them to shrink. A project already fully funded asks $0: " +
+    "it still counts toward S-Tier independence and its full registered goal still counts " +
+    "toward affiliation limits, but it adds nothing to the requested total.",
     `- ${sTier} needs at least 3 independent projects: choose three such that no pair shares ` +
     "any listed affiliation. RFPs have no affiliations, so each RFP counts as independent. " +
     "Additional related projects may be included if the affiliation limit below is kept.",
     `- In ${sTier}, the projects of one affiliation can hold at most half of the tier's ` +
-    "asked total. Check each affiliation separately; a project with several affiliations " +
-    "counts its full ask toward each. Exactly half is allowed.",
+    "total registered goals. Check each affiliation separately; a project with several affiliations " +
+    "counts its full registered goal toward each. Exactly half is allowed. Donations and " +
+    "pledges do not change this share.",
     ...(tierA
       ? [`- ${aTier} follows the same two independence and affiliation rules.`]
       : [`- ${aTier} has no independence minimum or affiliation limit in this round.`]),
@@ -199,7 +201,7 @@ export function voteLlms(
         "Before returning it, check the total asks against the smaller of 1.5× the live pool " +
         "(rounded up to one micro-USD) and all non-withdrawn projects' current asks, " +
         `name three pairwise-independent projects in each of ${enforced}, and check every ` +
-        "affiliation's share of each enforced tier's asks is at most 50%. If the voter's " +
+        "affiliation's share of each enforced tier's registered goals is at most 50%. If the voter's " +
         "choices cannot satisfy the rules, explain what is missing and ask which projects " +
         "they want to add; do not invent preferences or return an invalid ballot.",
       ]

@@ -14,6 +14,53 @@ const TX1 = "0x" + "a1".repeat(32);
 const TX2 = "0x" + "a2".repeat(32);
 const TX_ETH = "0x" + "a3".repeat(32);
 
+Deno.test("safe sync: untrusted next and persisted resume URLs cannot receive the service credential", async () => {
+  for (
+    const destination of [
+      "https://attacker.invalid/collect",
+      "http://api.safe.global/collect",
+      "https://api.safe.global@attacker.invalid/collect",
+      "https://api.safe.global/tx-service/eth/api/v1/other/",
+      "//attacker.invalid/collect",
+    ]
+  ) {
+    for (const resumed of [false, true]) {
+      const h = await harness({
+        env: { SAFE_API_KEY: "safe-key" },
+        fetch: (_url, init) => {
+          assertEquals(init?.redirect, "error");
+          return Response.json({ count: 1, next: destination, results: [] });
+        },
+      });
+      try {
+        const initiative = await h.db.initiatives.insert({
+          title: "Page isolation",
+          status: "approved",
+          goalUsd: 1000,
+          safeAddress: SAFE_ADDR,
+        });
+        if (resumed) {
+          await h.db.meta.setSafeSync(initiative.id, {
+            at: h.clock.now,
+            lastTxHash: "",
+            ok: false,
+            error: "",
+            backfilled: false,
+            resumeUrl: destination,
+          });
+        }
+        const result = await syncSafe(h.deps, initiative);
+        assertFalse(result.ok);
+        assertStringIncludes(result.error, "pagination destination");
+        assertEquals(h.fetchLog.length, resumed ? 0 : 1);
+        assert(h.fetchLog.every((r) => r.url.startsWith("https://api.safe.global/")));
+      } finally {
+        h.close();
+      }
+    }
+  }
+});
+
 const row = (o: Partial<Record<string, unknown>>) => ({
   type: "ERC20_TRANSFER",
   executionDate: "2026-09-01T00:00:00Z",

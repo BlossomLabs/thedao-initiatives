@@ -142,20 +142,21 @@ Deno.test("kv depth: the board and the initiative page stay within a few round t
   const cold = await timed(() => h.req("/api/board"));
   assertEquals(cold.body.cards.length, 25);
   assert(
-    cold.trips <= 6 && cold.ops <= 140,
+    cold.trips <= 7 && cold.ops <= 141,
     `cold board took ${cold.trips} sequential KV trips and ${cold.ops} operations`,
   );
   // Then a build is the status index (#47), one getMany per five cards, and the
   // ledger and balance snapshots per card, all but one wave in parallel.
+  // One additional strong read pins the dataset generation for the request.
   const board = await timed(() => h.req("/api/board"));
   assertEquals(board.body.cards.length, 25);
   assert(
-    board.trips <= 3 && board.ops <= 60,
+    board.trips <= 4 && board.ops <= 61,
     `board took ${board.trips} sequential KV trips and ${board.ops} operations`,
   );
 
   const page = await timed(() => h.req("/api/initiatives/initiative-3"));
   assertEquals(page.body.initiative.slug, "initiative-3");
-  assert(page.trips <= 4, `initiative page took ${page.trips} sequential KV trips`);
+  assert(page.trips <= 5, `initiative page took ${page.trips} sequential KV trips`);
   h.close();
 });

@@ -141,7 +141,7 @@ Deno.test("audit: auth failures, early Origin denials, validation and throttling
   }
 });
 
-Deno.test("audit: admin changes and mixed bulk outcomes identify each item without private content", async () => {
+Deno.test("audit: atomic bulk rollback identifies each item without private content", async () => {
   const h = await harness();
   try {
     const token = await h.mint(ADMIN, true);
@@ -176,7 +176,7 @@ Deno.test("audit: admin changes and mixed bulk outcomes identify each item witho
     const bulkEvents = forRequest(h, bulk);
     assert(
       bulkEvents.some((e) =>
-        e.action === "initiative.status" && e.outcome === "success" && e.detail === "reject" &&
+        e.action === "initiative.status" && e.outcome === "failure" && e.detail === "reject" &&
         e.target.id === sha256Hex(row.id)
       ),
     );
@@ -186,7 +186,7 @@ Deno.test("audit: admin changes and mixed bulk outcomes identify each item witho
         e.target.id === sha256Hex("missing-secret-id")
       ),
     );
-    assert(bulkEvents.some((e) => e.action === "initiative.bulk" && e.outcome === "partial"));
+    assert(bulkEvents.some((e) => e.action === "initiative.bulk" && e.outcome === "failure"));
     const sync = await h.req("/api/admin/sync-content", {
       method: "POST",
       token,
@@ -196,9 +196,9 @@ Deno.test("audit: admin changes and mixed bulk outcomes identify each item witho
     });
     assertEquals(sync.status, 200);
     const syncEvents = forRequest(h, sync);
-    assert(syncEvents.some((e) => e.action === "content.item" && e.outcome === "success"));
+    assert(!syncEvents.some((e) => e.action === "content.item" && e.outcome === "success"));
     assert(syncEvents.some((e) => e.action === "content.item" && e.outcome === "failure"));
-    assert(syncEvents.some((e) => e.action === "content.sync" && e.outcome === "partial"));
+    assert(syncEvents.some((e) => e.action === "content.sync" && e.outcome === "failure"));
     const serialized = JSON.stringify(events(h));
     for (
       const secret of [

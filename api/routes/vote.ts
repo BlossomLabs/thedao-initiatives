@@ -9,6 +9,7 @@ import { isValidBallotShape, tierName } from "../../shared/vote/ballot.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { contractOwner, recordCall } from "../../shared/vote/record.ts";
 import { kvStateCache, type VoteRound } from "../services/vote-chain.ts";
+import { RelayBudgetError } from "../services/vote-relay-policy.ts";
 import { currentVote } from "../services/vote-active.ts";
 import { etagOf, matchesEtag } from "./feeds.ts";
 import { chainStates, type StateSource } from "../../shared/vote/chain-states.ts";
@@ -80,6 +81,9 @@ const noStateSource: StateSource = {
 
 const fail = (status: number, code: string, message: string, extra?: Record<string, unknown>) =>
   new HttpError(status, message, { code, ...extra });
+
+const relayBudgetFailure = () =>
+  fail(503, "relay_budget", "The relay can't cover this ballot. Use “Send it yourself”.");
 
 type Call = Parameters<VoteRound["chain"]["send"]>[0];
 
@@ -608,10 +612,15 @@ export function voteRoutes(deps: Deps) {
         address: owner,
         ...voteTypedData(d.manifest, tokenId, owner, nonce, ballot),
         signature,
-      })).catch(() =>
-        false
-      );
-    if (!valid) throw fail(401, "bad_signature", "The signature doesn't match the badge's owner.");
+      })).catch((e) => {
+        if (e instanceof RelayBudgetError) {
+          throw relayBudgetFailure();
+        }
+        return false;
+      });
+    if (!valid) {
+      throw fail(401, "bad_signature", "The signature doesn't match the badge's owner.");
+    }
     // The ballot rules, judged with the pool on-chain now: the contract would refuse it.
     let asks: bigint[] | undefined;
     if (d.manifest.ballotRules) {
@@ -652,7 +661,9 @@ export function voteRoutes(deps: Deps) {
       deps.now(),
       d.manifest.slugs.length,
     );
-    if (no?.code === "closed") throw fail(410, "closed", "Voting has closed.");
+    if (no?.code === "closed") {
+      throw fail(410, "closed", "Voting has closed.");
+    }
     if (no?.code === "registration_closed") {
       throw fail(403, "registration_closed", "S-Tier settled before this badge voted.");
     }
@@ -714,10 +725,16 @@ export function voteRoutes(deps: Deps) {
           // The proof is about groups only; rounds before the rules have no asks to read.
           proof: findProof(
             hexToBytes(ballot as Hex),
-            rulesRound(d.manifest, asks ?? d.manifest.projects.map((p) => BigInt(p.goalUsd))),
+            rulesRound(
+              d.manifest,
+              asks ?? d.manifest.projects.map((p) =>
+                BigInt(p.goalUsd)
+              ),
+            ),
           ) ?? [],
         }, isContract),
       ).catch((e) => {
+        if (e instanceof RelayBudgetError) throw relayBudgetFailure();
         // The contract enforced a rule this check passed: the pool rose meanwhile (the
         // check uses a replay up to a few seconds old). Say so, not "internal error".
         // The server's clock is a few seconds ahead of the chain's at the opening.

@@ -2,6 +2,11 @@
 
 Design, Nov 15, 2026. Status: waiting for approval.
 
+Amended Nov 17, 2026: the owner chose registered funding goals for the affiliation limit.
+The size rule and funding still use live asks. This supersedes decision 2 and references
+below to affiliation totals using asks; see the current rules in
+`2026-11-11-ballot-rules-design.md`.
+
 ## Why
 
 The ballot rules (`2026-11-11-ballot-rules-design.md`) make a ballot spread the pool: the

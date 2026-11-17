@@ -75,7 +75,7 @@ Deno.test("vote llms: states the rules with the pool's 1.5× in dollars", () => 
   assertStringIncludes(text, "no pair shares any listed affiliation");
   assertStringIncludes(
     text,
-    "a project with several affiliations counts its full ask",
+    "a project with several affiliations counts its full registered goal",
   );
   assertStringIncludes(text, "Exactly half is allowed");
   assertStringIncludes(
@@ -270,13 +270,16 @@ Deno.test("vote llms: a round from before the ballot rules states none", () => {
   assertStringIncludes(old, "This round has no ballot rules.");
 });
 
-Deno.test("vote llms: the rules count asks at the recording block", () => {
+Deno.test("vote llms: size counts live asks while affiliation shares count registered goals", () => {
   assertStringIncludes(text, "The minimum is the smaller of 1.5× the pool");
   assertStringIncludes(
     text,
     "A project's ask is its goal less its donations and open pledges, on-chain at the block that records your ballot, so it can change before then",
   );
   assert(!text.includes("original requested amounts"));
+  assertStringIncludes(text, "total registered goals");
+  assertStringIncludes(text, "counts its full registered goal toward each");
+  assertStringIncludes(text, "pledges do not change this share");
 });
 
 Deno.test("vote llms: each project lists its chain ask", () => {

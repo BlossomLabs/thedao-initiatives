@@ -1,3 +1,4 @@
+import { versionedKv } from "./dataset.ts";
 import { initiativesRepo } from "./initiatives.ts";
 import { logosRepo } from "./logos.ts";
 import { revisionsRepo } from "./revisions.ts";
@@ -17,18 +18,15 @@ import { snapshotsRepo } from "./snapshots.ts";
 
 export type * from "./types.ts";
 
-export interface DbOptions extends RateLimiterOptions {
-  /** Serve the public reads (rows, lists, snapshots) from the nearest KV
-   * replica. Every write keeps strong reads for the entries it checks. */
-  eventualReads?: boolean;
-}
+export type DbOptions = RateLimiterOptions;
 
 export function createDb(
   kv: Deno.Kv,
   now: () => number = () => Date.now() / 1000,
   opts: DbOptions = {},
 ) {
-  const read: ReadOptions = opts.eventualReads ? { consistency: "eventual" } : undefined;
+  kv = versionedKv(kv);
+  const read: ReadOptions = undefined; // The dataset head and records are always read strongly.
   const pledges = pledgesRepo(kv, now, read);
   const donations = donationsRepo(kv, now, read);
   return {

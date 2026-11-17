@@ -1266,8 +1266,24 @@ Deno.test("page facts: content keys sync, an admin's patch validates and clears 
       },
     }),
   );
-  assertEquals(sync.created, 1);
+  assertEquals(sync.created, 0);
   assertEquals((sync.errors as string[]).length, 2);
+  assertEquals(await h.db.initiatives.bySlug("grant-x"), null);
+  const retry = await j(
+    await h.req("/api/admin/sync-content", {
+      method: "POST",
+      token: admin,
+      json: {
+        files: [{
+          name: "grant-x.md",
+          text:
+            "---\ntitle: Grant X\ngoal: 100\ntype: grant\nduration: 3\nrecipient: Team X\nrecipient_url: https://x.example/team#top\n---\n" +
+            grantBody(100),
+        }],
+      },
+    }),
+  );
+  assertEquals(retry.created, 1);
   const gx = (await h.db.initiatives.bySlug("grant-x"))!;
   assertEquals(gx.durationMonths, 3);
   assertEquals(gx.recipientTeam, "Team X");

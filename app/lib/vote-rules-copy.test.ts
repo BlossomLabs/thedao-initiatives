@@ -58,7 +58,7 @@ it("group: what the affiliation takes of the tier", () => {
     }),
   )
     .toBe(
-      "Projects affiliated with Seal take $310,000 of S-Tier's $500,000. One affiliation can hold at most half.",
+      "Projects affiliated with Seal have goals totaling $310,000 of S-Tier's $500,000 in goals. One affiliation can hold at most half.",
     );
 });
 

@@ -362,9 +362,9 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
     /// @dev The ballot rules (docs/superpowers/specs/2026-11-11-ballot-rules-design.md),
     ///      mirrored by shared/vote/rules.ts and vote/reference/ballot_rules.py. A ballot
     ///      may be shorter than the project list: the missing projects are unplaced. The
-    ///      money rules count each placed project's ask (goal less donations and open pledges)
-    ///      at the block that records the ballot; a project with a $0 ask still counts as a
-    ///      project but adds $0 to every total. The size minimum is the smaller of 1.5x the pool
+    ///      size rule counts each placed project's ask (goal less donations and open pledges)
+    ///      at the block that records the ballot. Affiliations count registered goals, so
+    ///      outside support cannot strand an unchanged settled tier. The size minimum is the smaller of 1.5x the pool
     ///      and every project's ask; the size sums and the 1.5x saturate, so no pool or ask overflows the size rule.
     function _validateBallot(bytes calldata ballot, uint8[] calldata proof) private {
         if (ballot.length == 0 || ballot.length > projectCount()) revert WrongLength();
@@ -375,13 +375,10 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         // below it: then only a ballot leaving out nothing that still asks passes.
         uint256 need = Math.saturatingAdd(poolUsd, poolUsd / 2 + (poolUsd & 1)); // 1.5x, rounded up
         if (requested < need && !_unplacedAskNothing(ballot, cs, prices)) revert BallotTooSmall();
-        _checkTiers(ballot, proof, counts, asks);
+        _checkTiers(ballot, proof, counts);
     }
 
-    function _checkTiers(bytes calldata ballot, uint8[] calldata proof, uint256[] memory counts, uint256[] memory asks)
-        private
-        view
-    {
+    function _checkTiers(bytes calldata ballot, uint8[] calldata proof, uint256[] memory counts) private view {
         (uint8[3] memory tierRank, uint256 tiers) = _tierRanks(counts);
         uint8 mask = independentTiers;
         uint256 enforced = (mask & 1) + ((mask >> 1) & 1);
@@ -392,13 +389,13 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
             if (rank == 0 || counts[rank] < 3) revert TooFewIndependent(t);
             if (proof.length != 3 * enforced) revert BadProof(t);
             _checkProof(ballot, rank, t, proof[3 * k:3 * k + 3]);
-            _checkGroups(ballot, rank, t, asks);
+            _checkGroups(ballot, rank, t);
             ++k;
         }
     }
 
     /// @dev How many projects hold each rank, and the placed projects' asked total, where a
-    ///      withdrawn project adds $0 (`asks` keeps its real ask for the affiliation rule).
+    ///      withdrawn project adds $0.
     function _rankCounts(bytes calldata ballot, uint256[] memory asks)
         private
         view
@@ -446,23 +443,25 @@ contract SignedBallots is ERC721, EIP712, RoundAccounting {
         if (ga & gb != 0 || ga & gc != 0 || gb & gc != 0) revert BadProof(t);
     }
 
-    /// @dev No group holds more than half of the tier's asked total (half passes).
-    function _checkGroups(bytes calldata ballot, uint8 rank, uint8 t, uint256[] memory asks) private view {
+    /// @dev No group holds more than half of the tier's registered goals (half passes).
+    ///      Live donations, pledges and prices must not invalidate settled membership.
+    function _checkGroups(bytes calldata ballot, uint8 rank, uint8 t) private view {
         uint256 n = ballot.length;
         uint256[] memory masks = new uint256[](n);
+        uint256[] memory goals = new uint256[](n);
         uint256 tierUsd;
         uint256 union;
         for (uint256 i; i < n; ++i) {
             if (uint8(ballot[i]) != rank) continue;
-            (, masks[i]) = _goalAndGroups(i);
-            tierUsd += asks[i];
+            (goals[i], masks[i]) = _goalAndGroups(i);
+            tierUsd += goals[i];
             union |= masks[i];
         }
         for (uint256 g; union >> g != 0; ++g) {
             if ((union >> g) & 1 == 0) continue;
             uint256 groupUsd;
             for (uint256 i; i < n; ++i) {
-                if ((masks[i] >> g) & 1 == 1) groupUsd += asks[i];
+                if ((masks[i] >> g) & 1 == 1) groupUsd += goals[i];
             }
             if (2 * groupUsd > tierUsd) revert GroupOverHalf(t, uint8(g));
         }

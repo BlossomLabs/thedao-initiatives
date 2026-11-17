@@ -1,3 +1,5 @@
+import { draftRoutes } from "./routes/draft.ts";
+import { withDataset } from "./db/dataset.ts";
 import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
@@ -35,7 +37,11 @@ const PUBLIC_MD = /^\/initiative\/[a-z0-9-]+\.md$/;
 
 /** One preview gate covers pages, assets and API routes. */
 export function siteLockFor(deps: Deps): SiteLock {
-  return createSiteLock(deps.config, async (t) => Boolean(await deps.db.sessions.get(t, false)));
+  return createSiteLock(
+    deps.config,
+    async (t) => Boolean(await deps.db.sessions.get(t, false)),
+    deps.now,
+  );
 }
 
 export function createApp(
@@ -99,6 +105,8 @@ export function createApp(
   const isFeed = (path: string) => feedPaths.has(path) || PUBLIC_MD.test(path);
   useApi((c, next) => (isFeed(c.req.path) ? feedCors : apiCors)(c, next));
   app.use("*", siteLock(lock));
+  const datasetKv = deps.db.kv;
+  app.use("*", (_c, next) => withDataset(datasetKv, next));
   // A backup restore carries the whole database; it sets its own, larger cap.
   const limit = bodyLimit({
     maxSize: 2 * 1024 * 1024,
@@ -140,6 +148,7 @@ export function createApp(
   // Before /api/initiatives, so /api/initiatives.json is never read as a slug.
   app.route("/", feedRoutes(feedCache, deps, votes.replay));
   app.route("/api/auth", authRoutes(deps));
+  app.route("/api/draft", draftRoutes(deps));
   app.route("/api/board", boardRoutes(deps, boardCache));
   app.route("/api/initiatives", initiativeRoutes(deps));
   app.route("/api/donate", donateRoutes(deps));

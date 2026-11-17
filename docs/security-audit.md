@@ -1,9 +1,12 @@
 # Application security audit events
 
 Security audit events are emitted through `console.log` as single JSON lines with
-`securityAudit: true` for OpenTelemetry to collect and send to Grafana. The injected `deps.log`
-logger routes these lines to the console without a text prefix. Audit logging does not read or
-write Deno KV. Storage, retention, access control, and queries belong to the external log backend.
+`securityAudit: true`. The injected `deps.log` logger routes these lines to the console without
+a text prefix. The current deployment uses the Deno Deploy dashboard for collection, with the
+retention of its plan and no external alert routing. The owner reconfirmed this arrangement on
+Nov 17, 2026. OpenTelemetry export, an external durable store and Grafana are not verified
+features of this deployment. Audit logging does not read or write Deno KV; exact retention,
+access controls and log immutability remain operational verification items.
 
 Each event includes its schema version, generated event ID, UTC timestamp,
 server-generated request ID, category, action, outcome, actor, and target. HTTP outcomes also

@@ -1,10 +1,19 @@
 import { roundKey } from "../../shared/vote/keys.ts";
 import {
+  BALLOT_RELAY_GAS,
+  ballotRelayBudget,
+  CONTRACT_SIGNATURE_GAS,
+  RelayBudgetError,
+} from "./vote-relay-policy.ts";
+import {
   BaseError,
   ContractFunctionRevertedError,
   ContractFunctionZeroDataError,
   createPublicClient,
   createWalletClient,
+  decodeFunctionResult,
+  encodeFunctionData,
+  getContractError,
   hashTypedData,
   type Hex,
   http,
@@ -12,6 +21,7 @@ import {
   parseAbi,
   parseAbiItem,
   type PublicClient,
+  toHex,
   type Transport,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -42,7 +52,8 @@ import {
 
 /** The round's RPC transport: calls made in the same tick go out as one JSON-RPC batch
  * (one HTTP request; the provider still counts each call). */
-export const voteTransport = (rpcUrl: string): Transport => http(rpcUrl, { batch: true });
+export const voteTransport = (rpcUrl: string): Transport =>
+  http(rpcUrl, { batch: true, fetchOptions: { redirect: "error" } });
 
 /** What the vote routes need from the chain. Injected so tests run without a chain. */
 export interface VoteChain {
@@ -245,12 +256,23 @@ export function createVoteChain(
     async verifyContractVote(owner, tokenId, nonce, ballot, signature) {
       // Match recordFor's ERC-1271 check directly; do not accept an EOA fallback or
       // counterfactual wrapper that the deployed owner's SignatureChecker would refuse.
-      const magic = await pub.readContract({
-        address: owner,
+      const { data } = await pub.call({
+        to: owner,
         account: m.contract,
+        data: encodeFunctionData({
+          abi: erc1271Abi,
+          functionName: "isValidSignature",
+          args: [hashTypedData(voteTypedData(m, tokenId, owner, nonce, ballot)), signature],
+        }),
+        gas: CONTRACT_SIGNATURE_GAS,
+      }).catch(() => {
+        // A wallet outside the sponsored preflight budget can still vote directly.
+        throw new RelayBudgetError("signature");
+      });
+      const magic = decodeFunctionResult({
         abi: erc1271Abi,
         functionName: "isValidSignature",
-        args: [hashTypedData(voteTypedData(m, tokenId, owner, nonce, ballot)), signature],
+        data: data ?? "0x",
       });
       return magic === "0x1626ba7e";
     },
@@ -308,12 +330,37 @@ export function createVoteChain(
           nonce,
         });
       }
-      return await wallet.writeContract({
+      const request = {
         address: m.contract,
         abi: SIGNED_BALLOTS_ABI,
         functionName: call.fn as never,
         args: call.args as never,
         nonce,
+      } as const;
+      if (call.fn === "record" || call.fn === "recordFor") {
+        const [estimate, fees] = await Promise.all([
+          // viem's estimateContractGas drops the caller's gas field. Send this RPC
+          // explicitly so estimation of untrusted owner code is bounded as well.
+          pub.request({
+            method: "eth_estimateGas",
+            params: [{
+              from: account.address,
+              to: request.address,
+              data: encodeFunctionData(request),
+              nonce: toHex(nonce),
+              gas: toHex(BALLOT_RELAY_GAS),
+            }],
+          }).then(BigInt).catch((e) => {
+            throw getContractError(e as BaseError, { ...request, sender: account.address });
+          }),
+          pub.estimateFeesPerGas(),
+        ]);
+        // Both ballot entry points share the final signing gate. Supplying gas and
+        // fees prevents writeContract from estimating them again without our limits.
+        return await wallet.writeContract({ ...request, ...ballotRelayBudget(estimate, fees) });
+      }
+      return await wallet.writeContract({
+        ...request,
         // A mint calls an EIP-7702 wallet's code (onERC721Received): a fixed
         // limit keeps a gas-hungry delegate from draining the relayer.
         ...(call.fn === "mint" ? { gas: MINT_GAS } : {}),

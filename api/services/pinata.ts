@@ -39,6 +39,7 @@ export function createPinata(config: Config, f: typeof fetch) {
     try {
       const res = await f(UPLOAD_URL, {
         method: "POST",
+        redirect: "error",
         headers: { Authorization: "Bearer " + config.pinataJwt },
         body: form,
         signal: AbortSignal.timeout(30_000),

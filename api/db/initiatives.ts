@@ -306,8 +306,8 @@ export function initiativesRepo(kv: Deno.Kv, now: () => number, read: ReadOption
     }
     if (n % 500) await op.commit();
     const all = (await collect(kv.list<Initiative>({ prefix: ["rfp"] }))).map(cardRow);
-    for (let i = 0; i < all.length; i += 100) {
-      const batch = all.slice(i, i + 100);
+    for (let i = 0; i < all.length; i += 99) {
+      const batch = all.slice(i, i + 99);
       const entry = (r: CardRow, o: Deno.AtomicOperation) =>
         o.check({ key: K.initiativeByStatus(r.status, r.id), versionstamp: null })
           .set(K.initiativeByStatus(r.status, r.id), r);

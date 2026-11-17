@@ -515,7 +515,7 @@ Deno.test("admin settings: a legacy row keeps its text, and text cannot ride alo
   h.close();
 });
 
-Deno.test("bulk admin actions: initiatives and comments, per-id failures reported", async () => {
+Deno.test("bulk admin actions: initiatives and comments roll back on any failure", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);
   const a = await h.db.initiatives.insert({
@@ -537,10 +537,10 @@ Deno.test("bulk admin actions: initiatives and comments, per-id failures reporte
       json: { ids: [a.id, b.id, "nope", a.id], action: "approve" },
     }),
   ) as { done: number; failed: { id: string; error: string }[] };
-  assertEquals(res.done, 2);
-  assertEquals(res.failed, [{ id: "nope", error: "not found" }]);
-  assertEquals((await h.db.initiatives.get(a.id))!.status, "approved");
-  assert((await h.db.initiatives.get(b.id))!.approvedAt);
+  assertEquals(res.done, 0);
+  assertEquals(res.failed.map((f) => f.id), [a.id, b.id, "nope"]);
+  assertEquals((await h.db.initiatives.get(a.id))!.status, "pending");
+  assertEquals((await h.db.initiatives.get(b.id))!.approvedAt, null);
   const arch = await j(
     await h.req("/api/admin/initiatives/bulk", {
       method: "POST",
@@ -587,8 +587,17 @@ Deno.test("bulk admin actions: initiatives and comments, per-id failures reporte
       json: { ids: [c1.id, c2.id, "missing"], action: "publish" },
     }),
   ) as { done: number; failed: { id: string }[] };
-  assertEquals(pub.done, 2);
-  assertEquals(pub.failed.map((f) => f.id), ["missing"]);
+  assertEquals(pub.done, 0);
+  assertEquals(pub.failed.map((f) => f.id), [c1.id, c2.id, "missing"]);
+  assertEquals((await h.db.comments.get(c1.id))!.status, "held");
+  const published = await j(
+    await h.req("/api/admin/comments/bulk", {
+      method: "POST",
+      token: admin,
+      json: { ids: [c1.id, c2.id], action: "publish" },
+    }),
+  );
+  assertEquals(published.done, 2);
   assertEquals((await h.db.comments.get(c1.id))!.status, "published");
   assertEquals(
     (await h.req("/api/admin/comments/bulk", {

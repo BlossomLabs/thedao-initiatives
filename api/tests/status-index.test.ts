@@ -102,6 +102,7 @@ Deno.test("status index: a restore drops the built mark so the index is rebuilt 
   const file = await exportBackup(h.db, h.deps.now);
   // The live database moved on since the file was taken.
   await h.db.initiatives.update(r.id, { status: "archived" });
+  await h.db.kv.set(["meta", "maintenance"], { on: true });
   await restoreBackup(h.db, file, "replace", h.deps.now);
   assertEquals((await h.kv.get(K.meta("rfp_by_status"))).value, null);
   assertEquals((await indexed(h, "approved")).map((x) => x.id), [r.id]);

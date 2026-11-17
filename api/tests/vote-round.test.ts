@@ -1457,6 +1457,55 @@ const ruled: VoteManifest = {
   ballotRules: true,
 };
 
+Deno.test("ballot: outside support preserves edits after S-Tier and A-Tier settle, but settled membership still cannot change", async () => {
+  const goals = [100n, 50n, 50n, 100n, 50n, 50n, 100n, 100n];
+  const m: VoteManifest = {
+    ...ruled,
+    poolUsd: "300",
+    slugs: goals.map((_, i) => `project-${i}`),
+    projects: goals.map((goalUsd, i) => ({
+      goalUsd: String(goalUsd),
+      rfp: false,
+      groups: i === 0 ? [0] : i === 3 ? [1] : [],
+    })),
+    groups: ["First affiliation", "Second affiliation"],
+    independentTiers: 3,
+  };
+  for (const tier of [0, 1]) {
+    const { h, state } = await setup(m);
+    try {
+      const after = m.schedule.firstTallyAt[tier] + m.schedule.initialWindow + 5;
+      state.owners.set(1n, VOTER.address);
+      state.nonces.set(1n, 1n);
+      state.logs = [logOf("1", "01010104040407ff", NOW - 100, 1)];
+      state.asks = [...goals];
+      state.asks[tier * 3 + 1] -= 1n;
+      state.states = [...oneState(goals, 300n), stateAt(2, after, state.asks, 300n)];
+      h.clock.now = after + 5;
+      const result = await j(await h.req("/api/vote/round")) as { tiers: { status: string }[] };
+      assertEquals(result.tiers[tier].status, "settled");
+      const changed = tier === 0 ? "0x01010101050505ff" : "0x01010104040704ff";
+      const refused = await h.req("/api/vote/ballot", {
+        method: "POST",
+        json: await signedBallot(VOTER, 1n, 2n, changed, m),
+      });
+      assertEquals([refused.status, (await j(refused)).code], [409, "tier_settled"]);
+      assertEquals(state.sent.length, 0);
+      const revision = tier === 0 ? "0x01010104040704ff" : "0x010101040404ff07";
+      const accepted = await h.req("/api/vote/ballot", {
+        method: "POST",
+        json: await signedBallot(VOTER, 1n, 2n, revision, m),
+      });
+      assertEquals(accepted.status, 200);
+      assertEquals(state.sent.length, 1);
+      assertEquals(state.sent[0].fn, "record");
+    } finally {
+      await h.settle();
+      h.close();
+    }
+  }
+});
+
 Deno.test("round: an invalid ballot shows as refused with invalid_ballot", async () => {
   const { h, state } = await setup(ruled);
   state.logs = [

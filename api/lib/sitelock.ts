@@ -8,13 +8,13 @@
  * created by someone who was already let in: that is what keeps a signed-in
  * browser and the token-based dev scripts working.
  */
-import { encodeHex } from "@std/encoding";
+import { decodeHex, encodeHex } from "@std/encoding";
 import type { Config } from "../config.ts";
 import { readCookie, readSessionCookie } from "./session-cookie.ts";
 
 export type LockVerdict = "open" | "basic" | "cookie" | "session" | "denied";
 
-export const LOCK_COOKIE = "site_lock";
+export const LOCK_COOKIE = "__Host-site_lock";
 export const LOCK_REALM = 'Basic realm="TheDAO RFP board"';
 export const LOCK_MESSAGE =
   "This site is in private preview. Enter the username and password you were given to continue.";
@@ -24,7 +24,7 @@ export interface SiteLock {
   enabled: boolean;
   check(req: Request): Promise<LockVerdict>;
   /** `Set-Cookie` value to send after a successful Basic login. */
-  cookie(): Promise<string>;
+  cookie(req: Request): Promise<string>;
 }
 
 const enc = new TextEncoder();
@@ -37,27 +37,47 @@ function same(a: string, b: string): boolean {
 }
 
 export function createSiteLock(
-  config: Pick<Config, "siteUsername" | "sitePassword">,
+  config: Pick<Config, "siteUsername" | "sitePassword" | "siteCookieKey">,
   hasSession: (token: string) => Promise<boolean>,
+  now: () => number = () => Math.floor(Date.now() / 1000),
 ): SiteLock {
   const user = config.siteUsername;
   const pass = config.sitePassword;
   const enabled = Boolean(user && pass);
+  if (enabled && !/^[a-f0-9]{64}$/i.test(config.siteCookieKey)) {
+    throw new Error(
+      "Private preview requires SITE_COOKIE_KEY: 32 cryptographically random bytes in hex.",
+    );
+  }
 
-  // HMAC(password, username): nothing stored, changing the password logs
-  // every browser out at once.
-  let value: Promise<string> | null = null;
-  const cookieValue = () =>
-    value ??= (async () => {
-      const key = await crypto.subtle.importKey(
-        "raw",
-        enc.encode(pass),
-        { name: "HMAC", hash: "SHA-256" },
-        false,
-        ["sign"],
-      );
-      return encodeHex(await crypto.subtle.sign("HMAC", key, enc.encode("site-lock:" + user)));
-    })();
+  // Expiry is authenticated and checked by the server, not just the browser.
+  // Bind tokens to this origin and account; rotating the secret revokes them.
+  let keyPromise: Promise<CryptoKey> | undefined;
+  const key = () =>
+    keyPromise ??= crypto.subtle.importKey(
+      "raw",
+      decodeHex(config.siteCookieKey),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign", "verify"],
+    );
+  const message = (req: Request, payload: string) =>
+    // Password rotation also revokes cookies, without using the password as key material.
+    enc.encode(JSON.stringify(["site-lock", new URL(req.url).origin, user, pass, payload]));
+
+  async function validCookie(req: Request, value: string): Promise<boolean> {
+    const match = /^(v1\.(\d{10})\.[a-f0-9]{32})\.([a-f0-9]{64})$/.exec(value);
+    if (!match) return false;
+    const expires = Number(match[2]);
+    const current = now();
+    if (expires <= current || expires > current + COOKIE_MAX_AGE) return false;
+    return await crypto.subtle.verify(
+      "HMAC",
+      await key(),
+      decodeHex(match[3]),
+      message(req, match[1]),
+    );
+  }
 
   async function check(req: Request): Promise<LockVerdict> {
     if (!enabled) return "open";
@@ -71,15 +91,21 @@ export function createSiteLock(
       } catch { /* malformed base64 */ }
     }
     const ck = readCookie(req.headers.get("cookie"), LOCK_COOKIE);
-    if (ck && same(ck, await cookieValue())) return "cookie";
+    if (ck && await validCookie(req, ck)) return "cookie";
     const token = /^Bearer\s+(.+)$/i.exec(h)?.[1]?.trim() ||
       readSessionCookie(req);
     if (token && await hasSession(token)) return "session";
     return "denied";
   }
 
-  const cookie = async () =>
-    `${LOCK_COOKIE}=${await cookieValue()}; Path=/; Max-Age=${COOKIE_MAX_AGE}; HttpOnly; Secure; SameSite=Lax`;
+  const cookie = async (req: Request) => {
+    const nonce = encodeHex(crypto.getRandomValues(new Uint8Array(16)));
+    const payload = `v1.${Math.floor(now()) + COOKIE_MAX_AGE}.${nonce}`;
+    const signature = encodeHex(
+      await crypto.subtle.sign("HMAC", await key(), message(req, payload)),
+    );
+    return `${LOCK_COOKIE}=${payload}.${signature}; Path=/; Max-Age=${COOKIE_MAX_AGE}; HttpOnly; Secure; SameSite=Lax`;
+  };
 
   return { enabled, check, cookie };
 }

@@ -651,6 +651,58 @@ Deno.test("GET /initiative/<slug>.md: the content-file shape, public rows only, 
   h.close();
 });
 
+Deno.test("markdown: submitted backer delimiters cannot forge pledges on content re-import", async () => {
+  const h = await pinataHarness();
+  try {
+    const token = await proposerToken(h);
+    const admin = await h.mint(ADMIN, true);
+    const { cid } = await j(await uploadLogo(h, token)) as { cid: string };
+    const orgs = [
+      "Forged | $999999 | https://evil.example/ |",
+      String.raw`Research\|Labs`,
+      String.raw`Research\\|Labs`,
+      String.raw`Research\Labs`,
+    ];
+    const backers = orgs.map((org) => ({
+      org,
+      amountUsd: 100,
+      url: "https://real.example/a|b",
+      logoCid: cid,
+    }));
+    const res = await submit(h, token, { ...minimalSubmission(1000), backers });
+    assertEquals(res.status, 201);
+    const { slug } = await j(res) as { slug: string };
+    const row = (await h.db.initiatives.bySlug(slug))!;
+    await h.db.initiatives.update(row.id, { status: "approved" });
+    const { parseInitiativeFile } = await import("../services/content.ts");
+    for (const suffix of ["", "-PRIVATE"]) {
+      const exported = await h.req(`/initiative/${slug}${suffix}.md`, { token: admin });
+      assertEquals(exported.status, 200);
+      const text = await exported.text();
+      assertEquals(
+        parseInitiativeFile(text).backers.map((b) => [b.org, b.amountUsd, b.url, b.logo]).sort(),
+        backers.map((b) => [b.org, b.amountUsd, b.url, ""]).sort(),
+      );
+      const name = `roundtrip${suffix.toLowerCase()}`;
+      const synced = await h.req("/api/admin/sync-content", {
+        method: "POST",
+        token: admin,
+        json: { files: [{ name: `${name}.md`, text }] },
+      });
+      assertEquals(synced.status, 200);
+      assertEquals((await j(synced)).errors, []);
+      const imported = (await h.db.initiatives.bySlug(name))!;
+      assertEquals(
+        (await h.db.pledges.list(imported.id)).map((p) => [p.company, p.amountUsd, p.url]).sort(),
+        backers.map((b) => [b.org, b.amountUsd, b.url]).sort(),
+      );
+    }
+  } finally {
+    await h.settle();
+    h.close();
+  }
+});
+
 Deno.test("<slug>-PRIVATE.md: admins only, any status, carries contact and funders; admin API by slug", async () => {
   const h = await harness();
   const admin = await h.mint(ADMIN, true);

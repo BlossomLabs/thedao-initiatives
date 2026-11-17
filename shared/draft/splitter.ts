@@ -68,6 +68,25 @@ export interface PastedBacker {
   logo: string;
 }
 
+/** Escape cell delimiters before exporting a backer, including literal escape characters. */
+export const escapeBackerCell = (text: string): string => text.replace(/[\\|]/g, "\\$&");
+
+/** Split before decoding, so escaped pipes can never become new pledge fields. */
+function backerCells(line: string): string[] {
+  const cells = [""];
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === "\\" && (line[i + 1] === "\\" || line[i + 1] === "|")) {
+      cells[cells.length - 1] += line[++i];
+    } else if (char === "|") {
+      cells.push("");
+    } else {
+      cells[cells.length - 1] += char;
+    }
+  }
+  return cells;
+}
+
 /** 'Org | $20,000 | https://...' lines -> backer rows (no logo: a pasted
  * draft never carries one, the proposer uploads the file). */
 export function parseBackers(text: string): PastedBacker[] {
@@ -75,7 +94,8 @@ export function parseBackers(text: string): PastedBacker[] {
   for (const raw of String(text ?? "").split("\n")) {
     const line = raw.replace(/^[-*+]\s+/, "").trim();
     if (line.indexOf("|") <= 0) continue;
-    const p = line.split("|");
+    const p = backerCells(line);
+    if (p.length < 2 || p.length > 4) continue;
     out.push({
       org: p[0].trim(),
       amountUsd: parseAmount(p[1] ?? ""),

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { parseBackers, splitDraft } from "./splitter.ts";
+import { escapeBackerCell, parseBackers, splitDraft } from "./splitter.ts";
 import { checkSubmission } from "./checks.ts";
 import { headingKey, SECTIONS } from "./sections.ts";
 import { parseAmount } from "./amount.ts";
@@ -93,6 +93,18 @@ test("backer lines, with an optional logo file as the 4th field", () => {
     { org: "Argot", amountUsd: 20000, url: "https://argot.org", logo: "argot.png" },
     { org: "Org2", amountUsd: 5000, url: "", logo: "" },
   ]);
+});
+
+test("backer cells preserve escaped delimiters and reject surplus columns", () => {
+  for (
+    const org of ["Org | $999999 | https://evil.example/ |", String.raw`A\|B`, String.raw`A\\|B`]
+  ) {
+    const url = "https://real.example/a|b";
+    expect(parseBackers(`${escapeBackerCell(org)} | $100 | ${escapeBackerCell(url)}`)).toEqual([
+      { org, amountUsd: 100, url, logo: "" },
+    ]);
+  }
+  expect(parseBackers("Org | $999999 | https://evil.example/ | | $100")).toEqual([]);
 });
 
 test("a Categories section is a page field", () => {

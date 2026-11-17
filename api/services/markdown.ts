@@ -5,7 +5,7 @@
  * edited and pushed again.
  */
 import type { Initiative, Pledge } from "../db/types.ts";
-import { FIELDS, milestonesToMd, SECTIONS } from "../../shared/draft/mod.ts";
+import { escapeBackerCell, FIELDS, milestonesToMd, SECTIONS } from "../../shared/draft/mod.ts";
 import { isStructured } from "../../shared/draft/normalise.ts";
 
 /** A front-matter value: one line, or indented continuation lines. */
@@ -44,7 +44,11 @@ export function initiativeMarkdown(
   if (backers.length) {
     fm.push("backers:");
     for (const p of backers) {
-      fm.push(`  ${value(p.company)} | $${p.amountUsd}${p.url ? ` | ${p.url}` : ""}`);
+      fm.push(
+        `  ${escapeBackerCell(value(p.company))} | $${p.amountUsd}${
+          p.url ? ` | ${escapeBackerCell(value(p.url))}` : ""
+        }`,
+      );
     }
   }
   if (opts.privateFields) {

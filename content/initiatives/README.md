@@ -58,6 +58,8 @@ Frontmatter keys:
   optional, at most 12). The logo is a file name in `content/initiatives/logos/` (png,
   jpg or webp, under 1 MB): the sync pins it to IPFS once and puts the
   picture on the pledge; the image never lives in the database as text.
+  Escape a literal pipe as `\|` and a literal backslash as `\\` within a field.
+  Exports apply this escaping automatically; extra unescaped columns are rejected.
 
   ```markdown
   backers:

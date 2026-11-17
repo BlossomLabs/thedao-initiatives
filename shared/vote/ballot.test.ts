@@ -4,7 +4,7 @@ import {
   encodeBallot,
   encodeBallotForSend,
   freshDraft,
-  isValidOnchainBallot,
+  isValidBallotShape,
   sendableBallot,
   sendableTiers,
   type Tier,
@@ -43,7 +43,7 @@ describe("ballots", () => {
       });
       const b = encodeBallot(slugs, t);
       expect(b.includes(0)).toBe(false);
-      expect(isValidOnchainBallot(b, 4)).toBe(true);
+      expect(isValidBallotShape(b, 4)).toBe(true);
       // Ranks keep order, not tier names: decoding round-trips the bytes.
       expect([...encodeBallot(slugs, decodeBallot(b, slugs))]).toEqual([...b]);
     }
@@ -59,14 +59,18 @@ describe("ballots", () => {
     expect(decodeBallot(Uint8Array.from([255, 1, 255, 255]), slugs)).toEqual({ b: "S" });
   });
 
-  test("on-chain validity matches SignedBallots._validateBallot", () => {
-    expect(isValidOnchainBallot(Uint8Array.from([1, 1, 3, 255]), 4)).toBe(true);
-    expect(isValidOnchainBallot(Uint8Array.from([255, 255, 255, 255]), 4)).toBe(true);
-    expect(isValidOnchainBallot(Uint8Array.from([0, 255, 255, 255]), 4)).toBe(false);
-    expect(isValidOnchainBallot(Uint8Array.from([2, 255, 255, 255]), 4)).toBe(false);
-    expect(isValidOnchainBallot(Uint8Array.from([1, 1, 2, 255]), 4)).toBe(false);
-    expect(isValidOnchainBallot(Uint8Array.from([5, 1, 1, 1]), 4)).toBe(false);
-    expect(isValidOnchainBallot(Uint8Array.from([1, 255, 255]), 4)).toBe(false);
+  test("shape validation accepts short competition-rank ballots and at most three groups", () => {
+    expect(isValidBallotShape(Uint8Array.from([1, 1, 3, 255]), 4)).toBe(true);
+    expect(isValidBallotShape(Uint8Array.from([255, 255, 255, 255]), 4)).toBe(true);
+    expect(isValidBallotShape(Uint8Array.from([0, 255, 255, 255]), 4)).toBe(false);
+    expect(isValidBallotShape(Uint8Array.from([2, 255, 255, 255]), 4)).toBe(false);
+    expect(isValidBallotShape(Uint8Array.from([1, 1, 2, 255]), 4)).toBe(false);
+    expect(isValidBallotShape(Uint8Array.from([5, 1, 1, 1]), 4)).toBe(false);
+    expect(isValidBallotShape(Uint8Array.from([1, 255, 255]), 4)).toBe(true);
+    expect(isValidBallotShape(new Uint8Array(), 4)).toBe(false);
+    expect(isValidBallotShape(Uint8Array.from([1, 1, 1, 1, 1]), 4)).toBe(false);
+    expect(isValidBallotShape(Uint8Array.from([1, 2, 3, 4]), 4)).toBe(false);
+    expect(isValidBallotShape(Uint8Array.from([1, 1, 3, 4]), 4)).toBe(true);
   });
 });
 
@@ -87,7 +91,7 @@ describe("withdrawn initiatives on a ballot", () => {
     expect([...encodeBallot(six, tiers)]).toEqual([1, 1, 1, 4, 4, 6]);
     const sent = sendableBallot(six, tiers, new Set(["p3"]), new Set<Tier>(["S"]));
     expect([...sent]).toEqual([1, 1, 1, 255, 4, 5]);
-    expect(isValidOnchainBallot(sent, six.length)).toBe(true);
+    expect(isValidBallotShape(sent, six.length)).toBe(true);
     const round = {
       projects: six.map(() => ({ goalUsd: 1n, rfp: false, groups: [] })),
       asks: six.map(() => 1n),
@@ -166,4 +170,23 @@ describe("sending preserves displayed tier labels", () => {
     const sent = sendableBallot(slugs, { a: "S", b: "A", d: "B" }, new Set(["a", "b"]), new Set());
     expect(decodeBallot(sent, slugs)).toEqual({ a: "S", b: "A", d: "B" });
   });
+});
+
+test("shape agrees with full validation when amount and independence constraints are disabled", () => {
+  for (let m = 1; m <= 4; m++) {
+    const round = {
+      projects: Array.from({ length: m }, () => ({ goalUsd: 1n, rfp: false, groups: [] })),
+      asks: Array<bigint>(m).fill(1n),
+      poolUsd: 0n,
+      independentTiers: 0,
+      groupNames: [],
+    };
+    const alphabet = [0, ...Array.from({ length: m }, (_, i) => i + 1), 255];
+    const visit = (bytes: number[]) => {
+      const ballot = Uint8Array.from(bytes);
+      expect(isValidBallotShape(ballot, m), `${m}: ${bytes}`).toBe(checkBallot(ballot, round).ok);
+      if (bytes.length < m) { for (const rank of alphabet) visit([...bytes, rank]); }
+    };
+    visit([]);
+  }
 });

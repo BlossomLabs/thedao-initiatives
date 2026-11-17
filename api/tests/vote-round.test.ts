@@ -469,7 +469,7 @@ Deno.test("vote round ballot: refusals", async () => {
   };
   const zero = bytesToHex(Uint8Array.from([0, 255, 255]));
   assertEquals(await post(await signedBallot(VOTER, 17n, 1n, zero)), [400, "bad_ballot"]);
-  assertEquals(await post(await signedBallot(VOTER, 17n, 1n, "0x01ff")), [400, "bad_ballot"]);
+  assertEquals(await post(await signedBallot(VOTER, 17n, 1n, "0x010101ff")), [400, "bad_ballot"]);
   assertEquals(await post(await signedBallot(OTHER, 17n, 1n, BALLOT)), [401, "bad_signature"]);
   assertEquals(await post({ tokenId: "x", nonce: "1", ballot: BALLOT, signature: "0x" }), [
     400,

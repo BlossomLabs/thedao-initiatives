@@ -81,13 +81,14 @@ it("a send finishing after a chain switch only saves under its original round", 
   try {
     const d = result.current.deps;
     d.ensureChain = vi.fn(async () => {});
-    d.nonceOf = vi.fn(async () => 0n);
-    d.signVote = vi.fn(async () => "0x1234" as const);
+    d.nonceOf = vi.fn(() => Promise.resolve(0n));
+    d.signVote = vi.fn(() => Promise.resolve("0x1234" as const));
     d.relay = vi.fn(() => landing.promise);
-    d.waitResult = vi.fn(async () => "recorded" as const);
+    d.waitResult = vi.fn(() => Promise.resolve("recorded" as const));
     let pending!: Promise<void>;
     await act(async () => {
       pending = result.current.submit(77n, "0x01");
+      await Promise.resolve();
     });
     await waitFor(() => expect(d.relay).toHaveBeenCalled());
     ROUND.chainId = original === 1 ? 11155111 : 1;
@@ -116,8 +117,8 @@ it("a send finishing after a chain switch only saves under its original round", 
 it("a recorded send waits for its own replay nonce before the counted phase", async () => {
   const { result, unmount } = renderHook(() => useBallotSubmit(88n));
   try {
-    result.current.deps.waitResult = vi.fn(async () => "recorded" as const);
-    await act(async () =>
+    result.current.deps.waitResult = vi.fn(() => Promise.resolve("recorded" as const));
+    await act(() =>
       result.current.track(`0x${"11".repeat(32)}`, {
         tokenId: 88n,
         nonce: 2n,
@@ -144,8 +145,8 @@ it("a recorded send waits for its own replay nonce before the counted phase", as
 it("a mined revision rejected by replay never reaches the counted phase", async () => {
   const { result, unmount } = renderHook(() => useBallotSubmit(89n));
   try {
-    result.current.deps.waitResult = vi.fn(async () => "recorded" as const);
-    await act(async () =>
+    result.current.deps.waitResult = vi.fn(() => Promise.resolve("recorded" as const));
+    await act(() =>
       result.current.track(`0x${"11".repeat(32)}`, {
         tokenId: 89n,
         nonce: 2n,

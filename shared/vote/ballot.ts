@@ -110,9 +110,10 @@ export function decodeBallot(bytes: Uint8Array, slugs: string[]): Partial<Record
   return out;
 }
 
-/** Exact port of SignedBallots._validateBallot. */
-export function isValidOnchainBallot(bytes: Uint8Array, m: number): boolean {
-  if (bytes.length !== m) return false;
+/** Ballot shape only: 1..m bytes, gapless competition ranks and at most three groups.
+ * Amounts, independence, affiliations and proofs need the full validator in rules.ts. */
+export function isValidBallotShape(bytes: Uint8Array, m: number): boolean {
+  if (bytes.length < 1 || bytes.length > m) return false;
   const counts = new Array<number>(m + 1).fill(0);
   for (const rank of bytes) {
     if (rank === WITHHELD) continue;
@@ -120,8 +121,9 @@ export function isValidOnchainBallot(bytes: Uint8Array, m: number): boolean {
     counts[rank]++;
   }
   let seen = 0;
+  let groups = 0;
   for (let rank = 1; rank <= m; rank++) {
-    if (counts[rank] !== 0 && rank !== seen + 1) return false;
+    if (counts[rank] !== 0 && (rank !== seen + 1 || ++groups > 3)) return false;
     seen += counts[rank];
   }
   return true;

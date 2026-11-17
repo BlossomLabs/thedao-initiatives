@@ -5,7 +5,7 @@ import type { Deps, Vars } from "../middleware/context.ts";
 import { requireAdmin, requireAuth } from "../middleware/auth.ts";
 import { jsonBody } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
-import { isValidOnchainBallot, tierName } from "../../shared/vote/ballot.ts";
+import { isValidBallotShape, tierName } from "../../shared/vote/ballot.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { contractOwner, recordCall } from "../../shared/vote/record.ts";
 import { kvStateCache, type VoteRound } from "../services/vote-chain.ts";
@@ -592,16 +592,12 @@ export function voteRoutes(deps: Deps) {
     const ballot = body.ballot;
     const signature = body.signature;
     const m = d.manifest.slugs.length;
-    // With the ballot rules a ballot may be shorter than the projects (signed before one
-    // was added): the missing ones are unplaced. Older rounds need every byte.
+    // Short ballots leave later initiatives unplaced; validate their original bytes.
     const bytes = typeof ballot === "string" && isHex(ballot) ? hexToBytes(ballot) : null;
-    const padded = bytes && d.manifest.ballotRules && bytes.length >= 1 && bytes.length <= m
-      ? Uint8Array.from([...bytes, ...Array(m - bytes.length).fill(255)])
-      : bytes;
     if (
       tokenId === null || nonce === null || typeof ballot !== "string" || !isHex(ballot) ||
-      !padded || typeof signature !== "string" ||
-      !isHex(signature) || !isValidOnchainBallot(padded, m)
+      !bytes || typeof signature !== "string" ||
+      !isHex(signature) || !isValidBallotShape(bytes, m)
     ) throw fail(400, "bad_ballot", "That ballot isn't valid.");
     const owner = await d.chain.ownerOf(tokenId);
     if (!owner) throw fail(404, "no_badge", "No such badge.");
@@ -651,7 +647,8 @@ export function voteRoutes(deps: Deps) {
     const no = deps.now() < firstWindowEnds ? null : refusal(
       await recentRound(d),
       tokenId.toString(),
-      padded,
+      // Compare settled sets with omitted tail projects explicitly unplaced.
+      Uint8Array.from([...bytes, ...Array(m - bytes.length).fill(255)]),
       deps.now(),
       d.manifest.slugs.length,
     );

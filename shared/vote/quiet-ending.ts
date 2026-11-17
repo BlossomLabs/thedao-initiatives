@@ -10,7 +10,7 @@
  * tally itself is the Python's stage tally (./stage.ts). Amounts are micro-USD bigints.
  * Browser and Deno. */
 import { effectiveRanks } from "../../vote/shared/ranks.ts";
-import { isValidOnchainBallot, type Tier } from "./ballot.ts";
+import { isValidBallotShape, type Tier } from "./ballot.ts";
 import { type ChainInputs, chainTally } from "./chain.ts";
 import { tierOf } from "./stage.ts";
 
@@ -204,9 +204,7 @@ export function replay(
 
   /** The contract judged the rules (size, groups) when it recorded the ballot, and the
    * transcript proves it did; only a ballot this replay can't read is refused. */
-  const readable = (ballot: Uint8Array): boolean =>
-    ballot.length >= 1 && ballot.length <= m &&
-    isValidOnchainBallot(Uint8Array.from([...ballot, ...Array(m - ballot.length).fill(255)]), m);
+  const readable = (ballot: Uint8Array): boolean => isValidBallotShape(ballot, m);
 
   const apply = (r: Receipt) => {
     if (r.ballot === null) {

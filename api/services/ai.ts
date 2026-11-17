@@ -144,7 +144,7 @@ export function screenFields(s: Screen, at: number): { aiSummary: string; aiScre
 
 export function createAi(config: Config, f: typeof fetch) {
   const enabled = Boolean(config.aiSearchApiKey);
-  const searchEnabled = config.typesafeEnabled ? Boolean(config.typesafeApiKey) : enabled;
+  const searchEnabled = enabled;
   // Some engines (Nexus's Qwen) refuse response_format with a 400. After the
   // first refusal this instance asks for JSON in the prompt only.
   let structured = true;
@@ -182,6 +182,7 @@ export function createAi(config: Config, f: typeof fetch) {
   async function chatOnce(system: string, user: string): Promise<Response> {
     return await f(config.aiSearchBaseUrl + "/chat/completions", {
       method: "POST",
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
         Authorization: "Bearer " + config.aiSearchApiKey,
@@ -208,7 +209,7 @@ export function createAi(config: Config, f: typeof fetch) {
     query: string,
     items: { id: string; title: string; summary: string }[],
   ): Promise<AiSearchResult["scores"]> {
-    if (!config.typesafeEnabled) {
+    if (!config.jevEnabled) {
       const out = await chatJson(
         "You match a donor's interests to Ethereum-security funding proposals. " +
           'Reply with JSON only: {"scores": {"proposal_id": 0.0}}. ' +
@@ -262,13 +263,14 @@ export function createAi(config: Config, f: typeof fetch) {
         criteria: AI_RELEVANCE_LEVELS,
       },
     ]));
-    const res = await f("https://api.typesafe.ai/v1/systemone", {
+    const res = await f("https://nexus-api.dappnode.com/v1/systemone", {
       method: "POST",
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer " + config.typesafeApiKey,
+        Authorization: "Bearer " + config.aiSearchApiKey,
       },
-      body: JSON.stringify({ model: config.typesafeModel, state: { query }, questions }),
+      body: JSON.stringify({ model: config.jevModel, state: { query }, questions }),
       signal: AbortSignal.timeout(25_000),
     });
     if (!res.ok) throw new Error(`Jev HTTP ${res.status}`);

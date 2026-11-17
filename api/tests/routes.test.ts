@@ -770,11 +770,10 @@ Deno.test("admin: settings, status, pledges with logo, safe deploy params + conf
 });
 
 Deno.test("ai-search: accepts zk in either provider mode but rejects other short queries", async () => {
-  for (const typesafeEnabled of ["true", "false"]) {
+  for (const jevEnabled of ["true", "false"]) {
     const h = await harness({
       env: {
-        TYPESAFE_ENABLED: typesafeEnabled,
-        TYPESAFE_API_KEY: "jev-key",
+        JEV_ENABLED: jevEnabled,
         AI_SEARCH_API_KEY: "llm-key",
       },
     });
@@ -796,21 +795,40 @@ Deno.test("ai-search: accepts zk in either provider mode but rejects other short
   }
 });
 
-Deno.test("ai-search: Jev scores every proposal, caches content, and has its own key", async () => {
-  const off = await harness({ env: { AI_SEARCH_API_KEY: "chat-only" } });
+Deno.test("ai-search: Jev scores every proposal, caches content, and shares the AI key", async () => {
+  const off = await harness();
   assertEquals(
     (await off.req("/api/ai-search", { method: "POST", json: { query: "compilers" } })).status,
     503,
   );
+  assertEquals(
+    (await off.req("/api/ai-categories", {
+      method: "POST",
+      json: { title: "Wallet security", summary: "Tools to improve wallet security." },
+    })).status,
+    503,
+  );
   off.close();
   let calls = 0;
+  let chatCalls = 0;
   const h = await harness({
-    env: { TYPESAFE_API_KEY: "k", AI_PICK_THRESHOLD: "0.75" },
+    env: {
+      AI_SEARCH_API_KEY: "shared-nexus-key",
+      AI_SEARCH_BASE_URL: "https://nexus-api.dappnode.com/v1",
+      AI_PICK_THRESHOLD: "0.75",
+    },
     fetch: (url, init) => {
-      assertEquals(url, "https://api.typesafe.ai/v1/systemone");
+      assertEquals(new Headers(init?.headers).get("Authorization"), "Bearer shared-nexus-key");
+      if (url === "https://nexus-api.dappnode.com/v1/chat/completions") {
+        chatCalls++;
+        return Response.json({
+          choices: [{ message: { content: JSON.stringify({ categories: ["opsec"] }) } }],
+        });
+      }
+      assertEquals(url, "https://nexus-api.dappnode.com/v1/systemone");
       calls++;
       const request = JSON.parse(String(init?.body));
-      assertEquals(request.model, "jev-1.13.0");
+      assertEquals(request.model, "jev");
       assertEquals(request.state, { query: "verified compilers" });
       assertEquals(Object.keys(request.questions).length, 5);
       const answers = Object.fromEntries(
@@ -893,13 +911,20 @@ Deno.test("ai-search: Jev scores every proposal, caches content, and has its own
   });
   await search();
   assertEquals(calls, 2);
+  const suggestions = await h.req("/api/ai-categories", {
+    method: "POST",
+    json: { title: "Wallet security", summary: "Tools to improve wallet security." },
+  });
+  assertEquals(suggestions.status, 200);
+  assertEquals(await j(suggestions), { categories: ["opsec"] });
+  assertEquals(chatCalls, 1);
   h.close();
 });
 
 Deno.test("ai-search: Jev scores a board too large for one request in batches", async () => {
   const sizes: number[] = [];
   const h = await harness({
-    env: { TYPESAFE_API_KEY: "k" },
+    env: { AI_SEARCH_API_KEY: "k" },
     fetch: (_url, init) => {
       const request = JSON.parse(String(init?.body));
       assertEquals(request.state, { query: "verified compilers" });
@@ -937,12 +962,11 @@ Deno.test("ai-search: Jev scores a board too large for one request in batches", 
   h.close();
 });
 
-Deno.test("ai-search: disabling TypeSafe uses the configured LLM and scores the whole board", async () => {
+Deno.test("ai-search: disabling Jev uses the configured LLM and scores the whole board", async () => {
   let calls = 0;
   const h = await harness({
     env: {
-      TYPESAFE_ENABLED: "false",
-      TYPESAFE_API_KEY: "unused-jev-key",
+      JEV_ENABLED: "false",
       AI_SEARCH_API_KEY: "llm-key",
       AI_SEARCH_BASE_URL: "https://llm.example/v1",
       AI_SEARCH_MODEL: "existing-model",
@@ -1016,7 +1040,7 @@ Deno.test("ai-search: disabling TypeSafe uses the configured LLM and scores the 
 });
 
 Deno.test("ai-search: LLM mode requires its key and rejects missing or malformed scores", async () => {
-  const off = await harness({ env: { TYPESAFE_ENABLED: "false", TYPESAFE_API_KEY: "jev-only" } });
+  const off = await harness({ env: { JEV_ENABLED: "false" } });
   const board = await j(await off.req("/api/board")) as { flags: { aiSearch: boolean } };
   assertEquals(board.flags.aiSearch, false);
   assertEquals(
@@ -1029,7 +1053,7 @@ Deno.test("ai-search: LLM mode requires its key and rejects missing or malformed
   off.close();
   for (const value of [undefined, "0.9", -0.1, 1.1]) {
     const h = await harness({
-      env: { TYPESAFE_ENABLED: "false", AI_SEARCH_API_KEY: "llm-key" },
+      env: { JEV_ENABLED: "false", AI_SEARCH_API_KEY: "llm-key" },
       fetch: (_url, init) => {
         const request = JSON.parse(String(init?.body));
         const { proposals } = JSON.parse(request.messages[1].content);
@@ -1063,7 +1087,7 @@ Deno.test("ai-search: invalid or missing Jev scores fail without caching partial
   ) {
     let calls = 0;
     const h = await harness({
-      env: { TYPESAFE_API_KEY: "k" },
+      env: { AI_SEARCH_API_KEY: "k" },
       fetch: () => {
         calls++;
         return Response.json({ answers: { proposal_0: answer } });

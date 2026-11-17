@@ -12,7 +12,6 @@ async function setup() {
       RATE_LIMIT_MODE: "off",
       PINATA_JWT: "test",
       AI_SEARCH_API_KEY: "test",
-      TYPESAFE_API_KEY: "test",
       SUPPORT_URL: "https://support.example/",
     },
   });

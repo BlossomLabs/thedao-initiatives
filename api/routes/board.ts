@@ -206,7 +206,7 @@ async function buildBoard(deps: Deps, refresh: boolean) {
     },
     flags: {
       aiSearch: deps.ai.searchEnabled,
-      aiSearchAuto: deps.ai.searchEnabled && config.typesafeEnabled,
+      aiSearchAuto: deps.ai.searchEnabled && config.jevEnabled,
       tokensOk,
       chainDetail: state.detail,
       uploads: deps.pinata.enabled,

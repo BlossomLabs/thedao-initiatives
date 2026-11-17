@@ -89,6 +89,28 @@ export function report(m: VoteManifest, st: Round, now: number): string[] {
     out.push(`  covered: ${covered(t.covered)}`);
   }
   out.push(`Ballots: ${st.accepted.size} counted, ${st.rejected.length} refused`);
+  if (st.lastChange) {
+    const c = st.lastChange;
+    const what = c.causes.map((x) =>
+      x.kind === "ballot"
+        ? `badge #${x.tokenId}'s ${x.first ? "first ballot" : "revised ballot"}`
+        : x.kind === "revoked"
+        ? `badge #${x.tokenId}'s ballot taken back`
+        : x.kind === "ask"
+        ? `${slug(x.project)} ask ${dollars(x.from)} -> ${dollars(x.to)}`
+        : x.kind === "pool"
+        ? `pool ${dollars(x.from)} -> ${dollars(x.to)}`
+        : x.kind === "withdrawn"
+        ? `${slug(x.project)} ${x.withdrawn ? "withdrawn" : "back"}`
+        : `${tierName(x.tier)} settled`
+    );
+    out.push(`Last change to TheDAO's ballot: ${dayTime(c.at)}, ${what.join(", ")}`);
+    for (const x of c.moved) {
+      const where = (t: typeof x.from) => (t ? tierName(t) : "none");
+      out.push(`  ${slug(x.project)}: ${where(x.from)} -> ${where(x.to)}`);
+    }
+    if (c.amounts.length) out.push(`  amounts changed: ${c.amounts.map(slug).join(", ")}`);
+  }
   out.push(
     `Transcript: matches the contract at block ${st.transcript.block} (${st.transcript.records} records${
       st.transcript.legacy ? ", pre-Nov 14 entries" : ""

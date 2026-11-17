@@ -6,6 +6,7 @@ import { api, ApiError } from "~/lib/api";
 import type { Tier } from "../../shared/vote/ballot";
 import type { ValuationEvidence } from "../../shared/vote/quiet-ending";
 import type { LiveInputsJson } from "../../shared/vote/live-inputs";
+import type { LastChangeJson } from "../../shared/vote/replay-round";
 
 /* The vote's reads and types. Sending a ballot (wallet, signing, the chain client)
  * is in use-vote-send.ts, so a page that only shows the vote doesn't load it. */
@@ -116,6 +117,10 @@ export type RoundView = {
      * it (into B-Tier when unfunded): its gap, and who comes in, drops out or moves. For
      * every open initiative not in the tier settling now; absent once closed. */
     give?: Record<string, NextTierEntry>;
+    /** What caused the last change to TheDAO's ballot, and what it moved; null when none
+     * was found in the last few inputs. Absent once closed, from examples and from servers
+     * before it. */
+    lastChange?: LastChangeJson | null;
     /** `next`, `threat` and `give` are from before the latest change (a ballot, a donation,
      * a pledge, the pool): served while they are worked out again. */
     aheadStale?: boolean;

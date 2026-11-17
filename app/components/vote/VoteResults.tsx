@@ -25,6 +25,9 @@ import {
 import { useSession } from "~/context/session";
 import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd, usdShort } from "~/lib/format";
+import { changeCause, changeEffect, changeMoves } from "~/lib/vote-change";
+import { When } from "./When";
+import type { LastChangeJson } from "../../../shared/vote/replay-round";
 import { ROUND, type VoteManifest } from "../../../shared/vote/manifest";
 import { poolEstimated, poolName, poolNoteText } from "~/components/vote/pool";
 import { dollars as dollarsFull } from "~/components/vote/FinalTiers";
@@ -34,6 +37,25 @@ import { liveInputsFrom, type LiveInputsJson } from "../../../shared/vote/live-i
 import { FINE, giftEffect, giftGapTo, liveTiers } from "../../../shared/vote/next-tier";
 
 const POLL_MS = 5_000;
+
+/** What caused the last change to TheDAO's ballot, and what it did; each move in the
+ * hover title. */
+function LastChangeNote(
+  { change, titleOf }: { change: LastChangeJson; titleOf: (slug: string) => string },
+) {
+  const effect = changeEffect(change);
+  return (
+    <p
+      className="m-0 mt-2 text-[13px] leading-snug text-white/60"
+      title={changeMoves(change, titleOf) || undefined}
+      data-testid="last-change"
+    >
+      Last change, <When at={change.at} />: {changeCause(change, titleOf)}
+      {effect && `, which ${effect}`}.
+    </p>
+  );
+}
+
 /** How long typing pauses before a typed amount's number is worked out, ms. */
 const TYPED_PAUSE_MS = 400;
 
@@ -592,6 +614,10 @@ export default function VoteResults(
               // Green is a donation's preview here: what the live tally adds stays neutral.
               liveTone="neutral"
               label={preview ? "TheDAO's ballot, with your donation" : "TheDAO's ballot"}
+              // What moved the ballot last (#118); a donation's preview says its own.
+              note={!preview && rv?.live.lastChange && (
+                <LastChangeNote change={rv.live.lastChange} titleOf={titleOf} />
+              )}
               // Its ring: the tier settling now and the later ones in two neutrals; green is
               // only a donation's preview here (a ballot's picks are green on its own page).
               settling={tier}

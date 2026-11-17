@@ -72,6 +72,10 @@ API.
 CI (`.github/workflows/ci.yml`) runs typecheck, lint, both test suites and the build on every push
 and pull request. Deno Deploy builds and deploys `main` itself; there is no deploy job.
 
+The build task enables Chokidar polling for all build-time watchers, including those
+created internally by React Router. This avoids Deno filesystem errors arriving after a
+native watcher closes, which can otherwise crash the deployment build.
+
 ## Routes
 
 - `/` board (hero total, AI search when enabled, initiative cards with inline donate, suggest card,

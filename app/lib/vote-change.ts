@@ -59,3 +59,19 @@ export function changeMoves(c: LastChangeJson, titleOf: (slug: string) => string
   const where = (t: LastChangeJson["moved"][number]["from"]) => t ? tierName(t) : "not funded";
   return c.moved.map((m) => `${titleOf(m.slug)}: ${where(m.from)} → ${where(m.to)}`).join("\n");
 }
+
+/** What a change did, for the vote results' toast (#126): "Foo is now included in A-Tier,
+ * Bar was pushed out." At most three moves by name, then "and N more". Empty when nothing
+ * moved. */
+export function changeHeadline(c: LastChangeJson, titleOf: (slug: string) => string): string {
+  const said = c.moved.map((m) =>
+    !m.to
+      ? `${titleOf(m.slug)} was pushed out`
+      : !m.from
+      ? `${titleOf(m.slug)} is now included in ${tierName(m.to)}`
+      : `${titleOf(m.slug)} moved to ${tierName(m.to)}`
+  );
+  if (!said.length) return "";
+  const shown = said.length > 3 ? [...said.slice(0, 3), `${said.length - 3} more moved`] : said;
+  return `${list(shown)}.`;
+}

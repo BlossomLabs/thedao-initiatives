@@ -81,6 +81,8 @@ export function SupportPanel() {
   const [email, setEmail] = useState("");
   const [transactionUrl, setTransactionUrl] = useState("");
   const [pledgeInitiative, setPledgeInitiative] = useState<string | null>(null);
+  /** The amount the pledge form opens with, when the request named one. */
+  const [pledgeAmount, setPledgeAmount] = useState<number | null>(null);
   const [text, setText] = useState("");
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
@@ -109,6 +111,7 @@ export function SupportPanel() {
     setEmail("");
     setTransactionUrl("");
     setPledgeInitiative(null);
+    setPledgeAmount(null);
     setText("");
     setScreenshot(null);
     setError(null);
@@ -138,10 +141,11 @@ export function SupportPanel() {
     }), [sending]);
 
   useEffect(() =>
-    onPledgeRequest((initiativeId) => {
+    onPledgeRequest((initiativeId, amountUsd) => {
       if (sending) return;
       reset();
       setPledgeInitiative(initiativeId);
+      setPledgeAmount(amountUsd);
       setCategory("pledge");
       setView("form");
       setOpen(true);
@@ -347,8 +351,9 @@ export function SupportPanel() {
 
         {view === "form" && pledge && (
           <PledgeSupportForm
-            key={pledgeInitiative ?? "picker"}
+            key={`${pledgeInitiative ?? "picker"}:${pledgeAmount ?? ""}`}
             initialInitiativeId={pledgeInitiative}
+            initialAmountUsd={pledgeAmount}
             sending={sending}
             onSending={setSending}
             onSent={() => setView("success")}

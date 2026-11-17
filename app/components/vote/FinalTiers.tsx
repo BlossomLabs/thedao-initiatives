@@ -35,6 +35,7 @@ export default function FinalTiers(
     arrived,
     liveTone = "green",
     withdrawn,
+    covered,
     celebrate,
     moves,
   }: {
@@ -48,6 +49,10 @@ export default function FinalTiers(
     items: BallotItem[];
     /** Initiatives an admin withdrew from the vote: an unfunded one's chip says so. */
     withdrawn?: ReadonlySet<string>;
+    /** Initiatives donations cover whole, in the tier that covered them: nothing from the
+     * pool, the chip says "covered". "final": a settled tier covered it (gold); "now": the
+     * tier settling now would, if it settled now. */
+    covered?: ReadonlyMap<string, "final" | "now">;
     /** slug → tier: the ballot that counted, or the tier that funded it. */
     tiers: Partial<Record<string, Tier>>;
     /** What the vote funded (slugs). */
@@ -212,6 +217,7 @@ export default function FinalTiers(
                     const up = from !== undefined &&
                       TIERS.indexOf(t.tier) < TIERS.indexOf(from);
                     const out = !isFunded && Boolean(withdrawn?.has(i.slug));
+                    const cover = covered?.get(i.slug);
                     // Turning gold now: glows, a beat after the chip before it.
                     const shine = goldNow.indexOf(i.slug);
                     const label = given !== undefined
@@ -228,6 +234,10 @@ export default function FinalTiers(
                       ? `${i.title}, comes in with your donation`
                       : out
                       ? `${i.title}, withdrawn`
+                      : cover
+                      ? `${i.title}, covered by donations${
+                        cover === "now" ? " if it ended now" : ""
+                      }`
                       : isFunded
                       ? youPaid !== undefined
                         ? `${i.title}, ${fundedWord}: ${live ? liveAmountWord : amountWord} ${
@@ -280,8 +290,10 @@ export default function FinalTiers(
                             ? "border-dashed border-vote-pale/70 bg-vote/[.12]"
                             : came
                             ? "border-dashed border-dao-green/70 bg-dao-green/[.12]"
-                            : gold
+                            : cover === "final" || gold
                             ? "border-vote/50 bg-vote/[.12]"
+                            : cover
+                            ? "border-white/15 bg-white/[.07]"
                             : green
                             ? "border-dao-green/50 bg-dao-green/[.12]"
                             : isFunded
@@ -355,6 +367,17 @@ export default function FinalTiers(
                           ? (
                             <span className="ml-1 flex-none text-[11.5px] font-semibold leading-none text-dao-red-pale">
                               Withdrawn
+                            </span>
+                          )
+                          : cover
+                          ? (
+                            <span
+                              className={cn(
+                                "ml-1 flex-none text-[11.5px] font-semibold leading-none",
+                                cover === "final" ? "text-vote" : "text-white/70",
+                              )}
+                            >
+                              covered
                             </span>
                           )
                           : youPaid !== undefined

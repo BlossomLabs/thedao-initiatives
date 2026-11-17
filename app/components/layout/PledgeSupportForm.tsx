@@ -16,12 +16,16 @@ import { Input, Textarea } from "~/components/ui/Field";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** A private pledge enquiry, delivered through the existing Support inbox. */
-export default function PledgeSupportForm({ initialInitiativeId, sending, onSending, onSent }: {
-  initialInitiativeId?: string | null;
-  sending: boolean;
-  onSending: (sending: boolean) => void;
-  onSent: () => void;
-}) {
+export default function PledgeSupportForm(
+  { initialInitiativeId, initialAmountUsd, sending, onSending, onSent }: {
+    initialInitiativeId?: string | null;
+    /** The amount to start from: the vote page's "Pledge instead" passes the donate form's. */
+    initialAmountUsd?: number | null;
+    sending: boolean;
+    onSending: (sending: boolean) => void;
+    onSent: () => void;
+  },
+) {
   const { data, isPending, isError, refetch } = useBoard();
   const initiatives = useMemo(() =>
     (data?.cards ?? []).map((c) => c.initiative)
@@ -29,7 +33,9 @@ export default function PledgeSupportForm({ initialInitiativeId, sending, onSend
       .sort((a, b) => a.title.localeCompare(b.title)), [data]);
   const [initiative, setInitiative] = useState<CardInitiative | null>(null);
   const [search, setSearch] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(
+    initialAmountUsd ? Math.round(initialAmountUsd).toLocaleString("en-US") : "",
+  );
   const [org, setOrg] = useState("");
   const [email, setEmail] = useState("");
   const [contact, setContact] = useState("");

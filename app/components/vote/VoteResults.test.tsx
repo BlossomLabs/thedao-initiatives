@@ -265,8 +265,8 @@ it("links a signed-in badge holder to their ballot", async () => {
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  expect(await screen.findByRole("link", { name: /see or change your ballot/i }))
-    .toHaveAttribute("href", "/vote/ballot");
+  expect(await screen.findByRole("link", { name: "Vote" }))
+    .toHaveAttribute("href", "/vote/ballot/edit");
   signedIn.address = null;
   signedIn.badge = null;
 });
@@ -1236,6 +1236,23 @@ it("a donation that only brings others in says it brings them in, in green", asy
   ).toHaveLength(1);
 });
 
+it("the legend says only what the ballot shows: no settled gold before a settlement", async () => {
+  await showOpen(openWith({ beta: give() }));
+  const legend = (text: string) => screen.queryByText(text);
+  expect(legend("settling now")).toBeInTheDocument();
+  expect(legend("settled: funded")).toBeNull();
+  expect(legend("later tiers, as they stand")).toBeNull();
+  expect(legend("with your donation")).toBeNull();
+  cleanup();
+  await showOpen(
+    openWith({ beta: give({ tier: "A", gap: "4000000000" }) }, { beta: [30_000, "A"] }, {
+      tiers: [settled("S", ["alpha"], { alpha: usdMicro(50_000) }), waiting("A"), waiting("B")],
+    }),
+  );
+  expect(legend("settled: funded")).toBeInTheDocument();
+  expect(legend("settling now")).toBeInTheDocument();
+});
+
 it("TheDAO's ring: the tier settling now and the later tiers in two neutrals, no ballot green", async () => {
   // Signed in with badge 1, whose ballot has Alpha: still no green here (green is a
   // donation's preview on this page).
@@ -1304,7 +1321,8 @@ it("covered projects are not counted as funded by the pool", async () => {
   expect(heading("S-Tier")).toHaveTextContent("1 initiative");
 });
 
-it("while open, a project covered now is covered for now, one covered at a settlement is final", async () => {
+it("covered projects are chips in the tier that covers them: a settled one's final, the settling one's for now", async () => {
+  withFour();
   const view = openWith({ beta: give() });
   await showOpen({
     ...view,
@@ -1315,11 +1333,14 @@ it("while open, a project covered now is covered for now, one covered at a settl
     ],
     live: { ...view.live, covered: ["beta", "gamma"] },
   });
-  const box = await screen.findByRole("region", { name: "Covered by donations" });
-  expect(within(box).getByText("Beta audits")).toBeInTheDocument();
-  const now = screen.getByRole("region", { name: "Covered by donations for now" });
-  expect(within(now).getByText("gamma")).toBeInTheDocument();
-  expect(within(now).queryByText("Beta audits")).toBeNull();
+  // No box apart: each in its tier on TheDAO's ballot.
+  expect(screen.queryByRole("region", { name: /^Covered by donations/ })).toBeNull();
+  const tierRow = (grade: string) =>
+    within(daoBallot()).getByRole("region", { name: new RegExp(`^${grade} · `) });
+  expect(within(tierRow("S")).getByLabelText("Beta audits, covered by donations"))
+    .toHaveTextContent("covered");
+  expect(within(tierRow("A")).getByLabelText("Gamma outside, covered by donations if it ended now"))
+    .toHaveTextContent("covered");
 });
 
 it("a donation that covers the whole ask reads as covered, not as dropping out", async () => {
@@ -1336,8 +1357,10 @@ it("a donation that covers the whole ask reads as covered, not as dropping out",
         .test(el.textContent ?? "")
     ),
   ).toBeInTheDocument();
-  const now = screen.getByRole("region", { name: "Covered by donations for now" });
-  expect(within(now).getByText("Alpha fuzzing")).toBeInTheDocument();
+  // In the tier settling now, covered, not dropping out.
+  expect(
+    within(daoBallot()).getByLabelText("Alpha fuzzing, covered by donations if it ended now"),
+  ).toBeInTheDocument();
   expect(within(daoBallot()).queryByLabelText(/Alpha fuzzing, drops out/)).toBeNull();
 });
 
@@ -1393,6 +1416,47 @@ it("TheDAO's ballot says what caused its last change, and each move on hover (#1
     "title",
     "Alpha fuzzing: S-Tier → not funded\nBeta audits: A-Tier → S-Tier",
   );
+});
+
+it("a new change while the page is open shows a toast saying what moved (#126)", async () => {
+  const qc = new QueryClient();
+  const base = openWith({ beta: give() });
+  const withChange = (at: number, moved: unknown[]) => ({
+    ...base,
+    live: {
+      ...base.live,
+      lastChange: {
+        at,
+        causes: [{ kind: "ask", slug: "beta", from: usdMicro(30_000), to: usdMicro(21_000) }],
+        moved,
+        amounts: [],
+      },
+    },
+  });
+  vi.mocked(api).mockResolvedValue(withChange(100, [{ slug: "alpha", from: "S", to: null }]));
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <VoteResults />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  await screen.findByText(/Test vote/i);
+  // The change already there when the page opened: no toast.
+  expect(screen.queryByTestId("change-toast")).toBeNull();
+  vi.mocked(api).mockResolvedValue(
+    withChange(200, [{ slug: "beta", from: null, to: "A" }, {
+      slug: "alpha",
+      from: "S",
+      to: null,
+    }]),
+  );
+  await act(() => qc.refetchQueries({ queryKey: ["production", "vote-round"] }));
+  expect(await screen.findByTestId("change-toast")).toHaveTextContent(
+    "A donation to Beta audits: Beta audits is now included in A-Tier and Alpha fuzzing was pushed out.",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+  expect(screen.queryByTestId("change-toast")).toBeNull();
 });
 
 it("no last change, no note", async () => {

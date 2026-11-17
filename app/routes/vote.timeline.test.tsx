@@ -598,8 +598,10 @@ it("the results page follows every event", async () => {
         expect(page, name).toMatch(/by 3 ballots/);
         break;
       case "a donation covers beta":
-        expect(t.beta, name).toBeUndefined();
-        expect(page, name).toMatch(/Covered by donations.*BETA/);
+        // In the tier settling now, marked covered: nothing from the pool.
+        expect(t.beta, name).toBe("S");
+        expect(chipLabel("TheDAO's ballot", "beta"), name)
+          .toMatch(/covered by donations if it ended now$/);
         break;
       case "a pledge lowers alpha's ask":
         expect(chipLabel("TheDAO's ballot", "alpha"), name).toMatch(/\$100$/);

@@ -11,6 +11,7 @@ import type { NextTierEntry } from "~/hooks/use-vote";
 import type { Card } from "~/lib/api-types";
 import { usd, usd2, usdK, usdShortUp } from "~/lib/format";
 import { lazyPart } from "~/lib/lazy-part";
+import { openPledgeRequest } from "~/lib/support";
 import { cn } from "~/lib/utils";
 import type { JumpUsd } from "~/lib/threat-queue";
 import { dollars } from "~/lib/vote-results";
@@ -259,6 +260,7 @@ export default function GiveList(
     steps,
     onGreenOrder,
     jumps,
+    amount,
   }: {
     /** The tier settling now. */
     tier: Tier;
@@ -294,6 +296,8 @@ export default function GiveList(
      * A green row absent from it is still being worked out; undefined when the page can't
      * work them out (no tally inputs). */
     jumps?: Map<string, JumpUsd[]>;
+    /** The open row's amount in its donate form: "Pledge instead" opens the pledge form with it. */
+    amount?: number;
   },
 ) {
   const name = tierName(tier);
@@ -504,17 +508,19 @@ export default function GiveList(
                       <span className="block truncate text-[14px] text-white">{i.title}</span>
                       <span className="mt-0.5 block truncate text-[12px] text-white/55 tnum">
                         {need !== undefined && `Needs ${usd(need)} · `}
-                        {r.now ? (
-                          // Funded if the vote ended now: green, against "not included" in red.
-                          <span className="text-[#a7e3a5]" data-now-in="">
-                            now in {tierName(r.now)}
-                          </span>
-                        ) : (
-                          // Not funded if the vote ended now: red, as the money it misses.
-                          <span className="text-[#ff8a88]" data-not-included="">
-                            not included
-                          </span>
-                        )}
+                        {r.now
+                          ? (
+                            // Funded if the vote ended now: green, against "not included" in red.
+                            <span className="text-[#a7e3a5]" data-now-in="">
+                              now in {tierName(r.now)}
+                            </span>
+                          )
+                          : (
+                            // Not funded if the vote ended now: red, as the money it misses.
+                            <span className="text-[#ff8a88]" data-not-included="">
+                              not included
+                            </span>
+                          )}
                       </span>
                     </span>
                     {r.entry && gap === null
@@ -566,8 +572,7 @@ export default function GiveList(
                                   <b className="font-semibold text-white">{usd(r.threat)}</b>{" "}
                                   to another initiative could move it out of{" "}
                                   <span className="whitespace-nowrap">{name}</span>{" "}
-                                  if the vote ended now. A
-                                  donation lowers what it asks of the pool.
+                                  if the vote ended now. A donation lowers what it asks of the pool.
                                 </>
                               )
                           )
@@ -668,6 +673,22 @@ export default function GiveList(
                             Donations are paused right now.
                           </p>
                         )}
+                      {isOpen && (
+                        // Pledging instead (#128): the pledge form, on this initiative and
+                        // with the amount above. Quiet, on the right, with why one would.
+                        <p className="m-0 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[12.5px] text-white/60">
+                          <span>Pay only once it's fully funded?</span>
+                          <button
+                            type="button"
+                            aria-haspopup="dialog"
+                            onClick={() =>
+                              openPledgeRequest(i.id, amount && amount > 0 ? amount : undefined)}
+                            className="cursor-pointer text-dao-green/90 underline decoration-dao-green/40 underline-offset-[3px] hover:text-dao-green hover:decoration-dao-green"
+                          >
+                            Pledge instead
+                          </button>
+                        </p>
+                      )}
                       {isOpen && effect}
                     </div>
                   </Reveal>

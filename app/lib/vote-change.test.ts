@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changeCause, changeEffect, changeMoves } from "./vote-change";
+import { changeCause, changeEffect, changeHeadline, changeMoves } from "./vote-change";
 import type { LastChangeJson } from "../../shared/vote/replay-round";
 
 const title = (slug: string) => slug.toUpperCase();
@@ -36,6 +36,22 @@ describe("last change copy", () => {
     });
     expect(changeCause(c, title)).toBe(
       "2 new voters sent ballots, a donation to FOO, BAR joined the vote, the pool changed to $900k and S-Tier settled",
+    );
+  });
+
+  it("heads the toast with what moved, in and out (#126)", () => {
+    const c = change({
+      moved: [{ slug: "foo", from: null, to: "A" }, { slug: "bar", from: "A", to: null }],
+    });
+    expect(changeHeadline(c, title)).toBe("FOO is now included in A-Tier and BAR was pushed out.");
+    expect(changeHeadline(change({ moved: [{ slug: "foo", from: "B", to: "S" }] }), title))
+      .toBe("FOO moved to S-Tier.");
+    expect(changeHeadline(change({ amounts: ["foo"] }), title)).toBe("");
+    const many = change({
+      moved: ["a", "b", "c", "d", "e"].map((slug) => ({ slug, from: null, to: "B" as const })),
+    });
+    expect(changeHeadline(many, title)).toBe(
+      "A is now included in B-Tier, B is now included in B-Tier, C is now included in B-Tier and 2 more moved.",
     );
   });
 });

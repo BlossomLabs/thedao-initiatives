@@ -1,5 +1,6 @@
 import { useRound, useVoteBase } from "~/lib/vote-round";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import RoundBox from "./RoundBox";
 import ValuationNotes from "./ValuationNotes";
@@ -11,7 +12,7 @@ import BoardPage from "~/components/board/BoardPage";
 import Hero from "~/components/board/Hero";
 import PledgeBand from "~/components/board/PledgeBand";
 import PageMain from "~/components/layout/PageMain";
-import ScrollAside from "~/components/layout/ScrollAside";
+import StickyAside from "~/components/layout/StickyAside";
 import { Button, LinkButton } from "~/components/ui/Button";
 import { boardKey, useBoard } from "~/hooks/use-board";
 import { useThreatJumps } from "~/hooks/use-threat-jumps";
@@ -26,7 +27,7 @@ import {
 import { useSession } from "~/context/session";
 import { type NextTierEntry, type RoundView, useMyBadges, useVoteRound } from "~/hooks/use-vote";
 import { usd, usdShort } from "~/lib/format";
-import { changeCause, changeEffect, changeMoves } from "~/lib/vote-change";
+import { changeCause, changeEffect, changeHeadline, changeMoves } from "~/lib/vote-change";
 import { When } from "./When";
 import type { LastChangeJson } from "../../../shared/vote/replay-round";
 import { type VoteManifest } from "../../../shared/vote/manifest";
@@ -56,6 +57,67 @@ function LastChangeNote(
     </p>
   );
 }
+
+/** A change to the result while the page is open, said for a few seconds (#126): what
+ * caused it, then what moved ("A donation to Foo: Foo is now included in A-Tier and Bar was
+ * pushed out."). Your own donation and anyone else's ballot or donation alike. */
+function ChangeToast(
+  { ready, change, titleOf }: {
+    /** The round's figures have come: the change they bring is the starting point. */
+    ready: boolean;
+    change: LastChangeJson | undefined;
+    titleOf: (slug: string) => string;
+  },
+) {
+  const [shown, setShown] = useState<{ at: number; text: string }>();
+  /** The change already on screen when the figures first came: never a toast. */
+  const seen = useRef<number | null>(null);
+  const at = change?.at ?? 0;
+  useEffect(() => {
+    if (!ready) return;
+    const before = seen.current;
+    seen.current = at;
+    if (before === null || before === at || !change) return;
+    const head = changeHeadline(change, titleOf);
+    if (!head) return;
+    const cause = changeCause(change, titleOf);
+    setShown({ at, text: `${cause[0].toUpperCase()}${cause.slice(1)}: ${head}` });
+    // Only a new change matters; titleOf is a new closure on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, at]);
+  useEffect(() => {
+    if (!shown) return;
+    const t = setTimeout(() => setShown(undefined), TOAST_MS);
+    return () => clearTimeout(t);
+  }, [shown]);
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="pointer-events-none fixed inset-x-0 bottom-5 z-[150] flex justify-center px-4"
+    >
+      {shown && (
+        <div
+          key={shown.at}
+          data-testid="change-toast"
+          className="pointer-events-auto flex max-w-[560px] items-start gap-3 rounded-[14px] border border-edge2 bg-panel px-4 py-3 font-inter-tight text-[14px] leading-snug text-white shadow-menu motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3"
+        >
+          <p className="m-0 flex-1">{shown.text}</p>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => setShown(undefined)}
+            className="-my-0.5 -mr-1 cursor-pointer rounded-md p-0.5 text-white/55 hover:bg-white/10 hover:text-white"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+/** How long a change's toast stays, ms. */
+const TOAST_MS = 9_000;
 
 /** How long typing pauses before a typed amount's number is worked out, ms. */
 const TYPED_PAUSE_MS = 400;
@@ -549,6 +611,28 @@ export default function VoteResults(
     );
   }
 
+  /** Projects donations cover whole, in the tier that covers them on TheDAO's ballot: a
+   * settled tier's, final (gold); the tier settling now, for now, with the one a donation
+   * being previewed would cover. */
+  const coveredIn = (() => {
+    const tiers: Partial<Record<string, Tier>> = {};
+    const kind = new Map<string, "final" | "now">();
+    for (const t of rv?.tiers ?? []) {
+      if (t.status !== "settled") continue;
+      for (const slug of t.covered ?? []) {
+        tiers[slug] = t.tier;
+        kind.set(slug, "final");
+      }
+    }
+    const now = [...covered.now, ...(change?.covered && subject && preview ? [subject] : [])];
+    for (const slug of now) {
+      if (kind.has(slug)) continue;
+      tiers[slug] = tier;
+      kind.set(slug, "now");
+    }
+    return { tiers, kind };
+  })();
+
   const hero = (
     <Hero
       raised={raised}
@@ -573,6 +657,12 @@ export default function VoteResults(
 
       }
     >
+      {mine && (
+        // A badge holder's way in, right under what the ballots fund (#123): the editor.
+        <div className="mt-5 flex justify-center">
+          <LinkButton variant="primary" to={`${mine}/edit`}>Vote</LinkButton>
+        </div>
+      )}
       {R.schedule && (
         // Where the round is (two thirds), and beside it the initiatives closest to the tier
         // settling now (a third); stacked on a phone.
@@ -584,10 +674,12 @@ export default function VoteResults(
         </div>
       )}
       {rv && <ValuationNotes view={rv} round={R} />}
-      {mine && (
-        <div className="mt-5 flex justify-center">
-          <LinkButton variant="primary" to={mine}>See or change your ballot</LinkButton>
-        </div>
+      {/* Pledging, up top and short, above the results (#127). */}
+      <div className="mx-auto mt-6 max-w-[1052px] text-left">
+        <PledgeBand compact />
+      </div>
+      {!example && (
+        <ChangeToast ready={Boolean(rv)} change={rv?.live.lastChange} titleOf={titleOf} />
       )}
     </Hero>
   );
@@ -604,10 +696,13 @@ export default function VoteResults(
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
           {
             /* Stays in view beside the long list, so a donation's preview shows by its form.
-              It scrolls on its own: the wheel over it moves only it, over the list only the
-              list (#95). */
+              No scroll of its own (#121): taller than the screen, it follows the page's scroll
+              until its bottom or its top shows. */
           }
-          <ScrollAside className="card grid min-w-0 grid-cols-1 gap-y-2 text-[15px] leading-relaxed text-white/80">
+          <StickyAside
+            narrow="(max-width: 1023.98px)"
+            className="card grid min-w-0 grid-cols-1 gap-y-2 text-[15px] leading-relaxed text-white/80 max-lg:static"
+          >
             <DaoBallot
               items={items}
               result={preview?.result ?? result}
@@ -625,6 +720,9 @@ export default function VoteResults(
               // only a donation's preview here (a ballot's picks are green on its own page).
               settling={tier}
               table={{
+                // Covered by donations: a chip in the tier that covers it, not a box apart.
+                tiers: { ...(preview?.result ?? result).tiers, ...coveredIn.tiers },
+                covered: coveredIn.kind,
                 mirrored: false,
                 // A tier settling while you watch: what it funds turns gold, glowing.
                 celebrate: true,
@@ -651,15 +749,9 @@ export default function VoteResults(
                 </div>
               )
             }
-            <Covered label="Covered by donations" titles={covered.final.map(titleOf)} />
-            <Covered
-              label="Covered by donations for now"
-              titles={[...covered.now, ...(change?.covered && subject && preview ? [subject] : [])]
-                .filter((s, i, all) => all.indexOf(s) === i).map(titleOf)}
-            />
             <Covered label="Withdrawn" titles={withdrawn.map(titleOf)} />
-            <Legend preview={Boolean(preview)} />
-          </ScrollAside>
+            <Legend show={legendFor(preview?.result ?? result, tier, coveredIn.kind, preview)} />
+          </StickyAside>
           <GiveList
             tier={tier}
             rows={rows}
@@ -680,15 +772,54 @@ export default function VoteResults(
             steps={steps}
             onGreenOrder={onGreenOrder}
             jumps={jumpsBySlug}
+            amount={given}
           />
         </div>
-        <PledgeBand />
       </PageMain>
     </>
   );
 }
 
-function Legend({ preview }: { preview: boolean }) {
+/** Which of the legend's entries TheDAO's ballot shows now. */
+function legendFor(
+  r: ReturnType<typeof daoResult>,
+  settlingTier: Tier,
+  covered: ReadonlyMap<string, "final" | "now">,
+  preview?: {
+    joining?: ReadonlyMap<string, number>;
+    moved?: ReadonlyMap<string, Tier>;
+    arrived?: ReadonlySet<string>;
+    leaving?: ReadonlySet<string>;
+  },
+) {
+  const live = [...r.provisional];
+  return {
+    settled: [...r.funded].some((s) => !r.provisional.has(s)) ||
+      [...covered.values()].includes("final"),
+    settling: live.some((s) => r.tiers[s] === settlingTier) ||
+      [...covered.values()].includes("now"),
+    later: live.some((s) => r.tiers[s] !== settlingTier),
+    joining: Boolean(preview?.joining?.size),
+    moved: Boolean(preview?.moved?.size),
+    arrived: Boolean(preview?.arrived?.size),
+    leaving: Boolean(preview?.leaving?.size),
+  };
+}
+
+/** What the ballot's colours and marks mean: only those it shows now (no "settled: funded"
+ * before a tier settles, no preview marks the preview doesn't use). */
+function Legend({ show }: {
+  show: {
+    settled: boolean;
+    settling: boolean;
+    later: boolean;
+    joining: boolean;
+    moved: boolean;
+    arrived: boolean;
+    leaving: boolean;
+  };
+}) {
+  if (!Object.values(show).some(Boolean)) return null;
   const item = (swatch: string, text: string) => (
     <span className="flex items-center gap-2">
       <i className={`inline-block h-[6px] w-6 rounded-full ${swatch}`} aria-hidden="true" />
@@ -697,22 +828,22 @@ function Legend({ preview }: { preview: boolean }) {
   );
   return (
     <div className="flex flex-wrap gap-x-5 gap-y-1.5 pt-1 text-[13px] text-white/60">
-      {item("bg-vote", "settled: funded")}
-      {item("bg-white/75", "settling now")}
-      {item("bg-white/30", "later tiers, as they stand")}
-      {preview &&
+      {show.settled && item("bg-vote", "settled: funded")}
+      {show.settling && item("bg-white/75", "settling now")}
+      {show.later && item("bg-white/30", "later tiers, as they stand")}
+      {show.joining &&
         item("border border-dashed border-dao-green bg-dao-green/30", "with your donation")}
-      {preview && (
+      {show.moved && (
         <span className="flex items-center gap-1.5">
           <b className="text-vote-pale" aria-hidden="true">↑↓</b>moves with it
         </span>
       )}
-      {preview && (
+      {show.arrived && (
         <span className="flex items-center gap-1.5 text-[#a7e3a5]">
           <b aria-hidden="true">↑</b>came in
         </span>
       )}
-      {preview && (
+      {show.leaving && (
         <span className="flex items-center gap-1.5 text-[#ff8a88]">
           <b aria-hidden="true">↓</b>dropped out
         </span>

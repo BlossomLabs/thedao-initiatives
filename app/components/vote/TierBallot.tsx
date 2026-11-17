@@ -12,6 +12,7 @@ import {
   Undo2,
 } from "lucide-react";
 import CategoryDot from "~/components/ui/CategoryDot";
+import StickyAside from "~/components/layout/StickyAside";
 import type { Card } from "~/lib/api-types";
 import type { AiSearchResult } from "../../../shared/ai-search";
 import BoardSearch from "~/components/board/BoardSearch";
@@ -71,10 +72,6 @@ export type BallotItem = {
 /** Where an initiative is: a tier, the list, or skipped (off the list, out of sight;
  * on the ballot it is as unranked as the list). */
 type Where = Tier | "unplaced" | "skipped";
-/** The tier column's place when pinned: under the top bar (86 px), and its gap to the
- * screen's bottom when it is taller than the screen. */
-const PIN_TOP = 86;
-const PIN_GAP = 16;
 /** A move Undo can take back: one initiative's, or the whole ballot's (Clear, Restore
  * sent ballot), with what was there before. */
 type Move = { kind: "place"; slug: string; from: Where } | {
@@ -266,24 +263,6 @@ export default function TierBallot(
   const [aiResult, setAiResult] = useState<AiSearchResult | null>(null);
   const [asking, setAsking] = useState(false);
   const [announce, setAnnounce] = useState("");
-  /** The tier column, and where it pins (#122): under the top bar, or higher by as much
-   * as it is taller than the screen, so its bottom shows. */
-  const columnRef = useRef<HTMLDivElement>(null);
-  const [columnTop, setColumnTop] = useState(PIN_TOP);
-  useEffect(() => {
-    const el = columnRef.current;
-    if (!el) return;
-    const fit = () =>
-      setColumnTop(Math.min(PIN_TOP, globalThis.innerHeight - el.offsetHeight - PIN_GAP));
-    fit();
-    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
-    ro?.observe(el);
-    globalThis.addEventListener("resize", fit);
-    return () => {
-      ro?.disconnect();
-      globalThis.removeEventListener("resize", fit);
-    };
-  }, []);
   /** The moves made here, last one last, for Undo (#125). */
   const [history, setHistory] = useState<Move[]>([]);
   /** Counts the changes to the ballot: the tools under the tiers pulse on each one. */
@@ -1131,15 +1110,10 @@ export default function TierBallot(
           /* The tier list: pinned under the top bar on a phone, the left column on wider
             screens, with the send bar under it there. On a phone these wrappers step aside.
             Wider, the column is pinned as the page scrolls, as tall as its contents, with no
-            scroll of its own (#122). Taller than the screen, it pins higher, by as much as it
-            is too tall, so its bottom (the send bar) stays in view: your ballot's summary
-            goes under the top bar first, the tiers stay. */
+            scroll of its own (#122): taller than the screen, it follows the scroll until its
+            bottom (the send bar) or its top shows, as the initiative page's side cards. */
         }
-        <div
-          ref={columnRef}
-          style={{ "--column-top": `${columnTop}px` } as React.CSSProperties}
-          className="contents sm:sticky sm:top-[var(--column-top)] sm:block"
-        >
+        <StickyAside narrow="(max-width: 639.98px)" className="max-sm:contents">
           {head && <div className="order-first mb-4 sm:mb-3">{head}</div>}
           <div className="sticky top-[57px] z-20 -mx-6 mb-4 border-b border-white/10 bg-panel/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:rounded-2xl sm:border sm:bg-white/[.03] sm:p-3 sm:backdrop-blur-none">
             {
@@ -1267,7 +1241,7 @@ export default function TierBallot(
             // Phone: first, above the tiers; wider: under the send bar.
             aside && <div className="order-first mb-4 sm:mb-0 sm:mt-3">{aside}</div>
           }
-        </div>
+        </StickyAside>
 
         {/* The list is as long as it needs: the page scrolls, on every screen. */}
         <div className="flex min-w-0 flex-col gap-4">

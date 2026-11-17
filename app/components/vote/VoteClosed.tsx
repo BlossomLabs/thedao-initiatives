@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import BallotArrows, { type ArrowFrom } from "~/components/vote/BallotArrows";
-import { bytesToHex, hexToBytes } from "viem";
+import { hexToBytes } from "viem";
 import { Button, LinkButton, SMALL_BUTTON } from "~/components/ui/Button";
 import { Link } from "react-router";
 import { cn } from "~/lib/utils";
@@ -117,16 +117,14 @@ export default function VoteClosed(
     };
   },
 ) {
-  // The chain's ballots only when this page doesn't know the sent one already.
+  // Read recorded ballots when no accepted ballot was supplied; always display decoded ranks.
   const ballots = useVoteBallots(false, !sentHere);
   const sent = useMemo(() => {
-    if (sentHere) return sentHere;
+    if (sentHere) return decodeBallot(encodeBallot(round.slugs, sentHere), round.slugs);
     if (n === null || !ballots.data) return undefined;
     const b = ballots.data.ballots.find((x) => x.tokenId === String(n));
     if (!b) return null;
-    const same = bytesToHex(encodeBallot(round.slugs, saved)).toLowerCase() ===
-      b.ballot.toLowerCase();
-    return same ? saved : decodeBallot(hexToBytes(b.ballot), round.slugs);
+    return decodeBallot(hexToBytes(b.ballot), round.slugs);
   }, [ballots.data, n, saved, sentHere, round]);
 
   // What the vote funds: the settled tiers, and during the vote what the open ones would

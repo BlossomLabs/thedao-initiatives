@@ -271,3 +271,11 @@ describe("empty tiers by label", () => {
     expect(emptyTierErrors({ a: "S" }, 1)).toEqual([]);
   });
 });
+
+it("an optional empty A-Tier is still required before B-Tier can be represented", () => {
+  expect(emptyTierErrors({ a: "S", b: "B" }, 1)).toEqual([{ rule: "empty_tier", tier: 1 }]);
+  expect(emptyTierErrors({ b: "B" }, 0)).toEqual([{ rule: "empty_tier", tier: 0 }, {
+    rule: "empty_tier",
+    tier: 1,
+  }]);
+});

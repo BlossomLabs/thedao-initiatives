@@ -41,7 +41,9 @@ import { useMockBallotSubmit } from "~/components/vote/mock-send";
 import { checkBallot, emptyTierErrors } from "../../../shared/vote/rules";
 import { shortDay, usd } from "~/lib/format";
 import {
+  emptyIntermediateTiers,
   encodeBallot,
+  encodeBallotForSend,
   freshDraft,
   sendableTiers,
   type Tier,
@@ -530,7 +532,7 @@ export default function VotePage(
       // The contract would refuse it: never open the wallet for a ballot breaking a rule.
       if (broken) return;
       setSendRoute("own");
-      void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallot(R.slugs, toSend)));
+      void ballotFlow.selfSend(BigInt(n), bytesToHex(encodeBallotForSend(R.slugs, toSend)));
     };
     const counted = rv ? Boolean(rv.accepted[String(n)]) : true;
     // The round as of the newest block the server judged it at, not this browser's clock.
@@ -556,7 +558,8 @@ export default function VotePage(
     // The draft is the ballot that counts, withdrawn initiatives and all: it still counts
     // (a ballot is as valid after a withdrawal as before), so the drop alone neither
     // breaks a rule nor calls for a resend.
-    const asCounted = Boolean(countedHex) && countedHex!.toLowerCase() === hexOf(tiers);
+    const asCounted = emptyIntermediateTiers(tiers).length === 0 && Boolean(countedHex) &&
+      countedHex!.toLowerCase() === hexOf(tiers);
     /** What a resend would leave out: withdrawn initiatives in its open tiers. */
     const leftOut = Object.keys(tiers).filter((slug) => tiers[slug] && !toSend[slug]);
     // What this badge has paid in the settled tiers, for good, and what is left.
@@ -596,7 +599,7 @@ export default function VotePage(
     // without asks) nothing can be judged, or sent, relayed or from the wallet.
     const asksPending = Boolean(R.ballotRules && !asks);
     // An enforced tier left empty: the bytes would read the next one in its place.
-    const empty = R.ballotRules ? emptyTierErrors(toSend, R.independentTiers) : [];
+    const empty = emptyTierErrors(toSend, R.ballotRules ? R.independentTiers : 0);
     const allErrors = asCounted
       ? []
       : empty.length
@@ -739,7 +742,8 @@ export default function VotePage(
     );
     const phaseKind = ballotFlow.phase.kind;
     const upToDateNow = asCounted ||
-      (Boolean(countedHex) && countedHex!.toLowerCase() === hexOf(toSend));
+      (emptyIntermediateTiers(toSend).length === 0 && Boolean(countedHex) &&
+        countedHex!.toLowerCase() === hexOf(toSend));
     // The sheet has something to say whatever the ballot: a send running, its outcome.
     const sheetNews = busy || upToDateNow || phaseKind === "failed" || phaseKind === "late" ||
       (phaseKind === "idle" && Boolean(ballotFlow.phase.note));
@@ -929,6 +933,12 @@ export default function VotePage(
                   An example ballot: Send goes through the steps, but nothing is signed or sent.
                 </p>
               )}
+              {locked.size === 3 && settledCount < 3 && (
+                <p>
+                  An earlier tier settled empty on this ballot. Later tiers cannot be added in this
+                  round.
+                </p>
+              )}
               <BallotStatus
                 phase={ballotFlow.phase}
                 route={sendRoute}
@@ -942,11 +952,17 @@ export default function VotePage(
                 sendLabel={countedHex ? "Resend my ballot" : "Send my ballot"}
                 resultsHref={REAL(R) ? "/" : "/vote"}
                 onSend={() => {
+                  if (broken) return;
                   setSendRoute("relay");
-                  void ballotFlow.submit(BigInt(n), bytesToHex(encodeBallot(R.slugs, toSend)));
+                  void ballotFlow.submit(
+                    BigInt(n),
+                    bytesToHex(encodeBallotForSend(R.slugs, toSend)),
+                  );
                 }}
                 onSelfSend={sendYourself}
-                onRetry={() => void ballotFlow.retry()}
+                onRetry={() => {
+                  if (!broken) void ballotFlow.retry();
+                }}
               />
             </div>
           )}

@@ -1,17 +1,13 @@
-import { bytesToHex, hexToBytes } from "viem";
-import { decodeBallot, encodeBallot, type Tier } from "../../shared/vote/ballot";
+import { hexToBytes } from "viem";
+import { decodeBallot, type Tier } from "../../shared/vote/ballot";
 
-/** The ballot that counts for a badge, as S/A/B labels: this browser's tiers when they
- * encode to exactly what counts (the chain's ranks can't tell an empty S-Tier from an
- * empty A-Tier), else the chain's reading. */
+/** Always display the groups the replay counts, even if an older local draft used
+ * empty intermediate tiers whose labels were lost during encoding. */
 export function countedTiers(
   acceptedHex: string,
-  local: Partial<Record<string, Tier>>,
+  _local: Partial<Record<string, Tier>>,
   slugs: string[],
 ): Partial<Record<string, Tier>> {
-  if (bytesToHex(encodeBallot(slugs, local)).toLowerCase() === acceptedHex.toLowerCase()) {
-    return local;
-  }
   return decodeBallot(hexToBytes(acceptedHex as `0x${string}`), slugs);
 }
 

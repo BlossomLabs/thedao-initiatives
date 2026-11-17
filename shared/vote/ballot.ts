@@ -24,6 +24,27 @@ export function encodeBallot(
   });
 }
 
+/** Empty intermediate tiers cannot be represented by competition ranks. */
+export function emptyIntermediateTiers(tiers: Partial<Record<string, Tier>>): Tier[] {
+  const used = new Set(Object.values(tiers));
+  return TIERS.filter((t, i) => !used.has(t) && TIERS.slice(i + 1).some((x) => used.has(x)));
+}
+
+/** Signing must never silently promote a displayed pick into an earlier tier. */
+export function encodeBallotForSend(
+  slugs: string[],
+  tiers: Partial<Record<string, Tier>>,
+): Uint8Array {
+  const known = Object.fromEntries(slugs.map((s) => [s, tiers[s]]));
+  const gaps = emptyIntermediateTiers(known);
+  if (gaps.length) {
+    throw new Error(
+      `${gaps.map(tierName).join(" and ")} must have a pick before a later tier can be used.`,
+    );
+  }
+  return encodeBallot(slugs, known);
+}
+
 /** The tiers a voter sends: an initiative an admin withdrew is left out of the open tiers,
  * and kept in a `settled` one (the supporter lock needs that tier's set unchanged). The
  * ranks below a dropped one move up to close the gap, as `encodeBallot` counts only what
@@ -69,7 +90,7 @@ export const sendableBallot = (
   tiers: Partial<Record<string, Tier>>,
   withdrawn: ReadonlySet<string>,
   settled: ReadonlySet<Tier>,
-): Uint8Array => encodeBallot(slugs, sendableTiers(tiers, withdrawn, settled));
+): Uint8Array => encodeBallotForSend(slugs, sendableTiers(tiers, withdrawn, settled));
 
 export function decodeBallot(bytes: Uint8Array, slugs: string[]): Partial<Record<string, Tier>> {
   // Lossy when a higher tier is empty (an A-only ballot reads back as S); the

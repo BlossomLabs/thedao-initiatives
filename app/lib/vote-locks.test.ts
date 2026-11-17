@@ -19,8 +19,8 @@ describe("lockedLabels: what a settled tier freezes on this voter's ballot", () 
 
 describe("countedTiers", () => {
   const slugs = ["alpha", "beta", "gamma"];
-  it("this browser's tiers when they are what counts (the chain can't tell an empty S)", () => {
-    expect(countedTiers("0xff01ff", { beta: "A" }, slugs)).toEqual({ beta: "A" });
+  it("corrects old local A-Tier labels to the S-Tier group actually counted", () => {
+    expect(countedTiers("0xff01ff", { beta: "A" }, slugs)).toEqual({ beta: "S" });
   });
   it("else the chain's reading", () => {
     expect(countedTiers("0xff01ff", {}, slugs)).toEqual({ beta: "S" });

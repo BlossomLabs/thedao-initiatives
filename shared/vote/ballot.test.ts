@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   decodeBallot,
   encodeBallot,
+  encodeBallotForSend,
   freshDraft,
   isValidOnchainBallot,
   sendableBallot,
@@ -147,5 +148,22 @@ describe("a fresh draft", () => {
     expect(freshDraft(rated, new Set(["a", "b", "c"]))).toEqual({ d: "A" });
     expect(sendableTiers(rated, new Set(["a", "b", "c"]), new Set())).toBe(rated);
     expect(freshDraft(rated, new Set())).toBe(rated);
+  });
+});
+
+describe("sending preserves displayed tier labels", () => {
+  test("an empty A-Tier cannot silently promote B-Tier", () => {
+    expect(() => encodeBallotForSend(slugs, { a: "S", b: "B" })).toThrow("A-Tier must have a pick");
+    expect(() => sendableBallot(slugs, { a: "S", b: "B" }, new Set(), new Set(["S", "A"]))).toThrow(
+      "A-Tier",
+    );
+  });
+  test("both empty intermediate tiers are refused", () => {
+    expect(() => encodeBallotForSend(slugs, { d: "B" })).toThrow("S-Tier and A-Tier");
+    expect(() => encodeBallotForSend(slugs, { unknown: "A", a: "S", d: "B" })).toThrow("A-Tier");
+  });
+  test("existing withdrawn placeholders preserve both intermediate tiers", () => {
+    const sent = sendableBallot(slugs, { a: "S", b: "A", d: "B" }, new Set(["a", "b"]), new Set());
+    expect(decodeBallot(sent, slugs)).toEqual({ a: "S", b: "A", d: "B" });
   });
 });

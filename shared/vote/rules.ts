@@ -6,6 +6,8 @@
  * vote/reference/ballot_rules.py and the contract; shared fixtures keep them equal.
  * Amounts are micro-USD bigints. Browser and Deno. */
 
+import { emptyIntermediateTiers, TIERS } from "./ballot.ts";
+
 export type RulesProject = { goalUsd: bigint; rfp: boolean; groups: number[] };
 export type RulesRound = {
   projects: RulesProject[];
@@ -23,6 +25,7 @@ export type RulesRound = {
 export type RuleError =
   | { rule: "shape" }
   | { rule: "tiers" }
+  | { rule: "empty_tier"; tier: 0 | 1 }
   | { rule: "size"; requested: bigint; needed: bigint; pool: bigint }
   | {
     rule: "independent";
@@ -174,7 +177,13 @@ export function emptyTierErrors(
   independentTiers: number,
 ): RuleError[] {
   const used = new Set(Object.values(tiers));
-  return ([0, 1] as const)
+  const enforcedErrors: RuleError[] = ([0, 1] as const)
     .filter((t) => (independentTiers >> t) & 1 && !used.has((["S", "A"] as const)[t]))
     .map((tier) => ({ rule: "independent", tier, count: 0, related: [] }));
+  return [
+    ...enforcedErrors,
+    ...emptyIntermediateTiers(tiers).filter((t) =>
+      !enforcedErrors.some((e) => "tier" in e && TIERS[e.tier] === t)
+    ).map((t) => ({ rule: "empty_tier" as const, tier: TIERS.indexOf(t) as 0 | 1 })),
+  ];
 }

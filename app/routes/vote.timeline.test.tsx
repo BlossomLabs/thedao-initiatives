@@ -119,12 +119,15 @@ vi.mock("~/context/wallet-picker", () => ({
 }));
 /** What the editor's Send hands the relay. */
 const submit = vi.hoisted(() => vi.fn());
+const flow = vi.hoisted(() => ({ failed: false, retry: vi.fn() }));
 vi.mock("~/hooks/use-vote-send", async (original) => ({
   ...await original<typeof import("~/hooks/use-vote-send")>(),
   useBallotSubmit: () => ({
-    phase: { kind: "idle" },
+    phase: flow.failed
+      ? { kind: "failed", reason: "send failed", hash: `0x${"11".repeat(32)}` }
+      : { kind: "idle" },
     submit,
-    retry: vi.fn(),
+    retry: flow.retry,
     selfSend: vi.fn(),
     last: null,
   }),
@@ -238,6 +241,8 @@ beforeEach(() => {
   chain.changes = [];
   chain.withdrawn = [];
   submit.mockReset();
+  flow.failed = false;
+  flow.retry.mockReset();
   vi.useFakeTimers({ shouldAdvanceTime: true });
   localStorage.clear();
   vi.mocked(api).mockReset().mockImplementation(
@@ -775,3 +780,26 @@ it("a fresh draft from ratings leaves a withdrawn 5★ initiative out, with no p
   await waitFor(() => expect(tierOf("beta")).toBe("A"));
   expect(tierOf("alpha")).toBe("unplaced");
 });
+
+for (const failed of [false, true]) {
+  it(`a gapped local draft is neither counted nor retried (failed: ${failed})`, async () => {
+    chain.events = [{
+      tokenId: "1",
+      block: 1100,
+      timestamp: 1100,
+      voter: ME,
+      nonce: 1,
+      ballot: ballotOf({ alpha: "S", beta: "A" }),
+    }];
+    await serve(1500, 1499);
+    vi.setSystemTime(1_500_000);
+    localStorage.setItem(`vote-tiers:${M.contract}:1`, JSON.stringify({ alpha: "S", beta: "B" }));
+    flow.failed = failed;
+    mount("editor");
+    expect(await screen.findByText(/A-Tier needs a pick before a later tier/)).toBeInTheDocument();
+    expect(screen.queryByText("Your ballot counts")).not.toBeInTheDocument();
+    if (failed) fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(submit).not.toHaveBeenCalled();
+    expect(flow.retry).not.toHaveBeenCalled();
+  });
+}

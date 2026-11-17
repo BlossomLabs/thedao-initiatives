@@ -163,6 +163,8 @@ export function voteLlms(
     `YAML with one key per tier, \`${sTier}\`, \`${aTier}\` and \`${bTier}\`, each a list of ` +
     "project slugs from the list below; an empty tier is `[]`. No voter id, no names, no " +
     "costs. Use only the exact project slugs below and list each project at most once. " +
+    "A tier must contain a pick before any later tier can be used: B-Tier requires both S-Tier and A-Tier. " +
+    "If an earlier tier settled empty on this ballot, later tiers cannot be added in this round. " +
     "Anything not listed is unranked. The voter pastes it into the ballot page. Syntax " +
     "example only; it may not meet the ballot rules or reflect the voter's priorities:",
     "",

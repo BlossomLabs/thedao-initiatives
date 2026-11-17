@@ -33,6 +33,10 @@ export function ruleMessage(
       return `Projects affiliated with ${groupName(e.group)} take ${dollars(e.groupUsd)} of ${
         tierName(TIERS[e.tier])
       }'s ${dollars(e.tierUsd)}. One affiliation can hold at most half.`;
+    case "empty_tier":
+      return `${
+        tierName(TIERS[e.tier])
+      } needs a pick before a later tier can be used. If it already settled empty on this ballot, later tiers cannot be added in this round.`;
     case "tiers":
       return "Use at most three tiers.";
     case "shape":
@@ -61,6 +65,11 @@ export function ruleStatus(errors: RuleError[]): { ok: boolean; text: string } {
         ok: false,
         text: `One affiliation holds over half of ${tierName(TIERS[e.tier])}`,
       };
+    case "empty_tier":
+      return {
+        ok: false,
+        text: `Add a pick to ${tierName(TIERS[e.tier])} before using a later tier`,
+      };
     case "tiers":
       return { ok: false, text: "Use at most three tiers" };
     case "shape":
@@ -73,5 +82,5 @@ export function ruleStatus(errors: RuleError[]): { ok: boolean; text: string } {
  * over half a tier). A short ballot or a tier with too few projects is said there alone. */
 export function explainBelow(e: RuleError): boolean {
   return (e.rule === "independent" && e.related.length > 0) || e.rule === "group" ||
-    e.rule === "tiers" || e.rule === "shape";
+    e.rule === "tiers" || e.rule === "shape" || e.rule === "empty_tier";
 }

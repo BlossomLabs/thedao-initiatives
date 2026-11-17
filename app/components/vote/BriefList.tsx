@@ -90,7 +90,7 @@ export function askText(item: BallotItem): string {
 /** The pledgers, a very small stack of their logos (silhouettes without one), as the
  * board's: the card carries up to four. Names in each logo's title. */
 export function PledgerStack(
-  { item, size = 16, className }: { item: BallotItem; size?: 16 | 20 | 32; className?: string },
+  { item, size = 16, className }: { item: BallotItem; size?: 16 | 32; className?: string },
 ) {
   const logos = item.card?.logos ?? [];
   if (!logos.length) return null;
@@ -108,11 +108,7 @@ export function PledgerStack(
             company={l.company}
             className={cn(
               "p-px ring-2 ring-panel-modal",
-              size === 16
-                ? "size-4 [&>svg]:size-2.5"
-                : size === 20
-                ? "size-5 [&>svg]:size-3"
-                : "size-8 [&>svg]:size-4",
+              size === 16 ? "size-4 [&>svg]:size-2.5" : "size-8 [&>svg]:size-4",
             )}
           />
         </span>

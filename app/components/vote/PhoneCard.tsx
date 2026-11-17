@@ -204,8 +204,9 @@ export default function PhoneCard<W extends string>(
                   ask{share && ` (${share})`}
                 </span>
               </span>
-              <PledgerStack item={item} size={20} />
               {paid && <span className="ml-2 text-vote">You paid {paid}</span>}
+              {/* Who pledged, on the right, as on the desktop card. */}
+              <PledgerStack item={item} size={32} className="ml-auto" />
             </p>
           )}
           {note && <p className="m-0 mt-2 text-[13px] leading-snug text-vote">{note}</p>}

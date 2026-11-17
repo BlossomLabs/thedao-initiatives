@@ -113,7 +113,7 @@ export function useDonation(
         kind: "ok",
         text: (
           <>
-            🦸 <b>{amt}</b> is now backing this initiative. You're a hero.
+            🦸 <b>{amt}</b> is now backing this initiative.
             <ReceiptRequestLink txHash={txHash} />
           </>
         ),

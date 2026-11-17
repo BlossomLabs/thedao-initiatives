@@ -699,7 +699,7 @@ it("an amount typed and then removed leaves nothing on TheDAO's ballot (#100)", 
 });
 
 // #100: a donation that went through stays green on TheDAO's ballot, solid, "+$X yours",
-// and its row says so, so the voter can keep giving.
+// and its row says so.
 afterEach(() => localStorage.clear());
 
 async function donateToBeta(usd: string) {
@@ -720,7 +720,7 @@ it("a donation that went through stays green, solid, with '+$X yours'; its row s
   expect(chip.className).not.toContain("border-dashed");
   expect(within(daoBallot()).queryByText(/if you give/)).toBeNull();
   expect(document.querySelector("[data-yours]")).toHaveTextContent(
-    "+$9,000 yours so far. You can keep giving.",
+    "+$9,000 yours so far.",
   );
 });
 
@@ -781,7 +781,7 @@ it("what was given is remembered in this browser, per round", async () => {
   cleanup();
   await showOpen(openWith({ beta: give() }));
   fireEvent.click(await list().findByRole("button", { name: /Beta audits/ }));
-  expect(await screen.findByText("+$9,000 yours so far. You can keep giving."))
+  expect(await screen.findByText("+$9,000 yours so far."))
     .toBeInTheDocument();
 });
 

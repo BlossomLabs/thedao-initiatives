@@ -170,7 +170,7 @@ export default function VoteClosed(
     return (
       <div className="space-y-6">
         <Header kicker={round.kind === "real" ? "TheDAO vote" : "Test vote · Demo on Sepolia"}>
-          The vote ended {closeText}. Thanks for stopping by!
+          The vote ended {closeText}.
         </Header>
         <SeeResult />
       </div>

@@ -623,7 +623,7 @@ export default function GiveList(
                       )}
                       {isOpen && yours?.get(i.slug) !== undefined && (
                         <p className="m-0 text-[13px] font-semibold text-[#a7e3a5]" data-yours>
-                          +{usd(yours.get(i.slug)!)} yours so far. You can keep giving.
+                          +{usd(yours.get(i.slug)!)} yours so far.
                         </p>
                       )}
                       {isOpen && working && (

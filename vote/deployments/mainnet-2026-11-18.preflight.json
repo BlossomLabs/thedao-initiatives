@@ -1,0 +1,21 @@
+{
+  "projects": 23,
+  "admins": [
+    "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF",
+    "0x839395e20bbB182fa440d08F850E6c7A8f6F0780",
+    "0xE930779472c04Dd97AF5b8B83d9EC95ABdA38dcE"
+  ],
+  "poolUsd": 714256,
+  "ethUsd": 1785.64181066,
+  "balanceEth": "0.003296346206949357",
+  "estimatedFeeEth": "0.00149260144935421",
+  "feeReserveEth": "0.00298520289870842",
+  "opening": "Two minutes after setup transactions finish",
+  "firstTallies": [
+    "Dec 4, 02:30",
+    "Dec 8, 02:30",
+    "Dec 10, 02:30"
+  ],
+  "registration": "Until S-Tier settles",
+  "maxWindows": 9
+}

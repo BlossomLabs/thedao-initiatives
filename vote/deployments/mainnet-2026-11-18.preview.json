@@ -1,0 +1,638 @@
+{
+  "status": "published",
+  "chainId": 1,
+  "name": "TheDAO vote",
+  "symbol": "VOTE",
+  "eligibilityNFT": "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C",
+  "deployer": "0x22797B059E20C1ef64CFe12815e09c0E984832F3",
+  "deployerBalanceWei": "3296346206949357",
+  "admins": [
+    "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF",
+    "0x839395e20bbB182fa440d08F850E6c7A8f6F0780",
+    "0xE930779472c04Dd97AF5b8B83d9EC95ABdA38dcE"
+  ],
+  "rolesPerAdmin": [
+    "DEFAULT_ADMIN_ROLE",
+    "ADMIN_ROLE",
+    "PLEDGE_ROLE"
+  ],
+  "opening": "Two minutes after setup transactions finish; the activation transaction sets the exact timestamp",
+  "firstTallyAt": [
+    1796331600,
+    1796677200,
+    1796850000
+  ],
+  "initialWindow": 86400,
+  "maxWindows": 9,
+  "maximumTierDuration": 172462,
+  "latestSettlementAt": [
+    1796504062,
+    1796849662,
+    1797022462
+  ],
+  "registration": "First accepted ballot before S-Tier settles; not a fixed end-of-first-window cutoff",
+  "additionsDeadline": 1795615200,
+  "additionsDeadlineEnforcement": "Operational policy; the current contract does not store this deadline",
+  "poolUsd": "714256000000",
+  "poolEstimateMicroUsd": "714256724264",
+  "poolEth": 400,
+  "poolPolicy": "Refresh estimate before deployment; replace with sale proceeds before S-Tier first tally",
+  "currencies": [
+    {
+      "symbol": "USD",
+      "asset": "0x0000000000000000000000000000000000000000",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "ETH",
+      "asset": "0x0000000000000000000000000000000000000000",
+      "usdFeed": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+    },
+    {
+      "symbol": "USDC",
+      "asset": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "EURC",
+      "asset": "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c",
+      "usdFeed": "0xb49f677943BC038e9857d61E7d053CaA2C1734C1"
+    },
+    {
+      "symbol": "USDT",
+      "asset": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "DAI",
+      "asset": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "USDS",
+      "asset": "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "crvUSD",
+      "asset": "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "BOLD",
+      "asset": "0x6440f144b7e50D6a8439336510312d2F54beB01D",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "fxUSD",
+      "asset": "0x085780639CC2cACd35E474e71f4d000e2405d8f6",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "ZCHF",
+      "asset": "0xB58E61C3098d85632Df34EecfB899A1Ed80921cB",
+      "usdFeed": "0x449d117117838fFA61263B61dA6301AA2a88B13A"
+    }
+  ],
+  "independentTiers": 1,
+  "selection": {
+    "vote": "eligible",
+    "status": "approved",
+    "funded": false,
+    "floorPct": 25,
+    "capUsd": 200000
+  },
+  "groups": [
+    "Argot",
+    "Nethermind",
+    "colibri",
+    "Sem Bloom",
+    "mab.xyz",
+    "ack3"
+  ],
+  "projects": [
+    {
+      "slug": "source-level-debugging-for-solidity-ethdebug-in-solc-2",
+      "account": "0x2e72eE36F7575Fae93f94aAeDAA9E77db2259d59",
+      "goalUsd": "279000000000",
+      "rfp": false,
+      "groups": [
+        0
+      ],
+      "title": "Walnut: Source-Level Debugging for Solidity, ethdebug in solc",
+      "boardRaisedUsd": 151007.85,
+      "pledges": [
+        {
+          "id": "01M2J7YHE9JPBTYN3CV7GHGKM6",
+          "amountUsd": 151000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "ai-guided-smart-contract-security-checks-in-remix",
+      "account": "0x695f06b497d2408A9f59ca17dDD6591eF5944D50",
+      "goalUsd": "265000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "Remix: AI-Guided Smart Contract Security Checks",
+      "boardRaisedUsd": 140000,
+      "pledges": [
+        {
+          "id": "01M6TGJ6JHP5KJ2PNXZAS4P72X",
+          "amountUsd": 125000,
+          "status": "pledged"
+        },
+        {
+          "id": "01M5FK50K2P5YGR2ZP9KWYCESE",
+          "amountUsd": 15000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "formally-verified-evm-for-ethereum",
+      "account": "0x166Ce9a5c29B7743A45e8D5e53198876a79Fe725",
+      "goalUsd": "266000000000",
+      "rfp": false,
+      "groups": [
+        1
+      ],
+      "title": "Nethermind: Formally Verified EVM for Ethereum",
+      "boardRaisedUsd": 67000,
+      "pledges": [
+        {
+          "id": "01M6DGF4Y9DB9R4J8PBVYZR4AY",
+          "amountUsd": 67000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "trustless-across-ethereum-colibri-verification-for-l2-networ",
+      "account": "0x3a53B03140B49Aee573740EAA499F038D7FdB5Aa",
+      "goalUsd": "245000000000",
+      "rfp": false,
+      "groups": [
+        2
+      ],
+      "title": "colibri: Trustless Across Ethereum, Verification for L2 Networks and Bridges",
+      "boardRaisedUsd": 61250,
+      "pledges": [
+        {
+          "id": "01M5XW0119YC04JR5X3XBR76QD",
+          "amountUsd": 51250,
+          "status": "pledged"
+        },
+        {
+          "id": "01M7KYNEE287VVQ3ZDW29313YG",
+          "amountUsd": 10000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "dappfence-verifiable-frontend-security",
+      "account": "0xCd1f63eDC31C75bE7518e503999DF065eF35abe9",
+      "goalUsd": "90000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "DappFence: Verifiable Frontend Security",
+      "boardRaisedUsd": 54000,
+      "pledges": [
+        {
+          "id": "01M3Z4WCF84BCMK3C29XB33F5R",
+          "amountUsd": 27000,
+          "status": "pledged"
+        },
+        {
+          "id": "01M7MF57WJ72T0VST389DZP6SW",
+          "amountUsd": 27000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "make-dapps-verify-what-they-show-colibri-in-wallets-defi-and",
+      "account": "0xF336cC89101be879007d8C988dBafae75fBb9D5e",
+      "goalUsd": "175000000000",
+      "rfp": false,
+      "groups": [
+        2
+      ],
+      "title": "colibri: Make dApps Verify What They Show in Wallets, DeFi and Web3 Apps",
+      "boardRaisedUsd": 53750,
+      "pledges": [
+        {
+          "id": "01M7MF74DF64T4MY89GS2GA46E",
+          "amountUsd": 33750,
+          "status": "pledged"
+        },
+        {
+          "id": "01M5XVYAMF50TZ90V623Y8KF8B",
+          "amountUsd": 10000,
+          "status": "pledged"
+        },
+        {
+          "id": "01M7KYMRPRKFRPF8RHN3QS6RK8",
+          "amountUsd": 10000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "know-what-you-sign-verified-simulation-against-blind-signing",
+      "account": "0xCF0375623C97496afb748200e80f541f74C97025",
+      "goalUsd": "135000000000",
+      "rfp": false,
+      "groups": [
+        2
+      ],
+      "title": "colibri: Know What You Sign, Verified Simulation Against Blind Signing",
+      "boardRaisedUsd": 43750,
+      "pledges": [
+        {
+          "id": "01M7MGFTWGDA81QJ3XW09XNSJ7",
+          "amountUsd": 23750,
+          "status": "pledged"
+        },
+        {
+          "id": "01M5XVWHWVV1FV8Q6B9BV8TH42",
+          "amountUsd": 10000,
+          "status": "pledged"
+        },
+        {
+          "id": "01M7KYKQ5WQG9KF3BMG8K2XRE5",
+          "amountUsd": 10000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "community-fuzzing-tooling-for-ethereum-ecosystem-projects",
+      "account": "0xf8ec6F630bb87303D2386eBCda4ab97D62786A71",
+      "goalUsd": "150000000000",
+      "rfp": true,
+      "groups": [],
+      "title": "RFP: Community Fuzzing Tooling for Ethereum Ecosystem Projects",
+      "boardRaisedUsd": 37501.06,
+      "pledges": [
+        {
+          "id": "01M3SH2C4GX6JHHQBE7PSG2KRX",
+          "amountUsd": 37500,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "forensiq-faster-ethereum-incident-response-through-evidence",
+      "account": "0x97ADF9f29c43356DF55cF18813AdC8644a9B9B9d",
+      "goalUsd": "135000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "ForensIQ: Faster Ethereum Incident Response Through Evidence Reconstruction",
+      "boardRaisedUsd": 35000,
+      "pledges": [
+        {
+          "id": "01M640CMHSQG0ZNR60KV91EJ0C",
+          "amountUsd": 20000,
+          "status": "pledged"
+        },
+        {
+          "id": "01M640EYKYDSBHV78QR263Y4GX",
+          "amountUsd": 15000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "independent-security-assurance-for-the-eez-smart-contracts",
+      "account": "0xddF05636bb76Bf8296bC0F5F3d7Aca35A2c41183",
+      "goalUsd": "120000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "EEZ: Making Its Contracts Safe for Chains to Adopt",
+      "boardRaisedUsd": 30026.92,
+      "pledges": [
+        {
+          "id": "01M4T2Q5CJSXR5KTKE4K16EPBH",
+          "amountUsd": 30000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "exploit-exposure-layer-free-data-on-every-wallet-still-appro",
+      "account": "0x4C1b4346E0Fbf1d0bE3bB763815B9d36969f7B9A",
+      "goalUsd": "120000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "Revoke.cash: Exploit Exposure Layer, Free Data on Every Wallet Still Approved to an Exploited Contract",
+      "boardRaisedUsd": 30000,
+      "pledges": [
+        {
+          "id": "01M7M0VMDJ611DXFSJ6RMMB6W7",
+          "amountUsd": 30000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "open-risk-pricing-for-defi-a-public-price-for-default-risk",
+      "account": "0xb82e7330BAf40489d197738C69E2293a6428e20D",
+      "goalUsd": "100000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "Kleros x Seer: Open Risk Pricing for DeFi, a Public Price for Default Risk",
+      "boardRaisedUsd": 25000,
+      "pledges": [
+        {
+          "id": "01M6JB27B8H4BF3V8BBECKA7T6",
+          "amountUsd": 25000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "decentralized-archive-for-ethereum-blob-data",
+      "account": "0x192B40d58678eD9B90Ec4839d80a6e4CeC70D0a4",
+      "goalUsd": "80000000000",
+      "rfp": false,
+      "groups": [
+        3
+      ],
+      "title": "Blobscan: Decentralized Archive for Ethereum Blob Data",
+      "boardRaisedUsd": 20000,
+      "pledges": [
+        {
+          "id": "01M73DZH31S7C4D625GY8HPN2E",
+          "amountUsd": 20000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "independent-attestations-for-the-erc-7730-descriptors-of-eth",
+      "account": "0xD344a48c2AA9744963a3a3EB3d659B06241755a1",
+      "goalUsd": "60000000000",
+      "rfp": true,
+      "groups": [],
+      "title": "RFP: Clear Signing: Independent Attestations for the ERC-7730 Descriptors of Ethereum's 100 Most-Used Contracts",
+      "boardRaisedUsd": 20000,
+      "pledges": [
+        {
+          "id": "01M7MFA8EPQRAK309WN0Q7HQ07",
+          "amountUsd": 20000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "address-poisoning-detection-and-public-api-for-ethereum-and",
+      "account": "0xBCF304a274e6e908009a9AE78A812469A56cd5E9",
+      "goalUsd": "59600000000",
+      "rfp": false,
+      "groups": [],
+      "title": "Blockscout: Address Poisoning Detection and Public API for Ethereum and L2s",
+      "boardRaisedUsd": 17501,
+      "pledges": [
+        {
+          "id": "01M5FNEJDT1RMAMB55KWHJ8CAV",
+          "amountUsd": 10000,
+          "status": "pledged"
+        },
+        {
+          "id": "01M7ACH04MD1KKM1E03S16YMMQ",
+          "amountUsd": 5000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "onchain-risk-map-an-open-operational-incident-graph-for-ethe",
+      "account": "0xBC1eaa7F9e1489cb93cF00D5552F11ad078651f3",
+      "goalUsd": "50000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "OKcontract: Onchain Risk Map, an Open Operational Incident Graph for Ethereum Security",
+      "boardRaisedUsd": 13000,
+      "pledges": [
+        {
+          "id": "01M63YBE9J6469Q8B25M1C3EQF",
+          "amountUsd": 10000,
+          "status": "pledged"
+        },
+        {
+          "id": "01M7M5MTD27R6TVVGM5RZ1F73D",
+          "amountUsd": 3000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "scaling-kann-ai-for-ai-smart-contract-security-2",
+      "account": "0xA4B516cef7db697C488eDbc5B988458596a256e1",
+      "goalUsd": "50000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "Kann Audits: Scaling Kann AI for AI Smart Contract Security",
+      "boardRaisedUsd": 12500,
+      "pledges": [
+        {
+          "id": "01M4PN0TRADBXXA21BPG6VBC89",
+          "amountUsd": 12500,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "reproducible-ethereum-clients-official-releases-that-anyone",
+      "account": "0xf8Ef1ef76C3bab8feF8054078E8b1Ecef1a932A1",
+      "goalUsd": "40000000000",
+      "rfp": false,
+      "groups": [
+        4
+      ],
+      "title": "mab.xyz: Reproducible Builds for the 12 Main Ethereum Clients",
+      "boardRaisedUsd": 10000,
+      "pledges": [
+        {
+          "id": "01M7B2PDWXJWDMNMEVR192WPXM",
+          "amountUsd": 10000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "securing-ethereum-with-formal-verification",
+      "account": "0xa939936726451E53A4081B45f4eE05199B283795",
+      "goalUsd": "40000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "Verity Labs: Securing Ethereum with Formal Verification",
+      "boardRaisedUsd": 10000,
+      "pledges": [
+        {
+          "id": "01M5FN1K3W9GWQ8MG6J77P81PB",
+          "amountUsd": 10000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "automated-eip-compliance-checks-for-ethereum-clients",
+      "account": "0xFBe524Bc88e71aE449872Ce9D010e4adF56b4B9d",
+      "goalUsd": "20000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "PRSpec: Automated EIP Compliance Checks for Ethereum Clients",
+      "boardRaisedUsd": 10000,
+      "pledges": [
+        {
+          "id": "01M7MGKHX3W47YR08MV0XXE77M",
+          "amountUsd": 10000,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw",
+      "account": "0x45ECAAD5C06040513839bE8E0a1eC546E1fAf62f",
+      "goalUsd": "30000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "Walletbeat: Clear signing ratings, fixes and ecosystem adoption for hardware and software wallets",
+      "boardRaisedUsd": 7500,
+      "pledges": []
+    },
+    {
+      "slug": "safe-lockdown-guard-an-emergency-freeze-for-kidnapping-and-c",
+      "account": "0x940D0E0E23A02283B97997F8fA608eDAeF13D2f2",
+      "goalUsd": "14000000000",
+      "rfp": false,
+      "groups": [],
+      "title": "Runtime Capital: Safe Lockdown Guard, an Emergency Freeze for Kidnapping and Coercion",
+      "boardRaisedUsd": 7500,
+      "pledges": [
+        {
+          "id": "01M411AEC9RGX43PNXSJJBHXR8",
+          "amountUsd": 3500,
+          "status": "pledged"
+        }
+      ]
+    },
+    {
+      "slug": "wake-v5-maintenance-and-ai-assisted-fuzzing",
+      "account": "0xae04d32b1f35F43F9cfDd19E50Cc1ca8357e284f",
+      "goalUsd": "20000000000",
+      "rfp": false,
+      "groups": [
+        5
+      ],
+      "title": "Wake: v5 Maintenance and AI-Assisted Fuzzing",
+      "boardRaisedUsd": 5000,
+      "pledges": [
+        {
+          "id": "01M7N4R49RVYRA1R18SYAN721P",
+          "amountUsd": 5000,
+          "status": "pledged"
+        }
+      ]
+    }
+  ],
+  "setupCalls": 88,
+  "creationBytecodeHash": "0x03e5e1838802ee61de0f913738d8382c087217b2ddacc4c5bd08886bc6348962",
+  "deployedCodeBytes": 24573,
+  "simulation": {
+    "status": "superseded-by-expanded-currency-preset",
+    "opensAt": 1794944623,
+    "backend": "EVMcrispr Revm mainnet fork",
+    "details": "Deployment, 80 setup calls, and assertions for all 23 accounts, goals, pledge totals, admin roles, currencies, pool, eligibility and window span passed. No mainnet transaction broadcast."
+  },
+  "checks": {
+    "deploymentTestsPassed": 40,
+    "contractTestsPassed": 173
+  },
+  "deploymentScriptSimulation": {
+    "status": "passed",
+    "gasUsed": "12567230",
+    "gasPriceWei": "125466883",
+    "estimatedFeeEth": "0.00157677117604409",
+    "mainnetDeployerBalanceEth": "0.003296346206949357",
+    "currencies": 10,
+    "ballotGas": "2135119",
+    "ballotGasWithSignatureReserve": "2635119",
+    "support": [
+      {
+        "slug": "source-level-debugging-for-solidity-ethdebug-in-solc-2",
+        "donatedUsd": 7.844026,
+        "pledgedUsd": 151000,
+        "askUsd": 127992.155974
+      },
+      {
+        "slug": "safe-lockdown-guard-an-emergency-freeze-for-kidnapping-and-c",
+        "donatedUsd": 4000,
+        "pledgedUsd": 3500,
+        "askUsd": 6500
+      }
+    ],
+    "details": "The complete deployment script, including EIP-7702 batching, role checks and delegation cleanup, passed on a local mainnet fork. No mainnet transaction broadcast."
+  },
+  "confirmedChoices": {
+    "opening": "After setup",
+    "pool": "Live estimate of 400 ETH, then update after sale",
+    "registration": "Until S-Tier settles",
+    "quietWindows": 9
+  },
+  "latestPreflight": {
+    "projects": 23,
+    "admins": [
+      "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF",
+      "0x839395e20bbB182fa440d08F850E6c7A8f6F0780",
+      "0xE930779472c04Dd97AF5b8B83d9EC95ABdA38dcE"
+    ],
+    "poolUsd": 714256,
+    "ethUsd": 1785.64181066,
+    "balanceEth": "0.003296346206949357",
+    "estimatedFeeEth": "0.00149260144935421",
+    "feeReserveEth": "0.00298520289870842",
+    "opening": "Two minutes after setup transactions finish",
+    "firstTallies": [
+      "Dec 4, 02:30",
+      "Dec 8, 02:30",
+      "Dec 10, 02:30"
+    ],
+    "registration": "Until S-Tier settles",
+    "maxWindows": 9
+  },
+  "currencyPolicy": {
+    "USDStablecoins": "Fixed $1 per token",
+    "ETH": "ETH/USD",
+    "EURC": "EUR/USD, assuming 1 EURC = 1 EUR",
+    "ZCHF": "CHF/USD, assuming 1 ZCHF = 1 CHF"
+  },
+  "supersedes": {
+    "contract": "0x2A97E831075f7d8959007BF10f72ccbcE8fEDf69",
+    "deployBlock": 26436825,
+    "reason": "Use the website EUR/USD feed for EURC as requested after the original admin handover. The original contract has no ballots and was never published on the website."
+  },
+  "contract": "0x52B7bcF6FDdb608Dd0D2F4F75f577Bc191350d80",
+  "deployBlock": 26436864,
+  "opensAt": 1794944075,
+  "sourceVerification": {
+    "verifier": "Sourcify",
+    "status": "exact_match",
+    "artifact": "mainnet-2026-11-18.verification.json"
+  },
+  "deploymentFunding": {
+    "initialEth": "0.005",
+    "firstDeploymentSpentEth": "0.001703653793050643",
+    "replacementSpentEth": "0.001668808024112763",
+    "remainingEth": "0.001627538182836594"
+  },
+  "initialPriceSnapshot": {
+    "ethUsdAnswer": "179543871513",
+    "ethUsdFeedDecimals": 8,
+    "ethUsdUpdatedAt": 1794939935
+  }
+}

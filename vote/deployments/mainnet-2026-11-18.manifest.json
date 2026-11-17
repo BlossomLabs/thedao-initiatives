@@ -1,0 +1,282 @@
+{
+  "kind": "real",
+  "chainId": 1,
+  "badge": "0x3B49f45EC8796F64feBB1Ae0f5661791845ce35C",
+  "contract": "0x52B7bcF6FDdb608Dd0D2F4F75f577Bc191350d80",
+  "deployBlock": 26436864,
+  "configRevision": "41",
+  "opensAt": 1794944075,
+  "closesAt": 1797022462,
+  "schedule": {
+    "opensAt": 1794944075,
+    "firstTallyAt": [
+      1796331600,
+      1796677200,
+      1796850000
+    ],
+    "initialWindow": 86400,
+    "maxWindows": 9
+  },
+  "poolUsd": "714256000000",
+  "slugs": [
+    "source-level-debugging-for-solidity-ethdebug-in-solc-2",
+    "ai-guided-smart-contract-security-checks-in-remix",
+    "formally-verified-evm-for-ethereum",
+    "trustless-across-ethereum-colibri-verification-for-l2-networ",
+    "dappfence-verifiable-frontend-security",
+    "make-dapps-verify-what-they-show-colibri-in-wallets-defi-and",
+    "know-what-you-sign-verified-simulation-against-blind-signing",
+    "community-fuzzing-tooling-for-ethereum-ecosystem-projects",
+    "forensiq-faster-ethereum-incident-response-through-evidence",
+    "independent-security-assurance-for-the-eez-smart-contracts",
+    "exploit-exposure-layer-free-data-on-every-wallet-still-appro",
+    "open-risk-pricing-for-defi-a-public-price-for-default-risk",
+    "decentralized-archive-for-ethereum-blob-data",
+    "independent-attestations-for-the-erc-7730-descriptors-of-eth",
+    "address-poisoning-detection-and-public-api-for-ethereum-and",
+    "onchain-risk-map-an-open-operational-incident-graph-for-ethe",
+    "scaling-kann-ai-for-ai-smart-contract-security-2",
+    "reproducible-ethereum-clients-official-releases-that-anyone",
+    "securing-ethereum-with-formal-verification",
+    "automated-eip-compliance-checks-for-ethereum-clients",
+    "clear-signing-ratings-fixes-and-ecosystem-adoption-for-hardw",
+    "safe-lockdown-guard-an-emergency-freeze-for-kidnapping-and-c",
+    "wake-v5-maintenance-and-ai-assisted-fuzzing"
+  ],
+  "projects": [
+    {
+      "goalUsd": "279000000000",
+      "rfp": false,
+      "groups": [
+        0
+      ]
+    },
+    {
+      "goalUsd": "265000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "266000000000",
+      "rfp": false,
+      "groups": [
+        1
+      ]
+    },
+    {
+      "goalUsd": "245000000000",
+      "rfp": false,
+      "groups": [
+        2
+      ]
+    },
+    {
+      "goalUsd": "90000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "175000000000",
+      "rfp": false,
+      "groups": [
+        2
+      ]
+    },
+    {
+      "goalUsd": "135000000000",
+      "rfp": false,
+      "groups": [
+        2
+      ]
+    },
+    {
+      "goalUsd": "150000000000",
+      "rfp": true,
+      "groups": []
+    },
+    {
+      "goalUsd": "135000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "120000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "120000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "100000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "80000000000",
+      "rfp": false,
+      "groups": [
+        3
+      ]
+    },
+    {
+      "goalUsd": "60000000000",
+      "rfp": true,
+      "groups": []
+    },
+    {
+      "goalUsd": "59600000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "50000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "50000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "40000000000",
+      "rfp": false,
+      "groups": [
+        4
+      ]
+    },
+    {
+      "goalUsd": "40000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "20000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "30000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "14000000000",
+      "rfp": false,
+      "groups": []
+    },
+    {
+      "goalUsd": "20000000000",
+      "rfp": false,
+      "groups": [
+        5
+      ]
+    }
+  ],
+  "groups": [
+    "Argot",
+    "Nethermind",
+    "colibri",
+    "Sem Bloom",
+    "mab.xyz",
+    "ack3"
+  ],
+  "currencies": [
+    {
+      "symbol": "USD",
+      "asset": "0x0000000000000000000000000000000000000000",
+      "usdFeed": "0x0000000000000000000000000000000000000000",
+      "disabled": false
+    },
+    {
+      "symbol": "ETH",
+      "asset": "0x0000000000000000000000000000000000000000",
+      "usdFeed": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+      "disabled": false
+    },
+    {
+      "symbol": "USDC",
+      "asset": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "usdFeed": "0x0000000000000000000000000000000000000000",
+      "disabled": false
+    },
+    {
+      "symbol": "EURC",
+      "asset": "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c",
+      "usdFeed": "0xb49f677943BC038e9857d61E7d053CaA2C1734C1",
+      "disabled": false
+    },
+    {
+      "symbol": "USDT",
+      "asset": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "usdFeed": "0x0000000000000000000000000000000000000000",
+      "disabled": false
+    },
+    {
+      "symbol": "DAI",
+      "asset": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "usdFeed": "0x0000000000000000000000000000000000000000",
+      "disabled": false
+    },
+    {
+      "symbol": "USDS",
+      "asset": "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
+      "usdFeed": "0x0000000000000000000000000000000000000000",
+      "disabled": false
+    },
+    {
+      "symbol": "crvUSD",
+      "asset": "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E",
+      "usdFeed": "0x0000000000000000000000000000000000000000",
+      "disabled": false
+    },
+    {
+      "symbol": "BOLD",
+      "asset": "0x6440f144b7e50D6a8439336510312d2F54beB01D",
+      "usdFeed": "0x0000000000000000000000000000000000000000",
+      "disabled": false
+    },
+    {
+      "symbol": "fxUSD",
+      "asset": "0x085780639CC2cACd35E474e71f4d000e2405d8f6",
+      "usdFeed": "0x0000000000000000000000000000000000000000",
+      "disabled": false
+    },
+    {
+      "symbol": "ZCHF",
+      "asset": "0xB58E61C3098d85632Df34EecfB899A1Ed80921cB",
+      "usdFeed": "0x449d117117838fFA61263B61dA6301AA2a88B13A",
+      "disabled": false
+    }
+  ],
+  "accounts": [
+    "0x2e72eE36F7575Fae93f94aAeDAA9E77db2259d59",
+    "0x695f06b497d2408A9f59ca17dDD6591eF5944D50",
+    "0x166Ce9a5c29B7743A45e8D5e53198876a79Fe725",
+    "0x3a53B03140B49Aee573740EAA499F038D7FdB5Aa",
+    "0xCd1f63eDC31C75bE7518e503999DF065eF35abe9",
+    "0xF336cC89101be879007d8C988dBafae75fBb9D5e",
+    "0xCF0375623C97496afb748200e80f541f74C97025",
+    "0xf8ec6F630bb87303D2386eBCda4ab97D62786A71",
+    "0x97ADF9f29c43356DF55cF18813AdC8644a9B9B9d",
+    "0xddF05636bb76Bf8296bC0F5F3d7Aca35A2c41183",
+    "0x4C1b4346E0Fbf1d0bE3bB763815B9d36969f7B9A",
+    "0xb82e7330BAf40489d197738C69E2293a6428e20D",
+    "0x192B40d58678eD9B90Ec4839d80a6e4CeC70D0a4",
+    "0xD344a48c2AA9744963a3a3EB3d659B06241755a1",
+    "0xBCF304a274e6e908009a9AE78A812469A56cd5E9",
+    "0xBC1eaa7F9e1489cb93cF00D5552F11ad078651f3",
+    "0xA4B516cef7db697C488eDbc5B988458596a256e1",
+    "0xf8Ef1ef76C3bab8feF8054078E8b1Ecef1a932A1",
+    "0xa939936726451E53A4081B45f4eE05199B283795",
+    "0xFBe524Bc88e71aE449872Ce9D010e4adF56b4B9d",
+    "0x45ECAAD5C06040513839bE8E0a1eC546E1fAf62f",
+    "0x940D0E0E23A02283B97997F8fA608eDAeF13D2f2",
+    "0xae04d32b1f35F43F9cfDd19E50Cc1ca8357e284f"
+  ],
+  "independentTiers": 1,
+  "ballotRules": true
+}

@@ -468,6 +468,25 @@ export default function RoundBox(
     now: chainNow(clock, rv?.head),
     closed: rv?.closed,
   });
+  if (rv?.poolInitialized === false) {
+    return (
+      <section aria-label="Where the round is" className="rounded-xl border border-white/15 p-4">
+        <div>
+          <strong>Awaiting funding</strong>
+          <p>
+            {phase.kind === "before"
+              ? (
+                <>
+                  Voting opens <When at={phase.opensAt} />.
+                </>
+              )
+              : "Voting stays open."}{" "}
+            No tier settles until funding is initialized. Expired dates must be rescheduled.
+          </p>
+        </div>
+      </section>
+    );
+  }
   // The clock passed the next step, the chain hasn't yet: nothing moves until it has.
   // Known only from a server that says which block it judged at (not on the examples).
   const unconfirmed = rv?.tiers.filter((t) => t.status === "settled" && t.confirmed === false) ??
@@ -699,6 +718,19 @@ export function RoundDeadline(
     now: chainNow(now, rv?.head),
     closed: rv?.closed,
   });
+  if (rv?.poolInitialized === false) {
+    return (
+      <span>
+        Awaiting funding · {phase.kind === "before"
+          ? (
+            <>
+              voting opens <When at={phase.opensAt} />
+            </>
+          )
+          : "voting stays open"}
+      </span>
+    );
+  }
   let what: string;
   let to: number | undefined;
   switch (phase.kind) {

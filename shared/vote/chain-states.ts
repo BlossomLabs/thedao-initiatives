@@ -27,6 +27,7 @@ export interface StateSource {
       timestamp: number;
       asks: bigint[];
       poolUsd: bigint;
+      poolInitialized: boolean;
       withdrawn: boolean[];
       valuation?: ValuationEvidence;
     }
@@ -92,6 +93,7 @@ type StoredState = {
   timestamp: number;
   asks: string[];
   poolUsd: string;
+  poolInitialized: boolean;
   withdrawn: boolean[];
   valuation?: ValuationEvidence;
 };
@@ -315,7 +317,7 @@ export async function chainStates(
 
   async function stateAt(block: number) {
     const reference = await canonical(block);
-    const key = `state:${contract}:${reference.hash}:v3`;
+    const key = `state:${contract}:${reference.hash}:v4`;
     const persistent = cache && block <= finalBlock && reference.hash;
     if (persistent) {
       const hit = (await cache.get(key)) as StoredState | undefined;
@@ -323,6 +325,7 @@ export async function chainStates(
         hit && hit.timestamp === reference.timestamp &&
         Array.isArray(hit.asks) && hit.asks.length <= m.slugs.length &&
         hit.asks.every((x) => typeof x === "string" && /^\d{1,78}$/.test(x)) &&
+        typeof hit.poolInitialized === "boolean" &&
         typeof hit.poolUsd === "string" && /^\d{1,78}$/.test(hit.poolUsd) &&
         Array.isArray(hit.withdrawn) && hit.withdrawn.every((x) => typeof x === "boolean")
       ) {
@@ -330,6 +333,7 @@ export async function chainStates(
           timestamp: hit.timestamp,
           asks: hit.asks.map(BigInt),
           poolUsd: BigInt(hit.poolUsd),
+          poolInitialized: hit.poolInitialized,
           withdrawn: hit.withdrawn,
           ...(hit.valuation ? { valuation: hit.valuation } : {}),
         };
@@ -355,6 +359,7 @@ export async function chainStates(
           timestamp: x.timestamp,
           asks: x.asks.map(String),
           poolUsd: String(x.poolUsd),
+          poolInitialized: x.poolInitialized,
           withdrawn: x.withdrawn,
           ...(x.valuation ? { valuation: x.valuation } : {}),
         } satisfies StoredState,

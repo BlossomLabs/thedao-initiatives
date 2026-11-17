@@ -62,6 +62,7 @@ function node(o: {
   count?: number;
   mask?: bigint;
   noMask?: boolean;
+  initialized?: boolean;
   ethOf?: (block: number, account: Hex) => bigint;
   logs?: Log[];
 }) {
@@ -149,6 +150,9 @@ function node(o: {
             if (o.noMask) return { success: false, returnData: "0x" as Hex };
             return ok(SIGNED_BALLOTS_ABI, functionName, o.mask ?? 0n);
           }
+          if (functionName === "poolInitialized") {
+            return ok(SIGNED_BALLOTS_ABI, functionName, o.initialized ?? true);
+          }
           if (functionName === "poolUsd") return ok(SIGNED_BALLOTS_ABI, functionName, 500n);
           if (functionName === "initiativeUsd") {
             const i = Number(args![0]);
@@ -216,6 +220,7 @@ Deno.test("stateAt: one multicall at that block; asks only for projects the cont
     timestamp: 400 * SECS,
     asks: [500n],
     poolUsd: 500n,
+    poolInitialized: true,
     withdrawn: [false],
     valuation: { available: true, issues: [] },
   });
@@ -471,4 +476,11 @@ Deno.test("older contracts keep their asks and explicitly lack valuation diagnos
   const state = await createStateSource(manifest(), "http://unused", transport).stateAt(400);
   assertEquals(state.asks, [500n]);
   assertEquals(state.valuation, { available: false, issues: [] });
+});
+
+Deno.test("stateAt and stateAtHash preserve an uninitialized pool", async () => {
+  const { transport } = node({ head: 1000, initialized: false });
+  const src = createStateSource(manifest(), "http://unused", transport);
+  assertEquals((await src.stateAt(400)).poolInitialized, false);
+  assertEquals((await src.stateAtHash!(400, toHex(400, { size: 32 }))).poolInitialized, false);
 });

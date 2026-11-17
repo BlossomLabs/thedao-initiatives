@@ -36,6 +36,7 @@ Deno.test("correction batches require admins, fresh authentication, current sett
         block: 1,
         timestamp: now - 1,
         poolUsd: 0n,
+        poolInitialized: true,
         asks: [1_000_000n],
         withdrawn: [],
         event: false,

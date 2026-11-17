@@ -524,8 +524,10 @@ export function voteRoutes(deps: Deps) {
     return undefined;
   };
 
-  const open = (d: VoteRound) => {
-    if (deps.now() >= d.manifest.closesAt) throw fail(410, "closed", "Voting has closed.");
+  const open = async (d: VoteRound) => {
+    if (deps.now() >= d.manifest.closesAt && (await recentRound(d)).poolInitialized) {
+      throw fail(410, "closed", "Voting has closed.");
+    }
   };
   const limit = async (name: string, ip: string | null) => {
     if (!(await deps.db.rateLimit(`vote-${name}:${ip ?? "?"}`, PER_MINUTE, 60))) {
@@ -568,7 +570,7 @@ export function voteRoutes(deps: Deps) {
   r.post("/ballot", async (c) => {
     const d = await dc();
     await limit("ballot", c.var.ip);
-    open(d);
+    await open(d);
     if (deps.now() < d.manifest.opensAt) throw fail(409, "not_open", NOT_OPEN);
     const body = await jsonBody(c, ["tokenId", "nonce", "ballot", "signature"]);
     const tokenId = uint(body.tokenId);
@@ -728,7 +730,7 @@ export function voteRoutes(deps: Deps) {
     const d = await dc();
     testOnly(d);
     await limit("gas", c.var.ip);
-    open(d);
+    await open(d);
     const body = await jsonBody(c, ["tokenId"]);
     const tokenId = uint(body.tokenId);
     if (tokenId === null) throw fail(400, "bad_badge", "No such badge.");

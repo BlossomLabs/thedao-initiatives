@@ -12,6 +12,7 @@ const state = (at: number, pool: bigint): ChainState => ({
   timestamp: at,
   asks: [51n, 55n],
   poolUsd: pool,
+  poolInitialized: true,
   withdrawn: [],
   event: at !== 0,
 });

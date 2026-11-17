@@ -122,7 +122,8 @@ export function voteLlms(
     "accepted. A settlement uses only blocks strictly before its cutoff; do not wait for the " +
     "last moment to send.",
     `- Before drafting, read [the current round state](${origin}/api/vote/round) for poolUsd, ` +
-    "registrationClosesAt, closed, and each tier's status. API dollar amounts are decimal " +
+    "poolInitialized, registrationClosesAt, closed, and each tier's status. While poolInitialized is false, " +
+    "registrationClosesAt is null and no tier settles; voting still waits for opensAt. API dollar amounts are decimal " +
     "strings in micro-USD (1,000,000 = $1). For a revision, ask the voter for the ballot that " +
     "currently counts and preserve its settled tiers. Re-read this feed if projects were added.",
     "",

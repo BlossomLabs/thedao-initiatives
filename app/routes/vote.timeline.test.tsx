@@ -199,6 +199,7 @@ function chainAt(head: number): RoundSource {
         timestamp: b,
         asks: at(b).asks,
         poolUsd: at(b).pool,
+        poolInitialized: true,
         withdrawn: chain.withdrawn,
       }),
     accountingEventBlocks: (from, to) => Promise.resolve(blocksOf(["pledge", "pool"], from, to)),

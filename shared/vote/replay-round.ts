@@ -261,6 +261,7 @@ export function roundJson(st: Round, slugs: string[]) {
         })
       ),
     ),
+    poolInitialized: st.poolInitialized,
     registrationClosesAt: st.registrationClosesAt,
     closed: st.closed,
     share: st.share.toString(),

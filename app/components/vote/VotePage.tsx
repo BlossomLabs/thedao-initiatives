@@ -535,7 +535,7 @@ export default function VotePage(
     const counted = rv ? Boolean(rv.accepted[String(n)]) : true;
     // The round as of the newest block the server judged it at, not this browser's clock.
     const at = chainNow(voteNow() / 1000, rv?.head);
-    const registrationOver = rv ? at >= rv.registrationClosesAt : false;
+    const registrationOver = rv?.registrationClosesAt != null && at >= rv.registrationClosesAt;
     const shut = !counted && registrationOver;
     // No ballot for it (below): a narrow page, like the other notices.
     if (shut) wide = false;

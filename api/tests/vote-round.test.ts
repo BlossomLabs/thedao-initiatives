@@ -224,7 +224,7 @@ const stateAt = (
   asks: bigint[],
   poolUsd: bigint,
   event = true,
-): ChainState => ({ block, timestamp, asks, poolUsd, withdrawn: [], event });
+): ChainState => ({ block, timestamp, asks, poolUsd, poolInitialized: true, withdrawn: [], event });
 /** One chain state for the whole round, as at block 0. */
 const oneState = (asks: bigint[], poolUsd: bigint) => [stateAt(0, 0, asks, poolUsd, false)];
 /** One state for the whole round and the node's head a second before now, as
@@ -1034,7 +1034,7 @@ Deno.test("round: before S's first tally every tier waits; the live tally funds 
   const body = await j(await h.req("/api/vote/round")) as
     & { tiers: { status: string }[] }
     & Record<string, unknown>;
-  assertEquals(body.tiers.map((t: { status: string }) => t.status), [
+  assertEquals((body.tiers as { status: string }[]).map((t) => t.status), [
     "waiting",
     "waiting",
     "waiting",
@@ -1963,4 +1963,37 @@ Deno.test("pool on-chain: refusals (not a number, the same amount, lower after S
   assertEquals(closed.status, 409);
   assertEquals(await msg(closed), "Voting has closed; the pool can't change now.");
   h.close();
+});
+
+Deno.test("unfunded rounds remain open to public reads, ballots and gas past their dates", async () => {
+  const { h, state } = await setup({ ...manifest, poolUsd: "0" });
+  try {
+    h.clock.now = manifest.closesAt + 100;
+    state.states = oneState([150n, 150n, 150n], 0n).map((s) => ({ ...s, poolInitialized: false }));
+    state.owners.set(12n, VOTER.address);
+    const res = await h.req("/api/vote/round");
+    assertEquals(res.status, 200);
+    const body = await j(res);
+    assertEquals(body.poolInitialized, false);
+    assertEquals(body.closed, false);
+    assertEquals(body.registrationClosesAt, null);
+    assertEquals((body.tiers as { status: string }[]).map((t) => t.status), [
+      "waiting",
+      "waiting",
+      "waiting",
+    ]);
+    const ballot = await h.req("/api/vote/ballot", {
+      method: "POST",
+      json: await signedBallot(VOTER, 12n, 1n, BALLOT),
+    });
+    assertEquals(ballot.status, 200);
+    const gas = await h.req("/api/vote/gas", {
+      method: "POST",
+      token: await h.mint(VOTER.address),
+      json: { tokenId: "12" },
+    });
+    assertEquals(gas.status, 200);
+  } finally {
+    h.close();
+  }
 });

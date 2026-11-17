@@ -216,6 +216,7 @@ function roundOf(
   over: Record<string, unknown> = {},
 ) {
   return {
+    poolInitialized: true,
     registrationClosesAt: 4_000_000_000,
     closed: false,
     tiers: [waiting("S"), waiting("A"), waiting("B")],

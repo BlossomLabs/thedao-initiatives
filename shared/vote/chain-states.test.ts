@@ -67,6 +67,7 @@ function fakeChain(o: {
         timestamp: b,
         asks: o.asksAt?.(b) ?? [1n, 2n, 3n],
         poolUsd: 100n,
+        poolInitialized: true,
         withdrawn: o.withdrawnAt?.(b) ?? [],
       });
     },

@@ -42,6 +42,7 @@ export type ChainState = {
   timestamp: number;
   asks: bigint[];
   poolUsd: bigint;
+  poolInitialized: boolean;
   valuation?: ValuationEvidence;
   /** Flags by project; may be shorter than the project count (missing = false). */
   withdrawn: boolean[];
@@ -85,7 +86,8 @@ export type Rejection = {
   reason: "tier_settled" | "registration_closed" | "invalid_ballot";
 };
 export type RoundState = {
-  registrationClosesAt: number;
+  poolInitialized: boolean;
+  registrationClosesAt: number | null;
   tiers: [TierState, TierState, TierState];
   accepted: Map<string, Uint8Array>;
   rejected: Rejection[];
@@ -171,7 +173,9 @@ export function replay(
   // First ballots: until S-Tier settles (the contract takes them until its latest
   // possible settlement). Every tally until then splits the pool among the ballots in,
   // so a newcomer shrinks the others' shares; S-Tier's charges fix them.
-  const chainDeadline = windowEnds(s, 0).at(-1)!;
+  const head = lastWhere(states, (x) => x.timestamp < now);
+  if (!head || typeof head.poolInitialized !== "boolean") throw new Error("missing funding state");
+  const chainDeadline = head.poolInitialized ? windowEnds(s, 0).at(-1)! : Infinity;
   const rollClosesAt = () => settled.find((x) => x.tier === "S")?.at ?? chainDeadline;
   const receipts = input.receipts.filter((r) => r.timestamp < now);
   const events = states.filter((x) => x.event && x.timestamp < now);
@@ -330,7 +334,7 @@ export function replay(
   for (let t = 0; t < TIERS.length; t++) {
     const start = s.firstTallyAt[t];
     const ends = windowEnds(s, t);
-    if (now < start) {
+    if (!head.poolInitialized || now < start) {
       tiers.push({ tier: TIERS[t], status: "waiting", startsAt: start });
       continue;
     }
@@ -381,7 +385,6 @@ export function replay(
   }
   applyBefore(now);
 
-  const head = before(now);
   const voters = [...roll].filter((t) => accepted.has(t)).length;
   const firstOpen = settled.length;
   const live = {
@@ -405,7 +408,8 @@ export function replay(
     }
   }
   return {
-    registrationClosesAt: rollClosesAt(),
+    poolInitialized: head.poolInitialized,
+    registrationClosesAt: head.poolInitialized ? rollClosesAt() : null,
     tiers: tiers as RoundState["tiers"],
     accepted: new Map([...accepted].map(([k, v]) => [k, Uint8Array.from(v)])),
     rejected,
@@ -433,7 +437,11 @@ export function refusal(
   | null {
   if (state.closed) return { code: "closed" };
   const old = state.accepted.get(tokenId);
-  if (!old) return now >= state.registrationClosesAt ? { code: "registration_closed" } : null;
+  if (!old) {
+    return state.registrationClosesAt !== null && now >= state.registrationClosesAt
+      ? { code: "registration_closed" }
+      : null;
+  }
   const before = [...old];
   const after = [...ballot];
   for (const [t, tier] of state.tiers.entries()) {

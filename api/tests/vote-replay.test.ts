@@ -72,6 +72,7 @@ function fakeSource(o: { failAt?: number; now?: number } = {}): RoundSource {
         asks: [150n, 150n, b >= donation ? 40n : 150n],
         withdrawn: [],
         poolUsd: 300n,
+        poolInitialized: true,
       });
     },
     accountingEventBlocks: (from, to) =>

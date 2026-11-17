@@ -65,7 +65,8 @@ export type RoundView = {
     string,
     { awardUsd: string; askUsd: string; shortfallUsd: string; excessAwardUsd: string }
   >;
-  registrationClosesAt: number;
+  poolInitialized: boolean;
+  registrationClosesAt: number | null;
   closed: boolean;
   /** Each voting badge's equal share of the pool, micro-USD. */
   share?: string;

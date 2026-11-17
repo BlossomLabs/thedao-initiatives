@@ -137,6 +137,7 @@ export function stateContracts(m: VoteManifest) {
       functionName: "valuationDiagnostics",
       args: [BigInt(i)],
     })),
+    { ...contract, functionName: "poolInitialized" },
   ];
 }
 
@@ -175,7 +176,17 @@ export function decodeState(m: VoteManifest, block: number, timestamp: number, r
       ).filter((d) => d.flags !== 0);
     }),
   };
-  return { timestamp, asks, poolUsd: BigInt(result(r[1]) as bigint), withdrawn, valuation };
+  const funding = r.at(-1)!;
+  if (funding.status !== "success") throw funding.error;
+  if (typeof funding.result !== "boolean") throw new Error("missing funding state");
+  return {
+    timestamp,
+    asks,
+    poolUsd: BigInt(result(r[1]) as bigint),
+    poolInitialized: funding.result,
+    withdrawn,
+    valuation,
+  };
 }
 
 type Call = {

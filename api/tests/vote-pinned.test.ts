@@ -179,6 +179,8 @@ function node(
               return result(functionName, proof.lastHash.get(String(args![0])));
             case "initiativeCount":
               return result(functionName, 3n);
+            case "poolInitialized":
+              return result(functionName, true);
             case "poolUsd":
               return result(functionName, 300n);
             case "withdrawnMask":

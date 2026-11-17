@@ -362,6 +362,7 @@ it("during a test vote, the board marks what an admin withdrew from it", async (
   api.mockImplementation((path: string) =>
     path === "/api/vote/round"
       ? Promise.resolve({
+        poolInitialized: true,
         registrationClosesAt: 0,
         closed: false,
         tiers: [{ tier: "S", status: "waiting", startsAt: 2 }],

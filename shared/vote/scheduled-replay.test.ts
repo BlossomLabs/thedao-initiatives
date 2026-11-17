@@ -60,6 +60,7 @@ describe("complete scheduled replay agrees with the independent Python reference
             ...s,
             asks: s.asks.map(BigInt),
             poolUsd: BigInt(s.poolUsd),
+            poolInitialized: true,
           })),
           receipts: h.receipts.map((r) => ({
             ...r,

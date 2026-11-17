@@ -22,6 +22,7 @@ const waiting = (tier: "S" | "A" | "B", startsAt: number): RoundTier => ({
   startsAt,
 });
 const view = (tiers: RoundTier[]): RoundView => ({
+  poolInitialized: true,
   registrationClosesAt: T + 45 * H,
   closed: false,
   tiers,
@@ -232,4 +233,37 @@ describe("RoundBox, steps only", () => {
     expect(within(where).getByRole("heading", { name: "S-Tier is settling" })).toBeInTheDocument();
     expect(where.querySelector("[data-window]")).toBeNull();
   });
+});
+
+it("an unfunded round explains why expired dates do not settle it", () => {
+  render(
+    <RoundBox
+      schedule={schedule}
+      rv={{
+        ...view([waiting("S", T), ...later]),
+        poolInitialized: false,
+        registrationClosesAt: null,
+      }}
+    />,
+  );
+  const box = screen.getByRole("region", { name: "Where the round is" });
+  expect(box).toHaveTextContent("Awaiting funding");
+  expect(box).toHaveTextContent("Voting stays open");
+  expect(within(box).queryByRole("timer")).not.toBeInTheDocument();
+});
+
+it("an unfunded round before opening still shows when voting opens", () => {
+  render(
+    <RoundBox
+      schedule={{ ...schedule, opensAt: now + H }}
+      rv={{
+        ...view([waiting("S", T), ...later]),
+        poolInitialized: false,
+        registrationClosesAt: null,
+      }}
+    />,
+  );
+  const box = screen.getByRole("region", { name: "Where the round is" });
+  expect(box).toHaveTextContent("Voting opens");
+  expect(box).not.toHaveTextContent("Voting stays open");
 });

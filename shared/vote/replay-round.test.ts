@@ -44,6 +44,7 @@ function fakeSource(o: { head: number; transcript?: Hex }) {
         timestamp: b,
         asks: [150n, 150n, 150n],
         poolUsd: 200n,
+        poolInitialized: true,
         withdrawn: [],
       });
     },
@@ -134,6 +135,7 @@ it("goal and account corrections preserve settled awards in fresh, cached and sn
       timestamp: b,
       asks: b < 1500 ? [150n, 150n, 150n] : [1n, 40n, 150n],
       poolUsd: 200n,
+      poolInitialized: true,
       withdrawn: [],
     });
   const opts = { now: 2200 };

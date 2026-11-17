@@ -7,6 +7,7 @@ import ValuationNotes from "./ValuationNotes";
 afterEach(cleanup);
 const round = { ...NO_ROUND, slugs: ["example"] };
 const view: RoundView = {
+  poolInitialized: true,
   registrationClosesAt: 0,
   closed: true,
   accepted: {},

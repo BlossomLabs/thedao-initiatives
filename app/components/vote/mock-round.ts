@@ -323,6 +323,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
     const { s, a, b } = sample;
     const view: RoundView = {
       ...base,
+      poolInitialized: true,
       registrationClosesAt: first[0] + WINDOW,
       tiers: (["S", "A", "B"] as const).map((tier, i) => ({
         tier,
@@ -399,6 +400,7 @@ export function mockRound(kind: MockKind, cards: Card[], n: number): Mock {
   const view: RoundView = {
     ...base,
     closed: kind === "finished",
+    poolInitialized: true,
     registrationClosesAt: settledCount ? first[0] + WINDOW : first[0] + LONGEST,
     tiers,
     accepted: t.accepted,

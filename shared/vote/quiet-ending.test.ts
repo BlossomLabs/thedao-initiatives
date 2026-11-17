@@ -33,6 +33,7 @@ const at = (time: number, asks: bigint[], poolUsd: bigint, event = true): ChainS
   timestamp: time,
   asks,
   poolUsd,
+  poolInitialized: true,
   withdrawn: [],
   event,
 });
@@ -634,5 +635,40 @@ describe("ballot shape in the replay", () => {
   it("a ballot signed before a project was added reads it as unplaced", () => {
     const s = run4([r("d", 1, [1, 1, 1])]);
     expect([...s.accepted.get("d")!]).toEqual([1, 1, 1, X]);
+  });
+});
+
+describe("uninitialized funding", () => {
+  it("keeps every tier and registration open past all cutoffs", () => {
+    const states = flat([150n, 150n], 0n).map((s) => ({ ...s, poolInitialized: false }));
+    const state = run([...base(), r("late", 30_000, [1, X])], 40_000, { states });
+    expect(state.poolInitialized).toBe(false);
+    expect(state.closed).toBe(false);
+    expect(state.registrationClosesAt).toBeNull();
+    expect(state.tiers.every((t) => t.status === "waiting")).toBe(true);
+    expect(state.settleInputs).toEqual([null, null, null]);
+    expect(state.accepted.has("late")).toBe(true);
+    expect(refusal(state, "new", Uint8Array.from([1, X]), 40_000, 2)).toBeNull();
+  });
+  it("settles an explicitly initialized zero pool", () => {
+    const state = run(base(), 40_000, { states: flat([150n, 150n], 0n) });
+    expect(state.poolInitialized).toBe(true);
+    expect(state.closed).toBe(true);
+    expect(state.registrationClosesAt).toBe(T + W);
+  });
+  it("reschedules and funds without losing ballots recorded while unfunded", () => {
+    const moved = {
+      ...schedule,
+      firstTallyAt: [50_000, 56_300, 62_600] as [number, number, number],
+    };
+    const states = [
+      { ...at(0, [150n, 150n], 0n), poolInitialized: false },
+      at(45_000, [150n, 150n], 200n),
+    ];
+    const state = run([...base(), r("late", 30_000, [1, X])], 53_600, { states, schedule: moved });
+    expect(state.closed).toBe(false);
+    expect(state.accepted.has("late")).toBe(true);
+    expect(state.tiers[0]).toMatchObject({ status: "settled", at: 53_600 });
+    expect(state.registrationClosesAt).toBe(53_600);
   });
 });

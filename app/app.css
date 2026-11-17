@@ -960,6 +960,8 @@
     @apply max-w-[760px] font-inter-tight font-light text-[15px] leading-[1.75] text-soft;
     text-align: justify;
     hyphens: auto;
+    /* long bare URLs break instead of widening the page on phones */
+    overflow-wrap: anywhere;
   }
   .md h1,
   .md h2,
@@ -1044,6 +1046,8 @@
   }
   .md th,
   .md td {
+    /* cells keep whole words; the .md-table wrapper scrolls instead */
+    overflow-wrap: break-word;
     @apply px-2.5 py-[7px] text-left border-b border-white/[.07] align-top;
   }
   .md th {

@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {SignedBallots} from "../contracts/SignedBallots.sol";
 import {MockToken, MockFeed} from "./helpers/Fixtures.sol";
 
-/// Gas of vote() with mainnet's currencies (ETH + feed, USDC fixed $1, EURC + feed),
+/// Gas of vote() with the three-currency baseline (ETH + feed, USDC fixed $1, EURC + feed),
 /// 80 initiatives each holding all three and an open USD pledge.
 contract GasTest is Test {
     uint256 constant M = 80;

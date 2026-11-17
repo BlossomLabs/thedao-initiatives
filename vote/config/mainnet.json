@@ -14,7 +14,42 @@
     {
       "symbol": "EURC",
       "asset": "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c",
-      "usdFeed": "0x04F84020Fdf10d9ee64D1dcC2986EDF2F556DA11"
+      "usdFeed": "0xb49f677943BC038e9857d61E7d053CaA2C1734C1"
+    },
+    {
+      "symbol": "USDT",
+      "asset": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "DAI",
+      "asset": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "USDS",
+      "asset": "0xdC035D45d973E3EC169d2276DDab16f1e407384F",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "crvUSD",
+      "asset": "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "BOLD",
+      "asset": "0x6440f144b7e50D6a8439336510312d2F54beB01D",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "fxUSD",
+      "asset": "0x085780639CC2cACd35E474e71f4d000e2405d8f6",
+      "usdFeed": "0x0000000000000000000000000000000000000000"
+    },
+    {
+      "symbol": "ZCHF",
+      "asset": "0xB58E61C3098d85632Df34EecfB899A1Ed80921cB",
+      "usdFeed": "0x449d117117838fFA61263B61dA6301AA2a88B13A"
     }
   ]
 }

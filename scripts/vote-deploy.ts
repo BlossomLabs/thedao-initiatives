@@ -1,4 +1,5 @@
-// Deploys a SignedBallots round, sets it up and hands the admin roles to sem-the-bee.eth.
+// Deploys a SignedBallots round, sets it up and hands the admin roles to --round-admins
+// (sem-the-bee.eth by default). --admins separately names the site's pledge signers.
 // The site reads the round from its contract: set it on Admin → Vote (its address and
 // network) once this prints it.
 //
@@ -11,6 +12,8 @@
 // For a longer rehearsal, --until <ISO date with time zone> sets the final cutoff;
 // --setup-minutes 10 opens ten minutes after deployment (default: 30).
 // --window-minutes 30 --windows 9 gives each tier nine windows, halving from 30 minutes.
+// --include slug-a,slug-b explicitly includes extra board initiatives in a test vote,
+// exempting only those slugs from the qualifying floor and ask cap for this rehearsal.
 // The pool is 400 ETH in dollars at Chainlink's live ETH/USD (read on mainnet:
 // MAINNET_RPC_URL, else a public node). By default it opens 30 min after the deploy; S-Tier's
 // first tally is 30 min later, and the three tiers then take 30 min at most (10 min
@@ -27,6 +30,8 @@
 // The real vote's windows are 24 h, 12 h, 6 h… nine of them (the last 5 min 37 s), so a
 // tier settles within 47 h 54 min 22 s of its first tally; each tally must leave the
 // tier above that long.
+// --open-after-setup moves opening to two minutes after setup transactions finish,
+// then hands over the roles, leaving time for the final checks before voting starts.
 //
 // The relayer key deploys and keeps only MINTER_ROLE; it is also the server's
 // sending key. Everything here must finish before opensAt (setup freezes then).
@@ -238,19 +243,45 @@ export function nextAddingOpen(s: Schedule, now: number): number | null {
 // Admin → Vote matches a test round's initiatives to the board by these accounts.
 const placeholder = testPlaceholder;
 
-/** A test round's initiatives: the board's that qualify by Admin → Vote's settings
- * (#99), in board order. `show` only hides the board's mark, so it doesn't matter here. */
-export const qualifyingCards = (cards: BoardCard[], s: VoteSettings): BoardCard[] =>
-  cards.filter((c) =>
-    c.goalUsd > 0 && voteState(c.raisedUsd ?? 0, c.goalUsd, s).kind === "eligible"
+/** Explicit rehearsal exceptions never apply to a real vote. */
+export function parseTestIncludes(value: string | undefined, real = false): string[] {
+  if (value === undefined) return [];
+  if (real) throw new Error("--include is only for test votes");
+  const slugs = [...new Set(value.split(",").map((s) => s.trim()).filter(Boolean))];
+  if (!slugs.length) throw new Error("--include needs at least one initiative slug");
+  return slugs;
+}
+
+/** A test round's initiatives: qualifying cards plus explicit rehearsal exceptions,
+ * in board order. `show` only hides the board's mark, so it doesn't matter here. */
+export function qualifyingCards(
+  cards: BoardCard[],
+  s: VoteSettings,
+  include: readonly string[] = [],
+): BoardCard[] {
+  for (const slug of include) {
+    const c = cards.find((c) => c.slug === slug);
+    if (!c) throw new Error(`not on the board: ${slug}`);
+    if (!Number.isFinite(c.goalUsd) || c.goalUsd <= 0) {
+      throw new Error(`${slug}: an included initiative needs a positive finite goal`);
+    }
+  }
+  return cards.filter((c) =>
+    c.goalUsd > 0 &&
+    (include.includes(c.slug) || voteState(c.raisedUsd ?? 0, c.goalUsd, s).kind === "eligible")
   );
+}
 
 /** Refuses a test round where an initiative would ask for more than the cap. The tally
  * has no cap of its own: an ask is the goal less what the round holds, and a test round
  * holds only the open pledges (not donations already received), so one that qualifies
- * through its donations can still ask for more. */
-export function checkAsks(cards: BoardCard[], s: VoteSettings): void {
-  const over = cards.map((c) => {
+ * through its donations can still ask for more. Explicit rehearsal exceptions are exempt. */
+export function checkAsks(
+  cards: BoardCard[],
+  s: VoteSettings,
+  include: readonly string[] = [],
+): void {
+  const over = cards.filter((c) => !include.includes(c.slug)).map((c) => {
     const pledged = (c.pledges ?? []).filter((p) => p.status === "pledged")
       .reduce((a, p) => a + p.amountUsd, 0);
     return { slug: c.slug, ask: Math.max(0, Math.round(c.goalUsd - pledged)) };
@@ -320,17 +351,39 @@ export function roleChecks(o: {
   handed: Hex[];
   minter: Hex;
   admin: Hex;
+  roundAdmins?: Hex[];
   relayer: Hex;
   admins: string[];
   minters?: Hex[];
 }): [Hex, Hex, boolean][] {
   return [
-    ...o.handed.map((r): [Hex, Hex, boolean] => [r, o.admin, true]),
+    ...(o.roundAdmins ?? [o.admin]).flatMap((a) =>
+      o.handed.map((r): [Hex, Hex, boolean] => [r, a, true])
+    ),
     ...o.handed.map((r): [Hex, Hex, boolean] => [r, o.relayer, false]),
     ...(o.real ? o.admins.map((a): [Hex, Hex, boolean] => [o.handed[2], a as Hex, true]) : []),
     ...(o.real ? [] : [[o.minter, o.relayer, true] as [Hex, Hex, boolean]]),
     ...(o.real ? [] : (o.minters ?? []).map((a): [Hex, Hex, boolean] => [o.minter, a, true])),
   ];
+}
+
+/** Full round administrators, separate from the site's pledge-only signers. The
+ * deployer must hand over to other accounts because it renounces these roles. */
+export function parseRoundAdmins(value: string | undefined, deployer: Hex): Hex[] {
+  const addresses = (value ?? ADMIN).split(",").map((a) => a.trim()).filter(Boolean);
+  if (!addresses.length) throw new Error("--round-admins needs at least one address");
+  const admins = [
+    ...new Set(addresses.map((a) => {
+      if (!isAddress(a) || a.toLowerCase() === ZERO) {
+        throw new Error(`--round-admins: ${a} isn't a nonzero address`);
+      }
+      return getAddress(a);
+    })),
+  ];
+  if (admins.some((a) => a.toLowerCase() === deployer.toLowerCase())) {
+    throw new Error("--round-admins cannot include the deployer: it renounces its admin roles");
+  }
+  return admins;
 }
 
 /** --minter: the extra accounts that mint a test round's badges (comma-separated), e.g. the
@@ -469,7 +522,9 @@ export function voteSchedule(now: number, timing: TestTiming = {}) {
     maxWindows: timing.maxWindows ?? TEST_WINDOWS.maxWindows,
   };
   const span = tierMax(windows);
-  const until = timing.durationHours === undefined ? timing.until : opensAt + timing.durationHours * 3600;
+  const until = timing.durationHours === undefined
+    ? timing.until
+    : opensAt + timing.durationHours * 3600;
   const s = until === undefined ? opensAt + VOTING_MINUTES * 60 : until - 3 * span;
   if (!Number.isSafeInteger(s + 3 * span)) throw new Error("The test schedule is out of range");
   if (s <= opensAt) {
@@ -800,7 +855,7 @@ async function regroupMain(
 
 async function main() {
   const args = parseArgs(Deno.args, {
-    boolean: ["real", "affiliations", "affiliated"],
+    boolean: ["real", "affiliations", "affiliated", "open-after-setup"],
     string: [
       "board",
       "rpc",
@@ -810,10 +865,12 @@ async function main() {
       "b-tally",
       "pool-usd",
       "slugs",
+      "include",
       "independent-tiers",
       "add",
       "added",
       "admins",
+      "round-admins",
       "test-usd",
       "minter",
       "contract",
@@ -824,6 +881,7 @@ async function main() {
       "windows",
     ],
   });
+  const include = parseTestIncludes(args.include, args.real);
   if (args.add || args.added) return await addMain(args);
   if (args.affiliations || args.affiliated) return await regroupMain(args);
   const independentTiers = Number(args["independent-tiers"] ?? 1);
@@ -831,6 +889,9 @@ async function main() {
     throw new Error("--independent-tiers is 1 (S-Tier) or 3 (S-Tier and A-Tier)");
   }
   const real = args.real ? parseRealArgs(args) : null;
+  if (args["open-after-setup"] && !real) {
+    throw new Error("--open-after-setup is only for real votes");
+  }
   const testTiming = parseTestTiming(args);
   const chain = real ? mainnet : sepolia;
   // DEVCON_RELAYER_KEY: the name before the rename, still accepted.
@@ -846,6 +907,7 @@ async function main() {
   if (!rpc) throw new Error(`--rpc or ${rpcEnv} is required`);
 
   const account = privateKeyToAccount(key);
+  const roundAdmins = parseRoundAdmins(args["round-admins"], account.address);
   const minters = parseMinters(args.minter, Boolean(real), account.address);
   // Public RPCs are slow at times: long timeouts, several retries.
   const transport = http(rpc, { timeout: 60_000, retryCount: 6, retryDelay: 1_000 });
@@ -858,11 +920,13 @@ async function main() {
   const qualify = real ? null : await boardVoteSettings(base);
   if (qualify) {
     const all = cards.length;
-    cards = qualifyingCards(cards, qualify);
+    cards = qualifyingCards(cards, qualify, include);
     console.log(
-      `${cards.length} of ${all} initiatives qualify (raised ${qualify.floorPct}% or more, ` +
-        `$${qualify.capUsd.toLocaleString("en-US")} or less left)`,
+      `${cards.length} of ${all} initiatives selected (raised ${qualify.floorPct}% or more, ` +
+        `$${qualify.capUsd.toLocaleString("en-US")} or less left; ` +
+        `${include.length} explicit rehearsal exceptions)`,
     );
+    if (include.length) console.log(`Included explicitly: ${include.join(", ")}`);
     if (!cards.length) throw new Error("no initiative qualifies: nothing to vote on");
   }
   if (real) {
@@ -885,7 +949,7 @@ async function main() {
     if (!r.ok) throw new Error(`${c.slug}: pledges unreadable (${r.status})`);
     c.pledges = ((await r.json()) as { pledges: NonNullable<BoardCard["pledges"]> }).pledges;
   }
-  if (qualify) checkAsks(cards, qualify);
+  if (qualify) checkAsks(cards, qualify, include);
   // The site's admins sign pledges: --admins, else ADMIN_ADDRESSES, else the site's default list.
   const admins = (args.admins ?? Deno.env.get("ADMIN_ADDRESSES") ?? "").split(",").map((x) =>
     x.trim()
@@ -1028,9 +1092,11 @@ async function main() {
     ...donation,
     // The site's relayer, when another key deploys: it mints the badges admins give.
     ...minters.map((a) => step("grantRole", [minterRole, a])),
-    ...handed.map((r) => step("grantRole", [r, ADMIN])),
+    ...roundAdmins.flatMap((a) => handed.map((r) => step("grantRole", [r, a]))),
     // The default admin goes last.
-    ...[...handed.slice(1), handed[0]].map((r) => step("renounceRole", [r, account.address])),
+    ...(args["open-after-setup"]
+      ? []
+      : [...handed.slice(1), handed[0]].map((r) => step("renounceRole", [r, account.address]))),
   ];
 
   const executorArtifact = JSON.parse(
@@ -1122,6 +1188,39 @@ async function main() {
     next += batch.length;
   }
 
+  if (args["open-after-setup"]) {
+    // All setup calls landed successfully. Opening and relinquishing the remaining
+    // deployer roles happen together, so a failed activation leaves the setup reserve.
+    s.opensAt = Number((await pub.getBlock()).timestamp) + 120;
+    const activation = [
+      step("setDates", [BigInt(s.opensAt), s.firstTallyAt.map(BigInt)]),
+      ...[...handed.slice(1), handed[0]].map((r) => step("renounceRole", [r, account.address])),
+    ];
+    const data = encodeFunctionData({
+      abi: executorArtifact.abi,
+      functionName: "execute",
+      args: [activation],
+    });
+    const estimate = await caughtUp(
+      "activation estimate",
+      () =>
+        pub.estimateGas({
+          account: account.address,
+          to: account.address,
+          data,
+          blockNumber: atBlock,
+        }),
+    );
+    if (!fits(estimate)) throw new Error("Activation exceeds the transaction gas cap");
+    const hash = await wallet.sendTransaction({
+      to: account.address,
+      data,
+      gas: limitFor(estimate),
+    });
+    atBlock = (await wait(hash, "open after setup and hand over")).blockNumber;
+    console.log(`Opening activated in ${hash}; final checks have two minutes before voting opens.`);
+  }
+
   // Back to a plain account: delegate to the zero address.
   const undelegate = await wallet.signAuthorization({
     contractAddress: "0x0000000000000000000000000000000000000000",
@@ -1147,6 +1246,7 @@ async function main() {
       handed,
       minter: minterRole,
       admin: ADMIN,
+      roundAdmins,
       relayer: account.address,
       admins,
       minters,

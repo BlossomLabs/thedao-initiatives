@@ -11,7 +11,7 @@ The contracts are a development implementation, not a deployed round.
 | [contracts/SignedBallots.sol](contracts/SignedBallots.sol) | Internal or external voter NFTs, signed NFT-ID ballot receipts, roles and independently editable future dates. |
 | [contracts/RoundAccounting.sol](contracts/RoundAccounting.sol) | Increase-only USD pool, allowed project currencies, initiatives, pledges and live USD views. |
 | [contracts/IPriceFeed.sol](contracts/IPriceFeed.sol) | Minimal Chainlink AggregatorV3 reader interface. |
-| [config/mainnet.json](config/mainnet.json) | Ethereum mainnet registration inputs: ETH/USD, fixed-dollar USDC and EURC/USD. |
+| [config/mainnet.json](config/mainnet.json) | Ethereum mainnet registration inputs for every website donation asset. |
 | [shared/pbear.ts](shared/pbear.ts) | Integer-exact tally, transcripts and public replay. |
 | [shared/ranks.ts](shared/ranks.ts) | Rank validation, packing and withholding marker 255. |
 | [reference/pbear.py](reference/pbear.py) | Original Python tally, using only the standard library. |
@@ -199,16 +199,26 @@ Native ETH uses asset address zero; virtual USD remains the separate currency ID
 | Currency | Chainlink USD feed |
 | --- | --- |
 | ETH | 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419 |
-| USDC | None: explicitly fixed at $1 per token |
-| EURC | 0x04F84020Fdf10d9ee64D1dcC2986EDF2F556DA11 |
+| USDC, USDT, DAI, USDS, crvUSD, BOLD, fxUSD | None: explicitly fixed at $1 per token |
+| EURC | 0xb49f677943BC038e9857d61E7d053CaA2C1734C1 (EUR/USD) |
+| ZCHF | 0x449d117117838fFA61263B61dA6301AA2a88B13A (CHF/USD) |
 
-USDC uses a zero feed address, matching the existing app's
-fixed-dollar policy for donations and pledges. The pool is recorded directly in USD.
-Other USD stablecoins can be registered the same way; this preset currently includes
-only ETH, USDC and EURC. Virtual USD remains separate from every token balance.
+USD stablecoins use zero feed addresses, matching the website's fixed-dollar policy:
+this does not detect a token depeg. ZCHF uses the website's CHF/USD feed, assuming
+one ZCHF equals one CHF; it does not measure ZCHF's market price. EURC uses the
+website's fiat EUR/USD feed, assuming one EURC equals one EUR; it does not detect
+an EURC depeg. The pool is recorded directly in USD. Virtual USD remains
+separate from every token balance.
 
-Both configured feeds report eight decimals. Their published heartbeats are
-1 hour for ETH and 24 hours for EURC; a late answer is still used.
+All ten website assets fit within the 32-currency limit (11 entries including virtual
+USD). Register them before opening: both registration and feed corrections freeze at
+opening. Only balances in each registered initiative account on this chain count.
+Additional assets increase ballot gas and replay reads; the three-currency gas fixture
+does not establish the cost of the full preset.
+
+All three configured feeds report eight decimals. A late answer is still used;
+the contract has no price-age limit and falls back to the last stored good answer
+when a feed fails. The website instead rejects stale feed answers.
 Addresses, decimals and descriptions were checked against mainnet and the
 [Chainlink feed directory](https://reference-data-directory.vercel.app/feeds-mainnet.json).
 Recheck feed availability before deployment. These are mainnet

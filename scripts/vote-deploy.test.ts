@@ -13,6 +13,8 @@ import {
   nextAddingOpen,
   parseMinters,
   parseRealArgs,
+  parseRoundAdmins,
+  parseTestIncludes,
   parseTestTiming,
   planDonationSetup,
   planGroups,
@@ -29,6 +31,7 @@ import {
   USD_CURRENCY,
   voteSchedule,
 } from "./vote-deploy.ts";
+import { CHAINLINK_FEEDS, TOKENS } from "../api/config.ts";
 
 // The plan (vote fact sheet): opens Nov 17, S-Tier Thu Dec 3, A-Tier Mon Dec 7,
 // B-Tier Wed Dec 9, every tally at 21:00 UTC.
@@ -425,10 +428,50 @@ const setup = (real: boolean) =>
 
 Deno.test("registers the configured currencies before opening", () => {
   const regs = setup(true).filter((c) => c.fn === "registerCurrency");
-  assertEquals(regs.map((c) => c.args), MAINNET_CURRENCIES.map((c) => [c.asset, c.usdFeed]));
-  assertEquals(MAINNET_CURRENCIES.map((c) => c.symbol), ["ETH", "USDC", "EURC"]);
+  assertEquals(
+    regs.map((c) => c.args),
+    MAINNET_CURRENCIES.map((c) => [c.asset, c.usdFeed]),
+  );
+  assertEquals(MAINNET_CURRENCIES.map((c) => c.symbol), [
+    "ETH",
+    "USDC",
+    "EURC",
+    "USDT",
+    "DAI",
+    "USDS",
+    "crvUSD",
+    "BOLD",
+    "fxUSD",
+    "ZCHF",
+  ]);
   // Currencies come first: they freeze at opening.
-  assertEquals(setup(true).slice(0, 3).map((c) => c.fn), Array(3).fill("registerCurrency"));
+  const n = MAINNET_CURRENCIES.length;
+  assertEquals(
+    setup(true).slice(0, n).map((c) => c.fn),
+    Array(n).fill("registerCurrency"),
+  );
+});
+
+Deno.test("mainnet currencies cover every website asset with explicit USD and CHF pricing", () => {
+  const registered = new Map(MAINNET_CURRENCIES.map((c) => [c.symbol, c]));
+  assertEquals(
+    [...registered.keys()].sort(),
+    ["ETH", ...Object.keys(TOKENS)].sort(),
+  );
+  assertEquals(registered.get("ETH")!.asset, ZERO_ADDR);
+  assertEquals(registered.get("ETH")!.usdFeed, CHAINLINK_FEEDS.ETH);
+  for (const [symbol, [asset]] of Object.entries(TOKENS)) {
+    assertEquals(
+      registered.get(symbol)!.asset.toLowerCase(),
+      asset.toLowerCase(),
+    );
+    if (symbol !== "EURC" && symbol !== "ZCHF") {
+      assertEquals(registered.get(symbol)!.usdFeed, ZERO_ADDR);
+    }
+  }
+  assertEquals(registered.get("ZCHF")!.usdFeed, CHAINLINK_FEEDS.ZCHF);
+  assertEquals(registered.get("EURC")!.usdFeed, CHAINLINK_FEEDS.EURC);
+  assertEquals(MAINNET_CURRENCIES.length + 1 <= 32, true);
 });
 
 Deno.test("grants the pledge role to each admin", () => {
@@ -500,7 +543,9 @@ Deno.test("deploy: code over EIP-170's limit is refused before it is sent", asyn
   const built = await Deno.readTextFile(
     new URL("../vote/out/SignedBallots.sol/SignedBallots.json", import.meta.url),
   ).catch(() => null);
-  if (built) checkCodeSize("SignedBallots", JSON.parse(built).deployedBytecode.object);
+  if (built) {
+    checkCodeSize("SignedBallots", JSON.parse(built).deployedBytecode.object);
+  }
 });
 
 Deno.test("deploy: the relayer ends the setup with none of the handed-over roles, PLEDGE_ROLE included", () => {
@@ -519,6 +564,63 @@ Deno.test("deploy: the relayer ends the setup with none of the handed-over roles
   const test = roleChecks({ ...base, real: false });
   assertEquals(test.filter(([x]) => x === m), [[m, relayer, true]]);
   assertEquals(test.some(([, who]) => who === signer), false);
+});
+
+Deno.test("deploy: every requested round admin receives all three roles and the deployer loses them", () => {
+  const handed = ["0xd0", "0xa0", "0x90"] as const;
+  const deployer = "0x0000000000000000000000000000000000000002" as const;
+  const requested = [
+    "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF",
+    "0x839395e20bbB182fa440d08F850E6c7A8f6F0780",
+    "0xE930779472c04Dd97AF5b8B83d9EC95ABdA38dcE",
+  ];
+  const admins = parseRoundAdmins(requested.join(","), deployer);
+  assertEquals(admins, requested);
+  const checks = roleChecks({
+    real: true,
+    handed: [...handed],
+    minter: "0x30",
+    admin: admins[0],
+    roundAdmins: admins,
+    relayer: deployer,
+    admins: [],
+  });
+  for (const role of handed) {
+    assertEquals(
+      checks.filter(([r, , held]) => r === role && held).map(([, a]) => a),
+      admins,
+    );
+    assertEquals(checks.filter(([r, a]) => r === role && a === deployer), [[
+      role,
+      deployer,
+      false,
+    ]]);
+  }
+});
+
+Deno.test("parseRoundAdmins: rejects an empty handover, invalid addresses and the renouncing deployer", () => {
+  const deployer = "0x0000000000000000000000000000000000000002" as const;
+  const admin = "0xf632Ce27Ea72deA30d30C1A9700B6b3bCeAA05cF";
+  assertEquals(parseRoundAdmins(undefined, deployer), [admin]);
+  assertEquals(parseRoundAdmins(`${admin}, ${admin.toLowerCase()}`, deployer), [
+    admin,
+  ]);
+  assertThrows(() => parseRoundAdmins(" , ", deployer), Error, "at least one");
+  assertThrows(
+    () => parseRoundAdmins("nope", deployer),
+    Error,
+    "nonzero address",
+  );
+  assertThrows(
+    () => parseRoundAdmins(ZERO_ADDR, deployer),
+    Error,
+    "nonzero address",
+  );
+  assertThrows(
+    () => parseRoundAdmins(`${admin},${deployer}`, deployer),
+    Error,
+    "renounces",
+  );
 });
 
 Deno.test("deploy: --minter gives a test round's MINTER_ROLE to the site's relayer too", () => {
@@ -585,7 +687,78 @@ Deno.test("qualifyingCards: a test round keeps only the initiatives that qualify
 
 Deno.test("qualifyingCards: settings with show off still apply (only the board mark is hidden)", () => {
   const cards = [card("in", 100_000, 30_000), card("out", 100_000, 10_000)];
-  assertEquals(qualifyingCards(cards, { ...QUALIFY, show: false }).map((c) => c.slug), ["in"]);
+  assertEquals(
+    qualifyingCards(cards, { ...QUALIFY, show: false }).map((c) => c.slug),
+    ["in"],
+  );
+});
+
+Deno.test("parseTestIncludes: deduplicates rehearsal exceptions and refuses real votes", () => {
+  assertEquals(parseTestIncludes(undefined), []);
+  assertEquals(parseTestIncludes(" assertions, vaults, assertions, "), [
+    "assertions",
+    "vaults",
+  ]);
+  assertThrows(
+    () => parseTestIncludes(" , "),
+    Error,
+    "at least one initiative slug",
+  );
+  assertThrows(
+    () => parseTestIncludes("vaults", true),
+    Error,
+    "only for test votes",
+  );
+});
+
+Deno.test("qualifyingCards: named rehearsal exceptions preserve board order and other exclusions", () => {
+  const cards = [
+    card("assertions", 75_000, 50),
+    card("eligible", 100_000, 25_000),
+    card("vaults", 240_000, 206.4),
+    card("whitehat", 200_000, 0),
+    card("excluded", 100_000, 0),
+  ];
+  const include = ["whitehat", "vaults", "assertions", "eligible"];
+  const selected = qualifyingCards(cards, QUALIFY, include);
+  assertEquals(selected.map((c) => c.slug), [
+    "assertions",
+    "eligible",
+    "vaults",
+    "whitehat",
+  ]);
+  checkAsks(selected, QUALIFY, include);
+  assertEquals(qualifyingCards(cards, QUALIFY).map((c) => c.slug), [
+    "eligible",
+  ]);
+  assertThrows(
+    () => qualifyingCards(cards, QUALIFY, ["typo"]),
+    Error,
+    "not on the board",
+  );
+  for (const goal of [0, -1, NaN, Infinity]) {
+    assertThrows(
+      () => qualifyingCards([card("invalid", goal, 0)], QUALIFY, ["invalid"]),
+      Error,
+      "positive finite goal",
+    );
+  }
+});
+
+Deno.test("checkAsks: an explicit rehearsal exception leaves every other ask capped", () => {
+  const vaults = card("vaults", 240_000, 0);
+  const donated = card("donated", 400_000, 220_000, 150_000);
+  checkAsks([vaults], QUALIFY, ["vaults"]);
+  assertThrows(
+    () => checkAsks([vaults], QUALIFY),
+    Error,
+    "vaults asks $240,000",
+  );
+  assertThrows(
+    () => checkAsks([vaults, donated], QUALIFY, ["vaults"]),
+    Error,
+    "donated asks $250,000",
+  );
 });
 
 Deno.test("checkAsks: refuses a round where an ask is over the cap once only open pledges count", () => {
@@ -628,10 +801,18 @@ Deno.test("voteSchedule: a 27-hour vote reserves its final three hours for nine 
   assertEquals(s.firstTallyAt[0] - s.opensAt, 24 * 3600 + 24);
   assertEquals(s.firstTallyAt[1] - s.firstTallyAt[0], span);
   assertEquals(s.firstTallyAt[2] - s.firstTallyAt[1], span);
-  assertThrows(() => parseTestTiming({ "duration-hours": "27", until: "2026-11-18T12:00:00Z" }), Error, "not both");
+  assertThrows(
+    () => parseTestTiming({ "duration-hours": "27", until: "2026-11-18T12:00:00Z" }),
+    Error,
+    "not both",
+  );
   assertThrows(() => parseTestTiming({ real: true, "duration-hours": "27" }), Error, "test votes");
   for (const duration of ["0", "-1", "NaN", "Infinity", "0.00001"]) {
     assertThrows(() => parseTestTiming({ "duration-hours": duration }), Error, "positive");
   }
-  assertThrows(() => voteSchedule(1_800_000_000, { ...timing, durationHours: 1 }), Error, "voting time");
+  assertThrows(
+    () => voteSchedule(1_800_000_000, { ...timing, durationHours: 1 }),
+    Error,
+    "voting time",
+  );
 });

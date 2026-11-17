@@ -99,6 +99,8 @@ function rpc(now = 1_800_000_000) {
           });
         case "eth_maxPriorityFeePerGas":
           return Promise.resolve(toHex(state.priorityFee));
+        case "eth_gasPrice":
+          return Promise.resolve(toHex(state.baseFee + state.priorityFee));
         case "eth_estimateGas": {
           state.estimates++;
           assertEquals(BigInt((params[0] as { gas: Hex }).gas), BALLOT_RELAY_GAS);

@@ -49,8 +49,9 @@ const NOT_OPEN = "Voting hasn't opened yet. Send your ballot again in a moment."
 /** The contract's ballot-rule reverts (vote/contracts/SignedBallots.sol). */
 const RULE_REVERT = /\b(BallotTooSmall|TooFewIndependent|BadProof|GroupOverHalf|TooManyTiers)\b/;
 
-/** Below this the real round's relayer stops and voters send it themselves. */
-const RELAY_FLOOR_WEI = 10_000_000_000_000_000n; // 0.01 ETH
+/** The real round's relayer stops, and voters send it themselves, when it holds less
+ * than this many ballots' gas at the current gas price. */
+const RELAY_FLOOR_BALLOTS = 2n;
 const BALLOTS_CACHE_SECS = 5;
 /** A replay pinned to one head block (the manifest's `readAt`: every read names that
  * block, so the replay is the same however often it runs) is reused this long. The key
@@ -693,7 +694,11 @@ export function voteRoutes(deps: Deps) {
     }
     if (d.manifest.kind === "real") {
       const relayer = d.chain.relayerAddress();
-      if (!relayer || (await d.chain.balance(relayer)) < RELAY_FLOOR_WEI) {
+      if (
+        !relayer ||
+        (await d.chain.balance(relayer)) <
+          RELAY_FLOOR_BALLOTS * (await d.chain.estimateRecordFor())
+      ) {
         throw fail(503, "relay_low", "The relay is out of gas for now. Use “Send it yourself”.");
       }
     }

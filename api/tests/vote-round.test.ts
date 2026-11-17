@@ -373,6 +373,25 @@ Deno.test("real round ballot: a relayer low on gas says to send it yourself", as
   h.close();
 });
 
+Deno.test("real round ballot: the relay's floor is two ballots' gas, not a fixed amount", async () => {
+  const { h, state } = await setup(real);
+  state.owners.set(12n, VOTER.address);
+  // The fake prices a ballot at 100k gas × 2 gwei = 0.0002 ETH: the floor is 0.0004 ETH.
+  state.balances.set(RELAYER, 399_999_999_999_999n);
+  const low = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: await signedBallot(VOTER, 12n, 1n, BALLOT, real),
+  });
+  assertEquals([low.status, (await j(low)).code], [503, "relay_low"]);
+  state.balances.set(RELAYER, 5_100_000_000_000_000n); // 0.0051 ETH, under the old 0.01 floor
+  const ok = await h.req(voteRequestPath(h.deps, "/api/vote/ballot"), {
+    method: "POST",
+    json: await signedBallot(VOTER, 12n, 1n, BALLOT, real),
+  });
+  assertEquals(ok.status, 200);
+  h.close();
+});
+
 Deno.test("vote relayer: admins see its address and balance; nobody else", async () => {
   const { h } = await setup(real);
   assertEquals(

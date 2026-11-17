@@ -4,6 +4,7 @@ import {
   ContractFunctionZeroDataError,
   createPublicClient,
   createWalletClient,
+  hashTypedData,
   type Hex,
   http,
   multicall3Abi,
@@ -13,6 +14,7 @@ import {
   type Transport,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import { TEST_USD_ABI } from "../../shared/vote/test-usd.ts";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
 import { type AccountChange, accountPeriods } from "../../shared/vote/account-history.ts";
@@ -54,6 +56,13 @@ export interface VoteChain {
   relayerAddress(): Hex | null;
   /** The account's code: "0x" for a plain EOA, 0xef0100… for an EIP-7702 delegation. */
   codeOf(a: Hex): Promise<Hex>;
+  verifyContractVote(
+    owner: Hex,
+    tokenId: bigint,
+    nonce: bigint,
+    ballot: Hex,
+    signature: Hex,
+  ): Promise<boolean>;
   /** Would the relayer's mint(to, n) succeed (simulated)? */
   canMint(to: Hex, n: bigint): Promise<boolean>;
   nonceOf(n: bigint): Promise<bigint>;
@@ -80,6 +89,7 @@ export interface VoteChain {
           }[],
         ];
       }
+      | { fn: "recordFor"; args: readonly [bigint, bigint, Hex, Hex, readonly number[]] }
       | { fn: "drip"; to: Hex; value: bigint }
       /** A test round's TestUSD minted to `to` (six decimals). */
       | { fn: "testUsd"; token: Hex; to: Hex; amount: bigint }
@@ -143,6 +153,9 @@ const TRANSFER = parseAbiItem(
 const OWNER_OF_ABI = parseAbi([
   "function ownerOf(uint256) view returns (address)",
   "error ERC721NonexistentToken(uint256 tokenId)",
+]);
+const erc1271Abi = parseAbi([
+  "function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)",
 ]);
 const LOG_CHUNK = 50_000n;
 /** Leave room for a smart wallet's receive hook while bounding the relayer's gas. */
@@ -228,6 +241,18 @@ export function createVoteChain(
       }
     },
     codeOf: async (a) => (await pub.getCode({ address: a })) ?? "0x",
+    async verifyContractVote(owner, tokenId, nonce, ballot, signature) {
+      // Match recordFor's ERC-1271 check directly; do not accept an EOA fallback or
+      // counterfactual wrapper that the deployed owner's SignatureChecker would refuse.
+      const magic = await pub.readContract({
+        address: owner,
+        account: m.contract,
+        abi: erc1271Abi,
+        functionName: "isValidSignature",
+        args: [hashTypedData(voteTypedData(m, tokenId, owner, nonce, ballot)), signature],
+      });
+      return magic === "0x1626ba7e";
+    },
     async canMint(to, n) {
       if (!account) return false;
       try {

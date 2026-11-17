@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { privateKeyToAccount } from "viem/accounts";
 import { recoverTypedDataAddress, serializeSignature } from "viem";
-import { recordVote } from "./record.ts";
+import { contractOwner, recordCall, recordVote } from "./record.ts";
 import { voteTypedData } from "./typed-data.ts";
 import type { VoteManifest } from "./manifest.ts";
 
@@ -36,4 +36,18 @@ test("recordVote splits the signature into r and vs that still recover the voter
     yParity: Number(yParity),
   });
   expect(await recoverTypedDataAddress({ ...typed, signature: full })).toBe(voter.address);
+});
+
+test("contract signatures stay intact while EIP-7702 owners retain ECDSA", () => {
+  expect(contractOwner("0x")).toBe(false);
+  expect(contractOwner(`0xef0100${"11".repeat(20)}`)).toBe(false);
+  expect(contractOwner("0x60006000")).toBe(true);
+  const s = {
+    tokenId: 7n,
+    nonce: 2n,
+    ballot: "0x01ff" as const,
+    signature: "0x1234" as const,
+    proof: [],
+  };
+  expect(recordCall(s, true)).toEqual({ fn: "recordFor", args: [7n, 2n, "0x01ff", "0x1234", []] });
 });

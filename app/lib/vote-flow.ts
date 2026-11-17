@@ -16,10 +16,12 @@ export type BallotPhase =
   | { kind: "failed"; reason: string; hash?: Hex };
 
 export type Expected = { tokenId: bigint; nonce: bigint; ballot: Hex };
-export type Signed = Expected & { signature: Hex; hash?: Hex };
+export type Signed = Expected & { signature: Hex; hash?: Hex; direct?: true };
 
 export interface FlowDeps {
   ensureChain(): Promise<void>;
+  isContractOwner(owner: Hex): Promise<boolean>;
+  sendDirect(ballot: Expected, proof: number[]): Promise<Hex>;
   signVote(typed: ReturnType<typeof voteTypedData>): Promise<Hex>;
   /** POST /api/vote/ballot; a 409 "pending" resolves to the hash already on its way. */
   relay(body: Signed): Promise<Hex>;
@@ -140,13 +142,15 @@ export async function retryBallot(
       set({ kind: "counted", hash: last.hash ?? ("0x" as Hex) });
       return last;
     }
-    // Another ballot took that nonce: sign this one again for the next.
+    // Another ballot took that nonce: prepare this one again for the next.
+    if (last.direct) return await selfSendBallot(d, m, last.tokenId, voter, last.ballot, null, set);
     return await submitBallot(d, m, last.tokenId, voter, last.ballot, set);
   }
+  if (last.direct) return await selfSendBallot(d, m, last.tokenId, voter, last.ballot, last, set);
   return await sendAndCheck(d, last, set);
 }
 
-/** "Send it yourself": the same signed ballot, submitted from the voter's wallet. */
+/** Self-send: EOAs submit their signed record; contract owners execute vote() directly. */
 export async function selfSendBallot(
   d: FlowDeps,
   m: VoteManifest,
@@ -156,19 +160,50 @@ export async function selfSendBallot(
   last: Signed | null,
   set: (p: BallotPhase) => void,
 ): Promise<Signed | null> {
+  let direct: boolean;
+  try {
+    direct = await d.isContractOwner(voter);
+  } catch (e) {
+    set({ kind: "failed", reason: message(e) });
+    return null;
+  }
   let signed: Signed | null = null;
-  if (last && last.tokenId === tokenId && last.ballot.toLowerCase() === ballot.toLowerCase()) {
+  if (
+    last && Boolean(last.direct) === direct && last.tokenId === tokenId &&
+    last.ballot.toLowerCase() === ballot.toLowerCase()
+  ) {
     const onchain = await d.nonceOf(tokenId).catch(() => null);
     if (onchain !== null && onchain + 1n === last.nonce) {
       const { hash: _, ...rest } = last;
       signed = rest;
     }
   }
+  if (!signed && direct) {
+    try {
+      signed = {
+        tokenId,
+        nonce: (await d.nonceOf(tokenId)) + 1n,
+        ballot,
+        signature: "0x",
+        direct: true,
+      };
+    } catch (e) {
+      set({ kind: "failed", reason: message(e) });
+      return null;
+    }
+  }
   signed ??= await signNext(d, m, tokenId, voter, ballot, set);
   if (!signed) return null;
+  if (direct) signed = { ...signed, direct: true };
   set({ kind: "relaying" });
   try {
     await d.ensureChain();
+  } catch (e) {
+    if (declined(e)) set({ kind: "idle", note: "You didn't confirm, so nothing was sent." });
+    else set({ kind: "failed", reason: message(e) });
+    return signed;
+  }
+  try {
     const gas = await d.requestGas(tokenId).catch(() => null);
     if (gas) await d.waitTx(gas);
   } catch {
@@ -180,7 +215,8 @@ export async function selfSendBallot(
     // contract refuses it and the failure says so. The proof is three unrelated projects
     // per enforced tier: groups only, so the manifest finds it whatever the asks are.
     const round = rulesRound(m, m.projects.map((p) => BigInt(p.goalUsd)));
-    hash = await d.sendOwn(signed, findProof(hexToBytes(ballot), round) ?? []);
+    const proof = findProof(hexToBytes(ballot), round) ?? [];
+    hash = direct ? await d.sendDirect(signed, proof) : await d.sendOwn(signed, proof);
   } catch (e) {
     if (declined(e)) set({ kind: "idle", note: "You didn't confirm, so nothing was sent." });
     else set({ kind: "failed", reason: message(e) });

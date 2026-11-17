@@ -243,3 +243,36 @@ Deno.test("blockTime: one read per block hash, shared across reads; a failed rea
   assertEquals(await blockTime(11155111, bad, read), 1_234);
   assertEquals(reads, 3, "a failed read is asked again");
 });
+
+Deno.test("contract vote verification checks the owner's ERC-1271 magic value and exact typed digest", async () => {
+  const { createVoteChain } = await import("../services/vote-chain.ts");
+  const { custom, decodeFunctionData, encodeFunctionResult, hashTypedData, parseAbi } =
+    await import("viem");
+  const { ROUND } = await import("../../shared/vote/manifest.ts");
+  const { voteTypedData } = await import("../../shared/vote/typed-data.ts");
+  const owner = "0x5555555555555555555555555555555555555555" as const;
+  const signature = "0x123456" as const;
+  const abi = parseAbi([
+    "function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)",
+  ]);
+  let magic: `0x${string}` = "0x1626ba7e";
+  const transport = custom({
+    request: ({ method, params }: { method: string; params: unknown[] }) => {
+      if (method !== "eth_call") throw new Error("unexpected " + method);
+      const tx = params[0] as { to: string; from: string; data: `0x${string}` };
+      assertEquals(tx.to.toLowerCase(), owner);
+      assertEquals(tx.from.toLowerCase(), ROUND.contract.toLowerCase());
+      assertEquals(decodeFunctionData({ abi, data: tx.data }).args, [
+        hashTypedData(voteTypedData(ROUND, 7n, owner, 2n, "0x0101")),
+        signature,
+      ]);
+      return Promise.resolve(
+        encodeFunctionResult({ abi, functionName: "isValidSignature", result: magic }),
+      );
+    },
+  });
+  const chain = createVoteChain(ROUND, "http://unused", null, transport);
+  assertEquals(await chain.verifyContractVote(owner, 7n, 2n, "0x0101", signature), true);
+  magic = "0xffffffff";
+  assertEquals(await chain.verifyContractVote(owner, 7n, 2n, "0x0101", signature), false);
+});

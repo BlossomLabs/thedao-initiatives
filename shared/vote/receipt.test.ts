@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { encodeFunctionData, type Hex } from "viem";
+import { encodeAbiParameters, encodeEventTopics, encodeFunctionData, type Hex } from "viem";
 import { SIGNED_BALLOTS_ABI } from "./abi.ts";
 import { checkBallotTx } from "./receipt.ts";
 import type { VoteManifest } from "./manifest.ts";
@@ -103,4 +103,28 @@ describe("checkBallotTx", () => {
     expect(checkBallotTx({ ...base, tx: { to: m.contract, input: record(8n, 2n, ballot) } }))
       .toBe("mismatch");
   });
+});
+
+test("a Safe wrapper must emit the matching round record, even when the outer call succeeds", () => {
+  const log = {
+    address: m.contract,
+    topics: encodeEventTopics({
+      abi: SIGNED_BALLOTS_ABI,
+      eventName: "BallotRecorded",
+      args: { tokenId: 7n, voter: m.contract },
+    }) as Hex[],
+    data: encodeAbiParameters([{ type: "uint64" }, { type: "bytes" }], [2n, ballot]),
+  };
+  const wrapped = {
+    ...base,
+    tx: { to: "0x3000000000000000000000000000000000000003", input: "0xdeadbeef" as const },
+  };
+  expect(checkBallotTx({ ...wrapped, logs: [log] })).toBe("counted");
+  expect(checkBallotTx({ ...wrapped, logs: [] })).toBe("mismatch");
+  expect(checkBallotTx({ ...wrapped, logs: [{ ...log, address: wrapped.tx.to }] })).toBe(
+    "mismatch",
+  );
+  expect(checkBallotTx({ ...wrapped, logs: [log], expect: { ...expectOk, nonce: 3n } })).toBe(
+    "mismatch",
+  );
 });

@@ -17,3 +17,18 @@ export function recordVote(
     proof: s.proof,
   };
 }
+
+/** EIP-7702 delegations still vote with their EOA key through record(). */
+export const contractOwner = (code: Hex): boolean =>
+  code !== "0x" && !/^0xef0100[0-9a-f]{40}$/i.test(code);
+
+/** ERC-1271 signatures can have arbitrary length and must reach the owner unchanged. */
+export function recordCall(s: Parameters<typeof recordVote>[0], contract: boolean) {
+  if (contract) {
+    return {
+      fn: "recordFor" as const,
+      args: [s.tokenId, s.nonce, s.ballot, s.signature, s.proof] as const,
+    };
+  }
+  return { fn: "record" as const, args: [[recordVote(s)]] as const };
+}

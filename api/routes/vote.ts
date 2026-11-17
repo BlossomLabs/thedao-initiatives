@@ -6,7 +6,7 @@ import { jsonBody } from "../lib/body.ts";
 import { HttpError } from "../lib/errors.ts";
 import { isValidOnchainBallot, tierName } from "../../shared/vote/ballot.ts";
 import { voteTypedData } from "../../shared/vote/typed-data.ts";
-import { recordVote } from "../../shared/vote/record.ts";
+import { contractOwner, recordCall } from "../../shared/vote/record.ts";
 import { kvStateCache, type VoteRound } from "../services/vote-chain.ts";
 import { currentVote } from "../services/vote-active.ts";
 import { etagOf, matchesEtag } from "./feeds.ts";
@@ -591,11 +591,16 @@ export function voteRoutes(deps: Deps) {
     ) throw fail(400, "bad_ballot", "That ballot isn't valid.");
     const owner = await d.chain.ownerOf(tokenId);
     if (!owner) throw fail(404, "no_badge", "No such badge.");
-    const valid = await verifyTypedData({
-      address: owner,
-      ...voteTypedData(d.manifest, tokenId, owner, nonce, ballot),
-      signature,
-    }).catch(() => false);
+    const isContract = contractOwner(await d.chain.codeOf(owner));
+    const valid = await (isContract
+      ? d.chain.verifyContractVote(owner, tokenId, nonce, ballot, signature)
+      : verifyTypedData({
+        address: owner,
+        ...voteTypedData(d.manifest, tokenId, owner, nonce, ballot),
+        signature,
+      })).catch(() =>
+        false
+      );
     if (!valid) throw fail(401, "bad_signature", "The signature doesn't match the badge's owner.");
     // The ballot rules, judged with the pool on-chain now: the contract would refuse it.
     let asks: bigint[] | undefined;
@@ -686,22 +691,22 @@ export function voteRoutes(deps: Deps) {
           "This badge has used its relayed ballots. Use “Send it yourself” to change it again.",
         );
       }
-      const h = await sendNext(kv, d, deps.now(), {
-        fn: "record",
-        args: [[
-          recordVote({
-            tokenId,
-            nonce,
-            ballot: ballot as Hex,
-            signature: signature as Hex,
-            // The proof is about groups only; rounds before the rules have no asks to read.
-            proof: findProof(
-              hexToBytes(ballot as Hex),
-              rulesRound(d.manifest, asks ?? d.manifest.projects.map((p) => BigInt(p.goalUsd))),
-            ) ?? [],
-          }),
-        ]],
-      }).catch((e) => {
+      const h = await sendNext(
+        kv,
+        d,
+        deps.now(),
+        recordCall({
+          tokenId,
+          nonce,
+          ballot: ballot as Hex,
+          signature: signature as Hex,
+          // The proof is about groups only; rounds before the rules have no asks to read.
+          proof: findProof(
+            hexToBytes(ballot as Hex),
+            rulesRound(d.manifest, asks ?? d.manifest.projects.map((p) => BigInt(p.goalUsd))),
+          ) ?? [],
+        }, isContract),
+      ).catch((e) => {
         // The contract enforced a rule this check passed: the pool rose meanwhile (the
         // check uses a replay up to a few seconds old). Say so, not "internal error".
         // The server's clock is a few seconds ahead of the chain's at the opening.

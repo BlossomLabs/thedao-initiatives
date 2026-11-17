@@ -20,7 +20,7 @@ import {
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi";
 import { MAINNET_CHAIN_ID, ROUND, voteChain } from "../../shared/vote/manifest";
 import { checkBallotTx } from "../../shared/vote/receipt";
-import { recordVote } from "../../shared/vote/record";
+import { contractOwner, recordVote } from "../../shared/vote/record";
 
 const SEPOLIA_RPC = (import.meta.env?.VITE_SEPOLIA_RPC_URL as string | undefined) ||
   "https://ethereum-sepolia-rpc.publicnode.com";
@@ -86,6 +86,7 @@ export async function waitResult(
     m: ROUND,
     tx: { to: tx.to, input: tx.input },
     status: receipt.status,
+    logs: receipt.logs,
     blockTimestamp: Number(block.timestamp),
     expect,
   });
@@ -109,6 +110,20 @@ export function useBallotSubmit(tokenId: bigint | null) {
 
   const deps = useMemo<FlowDeps>(() => ({
     ensureChain,
+    isContractOwner: async (owner) =>
+      contractOwner((await voteClient().getCode({ address: owner })) ?? "0x"),
+    sendDirect: (s, proof) => {
+      if (!wallet.config || !wallet.address) throw new Error("Connect your wallet first.");
+      return writeContract(wallet.config, {
+        address: ROUND.contract,
+        abi: SIGNED_BALLOTS_ABI,
+        functionName: "vote",
+        args: [s.tokenId, s.nonce, s.ballot, proof],
+        chainId: ROUND.chainId,
+        account: wallet.address,
+        connector: liveConnector(wallet),
+      });
+    },
     signVote: (typed) => {
       if (!wallet.config || !wallet.address) throw new Error("Connect your wallet first.");
       return signTypedData(wallet.config, {

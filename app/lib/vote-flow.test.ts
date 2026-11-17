@@ -36,6 +36,8 @@ const GAS: Hex = `0x${"99".repeat(32)}`;
 function deps(over: Partial<FlowDeps> = {}) {
   const d: FlowDeps = {
     ensureChain: vi.fn(() => Promise.resolve()),
+    isContractOwner: vi.fn(() => Promise.resolve(false)),
+    sendDirect: vi.fn(() => Promise.resolve(OWN)),
     signVote: vi.fn(() => Promise.resolve(SIG)),
     relay: vi.fn(() => Promise.resolve(HASH)),
     nonceOf: vi.fn(() => Promise.resolve(0n)),
@@ -261,4 +263,33 @@ describe("selfSendBallot", () => {
       note: "You didn't confirm, so nothing was sent.",
     });
   });
+});
+
+it("a contract owner self-sends and retries without an EOA signature", async () => {
+  const d = deps({ isContractOwner: vi.fn(() => Promise.resolve(true)) });
+  const { set } = record();
+  const last = await selfSendBallot(d, m, 7n, VOTER, BALLOT, null, set);
+  expect(d.signVote).not.toHaveBeenCalled();
+  expect(d.sendOwn).not.toHaveBeenCalled();
+  expect(d.sendDirect).toHaveBeenCalledWith({
+    tokenId: 7n,
+    nonce: 1n,
+    ballot: BALLOT,
+    signature: "0x",
+    direct: true,
+  }, PROOF);
+  await retryBallot(d, m, VOTER, last!, set);
+  expect(d.sendDirect).toHaveBeenCalledTimes(2);
+  expect(d.relay).not.toHaveBeenCalled();
+  expect(d.signVote).not.toHaveBeenCalled();
+});
+
+it("a contract owner declining the chain switch never submits the direct vote", async () => {
+  const d = deps({
+    isContractOwner: vi.fn(() => Promise.resolve(true)),
+    ensureChain: vi.fn(() => Promise.reject(new Error("User rejected switch"))),
+  });
+  await selfSendBallot(d, m, 7n, VOTER, BALLOT, null, record().set);
+  expect(d.sendDirect).not.toHaveBeenCalled();
+  expect(d.requestGas).not.toHaveBeenCalled();
 });

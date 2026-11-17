@@ -72,6 +72,7 @@ function fakeChain(chainManifest: VoteManifest = manifest) {
     nonces: new Map<bigint, bigint>(),
     /** Account code by lowercase address ("0xef0100…" = an EIP-7702 delegation). */
     code: new Map<string, Hex>(),
+    contractSignature: null as Hex | null,
     /** Addresses whose wallet code would make _safeMint revert. */
     unmintable: new Set<string>(),
     balances: new Map<string, bigint>(),
@@ -129,6 +130,8 @@ function fakeChain(chainManifest: VoteManifest = manifest) {
   };
   const chain: VoteChain = {
     ownerOf: (n) => Promise.resolve(state.owners.get(n) ?? null),
+    verifyContractVote: (_owner, _id, _nonce, _ballot, sig) =>
+      Promise.resolve(sig === state.contractSignature),
     balanceOf: (a) =>
       Promise.resolve(
         BigInt(
@@ -1993,6 +1996,47 @@ Deno.test("unfunded rounds remain open to public reads, ballots and gas past the
       json: { tokenId: "12" },
     });
     assertEquals(gas.status, 200);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("ERC-1271 owners relay recordFor with the original variable-length signature", async () => {
+  const { h, state } = await setup(real);
+  try {
+    state.owners.set(12n, PLAIN);
+    state.code.set(PLAIN.toLowerCase(), "0x60006000");
+    state.contractSignature = "0x123456";
+    const send = (signature: Hex) =>
+      h.req("/api/vote/ballot", {
+        method: "POST",
+        json: {
+          tokenId: "12",
+          nonce: "1",
+          ballot: BALLOT,
+          signature,
+        },
+      });
+    assertEquals((await send("0x123457")).status, 401);
+    assertEquals(state.sent.length, 0);
+    assertEquals((await send(state.contractSignature)).status, 200);
+    assertEquals(state.sent[0], { fn: "recordFor", args: [12n, 1n, BALLOT, "0x123456", []] });
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("EIP-7702 owners keep the ECDSA record relay path", async () => {
+  const { h, state } = await setup(real);
+  try {
+    state.owners.set(12n, VOTER.address);
+    state.code.set(VOTER.address.toLowerCase(), `0xef0100${"11".repeat(20)}`);
+    const response = await h.req("/api/vote/ballot", {
+      method: "POST",
+      json: await signedBallot(VOTER, 12n, 1n, BALLOT, real),
+    });
+    assertEquals(response.status, 200);
+    assertEquals(state.sent[0].fn, "record");
   } finally {
     h.close();
   }

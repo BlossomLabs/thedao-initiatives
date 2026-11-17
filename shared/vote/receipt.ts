@@ -1,4 +1,4 @@
-import { decodeFunctionData } from "viem";
+import { decodeEventLog, decodeFunctionData, type Hex } from "viem";
 import { SIGNED_BALLOTS_ABI } from "./abi.ts";
 import type { VoteManifest } from "./manifest.ts";
 
@@ -9,10 +9,31 @@ export function checkBallotTx(input: {
   m: VoteManifest;
   tx: { to: string | null; input: `0x${string}` };
   status: "success" | "reverted";
+  logs?: readonly { address: string; data: Hex; topics: readonly Hex[] }[];
   blockTimestamp: number;
   expect: { tokenId: bigint; nonce: bigint; ballot: `0x${string}` };
 }): BallotTxResult {
   const { m, tx, expect } = input;
+  if (input.logs) {
+    if (input.status !== "success") return "reverted";
+    const found = input.logs.some((log) => {
+      if (log.address.toLowerCase() !== m.contract.toLowerCase()) return false;
+      try {
+        const event = decodeEventLog({
+          abi: SIGNED_BALLOTS_ABI,
+          data: log.data,
+          topics: [...log.topics] as [Hex, ...Hex[]],
+          eventName: "BallotRecorded",
+        });
+        return event.args.tokenId === expect.tokenId && event.args.nonce === expect.nonce &&
+          event.args.ballot.toLowerCase() === expect.ballot.toLowerCase();
+      } catch {
+        return false;
+      }
+    });
+    if (!found) return "mismatch";
+    return input.blockTimestamp >= m.closesAt ? "late" : "counted";
+  }
   if (!tx.to || tx.to.toLowerCase() !== m.contract.toLowerCase()) return "mismatch";
   let call;
   try {

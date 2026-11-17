@@ -504,7 +504,12 @@ export default function GiveList(
                       <span className="block truncate text-[14px] text-white">{i.title}</span>
                       <span className="mt-0.5 block truncate text-[12px] text-white/55 tnum">
                         {need !== undefined && `Needs ${usd(need)} · `}
-                        {r.now ? `now in ${tierName(r.now)}` : (
+                        {r.now ? (
+                          // Funded if the vote ended now: green, against "not included" in red.
+                          <span className="text-[#a7e3a5]" data-now-in="">
+                            now in {tierName(r.now)}
+                          </span>
+                        ) : (
                           // Not funded if the vote ended now: red, as the money it misses.
                           <span className="text-[#ff8a88]" data-not-included="">
                             not included

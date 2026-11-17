@@ -625,6 +625,8 @@ it("while open: TheDAO's ballot beside what it takes each initiative to move up"
   expect(ahead).toHaveTextContent("$4k");
   expect(ahead).toHaveTextContent("$4kahead");
   expect(ahead).not.toHaveTextContent("−");
+  // Where it is now, in green against Beta's red "not included" (#116).
+  expect(within(ahead).getByText("now in S-Tier").className).toContain("text-[#a7e3a5]");
   const order = list().getAllByRole("button", { name: /Alpha fuzzing|Beta audits/ });
   expect(order.map((b) => b.textContent?.slice(0, 5))).toEqual(["Alpha", "Beta "]);
   // Only the round's initiatives.

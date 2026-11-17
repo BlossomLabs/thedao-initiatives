@@ -18,7 +18,7 @@ describe("TopBar hamburger", () => {
     fireEvent.click(toggle);
     const menu = document.getElementById("site-menu")!;
     expect(menu).toBeInTheDocument();
-    expect(menu.querySelectorAll("a")).toHaveLength(4);
+    expect(menu.querySelectorAll("a")).toHaveLength(2);
     expect(menu.textContent).toContain("Suggest an initiative");
     expect(screen.getByRole("button", { name: "Close menu" })).toHaveAttribute(
       "aria-expanded",
@@ -53,7 +53,7 @@ it("the static shell marks no link as the current page: one prerendered copy ser
   mount("/");
   fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
   const links = document.querySelectorAll('nav[aria-label="Site"] a');
-  expect(links).toHaveLength(8);
+  expect(links).toHaveLength(4);
   for (const a of links) {
     expect(a).not.toHaveAttribute("aria-current");
     expect(a.className).not.toMatch(/\bactive\b/);

@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import ConfirmPrivateFields from "~/components/admin/ConfirmPrivateFields";
@@ -15,6 +15,8 @@ import { adminFacetCounts, filterAdminRows } from "~/lib/admin-rows";
 import { parseAdminQuery, setQualifier, UNTAGGED } from "~/lib/admin-query";
 import { usd } from "~/lib/format";
 import { listKey, useAdminList } from "./queries";
+import Status from "~/components/ui/Status";
+import { type SummaryProgress, writeSummaries } from "./vote-summaries";
 
 /**
  * Every initiative with the filters and bulk actions. Its rows come from their
@@ -52,11 +54,36 @@ export default function AllInitiatives({ total }: { total: number }) {
   const inReview = all.filter((x) => x.initiative.pendingRevision).length;
   const rowIds = useMemo(() => rows.map((r) => r.initiative.id), [rows]);
   const rowSel = useSelection(rowIds);
+  const [summaries, setSummaries] = useState<SummaryProgress | null>(null);
+  /** Set when the page goes away: no more summary requests. */
+  const gone = useRef(false);
+  useEffect(() => {
+    gone.current = false;
+    return () => {
+      gone.current = true;
+    };
+  }, []);
   const bulk = async (action: string, ids: string[]) => {
     const r = await adminApi<BulkResult>("/api/admin/initiatives/bulk", { json: { ids, action } });
     await qc.invalidateQueries({ queryKey: ["admin"] });
+    if (action === "approve") {
+      // The approved ones get their vote card summary, one request each (#96).
+      const failed = new Set(r.failed.map((f) => f.id));
+      const approved = ids.filter((id) => !failed.has(id));
+      if (approved.length) {
+        void writeSummaries(
+          approved,
+          (id) =>
+            adminApi(`/api/admin/initiatives/${id}/vote-brief`, { json: { missing: true } })
+              .then(() => {}),
+          setSummaries,
+          () => gone.current,
+        ).then(() => qc.invalidateQueries({ queryKey: ["vote-briefs"] }));
+      }
+    }
     return r;
   };
+  const titleOf = (id: string) => all.find((x) => x.initiative.id === id)?.initiative.title ?? id;
   return (
     <section aria-labelledby={id} className="rounded-2xl border border-edge bg-card">
       <div className="flex flex-wrap items-center gap-2.5 px-4 py-3.5">
@@ -127,6 +154,26 @@ export default function AllInitiatives({ total }: { total: number }) {
                   ]}
                   onAct={bulk}
                 />
+                {summaries && (
+                  <Status
+                    kind={summaries.done < summaries.total
+                      ? "wait"
+                      : summaries.failed.length
+                      ? "err"
+                      : "ok"}
+                    className="mx-3 mb-3"
+                  >
+                    {summaries.done < summaries.total
+                      ? `Writing vote card summaries… ${summaries.done} of ${summaries.total}. Keep this page open.`
+                      : `Vote card summaries written: ${
+                        summaries.total - summaries.failed.length
+                      } of ${summaries.total}.`}
+                    {summaries.failed.length > 0 &&
+                      ` Failed: ${
+                        summaries.failed.map((f) => `${titleOf(f.id)} (${f.error})`).join("; ")
+                      }. Use Rewrite summary on the initiative's page.`}
+                  </Status>
+                )}
                 <table className="tbl [&_td]:align-middle">
                   <thead>
                     <tr>

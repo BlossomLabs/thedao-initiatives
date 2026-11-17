@@ -10,6 +10,7 @@ import { categoryOf } from "~/lib/categories";
 import { usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import type { BallotItem } from "./TierBallot";
+import BriefList, { askText, PledgerStack } from "./BriefList";
 
 /** A ballot initiative's card: a little about it, where it goes on this ballot (a tier, the
  * list, or skipped) and a link to its full page. It opens and closes with the browser's own morph
@@ -21,7 +22,7 @@ import type { BallotItem } from "./TierBallot";
 const STEP =
   "grid size-8 place-items-center rounded-lg border border-white/15 text-white/75 transition-colors hover:border-white/35 hover:bg-white/[.06] hover:text-white focus-visible:outline-2 focus-visible:outline-dao-green disabled:pointer-events-none disabled:opacity-30";
 
-/** The description scrolls like the sponsors row, but up and down: no scrollbar, a fade on
+/** The text scrolls like the sponsors row, but up and down: no scrollbar, a fade on
  * each edge that has more, growing in over the first RAMP pixels scrolled from that end
  * (`--edge-t`, `--edge-b`, 0 to 1), and over it an arrow that scrolls when clicked. */
 const FADE = 28;
@@ -97,6 +98,8 @@ export default function InitiativePeek<W extends string>(
     sc.addEventListener("scroll", measure, { passive: true });
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
     ro?.observe(sc);
+    const text = sc.querySelector("[data-peek-text]");
+    if (text) ro?.observe(text);
     return () => {
       ro?.disconnect();
       sc.removeEventListener("scroll", measure);
@@ -172,7 +175,7 @@ export default function InitiativePeek<W extends string>(
         {/* Always the same size: the text scrolls, the choices stay at the bottom. */}
         <div
           data-peek-box=""
-          className="flex h-[min(460px,calc(100dvh-40px))] flex-col overflow-hidden rounded-[18px] border border-edge2 bg-panel-modal shadow-modal"
+          className="flex h-[min(520px,calc(100dvh-40px))] flex-col overflow-hidden rounded-[18px] border border-edge2 bg-panel-modal shadow-modal"
         >
           {/* The header stays put: what it is, its title, where it goes. */}
           <div className="flex flex-none flex-col gap-3 px-5 pb-3 pt-5">
@@ -189,9 +192,10 @@ export default function InitiativePeek<W extends string>(
                 {item.askUsd !== undefined && (
                   <span className="whitespace-nowrap tnum">
                     {cat && "· "}
-                    {usd(item.askUsd)} ask
+                    {askText(item)}
                   </span>
                 )}
+                <PledgerStack item={item} />
               </p>
               <div className="-my-1 -mr-1 flex flex-none items-center gap-1">
                 <button
@@ -316,13 +320,14 @@ export default function InitiativePeek<W extends string>(
               ref={desc}
               // Keyboard users scroll it with the arrow keys once it has the focus.
               tabIndex={scrolls ? 0 : undefined}
-              aria-label={scrolls ? "Description" : undefined}
+              aria-label={scrolls ? "About this initiative" : undefined}
               style={scrolls ? { maskImage: MASK, WebkitMaskImage: MASK } : undefined}
               className="h-full overflow-y-auto overscroll-contain px-5 pb-3 outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-dao-green/60 [&::-webkit-scrollbar]:hidden"
             >
-              {r?.summary && (
-                <p className="m-0 text-[13.5px] leading-relaxed text-white/75">{r.summary}</p>
-              )}
+              {/* Observed: the bullets arrive after the card opens, and its edges move. */}
+              <div data-peek-text="">
+                <BriefList item={item} className="text-[13.5px]" />
+              </div>
             </div>
             {edges.top && <ScrollArrow dir={-1} onClick={() => page(-1)} />}
             {edges.bottom && <ScrollArrow dir={1} onClick={() => page(1)} />}

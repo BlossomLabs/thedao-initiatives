@@ -23,6 +23,7 @@ import Revisions from "~/components/admin/initiative/Revisions";
 import type { Msg, Run } from "~/components/admin/initiative/run";
 import SafeCard, { useSafeDeploy } from "~/components/admin/initiative/SafeCard";
 import SettingsForm from "~/components/admin/initiative/SettingsForm";
+import VoteSummary from "~/components/admin/initiative/VoteSummary";
 import ConfirmPrivateFields from "~/components/admin/ConfirmPrivateFields";
 import CategoriesPanel from "~/components/admin/initiative/CategoriesPanel";
 import { CategoryTag } from "~/components/ui/CategoryTag";
@@ -161,6 +162,14 @@ export default function ManageInitiative() {
           {said("edit")}
 
           <InitiativeText r={r} />
+
+          {r.status === "approved" && (
+            <>
+              <SectionHeading>Vote card summary</SectionHeading>
+              <VoteSummary r={r} run={runAt("summary")} />
+              {said("summary")}
+            </>
+          )}
 
           <SectionHeading>Settings</SectionHeading>
           {r.contact === undefined && (

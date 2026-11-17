@@ -8,6 +8,8 @@ import { usd } from "~/lib/format";
 import { cn } from "~/lib/utils";
 import type { PeekChoice } from "./InitiativePeek";
 import type { BallotItem } from "./TierBallot";
+import BriefList, { PledgerStack } from "./BriefList";
+import { ofGoal } from "../../../shared/vote/brief";
 
 /** How far a finger has to travel sideways for a swipe to the next or previous card. */
 export const SWIPE_PX = 70;
@@ -51,6 +53,8 @@ export default function PhoneCard<W extends string>(
   const now = choices.find((c) => c.value === current);
   const inTier = current.length === 1;
   const r = item.card?.initiative;
+  /** "75% of goal", beside the ask. */
+  const share = item.askUsd === undefined ? "" : ofGoal(item.askUsd, r?.goalUsd ?? 0);
   const cat = r?.categories[0];
 
   // The swipe: how far the card has followed the finger, and which way the next one
@@ -193,9 +197,14 @@ export default function PhoneCard<W extends string>(
             {item.title}
           </h2>
           {item.askUsd !== undefined && (
-            <p className="m-0 mt-2.5 text-[15px] tnum">
-              <b className="font-semibold text-white">{usd(item.askUsd)}</b>{" "}
-              <span className="text-white/60">ask</span>
+            <p className="m-0 mt-2.5 flex flex-wrap items-center gap-x-2 text-[15px] tnum">
+              <span>
+                <b className="font-semibold text-white">{usd(item.askUsd)}</b>{" "}
+                <span className="text-white/60">
+                  ask{share && ` (${share})`}
+                </span>
+              </span>
+              <PledgerStack item={item} size={20} />
               {paid && <span className="ml-2 text-vote">You paid {paid}</span>}
             </p>
           )}
@@ -204,11 +213,7 @@ export default function PhoneCard<W extends string>(
             <p className="m-0 mt-2 text-[13px] leading-snug text-dao-red-pale">{withdrawn}</p>
           )}
           <div className="mt-3.5 min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {r?.summary && (
-              <p className="m-0 select-text text-[14px] leading-relaxed text-white/75">
-                {r.summary}
-              </p>
-            )}
+            <BriefList item={item} className="select-text text-[14px]" />
           </div>
           <div className="mt-3 flex flex-none items-center justify-between gap-2">
             <button

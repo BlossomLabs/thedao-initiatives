@@ -14,6 +14,8 @@ import { ledgerStatus, refreshLedgers, safeApiPausedUntil } from "../services/le
 import { sharedChainState } from "../services/chain-state.ts";
 import { createSnapshotCache, type SnapshotCache } from "../lib/snapshot-cache.ts";
 import { DEFAULT_VOTE, type VoteSettings, voteState } from "../../shared/vote.ts";
+import { buildBriefs } from "../services/vote-briefs.ts";
+import type { VoteBrief } from "../../shared/vote/brief.ts";
 
 /** The vote-eligibility settings, the defaults until an admin saves them. */
 export const voteSettings = async (deps: Pick<Deps, "db">): Promise<VoteSettings> => ({
@@ -272,6 +274,8 @@ export const readBoard = (deps: Deps, cache: BoardCache) =>
 export function boardRoutes(deps: Deps, cache: BoardCache = createBoardCache(deps)) {
   const r = new Hono<Vars>();
   const { config } = deps;
+  /** The briefs read every approved row: each isolate keeps them half a minute. */
+  const briefs: SnapshotCache<Record<string, VoteBrief>> = createSnapshotCache(deps.now, 30);
 
   // The global profile/support UI must not load or poll the funding board.
   r.get("/settings", async (c) => {
@@ -299,6 +303,15 @@ export function boardRoutes(deps: Deps, cache: BoardCache = createBoardCache(dep
     return c.json(
       paused ? { ...board, refreshDue: false, cards: board.cards.map(quietCard) } : board,
     );
+  });
+
+  /** Every approved initiative's vote brief (#96), by slug: the bullets of its card on
+   * /vote. Read only: the model writes them when an admin reviews the text. */
+  r.get("/vote-briefs", async (c) => {
+    const out = await briefs.get(async () =>
+      buildBriefs(deps, (await readBoard(deps, cache)).cards)
+    );
+    return c.json({ briefs: out });
   });
   return r;
 }

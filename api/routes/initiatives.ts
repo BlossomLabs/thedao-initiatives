@@ -24,6 +24,7 @@ import {
 } from "../config.ts";
 import type { Initiative, Pledge, Revision, Session } from "../db/types.ts";
 import { isLive } from "../db/revisions.ts";
+import { rewriteBriefSoon } from "../services/vote-briefs.ts";
 import { isPublished, pickText } from "../db/initiatives.ts";
 import { ledgerStatus, refreshLedger, safeApiPausedUntil } from "../services/ledger.ts";
 import { sharedChainState } from "../services/chain-state.ts";
@@ -289,6 +290,12 @@ export function initiativeRoutes(deps: Deps) {
     };
     const saved = (next: Initiative, revision: Revision, warnings: Finding[]) => {
       const held = !isLive(revision);
+      // An admin's edit that went live on an approved initiative is reviewed text: the
+      // model writes its vote card's bullets again (#96). A held edit waits for its
+      // acceptance.
+      if (!held && revision.source === "admin" && next.status === "approved") {
+        rewriteBriefSoon(deps, next.id);
+      }
       return c.json({
         initiative: held
           ? adminInitiative(next, canReadPrivateFields(next, user, deps.now()))

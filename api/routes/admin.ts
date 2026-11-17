@@ -11,6 +11,8 @@ import { bodyLimit } from "hono/body-limit";
 import type { Deps, Vars } from "../middleware/context.ts";
 import { HttpError } from "../lib/errors.ts";
 import { auditContext, auditedItem, recordAudit } from "../services/audit.ts";
+import { briefFor, rewriteBriefSoon, writeBrief } from "../services/vote-briefs.ts";
+import { AiError } from "../services/ai.ts";
 import { INITIATIVE_CHANGED } from "../lib/initiative-identity.ts";
 import { assertFields, formBody, jsonBody, s } from "../lib/body.ts";
 import { assertRecentAuth, requireAdmin, requireRecentAuth } from "../middleware/auth.ts";
@@ -962,6 +964,8 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
         ? await db.initiatives.review(initiative.id, n, verdict, c.var.user!.address, note)
         : null;
       if (!done) throw new HttpError(409, "That edit is no longer waiting for review.");
+      // Accepted: the live text changed, the vote card's bullets follow.
+      if (verdict === "accept") rewriteBriefSoon(deps, initiative.id);
       return c.json({
         initiative: adminInitiative(
           done.initiative,
@@ -1040,6 +1044,9 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     const action = s((await jsonBody(c, ["action"])).action, 20);
     auditContext(c, { target: initiative.id, detail: action });
     const next = await applyStatus(initiative, action);
+    // Approved: the model writes its vote card's bullets. (A bulk approve leaves that to
+    // the page, one request per initiative.)
+    if (action === "approve") rewriteBriefSoon(deps, next.id);
     return c.json({
       initiative: adminInitiative(next, canReadPrivateFields(next, c.var.user, deps.now())),
     });
@@ -1326,6 +1333,34 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     }
     const r = await pledges.settleSent(initiative.id, pid, hash as Hex | null);
     return c.json({ state: r.state, pledge: r.pledge && pledgeJson(config, r.pledge) });
+  });
+
+  /** An initiative's vote card bullets (#96) as stored, and whether they stand for its
+   * live text. */
+  r.get("/initiatives/:id/vote-brief", async (c) => {
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    return c.json(await briefFor(deps, initiative.id));
+  });
+
+  /** Rewrite summary: the model writes the initiative's vote card bullets now (one call,
+   * ~10 s). The bulk approve's page sends one of these per approved initiative, with
+   * `missing: true`: nothing is written when they already stand for the live text. */
+  r.post("/initiatives/:id/vote-brief", async (c) => {
+    const body = await jsonBody(c, ["missing"]);
+    if (body.missing !== undefined && typeof body.missing !== "boolean") {
+      throw new HttpError(400, "missing must be true or false");
+    }
+    const initiative = await initiativeOr404(c.req.param("id"), true);
+    auditContext(c, { target: initiative.id, detail: body.missing ? "missing" : "rewrite" });
+    try {
+      if (!(body.missing && (await briefFor(deps, initiative.id)).current)) {
+        await writeBrief(deps, initiative.id);
+      }
+    } catch (e) {
+      if (e instanceof AiError) throw new HttpError(503, e.reason);
+      throw e;
+    }
+    return c.json(await briefFor(deps, initiative.id));
   });
 
   r.post("/initiatives/:id/donations/recheck", async (c) => {

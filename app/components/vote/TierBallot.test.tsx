@@ -5,6 +5,12 @@ import { useState } from "react";
 import type { Tier } from "../../../shared/vote/ballot";
 import TierBallot from "./TierBallot";
 
+// The card's bullets (#96) have their own test (BriefList.test.tsx): here none load, and
+// the card shows the summary.
+vi.mock("~/hooks/use-vote-briefs", () => ({
+  useVoteBriefs: () => ({ isPending: false, data: {} }),
+}));
+
 vi.mock("~/hooks/use-initiative", () => ({ usePrefetchInitiative: () => () => {} }));
 afterEach(cleanup);
 

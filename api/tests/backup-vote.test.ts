@@ -4,8 +4,15 @@ import { withRelayer } from "../routes/vote.ts";
 import { ADMIN, harness } from "./app-helpers.ts";
 
 const contract = "0x" + "12".repeat(20);
+const scope = {
+  manifest: { chainId: 1 },
+  chain: { relayerAddress: () => contract as `0x${string}` },
+};
+const leaseKey = ["vote", "relayer", 1, contract];
 const transient: BackupEntry[] = [
-  { key: ["vote", "relayer"], value: "orphan-from-old-backup" },
+  { key: leaseKey, value: "orphan-from-old-backup" },
+  { key: ["vote", "relayer"], value: "old-lease" },
+  { key: ["vote", 1, contract, "pending", "1", "2"], value: { hash: "0xab", at: 100 } },
   { key: ["vote", contract, "pending", "1", "2"], value: { hash: "0xab", at: 100 } },
   { key: ["vote", contract, "pledge-outcome", "initiative", "pledge"], value: { state: "landed" } },
   { key: ["vote", contract, "round"], value: { at: 100 } },
@@ -14,6 +21,8 @@ const transient: BackupEntry[] = [
   { key: ["vote", contract, "corrections1", 1, 2, "0xanchor", "ballots"], value: { at: 100 } },
 ];
 const durable: BackupEntry[] = [
+  { key: ["vote", "relayer-nonce", 1, contract], value: { next: 12, hash: "0xab", at: 100 } },
+  { key: ["vote", 1, contract, "relays", "1"], value: 3 },
   { key: ["vote", "relayer-nonce", 1], value: { next: 12, hash: "0xab", at: 100 } },
   { key: ["vote", contract, "relays", "1"], value: 3 },
   { key: ["vote", contract, "gas", "1"], value: true },
@@ -26,7 +35,7 @@ Deno.test("backup during a relayer send excludes transient vote records and keep
   const h = await harness();
   const started = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
-  const sending = withRelayer(h.kv, () => {
+  const sending = withRelayer(h.kv, scope, () => {
     started.resolve();
     return release.promise;
   });
@@ -69,13 +78,13 @@ Deno.test("merge and replace restore skip historical vote leases and preserve an
       let sending: Promise<void> | undefined;
       try {
         if (active) {
-          sending = withRelayer(h.kv, () => {
+          sending = withRelayer(h.kv, scope, () => {
             started.resolve();
             return release.promise;
           });
           await started.promise;
         }
-        const before = await h.kv.get(["vote", "relayer"]);
+        const before = await h.kv.get(leaseKey);
         const token = await h.mint(ADMIN, true);
         const maintenance = await h.req("/api/admin/maintenance/enter", {
           method: "POST",
@@ -95,14 +104,14 @@ Deno.test("merge and replace restore skip historical vote leases and preserve an
           skipped: transient.length,
           claimsRebuilt: 0,
         });
-        assertEquals(await h.kv.get(["vote", "relayer"]), before);
+        assertEquals(await h.kv.get(leaseKey), before);
         for (const e of transient.slice(1)) assertEquals((await h.kv.get(e.key)).value, null);
         for (const e of durable) assertEquals((await h.kv.get(e.key)).value, e.value);
         release.resolve();
         await sending;
         // No retry loop or expiry wait: the restored database can send immediately.
-        assertEquals(await withRelayer(h.kv, () => Promise.resolve("sent")), "sent");
-        assertEquals((await h.kv.get(["vote", "relayer"])).value, null);
+        assertEquals(await withRelayer(h.kv, scope, () => Promise.resolve("sent")), "sent");
+        assertEquals((await h.kv.get(leaseKey)).value, null);
       } finally {
         release.resolve();
         await sending;

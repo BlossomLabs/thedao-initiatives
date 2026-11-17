@@ -1,3 +1,4 @@
+import { ballotStorageKey } from "../../../shared/vote/keys";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { bytesToHex, type Hex } from "viem";
@@ -63,7 +64,7 @@ const NUDGE = "motion-safe:animate-reason-nudge";
 const ASKS_PENDING = "The asks are being worked out; try again in a minute.";
 const closeTextOf = (m: VoteManifest) => <When at={m.closesAt} />;
 
-const tiersKey = (n: number) => `vote-tiers:${ROUND.contract}:${n}`;
+const tiersKey = (n: number) => ballotStorageKey("tiers", ROUND, n);
 function loadTiers(n: number): Partial<Record<string, Tier>> {
   try {
     return JSON.parse(localStorage.getItem(tiersKey(n)) ?? "{}");
@@ -74,7 +75,7 @@ function loadTiers(n: number): Partial<Record<string, Tier>> {
 
 /** What this voter skipped on badge n's ballot: this browser only, never sent (a skipped
  * initiative is as unranked as the list). */
-const skippedKey = (n: number) => `vote-skipped:${ROUND.contract}:${n}`;
+const skippedKey = (n: number) => ballotStorageKey("skipped", ROUND, n);
 /** No skips saved for badge n in this browser yet (not even an empty list). */
 function skipsUnset(n: number): boolean {
   try {
@@ -276,7 +277,7 @@ export default function VotePage(
     setSkipped(mock ? new Set() : loadSkipped(n));
     // Each visit to a mock starts it over, its prefill too.
     mockPrefilled.current = null;
-  }, [n, mock, mockKind]);
+  }, [n, mock, mockKind, R.chainId, R.contract]);
   const setSkip = (slug: string, skip: boolean) => {
     setSkipped((prev) => {
       if (prev.has(slug) === skip) return prev;

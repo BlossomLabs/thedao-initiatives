@@ -76,7 +76,9 @@ const isFlagKey = (key: BackupKey) => key[0] === "meta" && key[1] === MAINTENANC
  * These particular leases, receipts and derived caches cannot survive losing TTL. */
 function isTransientVoteKey(key: BackupKey): boolean {
   if (key[0] !== "vote") return false;
-  if (key.length === 2 && key[1] === "relayer") return true;
+  if (key[1] === "relayer" && (key.length === 2 || key.length === 4)) return true;
+  // Normalize current chain-scoped round keys for the same transient-record rules.
+  if (typeof key[1] === "number") key = [key[0], ...key.slice(2)];
   if (typeof key[1] !== "string" || !/^0x[0-9a-f]{40}$/i.test(key[1])) return false;
   if (key.length === 5 && (key[2] === "pending" || key[2] === "pledge-outcome")) return true;
   return (key.length === 3 || key[2] === "corrections1") &&

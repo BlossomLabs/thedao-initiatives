@@ -1,3 +1,5 @@
+import { roundId } from "../../shared/vote/keys";
+import { ROUND } from "../../shared/vote/manifest";
 import { useQuery } from "@tanstack/react-query";
 import type { Hex } from "viem";
 import { api, ApiError } from "~/lib/api";
@@ -13,7 +15,7 @@ export type VoteBallots = { at: number; ballots: { tokenId: string; ballot: Hex 
 /** Every badge's latest ballot sent before the close (the vote results poll it). */
 export function useVoteBallots(refetchInterval: number | false = false, enabled = true) {
   return useQuery({
-    queryKey: ["vote-ballots"],
+    queryKey: ["vote-ballots", roundId(ROUND)],
     queryFn: () => api<VoteBallots>("/api/vote/ballots", { passive: true }),
     refetchInterval,
     retry: false,
@@ -151,7 +153,7 @@ export function roundPollInterval(
 /** The round's quiet ending (each tier's state, what counts, what was refused). */
 export function useVoteRound(refetchInterval: number | false = false, enabled = true) {
   return useQuery({
-    queryKey: ["vote-round"],
+    queryKey: ["vote-round", roundId(ROUND)],
     enabled,
     queryFn: () => api<RoundView>("/api/vote/round", { passive: true }),
     refetchInterval: (q) => roundPollInterval(q.state.data, refetchInterval),
@@ -162,7 +164,7 @@ export function useVoteRound(refetchInterval: number | false = false, enabled = 
 /** A review badge's own star ratings, by initiative id (only what it rated). */
 export function useBadgeRatings(tokenId: string | null, enabled = true) {
   return useQuery({
-    queryKey: ["vote-ratings", tokenId],
+    queryKey: ["vote-ratings", roundId(ROUND), tokenId],
     enabled: enabled && tokenId !== null,
     staleTime: 60_000,
     queryFn: async (): Promise<Record<string, number>> => {
@@ -181,7 +183,7 @@ export function useBadgeRatings(tokenId: string | null, enabled = true) {
  * `me` is known. */
 export function useMyBadges(me: string | null, enabled = true) {
   return useQuery({
-    queryKey: ["vote-mine", me?.toLowerCase()],
+    queryKey: ["vote-mine", roundId(ROUND), me?.toLowerCase()],
     enabled: enabled && Boolean(me),
     staleTime: 10 * 60_000,
     queryFn: async (): Promise<number[]> => (await api<{ ids: number[] }>("/api/vote/mine")).ids,

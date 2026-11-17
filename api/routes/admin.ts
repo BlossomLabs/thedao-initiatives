@@ -1,3 +1,4 @@
+import { roundKey } from "../../shared/vote/keys.ts";
 import { voteCorrectionRoutes } from "./vote-corrections.ts";
 import { parseAffiliations } from "../../shared/affiliations.ts";
 import { type Context, Hono } from "hono";
@@ -450,8 +451,8 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
       throw new HttpError(422, "That's a contract wallet: it can't sign ballots here.");
     }
     const kv = db.kv;
-    const nextKey = ["vote", d.manifest.contract.toLowerCase(), "admin-badge-next"];
-    const sent = await withRelayer(kv, async () => {
+    const nextKey = [...roundKey(d.manifest), "admin-badge-next"];
+    const sent = await withRelayer(kv, d, async () => {
       if ((await d.chain.balanceOf(to)) > 0n) {
         throw new HttpError(409, "That address already has a badge.");
       }
@@ -477,7 +478,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     }
     const d = await testRoundNow();
     const value = parseEther(String(eth));
-    const hash = await withRelayer(db.kv, async () => {
+    const hash = await withRelayer(db.kv, d, async () => {
       const left = await d.chain.balance(d.chain.relayerAddress()!);
       if (left < value) throw new HttpError(409, "The relayer doesn't have that much ETH.");
       return await sendNext(db.kv, d, deps.now(), { fn: "drip", to, value });
@@ -500,6 +501,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     if (!token) throw new HttpError(409, "This round has no TestUSD.");
     const hash = await withRelayer(
       db.kv,
+      d,
       () =>
         sendNext(db.kv, d, deps.now(), {
           fn: "testUsd",
@@ -573,7 +575,7 @@ export function adminRoutes(deps: Deps, voteReplay: VoteReplay) {
     const { fields, amount } = await testPledgeBody(c);
     const signed = signedPledgeOf(fields);
     try {
-      const hash = await withRelayer(db.kv, () =>
+      const hash = await withRelayer(db.kv, d, () =>
         sendNext(db.kv, d, deps.now(), {
           fn: "setPledgeBySig",
           args: [

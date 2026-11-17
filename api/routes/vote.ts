@@ -1,3 +1,4 @@
+import { roundId, roundKey } from "../../shared/vote/keys.ts";
 import { Hono } from "hono";
 import { type Hex, hexToBytes, isHex, verifyTypedData } from "viem";
 import type { Deps, Vars } from "../middleware/context.ts";
@@ -88,8 +89,8 @@ type Call = Parameters<VoteRound["chain"]["send"]>[0];
  * the chain is behind), fall back to the chain's count so nothing queues behind
  * the gap. */
 export async function sendNext(kv: Deno.Kv, d: VoteRound, now: number, call: Call): Promise<Hex> {
-  // Per chain: one relayer key serves the real round and an admin's Sepolia test round.
-  const key = ["vote", "relayer-nonce", d.manifest.chainId];
+  // One nonce journal per chain and signing account, shared across its rounds.
+  const key = relayerKey(d, "relayer-nonce");
   const stored = (await kv.get<{ next: number; hash: Hex; at: number }>(key)).value;
   const pending = await d.chain.relayerNonce();
   let nonce = Math.max(stored?.next ?? 0, pending);
@@ -109,8 +110,21 @@ export async function sendNext(kv: Deno.Kv, d: VoteRound, now: number, call: Cal
 
 /** One relayer send at a time across isolates, so account nonces and the
  * one-per-person check never race. */
-export async function withRelayer<T>(kv: Deno.Kv, fn: () => Promise<T>): Promise<T> {
-  const key = ["vote", "relayer"];
+type RelayerScope = {
+  manifest: { chainId: number };
+  chain: { relayerAddress(): Hex | null };
+};
+const relayerKey = (d: RelayerScope, kind: "relayer" | "relayer-nonce") => {
+  const sender = d.chain.relayerAddress();
+  if (!sender) throw new Error("VOTE_RELAYER_KEY is not configured");
+  return ["vote", kind, d.manifest.chainId, sender.toLowerCase()];
+};
+export async function withRelayer<T>(
+  kv: Deno.Kv,
+  d: RelayerScope,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const key = relayerKey(d, "relayer");
   const id = crypto.randomUUID();
   for (let tries = 0; tries < 200; tries++) {
     const cur = await kv.get(key);
@@ -133,7 +147,7 @@ export async function withRelayer<T>(kv: Deno.Kv, fn: () => Promise<T>): Promise
 /** A round's own records (claims in flight, relays, gas, the ballot cache) live
  * under its contract, so a redeployed round starts clean with the same codes.
  * The relayer's nonce and lease are the account's, shared by every round. */
-const round = (d: VoteRound): string[] => ["vote", d.manifest.contract.toLowerCase()];
+const round = (d: VoteRound) => roundKey(d.manifest);
 
 const uint = (v: unknown): bigint | null => {
   if (typeof v !== "string" || !/^\d{1,20}$/.test(v)) return null;
@@ -407,7 +421,7 @@ export function voteRoutes(deps: Deps) {
   const knownNext = async (d: VoteRound, firstOpen: number | null, stored?: KnownNext | null) => {
     if (firstOpen === null) return undefined;
     stored ??= (await deps.db.kv.get<KnownNext>(nextKey(d))).value;
-    const mine = lastNext?.contract === d.manifest.contract ? lastNext : null;
+    const mine = lastNext?.contract === roundId(d.manifest) ? lastNext : null;
     const known = [stored, mine].filter((k): k is KnownNext => k?.firstOpen === firstOpen);
     return known.sort((a, b) => b.at - a.at)[0];
   };
@@ -419,7 +433,7 @@ export function voteRoutes(deps: Deps) {
     st: RoundState,
   ): Promise<Ahead | undefined> => {
     if (!st.liveInputs) return undefined;
-    const contract = d.manifest.contract;
+    const contract = roundId(d.manifest);
     const key = await inputsKey(contract, st.liveInputs, st.firstOpen);
     if (lastNext?.contract === contract && lastNext.key === key) return lastNext;
     const stored = (await deps.db.kv.get<KnownNext>(nextKey(d))).value;
@@ -479,19 +493,19 @@ export function voteRoutes(deps: Deps) {
   /** The final what-ifs judged from `key`, if this isolate or KV has them. */
   const knownFinal = async (d: VoteRound, key: string | undefined) => {
     if (key === undefined) return undefined;
-    if (lastFinal?.contract === d.manifest.contract && lastFinal.key === key) {
+    if (lastFinal?.contract === roundId(d.manifest) && lastFinal.key === key) {
       return lastFinal.final;
     }
     const stored = (await deps.db.kv.get<KnownFinal>(finalStoreKey(d))).value;
     if (stored?.key !== key) return undefined;
-    lastFinal = { ...stored, contract: d.manifest.contract };
+    lastFinal = { ...stored, contract: roundId(d.manifest) };
     return stored.final;
   };
   /** The digest a closed round's final what-ifs are judged from; none while it is open. */
   const finalDigest = (d: VoteRound, st: RoundState) => {
     if (!st.closed) return Promise.resolve(undefined);
     const funded = st.tiers.map((t) => (t.status === "settled" ? t.funded : []));
-    return finalKey(d.manifest.contract, st.settleInputs, funded);
+    return finalKey(roundId(d.manifest), st.settleInputs, funded);
   };
   const finalFor = async (
     d: VoteRound,
@@ -503,7 +517,7 @@ export function voteRoutes(deps: Deps) {
     if (known || searching || triedRecently(key)) return known;
     searching = true;
     finalTried = { key, at: deps.now() };
-    const contract = d.manifest.contract;
+    const contract = roundId(d.manifest);
     // Each initiative's final tier: the settled tier that funded it.
     const finalTier = new Map<number, number>();
     for (const [k, t] of st.tiers.entries()) {
@@ -665,7 +679,7 @@ export function voteRoutes(deps: Deps) {
     const kv = deps.db.kv;
     const pendingKey = [...round(d), "pending", tokenId.toString(), nonce.toString()];
     const countKey = [...round(d), "relays", tokenId.toString()];
-    const hash = await withRelayer(kv, async () => {
+    const hash = await withRelayer(kv, d, async () => {
       const pending = await kv.get<{ hash: Hex; at: number }>(pendingKey);
       if (pending.value) {
         // Still on its way (or landed): the same hash. Reverted, or never seen
@@ -749,7 +763,7 @@ export function voteRoutes(deps: Deps) {
     }
     const kv = deps.db.kv;
     const key = [...round(d), "gas", tokenId.toString()];
-    const hash = await withRelayer(kv, async () => {
+    const hash = await withRelayer(kv, d, async () => {
       // Marked before sending: a failed send never pays twice.
       const marked = await kv.atomic().check({ key, versionstamp: null }).set(key, me).commit();
       if (!marked.ok) throw fail(409, "already_dripped", "This badge already got its gas.");
@@ -785,7 +799,7 @@ export function voteRoutes(deps: Deps) {
     const body = roundJson(st, d.manifest.slugs);
     const fk = await finalDigest(d, st);
     const ik = st.liveInputs
-      ? await inputsKey(d.manifest.contract, st.liveInputs, st.firstOpen)
+      ? await inputsKey(roundId(d.manifest), st.liveInputs, st.firstOpen)
       : undefined;
     return c.json(withAhead(body, await nextFor(d, st), await finalFor(d, st, fk), ik));
   });

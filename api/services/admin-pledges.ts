@@ -1,3 +1,4 @@
+import { roundKey } from "../../shared/vote/keys.ts";
 /**
  * Admin pledges during the real vote. A pledge to an initiative in the round lowers the
  * ask the tally uses, so the chain is the truth: the admin signs an EIP-712 Pledge, the
@@ -144,8 +145,7 @@ export type PendingPledgeJson = {
 
 /** Under the round's own records (kept by backups with the rest of the vote). */
 const pendingPrefix = (d: VoteRound, rfpId: string) => [
-  "vote",
-  d.manifest.contract.toLowerCase(),
+  ...roundKey(d.manifest),
   "pledge-pending",
   rfpId,
 ];
@@ -154,8 +154,7 @@ const pendingKey = (d: VoteRound, rfpId: string, pid: string) => [
   pid,
 ];
 const outcomeKey = (d: VoteRound, rfpId: string, pid: string) => [
-  "vote",
-  d.manifest.contract.toLowerCase(),
+  ...roundKey(d.manifest),
   "pledge-outcome",
   rfpId,
   pid,
@@ -369,7 +368,7 @@ export function adminPledges(deps: Deps) {
     if (owner && owner !== rfpId) throw taken();
     for await (
       const e of kv.list<PendingRecord>({
-        prefix: ["vote", d.manifest.contract.toLowerCase(), "pledge-pending"],
+        prefix: [...roundKey(d.manifest), "pledge-pending"],
       })
     ) {
       if (e.value.pid === pid && e.value.rfpId !== rfpId) throw taken();
@@ -483,7 +482,7 @@ export function adminPledges(deps: Deps) {
     const m = typed.message;
     let hash: Hex;
     try {
-      hash = await withRelayer(kv, async () => {
+      hash = await withRelayer(kv, d, async () => {
         const h = await sendNext(kv, d, now, {
           fn: "setPledgeBySig",
           args: [

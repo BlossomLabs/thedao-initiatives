@@ -793,7 +793,10 @@ for (const failed of [false, true]) {
     }];
     await serve(1500, 1499);
     vi.setSystemTime(1_500_000);
-    localStorage.setItem(`vote-tiers:${M.contract}:1`, JSON.stringify({ alpha: "S", beta: "B" }));
+    localStorage.setItem(
+      `vote-tiers:${M.chainId}:${M.contract.toLowerCase()}:1`,
+      JSON.stringify({ alpha: "S", beta: "B" }),
+    );
     flow.failed = failed;
     mount("editor");
     expect(await screen.findByText(/A-Tier needs a pick before a later tier/)).toBeInTheDocument();

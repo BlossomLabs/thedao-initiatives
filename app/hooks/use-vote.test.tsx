@@ -1,15 +1,16 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { ROUND } from "../../shared/vote/manifest";
 import { roundPollInterval, type RoundView } from "./use-vote";
 import { useBallotSubmit } from "./use-vote-send";
 
-vi.mock("~/context/wallet", () => ({ useWallet: () => ({ address: undefined }) }));
+const wallet = vi.hoisted(() => ({ address: undefined as string | undefined }));
+vi.mock("~/context/wallet", () => ({ useWallet: () => wallet }));
 vi.mock("~/hooks/use-vote-chain", () => ({ useEnsureVoteChain: () => () => Promise.resolve() }));
 
 it("switching to another badge drops the last badge's ballot (no Retry of the wrong one)", () => {
   sessionStorage.setItem(
-    `vote-last:${ROUND.contract}:12`,
+    `vote-last:${ROUND.chainId}:${ROUND.contract.toLowerCase()}:12`,
     JSON.stringify({ tokenId: "12", nonce: "1", ballot: "0x01", signature: "0x02" }),
   );
   const { result, rerender } = renderHook(({ id }) => useBallotSubmit(id), {
@@ -43,4 +44,71 @@ it("a closed round with what-ifs keeps polling until its settlements are confirm
   expect(roundPollInterval(pending, 5000)).toBe(15000);
   const final = { ...pending, tiers: [{ ...pending.tiers[0], confirmed: true }] } as RoundView;
   expect(roundPollInterval(final, 5000)).toBe(false);
+});
+
+it("switching chains at the same contract and badge clears an in-memory last send", () => {
+  const original = ROUND.chainId;
+  try {
+    sessionStorage.setItem(
+      `vote-last:${original}:${ROUND.contract.toLowerCase()}:42`,
+      JSON.stringify({ tokenId: "42", nonce: "1", ballot: "0x01", signature: "0x02" }),
+    );
+    const { result, rerender, unmount } = renderHook(() => useBallotSubmit(42n));
+    expect(result.current.last?.tokenId).toBe(42n);
+    ROUND.chainId = original === 1 ? 11155111 : 1;
+    rerender();
+    expect(result.current.last).toBeNull();
+    expect(result.current.phase.kind).toBe("idle");
+    unmount();
+  } finally {
+    ROUND.chainId = original;
+    sessionStorage.clear();
+  }
+});
+
+it("a send finishing after a chain switch only saves under its original round", async () => {
+  const original = ROUND.chainId;
+  const hash = `0x${"11".repeat(32)}` as const;
+  let resolve!: (hash: `0x${string}`) => void;
+  const landing = {
+    promise: new Promise<`0x${string}`>((r) => {
+      resolve = r;
+    }),
+    resolve: (hash: `0x${string}`) => resolve(hash),
+  };
+  wallet.address = `0x${"22".repeat(20)}`;
+  const { result, rerender, unmount } = renderHook(() => useBallotSubmit(77n));
+  try {
+    const d = result.current.deps;
+    d.ensureChain = vi.fn(async () => {});
+    d.nonceOf = vi.fn(async () => 0n);
+    d.signVote = vi.fn(async () => "0x1234" as const);
+    d.relay = vi.fn(() => landing.promise);
+    d.waitResult = vi.fn(async () => "counted" as const);
+    let pending!: Promise<void>;
+    await act(async () => {
+      pending = result.current.submit(77n, "0x01");
+    });
+    await waitFor(() => expect(d.relay).toHaveBeenCalled());
+    ROUND.chainId = original === 1 ? 11155111 : 1;
+    rerender();
+    await act(async () => {
+      landing.resolve(hash);
+      await pending;
+    });
+    expect(result.current.last).toBeNull();
+    expect(result.current.phase.kind).toBe("idle");
+    expect(sessionStorage.getItem(`vote-last:${ROUND.chainId}:${ROUND.contract.toLowerCase()}:77`))
+      .toBeNull();
+    expect(
+      JSON.parse(
+        sessionStorage.getItem(`vote-last:${original}:${ROUND.contract.toLowerCase()}:77`)!,
+      ),
+    ).toMatchObject({ hash });
+  } finally {
+    unmount();
+    ROUND.chainId = original;
+    wallet.address = undefined;
+    sessionStorage.clear();
+  }
 });

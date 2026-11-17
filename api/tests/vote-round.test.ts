@@ -7,7 +7,7 @@ import { voteTypedData } from "../../shared/vote/typed-data.ts";
 import type { VoteManifest } from "../../shared/vote/manifest.ts";
 import { type TranscriptEvent, transcriptOf } from "../../shared/vote/transcript.ts";
 import type { BallotEvent, VoteChain } from "../services/vote-chain.ts";
-import { cacheSet, errorText, voteSearches } from "../routes/vote.ts";
+import { cacheSet, errorText, sendNext, voteSearches, withRelayer } from "../routes/vote.ts";
 import { chainTally } from "../../shared/vote/chain.ts";
 import { liveInputsFrom, type LiveInputsJson } from "../../shared/vote/live-inputs.ts";
 import type { ChainState } from "../../shared/vote/quiet-ending.ts";
@@ -990,7 +990,9 @@ Deno.test("a closed round serves the final what-ifs", async () => {
   assertEquals(final.next.a, undefined, "S-Tier has a lead, not a next tier");
   assertEquals(final.lead.a !== undefined && BigInt(final.lead.a) >= 1_000_000_000n, true);
   assertEquals(
-    ((await h.kv.get(["vote", qe.contract.toLowerCase(), "final"])).value as { final: Final })
+    ((await h.kv.get(["vote", qe.chainId, qe.contract.toLowerCase(), "final"])).value as {
+      final: Final;
+    })
       .final,
     final,
   );
@@ -2037,6 +2039,55 @@ Deno.test("EIP-7702 owners keep the ECDSA record relay path", async () => {
     });
     assertEquals(response.status, 200);
     assertEquals(state.sent[0].fn, "record");
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("same-address rounds on different chains do not share pending ballots, quotas or gas", async () => {
+  const { h, state } = await setup(real);
+  const otherManifest = { ...manifest, contract: real.contract };
+  const other = fakeChain(otherManifest);
+  try {
+    state.owners.set(12n, VOTER.address);
+    const first = await h.req("/api/vote/ballot", {
+      method: "POST",
+      json: await signedBallot(VOTER, 12n, 1n, BALLOT, real),
+    });
+    assertEquals(first.status, 200);
+    await h.kv.set(["vote", real.chainId, real.contract.toLowerCase(), "relays", "12"], 100);
+    await h.kv.set(["vote", real.chainId, real.contract.toLowerCase(), "gas", "12"], true);
+    other.state.owners.set(12n, VOTER.address);
+    other.state.balances.set(RELAYER, 10n ** 18n);
+    h.deps.vote = { manifest: otherManifest, chain: other.chain, states: other.states };
+    const second = await h.req("/api/vote/ballot", {
+      method: "POST",
+      json: await signedBallot(VOTER, 12n, 1n, BALLOT, otherManifest),
+    });
+    assertEquals(second.status, 200);
+    assertEquals(other.state.sent.length, 1);
+    const gas = await h.req("/api/vote/gas", {
+      method: "POST",
+      token: await h.mint(VOTER.address),
+      json: { tokenId: "12" },
+    });
+    assertEquals(gas.status, 200);
+    assertEquals(state.nonces_used, [0]);
+    assertEquals(other.state.nonces_used, [0, 1]);
+  } finally {
+    h.close();
+  }
+});
+
+Deno.test("relayer nonces and leases are independent across signing accounts", async () => {
+  const { h, chain, state, states } = await setup();
+  try {
+    const d = { manifest, chain, states };
+    const call = { fn: "drip" as const, to: VOTER.address, value: 1n };
+    await withRelayer(h.kv, d, () => sendNext(h.kv, d, NOW, call));
+    chain.relayerAddress = () => OTHER.address;
+    await withRelayer(h.kv, d, () => sendNext(h.kv, d, NOW, call));
+    assertEquals(state.nonces_used, [0, 0]);
   } finally {
     h.close();
   }

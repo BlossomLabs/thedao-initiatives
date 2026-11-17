@@ -1,3 +1,4 @@
+import { roundKey } from "../../shared/vote/keys.ts";
 import {
   BaseError,
   ContractFunctionRevertedError,
@@ -870,7 +871,7 @@ export function createRoundSource(
 
 /** Chain reads that are final, kept in KV under the round's prefix. */
 export function kvStateCache(kv: Deno.Kv, m: VoteManifest): StateCache {
-  const prefix = ["vote", m.chainId, m.contract.toLowerCase(), "chain"];
+  const prefix = [...roundKey(m), "chain"];
   return {
     get: async (key) => (await kv.get([...prefix, key])).value ?? undefined,
     set: async (key, value) => {

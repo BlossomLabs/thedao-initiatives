@@ -1,6 +1,7 @@
+import { ballotStorageKey, roundId } from "../../shared/vote/keys";
 /** Sending a ballot and waiting for mints: the wallet, signing and the chain client.
  * Kept apart from use-vote.ts so the pages that only show the vote never load it. */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { createPublicClient, type Hex, http, type PublicClient } from "viem";
 import { signTypedData, writeContract } from "wagmi/actions";
 import { api, ApiError } from "~/lib/api";
@@ -18,7 +19,7 @@ import {
   submitBallot,
 } from "~/lib/vote-flow";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi";
-import { MAINNET_CHAIN_ID, ROUND, voteChain } from "../../shared/vote/manifest";
+import { MAINNET_CHAIN_ID, ROUND, voteChain, type VoteManifest } from "../../shared/vote/manifest";
 import { checkBallotTx } from "../../shared/vote/receipt";
 import { contractOwner, recordVote } from "../../shared/vote/record";
 
@@ -30,28 +31,28 @@ const WAIT_MS = 3 * 60_000;
 
 let client: { chainId: number; pub: PublicClient } | null = null;
 /** Reads the round's chain from the browser (receipts, nonces, self-send). */
-export const voteClient = (): PublicClient => {
-  if (client?.chainId !== ROUND.chainId) {
+export const voteClient = (m: VoteManifest = ROUND): PublicClient => {
+  if (client?.chainId !== m.chainId) {
     client = {
-      chainId: ROUND.chainId,
+      chainId: m.chainId,
       pub: createPublicClient({
-        chain: voteChain(),
-        transport: http(ROUND.chainId === MAINNET_CHAIN_ID ? MAINNET_RPC : SEPOLIA_RPC),
+        chain: voteChain(m),
+        transport: http(m.chainId === MAINNET_CHAIN_ID ? MAINNET_RPC : SEPOLIA_RPC),
       }) as PublicClient,
     };
   }
   return client.pub;
 };
 
-const read = <T>(functionName: string, args: readonly unknown[]) =>
-  voteClient().readContract({
-    address: ROUND.contract,
+const read = <T>(m: VoteManifest, functionName: string, args: readonly unknown[]) =>
+  voteClient(m).readContract({
+    address: m.contract,
     abi: SIGNED_BALLOTS_ABI,
     functionName: functionName as never,
     args: args as never,
   }) as Promise<T>;
 
-const storeKey = (tokenId: bigint) => `vote-last:${ROUND.contract}:${tokenId}`;
+const storeKey = (tokenId: bigint, m: VoteManifest = ROUND) => ballotStorageKey("last", m, tokenId);
 function loadLast(tokenId: bigint): Signed | null {
   try {
     const raw = sessionStorage.getItem(storeKey(tokenId));
@@ -62,11 +63,11 @@ function loadLast(tokenId: bigint): Signed | null {
     return null;
   }
 }
-function saveLast(s: Signed | null) {
+function saveLast(s: Signed | null, m: VoteManifest) {
   if (!s) return;
   try {
     sessionStorage.setItem(
-      storeKey(s.tokenId),
+      storeKey(s.tokenId, m),
       JSON.stringify({ ...s, tokenId: s.tokenId.toString(), nonce: s.nonce.toString() }),
     );
   } catch { /* storage unavailable */ }
@@ -75,15 +76,16 @@ function saveLast(s: Signed | null) {
 export async function waitResult(
   hash: Hex,
   expect: { tokenId: bigint; nonce: bigint; ballot: Hex },
+  m: VoteManifest = ROUND,
 ) {
-  const pub = voteClient();
+  const pub = voteClient(m);
   const receipt = await pub.waitForTransactionReceipt({ hash, timeout: WAIT_MS });
   const [tx, block] = await Promise.all([
     pub.getTransaction({ hash }),
     pub.getBlock({ blockNumber: receipt.blockNumber }),
   ]);
   return checkBallotTx({
-    m: ROUND,
+    m,
     tx: { to: tx.to, input: tx.input },
     status: receipt.status,
     logs: receipt.logs,
@@ -101,30 +103,48 @@ export function useBallotSubmit(tokenId: bigint | null) {
     () => (tokenId === null ? null : loadLast(tokenId)),
   );
   // Another badge (the picker): its own last ballot and a fresh status, never this one's.
-  const [forToken, setForToken] = useState(tokenId);
-  if (forToken !== tokenId) {
-    setForToken(tokenId);
+  const identity = `${roundId(ROUND)}:${tokenId}`;
+  const [forToken, setForToken] = useState(identity);
+  if (forToken !== identity) {
+    setForToken(identity);
     setLast(tokenId === null ? null : loadLast(tokenId));
     setPhase({ kind: "idle" });
   }
 
+  const active = useRef(identity);
+  active.current = identity;
+  const m = useMemo(() => ({ ...ROUND }), [identity, ROUND]);
+  const setCurrentPhase = useCallback((p: BallotPhase) => {
+    if (active.current === identity) setPhase(p);
+  }, [identity]);
+  const assertCurrent = useCallback(() => {
+    if (active.current !== identity) {
+      throw new Error("The voting round or badge changed. Reopen your ballot before sending.");
+    }
+  }, [identity]);
   const deps = useMemo<FlowDeps>(() => ({
-    ensureChain,
+    ensureChain: async () => {
+      assertCurrent();
+      await ensureChain();
+      assertCurrent();
+    },
     isContractOwner: async (owner) =>
-      contractOwner((await voteClient().getCode({ address: owner })) ?? "0x"),
+      contractOwner((await voteClient(m).getCode({ address: owner })) ?? "0x"),
     sendDirect: (s, proof) => {
+      assertCurrent();
       if (!wallet.config || !wallet.address) throw new Error("Connect your wallet first.");
       return writeContract(wallet.config, {
-        address: ROUND.contract,
+        address: m.contract,
         abi: SIGNED_BALLOTS_ABI,
         functionName: "vote",
         args: [s.tokenId, s.nonce, s.ballot, proof],
-        chainId: ROUND.chainId,
+        chainId: m.chainId,
         account: wallet.address,
         connector: liveConnector(wallet),
       });
     },
     signVote: (typed) => {
+      assertCurrent();
       if (!wallet.config || !wallet.address) throw new Error("Connect your wallet first.");
       return signTypedData(wallet.config, {
         ...typed,
@@ -133,6 +153,7 @@ export function useBallotSubmit(tokenId: bigint | null) {
       } as never);
     },
     relay: async (body) => {
+      assertCurrent();
       try {
         const r = await api<{ hash: Hex }>("/api/vote/ballot", {
           method: "POST",
@@ -151,58 +172,61 @@ export function useBallotSubmit(tokenId: bigint | null) {
         throw e;
       }
     },
-    nonceOf: async (id) => BigInt(await read<bigint>("nonceOf", [id])),
-    ballotHashOf: (id) => read<Hex>("ballotHashOf", [id]),
-    waitResult,
-    requestGas: async (id) =>
-      (await api<{ hash: Hex | null }>("/api/vote/gas", {
+    nonceOf: async (id) => BigInt(await read<bigint>(m, "nonceOf", [id])),
+    ballotHashOf: (id) => read<Hex>(m, "ballotHashOf", [id]),
+    waitResult: (hash, expect) => waitResult(hash, expect, m),
+    requestGas: async (id) => {
+      assertCurrent();
+      return (await api<{ hash: Hex | null }>("/api/vote/gas", {
         method: "POST",
         json: { tokenId: id.toString() },
-      })).hash,
+      })).hash;
+    },
     waitTx: async (hash) => {
-      await voteClient().waitForTransactionReceipt({ hash, timeout: WAIT_MS });
+      await voteClient(m).waitForTransactionReceipt({ hash, timeout: WAIT_MS });
     },
     sendOwn: (s, proof) => {
+      assertCurrent();
       if (!wallet.config || !wallet.address) throw new Error("Connect your wallet first.");
       return writeContract(wallet.config, {
-        address: ROUND.contract,
+        address: m.contract,
         abi: SIGNED_BALLOTS_ABI,
         // record(): plain ECDSA, so EIP-7702 wallets work too (see recordVote).
         functionName: "record",
         args: [[recordVote({ ...s, proof })]],
-        chainId: ROUND.chainId,
+        chainId: m.chainId,
         account: wallet.address,
         connector: liveConnector(wallet),
       } as never);
     },
-  }), [ensureChain, wallet]);
+  }), [ensureChain, wallet, m, assertCurrent]);
 
   const keep = useCallback((s: Signed | null) => {
     if (!s) return;
-    setLast(s);
-    saveLast(s);
-  }, []);
+    if (active.current === identity) setLast(s);
+    saveLast(s, m);
+  }, [identity, m]);
 
   const submit = useCallback(async (id: bigint, ballot: Hex) => {
     if (!wallet.address) return;
-    keep(await submitBallot(deps, ROUND, id, wallet.address, ballot, setPhase));
-  }, [deps, keep, wallet.address]);
+    keep(await submitBallot(deps, m, id, wallet.address, ballot, setCurrentPhase));
+  }, [deps, keep, wallet.address, m, setCurrentPhase]);
 
   const retry = useCallback(async () => {
     if (!last || !wallet.address) return;
-    keep(await retryBallot(deps, ROUND, wallet.address, last, setPhase));
-  }, [deps, keep, last, wallet.address]);
+    keep(await retryBallot(deps, m, wallet.address, last, setCurrentPhase));
+  }, [deps, keep, last, wallet.address, m, setCurrentPhase]);
 
   /** A hash the voter sent themselves goes through the same check. */
   const track = useCallback(async (hash: Hex, signed: Signed) => {
     keep({ ...signed, hash });
-    await check(deps, signed, hash, setPhase);
-  }, [deps, keep]);
+    await check(deps, signed, hash, setCurrentPhase);
+  }, [deps, keep, setCurrentPhase]);
 
   const selfSend = useCallback(async (id: bigint, ballot: Hex) => {
     if (!wallet.address) return;
-    keep(await selfSendBallot(deps, ROUND, id, wallet.address, ballot, last, setPhase));
-  }, [deps, keep, last, wallet.address]);
+    keep(await selfSendBallot(deps, m, id, wallet.address, ballot, last, setCurrentPhase));
+  }, [deps, keep, last, wallet.address, m, setCurrentPhase]);
 
   return { phase, submit, retry, selfSend, track, last, deps };
 }

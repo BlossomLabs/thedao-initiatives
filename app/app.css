@@ -28,6 +28,7 @@
   --animate-tier-land: tier-land 0.7s ease-out both;
   --animate-grade-bump: grade-bump 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
   --animate-chip-land: chip-land 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+  --animate-tool-pulse: tool-pulse 0.9s ease-out;
   /* The vote results: a tier settling while the page is open. Its row flashes gold and
      its grade bumps (grade-bump); each initiative it funds turns gold one after another,
      glowing twice (box-shadow, so it stays with reduced motion) while a sheen crosses it. */
@@ -211,6 +212,16 @@
     }
     80% {
       translate: -2px;
+    }
+  }
+  @keyframes tool-pulse {
+    0% {
+      border-color: rgba(92, 183, 90, 0.9);
+      background-color: rgba(92, 183, 90, 0.25);
+      box-shadow: 0 0 0 0 rgba(92, 183, 90, 0.55);
+    }
+    100% {
+      box-shadow: 0 0 0 7px rgba(92, 183, 90, 0);
     }
   }
   @keyframes chip-land {

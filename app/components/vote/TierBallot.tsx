@@ -8,6 +8,7 @@ import {
   EyeOff,
   GripVertical,
   Maximize2,
+  RotateCcw,
   Undo2,
 } from "lucide-react";
 import CategoryDot from "~/components/ui/CategoryDot";
@@ -74,6 +75,18 @@ type Where = Tier | "unplaced" | "skipped";
  * screen's bottom when it is taller than the screen. */
 const PIN_TOP = 86;
 const PIN_GAP = 16;
+/** A move Undo can take back: one initiative's, or the whole ballot's (Clear, Restore
+ * sent ballot), with what was there before. */
+type Move = { kind: "place"; slug: string; from: Where } | {
+  kind: "replace";
+  tiers: Partial<Record<string, Tier>>;
+  /** Which whole-ballot change: Clear, or Restore sent ballot. */
+  what: "clear" | "restore";
+};
+/** Undo, Clear and Restore sent ballot: small bordered buttons, bright enough to
+ * find, pulsing green once on each change to the ballot (`tool-pulse`, app.css). */
+const TOOL =
+  "inline-flex flex-none items-center gap-1 rounded-md border border-white/25 bg-white/[.06] px-2 py-1 text-white/90 transition-colors hover:border-white/45 hover:bg-white/[.12] hover:text-white disabled:pointer-events-none disabled:opacity-40 motion-safe:animate-tool-pulse";
 
 const UNRANKED = "Not ranked yet";
 /** An initiative an admin withdrew from the vote. */
@@ -271,8 +284,10 @@ export default function TierBallot(
       globalThis.removeEventListener("resize", fit);
     };
   }, []);
-  /** What Clear ballot took away, for its Undo, while the offer lasts. */
-  const [cleared, setCleared] = useState<Partial<Record<string, Tier>>>();
+  /** The moves made here, last one last, for Undo (#125). */
+  const [history, setHistory] = useState<Move[]>([]);
+  /** Counts the changes to the ballot: the tools under the tiers pulse on each one. */
+  const [changes, setChanges] = useState(0);
   /** The settled tier whose note is open: by a hover, or by a tap (phones can't hover). */
   const [noteOpen, setNoteOpen] = useState<Tier>();
   useEffect(() => {
@@ -286,20 +301,10 @@ export default function TierBallot(
     document.addEventListener("pointerdown", away);
     return () => document.removeEventListener("pointerdown", away);
   }, [noteOpen]);
-  useEffect(() => {
-    if (!cleared) return;
-    const t = setTimeout(() => setCleared(undefined), 8000);
-    return () => clearTimeout(t);
-  }, [cleared]);
+  // A tier settling freezes what the earlier moves touched: they can't be undone.
+  const lockedKey = [...(locked ?? [])].sort().join();
+  useEffect(() => setHistory([]), [lockedKey]);
   const placedCount = Object.keys(tiers).length;
-  const clearAll = () => {
-    if (!onReplace || placedCount === 0) return;
-    done();
-    setCleared({ ...tiers });
-    // A settled tier stays as it is.
-    onReplace(Object.fromEntries(Object.entries(tiers).filter(([, t]) => t && isLocked(t))));
-    setAnnounce("Ballot cleared. Every initiative is back in the list.");
-  };
   /** The ballot on screen isn't the one sent: offer to go back to it. */
   const changed = Boolean(sent) &&
     (Object.keys(sent!).length !== placedCount ||
@@ -307,15 +312,44 @@ export default function TierBallot(
   const restoreSent = () => {
     if (!onReplace || !sent) return;
     done();
-    setCleared(undefined);
+    setHistory((h) => [...h, { kind: "replace", tiers: { ...tiers }, what: "restore" }]);
+    setChanges((n) => n + 1);
     onReplace({ ...sent });
     setAnnounce("Back to the ballot you sent.");
   };
-  const undoClear = () => {
-    if (!onReplace || !cleared) return;
-    onReplace(cleared);
-    setCleared(undefined);
-    setAnnounce("Ballot restored.");
+  /** Whatever sits in an open tier: what Clear takes off (a settled tier stays). */
+  const clearable = () => Object.values(tiers).some((t) => t && !isLocked(t));
+  const clearAll = () => {
+    if (!onReplace || !clearable()) return;
+    done();
+    setHistory((h) => [...h, { kind: "replace", tiers: { ...tiers }, what: "clear" }]);
+    setChanges((n) => n + 1);
+    onReplace(Object.fromEntries(Object.entries(tiers).filter(([, t]) => t && isLocked(t))));
+    setAnnounce("Ballot cleared. Every initiative is back in the list.");
+  };
+  const undoLast = () => {
+    const last = history.at(-1);
+    if (!last) return;
+    done();
+    setHistory((h) => h.slice(0, -1));
+    if (last.kind === "place") {
+      move(last.slug, last.from);
+      setAnnounce(`Undone: ${titleOf(last.slug)} is back in ${labelOf(last.from)}.`);
+      return;
+    }
+    if (!onReplace) return;
+    // A settled tier stays as it is now.
+    const keep = (t: Tier | undefined) => Boolean(t && isLocked(t));
+    onReplace({
+      ...Object.fromEntries(Object.entries(last.tiers).filter(([, t]) => !keep(t))),
+      ...Object.fromEntries(Object.entries(tiers).filter(([, t]) => keep(t))),
+    });
+    setChanges((n) => n + 1);
+    setAnnounce(
+      last.what === "clear"
+        ? "Undone: your ballot is back as it was before you cleared it."
+        : "Undone: your ballot is as it was before you restored the sent one.",
+    );
   };
   /** The last drop, for its landing animation; `n` restarts it on a repeat drop. */
   const [landed, setLanded] = useState<{ slug: string; to: Where; n: number }>();
@@ -348,11 +382,16 @@ export default function TierBallot(
 
   const place = (slug: string, dest: Where | undefined) => {
     done();
-    if (!dest || where(slug) === dest) return;
     const from = where(slug);
-    if (isLocked(from) || isLocked(dest)) return;
+    if (move(slug, dest)) setHistory((h) => [...h, { kind: "place", slug, from }]);
+  };
+  /** Moves an initiative, if it can go there; true when it moved. */
+  const move = (slug: string, dest: Where | undefined): boolean => {
+    if (!dest || where(slug) === dest) return false;
+    const from = where(slug);
+    if (isLocked(from) || isLocked(dest)) return false;
     // Withdrawn: out of a tier, or skipped, but into none.
-    if (isOut(slug) && isTier(dest)) return;
+    if (isOut(slug) && isTier(dest)) return false;
     if (dest === "skipped") {
       if (isTier(from)) onChange(slug, undefined);
       onSkip?.(slug, true);
@@ -361,7 +400,9 @@ export default function TierBallot(
       onChange(slug, dest === "unplaced" ? undefined : dest);
     }
     setLanded((l) => ({ slug, to: dest, n: (l?.n ?? 0) + 1 }));
+    setChanges((n) => n + 1);
     setAnnounce(`${titleOf(slug)} moved to ${labelOf(dest)}.`);
+    return true;
   };
 
   // While a drag is on: follow the pointer, keep the page from scrolling under a
@@ -985,51 +1026,52 @@ export default function TierBallot(
         )}
       </div>
     );
-  /** Clear ballot (and its Undo), Restore sent ballot. */
+  const canUndo = history.length > 0 && !disabled;
+  const canRestore = Boolean(onReplace) && changed && !disabled;
+  const canClear = Boolean(onReplace) && clearable() && !disabled;
+  /** Undo, Clear and (a sent ballot changed since) Restore sent ballot: buttons, pulsing
+   * on each change (#125). */
   const ballotTools = (
     <>
-      {cleared
-        ? (
-          <>
-            <span className="min-w-0 flex-1 truncate text-white/60">Ballot cleared.</span>
-            <button
-              type="button"
-              onClick={undoClear}
-              className="rounded-md border border-white/20 px-2 py-1 text-white/75 hover:bg-white/10"
-            >
-              Undo
-            </button>
-          </>
-        )
-        : (
-          <>
-            <span className="min-w-0 flex-1 truncate px-1 text-white/45">
-              Initiatives in the same tier are ranked equally.
-            </span>
-            {onReplace && changed && !disabled && (
-              <button
-                type="button"
-                disabled={Boolean(drag)}
-                onClick={restoreSent}
-                className="inline-flex flex-none items-center gap-1 rounded-md px-1.5 py-1 text-white/50 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
-              >
-                <Undo2 className="size-3.5" aria-hidden="true" />
-                Restore sent ballot
-              </button>
-            )}
-            {onReplace && placedCount > 0 && !disabled && (
-              <button
-                type="button"
-                disabled={Boolean(drag)}
-                onClick={clearAll}
-                className="inline-flex flex-none items-center gap-1 rounded-md px-1.5 py-1 text-white/50 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
-              >
-                <Eraser className="size-3.5" aria-hidden="true" />
-                Clear ballot
-              </button>
-            )}
-          </>
-        )}
+      <span className="min-w-0 flex-1 truncate px-1 text-white/45">
+        Initiatives in the same tier are ranked equally.
+      </span>
+      {canRestore && (
+        <button
+          key={`restore-${changes}`}
+          type="button"
+          disabled={Boolean(drag)}
+          onClick={restoreSent}
+          className={TOOL}
+        >
+          <RotateCcw className="size-3.5" aria-hidden="true" />
+          Restore sent ballot
+        </button>
+      )}
+      {canUndo && (
+        <button
+          key={`undo-${changes}`}
+          type="button"
+          disabled={Boolean(drag)}
+          onClick={undoLast}
+          className={TOOL}
+        >
+          <Undo2 className="size-3.5" aria-hidden="true" />
+          Undo
+        </button>
+      )}
+      {canClear && (
+        <button
+          key={`clear-${changes}`}
+          type="button"
+          disabled={Boolean(drag)}
+          onClick={clearAll}
+          className={TOOL}
+        >
+          <Eraser className="size-3.5" aria-hidden="true" />
+          Clear
+        </button>
+      )}
     </>
   );
 
@@ -1206,8 +1248,7 @@ export default function TierBallot(
                 className={cn(
                   "mt-1.5 flex items-center justify-end gap-2 text-[12px] sm:mt-2 sm:text-[12.5px]",
                   // On a phone the pinned strip stays short: the row only when it can clear.
-                  !(onReplace && (cleared || ((placedCount > 0 || changed) && !disabled))) &&
-                    "max-sm:hidden",
+                  !(canUndo || canRestore || canClear) && "max-sm:hidden",
                 )}
               >
                 {ballotTools}

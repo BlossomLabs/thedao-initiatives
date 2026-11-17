@@ -126,10 +126,69 @@ it("an initiative in a settled tier opens its card, but nothing in it moves it",
   expect(onChange).not.toHaveBeenCalled();
 });
 
-it("Clear ballot keeps a settled tier", () => {
+/** A ballot that keeps its own tiers, as the vote page does. */
+function OwnBallot(
+  { start, sent }: { start: Partial<Record<string, Tier>>; sent?: Partial<Record<string, Tier>> },
+) {
+  const [tiers, setTiers] = useState(start);
+  return (
+    <TierBallot
+      items={items}
+      tiers={tiers}
+      disabled={false}
+      sent={sent}
+      onChange={(slug, t) =>
+        setTiers((prev) => {
+          const next = { ...prev, [slug]: t };
+          if (!t) delete next[slug];
+          return next;
+        })}
+      onReplace={setTiers}
+    />
+  );
+}
+const tierOf = (name: string) => screen.getByRole("list", { name });
+
+it("Undo takes back each move, last one first, then goes away (#125)", async () => {
+  inRouter(<OwnBallot start={{ alpha: "S", beta: "A" }} />);
+  expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "BETA" }));
+  const card = await screen.findByRole("dialog", { name: "BETA" });
+  await pickIn(card, "B-Tier, Nice to have");
+  await pickIn(card, "S-Tier, Must fund");
+  expect(within(tierOf("Must fund")).getByText("BETA")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(within(tierOf("Nice to have")).getByText("BETA")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(within(tierOf("Should fund")).getByText("BETA")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+});
+
+it("Clear keeps a settled tier, and Undo brings the rest back", () => {
   const { onReplace } = show({ alpha: "S", beta: "A" });
-  fireEvent.click(screen.getByRole("button", { name: /clear ballot/i }));
+  fireEvent.click(screen.getByRole("button", { name: "Clear" }));
   expect(onReplace).toHaveBeenCalledWith({ alpha: "S" });
+});
+
+it("Clear, then Undo, puts the ballot back", () => {
+  inRouter(<OwnBallot start={{ alpha: "S", beta: "A" }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+  // An empty tier has no list of chips.
+  expect(screen.queryByRole("list", { name: "Should fund" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(within(tierOf("Should fund")).getByText("BETA")).toBeInTheDocument();
+  expect(within(tierOf("Must fund")).getByText("ALPHA")).toBeInTheDocument();
+});
+
+it("Undo takes back Restore sent ballot", () => {
+  inRouter(<OwnBallot start={{ alpha: "S", beta: "A" }} sent={{ alpha: "A" }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Restore sent ballot" }));
+  expect(screen.queryByRole("button", { name: "Restore sent ballot" })).toBeNull();
+  expect(within(tierOf("Should fund")).getByText("ALPHA")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  expect(within(tierOf("Must fund")).getByText("ALPHA")).toBeInTheDocument();
+  expect(within(tierOf("Should fund")).getByText("BETA")).toBeInTheDocument();
 });
 
 it("a settled chip says what this badge paid for it", () => {
@@ -214,12 +273,12 @@ it("a settled A-Tier with picks that weren't funded has its own note", async () 
   ).toBeInTheDocument();
 });
 
-it("the Clear ballot row says that a tier's initiatives are equal, even with nothing placed", () => {
+it("the tools row says that a tier's initiatives are equal, even with nothing placed", () => {
   render(
     <TierBallot items={items} tiers={{}} disabled={false} onChange={vi.fn()} onReplace={vi.fn()} />,
   );
   expect(screen.getByText("Initiatives in the same tier are ranked equally.")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /clear ballot/i })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
 });
 
 it("a tap on a chip opens its card; a choice there moves it, Details opens the page", async () => {

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, ApiError } from "~/lib/api";
-import { sendTransaction, signMessage, switchChain } from "wagmi/actions";
+import { getBalance, readContract, sendTransaction, signMessage, switchChain } from "wagmi/actions";
 import { TERMS } from "~/data/terms";
 import { useDonation } from "./useDonation";
 import { SupportPanel } from "~/components/layout/SupportWidget";
@@ -24,7 +24,14 @@ vi.mock("~/context/wallet", () => ({
   // The page's snapshot lists no connectors until the island is attached.
   useWallet: () => ({ ...walletState, connectors: [], connect: island.connect }),
   useWalletStore: () => ({
-    load: () => Promise.resolve({ config: { connectors: island.connectors } }),
+    load: () =>
+      Promise.resolve({
+        config: { connectors: island.connectors },
+        getConnection: () => ({
+          address: walletState.address,
+          status: walletState.isConnected ? "connected" : "disconnected",
+        }),
+      }),
   }),
 }));
 vi.mock("./Celebration", () => ({ confettiBurst: vi.fn() }));
@@ -37,7 +44,9 @@ beforeEach(() => {
   vi.mocked(api).mockReset();
   vi.mocked(signMessage).mockReset();
   vi.mocked(sendTransaction).mockReset();
-  vi.mocked(switchChain).mockResolvedValue({ id: 1 } as never);
+  vi.mocked(switchChain).mockReset().mockResolvedValue({ id: 1 } as never);
+  vi.mocked(readContract).mockReset().mockResolvedValue(1_000_000_000n);
+  vi.mocked(getBalance).mockReset().mockResolvedValue({ value: 10n ** 18n } as never);
   sessionStorage.clear();
   walletState.address = undefined;
   walletState.isConnected = false;
@@ -117,7 +126,7 @@ it("records agreement before sending and never asks for a terms signature", asyn
   );
   vi.mocked(sendTransaction).mockResolvedValue(TX as `0x${string}`);
   const { result } = renderHook(() => useDonation(args));
-  await act(() => result.current.donate("USDC", "5", {}));
+  await act(() => result.current.donate("USDC", "5"));
   expect(api).toHaveBeenNthCalledWith(1, "/api/donate/accept", {
     json: {
       initiativeId: args.initiativeId,
@@ -148,10 +157,10 @@ it("does not send if acceptance cannot be recorded or the checkbox is unchecked"
   const { result, rerender } = renderHook(({ accepted }) => useDonation({ ...args, accepted }), {
     initialProps: { accepted: false },
   });
-  await act(() => result.current.donate("USDC", "5", {}));
+  await act(() => result.current.donate("USDC", "5"));
   expect(api).not.toHaveBeenCalled();
   rerender({ accepted: true });
-  await act(() => result.current.donate("USDC", "5", {}));
+  await act(() => result.current.donate("USDC", "5"));
   expect(sendTransaction).not.toHaveBeenCalled();
   expect(signMessage).not.toHaveBeenCalled();
   expect(result.current.status?.kind).toBe("err");
@@ -263,14 +272,237 @@ it("does not offer a receipt link when Support is not configured", async () => {
 it("connects through the island's wallets when the wallet stack is still on its way", async () => {
   const connector = { id: "io.metamask", uid: "1" };
   island.connectors = [connector];
-  island.connect.mockResolvedValue({ accounts: [ADDRESS], chainId: 1 });
+  island.connect.mockImplementation(() => {
+    walletState.address = ADDRESS;
+    walletState.isConnected = true;
+    return Promise.resolve({ accounts: [ADDRESS], chainId: 1 });
+  });
   vi.mocked(api).mockResolvedValueOnce({ attemptId: ID, recordedAt: 1 }).mockResolvedValueOnce(
     confirmed,
   );
   vi.mocked(sendTransaction).mockResolvedValue(TX as `0x${string}`);
   const { result } = renderHook(() => useDonation(args));
-  await act(() => result.current.donate("USDC", "5", {}));
+  await act(() => result.current.donate("USDC", "5"));
   expect(island.connect).toHaveBeenCalledWith({ connector, chainId: 1 });
+  expect(readContract).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      address: TOKEN,
+      args: [ADDRESS],
+      chainId: 1,
+    }),
+  );
   expect(result.current.status?.kind).toBe("ok");
+  expect(sendTransaction).toHaveBeenCalledTimes(1);
+});
+
+it("reads the funded mainnet balance again before donating when the displayed balance is old", async () => {
+  walletState.address = ADDRESS;
+  walletState.isConnected = true;
+  vi.mocked(readContract).mockResolvedValueOnce(1n).mockResolvedValueOnce(253_181_000n);
+  vi.mocked(api).mockResolvedValueOnce({ attemptId: ID, recordedAt: 1 }).mockResolvedValueOnce(
+    confirmed,
+  );
+  vi.mocked(sendTransaction).mockResolvedValue(TX as `0x${string}`);
+  const { result } = renderHook(() => useDonation(args));
+  expect(await result.current.loadBalances()).toEqual({ USDC: 0.000001 });
+
+  await act(() => result.current.donate("USDC", "250"));
+
+  expect(readContract).toHaveBeenCalledTimes(2);
+  expect(readContract).toHaveBeenLastCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      address: TOKEN,
+      functionName: "balanceOf",
+      args: [ADDRESS],
+      chainId: 1,
+      blockTag: "latest",
+    }),
+  );
+  expect(sendTransaction).toHaveBeenCalledTimes(1);
+  expect(result.current.status?.kind).toBe("ok");
+});
+
+it.each([
+  [0n, "0"],
+  [1n, "0.000001"],
+  [249_999_999n, "249.999999"],
+])(
+  "rejects a fresh insufficient balance of %s base units and displays its exact quantity",
+  async (raw, held) => {
+    walletState.address = ADDRESS;
+    walletState.isConnected = true;
+    const { result } = renderHook(() => useDonation(args));
+    expect(await result.current.loadBalances()).toEqual({ USDC: 1000 });
+    vi.mocked(readContract).mockResolvedValueOnce(raw);
+
+    let used: boolean | undefined;
+    await act(async () => {
+      used = await result.current.donate("USDC", "250");
+    });
+
+    expect(used).toBe(false);
+    expect(result.current.status).toEqual({
+      kind: "err",
+      text: `Not enough USDC on Ethereum mainnet: you hold ${held}, this donation needs 250.`,
+    });
+    expect(result.current.busy).toBeNull();
+    expect(api).not.toHaveBeenCalled();
+    expect(switchChain).not.toHaveBeenCalled();
+    expect(sendTransaction).not.toHaveBeenCalled();
+  },
+);
+
+it("shows a retryable balance error without using an earlier balance or recording agreement", async () => {
+  walletState.address = ADDRESS;
+  walletState.isConnected = true;
+  const { result } = renderHook(() => useDonation(args));
+  expect(await result.current.loadBalances()).toEqual({ USDC: 1000 });
+  vi.mocked(readContract).mockRejectedValueOnce(new Error("RPC unavailable"));
+
+  await act(() => result.current.donate("USDC", "250"));
+
+  expect(result.current.status).toEqual({
+    kind: "err",
+    text: "Couldn't check your USDC balance on Ethereum mainnet. Please try again.",
+  });
+  expect(result.current.busy).toBeNull();
+  expect(api).not.toHaveBeenCalled();
+  expect(sendTransaction).not.toHaveBeenCalled();
+
+  vi.mocked(api).mockResolvedValueOnce({ attemptId: ID, recordedAt: 1 }).mockResolvedValueOnce(
+    confirmed,
+  );
+  vi.mocked(sendTransaction).mockResolvedValue(TX as `0x${string}`);
+  await act(() => result.current.donate("USDC", "250"));
+  expect(result.current.status?.kind).toBe("ok");
+  expect(sendTransaction).toHaveBeenCalledTimes(1);
+});
+
+it("uses the current connected account even before React has rendered the account change", async () => {
+  walletState.address = ADDRESS;
+  walletState.isConnected = true;
+  const { result } = renderHook(() => useDonation(args));
+  walletState.address = SAFE;
+  vi.mocked(api).mockResolvedValueOnce({ attemptId: ID, recordedAt: 1 }).mockResolvedValueOnce(
+    confirmed,
+  );
+  vi.mocked(sendTransaction).mockResolvedValue(TX as `0x${string}`);
+
+  await act(() => result.current.donate("USDC", "250"));
+
+  expect(readContract).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      args: [SAFE],
+    }),
+  );
+  expect(sendTransaction).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      account: SAFE,
+    }),
+  );
+});
+
+it("stops if the connected account changes while its balance is being read", async () => {
+  walletState.address = ADDRESS;
+  walletState.isConnected = true;
+  vi.mocked(readContract).mockImplementationOnce(() => {
+    walletState.address = SAFE;
+    return Promise.resolve(253_181_000n);
+  });
+  const { result } = renderHook(() => useDonation(args));
+
+  await act(() => result.current.donate("USDC", "250"));
+
+  expect(result.current.status).toEqual({
+    kind: "err",
+    text: "Your wallet account changed. Please try again.",
+  });
+  expect(result.current.busy).toBeNull();
+  expect(api).not.toHaveBeenCalled();
+  expect(sendTransaction).not.toHaveBeenCalled();
+});
+
+it.each([false, true])(
+  "compares the ETH balance in wei at the exact donation boundary (enough: %s)",
+  async (enough) => {
+    walletState.address = ADDRESS;
+    walletState.isConnected = true;
+    const needed = 10n ** 17n;
+    vi.mocked(getBalance).mockResolvedValue({ value: enough ? needed : needed - 1n } as never);
+    vi.mocked(api).mockResolvedValueOnce({ attemptId: ID, recordedAt: 1 }).mockResolvedValueOnce(
+      confirmed,
+    );
+    vi.mocked(sendTransaction).mockResolvedValue(TX as `0x${string}`);
+    const { result } = renderHook(() =>
+      useDonation({
+        ...args,
+        params: {
+          ...params,
+          tokens: { ETH: { address: "native", decimals: 18 } },
+          rates: { ETH: 2500 },
+        },
+      })
+    );
+
+    await act(() => result.current.donate("ETH", "250"));
+
+    expect(getBalance).toHaveBeenCalledWith(expect.anything(), {
+      address: ADDRESS,
+      chainId: 1,
+      blockTag: "latest",
+    });
+    expect(readContract).not.toHaveBeenCalled();
+    if (enough) {
+      expect(sendTransaction).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          account: ADDRESS,
+          value: needed,
+          chainId: 1,
+        }),
+      );
+    } else {
+      expect(result.current.status).toEqual({
+        kind: "err",
+        text:
+          "Not enough ETH on Ethereum mainnet: you hold 0.099999999999999999, this donation needs 0.1.",
+      });
+      expect(api).not.toHaveBeenCalled();
+      expect(sendTransaction).not.toHaveBeenCalled();
+    }
+  },
+);
+
+it("keeps Donate busy and prevents duplicate sends while checking the balance", async () => {
+  walletState.address = ADDRESS;
+  walletState.isConnected = true;
+  let resolveBalance!: (value: bigint) => void;
+  vi.mocked(readContract).mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveBalance = resolve;
+    }),
+  );
+  vi.mocked(api).mockResolvedValueOnce({ attemptId: ID, recordedAt: 1 }).mockResolvedValueOnce(
+    confirmed,
+  );
+  vi.mocked(sendTransaction).mockResolvedValue(TX as `0x${string}`);
+  const { result } = renderHook(() => useDonation(args));
+  let donation!: Promise<boolean>;
+  await act(async () => {
+    donation = result.current.donate("USDC", "250");
+    await Promise.resolve();
+  });
+  expect(result.current.busy).toBe("Checking balance…");
+  await act(() => result.current.donate("USDC", "250"));
+  expect(readContract).toHaveBeenCalledTimes(1);
+  expect(api).not.toHaveBeenCalled();
+  await act(async () => {
+    resolveBalance(253_181_000n);
+    await donation;
+  });
   expect(sendTransaction).toHaveBeenCalledTimes(1);
 });

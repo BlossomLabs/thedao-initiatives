@@ -366,7 +366,7 @@ export default function DonateWidget({
             onClick={async () => {
               if (!gated()) return;
               if (example) return d.setStatus({ kind: "wait", text: EXAMPLE_NOTE });
-              if (await d.donate(symbol, amount, balances)) setAccepted(false);
+              if (await d.donate(symbol, amount)) setAccepted(false);
             }}
             disabled={Boolean(d.busy) || !accepted || over}
           >

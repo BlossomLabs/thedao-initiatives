@@ -3,8 +3,9 @@
  * USD amount -> token quantity -> wallet tx -> API confirm + status polling.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Config } from "wagmi";
 import { getBalance, readContract, sendTransaction, switchChain } from "wagmi/actions";
-import { erc20Abi } from "viem";
+import { erc20Abi, formatUnits } from "viem";
 import { useWallet, useWalletStore } from "~/context/wallet";
 import { api, ApiError, errorMessage, isMaintenance } from "~/lib/api";
 import type { AcceptanceReceipt, ExchangeDetails, WalletIntent } from "../../../shared/terms.ts";
@@ -48,6 +49,20 @@ const MAINTENANCE_TEXT =
   "The site is in maintenance. Your transfer is on-chain and will be credited once maintenance ends; keep the transaction link.";
 const CONFIRM_RETRY_MS = 1500;
 const PENDING: DonateResult = { status: "pending", detail: "", amount: 0, token: "", amountUsd: 0 };
+
+/** Read mainnet directly; the form's earlier balances are only for display. */
+async function readBalance(config: Config, account: `0x${string}`, token: string): Promise<bigint> {
+  return token === "native"
+    ? (await getBalance(config, { address: account, chainId: 1, blockTag: "latest" })).value
+    : await readContract(config, {
+      address: token as `0x${string}`,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [account],
+      chainId: 1,
+      blockTag: "latest",
+    });
+}
 
 export function useDonation(
   { initiativeId, slug, safeAddress, params, onConfirmed, accepted }: UseDonationArgs,
@@ -242,7 +257,6 @@ export function useDonation(
     async (
       symbol: string,
       usdRaw: string,
-      balances: Record<string, number | null>,
     ): Promise<boolean> => {
       let agreementUsed = false;
       if (busy || sending.current) return false;
@@ -300,11 +314,14 @@ export function useDonation(
         return false;
       }
       sending.current = true;
+      setBusy("Checking balance…");
       try {
-        let account = address;
-        if (!isConnected || !account) {
+        const walletApi = await wallet.load();
+        const { config } = walletApi;
+        const connection = walletApi.getConnection();
+        let account = connection.address;
+        if (connection.status !== "connected" || !account) {
           // The island's own list: the page's snapshot is empty until it is attached.
-          const { config } = await wallet.load();
           const usable = config.connectors.filter((c) => c.id !== "mock");
           if (!usable.length) {
             setStatus({
@@ -317,24 +334,33 @@ export function useDonation(
           const r = await connect({ connector: usable[0], chainId: 1 });
           account = r.accounts[0];
         }
-        const bal = balances[symbol];
-        if (typeof bal === "number" && bal <= 0) {
-          const held = Object.keys(params.tokens).filter((s) => (balances[s] ?? 0) > 0);
+        if (!account) {
           setStatus({
             kind: "err",
-            text: held.length
-              ? `This wallet holds no ${symbol}. You do hold: ${held.join(", ")}.`
-              : `This wallet holds none of the accepted tokens (${
-                Object.keys(params.tokens).join(", ")
-              }). Top it up, switch wallets (button top right), or use the exchange option.`,
+            text: "Select an account in your wallet and try again.",
           });
           return false;
         }
-        if (typeof bal === "number" && bal < qtyNum) {
+        setStatus({ kind: "wait", text: `Checking your ${symbol} balance on Ethereum mainnet…` });
+        let balance: bigint;
+        try {
+          balance = await readBalance(config, account, tok.address);
+        } catch {
           setStatus({
             kind: "err",
-            text: `Not enough ${symbol}: you hold ${
-              bal.toFixed(4)
+            text: `Couldn't check your ${symbol} balance on Ethereum mainnet. Please try again.`,
+          });
+          return false;
+        }
+        if (walletApi.getConnection().address?.toLowerCase() !== account.toLowerCase()) {
+          setStatus({ kind: "err", text: "Your wallet account changed. Please try again." });
+          return false;
+        }
+        if (balance < base) {
+          setStatus({
+            kind: "err",
+            text: `Not enough ${symbol} on Ethereum mainnet: you hold ${
+              formatUnits(balance, tok.decimals)
             }, this donation needs ${qtyStr}.`,
           });
           return false;
@@ -353,12 +379,11 @@ export function useDonation(
         setBusy("Recording agreement…");
         agreementUsed = true;
         const acceptance = await recordAcceptance("wallet", undefined, {
-          address: account!,
+          address: account,
           token: tok.address,
           amountRaw: base.toString(),
         });
         setBusy("Confirm in wallet…");
-        const { config } = await wallet.load();
         await switchChain(config, { chainId: 1 }).catch(() => {});
         const txHash = isNative
           ? await sendTransaction(config, {
@@ -402,6 +427,7 @@ export function useDonation(
         });
       } finally {
         sending.current = false;
+        if (!agreementUsed) setBusy(null);
       }
       return agreementUsed;
     },
@@ -409,8 +435,6 @@ export function useDonation(
       busy,
       safeAddress,
       params,
-      address,
-      isConnected,
       connect,
       wallet,
       confirmTx,
@@ -426,15 +450,7 @@ export function useDonation(
     await Promise.all(
       Object.entries(params.tokens).map(async ([sym, t]) => {
         try {
-          const raw = t.address === "native"
-            ? (await getBalance(config, { address, chainId: 1 })).value
-            : await readContract(config, {
-              address: t.address as `0x${string}`,
-              abi: erc20Abi,
-              functionName: "balanceOf",
-              args: [address],
-              chainId: 1,
-            });
+          const raw = await readBalance(config, address, t.address);
           out[sym] = Number(raw) / 10 ** t.decimals;
         } catch {
           out[sym] = null;

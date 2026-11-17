@@ -374,8 +374,8 @@ it("a held reply shows its thread, the screen's reason, and who wrote it", async
   expect(screen.getByRole("link", { name: "Open the thread" }))
     .toHaveAttribute("href", "/initiative/slug-1#qa-p1");
   expect(screen.getByText(HELD_ADDR)).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Open the address on Etherscan" }))
-    .toHaveAttribute("href", `https://etherscan.io/address/${HELD_ADDR}`);
+  expect(screen.getByRole("link", { name: "View on the explorer" }))
+    .toHaveAttribute("href", `https://eth.blockscout.com/address/${HELD_ADDR}`);
   expect(screen.getByText("Proposer of Directory of Value")).toBeInTheDocument();
   expect(screen.getByText("Backer: $25.00 to this initiative")).toBeInTheDocument();
   expect(screen.getByText("Comments: 2 published · 1 held · 1 discarded")).toBeInTheDocument();

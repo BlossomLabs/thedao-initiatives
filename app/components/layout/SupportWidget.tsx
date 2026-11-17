@@ -403,7 +403,7 @@ export function SupportPanel() {
                   id={transactionId}
                   type="url"
                   inputMode="url"
-                  placeholder="https://etherscan.io/tx/…"
+                  placeholder="https://eth.blockscout.com/tx/…"
                   value={transactionUrl}
                   onChange={(e) => {
                     setTransactionUrl(e.target.value);

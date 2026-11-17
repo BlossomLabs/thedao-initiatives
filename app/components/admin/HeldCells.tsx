@@ -13,7 +13,7 @@ import { cn } from "~/lib/utils";
 /** Long comments open in place past this many characters. */
 const FOLD = 600;
 
-export const addressUrl = (address: string) => `https://etherscan.io/address/${address}`;
+export const addressUrl = (address: string) => `https://eth.blockscout.com/address/${address}`;
 
 /** Where the comment shows once published: its thread, or the comments section. */
 export const commentAnchor = (c: HeldComment) =>
@@ -193,8 +193,8 @@ export function HeldWhoCell({ c }: { c: HeldComment }) {
                 target="_blank"
                 rel="noreferrer"
                 className="ml-1 align-middle text-muted"
-                aria-label="Open the address on Etherscan"
-                title="Etherscan"
+                aria-label="View on the explorer"
+                title="View on the explorer"
               >
                 <ExternalLink className="inline size-3.5" />
               </a>

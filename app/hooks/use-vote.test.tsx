@@ -84,7 +84,7 @@ it("a send finishing after a chain switch only saves under its original round", 
     d.nonceOf = vi.fn(async () => 0n);
     d.signVote = vi.fn(async () => "0x1234" as const);
     d.relay = vi.fn(() => landing.promise);
-    d.waitResult = vi.fn(async () => "counted" as const);
+    d.waitResult = vi.fn(async () => "recorded" as const);
     let pending!: Promise<void>;
     await act(async () => {
       pending = result.current.submit(77n, "0x01");
@@ -109,6 +109,62 @@ it("a send finishing after a chain switch only saves under its original round", 
     unmount();
     ROUND.chainId = original;
     wallet.address = undefined;
+    sessionStorage.clear();
+  }
+});
+
+it("a recorded send waits for its own replay nonce before the counted phase", async () => {
+  const { result, unmount } = renderHook(() => useBallotSubmit(88n));
+  try {
+    result.current.deps.waitResult = vi.fn(async () => "recorded" as const);
+    await act(async () =>
+      result.current.track(`0x${"11".repeat(32)}`, {
+        tokenId: 88n,
+        nonce: 2n,
+        ballot: "0x01",
+        signature: "0x1234",
+      })
+    );
+    expect(result.current.phase.kind).toBe("recorded");
+    const view = {
+      accepted: { "88": "0x01" },
+      acceptedNonces: { "88": 1 },
+      rejected: [],
+    } as unknown as RoundView;
+    act(() => result.current.confirm(view));
+    expect(result.current.phase.kind).toBe("recorded");
+    act(() => result.current.confirm({ ...view, acceptedNonces: { "88": 2 } }));
+    expect(result.current.phase.kind).toBe("counted");
+  } finally {
+    unmount();
+    sessionStorage.clear();
+  }
+});
+
+it("a mined revision rejected by replay never reaches the counted phase", async () => {
+  const { result, unmount } = renderHook(() => useBallotSubmit(89n));
+  try {
+    result.current.deps.waitResult = vi.fn(async () => "recorded" as const);
+    await act(async () =>
+      result.current.track(`0x${"11".repeat(32)}`, {
+        tokenId: 89n,
+        nonce: 2n,
+        ballot: "0x01",
+        signature: "0x1234",
+      })
+    );
+    act(() =>
+      result.current.confirm(
+        {
+          accepted: { "89": "0x02" },
+          acceptedNonces: { "89": 1 },
+          rejected: [{ tokenId: "89", nonce: 2, reason: "tier_settled" }],
+        } as unknown as RoundView,
+      )
+    );
+    expect(result.current.phase.kind).toBe("rejected");
+  } finally {
+    unmount();
     sessionStorage.clear();
   }
 });

@@ -254,6 +254,9 @@ export default function VotePage(
         ? { ...mockData.view, accepted: { ...mockData.view.accepted, [String(n)]: mockSent } }
         : mockData.view)
     : roundQ.data;
+  useEffect(() => {
+    if (!mock && rv) realFlow.confirm?.(rv);
+  }, [mock, rv, realFlow.confirm]);
 
   // Withdrawn by an admin (at the round's head; once closed, the last settlement's): never
   // placed, left out of the open tiers when sent, marked on the ballot. A body served
@@ -746,7 +749,8 @@ export default function VotePage(
       (emptyIntermediateTiers(toSend).length === 0 && Boolean(countedHex) &&
         countedHex!.toLowerCase() === hexOf(toSend));
     // The sheet has something to say whatever the ballot: a send running, its outcome.
-    const sheetNews = busy || upToDateNow || phaseKind === "failed" || phaseKind === "late" ||
+    const sheetNews = busy || upToDateNow || phaseKind === "recorded" || phaseKind === "failed" ||
+      phaseKind === "rejected" || phaseKind === "late" ||
       (phaseKind === "idle" && Boolean(ballotFlow.phase.note));
     const canSend = !busy && sending > 0 && !broken;
     const summary = !sheetNews && (
@@ -794,6 +798,10 @@ export default function VotePage(
       send: early ? undefined : {
         label: busy
           ? "Sending…"
+          : phaseKind === "recorded"
+          ? "Awaiting tally…"
+          : phaseKind === "rejected"
+          ? "Review ballot"
           : upToDateNow
           ? "Counted"
           : countedHex

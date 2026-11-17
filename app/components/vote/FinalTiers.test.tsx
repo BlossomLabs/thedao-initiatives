@@ -96,6 +96,11 @@ it("after the close: this badge's ballot and TheDAO's result, side by side, the 
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
         <VoteClosed
+          round={{
+            ...NO_ROUND,
+            slugs: items.map((i) => i.slug),
+            projects: items.map(() => ({ goalUsd: "1", rfp: false, groups: [] })),
+          }}
           n={17}
           titles={new Map(items.map((i) => [i.slug, i.title]))}
           closeText="Friday"
@@ -174,6 +179,11 @@ it("hovering or tapping a winner on the ballot draws its arrow to the result, an
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
         <VoteClosed
+          round={{
+            ...NO_ROUND,
+            slugs: items.map((i) => i.slug),
+            projects: items.map(() => ({ goalUsd: "1", rfp: false, groups: [] })),
+          }}
           n={17}
           titles={new Map(items.map((i) => [i.slug, i.title]))}
           closeText="Friday"
@@ -321,6 +331,11 @@ it("your ballot marks a withdrawn initiative that wasn't funded; a funded one st
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
         <VoteClosed
+          round={{
+            ...NO_ROUND,
+            slugs: items.map((i) => i.slug),
+            projects: items.map(() => ({ goalUsd: "1", rfp: false, groups: [] })),
+          }}
           n={17}
           titles={new Map(items.map((i) => [i.slug, i.title]))}
           closeText="Friday"

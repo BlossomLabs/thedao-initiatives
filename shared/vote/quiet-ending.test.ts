@@ -672,3 +672,13 @@ describe("uninitialized funding", () => {
     expect(state.registrationClosesAt).toBe(53_600);
   });
 });
+
+it("rejected revisions leave the accepted nonce unchanged and revocation removes it", () => {
+  const first = { ...r("a", 1, [1, X]), nonce: 1 };
+  const second = { ...r("a", T + W + 1, [X, 1]), nonce: 2 };
+  const state = run([first, second], T + W + 100);
+  expect(state.acceptedNonces.get("a")).toBe(1);
+  expect(state.rejected).toContainEqual({ tokenId: "a", nonce: 2, reason: "tier_settled" });
+  const revoked = run([first, r("a", 2, null)], T);
+  expect(revoked.acceptedNonces.has("a")).toBe(false);
+});

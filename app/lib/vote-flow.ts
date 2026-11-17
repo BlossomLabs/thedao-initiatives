@@ -11,6 +11,8 @@ export type BallotPhase =
   | { kind: "signing" }
   | { kind: "relaying" }
   | { kind: "waiting"; hash: Hex }
+  | { kind: "recorded"; hash: Hex }
+  | { kind: "rejected"; hash: Hex; reason: "rejected" | "superseded" }
   | { kind: "counted"; hash: Hex }
   | { kind: "late"; hash: Hex }
   | { kind: "failed"; reason: string; hash?: Hex };
@@ -36,7 +38,7 @@ export interface FlowDeps {
   sendOwn(signed: Signed, proof: number[]): Promise<Hex>;
 }
 
-const RESULT_TEXT: Record<Exclude<BallotTxResult, "counted" | "late">, string> = {
+const RESULT_TEXT: Record<Exclude<BallotTxResult, "recorded">, string> = {
   reverted: "The transaction failed on-chain.",
   mismatch: "The transaction on-chain isn't the ballot you signed.",
 };
@@ -82,8 +84,7 @@ export async function check(
     set({ kind: "failed", reason: "It's taking too long to be mined.", hash });
     return;
   }
-  if (result === "counted") set({ kind: "counted", hash });
-  else if (result === "late") set({ kind: "late", hash });
+  if (result === "recorded") set({ kind: "recorded", hash });
   else set({ kind: "failed", reason: RESULT_TEXT[result], hash });
 }
 
@@ -139,7 +140,7 @@ export async function retryBallot(
   if (onchain >= last.nonce) {
     const stored = await d.ballotHashOf(last.tokenId).catch(() => null);
     if (onchain === last.nonce && stored?.toLowerCase() === keccak256(last.ballot).toLowerCase()) {
-      set({ kind: "counted", hash: last.hash ?? ("0x" as Hex) });
+      set({ kind: "recorded", hash: last.hash ?? ("0x" as Hex) });
       return last;
     }
     // Another ballot took that nonce: prepare this one again for the next.

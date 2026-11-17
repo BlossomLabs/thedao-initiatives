@@ -90,6 +90,7 @@ export type RoundState = {
   registrationClosesAt: number | null;
   tiers: [TierState, TierState, TierState];
   accepted: Map<string, Uint8Array>;
+  acceptedNonces: Map<string, number>;
   rejected: Rejection[];
   closed: boolean;
   /** Each voting badge's equal share of the pool (micro-USD), before it pays anything. */
@@ -180,6 +181,7 @@ export function replay(
   const receipts = input.receipts.filter((r) => r.timestamp < now);
   const events = states.filter((x) => x.event && x.timestamp < now);
   const accepted = new Map<string, number[]>();
+  const acceptedNonces = new Map<string, number>();
   const roll = new Set<string>();
   const rejected: Rejection[] = [];
   const settled: Settled[] = [];
@@ -209,6 +211,7 @@ export function replay(
   const apply = (r: Receipt) => {
     if (r.ballot === null) {
       accepted.delete(r.tokenId);
+      acceptedNonces.delete(r.tokenId);
       if (r.timestamp < rollClosesAt()) roll.delete(r.tokenId);
       return;
     }
@@ -235,6 +238,7 @@ export function replay(
       }
     }
     accepted.set(r.tokenId, ballot);
+    acceptedNonces.set(r.tokenId, r.nonce);
     roll.add(r.tokenId);
   };
   /** Applies every receipt and passes every ask event before `time`, block by block;
@@ -412,6 +416,7 @@ export function replay(
     registrationClosesAt: head.poolInitialized ? rollClosesAt() : null,
     tiers: tiers as RoundState["tiers"],
     accepted: new Map([...accepted].map(([k, v]) => [k, Uint8Array.from(v)])),
+    acceptedNonces,
     rejected,
     closed: settled.length === TIERS.length,
     share: voters ? head.poolUsd / BigInt(voters) : 0n,

@@ -5,7 +5,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { createPublicClient, type Hex, http, type PublicClient } from "viem";
 import { signTypedData, writeContract } from "wagmi/actions";
 import { api, ApiError } from "~/lib/api";
-import { apiCode } from "~/hooks/use-vote";
+import { apiCode, type RoundView } from "~/hooks/use-vote";
 import { useWallet } from "~/context/wallet";
 import { liveConnector } from "~/lib/wallet-store";
 import { useEnsureVoteChain } from "~/hooks/use-vote-chain";
@@ -20,7 +20,7 @@ import {
 } from "~/lib/vote-flow";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi";
 import { MAINNET_CHAIN_ID, ROUND, voteChain, type VoteManifest } from "../../shared/vote/manifest";
-import { checkBallotTx } from "../../shared/vote/receipt";
+import { checkBallotTx, replayedBallot } from "../../shared/vote/receipt";
 import { contractOwner, recordVote } from "../../shared/vote/record";
 
 const SEPOLIA_RPC = (import.meta.env?.VITE_SEPOLIA_RPC_URL as string | undefined) ||
@@ -80,16 +80,10 @@ export async function waitResult(
 ) {
   const pub = voteClient(m);
   const receipt = await pub.waitForTransactionReceipt({ hash, timeout: WAIT_MS });
-  const [tx, block] = await Promise.all([
-    pub.getTransaction({ hash }),
-    pub.getBlock({ blockNumber: receipt.blockNumber }),
-  ]);
   return checkBallotTx({
     m,
-    tx: { to: tx.to, input: tx.input },
     status: receipt.status,
     logs: receipt.logs,
-    blockTimestamp: Number(block.timestamp),
     expect,
   });
 }
@@ -228,5 +222,16 @@ export function useBallotSubmit(tokenId: bigint | null) {
     keep(await selfSendBallot(deps, m, id, wallet.address, ballot, last, setCurrentPhase));
   }, [deps, keep, last, wallet.address, m, setCurrentPhase]);
 
-  return { phase, submit, retry, selfSend, track, last, deps };
+  const confirm = useCallback((view: RoundView) => {
+    if (
+      phase.kind !== "recorded" || !last ||
+      (last.hash ?? "0x").toLowerCase() !== phase.hash.toLowerCase()
+    ) return;
+    const result = replayedBallot(view, last);
+    if (result === "counted") setCurrentPhase({ kind: "counted", hash: phase.hash });
+    else if (result) {
+      setCurrentPhase({ kind: "rejected", hash: phase.hash, reason: result });
+    }
+  }, [phase, last, setCurrentPhase]);
+  return { phase, submit, retry, selfSend, track, last, deps, confirm };
 }

@@ -42,7 +42,7 @@ function deps(over: Partial<FlowDeps> = {}) {
     relay: vi.fn(() => Promise.resolve(HASH)),
     nonceOf: vi.fn(() => Promise.resolve(0n)),
     ballotHashOf: vi.fn(() => Promise.resolve(`0x${"00".repeat(32)}` as Hex)),
-    waitResult: vi.fn(() => Promise.resolve("counted" as const)),
+    waitResult: vi.fn(() => Promise.resolve("recorded" as const)),
     requestGas: vi.fn(() => Promise.resolve(null)),
     waitTx: vi.fn(() => Promise.resolve()),
     sendOwn: vi.fn(() => Promise.resolve(OWN)),
@@ -73,7 +73,7 @@ describe("submitBallot", () => {
       signature: SIG,
     });
     expect(d.waitResult).toHaveBeenCalledWith(HASH, { tokenId: 7n, nonce: 3n, ballot: BALLOT });
-    expect(phases.map((p) => p.kind)).toEqual(["signing", "relaying", "waiting", "counted"]);
+    expect(phases.map((p) => p.kind)).toEqual(["signing", "relaying", "waiting", "recorded"]);
     expect(signed).toEqual({ tokenId: 7n, nonce: 3n, ballot: BALLOT, signature: SIG, hash: HASH });
   });
 
@@ -103,12 +103,9 @@ describe("submitBallot", () => {
     expect(phases.at(-1)).toMatchObject({ kind: "failed" });
   });
 
-  it("reverted, mismatched and late results", async () => {
+  it("reverted and mismatched results", async () => {
     for (
-      const [result, kind] of [["reverted", "failed"], ["mismatch", "failed"], [
-        "late",
-        "late",
-      ]] as const
+      const [result, kind] of [["reverted", "failed"], ["mismatch", "failed"]] as const
     ) {
       const { phases, set } = record();
       await submitBallot(
@@ -140,7 +137,7 @@ describe("submitBallot", () => {
 describe("retryBallot", () => {
   const last = { tokenId: 7n, nonce: 3n, ballot: BALLOT, signature: SIG, hash: HASH };
 
-  it("the earlier transaction already landed: counted, nothing sent again", async () => {
+  it("the earlier transaction already landed: recorded, nothing sent again", async () => {
     const d = deps({
       nonceOf: vi.fn(() => Promise.resolve(3n)),
       ballotHashOf: vi.fn(() => Promise.resolve(keccak256(BALLOT))),
@@ -149,7 +146,7 @@ describe("retryBallot", () => {
     await retryBallot(d, m, VOTER, last, set);
     expect(d.relay).not.toHaveBeenCalled();
     expect(d.signVote).not.toHaveBeenCalled();
-    expect(phases.at(-1)).toEqual({ kind: "counted", hash: HASH });
+    expect(phases.at(-1)).toEqual({ kind: "recorded", hash: HASH });
   });
 
   it("nothing landed: resends the same signature", async () => {
@@ -163,7 +160,7 @@ describe("retryBallot", () => {
       ballot: BALLOT,
       signature: SIG,
     });
-    expect(phases.at(-1)?.kind).toBe("counted");
+    expect(phases.at(-1)?.kind).toBe("recorded");
   });
 
   it("another ballot took that nonce: signs again for the next one", async () => {
@@ -196,7 +193,7 @@ describe("selfSendBallot", () => {
     );
     expect(d.relay).not.toHaveBeenCalled();
     expect(d.waitResult).toHaveBeenCalledWith(OWN, { tokenId: 7n, nonce: 1n, ballot: BALLOT });
-    expect(phases.at(-1)).toEqual({ kind: "counted", hash: OWN });
+    expect(phases.at(-1)).toEqual({ kind: "recorded", hash: OWN });
     expect(out?.hash).toBe(OWN);
   });
 
@@ -249,7 +246,7 @@ describe("selfSendBallot", () => {
     const { phases, set } = record();
     await selfSendBallot(d, m, 7n, VOTER, BALLOT, null, set);
     expect(d.sendOwn).toHaveBeenCalled();
-    expect(phases.at(-1)?.kind).toBe("counted");
+    expect(phases.at(-1)?.kind).toBe("recorded");
   });
 
   it("a wallet that refuses the transaction goes back to idle", async () => {

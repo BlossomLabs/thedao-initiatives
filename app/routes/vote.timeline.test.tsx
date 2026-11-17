@@ -119,11 +119,13 @@ vi.mock("~/context/wallet-picker", () => ({
 }));
 /** What the editor's Send hands the relay. */
 const submit = vi.hoisted(() => vi.fn());
-const flow = vi.hoisted(() => ({ failed: false, retry: vi.fn() }));
+const flow = vi.hoisted(() => ({ failed: false, recorded: false, retry: vi.fn() }));
 vi.mock("~/hooks/use-vote-send", async (original) => ({
   ...await original<typeof import("~/hooks/use-vote-send")>(),
   useBallotSubmit: () => ({
-    phase: flow.failed
+    phase: flow.recorded
+      ? { kind: "recorded", hash: `0x${"11".repeat(32)}` }
+      : flow.failed
       ? { kind: "failed", reason: "send failed", hash: `0x${"11".repeat(32)}` }
       : { kind: "idle" },
     submit,
@@ -242,6 +244,7 @@ beforeEach(() => {
   chain.withdrawn = [];
   submit.mockReset();
   flow.failed = false;
+  flow.recorded = false;
   flow.retry.mockReset();
   vi.useFakeTimers({ shouldAdvanceTime: true });
   localStorage.clear();
@@ -806,3 +809,28 @@ for (const failed of [false, true]) {
     expect(flow.retry).not.toHaveBeenCalled();
   });
 }
+
+it("the phone send button waits for tally confirmation of a recorded revision", async () => {
+  const previous = globalThis.matchMedia;
+  vi.stubGlobal(
+    "matchMedia",
+    (query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }),
+  );
+  try {
+    await serve(1500, 1499);
+    vi.setSystemTime(1_500_000);
+    flow.recorded = true;
+    mount("editor");
+    await waitFor(() => expect(document.querySelector("[data-phone-send-bar]")).not.toBeNull());
+    const bar = document.querySelector<HTMLElement>("[data-phone-send-bar]")!;
+    expect(within(bar).getByRole("button", { name: "Awaiting tally…" })).toBeInTheDocument();
+    expect(within(bar).queryByRole("button", { name: "Counted" })).not.toBeInTheDocument();
+  } finally {
+    vi.stubGlobal("matchMedia", previous);
+  }
+});

@@ -56,7 +56,8 @@ it("each wait keeps the button, disabled, saying what it waits for", () => {
   cleanup();
   p = panel({ kind: "waiting", hash: HASH }, { chain: "Ethereum" });
   expect(p.button("Waiting for Ethereum…")).toBeDisabled();
-  expect(screen.getByText(/counts once mined, even if you close this page/)).toBeInTheDocument();
+  expect(screen.getByText(/tally checks whether it counts after it is recorded/))
+    .toBeInTheDocument();
   expect(screen.getByRole("link", { name: /on Etherscan/ }))
     .toHaveAttribute("href", `https://etherscan.io/tx/${HASH}`);
 });
@@ -194,4 +195,19 @@ it("just counted, its Counted stamp presses down; one already counting on a fres
   cleanup();
   panel({ kind: "idle" }, { upToDate: true });
   expect(stamp()).not.toHaveClass("animate-stamp-press");
+});
+
+it("a recorded transaction waits for replay even when an earlier identical ballot counts", () => {
+  const p = panel({ kind: "recorded", hash: HASH }, { upToDate: true });
+  expect(screen.getByText("Recorded on Sepolia")).toBeInTheDocument();
+  expect(screen.queryByText("Your ballot counts")).not.toBeInTheDocument();
+  expect(p.button("Awaiting tally…")).toBeDisabled();
+});
+
+it("a replay rejection sends the current edited draft as a new revision instead of retrying the old transaction", () => {
+  const p = panel({ kind: "rejected", hash: HASH, reason: "rejected" }, { canSend: true });
+  expect(screen.getByText("The tally did not accept this revision")).toBeInTheDocument();
+  fireEvent.click(p.button("Send my ballot"));
+  expect(p.onSend).toHaveBeenCalledOnce();
+  expect(p.onRetry).not.toHaveBeenCalled();
 });

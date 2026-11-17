@@ -117,7 +117,7 @@ export default function BallotStatus(
     case "relaying":
       if (own) {
         title = "Confirm the transaction in your wallet";
-        body = "The second request: it sends your signed ballot to Ethereum. You pay the gas.";
+        body = "Confirm the transaction to record your ballot. You pay the gas.";
         button = { text: "Waiting for you to confirm…", busy: true };
         foot = <span>If you reject it, nothing is sent.</span>;
         break;
@@ -130,10 +130,30 @@ export default function BallotStatus(
       button = { text: `Waiting for ${chain}…`, busy: true };
       foot = phase.kind === "waiting" && (
         <>
-          <span>Already sent: it counts once mined, even if you close this page.</span>
+          <span>
+            Already sent. The tally checks whether it counts after it is recorded, even if you close
+            this page.
+          </span>
           {txLink}
         </>
       );
+      break;
+    case "recorded":
+      title = `Recorded on ${chain}`;
+      body =
+        "Waiting for the tally to accept this ballot. Your earlier accepted ballot counts until then.";
+      button = { text: "Awaiting tally…", busy: true };
+      foot = txLink;
+      break;
+    case "rejected":
+      tone = "bad";
+      title = phase.reason === "superseded"
+        ? "A newer ballot replaced this submission"
+        : "The tally did not accept this revision";
+      body =
+        "Review your ballot and send a new revision. Your latest accepted ballot is the one that counts.";
+      button = { text: sendLabel, on: canSend ? onSend : undefined, blocked: !canSend };
+      foot = txLink;
       break;
     case "late":
       title = "It landed after voting closed";

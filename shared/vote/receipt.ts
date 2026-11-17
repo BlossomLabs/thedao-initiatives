@@ -2,15 +2,15 @@ import { decodeEventLog, decodeFunctionData, type Hex } from "viem";
 import { SIGNED_BALLOTS_ABI } from "./abi.ts";
 import type { VoteManifest } from "./manifest.ts";
 
-export type BallotTxResult = "counted" | "reverted" | "late" | "mismatch";
+export type BallotTxResult = "recorded" | "reverted" | "mismatch";
 
-/** Is this mined transaction exactly the ballot the voter signed, counted in time? */
+/** A matching successful record is on-chain; only replay can decide whether it counts. */
 export function checkBallotTx(input: {
   m: VoteManifest;
-  tx: { to: string | null; input: `0x${string}` };
+  tx?: { to: string | null; input: `0x${string}` };
   status: "success" | "reverted";
   logs?: readonly { address: string; data: Hex; topics: readonly Hex[] }[];
-  blockTimestamp: number;
+  blockTimestamp?: number;
   expect: { tokenId: bigint; nonce: bigint; ballot: `0x${string}` };
 }): BallotTxResult {
   const { m, tx, expect } = input;
@@ -32,9 +32,9 @@ export function checkBallotTx(input: {
       }
     });
     if (!found) return "mismatch";
-    return input.blockTimestamp >= m.closesAt ? "late" : "counted";
+    return "recorded";
   }
-  if (!tx.to || tx.to.toLowerCase() !== m.contract.toLowerCase()) return "mismatch";
+  if (!tx?.to || tx.to.toLowerCase() !== m.contract.toLowerCase()) return "mismatch";
   let call;
   try {
     call = decodeFunctionData({ abi: SIGNED_BALLOTS_ABI, data: tx.input });
@@ -60,6 +60,30 @@ export function checkBallotTx(input: {
     ballot.toLowerCase() !== expect.ballot.toLowerCase()
   ) return "mismatch";
   if (input.status !== "success") return "reverted";
-  if (input.blockTimestamp >= m.closesAt) return "late";
-  return "counted";
+  return "recorded";
+}
+
+/** Match a particular submission, not an earlier accepted ballot with identical bytes. */
+export function replayedBallot(
+  view: {
+    accepted: Record<string, string>;
+    acceptedNonces?: Record<string, number>;
+    rejected: { tokenId: string; nonce: number; reason: string }[];
+  },
+  expect: { tokenId: bigint; nonce: bigint; ballot: Hex },
+): "counted" | "rejected" | "superseded" | null {
+  const id = expect.tokenId.toString();
+  const nonce = view.acceptedNonces?.[id];
+  if (nonce !== undefined && BigInt(nonce) > expect.nonce) return "superseded";
+  const accepted = view.accepted[id]?.toLowerCase();
+  const ballot = expect.ballot.toLowerCase();
+  // Short recorded ballots leave later initiatives unplaced; replay pads those bytes.
+  if (
+    nonce !== undefined && BigInt(nonce) === expect.nonce && accepted &&
+    accepted.startsWith(ballot) && /^(ff)*$/.test(accepted.slice(ballot.length))
+  ) return "counted";
+  if (view.rejected.some((r) => r.tokenId === id && BigInt(r.nonce) === expect.nonce)) {
+    return "rejected";
+  }
+  return null;
 }

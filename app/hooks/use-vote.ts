@@ -75,6 +75,8 @@ export type RoundView = {
   tiers: RoundTier[];
   /** tokenId → the ballot that counts (hex). */
   accepted: Record<string, string>;
+  /** Accepted revision per badge; absent only in older responses and examples. */
+  acceptedNonces?: Record<string, number>;
   rejected: {
     tokenId: string;
     nonce: number;

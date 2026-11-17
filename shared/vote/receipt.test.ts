@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { encodeAbiParameters, encodeEventTopics, encodeFunctionData, type Hex } from "viem";
 import { SIGNED_BALLOTS_ABI } from "./abi.ts";
-import { checkBallotTx } from "./receipt.ts";
+import { checkBallotTx, replayedBallot } from "./receipt.ts";
 import type { VoteManifest } from "./manifest.ts";
 
 const m: VoteManifest = {
@@ -37,26 +37,26 @@ const base = {
 };
 
 describe("checkBallotTx", () => {
-  test("counted: our contract, recordFor, same token, nonce and bytes, before close", () => {
-    expect(checkBallotTx(base)).toBe("counted");
+  test("recorded: our contract, recordFor, same token, nonce and bytes, before close", () => {
+    expect(checkBallotTx(base)).toBe("recorded");
   });
 
-  test("counted for a self-sent vote() too", () => {
+  test("recorded for a self-sent vote() too", () => {
     const input = encodeFunctionData({
       abi: SIGNED_BALLOTS_ABI,
       functionName: "vote",
       args: [7n, 2n, ballot, [0, 1, 2]],
     });
-    expect(checkBallotTx({ ...base, tx: { to: m.contract, input } })).toBe("counted");
+    expect(checkBallotTx({ ...base, tx: { to: m.contract, input } })).toBe("recorded");
   });
 
   test("the contract address compares without case", () => {
     expect(checkBallotTx({ ...base, tx: { ...base.tx, to: m.contract.toUpperCase() } }))
-      .toBe("counted");
+      .toBe("recorded");
   });
 
-  test("late: mined at the close", () => {
-    expect(checkBallotTx({ ...base, blockTimestamp: 2_000 })).toBe("late");
+  test("a successful record after configured close still awaits replay", () => {
+    expect(checkBallotTx({ ...base, blockTimestamp: 2_000 })).toBe("recorded");
   });
 
   test("reverted", () => {
@@ -82,7 +82,7 @@ describe("checkBallotTx", () => {
     expect(other({ tx: { to: m.contract, input: "0xdeadbeef" } })).toBe("mismatch");
   });
 
-  test("counted for record() (the relay's ECDSA path that 7702 wallets need)", () => {
+  test("recorded for record() (the relay's ECDSA path that 7702 wallets need)", () => {
     const record = (tokenId: bigint, nonce: bigint, b: Hex) =>
       encodeFunctionData({
         abi: SIGNED_BALLOTS_ABI,
@@ -97,7 +97,7 @@ describe("checkBallotTx", () => {
         }]],
       });
     expect(checkBallotTx({ ...base, tx: { to: m.contract, input: record(7n, 2n, ballot) } }))
-      .toBe("counted");
+      .toBe("recorded");
     expect(checkBallotTx({ ...base, tx: { to: m.contract, input: record(7n, 3n, ballot) } }))
       .toBe("mismatch");
     expect(checkBallotTx({ ...base, tx: { to: m.contract, input: record(8n, 2n, ballot) } }))
@@ -119,7 +119,7 @@ test("a Safe wrapper must emit the matching round record, even when the outer ca
     ...base,
     tx: { to: "0x3000000000000000000000000000000000000003", input: "0xdeadbeef" as const },
   };
-  expect(checkBallotTx({ ...wrapped, logs: [log] })).toBe("counted");
+  expect(checkBallotTx({ ...wrapped, logs: [log] })).toBe("recorded");
   expect(checkBallotTx({ ...wrapped, logs: [] })).toBe("mismatch");
   expect(checkBallotTx({ ...wrapped, logs: [{ ...log, address: wrapped.tx.to }] })).toBe(
     "mismatch",
@@ -127,4 +127,27 @@ test("a Safe wrapper must emit the matching round record, even when the outer ca
   expect(checkBallotTx({ ...wrapped, logs: [log], expect: { ...expectOk, nonce: 3n } })).toBe(
     "mismatch",
   );
+});
+
+test("a mined ballot is counted only when replay accepts its exact nonce and bytes", () => {
+  const v = { accepted: { "7": ballot }, acceptedNonces: { "7": 1 }, rejected: [] };
+  expect(replayedBallot(v, expectOk)).toBeNull();
+  expect(replayedBallot({ ...v, acceptedNonces: { "7": 2 } }, expectOk)).toBe("counted");
+  expect(replayedBallot({ ...v, acceptedNonces: undefined }, expectOk)).toBeNull();
+  expect(
+    replayedBallot({ ...v, acceptedNonces: { "7": 2 }, accepted: { "7": "0x0101" } }, expectOk),
+  ).toBeNull();
+  expect(
+    replayedBallot(
+      { ...v, acceptedNonces: { "7": 2 }, accepted: { "7": `${ballot}ff` } },
+      expectOk,
+    ),
+  ).toBe("counted");
+  expect(
+    replayedBallot(
+      { ...v, rejected: [{ tokenId: "7", nonce: 2, reason: "tier_settled" }] },
+      expectOk,
+    ),
+  ).toBe("rejected");
+  expect(replayedBallot({ ...v, acceptedNonces: { "7": 3 } }, expectOk)).toBe("superseded");
 });

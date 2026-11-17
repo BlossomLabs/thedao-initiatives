@@ -280,6 +280,7 @@ export function roundJson(st: Round, slugs: string[]) {
         [t, b],
       ) => [t, `0x${[...b].map((x) => x.toString(16).padStart(2, "0")).join("")}`]),
     ),
+    acceptedNonces: Object.fromEntries(st.acceptedNonces),
     rejected: st.rejected,
     live: {
       funded: named(st.live.order),

@@ -1459,6 +1459,30 @@ it("a new change while the page is open shows a toast saying what moved (#126)",
   expect(screen.queryByTestId("change-toast")).toBeNull();
 });
 
+it("before the server can say what changed, the toast says what moved between two polls", async () => {
+  const qc = new QueryClient();
+  vi.mocked(api).mockResolvedValue(openWith({ beta: give() }, { alpha: [50_000, "S"] }));
+  render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <VoteResults />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  await screen.findByText(/Test vote/i);
+  expect(screen.queryByTestId("change-toast")).toBeNull();
+  // The same figures again: nothing to say.
+  await act(() => qc.refetchQueries({ queryKey: ["production", "vote-round"] }));
+  expect(screen.queryByTestId("change-toast")).toBeNull();
+  vi.mocked(api).mockResolvedValue(
+    openWith({ beta: give() }, { alpha: [50_000, "A"], beta: [30_000, "S"] }),
+  );
+  await act(() => qc.refetchQueries({ queryKey: ["production", "vote-round"] }));
+  expect(await screen.findByTestId("change-toast")).toHaveTextContent(
+    "The result changed: Alpha fuzzing moved to A-Tier and Beta audits is now included in S-Tier.",
+  );
+});
+
 it("no last change, no note", async () => {
   await showOpen(openWith({ beta: give() }));
   await list().findByRole("button", { name: /Beta audits/ });

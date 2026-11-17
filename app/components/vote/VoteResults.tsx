@@ -1,5 +1,6 @@
 import { useRound, useVoteBase } from "~/lib/vote-round";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import RoundBox from "./RoundBox";
@@ -59,46 +60,67 @@ function LastChangeNote(
 }
 
 /** A change to the result while the page is open, said for a few seconds (#126): what
- * caused it, then what moved ("A donation to Foo: Foo is now included in A-Tier and Bar was
+ * caused it (or "The result changed" while the server can't tell), then what moved ("A donation to Foo: Foo is now included in A-Tier and Bar was
  * pushed out."). Your own donation and anyone else's ballot or donation alike. */
 function ChangeToast(
-  { ready, change, titleOf }: {
-    /** The round's figures have come: the change they bring is the starting point. */
+  { ready, change, tiers, titleOf }: {
+    /** The round's figures have come: what they show is the starting point. */
     ready: boolean;
     change: LastChangeJson | undefined;
+    /** TheDAO's ballot as it stands (settled and live tiers): slug → tier. */
+    tiers: Partial<Record<string, Tier>>;
     titleOf: (slug: string) => string;
   },
 ) {
-  const [shown, setShown] = useState<{ at: number; text: string }>();
+  const [shown, setShown] = useState<{ n: number; text: string }>();
   /** The change already on screen when the figures first came: never a toast. */
   const seen = useRef<number | null>(null);
+  /** The ballot at the last poll: what moved since, when the server can't say why. Before
+   * S-Tier's first tally it has no history to tell (ballots carry the head's time), so the
+   * page compares one poll with the next. */
+  const before = useRef<Partial<Record<string, Tier>> | null>(null);
+  const count = useRef(0);
   const at = change?.at ?? 0;
+  const key = JSON.stringify(Object.entries(tiers).sort());
   useEffect(() => {
     if (!ready) return;
-    const before = seen.current;
+    const wasAt = seen.current;
+    const was = before.current;
     seen.current = at;
-    if (before === null || before === at || !change) return;
-    const head = changeHeadline(change, titleOf);
-    if (!head) return;
-    const cause = changeCause(change, titleOf);
-    setShown({ at, text: `${cause[0].toUpperCase()}${cause.slice(1)}: ${head}` });
-    // Only a new change matters; titleOf is a new closure on every render.
+    before.current = tiers;
+    if (wasAt === null || !was) return;
+    const say = (cause: string, head: string) =>
+      setShown({ n: ++count.current, text: `${cause[0].toUpperCase()}${cause.slice(1)}: ${head}` });
+    // The server's word first: what caused it, and what it moved.
+    if (change && wasAt !== at) {
+      const head = changeHeadline(change, titleOf);
+      if (head) return say(changeCause(change, titleOf), head);
+    }
+    const moved = [...new Set([...Object.keys(was), ...Object.keys(tiers)])]
+      .filter((slug) => was[slug] !== tiers[slug])
+      .map((slug) => ({ slug, from: was[slug] ?? null, to: tiers[slug] ?? null }));
+    const head = changeHeadline({ at, causes: [], moved, amounts: [] }, titleOf);
+    if (head) say("the result changed", head);
+    // Only a new change or a new ballot matters; titleOf is a new closure on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, at]);
+  }, [ready, at, key]);
   useEffect(() => {
     if (!shown) return;
     const t = setTimeout(() => setShown(undefined), TOAST_MS);
     return () => clearTimeout(t);
   }, [shown]);
-  return (
+  if (typeof document === "undefined") return null;
+  // On the body, so nothing the page wraps it in can clip it or move its fixed place.
+  return createPortal(
     <div
       role="status"
       aria-live="polite"
+      data-change-toast-region=""
       className="pointer-events-none fixed inset-x-0 bottom-5 z-[150] flex justify-center px-4"
     >
       {shown && (
         <div
-          key={shown.at}
+          key={shown.n}
           data-testid="change-toast"
           className="pointer-events-auto flex max-w-[560px] items-start gap-3 rounded-[14px] border border-edge2 bg-panel px-4 py-3 font-inter-tight text-[14px] leading-snug text-white shadow-menu motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3"
         >
@@ -113,7 +135,8 @@ function ChangeToast(
           </button>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
 /** How long a change's toast stays, ms. */
@@ -679,7 +702,12 @@ export default function VoteResults(
         <PledgeBand compact />
       </div>
       {!example && (
-        <ChangeToast ready={Boolean(rv)} change={rv?.live.lastChange} titleOf={titleOf} />
+        <ChangeToast
+          ready={Boolean(rv)}
+          change={rv?.live.lastChange ?? undefined}
+          tiers={result.tiers}
+          titleOf={titleOf}
+        />
       )}
     </Hero>
   );

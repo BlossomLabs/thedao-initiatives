@@ -29,7 +29,8 @@ it("switching environments changes the label and starts a separate draft", () =>
   expect(screen.getByText(/Does not affect the vote.s allocations/)).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("test draft"), { target: { value: "test selections" } });
   fireEvent.click(screen.getByRole("link", { name: "Open the vote" }));
-  expect(screen.getByLabelText("Vote environment")).toHaveTextContent("Vote · Ethereum");
+  // The vote's own pages carry no banner.
+  expect(screen.queryByLabelText("Vote environment")).toBeNull();
   expect(screen.getByLabelText("production draft")).toHaveValue("");
 });
 it("example results are visibly marked as a demonstration", () => {
@@ -42,7 +43,7 @@ it("example results are visibly marked as a demonstration", () => {
   );
   expect(screen.getByLabelText("Vote environment")).toHaveTextContent("Demonstration");
 });
-it("the vote's pages have no link to the test vote; Admin keeps it", () => {
+it("the vote's pages have no banner; Admin keeps it, with its link to the test vote", () => {
   const { unmount } = render(
     <MemoryRouter initialEntries={["/vote"]}>
       <VoteEnvironmentProvider>
@@ -50,8 +51,7 @@ it("the vote's pages have no link to the test vote; Admin keeps it", () => {
       </VoteEnvironmentProvider>
     </MemoryRouter>,
   );
-  expect(screen.getByLabelText("Vote environment")).toHaveTextContent("Vote · Ethereum");
-  expect(screen.queryByRole("link", { name: "Open test vote" })).toBeNull();
+  expect(screen.queryByLabelText("Vote environment")).toBeNull();
   unmount();
   render(
     <MemoryRouter initialEntries={["/admin/vote"]}>

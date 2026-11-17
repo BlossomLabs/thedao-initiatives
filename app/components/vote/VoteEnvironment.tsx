@@ -18,6 +18,8 @@ export function VoteEnvironmentBanner() {
   if (!/^\/(?:admin\/)?vote(?:-test)?(?:\/|$)/.test(pathname)) return null;
   const demo = /^\/vote-test\/(mock|results|effects)(?:\/|$)/.test(pathname);
   const admin = pathname.startsWith("/admin/");
+  // The vote's own pages carry no banner: only the test vote and Admin say which one it is.
+  if (env === "production" && !admin) return null;
   return (
     <aside
       aria-label="Vote environment"
@@ -38,15 +40,12 @@ export function VoteEnvironmentBanner() {
             </span>
           )}
         </div>
-        {/* The vote's pages don't point to the test vote; only Admin switches to it. */}
-        {(env === "test" || admin) && (
-          <Link
-            to={`${admin ? "/admin" : ""}${env === "test" ? "/vote" : "/vote-test"}`}
-            className="underline"
-          >
-            Open {env === "test" ? "the vote" : "test vote"}
-          </Link>
-        )}
+        <Link
+          to={`${admin ? "/admin" : ""}${env === "test" ? "/vote" : "/vote-test"}`}
+          className="underline"
+        >
+          Open {env === "test" ? "the vote" : "test vote"}
+        </Link>
       </div>
     </aside>
   );

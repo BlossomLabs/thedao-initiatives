@@ -155,12 +155,14 @@ export function createAi(config: Config, f: typeof fetch) {
   ): Promise<Record<string, unknown>> {
     let res: Response;
     try {
-      res = await chatOnce(system, user);
-      if (res.status === 400 && structured) {
+      // Read per call: calls in flight together may all be refused, each retries once.
+      const asked = structured;
+      res = await chatOnce(system, user, asked);
+      if (res.status === 400 && asked) {
         const detail = await res.text();
         if (/response_format|structured output|json_object/i.test(detail)) {
           structured = false;
-          res = await chatOnce(system, user);
+          res = await chatOnce(system, user, false);
         } else res = new Response(detail, { status: 400 });
       }
     } catch (e) {
@@ -179,7 +181,7 @@ export function createAi(config: Config, f: typeof fetch) {
     return parseJsonObject(data?.choices?.[0]?.message?.content);
   }
 
-  async function chatOnce(system: string, user: string): Promise<Response> {
+  async function chatOnce(system: string, user: string, json: boolean): Promise<Response> {
     return await f(config.aiSearchBaseUrl + "/chat/completions", {
       method: "POST",
       redirect: "error",
@@ -191,7 +193,7 @@ export function createAi(config: Config, f: typeof fetch) {
       body: JSON.stringify({
         model: config.aiSearchModel,
         messages: [{ role: "system", content: system }, { role: "user", content: user }],
-        ...(structured ? { response_format: { type: "json_object" } } : {}),
+        ...(json ? { response_format: { type: "json_object" } } : {}),
         temperature: 0,
         max_tokens: config.aiSearchMaxTokens,
         // Thinking models (Nexus's Qwen) spend 20 s+ reasoning over a board

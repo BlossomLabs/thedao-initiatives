@@ -1,6 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect } from "react";
 import BoardPage from "~/components/board/BoardPage";
-import { roundDeployed } from "../../shared/vote/manifest";
 import { primeRound } from "~/lib/vote-round";
 import { useBoard } from "~/hooks/use-board";
 
@@ -14,25 +13,13 @@ export function meta() {
   ];
 }
 
-// Its code (the tally, the donate previews) loads only once the vote is open, not
-// for every board visit.
-const VoteResults = lazy(() => import("~/components/vote/VoteResults"));
-
+/** The front page is the board, also while the vote is open: its results are on /vote. */
 export default function Board() {
   const board = useBoard();
   const manifest = board.data?.flags.round?.manifest;
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => setHydrated(true), []);
-  const vote = hydrated && manifest?.kind === "real" && roundDeployed(manifest) &&
-    Date.now() / 1000 >= manifest.opensAt;
+  // The top bar's vote links (Vote, Results) need the round.
   useEffect(() => {
     if (manifest?.kind === "real") primeRound(manifest, "production");
   }, [manifest]);
-  return vote
-    ? (
-      <Suspense fallback={<BoardPage />}>
-        <VoteResults />
-      </Suspense>
-    )
-    : <BoardPage />;
+  return <BoardPage />;
 }

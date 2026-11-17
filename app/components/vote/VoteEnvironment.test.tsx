@@ -42,3 +42,36 @@ it("example results are visibly marked as a demonstration", () => {
   );
   expect(screen.getByLabelText("Vote environment")).toHaveTextContent("Demonstration");
 });
+it("the vote's pages have no link to the test vote; Admin keeps it", () => {
+  const { unmount } = render(
+    <MemoryRouter initialEntries={["/vote"]}>
+      <VoteEnvironmentProvider>
+        <VoteEnvironmentBanner />
+      </VoteEnvironmentProvider>
+    </MemoryRouter>,
+  );
+  expect(screen.getByLabelText("Vote environment")).toHaveTextContent("Vote · Ethereum");
+  expect(screen.queryByRole("link", { name: "Open test vote" })).toBeNull();
+  unmount();
+  render(
+    <MemoryRouter initialEntries={["/admin/vote"]}>
+      <VoteEnvironmentProvider>
+        <VoteEnvironmentBanner />
+      </VoteEnvironmentProvider>
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("link", { name: "Open test vote" })).toHaveAttribute(
+    "href",
+    "/admin/vote-test",
+  );
+});
+it("the front page has no vote banner", () => {
+  render(
+    <MemoryRouter initialEntries={["/"]}>
+      <VoteEnvironmentProvider>
+        <VoteEnvironmentBanner />
+      </VoteEnvironmentProvider>
+    </MemoryRouter>,
+  );
+  expect(screen.queryByLabelText("Vote environment")).toBeNull();
+});

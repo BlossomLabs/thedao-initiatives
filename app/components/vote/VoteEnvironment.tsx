@@ -15,9 +15,7 @@ export function VoteEnvironmentBanner() {
   const env = useVoteEnvironment();
   const round = useRound();
   const { pathname } = useLocation();
-  const productionResults = pathname === "/" && round.kind === "real" &&
-    roundDeployed(round) && Date.now() / 1000 >= round.opensAt;
-  if (!productionResults && !/^\/(?:admin\/)?vote(?:-test)?(?:\/|$)/.test(pathname)) return null;
+  if (!/^\/(?:admin\/)?vote(?:-test)?(?:\/|$)/.test(pathname)) return null;
   const demo = /^\/vote-test\/(mock|results|effects)(?:\/|$)/.test(pathname);
   const admin = pathname.startsWith("/admin/");
   return (
@@ -40,12 +38,15 @@ export function VoteEnvironmentBanner() {
             </span>
           )}
         </div>
-        <Link
-          to={`${admin ? "/admin" : ""}${env === "test" ? "/vote" : "/vote-test"}`}
-          className="underline"
-        >
-          Open {env === "test" ? "the vote" : "test vote"}
-        </Link>
+        {/* The vote's pages don't point to the test vote; only Admin switches to it. */}
+        {(env === "test" || admin) && (
+          <Link
+            to={`${admin ? "/admin" : ""}${env === "test" ? "/vote" : "/vote-test"}`}
+            className="underline"
+          >
+            Open {env === "test" ? "the vote" : "test vote"}
+          </Link>
+        )}
       </div>
     </aside>
   );

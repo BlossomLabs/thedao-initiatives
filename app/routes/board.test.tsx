@@ -385,3 +385,17 @@ it("no round open: the board doesn't read the vote", async () => {
   await screen.findAllByText("Beta wallets");
   expect(api).not.toHaveBeenCalledWith("/api/vote/round", expect.anything());
 });
+
+it("an open vote leaves the front page as the board (its results are on /vote)", async () => {
+  flagRound.value = {
+    kind: "real",
+    chainId: 1,
+    contract: "0x1",
+    opensAt: 1,
+    closesAt: 4_000_000_000,
+    manifest: { kind: "real", chainId: 1, contract: "0x1", opensAt: 1, closesAt: 4_000_000_000 },
+  };
+  at("/");
+  await screen.findAllByText("Beta wallets");
+  expect(api).not.toHaveBeenCalledWith("/api/vote/round", expect.anything());
+});

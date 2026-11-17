@@ -143,7 +143,7 @@ export const tierBEmpty = (rv: RoundView) => {
 };
 const TIER_B_NOTE = " · B-Tier: nothing funded yet, the pool may not reach it.";
 
-/** The vote results. The real vote's are the front page, a test vote's are on `/vote-test`
+/** The vote results. The real vote's are on `/vote`, a test vote's are on `/vote-test`
  * (voters only), and examples of them at `/vote-test/results/<moment>` (`example`: a fictional
  * round at one moment, nothing donated from it).
  *

@@ -1353,6 +1353,34 @@ Deno.test("round: a request with a newer ballot doesn't join a read that lacks i
   h.close();
 });
 
+Deno.test("round: pinned to one head block, the replay is reused (and joined) until the next block", async () => {
+  const pin = (block: number, hash: string) => ({ block, timestamp: NOW - 1, hash: hash as Hex });
+  const { h, state } = await qeSetup();
+  h.deps.vote!.manifest = { ...h.deps.vote!.manifest, readAt: pin(2, `0x${"aa".repeat(32)}`) };
+  let reads = 0;
+  h.deps.vote!.states = () => (reads++, Promise.resolve(withHead([150n, 150n, 150n], 200n)));
+  // Polls at the same moment join one replay.
+  const both = await Promise.all([h.req("/api/vote/round"), h.req("/api/vote/round")]);
+  assertEquals(both.map((r) => r.status), [200, 200]);
+  assertEquals(reads, 1);
+  // Past the unpinned 5 s, the same pinned block: the same replay.
+  h.clock.now += 20;
+  assertEquals((await h.req("/api/vote/round")).status, 200);
+  assertEquals(reads, 1);
+  // The next block: read again, with its ballot.
+  state.logs.push(logOf("3", `01${X}${X}`, NOW - 5, 3));
+  h.deps.vote!.manifest = { ...h.deps.vote!.manifest, readAt: pin(3, `0x${"bb".repeat(32)}`) };
+  const next = await h.req("/api/vote/round");
+  assertEquals(reads, 2);
+  assertEquals(Object.keys((await j(next) as { accepted: object }).accepted), ["1", "2", "3"]);
+  // Pinned, still capped: a head that stops moving is read again after 30 s.
+  h.clock.now += 31;
+  await h.req("/api/vote/round");
+  assertEquals(reads, 3);
+  await h.settle();
+  h.close();
+});
+
 Deno.test("round: a request whose ballots a read in flight covers joins it", async () => {
   const { h } = await qeSetup();
   let finish = () => {};

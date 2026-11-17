@@ -94,9 +94,12 @@ function node(o: {
         );
       }
       if (method === "eth_call") {
-        const tag = params[1] as string;
+        // A block number or tag, or (EIP-1898) a block hash: hash n names block n.
+        const param = params[1] as string | { blockHash: Hex };
+        const tag = typeof param === "object" ? toHex(Number(param.blockHash)) : param;
         calls.push({ method, block: tag });
         const at = tag === "latest" ? o.head : Number(tag);
+        if (at > o.head) return Promise.reject(new Error("header for hash not found"));
         if (o.pruned && at < o.head - 10) {
           return Promise.reject(new Error("missing trie node (state is not available)"));
         }
@@ -107,7 +110,20 @@ function node(o: {
         ];
         const results = subs.map((s): { success: boolean; returnData: Hex } => {
           if (s.target.toLowerCase() === MULTICALL3) {
-            const { args } = decodeFunctionData({ abi: multicall3Abi, data: s.callData });
+            const { functionName, args } = decodeFunctionData({
+              abi: multicall3Abi,
+              data: s.callData,
+            });
+            if (functionName === "getCurrentBlockTimestamp") {
+              return {
+                success: true,
+                returnData: encodeFunctionResult({
+                  abi: multicall3Abi,
+                  functionName,
+                  result: BigInt(at * SECS),
+                }),
+              };
+            }
             return {
               success: true,
               returnData: encodeFunctionResult({

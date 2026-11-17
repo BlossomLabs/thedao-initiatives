@@ -14,6 +14,9 @@ export interface StateSource {
   finalized?(): Promise<ChainBlock>;
   blockAt?(block: number): Promise<ChainBlock>;
   head(): Promise<ChainBlock>;
+  /** The head read from the node again, for the replay's last check that it hasn't
+   * changed (a source that knows its head without a read; default `head`). */
+  confirmHead?(): Promise<ChainBlock>;
   /** The last block with timestamp < time. */
   blockBefore(time: number): Promise<ChainBlock>;
   /** At `block` (eth_call with that block): initiativeCount, each initiativeUsd(i).askUsd, poolUsd(). */
@@ -29,6 +32,9 @@ export interface StateSource {
     }
   >;
   /** Blocks in [from, to] holding a PledgeSet, PoolUsdSet, InitiativeWithdrawn or InitiativeConfigured log from the round's contract. */
+  /** `stateAt`, read at the block named by its hash and only if it is canonical (the
+   * read checks itself, so no read of the block after it). */
+  stateAtHash?(block: number, hash: `0x${string}`): ReturnType<StateSource["stateAt"]>;
   accountingEventBlocks(from: number, to: number): Promise<number[]>;
   /** Blocks in [from, to] where any account's balance in any registered currency changed:
    * ERC-20 Transfer logs to or from an account, and native balances read block by block
@@ -39,9 +45,12 @@ export interface StateSource {
 export async function finalizedBlock(
   src: StateSource,
   head: ChainBlock,
+  /** `src.finalized()` already started, alongside other reads (finality only advances,
+   * so an earlier read is at most more cautious). */
+  started?: Promise<ChainBlock>,
 ): Promise<ChainBlock | null> {
   if (!src.finalized || !src.blockAt) return null;
-  const value = await src.finalized();
+  const value = await (started ?? src.finalized());
   const at = value.block > head.block ? head : value;
   const canonical = await src.blockAt(at.block);
   if (!canonical.hash) return null;
@@ -157,8 +166,10 @@ export async function chainStates(
   const contract = m.contract.toLowerCase();
   // The clock: what is final, and whether the node lags. The chain: what has happened.
   const wallNow = opts.now;
+  const early = src.finalized && src.blockAt ? src.finalized() : undefined;
+  early?.catch(() => {}); // Awaited below, unless the head read fails first.
   const head = await src.head();
-  const finalized = await finalizedBlock(src, head);
+  const finalized = await finalizedBlock(src, head, early);
   const finalBlock = finalized?.block ?? -1;
   const now = judgedAt(wallNow, head.timestamp);
   const checked = new Map<number, Promise<ChainBlock>>();
@@ -295,7 +306,8 @@ export async function chainStates(
     const x = await stateAt(block);
     return { block, ...x, event: events.has(block) };
   });
-  const after = await src.head();
+  // The last check, read from the node even where the head is otherwise known.
+  const after = src.confirmHead ? await src.confirmHead() : await src.head();
   if (head.block !== after.block || ("hash" in head && head.hash !== (after as ChainBlock).hash)) {
     throw new Error("vote head changed during replay");
   }
@@ -323,9 +335,18 @@ export async function chainStates(
         };
       }
     }
-    const x = await src.stateAt(block);
-    if (src.blockAt && (await src.blockAt(block)).hash !== reference.hash) {
-      throw new Error("vote block changed during state read");
+    let x: Awaited<ReturnType<StateSource["stateAt"]>>;
+    if (src.stateAtHash && reference.hash) {
+      // Read by the reference's hash: the node refuses it unless that block is canonical.
+      x = await src.stateAtHash(block, reference.hash);
+      if (x.timestamp !== reference.timestamp) {
+        throw new Error("vote block changed during state read");
+      }
+    } else {
+      x = await src.stateAt(block);
+      if (src.blockAt && (await src.blockAt(block)).hash !== reference.hash) {
+        throw new Error("vote block changed during state read");
+      }
     }
     if (persistent) {
       await cache.set(

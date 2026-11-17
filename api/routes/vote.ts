@@ -49,6 +49,11 @@ const RULE_REVERT = /\b(BallotTooSmall|TooFewIndependent|BadProof|GroupOverHalf|
 /** Below this the real round's relayer stops and voters send it themselves. */
 const RELAY_FLOOR_WEI = 10_000_000_000_000_000n; // 0.01 ETH
 const BALLOTS_CACHE_SECS = 5;
+/** A replay pinned to one head block (the manifest's `readAt`: every read names that
+ * block, so the replay is the same however often it runs) is reused this long. The key
+ * changes with the next head, so a new ballot still shows at the next block; the cap keeps
+ * the lagging-node check (CUTOFF_GRACE_SECS in chain-states.ts) about as prompt. */
+const PINNED_REPLAY_SECS = 30;
 /** How long a request waits for the round's chain states. A cold read (a long window's
  * balance scan on an archive node) can take longer: it goes on in the background, fills
  * the cache, and the request is a 503 meanwhile. */
@@ -362,14 +367,21 @@ export function voteRoutes(deps: Deps) {
     return st;
   };
 
-  /** The replay, reused for a few seconds in this isolate: every relayed ballot asks. */
+  /** The replay, reused in this isolate while the head it read is the newest (a few
+   * seconds when unpinned): every results poll and relayed ballot asks. */
   let recent:
     | { at: number; contract: string; state: Promise<Round>; ready: boolean }
     | null = null;
   const recentRound = (d: VoteRound): Promise<Round> => {
+    // Pinned, a replay in flight reads the very block this request would, so it is
+    // joined (and cleared if it fails); polls arriving during one used to start their
+    // own. Unpinned, a later request may see a newer ballot: it starts its own.
+    const pinned = Boolean(d.manifest.readAt?.hash);
     if (
-      !recent || !recent.ready || recent.contract !== configurationKey(d) ||
-      deps.now() - recent.at >= BALLOTS_CACHE_SECS
+      !recent || recent.contract !== configurationKey(d) ||
+      (!recent.ready && !pinned) ||
+      (recent.ready &&
+        deps.now() - recent.at >= (pinned ? PINNED_REPLAY_SECS : BALLOTS_CACHE_SECS))
     ) {
       const state = roundState(d);
       const entry = { at: deps.now(), contract: configurationKey(d), state, ready: false };

@@ -106,6 +106,9 @@ export async function replayRound(
   },
 ): Promise<Round> {
   const { now } = opts;
+  // The projects' history doesn't depend on the ballots: read alongside them.
+  const history = m.ballotRules ? src.rulesHistory() : undefined;
+  history?.catch(() => {}); // Awaited below; a failed ballot read must not leave it unhandled.
   const { events, block: readAt } = await src.ballots();
   // The replay counts only what the contract committed to: the events read must hash
   // to its transcript, and each token's last ballot to its stored hash, at that block.
@@ -144,16 +147,19 @@ export async function replayRound(
   // Rounds deployed with the ballot rules: the projects added on-chain since the deploy.
   // One the manifest doesn't have yet: its ballots can't be read, so hold the round
   // rather than refuse them (or settle without them).
-  if (m.ballotRules) {
-    const history = await src.rulesHistory();
-    if (history.addedAt.length > m.slugs.length) {
+  if (history) {
+    const { addedAt } = await history;
+    if (addedAt.length > m.slugs.length) {
       throw new ReplayError(
         "round_out_of_date",
-        `round_out_of_date: the contract has ${history.addedAt.length} projects, the manifest ${m.slugs.length}`,
+        `round_out_of_date: the contract has ${addedAt.length} projects, the manifest ${m.slugs.length}`,
       );
     }
   }
   const receiptBlocks = events.flatMap((b) => (b.block === undefined ? [] : [b.block]));
+  // Finality read alongside the states (it is checked against the head after them).
+  const early = src.finalized && src.blockAt ? src.finalized() : undefined;
+  early?.catch(() => {});
   const states = opts.states ? await opts.states(receiptBlocks) : await chainStates(m, src, {
     now,
     receiptBlocks,
@@ -171,7 +177,11 @@ export async function replayRound(
     opts.log?.(`vote asks: ${asks.length} at the head for ${m.slugs.length} projects`);
     asks = undefined;
   }
-  const finalized = await finalizedBlock(src, { block: head.block, timestamp: head.timestamp });
+  const finalized = await finalizedBlock(
+    src,
+    { block: head.block, timestamp: head.timestamp },
+    early,
+  );
   const st = replay({
     schedule: m.schedule,
     m: m.slugs.length,

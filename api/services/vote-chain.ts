@@ -17,9 +17,29 @@ import { TEST_USD_ABI } from "../../shared/vote/test-usd.ts";
 import { SIGNED_BALLOTS_ABI } from "../../shared/vote/abi.ts";
 import { type AccountChange, accountPeriods } from "../../shared/vote/account-history.ts";
 import type { StateCache, StateSource } from "../../shared/vote/chain-states.ts";
-import type { ChainState, ValuationEvidence } from "../../shared/vote/quiet-ending.ts";
+import type { ChainState } from "../../shared/vote/quiet-ending.ts";
 import type { BallotEvent, RoundSource, RulesHistory } from "../../shared/vote/replay-round.ts";
 import { voteChain, type VoteManifest, voterNft } from "../../shared/vote/manifest.ts";
+import {
+  BALLOT_RECORDED,
+  type CallResult,
+  decodeState,
+  INITIATIVE_CONFIGURED,
+  INITIATIVE_WITHDRAWN,
+  MULTICALL3,
+  multicallAtHash,
+  type PinMemo,
+  pinMemo,
+  pinnedReads,
+  PLEDGE_SET,
+  POOL_USD_SET,
+  REGISTRATION_REVOKED,
+  stateContracts,
+} from "./vote-pinned.ts";
+
+/** The round's RPC transport: calls made in the same tick go out as one JSON-RPC batch
+ * (one HTTP request; the provider still counts each call). */
+export const voteTransport = (rpcUrl: string): Transport => http(rpcUrl, { batch: true });
 
 /** What the vote routes need from the chain. Injected so tests run without a chain. */
 export interface VoteChain {
@@ -117,17 +137,6 @@ export interface VoteRound {
   statesWaitMs?: number;
 }
 
-const BALLOT_RECORDED = parseAbiItem(
-  "event BallotRecorded(uint256 indexed tokenId, address indexed voter, uint64 nonce, bytes ballot)",
-);
-const REGISTRATION_REVOKED = parseAbiItem("event RegistrationRevoked(uint256 indexed tokenId)");
-const INITIATIVE_CONFIGURED = parseAbiItem(
-  "event InitiativeConfigured(uint256 indexed initiativeId, address indexed account, uint256 goalUsd, bool rfp, uint256 groups)",
-);
-const POOL_USD_SET = parseAbiItem("event PoolUsdSet(uint256 previousAmountUsd, uint256 amountUsd)");
-const INITIATIVE_WITHDRAWN = parseAbiItem(
-  "event InitiativeWithdrawn(uint256 indexed initiativeId, bool withdrawn)",
-);
 const TRANSFER = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
 );
@@ -143,13 +152,17 @@ export function createVoteChain(
   m: VoteManifest,
   rpcUrl: string,
   relayerKey: Hex | null,
-  transport: Transport = http(rpcUrl),
+  transport: Transport = voteTransport(rpcUrl),
   /** The real round: the voting-badge ids an address holds (an explorer index, then
    * fresh ownerOf checks; api/chain/reviewer.ts). */
   votingBadgeIds?: (a: Hex) => Promise<string[]>,
+  /** Shared with the round's state source (./vote-pinned.ts): a pinned manifest's
+   * logs and head multicall are read once for both. */
+  memo: StateSourceMemo = stateSourceMemo(),
 ): VoteChain {
   const chain = voteChain(m);
   const pub = createPublicClient({ chain, transport }) as PublicClient;
+  const pinned = pinnedReads(pub, m, memo.pins);
   const account = relayerKey ? privateKeyToAccount(relayerKey) : null;
   const wallet = account ? createWalletClient({ account, chain, transport }) : null;
   const read = <T>(functionName: string, args: readonly unknown[], blockNumber?: bigint) =>
@@ -160,7 +173,6 @@ export function createVoteChain(
       args: args as never,
       ...(blockNumber === undefined ? {} : { blockNumber }),
     }) as Promise<T>;
-  const blockTimes = new Map<bigint, number>();
 
   return {
     async ownerOf(n) {
@@ -312,6 +324,9 @@ export function createVoteChain(
       return null;
     },
     async committed(block, tokenIds) {
+      if (pinned && block === BigInt(pinned.head.block)) {
+        return (await pinned.snapshot(tokenIds)).committed;
+      }
       const contract = { address: m.contract, abi: SIGNED_BALLOTS_ABI } as const;
       const r = (await pub.multicall({
         blockNumber: block,
@@ -325,6 +340,43 @@ export function createVoteChain(
       return { transcript: r[0], recordCount: BigInt(r[1]), hashes: r.slice(2) as Hex[] };
     },
     async ballots() {
+      if (pinned) {
+        // The head's hash is checked by the call `committed` makes next, by that hash.
+        const logs = (await pinned.logs()).filter((l) =>
+          l.eventName === "BallotRecorded" || l.eventName === "RegistrationRevoked"
+        );
+        const times = await stampLogs(
+          logs.map((l) => ({ blockNumber: BigInt(l.block) })),
+          pinned.head.timestamp,
+          m.schedule.firstTallyAt[0],
+          (blockNumber) => {
+            const l = logs.find((x) => x.block === Number(blockNumber))!;
+            return l.timestamp !== undefined
+              ? Promise.resolve(l.timestamp)
+              : blockTime(m.chainId, l.blockHash, async () =>
+                Number((await pub.getBlock({ blockNumber })).timestamp));
+          },
+        );
+        const events: BallotEvent[] = logs.map((l, i) =>
+          l.eventName === "BallotRecorded"
+            ? {
+              tokenId: l.args.tokenId.toString(),
+              ballot: l.args.ballot,
+              voter: l.args.voter,
+              timestamp: times[i],
+              block: l.block,
+              logIndex: l.logIndex,
+              nonce: Number(l.args.nonce),
+            }
+            : {
+              tokenId: l.args.tokenId.toString(),
+              revoked: true,
+              timestamp: times[i],
+              block: l.block,
+            }
+        );
+        return { events, block: BigInt(pinned.head.block) };
+      }
       const headBlock = await pub.getBlock(
         m.readAt ? { blockNumber: BigInt(m.readAt.block) } : undefined,
       );
@@ -348,18 +400,17 @@ export function createVoteChain(
             ? -1
             : 1
         );
+        const hashOf = new Map(logs.map((l) => [l.blockNumber!, l.blockHash!]));
         const times = await stampLogs(
           logs,
           headTime,
           m.schedule.firstTallyAt[0],
-          async (blockNumber) => {
-            let t = blockTimes.get(blockNumber);
-            if (t === undefined) {
-              t = Number((await pub.getBlock({ blockNumber })).timestamp);
-              blockTimes.set(blockNumber, t);
-            }
-            return t;
-          },
+          (blockNumber) =>
+            blockTime(
+              m.chainId,
+              hashOf.get(blockNumber)!,
+              async () => Number((await pub.getBlock({ blockNumber })).timestamp),
+            ),
         );
         for (const [i, log] of logs.entries()) {
           const t = times[i];
@@ -395,6 +446,17 @@ export function createVoteChain(
       return r.map((x) => BigInt(x[3]));
     },
     async rulesHistory() {
+      if (pinned) {
+        const out: RulesHistory = { addedAt: [], pool: [] };
+        for (const l of await pinned.logs()) {
+          if (l.eventName === "InitiativeConfigured") {
+            out.addedAt[Number(l.args.initiativeId)] ??= { block: l.block, logIndex: l.logIndex };
+          } else if (l.eventName === "PoolUsdSet") {
+            out.pool.push({ block: l.block, logIndex: l.logIndex, poolUsd: l.args.amountUsd });
+          }
+        }
+        return out;
+      }
       // Positions, not times: the replay orders these against ballots exactly as the
       // contract saw them (a pool raise in a ballot's own block may come after it).
       const head = m.readAt ? BigInt(m.readAt.block) : await pub.getBlockNumber();
@@ -427,6 +489,32 @@ export function createVoteChain(
   };
 }
 
+/** Block times by chain and block hash, shared by every VoteChain in the isolate. A
+ * round's manifest is pinned to a new head block every few seconds, and each pin builds
+ * a new VoteChain: a per-chain cache started empty each time, so every results poll
+ * after S's first tally read one block per ballot block again. A hash names one block,
+ * so a reorganized block is simply a different entry. */
+const BLOCK_TIMES = new Map<string, Promise<number>>();
+const BLOCK_TIMES_MAX = 20_000;
+export function blockTime(
+  chainId: number,
+  hash: Hex,
+  read: () => Promise<number>,
+): Promise<number> {
+  const key = `${chainId}:${hash.toLowerCase()}`;
+  let t = BLOCK_TIMES.get(key);
+  if (!t) {
+    t = read();
+    BLOCK_TIMES.set(key, t);
+    // A failed read is not kept: the next replay asks again.
+    t.catch(() => {
+      if (BLOCK_TIMES.get(key) === t) BLOCK_TIMES.delete(key);
+    });
+    if (BLOCK_TIMES.size > BLOCK_TIMES_MAX) BLOCK_TIMES.delete(BLOCK_TIMES.keys().next().value!);
+  }
+  return t;
+}
+
 /** Exact times matter from S's first tally on (windows, registration, the close).
  * Before it, the head block's time bounds every log, so no per-block lookups (a cold
  * results page would otherwise make one RPC per ballot block). From it, one lookup per
@@ -445,13 +533,9 @@ export async function stampLogs(
   return logs.map((l) => times.get(l.blockNumber!)!);
 }
 
-const PLEDGE_SET = parseAbiItem(
-  "event PledgeSet(bytes32 indexed pledgeId, uint256 indexed initiativeId, uint256 indexed currencyId, uint256 amount)",
-);
 const ERC20_TRANSFER = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 value)",
 );
-const MULTICALL3: Hex = "0xcA11bde05977b3631167028862bE2a173976CA11";
 const NATIVE = /^0x0{40}$/i;
 /** Native balance multicalls in flight at once (one per block). */
 const BALANCE_READS = 8;
@@ -465,35 +549,54 @@ export type StateSourceMemo = {
   nativeScans: Map<string, Map<number, boolean>>;
   histories: Map<number, Promise<AccountChange[]>>;
   anchors: Map<string, { block: number; hash: Hex }>;
+  /** A pinned manifest's shared reads, and what outlives a pin (./vote-pinned.ts). */
+  pins: PinMemo;
 };
 export const stateSourceMemo = (): StateSourceMemo => ({
   nativeScans: new Map(),
   histories: new Map(),
   anchors: new Map(),
+  pins: pinMemo(),
 });
 
 export function createStateSource(
   m: VoteManifest,
   rpcUrl: string,
-  transport: Transport = http(rpcUrl),
+  transport: Transport = voteTransport(rpcUrl),
   memo = stateSourceMemo(),
 ): StateSource {
   const pub = createPublicClient({ chain: voteChain(m), transport }) as PublicClient;
-  const contract = { address: m.contract, abi: SIGNED_BALLOTS_ABI } as const;
+  const pinned = pinnedReads(pub, m, memo.pins);
   /** Native balance scans through a canonical finalized anchor are reused. Newer
    * blocks are scanned again; the KV cache shares finalized scans across instances. */
   const { nativeScans, histories } = memo;
-  const blockAt = async (n: number) => {
+  const before = memo.pins.before;
+  const final = memo.pins.finalBlocks;
+  const readBlock = async (n: number) => {
+    const known = n <= memo.pins.finalizedSeen ? final.get(n) : undefined;
+    if (known) return known;
     const b = await pub.getBlock({ blockNumber: BigInt(n) });
-    return { block: n, timestamp: Number(b.timestamp), hash: b.hash! };
+    const out = { block: n, timestamp: Number(b.timestamp), hash: b.hash! };
+    // Read at or below a finalized block: that block, for good.
+    if (n <= memo.pins.finalizedSeen) {
+      final.set(n, out);
+      if (final.size > 1024) final.delete(final.keys().next().value!);
+    }
+    return out;
   };
-  const head = async () => {
+  /** Pinned: the head and the finalized block are known from the pin's own reads. */
+  const blockAt = async (n: number) => (await pinned?.known(n)) ?? await readBlock(n);
+  /** The head read from the node, checked against the pin's hash. */
+  const readHead = async () => {
     const b = await pub.getBlock(m.readAt ? { blockNumber: BigInt(m.readAt.block) } : undefined);
     if (m.readAt?.hash && b.hash !== m.readAt.hash) {
       throw new Error("vote head changed during replay");
     }
     return { block: Number(b.number), timestamp: Number(b.timestamp), hash: b.hash! };
   };
+  /** Pinned, once the head answered a call by its hash, it is known; until then (and
+   * for the replay's last check, `confirmHead`) it is read. */
+  const head = async () => pinned?.checked() ? pinned.head : await readHead();
   /** Blocks in [from, to] holding a log `get` returns (read in chunks), ascending, once each. */
   const logBlocks = async (
     from: number,
@@ -579,6 +682,16 @@ export function createStateSource(
     return [...out].sort((x, y) => x - y);
   };
   const accountHistory = (to: number): Promise<AccountChange[]> => {
+    if (pinned && to <= pinned.head.block) {
+      return pinned.logs().then((logs) =>
+        logs.filter((l) => l.eventName === "InitiativeConfigured" && l.block <= to).map((l) => ({
+          block: l.block,
+          logIndex: l.logIndex,
+          id: Number(l.args.initiativeId),
+          account: l.args.account,
+        }))
+      );
+    }
     let p = histories.get(to);
     if (!p) {
       p = (async () => {
@@ -611,9 +724,11 @@ export function createStateSource(
   return {
     head,
     blockAt,
+    /** Pinned: the head read again (the replay's last check that it is still canonical). */
+    ...(pinned ? { confirmHead: readHead } : {}),
     async finalized() {
-      const b = await pub.getBlock({ blockTag: "finalized" });
-      const tip = await head();
+      if (pinned) return await pinned.finalized();
+      const [b, tip] = await Promise.all([pub.getBlock({ blockTag: "finalized" }), head()]);
       return Number(b.number) > tip.block ? tip : {
         block: Number(b.number),
         timestamp: Number(b.timestamp),
@@ -623,9 +738,20 @@ export function createStateSource(
     async blockBefore(time) {
       const top = await head();
       if (top.timestamp < time) return top;
+      // A search found before: still right while both blocks around the time are the
+      // same ones (read again: two reads instead of a search, and none once they are
+      // final, whose reads are kept).
+      const known = before.get(time);
+      if (known && known.hi.block <= top.block) {
+        const [lo, hi] = await Promise.all([blockAt(known.lo.block), blockAt(known.hi.block)]);
+        if (lo.hash === known.lo.hash && hi.hash === known.hi.hash) return known.lo;
+      }
       // Invariant: lo's time < time <= hi's time. Interpolation steps alternate with
       // halving, so uneven block times still finish in about 2·log2(head) reads.
-      let lo = await blockAt(0);
+      // From the round's deploy block when it is before the time (every tally time is):
+      // a short, even range the interpolation lands in within a read or two.
+      let lo = await blockAt(m.deployBlock <= top.block ? m.deployBlock : 0);
+      if (lo.timestamp >= time && lo.block > 0) lo = await blockAt(0);
       if (lo.timestamp >= time) throw new Error(`no block before ${time}`);
       let hi = top;
       for (let step = 0; hi.block - lo.block > 1; step++) {
@@ -636,9 +762,14 @@ export function createStateSource(
         if (mid.timestamp < time) lo = mid;
         else hi = mid;
       }
+      before.set(time, { lo, hi });
+      if (before.size > 64) before.delete(before.keys().next().value!);
       return lo;
     },
     async stateAt(block) {
+      // Pinned, the head's state came with the head multicall (by its hash).
+      const snap = pinned && block === pinned.head.block ? pinned.anySnapshot() : undefined;
+      if (snap) return decodeState(m, block, pinned!.head.timestamp, (await snap).state);
       // One eth_call at the block: the count, the pool and an ask for every manifest
       // project (one the contract doesn't have yet reverts, and is left out).
       const [b, r] = await Promise.all([
@@ -648,70 +779,34 @@ export function createStateSource(
           batchSize: 0,
           multicallAddress: MULTICALL3,
           allowFailure: true,
-          contracts: [
-            { ...contract, functionName: "initiativeCount" },
-            { ...contract, functionName: "poolUsd" },
-            { ...contract, functionName: "withdrawnMask" },
-            ...m.slugs.map((_, i) => ({
-              ...contract,
-              functionName: "initiativeUsd",
-              args: [BigInt(i)],
-            })),
-            ...m.slugs.map((_, i) => ({
-              ...contract,
-              functionName: "valuationDiagnostics",
-              args: [BigInt(i)],
-            })),
-          ],
-        } as never) as Promise<{ status: string; result?: unknown; error?: Error }[]>,
+          contracts: stateContracts(m),
+        } as never) as Promise<CallResult[]>,
       ]);
-      // allowFailure turns a failed eth_call into failed results: the read failed.
-      for (const x of r.slice(0, 2)) if (x.status !== "success") throw x.error;
-      const count = Number(r[0].result as bigint);
-      if (count > m.slugs.length) {
-        throw new Error(
-          `vote manifest: the contract has ${count} projects at block ${block}, the manifest ${m.slugs.length}`,
-        );
+      return decodeState(m, block, b.timestamp, r);
+    },
+    async stateAtHash(block, hash) {
+      if (pinned && block === pinned.head.block && hash === pinned.head.hash) {
+        const snap = pinned.anySnapshot();
+        if (snap) return decodeState(m, block, pinned.head.timestamp, (await snap).state);
       }
-      const asks = r.slice(3, 3 + count).map((x) => {
-        if (x.status !== "success") throw x.error;
-        return BigInt((x.result as readonly bigint[])[3]);
-      });
-      // A contract without withdrawnMask (the first test round) fails just that entry.
-      const mask = r[2].status === "success" ? BigInt(r[2].result as bigint) : 0n;
-      const withdrawn = Array.from({ length: count }, (_, i) => ((mask >> BigInt(i)) & 1n) === 1n);
-      const diagnostics = r.slice(3 + m.slugs.length, 3 + m.slugs.length + count);
-      const valuation: ValuationEvidence = {
-        available: diagnostics.every((x) => x.status === "success"),
-        issues: diagnostics.flatMap((x, project) => {
-          if (x.status !== "success") return [];
-          const packed = x.result as bigint;
-          return Array.from(
-            { length: 32 },
-            (_, currency) => ({
-              project,
-              currency,
-              flags: Number((packed >> BigInt(4 * currency)) & 15n),
-            }),
-          ).filter((d) => d.flags !== 0);
-        }),
-      };
-      return {
-        timestamp: b.timestamp,
-        asks,
-        poolUsd: BigInt(r[1].result as bigint),
-        withdrawn,
-        valuation,
-      };
+      const r = await multicallAtHash(pub, hash, [
+        ...stateContracts(m),
+        { address: MULTICALL3, abi: multicall3Abi, functionName: "getCurrentBlockTimestamp" },
+      ] as never);
+      const t = r.at(-1)!;
+      if (t.status !== "success") throw t.error;
+      return decodeState(m, block, Number(t.result as bigint), r.slice(0, -1));
     },
     accountingEventBlocks: (from, to) =>
-      logBlocks(from, to, (fromBlock, toBlock) =>
-        pub.getLogs({
-          address: m.contract,
-          events: [PLEDGE_SET, POOL_USD_SET, INITIATIVE_WITHDRAWN, INITIATIVE_CONFIGURED],
-          fromBlock,
-          toBlock,
-        })),
+      pinned && to <= pinned.head.block
+        ? pinned.accountingBlocks(from, to)
+        : logBlocks(from, to, (fromBlock, toBlock) =>
+          pub.getLogs({
+            address: m.contract,
+            events: [PLEDGE_SET, POOL_USD_SET, INITIATIVE_WITHDRAWN, INITIATIVE_CONFIGURED],
+            fromBlock,
+            toBlock,
+          })),
     async balanceChangeBlocks(from, to) {
       if (m.configRevision === undefined) {
         if (m.currencies && m.currencies.length > 1 && m.accounts?.length !== m.slugs.length) {
@@ -736,11 +831,12 @@ export function createStateSource(
 export function createRoundSource(
   m: VoteManifest,
   rpcUrl: string,
-  transport: Transport = http(rpcUrl),
+  transport: Transport = voteTransport(rpcUrl),
 ): RoundSource {
-  const chain = createVoteChain(m, rpcUrl, null, transport);
+  const memo = stateSourceMemo();
+  const chain = createVoteChain(m, rpcUrl, null, transport, undefined, memo);
   return {
-    ...createStateSource(m, rpcUrl, transport),
+    ...createStateSource(m, rpcUrl, transport, memo),
     ballots: () => chain.ballots(),
     committed: (block, tokenIds) => chain.committed(block, tokenIds),
     rulesHistory: () => chain.rulesHistory(),

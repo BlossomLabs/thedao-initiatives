@@ -224,3 +224,22 @@ Deno.test("canWithdraw: a contract with withdrawnMask can; one without (reverts,
   await down.canWithdraw!().catch(() => (threw = true));
   assertEquals(threw, true);
 });
+
+Deno.test("blockTime: one read per block hash, shared across reads; a failed read is not kept", async () => {
+  const { blockTime } = await import("../services/vote-chain.ts");
+  let reads = 0;
+  const read = () => (reads++, Promise.resolve(1_234));
+  const hash = `0x${"ab".repeat(32)}` as const;
+  assertEquals(await blockTime(11155111, hash, read), 1_234);
+  assertEquals(
+    await blockTime(11155111, hash.toUpperCase().replace("0X", "0x") as never, read),
+    1_234,
+  );
+  assertEquals(reads, 1, "the same block hash, read once");
+  await blockTime(1, hash, read);
+  assertEquals(reads, 2, "another chain's block is another entry");
+  const bad = `0x${"cd".repeat(32)}` as const;
+  await assertRejects(() => blockTime(11155111, bad, () => Promise.reject(new Error("rpc"))));
+  assertEquals(await blockTime(11155111, bad, read), 1_234);
+  assertEquals(reads, 3, "a failed read is asked again");
+});

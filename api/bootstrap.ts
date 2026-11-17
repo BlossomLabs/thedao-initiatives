@@ -77,7 +77,9 @@ export async function createServer(siteOptions?: SiteOptions) {
     ? config.voteRelayerKey as `0x${string}`
     : null;
   const stateMemos = new Map<string, StateSourceMemo>();
-  const stateSourceFor = (m: VoteManifest) => {
+  /** One per round configuration, shared by its pins (each new head block builds a new
+   * VoteRound): logs, finalized prefixes and searches outlive a pin. */
+  const memoFor = (m: VoteManifest) => {
     const key = `${m.chainId}:${m.contract}:${m.configRevision ?? "legacy"}:${
       m.configAnchor?.hash ?? ""
     }`;
@@ -86,8 +88,10 @@ export async function createServer(siteOptions?: SiteOptions) {
       if (stateMemos.size >= 4) stateMemos.delete(stateMemos.keys().next().value!);
       stateMemos.set(key, memo = stateSourceMemo());
     }
-    return createStateSource(m, voteRpcUrl(m), undefined, memo);
+    return memo;
   };
+  const stateSourceFor = (m: VoteManifest) =>
+    createStateSource(m, voteRpcUrl(m), undefined, memoFor(m));
   const deps: Deps = {
     db,
     chain,
@@ -106,6 +110,7 @@ export async function createServer(siteOptions?: SiteOptions) {
       read: () => db.meta.get<VoteRoundSetting>(VOTE_ROUND_KEY),
       refresh: async (m) => {
         const next = await refreshVoteManifest(m, voteRpcUrl(m), {
+          finalAnchors: memoFor(m).pins,
           slugOf: async () =>
             slugsByAccount(
               await db.initiatives.list(["approved", "archived", "pending", "rejected"]),
@@ -139,6 +144,7 @@ export async function createServer(siteOptions?: SiteOptions) {
           relayerKey,
           undefined,
           (a) => reviewTokenIds(chain.rpc, a, fetch),
+          memoFor(m),
         ),
         // Past blocks need an archive node: the round's RPC (RPC_URL / SEPOLIA_RPC_URL) must be one.
         source: stateSourceFor(m),

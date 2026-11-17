@@ -101,10 +101,11 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("the real vote, open: the front page is the vote results", async () => {
+it("the real vote, open: the front page stays the board; the results are on /vote", async () => {
   round.kind = "real";
   at("/");
-  expect(await screen.findByText("vote results")).toBeInTheDocument();
+  expect(await screen.findByText("the board")).toBeInTheDocument();
+  expect(screen.queryByText("vote results")).toBeNull();
 });
 
 it("the real vote, not open yet: the front page is the board", async () => {

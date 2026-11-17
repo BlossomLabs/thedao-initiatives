@@ -362,6 +362,7 @@ export interface Me {
 
 export interface Profile {
   nickname: string | null;
+  /** "private-badge" fixes the shared avatar ahead of uploaded pictures and ENS. */
   pfp: string;
   pfpUrl: string;
 }

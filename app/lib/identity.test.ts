@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveIdentity } from "./identity";
 import { avatarSrc, presetUri } from "./avatar";
+import { PRIVATE_BADGE_AVATAR, PRIVATE_BADGE_PFP } from "@shared/profile";
 
 const A = "0x839395e20bbB182fa440d08F850E6c7A8f6F0780";
 
@@ -26,6 +27,7 @@ describe("resolveIdentity", () => {
     expect(id.avatar).toBe("https://euc.li/griff.eth");
     expect(id.nameFromEns).toBe(true);
     expect(id.avatarFromEns).toBe(true);
+    expect(id.avatarFromBadge).toBe(false);
     expect(id.nickname).toBe("Griff");
   });
   it("ENS name without avatar uses the site picture", () => {
@@ -39,6 +41,8 @@ describe("resolveIdentity", () => {
     expect(id.avatarFromEns).toBe(false);
     expect(id.hasName).toBe(true);
     expect(id.hasAvatar).toBe(true);
+    expect(id.avatarFromBadge).toBe(false);
+    expect(id.avatarLocked).toBe(false);
   });
   it("uploaded picture wins over a preset; missing profile = nothing set", () => {
     const up = resolveIdentity(
@@ -57,5 +61,27 @@ describe("resolveIdentity", () => {
     const id = resolveIdentity(A, undefined, { name: null, avatar: "https://x/y.png" });
     expect(id.ensAvatar).toBeNull();
     expect(id.avatar).toBe(avatarSrc(A));
+  });
+  it("private voting badgeholders use the fixed avatar even when ENS has a picture", () => {
+    const id = resolveIdentity(
+      A,
+      { nickname: "Voter", pfp: PRIVATE_BADGE_PFP, pfpUrl: "https://old.example/avatar.png" },
+      { name: "voter.eth", avatar: "https://ens.example/avatar.png" },
+    );
+    expect(id.avatar).toBe(PRIVATE_BADGE_AVATAR);
+    expect(id.name).toBe("voter.eth");
+    expect(id.avatarFromBadge).toBe(true);
+    expect(id.avatarFromEns).toBe(false);
+    expect(id.avatarLocked).toBe(true);
+    expect(id.hasAvatar).toBe(true);
+  });
+  it("waits for the badge-aware profile before displaying an ENS picture or allowing edits", () => {
+    const id = resolveIdentity(A, undefined, {
+      name: "voter.eth",
+      avatar: "https://ens.example/avatar.png",
+    }, true);
+    expect(id.avatar).toBe(avatarSrc(A));
+    expect(id.avatarLocked).toBe(true);
+    expect(id.hasAvatar).toBe(false);
   });
 });

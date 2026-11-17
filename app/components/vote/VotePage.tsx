@@ -13,6 +13,7 @@ import RoundBox, { badgeLine, RoundDeadline } from "~/components/vote/RoundBox";
 import { chainNow, roundSteps } from "~/components/vote/round-steps";
 import { AddressAvatar, Avatar } from "~/components/wallet/Avatar";
 import { avatarSrc } from "~/lib/avatar";
+import { PRIVATE_BADGE_AVATAR } from "@shared/profile";
 import {
   isMockKind,
   MOCK_NOW,
@@ -423,6 +424,11 @@ export default function VotePage(
   );
 
   const titles = useMemo(() => new Map(items.map((i) => [i.slug, i.title])), [items]);
+  const ballotAvatar = mock
+    ? <Avatar src={PRIVATE_BADGE_AVATAR} size={48} />
+    : me
+    ? <AddressAvatar address={me} size={48} />
+    : <Avatar src={avatarSrc(`badge-${n}`)} size={48} />;
 
   // The ballot and the result as tier tables: the page after the close, and during the
   // vote the page a sent ballot lands on.
@@ -445,9 +451,7 @@ export default function VotePage(
         : []
     ),
     poolUsd: microUsd(rv?.poolUsd ?? R.poolUsd),
-    avatar: me
-      ? <AddressAvatar address={me} size={48} />
-      : <Avatar src={avatarSrc(`badge-${n}`)} size={48} />,
+    avatar: ballotAvatar,
     items,
     paid: new Map(
       rv?.tiers.flatMap((t) =>
@@ -642,9 +646,7 @@ export default function VotePage(
       rv && (
         <BallotMeter
           compact={compact}
-          avatar={me
-            ? <AddressAvatar address={me} size={48} />
-            : <Avatar src={avatarSrc(`badge-${n}`)} size={48} />}
+          avatar={ballotAvatar}
           asked={asked}
           target={askIn?.(R.slugs) ?? 0}
           pool={poolNow}

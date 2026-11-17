@@ -6,8 +6,8 @@ import { type Identity, resolveIdentity } from "~/lib/identity";
 export type { Identity };
 
 /**
- * Display identity for an address: ENS name/avatar first, then the site
- * profile, then a short address. Both lookups run in parallel; the server
+ * Display identity for an address: private badge avatars are fixed; otherwise
+ * ENS first, then the site profile, then a short address. Both lookups run in parallel; the server
  * caches ENS answers so repeated addresses are cheap.
  */
 export function useIdentity(address: string | undefined | null): Identity {

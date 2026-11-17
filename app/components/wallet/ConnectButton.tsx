@@ -160,10 +160,10 @@ export default function ConnectButton() {
       : []),
     {
       key: "name",
-      label: identity.nameFromEns && identity.avatarFromEns
+      label: identity.nameFromEns && identity.avatarLocked
         ? "Your name and picture"
         : identity.hasName
-        ? "Change name or picture"
+        ? (identity.avatarLocked ? "Change display name" : "Change name or picture")
         : "Set a display name",
       lucide: "edit",
       onClick: () => openProfile(false),

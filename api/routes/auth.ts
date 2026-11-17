@@ -8,7 +8,7 @@ import { auditContext } from "../services/audit.ts";
 import { verifySiwe } from "../chain/siwe.ts";
 import { selfOrigin } from "../lib/origin.ts";
 import { MAX_CONTRACT_SIGNATURE_BYTES } from "../chain/sign.ts";
-import { pfpUrl } from "../lib/json.ts";
+import { displayProfile } from "../services/profile.ts";
 import { clearSessionCookie, setSessionCookie } from "../lib/session-cookie.ts";
 import {
   CHAIN_ID,
@@ -31,16 +31,14 @@ export function authRoutes(deps: Deps) {
   /** What /me tells about an account beyond its session (also sent by /verify). */
   async function accountOf(address: string) {
     const [p, hasWatchlist, isBadgeHolder] = await Promise.all([
-      db.profiles.get(address),
+      displayProfile(deps, address),
       db.watchlists.has(address),
       // The same check that tags comments EXPERT (cached an hour); a chain error reads as "no badge".
       deps.chain.hasBadge(address).catch(() => false),
     ]);
     return {
       isBadgeHolder,
-      nickname: p.nickname || null,
-      pfp: p.pfp,
-      pfpUrl: pfpUrl(config, p.pfp),
+      ...p,
       hasWatchlist,
     };
   }
@@ -80,12 +78,10 @@ export function authRoutes(deps: Deps) {
       throw new HttpError(401, "nonce invalid or already used");
     }
     const isAdmin = await deps.admins.isAdmin(m.address);
-    // The account's details come back with the session, read alongside its write, so
-    // the page needn't ask /me right after (#82: one round trip less after the signature).
-    const [{ token, session }, account] = await Promise.all([
-      db.sessions.create(m.address, isAdmin, c.var.token),
-      accountOf(m.address),
-    ]);
+    // Resolve the profile before issuing credentials: an unavailable badge check
+    // must not create a session the client never receives.
+    const account = await accountOf(m.address);
+    const { token, session } = await db.sessions.create(m.address, isAdmin, c.var.token);
     auditContext(c, {
       actor: session.address,
       target: session.address,

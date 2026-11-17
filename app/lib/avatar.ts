@@ -1,4 +1,6 @@
-/** Avatars: 10 gradient presets + a deterministic default per address
+import { PRIVATE_BADGE_AVATAR, PRIVATE_BADGE_PFP } from "@shared/profile";
+
+/** Avatars: a fixed private badge picture, 10 gradient presets and a default per address
  * (port of static/app.js:294-343). */
 const PFP_COLORS: [string, string][] = [
   ["#5cb75a", "#00ff88"],
@@ -50,6 +52,7 @@ export const pfpDefaultIndex = (address: string): number => addrHash(address) % 
 
 /** Image source for an address given its pfp value ("" = default, "preset:N", or an uploaded URL). */
 export function avatarSrc(address: string, pfp?: string, pfpUrl?: string): string {
+  if (pfp === PRIVATE_BADGE_PFP) return PRIVATE_BADGE_AVATAR;
   if (pfpUrl) return pfpUrl;
   if (pfp?.startsWith("preset:")) return presetUri(parseInt(pfp.slice(7), 10) || 0);
   return presetUri(pfpDefaultIndex(address));

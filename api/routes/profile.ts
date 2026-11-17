@@ -10,6 +10,7 @@ import { DOMAIN_RE, NICK_RE, PRESET_RE } from "../lib/validate.ts";
 import { assertEthNameOwned } from "../services/names.ts";
 import { pfpUrl } from "../lib/json.ts";
 import { badgeHolders } from "../services/roles.ts";
+import { assertAvatarEditable, displayProfile } from "../services/profile.ts";
 
 export const PFP_MAX_BYTES = 512 * 1024;
 
@@ -50,12 +51,10 @@ export function profileRoutes(deps: Deps) {
   r.get("/nickname/:address", async (c) => {
     const address = c.req.param("address").trim();
     if (!isAddress(address)) throw new HttpError(400, "bad address");
-    const p = await db.profiles.get(address);
-    return c.json({
-      nickname: p.nickname || null,
-      pfp: p.pfp,
-      pfpUrl: pfpUrl(config, p.pfp),
-    });
+    if (!(await db.rateLimit("profile:" + requireClientIp(c), 120, 60))) {
+      throw new HttpError(429, "slow down");
+    }
+    return c.json(await displayProfile(deps, address));
   });
 
   /**
@@ -104,6 +103,7 @@ export function profileRoutes(deps: Deps) {
     if (!(await db.rateLimit("pfp:" + addr.toLowerCase(), 20, 60))) {
       throw new HttpError(429, "Too many tries, slow down a moment.");
     }
+    await assertAvatarEditable(deps, addr);
     await db.profiles.setPfp(addr, pfp);
     return c.json({ pfp, pfpUrl: "" });
   });
@@ -117,6 +117,7 @@ export function profileRoutes(deps: Deps) {
     if (!(await db.rateLimit("pfpup:" + addr.toLowerCase(), 10, 3600))) {
       throw new HttpError(429, "Too many uploads, slow down.");
     }
+    await assertAvatarEditable(deps, addr);
     const form = await formBody(c, ["image"]);
     const file = form.get("image");
     if (!(file instanceof File) || !file.size) {

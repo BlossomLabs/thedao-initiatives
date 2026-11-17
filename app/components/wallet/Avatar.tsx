@@ -1,5 +1,4 @@
 import { useIdentity } from "~/hooks/use-identity";
-import { avatarSrc } from "~/lib/avatar";
 
 export function Avatar(
   { src, size = 26, className = "" }: { src: string; size?: number; className?: string },
@@ -21,7 +20,5 @@ export function AddressAvatar(
   { address, size = 26, className }: { address: string; size?: number; className?: string },
 ) {
   const id = useIdentity(address);
-  return (
-    <Avatar src={id.loading ? avatarSrc(address) : id.avatar} size={size} className={className} />
-  );
+  return <Avatar src={id.avatar} size={size} className={className} />;
 }

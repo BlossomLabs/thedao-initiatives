@@ -8,15 +8,15 @@ import { prepareAvatar } from "~/lib/avatar-image";
 import { useSession } from "~/context/session";
 import { useIdentity } from "~/hooks/use-identity";
 import { cn } from "~/lib/utils";
-import { NICKNAME_MAX } from "@shared/profile";
+import { NICKNAME_MAX, PRIVATE_BADGE_AVATAR_RULE } from "@shared/profile";
 import { inputMax, tooLong } from "@shared/draft/caps";
 
 const ENS_APP = "https://app.ens.domains";
 
 /**
  * Pick a display name + avatar (preset or upload) for the signed-in wallet.
- * Fields that come from ENS (primary name, avatar record) are shown locked:
- * they always take precedence and can only be changed on ENS itself.
+ * ENS fields are shown locked. Private voting badgeholders have a shared
+ * avatar that cannot be changed, even through ENS.
  */
 export default function NicknameDialog({
   open,
@@ -43,7 +43,7 @@ export default function NicknameDialog({
   const [preparing, setPreparing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const nameLocked = identity.nameFromEns;
-  const avatarLocked = identity.avatarFromEns;
+  const avatarLocked = identity.avatarLocked;
   const allLocked = nameLocked && avatarLocked;
 
   useEffect(() => {
@@ -119,7 +119,9 @@ export default function NicknameDialog({
       : "Pick a display name")
     : "Your name and picture";
   const description = allLocked
-    ? "Both come from your ENS profile and are used as-is on the board."
+    ? (identity.avatarFromEns
+      ? "Both come from your ENS profile and are used as-is on the board."
+      : "Your name and avatar are shown as-is on the board.")
     : firstTime
     ? "Shown instead of your wallet address on donations and comments. A name like yours.eth works only if this wallet owns it."
     : "Change how you appear on the board. Domain names must be owned by this wallet.";
@@ -150,8 +152,14 @@ export default function NicknameDialog({
       {avatarLocked
         ? (
           <p className="m-0 text-[12px] text-muted">
-            Your ENS avatar record. Change it at{" "}
-            <a href={ENS_APP} target="_blank" rel="noopener">app.ens.domains</a>.
+            {identity.avatarFromBadge ? PRIVATE_BADGE_AVATAR_RULE : identity.avatarFromEns
+              ? (
+                <>
+                  Your ENS avatar record. Change it at{" "}
+                  <a href={ENS_APP} target="_blank" rel="noopener">app.ens.domains</a>.
+                </>
+              )
+              : "Your avatar will be available once your profile has loaded."}
           </p>
         )
         : (
